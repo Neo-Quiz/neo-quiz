@@ -14,7 +14,9 @@ release notes.
 ## [Unreleased]
 
 ### Changed
-- Learn and Practice now show as a badge next to the question type, on quiz cards and on the quiz page, instead of in the title. A Practice bank also finds the Learn note of the same source when the request had no attachment.
+- Learn and Practice now show as a badge on quiz cards and on the quiz page, instead of in the title. A Practice bank also finds the Learn note of the same source when the request had no attachment.
+- On quiz cards, the question type is now an icon before the question count, named on hover, instead of a second badge.
+- Labels, badges and section titles are no longer forced to all caps.
 
 ## [1.19.0] - 2026-09-23
 

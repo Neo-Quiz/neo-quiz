@@ -4,8 +4,6 @@
 	font-size: 0.75em;
 	font-weight: 700;
 	color: var(--text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
 	margin-bottom: 0.3em;
 }
 
@@ -123,8 +121,6 @@
     font-size: 0.65em;
     font-weight: 700;
     color: rgba(255,255,255,0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
     margin-bottom: 0.5em;
     padding-left: 2px;
 }

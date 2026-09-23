@@ -333,8 +333,6 @@
 	margin: 6px 0 2px;
 	font-size: 11px;
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
 	color: var(--text-faint);
 }
 
@@ -2713,8 +2711,6 @@
 	font-size: 10px;
 	font-weight: 600;
 	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
 	padding: 2px 4px 8px;
 }
 
@@ -3667,8 +3663,6 @@
 	font-weight: 600;
 	padding: 2px 7px;
 	border-radius: 4px;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
 	flex-shrink: 0;
 	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
 	color: var(--interactive-accent);
@@ -3871,8 +3865,6 @@
   margin: 0 0 6px;
   font-size: 0.72em;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--text-faint);
 }
 

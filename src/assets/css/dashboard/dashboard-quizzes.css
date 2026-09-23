@@ -942,8 +942,6 @@
 	font-size: 9.5px;
 	font-weight: 600;
 	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
 	white-space: nowrap;
 }
 

@@ -981,7 +981,5 @@ body {
 	margin: 12px 0 2px;
 	font-size: 11.5px;
 	font-weight: 600;
-	letter-spacing: 0.02em;
-	text-transform: uppercase;
 	color: var(--text-faint);
 }

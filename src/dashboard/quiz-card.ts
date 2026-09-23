@@ -19,6 +19,16 @@ const QUIZ_TYPE_KEYS: Record<QuizTypeTag, TransKey> = {
 	matching: "dashboard.quizType.matching"
 };
 
+/* Icône Lucide du type, sur la carte (le libellé passe au survol). */
+const QUIZ_TYPE_ICONS: Record<QuizTypeTag, string> = {
+	mixed: "shapes",
+	single: "circle-dot",
+	multiple: "list-checks",
+	text: "text-cursor-input",
+	ordering: "list-ordered",
+	matching: "cable"
+};
+
 /** Libellé traduit du type d'un quiz (partagé par la carte et la vue Détail). */
 export function quizTypeLabel(tag: QuizTypeTag): string {
 	return t(QUIZ_TYPE_KEYS[tag]);
@@ -145,16 +155,21 @@ export function renderQuizCard(
 	// Aucune barre de progression : la pastille d'état porte déjà le
 	// pourcentage (« In progress · 20% »), et la carte du handoff n'en a pas.
 
-	// Meta : nombre de questions + type
+	/* Meta : icône du type + nombre de questions, puis l'objectif en badge.
+	   Le type n'est plus un badge : deux badges collés se ressemblaient, et la
+	   page du quiz l'affiche déjà en toutes lettres (Ahmed, 2026-09-23). Son
+	   libellé vit dans le `title` de l'icône, révélé au survol. */
 	const meta = ajouter(body, "div", "qbd-quiz-card-meta");
+	const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
+	const typeIcon = ajouter(count, "span", "qbd-quiz-card-type-icon");
+	typeIcon.title = quizTypeLabel(quiz.quizType);
+	currentHost().ui.setIcon(typeIcon, QUIZ_TYPE_ICONS[quiz.quizType]);
 	ajouter(
-		meta, "span", "qbd-quiz-card-meta-item",
+		count, "span", undefined,
 		t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
 	);
-	const badge = ajouter(meta, "span", "qbd-quiz-card-badge");
-	badge.textContent = quizTypeLabel(quiz.quizType);
-	/* L'OBJECTIF (Learn / Practice) en badge, à droite du type : le titre ne
-	   le porte plus (Ahmed, 2026-09-23). */
+	/* L'OBJECTIF (Learn / Practice) en badge : le titre ne le porte plus
+	   (Ahmed, 2026-09-23). */
 	const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge");
 	modeBadge.textContent = quizModeLabel(quiz.mode);
 

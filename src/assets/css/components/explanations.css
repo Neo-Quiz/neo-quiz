@@ -99,8 +99,6 @@
   margin: 0 0 8px;
   font-size: 0.72em;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--interactive-accent);
 }
 

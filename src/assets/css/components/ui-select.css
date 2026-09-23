@@ -519,8 +519,6 @@
 	padding: 6px 8px 3px;
 	font-size: 10px;
 	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
 	color: var(--text-faint);
 }
 
@@ -768,8 +766,6 @@
 	padding: 6px 8px 3px;
 	font-size: 10px;
 	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
 	color: var(--text-faint);
 }
 

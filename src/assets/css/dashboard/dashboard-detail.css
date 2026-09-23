@@ -204,8 +204,6 @@
 .qbd-qz-stat-label {
 	font-size: 9px;
 	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
 	font-weight: 500;
 	white-space: nowrap;
 }
@@ -240,8 +238,6 @@
 	font-size: 11px;
 	font-weight: 600;
 	color: var(--text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.07em;
 }
 
 .qbd-root .qbd-qz-list-add {
@@ -597,8 +593,6 @@
 	font-size: 10px;
 	font-weight: 600;
 	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.09em;
 	padding-left: 2px;
 }
 
@@ -939,8 +933,6 @@
 	color: var(--text-muted);
 	font-size: 11px;
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
 }
 
 .qbd-qz-exam-icon svg {
