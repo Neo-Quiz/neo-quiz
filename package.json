@@ -15,6 +15,7 @@
     "check:md": "node scripts/check-markdown.mjs",
     "check:export": "node scripts/check-export.mjs",
     "check:quiz-format": "node scripts/check-quiz-format.mjs",
+    "check:code-exercise": "node scripts/check-code-exercise.mjs",
     "check:quiz-io": "node scripts/check-quiz-io.mjs",
     "check:markers": "node scripts/check-render-markers.mjs \"C:/obsidian-vaults/Personal\" \"C:/obsidian-vaults/Efrei\"",
     "check:scanner": "node scripts/check-scanner.mjs",

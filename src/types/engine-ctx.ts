@@ -52,6 +52,7 @@ import type {
 	MatchingQuestion,
 	TextQuestion,
 	ClozeQuestion,
+	CodeQuestion,
 	QuestionRole,
 	StatsRecord,
 } from "./quiz";
@@ -179,6 +180,8 @@ export interface EngineCtx {
 	isTextQuestion(q: QuizQuestion): q is TextQuestion;
 	/** Prédicat de variante — présence d'un gabarit `cloze` non vide (engine.ts). */
 	isClozeQuestion(q: QuizQuestion): q is ClozeQuestion;
+	/** Prédicat de variante — présence d'un `language` non vide (engine.ts). */
+	isCodeQuestion(q: QuizQuestion): q is CodeQuestion;
 
 	/* ── État runtime & carte des slides (engine.js:295-299) ── */
 	quizState: QuizState;

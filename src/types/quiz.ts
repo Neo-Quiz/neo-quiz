@@ -214,6 +214,27 @@ export interface ClozeQuestion extends QuestionBase {
 	caseSensitive?: boolean;
 }
 
+/**
+ * EXERCICE DE CODE EXÉCUTÉ (engine/code.ts, noyau src/code-exercise/). C'est
+ * la PRÉSENCE de `language` qui discrimine la variante, comme `cloze`.
+ * La sortie attendue n'est JAMAIS écrite : elle est calculée en exécutant
+ * `solution` (spec 2026-09-23-exercice-python-design.md §1.2).
+ */
+export interface CodeQuestion extends QuestionBase {
+	/** Seul "python" s'exécute ; une autre valeur s'affiche sans exécution. */
+	language: string;
+	/** Programme de référence. */
+	solution?: string;
+	/** Code placé dans l'éditeur au départ (écrire, compléter, corriger). */
+	starter?: string;
+	/** Entrée standard de chaque essai ; le premier est l'exemple montré. */
+	inputs?: string[];
+	/** Python exécuté APRÈS le code de l'élève ; passe s'il ne lève rien. */
+	asserts?: string;
+	/** Indices gradués ; `hint` (QuestionBase) sert de repli. */
+	hints?: string[];
+}
+
 /** Forme imbriquée alternative de `ordering`, lue en fallback (engine/questions.js: q?.ordering?.items/correctOrder/slotLabels). */
 export interface OrderingConfig {
 	items?: string[];
@@ -275,6 +296,7 @@ export type QuizQuestion =
 	| MultiSelectQuestion
 	| TextQuestion
 	| ClozeQuestion
+	| CodeQuestion
 	| OrderingQuestion
 	| MatchingQuestion;
 
