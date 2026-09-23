@@ -146,6 +146,14 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	r.check("un renommage depuis un chemin inconnu scanne quand même",
 		!!scanner.getQuiz("Cours/reseau3.md"), true);
 
+	/* L'OBJECTIF du bloc, affiché en badge (2026-09-23) : l'ancien mode
+	   `lesson` du bloc ci-dessus est un Practice ; un bloc `{ mode: 'learn' }`
+	   est un Learn. */
+	r.check("un bloc en mode hérité est un Practice", entry?.mode, "practice");
+	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'learn', objectives: ['Lire'] },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	r.check("un bloc { mode: 'learn' } est un Learn", scanner.getQuiz(fichierHote.path)?.mode, "learn");
+
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners
 	   coexistent une fraction de seconde. */
@@ -224,6 +232,15 @@ await withSrcModule("src/quiz-frontmatter.ts", async ({ lireFrontmatterNeoQuiz, 
 	r.check("aller-retour sans effort",
 		lireFrontmatterNeoQuiz(ecrireFrontmatterNeoQuiz({ provider: "ollama", model: "glm-5.3:cloud", generatedAt: "2026-09-13T00:00:00Z" })),
 		{ provider: "ollama", model: "glm-5.3:cloud", generatedAt: "2026-09-13T00:00:00Z" });
+
+	/* La SOURCE (2026-09-23) : c'est par elle qu'un Practice retrouve son
+	   Learn. Un deux-points dans le nom ne doit pas casser la valeur. */
+	r.check("aller-retour de la source",
+		lireFrontmatterNeoQuiz(ecrireFrontmatterNeoQuiz({ provider: "claude-code", model: "claude-sonnet-5", generatedAt: "2026-09-23T00:00:00Z", source: "CM1 - Python : les bases" }))?.source,
+		"CM1 - Python : les bases");
+	r.check("une note avec source et lien learn reste « rien que le frontmatter » de l'app",
+		neContientQueLeFrontmatterNeoQuiz(ecrireFrontmatterNeoQuiz({ provider: "claude-code", model: "m", generatedAt: "2026-09-23T00:00:00Z", source: "CM1", learn: "Parcours CM1" }) + "\n"),
+		true);
 
 	r.done();
 });

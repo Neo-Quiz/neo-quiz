@@ -71,6 +71,28 @@ export function modeDuBloc(items: readonly unknown[]): ModeQuiz {
 	return config && typeof config.mode === "string" && config.mode.trim().toLowerCase() === "learn" ? "learn" : "practice";
 }
 
+/** Le suffixe de mode d'un nom de fichier : « — Learn » / « — Practice ». */
+function suffixeDeMode(mode: ModeQuiz): string {
+	return ` — ${mode === "learn" ? "Learn" : "Practice"}`;
+}
+
+/** Le nom de fichier d'une note générée : `<base> — Learn` / `<base> —
+    Practice`. Le mode reste LISIBLE dans l'explorateur d'Obsidian, qui n'a
+    pas de badge ; l'application le retire du titre affiché
+    (`titreSansMode`) et le montre en badge à droite du type (Ahmed,
+    2026-09-23). */
+export function nomDeNote(base: string, mode: ModeQuiz): string {
+	return base + suffixeDeMode(mode);
+}
+
+/** Le titre affiché d'une note : son nom SANS le suffixe de son mode, que
+    le badge dit déjà. Seul le suffixe du mode RÉEL du bloc est retiré : un
+    Practice nommé « … — Learn » à la main garde son nom entier. */
+export function titreSansMode(nom: string, mode: ModeQuiz): string {
+	const suffixe = suffixeDeMode(mode);
+	return nom.endsWith(suffixe) && nom.length > suffixe.length ? nom.slice(0, -suffixe.length) : nom;
+}
+
 export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranchesConnues?: readonly number[]): Manque[] {
 	const { questions, config } = separer(items);
 	const manques: Manque[] = [];

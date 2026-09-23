@@ -18,6 +18,11 @@ export interface NeoQuizFrontmatter {
 	/** Practice seulement : le nom de la note Learn de la même source, écrit
 	 *  en lien `[[…]]` au premier niveau pour qu'Obsidian le suive. */
 	learn?: string;
+	/** La SOURCE de la note (première pièce jointe, sinon la demande) : c'est
+	 *  par elle qu'un Practice retrouve le Learn de la même source, le mode ne
+	 *  figurant plus dans le nom du fichier (2026-09-23). Déjà nettoyée des
+	 *  guillemets et sauts de ligne par `nomDeSource`. */
+	source?: string;
 }
 
 /** Retire les guillemets (simples ou doubles) qui entourent une valeur YAML,
@@ -65,9 +70,9 @@ export function lireFrontmatterNeoQuiz(content: string): NeoQuizFrontmatter | nu
 		champs[m[1]] = depouiller(m[2]);
 	}
 
-	const { provider, model, effort, generatedAt } = champs;
+	const { provider, model, effort, generatedAt, source } = champs;
 	if (!provider || !model || !generatedAt) return null;
-	return { provider, model, effort: effort || undefined, generatedAt };
+	return { provider, model, effort: effort || undefined, generatedAt, ...(source ? { source } : {}) };
 }
 
 /**
@@ -111,6 +116,8 @@ export function ecrireFrontmatterNeoQuiz(meta: NeoQuizFrontmatter): string {
 	if (meta.learn) lignes.push(`learn: "[[${meta.learn.replace(/"/g, "")}]]"`);
 	lignes.push("neo-quiz:", `  provider: ${meta.provider}`, `  model: ${meta.model}`);
 	if (meta.effort) lignes.push(`  effort: ${meta.effort}`);
-	lignes.push(`  generatedAt: ${meta.generatedAt}`, "---", "");
+	lignes.push(`  generatedAt: ${meta.generatedAt}`);
+	if (meta.source) lignes.push(`  source: "${meta.source.replace(/["\r\n]/g, "")}"`);
+	lignes.push("---", "");
 	return lignes.join("\n");
 }

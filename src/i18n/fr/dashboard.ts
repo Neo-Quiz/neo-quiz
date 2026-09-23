@@ -190,6 +190,9 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 
 	/* ── Type de quiz ── */
 	"dashboard.quizType.mixed": "Mixte",
+	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
+	"dashboard.quizMode.learn": "Learn",
+	"dashboard.quizMode.practice": "Practice",
 	"dashboard.quizType.single": "Choix unique",
 	"dashboard.quizType.multiple": "Choix multiple",
 	"dashboard.quizType.text": "Texte libre",
@@ -210,6 +213,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.detail.play": "Lancer",
 	"dashboard.detail.statBest": "Meilleur score",
 	"dashboard.detail.statType": "Type",
+	"dashboard.detail.statGoal": "Objectif",
 	"dashboard.detail.statLast": "Dernière fois",
 	"dashboard.detail.statAttempts": "Tentatives",
 	"dashboard.detail.generatedBy": "Généré par {model} ({effort})",

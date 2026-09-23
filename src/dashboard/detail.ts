@@ -5,7 +5,7 @@ import { t, currentLang } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
-import { quizTypeLabel } from "./quiz-card";
+import { quizModeLabel, quizTypeLabel } from "./quiz-card";
 import { getCanal, getProvider, setBrandLogo } from "./ai-providers";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
@@ -488,6 +488,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const played = stat.attempts > 0;
 		const cells: Array<{ label: string; value: string; accent?: string; cls?: string; title?: string; logo?: string }> = [
 			{ label: t("dashboard.detail.statType"), value: quizTypeLabel(quiz.quizType) },
+			// L'objectif, à droite du type (le titre ne le porte plus).
+			{ label: t("dashboard.detail.statGoal"), value: quizModeLabel(quiz.mode) },
 		];
 		// Qui a généré ce quiz, et QUAND — absente pour une note écrite à la
 		// main ou pour un quiz partagé sans frontmatter.

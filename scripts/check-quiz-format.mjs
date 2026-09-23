@@ -11,8 +11,17 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz }) => {
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode }) => {
 	const r = makeReporter("Format Learn / Practice");
+
+	/* Le mode reste dans le NOM du fichier (lisible dans Obsidian) mais pas
+	   dans le TITRE affiché par l'application, qui le montre en badge. */
+	r.check("nom de fichier Learn et Practice", [nomDeNote("CM1", "learn"), nomDeNote("CM1", "practice")], ["CM1 — Learn", "CM1 — Practice"]);
+	r.check("titre affiché sans le suffixe de son mode",
+		[titreSansMode("CM1 — Learn", "learn"), titreSansMode("CM1 — Practice", "practice")], ["CM1", "CM1"]);
+	r.check("un suffixe qui n'est pas celui du mode réel reste, un nom qui n'est QUE le suffixe aussi",
+		[titreSansMode("CM1 — Learn", "practice"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice")],
+		["CM1 — Learn", " — Learn", "Quiz libre"]);
 	const q = (o) => ({ title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que.", ...o });
 
 	r.check("bloc sans objet de mode = Practice", modeDuBloc([q()]), "practice");
@@ -59,12 +68,31 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.done();
 });
 
-await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, nomDeNote }) => {
-	const r = makeReporter("Nom d'une note par source");
-	r.check("la première pièce jointe, sans extension", nomDeSource([{ name: "CM1 - Introduction à Python.pdf" }, { name: "TP1.md" }], "Titre IA", "Nouveau quiz"), "CM1 - Introduction à Python");
-	r.check("sans pièce jointe : le titre du modèle", nomDeSource([], "Python : les bases", "Nouveau quiz"), "Python - les bases");
-	r.check("ni pièce ni titre : le repli", nomDeSource([], undefined, "Nouveau quiz"), "Nouveau quiz");
-	r.check("caractères interdits d'un nom de fichier remplacés", nomDeSource([{ name: "CM1: Python/avancé?.pdf" }], undefined, "x"), "CM1- Python-avancé-");
-	r.check("Learn et Practice", [nomDeNote("CM1", "learn"), nomDeNote("CM1", "practice")], ["CM1 — Learn", "CM1 — Practice"]);
+await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemande, trouverLearn }) => {
+	const r = makeReporter("Source d'une note, et son Learn");
+	r.check("la première pièce jointe, sans extension", nomDeSource([{ name: "CM1 - Introduction à Python.pdf" }, { name: "TP1.md" }], "Fais-moi un quiz", "Nouveau quiz"), "CM1 - Introduction à Python");
+	/* Sans pièce jointe, la source est la DEMANDE — la même au lancement
+	   (recherche du Learn) et à l'enregistrement : le titre du modèle, connu
+	   seulement après, la faisait diverger. */
+	r.check("sans pièce jointe : le début de la demande", nomDeSource([], "Python : les bases\navec des exemples", "Nouveau quiz"), "Python - les bases");
+	r.check("ni pièce ni demande : le repli", nomDeSource([], "", "Nouveau quiz"), "Nouveau quiz");
+	r.check("caractères interdits d'un nom de fichier remplacés", nomDeSource([{ name: "CM1: Python/avancé?.pdf" }], "", "x"), "CM1- Python-avancé-");
+	r.check("une longue demande est coupée au dernier mot entier",
+		debutDeDemande("Les suites numériques en terminale : suites arithmétiques et géométriques"),
+		{ texte: "Les suites numériques en terminale : suites arithmétiques", coupee: true });
+
+	const note = (path, mode, source, generatedAt = "2026-09-23T10:00:00Z") => ({ path, mode, generated: { source, generatedAt } });
+	const notes = [
+		note("Racine/XTI/CM1.md", "practice", "CM1"),
+		note("Racine/XTI/Autre/Learn CM1.md", "learn", "CM1"),
+		note("Racine/XTI/Parcours CM1.md", "learn", "CM1", "2026-09-22T10:00:00Z"),
+		note("Racine/XTI/Parcours CM1 v2.md", "learn", "CM1", "2026-09-23T12:00:00Z"),
+		note("Racine/XTI/Parcours CM2.md", "learn", "CM2"),
+		{ path: "Racine/XTI/Main.md", mode: "learn" },
+	];
+	r.check("le Learn de la même source, dans le même dossier, le plus récent",
+		trouverLearn(notes, "Racine/XTI", "CM1")?.path, "Racine/XTI/Parcours CM1 v2.md");
+	r.check("aucun Learn de cette source : null", trouverLearn(notes, "Racine/XTI", "CM3"), null);
+	r.check("un Learn d'un sous-dossier ne compte pas", trouverLearn(notes, "Racine/XTI/Autre", "CM2"), null);
 	r.done();
 });

@@ -3,6 +3,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { QuizIndexEntry, QuizTypeTag } from "./scanner";
+import type { ModeQuiz } from "../quiz-format";
 import type { QuizStatRecord } from "./stats-store";
 import { computeQuizState } from "./quiz-mastery";
 
@@ -21,6 +22,11 @@ const QUIZ_TYPE_KEYS: Record<QuizTypeTag, TransKey> = {
 /** Libellé traduit du type d'un quiz (partagé par la carte et la vue Détail). */
 export function quizTypeLabel(tag: QuizTypeTag): string {
 	return t(QUIZ_TYPE_KEYS[tag]);
+}
+
+/** Libellé de l'objectif d'un quiz (partagé par la carte et la vue Détail). */
+export function quizModeLabel(mode: ModeQuiz): string {
+	return t(mode === "learn" ? "dashboard.quizMode.learn" : "dashboard.quizMode.practice");
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -147,6 +153,10 @@ export function renderQuizCard(
 	);
 	const badge = ajouter(meta, "span", "qbd-quiz-card-badge");
 	badge.textContent = quizTypeLabel(quiz.quizType);
+	/* L'OBJECTIF (Learn / Practice) en badge, à droite du type : le titre ne
+	   le porte plus (Ahmed, 2026-09-23). */
+	const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge");
+	modeBadge.textContent = quizModeLabel(quiz.mode);
 
 	// Bouton ⋯ en bout de ligne meta (position StudySmarter : coin bas droit).
 	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.

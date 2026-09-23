@@ -5,6 +5,8 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
+import { modeDuBloc, titreSansMode } from "../quiz-format";
+import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
 
 /* ══════════════════════════════════════════════════════════
@@ -67,11 +69,16 @@ export interface QuizMeta {
 	items: QuizItemRef[];
 	types: QuestionTypeTag[];
 	quizType: QuizTypeTag;
+	/** L'OBJECTIF du bloc (`modeDuBloc`) : Learn s'il porte `{ mode: "learn" }`,
+	    Practice sinon. Affiché en badge, à droite du type ; son suffixe
+	    éventuel (« — Learn ») est retiré du titre (`titreSansMode`). */
+	mode: ModeQuiz;
 }
 
 /**
  * Entrée du cache du scanner (une par note contenant un bloc quiz-blocks).
- * `title` vaut toujours `file.basename` (seule valeur jamais assignée, dans
+ * `title` vaut `file.basename` sans le suffixe de son mode (« — Learn »,
+ * « — Practice » : le badge le dit déjà, 2026-09-23), dans
  * scanVault ET scanFile — scanFile.js d'origine omettait ce champ sur les
  * mises à jour incrémentales, un oubli de recopie qui rendait `quiz.title`
  * `undefined` après le premier `create`/`modify` ; corrigé ici en alignant
@@ -114,8 +121,9 @@ export function createScanner(host: Host): Scanner {
 		try {
 			// La détection de la configuration reste partagée avec le moteur : deux
 			// filtres locaux finiraient par construire des catalogues différents.
+			const brut = parseQuizSource(source, { logErrors: false });
 			const sansConfig = (
-				extractExamOptions(parseQuizSource(source, { logErrors: false })).questions
+				extractExamOptions(brut).questions
 			) as unknown as Array<RawQuizItem | null | undefined>;
 
 			// Conserver les positions du tableau BRUT est aussi important que la
@@ -163,7 +171,8 @@ export function createScanner(host: Host): Scanner {
 				questions: questions.length,
 				items,
 				types: Array.from(typeSet),
-				quizType
+				quizType,
+				mode: modeDuBloc(brut as unknown[])
 			};
 		} catch {
 			return null;
@@ -195,7 +204,7 @@ export function createScanner(host: Host): Scanner {
 				cache.set(file.path, {
 					path: file.path,
 					basename: file.basename,
-					title: file.basename,
+					title: titreSansMode(file.basename, meta.mode),
 					...meta,
 					mtime: file.mtime,
 					generated: lireFrontmatterNeoQuiz(content) || undefined,
@@ -231,7 +240,7 @@ export function createScanner(host: Host): Scanner {
 			const entry: QuizIndexEntry = {
 				path: file.path,
 				basename: file.basename,
-				title: file.basename,
+				title: titreSansMode(file.basename, meta.mode),
 				...meta,
 				mtime: file.mtime,
 				generated: lireFrontmatterNeoQuiz(content) || undefined,
