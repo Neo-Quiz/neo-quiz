@@ -17,15 +17,22 @@
   isolation: isolate;
 }
 
+/* LA HIÉRARCHIE SUIT LA LECTURE (2026-09-24) : l'énoncé est ce qu'on lit
+   et relit, le titre n'en est que l'étiquette. Titre à 2em en 800 sur un
+   énoncé à 0,875em (32 px contre 14 px dans l'application), l'œil allait au
+   titre et l'énoncé, formules comprises, se lisait en petits caractères. */
 .quiz-card h2{
   margin: 0 0 10px;
-  font-size: 2em;
-  font-weight: 800;
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .quiz-question{
   margin: 0 0 18px;
-  font-size: 0.875em;
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
 .quiz-question pre{

@@ -3,6 +3,7 @@ import "./theme/host-vars.css";
 import "./assets/toast.css";
 import "./assets/shell.css";
 import "./assets/modal.css";
+import "./assets/math.css";
 import { setLanguage, setHourCycle, t } from "../../../src/i18n";
 import { chargerLangue } from "./ui/langue";
 import { chargerFormatHeure } from "./ui/format-heure";

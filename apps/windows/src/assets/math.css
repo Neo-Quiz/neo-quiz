@@ -1,0 +1,28 @@
+/* ══════════════════════════════════════════════════════════
+   LES MATHS DANS LE TEXTE (rendu MathLive de l'application, host/math.ts)
+
+   MathLive compose avec les fontes KaTeX : un Computer Modern à l'œil plus
+   petit que Segoe UI, posé à la MÊME taille que la phrase. Les formules
+   paraissaient maigres et étrangères au texte qui les porte (Ahmed,
+   2026-09-23 : « même la police d'écriture utilisée pour les maths »).
+
+   Deux réglages, comparés à l'écran sur une question de suites :
+   - la formule grandit de 12 % : son œil rejoint celui du texte ;
+   - le romain des formules (chiffres, signes, parenthèses, noms de
+     fonctions : `.ML__cmr`) prend la police du texte, pour que le « 11 » de
+     « u₅ = 11 » soit le même que celui d'une phrase. Les VARIABLES restent
+     en italique mathématique (`.ML__mathit`) : c'est ce qui les distingue
+     d'un mot.
+
+   Seulement le rendu dans le contenu (`.math`) : le champ de saisie
+   <math-field> vit dans un shadow DOM que ces règles n'atteignent pas, et
+   sous Obsidian les formules passent par MathJax, pas par MathLive.
+   ══════════════════════════════════════════════════════════ */
+
+.math .ML__latex {
+	font-size: 1.12em;
+}
+
+.math .ML__cmr {
+	font-family: inherit;
+}
