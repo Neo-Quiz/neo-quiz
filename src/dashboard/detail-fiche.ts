@@ -114,10 +114,12 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 
 	const chips = ajouter(side, "div", "qbd-fiche-chips");
 	/* Le MODE, avec son icône, et au survol son explication : la bulle du
-	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
+	   sélecteur Learn | Practice de la page « Générer », mêmes textes. Les
+	   icônes ont été choisies parmi cinq chacune, rendues comme ici (Ahmed,
+	   2026-09-23) : le livre ouvert pour Learn, l'haltère pour Practice. */
 	const learn = deps.quiz.mode === "learn";
 	const mode = ajouter(chips, "span", "qbd-fiche-chip is-accent qbd-fiche-mode");
-	icone(mode, learn ? "book-open" : "target", "qbd-fiche-mode-icon");
+	icone(mode, learn ? "book-open" : "dumbbell", "qbd-fiche-mode-icon");
 	ajouter(mode, "span", undefined, quizModeLabel(deps.quiz.mode));
 	attachHoverTip(mode, (tip) => {
 		tip.classList.add("qbd-hover-tip--card");
