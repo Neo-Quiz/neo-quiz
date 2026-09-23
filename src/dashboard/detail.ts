@@ -15,6 +15,7 @@ import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
 import { renderExamPanel } from "./detail-exam";
 import { renderFiche } from "./detail-fiche";
+import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
@@ -520,34 +521,12 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 		// Qui a généré ce quiz, et QUAND — absente pour une note écrite à la
 		// main ou pour un quiz partagé sans frontmatter.
-		if (quiz.generated) {
-			const g = quiz.generated;
-			/* LE NOM LISIBLE DE LA SOURCE. Sur un site, `provider` et `model`
-			   portent tous DEUX l'identifiant du canal (le modèle est celui du
-			   site, inconnu d'ici — cf. l'écriture du frontmatter dans `ai.ts`) :
-			   les afficher tels quels donnait « chatgpt-web » au-dessus de
-			   « CHATGPT-WEB », l'identifiant technique deux fois (vu par Ahmed le
-			   2026-09-20). Le canal, lui, connaît son nom d'affichage. Un CLI ou
-			   Ollama montrent leur MODÈLE, qui est l'information utile, et un
-			   `provider` inconnu (réglage d'une version future) retombe dessus. */
-			const canal = getCanal(g.provider);
-			const source = canal && canal.type === "web" ? canal.label : g.model;
-			/* La date et l'heure EXACTES : c'est le seul endroit de l'application
-			   qui dise quand un quiz a été généré (demande d'Ahmed, 2026-09-20).
-			   L'effort d'un CLI passe dans l'infobulle — il n'a de sens que pour
-			   qui l'a réglé. */
-			const el = item(
-				t("dashboard.detail.metaGenerated", { model: source, date: formatGeneratedAt(g.generatedAt) }),
-				g.effort
-					? t("dashboard.detail.generatedBy", { model: source, effort: g.effort })
-					: t("dashboard.detail.generatedBySimple", { model: source }),
-			);
-			/* Le logo de l'ENTRÉE du fournisseur, pas de sa marque : un quiz généré
-			   par Antigravity CLI porte l'Antigravity, pas l'étincelle Gemini. */
-			const logoId = getProvider(g.provider).logo;
-			const logo = ajouter(el, "span", "qbd-provider-logo qbd-qz-meta-logo qbd-provider-logo--" + logoId);
+		const o = origineDe(quiz);
+		if (o) {
+			const el = item(t("dashboard.detail.metaGenerated", { model: o.source, date: o.date }), o.tooltip);
+			const logo = ajouter(el, "span", "qbd-provider-logo qbd-qz-meta-logo qbd-provider-logo--" + o.logo);
 			el.prepend(logo);
-			setBrandLogo(logo, logoId);
+			setBrandLogo(logo, o.logo);
 		}
 
 		// Jamais joué : ni meilleur score, ni date, ni tentatives — rien que
@@ -559,6 +538,38 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (ctx.statsStore) item(t("dashboard.detail.metaLast", { when: ctx.statsStore.formatRelativeTime(stat.lastPlayed) }));
 			item(t(stat.attempts === 1 ? "dashboard.detail.metaAttemptsOne" : "dashboard.detail.metaAttemptsOther", { count: stat.attempts }));
 		}
+	}
+
+	/** Qui a généré le quiz, et quand — partagé par la ligne d'infos et la
+	    fiche, qui l'écrivent chacune à sa façon. `null` pour une note écrite à
+	    la main ou un quiz partagé sans frontmatter. */
+	function origineDe(quiz: QuizIndexEntry): FicheOrigine | null {
+		const g = quiz.generated;
+		if (!g) return null;
+		/* LE NOM LISIBLE DE LA SOURCE. Sur un site, `provider` et `model`
+		   portent tous DEUX l'identifiant du canal (le modèle est celui du
+		   site, inconnu d'ici — cf. l'écriture du frontmatter dans `ai.ts`) :
+		   les afficher tels quels donnait « chatgpt-web » au-dessus de
+		   « CHATGPT-WEB », l'identifiant technique deux fois (vu par Ahmed le
+		   2026-09-20). Le canal, lui, connaît son nom d'affichage. Un CLI ou
+		   Ollama montrent leur MODÈLE, qui est l'information utile, et un
+		   `provider` inconnu (réglage d'une version future) retombe dessus. */
+		const canal = getCanal(g.provider);
+		const source = canal && canal.type === "web" ? canal.label : g.model;
+		return {
+			source,
+			/* La date et l'heure EXACTES : c'est le seul endroit de l'application
+			   qui dise quand un quiz a été généré (demande d'Ahmed, 2026-09-20). */
+			date: formatGeneratedAt(g.generatedAt),
+			/* Le logo de l'ENTRÉE du fournisseur, pas de sa marque : un quiz généré
+			   par Antigravity CLI porte l'Antigravity, pas l'étincelle Gemini. */
+			logo: getProvider(g.provider).logo,
+			// L'effort d'un CLI passe dans l'infobulle — il n'a de sens que pour
+			// qui l'a réglé.
+			tooltip: g.effort
+				? t("dashboard.detail.generatedBy", { model: source, effort: g.effort })
+				: t("dashboard.detail.generatedBySimple", { model: source }),
+		};
 	}
 
 	/** La FICHE du quiz (detail-fiche.ts) remplace tout le corps (liste +
@@ -582,6 +593,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			quiz,
 			questions: draft.questions,
 			stat: statOf(quiz),
+			origine: origineDe(quiz),
 			onStart: (el) => { void flushSave(); start.onClick(el); },
 			onEdit: () => toggleEditing(page),
 			onBack: () => { void flushSave(); spec.onBack(); },

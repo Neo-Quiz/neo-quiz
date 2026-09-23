@@ -243,6 +243,10 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.welcomeStart": "Commencer le quiz",
 	"dashboard.quiz.previewBanner": "Aperçu : vos réponses ici ne comptent pas.",
 	"dashboard.quiz.previewBack": "Retour au départ",
+	/* La fiche d'un quiz (detail-fiche.ts). */
+	"dashboard.fiche.generated": "Généré par {model} · {date}",
+	"dashboard.fiche.roleExplain": "Avec vos mots",
+	"dashboard.fiche.part": "Partie {n}",
 	"dashboard.quiz.editTitle": "Titre",
 	"dashboard.quiz.editTitlePlaceholder": "Nommez cette question…",
 	"dashboard.quiz.editPrompt": "Question",

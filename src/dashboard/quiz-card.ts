@@ -29,9 +29,15 @@ const QUIZ_TYPE_ICONS: Record<QuizTypeTag, string> = {
 	matching: "cable"
 };
 
-/** Icône Lucide du type d'un quiz (partagée par la carte et la page). */
-export function quizTypeIcon(tag: QuizTypeTag): string {
-	return QUIZ_TYPE_ICONS[tag];
+/** L'icône du type avec sa bulle au survol (la carte, et la fiche du quiz) :
+    l'icône grossit, la bulle donne le type. Pas de `title`, dont l'infobulle
+    native doublerait la bulle, en retard et hors thème. */
+export function renderQuizTypeIcon(parent: HTMLElement, tag: QuizTypeTag): HTMLElement {
+	const wrap = ajouter(parent, "span", "qbd-quiz-card-type");
+	const icon = ajouter(wrap, "span", "qbd-quiz-card-type-icon");
+	currentHost().ui.setIcon(icon, QUIZ_TYPE_ICONS[tag]);
+	ajouter(wrap, "span", "qbd-quiz-card-type-tip", quizTypeLabel(tag));
+	return wrap;
 }
 
 /** Libellé traduit du type d'un quiz (partagé par la carte et la vue Détail). */
@@ -163,14 +169,10 @@ export function renderQuizCard(
 	/* Meta : icône du type + nombre de questions, puis l'objectif en badge.
 	   Le type n'est plus un badge : deux badges collés se ressemblaient, et la
 	   page du quiz l'affiche déjà en toutes lettres (Ahmed, 2026-09-23). Son
-	   libellé est une bulle qui paraît au survol, en CSS : pas de `title`,
-	   dont l'infobulle native doublerait la bulle, en retard et hors thème. */
+	   libellé est une bulle qui paraît au survol (`renderQuizTypeIcon`). */
 	const meta = ajouter(body, "div", "qbd-quiz-card-meta");
 	const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
-	const typeWrap = ajouter(count, "span", "qbd-quiz-card-type");
-	const typeIcon = ajouter(typeWrap, "span", "qbd-quiz-card-type-icon");
-	currentHost().ui.setIcon(typeIcon, QUIZ_TYPE_ICONS[quiz.quizType]);
-	ajouter(typeWrap, "span", "qbd-quiz-card-type-tip", quizTypeLabel(quiz.quizType));
+	renderQuizTypeIcon(count, quiz.quizType);
 	ajouter(
 		count, "span", undefined,
 		t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
