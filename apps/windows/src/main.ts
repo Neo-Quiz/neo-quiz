@@ -3,8 +3,9 @@ import "./theme/host-vars.css";
 import "./assets/toast.css";
 import "./assets/shell.css";
 import "./assets/modal.css";
-import { setLanguage, t } from "../../../src/i18n";
+import { setLanguage, setHourCycle, t } from "../../../src/i18n";
 import { chargerLangue } from "./ui/langue";
+import { chargerFormatHeure } from "./ui/format-heure";
 import { LOG_PREFIX } from "../../../src/branding";
 import { createScanner } from "../../../src/dashboard/scanner";
 import type { QuizIndexEntry, Scanner } from "../../../src/dashboard/scanner";
@@ -176,6 +177,10 @@ function ouvrirReglages(): void {
 				   chaud laisserait vivre l'index et le surveillant de l'ancienne
 				   liste. */
 				onFoldersChanged: () => location.reload(),
+				/* RECHARGER aussi : toutes les heures déjà écrites (la page sous
+				   la modale, la section des comptes) repassent par `hourOptions`,
+				   et la reprise rouvre la même page. */
+				onTimeFormatChanged: () => location.reload(),
 				/* Le MÊME hôte que la page « Générer » : la section « Canaux
 				   payants » écrit à travers lui, le cache du client suit. */
 				aiSettings: reglagesIa,
@@ -225,6 +230,8 @@ async function demarrer(): Promise<void> {
 	   bootstrapper d'installation d'après la page du site d'où l'exe a été
 	   téléchargé. Lu AVANT le premier `t()`. */
 	setLanguage(await chargerLangue());
+	// Le format de l'heure, lu avec la langue : 24 h tant que rien d'autre n'est choisi.
+	setHourCycle(await chargerFormatHeure());
 	document.title = t("app.window.title");
 	/* Montée UNE FOIS, avant le premier écran : elle survit à tous les
 	   changements d'écran qui suivent (coquille, réglages), qui eux se

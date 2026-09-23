@@ -1204,10 +1204,13 @@ function labelsFromIds(ids: string[]): Record<string, string> {
 		if (!known || isNewerVersion(parsed.version, known)) best.set(parsed.family, parsed.version);
 	}
 	const labels: Record<string, string> = {};
-	for (const [family, version] of best) {
-		labels[family] = family.charAt(0).toUpperCase() + family.slice(1) + " " + version.join(".");
-	}
+	for (const [family, version] of best) labels[family] = libelleFamille(family, version);
 	return labels;
+}
+
+/** « opus », [5, 5] → « Opus 5.5 » : la forme des noms du catalogue. */
+function libelleFamille(family: string, version: number[]): string {
+	return family.charAt(0).toUpperCase() + family.slice(1) + " " + version.join(".");
 }
 
 /* Lit l'instantané de ~/.claude.json : Fable proposé ? + libellés de modèles
@@ -1319,6 +1322,30 @@ function modelesDuCatalogue(catalogue: unknown): CatalogueModele[] | null {
 
 function catalogueCourant(): CatalogueModele[] | null {
 	return modelesDuCatalogue(claudeCacheSnapshot?.catalogue);
+}
+
+/** Le nom LISIBLE d'un modèle, celui du menu des modèles (« Sonnet 5 », pas
+    « claude-sonnet-5 ») : lu dans le catalogue du fournisseur, jamais écrit
+    ici. Pour un modèle Claude que le catalogue ne nomme pas (catalogue pas
+    encore lu dans cette session, modèle retiré depuis), le nom se DÉDUIT de
+    l'identifiant, comme les libellés appris. Un fournisseur ou un modèle
+    inconnus rendent l'identifiant tel quel. */
+export function libelleModele(providerId: string, model: string): string {
+	if (providerId === "claude-code") {
+		const connu = catalogueCourant()?.find(m => m.def.value === model);
+		if (connu) return connu.def.label;
+		const parse = parseClaudeModelId(model);
+		if (parse) return libelleFamille(parse.family, parse.version);
+		// Un ALIAS (« sonnet ») : la famille seule, sans numéro inventé.
+		return CLAUDE_CODE_MODELS.some(m => m.value === model) ? model.charAt(0).toUpperCase() + model.slice(1) : model;
+	}
+	if (providerId === "codex") return getCodexModels().find(m => m.value === model)?.label ?? model;
+	if (providerId === "antigravity-cli") {
+		// L'identifiant d'une VARIANTE (« …-high ») nomme sa famille regroupée.
+		return getAntigravityModels().find(m => m.value === model || Object.values(m.variantes ?? {}).includes(model))?.label ?? model;
+	}
+	if (providerId === "ollama") return getOllamaModelMeta(model).label;
+	return model;
 }
 
 /* Liste des modèles Claude visibles maintenant. Avec un catalogue : sa section

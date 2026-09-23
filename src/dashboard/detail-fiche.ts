@@ -11,6 +11,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
+import { attachHoverTip } from "./hover-tip";
 
 /* ══════════════════════════════════════════════════════════
    FICHE D'UN QUIZ — ce que la page montre à l'ouverture
@@ -36,6 +37,12 @@ import { setBrandLogo } from "./ai-providers";
 
    La flèche retour et l'éditeur vivent DANS la fiche : l'en-tête de la page
    est masqué sur cet écran (classe `qbd-qz--fiche`).
+
+   UN CLIC SUR UNE QUESTION N'OUVRE RIEN. Il ouvrait l'aperçu, l'ancienne
+   page à deux colonnes, où l'on croyait pouvoir répondre ; il fait
+   maintenant briller « Commencer le quiz », seul endroit où l'on répond
+   (Ahmed, 2026-09-23). Le même reflet passe à l'arrivée sur la fiche, puis
+   périodiquement.
 ══════════════════════════════════════════════════════════ */
 
 /** D'où vient le quiz, déjà mis en forme par la page (même rendu que sa
@@ -47,7 +54,7 @@ export interface FicheOrigine {
 	date: string;
 	/** Logo de l'entrée du fournisseur (`setBrandLogo`). */
 	logo: string;
-	/** Infobulle : l'effort du CLI quand il est connu. */
+	/** Infobulle : l'identifiant exact du modèle, et l'effort du CLI quand il est connu. */
 	tooltip: string;
 }
 
@@ -63,8 +70,6 @@ export interface FicheDeps {
 	onEdit(): void;
 	/** Quitte la page. */
 	onBack(): void;
-	/** Ouvre l'aperçu d'une question — l'aperçu habituel de la page. */
-	onOpenQuestion(index: number): void;
 }
 
 function icone(parent: HTMLElement, name: string, cls = "qbd-fiche-i"): HTMLElement {
@@ -82,11 +87,16 @@ function texte(parent: HTMLElement, tag: "p" | "span", cls: string, value: strin
 
 export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 	const root = ajouter(parent, "div", "qbd-fiche");
-	renderSide(root, deps);
-	renderQuestions(root, deps);
+	const attirer = renderSide(root, deps);
+	renderQuestions(root, attirer, deps);
 }
 
-function renderSide(root: HTMLElement, deps: FicheDeps): void {
+function reduit(): boolean {
+	return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Rend la fiche, et la fonction qui attire l'œil sur « Commencer le quiz ». */
+function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	const side = ajouter(root, "aside", "qbd-fiche-side");
 
 	// Même bouton que le retour de l'en-tête : un seul retour dans tout le dashboard.
@@ -103,18 +113,33 @@ function renderSide(root: HTMLElement, deps: FicheDeps): void {
 	ajouter(side, "h2", "qbd-fiche-title", deps.quiz.title);
 
 	const chips = ajouter(side, "div", "qbd-fiche-chips");
-	ajouter(chips, "span", "qbd-fiche-chip is-accent", quizModeLabel(deps.quiz.mode));
+	/* Le MODE, avec son icône, et au survol son explication : la bulle du
+	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
+	const learn = deps.quiz.mode === "learn";
+	const mode = ajouter(chips, "span", "qbd-fiche-chip is-accent qbd-fiche-mode");
+	icone(mode, learn ? "book-open" : "target", "qbd-fiche-mode-icon");
+	ajouter(mode, "span", undefined, quizModeLabel(deps.quiz.mode));
+	attachHoverTip(mode, (tip) => {
+		tip.classList.add("qbd-hover-tip--card");
+		ajouter(tip, "div", "qbd-hover-tip-title", learn ? t("ai.mode.learn") : t("ai.mode.practice"));
+		ajouter(tip, "div", "qbd-hover-tip-body", learn ? t("ai.mode.learnTip") : t("ai.mode.practiceTip"));
+	});
 	const count = ajouter(chips, "span", "qbd-fiche-chip");
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 
+	/* D'où vient le quiz : le logo et le modèle, puis la date SOUS le modèle,
+	   alignée sur son nom — ni « Généré par », que le logo dit déjà (l'infobulle
+	   le dit en toutes lettres), ni séparateur entre les deux (Ahmed,
+	   2026-09-23). Chacune tient sur sa ligne. */
 	if (deps.origine) {
 		const o = deps.origine;
-		const line = ajouter(side, "div", "qbd-fiche-origin");
-		line.title = o.tooltip;
-		const logo = ajouter(line, "span", "qbd-provider-logo qbd-fiche-origin-logo qbd-provider-logo--" + o.logo);
+		const bloc = ajouter(side, "div", "qbd-fiche-origin");
+		bloc.title = o.tooltip;
+		const logo = ajouter(bloc, "span", "qbd-provider-logo qbd-fiche-origin-logo qbd-provider-logo--" + o.logo);
 		setBrandLogo(logo, o.logo);
-		ajouter(line, "span", undefined, t("dashboard.fiche.generated", { model: o.source, date: o.date }));
+		ajouter(bloc, "span", "qbd-fiche-origin-model", o.source);
+		ajouter(bloc, "span", "qbd-fiche-origin-date", o.date);
 	}
 
 	/* La progression, seulement quand elle dit quelque chose : une barre vide
@@ -138,6 +163,11 @@ function renderSide(root: HTMLElement, deps: FicheDeps): void {
 	start.type = "button";
 	icone(start, "play", "qbd-btn-icon");
 	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
+	/* Le REFLET qui défile : une animation CSS infinie, qui passe dès
+	   l'arrivée puis à chaque cycle (dashboard-fiche.css). Un élément à part,
+	   pas un ::after, pour que `attirer` puisse relancer son cycle. */
+	const reflet = ajouter(start, "span", "qbd-fiche-start-shine");
+	reflet.setAttribute("aria-hidden", "true");
 	start.addEventListener("click", () => deps.onStart(start));
 
 	const edit = ajouter(side, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");
@@ -145,6 +175,18 @@ function renderSide(root: HTMLElement, deps: FicheDeps): void {
 	icone(edit, "square-pen", "qbd-btn-icon");
 	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
 	edit.addEventListener("click", () => deps.onEdit());
+
+	/* Relance le reflet sur-le-champ (remis au début de son cycle) et donne au
+	   bouton une petite impulsion : le clic a lieu à droite, le bouton est à
+	   gauche, et le reflet seul passerait inaperçu. Rien sans animations. */
+	return () => {
+		if (reduit()) return;
+		for (const a of reflet.getAnimations()) a.currentTime = 0;
+		start.animate(
+			[{ transform: "scale(1)" }, { transform: "scale(1.045)" }, { transform: "scale(1)" }],
+			{ duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" },
+		);
+	};
 }
 
 /* Le RÔLE d'une question de Learn, quand il en change la nature : une
@@ -168,7 +210,7 @@ function etiquette(q: DraftQuestion): string {
 	return `${t(roleKey)} · ${type}`;
 }
 
-function renderQuestions(root: HTMLElement, deps: FicheDeps): void {
+function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps): void {
 	const items = ajouter(root, "div", "qbd-fiche-list");
 	/* Un Learn avance partie par partie : un titre à chaque nouvelle. Pas un
 	   Practice : sa \`slice\` nomme la partie du Learn qui enseigne la question,
@@ -181,8 +223,8 @@ function renderQuestions(root: HTMLElement, deps: FicheDeps): void {
 			partie = q.slice;
 			ajouter(items, "div", "qbd-fiche-part", t("dashboard.fiche.part", { n: q.slice }));
 		}
-		const card = ajouter(items, "button", "qbd-fiche-q");
-		card.type = "button";
+		// Pas un bouton : cliquer ici n'ouvre rien, on répond en jouant le quiz.
+		const card = ajouter(items, "div", "qbd-fiche-q");
 		ajouter(card, "span", "qbd-fiche-q-top", `${i + 1} · ${etiquette(q)}`);
 		texte(card, "p", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
 		/* Les options d'un QCM, SANS la bonne, marquées A, B, C… : des ronds
@@ -195,6 +237,6 @@ function renderQuestions(root: HTMLElement, deps: FicheDeps): void {
 				texte(line, "span", "qbd-fiche-opt-text", o);
 			});
 		}
-		card.addEventListener("click", () => deps.onOpenQuestion(i));
+		card.addEventListener("click", attirer);
 	});
 }

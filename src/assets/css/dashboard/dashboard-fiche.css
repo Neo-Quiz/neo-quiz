@@ -88,19 +88,49 @@
 	color: var(--interactive-accent);
 	font-weight: 600;
 }
-.qbd-fiche-chip .qbd-quiz-card-type-icon svg {
+.qbd-fiche-chip .qbd-quiz-card-type-icon svg,
+.qbd-fiche-mode-icon svg {
 	width: 14px;
 	height: 14px;
 }
+/* Les étiquettes ne se cliquent pas : le curseur reste la flèche, y compris
+   sur leur texte. */
+.qbd-fiche-chip { cursor: default; }
+/* L'icône du MODE grossit au survol, comme celle du type ; sa bulle est
+   celle de la page « Générer » (`attachHoverTip`). */
+.qbd-fiche-mode-icon {
+	display: inline-flex;
+	transition: transform 160ms ease;
+}
+.qbd-fiche-mode:hover .qbd-fiche-mode-icon {
+	transform: scale(1.3);
+}
 
-/* D'où vient le quiz : une ligne discrète, pas une étiquette de plus. */
+/* D'où vient le quiz : le logo et le modèle, puis la date dessous, plus
+   discrète et alignée sur le nom du modèle. Une ligne chacun : un nom trop
+   long s'abrège, l'infobulle le donne en entier. */
 .qbd-fiche-origin {
-	display: flex;
+	display: grid;
+	grid-template-columns: 14px minmax(0, 1fr);
+	column-gap: 7px;
+	row-gap: 1px;
 	align-items: center;
-	gap: 7px;
 	font-size: 12px;
 	line-height: 1.4;
 	color: var(--text-muted);
+	cursor: default;
+}
+.qbd-fiche-origin-model,
+.qbd-fiche-origin-date {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-fiche-origin-date {
+	grid-column: 2;
+	font-size: 11.5px;
+	color: var(--text-faint);
 }
 .qbd-fiche-origin-logo,
 .qbd-fiche-origin-logo svg {
@@ -132,11 +162,39 @@
 .qbd-fiche-best.is-fair { color: var(--color-yellow); }
 
 .qbd-root .qbd-fiche-start {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
 	margin-top: 4px;
 	height: 46px;
 	padding: 0 26px;
 	font-size: 15px;
 	justify-content: center;
+}
+/* Le contenu passe DEVANT le reflet. */
+.qbd-fiche-start > :not(.qbd-fiche-start-shine) {
+	position: relative;
+	z-index: 1;
+}
+/* Le REFLET qui défile : il passe dès l'arrivée, puis toutes les 6,5 s.
+   Infini, donc ignoré par `markViewEnter` (qui attend la fin de l'entrée),
+   et hors de toute classe `-enter` (`check:view-enter`). `attirer`
+   (detail-fiche.ts) le relance au clic sur une question. */
+.qbd-fiche-start-shine {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.8) 50%, transparent 68%);
+	transform: translateX(-110%);
+	animation: qbd-fiche-shine 6.5s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes qbd-fiche-shine {
+	0%, 5% { transform: translateX(-110%); }
+	22%, 100% { transform: translateX(110%); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-fiche-start-shine { display: none; }
 }
 .qbd-fiche-start .qbd-btn-icon,
 .qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }
@@ -160,15 +218,13 @@
 }
 .qbd-fiche-part:first-child { margin-top: 0; }
 
-.qbd-root .qbd-fiche-q {
+/* Une question de la fiche ne s'ouvre pas (un clic fait briller
+   « Commencer le quiz ») : ni survol, ni curseur de lien. */
+.qbd-fiche-q {
 	display: flex;
 	flex-direction: column;
-	align-items: stretch;
 	gap: 8px;
-	height: auto;
 	padding: 14px 16px;
-	text-align: left;
-	white-space: normal;
 	border-radius: var(--radius-m, 12px);
 	background: var(--qbd-glass-bg);
 	border: 1px solid var(--qbd-glass-edge);
@@ -176,11 +232,7 @@
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	color: var(--text-normal);
-	cursor: pointer;
-	transition: border-color 140ms ease;
-}
-.qbd-root .qbd-fiche-q:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--qbd-glass-edge));
+	cursor: default;
 }
 .qbd-fiche-q-top { font-size: 11px; font-weight: 600; color: var(--text-faint); }
 

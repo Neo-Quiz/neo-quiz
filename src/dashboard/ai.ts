@@ -7,6 +7,7 @@ import { debutDeDemande, nomDeSource, trouverLearn, lirePlanLearn, messagesDesMa
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
 import { ajouter, CLASSE_MODALE_HAUT } from "../dom";
+import { attachHoverTip } from "./hover-tip";
 import { openConfirmModal } from "../editor/modals";
 import { LOG_PREFIX } from "../branding";
 import * as aiProviders from "./ai-providers";
@@ -3564,31 +3565,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   souris. À appeler APRÈS setIcon, qui réécrit le contenu du bouton. */
 	function labelIconButton(btn: HTMLElement, label: string): void {
 		ajouter(btn, "span", "qbd-sr-only", label);
-	}
-
-	/* Bulle au survol d'un bouton du composer. Le CONTENU est reconstruit à
-	   chaque survol (`fill`), jamais mémorisé : ces bulles affichent un état
-	   vivant (options courantes, usage du forfait) qu'un texte figé à la
-	   construction ferait mentir. Portalée au <body> — le composer clippe. */
-	function attachHoverTip(btn: HTMLElement, fill: (tip: HTMLElement) => void): void {
-		let tip: HTMLElement | null = null;
-		const hide = () => { if (tip) { tip.remove(); tip = null; } };
-		btn.addEventListener("mouseenter", () => {
-			if (tip) return;
-			tip = ajouter(document.body, "div", "qbd-hover-tip");
-			fill(tip);
-			const r = btn.getBoundingClientRect();
-			tip.style.visibility = "hidden";
-			const tr = tip.getBoundingClientRect();
-			const left = Math.min(Math.max(8, r.left + r.width / 2 - tr.width / 2), window.innerWidth - tr.width - 8);
-			let top = r.top - tr.height - 8;
-			if (top < 8) top = r.bottom + 8;
-			tip.style.left = left + "px";
-			tip.style.top = top + "px";
-			tip.style.visibility = "";
-		});
-		btn.addEventListener("mouseleave", hide);
-		btn.addEventListener("click", hide);
 	}
 
 	/* Tooltip du bouton stop (référence Claude Code : « Arrêter  Esc »). */

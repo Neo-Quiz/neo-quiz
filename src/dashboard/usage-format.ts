@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { t, hourOptions } from "../i18n";
 
 /* ══════════════════════════════════════════════════════════
    USAGE IA — LA PARTIE PURE : les types et le formatage.
@@ -10,7 +10,7 @@ import { t } from "../i18n";
    d'Obsidian — le journal persisté et la lecture des quotas du compte, que
    l'application ne porte pas (décision du 2026-09-12 : l'écran d'usage reste
    au greffon). Un import de plus, et le paquet Vite de l'application tirait
-   Obsidian. Rien ici ne touche un hôte : `t()` seulement, au rendu.
+   Obsidian. Rien ici ne touche un hôte : `t()` et `hourOptions()` seulement, au rendu.
 
    `ai-usage.ts` réexporte tout ce fichier, ses appelants n'ont pas bougé.
 ══════════════════════════════════════════════════════════ */
@@ -167,8 +167,9 @@ export function formatResetMoment(resetsAt: number | null, lang: string): string
 		   07:00). Tronquer afficherait « 06:59 » là où l'écran officiel dit
 		   « 07:00 » — un décalage d'une minute qui se lit comme un bug. */
 		const minute = Math.round(resetsAt / 60000) * 60000;
+		// L'heure suit le réglage (24 h par défaut), pas la langue (`hourOptions`).
 		return new Intl.DateTimeFormat(lang, {
-			weekday: "short", hour: "numeric", minute: "2-digit"
+			weekday: "short", minute: "2-digit", ...hourOptions()
 		}).format(new Date(minute));
 	} catch {
 		return null;

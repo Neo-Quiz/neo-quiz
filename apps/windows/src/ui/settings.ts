@@ -16,11 +16,13 @@
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
+import { t, currentLang, currentHourCycle, hourOptions, setHourCycle } from "../../../../src/i18n";
+import type { HourCycle } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { MAX_DOSSIERS, addFolder, estVaultObsidian, lienAvecRacines, pickFolder, removeFolder, savedFolders, setDefaultFolder } from "../host/folder";
 import { poserLogoObsidian } from "./marques";
 import { chargerLangue, lireLangue, reglerLangue } from "./langue";
+import { lireFormatHeure, reglerFormatHeure } from "./format-heure";
 import { pont } from "../host/pont";
 import { createSelect } from "../../../../src/dashboard/ui-select";
 import { getProvider, MARQUES, resoudreApresMasquage } from "../../../../src/dashboard/ai-providers";
@@ -33,6 +35,10 @@ export function renderSettings(
 	root: HTMLElement,
 	deps: {
 		onFoldersChanged(): void;
+		/** Le format de l'heure a changé : l'écran SOUS la modale garde les
+		    heures qu'il a déjà écrites (une modale ne redessine rien en se
+		    fermant), c'est à l'appelant de le redessiner. */
+		onTimeFormatChanged(): void;
 		/** Les réglages IA : la section « Canaux payants » lit et écrit le
 		    masquage par le MÊME hôte que la page « Générer » — une écriture
 		    directe au principal (comptes.ts) laisserait le cache du client
@@ -211,6 +217,32 @@ export function renderSettings(
 	});
 	void chargerLangue().then(l => langueSelect.setValue(l));
 	ajouter(general, "p", "nq-reglages-aide", t("app.settings.languageHint"));
+
+	/* Le FORMAT DE L'HEURE : 24 h par défaut, 12 h sur demande, quelle que
+	   soit la langue. Les heures sont mises en forme au rendu (`hourOptions`) ;
+	   l'écran sous la modale, déjà rendu, est redessiné par l'appelant
+	   (`onTimeFormatChanged`) une fois le réglage ÉCRIT — sans quoi la fiche
+	   ouverte derrière gardait « 18:35 » après le passage en 12 h. Chaque
+	   option montre son exemple, mis en forme par Intl dans la langue de
+	   l'interface. */
+	const heureLigne = ajouter(general, "div", "nq-reglages-langue");
+	ajouter(heureLigne, "span", "nq-reglages-nom", t("app.settings.timeFormat"));
+	const exemple = (cycle: HourCycle): string =>
+		new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { minute: "2-digit", ...hourOptions(cycle) })
+			.format(new Date(2026, 0, 1, 18, 35));
+	createSelect(heureLigne, {
+		value: currentHourCycle(),
+		options: [
+			{ value: "24h", label: t("app.settings.timeFormat24", { example: exemple("24h") }) },
+			{ value: "12h", label: t("app.settings.timeFormat12", { example: exemple("12h") }) },
+		],
+		onChange: valeur => {
+			const format = lireFormatHeure(valeur);
+			if (format === currentHourCycle()) return;
+			setHourCycle(format);
+			void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
+		},
+	});
 
 	/* ── Comptes IA ── */
 	const comptes = ajouter(contenu, "section", "nq-reglages-section");

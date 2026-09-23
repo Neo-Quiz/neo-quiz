@@ -1,12 +1,12 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { markViewEnter } from "./view-enter";
-import { t, currentLang } from "../i18n";
+import { t, currentLang, hourOptions } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { quizModeLabel, quizTypeLabel } from "./quiz-card";
-import { getCanal, getProvider, setBrandLogo } from "./ai-providers";
+import { getCanal, getProvider, setBrandLogo, libelleModele } from "./ai-providers";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
@@ -82,8 +82,8 @@ export interface QuizPageSpec {
 	    d'attente. Ne vaut qu'au PREMIER rendu, comme `startEditing` : un
 	    repeint interne (frappe, question suivante) ne rejoue rien. */
 	animateEntry?: boolean;
-	/** La question COURANTE au premier rendu de cette clé (bornée) : celle que
-	    → ouvre depuis la fiche. Pour l'hôte qui rouvre là où on s'était
+	/** La question COURANTE au premier rendu de cette clé (bornée) : celle sur
+	    laquelle l'éditeur s'ouvre depuis la fiche. Pour l'hôte qui rouvre là où on s'était
 	    arrêté ; le greffon ne la passe pas. Ne vaut qu'à la première ouverture
 	    de la clé, comme `startEditing`. Elle ne décide PAS de l'écran : une
 	    arrivée montre toujours la fiche (voir `ouverture`). */
@@ -431,8 +431,11 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    lequel on revient le plus souvent. */
 	function toggleEditing(page: HTMLElement): void {
 		editing = !editing;
-		// L'édition ouvre sur une question ; en sortir montre son aperçu.
-		if (editing) welcome = false;
+		/* L'édition ouvre sur une question ; en sortir ramène à la FICHE, qui
+		   est la consultation du quiz — l'aperçu à deux colonnes, qu'on prenait
+		   pour l'endroit où répondre, n'est plus un écran où l'on atterrit
+		   (Ahmed, 2026-09-23). Sans fiche (page « Générer »), l'aperçu reste. */
+		welcome = !editing;
 		if (!editing) void flushSave();
 
 		const body = page.querySelector(".qbd-qz-body");
@@ -486,8 +489,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function formatGeneratedAt(iso: string): string {
 		const d = new Date(iso);
 		if (Number.isNaN(d.getTime())) return iso;
+		/* L'heure suit le RÉGLAGE (24 h par défaut), pas la langue : l'anglais
+		   écrivait « 06:35 PM » (`hourOptions`, src/i18n.ts). */
 		return d.toLocaleString(currentLang() === "fr" ? "fr-FR" : "en-US", {
-			day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+			day: "numeric", month: "short", year: "numeric", minute: "2-digit", ...hourOptions(),
 		});
 	}
 
@@ -552,10 +557,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   les afficher tels quels donnait « chatgpt-web » au-dessus de
 		   « CHATGPT-WEB », l'identifiant technique deux fois (vu par Ahmed le
 		   2026-09-20). Le canal, lui, connaît son nom d'affichage. Un CLI ou
-		   Ollama montrent leur MODÈLE, qui est l'information utile, et un
-		   `provider` inconnu (réglage d'une version future) retombe dessus. */
+		   Ollama montrent leur MODÈLE, qui est l'information utile, sous le nom
+		   du menu des modèles : « Sonnet 5 », pas « claude-sonnet-5 », dont le
+		   préfixe répétait le logo posé juste devant (Ahmed, 2026-09-23). Un
+		   `provider` inconnu (réglage d'une version future) garde l'identifiant. */
 		const canal = getCanal(g.provider);
-		const source = canal && canal.type === "web" ? canal.label : g.model;
+		const web = !!canal && canal.type === "web";
+		const source = web && canal ? canal.label : libelleModele(g.provider, g.model);
 		return {
 			source,
 			/* La date et l'heure EXACTES : c'est le seul endroit de l'application
@@ -564,11 +572,11 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			/* Le logo de l'ENTRÉE du fournisseur, pas de sa marque : un quiz généré
 			   par Antigravity CLI porte l'Antigravity, pas l'étincelle Gemini. */
 			logo: getProvider(g.provider).logo,
-			// L'effort d'un CLI passe dans l'infobulle — il n'a de sens que pour
-			// qui l'a réglé.
+			/* L'infobulle garde l'identifiant EXACT du modèle, et l'effort d'un CLI,
+			   qui n'a de sens que pour qui l'a réglé. */
 			tooltip: g.effort
-				? t("dashboard.detail.generatedBy", { model: source, effort: g.effort })
-				: t("dashboard.detail.generatedBySimple", { model: source }),
+				? t("dashboard.detail.generatedBy", { model: web ? source : g.model, effort: g.effort })
+				: t("dashboard.detail.generatedBySimple", { model: web ? source : g.model }),
 		};
 	}
 
@@ -597,7 +605,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onStart: (el) => { void flushSave(); start.onClick(el); },
 			onEdit: () => toggleEditing(page),
 			onBack: () => { void flushSave(); spec.onBack(); },
-			onOpenQuestion: (i) => goToQuestion(i, listCol, panel, nav, spec),
 		});
 		return true;
 	}
@@ -858,13 +865,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// au document peut être le Document lui-même, qui n'a pas closest().
 			const target = e.target;
 			if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
-			// Fiche : → ouvre la question courante, ← n'a nulle part où aller.
-			if (showingWelcome()) {
-				if (e.key !== "ArrowRight") return;
-				e.preventDefault();
-				goToQuestion(activeIdx, listCol, panel, nav, spec);
-				return;
-			}
+			/* Fiche : les flèches ne font rien. → ouvrait l'aperçu de la question
+			   courante, le même écran qu'un clic sur une question, retiré pour la
+			   même raison. */
+			if (showingWelcome()) return;
 			e.preventDefault();
 			goToQuestion(activeIdx + (e.key === "ArrowRight" ? 1 : -1), listCol, panel, nav, spec);
 		};

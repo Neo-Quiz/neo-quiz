@@ -837,6 +837,11 @@ export const CLE_DERNIERE_VUE = "derniereVue";
     dialogues natifs). */
 export const CLE_REGLAGES_LANGUE = "language";
 
+/** La clé du FORMAT DE L'HEURE (`neo.reglages`) : « 24h » ou « 12h » ; absente
+    ou illisible, 24 h. Écrite par la page Réglages seule, lue par le rendu au
+    démarrage (`ui/format-heure.ts`). Aucune garde : ce n'est pas un chemin. */
+export const CLE_REGLAGES_HEURE = "timeFormat";
+
 /** Le dossier de quiz PAR DÉFAUT, quand l'utilisateur en a choisi un autre que
     celui que `electron/dossier-defaut.ts` calcule. Absente (l'état courant de
     presque toutes les installations), c'est le chemin calculé qui vaut. Cette

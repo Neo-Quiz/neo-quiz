@@ -58,6 +58,7 @@
     "check:menu-app": "node scripts/check-menu-app.mjs",
     "check:reprise": "node scripts/check-reprise.mjs",
     "check:langue": "node scripts/check-langue.mjs",
+    "check:format-heure": "node scripts/check-format-heure.mjs",
     "check:fond": "node scripts/check-fond.mjs",
     "check:pdf": "node scripts/check-pdf.mjs",
     "check:folder-contents": "node scripts/check-folder-contents.mjs",

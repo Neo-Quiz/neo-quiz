@@ -135,8 +135,8 @@ let quizSelectionne: QuizIndexEntry | null = null;
 let vuePrecedente: DashboardViewName = "home";
 
 /**
- * La question COURANTE au tout premier rendu de la page « detail » (celle que
- * → ouvre depuis la fiche, qui reste l'écran d'ouverture), posée
+ * La question COURANTE au tout premier rendu de la page « detail » (celle sur
+ * laquelle l'éditeur s'ouvre ; la fiche reste l'écran d'ouverture), posée
  * par `reprendre()` au démarrage (reprise de session) et consommée par le
  * prochain `peindre()` — même patron que `editionEnAttente`, un état posé
  * une fois et remis à `undefined` aussitôt lu, pour qu'un aller-retour
@@ -618,7 +618,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			nav.setActive("detail");
 			// Notée SANS la question : `onQuestionChange` la précisera au premier
 			// changement. Ouvrir un quiz montre sa fiche ; sa question courante
-			// reste celle que → ouvre.
+			// reste celle sur laquelle l'éditeur s'ouvre.
 			noterVue({ vue: "detail", quiz: data.quiz.path });
 			peindre();
 			return;

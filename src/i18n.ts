@@ -69,6 +69,33 @@ export function langSetting(): LangSetting {
 	return setting;
 }
 
+/* ── Format de l'heure ──
+   24 h PAR DÉFAUT, quelle que soit la langue : l'anglais de l'interface
+   affichait « 06:35 PM », qui « ne correspond pas » à Ahmed (2026-09-23).
+   12 h reste un choix du réglage. Indépendant de la langue : on peut lire
+   l'interface en anglais et vouloir 18:35. */
+export type HourCycle = "24h" | "12h";
+let hourCycle: HourCycle = "24h";
+
+/** Applique le réglage ; toute autre valeur que « 12h » vaut 24 h. */
+export function setHourCycle(value?: string): void {
+	hourCycle = value === "12h" ? "12h" : "24h";
+}
+
+export function currentHourCycle(): HourCycle {
+	return hourCycle;
+}
+
+/** Les options d'`Intl.DateTimeFormat` pour l'HEURE d'une date, à ajouter à
+    toute mise en forme qui en montre une : 24 h sur deux chiffres (09:05,
+    18:35, 00:05 après minuit — `hourCycle: "h23"`), 12 h sans zéro devant
+    (9:05 AM, 6:35 PM). */
+export function hourOptions(cycle: HourCycle = hourCycle): Intl.DateTimeFormatOptions {
+	return cycle === "12h"
+		? { hour: "numeric", hourCycle: "h12" }
+		: { hour: "2-digit", hourCycle: "h23" };
+}
+
 /** Traduit une clé. `vars` remplace les jetons {nom} du libellé :
     t("ai.status.claudeOk", { version: "2.1.251" }). */
 export function t(key: TransKey, vars?: Record<string, string | number>): string {

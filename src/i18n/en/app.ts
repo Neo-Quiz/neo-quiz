@@ -165,6 +165,9 @@ export const EN_APP = {
 	"app.settings.general": "General",
 	"app.settings.languageAuto": "Automatic (follow Windows)",
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
+	"app.settings.timeFormat": "Time format",
+	"app.settings.timeFormat24": "24-hour ({example})",
+	"app.settings.timeFormat12": "12-hour ({example})",
 
 	/* ── Fond d'écran (application seulement) ── */
 	/* Les mises à jour : le titre remplace « About », retiré le 2026-09-17 — le
