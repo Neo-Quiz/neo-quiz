@@ -158,12 +158,14 @@ export function renderQuizCard(
 	/* Meta : icône du type + nombre de questions, puis l'objectif en badge.
 	   Le type n'est plus un badge : deux badges collés se ressemblaient, et la
 	   page du quiz l'affiche déjà en toutes lettres (Ahmed, 2026-09-23). Son
-	   libellé vit dans le `title` de l'icône, révélé au survol. */
+	   libellé est une bulle qui paraît au survol, en CSS : pas de `title`,
+	   dont l'infobulle native doublerait la bulle, en retard et hors thème. */
 	const meta = ajouter(body, "div", "qbd-quiz-card-meta");
 	const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
-	const typeIcon = ajouter(count, "span", "qbd-quiz-card-type-icon");
-	typeIcon.title = quizTypeLabel(quiz.quizType);
+	const typeWrap = ajouter(count, "span", "qbd-quiz-card-type");
+	const typeIcon = ajouter(typeWrap, "span", "qbd-quiz-card-type-icon");
 	currentHost().ui.setIcon(typeIcon, QUIZ_TYPE_ICONS[quiz.quizType]);
+	ajouter(typeWrap, "span", "qbd-quiz-card-type-tip", quizTypeLabel(quiz.quizType));
 	ajouter(
 		count, "span", undefined,
 		t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
