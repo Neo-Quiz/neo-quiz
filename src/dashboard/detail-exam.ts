@@ -2,20 +2,25 @@ import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import { createSelect } from "./ui-select";
+import { quizModeLabel } from "./quiz-card";
+import type { ModeQuiz } from "../quiz-format";
 import type { EditorExamOptions } from "../types/editor-ctx";
 
 /* ══════════════════════════════════════════════════════════
    MODE DU QUIZ — bloc réglages de la page « quiz »
 
-   Le mode (quiz / apprentissage / examen) et le chrono vivaient dans la
-   barre latérale de l'éditeur, et le mode LUI-MÊME n'y était même pas
-   réglable : il fallait ouvrir le panneau « Code » et écrire
-   `mode: 'lesson'` à la main. Retirer l'éditeur sans ce sélecteur aurait
-   donc retiré une capacité — c'est le seul point où la page ne se contente
-   pas de reprendre l'existant.
+   Deux modes, et seulement deux : Learn et Practice (spec
+   2026-09-23-learn-practice-design.md §1.1). Le sélecteur proposait encore
+   Quiz / Lesson / Exam et un chrono de bloc, que le format a retirés
+   (Ahmed, 2026-09-23 : « met à jour ça »).
+
+   Un Learn s'écrit `mode: 'learn'` : en interne c'est encore "lesson",
+   que `exportAll` réémet sous le nom du format. Un Practice n'a PAS d'objet
+   de mode. Un bloc hérité (`exam`, `examMode`) se lit comme un Practice et
+   reste tel quel tant qu'on ne touche pas au sélecteur : il est jouable.
 
    Visible en mode ÉDITION seulement : en consultation, le mode se lit dans
-   le quiz lui-même.
+   l'en-tête de la page.
 ══════════════════════════════════════════════════════════ */
 
 export interface ExamPanelOptions {
@@ -25,28 +30,12 @@ export interface ExamPanelOptions {
 	set(value: EditorExamOptions | null): void;
 	/** Persiste (débounce côté appelant). */
 	onChange(): void;
-	/** Re-rend le bloc : le jeu de champs dépend du mode choisi. */
+	/** Re-rend le bloc : l'aide dépend du mode choisi. */
 	onStructureChange(): void;
 }
 
-type QuizMode = "quiz" | "lesson" | "exam";
-
-/** Options par défaut d'un bloc qui n'en avait pas encore. */
-function defaults(mode: QuizMode): EditorExamOptions {
-	return {
-		mode,
-		enabled: mode === "exam",
-		durationMinutes: 10,
-		// Défauts du MOTEUR (quiz-utils.ts) : un examen soumet à la fin du
-		// temps et montre son chrono, sauf mention contraire.
-		autoSubmit: true,
-		showTimer: true,
-	};
-}
-
 export function renderExamPanel(parent: HTMLElement, opts: ExamPanelOptions): void {
-	const current = opts.get();
-	const mode: QuizMode = current?.mode || (current?.enabled ? "exam" : "quiz");
+	const mode: ModeQuiz = opts.get()?.mode === "lesson" ? "learn" : "practice";
 
 	const box = ajouter(parent, "div", "qbd-qz-exam");
 	const head = ajouter(box, "div", "qbd-qz-exam-head");
@@ -56,30 +45,21 @@ export function renderExamPanel(parent: HTMLElement, opts: ExamPanelOptions): vo
 	createSelect(box, {
 		value: mode,
 		options: [
-			{ value: "quiz", label: t("dashboard.quiz.modeQuiz") },
-			{ value: "lesson", label: t("dashboard.quiz.modeLesson") },
-			{ value: "exam", label: t("dashboard.quiz.modeExam") },
+			{ value: "learn", label: quizModeLabel("learn") },
+			{ value: "practice", label: quizModeLabel("practice") },
 		],
 		onChange: (value) => {
-			const next = value as QuizMode;
-			// Le mode « quiz » est le défaut du moteur : il n'a pas besoin
-			// d'objet de configuration dans le bloc, et en écrire un vide
-			// ajouterait du bruit à la note.
-			if (next === "quiz") {
-				/* Le mode « quiz » est le défaut du moteur, mais l'objet de
-				   configuration peut porter des clés personnalisées : les jeter
-				   avec lui perdait le travail de l'auteur. On ne le supprime donc
-				   que s'il ne restait rien d'autre dedans. */
-				const actuel = opts.get();
-				if (actuel?._extra) opts.set({ ...actuel, mode: "quiz", enabled: false });
-				else opts.set(null);
+			if (value === mode) return;
+			const actuel = opts.get();
+			if (value === "learn") {
+				// Aucun chrono : `enabled` faux, l'export n'écrit que le mode
+				// et les clés personnalisées.
+				opts.set({ durationMinutes: 10, autoSubmit: true, showTimer: true, ...actuel, mode: "lesson", enabled: false });
 			} else {
-				const base = opts.get() || defaults(next);
-				base.mode = next;
-				// Le chrono n'a de sens qu'en examen ; un mode leçon le porte
-				// seulement si l'auteur l'active explicitement ci-dessous.
-				base.enabled = next === "exam";
-				opts.set(base);
+				/* Practice = pas d'objet de mode. Les clés personnalisées de
+				   l'auteur survivent pourtant : les jeter avec l'objet perdait
+				   son travail, d'où un objet réduit à elles. */
+				opts.set(actuel?._extra ? { ...actuel, mode: undefined, enabled: false } : null);
 			}
 			opts.onChange();
 			opts.onStructureChange();
@@ -87,55 +67,5 @@ export function renderExamPanel(parent: HTMLElement, opts: ExamPanelOptions): vo
 	});
 
 	ajouter(box, "div", "qbd-qz-exam-help",
-		t(mode === "lesson" ? "dashboard.quiz.modeLessonHelp"
-			: mode === "exam" ? "dashboard.quiz.modeExamHelp"
-			: "dashboard.quiz.modeQuizHelp"));
-
-	// Le chrono : toujours pour l'examen, en option pour la leçon
-	// (bouton « Passer l'examen »). Rien à régler en mode quiz.
-	if (mode === "quiz") return;
-	const cfg = opts.get();
-	if (!cfg) return;
-
-	if (mode === "lesson") {
-		checkbox(box, t("dashboard.quiz.lessonExam"), cfg.enabled, (on) => {
-			cfg.enabled = on;
-			opts.onChange();
-			opts.onStructureChange();
-		});
-		if (!cfg.enabled) return;
-	}
-
-	const durWrap = ajouter(box, "div", "qbd-qz-exam-field");
-	ajouter(durWrap, "div", "qbd-qz-field-label", t("dashboard.quiz.duration"));
-	const dur = ajouter(durWrap, "input", "qbd-qz-field-input qbd-qz-field-input--single");
-	dur.type = "number";
-	dur.value = String(cfg.durationMinutes);
-	dur.min = "1";
-	dur.max = "180";
-	dur.addEventListener("input", () => {
-		// Bornes du MOTEUR (quiz-utils.ts, 1 à 180 minutes) : au-delà, la page
-		// afficherait 999 pendant que l'examen en durerait 180.
-		cfg.durationMinutes = Math.max(1, Math.min(180, Math.round(Number(dur.value) || 0)));
-		opts.onChange();
-	});
-	dur.addEventListener("blur", () => { dur.value = String(cfg.durationMinutes); });
-
-	checkbox(box, t("dashboard.quiz.autoSubmit"), cfg.autoSubmit, (on) => {
-		cfg.autoSubmit = on;
-		opts.onChange();
-	});
-	checkbox(box, t("dashboard.quiz.showTimer"), cfg.showTimer, (on) => {
-		cfg.showTimer = on;
-		opts.onChange();
-	});
-}
-
-function checkbox(parent: HTMLElement, label: string, checked: boolean, onToggle: (on: boolean) => void): void {
-	const row = ajouter(parent, "label", "qbd-qz-exam-check");
-	const input = ajouter(row, "input");
-	input.type = "checkbox";
-	input.checked = checked;
-	ajouter(row, "span", undefined, label);
-	input.addEventListener("change", () => onToggle(input.checked));
+		t(mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp"));
 }

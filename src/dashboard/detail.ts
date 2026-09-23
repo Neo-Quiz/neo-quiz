@@ -191,6 +191,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	let draft: QuizDraft | null = null;
 	let activeIdx = 0;
 	let editing = false;
+	/** La carte de départ est demandée (voir `showingWelcome`) : vrai à
+	    l'ouverture d'un quiz, faux dès qu'on ouvre une question. */
+	let welcome = false;
 	let saveTimer: number | null = null;
 	/** Brouillon FIGÉ dont l'écriture est en attente, et sa fonction d'écriture
 	    — pour que le débounce n'aille pas viser le quiz suivant. */
@@ -268,6 +271,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			draft = null;
 			activeIdx = 0;
 			if (typeof spec.initialQuestion === "number") activeIdx = Math.max(0, Math.floor(spec.initialQuestion));
+			// Rouvrir là où l'on s'était arrêté vise une QUESTION : pas de
+			// carte de départ par-dessus.
+			welcome = typeof spec.initialQuestion !== "number";
 			editing = false;
 		} else if (draft && draftIsStale(draft)) {
 			/* La note a changé DEHORS (éditeur markdown, synchro) pendant que la
@@ -294,7 +300,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const page = ajouter(container, "div", "qbd-qz");
 		markViewEnter(page, entering, "qbd-qz-enter");
 		renderHeader(page, spec);
-		renderStats(page, spec);
 
 		const body = ajouter(page, "div", "qbd-qz-body");
 		const listCol = ajouter(body, "div", "qbd-qz-list");
@@ -358,6 +363,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const count = draft ? draft.questions.length : spec.questionCount;
 		countEl = ajouter(titleRow, "span", "qbd-qz-count", String(count));
 		if (spec.subtitle) ajouter(info, "p", "qbd-qz-path", spec.subtitle);
+		renderMeta(info, spec);
 
 		const actions = ajouter(header, "div", "qbd-qz-actions");
 
@@ -401,6 +407,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    lequel on revient le plus souvent. */
 	function toggleEditing(page: HTMLElement): void {
 		editing = !editing;
+		// L'édition ouvre sur une question ; en sortir montre son aperçu.
+		if (editing) welcome = false;
 		if (!editing) void flushSave();
 
 		const body = page.querySelector(".qbd-qz-body");
@@ -459,38 +467,34 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		});
 	}
 
-	/* ── Stats : la colonne de cartes d'avant, compactée en une rangée ──
+	/** Stats du quiz, un enregistrement neutre s'il n'a jamais été joué. */
+	function statOf(quiz: QuizIndexEntry): QuizStatRecord {
+		const rec = ctx.statsStore ? ctx.statsStore.getRecord(quiz.path) : null;
+		return rec || { bestScore: 0, questionsDone: 0, totalQuestions: quiz.questions, lastPlayed: 0, attempts: 0 };
+	}
+
+	/* ── Ligne d'infos sous le titre ──
+	   Elle remplace la rangée de tuiles d'avant : des tuiles pour des
+	   métadonnées se lisaient comme des boutons, et se confondaient avec les
+	   tuiles des questions — les seules qu'on clique (Ahmed, 2026-09-23).
 	   Absente pour un quiz qui n'existe pas encore (résultat d'une
-	   génération) : ni score, ni tentative, ni date — quatre cases vides. */
-	function renderStats(page: HTMLElement, spec: QuizPageSpec): void {
+	   génération) : ni score, ni tentative, ni date. */
+	function renderMeta(parent: HTMLElement, spec: QuizPageSpec): void {
 		const quiz = spec.stats;
 		if (!quiz) return;
-		const rec = ctx.statsStore ? ctx.statsStore.getRecord(quiz.path) : null;
-		const stat: QuizStatRecord = rec || { bestScore: 0, questionsDone: 0, totalQuestions: quiz.questions, lastPlayed: 0, attempts: 0 };
-		const total = stat.totalQuestions || quiz.questions;
-		const pct = total > 0 ? Math.round(stat.questionsDone / total * 100) : 0;
+		const stat = statOf(quiz);
+		const line = ajouter(parent, "div", "qbd-qz-meta");
+		const item = (text: string, title?: string): HTMLElement => {
+			const el = ajouter(line, "span", "qbd-qz-meta-item");
+			ajouter(el, "span", undefined, text);
+			if (title) el.title = title;
+			return el;
+		};
 
-		const row = ajouter(page, "div", "qbd-qz-stats");
+		item(t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions }));
+		item(quizTypeLabel(quiz.quizType));
+		item(quizModeLabel(quiz.mode));
 
-		const prog = ajouter(row, "div", "qbd-qz-stat qbd-qz-stat--progress");
-		prog.appendChild(createRingSVG(pct, "var(--interactive-accent)", 40, 4));
-		const progText = ajouter(prog, "div", "qbd-qz-stat-body");
-		ajouter(progText, "span", "qbd-qz-stat-value qbd-qz-stat-pct", `${pct}%`);
-		ajouter(
-			progText, "span", "qbd-qz-stat-label",
-			t(total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done: stat.questionsDone, total }),
-		);
-
-		// Jamais joué : « Best score » et « Last played » n'auraient qu'un tiret
-		// à montrer — deux cases vides qui n'apprennent rien (demande d'Ahmed
-		// 2026-07-21). Elles apparaissent à la première tentative, avec le
-		// compteur de tentatives qui, lui, n'a de sens qu'à partir de 1.
-		const played = stat.attempts > 0;
-		const cells: Array<{ label: string; value: string; accent?: string; cls?: string; title?: string; logo?: string }> = [
-			{ label: t("dashboard.detail.statType"), value: quizTypeLabel(quiz.quizType) },
-			// L'objectif, à droite du type (le titre ne le porte plus).
-			{ label: t("dashboard.detail.statGoal"), value: quizModeLabel(quiz.mode) },
-		];
 		// Qui a généré ce quiz, et QUAND — absente pour une note écrite à la
 		// main ou pour un quiz partagé sans frontmatter.
 		if (quiz.generated) {
@@ -505,47 +509,97 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			   `provider` inconnu (réglage d'une version future) retombe dessus. */
 			const canal = getCanal(g.provider);
 			const source = canal && canal.type === "web" ? canal.label : g.model;
-			cells.push({
-				value: source,
-				/* La date et l'heure EXACTES prennent la place du libellé : c'est
-				   le seul endroit de l'application qui dise quand un quiz a été
-				   généré (demande d'Ahmed, 2026-09-20). L'effort d'un CLI, qui
-				   l'occupait, passe dans l'infobulle — il n'a de sens que pour
-				   qui l'a réglé. */
-				label: formatGeneratedAt(g.generatedAt),
-				/* Le logo de l'ENTRÉE du fournisseur, pas de sa marque : un quiz généré
-				   par Antigravity CLI porte l'Antigravity, pas l'étincelle Gemini. */
-				logo: getProvider(g.provider).logo,
-				cls: "qbd-qz-stat--generated",
-				title: g.effort
+			/* La date et l'heure EXACTES : c'est le seul endroit de l'application
+			   qui dise quand un quiz a été généré (demande d'Ahmed, 2026-09-20).
+			   L'effort d'un CLI passe dans l'infobulle — il n'a de sens que pour
+			   qui l'a réglé. */
+			const el = item(
+				t("dashboard.detail.metaGenerated", { model: source, date: formatGeneratedAt(g.generatedAt) }),
+				g.effort
 					? t("dashboard.detail.generatedBy", { model: source, effort: g.effort })
 					: t("dashboard.detail.generatedBySimple", { model: source }),
-			});
-		}
-		if (played) {
-			cells.unshift({
-				label: t("dashboard.detail.statBest"),
-				value: stat.bestScore > 0 ? `${stat.bestScore}%` : "—",
-				accent: stat.bestScore >= 80 ? "var(--color-green)" : stat.bestScore >= 60 ? "var(--color-yellow)" : undefined,
-			});
-			cells.push(
-				{ label: t("dashboard.detail.statLast"), value: ctx.statsStore ? ctx.statsStore.formatRelativeTime(stat.lastPlayed) : "—" },
-				{ label: t("dashboard.detail.statAttempts"), value: String(stat.attempts) },
 			);
+			/* Le logo de l'ENTRÉE du fournisseur, pas de sa marque : un quiz généré
+			   par Antigravity CLI porte l'Antigravity, pas l'étincelle Gemini. */
+			const logoId = getProvider(g.provider).logo;
+			const logo = ajouter(el, "span", "qbd-provider-logo qbd-qz-meta-logo qbd-provider-logo--" + logoId);
+			el.prepend(logo);
+			setBrandLogo(logo, logoId);
 		}
-		for (const c of cells) {
-			const cell = ajouter(row, "div", c.cls ? `qbd-qz-stat ${c.cls}` : "qbd-qz-stat");
-			if (c.title) cell.title = c.title;
-			const body = ajouter(cell, "div", "qbd-qz-stat-body");
-			const v = ajouter(body, "span", c.logo ? "qbd-qz-stat-value qbd-qz-stat-value--logo" : "qbd-qz-stat-value");
-			if (c.logo) {
-				const logo = ajouter(v, "span", "qbd-provider-logo qbd-qz-stat-logo qbd-provider-logo--" + c.logo);
-				setBrandLogo(logo, c.logo);
-			}
-			ajouter(v, "span", "", c.value);
-			if (c.accent) v.style.color = c.accent;
-			ajouter(body, "span", "qbd-qz-stat-label", c.label);
+
+		// Jamais joué : ni meilleur score, ni date, ni tentatives — rien que
+		// des tirets à montrer (demande d'Ahmed 2026-07-21).
+		if (stat.attempts > 0) {
+			const best = item(t("dashboard.detail.metaBest", { score: stat.bestScore }));
+			if (stat.bestScore >= 80) best.classList.add("is-good");
+			else if (stat.bestScore >= 60) best.classList.add("is-fair");
+			if (ctx.statsStore) item(t("dashboard.detail.metaLast", { when: ctx.statsStore.formatRelativeTime(stat.lastPlayed) }));
+			item(t(stat.attempts === 1 ? "dashboard.detail.metaAttemptsOne" : "dashboard.detail.metaAttemptsOther", { count: stat.attempts }));
 		}
+	}
+
+	/** Vrai quand le panneau montre la carte de départ plutôt qu'une question.
+	    Seulement pour un quiz du catalogue qu'on peut lancer, et jamais en
+	    édition : l'éditeur ouvre toujours sur une question. */
+	function showingWelcome(): boolean {
+		return welcome && !editing && !!currentSpec?.stats && !!currentSpec.start;
+	}
+
+	/* ── Carte de départ ──
+	   Ce que le panneau montre à l'ouverture. Avant elle, la page s'ouvrait
+	   sur la question 1, rendue comme si l'on pouvait y répondre : un
+	   nouveau venu tapait dans un champ qui ne comptait pas, et le seul vrai
+	   départ était un petit bouton dans le coin (« je fais quoi mtn ? »,
+	   2026-09-23). */
+	function renderWelcome(panel: HTMLElement, spec: QuizPageSpec, listCol: HTMLElement, nav: HTMLElement): void {
+		const quiz = spec.stats;
+		const start = spec.start;
+		if (!quiz || !start) return;
+		const stat = statOf(quiz);
+		const total = stat.totalQuestions || quiz.questions;
+		const done = Math.min(stat.questionsDone, total);
+		const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+		const card = ajouter(panel, "div", "qbd-qz-welcome");
+		const icon = ajouter(card, "span", "qbd-qz-welcome-icon");
+		currentHost().ui.setIcon(icon, "rocket");
+		ajouter(card, "h3", "qbd-qz-welcome-title", t("dashboard.quiz.welcomeTitle"));
+
+		const progress = ajouter(card, "div", "qbd-qz-welcome-progress");
+		const bar = ajouter(progress, "div", "qbd-qz-welcome-bar");
+		ajouter(bar, "div", "qbd-qz-welcome-fill").style.width = `${pct}%`;
+		ajouter(progress, "span", "qbd-qz-welcome-count", t("dashboard.quiz.welcomeProgress", { done, total }));
+
+		const btn = ajouter(card, "button", "qbd-btn--create qbd-qz-welcome-start");
+		btn.type = "button";
+		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), "play");
+		ajouter(btn, "span", undefined, t("dashboard.quiz.welcomeStart"));
+		btn.addEventListener("click", () => {
+			void flushSave();
+			start.onClick(btn);
+		});
+
+		const hint = ajouter(card, "button", "qbd-qz-welcome-hint");
+		hint.type = "button";
+		ajouter(hint, "span", undefined, t("dashboard.quiz.welcomeHint"));
+		currentHost().ui.setIcon(ajouter(hint, "span", "qbd-qz-welcome-hint-icon"), "arrow-right");
+		hint.addEventListener("click", () => goToQuestion(activeIdx, listCol, panel, nav, spec));
+	}
+
+	/** Bandeau de l'aperçu : dit que la question n'est pas jouée ici, et
+	    ramène à la carte de départ quand la page en a une. */
+	function renderPreviewBanner(panel: HTMLElement, spec: QuizPageSpec, listCol: HTMLElement, nav: HTMLElement): void {
+		const banner = ajouter(panel, "div", "qbd-qz-preview-banner");
+		currentHost().ui.setIcon(ajouter(banner, "span", "qbd-qz-preview-icon"), "eye");
+		ajouter(banner, "span", "qbd-qz-preview-text", t("dashboard.quiz.previewBanner"));
+		if (!spec.stats || !spec.start) return;
+		const back = ajouter(banner, "button", "qbd-qz-preview-back");
+		back.type = "button";
+		back.textContent = t("dashboard.quiz.previewBack");
+		back.addEventListener("click", () => {
+			welcome = true;
+			paint(listCol, panel, nav, spec);
+		});
 	}
 
 	/* ── Corps : liste des questions + question courante ── */
@@ -559,9 +613,18 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    liste et la navigation. `activeIdx` bouge ici et nulle part ailleurs :
 	    la direction du glissement se déduit de l'écart. */
 	function goToQuestion(target: number, listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
-		if (!draft || !slideHost) return;
+		if (!draft) return;
 		const clamped = Math.max(0, Math.min(target, draft.questions.length - 1));
-		if (clamped === activeIdx) return;
+		// Depuis la carte de départ : pas de glissement, le panneau change de
+		// nature (carte → aperçu), il est repeint.
+		if (showingWelcome()) {
+			welcome = false;
+			activeIdx = clamped;
+			spec.onQuestionChange?.(activeIdx);
+			paint(listCol, panel, nav, spec);
+			return;
+		}
+		if (!slideHost || clamped === activeIdx) return;
 		const dir: 1 | -1 = clamped > activeIdx ? 1 : -1;
 		const hops = Math.abs(clamped - activeIdx);
 		activeIdx = clamped;
@@ -606,7 +669,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
 		draft.questions.forEach((q, i) => {
-			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx ? " is-active" : ""));
+			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx && !showingWelcome() ? " is-active" : ""));
 			const num = ajouter(card, "span", "qbd-qz-card-num", String(i + 1));
 			num.setAttribute("aria-hidden", "true");
 			const text = questionText(q);
@@ -771,6 +834,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// au document peut être le Document lui-même, qui n'a pas closest().
 			const target = e.target;
 			if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
+			// Carte de départ : → ouvre la question courante, ← n'a nulle part où aller.
+			if (showingWelcome()) {
+				if (e.key !== "ArrowRight") return;
+				e.preventDefault();
+				goToQuestion(activeIdx, listCol, panel, nav, spec);
+				return;
+			}
 			e.preventDefault();
 			goToQuestion(activeIdx + (e.key === "ArrowRight" ? 1 : -1), listCol, panel, nav, spec);
 		};
@@ -799,15 +869,25 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		if (slideHost) finishSlide(slideHost);
 		panel.replaceChildren();
 		slideHost = null;
+		panel.classList.toggle("is-welcome", showingWelcome());
+		if (showingWelcome()) {
+			nav.replaceChildren();
+			renderWelcome(panel, spec, listCol, nav);
+			return;
+		}
 		const q = draft.questions[activeIdx];
 		if (!q) {
 			ajouter(panel, "div", "qbd-qz-error", t("dashboard.detail.noBlock"));
 			return;
 		}
 
+		if (!editing) renderPreviewBanner(panel, spec, listCol, nav);
 		// Le panneau est une piste de carrousel : le changement de question y
 		// glisse comme dans le quiz (detail-slide.ts).
 		slideHost = mountSlideHost(panel);
+		/* En consultation, l'aperçu est INERTE : ses champs de réponse se
+		   lisaient comme un quiz en cours, on y tapait, et rien ne comptait. */
+		slideHost.viewport.inert = !editing;
 		setSlide(slideHost, (slide) => fillSlide(slide, q, activeIdx, listCol, panel, nav, spec));
 		paintNav(listCol, panel, nav, spec);
 
@@ -881,31 +961,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		});
 	}
 
-	function createRingSVG(pct: number, color: string, size: number, sw: number): SVGSVGElement {
-		const r = (size - sw * 2) / 2;
-		const circ = 2 * Math.PI * r;
-		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		svg.setAttribute("width", String(size));
-		svg.setAttribute("height", String(size));
-		svg.style.transform = "rotate(-90deg)";
-		svg.style.flexShrink = "0";
-
-		const mk = (stroke: string, dash?: string, offset?: string): SVGCircleElement => {
-			const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-			c.setAttribute("cx", String(size / 2));
-			c.setAttribute("cy", String(size / 2));
-			c.setAttribute("r", String(r));
-			c.setAttribute("fill", "none");
-			c.setAttribute("stroke", stroke);
-			c.setAttribute("stroke-width", String(sw));
-			if (dash) c.setAttribute("stroke-dasharray", dash);
-			if (offset) { c.setAttribute("stroke-dashoffset", offset); c.setAttribute("stroke-linecap", "round"); }
-			return c;
-		};
-		svg.appendChild(mk("var(--background-modifier-border)"));
-		svg.appendChild(mk(color, String(circ), String(circ * (1 - pct / 100))));
-		return svg;
-	}
 
 	function dispose(): Promise<void> {
 		// L'écriture est CAPTURÉE avant que l'état ne soit remis à zéro : le

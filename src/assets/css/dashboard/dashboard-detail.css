@@ -134,78 +134,38 @@
 	align-items: center;
 }
 
-/* ── Rangée de stats (l'ancienne colonne de cartes, mise à plat) ── */
-.qbd-qz-stats {
+/* ── Ligne d'infos sous le titre (detail.ts renderMeta) ──
+   Du TEXTE, séparé par des points médians : seules les questions sont des
+   tuiles, parce que seules elles se cliquent. */
+.qbd-qz-meta {
 	display: flex;
-	align-items: stretch;
-	gap: 10px;
 	flex-wrap: wrap;
-	flex-shrink: 0;
-}
-
-.qbd-qz-stat {
-	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 8px 14px;
-	border-radius: var(--radius-m, 10px);
-	background: var(--qbd-glass-bg);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	margin-top: 6px;
+	font-size: 12.5px;
+	color: var(--text-muted);
+	line-height: 1.5;
 }
 
-.qbd-qz-stat--progress {
-	padding-left: 10px;
-}
-
-.qbd-qz-stat-body {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-}
-
-.qbd-qz-stat-value {
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--text-normal);
-	line-height: 1.2;
-}
-
-.qbd-qz-stat-pct {
-	font-size: 16px;
-	font-weight: 800;
-	color: var(--interactive-accent);
-	font-family: var(--font-monospace, monospace);
-	letter-spacing: -0.02em;
-}
-
-/* La tuile « généré par » : le logo de la marque devant le nom de la source
-   (« chatgpt.com », « claude-sonnet-4-5 »), à la taille du texte et non à
-   celle du sélecteur de fournisseur. Le libellé, dessous, porte la date. */
-.qbd-qz-stat-value--logo {
-	display: flex;
+.qbd-qz-meta-item {
+	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
 }
 
-.qbd-qz-stat-logo {
-	width: 14px;
-	height: 14px;
-}
-
-.qbd-qz-stat-logo svg {
-	width: 14px;
-	height: 14px;
-}
-
-.qbd-qz-stat-label {
-	font-size: 9px;
+.qbd-qz-meta-item + .qbd-qz-meta-item::before {
+	content: "·";
+	margin: 0 8px;
 	color: var(--text-faint);
-	font-weight: 500;
-	white-space: nowrap;
+}
+
+.qbd-qz-meta-item.is-good { color: var(--color-green); }
+.qbd-qz-meta-item.is-fair { color: var(--color-yellow); }
+
+.qbd-qz-meta-logo,
+.qbd-qz-meta-logo svg {
+	width: 13px;
+	height: 13px;
 }
 
 /* ── Corps : liste + panneau ── */
@@ -504,6 +464,161 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
+}
+
+/* ── Carte de départ (detail.ts renderWelcome) ──
+   Ce que le panneau montre à l'ouverture d'un quiz : une seule chose à
+   faire, en grand. Même verre que les autres surfaces de la page. */
+.qbd-qz-panel.is-welcome {
+	flex: 1 1 auto;
+	justify-content: center;
+}
+
+.qbd-qz-welcome {
+	align-self: center;
+	width: min(440px, 100%);
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	padding: 32px 28px 24px;
+	border-radius: var(--radius-l, 16px);
+	background: var(--qbd-glass-bg);
+	border: 1px solid var(--qbd-glass-edge);
+	box-shadow: var(--qbd-glass-sheen);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	text-align: center;
+}
+
+.qbd-qz-welcome-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+	color: var(--interactive-accent);
+}
+
+.qbd-qz-welcome-icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.qbd-qz-welcome-title {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+.qbd-qz-welcome-progress {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.qbd-qz-welcome-bar {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--background-modifier-border);
+	overflow: hidden;
+}
+
+.qbd-qz-welcome-fill {
+	height: 100%;
+	border-radius: inherit;
+	background: var(--interactive-accent);
+}
+
+.qbd-qz-welcome-count {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.qbd-root .qbd-qz-welcome-start {
+	width: 100%;
+	height: 44px;
+	justify-content: center;
+	font-size: 14.5px;
+}
+
+.qbd-qz-welcome-start .qbd-btn-icon {
+	display: flex;
+	align-items: center;
+}
+
+.qbd-root .qbd-qz-welcome-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.qbd-root .qbd-qz-welcome-hint:hover {
+	color: var(--text-normal);
+	background: transparent;
+}
+
+.qbd-qz-welcome-hint-icon svg {
+	width: 13px;
+	height: 13px;
+}
+
+/* ── Bandeau de l'aperçu (detail.ts renderPreviewBanner) ── */
+.qbd-qz-preview-banner {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+	padding: 8px 12px;
+	border-radius: var(--radius-m, 10px);
+	background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+	color: var(--text-muted);
+	font-size: 12.5px;
+}
+
+.qbd-qz-preview-icon {
+	display: flex;
+	color: var(--interactive-accent);
+}
+
+.qbd-qz-preview-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.qbd-qz-preview-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.qbd-root .qbd-qz-preview-back {
+	flex-shrink: 0;
+	padding: 2px 6px;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--interactive-accent);
+	font-size: 12.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.qbd-root .qbd-qz-preview-back:hover {
+	background: transparent;
+	text-decoration: underline;
 }
 
 .qbd-qz-loading,
@@ -946,26 +1061,6 @@
 	color: var(--text-faint);
 }
 
-.qbd-qz-exam-field {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.qbd-qz-exam-check {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 12px;
-	color: var(--text-muted);
-	cursor: pointer;
-}
-
-.qbd-qz-exam-check input {
-	flex-shrink: 0;
-	margin: 0;
-}
-
 
 /* ── Bascule consultation ⇄ édition ──
    Le corps sort (estompe + léger recul), la page se repeint dans l'autre
@@ -1116,11 +1211,9 @@
    quiz »). `.qbd-qz-enter` tombe dès l'animation finie (view-enter.ts) ;
    `backwards`, jamais `both` : `npm run check:view-enter` y veille.
    ══════════════════════════════════════════════════════════ */
-.qbd-qz-enter .qbd-qz-header,
-.qbd-qz-enter .qbd-qz-stats {
+.qbd-qz-enter .qbd-qz-header {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
 }
-.qbd-qz-enter .qbd-qz-stats { animation-delay: 60ms; }
 .qbd-qz-enter .qbd-qz-list,
 .qbd-qz-enter .qbd-qz-main {
 	animation: qbd-folder-card-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
@@ -1130,7 +1223,6 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-qz-enter .qbd-qz-header,
-	.qbd-qz-enter .qbd-qz-stats,
 	.qbd-qz-enter .qbd-qz-list,
 	.qbd-qz-enter .qbd-qz-main { animation: none; }
 }

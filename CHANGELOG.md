@@ -17,6 +17,8 @@ release notes.
 - Learn and Practice now show as a badge on quiz cards and on the quiz page, instead of in the title. A Practice bank also finds the Learn note of the same source when the request had no attachment.
 - On quiz cards, the question type is now an icon before the question count, named on hover, instead of a second badge.
 - Labels, badges and section titles are no longer forced to all caps.
+- The quiz page opens on a "Ready to start?" card with the progress and a large Start button. The stat tiles above the questions are now one line of text under the title, and a question clicked in the list shows as a preview whose answers can't be typed in.
+- The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 
 ## [1.19.0] - 2026-09-23
 
