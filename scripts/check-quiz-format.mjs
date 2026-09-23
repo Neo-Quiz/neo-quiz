@@ -11,7 +11,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode }) => {
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn }) => {
 	const r = makeReporter("Format Learn / Practice");
 
 	/* Le mode reste dans le NOM du fichier (lisible dans Obsidian) mais pas
@@ -60,6 +60,18 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		verifierFormat("learn", [...tranche(1), q({ title: "Sans", slice: 1, role: "pre" }), q({ title: "Vide", slice: 1, role: "pre", hint: "  " }), config]),
 		[{ kind: "preSansIndice", questions: ["Sans", "Vide"] }]);
 	r.check("Practice : l'indice n'est pas exigé", verifierFormat("practice", [q({ role: "pre" })]), []);
+
+
+	const sansMode = [...tranche(1), { objectives: ["Définir l'OSINT"] }];
+	r.check("Learn demandé, mode oublié : les objectifs deviennent la configuration",
+		[modeDuBloc(sansMode), modeDuBloc(completerConfigLearn(sansMode)), completerConfigLearn(sansMode).length, completerConfigLearn(sansMode).at(-1).objectives[0]],
+		["practice", "learn", sansMode.length, "Définir l'OSINT"]);
+	r.check("Learn demandé, aucune configuration : elle est ajoutée",
+		[modeDuBloc(completerConfigLearn(tranche(1))), completerConfigLearn(tranche(1)).length], ["learn", tranche(1).length + 1]);
+	r.check("sans rôle de parcours, rien n'est inventé",
+		completerConfigLearn([q(), q({ title: "R" })]).length, 2);
+	r.check("déjà un Learn : inchangé",
+		JSON.stringify(completerConfigLearn([...tranche(1), config])), JSON.stringify([...tranche(1), config]));
 
 	r.check("plan des tranches : titre de la lecture, sinon de la première question, trié",
 		planDesTranches([q({ title: "pre2", slice: 2, role: "pre" }), ...tranche(1), q({ title: "x", slice: 2, role: "recall" }), config]),

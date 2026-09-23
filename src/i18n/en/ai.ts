@@ -243,6 +243,12 @@ export const EN_AI = {
 
 	/* ── Scène : chargement, erreur, résultat ── */
 	"ai.loading.title": "Creating your quiz…",
+	/* Un quiz par fichier joint : où en est le lot, et ce qui s'y passe. */
+	"ai.batch.progress": "Quiz {index} of {total} · {file}",
+	"ai.batch.ready": "“{file}” is ready ({index} of {total}). The next one is on its way.",
+	"ai.batch.failed": "“{file}” could not be generated: {error}",
+	"ai.batch.stopped": "Stopped. {count} quiz(zes) already saved are kept.",
+	"ai.batch.webNext": "“{file}” is saved. Next file: {next}.",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",

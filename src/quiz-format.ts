@@ -131,6 +131,32 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 	return manques;
 }
 
+/** Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` : la configuration
+    est complétée plutôt que le parcours enregistré comme banque Practice.
+    Gemini 3.5 Flash-Lite a rendu un parcours complet (rôles pre / read /
+    explain / recall) avec `{ objectives: [...] }` en dernier, sans `mode`
+    (2026-09-24) : la note s'étiquetait Practice et l'objet des objectifs
+    devenait une question vide. Rien n'est touché si aucune question ne porte
+    un rôle de parcours : ce serait inventer un Learn. PURE : rend un nouveau
+    tableau. */
+export function completerConfigLearn(items: readonly unknown[]): unknown[] {
+	if (modeDuBloc(items) === "learn") return [...items];
+	const { questions } = separer(items);
+	const parcours = questions.some(({ q }) => q.role === "pre" || q.role === "read" || q.role === "explain" || q.role === "recall");
+	if (!parcours) return [...items];
+	const copie = [...items];
+	/* L'objet des objectifs, sans énoncé : c'est la configuration qu'il
+	   voulait écrire. Il garde ses objectifs et reçoit le mode. */
+	const idx = copie.findIndex(it => !!it && typeof it === "object" && !Array.isArray(it)
+		&& Array.isArray((it as Element).objectives) && !texte((it as Element).prompt));
+	if (idx >= 0) {
+		copie[idx] = { ...(copie[idx] as object), mode: "learn" };
+		return copie;
+	}
+	copie.push({ mode: "learn" });
+	return copie;
+}
+
 export function planDesTranches(items: readonly unknown[]): { slice: number; titre: string }[] {
 	const titres = new Map<number, string>();
 	for (const { q, i } of separer(items).questions) {

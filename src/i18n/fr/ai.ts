@@ -214,6 +214,11 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 
 	/* ── Scène : chargement, erreur, résultat ── */
 	"ai.loading.title": "Quiz en cours de création…",
+	"ai.batch.progress": "Quiz {index} sur {total} · {file}",
+	"ai.batch.ready": "« {file} » est prêt ({index} sur {total}). Le suivant arrive.",
+	"ai.batch.failed": "« {file} » n'a pas pu être généré : {error}",
+	"ai.batch.stopped": "Arrêté. Les {count} quiz déjà enregistrés sont gardés.",
+	"ai.batch.webNext": "« {file} » est enregistré. Fichier suivant : {next}.",
 	"ai.error.title": "Échec de la génération",
 	"ai.error.retry": "Réessayer",
 	"ai.error.checkSettings": "Vérifiez vos paramètres IA dans les paramètres du plugin.",

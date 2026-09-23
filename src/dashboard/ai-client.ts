@@ -459,9 +459,22 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 	cleaned = repairLatexBackslashes(cleaned);
 
 	let parsed: unknown;
+	let lu = false;
 	try {
 		parsed = JSON5.parse(cleaned);
+		lu = true;
 	} catch (err) {
+		/* UNE VIRGULE OUBLIÉE entre deux champs ne doit pas coûter une
+		   génération : Gemini 3.5 Flash-Lite a rendu un quiz entier, juste,
+		   avec deux `"explain": "…"` suivis à la ligne d'un `"hint"` sans
+		   virgule (2026-09-24) — « invalid character '"' at 67:5 », et tout
+		   était à refaire. Seconde lecture après réparation ; si elle échoue
+		   aussi, l'erreur rapportée reste celle de la réponse d'ORIGINE. */
+		const repare = reparerVirgulesManquantes(cleaned);
+		if (repare !== cleaned) {
+			try { parsed = JSON5.parse(repare); lu = true; } catch { /* l'erreur d'origine suit */ }
+		}
+		if (lu && Array.isArray(parsed)) return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
 		   (ligne, colonne), ce qu'aucune paraphrase ne ferait mieux. Une
 		   réponse qui n'est pas un quiz du tout, elle, mérite qu'on dise ce
@@ -479,7 +492,38 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		throw new Error(t("ai.err.notAnArray"));
 	}
 
-	return { questions: parsed, titre: titreEnCommentaire(cleaned) };
+	return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+}
+
+/** Ajoute la virgule qu'un modèle a oubliée en fin de ligne, entre une
+    valeur qui se termine (chaîne, nombre, littéral, `]`, `}`) et une ligne
+    qui commence un nouvel élément ou un nouveau champ. Une ligne de
+    commentaire n'est jamais touchée. Ne sert qu'en SECONDE lecture, après
+    l'échec de la première : une réponse valide ne passe jamais ici. */
+export function reparerVirgulesManquantes(source: string): string {
+	const lignes = source.split("\n");
+	const finDeValeur = /(["'\d\]}]|\btrue|\bfalse|\bnull)\s*$/;
+	const debutDElement = /^\s*(["'{[\d-]|[A-Za-z_$][\w$]*\s*:)/;
+	for (let i = 0; i < lignes.length - 1; i++) {
+		const cur = lignes[i];
+		if (/^\s*\/\//.test(cur) || !finDeValeur.test(cur)) continue;
+		let j = i + 1;
+		while (j < lignes.length && !lignes[j].trim()) j++;
+		if (j < lignes.length && debutDElement.test(lignes[j])) lignes[i] = cur.replace(/\s*$/, ",");
+	}
+	return lignes.join("\n");
+}
+
+/** Retire les faux titres de section qu'un modèle glisse entre les
+    questions, `{ "// title": "Partie 2" }` : un objet dont TOUTES les clés
+    sont des commentaires n'est pas une question, et deviendrait une carte
+    vide dans le quiz (vu avec Gemini 3.5 Flash-Lite le 2026-09-24). */
+function sansFauxTitres(items: unknown[]): unknown[] {
+	return items.filter(it => {
+		if (!it || typeof it !== "object" || Array.isArray(it)) return true;
+		const cles = Object.keys(it);
+		return cles.length === 0 || !cles.every(k => k.trim().startsWith("//"));
+	});
 }
 
 /* Le modèle a répondu autre chose qu'un quiz : nommer QUOI, et surtout

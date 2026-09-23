@@ -41,6 +41,11 @@ jobs:
       - name: Numeric answers typed in LaTeX
         run: npm run check:numeric
 
+      # UNE RÉPONSE COPIÉE D'UN SITE, dans tous ses états : fence, prose,
+      # LaTeX, virgule oubliée, faux titres de section (Gemini, 2026-09-24).
+      - name: Web channel responses
+        run: npm run check:web-channel
+
       # LE CLIQUET DE LA FRONTIÈRE D'HÔTE. Le contrat `src/host/types.ts` dit
       # que c'est ce contrôle, et non la discipline, qui tient la frontière :
       # tant qu'il n'était lancé qu'à la main, c'était encore la discipline.

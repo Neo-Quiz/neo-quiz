@@ -2,7 +2,7 @@ import JSON5 from "json5";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
+import { completerConfigLearn, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
 import { debutDeDemande, nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
@@ -318,6 +318,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   dont le CLI tourne encore. */
 		if (phase === "loading") activeClient?.abort();
 		if (phase !== "idle") resetGeneration();
+		/* Les pièces du dossier REMPLACENT celles du composer : arriver depuis
+		   XTI302 avec les fichiers d'XTI301 encore joints (préréglage
+		   précédent, jamais envoyé) mêlait deux cours dans une génération
+		   écrite dans un seul dossier (vu le 2026-09-24). Le texte tapé, lui,
+		   reste : c'est une consigne, pas une source. */
+		for (const img of images) URL.revokeObjectURL(img.url);
+		images = [];
+		noteAttachments = [];
 		destination = p.destination;
 		aJoindre = [...p.attach];
 	}
@@ -489,6 +497,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/* Demande PARTIE. Non nulle dès l'envoi, remise à null quand la demande
 	   est rendue au composer (annulation) ou qu'on recommence à zéro. */
 	let sentMessage: SentMessage | null = null;
+	/* UN QUIZ PAR FICHIER JOINT (2026-09-23) : CM1, CM2 et CM3 joints
+	   ensemble donnent trois quiz, un par cours, et non un quiz de 60
+	   questions qui décourage avant de commencer et prend trois fois plus
+	   longtemps à venir. `lot` dit où en est la génération (« 2 sur 3 »),
+	   pour la modale d'attente ; null hors lot. */
+	let lot: { index: number; total: number; nom: string } | null = null;
+	/* Canal web : les fichiers qui attendent leur tour. Le site s'ouvre pour
+	   le suivant dès que la réponse du précédent est enregistrée ; la page
+	   du PREMIER quiz s'ouvre à la fin. */
+	let lotWebRestant: SentMessage[] = [];
+	let lotWebPremier: (() => void) | null = null;
+	/** La demande partie sur le site en ce moment (un fichier du lot, ou
+	    l'envoi entier) : c'est elle qui nomme la note reçue. */
+	let demandeWeb: SentMessage | null = null;
+	/** Oublie le lot web : plus de fichier en attente, plus de progression. */
+	function oublierLotWeb(): void {
+		lotWebRestant = [];
+		lotWebPremier = null;
+		demandeWeb = null;
+		lot = null;
+	}
 	// Client IA de la génération en cours — permet au bouton stop (et à
 	// la touche Esc) d'annuler réellement (kill du CLI / abort du fetch).
 	let activeClient: AiClient | null = null;
@@ -2740,6 +2769,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const iconWrap = ajouter(loader, "div", "qbd-ai-loading-icon");
 		host.ui.setIcon(iconWrap, "sparkles");
 		ajouter(loader, "p", "qbd-ai-loading-title", t("ai.loading.title"));
+		// Un quiz par fichier joint : lequel est en cours.
+		if (lot) ajouter(loader, "p", "qbd-ai-loading-batch", t("ai.batch.progress", { index: lot.index, total: lot.total, file: lot.nom }));
 
 		const dots = ajouter(loader, "div", "qbd-ai-loading-dots");
 		for (let i = 0; i < 3; i++) {
@@ -3339,10 +3370,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    rend la navigation à faire au lieu de la faire : l'appelant choisit
 	    quand la page du quiz remplace ce qui est à l'écran. `false` si rien
 	    n'a pu être enregistré (notice déjà affichée). */
-	async function saveGeneratedQuiz(options: { differerNavigation?: boolean } = {}): Promise<false | (() => void)> {
+	async function saveGeneratedQuiz(options: { differerNavigation?: boolean; demande?: SentMessage } = {}): Promise<false | (() => void)> {
 		const root = host.paths.defaultRoot();
+		/* La demande qui a produit CE quiz : dans un lot (un quiz par fichier
+		   joint), c'est le sous-message du fichier, pas l'envoi entier — sinon
+		   chaque note prendrait le nom du premier fichier. */
+		const demande = options.demande ?? sentMessage;
 
 		try {
+			/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
+			   Learn (`completerConfigLearn`) : AVANT le brouillon, qui lit
+			   `generatedQuestions`. */
+			if (modeGeneration === "learn") {
+				const complete = completerConfigLearn(generatedQuestions);
+				if (complete.length !== generatedQuestions.length || modeDuBloc(complete) !== modeDuBloc(generatedQuestions)) {
+					generatedQuestions = complete;
+					generatedDraft = null;
+				}
+			}
 			const draft = loadGeneratedDraft();
 			if (!draft.questions.length) return false;
 			/* La destination CHOISIE dans le popover des options, sinon le
@@ -3358,10 +3403,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   c'est par elle, et non par le nom, qu'un Practice retrouve son
 			   Learn — calculable dès le lancement, avant le titre du modèle. */
 			const defaut = t("dashboard.quizzes.newQuizDefaultName");
-			const pieces = sentMessage?.notes ?? [];
-			const source = nomDeSource(pieces, sentMessage?.text ?? "", defaut);
+			const pieces = demande?.notes ?? [];
+			const source = nomDeSource(pieces, demande?.text ?? "", defaut);
 			const mode = modeDuBloc(generatedQuestions);
-			const base = pieces.length ? source : nomDeSource([], generatedTitre || sentMessage?.text || "", defaut);
+			const base = pieces.length ? source : nomDeSource([], generatedTitre || demande?.text || "", defaut);
 			const name = nomDeNote(base, mode);
 			const path = await freeNotePath(folder, name);
 			const provider = settings().aiProvider || "";
@@ -3514,6 +3559,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function resetGeneration(): void {
 		couperSondeConnexion();
 		arreterAttenteWeb();
+		oublierLotWeb();
 		errorAction = null;
 		attenteWebSite = "";
 		phase = "idle";
@@ -3649,6 +3695,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { source, prompt };
 	}
 
+	/** Un sous-message PAR FICHIER joint, même consigne pour chacun, dès que
+	    la demande porte plusieurs documents et aucune image (une image
+	    illustre souvent LE document d'à côté : les séparer les couperait de
+	    leur contexte). Sinon, la demande telle quelle. */
+	function decouperParFichier(msg: SentMessage): SentMessage[] {
+		if (msg.images.length > 0 || msg.notes.length < 2) return [msg];
+		return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
+	}
+
 	/** La demande pour un site quand les fichiers sont DÉPOSÉS à côté : la
 	    consigne de l'utilisateur et les noms des documents, dont le contenu
 	    arrivera par le glisser-déposer — pas inliné. Adressé au modèle, donc en
@@ -3739,8 +3794,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   écouteurs `document` (Esc, collage) continueraient de tourner sous la
 		   génération CLI qui vient de partir. */
 		arreterAttenteWeb();
+		const parFichier = decouperParFichier(msg);
 		if (aiProviders.estCanalWeb(settings().aiProvider || "")) {
-			await ouvrirSite(msg, container);
+			/* Un site ne reçoit qu'une demande à la fois : le premier fichier
+			   part, les autres attendent la réponse du précédent
+			   (`recevoirReponse`). */
+			lotWebRestant = parFichier.slice(1);
+			lotWebPremier = null;
+			lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
+			await ouvrirSite(parFichier[0], container);
 			return;
 		}
 		phase = "loading";
@@ -3759,107 +3821,155 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		};
 		document.addEventListener("keydown", onEsc);
 
-		try {
+		/* UN QUIZ PAR FICHIER JOINT : chaque fichier est une génération à part,
+		   enregistrée dès qu'elle arrive. Un fichier en échec est SIGNALÉ et le
+		   lot continue ; un arrêt (Stop, Esc) garde ce qui est déjà écrit. À la
+		   fin, la page du PREMIER quiz s'ouvre. Sans lot (un seul fichier, ou
+		   des images), une seule itération : le chemin d'avant. */
+		const ouverts: (() => void)[] = [];
+		let annule = false;
+		let derniereErreur: Error | null = null;
+		for (let k = 0; k < parFichier.length; k++) {
+			const demande = parFichier[k];
+			lot = parFichier.length > 1 ? { index: k + 1, total: parFichier.length, nom: demande.notes[0]?.name ?? "" } : null;
+			if (lot) render(container);
+			generatedQuestions = [];
+			try {
+				const { source, prompt } = composerDemande(demande);
 
-			const { source, prompt } = composerDemande(msg);
+				// Convert image files to base64 for vision API
+				let imageData: ImagePayload[] = [];
+				if (demande.images.length > 0) {
+					imageData = await Promise.all(demande.images.map(async (img) => {
+						const buffer = await img.file.arrayBuffer();
+						const bytes = new Uint8Array(buffer);
+						let binary = "";
+						for (let i = 0; i < bytes.length; i++) {
+							binary += String.fromCharCode(bytes[i]);
+						}
+						const base64 = btoa(binary);
+						return { base64, mediaType: img.file.type || "image/png" };
+					}));
+				}
 
-			// Convert image files to base64 for vision API
-			let imageData: ImagePayload[] = [];
-			if (msg.images.length > 0) {
-				imageData = await Promise.all(msg.images.map(async (img) => {
-					const buffer = await img.file.arrayBuffer();
-					const bytes = new Uint8Array(buffer);
-					let binary = "";
-					for (let i = 0; i < bytes.length; i++) {
-						binary += String.fromCharCode(bytes[i]);
+				// La vue a-t-elle été fermée pendant l'encodage des images ? Lancer le
+				// CLI maintenant ferait tourner un processus que plus personne
+				// n'écoute, et sa réponse repeindrait un conteneur détaché.
+				if (disposed) {
+					document.removeEventListener("keydown", onEsc);
+					activeClient = null;
+					lot = null;
+					return;
+				}
+
+				await preparerLienLearn(demande);
+				const planTranches = planTranchesEnvoye;
+
+				const reponse = await client.generate(prompt, {
+					count: questionCount,
+					type: questionType,
+					mode: modeGeneration,
+					source,
+					planTranches,
+					images: imageData
+				});
+				generatedQuestions = reponse.questions;
+				generatedTitre = reponse.titre;
+
+				/* Coût de CE qui vient d'être produit. Le journal et la lecture des
+				   quotas sont accessoires : ils ne doivent jamais faire échouer une
+				   génération qui, elle, a réussi. */
+				lastUsage = client.lastUsage;
+				lastPlan = null;
+				if (lastUsage && deps.usage) {
+					try {
+						await deps.usage.record({
+							...lastUsage,
+							at: Date.now(),
+							questionCount: generatedQuestions.length
+						});
+						// La génération vient de consommer du forfait : relire tout de
+						// suite garde le survol du bouton d'usage juste, sans attendre
+						// que l'écran soit ouvert.
+						lastPlan = await deps.usage.fetchPlan(lastUsage);
+					} catch (e) {
+						console.warn(LOG_PREFIX, "usage non enregistré:", e);
 					}
-					const base64 = btoa(binary);
-					return { base64, mediaType: img.file.type || "image/png" };
-				}));
+				}
+			} catch (err) {
+				const e = err as Error & { aborted?: boolean };
+				if (e && e.aborted) {
+					annule = true;
+					generatedQuestions = [];
+					break;
+				}
+				derniereErreur = e;
+				errorMessage = e.message || t("ai.error.checkSettings");
+				errorLogin = (e as LoginRequiredError).besoinConnexion || null;
+				errorAction = (e as UpgradeRequiredError).besoinPlan ? "upgrade" : null;
+				generatedQuestions = [];
+				/* Dans un lot, un fichier en échec n'arrête pas les autres ; un
+				   compte déconnecté ou un plan épuisé, si : les suivants
+				   échoueraient pareil. */
+				if (lot) {
+					host.ui.notice(t("ai.batch.failed", { file: lot.nom, error: errorMessage }));
+					if (errorLogin || errorAction) break;
+				}
+				continue;
 			}
 
-			// La vue a-t-elle été fermée pendant l'encodage des images ? Lancer le
-			// CLI maintenant ferait tourner un processus que plus personne
-			// n'écoute, et sa réponse repeindrait un conteneur détaché.
-			if (disposed) {
-				document.removeEventListener("keydown", onEsc);
-				activeClient = null;
-				return;
-			}
-
-			await preparerLienLearn(msg);
-			const planTranches = planTranchesEnvoye;
-
-			const reponse = await client.generate(prompt, {
-				count: questionCount,
-				type: questionType,
-				mode: modeGeneration,
-				source,
-				planTranches,
-				images: imageData
-			});
-			generatedQuestions = reponse.questions;
-			generatedTitre = reponse.titre;
-
-			/* Coût de CE qui vient d'être produit. Le journal et la lecture des
-			   quotas sont accessoires : ils ne doivent jamais faire échouer une
-			   génération qui, elle, a réussi. */
-			lastUsage = client.lastUsage;
-			lastPlan = null;
-			if (lastUsage && deps.usage) {
-				try {
-					await deps.usage.record({
-						...lastUsage,
-						at: Date.now(),
-						questionCount: generatedQuestions.length
-					});
-					// La génération vient de consommer du forfait : relire tout de
-					// suite garde le survol du bouton d'usage juste, sans attendre
-					// que l'écran soit ouvert.
-					lastPlan = await deps.usage.fetchPlan(lastUsage);
-				} catch (e) {
-					console.warn(LOG_PREFIX, "usage non enregistré:", e);
+			if (generatedQuestions.length > 0) {
+				// Nouvelle génération → l'éditeur embarqué repart des questions
+				// fraîches (renderResult le monte pleine page).
+				generationId++;
+				generatedDraft = null;
+				phase = "result";
+				const ouvrir = await saveGeneratedQuiz({ differerNavigation: true, demande });
+				phase = "loading";
+				/* Un seul fichier et l'enregistrement a échoué : le quiz généré
+				   reste affiché (la page résultat), comme avant les lots — il
+				   peut encore être inséré dans une note. */
+				if (!ouvrir && parFichier.length === 1) {
+					document.removeEventListener("keydown", onEsc);
+					activeClient = null;
+					signalerGeneration(false);
+					lot = null;
+					phase = "result";
+					render(container);
+					return;
+				}
+				if (ouvrir) {
+					ouverts.push(ouvrir);
+					if (lot && k < parFichier.length - 1) host.ui.notice(t("ai.batch.ready", { file: lot.nom, index: lot.index, total: lot.total }));
 				}
 			}
-		} catch (err) {
-			const e = err as Error & { aborted?: boolean };
-			if (e && e.aborted) {
-				// Annulation volontaire (bouton stop / Esc) → retour à l'état
-				// initial, sans écran d'erreur. La demande RETOURNE dans le
-				// composer : annuler, c'est défaire l'envoi — sinon le texte
-				// (et les pièces jointes) seraient perdus.
-				document.removeEventListener("keydown", onEsc);
-				activeClient = null;
-				generatedQuestions = [];
-				restoreComposerMessage();
-				phase = "idle";
-				signalerGeneration(false);
-				render(container);
-				return;
-			}
-			errorMessage = e.message || t("ai.error.checkSettings");
-			errorLogin = (e as LoginRequiredError).besoinConnexion || null;
-			errorAction = (e as UpgradeRequiredError).besoinPlan ? "upgrade" : null;
-			generatedQuestions = [];
 		}
 
 		document.removeEventListener("keydown", onEsc);
 		activeClient = null;
 		signalerGeneration(false);
-		let navigated = false;
-		if (generatedQuestions.length > 0) {
-			// Nouvelle génération → l'éditeur embarqué repart des questions
-			// fraîches (renderResult le monte pleine page).
-			generationId++;
-			generatedDraft = null;
+		lot = null;
+		if (ouverts.length > 0) {
+			/* Au moins un quiz est écrit : sa page s'ouvre, même après un arrêt
+			   ou un échec en cours de lot — ce qui est enregistré le reste. */
+			if (annule && parFichier.length > 1) host.ui.notice(t("ai.batch.stopped", { count: ouverts.length }));
 			phase = "result";
-			// Le succès visible est directement la page de la note enregistrée :
-			// elle affiche déjà « Lancer », sans clic intermédiaire sur Enregistrer.
-			navigated = !!(await saveGeneratedQuiz());
-		} else {
-			phase = "error";
+			ouverts[0]();
+			return;
 		}
-		if (!navigated) render(container);
+		if (annule) {
+			// Annulation volontaire (bouton stop / Esc) → retour à l'état
+			// initial, sans écran d'erreur. La demande RETOURNE dans le
+			// composer : annuler, c'est défaire l'envoi — sinon le texte
+			// (et les pièces jointes) seraient perdus.
+			restoreComposerMessage();
+			phase = "idle";
+			render(container);
+			return;
+		}
+		if (!derniereErreur && !errorMessage) errorMessage = t("ai.error.checkSettings");
+		phase = "error";
+		render(container);
 	}
 
 	/**
@@ -3868,6 +3978,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	 * Copier), et rien à confirmer ici : c'est la contrainte de la spec.
 	 */
 	async function ouvrirSite(msg: SentMessage, container: HTMLElement | null): Promise<void> {
+		demandeWeb = msg;
 		const canalId = settings().aiProvider || "";
 		const canal = aiProviders.getCanal(canalId);
 		const site = canal ? canal.label : canalId;
@@ -4019,6 +4130,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Annuler = défaire l'ouverture : la demande revient dans le composer. */
 	function annulerAttenteWeb(): void {
 		arreterAttenteWeb();
+		/* Au milieu d'un lot, les quiz déjà reçus sont enregistrés : annuler
+		   les suivants ouvre le premier, plutôt que de rendre au composer des
+		   fichiers déjà traités. */
+		const premier = lotWebPremier;
+		oublierLotWeb();
+		if (premier) { resetGeneration(); premier(); return; }
 		restoreComposerMessage();
 		phase = "idle";
 		render(containerRef);
@@ -4066,12 +4183,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		void host.ui.premierPlan?.().catch(() => { /* la page reste juste derrière */ });
 		render(containerRef);
 		const [navigated] = await Promise.all([
-			saveGeneratedQuiz({ differerNavigation: true }),
+			saveGeneratedQuiz({ differerNavigation: true, demande: demandeWeb ?? undefined }),
 			new Promise<void>(resolve => window.setTimeout(resolve, 1000)),
 		]);
 		reponseRecue = null;
 		if (disposed) return;
-		if (navigated) { navigated(); return; }
+		/* UN QUIZ PAR FICHIER JOINT : un autre fichier attend son tour → le site
+		   se rouvre pour lui, avec la même consigne. La page du PREMIER quiz
+		   enregistré s'ouvre quand le dernier est reçu. */
+		if (lotWebRestant.length > 0) {
+			if (navigated && !lotWebPremier) lotWebPremier = navigated;
+			const suivant = lotWebRestant.shift() as SentMessage;
+			const fait = lot?.nom ?? "";
+			const total = lot?.total ?? lotWebRestant.length + 2;
+			lot = { index: (lot?.index ?? 1) + 1, total, nom: suivant.notes[0]?.name ?? "" };
+			host.ui.notice(t("ai.batch.webNext", { file: fait, next: lot.nom }));
+			await ouvrirSite(suivant, containerRef);
+			return;
+		}
+		const premier = lotWebPremier ?? navigated;
+		oublierLotWeb();
+		if (premier) { premier(); return; }
 		phase = "result";
 		render(containerRef);
 	}

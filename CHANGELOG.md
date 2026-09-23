@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, generated one after the other ("Quiz 2 of 3"), each saved as soon as it is ready. A document that fails is reported and the others go on; with a website, the site reopens for the next document once the previous answer is received.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
@@ -28,6 +29,11 @@ release notes.
 - The quiz page opens on a sheet: on the left the folder, the title, the goal and the question count on one line (hovering them explains the mode and names the question type), the model that generated the quiz with the date below it, the progress once started, a large Start button and the editor; on the right every question, readable at a glance and without the answers, along a numbered path with its type icon and, in a Learn note, its role; short choices sit side by side, long ones in a column, and only the list scrolls. Clicking a question makes the Start button shine instead of opening it, the same shine that plays on arrival and every few seconds, and leaving the editor returns to the sheet. The stat tiles under the title are now one line of text, and models show their readable name (Sonnet 5 rather than claude-sonnet-5).
 - The Practice hint now says the bank prepares you for your exam, rather than promising your exam's format.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
+
+### Fixed
+- "Create with AI" from a folder no longer keeps the files of the previous folder in the request.
+- A quiz copied from a website is read even when the model forgot a comma between two fields or inserted section headings between questions, instead of being rejected.
+- A Learn path whose model forgot to mark it as Learn is saved as Learn, not as a Practice bank.
 
 ## [1.19.0] - 2026-09-23
 
