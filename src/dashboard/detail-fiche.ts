@@ -178,16 +178,12 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
 	edit.addEventListener("click", () => deps.onEdit());
 
-	/* Relance le reflet sur-le-champ (remis au début de son cycle) et donne au
-	   bouton une petite impulsion : le clic a lieu à droite, le bouton est à
-	   gauche, et le reflet seul passerait inaperçu. Rien sans animations. */
+	/* Relance le reflet sur-le-champ (remis au début de son cycle). Le bouton
+	   ne grossit plus au clic (Ahmed, 2026-09-23) : le reflet seul. Rien sans
+	   animations. */
 	return () => {
 		if (reduit()) return;
 		for (const a of reflet.getAnimations()) a.currentTime = 0;
-		start.animate(
-			[{ transform: "scale(1)" }, { transform: "scale(1.045)" }, { transform: "scale(1)" }],
-			{ duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" },
-		);
 	};
 }
 
@@ -202,37 +198,51 @@ const ROLE_KEYS: Partial<Record<QuestionRole, TransKey>> = {
 	recall: "engine.lesson.roleRecall",
 };
 
-function etiquette(q: DraftQuestion): string {
-	const type = Q_TYPES.find(d => d.key === q._type)?.label ?? q._type;
+/* Au-delà, une option ne tient plus dans une bulle à côté des autres : la
+   liste passe en colonne. Compté sur le texte BRUT, LaTeX compris. */
+const OPTION_COURTE = 32;
+
+/** L'en-tête d'une carte : l'icône et le nom du type, puis le rôle d'un Learn. */
+function renderTop(card: HTMLElement, q: DraftQuestion): void {
+	const top = ajouter(card, "div", "qbd-fiche-q-top");
 	const roleKey = q.role ? ROLE_KEYS[q.role] : undefined;
-	if (!roleKey) return type;
 	// Une lecture n'attend pas de réponse, une explication est toujours libre :
 	// leur type n'apprendrait rien.
-	if (q.role === "read" || q.role === "explain") return t(roleKey);
-	return `${t(roleKey)} · ${type}`;
+	if (q.role === "read") icone(top, "book-open", "qbd-fiche-q-icon");
+	if (q.role !== "read" && q.role !== "explain") {
+		const def = Q_TYPES.find(d => d.key === q._type);
+		if (def) icone(top, def.lucide, "qbd-fiche-q-icon");
+		ajouter(top, "span", undefined, def?.label ?? q._type);
+	}
+	if (roleKey) ajouter(top, "span", "qbd-fiche-q-role", t(roleKey));
 }
 
+/* B · PARCOURS (retenu le 2026-09-23) : un rail vertical à gauche de la
+   liste, le numéro de chaque question en pastille SUR le rail. Le bleu ne
+   marque que les repères, jamais le texte à lire. La liste défile dans SON
+   cadre : la fiche de gauche ne bouge pas.
+
+   PAS DE PARTIES. Un Learn en enchaîne plusieurs (pré-questions, lecture,
+   explication, rappel), mais rien ne les montre, ni ici ni au lecteur : des
+   titres « Partie 1 » à « Partie 7 » sur 54 questions effrayaient (Ahmed,
+   2026-09-23). Un cours trop long se coupe désormais en plusieurs quiz. */
 function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps): void {
-	const items = ajouter(root, "div", "qbd-fiche-list");
-	/* Un Learn avance partie par partie : un titre à chaque nouvelle. Pas un
-	   Practice : sa \`slice\` nomme la partie du Learn qui enseigne la question,
-	   et ses questions MÉLANGENT les parties exprès — les titres s'y
-	   répétaient (« Partie 4 », « Partie 3 », « Partie 4 »). */
-	const parParties = deps.quiz.mode === "learn";
-	let partie: number | undefined;
+	const main = ajouter(root, "div", "qbd-fiche-main");
+	const scroller = ajouter(main, "div", "qbd-fiche-scroll");
+	const items = ajouter(scroller, "div", "qbd-fiche-list");
 	deps.questions.forEach((q, i) => {
-		if (parParties && typeof q.slice === "number" && q.slice !== partie) {
-			partie = q.slice;
-			ajouter(items, "div", "qbd-fiche-part", t("dashboard.fiche.part", { n: q.slice }));
-		}
+		const item = ajouter(items, "div", "qbd-fiche-item");
+		ajouter(item, "span", "qbd-fiche-node", String(i + 1));
 		// Pas un bouton : cliquer ici n'ouvre rien, on répond en jouant le quiz.
-		const card = ajouter(items, "div", "qbd-fiche-q");
-		ajouter(card, "span", "qbd-fiche-q-top", `${i + 1} · ${etiquette(q)}`);
+		const card = ajouter(item, "div", "qbd-fiche-q");
+		renderTop(card, q);
 		texte(card, "p", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
 		/* Les options d'un QCM, SANS la bonne, marquées A, B, C… : des ronds
-		   de bouton radio donnaient envie de cocher, et rien ne se coche ici. */
+		   de bouton radio donnaient envie de cocher, et rien ne se coche ici.
+		   Toutes courtes : des bulles côte à côte ; sinon une colonne. */
 		if ((q._type === "single" || q._type === "multi") && q.role !== "read" && q.options?.length) {
-			const opts = ajouter(card, "span", "qbd-fiche-opts");
+			const courtes = q.options.every(o => o.length <= OPTION_COURTE);
+			const opts = ajouter(card, "div", courtes ? "qbd-fiche-opts is-pills" : "qbd-fiche-opts");
 			q.options.forEach((o, j) => {
 				const line = ajouter(opts, "span", "qbd-fiche-opt");
 				ajouter(line, "span", "qbd-fiche-opt-letter", String.fromCharCode(65 + j));

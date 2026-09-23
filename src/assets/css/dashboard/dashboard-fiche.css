@@ -9,15 +9,16 @@
 	display: none;
 }
 
+/* La page ne défile pas : la fiche reste en place, et la LISTE défile dans
+   son propre cadre (`.qbd-fiche-scroll`). */
 .qbd-fiche {
 	flex: 1;
 	min-width: 0;
 	min-height: 0;
 	display: flex;
-	align-items: flex-start;
+	align-items: stretch;
 	gap: 22px;
-	overflow-y: auto;
-	padding: 2px 4px 12px 2px;
+	overflow: hidden;
 }
 
 .qbd-fiche-i { display: inline-flex; }
@@ -27,8 +28,9 @@
 .qbd-fiche-side {
 	width: 300px;
 	flex-shrink: 0;
-	position: sticky;
-	top: 0;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 2px 0 12px 2px;
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
@@ -211,48 +213,109 @@
 .qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }
 .qbd-root .qbd-fiche-edit { justify-content: center; }
 
-/* ── Les questions ── */
-.qbd-fiche-list {
+/* ── Les questions : B · Parcours ──
+   Un rail vertical à gauche, le numéro de chaque question en pastille sur le
+   rail. Le bleu ne marque que les repères (rail, numéros, icônes, lettres,
+   rôles), jamais le texte à lire. */
+.qbd-fiche-main {
 	flex: 1;
 	min-width: 0;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+}
+/* Le cadre qui défile : seule la liste bouge, la fiche reste en place. */
+.qbd-fiche-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 2px 4px 12px 0;
+}
+.qbd-fiche-list {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding-left: 46px;
+}
+.qbd-fiche-list::before {
+	content: "";
+	position: absolute;
+	left: 15px;
+	top: 16px;
+	bottom: 16px;
+	width: 2px;
+	border-radius: 1px;
+	background: linear-gradient(
+		color-mix(in srgb, var(--interactive-accent) 60%, transparent),
+		color-mix(in srgb, var(--interactive-accent) 12%, transparent)
+	);
 }
 
-/* Titre d'une partie de Learn. */
-.qbd-fiche-part {
-	margin: 12px 2px 0;
+.qbd-fiche-item { position: relative; }
+.qbd-fiche-node {
+	position: absolute;
+	left: -46px;
+	top: 12px;
+	width: 32px;
+	height: 32px;
+	box-sizing: border-box;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: color-mix(in srgb, var(--background-secondary) 82%, var(--interactive-accent));
+	border: 2px solid color-mix(in srgb, var(--interactive-accent) 65%, transparent);
+	color: var(--interactive-accent);
 	font-size: 12.5px;
 	font-weight: 700;
-	color: var(--text-muted);
 }
-.qbd-fiche-part:first-child { margin-top: 0; }
 
 /* Une question de la fiche ne s'ouvre pas (un clic fait briller
    « Commencer le quiz ») : ni survol, ni curseur de lien. */
 .qbd-fiche-q {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	padding: 14px 16px;
-	border-radius: var(--radius-m, 12px);
+	gap: 10px;
+	padding: 14px 18px 16px;
+	border-radius: 14px;
 	background: var(--qbd-glass-bg);
-	border: 1px solid var(--qbd-glass-edge);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
 	box-shadow: var(--qbd-glass-sheen);
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	color: var(--text-normal);
 	cursor: default;
 }
-.qbd-fiche-q-top { font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.qbd-fiche-q-top {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+.qbd-fiche-q-icon {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+.qbd-fiche-q-icon svg { width: 14px; height: 14px; }
+.qbd-fiche-q-role {
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--interactive-accent);
+	padding: 2px 9px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+}
 
-/* Trois lignes au plus : une longue lecture ne mange plus la liste, le texte
-   entier reste dans l'aperçu. */
+/* Trois lignes au plus : une longue lecture ne mange plus la liste. */
 .qbd-fiche-q-text {
 	margin: 0;
-	font-size: 13.5px;
-	line-height: 1.5;
+	max-width: 70ch;
+	font-size: 15px;
+	line-height: 1.6;
+	font-weight: 500;
+	color: var(--text-normal);
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
@@ -260,32 +323,51 @@
 	overflow: hidden;
 }
 
-.qbd-fiche-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; }
+/* Options longues : une colonne, sans fond. Toutes courtes (`is-pills`) :
+   des bulles côte à côte. */
+.qbd-fiche-opts {
+	display: flex;
+	flex-direction: column;
+	gap: 9px;
+}
 .qbd-fiche-opt {
 	display: flex;
 	align-items: flex-start;
-	gap: 8px;
+	gap: 10px;
 	min-width: 0;
-	font-size: 12.5px;
-	line-height: 1.45;
-	color: var(--text-muted);
+	font-size: 13.5px;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text-normal) 92%, var(--text-muted));
+}
+.qbd-fiche-opts.is-pills {
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.qbd-fiche-opts.is-pills .qbd-fiche-opt {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 13px 5px 5px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
 }
 .qbd-fiche-opt-letter {
 	flex-shrink: 0;
-	width: 18px;
-	height: 18px;
-	border-radius: 5px;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
 	display: grid;
 	place-items: center;
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
-	color: var(--text-faint);
-	font-size: 10.5px;
+	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	color: var(--interactive-accent);
+	font-size: 11px;
 	font-weight: 700;
 }
 .qbd-fiche-opt-text { min-width: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 820px) {
-	.qbd-fiche { flex-direction: column; }
-	.qbd-fiche-side { width: 100%; position: static; }
-	.qbd-fiche-opts { grid-template-columns: 1fr; }
+	.qbd-fiche { flex-direction: column; overflow-y: auto; }
+	.qbd-fiche-side { width: 100%; overflow: visible; }
+	.qbd-fiche-main, .qbd-fiche-scroll { flex: none; overflow: visible; }
 }
