@@ -94,16 +94,27 @@
 	height: 14px;
 }
 /* Les étiquettes ne se cliquent pas : le curseur reste la flèche, y compris
-   sur leur texte. */
-.qbd-fiche-chip { cursor: default; }
-/* L'icône du MODE grossit au survol, comme celle du type ; sa bulle est
+   sur leur texte.
+   AU SURVOL, TOUTE LA PASTILLE grossit, icône et texte ensemble : ce sont des
+   pastilles, pas des icônes seules (Ahmed, 2026-09-23). L'icône ne grossit
+   donc pas une seconde fois par-dessus (la règle des cartes, qui la fait
+   passer à 1,3, est neutralisée ici), et la bulle du type s'ouvre au survol
+   de la pastille entière, plus seulement de son icône. La bulle du MODE est
    celle de la page « Générer » (`attachHoverTip`). */
-.qbd-fiche-mode-icon {
-	display: inline-flex;
+.qbd-fiche-chip {
+	cursor: default;
 	transition: transform 160ms ease;
 }
-.qbd-fiche-mode:hover .qbd-fiche-mode-icon {
-	transform: scale(1.3);
+.qbd-fiche-chip:hover {
+	transform: scale(1.08);
+}
+.qbd-fiche-mode-icon { display: inline-flex; }
+.qbd-fiche-chip .qbd-quiz-card-type:hover .qbd-quiz-card-type-icon {
+	transform: none;
+}
+.qbd-fiche-chip:hover .qbd-quiz-card-type-tip {
+	opacity: 1;
+	transform: translateY(0);
 }
 
 /* D'où vient le quiz : le logo et le modèle, puis la date dessous, plus
