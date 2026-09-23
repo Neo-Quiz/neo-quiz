@@ -29,6 +29,11 @@ const QUIZ_TYPE_ICONS: Record<QuizTypeTag, string> = {
 	matching: "cable"
 };
 
+/** Icône Lucide du type d'un quiz (partagée par la carte et la page). */
+export function quizTypeIcon(tag: QuizTypeTag): string {
+	return QUIZ_TYPE_ICONS[tag];
+}
+
 /** Libellé traduit du type d'un quiz (partagé par la carte et la vue Détail). */
 export function quizTypeLabel(tag: QuizTypeTag): string {
 	return t(QUIZ_TYPE_KEYS[tag]);

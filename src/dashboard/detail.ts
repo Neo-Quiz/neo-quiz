@@ -14,6 +14,7 @@ import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./deta
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
 import { renderExamPanel } from "./detail-exam";
+import { lireVariante, varianteSuivante, renderVariante } from "./detail-variantes";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
@@ -538,6 +539,38 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		}
 	}
 
+	/** ESSAI (branche essai-page-quiz) : sur la carte de départ, une des trois
+	    interfaces à tester remplace tout le corps (liste + panneau). Rend vrai
+	    quand elle est peinte. La touche `i` en change (bindArrowKeys). */
+	function paintVariante(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): boolean {
+		const body = listCol.parentElement;
+		const main = panel.parentElement;
+		const page = body?.parentElement;
+		if (!body || !main || !page || !draft) return false;
+		body.querySelector(":scope > .qbd-essai")?.remove();
+		page.classList.remove("qbd-qz--var-a", "qbd-qz--var-b", "qbd-qz--var-c");
+		const v = lireVariante();
+		const quiz = spec.stats;
+		const start = spec.start;
+		if (!showingWelcome() || v === "actuelle" || !quiz || !start) {
+			listCol.style.display = "";
+			main.style.display = "";
+			return false;
+		}
+		listCol.style.display = "none";
+		main.style.display = "none";
+		nav.replaceChildren();
+		page.classList.add(`qbd-qz--var-${v}`);
+		renderVariante(v, body, {
+			quiz,
+			questions: draft.questions,
+			stat: statOf(quiz),
+			onStart: (el) => { void flushSave(); start.onClick(el); },
+			onOpenQuestion: (i) => goToQuestion(i, listCol, panel, nav, spec),
+		});
+		return true;
+	}
+
 	/** Vrai quand le panneau montre la carte de départ plutôt qu'une question.
 	    Seulement pour un quiz du catalogue qu'on peut lancer, et jamais en
 	    édition : l'éditeur ouvre toujours sur une question. */
@@ -605,6 +638,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	/* ── Corps : liste des questions + question courante ── */
 	function paint(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
+		if (paintVariante(listCol, panel, nav, spec)) return;
 		paintList(listCol, panel, nav, spec);
 		paintPanel(listCol, panel, nav, spec);
 	}
@@ -815,7 +849,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const doc = page.ownerDocument;
 		const onKey = (e: KeyboardEvent): void => {
 			if (!page.isConnected) { detach(); return; }
-			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "i") return;
 			if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
 			// Page HORS ÉCRAN (onglet en arrière-plan, autre vue du dashboard) :
 			// son DOM existe encore et son écoute est toujours posée sur le
@@ -834,6 +868,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// au document peut être le Document lui-même, qui n'a pas closest().
 			const target = e.target;
 			if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
+			// ESSAI : `i` change l'interface d'ouverture, et y ramène depuis un aperçu.
+			if (e.key === "i") {
+				if (editing || !spec.stats || !spec.start) return;
+				e.preventDefault();
+				varianteSuivante();
+				welcome = true;
+				paint(listCol, panel, nav, spec);
+				return;
+			}
 			// Carte de départ : → ouvre la question courante, ← n'a nulle part où aller.
 			if (showingWelcome()) {
 				if (e.key !== "ArrowRight") return;
