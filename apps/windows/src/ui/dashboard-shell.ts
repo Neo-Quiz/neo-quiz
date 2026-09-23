@@ -135,7 +135,8 @@ let quizSelectionne: QuizIndexEntry | null = null;
 let vuePrecedente: DashboardViewName = "home";
 
 /**
- * La question à ouvrir au TOUT PREMIER rendu de la page « detail », posée
+ * La question COURANTE au tout premier rendu de la page « detail » (celle que
+ * → ouvre depuis la fiche, qui reste l'écran d'ouverture), posée
  * par `reprendre()` au démarrage (reprise de session) et consommée par le
  * prochain `peindre()` — même patron que `editionEnAttente`, un état posé
  * une fois et remis à `undefined` aussitôt lu, pour qu'un aller-retour
@@ -505,6 +506,11 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	    appartient ensuite à l'utilisateur (`pendingEdit` du greffon). Locale
 	    au montage : elle est toujours consommée dans le même tour. */
 	let editionEnAttente = false;
+	/** Posée par `naviguer("detail")` et consommée par le prochain `peindre()` :
+	    l'utilisateur OUVRE la page, qui repart donc de sa fiche même sur le
+	    quiz déjà ouvert. Un repeint (annulation d'une suppression) la laisse
+	    fausse et garde l'écran en cours. */
+	let ouvertureEnAttente = false;
 	/** D'où l'on arrive sur la page du quiz (`NavigateData.entree`), consommé au rendu. */
 	let entreeDetail: "generation" | undefined;
 
@@ -544,6 +550,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 				// de la session précédente.
 				const initial = questionInitiale;
 				questionInitiale = undefined;
+				const ouverture = ouvertureEnAttente;
+				ouvertureEnAttente = false;
 				const entreeAnimee = entreeDetail === "generation";
 				entreeDetail = undefined;
 				detail.render(contentEl, quiz, {
@@ -559,6 +567,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 					},
 					isStale: () => vueCourante !== "detail",
 					initialQuestion: initial,
+					ouverture,
 					onQuestionChange: (i) => noterVue({ vue: "detail", quiz: quiz.path, question: i }),
 				});
 				break;
@@ -600,6 +609,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			if (!data?.quiz) return;
 			quizSelectionne = data.quiz;
 			editionEnAttente = !!data.edit;
+			ouvertureEnAttente = true;
 			entreeDetail = data.entree;
 			if (vueCourante !== "detail") vuePrecedente = vueCourante;
 			vueCourante = "detail";
@@ -607,7 +617,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			// la carte active, comme sous Obsidian.
 			nav.setActive("detail");
 			// Notée SANS la question : `onQuestionChange` la précisera au premier
-			// changement — ouvrir un quiz reprend d'abord sa question courante.
+			// changement. Ouvrir un quiz montre sa fiche ; sa question courante
+			// reste celle que → ouvre.
 			noterVue({ vue: "detail", quiz: data.quiz.path });
 			peindre();
 			return;

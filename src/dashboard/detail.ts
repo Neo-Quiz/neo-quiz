@@ -81,10 +81,19 @@ export interface QuizPageSpec {
 	    d'attente. Ne vaut qu'au PREMIER rendu, comme `startEditing` : un
 	    repeint interne (frappe, question suivante) ne rejoue rien. */
 	animateEntry?: boolean;
-	/** La question à afficher AU PREMIER RENDU de cette clé (bornée). Pour
-	    l'hôte qui rouvre là où on s'était arrêté ; le greffon ne la passe
-	    pas. Ne vaut qu'à la première ouverture de la clé, comme `startEditing`. */
+	/** La question COURANTE au premier rendu de cette clé (bornée) : celle que
+	    → ouvre depuis la fiche. Pour l'hôte qui rouvre là où on s'était
+	    arrêté ; le greffon ne la passe pas. Ne vaut qu'à la première ouverture
+	    de la clé, comme `startEditing`. Elle ne décide PAS de l'écran : une
+	    arrivée montre toujours la fiche (voir `ouverture`). */
 	initialQuestion?: number;
+	/** Vrai quand l'utilisateur OUVRE la page (navigation) : elle repart de sa
+	    fiche, même sur le quiz qu'elle montrait déjà — un aperçu ou une édition
+	    laissés en partant ne doivent pas devenir le nouvel écran d'ouverture.
+	    Faux (ou absent) pour un simple repeint. Consommée au rendu, comme
+	    `startEditing` : la même spec sert à chaque repeint interne, et la
+	    relire ramènerait la fiche à chaque clic. */
+	ouverture?: boolean;
 	/** Appelée à chaque changement de question courante, par `goToQuestion`
 	    et nulle part ailleurs — c'est le seul endroit où `activeIdx` bouge. */
 	onQuestionChange?(index: number): void;
@@ -130,7 +139,7 @@ export interface QuizPageHandlers {
     membre de plus sur le ctx aurait forcé la fenêtre à fabriquer une fausse
     vue. C'est le même découpage que `QuizPageSpec.onBack`/`isStale`, dont
     ces champs sont la projection exacte. */
-export type DetailHostSpec = Pick<QuizPageSpec, "onBack" | "isStale" | "startEditing" | "animateEntry" | "initialQuestion" | "onQuestionChange">;
+export type DetailHostSpec = Pick<QuizPageSpec, "onBack" | "isStale" | "startEditing" | "animateEntry" | "initialQuestion" | "onQuestionChange" | "ouverture">;
 
 export interface DetailHandlers {
 	render(container: HTMLElement, quiz: QuizIndexEntry, host: DetailHostSpec): void;
@@ -172,6 +181,7 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				animateEntry: host.animateEntry,
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
+				ouverture: host.ouverture,
 			});
 		},
 		dispose: () => page.dispose(),
@@ -263,6 +273,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		container.replaceChildren();
 		currentContainer = container;
 		currentSpec = spec;
+		// Une ARRIVÉE sur la page : un autre quiz, ou le même rouvert par
+		// l'utilisateur. Lue AVANT que la clé ne soit notée, consommée aussitôt.
+		const arrivee = spec.key !== currentPath || !!spec.ouverture;
+		spec.ouverture = false;
 		if (spec.key !== currentPath) {
 			// Le quiz précédent part MAINTENANT : sans ça, ouvrir un autre quiz
 			// dans les 600 ms du débounce perdait la dernière frappe. `void` :
@@ -272,10 +286,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			draft = null;
 			activeIdx = 0;
 			if (typeof spec.initialQuestion === "number") activeIdx = Math.max(0, Math.floor(spec.initialQuestion));
-			// Rouvrir là où l'on s'était arrêté vise une QUESTION : pas de
-			// fiche par-dessus.
-			welcome = typeof spec.initialQuestion !== "number";
-			editing = false;
 		} else if (draft && draftIsStale(draft)) {
 			/* La note a changé DEHORS (éditeur markdown, synchro) pendant que la
 			   page gardait son brouillon : on la relit, sinon la frappe suivante
@@ -284,6 +294,18 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (saveTimer) currentHost().ui.notice(t("dashboard.quiz.externalChange"));
 			void flushSave();
 			draft = null;
+		}
+
+		/* Toute arrivée montre la FICHE, y compris au redémarrage sur une
+		   question notée par la reprise, et en rouvrant le quiz qu'on venait de
+		   quitter sur un aperçu. Sans cette règle, l'état de la visite
+		   précédente devenait l'écran d'ouverture : l'aperçu d'une question
+		   remplaçait la fiche, qui semblait avoir disparu (Ahmed, 2026-09-23,
+		   « je ne la vois plus »). L'édition demandée explicitement passe
+		   après, juste en dessous. */
+		if (arrivee) {
+			welcome = true;
+			editing = false;
 		}
 
 		/* Demande EXPLICITE d'ouvrir en édition (menu « Modifier », quiz qu'on
