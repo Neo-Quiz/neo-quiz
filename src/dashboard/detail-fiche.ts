@@ -194,7 +194,7 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 const ROLE_KEYS: Partial<Record<QuestionRole, TransKey>> = {
 	pre: "engine.lesson.rolePre",
 	read: "engine.lesson.roleRead",
-	explain: "dashboard.fiche.roleExplain",
+	explain: "engine.lesson.roleExplain",
 	recall: "engine.lesson.roleRecall",
 };
 

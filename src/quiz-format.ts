@@ -23,7 +23,7 @@ export type ModeQuiz = "learn" | "practice";
     le contrôle à l'arrivée exige mais que le prompt tait n'est jamais produit
     (test du 2026-09-23 : `explain` absent du prompt, aucune explication). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
-	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"'],
+	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 
@@ -35,10 +35,13 @@ export type Manque =
 	| { kind: "trancheIncomplete"; slice: number; rolesManquants: QuestionRole[] }
 	| { kind: "sansTranche"; questions: string[] }
 	| { kind: "trancheInconnue"; questions: string[] }
-	| { kind: "sansObjectifs" };
+	| { kind: "sansObjectifs" }
+	/** Une pré-question sans indice : on la pose AVANT la lecture, sans rien
+	    savoir — sans aide du tout, elle décourage (Ahmed, 2026-09-23). */
+	| { kind: "preSansIndice"; questions: string[] };
 
 interface Element {
-	title?: unknown; prompt?: unknown; explain?: unknown; explainHtml?: unknown;
+	title?: unknown; prompt?: unknown; explain?: unknown; explainHtml?: unknown; hint?: unknown;
 	slice?: unknown; role?: unknown; mode?: unknown; objectives?: unknown;
 }
 
@@ -123,6 +126,8 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 		const rolesManquants = exiges.filter(r => !presents.has(r));
 		if (rolesManquants.length) manques.push({ kind: "trancheIncomplete", slice, rolesManquants });
 	}
+	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !texte(q.hint)).map(({ q, i }) => nom(q, i));
+	if (preSansIndice.length) manques.push({ kind: "preSansIndice", questions: preSansIndice });
 	return manques;
 }
 

@@ -339,6 +339,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.format.noSlice": "{count} question(s) n'appartiennent à aucune tranche : {names}.",
 	"ai.format.incompleteSlice": "Il manque à la tranche {slice} : {roles}.",
 	"ai.format.noObjectives": "La note Learn n'a pas d'objectifs d'apprentissage.",
+	"ai.format.preNoHint": "{count} question(s) posée(s) avant la lecture n'ont pas d'indice : {names}.",
 	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme banque Practice.",
 
 };

@@ -66,9 +66,9 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Mode leçon ── */
 	"engine.lesson.label": "Leçon",
-	/* Progression en tranches (en-tête de carte, Task 6) : "sliceProgress" est
-	   la ligne principale, "role*" son sous-titre selon le rôle de la question. */
-	"engine.lesson.sliceProgress": "Tranche {current} sur {total}",
+	/* Le rôle d'une question de Learn, en tête de carte. Plus de « Tranche N
+	   sur M » au-dessus (2026-09-23) : les étapes d'un Learn ne se montrent pas. */
+	"engine.lesson.roleExplain": "Avec vos mots",
 	"engine.lesson.rolePre": "Avant la lecture",
 	"engine.lesson.roleRead": "Lecture",
 	"engine.lesson.roleRecall": "De mémoire",

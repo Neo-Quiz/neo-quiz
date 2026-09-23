@@ -459,10 +459,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// carte qui n'a justement aucune réponse à vérifier.
 		if (role === "read") return t("engine.lesson.roleRead");
 		if (role === "recall") return t("engine.lesson.roleRecall");
+		// "explain" : répondre avec ses mots, jamais une « vérification ».
+		if (role === "explain") return t("engine.lesson.roleExplain");
 		return t("engine.lesson.roleTest");
 	}
 
-	/* En-tête « Tranche X sur Y » + rôle en sous-titre (Task 6, mode Leçon).
+	/* En-tête : le RÔLE de la question dans un Learn. La ligne « Tranche X
+	   sur Y » qui le surmontait est retirée (2026-09-23) : les étapes d'un
+	   Learn ne se montrent plus nulle part, un compteur de tranches sur un
+	   long parcours décourageait avant même de commencer.
 	   Hors mode Leçon (ou pour un quiz ordinaire, question sans `slice`
 	   valide), `sliceOfQuestion` renvoie déjà `null` (engine/lesson.ts) : ce
 	   bloc ne peut donc RIEN changer à l'en-tête des 48 quiz ordinaires
@@ -473,12 +478,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   résultat réutilisé localement — `lesson.ts` reconstruit son modèle à
 	   chaque appel (accessor vivant sur `ctx.quizMode`, jamais un cache). */
 	function lessonProgressHtml(qi: number): string {
-		const slice = ctx.sliceOfQuestion(qi);
-		if (slice === null) return "";
-		const total = ctx.lessonSlices().length;
+		if (ctx.sliceOfQuestion(qi) === null) return "";
 		const role = ctx.roleOfQuestion(qi);
 		return `<div class="quiz-lesson-progress">
-			<div class="quiz-lesson-progress-slice">${t("engine.lesson.sliceProgress", { current: slice, total })}</div>
 			<div class="quiz-lesson-progress-role">${lessonRoleLabel(role)}</div>
 		</div>`;
 	}

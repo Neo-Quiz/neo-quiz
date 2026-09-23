@@ -40,7 +40,7 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.check("Practice sans Learn connu : slice non vérifié", verifierFormat("practice", [q({ slice: 9 })]), []);
 
 	const tranche = (s) => [
-		q({ title: `pre${s}`, slice: s, role: "pre" }),
+		q({ title: `pre${s}`, slice: s, role: "pre", hint: "Pense à la définition." }),
 		{ title: `Lecture ${s}`, prompt: "Passage.", slice: s, role: "read" },
 		{ title: `expl${s}`, prompt: "Explique.", type: "text", answer: "Modèle.", slice: s, role: "explain" },
 		q({ title: `rec${s}`, slice: s, role: "recall" }),
@@ -53,7 +53,13 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 			{ kind: "sansObjectifs" },
 			{ kind: "sansTranche", questions: ["Orpheline"] },
 			{ kind: "trancheIncomplete", slice: 1, rolesManquants: ["read", "recall"] },
+				{ kind: "preSansIndice", questions: ["pre1"] },
 		]);
+
+	r.check("Learn : une pré-question sans indice est nommée, un indice vide aussi",
+		verifierFormat("learn", [...tranche(1), q({ title: "Sans", slice: 1, role: "pre" }), q({ title: "Vide", slice: 1, role: "pre", hint: "  " }), config]),
+		[{ kind: "preSansIndice", questions: ["Sans", "Vide"] }]);
+	r.check("Practice : l'indice n'est pas exigé", verifierFormat("practice", [q({ role: "pre" })]), []);
 
 	r.check("plan des tranches : titre de la lecture, sinon de la première question, trié",
 		planDesTranches([q({ title: "pre2", slice: 2, role: "pre" }), ...tranche(1), q({ title: "x", slice: 2, role: "recall" }), config]),

@@ -72,6 +72,7 @@ export function messagesDesManques(manques: Manque[]): string[] {
 			case "sansTranche": return t("ai.format.noSlice", { count: m.questions.length, names: m.questions.join(", ") });
 			case "trancheIncomplete": return t("ai.format.incompleteSlice", { slice: m.slice, roles: m.rolesManquants.join(", ") });
 			case "sansObjectifs": return t("ai.format.noObjectives");
+			case "preSansIndice": return t("ai.format.preNoHint", { count: m.questions.length, names: m.questions.join(", ") });
 		}
 	});
 }

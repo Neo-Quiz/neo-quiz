@@ -80,9 +80,9 @@ export const EN_ENGINE = {
 
 	/* ── Mode leçon ── */
 	"engine.lesson.label": "Lesson",
-	/* Progression en tranches (en-tête de carte, Task 6) : "sliceProgress" est
-	   la ligne principale, "role*" son sous-titre selon le rôle de la question. */
-	"engine.lesson.sliceProgress": "Slice {current} of {total}",
+	/* Le rôle d'une question de Learn, en tête de carte. Plus de « Slice N of
+	   M » au-dessus (2026-09-23) : les étapes d'un Learn ne se montrent pas. */
+	"engine.lesson.roleExplain": "In your own words",
 	"engine.lesson.rolePre": "Before reading",
 	"engine.lesson.roleRead": "Reading",
 	"engine.lesson.roleRecall": "From memory",

@@ -17,7 +17,9 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
-- A numeric question written with math now opens the equation editor and its math keyboard. The answer can be typed as a number, a fraction, a power or a product (3 × 255, rac{3}{4}, 2^{10}) and is still compared by value, within the question's tolerance.
+- A generated Learn note now stays short: at most 20 questions unless the course truly needs more, and a Practice bank holds 10 to 20. Every question asked before the reading comes with a hint, and a note that lacks one says so.
+- The quiz no longer shows "Slice N of M" above a Learn question: only its role remains, and "In your own words" is now named as such instead of "Check".
+- A numeric question written with math now opens the equation editor and its math keyboard. The answer can be typed as a number, a fraction, a power or a product (3 × 255, 3/4 as a fraction, 2 to the power 10) and is still compared by value, within the question's tolerance.
 - Learn and Practice now show as a badge on quiz cards and on the quiz page, instead of in the title. A Practice bank also finds the Learn note of the same source when the request had no attachment.
 - On quiz cards, the question type is now an icon before the question count, named on hover, instead of a second badge.
 - Labels, badges and section titles are no longer forced to all caps.

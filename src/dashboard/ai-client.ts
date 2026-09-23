@@ -268,12 +268,12 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	const quantite = count != null
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
-		? "QUANTITY: as many slices as the source needs to cover everything that can be examined on it, and nothing else — no padding, no trivia."
-		: "QUANTITY: between 10 and 25 questions, chosen by you from the source: ONLY what can be examined, the most important first. Never pad with trivia.";
+		? "QUANTITY: at most 20 questions in total, every role counted — usually 2 or 3 slices. Cover what can be examined on the source, the most important first; go beyond 20 ONLY if the source truly cannot be learned in fewer, and never pad with trivia. A learner who sees 50 questions gives up before starting."
+		: "QUANTITY: between 10 and 20 questions, chosen by you from the source: ONLY what can be examined, the most important first. Never pad with trivia.";
 
 	const blocMode = learn ? `MODE: LEARN. You are writing a guided LEARNING PATH through the source — not a test, and not a summary to read.
 	Split the source into SLICES, numbered from 1 in "slice", each small enough for ONE screen of reading. Every slice contains, in this order:
-	  1. one or two questions with "role": "pre", asked BEFORE the reading on what the slice is about to teach. The learner is expected to fail: keep them short (single choice preferred) and give "explain".
+	  1. one or two questions with "role": "pre", asked BEFORE the reading on what the slice is about to teach. The learner is expected to fail: keep them short (single choice preferred) and give "explain". EVERY pre question also has "hint": a clue that lets someone who has NOT read the slice yet reason toward the answer (the principle to apply, an analogy, what a key word means) — never the answer itself. Answering blind with no help at all is discouraging.
 	  2. exactly one card with "role": "read": "title" names the slice and "prompt" holds the passage — the slice's content REPHRASED clearly in at most about 150 words, keeping the teacher's technical terms EXACTLY as in the source. When the slice lists arbitrary items (layers, steps, keywords), add a mnemonic. A read card has no options and no answer. For a PROCEDURAL slice (code, method, calculation), the read card is a fully WORKED EXAMPLE, correct, step by step.
 	  3. exactly one question with "role": "explain" and "type": "text": ask the learner to explain the slice's key idea in their own words (why, how, a relation, an example). "answer" holds a MODEL ANSWER of 2 to 4 sentences.
 	  4. two to four questions with "role": "recall": retrieval from memory of what the slice taught, each with "explain". For a procedural slice use: a "cloze" with the missing step, a text question predicting the OUTPUT of a code snippet ("terminalVariant": "python"), an "ordering" question rebuilding the lines of the code, a single-choice "find the bug".
