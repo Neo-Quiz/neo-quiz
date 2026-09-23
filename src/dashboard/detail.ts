@@ -14,7 +14,7 @@ import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./deta
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
 import { renderExamPanel } from "./detail-exam";
-import { lireVariante, varianteSuivante, renderVariante } from "./detail-variantes";
+import { renderFiche } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
@@ -192,7 +192,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	let draft: QuizDraft | null = null;
 	let activeIdx = 0;
 	let editing = false;
-	/** La carte de départ est demandée (voir `showingWelcome`) : vrai à
+	/** La fiche du quiz est demandée (voir `showingWelcome`) : vrai à
 	    l'ouverture d'un quiz, faux dès qu'on ouvre une question. */
 	let welcome = false;
 	let saveTimer: number | null = null;
@@ -273,7 +273,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			activeIdx = 0;
 			if (typeof spec.initialQuestion === "number") activeIdx = Math.max(0, Math.floor(spec.initialQuestion));
 			// Rouvrir là où l'on s'était arrêté vise une QUESTION : pas de
-			// carte de départ par-dessus.
+			// fiche par-dessus.
 			welcome = typeof spec.initialQuestion !== "number";
 			editing = false;
 		} else if (draft && draftIsStale(draft)) {
@@ -539,88 +539,44 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		}
 	}
 
-	/** ESSAI (branche essai-page-quiz) : sur la carte de départ, une des trois
-	    interfaces à tester remplace tout le corps (liste + panneau). Rend vrai
-	    quand elle est peinte. La touche `i` en change (bindArrowKeys). */
-	function paintVariante(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): boolean {
+	/** La FICHE du quiz (detail-fiche.ts) remplace tout le corps (liste +
+	    panneau) et l'en-tête à l'ouverture. Rend vrai quand elle est peinte ;
+	    faux dès qu'une question est ouverte, ou en édition. */
+	function paintFiche(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): boolean {
 		const body = listCol.parentElement;
 		const main = panel.parentElement;
 		const page = body?.parentElement;
 		if (!body || !main || !page || !draft) return false;
-		body.querySelector(":scope > .qbd-essai")?.remove();
-		page.classList.remove("qbd-qz--var-a", "qbd-qz--var-b", "qbd-qz--var-c");
-		const v = lireVariante();
+		body.querySelector(":scope > .qbd-fiche")?.remove();
 		const quiz = spec.stats;
 		const start = spec.start;
-		if (!showingWelcome() || v === "actuelle" || !quiz || !start) {
-			listCol.style.display = "";
-			main.style.display = "";
-			return false;
-		}
-		listCol.style.display = "none";
-		main.style.display = "none";
+		const on = showingWelcome() && !!quiz && !!start;
+		page.classList.toggle("qbd-qz--fiche", on);
+		listCol.style.display = on ? "none" : "";
+		main.style.display = on ? "none" : "";
+		if (!on || !quiz || !start) return false;
 		nav.replaceChildren();
-		page.classList.add(`qbd-qz--var-${v}`);
-		renderVariante(v, body, {
+		renderFiche(body, {
 			quiz,
 			questions: draft.questions,
 			stat: statOf(quiz),
 			onStart: (el) => { void flushSave(); start.onClick(el); },
+			onEdit: () => toggleEditing(page),
+			onBack: () => { void flushSave(); spec.onBack(); },
 			onOpenQuestion: (i) => goToQuestion(i, listCol, panel, nav, spec),
 		});
 		return true;
 	}
 
-	/** Vrai quand le panneau montre la carte de départ plutôt qu'une question.
+	/** Vrai quand la page montre la fiche du quiz plutôt qu'une question.
 	    Seulement pour un quiz du catalogue qu'on peut lancer, et jamais en
 	    édition : l'éditeur ouvre toujours sur une question. */
 	function showingWelcome(): boolean {
 		return welcome && !editing && !!currentSpec?.stats && !!currentSpec.start;
 	}
 
-	/* ── Carte de départ ──
-	   Ce que le panneau montre à l'ouverture. Avant elle, la page s'ouvrait
-	   sur la question 1, rendue comme si l'on pouvait y répondre : un
-	   nouveau venu tapait dans un champ qui ne comptait pas, et le seul vrai
-	   départ était un petit bouton dans le coin (« je fais quoi mtn ? »,
-	   2026-09-23). */
-	function renderWelcome(panel: HTMLElement, spec: QuizPageSpec, listCol: HTMLElement, nav: HTMLElement): void {
-		const quiz = spec.stats;
-		const start = spec.start;
-		if (!quiz || !start) return;
-		const stat = statOf(quiz);
-		const total = stat.totalQuestions || quiz.questions;
-		const done = Math.min(stat.questionsDone, total);
-		const pct = total > 0 ? Math.round(done / total * 100) : 0;
-
-		const card = ajouter(panel, "div", "qbd-qz-welcome");
-		const icon = ajouter(card, "span", "qbd-qz-welcome-icon");
-		currentHost().ui.setIcon(icon, "rocket");
-		ajouter(card, "h3", "qbd-qz-welcome-title", t("dashboard.quiz.welcomeTitle"));
-
-		const progress = ajouter(card, "div", "qbd-qz-welcome-progress");
-		const bar = ajouter(progress, "div", "qbd-qz-welcome-bar");
-		ajouter(bar, "div", "qbd-qz-welcome-fill").style.width = `${pct}%`;
-		ajouter(progress, "span", "qbd-qz-welcome-count", t("dashboard.quiz.welcomeProgress", { done, total }));
-
-		const btn = ajouter(card, "button", "qbd-btn--create qbd-qz-welcome-start");
-		btn.type = "button";
-		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), "play");
-		ajouter(btn, "span", undefined, t("dashboard.quiz.welcomeStart"));
-		btn.addEventListener("click", () => {
-			void flushSave();
-			start.onClick(btn);
-		});
-
-		const hint = ajouter(card, "button", "qbd-qz-welcome-hint");
-		hint.type = "button";
-		ajouter(hint, "span", undefined, t("dashboard.quiz.welcomeHint"));
-		currentHost().ui.setIcon(ajouter(hint, "span", "qbd-qz-welcome-hint-icon"), "arrow-right");
-		hint.addEventListener("click", () => goToQuestion(activeIdx, listCol, panel, nav, spec));
-	}
-
 	/** Bandeau de l'aperçu : dit que la question n'est pas jouée ici, et
-	    ramène à la carte de départ quand la page en a une. */
+	    ramène à la fiche quand la page en a une. */
 	function renderPreviewBanner(panel: HTMLElement, spec: QuizPageSpec, listCol: HTMLElement, nav: HTMLElement): void {
 		const banner = ajouter(panel, "div", "qbd-qz-preview-banner");
 		currentHost().ui.setIcon(ajouter(banner, "span", "qbd-qz-preview-icon"), "eye");
@@ -638,7 +594,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	/* ── Corps : liste des questions + question courante ── */
 	function paint(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
-		if (paintVariante(listCol, panel, nav, spec)) return;
+		if (paintFiche(listCol, panel, nav, spec)) return;
 		paintList(listCol, panel, nav, spec);
 		paintPanel(listCol, panel, nav, spec);
 	}
@@ -649,8 +605,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function goToQuestion(target: number, listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
 		const clamped = Math.max(0, Math.min(target, draft.questions.length - 1));
-		// Depuis la carte de départ : pas de glissement, le panneau change de
-		// nature (carte → aperçu), il est repeint.
+		// Depuis la fiche : pas de glissement, la page change de nature
+		// (fiche → aperçu), elle est repeinte.
 		if (showingWelcome()) {
 			welcome = false;
 			activeIdx = clamped;
@@ -849,7 +805,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const doc = page.ownerDocument;
 		const onKey = (e: KeyboardEvent): void => {
 			if (!page.isConnected) { detach(); return; }
-			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "i") return;
+			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 			if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
 			// Page HORS ÉCRAN (onglet en arrière-plan, autre vue du dashboard) :
 			// son DOM existe encore et son écoute est toujours posée sur le
@@ -868,16 +824,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// au document peut être le Document lui-même, qui n'a pas closest().
 			const target = e.target;
 			if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
-			// ESSAI : `i` change l'interface d'ouverture, et y ramène depuis un aperçu.
-			if (e.key === "i") {
-				if (editing || !spec.stats || !spec.start) return;
-				e.preventDefault();
-				varianteSuivante();
-				welcome = true;
-				paint(listCol, panel, nav, spec);
-				return;
-			}
-			// Carte de départ : → ouvre la question courante, ← n'a nulle part où aller.
+			// Fiche : → ouvre la question courante, ← n'a nulle part où aller.
 			if (showingWelcome()) {
 				if (e.key !== "ArrowRight") return;
 				e.preventDefault();
@@ -912,12 +859,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		if (slideHost) finishSlide(slideHost);
 		panel.replaceChildren();
 		slideHost = null;
-		panel.classList.toggle("is-welcome", showingWelcome());
-		if (showingWelcome()) {
-			nav.replaceChildren();
-			renderWelcome(panel, spec, listCol, nav);
-			return;
-		}
+		// La fiche occupe le corps : `paint` l'a déjà peinte à la place du panneau.
+		if (showingWelcome()) return;
 		const q = draft.questions[activeIdx];
 		if (!q) {
 			ajouter(panel, "div", "qbd-qz-error", t("dashboard.detail.noBlock"));
