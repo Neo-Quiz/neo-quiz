@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import { LOG_PREFIX } from "../branding";
 import type { ResourceButton, QuestionRole } from "../types/quiz";
 
-export type QuestionTypeKey = "single" | "multi" | "ordering" | "matching" | "cloze" | "numeric" | "text" | "cmd" | "powershell" | "bash";
+export type QuestionTypeKey = "single" | "multi" | "ordering" | "matching" | "cloze" | "numeric" | "text" | "cmd" | "powershell" | "bash" | "code";
 
 interface QuizTypeDef {
 	key: QuestionTypeKey;

@@ -9,6 +9,7 @@ export const EN_EDITOR = {
 	"editor.lesson.help": "Shown before the question in Lesson mode.",
 	"editor.lesson.placeholder": "What the learner should read first…",
 	"editor.paste.imageFailed": "Could not paste the image",
+	"editor.codeEditInNote": "Programming exercises are edited directly in the note.",
 
 	/* ── Actions communes ── */
 	"editor.action.add": "Add",

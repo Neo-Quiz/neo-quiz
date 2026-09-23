@@ -543,6 +543,13 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			czWrap.addEventListener("click", () => { q.caseSensitive = !q.caseSensitive; view.render(); view.scheduleSave?.(); });
 		}
 
+		/* Un exercice de code ne s'édite pas ici : il n'a qu'à TRAVERSER
+		   (editor/convert.ts). Un seul message, pas de champ — modifier
+		   `solution`/`starter`/`inputs`/`asserts`/`hints` se fait dans la note. */
+		if (qType === "code") {
+			ajouter(box, "div", "qb-field-help", t("editor.codeEditInNote"));
+		}
+
 		if (qType === "numeric") {
 			ajouter(box, "div", "qb-field-help", t("editor.numeric.help"));
 			_arrayEditor(box, t("editor.numeric.answers"), q.acceptedAnswers!, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));

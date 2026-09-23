@@ -367,6 +367,17 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	const vide = tour({ ...base, prompt: "P", cloze: "", caseSensitive: true });
 	r.check("gabarit vide reste un cloze", [vide.cloze, vide.caseSensitive], ["", true]);
 
+	// Un exercice de code : ses champs multi-lignes et ses tableaux survivent,
+	// et il ne gagne AUCUNE option fantôme de choix unique.
+	const code = tour({ ...base, prompt: "Maximum", language: "python",
+		solution: "a = int(input('a : '))\nprint(a)", starter: "a = ...\n",
+		inputs: ["24\n18", "3\n7"], asserts: "assert True", hints: ["Pense à int().", "Compare avec if."],
+		explain: "int() convertit." });
+	r.check("exercice de code : champs conservés",
+		[code.language, code.solution, code.starter, code.inputs, code.asserts, code.hints, code.explain],
+		["python", "a = int(input('a : '))\nprint(a)", "a = ...\n", ["24\n18", "3\n7"], "assert True", ["Pense à int().", "Compare avec if."], "int() convertit."]);
+	r.check("exercice de code : ni options ni correctIndex", [code.options, code.correctIndex], [undefined, undefined]);
+
 	// Formes IMBRIQUEES, que le moteur lit en repli.
 	const ord = tour({ ...base, prompt: "P",
 		ordering: { items: ["A", "B"], correctOrder: [1, 0], slotLabels: ["Premier", "Second"] } });
