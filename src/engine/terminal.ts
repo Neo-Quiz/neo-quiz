@@ -1,7 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import type { QuizQuestion, TextQuestion } from "../types/quiz";
-import { isMathQuestion, matchesMathAnswer, createMathField } from "./math-input";
-import { isNumericQuestion, matchesNumericAnswer, isPurelyNumeric, parseNumericValue } from "./numeric";
+import { isMathQuestion, usesMathField, matchesMathAnswer, createMathField } from "./math-input";
+import { isNumericQuestion, matchesNumericAnswer, isPurelyNumeric, parseNumericValue, latexEnNombre } from "./numeric";
 import type { NumericQuestion } from "./numeric";
 import { t } from "../i18n";
 
@@ -260,7 +260,8 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 		// Question numérique DÉCLARÉE : la réponse est un nombre, comparé en
 		// valeur à la marge près, l'unité acceptée en suffixe.
-		if (isNumericQuestion(q)) return matchesNumericAnswer(q as NumericQuestion, accepted, value);
+		// Saisie faite dans l'éditeur d'équations : du LaTeX, ramené à un nombre.
+		if (isNumericQuestion(q)) return matchesNumericAnswer(q as NumericQuestion, accepted, usesMathField(q) ? latexEnNombre(value) : value);
 
 		return accepted.some(expected =>
 			normalizeTextAnswer(expected, { caseSensitive: !!q.caseSensitive }) ===
@@ -365,9 +366,10 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 				</div>`;
 		}
 
-		// Question math : HOST vide — le <math-field> (custom element à
-		// configurer) est créé au bind, jamais via innerHTML.
-		if (isMathQuestion(q)) {
+		// Question math, ou numérique posée en LaTeX : HOST vide — le
+		// <math-field> (custom element à configurer) est créé au bind,
+		// jamais via innerHTML.
+		if (usesMathField(q)) {
 			return `
 				<div class="qcm-options quiz-text-wrap quiz-math-wrap ${statusClass}" data-math-input="1"></div>`;
 		}

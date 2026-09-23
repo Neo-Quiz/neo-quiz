@@ -36,6 +36,11 @@ jobs:
       - name: Learn and Practice prompts
         run: npm run check:prompt
 
+      # UNE RÉPONSE NUMÉRIQUE TAPÉE DANS L'ÉDITEUR D'ÉQUATIONS arrive en LaTeX
+      # (« 1{,}5 », « \frac{3}{4} ») : ramenée à un nombre, jamais juste à tort.
+      - name: Numeric answers typed in LaTeX
+        run: npm run check:numeric
+
       # LE CLIQUET DE LA FRONTIÈRE D'HÔTE. Le contrat `src/host/types.ts` dit
       # que c'est ce contrôle, et non la discipline, qui tient la frontière :
       # tant qu'il n'était lancé qu'à la main, c'était encore la discipline.

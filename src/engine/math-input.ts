@@ -82,6 +82,20 @@ function isMathQuestion(q: MathQuestionInput | null | undefined): boolean {
 	return answers.some(a => typeof a === "string" && (hasMath(a) || /\\[a-zA-Z]{2,}/.test(a)));
 }
 
+/* Le champ de saisie est-il l'éditeur d'équations ? Oui pour une question
+   math, et AUSSI pour une question numérique posée en LaTeX : « Calculer
+   $u_0 + … + u_7$ » réclame le clavier mathématique (Ahmed, 2026-09-23).
+   Seule la SAISIE change : la comparaison reste numérique, avec sa
+   tolérance (`latexEnNombre`, engine/numeric.ts). Un `mathInput: false`
+   explicite garde le champ texte. */
+function usesMathField(q: MathQuestionInput | null | undefined): boolean {
+	if (isMathQuestion(q)) return true;
+	if (!q || q.numeric !== true || (q.type !== "text" && q._type !== "text")) return false;
+	const flag = q.mathInput ?? (q._extraFields && q._extraFields.mathInput);
+	if (flag === false) return false;
+	return flag === true || hasMath(q.prompt || "") || hasMath(q.promptHtml || q._promptHtml || "");
+}
+
 /* Normalisation de FORME uniquement (décision Ahmed 2026-07-11 : pas
    d'équivalence symbolique — x\cdot4 ≠ 4x ; chaque forme acceptable est
    listée dans acceptedAnswers). Rend comparables les écritures
@@ -558,6 +572,6 @@ function createMathField(host: HTMLElement, opts: CreateMathFieldOptions = {}): 
 }
 
 export {
-	isMathQuestion, normalizeMathAnswer, matchesMathAnswer,
+	isMathQuestion, usesMathField, normalizeMathAnswer, matchesMathAnswer,
 	createMathField, provideMathlive,
 };

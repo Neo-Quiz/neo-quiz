@@ -12,7 +12,7 @@ import { sanitizeQuizHtml } from "../engine/sanitizer";
    not defined » (vu par Ahmed le 2026-09-13 sur un quiz généré). Le greffon
    (bundle CommonJS) ne s'en apercevait pas. Aucun cycle : `math-input`
    n'importe rien de l'éditeur. */
-import { isMathQuestion, createMathField } from "../engine/math-input";
+import { usesMathField, createMathField } from "../engine/math-input";
 
 /* ══════════════════════════════════════════════════════════
    QUESTION PREVIEW — la question telle que l'apprenant la verra
@@ -230,7 +230,7 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 	}
 
 	if (type === "text") {
-		if (isMathQuestion(q)) {
+		if (usesMathField(q)) {
 			// Question math : le même éditeur d'équations que le quiz, en
 			// lecture seule, gabarit affiché s'il existe.
 			const mathWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-math-wrap");

@@ -17,6 +17,7 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
+- A numeric question written with math now opens the equation editor and its math keyboard. The answer can be typed as a number, a fraction, a power or a product (3 × 255, rac{3}{4}, 2^{10}) and is still compared by value, within the question's tolerance.
 - Learn and Practice now show as a badge on quiz cards and on the quiz page, instead of in the title. A Practice bank also finds the Learn note of the same source when the request had no attachment.
 - On quiz cards, the question type is now an icon before the question count, named on hover, instead of a second badge.
 - Labels, badges and section titles are no longer forced to all caps.

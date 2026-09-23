@@ -142,3 +142,98 @@ export function matchesNumericAnswer(q: NumericQuestion, accepted: string[], val
 		return Math.abs(student.value - target.value) <= epsilon;
 	});
 }
+
+/* ══════════════════════════════════════════════════════════
+   SAISIE MATHLIVE D'UNE RÉPONSE NUMÉRIQUE
+
+   Une question numérique posée en LaTeX (« Calculer $u_0 + … + u_7$ »)
+   s'écrit dans l'éditeur d'équations, avec son clavier (Ahmed,
+   2026-09-23). Sa réponse arrive donc en LaTeX : « 765 », mais aussi
+   « 1{,}5 », « \frac{3}{4} », « 2^{10} » ou « 3\times 255 ». On la ramène
+   à un nombre avant la comparaison en valeur, pour que la tolérance et
+   l'unité restent celles de la question. Une écriture qu'on ne sait pas
+   évaluer reste telle quelle : elle sera fausse, jamais juste à tort.
+══════════════════════════════════════════════════════════ */
+
+/** Le LaTeX d'une saisie ramené à une expression arithmétique, et l'unité
+    écrite en `\text{…}` / `\mathrm{…}` à part. */
+function latexEnExpression(latex: string): { expr: string; unit: string } {
+	let s = latex.trim().replace(/^\$\$?|\$\$?$/g, "");
+	let unit = "";
+	s = s.replace(/\\(?:text|mathrm|operatorname)\{([^{}]*)\}/g, (_m, u: string) => { unit += u; return ""; });
+	s = s.replace(/\{,\}/g, ".");
+	s = s.replace(/\\left|\\right/g, "");
+	s = s.replace(/\\[,;:! ]|~|\\quad|\\qquad/g, "");
+	s = s.replace(/\\(?:cdot|times)/g, "*").replace(/\\div/g, "/");
+	s = s.replace(/−/g, "-");
+	// \frac{a}{b} (et ses variantes), répété pour les fractions imbriquées.
+	for (let i = 0; i < 4; i++) s = s.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, "(($1)/($2))");
+	// Accolades restantes : de simples groupements (exposants, etc.).
+	s = s.replace(/\{/g, "(").replace(/\}/g, ")");
+	s = s.replace(/\s+/g, "").replace(/,/g, ".");
+	return { expr: s, unit: unit.trim() };
+}
+
+/** Évalue + − × ÷ ^ et parenthèses sur des décimaux ; `null` sur tout le
+    reste (une lettre, une fonction, une parenthèse orpheline). */
+function evaluer(expr: string): number | null {
+	let i = 0;
+	const voir = (): string => expr[i] ?? "";
+	function somme(): number | null {
+		let v = produit();
+		while (v !== null && (voir() === "+" || voir() === "-")) {
+			const op = expr[i++];
+			const d = produit();
+			if (d === null) return null;
+			v = op === "+" ? v + d : v - d;
+		}
+		return v;
+	}
+	function produit(): number | null {
+		let v = puissance();
+		// Produit implicite : « 3(2) » ou « (2)(3) ».
+		while (v !== null && (voir() === "*" || voir() === "/" || voir() === "(")) {
+			const op = voir() === "(" ? "*" : expr[i++];
+			const d = puissance();
+			if (d === null) return null;
+			v = op === "*" ? v * d : v / d;
+		}
+		return v;
+	}
+	function puissance(): number | null {
+		const b = unaire();
+		if (b === null) return null;
+		if (voir() !== "^") return b;
+		i++;
+		const e = puissance();
+		return e === null ? null : Math.pow(b, e);
+	}
+	function unaire(): number | null {
+		if (voir() === "-") { i++; const v = unaire(); return v === null ? null : -v; }
+		if (voir() === "+") { i++; return unaire(); }
+		if (voir() === "(") {
+			i++;
+			const v = somme();
+			if (voir() !== ")") return null;
+			i++;
+			return v;
+		}
+		const m = expr.slice(i).match(/^\d+(?:\.\d+)?(?:e[-+]?\d+)?/i);
+		if (!m) return null;
+		i += m[0].length;
+		return Number(m[0]);
+	}
+	const v = somme();
+	return v !== null && i === expr.length && Number.isFinite(v) ? v : null;
+}
+
+/** La saisie LaTeX d'une réponse numérique, écrite comme `parseNumericValue`
+    la lit : « 765 », « 0.75 m/s ». Inévaluable : la saisie brute. */
+export function latexEnNombre(latex: unknown): string {
+	const brut = String(latex ?? "");
+	const { expr, unit } = latexEnExpression(brut);
+	if (!expr) return brut;
+	const v = evaluer(expr);
+	if (v === null) return brut;
+	return unit ? `${v} ${unit}` : String(v);
+}
