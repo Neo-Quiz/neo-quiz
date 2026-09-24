@@ -43,6 +43,11 @@ jobs:
 
       # UNE RÉPONSE COPIÉE D'UN SITE, dans tous ses états : fence, prose,
       # LaTeX, virgule oubliée, faux titres de section (Gemini, 2026-09-24).
+      # LE COURS AU-DESSUS D'UNE QUESTION : caché avant la lecture et pendant
+      # un rappel, ouvert au-dessus d'une « à expliquer avec tes mots ».
+      - name: Passage above a question
+        run: npm run check:passage
+
       - name: Web channel responses
         run: npm run check:web-channel
 

@@ -67,6 +67,10 @@ export function passageVisibility({ role, checked, isLesson }: { role: QuestionR
 	if (role === "pre") return "hidden";
 	if (role === "read") return "open";
 	if (role === "recall") return checked ? "open" : "hidden";
+	/* "explain" : on explique AVEC le cours sous les yeux (Ahmed, 2026-09-24 :
+	   « le cours devra rester lisible au-dessus »). Ce n'est pas un rappel de
+	   mémoire — c'est "recall" qui le fait — mais une mise en mots. */
+	if (role === "explain") return "open";
 	return "collapsible";
 }
 
@@ -179,7 +183,7 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 		// Sans identifiant de partage, le support doit être porté par la question
 		// elle-même — sinon il n'y a rien à afficher.
 		if (!sharedId) {
-			if (!hasContent(qi)) return null;
+			if (!hasContent(qi)) return lectureDeLEtape(qi);
 			return {
 				key: `q${qi}`,
 				title: String(q.passageTitle ?? "").trim() || t("engine.passage.defaultTitle"),
@@ -210,6 +214,30 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 			html: rawHtml(source),
 			sharedWith
 		};
+	}
+
+	/** Le cours d'une question "explain" de Learn : la carte de LECTURE de la
+	    même étape (son titre et son texte), faute de support propre. Un Learn
+	    généré n'écrit pas de `passage` : le cours vit dans la carte "read".
+	    `null` hors Learn, pour un autre rôle, ou sans lecture dans l'étape. */
+	function lectureDeLEtape(qi: number): ResolvedPassage | null {
+		if (!ctx.isLessonMode() || ctx.roleOfQuestion(qi) !== "explain") return null;
+		const etape = ctx.sliceOfQuestion(qi);
+		if (etape === null) return null;
+		for (let i = 0; i < ctx.quiz.length; i++) {
+			if (i === qi || ctx.sliceOfQuestion(i) !== etape || ctx.roleOfQuestion(i) !== "read") continue;
+			const lecture = ctx.quiz[i];
+			const texte = String(lecture?.prompt ?? "").trim();
+			if (!texte) continue;
+			return {
+				key: `lecture-${i}`,
+				title: String(lecture?.title ?? "").trim() || t("engine.passage.defaultTitle"),
+				text: texte,
+				html: "",
+				sharedWith: [qi]
+			};
+		}
+		return null;
 	}
 
 	/** « Q2 · questions 2 à 4 » — dit au lecteur combien de questions portent sur ce document. */
