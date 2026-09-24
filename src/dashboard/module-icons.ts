@@ -40,7 +40,7 @@ export const MODULE_ICONS = [
 	"globe-lock", "earth",
 	// Sécurité
 	"shield", "shield-check", "shield-alert", "lock", "key-round", "fingerprint",
-	"scan-search", "search", "radar", "siren", "activity", "eye", "skull",
+	"hat-glasses", "scan-search", "search", "radar", "siren", "activity", "eye", "skull",
 	// Communication, langues, veille
 	"languages", "book-a", "message-square", "messages-square", "mic", "newspaper",
 	"rss", "users", "handshake", "mail", "megaphone", "map",

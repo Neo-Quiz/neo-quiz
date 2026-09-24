@@ -26,7 +26,7 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
-	{ keys: ["hacking", "hacker", "pentest", "osint", "exploit", "attaque", "intrusion", "ctf", "tryhackme"], icons: ["bug", "scan-search", "shield-alert", "shield"] },
+	{ keys: ["hacking", "hacker", "pentest", "osint", "exploit", "attaque", "intrusion", "ctf", "tryhackme"], icons: ["hat-glasses", "scan-search", "bug", "shield-alert"] },
 	{ keys: ["soc", "siem", "incident", "supervision", "detection"], icons: ["siren", "radar", "activity"] },
 	{ keys: ["audit", "conformite", "iso", "norme"], icons: ["clipboard-check", "file-check", "list-checks"] },
 	{ keys: ["veille", "actualite", "information"], icons: ["radar", "newspaper", "rss"] },

@@ -136,7 +136,7 @@ await withSrcModule("src/dashboard/module-icons.ts", async ({ moduleIcon }) => {
 		moduleIcon({ name: "XTI302 - Administration système avancées & Scripting" }),
 		moduleIcon({ name: "XCS319 - Outils de Veille en Cybersécurité" }),
 		moduleIcon({ name: "XTI403 - CCNA 2" }),
-	], ["bug", "blocks", "square-terminal", "radar", "router"]);
+	], ["hat-glasses", "blocks", "square-terminal", "radar", "router"]);
 	/* En début de mot seulement : « écosystème » ne vaut pas « système », ni
 	   « outils » le mot-clé « ui ». */
 	r.check("un mot-clé au milieu d'un mot ne compte pas",
