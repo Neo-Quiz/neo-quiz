@@ -20,9 +20,13 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 	function examTimerHtml(): string {
     if (!ctx.isExamMode) return "";
     if (!ctx.examStarted) {
-        const learn = ctx.quizState?.startMode === "learn";
-        const modeSelectorHtml = typeof ctx.cards?.startModeSelectorHtml === "function" ? ctx.cards.startModeSelectorHtml() : "";
-        const primaryLabel = t(learn ? "engine.exam.startLearn" : "engine.exam.startExam");
+        /* PAS DE CHOIX (2026-09-24) : cet écran n'existe que parce que le quiz a
+           un CHRONO, et il sert à le dire avant de le lancer — durée, nombre de
+           questions, un seul bouton. Le sélecteur Apprendre | Examen qui y
+           vivait est retiré : pour apprendre, il y a les Learn (Ahmed : « on ne
+           doit pas avoir à choisir, juste elle apparaît, comme ça on sait qu'il
+           y a un timer »). */
+        ctx.quizState.startMode = "exam";
         // examOptions est non-null en mode examen (garde isExamMode ci-dessus) ;
         // `!` reproduit exactement l'accès direct du JS (throw si null, jamais
         // atteint), et reste DANS la branche examen : l'entraînement ne le lit pas.
@@ -32,7 +36,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
             const minutes = ctx.examOptions!.durationMinutes;
             return t(minutes > 1 ? "engine.exam.duration.other" : "engine.exam.duration.one", { minutes });
         };
-        const summaryLabel = learn ? t("engine.exam.noTimer") : durationLabel();
+        const summaryLabel = durationLabel();
         const questionCount = t(
             ctx.quiz.length > 1 ? "engine.exam.questionCount.other" : "engine.exam.questionCount.one",
             { count: ctx.quiz.length }
@@ -46,11 +50,10 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
                         <circle cx="12" cy="14" r="8"></circle>
                     </svg>
                 </div>
-                <div class="quiz-exam-start-title">${t("engine.exam.chooseMode")}</div>
+                <div class="quiz-exam-start-title">${t("engine.exam.timedTitle")}</div>
                 <div class="quiz-exam-start-duration">${summaryLabel}</div>
                 <div class="quiz-exam-start-question-count">${questionCount}</div>
-                ${modeSelectorHtml}
-                <button class="quiz-exam-start-btn" type="button">${primaryLabel}</button>
+                <button class="quiz-exam-start-btn" type="button">${t("engine.exam.start")}</button>
             </div>
         </div>`;
     }

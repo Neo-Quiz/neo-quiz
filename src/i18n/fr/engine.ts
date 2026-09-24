@@ -33,7 +33,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.start.learnSub": "Sans chrono, correction après chaque réponse",
 
 	/* ── Mode examen ── */
-	"engine.exam.chooseMode": "Choisir le mode",
+	"engine.exam.timedTitle": "Quiz chronométré",
+	"engine.exam.start": "Commencer",
 	"engine.exam.startExam": "Commencer l'examen",
 	"engine.exam.startLearn": "Commencer à apprendre",
 	"engine.exam.noTimer": "Sans chrono",

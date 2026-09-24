@@ -47,7 +47,9 @@ export const EN_ENGINE = {
 	"engine.start.learnSub": "No timer, corrected after each answer",
 
 	/* ── Mode examen ── */
-	"engine.exam.chooseMode": "Choose your mode",
+	/* L'écran de départ d'un quiz CHRONOMÉTRÉ : il annonce le chrono, sans choix. */
+	"engine.exam.timedTitle": "Timed quiz",
+	"engine.exam.start": "Start",
 	"engine.exam.startExam": "Start the exam",
 	"engine.exam.startLearn": "Start learning",
 	"engine.exam.noTimer": "No timer",

@@ -262,7 +262,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.next": "Next question",
 	"dashboard.quiz.promptEmpty": "Empty question",
 	"dashboard.quiz.back": "Back",
-	"dashboard.quiz.editor": "Editor",
+	"dashboard.quiz.editor": "Edit",
 	"dashboard.quiz.editDone": "Done",
 	"dashboard.quiz.moveUp": "Move up",
 	"dashboard.quiz.moveDown": "Move down",

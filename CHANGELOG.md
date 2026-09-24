@@ -18,6 +18,8 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
+- A timed quiz opens on a screen that announces the timer (duration, number of questions, one Start button) instead of asking to choose between learning and exam mode.
+- The button that opens a quiz in the editor now reads "Edit".
 - Easier reading in a quiz: the question text is larger than before and its title smaller, the role of a Learn question shows as a badge, and the note's location under the quiz title uses the interface font instead of a code font.
 - Math in quiz text blends in with the sentence: numbers, signs and brackets use the interface font and formulas are slightly larger, while variables stay in math italics.
 - A generated Learn note now stays short: at most 20 questions unless the course truly needs more, and a Practice bank holds 10 to 20. Every question asked before the reading comes with a hint, and a note that lacks one says so.

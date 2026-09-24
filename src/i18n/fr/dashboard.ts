@@ -232,7 +232,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.next": "Question suivante",
 	"dashboard.quiz.promptEmpty": "Question vide",
 	"dashboard.quiz.back": "Retour",
-	"dashboard.quiz.editor": "Éditeur",
+	"dashboard.quiz.editor": "Modifier",
 	"dashboard.quiz.editDone": "Terminé",
 	"dashboard.quiz.moveUp": "Déplacer vers le haut",
 	"dashboard.quiz.moveDown": "Déplacer vers le bas",
