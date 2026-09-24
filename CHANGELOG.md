@@ -18,7 +18,7 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
-- The Learn and the Practice of a same course show as one card, with a button for each mode, on My quizzes and on the home page; the quiz sheet switches between the two. A setting keeps them apart.
+- The Learn and the Practice of a same course show as one card on My quizzes and on the home page, with two numbered buttons, 1 Learn then 2 Practice, that start each mode and show its progress; the quiz sheet switches between the two. A setting keeps them apart. Every quiz card now ends with such a button instead of a small label and a separate play button, and cards inside a folder no longer repeat the folder name.
 - My quizzes can be grouped by Recent (the default) or by Folder, which puts each folder under the folder that contains it; grouping by course unit moves to a Custom section of the menu, since it depends on your own course.
 - A folder without a chosen icon gets one that fits its name instead of a book everywhere: a bug for Ethical Hacking, blocks for software architecture, a terminal for scripting, a router for networks, a radar for technology watch. The icon picker offers about a hundred icons grouped by theme.
 - In a Learn path, a question that asks you to explain in your own words shows the lesson of its step above it, open.

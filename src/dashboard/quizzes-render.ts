@@ -235,6 +235,8 @@ export function renderModuleDrill(
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
 			frere,
 			statsFrere: frere ? stats[frere.path] : undefined,
+			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
+			showPath: false,
 			onPlay: (q) => ctx.openQuiz(q),
 			// Absent côté application (menus et modals = tranche 2.6) : la
 			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —

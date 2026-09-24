@@ -217,6 +217,10 @@ export const EN_DASHBOARD = {
 	"dashboard.card.review": "To review",
 	"dashboard.card.progress": "In progress · {pct}%",
 	"dashboard.card.fresh": "Not started",
+	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */
+	"dashboard.card.actionLearn": "Learn",
+	"dashboard.card.actionPractice": "Practice",
+	"dashboard.card.actionDone": "Done",
 	"dashboard.card.more": "More actions",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */

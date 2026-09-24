@@ -216,13 +216,6 @@
 	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
 }
-/* Carte d'un cours : les deux pastilles et le ⋯ sur une seule ligne. */
-.qbd-quiz-card-meta--cours {
-	flex-wrap: nowrap;
-	gap: 6px;
-}
-.qbd-quiz-card-meta--cours .qbd-quiz-card-mode--bouton { white-space: nowrap; }
-
 /* Bouton ⋯ des cartes (quiz ET module) — coin bas droit de la ligne meta,
    façon StudySmarter : trois points NUS, aucun chrome au repos, halo rond
    discret au survol. Les !important battent `.theme-dark button` (0,1,1),
@@ -589,24 +582,88 @@
 	font-size: 10.5px;
 	padding: 2px 8px 2px 6px;
 }
-/* Sur la carte d'un cours, chaque pastille est un BOUTON qui ouvre son mode. */
-.qbd-root .qbd-quiz-card-mode--bouton {
+.qbd-quiz-card-mode-icon { display: inline-flex; }
+
+/* ── Les ACTIONS d'une carte (2026-09-24) : un bouton par mode, pleine
+   largeur, deux colonnes dans un cours. Un vrai bouton — fond, bordure,
+   survol — pour qu'on sache qu'il se clique ; le numéro dit l'ordre. ── */
+.qbd-quiz-card-actions {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 8px;
+	margin-top: 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.qbd-quiz-card-actions--deux { grid-template-columns: 1fr 1fr; }
+.qbd-root .qbd-quiz-card-action {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	min-width: 0;
 	height: auto;
 	margin: 0;
-	border: none;
+	padding: 8px 10px;
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
 	box-shadow: none;
-	font-family: inherit;
+	font: inherit;
+	text-align: left;
+	color: var(--text-normal);
 	cursor: pointer;
-	transition: background-color 140ms ease, transform 140ms ease;
+	transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
-.qbd-root .qbd-quiz-card-mode--bouton:hover {
-	background: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+.qbd-root .qbd-quiz-card-action:hover {
+	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	border-color: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
 	transform: translateY(-1px);
 }
-.qbd-quiz-card--tinted .qbd-quiz-card-mode--bouton:hover {
-	background: color-mix(in oklab, var(--accent) 34%, #181d2b);
+.qbd-quiz-card--tinted .qbd-quiz-card-action {
+	border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+	background: color-mix(in oklab, var(--accent) 12%, transparent);
 }
-.qbd-quiz-card-mode-icon { display: inline-flex; }
+.qbd-root .qbd-quiz-card--tinted .qbd-quiz-card-action:hover {
+	border-color: color-mix(in oklab, var(--accent) 65%, transparent);
+	background: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+.qbd-quiz-card-action-top {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.qbd-quiz-card-action-num {
+	flex-shrink: 0;
+	width: 17px;
+	height: 17px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	font-size: 10.5px;
+	font-weight: 700;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent, #fff);
+}
+.qbd-quiz-card--tinted .qbd-quiz-card-action-num { background: var(--accent); }
+.qbd-quiz-card-action-icon { display: inline-flex; color: var(--interactive-accent); }
+.qbd-quiz-card--tinted .qbd-quiz-card-action-icon { color: var(--accent); }
+.qbd-quiz-card-action-icon svg { width: 14px; height: 14px; }
+.qbd-quiz-card-action-label { overflow: hidden; text-overflow: ellipsis; }
+.qbd-quiz-card-action-sub {
+	font-size: 11.5px;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+/* Un mode terminé : la coche en vert, le bouton reste cliquable pour réviser. */
+.qbd-quiz-card-action.is-done .qbd-quiz-card-action-icon { color: var(--color-green); }
 .qbd-quiz-card-mode-icon svg { width: 12px; height: 12px; }
 
 

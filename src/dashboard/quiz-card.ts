@@ -133,43 +133,33 @@ export function renderQuizCard(
 
 	const body = ajouter(card, "div", "qbd-quiz-card-body");
 
-	// En-tête : pastille d'état + bouton lecture
+	// En-tête : pastille d'état, et le menu ⋯ à droite (il y était le ▶).
 	const head = ajouter(body, "div", "qbd-quiz-card-head");
 	const pill = ajouter(head, "div", `qbd-quiz-card-status qbd-quiz-card-status--${state}`);
 	const sIcon = ajouter(pill, "span", "qbd-quiz-card-status-icon");
 	currentHost().ui.setIcon(sIcon, stateIcon);
 	ajouter(pill, "span", undefined, stateLabel);
-	if (opts?.onPlay) {
-		const onPlay = opts.onPlay;
-		// Bouton lecture rond — lance le quiz directement, sans passer par la
-		// fiche. Pas d'aria-label (Obsidian en ferait une infobulle native
-		// flottante, cf. ai.ts) : un `title` traduit suffit, le bouton n'a pas
-		// de texte visible pour porter un nom accessible implicite.
-		const playBtn = ajouter(head, "button", "qbd-quiz-card-play");
-		playBtn.type = "button";
-		playBtn.title = t("dashboard.detail.play");
-		currentHost().ui.setIcon(playBtn, "circle-play");
-		playBtn.addEventListener("click", (e) => {
-			// Empêche le clic de remonter à la carte : sinon on lancerait le
-			// quiz ET on ouvrirait la fiche (deux actions pour un seul clic).
+	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
+	if (opts?.onMenu) {
+		const onMenu = opts.onMenu;
+		const moreBtn = ajouter(head, "button", "qbd-card-more");
+		moreBtn.type = "button";
+		moreBtn.title = t("dashboard.card.more");
+		currentHost().ui.setIcon(moreBtn, "ellipsis");
+		moreBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			// Un cours : le Learn d'abord, le Practice une fois le Learn terminé.
-			const learnFini = infoQuiz.state === "mastered" || infoQuiz.state === "review";
-			onPlay(frere && learnFini ? frere : quiz);
+			onMenu(quiz, moreBtn);
 		});
 	}
 
 	// Titre
 	ajouter(body, "p", "qbd-quiz-card-title", quiz.title);
 
-	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà.
+	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans
+	// la grille d'un dossier, le dossier EST le titre de la page (2026-09-24).
 	// N'affiche que le DOSSIER PARENT (dernier segment), jamais le chemin
-	// complet ni l'extension : le nom de fichier est déjà le titre juste
-	// au-dessus, et le préfixe de dossiers commun à toutes les cartes
-	// n'apprend rien — seul le dernier dossier identifie « d'où ça sort »
-	// (défaut relevé par Ahmed à l'écran, 2026-07-17 : 3 lignes de
-	// monospace, préfixe répété sur chaque carte). Racine du vault → aucun
-	// dossier parent, donc aucune ligne (pas de texte vide, pas de placeholder).
+	// complet ni l'extension (Ahmed, 2026-07-17). Racine du vault → aucun
+	// dossier parent, donc aucune ligne.
 	if (opts?.showPath !== false) {
 		const segs = quiz.path.split("/").slice(0, -1).filter(Boolean);
 		const parentFolder = segs.length > 0 ? segs[segs.length - 1] : null;
@@ -179,60 +169,39 @@ export function renderQuizCard(
 		}
 	}
 
-	// Aucune barre de progression : la pastille d'état porte déjà le
-	// pourcentage (« In progress · 20% »), et la carte du handoff n'en a pas.
-
-	/* Meta : icône du type + nombre de questions, puis l'objectif en badge.
-	   Le type n'est plus un badge : deux badges collés se ressemblaient, et la
-	   page du quiz l'affiche déjà en toutes lettres (Ahmed, 2026-09-23). Son
-	   libellé est une bulle qui paraît au survol (`renderQuizTypeIcon`). */
-	const meta = ajouter(body, "div", "qbd-quiz-card-meta");
-	if (frere) {
-		/* UN COURS : une pastille par mode, avec son nombre de questions ; un
-		   clic ouvre la fiche de CE mode (2026-09-24). Le nombre total n'est
-		   plus répété à gauche : les deux pastilles le disent déjà. */
-		/* Sans l'icône de type : les deux pastilles et le ⋯ doivent tenir sur
-		   UNE ligne, et le type se lit sur la fiche. */
-		meta.classList.add("qbd-quiz-card-meta--cours");
-		for (const q of [quiz, frere]) {
-			const pastille = ajouter(meta, "button", "qbd-quiz-card-badge qbd-quiz-card-mode qbd-quiz-card-mode--bouton");
-			pastille.type = "button";
-			pastille.title = t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions });
-			currentHost().ui.setIcon(ajouter(pastille, "span", "qbd-quiz-card-mode-icon"), q.mode === "learn" ? "book-open" : "dumbbell");
-			ajouter(pastille, "span", undefined, `${quizModeLabel(q.mode)} · ${q.questions}`);
-			pastille.addEventListener("click", (e) => {
-				e.stopPropagation();
-				if (typeof onOpen === "function") onOpen(q);
-			});
-		}
-	} else {
-		const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
-		renderQuizTypeIcon(count, quiz.quizType);
-		ajouter(
-			count, "span", undefined,
-			t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
-		);
-		/* L'OBJECTIF (Learn / Practice) en badge : le titre ne le porte plus
-		   (Ahmed, 2026-09-23). Avec son icône, la même que sur la fiche : le
-		   livre ouvert pour Learn, l'haltère pour Practice (2026-09-24). */
-		const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge qbd-quiz-card-mode");
-		currentHost().ui.setIcon(ajouter(modeBadge, "span", "qbd-quiz-card-mode-icon"), quiz.mode === "learn" ? "book-open" : "dumbbell");
-		ajouter(modeBadge, "span", undefined, quizModeLabel(quiz.mode));
-	}
-
-	// Bouton ⋯ en bout de ligne meta (position StudySmarter : coin bas droit).
-	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
-	if (opts?.onMenu) {
-		const onMenu = opts.onMenu;
-		const moreBtn = ajouter(meta, "button", "qbd-card-more");
-		moreBtn.type = "button";
-		moreBtn.title = t("dashboard.card.more");
-		currentHost().ui.setIcon(moreBtn, "ellipsis");
-		moreBtn.addEventListener("click", (e) => {
+	/* LES ACTIONS (2026-09-24) : un bouton par mode, en pleine largeur, à la
+	   place de la ligne « N questions + étiquette » et du ▶. Dans un cours,
+	   ils sont NUMÉROTÉS — ① apprendre, ② s'entraîner : l'ordre se lit sans
+	   explication. Chaque bouton dit l'état de SON mode (nombre de questions,
+	   progression, coche une fois terminé) et lance ce mode ; le reste de la
+	   carte ouvre la fiche. Les deux sortes de cartes se lisent pareil : une
+	   carte d'un seul mode a le même bouton, seul, sans numéro. */
+	const modes = frere ? [quiz, frere] : [quiz];
+	const actions = ajouter(body, "div", "qbd-quiz-card-actions" + (frere ? " qbd-quiz-card-actions--deux" : ""));
+	modes.forEach((q, i) => {
+		const info = q === quiz ? infoQuiz : infoFrere!;
+		const fini = info.state === "mastered" || info.state === "review";
+		const btn = ajouter(actions, "button", "qbd-quiz-card-action" + (fini ? " is-done" : ""));
+		btn.type = "button";
+		const haut = ajouter(btn, "span", "qbd-quiz-card-action-top");
+		if (frere) ajouter(haut, "span", "qbd-quiz-card-action-num", String(i + 1));
+		currentHost().ui.setIcon(ajouter(haut, "span", "qbd-quiz-card-action-icon"), fini ? "circle-check" : q.mode === "learn" ? "book-open" : "dumbbell");
+		ajouter(haut, "span", "qbd-quiz-card-action-label", t(q.mode === "learn" ? "dashboard.card.actionLearn" : "dashboard.card.actionPractice"));
+		/* L'état sous le bouton seulement dans un cours : sur une carte d'un
+		   seul mode, la pastille d'état le dit déjà, le bouton garde le nombre
+		   de questions. */
+		const nombre = t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions });
+		ajouter(btn, "span", "qbd-quiz-card-action-sub",
+			!frere ? nombre
+				: fini ? t("dashboard.card.actionDone")
+					: info.state === "progress" ? t("dashboard.card.progress", { pct: info.pct })
+						: nombre);
+		btn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			onMenu(quiz, moreBtn);
+			if (opts?.onPlay) opts.onPlay(q);
+			else if (typeof onOpen === "function") onOpen(q);
 		});
-	}
+	});
 
 	// Ouverture (navigation laissée à l'appelant)
 	card.addEventListener("click", () => {

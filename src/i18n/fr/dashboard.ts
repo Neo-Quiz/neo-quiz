@@ -188,6 +188,9 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.card.review": "À revoir",
 	"dashboard.card.progress": "En cours · {pct}%",
 	"dashboard.card.fresh": "À commencer",
+	"dashboard.card.actionLearn": "Apprendre",
+	"dashboard.card.actionPractice": "S'entraîner",
+	"dashboard.card.actionDone": "Terminé",
 	"dashboard.card.more": "Plus d'actions",
 
 	/* ── Type de quiz ── */
