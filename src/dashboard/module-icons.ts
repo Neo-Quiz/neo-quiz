@@ -24,7 +24,7 @@ export const MODULE_ICONS = [
 	// Études
 	"book", "book-open", "book-text", "book-marked", "notebook", "notebook-text",
 	"library", "graduation-cap", "school", "file-text", "scroll-text", "presentation",
-	"lightbulb", "brain", "target", "trophy", "star", "folder",
+	"lightbulb", "brain", "brain-circuit", "target", "trophy", "star", "folder",
 	// Sciences
 	"calculator", "sigma", "square-function", "pi", "chart-line", "chart-pie",
 	"atom", "flask-conical", "microscope", "dna", "telescope", "orbit",
@@ -35,15 +35,18 @@ export const MODULE_ICONS = [
 	// Matériel, systèmes, réseaux
 	"cpu", "circuit-board", "memory-stick", "hard-drive", "monitor", "laptop",
 	"server", "server-cog", "monitor-cog", "database", "table-2", "wrench",
+	"cloud-cog",
 	"network", "router", "wifi", "share-2", "cloud", "globe",
+	"globe-lock", "earth",
 	// Sécurité
 	"shield", "shield-check", "shield-alert", "lock", "key-round", "fingerprint",
-	"scan-search", "radar", "siren", "activity", "eye", "skull",
+	"scan-search", "search", "radar", "siren", "activity", "eye", "skull",
 	// Communication, langues, veille
 	"languages", "book-a", "message-square", "messages-square", "mic", "newspaper",
 	"rss", "users", "handshake", "mail", "megaphone", "map",
 	// Travail, droit, économie
 	"briefcase", "briefcase-business", "id-card", "list-checks", "kanban", "clipboard-check",
+	"clipboard-list",
 	"file-check", "file-badge", "scale", "gavel", "trending-up", "coins",
 	// Création
 	"palette", "pen-tool", "layout-dashboard", "layout-panel-top", "layout-template", "copy",
