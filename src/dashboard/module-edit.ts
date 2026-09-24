@@ -114,7 +114,7 @@ export function openModuleEditModal(
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.quizzes.moduleEditIcon"));
 			const iconBtn = ajouter(c, "button", "qbd-medit-icon-btn");
 			iconBtn.type = "button";
-			const paintIcon = () => { iconBtn.replaceChildren(); currentHost().ui.setIcon(iconBtn, moduleIcon({ icon }, { generated: genere })); };
+			const paintIcon = () => { iconBtn.replaceChildren(); currentHost().ui.setIcon(iconBtn, moduleIcon({ icon, name, ue }, { generated: genere })); };
 			paintIcon();
 			iconBtn.addEventListener("click", () => {
 				// Portalé au PANNEAU du modal (comme le color picker) → pas de vol

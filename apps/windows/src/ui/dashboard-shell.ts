@@ -450,7 +450,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			const generated = path === ctx.generatedFolder?.();
 			return {
 				path, name,
-				icon: moduleIcon(ov ?? {}, { generated }),
+				icon: moduleIcon({ icon: ov?.icon, name, ue: ov?.ue }, { generated }),
 				color: moduleAccent({ folder: name, color: ov?.color }, { generated }),
 				root: currentHost().paths.rootOf(path)?.name ?? "",
 			};

@@ -128,6 +128,34 @@ await withSrcModule("src/dashboard/module-icons.ts", async ({ moduleIcon }) => {
 	/* Une chaîne vide vient d'un champ effacé, pas d'un choix : elle doit
 	   retomber sur le défaut comme une absence, sinon la pastille se vide. */
 	r.check("une icône vide vaut une absence", moduleIcon({ icon: "" }, { generated: true }), "sparkles");
+	/* Sans icône choisie, le NOM décide (2026-09-24) : un livre partout ne
+	   disait rien de la matière. Noms réels des modules d'Ahmed. */
+	r.check("le nom choisit l'icône d'un module sans choix", [
+		moduleIcon({ name: "XTI305 - Ethical Hacking 1 - Initiation" }),
+		moduleIcon({ name: "XTI303 - Conception & Architecture logicielle" }),
+		moduleIcon({ name: "XTI302 - Administration système avancées & Scripting" }),
+		moduleIcon({ name: "XCS319 - Outils de Veille en Cybersécurité" }),
+		moduleIcon({ name: "XTI403 - CCNA 2" }),
+	], ["bug", "blocks", "square-terminal", "radar", "router"]);
+	/* En début de mot seulement : « écosystème » ne vaut pas « système », ni
+	   « outils » le mot-clé « ui ». */
+	r.check("un mot-clé au milieu d'un mot ne compte pas",
+		[moduleIcon({ name: "Écosystème" }), moduleIcon({ name: "Outils" })], ["book", "book"]);
+	r.check("un nom sans mot-clé garde le livre ; un choix l'emporte sur le nom",
+		[moduleIcon({ name: "Divers" }), moduleIcon({ name: "XTI403 - CCNA 2", icon: "star" })], ["book", "star"]);
+	r.done();
+});
+
+/* Chaque icône de la grille et des suggestions EXISTE dans le catalogue que
+   l'application dessine (`lucide`) : un nom inconnu donne une pastille vide,
+   sans la moindre erreur. */
+await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-suggest.ts"], async (mi, is) => {
+	const r = makeReporter("Module — les icônes existent");
+	const { icons } = await import("../apps/windows/node_modules/lucide/dist/esm/lucide.mjs");
+	const pascal = n => n.split("-").map(p => p[0].toUpperCase() + p.slice(1)).join("");
+	const tous = [...new Set([...mi.MODULE_ICONS, ...is.iconesDesRegles()])];
+	r.check("aucune icône inconnue de lucide", tous.filter(n => !icons[pascal(n)]), []);
+	r.check("chaque suggestion est aussi dans la grille", is.iconesDesRegles().filter(n => !mi.MODULE_ICONS.includes(n)), []);
 	r.done();
 });
 
