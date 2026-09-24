@@ -865,6 +865,20 @@ function installerPont(fichiers = {}, perimetre = null) {
 	r.done();
 }
 
+/* LE MEMBRE `python` DE L'HÔTE, statiquement — même raison que le bloc
+   `video` ci-dessus (tâche 4 de l'exercice Python, spec
+   2026-09-23-exercice-python-design.md §3) : le contrat gagne un membre
+   OPTIONNEL, et l'hôte Windows l'implore du pont (`./python.ts`), jamais
+   d'un objet posé à la main dans `index.ts`. */
+{
+	const r = makeReporter("Hôte Windows — l'exécution Python (statique)");
+	const source = readFileSync("apps/windows/src/host/index.ts", "utf-8");
+	const nu = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+	r.check("l'hôte assemblé déclare le membre python par createWindowsPython(pont)", /\bpython\s*:\s*createWindowsPython\(pont\)/.test(nu), true);
+	r.check("… importé de ./python", /import \{ createWindowsPython \} from "\.\/python"/.test(nu), true);
+	r.done();
+}
+
 /* `shell.openExternal` D'UNE CHAÎNE, statiquement — même raison que le bloc
    PDF ci-dessus (`index.ts` importe MathLive par `createWindowsModals`/
    `createWindowsUi`, qu'esbuild ne charge pas hors de la fenêtre : ce module

@@ -56,6 +56,11 @@ import { creerReglages } from "./reglages";
 import type { Reglages } from "./reglages";
 import { autoriserHote } from "./reseau";
 import { SCHEMA_RESSOURCES, resoudreRessource } from "./ressources";
+/* L'EXÉCUTION PYTHON (tâche 4) : `PRIVILEGES_PYTHON` s'ajoute à l'UNIQUE
+   appel `registerSchemesAsPrivileged` (Electron n'en retient qu'un), et
+   `creerBacASable` construit la fenêtre cachée passée aux canaux. */
+import { creerBacASable, PRIVILEGES_PYTHON } from "./python";
+import type { BacASable } from "./python";
 
 /** Le serveur de développement de Vite. Le port vient de `vite.config.ts`
     (`strictPort: true`) : s'il change là-bas, il change ici. */
@@ -127,6 +132,9 @@ let gardeFermeture: NodeJS.Timeout | null = null;
 /** Arrête l'attente d'une réponse copiée (voir `canaux.ts`) ; posée par
     `enregistrerCanaux`, appelée à la fermeture de la fenêtre. */
 let arreterAttente: (() => void) | null = null;
+/** Le bac à sable Python (tâche 4, `./python.ts`) : créé une fois, fermé à la
+    fermeture de la fenêtre, comme `arreterAttente`. */
+let python: BacASable | null = null;
 
 /** Les réglages, ou une erreur NOMMÉE — voir `DependancesCanaux`. */
 function reglagesOuErreur(): Reglages {
@@ -456,6 +464,7 @@ function creerFenetre(): void {
 	fenetre.on("closed", () => {
 		fenetre = null;
 		arreterAttente?.();
+		python?.fermer();
 	});
 
 	void charger(fenetre).catch(e => console.error(LOG_PREFIX, "chargement du rendu impossible:", e));
@@ -538,6 +547,7 @@ function servirRessources(perimetre: Perimetre): void {
    et une surface qu'aucun appelant ne demande est une surface de trop. */
 protocol.registerSchemesAsPrivileged([
 	{ scheme: SCHEMA_RESSOURCES, privileges: { standard: true, secure: true, stream: true } },
+	PRIVILEGES_PYTHON,
 ]);
 
 /* ─────────── le démarrage ─────────── */
@@ -689,9 +699,17 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);
 			},
 		});
+		/* Le bac à sable Python (tâche 3, `./python.ts`) : une fenêtre cachée,
+		   créée ici et fermée avec la fenêtre principale (voir `fenetre.on
+		   ("closed", …)` plus haut). `dist-electron/python` porte les fichiers
+		   servis par `neo-python://`, `python-preload.cjs` le préchargement
+		   sandboxé de cette fenêtre-là — deux artefacts distincts de ceux de
+		   la fenêtre de l'app. */
+		python = creerBacASable(path.join(__dirname, "python"), path.join(__dirname, "python-preload.cjs"));
 		const canaux = enregistrerCanaux({
 			perimetre,
 			reglagesOuErreur,
+			python,
 			/* LU À CHAQUE APPEL, jamais capturé : l'utilisateur peut changer ce
 			   dossier en cours de session, et les canaux doivent servir le
 			   nouveau dès l'instant où il est écrit. */
