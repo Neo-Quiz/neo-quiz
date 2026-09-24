@@ -179,8 +179,11 @@ export function renderQuizCard(
 	);
 	/* L'OBJECTIF (Learn / Practice) en badge : le titre ne le porte plus
 	   (Ahmed, 2026-09-23). */
-	const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge");
-	modeBadge.textContent = quizModeLabel(quiz.mode);
+	/* Avec son icône, la même que sur la fiche : le livre ouvert pour Learn,
+	   l'haltère pour Practice (2026-09-24). */
+	const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge qbd-quiz-card-mode");
+	currentHost().ui.setIcon(ajouter(modeBadge, "span", "qbd-quiz-card-mode-icon"), quiz.mode === "learn" ? "book-open" : "dumbbell");
+	ajouter(modeBadge, "span", undefined, quizModeLabel(quiz.mode));
 
 	// Bouton ⋯ en bout de ligne meta (position StudySmarter : coin bas droit).
 	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
