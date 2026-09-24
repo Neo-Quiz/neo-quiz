@@ -216,6 +216,12 @@
 	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
 }
+/* Carte d'un cours : les deux pastilles et le ⋯ sur une seule ligne. */
+.qbd-quiz-card-meta--cours {
+	flex-wrap: nowrap;
+	gap: 6px;
+}
+.qbd-quiz-card-meta--cours .qbd-quiz-card-mode--bouton { white-space: nowrap; }
 
 /* Bouton ⋯ des cartes (quiz ET module) — coin bas droit de la ligne meta,
    façon StudySmarter : trois points NUS, aucun chrome au repos, halo rond
@@ -582,6 +588,23 @@
 	gap: 4px;
 	font-size: 10.5px;
 	padding: 2px 8px 2px 6px;
+}
+/* Sur la carte d'un cours, chaque pastille est un BOUTON qui ouvre son mode. */
+.qbd-root .qbd-quiz-card-mode--bouton {
+	height: auto;
+	margin: 0;
+	border: none;
+	box-shadow: none;
+	font-family: inherit;
+	cursor: pointer;
+	transition: background-color 140ms ease, transform 140ms ease;
+}
+.qbd-root .qbd-quiz-card-mode--bouton:hover {
+	background: color-mix(in srgb, var(--interactive-accent) 26%, transparent);
+	transform: translateY(-1px);
+}
+.qbd-quiz-card--tinted .qbd-quiz-card-mode--bouton:hover {
+	background: color-mix(in oklab, var(--accent) 34%, #181d2b);
 }
 .qbd-quiz-card-mode-icon { display: inline-flex; }
 .qbd-quiz-card-mode-icon svg { width: 12px; height: 12px; }

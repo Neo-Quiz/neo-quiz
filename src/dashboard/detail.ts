@@ -4,6 +4,7 @@ import { markViewEnter } from "./view-enter";
 import { t, currentLang, hourOptions } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
+import { quizFrere } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { quizModeLabel, quizTypeLabel } from "./quiz-card";
 import { getCanal, getProvider, setBrandLogo, libelleModele } from "./ai-providers";
@@ -98,6 +99,9 @@ export interface QuizPageSpec {
 	/** Appelée à chaque changement de question courante, par `goToQuestion`
 	    et nulle part ailleurs — c'est le seul endroit où `activeIdx` bouge. */
 	onQuestionChange?(index: number): void;
+	/** L'AUTRE mode du même cours (course-pairs.ts) : la fiche montre alors un
+	    sélecteur Learn | Practice qui ouvre ce quiz. */
+	autreMode?: { quiz: QuizIndexEntry; open(): void };
 }
 
 /** Dépendances d'une page « quiz », indépendantes du dashboard — et de
@@ -183,6 +187,11 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
 				ouverture: host.ouverture,
+				autreMode: (() => {
+					if (ctx.settings.quizzesGroupModes === false) return undefined;
+					const frere = quizFrere(quiz, ctx.scanner.getQuizzes());
+					return frere ? { quiz: frere, open: () => ctx.navigate("detail", { quiz: frere }) } : undefined;
+				})(),
 			});
 		},
 		dispose: () => page.dispose(),
@@ -605,6 +614,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onStart: (el) => { void flushSave(); start.onClick(el); },
 			onEdit: () => toggleEditing(page),
 			onBack: () => { void flushSave(); spec.onBack(); },
+			autreMode: spec.autreMode ? { mode: spec.autreMode.quiz.mode, open: () => { void flushSave(); spec.autreMode!.open(); } } : undefined,
 		});
 		return true;
 	}

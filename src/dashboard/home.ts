@@ -6,6 +6,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard as renderSharedQuizCard } from "./quiz-card";
+import { regrouperParCours } from "./course-pairs";
 import { isFolderArchived } from "./folder-archive";
 import { moduleForQuiz, applyModuleOverrides } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
@@ -220,7 +221,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		/* Une section = en-tête repliable + grille plafonnée + « See all » vers
 		   « Mes quiz ». TOUTE section plafonnée porte ce lien : sans lui, les
 		   quiz au-delà du 6e n'auraient aucune sortie depuis l'accueil. */
-		const renderSection = (key: string, label: string, list: QuizIndexEntry[], defaultOpen: boolean): void => {
+		const renderSection = (key: string, label: string, quizzes: QuizIndexEntry[], defaultOpen: boolean): void => {
+			/* Un cours, une carte (course-pairs.ts), comme dans « Mes quiz » : le
+			   compteur et le plafond comptent des COURS, pas des fichiers. */
+			const list = regrouperParCours(quizzes, ctx.settings.quizzesGroupModes !== false);
 			const shown = list.slice(0, HOME_GRID_MAX);
 			const section = ajouter(container, "div", "qbd-home-section");
 			const body = renderCollapsibleSection(collapse, section, key, label, list.length, {
@@ -244,8 +248,8 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			});
 
 			const grid = ajouter(body, "div", "qbd-home-grid");
-			for (const quiz of shown) {
-				renderQuizCard(grid, quiz, stats[quiz.path], map).style
+			for (const { quiz, frere } of shown) {
+				renderQuizCard(grid, quiz, stats[quiz.path], map, frere, frere ? stats[frere.path] : undefined).style
 					.setProperty("--qbd-card-delay", entryDelay());
 			}
 		};
@@ -442,9 +446,13 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		container: HTMLElement,
 		quiz: QuizIndexEntry,
 		stats: QuizStatRecord | null | undefined,
-		map: ModuleMap
+		map: ModuleMap,
+		frere?: QuizIndexEntry,
+		statsFrere?: QuizStatRecord
 	): HTMLDivElement {
 		return renderSharedQuizCard(container, quiz, stats, (q) => ctx.navigate("detail", { quiz: q }), {
+			frere,
+			statsFrere,
 			onPlay: (q) => ctx.openQuiz(q),
 			// Absent côté application (menus et modals = tranche 2.6) : la carte
 			// se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in. L'hôte

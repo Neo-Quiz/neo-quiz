@@ -92,6 +92,10 @@ export function renderQuizCard(
 		onMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement) => void;
 		accent?: string;
 		entryIndex?: number;
+		/** Le quiz de l'AUTRE mode du même cours (`regrouperParCours`) : la
+		    carte devient celle du cours, avec une pastille par mode. */
+		frere?: QuizIndexEntry;
+		statsFrere?: QuizStatRecord | null;
 	}
 ): HTMLDivElement {
 	/* Anatomie UNIQUE depuis le contrat visuel du 2026-07-28 : l'accueil et
@@ -107,7 +111,17 @@ export function renderQuizCard(
 	// ── État du quiz (calcul partagé quiz-mastery.ts) ──
 	// `state` reste un identifiant (suffixe de classe CSS) ; seul `stateLabel`
 	// est traduit — et il l'est ici, à chaque rendu de carte.
-	const { state, pct } = computeQuizState(quiz, stats);
+	/* Un cours réuni résume ses deux modes : maîtrisé si les deux le sont, à
+	   revoir si l'un l'est, en cours dès que l'un a commencé (pourcentage
+	   moyen), neuf sinon. */
+	const frere = opts?.frere;
+	const infoQuiz = computeQuizState(quiz, stats);
+	const infoFrere = frere ? computeQuizState(frere, opts?.statsFrere) : null;
+	const { state, pct } = !infoFrere ? infoQuiz
+		: infoQuiz.state === "mastered" && infoFrere.state === "mastered" ? { state: "mastered" as const, pct: 100 }
+		: infoQuiz.state === "review" || infoFrere.state === "review" ? { state: "review" as const, pct: 100 }
+		: infoQuiz.state === "fresh" && infoFrere.state === "fresh" ? { state: "fresh" as const, pct: 0 }
+		: { state: "progress" as const, pct: Math.round((infoQuiz.pct + infoFrere.pct) / 2) };
 	const best = stats ? stats.bestScore : 0;
 	let stateLabel: string, stateIcon: string;
 	switch (state) {
@@ -139,7 +153,9 @@ export function renderQuizCard(
 			// Empêche le clic de remonter à la carte : sinon on lancerait le
 			// quiz ET on ouvrirait la fiche (deux actions pour un seul clic).
 			e.stopPropagation();
-			onPlay(quiz);
+			// Un cours : le Learn d'abord, le Practice une fois le Learn terminé.
+			const learnFini = infoQuiz.state === "mastered" || infoQuiz.state === "review";
+			onPlay(frere && learnFini ? frere : quiz);
 		});
 	}
 
@@ -171,19 +187,38 @@ export function renderQuizCard(
 	   page du quiz l'affiche déjà en toutes lettres (Ahmed, 2026-09-23). Son
 	   libellé est une bulle qui paraît au survol (`renderQuizTypeIcon`). */
 	const meta = ajouter(body, "div", "qbd-quiz-card-meta");
-	const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
-	renderQuizTypeIcon(count, quiz.quizType);
-	ajouter(
-		count, "span", undefined,
-		t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
-	);
-	/* L'OBJECTIF (Learn / Practice) en badge : le titre ne le porte plus
-	   (Ahmed, 2026-09-23). */
-	/* Avec son icône, la même que sur la fiche : le livre ouvert pour Learn,
-	   l'haltère pour Practice (2026-09-24). */
-	const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge qbd-quiz-card-mode");
-	currentHost().ui.setIcon(ajouter(modeBadge, "span", "qbd-quiz-card-mode-icon"), quiz.mode === "learn" ? "book-open" : "dumbbell");
-	ajouter(modeBadge, "span", undefined, quizModeLabel(quiz.mode));
+	if (frere) {
+		/* UN COURS : une pastille par mode, avec son nombre de questions ; un
+		   clic ouvre la fiche de CE mode (2026-09-24). Le nombre total n'est
+		   plus répété à gauche : les deux pastilles le disent déjà. */
+		/* Sans l'icône de type : les deux pastilles et le ⋯ doivent tenir sur
+		   UNE ligne, et le type se lit sur la fiche. */
+		meta.classList.add("qbd-quiz-card-meta--cours");
+		for (const q of [quiz, frere]) {
+			const pastille = ajouter(meta, "button", "qbd-quiz-card-badge qbd-quiz-card-mode qbd-quiz-card-mode--bouton");
+			pastille.type = "button";
+			pastille.title = t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions });
+			currentHost().ui.setIcon(ajouter(pastille, "span", "qbd-quiz-card-mode-icon"), q.mode === "learn" ? "book-open" : "dumbbell");
+			ajouter(pastille, "span", undefined, `${quizModeLabel(q.mode)} · ${q.questions}`);
+			pastille.addEventListener("click", (e) => {
+				e.stopPropagation();
+				if (typeof onOpen === "function") onOpen(q);
+			});
+		}
+	} else {
+		const count = ajouter(meta, "span", "qbd-quiz-card-meta-item");
+		renderQuizTypeIcon(count, quiz.quizType);
+		ajouter(
+			count, "span", undefined,
+			t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions })
+		);
+		/* L'OBJECTIF (Learn / Practice) en badge : le titre ne le porte plus
+		   (Ahmed, 2026-09-23). Avec son icône, la même que sur la fiche : le
+		   livre ouvert pour Learn, l'haltère pour Practice (2026-09-24). */
+		const modeBadge = ajouter(meta, "span", "qbd-quiz-card-badge qbd-quiz-card-mode");
+		currentHost().ui.setIcon(ajouter(modeBadge, "span", "qbd-quiz-card-mode-icon"), quiz.mode === "learn" ? "book-open" : "dumbbell");
+		ajouter(modeBadge, "span", undefined, quizModeLabel(quiz.mode));
+	}
 
 	// Bouton ⋯ en bout de ligne meta (position StudySmarter : coin bas droit).
 	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.

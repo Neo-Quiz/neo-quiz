@@ -6,6 +6,7 @@ import { mathifyElement } from "../engine/mathjax";
 import { Q_TYPES } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
 import type { QuestionRole } from "../types/quiz";
+import type { ModeQuiz } from "../quiz-format";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
@@ -70,6 +71,9 @@ export interface FicheDeps {
 	onEdit(): void;
 	/** Quitte la page. */
 	onBack(): void;
+	/** L'autre mode du même cours : la pastille du mode devient un sélecteur
+	    Learn | Practice, dont l'autre segment ouvre ce quiz. */
+	autreMode?: { mode: ModeQuiz; open(): void };
 }
 
 function icone(parent: HTMLElement, name: string, cls = "qbd-fiche-i"): HTMLElement {
@@ -117,15 +121,33 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	   sélecteur Learn | Practice de la page « Générer », mêmes textes. Les
 	   icônes ont été choisies parmi cinq chacune, rendues comme ici (Ahmed,
 	   2026-09-23) : le livre ouvert pour Learn, l'haltère pour Practice. */
-	const learn = deps.quiz.mode === "learn";
-	const mode = ajouter(chips, "span", "qbd-fiche-chip is-accent qbd-fiche-mode");
-	icone(mode, learn ? "book-open" : "dumbbell", "qbd-fiche-mode-icon");
-	ajouter(mode, "span", undefined, quizModeLabel(deps.quiz.mode));
-	attachHoverTip(mode, (tip) => {
-		tip.classList.add("qbd-hover-tip--card");
-		ajouter(tip, "div", "qbd-hover-tip-title", learn ? t("ai.mode.learn") : t("ai.mode.practice"));
-		ajouter(tip, "div", "qbd-hover-tip-body", learn ? t("ai.mode.learnTip") : t("ai.mode.practiceTip"));
-	});
+	/* UN COURS AUX DEUX MODES (2026-09-24) : un sélecteur Learn | Practice à la
+	   place de la pastille ; le segment de l'autre mode ouvre sa fiche. */
+	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
+		const el = ajouter(parent, tag, cls);
+		icone(el, m === "learn" ? "book-open" : "dumbbell", "qbd-fiche-mode-icon");
+		ajouter(el, "span", undefined, quizModeLabel(m));
+		attachHoverTip(el, (tip) => {
+			tip.classList.add("qbd-hover-tip--card");
+			ajouter(tip, "div", "qbd-hover-tip-title", m === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
+			ajouter(tip, "div", "qbd-hover-tip-body", m === "learn" ? t("ai.mode.learnTip") : t("ai.mode.practiceTip"));
+		});
+		return el;
+	};
+	const autre = deps.autreMode;
+	if (autre && autre.mode !== deps.quiz.mode) {
+		const choix = ajouter(chips, "div", "qbd-fiche-modes");
+		choix.setAttribute("role", "group");
+		for (const m of ["learn", "practice"] as const) {
+			const actif = m === deps.quiz.mode;
+			const seg = pastilleMode(choix, m, "qbd-fiche-mode-seg" + (actif ? " is-active" : ""), "button");
+			(seg as HTMLButtonElement).type = "button";
+			seg.setAttribute("aria-pressed", actif ? "true" : "false");
+			if (!actif) seg.addEventListener("click", () => autre.open());
+		}
+	} else {
+		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip is-accent qbd-fiche-mode", "span");
+	}
 	const count = ajouter(chips, "span", "qbd-fiche-chip");
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));

@@ -5,6 +5,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
+import { regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
@@ -227,8 +228,13 @@ export function renderModuleDrill(
 		else if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
 	}
 	const grid = ajouter(principal, "div", "qbd-home-grid qbd-quizzes-drill-grid");
-	for (const [index, quiz] of inModule.entries()) {
+	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
+	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
+	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	for (const [index, { quiz, frere }] of cartes.entries()) {
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
+			frere,
+			statsFrere: frere ? stats[frere.path] : undefined,
 			onPlay: (q) => ctx.openQuiz(q),
 			// Absent côté application (menus et modals = tranche 2.6) : la
 			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —

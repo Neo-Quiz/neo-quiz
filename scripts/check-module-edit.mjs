@@ -159,6 +159,28 @@ await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-sugges
 	r.done();
 });
 
+/* UN COURS, UNE CARTE (2026-09-24) : le Learn et le Practice d'un même
+   cours — même dossier, même titre, modes différents — sont réunis. */
+await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours, quizFrere }) => {
+	const r = makeReporter("Cours — Learn et Practice réunis");
+	const q = (path, title, mode) => ({ path, title, mode, questions: 20 });
+	const D = "Efrei/B2/XTI301";
+	const liste = [
+		q(`${D}/CM1 — Practice.md`, "CM1", "practice"), q(`${D}/CM1 — Learn.md`, "CM1", "learn"),
+		q(`${D}/CM2 — Learn.md`, "CM2", "learn"), q(`${D}/TP1 — Learn.md`, "TP1", "learn"),
+		q(`Autre/CM2 — Practice.md`, "CM2", "practice"),
+	];
+	const cartes = regrouperParCours(liste, true);
+	r.check("un cours = une carte, le Learn en tête, à la place de son premier quiz",
+		cartes.map(c => [c.quiz.path.split("/").pop(), c.frere?.path.split("/").pop() ?? null]),
+		[["CM1 — Learn.md", "CM1 — Practice.md"], ["CM2 — Learn.md", null], ["TP1 — Learn.md", null], ["CM2 — Practice.md", null]]);
+	r.check("un homonyme d'un AUTRE dossier n'est pas réuni", quizFrere(liste[2], liste), null);
+	r.check("deux quiz du même mode ne forment pas un cours",
+		quizFrere(q(`${D}/X.md`, "X", "learn"), [q(`${D}/X.md`, "X", "learn"), q(`${D}/X 2.md`, "X", "learn")]), null);
+	r.check("réglage désactivé : une carte par quiz", regrouperParCours(liste, false).length, 5);
+	r.done();
+});
+
 await withSrcModule("src/dashboard/quiz-modules.ts", async ({ buildFolderGroups }) => {
 	const r = makeReporter("Module — l'axe Dossier");
 	const m = (name, path) => ({ folder: name, name, ue: null, path, quizzes: [], total: 0, mastered: 0 });
