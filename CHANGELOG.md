@@ -18,6 +18,7 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
+- Generated quizzes put code, commands, identifiers and paths between backticks, so they show in a code font and Python names such as __init__ keep their underscores.
 - A timed quiz opens on a screen that announces the timer (duration, number of questions, one Start button) instead of asking to choose between learning and exam mode.
 - The button that opens a quiz in the editor now reads "Edit".
 - Easier reading in a quiz: the question text is larger than before and its title smaller, the role of a Learn question shows as a badge, and the note's location under the quiz title uses the interface font instead of a code font.
