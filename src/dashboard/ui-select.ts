@@ -50,6 +50,9 @@ export interface SelectOption {
 	hint?: string;
 	/** Visible, mais pas sélectionnable : un clic appelle `onDisabledClick` (le fournisseur absent ouvre son modal d'installation). */
 	disabled?: boolean;
+	/** Intitulé de section affiché AVANT cette option (non cliquable) : le
+	    tri « Personnalisé » sépare « UE » des tris par défaut. */
+	section?: string;
 }
 
 export interface SelectOptions<T extends SelectOption = SelectOption> {
@@ -151,6 +154,7 @@ export function createSelect<T extends SelectOption = SelectOption>(parent: HTML
 		if (!menuEl) return;
 		menuEl.replaceChildren();
 		for (const o of options) {
+			if (o.section) ajouter(menuEl, "div", "qbd-select-section", o.section);
 			const optBtn = ajouter(menuEl, "button", "qbd-select-option" + (o.value === value && !o.disabled ? " is-active" : ""));
 			optBtn.type = "button";
 			optBtn.setAttribute("role", "option");

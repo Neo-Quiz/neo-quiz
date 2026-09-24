@@ -159,6 +159,20 @@ await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-sugges
 	r.done();
 });
 
+await withSrcModule("src/dashboard/quiz-modules.ts", async ({ buildFolderGroups }) => {
+	const r = makeReporter("Module — l'axe Dossier");
+	const m = (name, path) => ({ folder: name, name, ue: null, path, quizzes: [], total: 0, mastered: 0 });
+	const B2 = "Efrei/Bachelor/B2 (2026-2027)";
+	const g = buildFolderGroups([
+		m("XTI305", B2 + "/XTI305"), m("Generated", "Neo Quiz/Generated"), m("XTI301", B2 + "/XTI301"),
+		m("Templates", "Personal/Templates"), m("Orphelin", undefined),
+	]);
+	r.check("un en-tête par dossier parent, alphabétique, le groupe sans chemin en dernier",
+		g.map(x => [x.label, x.modules.map(y => y.name)]),
+		[["B2 (2026-2027)", ["XTI301", "XTI305"]], ["Neo Quiz", ["Generated"]], ["Personal", ["Templates"]], ["", ["Orphelin"]]]);
+	r.done();
+});
+
 await withSrcModule("src/dashboard/quiz-modules.ts", async ({ estLeSas }) => {
 	const r = makeReporter("Module — reconnaître le SAS");
 	const sas = "Neo Quiz/Generated";

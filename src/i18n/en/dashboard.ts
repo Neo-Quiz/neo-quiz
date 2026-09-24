@@ -135,6 +135,8 @@ export const EN_DASHBOARD = {
 	   over a month » sonnait comme un reproche là où les deux autres étaient
 	   positifs — un groupe décrit un intervalle, il ne juge pas. */
 	"dashboard.quizzes.groupByUE": "UE",
+	"dashboard.quizzes.groupByFolder": "Folder",
+	"dashboard.quizzes.groupCustom": "Custom",
 	"dashboard.quizzes.noUe": "No course unit",
 	"dashboard.quizzes.moduleQuizzesOne": "{count} quiz",
 	"dashboard.quizzes.moduleQuizzesOther": "{count} quizzes",

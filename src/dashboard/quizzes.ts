@@ -65,13 +65,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		ctx.saveSettings().catch(() => {});
 	}
 
-	/* Axe de regroupement : DEUX axes seulement (demande Excalidraw
-	   2026-07-18) — « UE » (défaut : en-têtes d'UE, cartes de module dessous)
-	   et « Récent » (activité). Toute valeur historique (« module », « type »,
-	   « folder »…) migre vers « ue ». */
+	/* Axe de regroupement (2026-09-24) : « Récent » (défaut) et « Dossier »
+	   pour tout le monde, puis « UE », personnalisé. Une valeur historique
+	   inconnue (« module », « type »…) retombe sur le défaut. */
 	function currentGrouping(): GroupingKey {
 		const g = ctx.settings.quizzesGrouping;
-		return g === "recent" ? g : "ue";
+		return g === "folder" || g === "ue" ? g : "recent";
 	}
 
 	function setGrouping(g: GroupingKey): void {
@@ -201,12 +200,13 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		}
 	}
 
-	// Ordre FIXE : « UE » (défaut) puis « Récent » — libellés SANS « By/Par »
-	// (demande Excalidraw 2026-07-18 : « on ne doit voir que UE ou Recent »).
-	const GROUPING_ORDER: GroupingKey[] = ["ue", "recent"];
+	// Ordre FIXE : les tris par défaut, puis la section « Personnalisé » —
+	// libellés SANS « By/Par » (demande Excalidraw 2026-07-18).
+	const GROUPING_ORDER: GroupingKey[] = ["recent", "folder", "ue"];
 	const GROUPING_LABEL_KEYS: Record<GroupingKey, TransKey> = {
-		ue: "dashboard.quizzes.groupByUE",
-		recent: "dashboard.quizzes.groupByActivity"
+		recent: "dashboard.quizzes.groupByActivity",
+		folder: "dashboard.quizzes.groupByFolder",
+		ue: "dashboard.quizzes.groupByUE"
 	};
 
 	function render(container: HTMLElement): void {
@@ -378,7 +378,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// bouton pour le changer (bouton MASQUÉ, Ruling 7).
 			const groupSelect = ctx.renderGroupingSelect?.(groupWrap, {
 				value: currentGrouping(),
-				options: GROUPING_ORDER.map(g => ({ value: g, label: t(GROUPING_LABEL_KEYS[g]) })),
+				options: GROUPING_ORDER.map(g => ({ value: g, label: t(GROUPING_LABEL_KEYS[g]), section: g === "ue" ? t("dashboard.quizzes.groupCustom") : undefined })),
 				onChange: (v) => { setGrouping(v as GroupingKey); render(container); }
 			});
 			groupSelect?.el.classList.add("qbd-quizzes-group-select");

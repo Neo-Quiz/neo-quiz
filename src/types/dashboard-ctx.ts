@@ -90,7 +90,7 @@ export interface AiSettings {
 	quizzesExpandedFolders?: string[];
 	/** Axe de regroupement de « Mes quiz » (module/ue/recent/type) — même remarque
 	    que ci-dessus, aucun rapport avec l'IA. Cf. plugin.ts DEFAULT_SETTINGS. */
-	quizzesGrouping?: "module" | "ue" | "recent" | "type";
+	quizzesGrouping?: "module" | "ue" | "recent" | "type" | "folder";
 	/** Note de correspondance UE → module. Cf. plugin.ts DEFAULT_SETTINGS. */
 	quizzesModuleMapNote?: string;
 	/** DOSSIERS archivés (clé `folder` de module) — l'archivage n'existe qu'au

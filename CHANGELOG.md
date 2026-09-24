@@ -18,6 +18,7 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 
 ### Changed
+- My quizzes can be grouped by Recent (the default) or by Folder, which puts each folder under the folder that contains it; grouping by course unit moves to a Custom section of the menu, since it depends on your own course.
 - A folder without a chosen icon gets one that fits its name instead of a book everywhere: a bug for Ethical Hacking, blocks for software architecture, a terminal for scripting, a router for networks, a radar for technology watch. The icon picker offers about a hundred icons grouped by theme.
 - In a Learn path, a question that asks you to explain in your own words shows the lesson of its step above it, open.
 - Generated quizzes put code, commands, identifiers and paths between backticks, so they show in a code font and Python names such as __init__ keep their underscores.

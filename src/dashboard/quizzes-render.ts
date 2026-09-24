@@ -6,7 +6,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
 import { renderModuleCard } from "./module-card";
-import { moduleForQuiz, buildModuleGroups, buildUeGroups, estLeSas } from "./quiz-modules";
+import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
 import { buildRecentModuleGroups } from "./quiz-recent";
@@ -24,9 +24,11 @@ import { renderFolderSections } from "./folder-sections";
    recherche/filtres/sélecteur, dispatch vers ce module.
 ══════════════════════════════════════════════════════════ */
 
-/* Deux axes seulement depuis la demande Excalidraw 2026-07-18 (« on ne doit
-   voir que UE ou Recent ») ; « module » et « type » ont été retirés. */
-export type GroupingKey = "ue" | "recent";
+/* Trois axes depuis le 2026-09-24 : « Récent » et « Dossier », valables pour
+   tout le monde, puis « UE », PERSONNALISÉ — il suppose un cursus déclaré
+   (Ahmed : « c'est pas toutes les personnes qui utilisent l'app qui sont à
+   l'Efrei »). « module » et « type » restent retirés. */
+export type GroupingKey = "recent" | "folder" | "ue";
 
 /** Dépendances d'ÉTAT fournies par le contrôleur (réglages, recherche,
     re-rendu) — tout ce qui n'est pas pur DOM reste côté quizzes.ts. */
@@ -143,6 +145,13 @@ export function renderQuizGrid(
 	if (mode === "recent") {
 		for (const g of buildRecentModuleGroups(modules, stats, sasVide)) {
 			const body = renderCollapsibleSection(deps, treeEl, g.key, t(RECENT_GROUP_LABEL_KEYS[g.key]), g.modules.length, { entryDelay });
+			renderModuleGrid(deps, body, g.modules, map, entryDelay);
+		}
+	} else if (mode === "folder") {
+		// Axe Dossier : un en-tête par dossier parent. Clé « folder: » : « : »
+		// est interdit dans un chemin, aucune collision avec les autres axes.
+		for (const g of buildFolderGroups(modules)) {
+			const body = renderCollapsibleSection(deps, treeEl, "folder:" + g.parent, g.label || t("dashboard.quizzes.noFolder"), g.modules.length, { entryDelay });
 			renderModuleGrid(deps, body, g.modules, map, entryDelay);
 		}
 	} else {

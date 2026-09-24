@@ -116,6 +116,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 
 	/* ── Regroupement ── */
 	"dashboard.quizzes.groupByUE": "UE",
+	"dashboard.quizzes.groupByFolder": "Dossier",
+	"dashboard.quizzes.groupCustom": "Personnalisé",
 	"dashboard.quizzes.noUe": "Sans UE",
 	"dashboard.quizzes.moduleQuizzesOne": "{count} quiz",
 	"dashboard.quizzes.moduleQuizzesOther": "{count} quiz",
