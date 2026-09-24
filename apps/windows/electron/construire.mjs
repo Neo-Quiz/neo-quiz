@@ -40,7 +40,7 @@ const ici = fileURLToPath(new URL(".", import.meta.url));
    lui-même, le bundler ne doit pas tenter de le résoudre. Les modules `node:*`
    le sont déjà par `platform: "node"`. */
 await build({
-	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`],
+	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`, `${ici}python-preload.ts`],
 	outdir: `${ici}../dist-electron`,
 	outExtension: { ".js": ".cjs" },
 	bundle: true,
@@ -62,3 +62,8 @@ await Promise.all([
 	copyFile(join(ici, "maj", "index.html"), join(sortieMaj, "index.html")),
 	copyFile(join(ici, "..", "installer", "fond.png"), join(sortieMaj, "fond.png")),
 ]);
+
+/* LE BAC À SABLE PYTHON : page, worker et fichiers de Pyodide, copiés tels
+   quels (spec 2026-09-23-exercice-python-design.md §3.4). */
+const { copierBacASable } = await import("./python/copier.mjs");
+await copierBacASable(join(ici, "..", "dist-electron", "python"));

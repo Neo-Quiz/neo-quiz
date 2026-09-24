@@ -22,7 +22,8 @@
     "chokidar": "^5.0.0",
     "electron-updater": "^6.8.9",
     "lucide": "^1.41.0",
-    "pdfjs-dist": "^5.7.284"
+    "pdfjs-dist": "^5.7.284",
+    "pyodide": "314.0.7"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

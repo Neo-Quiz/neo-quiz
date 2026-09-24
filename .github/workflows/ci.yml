@@ -207,6 +207,9 @@ jobs:
         run: npm ci
         working-directory: apps/windows
 
+      - name: Python sandbox (Pyodide isolation)
+        run: npm run check:python-sandbox
+
       - name: Build and package (NSIS)
         run: npm run pack:win
         working-directory: apps/windows
