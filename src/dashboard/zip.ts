@@ -99,3 +99,20 @@ export function parseZip(bytes: Uint8Array): ZipEntry[] {
 	}
 	return out;
 }
+
+/** Le NOM DE NOTE (sans extension) sous lequel importer une entrée d'une
+    archive REÇUE, ou `null` pour l'écarter (2026-09-25). Une archive partagée
+    vient d'un tiers : ses noms ne sont pas des chemins à suivre. On garde le
+    DERNIER segment, coupé sur « / » ET sur « \ » (un nom `..\..\x.md` créait
+    la note hors du dossier du cours, sous Windows), on retire les caractères
+    interdits et les points de tête (fichier caché, `..`), et seul un `.md`
+    passe : nos partages n'écrivent que des notes, et un `.exe` ou un `.lnk`
+    reçu n'a rien à faire dans un dossier de cours. */
+export function nomNoteImportee(nomDansArchive: string): string | null {
+	const dernier = nomDansArchive.split(/[\\/]/).pop() ?? "";
+	if (!/\.md$/i.test(dernier)) return null;
+	const nom = dernier.slice(0, -3)
+		.replace(/[:*?"<>|\u0000-\u001f]/g, "-")
+		.replace(/^[\s.]+|[\s.]+$/g, "");
+	return nom.length > 0 && nom.length <= 150 ? nom : null;
+}

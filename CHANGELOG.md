@@ -42,6 +42,10 @@ release notes.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 
 ### Fixed
+- The AI tools (Claude Code, Codex, Antigravity) can only be started with the exact options Neo Quiz uses for a generation: an option that would let them run commands on their own is refused.
+- Opening a file from a quiz refuses more kinds of programs and scripts, including when the name ends with a dot or a space, which Windows ignores.
+- A typographic apostrophe (’) in a translated message or a folder path no longer breaks the scripts that install and connect the AI tools, and can no longer be used to run something else in them.
+- Importing a shared folder or quiz only brings in its notes (.md): any other file in the archive is left out.
 - "Create with AI" from a folder no longer keeps the files of the previous folder in the request.
 - A quiz copied from a website is read even when the model forgot a comma between two fields or inserted section headings between questions, instead of being rejected.
 - A Learn path whose model forgot to mark it as Learn is saved as Learn, not as a Practice bank.

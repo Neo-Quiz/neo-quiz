@@ -56,13 +56,14 @@ import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
 import type { MiseAJour } from "./mise-a-jour";
-import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM } from "./pont";
+import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
-import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage } from "./partage";
+import { argumentsAutorises } from "./gabarits-cli";
+import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
@@ -600,16 +601,23 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			defaultPath: path.join(app.getPath("downloads"), propre),
 			filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
 		};
-		const fenetre = deps.fenetreCourante();
-		const choix = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options);
-		if (choix.canceled || !choix.filePath) return null;
-		/* L'extension est IMPOSÉE : l'emplacement est à l'utilisateur, la
-		   nature du fichier non. Sans ça, des octets venus de la fenêtre
-		   pouvaient finir en `.bat` d'une simple frappe dans le dialogue. */
-		const dest = path.extname(choix.filePath).toLowerCase() === "." + ext ? choix.filePath : `${choix.filePath}.${ext}`;
-		await fsp.writeFile(dest, contenu);
-		shell.showItemInFolder(dest);
-		return dest;
+		// Un dialogue à la fois : pas de pile de dialogues (voir `verrouEnregistrer`).
+		const jeton = verrouEnregistrer.prendre();
+		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
+		try {
+			const fenetre = deps.fenetreCourante();
+			const choix = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options);
+			if (choix.canceled || !choix.filePath) return null;
+			/* L'extension est IMPOSÉE : l'emplacement est à l'utilisateur, la
+			   nature du fichier non. Sans ça, des octets venus de la fenêtre
+			   pouvaient finir en `.bat` d'une simple frappe dans le dialogue. */
+			const dest = path.extname(choix.filePath).toLowerCase() === "." + ext ? choix.filePath : `${choix.filePath}.${ext}`;
+			await fsp.writeFile(dest, contenu);
+			shell.showItemInFolder(dest);
+			return dest;
+		} finally {
+			verrouEnregistrer.rendre(jeton);
+		}
 	});
 
 	ipcMain.handle(CANAUX.partageDiscord, async (_e, nom: unknown, octets: unknown) => {
@@ -618,7 +626,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
 		// Le presse-papiers de FICHIERS et le script ne valent que sous Windows.
 		if (process.platform !== "win32") return false;
-		return lancerDiscord(await ecrireTemporaire(propre, contenu));
+		// Un PowerShell à la fois, rendu à sa sortie (voir `verrouDiscord`).
+		const jeton = verrouDiscord.prendre();
+		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
+		try {
+			return await lancerDiscord(await ecrireTemporaire(propre, contenu), () => verrouDiscord.rendre(jeton));
+		} catch (e) {
+			verrouDiscord.rendre(jeton);
+			throw e;
+		}
 	});
 
 	ipcMain.handle(CANAUX.systemeCopierTexte, (_e, texte: unknown) => {
@@ -1251,7 +1267,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			return { ok: false, nom: "refuse", message: "outil hors liste : " + String(s.tool) };
 		}
 		const tool = s.tool;
-		const args = Array.isArray(s.args) ? s.args.filter((a): a is string => typeof a === "string") : [];
+		/* LES ARGUMENTS AUSSI, et pas seulement le nom (revue de sécurité du
+		   2026-09-25) : un rendu compromis passait sinon à Claude Code ou à
+		   Codex les options qui exécutent des commandes sans le modèle. Seules
+		   les formes d'appel connues passent — voir `gabarits-cli.ts`. */
+		if (!argumentsAutorises(tool, s.args, s.marqueur)) {
+			console.warn(LOG_PREFIX, "CLI refusé, arguments hors gabarit:", tool);
+			return { ok: false, nom: "refuse", message: "arguments refusés pour " + tool };
+		}
+		const args = s.args as string[];
 		const fichiers = Array.isArray(s.fichiers)
 			? s.fichiers
 				.filter((f): f is { nom: string; base64: string } =>

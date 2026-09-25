@@ -704,6 +704,11 @@ export interface Pont {
  * qui rejette à l'exécution avec « No handler registered ». Une seule source
  * rend la faute impossible.
  */
+/** Le message d'erreur d'un partage refusé parce qu'un autre est en cours
+    (`electron/partage.ts`) : la fenêtre le reconnaît et le dit, au lieu d'un
+    échec muet. Ici parce que les deux côtés du pont l'importent. */
+export const PARTAGE_OCCUPE = "partage-occupe";
+
 export const CANAUX = {
 	demarrer: "neo:demarrer",
 	read: "neo:fichiers/read",

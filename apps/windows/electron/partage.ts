@@ -11,22 +11,25 @@
    - « Discord » : le fichier va dans un dossier temporaire tiré au sort, et
      le script PowerShell n'a qu'un paramètre, ce chemin que le principal a
      lui-même composé. Le nom venu du rendu est assaini AVANT (`nomPartage`),
-     puis cité dans le script (`citerPs`).
+     et le chemin n'est JAMAIS écrit dans le script : PowerShell le lit dans
+     une variable d'environnement (`VARIABLE_FICHIER`). Aucune citation,
+     donc aucune apostrophe — ASCII ou typographique — pour en sortir.
 
-   `nomPartage`, `octetsPartage`, `citerPs` et `scriptDiscord` sont PURS :
+   `nomPartage`, `octetsPartage` et `scriptDiscord` sont PURS :
    `npm run check:partage` les éprouve sans rien lancer.
 ══════════════════════════════════════════════════════════ */
 
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** Ce qu'un partage produit : le zip d'un dossier, le .md d'un quiz. */
 export const EXTENSIONS_PARTAGE = [".zip", ".md"] as const;
-/** Un dossier de cours entier tient largement dedans ; au-delà, c'est une
-    fenêtre qui envoie n'importe quoi. */
-export const TAILLE_MAX_PARTAGE = 64 * 1024 * 1024;
+/** Un partage ne porte que des NOTES (texte) : les neuf quiz d'un dossier de
+    cours pèsent quelques centaines de Ko. 16 Mo laissent une marge large ;
+    au-delà, c'est une fenêtre qui envoie n'importe quoi. */
+export const TAILLE_MAX_PARTAGE = 16 * 1024 * 1024;
 
 /** Le nom de fichier assaini, ou `null` s'il n'est pas un partage : pas de
     séparateur de chemin (un nom, jamais un chemin), pas de caractère interdit
@@ -49,17 +52,88 @@ export function octetsPartage(octets: unknown): Uint8Array | null {
 	return octets.length > 0 && octets.length <= TAILLE_MAX_PARTAGE ? octets : null;
 }
 
-/** Une chaîne PowerShell entre apostrophes : la seule séquence à doubler. */
-export function citerPs(texte: string): string {
-	return "'" + texte.replace(/'/g, "''") + "'";
+/** La variable d'environnement par laquelle le script reçoit le chemin. */
+export const VARIABLE_FICHIER = "NEO_QUIZ_PARTAGE_FICHIER";
+
+/** UN partage à la fois (2026-09-25). Une fenêtre compromise pouvait sinon
+    lancer le partage en boucle : un PowerShell et un fichier temporaire par
+    appel, ou une pile de dialogues « Enregistrer sous ». Rien n'y donnait un
+    accès, mais c'était une nuisance sans borne. `prendre` rend `false` si le
+    verrou est déjà tenu, ou pris il y a moins de `intervalleMin` ms même
+    s'il est rendu (un clic humain ne partage pas plus vite) ; il retombe de
+    lui-même après `delaiMax` ms, pour qu'un processus qui ne rendrait jamais
+    la main ne bloque pas le partage jusqu'au redémarrage. */
+export function creerVerrou(delaiMax: number, intervalleMin = 0, maintenant: () => number = Date.now): { prendre(): number | null; rendre(jeton: number): void } {
+	let pris: number | null = null;
+	let dernier: number | null = null;
+	let compteur = 0;
+	let jetonCourant = 0;
+	return {
+		/** Un JETON si le verrou est pris, `null` sinon. */
+		prendre() {
+			const t = maintenant();
+			if (pris !== null && t - pris < delaiMax) return null;
+			if (dernier !== null && t - dernier < intervalleMin) return null;
+			pris = dernier = t;
+			jetonCourant = ++compteur;
+			return jetonCourant;
+		},
+		/** Ne rend que SON verrou : un processus qui finit après que le verrou
+		    est retombé de lui-même ne libère pas celui du partage suivant. */
+		rendre(jeton: number) { if (jeton === jetonCourant) pris = null; },
+	};
+}
+
+/** Un verrou PAR BOUTON : un dialogue « Enregistrer sous » ouvert ne doit
+    pas empêcher Discord, ni l'inverse (seconde revue du 2026-09-25).
+    - Enregistrer : un dialogue à la fois ; il peut rester ouvert longtemps.
+    - Discord : le script attend la fenêtre jusqu'à 20 s, plus 1,2 s de
+      signal, d'où 30 s ; et deux secondes au moins entre deux lancements. */
+export const verrouEnregistrer = creerVerrou(10 * 60_000);
+export const verrouDiscord = creerVerrou(30_000, 2_000);
+
+const PREFIXE_TEMPORAIRE = "neo-quiz-partage-";
+/** Âge au-delà duquel un fichier partagé vers Discord est effacé : le temps
+    de le coller et que Discord l'ait lu. */
+export const AGE_MAX_TEMPORAIRE = 10 * 60 * 1000;
+
+/** Les dossiers temporaires de partage à effacer : les NÔTRES seulement
+    (préfixe), et plus vieux que `AGE_MAX_TEMPORAIRE`. Pur. */
+export function temporairesPerimes(entrees: { nom: string; mtimeMs: number; dossier: boolean }[], maintenant: number): string[] {
+	return entrees
+		.filter(e => e.dossier && e.nom.startsWith(PREFIXE_TEMPORAIRE) && maintenant - e.mtimeMs > AGE_MAX_TEMPORAIRE)
+		.map(e => e.nom);
+}
+
+/** Efface les partages périmés du dossier temporaire. `lstat` : un lien ou
+    une jonction portant notre préfixe n'est jamais suivi. Tout échec est
+    muet : le ménage ne doit pas empêcher un partage. */
+async function nettoyerTemporaires(): Promise<void> {
+	try {
+		const racine = tmpdir();
+		const entrees: { nom: string; mtimeMs: number; dossier: boolean }[] = [];
+		for (const nom of await readdir(racine)) {
+			if (!nom.startsWith(PREFIXE_TEMPORAIRE)) continue;
+			try {
+				const s = await lstat(join(racine, nom));
+				entrees.push({ nom, mtimeMs: s.mtimeMs, dossier: s.isDirectory() && !s.isSymbolicLink() });
+			} catch { /* disparu entre-temps */ }
+		}
+		for (const nom of temporairesPerimes(entrees, Date.now())) {
+			await rm(join(racine, nom), { recursive: true, force: true }).catch(() => {});
+		}
+	} catch { /* dossier temporaire illisible : rien à nettoyer */ }
 }
 
 /** Écrit le fichier dans un dossier temporaire NEUF et rend son chemin. Un
     dossier par partage : deux quiz homonymes partagés coup sur coup ne
     s'écrasent pas, alors que le presse-papier du premier pointe encore sur
-    son fichier. Jamais nettoyé : Discord le lit après coup. */
+    son fichier. Les partages de plus de dix minutes sont effacés au passage :
+    avec le verrou et la borne de taille, le disque temporaire ne peut plus
+    se remplir, même depuis une fenêtre qui partagerait en boucle. */
 export async function ecrireTemporaire(nom: string, octets: Uint8Array): Promise<string> {
-	const dossier = await mkdtemp(join(tmpdir(), "neo-quiz-partage-"));
+	await nettoyerTemporaires();
+	const dossier = await mkdtemp(join(tmpdir(), PREFIXE_TEMPORAIRE));
 	const dest = join(dossier, nom);
 	await writeFile(dest, octets);
 	return dest;
@@ -77,10 +151,11 @@ export async function ecrireTemporaire(nom: string, octets: Uint8Array): Promise
       SwitchToThisWindow), si le signal n'a pas suffi.
    Discord fermé : le signal le lance, et la boucle attrape la fenêtre
    principale en écartant le splash « Discord Updater » (même classe, ~300 px).
-   Script passé en -EncodedCommand : aucun échappement de shell. */
-export function scriptDiscord(dest: string): string {
+   Script passé en -EncodedCommand : aucun échappement de shell. Il est
+   CONSTANT : rien de ce que la fenêtre envoie n'y entre. */
+export function scriptDiscord(): string {
 	return `$ErrorActionPreference = 'SilentlyContinue'
-Set-Clipboard -LiteralPath ${citerPs(dest)}
+Set-Clipboard -LiteralPath $env:${VARIABLE_FICHIER}
 $lnk = Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk'
 $up = Join-Path $env:LOCALAPPDATA 'Discord\\Update.exe'
 function Send-DiscordSignal {
@@ -187,17 +262,20 @@ if ($h -ne [IntPtr]::Zero) {
 /** Lance le script, caché. Rend `true` une fois PowerShell LANCÉ, pas à sa
     fin : le script active Discord avec ses propres attentes, et attendre sa
     sortie retarderait la confirmation de plusieurs secondes. Un échec de
-    lancement (`ENOENT`) arrive, lui, tout de suite. */
-export function lancerDiscord(dest: string): Promise<boolean> {
+    lancement (`ENOENT`) arrive, lui, tout de suite. `fin` est appelé quand
+    PowerShell rend la main (ou ne se lance pas) : c'est là que le verrou du
+    partage retombe. */
+export function lancerDiscord(dest: string, fin: () => void): Promise<boolean> {
 	return new Promise((resolve) => {
 		try {
-			const encode = Buffer.from(scriptDiscord(dest), "utf16le").toString("base64");
+			const encode = Buffer.from(scriptDiscord(), "utf16le").toString("base64");
 			const enfant = execFile("powershell.exe",
 				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
-				{ windowsHide: true }, () => { /* issue tardive : la copie est déjà annoncée */ });
-			enfant.once("error", () => resolve(false));
+				{ windowsHide: true, env: { ...process.env, [VARIABLE_FICHIER]: dest } }, () => fin());
+			enfant.once("error", () => { fin(); resolve(false); });
 			setTimeout(() => resolve(true), 300);
 		} catch {
+			fin();
 			resolve(false);
 		}
 	});

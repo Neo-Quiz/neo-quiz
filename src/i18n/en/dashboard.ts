@@ -174,6 +174,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.shareCopyHint": "The file is copied to the clipboard for sharing",
 	"dashboard.quizzes.shareCopiedToast": "Copied, paste it into Discord with Ctrl+V",
 	"dashboard.quizzes.shareSaveError": "Could not share the file",
+	"dashboard.quizzes.shareBusy": "A share is already in progress, try again in a moment",
 	"dashboard.quizzes.fileSaved": "Saved: {path}",
 	"dashboard.quizzes.menuRename": "Rename",
 	"dashboard.quizzes.menuCopyPath": "Copy path",

@@ -148,6 +148,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.shareCopyHint": "Le fichier est copié dans le presse-papiers pour le partage",
 	"dashboard.quizzes.shareCopiedToast": "Copié, collez-le dans Discord avec Ctrl+V",
 	"dashboard.quizzes.shareSaveError": "Impossible de partager le fichier",
+	"dashboard.quizzes.shareBusy": "Un partage est déjà en cours, réessayez dans un instant",
 	"dashboard.quizzes.fileSaved": "Enregistré : {path}",
 	"dashboard.quizzes.menuRename": "Renommer",
 	"dashboard.quizzes.menuCopyPath": "Copier le chemin",

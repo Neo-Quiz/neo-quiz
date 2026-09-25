@@ -8,6 +8,7 @@ import { LOG_PREFIX } from "../../../../src/branding";
 import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
 import type { ModuleGroup } from "../../../../src/dashboard/quiz-modules";
 import { pont } from "../host/pont";
+import { PARTAGE_OCCUPE } from "../../electron/pont";
 
 /* ══════════════════════════════════════════════════════════
    « PARTAGER » un quiz ou un dossier (2026-09-25), le modal du greffon
@@ -93,8 +94,7 @@ export function ouvrirPartage(cible: CiblePartage): void {
 							retour.classList.add("is-visible");
 							window.setTimeout(() => m.close(), 2600);
 						} catch (e) {
-							console.error(`${LOG_PREFIX} partage Discord impossible :`, e);
-							currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
+							signalerEchec(e, "partage Discord impossible");
 						} finally {
 							discord.disabled = false;
 						}
@@ -116,13 +116,23 @@ export function ouvrirPartage(cible: CiblePartage): void {
 						const chemin = await pont().partage.enregistrer(fichier.nom, fichier.octets);
 						if (chemin) currentHost().ui.notice(t("dashboard.quizzes.fileSaved", { path: chemin }));
 					} catch (e) {
-						console.error(`${LOG_PREFIX} enregistrement du partage impossible :`, e);
-						currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
+						signalerEchec(e, "enregistrement du partage impossible");
 					}
 				})();
 			});
 		},
 	});
+}
+
+/** Un partage déjà en cours n'est pas une panne : on le dit. L'IPC
+    d'Electron ne garde que le MESSAGE d'une erreur, d'où le `includes`. */
+function signalerEchec(e: unknown, contexte: string): void {
+	if (e instanceof Error && e.message.includes(PARTAGE_OCCUPE)) {
+		currentHost().ui.notice(t("dashboard.quizzes.shareBusy"));
+		return;
+	}
+	console.error(`${LOG_PREFIX} ${contexte} :`, e);
+	currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
 }
 
 function logoDiscord(parent: HTMLElement): void {
