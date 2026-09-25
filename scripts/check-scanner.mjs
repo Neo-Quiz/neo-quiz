@@ -157,6 +157,32 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners
 	   coexistent une fraction de seconde. */
+	/* CARTES MÉMOIRE (2026-09-25) : une note de cartes seules est étiquetée
+	   flashcard ; mêlée à un autre type, mixed comme n'importe quel mélange. */
+	async function typeDe(bloc) {
+		const fichier = { path: "Cours/carte.md", name: "carte.md", basename: "carte", extension: "md", mtime: 1 };
+		const hote = {
+			fs: {
+				listMarkdown: () => [fichier],
+				readCached: async () => texte,
+				read: async () => texte,
+				getFile: (p) => (p === fichier.path ? fichier : null),
+			},
+			watcher: { onChange: () => () => {} },
+		};
+		const texte = "```quiz-blocks\n" + bloc + "\n```";
+		const s = createScanner(hote);
+		await s.init();
+		const e = s.getQuiz(fichier.path);
+		s.destroy();
+		return e?.quizType;
+	}
+
+	r.check("une note de cartes seules est étiquetée flashcard ; mêlée, mixed",
+		[await typeDe("[{ prompt: 'A', flashcard: true, answer: 'a' }, { prompt: 'B', flashcard: true, answer: 'b' }]"),
+		 await typeDe("[{ prompt: 'A', flashcard: true, answer: 'a' }, { prompt: 'Q', options: ['x', 'y'], correctIndex: 0 }]")],
+		["flashcard", "mixed"]);
+
 	scanner.destroy();
 	r.check("destroy retire l'abonnement au watcher", abonne, null);
 

@@ -22,6 +22,12 @@ export const EN_EDITOR = {
 	/* ── Texte à trous ── */
 	"editor.type.cloze.label": "Fill in the blanks",
 	"editor.type.cloze.desc": "Complete a text",
+	"editor.type.flashcard.label": "Flashcard",
+	"editor.type.flashcard.desc": "Flip it, then rate yourself",
+	"editor.flashcard.section": "Back of the card",
+	"editor.flashcard.help": "The question above is the front. Write the expected answer here: one sentence, one formula or one line of code.",
+	"editor.flashcard.back": "Answer",
+	"editor.flashcard.backPlaceholder": "<class 'list'>",
 	"editor.cloze.help": "Write the whole text and wrap each blank in double braces. Separate accepted variants with a pipe: {{Paris}}, {{the euro|euro}}.",
 	"editor.cloze.templateLabel": "Text with blanks",
 	"editor.cloze.templatePlaceholder": "The capital of France is {{Paris}}.",

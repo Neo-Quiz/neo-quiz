@@ -62,6 +62,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return Array.isArray(sel) && sel.some(v => v !== null);
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
 	}
@@ -91,6 +92,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return Array.isArray(sel) && sel.length > 0 && sel.every(v => v !== null);
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
 	}
@@ -134,6 +136,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return cm.every((v, k) => sel[k] === v);
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) {
 			if (!(sel instanceof Set) || !Array.isArray(q.correctIndices) || sel.size !== q.correctIndices.length) return false;
 			return q.correctIndices.every(ci => sel.has(ci));

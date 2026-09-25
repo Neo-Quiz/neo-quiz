@@ -18,6 +18,7 @@ release notes.
 - The back and forward buttons of a mouse move through the pages you visited, like in a browser: home, My quizzes, a folder, a quiz page. On a quiz being played, the back button returns to the list.
 - Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, generated one after the other ("Quiz 2 of 3"), each saved as soon as it is ready. A document that fails is reported and the others go on; with a website, the site reopens for the next document once the previous answer is received.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
+- Flashcards: a Learn recall can be a card that you flip, then rate "Review again" or "I knew it" (Space or Enter flips, 1 and 2 rate); your rating counts in spaced review. The editor has a Flashcard type, and a course page shows a cards icon for a quiz made only of flashcards.
 
 ### Changed
 - The Learn and the Practice of a same course show as one card on My quizzes and on the home page. Every quiz card now shows its title and total number of questions, a progress ring with its percentage (blue in progress, green mastered), and one pill per mode with its own percentage that starts that mode; hovering a pill gives its number of questions. The status badge and the buttons inside the card are gone. A setting keeps Learn and Practice apart, and cards inside a folder no longer repeat the folder name.

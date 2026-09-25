@@ -183,6 +183,12 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 		L.push(`\t\tcloze: '${e(q.cloze || "")}',`);
 		if (q.caseSensitive) L.push("\t\tcaseSensitive: true,");
 	}
+	if (t === "flashcard") {
+		// Le recto est `prompt` (écrit plus haut), le verso `answer` ; `type`
+		// reste absent : le moteur discrimine sur `flashcard`.
+		L.push("\t\tflashcard: true,");
+		L.push(`\t\tanswer: '${e(q.answer || "")}',`);
+	}
 	if (["numeric", "text", "cmd", "powershell", "bash"].includes(t)) {
 		L.push("\t\ttype: 'text',");
 		/* La variante telle qu'elle était écrite, si on l'a lue quelque part :

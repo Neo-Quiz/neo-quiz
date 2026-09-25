@@ -5,7 +5,7 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { modeDuBloc, titreSansMode } from "../quiz-format";
+import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
 
@@ -23,7 +23,7 @@ import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
  * (editor/export.ts ne pose `type` que pour la variante texte, cf.
  * types/quiz.ts) — comportement de scanner.js préservé tel quel, pas « corrigé ».
  */
-export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "matching";
+export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "matching" | "flashcard";
 
 /**
  * Type global d'un quiz — un TAG stable, pas un libellé.
@@ -34,7 +34,7 @@ export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "mat
  * traduction se fait donc au rendu (quiz-card.ts, detail.ts) via la clé
  * « dashboard.quizType.<tag> ».
  */
-export type QuizTypeTag = "mixed" | "single" | "multiple" | "text" | "ordering" | "matching";
+export type QuizTypeTag = "mixed" | "single" | "multiple" | "text" | "ordering" | "matching" | "flashcard";
 
 /** Forme minimale lue sur un item brut du tableau JSON5 par le scanner. */
 interface RawQuizItem extends Pick<ParsedQuizItem, "id"> {
@@ -148,7 +148,8 @@ export function createScanner(host: Host): Scanner {
 			// Détecter les types de questions
 			const typeSet = new Set<QuestionTypeTag>();
 			for (const { q } of questions) {
-				if (q.multiSelect) typeSet.add("multiple");
+				if (estCarte(q)) typeSet.add("flashcard");
+				else if (q.multiSelect) typeSet.add("multiple");
 				else if (q.type === "text") typeSet.add("text");
 				else if (q.type === "ordering") typeSet.add("ordering");
 				else if (q.type === "matching") typeSet.add("matching");
@@ -163,6 +164,7 @@ export function createScanner(host: Host): Scanner {
 			else if (typeSet.has("text")) quizType = "text";
 			else if (typeSet.has("ordering")) quizType = "ordering";
 			else if (typeSet.has("matching")) quizType = "matching";
+			else if (typeSet.has("flashcard")) quizType = "flashcard";
 			else quizType = "mixed";
 
 			// Le titre affiché vient du nom de la note (défini au niveau du cache),

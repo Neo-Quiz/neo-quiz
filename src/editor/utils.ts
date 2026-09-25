@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import { LOG_PREFIX } from "../branding";
 import type { ResourceButton, QuestionRole } from "../types/quiz";
 
-export type QuestionTypeKey = "single" | "multi" | "ordering" | "matching" | "cloze" | "numeric" | "text" | "cmd" | "powershell" | "bash";
+export type QuestionTypeKey = "single" | "multi" | "ordering" | "matching" | "cloze" | "flashcard" | "numeric" | "text" | "cmd" | "powershell" | "bash";
 
 interface QuizTypeDef {
 	key: QuestionTypeKey;
@@ -25,6 +25,7 @@ const Q_TYPES: QuizTypeDef[] = [
 	{ key: "ordering", lucide: "arrow-up-down", get label() { return t("editor.type.ordering.label"); }, get desc() { return t("editor.type.ordering.desc"); } },
 	{ key: "matching", lucide: "link", get label() { return t("editor.type.matching.label"); }, get desc() { return t("editor.type.matching.desc"); } },
 	{ key: "cloze", lucide: "text-cursor-input", get label() { return t("editor.type.cloze.label"); }, get desc() { return t("editor.type.cloze.desc"); } },
+	{ key: "flashcard", lucide: "layers", get label() { return t("editor.type.flashcard.label"); }, get desc() { return t("editor.type.flashcard.desc"); } },
 	{ key: "numeric", lucide: "calculator", get label() { return t("editor.type.numeric.label"); }, get desc() { return t("editor.type.numeric.desc"); } },
 	{ key: "text", lucide: "type", get label() { return t("editor.type.text.label"); }, get desc() { return t("editor.type.text.desc"); } },
 	{ key: "cmd", lucide: "terminal", get label() { return t("editor.type.cmd.label"); }, get desc() { return t("editor.type.cmd.desc"); } },
@@ -144,6 +145,8 @@ export interface DraftQuestion {
 	 */
 	slice?: number;
 	role?: QuestionRole;
+	/** Verso d'une carte mémoire (clé de format `answer`). */
+	answer?: string;
 }
 
 /* Libellés de slots par défaut (« Étape 1 »…) : contenu de DÉPART écrit ensuite
@@ -164,6 +167,7 @@ function makeDefault(type: QuestionTypeKey): DraftQuestion {
 		// Gabarit d'exemple : un texte à trous vide n'apprend pas sa syntaxe, et
 		// les doubles accolades ne s'inventent pas.
 		case "cloze": return { ...b, cloze: t("editor.cloze.defaultTemplate"), caseSensitive: false };
+		case "flashcard": return { ...b, answer: "" };
 		case "numeric": return { ...b, placeholder: "", acceptedAnswers: [""], caseSensitive: false, unit: "" };
 		case "text": return { ...b, placeholder: t("editor.text.defaultPlaceholder"), acceptedAnswers: [""], caseSensitive: false };
 		case "cmd": return { ...b, placeholder: "", acceptedAnswers: [""], caseSensitive: false, commandPrefix: "C:\\>" };

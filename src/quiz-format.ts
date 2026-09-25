@@ -23,7 +23,7 @@ export type ModeQuiz = "learn" | "practice";
     le contrôle à l'arrivée exige mais que le prompt tait n'est jamais produit
     (test du 2026-09-23 : `explain` absent du prompt, aucune explication). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
-	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"'],
+	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 
@@ -38,15 +38,23 @@ export type Manque =
 	| { kind: "sansObjectifs" }
 	/** Une pré-question sans indice : on la pose AVANT la lecture, sans rien
 	    savoir — sans aide du tout, elle décourage (Ahmed, 2026-09-23). */
-	| { kind: "preSansIndice"; questions: string[] };
+	| { kind: "preSansIndice"; questions: string[] }
+	/** Une carte sans verso : retournée, elle ne montrerait rien à comparer. */
+	| { kind: "carteSansReponse"; questions: string[] };
 
 interface Element {
 	title?: unknown; prompt?: unknown; explain?: unknown; explainHtml?: unknown; hint?: unknown;
 	slice?: unknown; role?: unknown; mode?: unknown; objectives?: unknown;
+	flashcard?: unknown; answer?: unknown;
 }
 
 const texte = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 const estTranche = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1;
+
+/** Une carte mémoire : `flashcard: true`, rien d'autre (spec cartes §2). */
+export function estCarte(q: unknown): boolean {
+	return !!q && typeof q === "object" && (q as { flashcard?: unknown }).flashcard === true;
+}
 
 /** Le nom d'une question dans une notice : son titre, sinon le début de son
     énoncé, sinon son rang. */
@@ -99,6 +107,7 @@ export function titreSansMode(nom: string, mode: ModeQuiz): string {
 export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranchesConnues?: readonly number[]): Manque[] {
 	const { questions, config } = separer(items);
 	const manques: Manque[] = [];
+	const cartesSansVerso = questions.filter(({ q }) => estCarte(q) && !texte(q.answer)).map(({ q, i }) => nom(q, i));
 	if (mode === "practice") {
 		const sans = questions.filter(({ q }) => !texte(q.explain) && !texte(q.explainHtml)).map(({ q, i }) => nom(q, i));
 		if (sans.length) manques.push({ kind: "sansExplication", questions: sans });
@@ -107,6 +116,7 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 			const inconnues = questions.filter(({ q }) => estTranche(q.slice) && !connues.has(q.slice)).map(({ q, i }) => nom(q, i));
 			if (inconnues.length) manques.push({ kind: "trancheInconnue", questions: inconnues });
 		}
+		if (cartesSansVerso.length) manques.push({ kind: "carteSansReponse", questions: cartesSansVerso });
 		return manques;
 	}
 	const objectifs = config?.objectives;
@@ -128,6 +138,7 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 	}
 	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !texte(q.hint)).map(({ q, i }) => nom(q, i));
 	if (preSansIndice.length) manques.push({ kind: "preSansIndice", questions: preSansIndice });
+	if (cartesSansVerso.length) manques.push({ kind: "carteSansReponse", questions: cartesSansVerso });
 	return manques;
 }
 

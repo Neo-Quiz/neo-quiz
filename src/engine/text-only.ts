@@ -5,9 +5,10 @@ import type {
 	QcmQuestion,
 	MultiSelectQuestion,
 	TextOnlyRating,
+	FlashcardQuestion,
 } from "../types/quiz";
 import { renderLessonHtml } from "./sanitizer";
-import { t } from "../i18n";
+import { t, type TransKey } from "../i18n";
 
 export interface TextOnlyResults {
 	understood: number;
@@ -87,6 +88,9 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   mode par sa configuration (démarrage « Entraînement ») continue de tout
 	   afficher en réponse libre, question par question. */
 	function isTextOnlyFor(qi: number): boolean {
+		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
+		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
+		if (ctx.isFlashcardQuestion(ctx.quiz[qi])) return true;
 		return isTextOnlyMode() || (ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall");
 	}
 
@@ -287,7 +291,43 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		</div>`;
 	}
 
+	/* CARTE MÉMOIRE (spec cartes §3). Le recto est l'énoncé, déjà rendu par
+	   cards.ts au-dessus de ce corps ; ici : « Retourner », puis le verso.
+	   Le bouton Retourner porte AUSSI `quiz-textonly-check-btn` : le même
+	   gestionnaire que « Vérifier » pose textOnlyChecked[qi]. Les deux notes
+	   portent `quiz-textonly-rating-btn` : le même gestionnaire journalise. */
+	function flashcardBodyHtml(q: FlashcardQuestion, qi: number): string {
+		if (!isChecked(qi)) {
+			return `<div class="quiz-flashcard" data-flashcard="1">
+				<div class="quiz-actions quiz-flashcard-actions">
+					<button class="quiz-action-btn success quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space">${t("engine.flashcard.flip")}</button>
+					<span class="quiz-flashcard-kbd">${t("engine.flashcard.flipHint")}</span>
+				</div>
+			</div>`;
+		}
+		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
+		const verso = typeof q.answer === "string" && q.answer.trim()
+			? ctx.sanitize.renderInlineText(q.answer)
+			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
+		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
+			const on = current === value;
+			return `<button class="quiz-action-btn quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}">${t(key)} <span class="quiz-flashcard-kbd">${touche}</span></button>`;
+		};
+		return `<div class="quiz-flashcard is-flipped" data-flashcard="1">
+			<div class="quiz-flashcard-back" aria-live="polite">
+				<div class="quiz-textonly-label">${t("engine.flashcard.back")}</div>
+				<div class="quiz-flashcard-answer">${verso}</div>
+				${learningHtml(q)}
+				<div class="quiz-flashcard-rating">
+					${note("review", "engine.flashcard.again", "1")}
+					${note("understood", "engine.flashcard.knew", "2")}
+				</div>
+			</div>
+		</div>`;
+	}
+
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
+		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
 		const checked = isChecked(qi);
 		const examAnswerPhase = isExamAnswerPhase();
 		const revealed = checked && !examAnswerPhase;
@@ -404,6 +444,67 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			});
 		});
 	}
+
+	/* Clavier d'une carte mémoire, sur le CONTENEUR du quiz, en phase de
+	   CAPTURE (revue finale). Deux versions ont échoué avant :
+	   - sur `trackItem`, il ne voyait jamais une frappe dont le focus est
+	     ailleurs dans le quiz — l'onglet de navigation `.quiz-tab`, notamment ;
+	   - sur `document`, TOUS les quiz de la page réagissaient à la même touche
+	     (deux blocs dans une note, un onglet Obsidian en arrière-plan), Espace
+	     sur un bouton hors du quiz retournait la carte, et le `keydown` de
+	     `.quiz-tab` (interactions.ts) arrêtait de toute façon Espace avant
+	     qu'il remonte — seuls 1 et 2 passaient.
+	   La capture sur le conteneur passe AVANT l'écouteur de l'onglet, et ne
+	   voit que les frappes dont le focus est DANS ce quiz : c'est la règle des
+	   flèches (`interactions.ts`, « Bindé sur le container »). Un bouton de la
+	   carte qui a le focus garde son comportement natif (Espace et Entrée
+	   l'activent eux-mêmes). Ignore les champs de saisie, MathLive compris, et
+	   les modificateurs. Espace ou Entrée retourne (spec §3), 1 note « À
+	   revoir », 2 « Je savais » ; après le retournement, le focus passe sur
+	   « Je savais ». */
+	function currentFlashcardQuestionIndex(): number | null {
+		const si = ctx.quizState.current;
+		if (!ctx.isQuestionSlideIndex(si)) return null;
+		const qi = (ctx.slideMap[si] as { questionIndex: number }).questionIndex;
+		return ctx.isFlashcardQuestion(ctx.quiz[qi]) ? qi : null;
+	}
+
+	function bindFlashcardKeys(): void {
+		// Repli test (check-engine-review.mjs, ctx factice sans DOM).
+		if (!ctx.container || typeof ctx.container.addEventListener !== "function") return;
+		const onKeydown = (e: KeyboardEvent) => {
+			if (ctx.isDestroyed() || !ctx.container.isConnected) return;
+			const qi = currentFlashcardQuestionIndex();
+			if (qi === null) return;
+			const cible = e.target as HTMLElement | null;
+			if (cible?.closest?.("input, textarea, select, [contenteditable], math-field")) return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			const trackItem = ctx.container.querySelector<HTMLElement>(`[data-qi="${qi}"]`);
+			if (!trackItem) return;
+			// Un bouton DE LA CARTE qui a le focus s'active tout seul.
+			if ((e.key === " " || e.key === "Enter") && cible?.closest?.("button") && trackItem.contains(cible)) return;
+			const retourner = e.key === " " || e.key === "Enter";
+			const vise = retourner ? ".quiz-flashcard-flip-btn"
+				: e.key === "1" ? '.quiz-textonly-rating-btn[data-textonly-rating="review"]'
+				: e.key === "2" ? '.quiz-textonly-rating-btn[data-textonly-rating="understood"]'
+				: null;
+			if (!vise) return;
+			const bouton = trackItem.querySelector<HTMLButtonElement>(vise);
+			if (!bouton) return;
+			e.preventDefault();
+			e.stopPropagation();
+			bouton.click();
+			if (retourner) {
+				// Le verso vient d'être peint : le focus va à l'action suivante.
+				requestAnimationFrame(() => {
+					ctx.container.querySelector<HTMLButtonElement>(`[data-qi="${qi}"] .quiz-textonly-rating-btn[data-textonly-rating="understood"]`)?.focus({ preventScroll: true });
+				});
+			}
+		};
+		ctx.container.addEventListener("keydown", onKeydown, true);
+		ctx.__quizGlobalCleanups.push(() => ctx.container.removeEventListener("keydown", onKeydown, true));
+	}
+	bindFlashcardKeys();
 
 	return {
 		RATINGS,

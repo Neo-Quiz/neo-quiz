@@ -94,6 +94,14 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.rating.partial": "Partiel",
 	"engine.rating.review": "À revoir",
 
+	/* ── Carte mémoire ── */
+	"engine.flashcard.flip": "Retourner",
+	"engine.flashcard.flipHint": "Espace",
+	"engine.flashcard.back": "Réponse",
+	"engine.flashcard.again": "À revoir",
+	"engine.flashcard.knew": "Je savais",
+	"engine.flashcard.missingAnswer": "Pas de réponse au verso de cette carte.",
+
 	/* ── Slide de soumission ── */
 	"engine.submit.back": "Retour",
 	"engine.submit.showScore": "Voir le score",

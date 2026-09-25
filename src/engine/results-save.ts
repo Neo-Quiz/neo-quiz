@@ -133,6 +133,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	}
 
 	function getQuestionKind(q: QuizQuestion): string {
+		if (ctx.isFlashcardQuestion(q)) return "flashcard";
 		if (ctx.isClozeQuestion(q)) return "cloze";
 		if (ctx.isTextQuestion(q)) return "text";
 		if (ctx.isOrderingQuestion(q)) return "ordering";
@@ -281,6 +282,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		if (ctx.isTextQuestion(q)) return buildTextQuestionResult(q, qi);
 		if (ctx.isOrderingQuestion(q)) return buildOrderingResult(q, qi);
 		if (ctx.isMatchingQuestion(q)) return buildMatchingResult(q, qi);
+		if (ctx.isFlashcardQuestion(q)) return null;
 		return buildChoiceResult(q, qi);
 	}
 
@@ -333,6 +335,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			});
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return null;
 		return optionEntries(q, getCorrectOptionIndices(q));
 	}
 

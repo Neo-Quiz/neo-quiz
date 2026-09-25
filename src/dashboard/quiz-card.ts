@@ -16,7 +16,8 @@ const QUIZ_TYPE_KEYS: Record<QuizTypeTag, TransKey> = {
 	multiple: "dashboard.quizType.multiple",
 	text: "dashboard.quizType.text",
 	ordering: "dashboard.quizType.ordering",
-	matching: "dashboard.quizType.matching"
+	matching: "dashboard.quizType.matching",
+	flashcard: "dashboard.quizType.flashcard"
 };
 
 /* Icône Lucide du type, sur la carte (le libellé passe au survol). */
@@ -26,7 +27,8 @@ const QUIZ_TYPE_ICONS: Record<QuizTypeTag, string> = {
 	multiple: "list-checks",
 	text: "text-cursor-input",
 	ordering: "list-ordered",
-	matching: "cable"
+	matching: "cable",
+	flashcard: "layers"
 };
 
 /** L'icône du type avec sa bulle au survol (la carte, et la fiche du quiz) :

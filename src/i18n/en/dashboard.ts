@@ -243,6 +243,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizType.text": "Free text",
 	"dashboard.quizType.ordering": "Ordering",
 	"dashboard.quizType.matching": "Matching",
+	"dashboard.quizType.flashcard": "Flashcards",
 
 	/* ── Temps relatif (stats-store) ── */
 	"dashboard.time.justNow": "Just now",
