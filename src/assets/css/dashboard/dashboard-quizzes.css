@@ -746,11 +746,10 @@
 }
 
 /* Dans un dossier, la flèche est AU-DESSUS du titre (2026-09-25) : sur sa
-   ligne, elle décalait le titre. Neutre au repos : la couleur du dossier ne
-   vit plus que dans l'icône du titre. -6px aligne le TRAIT de la flèche
-   (21px dans un bouton de 32px) sur la marge du contenu. */
+   ligne, elle décalait le titre. Centrée sur l'ICÔNE du titre (46 px) : le
+   bouton fait 32 px, d'où 7 px de retrait. Neutre au repos. */
 .qbd-root .qbd-quizzes-header-back {
-	margin: 0 0 4px -6px;
+	margin: 0 0 8px 7px;
 	color: var(--text-muted);
 }
 
