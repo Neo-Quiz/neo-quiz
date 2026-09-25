@@ -59,14 +59,19 @@
 
 /* L'action principale d'une question (« Vérifier », « Retourner »,
    « Voir le score », « Recommencer ») : le bouton « à presser » de BRILLIANT,
-   comme les flèches ← → (2026-09-25), dans leur vert (#29CC57). Une tranche
-   pleine plus sombre dessous (`0 4px 0 0`, sans flou) ; au survol le vert
-   s'éclaircit sans que le bouton se soulève ; au clic la tranche disparaît
-   et le bouton descend d'autant. */
+   comme les flèches ← → (2026-09-25). Une tranche pleine plus sombre dessous
+   (`0 4px 0 0`, sans flou) ; au survol la face s'éclaircit sans se soulever ;
+   au clic la tranche disparaît et le bouton descend d'autant.
+   BLEU, et plus vert (même jour, après examen) : le vert #29CC57 ne donnait
+   que 2,1:1 de contraste au texte blanc (il en faut 4,5) — d'où l'aspect
+   délavé ; et dans un quiz le vert veut dire « bonne réponse », pas
+   « valider ». Le bleu des flèches, posé juste à côté, fait de l'action et
+   de la navigation une seule famille (4,3:1). Pas de reflet ici : dans une
+   question, l'attention va à la question. */
 .quiz-action-btn.success{
-  --quiz-press-face: #29cc57;
-  --quiz-press-face-hover: #3ad968;
-  --quiz-press-edge: #1b9440;
+  --quiz-press-face: #456dff;
+  --quiz-press-face-hover: #5b80ff;
+  --quiz-press-edge: #2a47c4;
   --quiz-press-depth: 4px;
   color: #fff;
   background: var(--quiz-press-face);

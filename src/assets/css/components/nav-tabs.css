@@ -26,9 +26,10 @@
    mécanique reste la même pour tous. Remplace l'ancienne couche d'effets
    (lueurs, levées, `!important` de button-press.css). */
 .quiz-tab{
-  --tab-face: color-mix(in srgb, var(--text-normal) 7%, var(--background-primary));
-  --tab-border: color-mix(in srgb, var(--text-normal) 12%, transparent);
-  --tab-edge: color-mix(in srgb, #000 55%, var(--tab-face));
+  --tab-face: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --tab-edge: color-mix(in srgb, #000 45%, var(--tab-face));
+  --tab-text: color-mix(in srgb, var(--text-normal) 82%, transparent);
   --tab-depth: 3px;
   display: inline-block;
   box-sizing: border-box;
@@ -38,7 +39,7 @@
   border-radius: var(--quiz-tab-radius);
   border: 1px solid var(--tab-border);
   background: var(--tab-face);
-  color: var(--text-normal);
+  color: var(--tab-text);
   font-size: 0.75em;
   font-weight: 700;
   cursor: pointer;
@@ -62,45 +63,56 @@
   outline-offset: 2px;
 }
 
-/* La question affichée : bleue, comme les flèches. */
-.quiz-tab.active{
-  --tab-face: color-mix(in srgb, #456dff 22%, var(--background-primary));
-  --tab-border: #456dff;
-  --tab-edge: #2a47c4;
-}
-
+/* COLORIMÉTRIE (2026-09-25, revue à l'écran) : l'onglet courant ne se
+   voyait qu'à un liseré bleu pâle, « répondu » et « courant » étaient deux
+   bleus voisins, et la tranche noire disparaissait sur le fond sombre.
+   Désormais UNE seule règle : l'état donne la COULEUR (bleu = répondu,
+   émeraude = juste, rouge = faux), la question courante est la seule en
+   aplat PLEIN de sa couleur, texte blanc — le même bleu que les flèches. */
 .quiz-tab.answered{
-  --tab-face: color-mix(in srgb, #456dff 13%, var(--background-primary));
-  --tab-border: color-mix(in srgb, #456dff 45%, transparent);
-  --tab-edge: color-mix(in srgb, #2a47c4 70%, #000);
+  --tab-face: color-mix(in srgb, #456dff 26%, var(--background-primary));
+  --tab-border: color-mix(in srgb, #456dff 50%, transparent);
+  --tab-edge: #1f358f;
+  --tab-text: #fff;
 }
 
 .quiz-tab.correct{
-  --tab-face: color-mix(in srgb, var(--quiz-success) 18%, var(--background-primary));
-  --tab-border: color-mix(in srgb, var(--quiz-success) 55%, transparent);
-  --tab-edge: color-mix(in srgb, var(--quiz-success) 45%, #000);
+  --tab-face: color-mix(in srgb, #15803d 42%, var(--background-primary));
+  --tab-border: color-mix(in srgb, #22c55e 45%, transparent);
+  --tab-edge: #0c4f25;
+  --tab-text: #fff;
 }
 
 .quiz-tab.wrong{
-  --tab-face: color-mix(in srgb, var(--quiz-danger) 16%, var(--background-primary));
-  --tab-border: color-mix(in srgb, var(--quiz-danger) 55%, transparent);
-  --tab-edge: color-mix(in srgb, var(--quiz-danger) 45%, #000);
+  --tab-face: color-mix(in srgb, #b91c1c 40%, var(--background-primary));
+  --tab-border: color-mix(in srgb, #ef4444 45%, transparent);
+  --tab-edge: #6f1111;
+  --tab-text: #fff;
 }
 
-.quiz-tab.correct.active{ --tab-border: var(--quiz-success); }
-.quiz-tab.wrong.active{ --tab-border: var(--quiz-danger); }
-
-/* « Résultats » : le vert plein des boutons principaux. */
-.quiz-tab.is-result{
-  --tab-face: #29cc57;
+/* La question courante : aplat plein de sa couleur. */
+.quiz-tab.active{
+  --tab-face: #456dff;
   --tab-border: transparent;
-  --tab-edge: #1b9440;
-  color: #fff;
+  --tab-edge: #2a47c4;
+  --tab-text: #fff;
+}
+.quiz-tab.correct.active{ --tab-face: #15803d; --tab-edge: #0c4f25; }
+.quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
+
+/* « Résultats » : la fin du quiz, donc VERT — un émeraude profond (#15803D,
+   5:1 de contraste au texte blanc) et plus le vert néon #29CC57 (2,1:1),
+   qui criait dans la rangée d'onglets sombres (2026-09-25). */
+.quiz-tab.is-result{
+  --tab-face: #15803d;
+  --tab-border: transparent;
+  --tab-edge: #0c4f25;
+  --tab-text: #fff;
 }
 
 .quiz-tab.is-result:hover,
 .quiz-tab.is-result:focus-visible{
-  background: #3ad968;
+  background: #17924a;
 }
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
