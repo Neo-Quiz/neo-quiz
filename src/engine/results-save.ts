@@ -281,6 +281,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		if (ctx.isTextQuestion(q)) return buildTextQuestionResult(q, qi);
 		if (ctx.isOrderingQuestion(q)) return buildOrderingResult(q, qi);
 		if (ctx.isMatchingQuestion(q)) return buildMatchingResult(q, qi);
+		if (ctx.isFlashcardQuestion(q)) return null;
 		return buildChoiceResult(q, qi);
 	}
 
@@ -333,6 +334,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			});
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return null;
 		return optionEntries(q, getCorrectOptionIndices(q));
 	}
 

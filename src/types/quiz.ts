@@ -214,6 +214,18 @@ export interface ClozeQuestion extends QuestionBase {
 	caseSensitive?: boolean;
 }
 
+/**
+ * CARTE MÉMOIRE (engine/text-only.ts, branche carte). Le recto est `prompt`,
+ * le verso `answer` (champ déjà connu du format, réutilisé plutôt qu'un
+ * `back` de plus). C'est la PRÉSENCE de `flashcard: true` qui discrimine la
+ * variante, comme `cloze` ; `type` reste absent. On la retourne, puis on se
+ * note « À revoir » / « Je savais » : la note passe par l'auto-évaluation.
+ */
+export interface FlashcardQuestion extends QuestionBase {
+	flashcard: true;
+	answer?: string;
+}
+
 /** Forme imbriquée alternative de `ordering`, lue en fallback (engine/questions.js: q?.ordering?.items/correctOrder/slotLabels). */
 export interface OrderingConfig {
 	items?: string[];
@@ -275,6 +287,7 @@ export type QuizQuestion =
 	| MultiSelectQuestion
 	| TextQuestion
 	| ClozeQuestion
+	| FlashcardQuestion
 	| OrderingQuestion
 	| MatchingQuestion;
 

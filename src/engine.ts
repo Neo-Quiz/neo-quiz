@@ -35,6 +35,7 @@ import type {
 	MatchingQuestion,
 	TextQuestion,
 	ClozeQuestion,
+	FlashcardQuestion,
 } from "./types/quiz";
 
 /**
@@ -135,6 +136,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// vide est un texte à trous, quels que soient ses autres champs.
 	const isClozeQuestion = (q: QuizQuestion): q is ClozeQuestion =>
 		!!(q && typeof (q as { cloze?: unknown }).cloze === "string" && (q as { cloze: string }).cloze.trim().length > 0);
+	const isFlashcardQuestion = (q: QuizQuestion): q is FlashcardQuestion =>
+		!!(q && (q as { flashcard?: unknown }).flashcard === true);
 
 	// Créer le contexte partagé (ctx) pour injection de dépendances
 	const originalQuizMode = quizMode;
@@ -191,7 +194,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		isOrderingQuestion,
 		isMatchingQuestion,
 		isTextQuestion,
-		isClozeQuestion
+		isClozeQuestion,
+		isFlashcardQuestion
 	} as EngineCtx;
 
 	// Instancier tous les modules avec ctx injecté
@@ -309,6 +313,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			if (isTextQuestion(q)) return null;
 			// Un texte à trous se lit dans l'ordre où il est écrit : rien à mélanger.
 			if (isClozeQuestion(q)) return null;
+			// Une carte se retourne : rien à mélanger.
+			if (isFlashcardQuestion(q)) return null;
 
 			if (isOrderingQuestion(q)) {
 				return shuffleArray([...Array(questions.getOrderingItems(q).length).keys()]);
@@ -334,6 +340,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			if (isClozeQuestion(q)) return new Array<string>(cloze.getBlanks(q).length).fill("");
 			if (isOrderingQuestion(q)) return new Array<number | null>(questions.getOrderingItems(q).length).fill(null);
 			if (isMatchingQuestion(q)) return new Array<number | null>(questions.getMatchRows(q).length).fill(null);
+			if (isFlashcardQuestion(q)) return null;
 			if (q.multiSelect) return new Set<number>();
 			return null;
 		});

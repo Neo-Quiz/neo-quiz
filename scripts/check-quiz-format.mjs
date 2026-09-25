@@ -11,7 +11,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn }) => {
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, estCarte }) => {
 	const r = makeReporter("Format Learn / Practice");
 
 	/* Le mode reste dans le NOM du fichier (lisible dans Obsidian) mais pas
@@ -60,6 +60,19 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		verifierFormat("learn", [...tranche(1), q({ title: "Sans", slice: 1, role: "pre" }), q({ title: "Vide", slice: 1, role: "pre", hint: "  " }), config]),
 		[{ kind: "preSansIndice", questions: ["Sans", "Vide"] }]);
 	r.check("Practice : l'indice n'est pas exigé", verifierFormat("practice", [q({ role: "pre" })]), []);
+
+	const carte = (o) => ({ title: "Carte", prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "`<class 'list'>`", ...o });
+	r.check("estCarte : flashcard === true seulement",
+		[estCarte(carte()), estCarte({ flashcard: "true" }), estCarte({ prompt: "x" }), estCarte(null)],
+		[true, false, false, false]);
+	r.check("Learn : une carte complète n'ajoute aucun manque",
+		verifierFormat("learn", [...tranche(1), carte({ slice: 1, role: "recall", explain: "Liste." }), config]), []);
+	r.check("Learn : une carte sans verso (absent ou blanc) est nommée",
+		verifierFormat("learn", [...tranche(1), carte({ title: "A", slice: 1, role: "recall", answer: undefined }), carte({ title: "B", slice: 1, role: "recall", answer: "  " }), config]),
+		[{ kind: "carteSansReponse", questions: ["A", "B"] }]);
+	r.check("Practice : une carte sans verso est nommée aussi (le moteur la joue quel que soit le mode)",
+		verifierFormat("practice", [carte({ title: "C", answer: "", explain: "x" })]),
+		[{ kind: "carteSansReponse", questions: ["C"] }]);
 
 
 	const sansMode = [...tranche(1), { objectives: ["Définir l'OSINT"] }];
