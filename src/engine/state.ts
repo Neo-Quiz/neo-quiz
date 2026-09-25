@@ -409,7 +409,10 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// `lastQuestionIndex`/`pendingResultsLock` étaient déjà mutés alors que
 		// la navigation elle-même était refusée.
 		marquerPreNonTentees(ctx.SLIDE_SUBMIT_INDEX);
-		ctx.clearSession();
+		/* PAS d'effacement de la session ici : l'écran de soumission n'est pas
+		   la fin du quiz (« Il manque N réponses », avec « Retour ») ; y passer
+		   par l'onglet Résultats puis fermer l'application perdait la reprise.
+		   Elle ne s'efface qu'au score (`goToResults`). */
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = false;
 		goToSlide(ctx.SLIDE_SUBMIT_INDEX, { forceRender: false });
