@@ -382,6 +382,8 @@ async function demarrer(): Promise<void> {
 			}
 			store.destroy();
 			stats.destroy();
+			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
+			await sessions.vider();
 		});
 		/* L'appariement des renommages que le surveillant n'a pas su nommer.
 		   BRANCHÉ CÔTÉ APPLICATION SEULEMENT : Obsidian émet un vrai `rename`, que
