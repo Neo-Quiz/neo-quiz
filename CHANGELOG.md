@@ -22,6 +22,7 @@ release notes.
 - Flashcards: a Learn recall can be a card that you flip, then rate "Review again" or "I knew it" (Space or Enter flips, 1 and 2 rate); your rating counts in spaced review. The editor has a Flashcard type, and a course page shows a cards icon for a quiz made only of flashcards.
 
 ### Changed
+- A quiz page is laid out like StudySmarter: a header across the page (back, folder and title on the left; Edit, Start the quiz and a ⋮ menu on the right), a line with the mode, the number of questions, where the quiz comes from and your progress, then a bar to switch between a grid of questions and a list with the chosen question shown large (← and → move between them), and a search box that filters questions by their text and options, accents ignored. Answers are still never shown there.
 - The colored choices of Add content and of Create a folder carry a soft glow of their color rising from the bottom, which brightens on hover.
 - Hint and I don't know are now one help button that goes up a step: Hint first, whose text then stays under the question instead of opening a window, then I don't know where it applies. The button is a neutral pill you press down, with an amber bulb or a question mark.
 - Start the quiz, on a course page, and the next step button of a folder (Review, Learn or Practice, with its arrow) are blue buttons raised above their edge that sink when clicked, with a light that sweeps across them every few seconds.
