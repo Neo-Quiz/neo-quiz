@@ -290,7 +290,13 @@ export function renderModuleDrill(
 		renderFolderSections(principal, { ctx, folder: cheminOuvert, rerender });
 	}
 
-	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats);
+	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, {
+		ctx, map, rerender, cartes,
+		group: {
+			folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
+			color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
+		},
+	});
 	layout.hidden = onglet === "progression" && progression !== null;
 	if (progression) progression.hidden = !layout.hidden;
 	return { contenu: layout, progression };

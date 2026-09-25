@@ -7,6 +7,21 @@ import { renderProgressRing } from "./quiz-card";
 import { computeQuizState } from "./quiz-mastery";
 import { placerIndicateur } from "./seg-indic";
 import type { OngletDossier, VuesDossier } from "./quizzes-render";
+import type { DashboardShellCtx } from "../types/dashboard-ctx";
+import type { ModuleGroup, ModuleMap } from "./quiz-modules";
+import type { CarteCours } from "./course-pairs";
+import { renderExamen, renderListeCours, renderRevisionDuJour } from "./folder-progress-details";
+
+/** Ce que les tuiles du bas demandent en plus des chiffres. */
+export interface DetailsProgression {
+	ctx: DashboardShellCtx;
+	/** Le dossier, pour la date d'examen et son modal « Modifier ». */
+	group: ModuleGroup;
+	map: ModuleMap;
+	rerender: () => void;
+	/** Les cartes de la grille : un cours, ses deux modes. */
+	cartes: CarteCours[];
+}
 
 /* ══════════════════════════════════════════════════════════
    ONGLET « PROGRESSION » d'un dossier (2026-09-25).
@@ -15,12 +30,14 @@ import type { OngletDossier, VuesDossier } from "./quizzes-render";
    il répétait, sur la page où l'on travaille, ce que chaque carte disait
    déjà. Il a son onglet, comme la page d'un cours chez StudySmarter, et y
    devient des TUILES de chiffres : une grande pour l'avancement du dossier,
-   trois petites pour les quiz maîtrisés, en cours, à commencer.
+   trois petites pour les quiz maîtrisés, en cours, à commencer ; puis
+   ce qui est à réviser aujourd'hui, la date d'examen, et chaque cours mode
+   par mode (`folder-progress-details.ts`).
    `inModule` = TOUS les quiz du dossier. « À revoir » (fini sous le seuil)
    compte comme « en cours » : pas encore acquis.
 ══════════════════════════════════════════════════════════ */
 
-export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): HTMLElement {
+export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, details: DetailsProgression): HTMLElement {
 	const total = inModule.length;
 	let masteredN = 0, enCoursN = 0, freshN = 0, somme = 0;
 	for (const quiz of inModule) {
@@ -48,6 +65,10 @@ export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEnt
 	tuile("done", masteredN, t(masteredN > 1 ? "dashboard.quizzes.progressMasteredOther" : "dashboard.quizzes.progressMasteredOne"));
 	tuile("progress", enCoursN, t("dashboard.quizzes.progressInProgress"));
 	tuile("fresh", freshN, t("dashboard.quizzes.progressToStart"));
+
+	renderRevisionDuJour(vue, details.ctx, inModule);
+	renderExamen(vue, details.ctx, details.group, details.map, details.rerender);
+	renderListeCours(vue, details.ctx, details.cartes, stats);
 	return vue;
 }
 

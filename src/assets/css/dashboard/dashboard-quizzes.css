@@ -1136,25 +1136,152 @@
 	color: var(--text-muted);
 }
 
-.qbd-folder-progress-tile b {
+.qbd-folder-progress-tile > b {
 	font-size: 28px;
 	font-weight: 800;
 	line-height: 1.1;
 	font-variant-numeric: tabular-nums;
 }
 
-.qbd-folder-progress-tile span {
+.qbd-folder-progress-tile > span {
 	font-size: 13px;
 	color: var(--text-muted);
 }
 
-.qbd-folder-progress-tile span::first-letter { text-transform: uppercase; }
-.qbd-folder-progress-tile--done b { color: var(--qbd-state-done); }
-.qbd-folder-progress-tile--progress b { color: var(--qbd-state-progress); }
-.qbd-folder-progress-tile--fresh b { color: var(--text-muted); }
+.qbd-folder-progress-tile > span::first-letter { text-transform: uppercase; }
+.qbd-folder-progress-tile--done > b { color: var(--qbd-state-done); }
+.qbd-folder-progress-tile--progress > b { color: var(--qbd-state-progress); }
+.qbd-folder-progress-tile--fresh > b { color: var(--text-muted); }
+
+/* ── Les tuiles du bas : à réviser aujourd'hui (deux colonnes), l'examen,
+   puis les cours sur toute la largeur. ── */
+.qbd-folder-progress-tile--due { grid-column: span 2; gap: 10px; }
+.qbd-folder-progress-tile--exam { gap: 6px; align-items: flex-start; }
+.qbd-folder-progress-tile--courses { grid-column: 1 / -1; gap: 10px; }
+
+.qbd-folder-due-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.qbd-folder-due-count { display: flex; align-items: baseline; gap: 8px; }
+.qbd-folder-due-count b {
+	font-size: 28px;
+	font-weight: 800;
+	line-height: 1.1;
+	color: var(--qbd-state-progress);
+	font-variant-numeric: tabular-nums;
+}
+.qbd-folder-due-count span { font-size: 13px; color: var(--text-muted); }
+
+/* « Réviser » : la pilule claire de l'action principale de l'app. */
+.qbd-root .qbd-folder-due-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: auto;
+	margin: 0;
+	padding: 9px 16px;
+	border: 0;
+	border-radius: 10px;
+	background: rgba(231, 235, 247, 0.92);
+	box-shadow: none;
+	color: #141a2c;
+	font: inherit;
+	font-size: 13.5px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background-color 0.15s ease;
+}
+.qbd-root .qbd-folder-due-action:hover { background: #fff; }
+.qbd-root .qbd-folder-due-action:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.qbd-folder-due-action .qbd-btn-icon svg { width: 14px; height: 14px; fill: currentColor; }
+
+.qbd-folder-due-list { display: flex; flex-direction: column; }
+.qbd-root .qbd-folder-due-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	height: auto;
+	margin: 0;
+	padding: 8px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+.qbd-root .qbd-folder-due-row:hover { background: color-mix(in srgb, var(--text-normal) 7%, transparent); }
+.qbd-root .qbd-folder-due-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.qbd-folder-due-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbd-folder-due-n { flex-shrink: 0; font-size: 12px; color: var(--text-muted); }
+
+.qbd-folder-exam-date { font-size: 20px; font-weight: 700; color: var(--text-normal); }
+.qbd-folder-exam-date--none { font-size: 15px; color: var(--text-muted); font-weight: 600; }
+.qbd-folder-exam-action { margin-top: auto; }
+
+.qbd-folder-courses { display: flex; flex-direction: column; }
+.qbd-folder-course {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+	align-items: center;
+	gap: 16px;
+	padding: 9px 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.qbd-folder-course:first-child { border-top: 0; }
+.qbd-root .qbd-folder-course-title {
+	justify-self: start;
+	max-width: 100%;
+	height: auto;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13.5px;
+	font-weight: 600;
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.qbd-root .qbd-folder-course-title:hover { text-decoration: underline; }
+.qbd-root .qbd-folder-course-title:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.qbd-folder-course-modes { display: flex; flex-direction: column; gap: 6px; }
+.qbd-folder-course-mode {
+	display: grid;
+	grid-template-columns: 64px minmax(0, 1fr) 40px;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+}
+.qbd-folder-course-mode-label { color: var(--text-muted); }
+.qbd-folder-course-pct { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.qbd-folder-course-bar {
+	height: 6px;
+	border-radius: 99px;
+	background: var(--qbd-ring-track, color-mix(in srgb, var(--text-normal) 10%, transparent));
+	overflow: hidden;
+}
+.qbd-folder-course-bar i { display: block; height: 100%; border-radius: inherit; }
+.qbd-folder-course-bar--progress i { background: var(--qbd-state-progress); }
+.qbd-folder-course-bar--done i { background: var(--qbd-state-done); }
 
 @media (max-width: 620px) {
 	.qbd-folder-progress { grid-template-columns: minmax(0, 1fr); }
+	.qbd-folder-progress-tile--due { grid-column: auto; }
+	.qbd-folder-course { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
 
