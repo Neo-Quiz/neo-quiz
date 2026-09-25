@@ -222,14 +222,14 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 		}
 	}
 
-	const start = ajouter(side, "button", "qbd-btn--create qbd-fiche-start");
+	const start = ajouter(side, "button", "qbd-btn--create qbd-btn--shine qbd-fiche-start");
 	start.type = "button";
 	icone(start, "play", "qbd-btn-icon");
 	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
 	/* Le REFLET qui défile : une animation CSS infinie, qui passe dès
-	   l'arrivée puis à chaque cycle (dashboard-fiche.css). Un élément à part,
-	   pas un ::after, pour que `attirer` puisse relancer son cycle. */
-	const reflet = ajouter(start, "span", "qbd-fiche-start-shine");
+	   l'arrivée puis à chaque cycle (dashboard-components.css). Un élément à
+	   part, pas un ::after, pour que `attirer` puisse relancer son cycle. */
+	const reflet = ajouter(start, "span", "qbd-btn-shine");
 	reflet.setAttribute("aria-hidden", "true");
 	start.addEventListener("click", () => deps.onStart(start));
 

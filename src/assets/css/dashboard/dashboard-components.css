@@ -284,6 +284,38 @@
 	height: 15px;
 }
 
+/* Le REFLET qui défile sur une action principale (« Commencer le quiz »,
+   « Nouveau quiz ») : il passe dès l'arrivée, puis toutes les 6,5 s. Un
+   élément à part (`.qbd-btn-shine`), pas un ::after, pour qu'on puisse
+   relancer son cycle. Infini, donc ignoré par `markViewEnter` (qui attend la
+   fin de l'entrée), et hors de toute classe `-enter` (`check:view-enter`). */
+.qbd-btn--shine {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+}
+/* Le contenu passe DEVANT le reflet. */
+.qbd-btn--shine > :not(.qbd-btn-shine) {
+	position: relative;
+	z-index: 1;
+}
+.qbd-btn-shine {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.8) 50%, transparent 68%);
+	transform: translateX(-110%);
+	animation: qbd-btn-shine 6.5s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes qbd-btn-shine {
+	0%, 5% { transform: translateX(-110%); }
+	22%, 100% { transform: translateX(110%); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-btn-shine { display: none; }
+}
+
 /* ── Modal « Modifier dossier » (référence StudySmarter, sans toggle public).
    Champs façon Notion (obsidian:plugin-design §2) ; !important contre le
    chrome natif des input/button d'Obsidian (0,1,1). ── */

@@ -236,40 +236,14 @@
 .qbd-fiche-best.is-good { color: var(--color-green); }
 .qbd-fiche-best.is-fair { color: var(--color-yellow); }
 
+/* Le reflet qui défile est celui de tout bouton `qbd-btn--shine`
+   (dashboard-components.css). */
 .qbd-root .qbd-fiche-start {
-	position: relative;
-	overflow: hidden;
-	isolation: isolate;
 	margin-top: 4px;
 	height: 46px;
 	padding: 0 26px;
 	font-size: 15px;
 	justify-content: center;
-}
-/* Le contenu passe DEVANT le reflet. */
-.qbd-fiche-start > :not(.qbd-fiche-start-shine) {
-	position: relative;
-	z-index: 1;
-}
-/* Le REFLET qui défile : il passe dès l'arrivée, puis toutes les 6,5 s.
-   Infini, donc ignoré par `markViewEnter` (qui attend la fin de l'entrée),
-   et hors de toute classe `-enter` (`check:view-enter`). `attirer`
-   (detail-fiche.ts) le relance au clic sur une question. */
-.qbd-fiche-start-shine {
-	position: absolute;
-	inset: 0;
-	z-index: 0;
-	pointer-events: none;
-	background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.8) 50%, transparent 68%);
-	transform: translateX(-110%);
-	animation: qbd-fiche-shine 6.5s cubic-bezier(.4, 0, .2, 1) infinite;
-}
-@keyframes qbd-fiche-shine {
-	0%, 5% { transform: translateX(-110%); }
-	22%, 100% { transform: translateX(110%); }
-}
-@media (prefers-reduced-motion: reduce) {
-	.qbd-fiche-start-shine { display: none; }
 }
 .qbd-fiche-start .qbd-btn-icon,
 .qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }

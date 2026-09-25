@@ -328,10 +328,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				   Ordre : la déclaration, sinon le chemin déduit d'un quiz du
 				   dossier, sinon le segment (comportement d'avant). */
 				const folder = cheminOuvert ?? openModuleFolder;
-				const newQuizBtn = ajouter(headerActions, "button", "qbd-btn--create");
+				// Le reflet qui défile, comme « Commencer le quiz » (2026-09-25).
+				const newQuizBtn = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--shine");
 				const newQuizIcon = ajouter(newQuizBtn, "span", "qbd-btn-icon");
 				currentHost().ui.setIcon(newQuizIcon, "plus");
 				ajouter(newQuizBtn, "span", undefined, t("dashboard.quizzes.newQuiz"));
+				ajouter(newQuizBtn, "span", "qbd-btn-shine").setAttribute("aria-hidden", "true");
 				newQuizBtn.addEventListener("click", () => {
 					ctx.createQuiz!(folder, () => { if (containerRef) render(containerRef); });
 				});
