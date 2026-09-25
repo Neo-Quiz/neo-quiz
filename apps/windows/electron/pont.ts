@@ -359,6 +359,19 @@ export interface Pont {
 		supprimer(cle: string): Promise<void>;
 	};
 
+	/** Partager un quiz (.md) ou un dossier (.zip) — voir `./partage.ts`. La
+	    fenêtre ne donne qu'un NOM et des OCTETS : l'emplacement vient du
+	    dialogue natif, le chemin temporaire et le script du principal. */
+	partage: {
+		/** Le dialogue « Enregistrer sous » (Téléchargements par défaut), puis
+		    le fichier montré dans l'explorateur. Rend son chemin, `null` si
+		    l'utilisateur a annulé. */
+		enregistrer(nom: string, octets: Uint8Array): Promise<string | null>;
+		/** Windows : le FICHIER copié dans le presse-papiers, Discord au
+		    premier plan (l'utilisateur colle). `false` si rien n'est parti. */
+		discord(nom: string, octets: Uint8Array): Promise<boolean>;
+	};
+
 	systeme: {
 		/** Ouvre le fichier avec l'application par défaut du système. Rend
 		    `false` si le système a refusé : `HostShell.openExternal` rend un
@@ -745,6 +758,8 @@ export const CANAUX = {
 	systemeCopierTexte: "neo:systeme/copier-texte",
 	systemeChoisirDossierDefaut: "neo:systeme/choisir-dossier-defaut",
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
+	partageEnregistrer: "neo:partage/enregistrer",
+	partageDiscord: "neo:partage/discord",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",

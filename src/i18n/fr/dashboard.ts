@@ -141,6 +141,14 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 
 	/* ── Menu ⋯ des cartes ── */
 	"dashboard.quizzes.menuShare": "Partager",
+	"dashboard.quizzes.shareTitle": "Partager le dossier",
+	"dashboard.quizzes.shareQuizTitle": "Partager le quiz",
+	"dashboard.quizzes.shareHint": "Aucune application ne peut joindre un fichier automatiquement : choisissez-en une, le fichier est prêt à coller.",
+	"dashboard.quizzes.shareSave": "Enregistrer le fichier",
+	"dashboard.quizzes.shareCopyHint": "Le fichier est copié dans le presse-papiers pour le partage",
+	"dashboard.quizzes.shareCopiedToast": "Copié, collez-le dans Discord avec Ctrl+V",
+	"dashboard.quizzes.shareSaveError": "Impossible de partager le fichier",
+	"dashboard.quizzes.fileSaved": "Enregistré : {path}",
 	"dashboard.quizzes.menuRename": "Renommer",
 	"dashboard.quizzes.menuCopyPath": "Copier le chemin",
 	"dashboard.quizzes.menuOpenFolder": "Ouvrir le dossier",

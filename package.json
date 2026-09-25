@@ -58,6 +58,7 @@
     "check:installer": "node scripts/check-installer.mjs",
     "check:changelog": "node --test scripts/changelog.test.mjs",
     "check:menu-app": "node scripts/check-menu-app.mjs",
+    "check:partage": "node scripts/check-partage.mjs",
     "check:reprise": "node scripts/check-reprise.mjs",
     "check:historique-nav": "node scripts/check-historique-nav.mjs",
     "check:langue": "node scripts/check-langue.mjs",

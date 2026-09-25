@@ -100,6 +100,11 @@ const pont: Pont = {
 		supprimer: cle => ipcRenderer.invoke(CANAUX.reglagesSupprimer, cle),
 	},
 
+	partage: {
+		enregistrer: (nom, octets) => ipcRenderer.invoke(CANAUX.partageEnregistrer, nom, octets),
+		discord: (nom, octets) => ipcRenderer.invoke(CANAUX.partageDiscord, nom, octets),
+	},
+
 	systeme: {
 		ouvrir: abs => ipcRenderer.invoke(CANAUX.ouvrir, abs),
 		copierTexte: texte => ipcRenderer.invoke(CANAUX.systemeCopierTexte, texte),

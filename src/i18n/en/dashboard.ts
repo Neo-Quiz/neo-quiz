@@ -167,6 +167,14 @@ export const EN_DASHBOARD = {
 	   2026-07-18) : Share / Edit / Rename / Archive / Delete. « Pause study
 	   reminders » retiré le 2026-07-21 (demande Ahmed). ── */
 	"dashboard.quizzes.menuShare": "Share",
+	"dashboard.quizzes.shareTitle": "Share folder",
+	"dashboard.quizzes.shareQuizTitle": "Share quiz",
+	"dashboard.quizzes.shareHint": "No app lets a file be attached automatically: pick one, the file is ready to paste.",
+	"dashboard.quizzes.shareSave": "Save file",
+	"dashboard.quizzes.shareCopyHint": "The file is copied to the clipboard for sharing",
+	"dashboard.quizzes.shareCopiedToast": "Copied, paste it into Discord with Ctrl+V",
+	"dashboard.quizzes.shareSaveError": "Could not share the file",
+	"dashboard.quizzes.fileSaved": "Saved: {path}",
 	"dashboard.quizzes.menuRename": "Rename",
 	"dashboard.quizzes.menuCopyPath": "Copy path",
 	"dashboard.quizzes.menuOpenFolder": "Open folder",

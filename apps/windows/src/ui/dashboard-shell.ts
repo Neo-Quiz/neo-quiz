@@ -43,6 +43,7 @@ import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host"
 import { openIconPicker } from "../../../../src/dashboard/icon-picker";
 import { openCreateFolderModal } from "../../../../src/dashboard/folder-create";
 import { openAddContentModal } from "../../../../src/dashboard/folder-add";
+import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
@@ -415,15 +416,16 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			if (!entry) { currentHost().ui.notice(t("dashboard.detail.noBlockInNote")); return; }
 			naviguer("detail", { quiz: entry, edit: opts?.edit });
 		},
-		/* shareQuiz, renameQuiz : ABSENTS À DESSEIN, et le menu « ⋯ » de la
-		   fenêtre a donc DEUX entrées (Éditer, Supprimer) là où le greffon en
-		   a quatre. `share.ts` livre par `child_process`/`electron.shell`, hors
-		   du contrat (spec §7 : hors chantier). `renameQuiz` exige de réécrire
+		/* Partager : le modal du greffon, porté le 2026-09-25 — le fichier
+		   est construit dans la fenêtre, écrit et lancé par le principal
+		   (`electron/partage.ts`). */
+		shareQuiz: (cible) => ouvrirPartage(cible),
+		/* renameQuiz : ABSENT À DESSEIN. `renameQuiz` exige de réécrire
 		   les wikilinks ENTRANTS ([[ancien nom]]), ce que seul l'index de liens
 		   d'Obsidian sait faire (`fileManager.renameFile`) ; le poser sur
 		   `HostFs.rename` déplacerait la note et casserait ces liens EN
 		   SILENCE — une entrée absente vaut mieux qu'une entrée qui ment
-		   (`types/dashboard-ctx.ts`). Les deux restent optionnels côté
+		   (`types/dashboard-ctx.ts`). Il reste optionnel côté
 		   `DashboardShellCtx` pour que cette absence soit un état PRÉVU, pas
 		   une erreur de compilation. */
 	};

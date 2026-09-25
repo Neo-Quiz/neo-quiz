@@ -154,6 +154,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   Il compare aussi le sha512 (calculé sur le fichier) et la taille de l'exe
   nommé par `latest.yml` aux valeurs qu'il y porte : c'est ce qui rougit
   quand l'exe signé n'a pas repassé par `scripts/update-info-after-signing.mjs`.
+- `npm run check:partage` — le PARTAGE côté principal (`apps/windows/electron/
+  partage.ts`) : la fenêtre ne donne qu'un nom et des octets. Un nom qui serait
+  un CHEMIN, une extension hors de `.zip`/`.md`, un contenu vide ou démesuré
+  sont refusés, et une apostrophe du nom ne ferme pas la chaîne du script
+  PowerShell qui met le fichier dans le presse-papiers. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

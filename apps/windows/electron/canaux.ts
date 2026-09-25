@@ -62,6 +62,7 @@ import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
+import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
@@ -588,6 +589,38 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   le jeton quand c'est le prompt). Retenu ici, côté principal, où la copie
 	   et la lecture se font toutes deux. */
 	let dernierTexteEcritParLapp = "";
+	/* LE PARTAGE (voir `./partage.ts`). Le rendu fournit un nom et des
+	   octets, tous deux vérifiés ici ; jamais un chemin. */
+	ipcMain.handle(CANAUX.partageEnregistrer, async (_e, nom: unknown, octets: unknown) => {
+		const propre = nomPartage(nom);
+		const contenu = octetsPartage(octets);
+		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
+		const ext = path.extname(propre).slice(1).toLowerCase();
+		const options = {
+			defaultPath: path.join(app.getPath("downloads"), propre),
+			filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+		};
+		const fenetre = deps.fenetreCourante();
+		const choix = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options);
+		if (choix.canceled || !choix.filePath) return null;
+		/* L'extension est IMPOSÉE : l'emplacement est à l'utilisateur, la
+		   nature du fichier non. Sans ça, des octets venus de la fenêtre
+		   pouvaient finir en `.bat` d'une simple frappe dans le dialogue. */
+		const dest = path.extname(choix.filePath).toLowerCase() === "." + ext ? choix.filePath : `${choix.filePath}.${ext}`;
+		await fsp.writeFile(dest, contenu);
+		shell.showItemInFolder(dest);
+		return dest;
+	});
+
+	ipcMain.handle(CANAUX.partageDiscord, async (_e, nom: unknown, octets: unknown) => {
+		const propre = nomPartage(nom);
+		const contenu = octetsPartage(octets);
+		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
+		// Le presse-papiers de FICHIERS et le script ne valent que sous Windows.
+		if (process.platform !== "win32") return false;
+		return lancerDiscord(await ecrireTemporaire(propre, contenu));
+	});
+
 	ipcMain.handle(CANAUX.systemeCopierTexte, (_e, texte: unknown) => {
 		if (typeof texte !== "string" || texte.length > 524288) throw new Error("copie refusée : le presse-papiers ne prend qu'un texte borné");
 		dernierTexteEcritParLapp = texte;

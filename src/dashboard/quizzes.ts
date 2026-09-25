@@ -308,6 +308,22 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			}
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
 
+			/* « Partager » le dossier (2026-09-25, comme StudySmarter) : le même
+			   modal que l'entrée « Partager » du menu ⋯ de sa carte, sur les
+			   mêmes quiz que la grille. Absent si l'hôte ne sait pas partager. */
+			const { shareQuiz } = ctx;
+			if (shareQuiz && inModule.length > 0) {
+				const partager = ajouter(headerActions, "button", "qbd-folder-share-btn");
+				partager.type = "button";
+				currentHost().ui.setIcon(ajouter(partager, "span", "qbd-btn-icon"), "share-2");
+				ajouter(partager, "span", undefined, t("dashboard.quizzes.menuShare"));
+				const nom = openModuleInfo?.name || openModuleFolder;
+				partager.addEventListener("click", () => shareQuiz({ group: {
+					folder: openModuleFolder as string, name: nom, ue: null, path: cheminOuvert,
+					quizzes: inModule, total: inModule.length, mastered: 0,
+				} }));
+			}
+
 			/* LE SAS : « Générer », et non « Nouveau quiz » (demande d'Ahmed,
 			   2026-09-20). La génération est la SEULE façon dont un quiz arrive
 			   ici : les deux autres options du modal — vierge, import — écrivent
