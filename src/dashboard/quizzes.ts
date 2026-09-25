@@ -269,8 +269,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			const header = ajouter(headerParent, "div", "qbd-quizzes-header");
 			back.type = "button";
 			back.setAttribute("aria-label", t("dashboard.quizzes.backToModules"));
-			const backIcon = ajouter(back, "span", "qbd-quizzes-crumb-icon");
-			currentHost().ui.setIcon(backIcon, "arrow-left");
+			// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+			ajouter(back, "span", "qbd-quizzes-crumb-icon");
 			back.addEventListener("click", () => {
 				ctx.recordNav();
 				openModuleFolder = null;
@@ -285,6 +285,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			const titleIcon = ajouter(titleEl, "span", "qbd-quizzes-title-icon");
 			currentHost().ui.setIcon(titleIcon, moduleIcon(openModuleInfo ?? {}, { generated: sas }));
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
+			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 
 			// ── Action du header : la pilule « Nouveau quiz », à droite. Plus de
 			// compteurs « N quiz | N maîtrisés » (2026-09-25) : le nombre de

@@ -107,7 +107,8 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	const back = ajouter(side, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
 	back.type = "button";
 	back.setAttribute("aria-label", t("dashboard.quiz.back"));
-	icone(back, "arrow-left", "qbd-quizzes-crumb-icon");
+	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+	ajouter(back, "span", "qbd-quizzes-crumb-icon");
 	back.addEventListener("click", () => deps.onBack());
 
 	// Le DOSSIER du quiz, au-dessus du titre — le seul segment du chemin qui

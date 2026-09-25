@@ -732,16 +732,17 @@
 	transition: background 0.14s ease, color 0.14s ease;
 }
 
+/* La flèche de retour (2026-09-25) : un SVG de MASQUE, peint à la couleur du
+   texte du bouton (currentColor) — il suit donc le repos, le survol et le
+   thème sans une variante de plus. Un seul dessin pour tous les boutons
+   retour du dashboard. */
 .qbd-quizzes-crumb-icon {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.qbd-quizzes-crumb-icon svg {
+	display: block;
 	width: 21px;
 	height: 21px;
-	stroke-width: 1.7;
+	background-color: currentColor;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 5L4 12L11 19M4 12H21' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 5L4 12L11 19M4 12H21' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* Dans un dossier, la flèche est AU-DESSUS du titre (2026-09-25) : sur sa
@@ -777,6 +778,19 @@
 	white-space: nowrap;
 }
 
+/* Trait 7a sous le titre, à l'accent du dossier : les 61 px correspondent
+   exactement à l'icône 46 px + gap 15 px. */
+.qbd-quizzes-title-underline {
+	margin-top: 13px;
+	margin-left: 61px;
+	width: 200px;
+	max-width: calc(100% - 61px);
+	height: 3px;
+	border-radius: 2px;
+	background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 5%, transparent));
+	box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
 
 
 .qbd-quizzes-folder-hero .qbd-quizzes-header {
@@ -793,7 +807,8 @@
 	font-variant-numeric: lining-nums;
 	color: var(--text-normal);
 	letter-spacing: -0.01em;
-	text-shadow: 0 2px 22px rgba(0, 0, 0, 0.65);
+	/* Plus d'ombre portée : sur le fond d'écran, ses 22 px de flou dessinaient
+	   une tache sombre derrière le titre (2026-09-25). */
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg {
@@ -802,6 +817,10 @@
 	color: var(--accent);
 	stroke: var(--accent);
 	stroke-width: 1.5;
+	/* Une lueur sur l'ICÔNE seule, la seule surface qui porte la couleur du
+	   dossier (2026-09-25) : deux ombres, une serrée et une large, douces. */
+	filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent))
+		drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 25%, transparent));
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg > :first-child {

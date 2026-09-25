@@ -71,8 +71,8 @@ export async function openQuizPage(
 	   traductions du même mot, qui divergeraient à la première retouche. */
 	retour.setAttribute("aria-label", t("dashboard.quiz.back"));
 	retour.title = t("dashboard.quiz.back");
-	// Icône LUCIDE par l'hôte, jamais d'emoji : même silhouette que le greffon.
-	currentHost().ui.setIcon(ajouter(retour, "span", "qbd-quizzes-crumb-icon"), "arrow-left");
+	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+	ajouter(retour, "span", "qbd-quizzes-crumb-icon");
 	retour.addEventListener("click", () => onBack());
 
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");

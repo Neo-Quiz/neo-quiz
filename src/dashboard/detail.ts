@@ -383,8 +383,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const back = ajouter(header, "button", "qbd-quizzes-crumb-back qbd-qz-back");
 		back.type = "button";
 		back.setAttribute("aria-label", t("dashboard.quiz.back"));
-		const backIcon = ajouter(back, "span", "qbd-quizzes-crumb-icon");
-		currentHost().ui.setIcon(backIcon, "arrow-left");
+		// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+		ajouter(back, "span", "qbd-quizzes-crumb-icon");
 		back.addEventListener("click", () => {
 			void flushSave();
 			spec.onBack();
