@@ -1,4 +1,5 @@
 import { currentHost, requireHost } from "../host/current";
+import { placerIndicateur } from "./seg-indic";
 import { ajouter } from "../dom";
 import { currentLang, t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -33,12 +34,44 @@ export interface FolderSectionsDeps {
 	rerender: () => void;
 }
 
+/* L'onglet ouvert de chaque dossier, gardé pendant la session : repeindre la
+   page (ajout d'un fichier, retour d'un quiz) ne doit pas ramener à
+   « Documents » celui qui regardait ses notes. */
+const ongletParDossier = new Map<string, number>();
+
 export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDeps): void {
+	/* UNE tuile pour les trois (2026-09-25) : Documents, Liens et Notes en
+	   ONGLETS, dans la même matière que les cartes de quiz mais bordée de
+	   POINTILLÉS — la zone des ressources se distingue sans changer de
+	   texture. Un état vide ne s'affiche plus que si l'on ouvre son onglet. */
 	const wrap = ajouter(parent, "div", "qbd-folder-sections");
 	const estQuiz = (path: string): boolean => !!deps.ctx.scanner.getQuiz(path);
 	void lireContenuDossier(deps.folder, estQuiz).then(contenu => {
 		if (!wrap.isConnected) return;
-		renderSection(wrap, deps, {
+		const onglets = ajouter(wrap, "div", "qbd-folder-tabs");
+		onglets.setAttribute("role", "tablist");
+		const indic = ajouter(onglets, "div", "qbd-folder-tabs-indic");
+		const sections: HTMLElement[] = [];
+		const boutons: HTMLElement[] = [];
+		const montrer = (i: number, anime: boolean): void => {
+			ongletParDossier.set(deps.folder, i);
+			sections.forEach((sec, k) => { sec.hidden = k !== i; });
+			boutons.forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+			placerIndicateur(indic, boutons[i], anime);
+		};
+		const ajouterSection = (spec: SectionSpec): void => {
+			const i = sections.length;
+			const b = ajouter(onglets, "button", "qbd-folder-tab");
+			b.type = "button";
+			b.setAttribute("role", "tab");
+			currentHost().ui.setIcon(ajouter(b, "span", "qbd-folder-tab-icon"), spec.icon);
+			ajouter(b, "span", undefined, t(spec.title));
+			ajouter(b, "span", "qbd-folder-tab-count", String(spec.count));
+			b.addEventListener("click", () => montrer(i, true));
+			boutons.push(b);
+			sections.push(renderSection(wrap, deps, spec));
+		};
+		ajouterSection({
 			icon: "file-text", title: "dashboard.folder.documents", count: contenu.documents.length,
 			emptyTitle: "dashboard.folder.documentsEmptyTitle", emptyHint: "dashboard.folder.documentsEmptyHint",
 			action: { icon: "upload", label: "dashboard.folder.addFiles", onClick: () => void ajouterDesFichiers(deps, choisirFichiers()) },
@@ -52,7 +85,7 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
 			})),
 		});
-		renderSection(wrap, deps, {
+		ajouterSection({
 			icon: "link", title: "dashboard.folder.links", count: contenu.liens.length,
 			emptyTitle: "dashboard.folder.linksEmptyTitle", emptyHint: "dashboard.folder.linksEmptyHint",
 			action: { icon: "plus", label: "dashboard.folder.addLink", onClick: () => ouvrirModalLien(deps) },
@@ -62,7 +95,7 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => confirmerPuis(t("dashboard.folder.deleteLinkTitle", { name: l.title }), t("dashboard.folder.deleteLinkMessage"), () => retirerLeLien(deps, l)),
 			})),
 		});
-		renderSection(wrap, deps, {
+		ajouterSection({
 			icon: "sticky-note", title: "dashboard.folder.notes", count: contenu.notes.length,
 			emptyTitle: "dashboard.folder.notesEmptyTitle", emptyHint: "dashboard.folder.notesEmptyHint",
 			action: { icon: "pen-line", label: "dashboard.folder.createNote", onClick: () => void creerUneNote(deps) },
@@ -72,6 +105,8 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
 			})),
 		});
+		// Mesuré au prochain cadre : les onglets doivent être posés.
+		requestAnimationFrame(() => montrer(ongletParDossier.get(deps.folder) ?? 0, false));
 	});
 }
 
@@ -90,7 +125,7 @@ interface SectionSpec {
 	items: { icon: string; label: string; meta: string; thumb?: string | null; onOpen: () => void; onDelete: () => void }[];
 }
 
-function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): void {
+function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): HTMLElement {
 	const host = currentHost();
 	/* UNE zone par section (retour Ahmed 2026-09-17, à l'écran) : le panneau
 	   contient tout — l'en-tête, la liste ou l'état vide, ET le bouton, dans
@@ -98,11 +133,7 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 	   séparée : deux objets pour une section, et une pilule qui n'était pas
 	   celle de l'application. Même surface que le panneau « Progrès ». */
 	const section = ajouter(parent, "section", "qbd-folder-section" + (spec.items.length === 0 ? " qbd-folder-section--vide" : ""));
-	const head = ajouter(section, "div", "qbd-folder-section-head");
-	const titre = ajouter(head, "div", "qbd-folder-section-title");
-	host.ui.setIcon(ajouter(titre, "span", "qbd-folder-section-icon"), spec.icon);
-	ajouter(titre, "span", undefined, t(spec.title));
-	ajouter(head, "span", "qbd-folder-section-count", String(spec.count));
+	// Plus d'en-tête dans la section : son titre et son compteur sont l'ONGLET.
 
 	if (spec.items.length === 0) {
 		const vide = ajouter(section, "div", "qbd-folder-empty");
@@ -160,6 +191,7 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 	host.ui.setIcon(ajouter(b, "span", "qbd-folder-section-action-icon"), spec.action.icon);
 	ajouter(b, "span", undefined, t(spec.action.label));
 	b.addEventListener("click", spec.action.onClick);
+	return section;
 }
 
 /* ── Documents ── */

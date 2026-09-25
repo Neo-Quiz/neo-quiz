@@ -26,61 +26,107 @@
 	color: var(--text-faint);
 }
 
+/* ── LA TUILE DES RESSOURCES (2026-09-25) ──
+   Documents, Liens et Notes en onglets dans UNE tuile : la même matière que
+   les cartes de quiz (le verre), mais bordée de POINTILLÉS — la zone des
+   ressources se distingue sans changer de texture. Les sections ne sont plus
+   des panneaux : ce sont les pages de cette tuile. */
 .qbd-folder-sections {
-	display: flex;
-	flex-direction: column;
-	gap: 16px;
-}
-
-/* ── Le panneau ── */
-.qbd-folder-section {
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
-	padding: 18px 22px 16px;
 	min-width: 0;
+	padding: 10px 22px 16px;
 	border-radius: 18px;
-	border: 1px solid var(--qbd-glass-edge);
+	border: 1px dashed color-mix(in srgb, var(--text-normal) 24%, transparent);
 	background: var(--qbd-glass-bg);
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
 }
 
-.qbd-folder-section-head {
+/* Les onglets, avec le bloc qui glisse (`seg-indic.ts`). */
+.qbd-folder-tabs {
+	position: relative;
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 8px;
+	gap: 2px;
+	padding: 6px 0 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.qbd-folder-section-title {
-	display: flex;
+.qbd-folder-tabs-indic {
+	position: absolute;
+	left: 0;
+	top: 6px;
+	bottom: 10px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--text-normal) 9%, transparent);
+	transform-origin: left center;
+	pointer-events: none;
+}
+
+.qbd-root .qbd-folder-tab {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
 	align-items: center;
-	gap: 8px;
-	font-size: 15px;
-	font-weight: 700;
+	gap: 7px;
+	height: auto;
+	margin: 0;
+	padding: 6px 12px;
+	border: 0;
+	border-radius: 8px;
+	background: none;
+	box-shadow: none;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 160ms ease;
+}
+
+.qbd-root .qbd-folder-tab:hover,
+.qbd-root .qbd-folder-tab[aria-selected="true"] {
 	color: var(--text-normal);
 }
 
-.qbd-folder-section-icon {
+.qbd-root .qbd-folder-tab:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.qbd-folder-tab-icon {
 	display: inline-flex;
+}
+
+.qbd-folder-tab-icon svg {
+	width: 15px;
+	height: 15px;
+}
+
+.qbd-folder-tab-count {
+	padding: 0 6px;
+	border-radius: 999px;
+	font-size: 11.5px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	color: var(--text-muted);
 }
 
-.qbd-folder-section-icon svg {
-	width: 16px;
-	height: 16px;
+/* Une section = une page de la tuile, sans cadre à elle. */
+.qbd-folder-section {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
 }
 
-/* Le compteur : la même typographie que « 0/3 quiz » du panneau Progrès. */
-.qbd-folder-section-count {
-	font-family: var(--font-monospace, monospace);
-	font-size: 11px;
-	color: var(--text-faint);
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
+.qbd-folder-section[hidden] {
+	display: none;
 }
 
 /* ── L'état vide : deux lignes, à gauche, sans boîte dans la boîte ── */
@@ -342,14 +388,11 @@
 .qbd-folder-section--vide {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
-	grid-template-areas:
-		"head head"
-		"vide foot";
+	grid-template-areas: "vide foot";
 	align-items: center;
 	column-gap: 16px;
 }
 
-.qbd-folder-section--vide .qbd-folder-section-head { grid-area: head; }
 .qbd-folder-section--vide .qbd-folder-empty { grid-area: vide; }
 .qbd-folder-section--vide .qbd-folder-section-foot { grid-area: foot; padding-top: 0; }
 
@@ -357,7 +400,6 @@
 	.qbd-folder-section--vide {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-areas:
-			"head"
 			"vide"
 			"foot";
 	}
