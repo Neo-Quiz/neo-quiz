@@ -31,5 +31,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		composerPrompts("x", { mode: "practice", planTranches: plan }).userPrompt.includes("1. Types\n2. Listes"), true);
 	r.check("Learn : le plan des tranches est ignoré",
 		composerPrompts("x", { mode: "learn", planTranches: plan }).userPrompt.includes("Listes"), false);
+	r.check("la carte mémoire est décrite en Learn, jamais en Practice",
+		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes('"flashcard": true')), [true, false]);
+	r.check("Learn : une carte seulement pour une réponse courte",
+		composerPrompts("x", { mode: "learn" }).systemPrompt.includes("ONLY when the answer fits in one sentence, one formula or one line of code"), true);
 	r.done();
 });

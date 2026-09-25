@@ -23,7 +23,7 @@ export type ModeQuiz = "learn" | "practice";
     le contrôle à l'arrivée exige mais que le prompt tait n'est jamais produit
     (test du 2026-09-23 : `explain` absent du prompt, aucune explication). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
-	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"'],
+	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 
