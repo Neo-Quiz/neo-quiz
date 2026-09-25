@@ -698,9 +698,10 @@
 
 .qbd-quiz-card--folder .qbd-quiz-card-title {
 	margin: 0;
-	/* 14.5px : 17.5px lisait trop gros sur une grille 3 colonnes (retour
-	   Ahmed 2026-07-20), les titres longs mangeaient la carte. */
-	font-size: 14.5px;
+	/* 13.5px : 17.5px puis 14.5px lisaient trop gros sur une grille 3
+	   colonnes (retours 2026-07-20 et 2026-09-25), à côté de l'anneau les
+	   titres longs passaient sur trois lignes. */
+	font-size: 13.5px;
 	font-weight: 650;
 	line-height: 1.28;
 	letter-spacing: -0.01em;
