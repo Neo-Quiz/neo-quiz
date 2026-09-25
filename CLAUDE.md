@@ -171,6 +171,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   seuls variables) ; `--dangerously-skip-permissions`, `--mcp-config` ou un
   bac à sable ouvert sont refusés. **Ajouter une option à un appel de CLI du
   rendu exige de l'ajouter à ce gabarit.** Dans la CI.
+- `npm run check:session` — la PHOTO DE SESSION d'un quiz (`src/engine/session.ts`),
+  pour reprendre là où on s'était arrêté : aller-retour de chaque type de
+  question, quiz modifié entre deux sessions (question supprimée, ajoutée,
+  options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
+  s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

@@ -111,6 +111,11 @@ jobs:
       - name: Share names and script quoting
         run: npm run check:partage
 
+      # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
+      # perdre de réponses, même si le quiz a changé entre deux sessions.
+      - name: Quiz session snapshot
+        run: npm run check:session
+
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à
       # l'écran. Ce contrôle charge le noyau réellement appelé par l'installeur.
