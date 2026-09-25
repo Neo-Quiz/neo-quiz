@@ -10,7 +10,6 @@ import { parseZip } from "./zip";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
-import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
 /* ══════════════════════════════════════════════════════════
    CREATE FOLDER — modal « Créer un dossier » calqué sur StudySmarter
@@ -76,43 +75,6 @@ export function openCreateFolderModal(
 			}
 			createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
 				() => void importSharedFolder(ctx, map, quizzes, onDone));
-		},
-	});
-}
-
-/** « Nouveau quiz » (drill-down d'un dossier) — MÊME modal à trois options que
-    « Créer un dossier » (demande d'homogénéité Ahmed, capture 2026-07-19),
-    décliné au niveau quiz : IA / quiz vierge dans CE dossier / import d'un
-    quiz reçu dans CE dossier. */
-export function openCreateQuizModal(
-	ctx: DashboardShellCtx,
-	folder: string,
-	onDone: () => void
-): void {
-	requireHost("modals").open({
-		className: "qbd-create-modal",
-		title: t("dashboard.quizzes.createQuizTitle"),
-		onOpen: (m) => {
-			const c = m.contentEl;
-			// Même garde, même raison qu'`openCreateFolderModal` ci-dessus.
-			if (ctx.canOpen("ai")) {
-				/* DEPUIS UN DOSSIER (2026-09-17) : la page « Générer » arrive avec
-				   ce dossier en destination et ses documents et notes déjà joints
-				   (`NavigateData.aiPreset`). Le contenu se lit d'abord — `listDir`
-				   est asynchrone —, la navigation suit. Un dossier illisible rend
-				   trois listes vides, et on navigue quand même : la destination,
-				   elle, reste juste. */
-				createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.quizzes.createAiTitle"), t("dashboard.quizzes.createAiDescFolder"),
-					() => {
-						void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
-							ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu) } });
-						});
-					});
-			}
-			createOptionCard(m, c, "file-plus", "#4573ff", t("dashboard.quizzes.createQuizEmptyTitle"), t("dashboard.quizzes.createQuizEmptyDesc"),
-				() => void createQuizInFolder(ctx, folder));
-			createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createQuizImportTitle"), t("dashboard.quizzes.createQuizImportDesc"),
-				() => void importQuizIntoFolder(ctx, folder, onDone));
 		},
 	});
 }

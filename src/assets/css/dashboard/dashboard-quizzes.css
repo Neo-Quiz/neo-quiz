@@ -967,18 +967,57 @@
 	outline-offset: 1px;
 }
 
-/* ── L'étape suivante : un bouton scindé au-dessus de la grille. ── */
+/* ── Au-dessus de la grille : « Ajouter du contenu » et l'étape suivante,
+   à parts égales (d'après StudySmarter). ── */
 .qbd-quizzes-drill-next {
-	margin-bottom: 16px;
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(0, 1fr);
+	gap: 14px;
+	margin-bottom: 18px;
 	animation-delay: 60ms;
 }
 
-.qbd-next-step {
+.qbd-root .qbd-add-content-btn {
 	display: inline-flex;
-	max-width: 100%;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: auto;
+	margin: 0;
+	padding: 11px 16px;
 	border-radius: 11px;
-	background: var(--qbd-state-progress);
-	box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--qbd-state-progress) 80%, transparent);
+	border: 1px solid var(--qbd-glass-edge);
+	background: var(--qbd-glass-bg);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.qbd-root .qbd-add-content-btn:hover {
+	border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+}
+
+.qbd-root .qbd-add-content-btn:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.qbd-add-content-btn .qbd-btn-icon svg { width: 16px; height: 16px; }
+
+/* L'étape suivante : la pilule claire de l'action principale de l'app. */
+.qbd-next-step {
+	display: flex;
+	min-width: 0;
+	border-radius: 11px;
+	background: rgba(231, 235, 247, 0.92);
+	color: #141a2c;
 }
 
 .qbd-root .qbd-next-step-main,
@@ -990,24 +1029,26 @@
 	border: 0;
 	background: none;
 	box-shadow: none;
-	color: #fff;
+	color: #141a2c;
 	font: inherit;
 	cursor: pointer;
 	transition: background-color 0.15s ease;
 }
 
 .qbd-root .qbd-next-step-main {
+	flex: 1;
+	justify-content: center;
 	gap: 8px;
 	min-width: 0;
-	padding: 10px 16px;
+	padding: 11px 16px;
 	border-radius: 11px;
 	font-size: 14px;
 }
 
 .qbd-root .qbd-next-step-caret {
-	padding: 10px 11px;
+	padding: 11px 13px;
 	border-radius: 0 11px 11px 0;
-	border-left: 1px solid rgba(255, 255, 255, 0.28);
+	border-left: 1px solid rgba(20, 26, 44, 0.16);
 }
 
 .qbd-root .qbd-next-step-main:has(+ .qbd-next-step-caret) {
@@ -1017,12 +1058,12 @@
 .qbd-root .qbd-next-step-main:hover,
 .qbd-root .qbd-next-step-caret:hover,
 .qbd-root .qbd-next-step-caret[aria-expanded="true"] {
-	background: rgba(255, 255, 255, 0.12);
+	background: rgba(20, 26, 44, 0.07);
 }
 
 .qbd-root .qbd-next-step-main:focus-visible,
 .qbd-root .qbd-next-step-caret:focus-visible {
-	outline: 2px solid #fff;
+	outline: 2px solid var(--interactive-accent);
 	outline-offset: -3px;
 }
 

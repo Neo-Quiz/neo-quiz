@@ -210,7 +210,7 @@ function extensionAffichee(nom: string): string {
 /** Copie les fichiers choisis DANS le dossier : `<input type=file>` (le même
     geste que l'import d'un dossier partagé, folder-create.ts), puis
     `writeBinary` sous un nom libre — deux « CM1.pdf » ne s'écrasent pas. */
-async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[]>): Promise<void> {
+export async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[]>): Promise<void> {
 	const fichiers = await choix;
 	if (fichiers.length === 0) return;
 	const host = currentHost();
@@ -232,7 +232,7 @@ async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[
 	}
 }
 
-function choisirFichiers(): Promise<File[]> {
+export function choisirFichiers(): Promise<File[]> {
 	return new Promise((resolve) => {
 		const input = document.createElement("input");
 		input.type = "file";
@@ -288,7 +288,7 @@ async function ouvrirFichier(deps: FolderSectionsDeps, e: DirEntry): Promise<voi
 
 /** Une note vierge dans le dossier, puis ouverte avec l'application du
     système : l'application n'a pas d'éditeur de notes, Obsidian en est un. */
-async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
+export async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
 	const host = currentHost();
 	try {
 		const path = await freeNotePath(deps.folder, t("dashboard.folder.newNoteDefaultName"));
@@ -305,7 +305,7 @@ async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
     et `dragleave` se déclenchent aussi en passant d'un ENFANT du panneau à un
     autre — d'où le compteur, sans lequel le liseré clignoterait à chaque
     rangée traversée. */
-function brancherDepot(section: HTMLElement, onDrop: (fichiers: File[]) => void): void {
+export function brancherDepot(section: HTMLElement, onDrop: (fichiers: File[]) => void): void {
 	let profondeur = 0;
 	section.addEventListener("dragenter", (e) => {
 		if (!e.dataTransfer?.types.includes("Files")) return;
@@ -391,7 +391,7 @@ async function ouvrirNote(deps: FolderSectionsDeps, e: DirEntry): Promise<void> 
 
 /* ── Liens ── */
 
-function ouvrirModalLien(deps: FolderSectionsDeps): void {
+export function ouvrirModalLien(deps: FolderSectionsDeps): void {
 	let url = "";
 	let titre = "";
 	requireHost("modals").open({

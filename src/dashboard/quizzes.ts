@@ -296,9 +296,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
 			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 
-			// ── Action du header : la pilule « Nouveau quiz », à droite. Plus de
-			// compteurs « N quiz | N maîtrisés » (2026-09-25) : le nombre de
-			// quiz est dans le panneau « Progrès », qui dit aussi les maîtrisés.
+			// ── À droite : Contenu | Progression. Plus de compteurs ni de
+			// « Nouveau quiz » (2026-09-25) : les chiffres sont dans l'onglet
+			// Progression, et « Ajouter du contenu » est à côté de l'étape
+			// suivante, au-dessus de la grille (quizzes-render.ts).
 			if (!sas) {
 				renderOngletsDossier(header, ongletDossier, (onglet) => {
 					ongletDossier = onglet;
@@ -307,13 +308,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			}
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
 
-			// Drill-down : créer un dossier ICI n'a pas de sens (demande Ahmed
-			// 2026-07-19) → une seule pilule « Nouveau quiz », qui ouvre le MÊME
-			// modal à trois options que « Nouveau dossier » (IA / vierge /
-			// import), décliné pour le dossier OUVERT — homogénéité demandée.
-			// Absente côté application (modals = tranche 2.6, D5) : le bouton
-			// est alors MASQUÉ, pas grisé (Ruling 7 — un bouton d'action absent
-			// ne déroute personne, contrairement au rail de navigation).
 			/* LE SAS : « Générer », et non « Nouveau quiz » (demande d'Ahmed,
 			   2026-09-20). La génération est la SEULE façon dont un quiz arrive
 			   ici : les deux autres options du modal — vierge, import — écrivent
@@ -330,28 +324,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 					ajouter(genBtn, "span", undefined, t("dashboard.nav.generate"));
 					genBtn.addEventListener("click", () => ctx.navigate("ai"));
 				}
-			} else if (ctx.createQuiz) {
-				/* LE CHEMIN RÉEL, jamais le segment (correctif 2026-09-17) :
-				   `openModuleFolder` est une CLÉ de module (« Generated »), et
-				   l'écriture veut un chemin du contrat (« Neo Quiz/Generated »).
-				   Passer le segment faisait échouer « Nouveau quiz » dans TOUT
-				   dossier qui n'était pas posé à la racine d'un dossier ouvert —
-				   `fs.write` rendait « chemin hors des dossiers ouverts », et
-				   l'utilisateur ne voyait qu'un « Impossible de créer le quiz ».
-				   Le défaut est né avec l'application : sous Obsidian, les
-				   chemins sont relatifs au vault, donc le segment y suffisait.
-				   Ordre : la déclaration, sinon le chemin déduit d'un quiz du
-				   dossier, sinon le segment (comportement d'avant). */
-				const folder = cheminOuvert ?? openModuleFolder;
-				// Le reflet qui défile, comme « Commencer le quiz » (2026-09-25).
-				const newQuizBtn = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--shine");
-				const newQuizIcon = ajouter(newQuizBtn, "span", "qbd-btn-icon");
-				currentHost().ui.setIcon(newQuizIcon, "plus");
-				ajouter(newQuizBtn, "span", undefined, t("dashboard.quizzes.newQuiz"));
-				ajouter(newQuizBtn, "span", "qbd-btn-shine").setAttribute("aria-hidden", "true");
-				newQuizBtn.addEventListener("click", () => {
-					ctx.createQuiz!(folder, () => { if (containerRef) render(containerRef); });
-				});
 			}
 		}
 

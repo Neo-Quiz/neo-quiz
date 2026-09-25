@@ -1,4 +1,5 @@
 import { ajouter } from "../dom";
+import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
@@ -240,12 +241,26 @@ export function renderModuleDrill(
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
 	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
+	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
+	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
+	   la génération (son bouton « Générer » est dans l'en-tête). */
 	if (!sas) {
+		const rangee = ajouter(principal, "div", "qbd-quizzes-drill-next");
+		principal.insertBefore(rangee, grid);
+		if (ctx.createQuiz) {
+			const ajout = ajouter(rangee, "button", "qbd-add-content-btn");
+			ajout.type = "button";
+			currentHost().ui.setIcon(ajouter(ajout, "span", "qbd-btn-icon"), "plus");
+			ajouter(ajout, "span", undefined, t("dashboard.folder.addContent"));
+			/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture veut un
+			   chemin du contrat (correctif 2026-09-17, cf. quizzes.ts). */
+			const dossier = cheminOuvert ?? openModuleFolder;
+			ajout.addEventListener("click", () => ctx.createQuiz!(dossier, rerender));
+		}
 		const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
-		const prochaine = ajouter(principal, "div", "qbd-quizzes-drill-next");
-		renderNextStep(prochaine, ctx, ordre, stats);
-		principal.insertBefore(prochaine, grid);
-		if (!prochaine.firstChild) prochaine.remove();
+		renderNextStep(rangee, ctx, ordre, stats);
+		if (!rangee.firstChild) rangee.remove();
 	}
 	for (const [index, { quiz, frere }] of cartes.entries()) {
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {

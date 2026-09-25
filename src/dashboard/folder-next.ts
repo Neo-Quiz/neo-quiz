@@ -27,7 +27,9 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 	const learn = aFaire.find(q => q.mode === "learn");
 	const practice = aFaire.find(q => q.mode === "practice");
 
-	const split = ajouter(parent, "div", "qbd-next-step");
+	// Le reflet qui défile de l'action principale (« Commencer le quiz »).
+	const split = ajouter(parent, "div", "qbd-next-step qbd-btn--shine");
+	ajouter(split, "span", "qbd-btn-shine").setAttribute("aria-hidden", "true");
 	const main = ajouter(split, "button", "qbd-next-step-main");
 	main.type = "button";
 	main.title = t(suivant.mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp");
