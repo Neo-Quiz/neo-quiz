@@ -15,7 +15,7 @@ import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./deta
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
 import { renderExamPanel } from "./detail-exam";
-import { renderFiche } from "./detail-fiche";
+import { oublierFiche, renderFiche } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
@@ -297,6 +297,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// l'utilisateur. Lue AVANT que la clé ne soit notée, consommée aussitôt.
 		const arrivee = spec.key !== currentPath || !!spec.ouverture;
 		spec.ouverture = false;
+		// Une arrivée repart d'une fiche vierge : ni recherche, ni question
+		// choisie laissées par la visite précédente du même quiz.
+		if (arrivee) oublierFiche();
 		if (spec.key !== currentPath) {
 			// Le quiz précédent part MAINTENANT : sans ça, ouvrir un autre quiz
 			// dans les 600 ms du débounce perdait la dernière frappe. `void` :

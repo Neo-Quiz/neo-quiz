@@ -106,6 +106,15 @@ function reduit(): boolean {
 	return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Oublie la recherche et la question choisie : appelée par la page à
+    chaque ARRIVÉE (navigation), jamais à un repeint interne. Le fondu d'un
+    changement de mode, lui, doit survivre à l'arrivée sur l'autre quiz. */
+export function oublierFiche(): void {
+	etat.chemin = "";
+	etat.selection = 0;
+	etat.recherche = "";
+}
+
 export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 	if (etat.chemin !== deps.quiz.path) {
 		etat.chemin = deps.quiz.path;
@@ -428,7 +437,14 @@ function renderListe(body: HTMLElement, idx: number[], deps: FicheDeps, attirer:
 	}
 	rail.scrollTop = defile;
 	const courante = active;
-	if (courante) requestAnimationFrame(() => courante.scrollIntoView({ block: "nearest" }));
+	if (courante) {
+		/* Le repeint vient de retirer l'élément qui avait le focus (la ligne
+		   cliquée, la carte de la grille) : le focus est retombé sur le
+		   document, hors de la fiche, et ← → ne l'atteignaient plus. On le
+		   rend à la ligne choisie ; jamais volé à la recherche. */
+		if (!document.activeElement || document.activeElement === document.body) courante.focus({ preventScroll: true });
+		requestAnimationFrame(() => courante.scrollIntoView({ block: "nearest" }));
+	}
 
 	const detail = ajouter(split, "div", "qbd-fiche-detail");
 	const q = deps.questions[etat.selection];

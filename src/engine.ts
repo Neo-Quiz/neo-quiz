@@ -437,9 +437,13 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	/* La photo de session : prise après chaque réponse (`invalidateSavedResults`
 	   est appelé par TOUTE interaction), à chaque changement de question
 	   (state.ts) et à la destruction du moteur (un texte tapé sans quitter la
-	   question). Jamais en examen ; jamais hors d'une question. */
+	   question). Jamais en examen ; jamais hors d'une question. Un bloc
+	   d'EXAMEN d'origine (`isExamMode` à l'assemblage) n'est jamais
+	   photographié, même joué en « Apprendre » : il rouvre sur son écran de
+	   départ, qui effacerait la session — le « Reprendre » du dossier
+	   aurait promis une reprise que le moteur détruit. */
 	ctx.saveSession = () => {
-		if (!sessionSink || ctx.isExamMode || quizState.locked) return;
+		if (!sessionSink || isExamMode || ctx.isExamMode || quizState.locked) return;
 		const entree = slideMap[quizState.current];
 		if (!entree || entree.type !== "question") return;
 		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now());

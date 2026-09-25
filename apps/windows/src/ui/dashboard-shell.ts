@@ -237,8 +237,8 @@ export interface MonterDashboardDeps {
 	onOpenQuiz(entry: QuizIndexEntry): void;
 	onOpenSettings(): void;
 	/** Les sessions en cours (2026-09-26) : reprendre un quiz là où on
-	    s'était arrêté. Optionnel ici — c'est la tâche 4 qui en fait usage
-	    (`sessionOf`). */
+	    s'était arrêté. Lues par `sessionOf` (le « Reprendre » du dossier) ;
+	    absentes, pas de « Reprendre ». */
 	sessions?: SessionsApp;
 }
 

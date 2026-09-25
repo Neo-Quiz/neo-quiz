@@ -326,10 +326,11 @@ async function demarrer(): Promise<void> {
 		   s'était arrêté. À côté du journal et des stats, un troisième
 		   système distinct (voir `review/sessions.ts`). */
 		const sessions = await creerSessionsApp();
-		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Trois écrivains différés
+		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Quatre écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
-		   `stats` (même débounce, `dashboard/stats-store.ts`) et la page d'un
-		   quiz (600 ms, `dashboard/detail.ts`), tenue par l'écran courant.
+		   `stats` (même débounce, `dashboard/stats-store.ts`), la page d'un
+		   quiz (600 ms, `dashboard/detail.ts`), tenue par l'écran courant, et
+		   les sessions en cours (400 ms, `review/sessions.ts`, voir plus bas).
 		   Deux sorties, deux mécanismes, parce qu'aucun ne couvre les deux :
 
 		   1. FERMETURE DE LA FENÊTRE (croix, Alt+F4, barre des tâches) :
