@@ -21,6 +21,8 @@ import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
 import { creerStatsApp } from "./review/stats";
+import { creerSessionsApp } from "./review/sessions";
+import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
 import { chargerReglagesPages, monterDashboard, reprendre } from "./ui/dashboard-shell";
 import { chargerReprise } from "./ui/reprise";
@@ -128,7 +130,7 @@ function demonter(): Promise<void> | void {
 
 /* `document.createElement`, jamais les extensions DOM d'Obsidian (`createEl`,
    `createDiv`, `empty`) : elles n'existent pas dans la fenêtre de l'app. */
-export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore): void {
+export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp): void {
 	void demonter();
 	root.textContent = "";
 	demonterCourant = monterDashboard(root, {
@@ -138,8 +140,9 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		aiSettings: reglagesIa,
 		cheminDuContrat: (absolu) => carteCourante?.depuisAbsolu(absolu) ?? null,
 		cheminAbsolu: (contrat) => carteCourante?.absolu(contrat) ?? null,
-		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, entry); },
+		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); },
 		onOpenSettings: () => ouvrirReglages(),
+		sessions,
 	});
 }
 
@@ -208,7 +211,7 @@ function ouvrirReglages(): void {
  * démonterait rien deux fois. C'est aussi pourquoi la page fait elle-même son
  * `root.replaceChildren()` en entrée.
  */
-async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, entry: QuizIndexEntry): Promise<void> {
+async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
 	void demonter();
 	root.textContent = "";
 	/* Le démontage rendu par `openQuizPage` appelle `__quizDestroy` : sans lui,
@@ -219,8 +222,8 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	   `StatsStore` portent déjà exactement la FORME que `openQuizPage`
 	   attend — les envelopper dans un objet littéral n'ajouterait rien. */
 	demonterCourant = await openQuizPage(root, entry, () => {
-		mount(root, scanner, store, stats);
-	}, store, stats);
+		mount(root, scanner, store, stats, sessions);
+	}, store, stats, sessions);
 }
 
 async function demarrer(): Promise<void> {
@@ -319,6 +322,10 @@ async function demarrer(): Promise<void> {
 		   n'ont rien en commun, mélanger leur construction les lierait pour
 		   rien. */
 		const stats = await creerStatsApp();
+		/* LES SESSIONS en cours (2026-09-26) : reprendre un quiz là où on
+		   s'était arrêté. À côté du journal et des stats, un troisième
+		   système distinct (voir `review/sessions.ts`). */
+		const sessions = await creerSessionsApp();
 		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Trois écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
 		   `stats` (même débounce, `dashboard/stats-store.ts`) et la page d'un
@@ -358,6 +365,13 @@ async function demarrer(): Promise<void> {
 		   les appeler des deux côtés ne double aucune écriture. C'est le pendant
 		   du `this._reviewStore?.destroy()` de l'`onunload` du greffon. */
 		window.addEventListener("beforeunload", () => { store.destroy(); stats.destroy(); });
+		/* Les sessions ne portent pas de délai d'écriture symétrique aux deux
+		   autres (`destroy()`) : `vider()` écrit immédiatement, sans annuler de
+		   minuterie propre à un `destroy` — la page d'un quiz l'a déjà appelé à
+		   son démontage. Posé ici pour couvrir le cas restant : une frappe qui
+		   photographie la session juste avant une fermeture qui saute le
+		   démontage normal. */
+		window.addEventListener("beforeunload", () => { void sessions.vider(); });
 		await pont().fenetre.surFermeture(async () => {
 			try {
 				await demonter();
@@ -383,7 +397,7 @@ async function demarrer(): Promise<void> {
 		   ("home"), sans Notice : une note disparue n'est pas une erreur. */
 		const derniereVue = await chargerReprise();
 		if (derniereVue) reprendre(derniereVue, scanner);
-		mount(root, scanner, store, stats);
+		mount(root, scanner, store, stats, sessions);
 	} catch (e) {
 		root.textContent = t("app.error.startup", { error: e instanceof Error ? e.message : String(e) });
 	}

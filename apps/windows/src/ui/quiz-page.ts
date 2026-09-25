@@ -31,6 +31,7 @@ import { ajouter } from "../../../../src/dom";
 // et ce fichier ne doit tirer aucune implémentation de plus.
 import type { ReviewGrade } from "../../../../src/scheduler";
 import type { QuestionRole, StatsRecord } from "../../../../src/types/quiz";
+import type { SessionsApp } from "../review/sessions";
 
 
 /**
@@ -55,6 +56,10 @@ export async function openQuizPage(
 	   qui permet à `StatsStore` (obsidian.Plugin ou réglages de l'app) de
 	   servir les deux hôtes sans que le moteur sache lequel l'appelle. */
 	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown },
+	/* Les SESSIONS en cours (2026-09-26) : reprendre le quiz là où on
+	   s'était arrêté. Optionnel comme les deux puits ci-dessus, pour les
+	   mêmes raisons. */
+	sessions?: SessionsApp,
 ): Promise<() => void> {
 	root.replaceChildren();
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
@@ -153,6 +158,7 @@ export async function openQuizPage(
 			   §9.1, « deux systèmes distincts, à ne pas fusionner »). */
 			statsSink,
 			reviewSink,
+			sessionSink: sessions?.puits(entry.path),
 		});
 	} catch (e) {
 		hote.replaceChildren();
@@ -188,6 +194,10 @@ export async function openQuizPage(
 			// traduit pas (il s'adresse au développeur, pas à l'apprenant).
 			console.warn(LOG_PREFIX + " destruction du quiz incomplète", e);
 		}
+		// APRÈS la destruction du moteur : elle a déjà appelé `enregistrer` sur
+		// le puits (sauvegarde de sortie) ; `vider()` écrit immédiatement au lieu
+		// d'attendre le délai de garde de 400 ms.
+		void sessions?.vider();
 		root.replaceChildren();
 	};
 }

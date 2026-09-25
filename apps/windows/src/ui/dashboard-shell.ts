@@ -59,6 +59,7 @@ import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import type { DerniereVue } from "./reprise";
+import type { SessionsApp } from "../review/sessions";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES DES PAGES « ACCUEIL » / « MES QUIZ »
@@ -235,6 +236,10 @@ export interface MonterDashboardDeps {
 	cheminAbsolu(contrat: string): string | null;
 	onOpenQuiz(entry: QuizIndexEntry): void;
 	onOpenSettings(): void;
+	/** Les sessions en cours (2026-09-26) : reprendre un quiz là où on
+	    s'était arrêté. Optionnel ici — c'est la tâche 4 qui en fait usage
+	    (`sessionOf`). */
+	sessions?: SessionsApp;
 }
 
 /**
