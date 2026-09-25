@@ -21,6 +21,7 @@ release notes.
 - Flashcards: a Learn recall can be a card that you flip, then rate "Review again" or "I knew it" (Space or Enter flips, 1 and 2 rate); your rating counts in spaced review. The editor has a Flashcard type, and a course page shows a cards icon for a quiz made only of flashcards.
 
 ### Changed
+- Start the quiz, on a course page, is a blue button raised above its edge that sinks when clicked, with a light that sweeps across it every few seconds.
 - The previous and next arrows of a question, its main green buttons (Check, Flip, Show score, Try again) and the question tabs (Q1, Q2… Results) are buttons you press down: a darker edge under them, and they sink when clicked.
 - In a Learn, moving on from a question asked before the lesson without answering it counts as "I don't know" instead of stopping you with a message.
 - The Learn and the Practice of a same course show as one card on My quizzes and on the home page. Every quiz card now shows its title and total number of questions, a progress ring with its percentage (blue in progress, green mastered), and one pill per mode that starts that mode; hovering a pill gives its number of questions. The status badge and the buttons inside the card are gone. A setting keeps Learn and Practice apart, and cards inside a folder no longer repeat the folder name.

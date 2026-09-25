@@ -238,14 +238,17 @@
 
 /* Le reflet qui défile est celui de tout bouton `qbd-btn--shine`
    (dashboard-components.css). */
+/* « Commencer le quiz » : le bouton 3D (.qbd-cta3d, dashboard-components.css),
+   à la taille de la colonne. */
 .qbd-root .qbd-fiche-start {
-	margin-top: 4px;
-	height: 46px;
+	margin-top: calc(4px + var(--qbd-cta3d-depth, 4px));
+	align-self: stretch;
+}
+.qbd-fiche-start .qbd-cta3d-face {
+	min-height: 46px;
 	padding: 0 26px;
 	font-size: 15px;
-	justify-content: center;
 }
-.qbd-fiche-start .qbd-btn-icon,
 .qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }
 .qbd-root .qbd-fiche-edit { justify-content: center; }
 

@@ -1,6 +1,7 @@
 import { currentHost } from "../host/current";
 import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
+import { poserBouton3d } from "./cta3d";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
@@ -222,15 +223,14 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 		}
 	}
 
-	const start = ajouter(side, "button", "qbd-btn--create qbd-btn--shine qbd-fiche-start");
+	const start = ajouter(side, "button", "qbd-fiche-start");
 	start.type = "button";
 	icone(start, "play", "qbd-btn-icon");
 	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
-	/* Le REFLET qui défile : une animation CSS infinie, qui passe dès
-	   l'arrivée puis à chaque cycle (dashboard-components.css). Un élément à
-	   part, pas un ::after, pour que `attirer` puisse relancer son cycle. */
-	const reflet = ajouter(start, "span", "qbd-btn-shine");
-	reflet.setAttribute("aria-hidden", "true");
+	/* Le bouton 3D de Brilliant, dans le bleu des flèches (2026-09-25) : face
+	   surélevée qui s'enfonce au clic, et le REFLET qui balaie — un SVG à
+	   part, pour que `attirer` puisse relancer son cycle (cta3d.ts). */
+	const reflet = poserBouton3d(start);
 	start.addEventListener("click", () => deps.onStart(start));
 
 	const edit = ajouter(side, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");

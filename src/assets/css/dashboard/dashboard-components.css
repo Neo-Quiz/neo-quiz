@@ -1084,3 +1084,108 @@
 .qbd-add-tile .qbd-create-option-icon { width: 36px; height: 36px; }
 .qbd-add-tile .qbd-create-option-icon svg { width: 18px; height: 18px; }
 .qbd-add-tile-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--text-normal); }
+
+/* ── LE BOUTON 3D de Brilliant (« Continue course »), dans le bleu des
+   flèches ← → du quiz (2026-09-25, cta3d.ts). Le bouton est transparent et
+   pâlit au survol ; la FACE est surélevée de --qbd-cta3d-depth au-dessus de
+   sa tranche pleine et s'enfonce au clic (100 ms ease-out, valeurs de
+   Brilliant) ; le REFLET balaie la face au premier quart d'un cycle de
+   6,4 s, sur la courbe d'origine — déplacé en `transform` (même trajet que
+   leur `left`, mesuré identique) pour rester fluide sur le compositeur. ── */
+.qbd-root .qbd-cta3d {
+	--qbd-cta3d-face: #456dff;
+	--qbd-cta3d-edge: #2a47c4;
+	--qbd-cta3d-depth: 4px;
+	appearance: none;
+	position: relative;
+	display: inline-flex;
+	height: auto;
+	margin: var(--qbd-cta3d-depth) 0 0;
+	padding: 0;
+	border: 0;
+	border-radius: 60px;
+	background: none;
+	box-shadow: none;
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+	transition: opacity 100ms ease-out;
+}
+.qbd-root .qbd-cta3d:hover:not(:disabled) {
+	background: none;
+	opacity: 0.85;
+}
+.qbd-cta3d-face {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 14px 24px;
+	border-radius: 60px;
+	background: var(--qbd-cta3d-face);
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 20px;
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+	box-shadow: 0 var(--qbd-cta3d-depth) 0 0 var(--qbd-cta3d-edge);
+	transform: translateY(calc(-1 * var(--qbd-cta3d-depth)));
+	transition: transform 100ms ease-out, box-shadow 100ms ease-out;
+}
+.qbd-cta3d:active:not(:disabled) .qbd-cta3d-face {
+	transform: none;
+	box-shadow: none;
+}
+.qbd-root .qbd-cta3d:focus-visible {
+	outline: none;
+}
+.qbd-cta3d:focus-visible .qbd-cta3d-face {
+	outline: 2px solid #fff;
+	outline-offset: 3px;
+}
+.qbd-cta3d-face .qbd-btn-icon { display: flex; align-items: center; }
+.qbd-cta3d-face .qbd-btn-icon svg { width: 16px; height: 16px; fill: currentColor; }
+.qbd-cta3d-clip {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: inherit;
+	overflow: clip;
+	pointer-events: none;
+	container-type: inline-size;
+}
+.qbd-cta3d-clip svg {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 100;
+	display: block;
+	overflow: hidden;
+	width: 150px;
+	height: 56px;
+	opacity: 0;
+	will-change: transform, opacity;
+	animation: qbd-cta3d-reflet 6400ms cubic-bezier(0.16, 1, 0.7, 1) infinite;
+}
+@keyframes qbd-cta3d-reflet {
+	0% { opacity: 1; transform: translateX(-100cqw); }
+	25% { opacity: 1; transform: translateX(100cqw); }
+	26% { opacity: 0; }
+	100% { opacity: 0; transform: translateX(100cqw); }
+}
+.qbd-root .qbd-cta3d:disabled { cursor: not-allowed; }
+.qbd-cta3d:disabled .qbd-cta3d-face {
+	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+	color: color-mix(in srgb, var(--text-normal) 40%, transparent);
+	text-shadow: none;
+	box-shadow: none;
+	transform: none;
+}
+.qbd-cta3d:disabled .qbd-cta3d-clip { display: none; }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-root .qbd-cta3d,
+	.qbd-cta3d-face { transition: none; }
+	.qbd-cta3d-clip { display: none; }
+}
