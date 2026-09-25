@@ -157,20 +157,19 @@ export function renderQuizCard(
 	   pas acquis. */
 	renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
 
-	/* LES MODES : une pastille par mode, même couleur pour tous, pourcentage
-	   TOUJOURS affiché (0 % comme 100 %), jamais de coche. Un clic lance le
-	   mode ; au survol, le nombre de questions du mode. Le « ⋯ » ferme la
-	   ligne, en bas à droite. */
+	/* LES MODES : une pastille par mode, même couleur pour tous, jamais de
+	   coche. Plus de pourcentage (2026-09-25) : l'anneau reste le seul chiffre
+	   de la carte, et le détail par mode vit dans l'onglet « Progression » du
+	   dossier. Un clic lance le mode ; au survol, le nombre de questions du
+	   mode. Le « ⋯ » ferme la ligne, en bas à droite. */
 	const bas = ajouter(body, "div", "qbd-quiz-card-modes");
 	const modes = frere ? [quiz, frere].sort((x, y) => (x.mode === "learn" ? 0 : 1) - (y.mode === "learn" ? 0 : 1)) : [quiz];
 	for (const q of modes) {
-		const info = q === quiz ? infoQuiz : infoFrere!;
 		const wrap = ajouter(bas, "span", "qbd-quiz-card-type qbd-quiz-card-mode");
 		const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
 		btn.type = "button";
 		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), q.mode === "learn" ? "book-open" : "dumbbell");
 		ajouter(btn, "span", undefined, quizModeLabel(q.mode));
-		ajouter(btn, "span", "qbd-quiz-card-mode-pct", `${info.pct}%`);
 		ajouter(wrap, "span", "qbd-quiz-card-type-tip",
 			t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
 		btn.addEventListener("click", (e) => {

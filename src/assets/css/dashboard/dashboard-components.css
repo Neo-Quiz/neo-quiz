@@ -813,6 +813,13 @@
 	opacity: 1;
 	transform: translateY(0);
 }
+/* Elle DISPARAÎT d'un coup et n'apparaît qu'en fondu (2026-09-25) : son
+   fondu de sortie laissait, une fraction de seconde après que la souris a
+   quitté la pastille, un « N questions » à moitié transparent flotter sur la
+   carte — un fantôme sur une capture d'écran. */
+.qbd-quiz-card .qbd-quiz-card-type:not(:hover) .qbd-quiz-card-type-tip {
+	transition: none;
+}
 .qbd-quiz-card--folder .qbd-quiz-card-meta-item .qbd-quiz-card-type-icon svg {
 	width: 14px;
 	height: 14px;
@@ -997,13 +1004,6 @@
 .qbd-quiz-card-mode-icon svg {
 	width: 11px;
 	height: 11px;
-}
-
-.qbd-quiz-card-mode-pct {
-	font-weight: 500;
-	color: var(--text-muted);
-	margin-left: 1px;
-	font-variant-numeric: tabular-nums;
 }
 
 .qbd-quiz-card-modes .qbd-card-more {
