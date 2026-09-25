@@ -1,4 +1,5 @@
 import { currentHost } from "../host/current";
+import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -139,12 +140,31 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	if (autre && autre.mode !== deps.quiz.mode) {
 		const choix = ajouter(chips, "div", "qbd-fiche-modes");
 		choix.setAttribute("role", "group");
-		for (const m of ["learn", "practice"] as const) {
+		/* Le bloc qui glisse, comme dans la page « Générer » (2026-09-25) : au
+		   clic, il glisse vers l'autre mode, PUIS sa fiche s'ouvre — ouvrir
+		   tout de suite repeindrait la page avant qu'on ait vu le mouvement. */
+		const indic = ajouter(choix, "div", "qbd-fiche-mode-indic");
+		const segs = (["learn", "practice"] as const).map(m => {
 			const actif = m === deps.quiz.mode;
 			const seg = pastilleMode(choix, m, "qbd-fiche-mode-seg" + (actif ? " is-active" : ""), "button");
 			(seg as HTMLButtonElement).type = "button";
 			seg.setAttribute("aria-pressed", actif ? "true" : "false");
-			if (!actif) seg.addEventListener("click", () => autre.open());
+			return { actif, seg };
+		});
+		const courant = segs.find(s => s.actif)!.seg;
+		requestAnimationFrame(() => placerIndicateur(indic, courant, false));
+		for (const { actif, seg } of segs) {
+			if (actif) continue;
+			let parti = false;
+			seg.addEventListener("click", () => {
+				if (parti) return;
+				parti = true;
+				courant.classList.remove("is-active");
+				seg.classList.add("is-active");
+				placerIndicateur(indic, seg, true);
+				const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+				window.setTimeout(() => autre.open(), reduit ? 0 : DUREE_GLISSEMENT);
+			});
 		}
 	} else {
 		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip is-accent qbd-fiche-mode", "span");

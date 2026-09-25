@@ -1,4 +1,5 @@
 import JSON5 from "json5";
+import { placerIndicateur } from "./seg-indic";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
@@ -1604,10 +1605,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const seg = ajouter(composerBottom, "div", "qbd-ai-seg");
 		seg.setAttribute("role", "radiogroup");
 		seg.setAttribute("aria-label", t("ai.mode.group"));
-		/* Le bloc qui glisse (relevé sur claude.ai le 2026-09-23) : un seul
-		   indicateur positionné sous les options, déplacé en FLIP au
-		   changement — 200 ms, cubic-bezier(.32, .72, 0, 1), depuis
-		   l'ancienne position avec un scaleX qui rattrape l'ancienne largeur. */
+		/* Le bloc qui glisse (relevé sur claude.ai le 2026-09-23), partagé
+		   avec la fiche d'un cours : `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
 		const segBtns = (["learn", "practice"] as const).map(v => {
 			const b = ajouter(seg, "button", "qbd-ai-seg-btn", v === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
@@ -1641,20 +1640,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				b.classList.toggle("is-active", v === modeGeneration);
 				b.setAttribute("aria-checked", String(v === modeGeneration));
 			});
-			const ancienX = indic.dataset.x === undefined ? null : parseFloat(indic.dataset.x);
-			const ancienneL = parseFloat(indic.dataset.w || "0");
-			const x = actif.offsetLeft, w = actif.offsetWidth;
-			indic.dataset.x = String(x);
-			indic.dataset.w = String(w);
-			indic.style.width = `${w}px`;
-			indic.style.transform = `translateX(${x}px)`;
-			const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-			if (anime && !reduit && ancienX !== null && ancienneL > 0) {
-				indic.animate(
-					{ transform: [`translateX(${ancienX}px) scaleX(${ancienneL / w})`, `translateX(${x}px) scaleX(1)`] },
-					{ duration: 200, easing: "cubic-bezier(.32, .72, 0, 1)" },
-				);
-			}
+			placerIndicateur(indic, actif, anime);
 		};
 		// Mesure après insertion dans le document (largeurs réelles des options).
 		requestAnimationFrame(() => majSeg(false));

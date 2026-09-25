@@ -116,6 +116,7 @@
    fiche en accent, l'autre cliquable (il ouvre sa fiche). Même hauteur et
    même rayon que les étiquettes voisines. */
 .qbd-fiche-modes {
+	position: relative;
 	display: inline-flex;
 	gap: 2px;
 	padding: 2px;
@@ -147,11 +148,29 @@
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	color: var(--text-normal);
 }
+/* Le fond du segment actif est le BLOC QUI GLISSE (`seg-indic.ts`), posé
+   sous les segments : le segment lui-même reste transparent, il ne porte que
+   la couleur du texte. */
+.qbd-root .qbd-fiche-mode-seg {
+	position: relative;
+	z-index: 1;
+	transition: color 200ms ease;
+}
 .qbd-root .qbd-fiche-mode-seg.is-active {
-	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	background: none;
 	color: var(--interactive-accent);
 	font-weight: 600;
 	cursor: default;
+}
+.qbd-fiche-mode-indic {
+	position: absolute;
+	top: 2px;
+	bottom: 2px;
+	left: 0;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	transform-origin: left center;
+	pointer-events: none;
 }
 .qbd-fiche-mode-seg .qbd-fiche-mode-icon svg { width: 14px; height: 14px; }
 .qbd-fiche-chip .qbd-quiz-card-type:hover .qbd-quiz-card-type-icon {
