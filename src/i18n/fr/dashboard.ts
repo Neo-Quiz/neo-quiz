@@ -80,7 +80,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.folder.documents": "Documents",
 	"dashboard.folder.documentsEmptyTitle": "Aucun document pour l'instant",
 	"dashboard.folder.documentsEmptyHint": "Ajoutez un fichier (PDF, image) et créez des quiz à partir de celui-ci.",
-	"dashboard.folder.addFiles": "Ajouter des fichiers",
+	"dashboard.folder.addFiles": "Upload des fichiers",
 	"dashboard.folder.filesAddedOne": "{count} fichier ajouté",
 	"dashboard.folder.filesAddedOther": "{count} fichiers ajoutés",
 	"dashboard.folder.fileAddError": "Impossible d'ajouter {name}",

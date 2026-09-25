@@ -323,11 +323,15 @@
 }
 
 /* ── Le pied : le bouton d'action, à droite, DANS le panneau ── */
-.qbd-folder-section-foot {
+/* Les actions des onglets, poussées à droite de la ligne des onglets. */
+.qbd-folder-tabs-actions {
 	display: flex;
-	justify-content: flex-end;
-	padding-top: 2px;
+	align-items: center;
+	margin-left: auto;
+	padding-left: 12px;
 }
+
+.qbd-folder-section-action[hidden] { display: none; }
 
 /* Copie assumée du style des actions de hint (`qbd-ai-hint-action`,
    dashboard-ai.css) : même fond, même liseré, même survol à liseré accent
@@ -381,29 +385,6 @@
 .qbd-folder-section-action-icon svg {
 	width: 13px;
 	height: 13px;
-}
-
-/* Section vide : l'état vide et le bouton sur UNE ligne, texte à gauche,
-   bouton à droite — la zone reste basse. */
-.qbd-folder-section--vide {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	grid-template-areas: "vide foot";
-	align-items: center;
-	column-gap: 16px;
-}
-
-.qbd-folder-section--vide .qbd-folder-empty { grid-area: vide; }
-.qbd-folder-section--vide .qbd-folder-section-foot { grid-area: foot; padding-top: 0; }
-
-@media (max-width: 640px) {
-	.qbd-folder-section--vide {
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas:
-			"vide"
-			"foot";
-	}
-	.qbd-folder-section--vide .qbd-folder-section-foot { justify-content: flex-start; }
 }
 
 /* ── LE MODAL D'UNE IMAGE ──

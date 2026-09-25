@@ -89,7 +89,7 @@ export const EN_DASHBOARD = {
 	"dashboard.folder.documents": "Documents",
 	"dashboard.folder.documentsEmptyTitle": "No documents yet",
 	"dashboard.folder.documentsEmptyHint": "Add a file (PDF, image) and create quizzes from it.",
-	"dashboard.folder.addFiles": "Add files",
+	"dashboard.folder.addFiles": "Upload files",
 	"dashboard.folder.filesAddedOne": "{count} file added",
 	"dashboard.folder.filesAddedOther": "{count} files added",
 	"dashboard.folder.fileAddError": "Could not add {name}",

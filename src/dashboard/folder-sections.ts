@@ -51,11 +51,18 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 		const onglets = ajouter(wrap, "div", "qbd-folder-tabs");
 		onglets.setAttribute("role", "tablist");
 		const indic = ajouter(onglets, "div", "qbd-folder-tabs-indic");
+		/* L'action de l'onglet ouvert, en haut à droite de la tuile, sur la
+		   ligne des onglets (2026-09-25) : en pied de liste, elle descendait
+		   avec les documents et sortait de l'écran. Une par onglet, seule
+		   celle de l'onglet ouvert est visible. */
+		const actions = ajouter(onglets, "div", "qbd-folder-tabs-actions");
 		const sections: HTMLElement[] = [];
 		const boutons: HTMLElement[] = [];
+		const boutonsAction: HTMLElement[] = [];
 		const montrer = (i: number, anime: boolean): void => {
 			ongletParDossier.set(deps.folder, i);
 			sections.forEach((sec, k) => { sec.hidden = k !== i; });
+			boutonsAction.forEach((b, k) => { b.hidden = k !== i; });
 			boutons.forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
 			placerIndicateur(indic, boutons[i], anime);
 		};
@@ -68,7 +75,14 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 			ajouter(b, "span", undefined, t(spec.title));
 			ajouter(b, "span", "qbd-folder-tab-count", String(spec.count));
 			b.addEventListener("click", () => montrer(i, true));
+			onglets.insertBefore(b, actions);
 			boutons.push(b);
+			const action = ajouter(actions, "button", "qbd-folder-section-action");
+			action.type = "button";
+			currentHost().ui.setIcon(ajouter(action, "span", "qbd-folder-section-action-icon"), spec.action.icon);
+			ajouter(action, "span", undefined, t(spec.action.label));
+			action.addEventListener("click", spec.action.onClick);
+			boutonsAction.push(action);
 			sections.push(renderSection(wrap, deps, spec));
 		};
 		ajouterSection({
@@ -131,7 +145,8 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 	   contient tout — l'en-tête, la liste ou l'état vide, ET le bouton, dans
 	   son pied. La v1 posait le bouton en pilule blanche au-dessus d'une boîte
 	   séparée : deux objets pour une section, et une pilule qui n'était pas
-	   celle de l'application. Même surface que le panneau « Progrès ». */
+	   celle de l'application. Depuis les onglets, son bouton est sur la
+	   ligne des onglets (renderFolderSections). */
 	const section = ajouter(parent, "section", "qbd-folder-section" + (spec.items.length === 0 ? " qbd-folder-section--vide" : ""));
 	// Plus d'en-tête dans la section : son titre et son compteur sont l'ONGLET.
 
@@ -182,15 +197,6 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 		brancherDepot(section, spec.onDrop);
 	}
 
-	/* Le bouton, TOUJOURS au même endroit : le pied du panneau. Le style est
-	   celui des actions des hints de « Générer » (`qbd-ai-hint-action`) — un
-	   contrôle de panneau, pas l'action de la page. */
-	const pied = ajouter(section, "div", "qbd-folder-section-foot");
-	const b = ajouter(pied, "button", "qbd-folder-section-action");
-	b.type = "button";
-	host.ui.setIcon(ajouter(b, "span", "qbd-folder-section-action-icon"), spec.action.icon);
-	ajouter(b, "span", undefined, t(spec.action.label));
-	b.addEventListener("click", spec.action.onClick);
 	return section;
 }
 
