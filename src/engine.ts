@@ -968,7 +968,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	   où l'on s'était arrêté, réponses comprises. Jamais pour un examen
 	   (décision : un examen se fait d'une traite), dont la session est
 	   effacée. Photo illisible → `null` → ouverture de zéro. */
-	if (sessionSink && isExamMode) sessionSink.effacer();
+	if (sessionSink && ctx.isExamMode) sessionSink.effacer();
 	else if (sessionSink?.initiale) {
 		const reprise = restaurer(sessionSink.initiale, ctx.questionIds, { selections: quizState.selections, shuffleMap: quizState.shuffleMap });
 		if (reprise) {
