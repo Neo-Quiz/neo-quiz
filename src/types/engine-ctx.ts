@@ -137,6 +137,11 @@ export interface EngineCtx {
 	 * fonction ; l'app n'a pas de `Plugin`.
 	 */
 	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown };
+	sessionSink?: import("../engine/session").SessionSink;
+	/** Photographie l'état et l'enregistre (sans effet en examen, sans puits, hors question). */
+	saveSession(): void;
+	/** Efface la session de ce quiz (fin, « Recommencer », examen). */
+	clearSession(): void;
 	/**
 	 * Jamais assigné dans le littéral `ctx` ni ailleurs dans engine.js (mort/
 	 * vestigial) ; accédé optionnellement par sanitizer.js:172 (`ctx.lucideIcons

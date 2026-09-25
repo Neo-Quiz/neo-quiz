@@ -121,6 +121,8 @@ await withSrcModule(
 			// l'appel à `ctx.recordReview` qui le précède nous intéresse ici.
 			commitQuestionInteraction: () => {},
 			invalidateSavedResults: () => {},
+			saveSession: () => {},
+			clearSession: () => {},
 		});
 		return { ctx, appels };
 	}

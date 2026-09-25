@@ -21,6 +21,7 @@ import { createClozeHandlers } from "./engine/cloze";
 import { createLessonHandlers } from "./engine/lesson";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
+import { photographier, restaurer, type SessionSink } from "./engine/session";
 import { t } from "./i18n";
 
 import { currentHost } from "./host/current";
@@ -58,6 +59,8 @@ interface RenderQuizContext {
 	statsSink?: EngineCtx["statsSink"];
 	/** Absent = les réponses ne sont pas journalisées. Même raison. */
 	reviewSink?: EngineCtx["reviewSink"];
+	/** Absent = pas de reprise : le quiz s'ouvre toujours de zéro. */
+	sessionSink?: SessionSink;
 }
 
 async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> {
@@ -67,7 +70,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		quiz: rawQuiz,
 		sourcePath,
 		statsSink,
-		reviewSink
+		reviewSink,
+		sessionSink
 	} = context;
 
 	container.replaceChildren();
@@ -169,6 +173,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		   reste lu par accessors de closure — cette distinction-là ne bouge pas. */
 		reviewSink,
 		statsSink,
+		sessionSink,
 		quizMode,
 		isExamMode,
 		trainingSession: false,
@@ -429,8 +434,25 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.clampSlideIndex = clampSlideIndex;
 	ctx.getSlidingWindow = getSlidingWindow;
 	ctx.getSlideIndexForQuestion = getSlideIndexForQuestion;
+	/* La photo de session : prise après chaque réponse (`invalidateSavedResults`
+	   est appelé par TOUTE interaction), à chaque changement de question
+	   (state.ts) et à la destruction du moteur (un texte tapé sans quitter la
+	   question). Jamais en examen ; jamais hors d'une question. */
+	ctx.saveSession = () => {
+		if (!sessionSink || ctx.isExamMode || quizState.locked) return;
+		const entree = slideMap[quizState.current];
+		if (!entree || entree.type !== "question") return;
+		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now());
+		// Un quiz ouvert puis feuilleté sans jamais répondre n'a rien à
+		// reprendre : ne pas lui offrir « Reprendre » (règle du chantier).
+		if (Object.keys(photo.questions).length === 0) sessionSink.effacer();
+		else sessionSink.enregistrer(photo);
+	};
+	ctx.clearSession = () => { sessionSink?.effacer(); };
+
 	ctx.invalidateSavedResults = () => {
 		quizState.savedResultsPath = null;
+		ctx.saveSession();
 	};
 
 	if (typeof container.__quizDestroy === "function") {
@@ -695,6 +717,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// sont fournies par le module state via ctx.state.*
 
 	function destroyQuiz(): void {
+		try { ctx.saveSession(); } catch (_) {}
 		__quizDestroyed = true;
 		__quizAsyncEpoch++;
 
@@ -939,6 +962,26 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.cancelEnsureTrackVisibleRaf = cancelEnsureTrackVisibleRaf;
 	ctx.stopExamTimer = exam.stopExamTimer;
 	ctx.updateExamTimerDisplay = exam.updateExamTimerDisplay;
+
+	/* REPRISE (2026-09-26) : la photo de la session précédente, restaurée
+	   AVANT le premier rendu — le quiz s'ouvre directement sur la question
+	   où l'on s'était arrêté, réponses comprises. Jamais pour un examen
+	   (décision : un examen se fait d'une traite), dont la session est
+	   effacée. Photo illisible → `null` → ouverture de zéro. */
+	if (sessionSink && isExamMode) sessionSink.effacer();
+	else if (sessionSink?.initiale) {
+		const reprise = restaurer(sessionSink.initiale, ctx.questionIds, { selections: quizState.selections, shuffleMap: quizState.shuffleMap });
+		if (reprise) {
+			const { courante, ...champs } = reprise;
+			Object.assign(quizState, champs);
+			const slide = slideMap.findIndex(e => e.type === "question" && e.questionIndex === courante);
+			if (slide >= 0) {
+				quizState.current = slide;
+				quizState.prevCurrent = slide;
+				quizState.lastQuestionIndex = courante;
+			}
+		}
+	}
 
 	render();
 

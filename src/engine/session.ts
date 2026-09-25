@@ -204,3 +204,11 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 	}
 	return r;
 }
+
+/** Le puits de session que l'hôte passe au moteur (`renderInteractiveQuiz`). */
+export interface SessionSink {
+	/** La photo à reprendre, lue par l'hôte avant l'ouverture ; null si aucune. */
+	initiale: SessionQuiz | null;
+	enregistrer(s: SessionQuiz): void;
+	effacer(): void;
+}

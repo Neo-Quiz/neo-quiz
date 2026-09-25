@@ -312,6 +312,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		const token = ctx.quizState.slideToken;
 		ctx.quizState.prevCurrent = ctx.quizState.current;
 		ctx.quizState.current = next;
+		ctx.saveSession();
 		// isQuestionSlideIndex garantit la variante « question » de slideMap[next].
 		if (ctx.isQuestionSlideIndex(next)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[next] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
@@ -343,6 +344,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		const token = ctx.quizState.slideToken;
 		ctx.quizState.prevCurrent = ctx.quizState.current;
 		ctx.quizState.current = targetIndex;
+		ctx.saveSession();
 		if (ctx.isQuestionSlideIndex(targetIndex)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[targetIndex] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
 		ctx.quizState.isSliding = true;
@@ -407,6 +409,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// `lastQuestionIndex`/`pendingResultsLock` étaient déjà mutés alors que
 		// la navigation elle-même était refusée.
 		marquerPreNonTentees(ctx.SLIDE_SUBMIT_INDEX);
+		ctx.clearSession();
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = false;
 		goToSlide(ctx.SLIDE_SUBMIT_INDEX, { forceRender: false });
@@ -477,6 +480,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		   (`handleExamTimeUp`, engine/exam.ts) n'a donc plus rien de bloqué à ce
 		   stade et atteint bien ses résultats. */
 		marquerPreNonTentees(ctx.SLIDE_RESULTS_INDEX);
+		ctx.clearSession();
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = !ctx.textOnly?.isTextOnlyMode?.();
 
@@ -637,6 +641,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 
 		ctx.render();
+		ctx.clearSession();
 	}
 
 	return {
