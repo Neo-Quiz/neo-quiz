@@ -90,6 +90,10 @@ export function renderQuizCard(
 	   d'entrée (la vue qui l'anime pose `.qbd-quizzes-enter`). */
 	opts?: {
 		showPath?: boolean;
+		/** L'anneau d'avancement (défaut true). Faux dans un dossier : son
+		    onglet « Progression » donne déjà chaque cours mode par mode
+		    (2026-09-26) ; l'accueil, qui n'a pas cet onglet, le garde. */
+		showRing?: boolean;
 		onPlay?: (quiz: QuizIndexEntry) => void;
 		onMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement) => void;
 		accent?: string;
@@ -155,7 +159,7 @@ export function renderQuizCard(
 	/* La couleur dit l'ÉTAT, pas le dossier : bleu en cours, vert maîtrisé,
 	   rien tant que rien n'est commencé. « À revoir » reste bleu : fini, mais
 	   pas acquis. */
-	renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
+	if (opts?.showRing !== false) renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
 
 	/* LES MODES : une pastille par mode, même couleur pour tous, jamais de
 	   coche. Plus de pourcentage (2026-09-25) : l'anneau reste le seul chiffre
