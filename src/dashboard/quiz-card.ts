@@ -109,8 +109,7 @@ export function renderQuizCard(
 	card.style.setProperty("--qbd-card-delay", `${100 + (opts?.entryIndex ?? 0) * 45}ms`);
 
 	// ── État du quiz (calcul partagé quiz-mastery.ts) ──
-	// `state` reste un identifiant (suffixe de classe CSS) ; seul `stateLabel`
-	// est traduit — et il l'est ici, à chaque rendu de carte.
+	// `state` choisit la couleur de l'anneau, `pct` ce qu'il affiche.
 	/* Un cours réuni résume ses deux modes : maîtrisé si les deux le sont, à
 	   revoir si l'un l'est, en cours dès que l'un a commencé (pourcentage
 	   moyen), neuf sinon. */
@@ -122,38 +121,20 @@ export function renderQuizCard(
 		: infoQuiz.state === "review" || infoFrere.state === "review" ? { state: "review" as const, pct: 100 }
 		: infoQuiz.state === "fresh" && infoFrere.state === "fresh" ? { state: "fresh" as const, pct: 0 }
 		: { state: "progress" as const, pct: Math.round((infoQuiz.pct + infoFrere.pct) / 2) };
-	const best = stats ? stats.bestScore : 0;
-	let stateLabel: string, stateIcon: string;
-	switch (state) {
-		case "mastered": stateLabel = t("dashboard.card.mastered"); stateIcon = "circle-check"; break;
-		case "review": stateLabel = t("dashboard.card.review"); stateIcon = "rotate-ccw"; break;
-		case "progress": stateLabel = t("dashboard.card.progress", { pct }); stateIcon = "rotate-cw"; break;
-		default: stateLabel = t("dashboard.card.fresh"); stateIcon = "circle-play";
-	}
-
 	const body = ajouter(card, "div", "qbd-quiz-card-body");
 
-	// En-tête : pastille d'état, et le menu ⋯ à droite (il y était le ▶).
-	const head = ajouter(body, "div", "qbd-quiz-card-head");
-	const pill = ajouter(head, "div", `qbd-quiz-card-status qbd-quiz-card-status--${state}`);
-	const sIcon = ajouter(pill, "span", "qbd-quiz-card-status-icon");
-	currentHost().ui.setIcon(sIcon, stateIcon);
-	ajouter(pill, "span", undefined, stateLabel);
-	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
-	if (opts?.onMenu) {
-		const onMenu = opts.onMenu;
-		const moreBtn = ajouter(head, "button", "qbd-card-more");
-		moreBtn.type = "button";
-		moreBtn.title = t("dashboard.card.more");
-		currentHost().ui.setIcon(moreBtn, "ellipsis");
-		moreBtn.addEventListener("click", (e) => {
-			e.stopPropagation();
-			onMenu(quiz, moreBtn);
-		});
-	}
-
-	// Titre
-	ajouter(body, "p", "qbd-quiz-card-title", quiz.title);
+	/* ANATOMIE DU 2026-09-25 (maquette « anneau de progression », variante 2) :
+	   en haut, le titre et le total de questions à gauche, l'ANNEAU à droite ;
+	   en bas, une pastille par mode et le « ⋯ ». Plus de pastille d'état
+	   (« En cours · 65 % ») : l'anneau le dit, en pourcentage, toujours
+	   affiché. Plus de bouton-tuile dans la carte : une tuile dans une tuile
+	   se lit comme une parenthèse dans une parenthèse. */
+	const haut = ajouter(body, "div", "qbd-quiz-card-top");
+	const texte = ajouter(haut, "div", "qbd-quiz-card-text");
+	ajouter(texte, "p", "qbd-quiz-card-title", quiz.title);
+	const totalQuestions = quiz.questions + (frere ? frere.questions : 0);
+	ajouter(texte, "p", "qbd-quiz-card-count",
+		t(totalQuestions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: totalQuestions }));
 
 	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans
 	// la grille d'un dossier, le dossier EST le titre de la page (2026-09-24).
@@ -164,55 +145,48 @@ export function renderQuizCard(
 		const segs = quiz.path.split("/").slice(0, -1).filter(Boolean);
 		const parentFolder = segs.length > 0 ? segs[segs.length - 1] : null;
 		if (parentFolder) {
-			const pathEl = ajouter(body, "p", "qbd-quiz-card-path");
+			const pathEl = ajouter(texte, "p", "qbd-quiz-card-path");
 			ajouter(pathEl, "span", undefined, parentFolder);
 		}
 	}
 
-	/* L'ACTION (2026-09-25) : UN bouton plein, la PROCHAINE étape — le Learn
-	   tant qu'il n'est pas fini, le Practice ensuite — et, dans un cours, un
-	   lien discret vers l'autre mode. Remplace les deux boutons numérotés
-	   « 1 Learn / 2 Practice » de la veille : deux boutons de même poids se
-	   lisaient comme un choix, pas comme une suite. Relevé sur Quizlet, Khan
-	   Academy, Brilliant et StudySmarter (rapport « Modes d'étude sur une
-	   carte 2026 ») : aucun ne met deux modes côte à côte sur une carte de
-	   liste, tous poussent l'étape suivante. Le reste de la carte ouvre la
-	   fiche ; une carte d'un seul mode a le même bouton, sans lien. */
-	const lancer = (q: QuizIndexEntry) => {
-		if (opts?.onPlay) opts.onPlay(q);
-		else if (typeof onOpen === "function") onOpen(q);
-	};
-	const estFini = (s: string) => s === "mastered" || s === "review";
-	const learnQ = frere ? (quiz.mode === "learn" ? quiz : frere) : null;
-	const learnFini = !!learnQ && estFini((learnQ === quiz ? infoQuiz : infoFrere!).state);
-	const principal = !frere ? quiz : learnFini ? (learnQ === quiz ? frere : quiz) : learnQ!;
-	const secondaire = frere ? (principal === quiz ? frere : quiz) : null;
-	const infoPrincipal = principal === quiz ? infoQuiz : infoFrere!;
+	/* La couleur dit l'ÉTAT, pas le dossier : bleu en cours, vert maîtrisé,
+	   rien tant que rien n'est commencé. « À revoir » reste bleu : fini, mais
+	   pas acquis. */
+	renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
 
-	const actions = ajouter(body, "div", "qbd-quiz-card-actions");
-	const fini = estFini(infoPrincipal.state);
-	const btn = ajouter(actions, "button", "qbd-quiz-card-action" + (fini ? " is-done" : ""));
-	btn.type = "button";
-	const haut = ajouter(btn, "span", "qbd-quiz-card-action-top");
-	currentHost().ui.setIcon(ajouter(haut, "span", "qbd-quiz-card-action-icon"), fini ? "circle-check" : principal.mode === "learn" ? "book-open" : "dumbbell");
-	ajouter(haut, "span", "qbd-quiz-card-action-label", t(principal.mode === "learn" ? "dashboard.card.actionLearn" : "dashboard.card.actionPractice"));
-	/* Sous le verbe : la progression en cours, sinon le nombre de questions
-	   (la pastille d'état dit déjà « maîtrisé » ou « à revoir »). */
-	const nombre = t(principal.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: principal.questions });
-	ajouter(btn, "span", "qbd-quiz-card-action-sub",
-		infoPrincipal.state === "progress" ? t("dashboard.card.progress", { pct: infoPrincipal.pct }) : nombre);
-	btn.addEventListener("click", (e) => {
-		e.stopPropagation();
-		lancer(principal);
-	});
-
-	if (secondaire) {
-		const lien = ajouter(actions, "button", "qbd-quiz-card-action-alt",
-			t(secondaire.mode === "learn" ? "dashboard.card.orLearn" : "dashboard.card.orPractice"));
-		lien.type = "button";
-		lien.addEventListener("click", (e) => {
+	/* LES MODES : une pastille par mode, même couleur pour tous, pourcentage
+	   TOUJOURS affiché (0 % comme 100 %), jamais de coche. Un clic lance le
+	   mode ; au survol, le nombre de questions du mode. Le « ⋯ » ferme la
+	   ligne, en bas à droite. */
+	const bas = ajouter(body, "div", "qbd-quiz-card-modes");
+	const modes = frere ? [quiz, frere].sort((x, y) => (x.mode === "learn" ? 0 : 1) - (y.mode === "learn" ? 0 : 1)) : [quiz];
+	for (const q of modes) {
+		const info = q === quiz ? infoQuiz : infoFrere!;
+		const wrap = ajouter(bas, "span", "qbd-quiz-card-type qbd-quiz-card-mode");
+		const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
+		btn.type = "button";
+		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), q.mode === "learn" ? "book-open" : "dumbbell");
+		ajouter(btn, "span", undefined, quizModeLabel(q.mode));
+		ajouter(btn, "span", "qbd-quiz-card-mode-pct", `${info.pct}%`);
+		ajouter(wrap, "span", "qbd-quiz-card-type-tip",
+			t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
+		btn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			lancer(secondaire);
+			if (opts?.onPlay) opts.onPlay(q);
+			else if (typeof onOpen === "function") onOpen(q);
+		});
+	}
+	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
+	if (opts?.onMenu) {
+		const onMenu = opts.onMenu;
+		const moreBtn = ajouter(bas, "button", "qbd-card-more");
+		moreBtn.type = "button";
+		moreBtn.title = t("dashboard.card.more");
+		currentHost().ui.setIcon(moreBtn, "ellipsis");
+		moreBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			onMenu(quiz, moreBtn);
 		});
 	}
 
@@ -222,4 +196,44 @@ export function renderQuizCard(
 	});
 
 	return card;
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** L'anneau de progression d'une carte : un tour de piste, un arc de la
+    couleur de l'état, et le pourcentage au centre, TOUJOURS affiché (0 % est
+    une information). SVG plutôt qu'un dégradé conique : trait net, bouts
+    arrondis. Partagé avec le panneau « Progrès » (quizzes-render.ts). */
+export function renderProgressRing(parent: HTMLElement, pct: number, tone: "fresh" | "progress" | "done", size = 60, stroke = 5): HTMLElement {
+	const ring = ajouter(parent, "div", `qbd-ring qbd-ring--${tone}`);
+	ring.style.width = ring.style.height = `${size}px`;
+	ring.setAttribute("role", "img");
+	ring.setAttribute("aria-label", `${pct}%`);
+	const r = (size - stroke) / 2, c = 2 * Math.PI * r, mid = size / 2;
+	const svg = document.createElementNS(SVG_NS, "svg");
+	svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+	svg.setAttribute("aria-hidden", "true");
+	svg.classList.add("qbd-ring-svg");
+	const cercle = (cls: string): SVGCircleElement => {
+		const el = document.createElementNS(SVG_NS, "circle");
+		el.setAttribute("class", cls);
+		el.setAttribute("cx", String(mid));
+		el.setAttribute("cy", String(mid));
+		el.setAttribute("r", String(r));
+		el.setAttribute("fill", "none");
+		el.setAttribute("stroke-width", String(stroke));
+		svg.appendChild(el);
+		return el;
+	};
+	cercle("qbd-ring-track");
+	const borne = Math.max(0, Math.min(100, pct));
+	if (borne > 0) {
+		const arc = cercle("qbd-ring-arc");
+		arc.setAttribute("stroke-linecap", "round");
+		arc.setAttribute("stroke-dasharray", `${(borne / 100) * c} ${c}`);
+	}
+	ring.appendChild(svg);
+	const centre = ajouter(ring, "span", "qbd-ring-pct", String(Math.round(pct)));
+	ajouter(centre, "span", "qbd-ring-sign", "%");
+	return ring;
 }

@@ -143,13 +143,16 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.backToModules": "All quizzes",
 	/* ── Header d'un dossier ouvert (icône + nom + stats + panneau Progrès,
 	   design claude.ai capture 2026-07-20) ── */
-	"dashboard.quizzes.statQuizzes": "Quizzes",
 	"dashboard.quizzes.progressTitle": "Progress",
-	"dashboard.quizzes.progressCount": "{done}/{total} quiz",
+	"dashboard.quizzes.progressQuizzesOne": "{count} quiz",
+	"dashboard.quizzes.progressQuizzesOther": "{count} quizzes",
+	"dashboard.quizzes.progressMasteredOne": "mastered",
+	"dashboard.quizzes.progressMasteredOther": "mastered",
+	"dashboard.quizzes.progressInProgress": "in progress",
+	"dashboard.quizzes.progressToStart": "not started",
 	/* "Mastered"/"To review" du donut réutilisent dashboard.card.mastered/review
 	   (même mot que la pastille d'état d'une carte) ; "To learn" agrège fresh
 	   ET progress (rien de tel n'existe pour une carte individuelle). */
-	"dashboard.quizzes.progressToLearn": "To learn",
 	"dashboard.quizzes.groupByActivity": "Recent",
 	"dashboard.quizzes.recentWeek": "Last 7 days",
 	"dashboard.quizzes.recentMonth": "Last 30 days",
@@ -213,15 +216,7 @@ export const EN_DASHBOARD = {
 	"dashboard.review.deferredOther": "{count} more, held back for tomorrow",
 
 	/* ── Carte de quiz (état) ── */
-	"dashboard.card.mastered": "Mastered",
-	"dashboard.card.review": "To review",
-	"dashboard.card.progress": "In progress · {pct}%",
-	"dashboard.card.fresh": "Not started",
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */
-	"dashboard.card.actionLearn": "Learn",
-	"dashboard.card.actionPractice": "Practice",
-	"dashboard.card.orLearn": "or review the lesson",
-	"dashboard.card.orPractice": "or skip to practice",
 	"dashboard.card.more": "More actions",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */

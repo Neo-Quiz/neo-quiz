@@ -574,111 +574,6 @@
 	color: var(--interactive-accent);
 	line-height: 1.3;
 }
-/* La pastille du mode porte son icône, comme sur la fiche. */
-.qbd-quiz-card-mode {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 10.5px;
-	padding: 2px 8px 2px 6px;
-}
-.qbd-quiz-card-mode-icon { display: inline-flex; }
-
-/* ── Les ACTIONS d'une carte (2026-09-24) : un bouton par mode, pleine
-   largeur, deux colonnes dans un cours. Un vrai bouton — fond, bordure,
-   survol — pour qu'on sache qu'il se clique ; le numéro dit l'ordre. ── */
-.qbd-quiz-card-actions {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 2px;
-	margin-top: 6px;
-	padding-top: 10px;
-	border-top: 1px solid var(--background-modifier-border);
-}
-.qbd-root .qbd-quiz-card-action {
-	/* Sur UNE ligne : le verbe à gauche, le nombre de questions ou la
-	   progression à droite (2026-09-25, demande de compacité). */
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	min-width: 0;
-	height: auto;
-	margin: 0;
-	padding: 6px 10px;
-	border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, transparent);
-	border-radius: 10px;
-	background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
-	box-shadow: none;
-	font: inherit;
-	text-align: left;
-	color: var(--text-normal);
-	cursor: pointer;
-	transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
-}
-.qbd-root .qbd-quiz-card-action:hover {
-	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
-	transform: translateY(-1px);
-}
-.qbd-quiz-card--tinted .qbd-quiz-card-action {
-	border-color: color-mix(in oklab, var(--accent) 35%, transparent);
-	background: color-mix(in oklab, var(--accent) 12%, transparent);
-}
-.qbd-root .qbd-quiz-card--tinted .qbd-quiz-card-action:hover {
-	border-color: color-mix(in oklab, var(--accent) 65%, transparent);
-	background: color-mix(in oklab, var(--accent) 24%, transparent);
-}
-.qbd-quiz-card-action-top {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	min-width: 0;
-	font-size: 13px;
-	font-weight: 600;
-	white-space: nowrap;
-}
-.qbd-quiz-card-action-icon { display: inline-flex; color: var(--interactive-accent); }
-.qbd-quiz-card--tinted .qbd-quiz-card-action-icon { color: var(--accent); }
-.qbd-quiz-card-action-icon svg { width: 14px; height: 14px; }
-.qbd-quiz-card-action-label { overflow: hidden; text-overflow: ellipsis; }
-.qbd-quiz-card-action-sub {
-	flex-shrink: 1;
-	min-width: 0;
-	font-size: 11.5px;
-	color: var(--text-muted);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
-}
-/* Le lien vers l'AUTRE mode d'un cours : du texte, pas un second bouton —
-   il ne doit pas disputer la prochaine étape au bouton plein. */
-.qbd-root .qbd-quiz-card-action-alt {
-	justify-self: center;
-	height: auto;
-	margin: 0;
-	padding: 0 6px;
-	border: 0;
-	border-radius: 6px;
-	background: none;
-	box-shadow: none;
-	font: inherit;
-	font-size: 11.5px;
-	color: var(--text-muted);
-	cursor: pointer;
-}
-.qbd-root .qbd-quiz-card-action-alt:hover {
-	background: none;
-	color: var(--text-normal);
-	text-decoration: underline;
-	text-underline-offset: 2px;
-}
-.qbd-root .qbd-quiz-card-action-alt:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-/* Un mode terminé : la coche en vert, le bouton reste cliquable pour réviser. */
-.qbd-quiz-card-action.is-done .qbd-quiz-card-action-icon { color: var(--color-green); }
-.qbd-quiz-card-mode-icon svg { width: 12px; height: 12px; }
 
 
 /* ── Carte quiz TEINTÉE par son DOSSIER PARENT (handoff « cartes quiz teintées »
@@ -699,56 +594,6 @@
 	color: color-mix(in oklab, var(--accent) 75%, #ffffff);
 }
 
-/* ── En-tête de carte : pastille d'état + chevron d'ouverture ── */
-.qbd-quiz-card-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	margin-bottom: 10px;
-}
-
-.qbd-quiz-card-status {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 10px;
-	font-weight: 600;
-	padding: 3px 9px 3px 7px;
-	border-radius: 999px;
-	white-space: nowrap;
-	line-height: 1.2;
-}
-
-.qbd-quiz-card-status-icon {
-	display: inline-flex;
-	align-items: center;
-}
-
-.qbd-quiz-card-status-icon svg {
-	width: 12px;
-	height: 12px;
-}
-
-.qbd-quiz-card-status--mastered {
-	color: var(--color-green, #4ade80);
-	background: color-mix(in srgb, var(--color-green, #4ade80) 14%, transparent);
-}
-
-.qbd-quiz-card-status--progress {
-	color: var(--interactive-accent);
-	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-}
-
-.qbd-quiz-card-status--review {
-	color: var(--color-yellow, #facc15);
-	background: color-mix(in srgb, var(--color-yellow, #facc15) 16%, transparent);
-}
-
-.qbd-quiz-card-status--fresh {
-	color: var(--text-muted);
-	background: var(--background-modifier-hover, rgba(255,255,255,0.05));
-}
 
 /* Bouton lecture rond — présent dès que l'appelant fournit `opts.onPlay`
    (accueil ET « Mes quiz »). `.qbd-root` préfixe pour passer devant le chrome
@@ -802,13 +647,13 @@
 	min-width: 0;
 	max-width: 100%;
 	padding: 15px 17px 11px;
-	/* Système verre commun (tokens.css — harmonisation 2026-07-21) ;
-	   contours teintés à l'accent du dossier conservés (formule des cartes
-	   de module). */
+	/* Système verre commun (tokens.css — harmonisation 2026-07-21).
+	   Contour NEUTRE depuis le 2026-09-25 : l'orange du dossier répété sur
+	   chaque carte saturait la page ; la couleur y dit l'ÉTAT (l'anneau). */
 	--card-bg: var(--qbd-glass-bg);
-	--border-c: color-mix(in oklab, var(--accent) 55%, #232939);
-	--border-soft: color-mix(in oklab, var(--accent) 25%, #262d3f);
-	--glow: color-mix(in oklab, var(--accent) 45%, transparent);
+	--border-c: color-mix(in srgb, var(--text-normal) 22%, transparent);
+	--border-soft: color-mix(in srgb, var(--text-normal) 9%, transparent);
+	--glow: color-mix(in srgb, var(--text-normal) 10%, transparent);
 	background: var(--card-bg);
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
@@ -843,27 +688,13 @@
 	gap: 8px;
 }
 
-.qbd-quiz-card--folder .qbd-quiz-card-head {
-	margin-bottom: 0;
-}
 
 /* Teintes THEME-AWARE (2026-07-28) : cette variante peint désormais AUSSI
    l'accueil, donc toutes ses surfaces. Les hex clairs du handoff 7a étaient
    les couleurs de rôle du thème sombre (texte normal, texte atténué, filet) —
    passer par les variables natives donne le même rendu en sombre et rend la
    carte lisible en thème clair, où le titre #f8fafd disparaissait. */
-.qbd-quiz-card--folder .qbd-quiz-card-status {
-	gap: 6px;
-	padding: 3px 10px;
-	border-radius: 20px;
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
-	font-size: 11.5px;
-}
 
-.qbd-quiz-card--folder .qbd-quiz-card-status--mastered {
-	color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
 
 .qbd-quiz-card--folder .qbd-quiz-card-title {
 	margin: 0;
@@ -1006,4 +837,142 @@
 	flex-direction: column;
 	align-items: center;
 	gap: 6px;
+}
+
+
+/* ══ Carte de quiz, anatomie du 2026-09-25 ══
+   En haut : titre + total de questions à gauche, anneau à droite. En bas :
+   une pastille par mode, puis le « ⋯ ». La couleur dit l'ÉTAT (bleu en
+   cours, vert maîtrisé) ; teintes d'Apple en mode sombre, les plus éprouvées
+   sur fond noir. */
+.qbd-root {
+	--qbd-state-progress: #0a84ff;
+	--qbd-state-done: #30d158;
+	--qbd-ring-track: color-mix(in srgb, var(--text-normal) 13%, transparent);
+}
+
+.qbd-quiz-card-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	min-width: 0;
+}
+
+.qbd-quiz-card-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+
+.qbd-quiz-card-count {
+	margin: 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+/* L'anneau : piste, arc de la couleur de l'état, pourcentage au centre. */
+.qbd-ring {
+	position: relative;
+	flex-shrink: 0;
+	display: grid;
+	place-items: center;
+}
+
+.qbd-ring-svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	transform: rotate(-90deg);
+}
+
+.qbd-ring-track { stroke: var(--qbd-ring-track); }
+.qbd-ring--progress .qbd-ring-arc { stroke: var(--qbd-state-progress); }
+.qbd-ring--done .qbd-ring-arc { stroke: var(--qbd-state-done); }
+
+.qbd-ring-pct {
+	position: relative;
+	font-size: 15px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-ring-sign {
+	font-size: 0.62em;
+	font-weight: 700;
+	color: var(--text-muted);
+	margin-left: 1px;
+}
+
+/* Les pastilles de mode : même teinte neutre pour tous, pourcentage toujours
+   affiché. Pas de tuile dans la tuile : une pastille, pas un bouton encadré. */
+.qbd-quiz-card-modes {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+	min-width: 0;
+}
+
+.qbd-quiz-card-mode {
+	display: inline-flex;
+	min-width: 0;
+}
+
+.qbd-root .qbd-quiz-card-mode-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	height: auto;
+	margin: 0;
+	padding: 3px 6px;
+	border: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	box-shadow: none;
+	font: inherit;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text-normal);
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background-color 140ms ease;
+}
+
+.qbd-root .qbd-quiz-card-mode-btn:hover {
+	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+.qbd-root .qbd-quiz-card-mode-btn:focus-visible {
+	outline: 2px solid var(--qbd-state-progress);
+	outline-offset: 2px;
+}
+
+.qbd-quiz-card-mode-icon {
+	display: inline-flex;
+}
+
+.qbd-quiz-card-mode-icon svg {
+	width: 11px;
+	height: 11px;
+}
+
+.qbd-quiz-card-mode-pct {
+	font-weight: 500;
+	color: var(--text-muted);
+	margin-left: 1px;
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-quiz-card-modes .qbd-card-more {
+	flex-shrink: 0;
 }

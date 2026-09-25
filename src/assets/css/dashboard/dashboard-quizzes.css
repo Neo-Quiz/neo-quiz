@@ -692,70 +692,13 @@
 	animation-delay: 170ms;
 }
 
-/* Bannière autonome du dossier ouvert. Son accent est posé sur le wrapper :
-   titre, icône, halo, stats et contenu héritent tous de la même source. */
+/* Bannière autonome du dossier ouvert. Son accent est posé sur le wrapper ;
+   depuis le 2026-09-25, seule l'ICÔNE du titre le porte (plus de halo, de
+   titre coloré ni de soulignement : la couleur répétée partout salissait
+   la page). */
 .qbd-quizzes-folder-hero {
 	position: relative;
 	margin-bottom: 26px;
-}
-
-/* Trois couches réparties le long du hero (retour Ahmed 2026-07-20 — la
-   version à deux ellipses faisait une tache unique derrière le début du
-   titre) : cœur derrière l'icône, nappe qui court le long du titre et
-   s'estompe vers la droite, traînée basse qui prolonge le soulignement. */
-/* CONTRAINTE anti-coupure (retour Ahmed 2026-07-21) : la boîte ne déborde
-   jamais en négatif (un ancêtre scrollable clippait le débordement en une
-   ligne nette) et chaque ellipse reste ENTIÈREMENT dans la boîte
-   (centre ± rayon ∈ [0,100%]) — l'alpha atteint 0 avant tout bord, une
-   arête de coupe est impossible par construction. */
-.qbd-quizzes-folder-halo {
-	position: absolute;
-	/* -8px : débordement discret seulement — à -32px (tout le padding de
-	   .qbd-content) la lueur envahissait le couloir du rail (retour Ahmed
-	   2026-07-21). Le padding fait 28/32px, donc toujours aucun clip ;
-	   les ellipses restent contenues dans la boîte, donc aucun bord dur. */
-	left: -8px;
-	top: -8px;
-	width: min(1150px, calc(100% + 16px));
-	height: 260px;
-	/* Hauteur du CENTRE lumineux dans cette boîte : il doit tomber sur l'icône
-	   du module. Les 32 % d'origine dataient du temps où un fil d'Ariane
-	   occupait une ligne au-dessus du titre ; depuis que la flèche a rejoint la
-	   ligne du titre, l'icône est remontée et la lueur éclairait 50 px sous
-	   elle (retour Ahmed 2026-07-21 « le néon n'est pas au bon endroit »).
-	   Une variable plutôt que trois pourcentages recopiés : un seul chiffre à
-	   revoir si le header change encore. Mesuré in-app : 11,9 %. */
-	--halo-y: 12%;
-	/* Source lumineuse = l'ICÔNE (demande Ahmed 2026-07-21) : toutes les
-	   ellipses partagent le MÊME centre (l'icône, ~5.5%/32% de la boîte).
-	   EXTINCTION À DÉRIVÉE NULLE : un radial-gradient interpole
-	   LINÉAIREMENT entre stops, donc sans correction la lueur atteint 0
-	   avec une pente franche — l'œil voit cette rupture (bandes de Mach)
-	   sur fond sombre. Les stops suivent (1-t)^2.5 (profil quasi gaussien,
-	   pente → 0 à l'extinction) et le blur fusionne les couches et casse
-	   les micro-frontières restantes. Ellipses contenues dans la boîte. */
-	background:
-		radial-gradient(ellipse 5% 18% at 5.5% var(--halo-y),
-			color-mix(in srgb, var(--accent) 34%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 14%, transparent) 30%,
-			color-mix(in srgb, var(--accent) 3.4%, transparent) 60%,
-			color-mix(in srgb, var(--accent) 0.2%, transparent) 85%,
-			transparent 100%),
-		radial-gradient(ellipse 14% 26% at 6% var(--halo-y),
-			color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 7.8%, transparent) 25%,
-			color-mix(in srgb, var(--accent) 2.8%, transparent) 50%,
-			color-mix(in srgb, var(--accent) 0.5%, transparent) 75%,
-			transparent 100%),
-		radial-gradient(ellipse 58% 30% at 6% calc(var(--halo-y) + 1%),
-			color-mix(in srgb, var(--accent) 12%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 6.9%, transparent) 20%,
-			color-mix(in srgb, var(--accent) 3.3%, transparent) 40%,
-			color-mix(in srgb, var(--accent) 1.2%, transparent) 60%,
-			color-mix(in srgb, var(--accent) 0.2%, transparent) 80%,
-			transparent 100%);
-	filter: blur(12px);
-	pointer-events: none;
 }
 
 .qbd-quizzes-folder-hero-inner {
@@ -801,36 +744,24 @@
 	stroke-width: 1.7;
 }
 
-/* Dans le header d'un dossier : la flèche est SUR la ligne du titre, calée
-   sur l'axe de l'icône du module (titre 28px).
-   COULEUR (essai comparatif in-app 2026-07-21) : l'accent PLEIN se noyait
-   dans le halo du dossier — flèche verte sur lueur verte, illisible, et deux
-   éléments colorés qui se disputent l'œil. Le neutre, lui, ignorait le
-   dossier. Retenu : l'accent MÊLÉ au gris de texte — on reconnaît la teinte
-   du dossier, le titre reste le seul élément pleinement coloré. Le survol
-   passe à l'accent plein : la couleur y signale l'interaction. */
+/* Dans un dossier, la flèche est AU-DESSUS du titre (2026-09-25) : sur sa
+   ligne, elle décalait le titre. Neutre au repos : la couleur du dossier ne
+   vit plus que dans l'icône du titre. -6px aligne le TRAIT de la flèche
+   (21px dans un bouton de 32px) sur la marge du contenu. */
 .qbd-root .qbd-quizzes-header-back {
-	flex: 0 0 auto;
-	/* -6px : le bouton fait 32px pour une flèche de 21px ; ce retrait aligne
-	   le TRAIT de la flèche sur la marge du contenu, pas la boîte du bouton.
-	   margin-right modeste : la flèche appartient au titre.  */
-	margin-left: -6px;
-	margin-right: 6px;
-	align-self: flex-start;
-	/* Cale l'axe de la flèche sur celui de l'icône du module (46px de haut). */
-	margin-top: 6px;
-	color: color-mix(in srgb, var(--accent, var(--text-muted)) 55%, var(--text-muted));
+	margin: 0 0 4px -6px;
+	color: var(--text-muted);
 }
 
 .qbd-root .qbd-quizzes-header-back:hover {
-	color: var(--accent, var(--text-normal));
-	background: color-mix(in srgb, var(--accent, var(--text-normal)) 12%, transparent);
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
 /* ══════════════════════════════════════════════════════════
    HEADER D'UN DOSSIER OUVERT — design claude.ai (capture 2026-07-20) :
-   nom en serif + soulignement dégradé lumineux (accent du dossier),
-   stats QUIZZES/MASTERED + bouton pilule alignés à droite.
+   nom en serif, blanc, et bouton pilule aligné à droite. L'accent du
+   dossier ne colore que l'icône, sans lueur (2026-09-25).
    ═════════════════════════════════════════════════════════ */
 
 /* Le bloc gauche reproduit la structure 7a : ligne icône + titre, puis trait
@@ -846,16 +777,7 @@
 	white-space: nowrap;
 }
 
-/* Trait 7a : les 61 px correspondent exactement à l'icône 46 px + gap 15 px. */
-.qbd-quizzes-title-underline {
-	margin-top: 13px;
-	margin-left: 61px;
-	width: 200px;
-	height: 3px;
-	border-radius: 2px;
-	background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 5%, transparent));
-	box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
-}
+
 
 .qbd-quizzes-folder-hero .qbd-quizzes-header {
 	align-items: flex-end;
@@ -869,9 +791,9 @@
 	font-size: 34px;
 	font-weight: 700;
 	font-variant-numeric: lining-nums;
-	color: var(--accent);
+	color: var(--text-normal);
 	letter-spacing: -0.01em;
-	text-shadow: 0 2px 22px rgba(0, 0, 0, 0.65), 0 0 30px color-mix(in srgb, var(--accent) 30%, transparent);
+	text-shadow: 0 2px 22px rgba(0, 0, 0, 0.65);
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg {
@@ -880,7 +802,6 @@
 	color: var(--accent);
 	stroke: var(--accent);
 	stroke-width: 1.5;
-	filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 55%, transparent));
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg > :first-child {
@@ -891,7 +812,7 @@
 	fill: none;
 }
 
-/* Stats + bouton pilule, groupés à droite du header. margin-left:auto : à la
+/* Bouton pilule, à droite du header. margin-left:auto : à la
    racine le header n'a PLUS de titre (icône retirée, elle vit dans le rail) —
    space-between seul collerait l'unique enfant à gauche. Sans effet en drill
    (le title-block flex:1 consomme déjà tout l'espace). */
@@ -906,44 +827,17 @@
 	padding-left: 24px;
 }
 
-.qbd-quizzes-header-stats {
-	display: flex;
-	align-items: center;
-	gap: 22px;
-}
 
-.qbd-quizzes-header-divider {
-	width: 1px;
-	height: 32px;
-	background: rgba(255, 255, 255, 0.18);
-}
 
-.qbd-quizzes-header-stat {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
 
-.qbd-quizzes-header-stat-num {
-	font-size: 20px;
-	font-weight: 700;
-	line-height: 1.15;
-	color: var(--text-normal);
-	font-variant-numeric: tabular-nums;
-}
 
-.qbd-quizzes-header-stat--mastered .qbd-quizzes-header-stat-num {
-	color: var(--accent);
-	text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
-}
 
-.qbd-quizzes-header-stat-label {
-	margin-top: 2px;
-	font-size: 9.5px;
-	font-weight: 600;
-	color: var(--text-faint);
-	white-space: nowrap;
-}
+
+
+
+
+
+
 
 /* Même pilule pour « Nouveau dossier » (ligne du regroupement, racine)
    que pour « Nouveau quiz » (hero du drill) — demande Ahmed 2026-07-20.
@@ -995,8 +889,6 @@
 }
 
 .qbd-progress-panel {
-	--qbd-progress-neutral: rgba(255, 255, 255, 0.12);
-	--qbd-progress-review: #fbbf24;
 	width: 300px;
 	box-sizing: border-box;
 	padding: 22px 24px;
@@ -1049,106 +941,76 @@
 }
 
 .qbd-progress-panel-count {
-	font-family: var(--font-monospace, monospace);
-	font-size: 11px;
-	color: var(--text-faint);
-	font-variant-numeric: tabular-nums;
+	font-size: 12px;
+	color: var(--text-muted);
 	white-space: nowrap;
 }
 
-/* ── Donut (anneau SVG à 3 segments statut : mastered/review/à-apprendre —
-   cf. skill dataviz, couleurs de statut jamais une palette catégorielle). ── */
-.qbd-progress-donut-wrap {
-	display: flex;
-	justify-content: center;
+/* L'anneau du dossier (même composant que celui des cartes, en grand) et
+   trois chiffres sur une ligne : maîtrisés, en cours, à commencer. */
+.qbd-progress-ring-wrap {
+	display: grid;
+	place-items: center;
 	padding: 4px 0;
 }
 
-.qbd-progress-donut {
-	width: 150px;
-	height: 150px;
-	border-radius: 50%;
-	background: conic-gradient(
-		var(--accent) 0 var(--qbd-donut-mastered-end),
-		var(--qbd-progress-review) var(--qbd-donut-mastered-end) var(--qbd-donut-review-end),
-		rgba(255, 255, 255, 0.12) var(--qbd-donut-review-end) 100%
-	);
-	display: flex;
-	align-items: center;
-	justify-content: center;
+.qbd-progress-ring-wrap .qbd-ring-pct {
+	font-size: 30px;
 }
 
-.qbd-progress-donut-center {
-	width: 112px;
-	height: 112px;
-	border-radius: 50%;
-	background: #0d1222;
+.qbd-progress-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 6px;
+	text-align: center;
+}
+
+.qbd-progress-stat {
 	display: flex;
-	align-items: center;
-	justify-content: center;
+	flex-direction: column;
 	gap: 2px;
+	min-width: 0;
 }
 
-.qbd-progress-donut-pct {
-	font-family: var(--font-display, inherit);
-	font-size: 32px;
-	font-weight: 700;
-	color: #f2f4fb;
+.qbd-progress-stat b {
+	font-size: 20px;
+	font-weight: 800;
+	line-height: 1.1;
 	font-variant-numeric: tabular-nums;
 }
 
-.qbd-progress-donut-pct-sign {
-	align-self: center;
-	margin-top: 8px;
-	font-size: 14px;
-	font-weight: 600;
+.qbd-progress-stat span {
+	font-size: 11.5px;
 	color: var(--text-muted);
 }
 
-/* ── Légende : puce couleur + libellé + % (identité JAMAIS portée par la
-   couleur seule — le libellé texte est toujours visible, cf. dataviz). ── */
-.qbd-progress-legend {
-	display: flex;
-	flex-direction: column;
-	gap: 11px;
-}
+.qbd-progress-stat--done b { color: var(--qbd-state-done); }
+.qbd-progress-stat--progress b { color: var(--qbd-state-progress); }
+.qbd-progress-stat--fresh b { color: var(--text-muted); }
 
-.qbd-progress-legend-row {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
 
-.qbd-progress-legend-dot {
-	width: 11px;
-	height: 11px;
-	border-radius: 50%;
-	flex-shrink: 0;
-}
 
-.qbd-progress-legend-dot--mastered { background: var(--accent); }
-.qbd-progress-legend-dot--review { background: var(--qbd-progress-review); }
-.qbd-progress-legend-dot--learn { background: var(--qbd-progress-neutral); }
 
-.qbd-progress-legend-label {
-	flex: 1;
-	min-width: 0;
-	font-size: 13.5px;
-	font-weight: 600;
-	color: #d3dae9;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
 
-.qbd-progress-legend-pct {
-	font-size: 13.5px;
-	font-weight: 400;
-	color: #9aa2b8;
-	font-variant-numeric: tabular-nums;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @media (max-width: 900px) {
 	.qbd-quizzes-folder-hero .qbd-quizzes-header {
@@ -1167,9 +1029,7 @@
 		font-size: 28px;
 	}
 
-	.qbd-quizzes-title-underline {
-		max-width: calc(100% - 61px);
-	}
+
 
 	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
 		justify-content: flex-start;
@@ -1177,9 +1037,7 @@
 		flex-wrap: wrap;
 	}
 
-	.qbd-quizzes-folder-hero .qbd-quizzes-header-stats {
-		gap: 14px;
-	}
+
 
 	.qbd-quizzes-folder-hero .qbd-btn--create {
 		margin-left: 0;
@@ -1238,8 +1096,3 @@
 	color: var(--text-normal) !important;
 }
 
-/* Même traitement pour les deux surfaces du drill restées en rgba blanc :
-   invisibles sur fond clair. */
-.theme-light .qbd-progress-panel {
-	--qbd-progress-neutral: color-mix(in srgb, var(--text-normal) 14%, transparent);
-}

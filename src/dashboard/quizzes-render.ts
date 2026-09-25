@@ -4,7 +4,7 @@ import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
-import { renderQuizCard } from "./quiz-card";
+import { renderQuizCard, renderProgressRing } from "./quiz-card";
 import { regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
@@ -262,58 +262,41 @@ export function renderModuleDrill(
 	if (!sas) renderProgressPanel(layout, inModule, stats);
 }
 
-/** Donut structurel du handoff 7a : un anneau conique de 150 px et un disque
-    central opaque. Le centre fait partie du donut, le pourcentage ne peut donc
-    plus dériver hors du trou selon les métriques de police. */
-function renderDonut(container: HTMLElement, mastered: number, review: number, total: number, centerPct: number): void {
-	const masteredEnd = total > 0 ? mastered / total * 100 : 0;
-	const reviewEnd = total > 0 ? (mastered + review) / total * 100 : 0;
-	const donut = ajouter(container, "div", "qbd-progress-donut");
-	donut.style.setProperty("--qbd-donut-mastered-end", `${masteredEnd}%`);
-	donut.style.setProperty("--qbd-donut-review-end", `${reviewEnd}%`);
-	donut.setAttribute("role", "img");
-	donut.setAttribute("aria-label", `${centerPct}%`);
-
-	const centerLabel = ajouter(donut, "div", "qbd-progress-donut-center");
-	ajouter(centerLabel, "b", "qbd-progress-donut-pct", String(centerPct));
-	ajouter(centerLabel, "span", "qbd-progress-donut-pct-sign", "%");
-}
-
-/** Panneau « Progrès » : donut (mastered/review/à-apprendre) + légende, à
-    côté de la grille du module ouvert. `inModule` = TOUS les quiz du dossier
-    (pas juste ceux filtrés par une recherche) : c'est un statut du dossier
-    entier. Regroupement des 4 états de computeQuizState en 3 catégories —
-    "review" (quiz raté, seuil déjà atteint) reste seul (correspondance
-    directe avec « à réviser ») ; "progress" (en cours, pas fini) ET "fresh"
-    (jamais commencé) fusionnent dans « à apprendre » : aucun des deux n'est
-    encore acquis, et le triplé de la référence ne laisse pas de 4e case. */
+/** Panneau « Progrès » (2026-09-25) : un anneau fin avec l'avancement moyen
+    des quiz du dossier, puis trois chiffres sur une ligne — maîtrisés, en
+    cours, à commencer — et le nombre de quiz dans l'en-tête (il était dans
+    celui de la page). `inModule` = TOUS les quiz du dossier (pas seulement
+    ceux d'une recherche) : c'est un statut du dossier entier. « À revoir »
+    (fini mais sous le seuil) compte comme « en cours » : pas encore acquis.
+    Plus de donut épais ni de légende en pourcentages, ni de police machine. */
 function renderProgressPanel(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 	const total = inModule.length;
-	let masteredN = 0, reviewN = 0, learnN = 0;
+	let masteredN = 0, enCoursN = 0, freshN = 0, somme = 0;
 	for (const quiz of inModule) {
-		const { state } = computeQuizState(quiz, stats[quiz.path]);
+		const { state, pct } = computeQuizState(quiz, stats[quiz.path]);
+		somme += state === "mastered" ? 100 : pct;
 		if (state === "mastered") masteredN++;
-		else if (state === "review") reviewN++;
-		else learnN++;
+		else if (state === "fresh") freshN++;
+		else enCoursN++;
 	}
-	const pctOf = (n: number): number => total > 0 ? Math.round(n / total * 100) : 0;
+	const moyenne = total > 0 ? Math.round(somme / total) : 0;
 
 	const panel = ajouter(parent, "div", "qbd-progress-panel");
 	const head = ajouter(panel, "div", "qbd-progress-panel-head");
 	ajouter(head, "div", "qbd-progress-panel-title", t("dashboard.quizzes.progressTitle"));
-	ajouter(head, "div", "qbd-progress-panel-count", t("dashboard.quizzes.progressCount", { done: masteredN, total }));
+	ajouter(head, "div", "qbd-progress-panel-count",
+		t(total === 1 ? "dashboard.quizzes.progressQuizzesOne" : "dashboard.quizzes.progressQuizzesOther", { count: total }));
 
-	const donutWrap = ajouter(panel, "div", "qbd-progress-donut-wrap");
-	renderDonut(donutWrap, masteredN, reviewN, total, pctOf(masteredN));
+	const centre = ajouter(panel, "div", "qbd-progress-ring-wrap");
+	renderProgressRing(centre, moyenne, masteredN === total && total > 0 ? "done" : moyenne > 0 ? "progress" : "fresh", 128, 9);
 
-	const legend = ajouter(panel, "div", "qbd-progress-legend");
-	const addRow = (dotMod: string, label: string, n: number): void => {
-		const row = ajouter(legend, "div", "qbd-progress-legend-row");
-		ajouter(row, "div", `qbd-progress-legend-dot qbd-progress-legend-dot--${dotMod}`);
-		ajouter(row, "div", "qbd-progress-legend-label", label);
-		ajouter(row, "div", "qbd-progress-legend-pct", `${pctOf(n)}%`);
+	const chiffres = ajouter(panel, "div", "qbd-progress-stats");
+	const chiffre = (tone: string, n: number, cle: TransKey): void => {
+		const cell = ajouter(chiffres, "div", `qbd-progress-stat qbd-progress-stat--${tone}`);
+		ajouter(cell, "b", undefined, String(n));
+		ajouter(cell, "span", undefined, t(cle));
 	};
-	addRow("mastered", t("dashboard.card.mastered"), masteredN);
-	addRow("review", t("dashboard.card.review"), reviewN);
-	addRow("learn", t("dashboard.quizzes.progressToLearn"), learnN);
+	chiffre("done", masteredN, masteredN > 1 ? "dashboard.quizzes.progressMasteredOther" : "dashboard.quizzes.progressMasteredOne");
+	chiffre("progress", enCoursN, "dashboard.quizzes.progressInProgress");
+	chiffre("fresh", freshN, "dashboard.quizzes.progressToStart");
 }

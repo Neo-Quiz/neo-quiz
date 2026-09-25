@@ -6,7 +6,6 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
-import { isMastered } from "./quiz-mastery";
 import type { ModuleMap } from "./quiz-modules";
 import { isFolderArchived } from "./folder-archive";
 import { renderQuizGrid, renderModuleDrill } from "./quizzes-render";
@@ -248,13 +247,13 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			? moduleAccent(openModuleInfo ?? { folder: openModuleFolder }, { generated: sas })
 			: null;
 
-		// Le dossier ouvert possède sa propre bannière : le halo doit rester
-		// derrière le breadcrumb et le header, sans affecter la vue racine.
+		/* Le dossier ouvert possède sa bannière. Plus de halo derrière le
+		   titre (2026-09-25) : la lueur salissait toute la page ; la couleur
+		   du dossier ne tient plus que dans l'icône du titre. */
 		let headerParent = container;
 		if (openModuleAccent !== null) {
 			const hero = ajouter(container, "div", "qbd-quizzes-folder-hero");
 			hero.style.setProperty("--accent", openModuleAccent);
-			ajouter(hero, "div", "qbd-quizzes-folder-halo");
 			headerParent = ajouter(hero, "div", "qbd-quizzes-folder-hero-inner");
 		}
 
@@ -263,12 +262,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		// « + New folder » sur la ligne du regroupement (demande Ahmed
 		// 2026-07-20), même ligne que le chip UE/Recent.
 		if (openModuleFolder !== null) {
+			/* Retour AU-DESSUS du titre (2026-09-25) : à sa gauche, la flèche
+			   décalait le titre et se lisait mal. Un seul bouton retour dans
+			   tout le dashboard. */
+			const back = ajouter(headerParent, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
 			const header = ajouter(headerParent, "div", "qbd-quizzes-header");
-
-			// Retour SUR LA LIGNE du titre, à sa gauche (comme la page d'un
-			// quiz) : une flèche seule au-dessus du titre faisait un étage de
-			// plus pour rien. Un seul bouton retour dans tout le dashboard.
-			const back = ajouter(header, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
 			back.type = "button";
 			back.setAttribute("aria-label", t("dashboard.quizzes.backToModules"));
 			const backIcon = ajouter(back, "span", "qbd-quizzes-crumb-icon");
@@ -287,24 +285,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			const titleIcon = ajouter(titleEl, "span", "qbd-quizzes-title-icon");
 			currentHost().ui.setIcon(titleIcon, moduleIcon(openModuleInfo ?? {}, { generated: sas }));
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
-			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 
-			// ── Actions du header : stats + pilule « Nouveau quiz » ── (groupées
-			// pour rester alignées à droite, comme la référence).
+			// ── Action du header : la pilule « Nouveau quiz », à droite. Plus de
+			// compteurs « N quiz | N maîtrisés » (2026-09-25) : le nombre de
+			// quiz est dans le panneau « Progrès », qui dit aussi les maîtrisés.
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
-			const masteredCount = inModule.filter(q => isMastered(q, stats)).length;
-			const statsWrap = ajouter(headerActions, "div", "qbd-quizzes-header-stats");
-			const addStat = (n: number, key: TransKey, modifier?: string): void => {
-				const item = ajouter(statsWrap, "div", "qbd-quizzes-header-stat");
-				if (modifier) item.classList.add(modifier);
-				ajouter(item, "div", "qbd-quizzes-header-stat-num", String(n));
-				ajouter(item, "div", "qbd-quizzes-header-stat-label", t(key));
-			};
-			addStat(inModule.length, "dashboard.quizzes.statQuizzes");
-			if (!sas) {
-				ajouter(statsWrap, "div", "qbd-quizzes-header-divider");
-				addStat(masteredCount, "dashboard.card.mastered", "qbd-quizzes-header-stat--mastered");
-			}
 
 			// Drill-down : créer un dossier ICI n'a pas de sens (demande Ahmed
 			// 2026-07-19) → une seule pilule « Nouveau quiz », qui ouvre le MÊME

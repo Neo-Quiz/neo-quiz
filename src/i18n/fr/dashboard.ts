@@ -122,10 +122,13 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.moduleQuizzesOne": "{count} quiz",
 	"dashboard.quizzes.moduleQuizzesOther": "{count} quiz",
 	"dashboard.quizzes.backToModules": "Tous les quiz",
-	"dashboard.quizzes.statQuizzes": "Quiz",
 	"dashboard.quizzes.progressTitle": "Progrès",
-	"dashboard.quizzes.progressCount": "{done}/{total} quiz",
-	"dashboard.quizzes.progressToLearn": "À apprendre",
+	"dashboard.quizzes.progressQuizzesOne": "{count} quiz",
+	"dashboard.quizzes.progressQuizzesOther": "{count} quiz",
+	"dashboard.quizzes.progressMasteredOne": "maîtrisé",
+	"dashboard.quizzes.progressMasteredOther": "maîtrisés",
+	"dashboard.quizzes.progressInProgress": "en cours",
+	"dashboard.quizzes.progressToStart": "à commencer",
 	"dashboard.quizzes.groupByActivity": "Récent",
 	"dashboard.quizzes.recentWeek": "7 derniers jours",
 	"dashboard.quizzes.recentMonth": "30 derniers jours",
@@ -184,14 +187,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.review.deferredOther": "{count} de plus, gardées pour demain",
 
 	/* ── Carte de quiz ── */
-	"dashboard.card.mastered": "Maîtrisé",
-	"dashboard.card.review": "À revoir",
-	"dashboard.card.progress": "En cours · {pct}%",
-	"dashboard.card.fresh": "À commencer",
-	"dashboard.card.actionLearn": "Apprendre",
-	"dashboard.card.actionPractice": "S'entraîner",
-	"dashboard.card.orLearn": "ou revoir le cours",
-	"dashboard.card.orPractice": "ou s'entraîner directement",
 	"dashboard.card.more": "Plus d'actions",
 
 	/* ── Type de quiz ── */
