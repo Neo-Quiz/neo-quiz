@@ -333,7 +333,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				plus.type = "button";
 				plus.setAttribute("aria-label", t("dashboard.card.more"));
 				plus.title = t("dashboard.card.more");
-				currentHost().ui.setIcon(plus, "ellipsis");
+				currentHost().ui.setIcon(plus, "ellipsis-vertical");
 				const groupe = {
 					folder: openModuleFolder, name: openModuleInfo?.name || openModuleFolder, ue: openModuleInfo?.ue ?? null,
 					path: cheminOuvert, color: openModuleInfo?.color, icon: openModuleInfo?.icon,

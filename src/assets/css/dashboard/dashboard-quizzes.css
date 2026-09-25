@@ -1449,26 +1449,27 @@
 	gap: 10px;
 }
 
-/* « ⋯ » : rond, même contour que « Partager ». */
+/* « ⋮ » : trois points VERTICAUX, nus — ni contour ni fond, comme
+   StudySmarter ; un voile rond n'apparaît qu'au survol. */
 .qbd-root .qbd-folder-more-btn {
 	display: inline-grid;
 	place-items: center;
-	width: 37px;
-	height: 37px;
-	margin: 0;
+	width: 32px;
+	height: 32px;
+	margin: 0 -6px 0 -4px;
 	padding: 0;
+	border: 0;
 	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
-	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	background: none;
 	box-shadow: none;
-	color: var(--text-normal);
+	color: var(--text-muted);
 	cursor: pointer;
-	transition: border-color 0.15s ease, background-color 0.15s ease;
+	transition: color 0.15s ease, background-color 0.15s ease;
 }
 .qbd-root .qbd-folder-more-btn:hover,
 .qbd-root .qbd-folder-more-btn[aria-expanded="true"] {
-	border-color: color-mix(in srgb, var(--text-normal) 24%, transparent);
-	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 }
 .qbd-root .qbd-folder-more-btn:focus-visible {
 	outline: 2px solid var(--interactive-accent);
