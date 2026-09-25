@@ -169,39 +169,52 @@ export function renderQuizCard(
 		}
 	}
 
-	/* LES ACTIONS (2026-09-24) : un bouton par mode, en pleine largeur, à la
-	   place de la ligne « N questions + étiquette » et du ▶. Dans un cours,
-	   ils sont NUMÉROTÉS — ① apprendre, ② s'entraîner : l'ordre se lit sans
-	   explication. Chaque bouton dit l'état de SON mode (nombre de questions,
-	   progression, coche une fois terminé) et lance ce mode ; le reste de la
-	   carte ouvre la fiche. Les deux sortes de cartes se lisent pareil : une
-	   carte d'un seul mode a le même bouton, seul, sans numéro. */
-	const modes = frere ? [quiz, frere] : [quiz];
-	const actions = ajouter(body, "div", "qbd-quiz-card-actions" + (frere ? " qbd-quiz-card-actions--deux" : ""));
-	modes.forEach((q, i) => {
-		const info = q === quiz ? infoQuiz : infoFrere!;
-		const fini = info.state === "mastered" || info.state === "review";
-		const btn = ajouter(actions, "button", "qbd-quiz-card-action" + (fini ? " is-done" : ""));
-		btn.type = "button";
-		const haut = ajouter(btn, "span", "qbd-quiz-card-action-top");
-		if (frere) ajouter(haut, "span", "qbd-quiz-card-action-num", String(i + 1));
-		currentHost().ui.setIcon(ajouter(haut, "span", "qbd-quiz-card-action-icon"), fini ? "circle-check" : q.mode === "learn" ? "book-open" : "dumbbell");
-		ajouter(haut, "span", "qbd-quiz-card-action-label", t(q.mode === "learn" ? "dashboard.card.actionLearn" : "dashboard.card.actionPractice"));
-		/* L'état sous le bouton seulement dans un cours : sur une carte d'un
-		   seul mode, la pastille d'état le dit déjà, le bouton garde le nombre
-		   de questions. */
-		const nombre = t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions });
-		ajouter(btn, "span", "qbd-quiz-card-action-sub",
-			!frere ? nombre
-				: fini ? t("dashboard.card.actionDone")
-					: info.state === "progress" ? t("dashboard.card.progress", { pct: info.pct })
-						: nombre);
-		btn.addEventListener("click", (e) => {
-			e.stopPropagation();
-			if (opts?.onPlay) opts.onPlay(q);
-			else if (typeof onOpen === "function") onOpen(q);
-		});
+	/* L'ACTION (2026-09-25) : UN bouton plein, la PROCHAINE étape — le Learn
+	   tant qu'il n'est pas fini, le Practice ensuite — et, dans un cours, un
+	   lien discret vers l'autre mode. Remplace les deux boutons numérotés
+	   « 1 Learn / 2 Practice » de la veille : deux boutons de même poids se
+	   lisaient comme un choix, pas comme une suite. Relevé sur Quizlet, Khan
+	   Academy, Brilliant et StudySmarter (rapport « Modes d'étude sur une
+	   carte 2026 ») : aucun ne met deux modes côte à côte sur une carte de
+	   liste, tous poussent l'étape suivante. Le reste de la carte ouvre la
+	   fiche ; une carte d'un seul mode a le même bouton, sans lien. */
+	const lancer = (q: QuizIndexEntry) => {
+		if (opts?.onPlay) opts.onPlay(q);
+		else if (typeof onOpen === "function") onOpen(q);
+	};
+	const estFini = (s: string) => s === "mastered" || s === "review";
+	const learnQ = frere ? (quiz.mode === "learn" ? quiz : frere) : null;
+	const learnFini = !!learnQ && estFini((learnQ === quiz ? infoQuiz : infoFrere!).state);
+	const principal = !frere ? quiz : learnFini ? (learnQ === quiz ? frere : quiz) : learnQ!;
+	const secondaire = frere ? (principal === quiz ? frere : quiz) : null;
+	const infoPrincipal = principal === quiz ? infoQuiz : infoFrere!;
+
+	const actions = ajouter(body, "div", "qbd-quiz-card-actions");
+	const fini = estFini(infoPrincipal.state);
+	const btn = ajouter(actions, "button", "qbd-quiz-card-action" + (fini ? " is-done" : ""));
+	btn.type = "button";
+	const haut = ajouter(btn, "span", "qbd-quiz-card-action-top");
+	currentHost().ui.setIcon(ajouter(haut, "span", "qbd-quiz-card-action-icon"), fini ? "circle-check" : principal.mode === "learn" ? "book-open" : "dumbbell");
+	ajouter(haut, "span", "qbd-quiz-card-action-label", t(principal.mode === "learn" ? "dashboard.card.actionLearn" : "dashboard.card.actionPractice"));
+	/* Sous le verbe : la progression en cours, sinon le nombre de questions
+	   (la pastille d'état dit déjà « maîtrisé » ou « à revoir »). */
+	const nombre = t(principal.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: principal.questions });
+	ajouter(btn, "span", "qbd-quiz-card-action-sub",
+		infoPrincipal.state === "progress" ? t("dashboard.card.progress", { pct: infoPrincipal.pct }) : nombre);
+	btn.addEventListener("click", (e) => {
+		e.stopPropagation();
+		lancer(principal);
 	});
+
+	if (secondaire) {
+		const lien = ajouter(actions, "button", "qbd-quiz-card-action-alt",
+			t(secondaire.mode === "learn" ? "dashboard.card.orLearn" : "dashboard.card.orPractice"));
+		lien.type = "button";
+		lien.addEventListener("click", (e) => {
+			e.stopPropagation();
+			lancer(secondaire);
+		});
+	}
 
 	// Ouverture (navigation laissée à l'appelant)
 	card.addEventListener("click", () => {

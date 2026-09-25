@@ -220,7 +220,8 @@ export const EN_DASHBOARD = {
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */
 	"dashboard.card.actionLearn": "Learn",
 	"dashboard.card.actionPractice": "Practice",
-	"dashboard.card.actionDone": "Done",
+	"dashboard.card.orLearn": "or review the lesson",
+	"dashboard.card.orPractice": "or skip to practice",
 	"dashboard.card.more": "More actions",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */
