@@ -7,6 +7,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { quizModeLabel } from "./quiz-card";
 import { computeQuizState } from "./quiz-mastery";
 import { openActionMenu } from "./ui-select";
+import { poserBouton3d } from "./cta3d";
 import { duesDuDossier, questions } from "./folder-progress-details";
 
 /* ══════════════════════════════════════════════════════════
@@ -50,9 +51,11 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 	const premier = choix[0];
 	if (!premier) return;
 
-	// Le reflet qui défile de l'action principale (« Commencer le quiz »).
-	const split = ajouter(parent, "div", "qbd-next-step qbd-btn--shine");
-	ajouter(split, "span", "qbd-btn-shine").setAttribute("aria-hidden", "true");
+	/* Le bouton 3D de « Commencer le quiz » (cta3d.ts), SCINDÉ : une seule
+	   face surélevée porte les deux boutons — cliquer l'un ou l'autre
+	   l'enfonce (`:active` remonte au conteneur), et le reflet balaie le
+	   tout (2026-09-26). */
+	const split = ajouter(parent, "div", "qbd-next-step");
 	const main = ajouter(split, "button", "qbd-next-step-main");
 	main.type = "button";
 	main.title = premier.aide;
@@ -62,7 +65,11 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 	main.addEventListener("click", premier.lancer);
 
 	// La flèche n'a de sens que s'il reste un AUTRE choix que celui du bouton.
-	if (choix.length < 2) return;
+	if (choix.length >= 2) ajouterFleche(split, choix);
+	poserBouton3d(split);
+}
+
+function ajouterFleche(split: HTMLElement, choix: Choix[]): void {
 	const caret = ajouter(split, "button", "qbd-next-step-caret");
 	caret.type = "button";
 	caret.setAttribute("aria-label", t("dashboard.quizzes.nextStepMore"));

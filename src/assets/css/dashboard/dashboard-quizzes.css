@@ -1011,17 +1011,24 @@
 
 .qbd-add-content-btn .qbd-btn-icon svg { width: 16px; height: 16px; }
 
-/* L'étape suivante : la pilule claire de l'action principale de l'app. */
-.qbd-next-step {
+/* L'étape suivante : le bouton 3D de « Commencer le quiz » (.qbd-cta3d,
+   dashboard-components.css), SCINDÉ — la face porte les deux boutons,
+   transparents, séparés par un filet. (2026-09-26) */
+.qbd-root .qbd-next-step.qbd-cta3d {
 	display: flex;
 	min-width: 0;
-	border-radius: 11px;
-	background: rgba(231, 235, 247, 0.92);
-	color: #141a2c;
+	cursor: default;
+}
+.qbd-next-step .qbd-cta3d-face {
+	padding: 0;
+	justify-content: stretch;
+	gap: 0;
 }
 
 .qbd-root .qbd-next-step-main,
 .qbd-root .qbd-next-step-caret {
+	position: relative;
+	z-index: 1;
 	display: inline-flex;
 	align-items: center;
 	height: auto;
@@ -1029,10 +1036,9 @@
 	border: 0;
 	background: none;
 	box-shadow: none;
-	color: #141a2c;
+	color: #fff;
 	font: inherit;
 	cursor: pointer;
-	transition: background-color 0.15s ease;
 }
 
 .qbd-root .qbd-next-step-main {
@@ -1040,30 +1046,29 @@
 	justify-content: center;
 	gap: 8px;
 	min-width: 0;
-	padding: 11px 16px;
-	border-radius: 11px;
-	font-size: 14px;
+	padding: 14px 20px;
+	border-radius: 60px 0 0 60px;
+}
+
+.qbd-root .qbd-next-step-main:only-of-type {
+	border-radius: 60px;
 }
 
 .qbd-root .qbd-next-step-caret {
-	padding: 11px 13px;
-	border-radius: 0 11px 11px 0;
-	border-left: 1px solid rgba(20, 26, 44, 0.16);
-}
-
-.qbd-root .qbd-next-step-main:has(+ .qbd-next-step-caret) {
-	border-radius: 11px 0 0 11px;
+	padding: 14px 16px 14px 13px;
+	border-radius: 0 60px 60px 0;
+	border-left: 1px solid rgba(255, 255, 255, 0.28);
 }
 
 .qbd-root .qbd-next-step-main:hover,
 .qbd-root .qbd-next-step-caret:hover,
 .qbd-root .qbd-next-step-caret[aria-expanded="true"] {
-	background: rgba(20, 26, 44, 0.07);
+	background: rgba(255, 255, 255, 0.1);
 }
 
 .qbd-root .qbd-next-step-main:focus-visible,
 .qbd-root .qbd-next-step-caret:focus-visible {
-	outline: 2px solid var(--interactive-accent);
+	outline: 2px solid #fff;
 	outline-offset: -3px;
 }
 
