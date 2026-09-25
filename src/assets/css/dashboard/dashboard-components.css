@@ -1074,11 +1074,39 @@
 	white-space: normal;
 	font: inherit;
 	cursor: pointer;
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
 	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+/* LA LUEUR de Brilliant (2026-09-26, la carte « Continue course ») : un halo
+   de la couleur de la tuile monte du bas, discret au repos, plein au survol.
+   Portée par un pseudo-élément dont seule l'OPACITÉ bouge : un dégradé ne
+   s'anime pas, une opacité passe par le compositeur. */
+.qbd-create-option,
+.qbd-root .qbd-create-option { position: relative; isolation: isolate; overflow: hidden; }
+.qbd-create-option::before,
+.qbd-add-tile::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: radial-gradient(130% 90% at 50% 125%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 72%);
+	opacity: 0.45;
+	transition: opacity 0.25s ease;
+	pointer-events: none;
 }
 .qbd-add-tile:hover {
 	border-color: color-mix(in oklab, var(--accent) 55%, transparent);
-	background: color-mix(in oklab, var(--accent) 8%, transparent);
+	background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.qbd-add-tile:hover::before,
+.qbd-add-tile:focus-visible::before,
+.qbd-create-option:hover::before,
+.qbd-create-option:focus-visible::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-add-tile::before,
+	.qbd-create-option::before { transition: none; }
 }
 .qbd-add-tile:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .qbd-add-tile .qbd-create-option-icon { width: 36px; height: 36px; }
