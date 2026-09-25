@@ -82,5 +82,10 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, SESSIO
 	r.check("forme invalide : null", restaurer({ v: 1, courante: 3, questions: [] }, ids, base), null);
 	r.check("sélection du mauvais type : ignorée", restaurer({ v: 1, courante: null, ecrite: 1, questions: { unique: { selection: "texte" } } }, ids, base).selections[0], null);
 	r.check("indice hors bornes : ignoré", restaurer({ v: 1, courante: null, ecrite: 1, questions: { unique: { selection: 7 } } }, ids, base).selections[0], null);
+
+	// Classement, appariement, carte mémoire : bornes additionnelles.
+	r.check("classement : indice hors des items", restaurer({ v: 1, courante: null, ecrite: 1, questions: { classement: { selection: [99999, 0, 1] } } }, ids, base).selections[3], [null, null, null]);
+	r.check("appariement : indice hors des choix", restaurer({ v: 1, courante: null, ecrite: 1, questions: { appariement: { selection: [5, 0] } } }, ids, base).selections[4], [null, null]);
+	r.check("carte mémoire : number rejeté", restaurer({ v: 1, courante: null, ecrite: 1, questions: { carte: { selection: 42 } } }, ids, base).selections[5], null);
 	r.done();
 });

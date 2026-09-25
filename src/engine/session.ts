@@ -109,20 +109,29 @@ function melangeValide(sauve: unknown, neuf: QuestionShuffleEntry): QuestionShuf
 		: undefined;
 }
 
-/** La sélection sauvée, si elle a le TYPE de la sélection initiale. `n` : nombre d'options connu (mélange), sinon null. */
-function selectionValide(sauve: unknown, initiale: QuestionSelection, n: number | null): QuestionSelection | undefined {
-	const dansBornes = (v: number): boolean => n === null || v < n;
+/** La sélection sauvée, si elle a le TYPE de la sélection initiale. `borne` : nombre d'options connu (mélange), sinon null. */
+function selectionValide(sauve: unknown, initiale: QuestionSelection, borne: number | null): QuestionSelection | undefined {
+	const dansBornes = (v: number): boolean => borne === null || v < borne;
 	if (initiale instanceof Set) {
 		return Array.isArray(sauve) && sauve.every(v => estEntier(v) && dansBornes(v)) ? new Set(sauve as number[]) : undefined;
 	}
 	if (Array.isArray(initiale)) {
 		if (!Array.isArray(sauve) || sauve.length !== initiale.length) return undefined;
 		const texte = initiale.every(v => typeof v === "string");
-		const ok = texte ? sauve.every(v => typeof v === "string") : sauve.every(v => v === null || estEntier(v));
+		if (texte) {
+			return sauve.every(v => typeof v === "string") ? [...sauve] as QuestionSelection : undefined;
+		}
+		// Classement ou appariement : chaque élément non-null doit être < borne
+		const ok = sauve.every(v => v === null || (estEntier(v) && dansBornes(v)));
 		return ok ? [...sauve] as QuestionSelection : undefined;
 	}
 	if (typeof initiale === "string") return typeof sauve === "string" ? sauve : undefined;
-	// Choix unique (ou carte mémoire, dont la sélection reste null).
+	// Choix unique ou carte mémoire.
+	// Carte mémoire : initiale === null ET borne === null, seul null accepté.
+	if (initiale === null && borne === null) {
+		return sauve === null ? null : undefined;
+	}
+	// Choix unique : scalar selection (initiale est null ou un nombre)
 	if (sauve === null) return null;
 	return estEntier(sauve) && dansBornes(sauve) ? sauve : undefined;
 }
@@ -165,8 +174,18 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 		const melangeRejete = neuf !== null && e.melange !== undefined && melange === undefined;
 		if (melange) r.shuffleMap[i] = melange;
 		if (!melangeRejete && e.selection !== undefined) {
-			const nOptions = Array.isArray(neuf) ? neuf.length : null;
-			const sel = selectionValide(e.selection, base.selections[i], nOptions);
+			const initiale = base.selections[i];
+			let borne: number | null = null;
+			if (neuf === null) {
+				borne = null;
+			} else if (Array.isArray(neuf)) {
+				// Pour Set/scalar, borne = shuffle.length. Pour array (classement), borne = initiale.length.
+				borne = Array.isArray(initiale) ? initiale.length : neuf.length;
+			} else {
+				// Pour {rows, choices} (appariement), borne = choices.length
+				borne = neuf.choices.length;
+			}
+			const sel = selectionValide(e.selection, initiale, borne);
 			if (sel !== undefined) r.selections[i] = sel;
 		}
 		if (typeof e.texte === "string") r.textOnlyAnswers[i] = e.texte;
