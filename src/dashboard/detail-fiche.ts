@@ -19,33 +19,28 @@ import { attachHoverTip } from "./hover-tip";
 /* ══════════════════════════════════════════════════════════
    FICHE D'UN QUIZ — ce que la page montre à l'ouverture
 
-   Une fiche fixe à gauche (dossier, titre, objectif, nombre de questions,
-   origine, progression, Commencer, Éditeur) et toutes les questions à
-   droite, lisibles d'un coup. Retenue le 2026-09-23 parmi quatre interfaces
-   essayées dans l'app, sur le modèle de Wayground (ex-Quizizz). Avant elle,
-   la page s'ouvrait sur la question 1 rendue comme si l'on pouvait y
-   répondre : un nouveau venu ne savait pas quoi faire (« je fais quoi
-   mtn ? »).
+   ORGANISATION DE STUDYSMARTER (2026-09-26), qui remplace la fiche fixe à
+   gauche et la frise verticale du 2026-09-23 (« c'est beau mais c'est mal
+   organisé ») : un EN-TÊTE sur toute la largeur (retour, dossier et titre à
+   gauche ; Éditeur, Commencer le quiz et ⋮ à droite), une ligne d'infos
+   (mode, nombre de questions, origine, progression), une BARRE d'outils
+   (grille | liste, recherche), puis les questions sur toute la largeur.
+
+   DEUX VUES, comme StudySmarter, essayées toutes deux dans l'app :
+   - GRILLE : toutes les questions en cartes, vues d'un coup ;
+   - LISTE : les questions en colonne à gauche, celle qu'on choisit en
+     grand à droite, avec ← → pour passer de l'une à l'autre.
+   Cliquer une carte de la grille l'ouvre dans la liste. La vue choisie est
+   une commodité de l'utilisateur : `localStorage`, et la grille à défaut.
 
    AUCUNE RÉPONSE ici : on relit le quiz pour savoir ce qui attend, pas pour
    en apprendre la solution. Seules les options d'un QCM sont montrées, sans
-   la bonne ; les autres types n'affichent que leur énoncé.
+   la bonne ; les autres types n'affichent que leur énoncé. Répondre ne se
+   fait qu'en jouant le quiz : cliquer la question agrandie fait briller
+   « Commencer le quiz » (règle du 2026-09-23, gardée).
 
-   PAS DE COUVERTURE. Un bandeau en dégradé portait l'icône du type : les
-   quiz générés sont presque tous « Mixte », il était donc le même sur
-   chaque quiz, seul bloc opaque d'une interface en verre, et repoussait
-   Commencer de 140 px (retiré le 2026-09-23). Le type vit dans l'icône de
-   l'étiquette « N questions », nommé au survol comme sur les cartes. Les
-   étiquettes tiennent sur UNE ligne, toujours (demande d'Ahmed).
-
-   La flèche retour et l'éditeur vivent DANS la fiche : l'en-tête de la page
-   est masqué sur cet écran (classe `qbd-qz--fiche`).
-
-   UN CLIC SUR UNE QUESTION N'OUVRE RIEN. Il ouvrait l'aperçu, l'ancienne
-   page à deux colonnes, où l'on croyait pouvoir répondre ; il fait
-   maintenant briller « Commencer le quiz », seul endroit où l'on répond
-   (Ahmed, 2026-09-23). Le même reflet passe à l'arrivée sur la fiche, puis
-   périodiquement.
+   L'en-tête de la page est masqué sur cet écran (classe `qbd-qz--fiche`) :
+   la flèche retour et l'éditeur vivent dans celui de la fiche.
 ══════════════════════════════════════════════════════════ */
 
 /** D'où vient le quiz, déjà mis en forme par la page (même rendu que sa
@@ -60,14 +55,6 @@ export interface FicheOrigine {
 	/** Infobulle : l'identifiant exact du modèle, et l'effort du CLI quand il est connu. */
 	tooltip: string;
 }
-
-/* LA FRISE AU CHANGEMENT DE MODE (2026-09-25) : la ligne et ses ronds
-   numérotés RESTENT ; chaque rond glisse verticalement jusqu'à sa place dans
-   la nouvelle liste (FLIP), pendant que les cartes des questions s'effacent
-   puis réapparaissent. La page est entièrement redessinée entre les deux :
-   la position de chaque rond (par rapport au haut de la liste) est donc
-   relevée au clic et consommée par le rendu suivant, une seule fois. */
-let rondsAvant: number[] | null = null;
 
 export interface FicheDeps {
 	quiz: QuizIndexEntry;
@@ -84,7 +71,23 @@ export interface FicheDeps {
 	/** L'autre mode du même cours : la pastille du mode devient un sélecteur
 	    Learn | Practice, dont l'autre segment ouvre ce quiz. */
 	autreMode?: { mode: ModeQuiz; open(): void };
+	/** Le menu « ⋮ » du quiz, le même que celui de sa carte. Absent : pas de bouton. */
+	menu?(anchor: HTMLElement): void;
 }
+
+type Vue = "grille" | "liste";
+const CLE_VUE = "neo-quiz.fiche.vue";
+
+function lireVue(): Vue {
+	try { return localStorage.getItem(CLE_VUE) === "liste" ? "liste" : "grille"; } catch { return "grille"; }
+}
+function ecrireVue(v: Vue): void {
+	try { localStorage.setItem(CLE_VUE, v); } catch { /* simple commodité : sans stockage, la grille */ }
+}
+
+/* L'état de la barre, gardé entre deux repeints du MÊME quiz (la page se
+   repeint sur des événements extérieurs) ; remis à zéro sur un autre quiz. */
+const etat = { chemin: "", selection: 0, recherche: "", fondu: false };
 
 function icone(parent: HTMLElement, name: string, cls = "qbd-fiche-i"): HTMLElement {
 	const el = ajouter(parent, "span", cls);
@@ -99,22 +102,28 @@ function texte(parent: HTMLElement, tag: "p" | "span", cls: string, value: strin
 	return el;
 }
 
-export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
-	const root = ajouter(parent, "div", "qbd-fiche");
-	const attirer = renderSide(root, deps);
-	renderQuestions(root, attirer, deps);
-}
-
 function reduit(): boolean {
 	return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Rend la fiche, et la fonction qui attire l'œil sur « Commencer le quiz ». */
-function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
-	const side = ajouter(root, "aside", "qbd-fiche-side");
+export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
+	if (etat.chemin !== deps.quiz.path) {
+		etat.chemin = deps.quiz.path;
+		etat.selection = 0;
+		etat.recherche = "";
+	}
+	const root = ajouter(parent, "div", "qbd-fiche");
+	const attirer = renderHead(root, deps);
+	renderMeta(root, deps);
+	renderBody(root, attirer, deps);
+}
+
+/** L'en-tête, et la fonction qui attire l'œil sur « Commencer le quiz ». */
+function renderHead(root: HTMLElement, deps: FicheDeps): () => void {
+	const head = ajouter(root, "header", "qbd-fiche-head");
 
 	// Même bouton que le retour de l'en-tête : un seul retour dans tout le dashboard.
-	const back = ajouter(side, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
+	const back = ajouter(head, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
 	back.type = "button";
 	back.setAttribute("aria-label", t("dashboard.quiz.back"));
 	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
@@ -123,17 +132,54 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 
 	// Le DOSSIER du quiz, au-dessus du titre — le seul segment du chemin qui
 	// dise d'où il sort (même règle que les cartes). Racine du vault : rien.
+	const titres = ajouter(head, "div", "qbd-fiche-titles");
 	const dossier = deps.quiz.path.split("/").slice(0, -1).filter(Boolean).pop();
-	if (dossier) ajouter(side, "div", "qbd-fiche-kicker", dossier);
-	ajouter(side, "h2", "qbd-fiche-title", deps.quiz.title);
+	if (dossier) ajouter(titres, "div", "qbd-fiche-kicker", dossier);
+	ajouter(titres, "h2", "qbd-fiche-title", deps.quiz.title);
 
-	const chips = ajouter(side, "div", "qbd-fiche-chips");
+	const actions = ajouter(head, "div", "qbd-fiche-actions");
+	const edit = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");
+	edit.type = "button";
+	icone(edit, "square-pen", "qbd-btn-icon");
+	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
+	edit.addEventListener("click", () => deps.onEdit());
+
+	const start = ajouter(actions, "button", "qbd-fiche-start");
+	start.type = "button";
+	icone(start, "play", "qbd-btn-icon");
+	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
+	/* Le bouton 3D de Brilliant, dans le bleu des flèches (2026-09-25) : face
+	   surélevée qui s'enfonce au clic, et le REFLET qui balaie — un SVG à
+	   part, pour que `attirer` puisse relancer son cycle (cta3d.ts). */
+	const reflet = poserBouton3d(start);
+	start.addEventListener("click", () => deps.onStart(start));
+
+	/* « ⋮ » : le menu de la carte du quiz, comme l'en-tête d'un dossier. */
+	const menu = deps.menu;
+	if (menu) {
+		const plus = ajouter(actions, "button", "qbd-folder-more-btn");
+		plus.type = "button";
+		plus.setAttribute("aria-label", t("dashboard.card.more"));
+		plus.title = t("dashboard.card.more");
+		currentHost().ui.setIcon(plus, "ellipsis-vertical");
+		plus.addEventListener("click", () => menu(plus));
+	}
+
+	/* Relance le reflet sur-le-champ (remis au début de son cycle). Rien
+	   sans animations. */
+	return () => {
+		if (reduit()) return;
+		for (const a of reflet.getAnimations()) a.currentTime = 0;
+	};
+}
+
+/** La ligne d'infos : le mode (ou le sélecteur Learn | Practice), le nombre
+    de questions, l'origine, la progression. */
+function renderMeta(root: HTMLElement, deps: FicheDeps): void {
+	const meta = ajouter(root, "div", "qbd-fiche-meta");
+	const chips = ajouter(meta, "div", "qbd-fiche-chips");
 	/* Le MODE, avec son icône, et au survol son explication : la bulle du
-	   sélecteur Learn | Practice de la page « Générer », mêmes textes. Les
-	   icônes ont été choisies parmi cinq chacune, rendues comme ici (Ahmed,
-	   2026-09-23) : le livre ouvert pour Learn, l'haltère pour Practice. */
-	/* UN COURS AUX DEUX MODES (2026-09-24) : un sélecteur Learn | Practice à la
-	   place de la pastille ; le segment de l'autre mode ouvre sa fiche. */
+	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
 	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
 		const el = ajouter(parent, tag, cls);
 		icone(el, m === "learn" ? "book-open" : "dumbbell", "qbd-fiche-mode-icon");
@@ -150,8 +196,8 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 		const choix = ajouter(chips, "div", "qbd-fiche-modes");
 		choix.setAttribute("role", "group");
 		/* Le bloc qui glisse, comme dans la page « Générer » (2026-09-25) : au
-		   clic, il glisse vers l'autre mode, PUIS sa fiche s'ouvre — ouvrir
-		   tout de suite repeindrait la page avant qu'on ait vu le mouvement. */
+		   clic, il glisse vers l'autre mode pendant que les questions
+		   s'effacent, PUIS sa fiche s'ouvre et les siennes apparaissent. */
 		const indic = ajouter(choix, "div", "qbd-fiche-mode-indic");
 		const segs = (["learn", "practice"] as const).map(m => {
 			const actif = m === deps.quiz.mode;
@@ -171,18 +217,15 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 				courant.classList.remove("is-active");
 				seg.classList.add("is-active");
 				placerIndicateur(indic, seg, true);
-				const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-				const liste = choix.closest(".qbd-fiche")?.querySelector<HTMLElement>(".qbd-fiche-list");
-				if (!reduit && liste) {
-					const haut = liste.getBoundingClientRect().top;
-					rondsAvant = [...liste.querySelectorAll<HTMLElement>(".qbd-fiche-node")].map(n => n.getBoundingClientRect().top - haut);
-					// Les cartes s'effacent pendant que le bloc du sélecteur glisse.
-					liste.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
+				const sansAnim = reduit();
+				if (!sansAnim) {
+					etat.fondu = true;
+					root.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
 						[{ opacity: 1 }, { opacity: 0 }],
 						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
 					));
 				}
-				window.setTimeout(() => autre.open(), reduit ? 0 : DUREE_GLISSEMENT);
+				window.setTimeout(() => autre.open(), sansAnim ? 0 : DUREE_GLISSEMENT);
 			});
 		}
 	} else {
@@ -192,13 +235,11 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 
-	/* D'où vient le quiz : le logo et le modèle, puis la date SOUS le modèle,
-	   alignée sur son nom — ni « Généré par », que le logo dit déjà (l'infobulle
-	   le dit en toutes lettres), ni séparateur entre les deux (Ahmed,
-	   2026-09-23). Chacune tient sur sa ligne. */
+	/* D'où vient le quiz : le logo, le modèle, puis la date, sur une ligne ;
+	   l'infobulle donne l'identifiant exact. */
 	if (deps.origine) {
 		const o = deps.origine;
-		const bloc = ajouter(side, "div", "qbd-fiche-origin");
+		const bloc = ajouter(meta, "div", "qbd-fiche-origin");
 		bloc.title = o.tooltip;
 		const logo = ajouter(bloc, "span", "qbd-provider-logo qbd-fiche-origin-logo qbd-provider-logo--" + o.logo);
 		setBrandLogo(logo, o.logo);
@@ -211,7 +252,7 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 	const total = deps.stat.totalQuestions || deps.quiz.questions;
 	const done = Math.min(deps.stat.questionsDone, total);
 	if (done > 0 || deps.stat.attempts > 0) {
-		const progress = ajouter(side, "div", "qbd-fiche-progress");
+		const progress = ajouter(meta, "div", "qbd-fiche-progress");
 		const bar = ajouter(progress, "div", "qbd-fiche-bar");
 		ajouter(bar, "div", "qbd-fiche-fill").style.width = `${total > 0 ? Math.round(done / total * 100) : 0}%`;
 		const legend = ajouter(progress, "div", "qbd-fiche-legend");
@@ -222,30 +263,6 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 			else if (deps.stat.bestScore >= 60) best.classList.add("is-fair");
 		}
 	}
-
-	const start = ajouter(side, "button", "qbd-fiche-start");
-	start.type = "button";
-	icone(start, "play", "qbd-btn-icon");
-	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
-	/* Le bouton 3D de Brilliant, dans le bleu des flèches (2026-09-25) : face
-	   surélevée qui s'enfonce au clic, et le REFLET qui balaie — un SVG à
-	   part, pour que `attirer` puisse relancer son cycle (cta3d.ts). */
-	const reflet = poserBouton3d(start);
-	start.addEventListener("click", () => deps.onStart(start));
-
-	const edit = ajouter(side, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");
-	edit.type = "button";
-	icone(edit, "square-pen", "qbd-btn-icon");
-	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
-	edit.addEventListener("click", () => deps.onEdit());
-
-	/* Relance le reflet sur-le-champ (remis au début de son cycle). Le bouton
-	   ne grossit plus au clic (Ahmed, 2026-09-23) : le reflet seul. Rien sans
-	   animations. */
-	return () => {
-		if (reduit()) return;
-		for (const a of reflet.getAnimations()) a.currentTime = 0;
-	};
 }
 
 /* Le RÔLE d'une question de Learn, quand il en change la nature : une
@@ -263,9 +280,10 @@ const ROLE_KEYS: Partial<Record<QuestionRole, TransKey>> = {
    liste passe en colonne. Compté sur le texte BRUT, LaTeX compris. */
 const OPTION_COURTE = 32;
 
-/** L'en-tête d'une carte : l'icône et le nom du type, puis le rôle d'un Learn. */
-function renderTop(card: HTMLElement, q: DraftQuestion): void {
-	const top = ajouter(card, "div", "qbd-fiche-q-top");
+/** L'en-tête d'une carte : son numéro, l'icône et le nom du type, puis le rôle d'un Learn. */
+function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): void {
+	const top = ajouter(card, "span", "qbd-fiche-q-top");
+	ajouter(top, "span", "qbd-fiche-num", String(numero));
 	const roleKey = q.role ? ROLE_KEYS[q.role] : undefined;
 	// Une lecture n'attend pas de réponse, une explication est toujours libre :
 	// leur type n'apprendrait rien.
@@ -278,68 +296,161 @@ function renderTop(card: HTMLElement, q: DraftQuestion): void {
 	if (roleKey) ajouter(top, "span", "qbd-fiche-q-role", t(roleKey));
 }
 
-/* B · PARCOURS (retenu le 2026-09-23) : un rail vertical à gauche de la
-   liste, le numéro de chaque question en pastille SUR le rail. Le bleu ne
-   marque que les repères, jamais le texte à lire. La liste défile dans SON
-   cadre : la fiche de gauche ne bouge pas.
-
-   PAS DE PARTIES. Un Learn en enchaîne plusieurs (pré-questions, lecture,
-   explication, rappel), mais rien ne les montre, ni ici ni au lecteur : des
-   titres « Partie 1 » à « Partie 7 » sur 54 questions effrayaient (Ahmed,
-   2026-09-23). Un cours trop long se coupe désormais en plusieurs quiz. */
-function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps): void {
-	const main = ajouter(root, "div", "qbd-fiche-main");
-	const scroller = ajouter(main, "div", "qbd-fiche-scroll");
-	const items = ajouter(scroller, "div", "qbd-fiche-list");
-	deps.questions.forEach((q, i) => {
-		const item = ajouter(items, "div", "qbd-fiche-item");
-		ajouter(item, "span", "qbd-fiche-node", String(i + 1));
-		// Pas un bouton : cliquer ici n'ouvre rien, on répond en jouant le quiz.
-		const card = ajouter(item, "div", "qbd-fiche-q");
-		renderTop(card, q);
-		texte(card, "p", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
-		/* Les options d'un QCM, SANS la bonne, marquées A, B, C… : des ronds
-		   de bouton radio donnaient envie de cocher, et rien ne se coche ici.
-		   Toutes courtes : des bulles côte à côte ; sinon une colonne. */
-		if ((q._type === "single" || q._type === "multi") && q.role !== "read" && q.options?.length) {
-			const courtes = q.options.every(o => o.length <= OPTION_COURTE);
-			const opts = ajouter(card, "div", courtes ? "qbd-fiche-opts is-pills" : "qbd-fiche-opts");
-			q.options.forEach((o, j) => {
-				const line = ajouter(opts, "span", "qbd-fiche-opt");
-				ajouter(line, "span", "qbd-fiche-opt-letter", String.fromCharCode(65 + j));
-				texte(line, "span", "qbd-fiche-opt-text", o);
-			});
-		}
-		card.addEventListener("click", attirer);
+/** Les options d'un QCM, SANS la bonne, marquées A, B, C… : rien ne se
+    coche ici. Toutes courtes : des bulles côte à côte ; sinon une colonne. */
+function renderOptions(card: HTMLElement, q: DraftQuestion): void {
+	if ((q._type !== "single" && q._type !== "multi") || q.role === "read" || !q.options?.length) return;
+	const courtes = q.options.every(o => o.length <= OPTION_COURTE);
+	const opts = ajouter(card, "span", courtes ? "qbd-fiche-opts is-pills" : "qbd-fiche-opts");
+	q.options.forEach((o, j) => {
+		const line = ajouter(opts, "span", "qbd-fiche-opt");
+		ajouter(line, "span", "qbd-fiche-opt-letter", String.fromCharCode(65 + j));
+		texte(line, "span", "qbd-fiche-opt-text", o);
 	});
-	if (rondsAvant) animerFrise(items, rondsAvant);
-	rondsAvant = null;
 }
 
-/** Joue la transition de la frise sur la NOUVELLE liste (voir `rondsAvant`) :
-    les ronds partent de leur ancienne hauteur et glissent à la nouvelle, les
-    cartes apparaissent. Les ronds en plus (liste plus longue) apparaissent en
-    grandissant. Mesures au prochain cadre : la liste doit être posée. */
-function animerFrise(liste: HTMLElement, avant: number[]): void {
-	const cartes = [...liste.querySelectorAll<HTMLElement>(".qbd-fiche-q")];
-	cartes.forEach(c => { c.style.opacity = "0"; });
-	requestAnimationFrame(() => {
-		const haut = liste.getBoundingClientRect().top;
-		liste.querySelectorAll<HTMLElement>(".qbd-fiche-node").forEach((n, i) => {
-			if (i < avant.length) {
-				const dy = avant[i] - (n.getBoundingClientRect().top - haut);
-				if (Math.abs(dy) > 0.5) n.animate(
-					[{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
-					{ duration: 380, easing: "cubic-bezier(.32, .72, 0, 1)" },
-				);
-			} else {
-				n.animate([{ opacity: 0, transform: "scale(.6)" }, { opacity: 1, transform: "scale(1)" }],
-					{ duration: 260, delay: 120, easing: "ease-out", fill: "backwards" });
-			}
-		});
-		cartes.forEach(c => {
-			c.style.opacity = "";
-			c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 140, easing: "ease-out", fill: "backwards" });
-		});
+/** Minuscules sans accents : « équation » se trouve en tapant « equation ». */
+function plier(s: string): string {
+	return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/** Les indices des questions qui contiennent la recherche (énoncé ou options). */
+function filtrer(questions: DraftQuestion[], recherche: string): number[] {
+	const r = plier(recherche.trim());
+	const tous = questions.map((_, i) => i);
+	if (!r) return tous;
+	return tous.filter(i => {
+		const q = questions[i];
+		return plier([questionText(q), ...(q.options ?? [])].join(" ")).includes(r);
 	});
+}
+
+/** La barre (grille | liste, recherche) et les questions dessous. */
+function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): void {
+	let vue = lireVue();
+	const tools = ajouter(root, "div", "qbd-fiche-tools");
+	const vues = ajouter(tools, "div", "qbd-fiche-views");
+	vues.setAttribute("role", "group");
+	const boutonsVue = (["grille", "liste"] as const).map(v => {
+		const b = ajouter(vues, "button", "qbd-fiche-view");
+		b.type = "button";
+		const label = t(v === "grille" ? "dashboard.fiche.viewGrid" : "dashboard.fiche.viewList");
+		b.setAttribute("aria-label", label);
+		b.title = label;
+		currentHost().ui.setIcon(b, v === "grille" ? "layout-grid" : "layout-list");
+		b.addEventListener("click", () => { if (vue !== v) { vue = v; ecrireVue(v); peindre(); } });
+		return { v, b };
+	});
+
+	const recherche = ajouter(tools, "label", "qbd-fiche-search");
+	icone(recherche, "search", "qbd-fiche-search-icon");
+	const champ = ajouter(recherche, "input", "qbd-fiche-search-input");
+	champ.type = "search";
+	champ.placeholder = t("dashboard.fiche.search");
+	champ.setAttribute("aria-label", t("dashboard.fiche.search"));
+	champ.value = etat.recherche;
+	champ.addEventListener("input", () => { etat.recherche = champ.value; peindre(); });
+
+	const body = ajouter(root, "div", "qbd-fiche-body");
+
+	/* ← → dans la vue liste, sauf quand on écrit dans la recherche. */
+	root.addEventListener("keydown", (e) => {
+		if (vue !== "liste" || e.target === champ || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+		const idx = filtrer(deps.questions, etat.recherche);
+		const pos = idx.indexOf(etat.selection);
+		const suivante = idx[pos + (e.key === "ArrowRight" ? 1 : -1)];
+		if (suivante === undefined) return;
+		e.preventDefault();
+		etat.selection = suivante;
+		peindre();
+	});
+
+	function peindre(): void {
+		for (const { v, b } of boutonsVue) {
+			b.classList.toggle("is-active", v === vue);
+			b.setAttribute("aria-pressed", v === vue ? "true" : "false");
+		}
+		const defile = body.querySelector<HTMLElement>(".qbd-fiche-rail")?.scrollTop ?? 0;
+		body.replaceChildren();
+		body.dataset.vue = vue;
+		const idx = filtrer(deps.questions, etat.recherche);
+		if (idx.length === 0) {
+			ajouter(body, "p", "qbd-fiche-empty", t("dashboard.fiche.searchEmpty"));
+			return;
+		}
+		if (vue === "grille") renderGrille(body, idx, deps, (i) => {
+			etat.selection = i;
+			vue = "liste";
+			ecrireVue(vue);
+			peindre();
+		});
+		else {
+			if (!idx.includes(etat.selection)) etat.selection = idx[0];
+			renderListe(body, idx, deps, attirer, defile, (i) => { etat.selection = i; peindre(); });
+		}
+		if (etat.fondu) {
+			etat.fondu = false;
+			body.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
+				[{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 60, easing: "ease-out", fill: "backwards" },
+			));
+		}
+	}
+	peindre();
+}
+
+/** GRILLE : une carte par question ; cliquer l'ouvre dans la liste. */
+function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, ouvrir: (i: number) => void): void {
+	const grille = ajouter(body, "div", "qbd-fiche-grid");
+	for (const i of idx) {
+		const q = deps.questions[i];
+		const card = ajouter(grille, "button", "qbd-fiche-q qbd-fiche-card");
+		card.type = "button";
+		renderTop(card, q, i + 1);
+		texte(card, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+		renderOptions(card, q);
+		card.addEventListener("click", () => ouvrir(i));
+	}
+}
+
+/** LISTE : les questions en colonne, celle choisie en grand à droite. */
+function renderListe(body: HTMLElement, idx: number[], deps: FicheDeps, attirer: () => void, defile: number, choisir: (i: number) => void): void {
+	const split = ajouter(body, "div", "qbd-fiche-split");
+	const rail = ajouter(split, "div", "qbd-fiche-rail");
+	let active: HTMLElement | null = null;
+	for (const i of idx) {
+		const q = deps.questions[i];
+		const row = ajouter(rail, "button", "qbd-fiche-row" + (i === etat.selection ? " is-active" : ""));
+		row.type = "button";
+		if (i === etat.selection) { active = row; row.setAttribute("aria-current", "true"); }
+		renderTop(row, q, i + 1);
+		texte(row, "span", "qbd-fiche-row-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+		row.addEventListener("click", () => choisir(i));
+	}
+	rail.scrollTop = defile;
+	const courante = active;
+	if (courante) requestAnimationFrame(() => courante.scrollIntoView({ block: "nearest" }));
+
+	const detail = ajouter(split, "div", "qbd-fiche-detail");
+	const q = deps.questions[etat.selection];
+	// Pas un bouton : on répond en jouant le quiz ; un clic fait briller « Commencer ».
+	const card = ajouter(detail, "div", "qbd-fiche-q qbd-fiche-big");
+	renderTop(card, q, etat.selection + 1);
+	texte(card, "p", "qbd-fiche-big-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+	renderOptions(card, q);
+	card.addEventListener("click", attirer);
+
+	const pos = idx.indexOf(etat.selection);
+	const nav = ajouter(detail, "div", "qbd-fiche-nav");
+	const fleche = (sens: -1 | 1): void => {
+		const b = ajouter(nav, "button", "qbd-fiche-nav-btn");
+		b.type = "button";
+		b.setAttribute("aria-label", t(sens < 0 ? "dashboard.quiz.prev" : "dashboard.quiz.next"));
+		currentHost().ui.setIcon(b, sens < 0 ? "chevron-left" : "chevron-right");
+		const cible = idx[pos + sens];
+		if (cible === undefined) b.disabled = true;
+		else b.addEventListener("click", () => choisir(cible));
+	};
+	fleche(-1);
+	ajouter(nav, "span", "qbd-fiche-nav-pos", t("dashboard.fiche.position", { n: pos + 1, total: idx.length }));
+	fleche(1);
 }

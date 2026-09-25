@@ -102,6 +102,8 @@ export interface QuizPageSpec {
 	/** L'AUTRE mode du même cours (course-pairs.ts) : la fiche montre alors un
 	    sélecteur Learn | Practice qui ouvre ce quiz. */
 	autreMode?: { quiz: QuizIndexEntry; open(): void };
+	/** Le menu « ⋮ » de la fiche : celui de la carte du quiz (hôte). */
+	menu?(anchor: HTMLElement): void;
 }
 
 /** Dépendances d'une page « quiz », indépendantes du dashboard — et de
@@ -192,6 +194,14 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 					const frere = quizFrere(quiz, ctx.scanner.getQuizzes());
 					return frere ? { quiz: frere, open: () => ctx.navigate("detail", { quiz: frere }) } : undefined;
 				})(),
+				/* Le menu de la carte, avec un repeint qui relit le quiz : renommé,
+				   la page le reprend ; supprimé ou déplacé hors du catalogue, on
+				   revient en arrière. */
+				menu: ctx.openCardMenu ? (anchor) => ctx.openCardMenu!(quiz, anchor, () => {
+					const frais = ctx.scanner.getQuiz(quiz.path);
+					if (frais) ctx.navigate("detail", { quiz: frais });
+					else host.onBack();
+				}) : undefined,
 			});
 		},
 		dispose: () => page.dispose(),
@@ -615,6 +625,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onEdit: () => toggleEditing(page),
 			onBack: () => { void flushSave(); spec.onBack(); },
 			autreMode: spec.autreMode ? { mode: spec.autreMode.quiz.mode, open: () => { void flushSave(); spec.autreMode!.open(); } } : undefined,
+			menu: spec.menu,
 		});
 		return true;
 	}
