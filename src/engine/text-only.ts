@@ -461,7 +461,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   l'activent eux-mêmes). Ignore les champs de saisie, MathLive compris, et
 	   les modificateurs. Espace ou Entrée retourne (spec §3), 1 note « À
 	   revoir », 2 « Je savais » ; après le retournement, le focus passe sur
-	   « Je savais ». */
+	   « Je savais » (restauration de `focus.ts`). */
 	function currentFlashcardQuestionIndex(): number | null {
 		const si = ctx.quizState.current;
 		if (!ctx.isQuestionSlideIndex(si)) return null;
@@ -493,13 +493,10 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			if (!bouton) return;
 			e.preventDefault();
 			e.stopPropagation();
+			/* Le focus suit comme après un clic : la restauration de `focus.ts`
+			   le passe de « Retourner » à « Je savais » au repeint du verso. */
+			if (retourner) bouton.focus({ preventScroll: true });
 			bouton.click();
-			if (retourner) {
-				// Le verso vient d'être peint : le focus va à l'action suivante.
-				requestAnimationFrame(() => {
-					ctx.container.querySelector<HTMLButtonElement>(`[data-qi="${qi}"] .quiz-textonly-rating-btn[data-textonly-rating="understood"]`)?.focus({ preventScroll: true });
-				});
-			}
 		};
 		ctx.container.addEventListener("keydown", onKeydown, true);
 		ctx.__quizGlobalCleanups.push(() => ctx.container.removeEventListener("keydown", onKeydown, true));

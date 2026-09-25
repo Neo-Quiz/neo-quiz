@@ -60,6 +60,13 @@ export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
 		else if (activeEl.matches?.('.quiz-textonly-textarea[data-textonly-answer]')) {
 			descriptor.selector = '.quiz-textonly-textarea[data-textonly-answer]';
 		}
+		/* « Retourner » d'une carte mémoire DISPARAÎT au verso : le rechercher
+		   par son sélecteur laissait le focus tomber sur <body>, hors du quiz,
+		   et les touches 1 et 2 ne répondaient plus après un clic. Le focus
+		   passe à l'action suivante, « Je savais » (spec cartes mémoire §3). */
+		else if (activeEl.matches?.('.quiz-flashcard-flip-btn')) {
+			descriptor.selector = '.quiz-textonly-rating-btn[data-textonly-rating="understood"]';
+		}
 		else if (activeEl.matches?.('.quiz-textonly-check-btn')) {
 			descriptor.selector = '.quiz-textonly-check-btn';
 		}
