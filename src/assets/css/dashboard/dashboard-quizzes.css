@@ -1025,8 +1025,7 @@
 	gap: 0;
 }
 
-.qbd-root .qbd-next-step-main,
-.qbd-root .qbd-next-step-caret {
+.qbd-root .qbd-next-step-main {
 	position: relative;
 	z-index: 1;
 	display: inline-flex;
@@ -1047,38 +1046,23 @@
 	gap: 8px;
 	min-width: 0;
 	padding: 14px 20px;
-	border-radius: 60px 0 0 60px;
-}
-
-.qbd-root .qbd-next-step-main:only-of-type {
 	border-radius: 60px;
 }
 
-.qbd-root .qbd-next-step-caret {
-	padding: 14px 16px 14px 13px;
-	border-radius: 0 60px 60px 0;
-	border-left: 1px solid rgba(255, 255, 255, 0.28);
-}
-
-.qbd-root .qbd-next-step-main:hover,
-.qbd-root .qbd-next-step-caret:hover,
-.qbd-root .qbd-next-step-caret[aria-expanded="true"] {
+.qbd-root .qbd-next-step-main:hover {
 	background: rgba(255, 255, 255, 0.1);
 }
 
-.qbd-root .qbd-next-step-main:focus-visible,
-.qbd-root .qbd-next-step-caret:focus-visible {
+.qbd-root .qbd-next-step-main:focus-visible {
 	outline: 2px solid #fff;
 	outline-offset: -3px;
 }
 
-.qbd-next-step-icon,
-.qbd-next-step-caret {
+.qbd-next-step-icon {
 	flex-shrink: 0;
 }
 
 .qbd-next-step-icon svg { width: 15px; height: 15px; fill: currentColor; }
-.qbd-next-step-caret svg { width: 16px; height: 16px; }
 
 .qbd-next-step-mode {
 	font-weight: 700;

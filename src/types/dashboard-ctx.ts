@@ -189,6 +189,10 @@ export interface DashboardShellCtx {
 	    Absent = la section ne s'affiche pas. Le greffon le fournit depuis
 	    `plugin._reviewStore` ; l'application depuis `creerJournalApp`. */
 	reviewStore?: ReviewStore;
+	/** La session EN COURS d'un quiz (reprendre là où on s'était arrêté) :
+	    numéro 1-based de la question courante, total, heure d'écriture.
+	    Absent côté hôte sans reprise : pas de « Reprendre ». */
+	sessionOf?(path: string): { question: number; total: number; ecrite: number } | null;
 	/** OUVRE le menu « ⋯ » d'une carte de quiz sur `anchor` (le bouton « ⋯ »),
 	    appelée par la page avec SON propre `rerender` — le menu doit pouvoir
 	    repeindre la page qui l'affiche. Absente = pas de bouton « ⋯ », ce que

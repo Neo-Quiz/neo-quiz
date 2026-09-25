@@ -167,8 +167,9 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.progressExamTomorrow": "tomorrow",
 	"dashboard.quizzes.progressExamPast": "already passed",
 	"dashboard.quizzes.progressCourses": "Courses",
-	"dashboard.quizzes.nextStepMore": "Other modes",
 	"dashboard.quizzes.nextStepReviewHelp": "Questions due today in this folder.",
+	"dashboard.quizzes.nextStepResume": "Resume",
+	"dashboard.quizzes.nextStepResumeHelp": "Pick up this quiz where you left off.",
 	/* "Mastered"/"To review" du donut réutilisent dashboard.card.mastered/review
 	   (même mot que la pastille d'état d'une carte) ; "To learn" agrège fresh
 	   ET progress (rien de tel n'existe pour une carte individuelle). */

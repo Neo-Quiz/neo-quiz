@@ -298,6 +298,13 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   « fournisseur indisponible » propre, jamais un composer mort). */
 		canOpen: () => true,
 		reviewStore: deps.reviewStore,
+		sessionOf: (path) => {
+			const s = deps.sessions?.toutes()[path];
+			const quiz = deps.scanner.getQuiz(path);
+			if (!s || !quiz || s.courante === null) return null;
+			const i = quiz.items.findIndex(it => it.id === s.courante);
+			return i < 0 ? null : { question: i + 1, total: quiz.items.length, ecrite: s.ecrite };
+		},
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
