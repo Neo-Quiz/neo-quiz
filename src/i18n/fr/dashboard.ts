@@ -147,6 +147,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.progressExamPast": "déjà passé",
 	"dashboard.quizzes.progressCourses": "Cours",
 	"dashboard.quizzes.nextStepMore": "Autres modes",
+	"dashboard.quizzes.nextStepReviewHelp": "Les questions dues aujourd'hui dans ce dossier.",
 	"dashboard.quizzes.groupByActivity": "Récent",
 	"dashboard.quizzes.recentWeek": "7 derniers jours",
 	"dashboard.quizzes.recentMonth": "30 derniers jours",

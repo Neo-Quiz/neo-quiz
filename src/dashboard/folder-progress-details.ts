@@ -38,16 +38,30 @@ function parNote(cles: readonly string[], chemins: ReadonlySet<string>): Map<str
 	return out;
 }
 
-const questions = (n: number): string =>
+/** Ce que l'ordonnanceur met au programme du jour POUR CE DOSSIER : le
+    total, et les notes (la plus chargée d'abord, ordre TOTAL donc stable). */
+export function duesDuDossier(ctx: DashboardShellCtx, inModule: QuizIndexEntry[]): { total: number; reportees: number; lignes: { quiz: QuizIndexEntry; n: number }[] } {
+	const plan = ctx.reviewStore?.plan(Date.now());
+	const chemins = new Set(inModule.map(q => q.path));
+	const dues = parNote(plan?.today ?? [], chemins);
+	const lignes = [...dues.entries()]
+		.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+		.map(([chemin, n]) => ({ quiz: ctx.scanner?.getQuiz(chemin), n }))
+		.filter((l): l is { quiz: QuizIndexEntry; n: number } => !!l.quiz);
+	return {
+		total: lignes.reduce((a, l) => a + l.n, 0),
+		reportees: [...parNote(plan?.deferred ?? [], chemins).values()].reduce((a, b) => a + b, 0),
+		lignes,
+	};
+}
+
+export const questions = (n: number): string =>
 	t(n === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: n });
 
 export function renderRevisionDuJour(parent: HTMLElement, ctx: DashboardShellCtx, inModule: QuizIndexEntry[]): void {
 	const tuile = ajouter(parent, "div", "qbd-folder-progress-tile qbd-folder-progress-tile--due");
 	ajouter(tuile, "div", "qbd-folder-progress-label", t("dashboard.review.title"));
-	const plan = ctx.reviewStore?.plan(Date.now());
-	const chemins = new Set(inModule.map(q => q.path));
-	const dues = parNote(plan?.today ?? [], chemins);
-	const total = [...dues.values()].reduce((a, b) => a + b, 0);
+	const { total, reportees, lignes } = duesDuDossier(ctx, inModule);
 
 	const tete = ajouter(tuile, "div", "qbd-folder-due-head");
 	const chiffre = ajouter(tete, "div", "qbd-folder-due-count");
@@ -58,11 +72,6 @@ export function renderRevisionDuJour(parent: HTMLElement, ctx: DashboardShellCtx
 		ajouter(tuile, "div", "qbd-folder-progress-sub", t("dashboard.quizzes.progressDueNone"));
 		return;
 	}
-	// Nombre décroissant puis chemin : un ordre TOTAL, stable d'un rendu à l'autre.
-	const lignes = [...dues.entries()]
-		.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
-		.map(([chemin, n]) => ({ quiz: ctx.scanner?.getQuiz(chemin), n }))
-		.filter((l): l is { quiz: QuizIndexEntry; n: number } => !!l.quiz);
 	if (lignes.length === 0) return;
 
 	const reviser = ajouter(tete, "button", "qbd-folder-due-action");
@@ -82,7 +91,6 @@ export function renderRevisionDuJour(parent: HTMLElement, ctx: DashboardShellCtx
 	}
 	/* Le report est une INFORMATION, pas un reproche : le budget du jour a
 	   tenu (même phrase que l'accueil). */
-	const reportees = [...parNote(plan?.deferred ?? [], chemins).values()].reduce((a, b) => a + b, 0);
 	if (reportees > 0) {
 		ajouter(tuile, "div", "qbd-folder-progress-sub",
 			t(reportees === 1 ? "dashboard.review.deferredOne" : "dashboard.review.deferredOther", { count: reportees }));

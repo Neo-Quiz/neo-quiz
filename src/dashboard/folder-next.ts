@@ -7,50 +7,68 @@ import type { QuizStatRecord } from "./stats-store";
 import { quizModeLabel } from "./quiz-card";
 import { computeQuizState } from "./quiz-mastery";
 import { openActionMenu } from "./ui-select";
+import { duesDuDossier, questions } from "./folder-progress-details";
 
 /* ══════════════════════════════════════════════════════════
    L'ÉTAPE SUIVANTE d'un dossier (2026-09-25) : un bouton scindé au-dessus
-   de la grille. La partie principale lance le premier quiz pas encore
-   maîtrisé, dans l'ordre des cours, le Learn d'un cours avant son
-   Practice ; la flèche propose le prochain Learn et le prochain Practice.
-   Plus rien à faire (tout maîtrisé) : pas de bouton.
+   de la grille. La partie principale lance, dans cet ordre, la révision du
+   jour (si l'ordonnanceur en a pour ce dossier), sinon le prochain Learn
+   pas encore maîtrisé, sinon le prochain Practice ; la flèche propose les
+   autres. Plus rien à faire : pas de bouton.
 ══════════════════════════════════════════════════════════ */
 
 const ICONES = { learn: "book-open", practice: "dumbbell" } as const;
 
+/** Un choix du bouton : ce qu'il affiche et ce qu'il lance. */
+interface Choix { icone: string; mode: string; titre: string; aide: string; lancer: () => void }
+
 /** `ordre` : les quiz dans l'ordre des cartes, le Learn avant le Practice
-    d'un même cours. */
+    d'un même cours. Le bouton propose d'abord la RÉVISION du jour quand
+    l'ordonnanceur en a pour ce dossier (2026-09-25, d'après le « Réviser N
+    flashcards » de StudySmarter), puis le prochain Learn, puis le prochain
+    Practice ; la flèche offre les autres. */
 export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordre: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 	const aFaire = ordre.filter(q => computeQuizState(q, stats[q.path]).state !== "mastered");
-	const suivant = aFaire[0];
-	if (!suivant) return;
-	const learn = aFaire.find(q => q.mode === "learn");
-	const practice = aFaire.find(q => q.mode === "practice");
+	const choix: Choix[] = [];
+	const dues = duesDuDossier(ctx, ordre);
+	if (dues.total > 0 && dues.lignes.length > 0) {
+		const note = dues.lignes[0].quiz;
+		choix.push({
+			icone: "rotate-ccw", mode: t("dashboard.quizzes.progressDueAction"), titre: questions(dues.total),
+			aide: t("dashboard.quizzes.nextStepReviewHelp"), lancer: () => ctx.openQuiz(note),
+		});
+	}
+	for (const mode of ["learn", "practice"] as const) {
+		const q = aFaire.find(x => x.mode === mode);
+		if (!q) continue;
+		choix.push({
+			icone: ICONES[mode], mode: quizModeLabel(mode), titre: q.title,
+			aide: t(mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp"),
+			lancer: () => ctx.openQuiz(q),
+		});
+	}
+	const premier = choix[0];
+	if (!premier) return;
 
 	// Le reflet qui défile de l'action principale (« Commencer le quiz »).
 	const split = ajouter(parent, "div", "qbd-next-step qbd-btn--shine");
 	ajouter(split, "span", "qbd-btn-shine").setAttribute("aria-hidden", "true");
 	const main = ajouter(split, "button", "qbd-next-step-main");
 	main.type = "button";
-	main.title = t(suivant.mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp");
+	main.title = premier.aide;
 	currentHost().ui.setIcon(ajouter(main, "span", "qbd-next-step-icon"), "play");
-	ajouter(main, "span", "qbd-next-step-mode", quizModeLabel(suivant.mode));
-	ajouter(main, "span", "qbd-next-step-title", suivant.title);
-	main.addEventListener("click", () => ctx.openQuiz(suivant));
+	ajouter(main, "span", "qbd-next-step-mode", premier.mode);
+	ajouter(main, "span", "qbd-next-step-title", premier.titre);
+	main.addEventListener("click", premier.lancer);
 
-	// La flèche n'a de sens que s'il reste un AUTRE mode que celui du bouton.
-	if (!learn || !practice) return;
+	// La flèche n'a de sens que s'il reste un AUTRE choix que celui du bouton.
+	if (choix.length < 2) return;
 	const caret = ajouter(split, "button", "qbd-next-step-caret");
 	caret.type = "button";
 	caret.setAttribute("aria-label", t("dashboard.quizzes.nextStepMore"));
 	caret.setAttribute("aria-haspopup", "menu");
 	currentHost().ui.setIcon(caret, "chevron-down");
 	caret.addEventListener("click", () => {
-		openActionMenu(caret, [learn, practice].map(q => ({
-			icon: ICONES[q.mode],
-			label: `${quizModeLabel(q.mode)} · ${q.title}`,
-			sub: t(q.mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp"),
-			onClick: () => ctx.openQuiz(q),
-		})));
+		openActionMenu(caret, choix.map(c => ({ icon: c.icone, label: `${c.mode} · ${c.titre}`, sub: c.aide, onClick: c.lancer })));
 	});
 }
