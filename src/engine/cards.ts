@@ -545,9 +545,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		}
 
 		const hintBtn = (!isRead && !isTextOnly && q.hint && String(q.hint).trim()) ? `<button class="quiz-hint-btn" type="button">${t("engine.hint.button")}</button>` : "";
-		// Task 7 (mode Lesson) : seule échappatoire à la pré-question bloquante
-		// (engine/state.ts isBlockedBySkippedPreQuestion) — une tentative VIDE
-		// mais EXPLICITE. Gardée par !ctx.quizState.locked comme hintBtn/
+		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une
+		// tentative VIDE mais EXPLICITE. Passer à la suite sans répondre donne
+		// désormais le même verdict (engine/state.ts marquerPreNonTentees). Gardée par !ctx.quizState.locked comme hintBtn/
 		// lessonContent : un quiz déjà soumis n'a plus rien à "laisser passer".
 		// Round 1 de revue (Finding 4) : masqué dès que lessonPreSkipped[qi] est
 		// déjà vrai — sur la DERNIÈRE question (aucune navigation suivante

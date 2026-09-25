@@ -238,10 +238,11 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	/**
 	 * Task 7, mode Lesson : la tentative sur une pré-question ("pre") est le
 	 * mécanisme qui produit l'effet (Richland 2009) — pas la simple lecture de
-	 * la question. Bloque donc UNIQUEMENT la navigation VERS L'AVANT tant que
-	 * la pré-question affichée n'a reçu ni réponse (`hasAnyAnswer`) ni un clic
-	 * explicite sur « Je ne sais pas » (`lessonPreSkipped`). Le retour en
-	 * arrière (index <= courant) n'est jamais concerné.
+	 * la question. `firstUnattemptedPreBetween` repère, sur la navigation VERS
+	 * L'AVANT, une pré-question qui n'a reçu ni réponse (`hasAnyAnswer`) ni un
+	 * clic sur « Je ne sais pas » (`lessonPreSkipped`) ; elle BLOQUAIT la
+	 * navigation, elle la marque aujourd'hui « Je ne sais pas » (voir
+	 * `marquerPreNonTentees`). Le retour en arrière n'est jamais concerné.
 	 *
 	 * Posé ici plutôt que dans chaque bouton/flèche/onglet : `goToSlide` et
 	 * `redirectSlide` sont le SEUL point de passage commun à tous les chemins
@@ -285,18 +286,26 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		return null;
 	}
 
-	function isBlockedBySkippedPreQuestion(targetIndex: number): boolean {
-		return firstUnattemptedPreBetween(targetIndex) !== null;
-	}
-
-	function warnSkipBlocked(): void {
-		ctx.host.ui.notice(t("engine.lesson.skipBlocked"));
+	/**
+	 * PLUS DE BLOCAGE (2026-09-25, demande d'Ahmed : « ça met je ne sais pas
+	 * automatiquement, c'est plus simple et moins de friction »). Une "pre"
+	 * franchie sans réponse reçoit le même verdict qu'un clic sur « Je ne sais
+	 * pas » (`lessonPreSkipped`, journalisée `skipped`) au lieu d'arrêter la
+	 * navigation sur une Notice. La tentative reste proposée — la question est
+	 * affichée, le bouton aussi — mais n'est plus imposée. Même point de
+	 * passage unique qu'avant : tous les chemins de navigation y passent.
+	 */
+	function marquerPreNonTentees(targetIndex: number): void {
+		for (let qi = firstUnattemptedPreBetween(targetIndex); qi !== null; qi = firstUnattemptedPreBetween(targetIndex)) {
+			ctx.quizState.lessonPreSkipped[qi] = true;
+			ctx.commitQuestionInteraction(qi, { syncHeight: false });
+		}
 	}
 
 	async function goToSlide(index: number, { forceRender = false }: { forceRender?: boolean } = {}): Promise<void> {
 		ctx.closeHintModal();
 		const next = ctx.clampSlideIndex(index);
-		if (isBlockedBySkippedPreQuestion(next)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(next);
 		if (next === ctx.quizState.current && !ctx.quizState.isSliding) return;
 		if (ctx.quizState.isSliding) return ctx.redirectSlide(next, { forceRender });
 		++ctx.quizState.slideToken;
@@ -327,7 +336,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 	async function redirectSlide(next: number, { forceRender = false }: { forceRender?: boolean } = {}): Promise<void> {
 		const targetIndex = ctx.clampSlideIndex(next);
-		if (isBlockedBySkippedPreQuestion(targetIndex)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(targetIndex);
 		if (targetIndex === ctx.quizState.current) return;
 		const snapshot = ctx.track.cancelRunningTrackAnimation();
 		++ctx.quizState.slideToken;
@@ -393,11 +402,11 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	};
 
 	function goToSubmit(): void {
-		// Round 1 de revue (Finding 1) : le refus doit intervenir AVANT tout
+		// Round 1 de revue (Finding 1) : le marquage doit intervenir AVANT tout
 		// effet de bord, pas seulement au `goToSlide` final - sinon
 		// `lastQuestionIndex`/`pendingResultsLock` étaient déjà mutés alors que
 		// la navigation elle-même était refusée.
-		if (isBlockedBySkippedPreQuestion(ctx.SLIDE_SUBMIT_INDEX)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(ctx.SLIDE_SUBMIT_INDEX);
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = false;
 		goToSlide(ctx.SLIDE_SUBMIT_INDEX, { forceRender: false });
@@ -462,12 +471,12 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		   refuser — un clic sur l'onglet Résultats depuis une "pre" non tentée
 		   enregistrait alors une tentative ET un score au tableau de bord SANS
 		   naviguer, et le comptage légitime ultérieur était perdu
-		   (`resultsCounted` déjà vrai). Le refus doit donc intervenir ICI, avant
+		   (`resultsCounted` déjà vrai). Le marquage des "pre" franchies se fait donc ICI, avant
 		   toute mutation — `isBlockedBySkippedPreQuestion` lit `ctx.quizState.locked`
 		   (Finding 2) : un examen qui vient de se verrouiller lui-même
 		   (`handleExamTimeUp`, engine/exam.ts) n'a donc plus rien de bloqué à ce
 		   stade et atteint bien ses résultats. */
-		if (isBlockedBySkippedPreQuestion(ctx.SLIDE_RESULTS_INDEX)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(ctx.SLIDE_RESULTS_INDEX);
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = !ctx.textOnly?.isTextOnlyMode?.();
 

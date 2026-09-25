@@ -90,7 +90,6 @@ export const EN_ENGINE = {
 	"engine.lesson.roleRecall": "From memory",
 	"engine.lesson.roleTest": "Check",
 	/* Task 7 : la pré-question ne peut pas être sautée sans tentative explicite. */
-	"engine.lesson.skipBlocked": "Answer first — getting it wrong is the point.",
 	"engine.lesson.dontKnow": "I don't know",
 
 	/* ── Question texte / terminal ── */
