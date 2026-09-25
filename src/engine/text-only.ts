@@ -443,25 +443,51 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				ctx.commitQuestionInteraction(qi, { syncHeight: true });
 			});
 		});
-
-		/* Clavier d'une carte : Espace retourne, 1 / 2 notent. Jamais depuis un
-		   champ de saisie : une frappe dans une autre question ne note rien. */
-		if (ctx.isFlashcardQuestion(ctx.quiz[qi])) {
-			trackItem.addEventListener("keydown", (e: KeyboardEvent) => {
-				const cible = e.target as HTMLElement | null;
-				if (cible?.closest?.("input, textarea, [contenteditable]")) return;
-				if (e.ctrlKey || e.metaKey || e.altKey) return;
-				const vise = e.key === " " ? ".quiz-flashcard-flip-btn"
-					: e.key === "1" ? '.quiz-textonly-rating-btn[data-textonly-rating="review"]'
-					: e.key === "2" ? '.quiz-textonly-rating-btn[data-textonly-rating="understood"]'
-					: null;
-				const bouton = vise ? trackItem.querySelector<HTMLButtonElement>(vise) : null;
-				if (!bouton) return;
-				e.preventDefault();
-				bouton.click();
-			});
-		}
 	}
+
+	/* Clavier d'une carte mémoire, au niveau du DOCUMENT (fix round 1, écran) :
+	   un `keydown` posé sur `trackItem` (précédente version) ne voit jamais une
+	   frappe dont le focus est ailleurs dans le quiz — l'onglet de navigation
+	   `.quiz-tab`, notamment, après un clic ou une flèche. Un seul écouteur par
+	   instance de moteur, retiré via `ctx.__quizGlobalCleanups` comme les autres
+	   écouteurs globaux (`hint.ts`, `interactions.ts`). N'agit que si la slide
+	   COURANTE est une carte mémoire ; ignore toujours une cible
+	   `input`/`textarea`/`[contenteditable]` et les modificateurs Ctrl/Meta/Alt ;
+	   `preventDefault()` seulement quand la touche est prise, pour qu'Espace
+	   n'active pas aussi l'onglet qui a le focus. */
+	function currentFlashcardQuestionIndex(): number | null {
+		const si = ctx.quizState.current;
+		if (!ctx.isQuestionSlideIndex(si)) return null;
+		const qi = (ctx.slideMap[si] as { questionIndex: number }).questionIndex;
+		return ctx.isFlashcardQuestion(ctx.quiz[qi]) ? qi : null;
+	}
+
+	function bindGlobalFlashcardKeys(): void {
+		// Repli test (check-engine-review.mjs, ctx factice sans DOM) : même garde
+		// que le MutationObserver optionnel de hint.ts. En Obsidian comme dans
+		// l'app (rendu Electron), `document` existe toujours.
+		if (typeof document === "undefined") return;
+		const onKeydown = (e: KeyboardEvent) => {
+			const qi = currentFlashcardQuestionIndex();
+			if (qi === null) return;
+			const cible = e.target as HTMLElement | null;
+			if (cible?.closest?.("input, textarea, [contenteditable]")) return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			const vise = e.key === " " ? ".quiz-flashcard-flip-btn"
+				: e.key === "1" ? '.quiz-textonly-rating-btn[data-textonly-rating="review"]'
+				: e.key === "2" ? '.quiz-textonly-rating-btn[data-textonly-rating="understood"]'
+				: null;
+			if (!vise) return;
+			const trackItem = ctx.container.querySelector<HTMLElement>(`[data-qi="${qi}"]`);
+			const bouton = trackItem?.querySelector<HTMLButtonElement>(vise);
+			if (!bouton) return;
+			e.preventDefault();
+			bouton.click();
+		};
+		document.addEventListener("keydown", onKeydown);
+		ctx.__quizGlobalCleanups.push(() => document.removeEventListener("keydown", onKeydown));
+	}
+	bindGlobalFlashcardKeys();
 
 	return {
 		RATINGS,
