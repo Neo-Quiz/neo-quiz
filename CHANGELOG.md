@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- A ⋯ button at the top right of a folder opens the same menu as its card (edit, open the folder, copy its path, archive, move, delete).
 - Share a folder or a quiz: a Share button at the top right of a folder, and a Share entry in the ⋯ menu of every card. Discord puts the file (a .zip for a folder, a .md for a quiz) in the clipboard and brings Discord to the front, ready to paste; Save file asks where to save it and shows it in the explorer.
 - The back and forward buttons of a mouse move through the pages you visited, like in a browser: home, My quizzes, a folder, a quiz page. On a quiz being played, the back button returns to the list.
 - Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, generated one after the other ("Quiz 2 of 3"), each saved as soon as it is ready. A document that fails is reported and the others go on; with a website, the site reopens for the next document once the previous answer is received.

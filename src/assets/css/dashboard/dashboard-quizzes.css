@@ -1430,3 +1430,52 @@
 }
 
 .qbd-folder-share-btn .qbd-btn-icon svg { width: 15px; height: 15px; }
+
+/* ── L'en-tête d'un dossier, ALIGNÉ (2026-09-26) : le sélecteur Contenu |
+   Progression, « Partager » et « ⋯ » sont centrés sur la ligne du TITRE, pas
+   sur le bloc titre + soulignement (13px d'écart avant). Le titre fait 41px
+   de haut et commence 3px sous le haut de l'en-tête. ── */
+.qbd-quizzes-folder-hero .qbd-quizzes-header {
+	align-items: flex-start;
+}
+.qbd-quizzes-folder-hero .qbd-folder-view-tabs,
+.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
+	align-self: flex-start;
+	height: 39px;
+	margin-top: 4px;
+}
+.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
+	align-items: center;
+	gap: 10px;
+}
+
+/* « ⋯ » : rond, même contour que « Partager ». */
+.qbd-root .qbd-folder-more-btn {
+	display: inline-grid;
+	place-items: center;
+	width: 37px;
+	height: 37px;
+	margin: 0;
+	padding: 0;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	box-shadow: none;
+	color: var(--text-normal);
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.qbd-root .qbd-folder-more-btn:hover,
+.qbd-root .qbd-folder-more-btn[aria-expanded="true"] {
+	border-color: color-mix(in srgb, var(--text-normal) 24%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+.qbd-root .qbd-folder-more-btn:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-folder-more-btn svg { width: 16px; height: 16px; }
+
+@media (max-width: 900px) {
+	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions { height: auto; }
+}

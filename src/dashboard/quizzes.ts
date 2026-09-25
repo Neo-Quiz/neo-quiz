@@ -324,6 +324,24 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				} }));
 			}
 
+			/* « ⋯ » : le menu du dossier (Modifier, Ouvrir dans l'explorateur,
+			   Archiver…), le MÊME que celui de sa carte dans « Mes quiz »
+			   (2026-09-26, comme StudySmarter). Absent si l'hôte n'en a pas. */
+			const { openModuleMenu } = ctx;
+			if (openModuleMenu && openModuleFolder !== null) {
+				const plus = ajouter(headerActions, "button", "qbd-folder-more-btn");
+				plus.type = "button";
+				plus.setAttribute("aria-label", t("dashboard.card.more"));
+				plus.title = t("dashboard.card.more");
+				currentHost().ui.setIcon(plus, "ellipsis");
+				const groupe = {
+					folder: openModuleFolder, name: openModuleInfo?.name || openModuleFolder, ue: openModuleInfo?.ue ?? null,
+					path: cheminOuvert, color: openModuleInfo?.color, icon: openModuleInfo?.icon,
+					quizzes: inModule, total: inModule.length, mastered: 0,
+				};
+				plus.addEventListener("click", () => openModuleMenu(groupe, plus, () => { if (containerRef) render(containerRef); }, effectiveMap()));
+			}
+
 			/* LE SAS : « Générer », et non « Nouveau quiz » (demande d'Ahmed,
 			   2026-09-20). La génération est la SEULE façon dont un quiz arrive
 			   ici : les deux autres options du modal — vierge, import — écrivent
