@@ -805,7 +805,8 @@
 	font-size: 34px;
 	font-weight: 700;
 	font-variant-numeric: lining-nums;
-	color: var(--text-normal);
+	/* Le titre porte la couleur du dossier, comme son icône et son trait. */
+	color: var(--accent);
 	letter-spacing: -0.01em;
 	/* Plus d'ombre portée : sur le fond d'écran, ses 22 px de flou dessinaient
 	   une tache sombre derrière le titre (2026-09-25). */
