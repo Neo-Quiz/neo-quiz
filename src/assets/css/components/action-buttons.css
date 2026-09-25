@@ -119,43 +119,62 @@
   padding-bottom: 20px;
 }
 
+/* Les flèches ← → d'une question, façon BRILLIANT (2026-09-25, relevé sur
+   brilliant.org) : un bouton « à presser ». Une TRANCHE pleine plus sombre
+   dessous (`0 4px 0 0`, sans flou) lui donne son épaisseur ; au clic, la
+   tranche disparaît et le bouton descend d'autant (`translateY(4px)`),
+   comme une touche qui s'enfonce. En bleu (#456DFF, le bleu de Brilliant). */
 .quiz-question-nav .quiz-nav-btn{
+  --quiz-nav-face: #456dff;
+  --quiz-nav-face-hover: #5b80ff;
+  --quiz-nav-edge: #2a47c4;
+  --quiz-nav-depth: 4px;
   appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: none;
-  border-radius: 9px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  box-shadow: none;
+  border-radius: 12px;
+  background: var(--quiz-nav-face);
+  color: #fff;
+  box-shadow: 0 var(--quiz-nav-depth) 0 0 var(--quiz-nav-edge);
   cursor: pointer;
-  transition: background 0.14s ease, transform 0.08s ease, opacity 0.14s ease;
+  transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease, opacity 0.14s ease;
 }
 
 .quiz-question-nav .quiz-nav-btn svg{
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.5;
 }
 
-.quiz-question-nav .quiz-nav-btn:hover:not(:disabled),
+.quiz-question-nav .quiz-nav-btn:hover:not(:disabled){
+  background: var(--quiz-nav-face-hover);
+}
+
 .quiz-question-nav .quiz-nav-btn:focus-visible{
-  background: var(--interactive-accent-hover);
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
-.quiz-question-nav .quiz-nav-btn:focus-visible{
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
-}
-
+/* La touche s'enfonce : la tranche disparaît, le bouton descend d'autant. */
 .quiz-question-nav .quiz-nav-btn:active:not(:disabled){
-  transform: scale(0.93);
+  transform: translateY(var(--quiz-nav-depth));
+  box-shadow: 0 0 0 0 var(--quiz-nav-edge);
 }
 
+/* Désactivée : grise et à plat, sans tranche — rien à presser. */
 .quiz-question-nav .quiz-nav-btn:disabled{
-  opacity: 0.45;
+  background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 45%, transparent);
+  box-shadow: none;
+  transform: translateY(var(--quiz-nav-depth));
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-question-nav .quiz-nav-btn{ transition: none; }
 }
