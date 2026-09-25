@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- The back and forward buttons of a mouse move through the pages you visited, like in a browser: home, My quizzes, a folder, a quiz page. On a quiz being played, the back button returns to the list.
 - Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, generated one after the other ("Quiz 2 of 3"), each saved as soon as it is ready. A document that fails is reported and the others go on; with a website, the site reopens for the next document once the previous answer is received.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 

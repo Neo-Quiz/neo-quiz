@@ -1,11 +1,12 @@
 /* ══════════════════════════════════════════════════════════
    LA COQUILLE DU TABLEAU DE BORD, CÔTÉ APPLICATION
 
-   Sous Obsidian, `src/dashboard.ts` est un `ItemView` : il porte le cycle de
-   vie d'un onglet, un `Scope` de raccourcis, l'historique des boutons de
-   souris. Rien de tout cela n'est portable — et rien de tout cela n'est
-   l'interface. Ce fichier fait les trois choses que `dashboard.ts` fait et
-   qui comptent : monter le rail, router entre les pages, assembler le `ctx`.
+   Sous Obsidian, `src/dashboard.ts` était un `ItemView` : il portait le cycle
+   de vie d'un onglet et un `Scope` de raccourcis, qui ne sont pas portables.
+   Ce fichier fait les choses que `dashboard.ts` faisait et qui comptent :
+   monter le rail, router entre les pages, assembler le `ctx` — et, depuis le
+   2026-09-25, l'historique des boutons « précédent » / « suivant » de la
+   souris (`historique-nav.ts`).
 
    Les PAGES, elles, sont les mêmes qu'Obsidian : `src/dashboard/nav.ts`,
    `home.ts`, `quizzes.ts`, et depuis la tranche 3 la page d'un quiz,
@@ -29,6 +30,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { ajouter } from "../../../../src/dom";
+import { creerHistorique } from "./historique-nav";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
 import { createNavHandlers } from "../../../../src/dashboard/nav";
@@ -150,6 +152,24 @@ let quizSelectionne: QuizIndexEntry | null = null;
 let vuePrecedente: DashboardViewName = "home";
 
 /**
+ * L'HISTORIQUE des boutons « précédent » et « suivant » de la souris (2026-09-25,
+ * portage de l'historique de l'ancienne vue Obsidian) : la page, le dossier
+ * ouvert dans « Mes quiz » et le quiz de la page « detail ». Au niveau du
+ * MODULE, comme `vueCourante` : jouer un quiz démonte la coquille, et revenir
+ * ne doit pas effacer le chemin parcouru. État d'interface, jamais persisté.
+ */
+interface EtatNav {
+	vue: DashboardViewName;
+	/** Dossier ouvert — seulement quand `vue` vaut "quizzes". */
+	dossier: string | null;
+	/** Quiz affiché — seulement quand `vue` vaut "detail". */
+	quiz: QuizIndexEntry | null;
+}
+const memeEtatNav = (a: EtatNav, b: EtatNav): boolean =>
+	a.vue === b.vue && a.dossier === b.dossier && (a.quiz?.path ?? null) === (b.quiz?.path ?? null);
+const historiqueNav = creerHistorique<EtatNav>(memeEtatNav);
+
+/**
  * La question COURANTE au tout premier rendu de la page « detail » (celle sur
  * laquelle l'éditeur s'ouvre ; la fiche reste l'écran d'ouverture), posée
  * par `reprendre()` au démarrage (reprise de session) et consommée par le
@@ -259,12 +279,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		settings: reglagesPages(),
 		saveSettings: () => enregistrerReglagesPages(),
 		navigate: (vue, data) => naviguer(vue, data),
-		/* PAS d'historique de boutons de souris dans l'application : c'est un
-		   confort d'onglet Obsidian, et `recordNav` n'a donc rien à empiler.
-		   Le no-op est explicite plutôt qu'absent — les pages l'appellent, et
-		   un membre manquant serait une erreur de compilation qui inviterait à
-		   retirer l'appel côté page, donc à faire diverger les deux hôtes. */
-		recordNav: () => {},
+		/* L'historique des boutons de souris : la page « Mes quiz » l'appelle
+		   juste avant d'entrer dans un dossier ou d'en sortir, qui ne passe pas
+		   par `navigate`. */
+		recordNav: () => enregistrerNav(),
 		openQuiz: (quiz) => deps.onOpenQuiz(quiz),
 		openSettings: () => deps.onOpenSettings(),
 		/* Toutes les vues, la génération comprise (tranche 5, tâche 6) : la page
@@ -615,11 +633,51 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	 *   ne gouverne que l'état du rail. Le routeur le consulte quand même :
 	 *   une SEULE source de vérité entre le rail et lui.
 	 */
+	/* ── Boutons « précédent » / « suivant » de la souris ── */
+	let enRestauration = false;
+	const etatCourant = (): EtatNav => ({
+		vue: vueCourante,
+		// Le dossier n'est un état restaurable que VU depuis « Mes quiz » : hors
+		// de cette vue, `openModuleFolder` peut traîner en résidu.
+		dossier: vueCourante === "quizzes" ? quizzes.getOpenFolder() : null,
+		quiz: vueCourante === "detail" ? quizSelectionne : null,
+	});
+	/** On QUITTE l'état courant : il part sur la pile arrière. Une restauration
+	    n'est pas une navigation, elle n'empile rien. */
+	function enregistrerNav(): void {
+		if (!enRestauration) historiqueNav.enregistrer(etatCourant());
+	}
+	function appliquerNav(etat: EtatNav): void {
+		enRestauration = true;
+		try {
+			naviguer(etat.vue, etat.quiz ? { quiz: etat.quiz } : undefined);
+			// `naviguer` vient de refermer le dossier : rouvrir celui de l'état.
+			if (etat.vue === "quizzes" && etat.dossier !== null) quizzes.openFolder(etat.dossier);
+		} finally {
+			enRestauration = false;
+		}
+	}
+	/* En CAPTURE, sur les deux phases : le bouton est consommé dès l'appui
+	   (Chromium pourrait sinon y voir une navigation), l'action part au
+	   relâchement. Pile vide : le clic ne fait rien. */
+	const surBoutonSouris = (e: MouseEvent): void => {
+		if (e.button !== 3 && e.button !== 4) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.type !== "mouseup") return;
+		const cible = e.button === 3 ? historiqueNav.reculer(etatCourant()) : historiqueNav.avancer(etatCourant());
+		if (cible) appliquerNav(cible);
+	};
+
 	function naviguer(vue: DashboardViewName, data?: NavigateData): void {
 		/* « Créer avec l'IA » depuis un dossier : le préréglage est posé sur
 		   la page AVANT qu'elle se peigne — c'est son premier `render` qui
 		   joint les sources, et il a besoin de la destination déjà connue. */
 		if (vue === "ai" && data?.aiPreset) ai.preset(data.aiPreset);
+		/* L'état QUITTÉ va dans l'historique — sauf si la navigation est
+		   refusée, ou immobile (re-clic du rail sur la page courante). */
+		if (vue === "detail" ? !data?.quiz : !ctx.canOpen(vue)) return;
+		if (!memeEtatNav(etatCourant(), { vue, dossier: null, quiz: vue === "detail" ? data?.quiz ?? null : null })) enregistrerNav();
 		if (vue === "detail") {
 			if (!data?.quiz) return;
 			quizSelectionne = data.quiz;
@@ -695,10 +753,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		void annulerDerniereSuppression(ctx).then(restaure => { if (restaure) peindre(); });
 	};
 	document.addEventListener("keydown", surCtrlZ);
+	document.addEventListener("mousedown", surBoutonSouris, true);
+	document.addEventListener("mouseup", surBoutonSouris, true);
 
 	return () => {
 		if (demonte) return demonte;
 		document.removeEventListener("keydown", surCtrlZ);
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
 		desabonner();
 		demonterMaj();
 		/* La page « Générer » aussi : une génération en vol, son écoute Échap

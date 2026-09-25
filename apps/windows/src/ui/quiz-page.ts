@@ -74,6 +74,18 @@ export async function openQuizPage(
 	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
 	ajouter(retour, "span", "qbd-quizzes-crumb-icon");
 	retour.addEventListener("click", () => onBack());
+	/* Le bouton « précédent » de la souris fait la même chose que la flèche
+	   (2026-09-25). Consommé dès l'appui, en capture ; l'action part au
+	   relâchement. Le « suivant » est consommé sans effet : il n'y a rien après
+	   un quiz qu'on joue. */
+	const surBoutonSouris = (e: MouseEvent): void => {
+		if (e.button !== 3 && e.button !== 4) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.type === "mouseup" && e.button === 3) onBack();
+	};
+	document.addEventListener("mousedown", surBoutonSouris, true);
+	document.addEventListener("mouseup", surBoutonSouris, true);
 
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");
 	const ligneTitre = ajouter(titrage, "div", "qbd-qz-title-row");
@@ -165,6 +177,8 @@ export async function openQuizPage(
 	return () => {
 		if (fait) return;
 		fait = true;
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
 		try {
 			hote.__quizDestroy?.();
 		} catch (e) {
