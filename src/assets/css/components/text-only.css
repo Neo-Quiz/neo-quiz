@@ -457,23 +457,27 @@
 }
 
 .quiz-tab.checked{
-  border-color: color-mix(in srgb, var(--quiz-hint) 48%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-hint) 10%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-hint) 10%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-hint) 48%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-hint) 45%, #000);
 }
 
 .quiz-tab.understood{
-  border-color: color-mix(in srgb, var(--quiz-success) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-success) 16%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-success) 16%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-success) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-success) 45%, #000);
 }
 
 .quiz-tab.partial{
-  border-color: color-mix(in srgb, var(--quiz-hint) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-hint) 14%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-hint) 14%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-hint) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-hint) 45%, #000);
 }
 
 .quiz-tab.review{
-  border-color: color-mix(in srgb, var(--quiz-danger) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-danger) 12%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-danger) 12%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-danger) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-danger) 45%, #000);
 }
 
 @media (max-width: 640px){

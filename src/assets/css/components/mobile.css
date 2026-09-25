@@ -19,43 +19,8 @@
     touch-action: pan-y;
   }
 
-  .quiz-tab:not(.is-result):not(.correct):not(.wrong):hover,
-  .quiz-tab:not(.is-result):not(.correct):not(.wrong):focus-visible{
-    transform: translate3d(0,-1px,0);
-    box-shadow:
-      0 0 0 1.5px var(--quiz-primary-ring-12),
-      0 0 8px color-mix(in srgb, var(--quiz-primary) 6%, transparent);
-  }
-
-  .quiz-tab.is-result:hover,
-  .quiz-tab.is-result:focus-visible{
-    transform: translate3d(0,-1px,0);
-    box-shadow:
-      0 0 0 1.5px var(--quiz-success-ring-14),
-      0 0 8px color-mix(in srgb, var(--quiz-success) 6%, transparent);
-  }
-
-  .quiz-tab.correct:hover,
-  .quiz-tab.correct:focus-visible{
-    transform: translate3d(0,-1px,0);
-    border-color: var(--quiz-success);
-    background: color-mix(in srgb, var(--quiz-success) 18%, var(--background-primary));
-    box-shadow:
-      0 0 0 1.5px var(--quiz-success-ring-20),
-      0 0 10px var(--quiz-success-ring-22);
-    color: var(--quiz-success);
-  }
-
-  .quiz-tab.wrong:hover,
-  .quiz-tab.wrong:focus-visible{
-    transform: translate3d(0,-1px,0);
-    border-color: var(--quiz-danger);
-    background: color-mix(in srgb, var(--quiz-danger) 14%, var(--background-primary));
-    box-shadow:
-      0 0 0 1.5px var(--quiz-danger-ring-20),
-      0 0 10px var(--quiz-danger-ring-22);
-    color: var(--quiz-danger);
-  }
+  /* Les onglets n'ont plus de variante tactile : leur appui « à presser »
+     (nav-tabs.css) est le même partout (2026-09-25). */
 
   .quiz-option:not(.selected):not(.correct):not(.wrong):hover,
   .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
