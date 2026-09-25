@@ -445,16 +445,23 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		});
 	}
 
-	/* Clavier d'une carte mémoire, au niveau du DOCUMENT (fix round 1, écran) :
-	   un `keydown` posé sur `trackItem` (précédente version) ne voit jamais une
-	   frappe dont le focus est ailleurs dans le quiz — l'onglet de navigation
-	   `.quiz-tab`, notamment, après un clic ou une flèche. Un seul écouteur par
-	   instance de moteur, retiré via `ctx.__quizGlobalCleanups` comme les autres
-	   écouteurs globaux (`hint.ts`, `interactions.ts`). N'agit que si la slide
-	   COURANTE est une carte mémoire ; ignore toujours une cible
-	   `input`/`textarea`/`[contenteditable]` et les modificateurs Ctrl/Meta/Alt ;
-	   `preventDefault()` seulement quand la touche est prise, pour qu'Espace
-	   n'active pas aussi l'onglet qui a le focus. */
+	/* Clavier d'une carte mémoire, sur le CONTENEUR du quiz, en phase de
+	   CAPTURE (revue finale). Deux versions ont échoué avant :
+	   - sur `trackItem`, il ne voyait jamais une frappe dont le focus est
+	     ailleurs dans le quiz — l'onglet de navigation `.quiz-tab`, notamment ;
+	   - sur `document`, TOUS les quiz de la page réagissaient à la même touche
+	     (deux blocs dans une note, un onglet Obsidian en arrière-plan), Espace
+	     sur un bouton hors du quiz retournait la carte, et le `keydown` de
+	     `.quiz-tab` (interactions.ts) arrêtait de toute façon Espace avant
+	     qu'il remonte — seuls 1 et 2 passaient.
+	   La capture sur le conteneur passe AVANT l'écouteur de l'onglet, et ne
+	   voit que les frappes dont le focus est DANS ce quiz : c'est la règle des
+	   flèches (`interactions.ts`, « Bindé sur le container »). Un bouton de la
+	   carte qui a le focus garde son comportement natif (Espace et Entrée
+	   l'activent eux-mêmes). Ignore les champs de saisie, MathLive compris, et
+	   les modificateurs. Espace ou Entrée retourne (spec §3), 1 note « À
+	   revoir », 2 « Je savais » ; après le retournement, le focus passe sur
+	   « Je savais ». */
 	function currentFlashcardQuestionIndex(): number | null {
 		const si = ctx.quizState.current;
 		if (!ctx.isQuestionSlideIndex(si)) return null;
@@ -462,32 +469,42 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return ctx.isFlashcardQuestion(ctx.quiz[qi]) ? qi : null;
 	}
 
-	function bindGlobalFlashcardKeys(): void {
-		// Repli test (check-engine-review.mjs, ctx factice sans DOM) : même garde
-		// que le MutationObserver optionnel de hint.ts. En Obsidian comme dans
-		// l'app (rendu Electron), `document` existe toujours.
-		if (typeof document === "undefined") return;
+	function bindFlashcardKeys(): void {
+		// Repli test (check-engine-review.mjs, ctx factice sans DOM).
+		if (!ctx.container || typeof ctx.container.addEventListener !== "function") return;
 		const onKeydown = (e: KeyboardEvent) => {
+			if (ctx.isDestroyed() || !ctx.container.isConnected) return;
 			const qi = currentFlashcardQuestionIndex();
 			if (qi === null) return;
 			const cible = e.target as HTMLElement | null;
-			if (cible?.closest?.("input, textarea, [contenteditable]")) return;
+			if (cible?.closest?.("input, textarea, select, [contenteditable], math-field")) return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
-			const vise = e.key === " " ? ".quiz-flashcard-flip-btn"
+			const trackItem = ctx.container.querySelector<HTMLElement>(`[data-qi="${qi}"]`);
+			if (!trackItem) return;
+			// Un bouton DE LA CARTE qui a le focus s'active tout seul.
+			if ((e.key === " " || e.key === "Enter") && cible?.closest?.("button") && trackItem.contains(cible)) return;
+			const retourner = e.key === " " || e.key === "Enter";
+			const vise = retourner ? ".quiz-flashcard-flip-btn"
 				: e.key === "1" ? '.quiz-textonly-rating-btn[data-textonly-rating="review"]'
 				: e.key === "2" ? '.quiz-textonly-rating-btn[data-textonly-rating="understood"]'
 				: null;
 			if (!vise) return;
-			const trackItem = ctx.container.querySelector<HTMLElement>(`[data-qi="${qi}"]`);
-			const bouton = trackItem?.querySelector<HTMLButtonElement>(vise);
+			const bouton = trackItem.querySelector<HTMLButtonElement>(vise);
 			if (!bouton) return;
 			e.preventDefault();
+			e.stopPropagation();
 			bouton.click();
+			if (retourner) {
+				// Le verso vient d'être peint : le focus va à l'action suivante.
+				requestAnimationFrame(() => {
+					ctx.container.querySelector<HTMLButtonElement>(`[data-qi="${qi}"] .quiz-textonly-rating-btn[data-textonly-rating="understood"]`)?.focus({ preventScroll: true });
+				});
+			}
 		};
-		document.addEventListener("keydown", onKeydown);
-		ctx.__quizGlobalCleanups.push(() => document.removeEventListener("keydown", onKeydown));
+		ctx.container.addEventListener("keydown", onKeydown, true);
+		ctx.__quizGlobalCleanups.push(() => ctx.container.removeEventListener("keydown", onKeydown, true));
 	}
-	bindGlobalFlashcardKeys();
+	bindFlashcardKeys();
 
 	return {
 		RATINGS,

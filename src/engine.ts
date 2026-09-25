@@ -526,7 +526,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		cancelEnsureTrackVisibleRaf,
 		currentAsyncEpoch,
 		isQuizInstanceAlive,
-		isDestroyed: () => !__quizDestroyed,
+		// Vrai une fois le quiz DÉTRUIT. Était inversé (`!__quizDestroyed`)
+		// et sans appelant jusqu'à l'écouteur clavier des cartes (2026-09-25).
+		isDestroyed: () => __quizDestroyed,
 		getSlideGeneration,
 		isSlideGenerationCurrent
 	});
