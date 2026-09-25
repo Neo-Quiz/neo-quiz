@@ -60,14 +60,13 @@ export interface FicheOrigine {
 	tooltip: string;
 }
 
-/* L'ENTRÉE de la liste des questions après un changement de mode (2026-09-25) :
-   « axe partagé » horizontal, dans le sens du sélecteur — vers Practice (à
-   droite), l'ancienne liste part à gauche et la nouvelle arrive de la droite ;
-   vers Learn, l'inverse. La page est entièrement redessinée entre les deux :
-   le sens est donc posé ici au clic et consommé par le rendu suivant, une
-   seule fois. */
-let entreeListe: "droite" | "gauche" | null = null;
-const DECALAGE_LISTE = 28;
+/* LA FRISE AU CHANGEMENT DE MODE (2026-09-25) : la ligne et ses ronds
+   numérotés RESTENT ; chaque rond glisse verticalement jusqu'à sa place dans
+   la nouvelle liste (FLIP), pendant que les cartes des questions s'effacent
+   puis réapparaissent. La page est entièrement redessinée entre les deux :
+   la position de chaque rond (par rapport au haut de la liste) est donc
+   relevée au clic et consommée par le rendu suivant, une seule fois. */
+let rondsAvant: number[] | null = null;
 
 export interface FicheDeps {
 	quiz: QuizIndexEntry;
@@ -172,14 +171,15 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 				seg.classList.add("is-active");
 				placerIndicateur(indic, seg, true);
 				const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-				if (!reduit) {
-					const versPractice = autre.mode === "practice";
-					entreeListe = versPractice ? "droite" : "gauche";
-					// L'ancienne liste s'efface en glissant, pendant le bloc du sélecteur.
-					choix.closest(".qbd-fiche")?.querySelector(".qbd-fiche-list")?.animate(
-						[{ opacity: 1, transform: "translateX(0)" }, { opacity: 0, transform: `translateX(${versPractice ? -DECALAGE_LISTE : DECALAGE_LISTE}px)` }],
-						{ duration: DUREE_GLISSEMENT, easing: "cubic-bezier(.32, .72, 0, 1)", fill: "forwards" },
-					);
+				const liste = choix.closest(".qbd-fiche")?.querySelector<HTMLElement>(".qbd-fiche-list");
+				if (!reduit && liste) {
+					const haut = liste.getBoundingClientRect().top;
+					rondsAvant = [...liste.querySelectorAll<HTMLElement>(".qbd-fiche-node")].map(n => n.getBoundingClientRect().top - haut);
+					// Les cartes s'effacent pendant que le bloc du sélecteur glisse.
+					liste.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
+						[{ opacity: 1 }, { opacity: 0 }],
+						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
+					));
 				}
 				window.setTimeout(() => autre.open(), reduit ? 0 : DUREE_GLISSEMENT);
 			});
@@ -291,14 +291,6 @@ function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps
 	const main = ajouter(root, "div", "qbd-fiche-main");
 	const scroller = ajouter(main, "div", "qbd-fiche-scroll");
 	const items = ajouter(scroller, "div", "qbd-fiche-list");
-	if (entreeListe) {
-		const depuis = entreeListe === "droite" ? DECALAGE_LISTE : -DECALAGE_LISTE;
-		entreeListe = null;
-		items.animate(
-			[{ opacity: 0, transform: `translateX(${depuis}px)` }, { opacity: 1, transform: "translateX(0)" }],
-			{ duration: 260, easing: "cubic-bezier(.32, .72, 0, 1)" },
-		);
-	}
 	deps.questions.forEach((q, i) => {
 		const item = ajouter(items, "div", "qbd-fiche-item");
 		ajouter(item, "span", "qbd-fiche-node", String(i + 1));
@@ -319,5 +311,35 @@ function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps
 			});
 		}
 		card.addEventListener("click", attirer);
+	});
+	if (rondsAvant) animerFrise(items, rondsAvant);
+	rondsAvant = null;
+}
+
+/** Joue la transition de la frise sur la NOUVELLE liste (voir `rondsAvant`) :
+    les ronds partent de leur ancienne hauteur et glissent à la nouvelle, les
+    cartes apparaissent. Les ronds en plus (liste plus longue) apparaissent en
+    grandissant. Mesures au prochain cadre : la liste doit être posée. */
+function animerFrise(liste: HTMLElement, avant: number[]): void {
+	const cartes = [...liste.querySelectorAll<HTMLElement>(".qbd-fiche-q")];
+	cartes.forEach(c => { c.style.opacity = "0"; });
+	requestAnimationFrame(() => {
+		const haut = liste.getBoundingClientRect().top;
+		liste.querySelectorAll<HTMLElement>(".qbd-fiche-node").forEach((n, i) => {
+			if (i < avant.length) {
+				const dy = avant[i] - (n.getBoundingClientRect().top - haut);
+				if (Math.abs(dy) > 0.5) n.animate(
+					[{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
+					{ duration: 380, easing: "cubic-bezier(.32, .72, 0, 1)" },
+				);
+			} else {
+				n.animate([{ opacity: 0, transform: "scale(.6)" }, { opacity: 1, transform: "scale(1)" }],
+					{ duration: 260, delay: 120, easing: "ease-out", fill: "backwards" });
+			}
+		});
+		cartes.forEach(c => {
+			c.style.opacity = "";
+			c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 140, easing: "ease-out", fill: "backwards" });
+		});
 	});
 }
