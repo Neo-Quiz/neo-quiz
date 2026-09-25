@@ -367,6 +367,16 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	const vide = tour({ ...base, prompt: "P", cloze: "", caseSensitive: true });
 	r.check("gabarit vide reste un cloze", [vide.cloze, vide.caseSensitive], ["", true]);
 
+	// Une carte mémoire : flashcard, recto, verso, explication, et RIEN d'autre.
+	const carte = tour({ ...base, prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "`<class 'list'>`", explain: "Liste vide." });
+	r.check("carte : flashcard, prompt, answer, explain conservés",
+		[carte.flashcard, carte.prompt, carte.answer, carte.explain],
+		[true, "Que renvoie `type([])` ?", "`<class 'list'>`", "Liste vide."]);
+	r.check("carte : ni type, ni options fantômes, ni correctIndex",
+		["type", "options", "correctIndex", "acceptedAnswers"].filter(k => k in carte), []);
+	const carteVide = tour({ ...base, prompt: "P", flashcard: true });
+	r.check("carte sans verso reste une carte (verso vide écrit)", [carteVide.flashcard, carteVide.answer], [true, ""]);
+
 	// Formes IMBRIQUEES, que le moteur lit en repli.
 	const ord = tour({ ...base, prompt: "P",
 		ordering: { items: ["A", "B"], correctOrder: [1, 0], slotLabels: ["Premier", "Second"] } });

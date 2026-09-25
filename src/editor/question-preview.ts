@@ -214,6 +214,15 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		);
 	}
 
+	if (type === "flashcard") {
+		/* Aperçu : le recto est l'énoncé déjà rendu ; le verso en sourdine
+		   dessous, pour que l'auteur relise sa réponse sans jouer la carte. */
+		const back = ajouter(card, "div", "quiz-flashcard-back");
+		ajouter(back, "div", "quiz-textonly-label", t("engine.flashcard.back"));
+		if (q.answer && q.answer.trim()) inlineInto(ajouter(back, "div", "quiz-flashcard-answer"), q.answer, opts.sourcePath);
+		else ajouter(back, "div", "quiz-flashcard-missing", t("engine.flashcard.missingAnswer"));
+	}
+
 	if (type === "numeric") {
 		/* Un champ nu, comme le moteur — et RIEN d'autre. L'unité n'est pas un
 		   décor : c'est un suffixe ACCEPTÉ à la correction (engine/numeric.ts),

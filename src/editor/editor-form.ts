@@ -543,6 +543,15 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			czWrap.addEventListener("click", () => { q.caseSensitive = !q.caseSensitive; view.render(); view.scheduleSave?.(); });
 		}
 
+		if (qType === "flashcard") {
+			// Le recto est l'énoncé du formulaire, déjà affiché plus haut : ici,
+			// seul le verso — un champ, comme pour le gabarit d'un texte à trous.
+			ajouter(box, "label", "qb-field-label", t("editor.flashcard.section"));
+			ajouter(box, "div", "qb-field-help", t("editor.flashcard.help"));
+			_field(box, t("editor.flashcard.back"), q.answer, t("editor.flashcard.backPlaceholder"), true,
+				v => { q.answer = v; rerender(); });
+		}
+
 		if (qType === "numeric") {
 			ajouter(box, "div", "qb-field-help", t("editor.numeric.help"));
 			_arrayEditor(box, t("editor.numeric.answers"), q.acceptedAnswers!, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));

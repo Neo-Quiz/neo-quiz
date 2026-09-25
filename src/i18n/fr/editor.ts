@@ -21,6 +21,12 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	/* ── Texte à trous ── */
 	"editor.type.cloze.label": "Texte à trous",
 	"editor.type.cloze.desc": "Compléter un texte",
+	"editor.type.flashcard.label": "Carte mémoire",
+	"editor.type.flashcard.desc": "On la retourne, puis on se note",
+	"editor.flashcard.section": "Verso de la carte",
+	"editor.flashcard.help": "L'énoncé ci-dessus est le recto. Écris ici la réponse attendue : une phrase, une formule ou une ligne de code.",
+	"editor.flashcard.back": "Réponse",
+	"editor.flashcard.backPlaceholder": "<class 'list'>",
 	"editor.cloze.help": "Écrivez le texte entier et encadrez chaque trou de doubles accolades. Séparez les variantes acceptées par une barre verticale : {{Paris}}, {{l'euro|euro}}.",
 	"editor.cloze.templateLabel": "Texte à trous",
 	"editor.cloze.templatePlaceholder": "La capitale de la France est {{Paris}}.",

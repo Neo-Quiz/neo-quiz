@@ -493,6 +493,8 @@ export interface ParsedQuizItem {
 	correctMap?: number[];
 	/** Gabarit du texte à trous (engine/cloze.ts). */
 	cloze?: string;
+	/** Carte mémoire (engine/…) : `true` discrimine, le verso vit dans `answer`. */
+	flashcard?: boolean;
 	/** Réponse numérique et ses marges (engine/numeric.ts). */
 	numeric?: boolean;
 	tolerance?: number;

@@ -99,6 +99,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   choix unique, et la sauvegarde suivante remplaçait `cloze` par des
 	   options fantômes (revue codex 2026-07-31). Le MOTEUR, lui, a raison
 	   d'exiger du contenu : il ne peut rien afficher d'un gabarit vide. */
+	/* Carte mémoire : `flashcard: true` discrimine, AVANT le repli sur le choix
+	   unique — sans cette ligne, la sauvegarde suivante réécrivait la carte en
+	   QCM à options vides (même piège que pour `cloze`). */
+	else if (q.flashcard === true) type = "flashcard";
 	else if (typeof q.cloze === "string") type = "cloze";
 	/* MÊME critère que le moteur (engine/numeric.ts isNumericQuestion) : une
 	   marge ou une unité suffisent à déclarer une réponse numérique. Une
@@ -269,6 +273,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		question.caseSensitive = q.caseSensitive || false;
 	}
 
+	if (type === "flashcard") {
+		question.answer = String(q.answer ?? "");
+	}
+
 	if (["numeric", "text", "cmd", "powershell", "bash"].includes(type)) {
 		/* UNION, pas alternative : le moteur agrège les cinq champs
 		   (engine/terminal.ts getTextAcceptedAnswers). Les traiter comme
@@ -329,7 +337,7 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   de configuration, jamais pour une question (revue codex 2026-07-31).
 	   L'objet de configuration, lui, ne passe pas par ici : il est repéré par
 	   son index et lu par `readModeConfig`. */
-	const knownKeys = new Set(['id','title','prompt','promptHtml','options','correctIndex','multiSelect','correctIndices','ordering','slots','possibilities','correctOrder','matching','rows','choices','correctMap','type','terminalVariant','textVariant','commandPrefix','placeholder','caseSensitive','acceptedAnswers','acceptableAnswers','correctAnswers','correctText','answer','hint','explain','explainHtml','resourceButton','cloze','numeric','tolerance','tolerancePercent','unit',
+	const knownKeys = new Set(['id','title','prompt','promptHtml','options','correctIndex','multiSelect','correctIndices','ordering','slots','possibilities','correctOrder','matching','rows','choices','correctMap','type','terminalVariant','textVariant','commandPrefix','placeholder','caseSensitive','acceptedAnswers','acceptableAnswers','correctAnswers','correctText','answer','hint','explain','explainHtml','resourceButton','cloze','flashcard','numeric','tolerance','tolerancePercent','unit',
 		// Leçon (mode "lesson") : nom canonique + alias hérités de "learn" — les
 		// deux sont lus explicitement ci-dessus, donc ni l'un ni l'autre ne doit
 		// retomber dans `_extraFields` (double écriture à l'export sinon).
