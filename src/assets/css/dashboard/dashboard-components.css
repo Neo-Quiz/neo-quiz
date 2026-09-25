@@ -590,20 +590,23 @@
 .qbd-quiz-card-actions {
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: 4px;
-	margin-top: 8px;
-	padding-top: 12px;
+	gap: 2px;
+	margin-top: 6px;
+	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
 }
 .qbd-root .qbd-quiz-card-action {
+	/* Sur UNE ligne : le verbe à gauche, le nombre de questions ou la
+	   progression à droite (2026-09-25, demande de compacité). */
 	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 3px;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
 	min-width: 0;
 	height: auto;
 	margin: 0;
-	padding: 8px 10px;
+	padding: 6px 10px;
 	border: 1px solid color-mix(in srgb, var(--interactive-accent) 28%, transparent);
 	border-radius: 10px;
 	background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
@@ -641,6 +644,8 @@
 .qbd-quiz-card-action-icon svg { width: 14px; height: 14px; }
 .qbd-quiz-card-action-label { overflow: hidden; text-overflow: ellipsis; }
 .qbd-quiz-card-action-sub {
+	flex-shrink: 1;
+	min-width: 0;
 	font-size: 11.5px;
 	color: var(--text-muted);
 	white-space: nowrap;
@@ -654,7 +659,7 @@
 	justify-self: center;
 	height: auto;
 	margin: 0;
-	padding: 2px 6px;
+	padding: 0 6px;
 	border: 0;
 	border-radius: 6px;
 	background: none;
