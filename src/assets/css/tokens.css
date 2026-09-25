@@ -28,11 +28,22 @@
 }
 
 body{
-  --quiz-primary: #0ea5e9;
-  --quiz-primary-hover: #0284c7;
+  /* UNE couleur par rôle (2026-09-25) : le quiz mêlait un bleu ciel
+     (#0EA5E9, options cochées) et un bleu roi (#456DFF, flèches, actions),
+     un vert néon (#29CC57), un vert moyen (#16A34A) et un émeraude
+     (#15803D). Chaque couleur pleine porte du texte blanc : elle doit donc
+     tenir au moins 4,5:1 de contraste — le bleu ciel en avait 2,8, le vert
+     moyen 3,3. `-light` : la face d'un bouton 3D au survol ; `-edge` : sa
+     tranche. */
+  --quiz-primary: #3b62f6;        /* 4,9:1 avec le blanc */
+  --quiz-primary-hover: #2f54e6;
+  --quiz-primary-light: #5a7dff;
+  --quiz-primary-edge: #2442b8;
 
-  --quiz-success: #16a34a;
-  --quiz-success-hover: #15803d;
+  --quiz-success: #15803d;        /* 5,0:1 avec le blanc */
+  --quiz-success-hover: #166534;
+  --quiz-success-light: #17924a;
+  --quiz-success-edge: #0c4f25;
 
   --quiz-danger: #dc2626;
   --quiz-danger-hover: #b91c1c;

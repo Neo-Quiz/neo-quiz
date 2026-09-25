@@ -1093,8 +1093,8 @@
    6,4 s, sur la courbe d'origine — déplacé en `transform` (même trajet que
    leur `left`, mesuré identique) pour rester fluide sur le compositeur. ── */
 .qbd-root .qbd-cta3d {
-	--qbd-cta3d-face: #456dff;
-	--qbd-cta3d-edge: #2a47c4;
+	--qbd-cta3d-face: var(--quiz-primary);
+	--qbd-cta3d-edge: var(--quiz-primary-edge);
 	--qbd-cta3d-depth: 4px;
 	appearance: none;
 	position: relative;

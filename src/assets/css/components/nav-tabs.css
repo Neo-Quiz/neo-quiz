@@ -70,16 +70,16 @@
    émeraude = juste, rouge = faux), la question courante est la seule en
    aplat PLEIN de sa couleur, texte blanc — le même bleu que les flèches. */
 .quiz-tab.answered{
-  --tab-face: color-mix(in srgb, #456dff 26%, var(--background-primary));
-  --tab-border: color-mix(in srgb, #456dff 50%, transparent);
+  --tab-face: color-mix(in srgb, var(--quiz-primary) 26%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-primary) 50%, transparent);
   --tab-edge: #1f358f;
   --tab-text: #fff;
 }
 
 .quiz-tab.correct{
-  --tab-face: color-mix(in srgb, #15803d 42%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-success) 42%, var(--background-primary));
   --tab-border: color-mix(in srgb, #22c55e 45%, transparent);
-  --tab-edge: #0c4f25;
+  --tab-edge: var(--quiz-success-edge);
   --tab-text: #fff;
 }
 
@@ -92,27 +92,27 @@
 
 /* La question courante : aplat plein de sa couleur. */
 .quiz-tab.active{
-  --tab-face: #456dff;
+  --tab-face: var(--quiz-primary);
   --tab-border: transparent;
-  --tab-edge: #2a47c4;
+  --tab-edge: var(--quiz-primary-edge);
   --tab-text: #fff;
 }
-.quiz-tab.correct.active{ --tab-face: #15803d; --tab-edge: #0c4f25; }
+.quiz-tab.correct.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
 .quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
 
-/* « Résultats » : la fin du quiz, donc VERT — un émeraude profond (#15803D,
+/* « Résultats » : la fin du quiz, donc VERT — un émeraude profond (var(--quiz-success),
    5:1 de contraste au texte blanc) et plus le vert néon #29CC57 (2,1:1),
    qui criait dans la rangée d'onglets sombres (2026-09-25). */
 .quiz-tab.is-result{
-  --tab-face: #15803d;
+  --tab-face: var(--quiz-success);
   --tab-border: transparent;
-  --tab-edge: #0c4f25;
+  --tab-edge: var(--quiz-success-edge);
   --tab-text: #fff;
 }
 
 .quiz-tab.is-result:hover,
 .quiz-tab.is-result:focus-visible{
-  background: #17924a;
+  background: var(--quiz-success-light);
 }
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }

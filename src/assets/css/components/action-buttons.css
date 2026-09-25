@@ -69,9 +69,9 @@
    de la navigation une seule famille (4,3:1). Pas de reflet ici : dans une
    question, l'attention va à la question. */
 .quiz-action-btn.success{
-  --quiz-press-face: #456dff;
-  --quiz-press-face-hover: #5b80ff;
-  --quiz-press-edge: #2a47c4;
+  --quiz-press-face: var(--quiz-primary);
+  --quiz-press-face-hover: var(--quiz-primary-light);
+  --quiz-press-edge: var(--quiz-primary-edge);
   --quiz-press-depth: 4px;
   color: #fff;
   background: var(--quiz-press-face);
@@ -158,11 +158,11 @@
    brilliant.org) : un bouton « à presser ». Une TRANCHE pleine plus sombre
    dessous (`0 4px 0 0`, sans flou) lui donne son épaisseur ; au clic, la
    tranche disparaît et le bouton descend d'autant (`translateY(4px)`),
-   comme une touche qui s'enfonce. En bleu (#456DFF, le bleu de Brilliant). */
+   comme une touche qui s'enfonce. En bleu (var(--quiz-primary), le bleu de Brilliant). */
 .quiz-question-nav .quiz-nav-btn{
-  --quiz-nav-face: #456dff;
-  --quiz-nav-face-hover: #5b80ff;
-  --quiz-nav-edge: #2a47c4;
+  --quiz-nav-face: var(--quiz-primary);
+  --quiz-nav-face-hover: var(--quiz-primary-light);
+  --quiz-nav-edge: var(--quiz-primary-edge);
   --quiz-nav-depth: 4px;
   appearance: none;
   display: inline-flex;
