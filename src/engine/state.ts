@@ -600,6 +600,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// Recommencer, c'est une NOUVELLE tentative : une pré-question déjà
 		// passée en « Je ne sais pas » redevient bloquante (Task 7).
 		ctx.quizState.lessonPreSkipped = ctx.quiz.map(() => false);
+		ctx.quizState.hintSeen = ctx.quiz.map(() => false);
 		// Recommencer, c'est une NOUVELLE session pour l'ordonnanceur aussi :
 		// sans cette remise à zéro, une question déjà journalisée à la tentative
 		// précédente ne serait plus jamais recomptée (Task 8).

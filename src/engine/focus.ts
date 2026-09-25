@@ -73,8 +73,10 @@ export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
 		else if (activeEl.matches?.('.quiz-textonly-rating-btn[data-textonly-rating]')) {
 			descriptor.selector = `.quiz-textonly-rating-btn[data-textonly-rating="${activeEl.dataset.textonlyRating}"]`;
 		}
+		/* « Indice » disparaît une fois l'indice révélé : le focus passe au
+		   cran suivant du bouton d'aide, « Je ne sais pas », s'il existe. */
 		else if (activeEl.matches?.('.quiz-hint-btn')) {
-			descriptor.selector = '.quiz-hint-btn';
+			descriptor.selector = '.quiz-lesson-dontknow-btn';
 		}
 		else if (activeEl.matches?.('.quiz-prev-btn')) {
 			descriptor.selector = '.quiz-prev-btn';

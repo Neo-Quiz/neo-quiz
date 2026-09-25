@@ -386,6 +386,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		matchPick: initMatchPicks(),
 		// Task 7, mode Lesson : cf. QuizState.lessonPreSkipped (src/types/quiz.ts).
 		lessonPreSkipped: quiz.map(() => false),
+		hintSeen: quiz.map(() => false),
 		// Task 8 : cf. QuizState.recorded (src/types/quiz.ts). Vide à l'assemblage,
 		// comme resultsCounted, avant que resetQuiz() ne l'aligne sur ctx.quiz.
 		recorded: [],

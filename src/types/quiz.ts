@@ -385,6 +385,13 @@ export interface QuizState {
 	 */
 	lessonPreSkipped: boolean[];
 	/**
+	 * L'indice de la question a été RÉVÉLÉ (2026-09-26) : il reste affiché
+	 * sous la question, et le bouton d'aide passe au cran suivant
+	 * (« Je ne sais pas » sur une pré-question, rien sinon). Un seul bouton
+	 * d'aide à la fois, sans rien perdre : l'indice se relit sur place.
+	 */
+	hintSeen: boolean[];
+	/**
 	 * Questions DÉJÀ journalisées pour l'ordonnanceur pendant cette session.
 	 *
 	 * Une auto-évaluation journalise immédiatement (le verdict existe) ;

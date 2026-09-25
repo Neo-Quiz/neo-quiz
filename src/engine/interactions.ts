@@ -374,7 +374,12 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			hintBtn.addEventListener("click", e => {
 				e.preventDefault();
 				e.stopPropagation();
-				ctx.openHintModal(q.hint);
+				if (ctx.quizState.isSliding) return;
+				/* L'indice se RÉVÈLE sur place (plus de fenêtre) : l'état le
+				   retient, le re-rendu l'affiche sous la question et fait
+				   monter le bouton d'aide d'un cran (cards.ts). */
+				ctx.quizState.hintSeen[qi] = true;
+				ctx.commitQuestionInteraction(qi, { syncHeight: true });
 			});
 		}
 

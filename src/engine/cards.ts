@@ -17,6 +17,9 @@ import { t, type TransKey } from "../i18n";
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
    canal d'icône à cet endroit. */
 const ICON_ARROW_LEFT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>';
+/* Les icônes du bouton d'aide (Lucide « lightbulb » et « circle-help »). */
+const ICON_BULB = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
+const ICON_HELP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 export interface CardHandlers {
@@ -544,7 +547,17 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			body = mi + `<div class="quiz-options-wrap${hasImg ? " quiz-options-image-grid" : ""}">${optionsHtml}</div>`;
 		}
 
-		const hintBtn = (!isRead && !isTextOnly && q.hint && String(q.hint).trim()) ? `<button class="quiz-hint-btn" type="button">${t("engine.hint.button")}</button>` : "";
+		/* UN SEUL BOUTON D'AIDE, qui monte d'un cran (2026-09-26) : « Indice »
+		   tant que l'indice n'a pas été révélé ; révélé, l'indice reste AFFICHÉ
+		   sous la question (il se relit sans rouvrir de fenêtre) et le bouton
+		   devient « Je ne sais pas » là où il existe, disparaît ailleurs.
+		   Chercher, se faire aider, puis seulement abandonner. */
+		const aIndice = !isRead && !isTextOnly && !!(q.hint && String(q.hint).trim());
+		const indiceVu = aIndice && !!ctx.quizState.hintSeen?.[qi];
+		const hintBtn = aIndice && !indiceVu ? `<button class="quiz-help-btn quiz-hint-btn" type="button">${ICON_BULB}<span>${t("engine.hint.button")}</span></button>` : "";
+		const indiceHtml = indiceVu
+			? `<div class="quiz-hint-inline"><div class="quiz-hint-inline-label">${ICON_BULB}<span>${t("engine.hint.button")}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(q.hint)}</div></div>`
+			: "";
 		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une
 		// tentative VIDE mais EXPLICITE. Passer à la suite sans répondre donne
 		// désormais le même verdict (engine/state.ts marquerPreNonTentees). Gardée par !ctx.quizState.locked comme hintBtn/
@@ -554,8 +567,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// possible), le clic ne produisait sinon aucun effet visible ; sa
 		// disparition EST l'effet visible attendu, en plus du re-rendu qui la
 		// déclenche (interactions.ts markLessonPreSkipped).
-		const dontKnowBtn = (!isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.quizState.locked && !ctx.quizState.lessonPreSkipped[qi])
-			? `<button class="quiz-action-btn quiz-lesson-dontknow-btn" type="button">${t("engine.lesson.dontKnow")}</button>`
+		const dontKnowBtn = (!hintBtn && !isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.quizState.locked && !ctx.quizState.lessonPreSkipped[qi])
+			? `<button class="quiz-help-btn quiz-lesson-dontknow-btn" type="button">${ICON_HELP}<span>${t("engine.lesson.dontKnow")}</span></button>`
 			: "";
 		// Mode leçon (ex "learn") : la leçon s'affiche AVANT que la question soit
 		// verrouillée, jamais après (revoir la leçon une fois corrigé n'a pas de
@@ -600,6 +613,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				<div class="quiz-question">${renderQuizPromptHtml(q)}</div>
 				${body}
 				${learnSection}
+				${indiceHtml}
 				${hintBtn}
 				${dontKnowBtn}
 				${!isRead && !isTextOnly && ctx.quizState.locked ? explanationHtml(qi) : ""}
