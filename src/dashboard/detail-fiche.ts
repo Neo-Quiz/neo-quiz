@@ -60,6 +60,15 @@ export interface FicheOrigine {
 	tooltip: string;
 }
 
+/* L'ENTRÉE de la liste des questions après un changement de mode (2026-09-25) :
+   « axe partagé » horizontal, dans le sens du sélecteur — vers Practice (à
+   droite), l'ancienne liste part à gauche et la nouvelle arrive de la droite ;
+   vers Learn, l'inverse. La page est entièrement redessinée entre les deux :
+   le sens est donc posé ici au clic et consommé par le rendu suivant, une
+   seule fois. */
+let entreeListe: "droite" | "gauche" | null = null;
+const DECALAGE_LISTE = 28;
+
 export interface FicheDeps {
 	quiz: QuizIndexEntry;
 	questions: DraftQuestion[];
@@ -163,6 +172,15 @@ function renderSide(root: HTMLElement, deps: FicheDeps): () => void {
 				seg.classList.add("is-active");
 				placerIndicateur(indic, seg, true);
 				const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+				if (!reduit) {
+					const versPractice = autre.mode === "practice";
+					entreeListe = versPractice ? "droite" : "gauche";
+					// L'ancienne liste s'efface en glissant, pendant le bloc du sélecteur.
+					choix.closest(".qbd-fiche")?.querySelector(".qbd-fiche-list")?.animate(
+						[{ opacity: 1, transform: "translateX(0)" }, { opacity: 0, transform: `translateX(${versPractice ? -DECALAGE_LISTE : DECALAGE_LISTE}px)` }],
+						{ duration: DUREE_GLISSEMENT, easing: "cubic-bezier(.32, .72, 0, 1)", fill: "forwards" },
+					);
+				}
 				window.setTimeout(() => autre.open(), reduit ? 0 : DUREE_GLISSEMENT);
 			});
 		}
@@ -273,6 +291,14 @@ function renderQuestions(root: HTMLElement, attirer: () => void, deps: FicheDeps
 	const main = ajouter(root, "div", "qbd-fiche-main");
 	const scroller = ajouter(main, "div", "qbd-fiche-scroll");
 	const items = ajouter(scroller, "div", "qbd-fiche-list");
+	if (entreeListe) {
+		const depuis = entreeListe === "droite" ? DECALAGE_LISTE : -DECALAGE_LISTE;
+		entreeListe = null;
+		items.animate(
+			[{ opacity: 0, transform: `translateX(${depuis}px)` }, { opacity: 1, transform: "translateX(0)" }],
+			{ duration: 260, easing: "cubic-bezier(.32, .72, 0, 1)" },
+		);
+	}
 	deps.questions.forEach((q, i) => {
 		const item = ajouter(items, "div", "qbd-fiche-item");
 		ajouter(item, "span", "qbd-fiche-node", String(i + 1));
