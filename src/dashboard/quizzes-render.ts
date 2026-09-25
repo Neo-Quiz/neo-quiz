@@ -4,12 +4,14 @@ import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
-import { renderQuizCard, renderProgressRing } from "./quiz-card";
+import { renderQuizCard } from "./quiz-card";
 import { regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
+import { renderFolderProgress } from "./folder-progress";
+import { renderNextStep } from "./folder-next";
 import { buildRecentModuleGroups } from "./quiz-recent";
 import type { RecentGroupKey } from "./quiz-recent";
 import { moduleAccent } from "./module-color";
@@ -173,8 +175,18 @@ export function renderQuizGrid(
 	}
 }
 
-/** Drill-down d'un module ouvert : grille de ses quiz + panneau « Progrès »
-    (design claude.ai, capture 2026-07-20). Le fil d'Ariane et le titre vivent
+/** Les deux onglets d'un dossier ouvert (2026-09-25) : son contenu, et sa
+    progression, qui a quitté la colonne de droite. */
+export type OngletDossier = "contenu" | "progression";
+
+/** Les deux vues d'un dossier ; `progression` est absente dans le sas. */
+export interface VuesDossier {
+	contenu: HTMLElement;
+	progression: HTMLElement | null;
+}
+
+/** Drill-down d'un module ouvert : l'étape suivante, la grille de ses quiz et
+    les ressources du dossier, et la vue « Progression » de l'autre onglet. Le fil d'Ariane et le titre vivent
     désormais dans quizzes.ts (le header EST le titre du dossier) ; `inModule`
     arrive déjà filtré par module — mêmes quiz que les stats du header
     (calculés UNE fois par render(), cf. quizzes.ts). */
@@ -186,8 +198,9 @@ export function renderModuleDrill(
 	map: ModuleMap,
 	openModuleFolder: string,
 	/* Re-rendu SANS refermer le drill-down (reset de stats depuis le menu ⋯). */
-	rerender: () => void
-): void {
+	rerender: () => void,
+	onglet: OngletDossier
+): VuesDossier {
 	treeEl.replaceChildren();
 
 	// Module ouvert : sert à l'accent des cartes (le nom est déjà porté par le
@@ -206,16 +219,12 @@ export function renderModuleDrill(
 	   sections, et le bouton pour générer. L'état vide reste, à la place de la
 	   grille, avec la phrase qui dit quoi faire. */
 
-	// ── Layout 2 colonnes : colonne principale (grille + sections du dossier)
-	// + panneau « Progrès » (repli 1 colonne sous une largeur seuil, cf.
-	// dashboard-quizzes.css). ──
-	/* Le SAS n'a pas de panneau « Progrès » : on n'y progresse pas, on y
-	   passe. La colonne principale prend alors toute la largeur (une seule
-	   colonne de layout, cf. `.qbd-quizzes-drill-layout--plein`). Reconnu par
-	   le CHEMIN du dossier ouvert, comme la carte. */
+	/* Le SAS n'a ni onglet « Progression » ni étape suivante : on n'y
+	   progresse pas, on y passe. Reconnu par le CHEMIN du dossier ouvert,
+	   comme la carte. */
 	const sas = !!ctx.generatedFolder && cheminOuvert !== undefined && cheminOuvert === ctx.generatedFolder();
 	const accent = moduleAccent(info ?? { folder: openModuleFolder }, { generated: sas });
-	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout" + (sas ? " qbd-quizzes-drill-layout--plein" : ""));
+	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout");
 	layout.style.setProperty("--accent", accent);
 	const principal = ajouter(layout, "div", "qbd-quizzes-drill-main");
 	if (inModule.length === 0) {
@@ -231,6 +240,13 @@ export function renderModuleDrill(
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
 	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	if (!sas) {
+		const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
+		const prochaine = ajouter(principal, "div", "qbd-quizzes-drill-next");
+		renderNextStep(prochaine, ctx, ordre, stats);
+		principal.insertBefore(prochaine, grid);
+		if (!prochaine.firstChild) prochaine.remove();
+	}
 	for (const [index, { quiz, frere }] of cartes.entries()) {
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
 			frere,
@@ -259,44 +275,8 @@ export function renderModuleDrill(
 		renderFolderSections(principal, { ctx, folder: cheminOuvert, rerender });
 	}
 
-	if (!sas) renderProgressPanel(layout, inModule, stats);
-}
-
-/** Panneau « Progrès » (2026-09-25) : un anneau fin avec l'avancement moyen
-    des quiz du dossier, puis trois chiffres sur une ligne — maîtrisés, en
-    cours, à commencer — et le nombre de quiz dans l'en-tête (il était dans
-    celui de la page). `inModule` = TOUS les quiz du dossier (pas seulement
-    ceux d'une recherche) : c'est un statut du dossier entier. « À revoir »
-    (fini mais sous le seuil) compte comme « en cours » : pas encore acquis.
-    Plus de donut épais ni de légende en pourcentages, ni de police machine. */
-function renderProgressPanel(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
-	const total = inModule.length;
-	let masteredN = 0, enCoursN = 0, freshN = 0, somme = 0;
-	for (const quiz of inModule) {
-		const { state, pct } = computeQuizState(quiz, stats[quiz.path]);
-		somme += state === "mastered" ? 100 : pct;
-		if (state === "mastered") masteredN++;
-		else if (state === "fresh") freshN++;
-		else enCoursN++;
-	}
-	const moyenne = total > 0 ? Math.round(somme / total) : 0;
-
-	const panel = ajouter(parent, "div", "qbd-progress-panel");
-	const head = ajouter(panel, "div", "qbd-progress-panel-head");
-	ajouter(head, "div", "qbd-progress-panel-title", t("dashboard.quizzes.progressTitle"));
-	ajouter(head, "div", "qbd-progress-panel-count",
-		t(total === 1 ? "dashboard.quizzes.progressQuizzesOne" : "dashboard.quizzes.progressQuizzesOther", { count: total }));
-
-	const centre = ajouter(panel, "div", "qbd-progress-ring-wrap");
-	renderProgressRing(centre, moyenne, masteredN === total && total > 0 ? "done" : moyenne > 0 ? "progress" : "fresh", 128, 9);
-
-	const chiffres = ajouter(panel, "div", "qbd-progress-stats");
-	const chiffre = (tone: string, n: number, cle: TransKey): void => {
-		const cell = ajouter(chiffres, "div", `qbd-progress-stat qbd-progress-stat--${tone}`);
-		ajouter(cell, "b", undefined, String(n));
-		ajouter(cell, "span", undefined, t(cle));
-	};
-	chiffre("done", masteredN, masteredN > 1 ? "dashboard.quizzes.progressMasteredOther" : "dashboard.quizzes.progressMasteredOne");
-	chiffre("progress", enCoursN, "dashboard.quizzes.progressInProgress");
-	chiffre("fresh", freshN, "dashboard.quizzes.progressToStart");
+	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats);
+	layout.hidden = onglet === "progression" && progression !== null;
+	if (progression) progression.hidden = !layout.hidden;
+	return { contenu: layout, progression };
 }

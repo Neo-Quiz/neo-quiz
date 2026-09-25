@@ -9,7 +9,8 @@ import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { isFolderArchived } from "./folder-archive";
 import { renderQuizGrid, renderModuleDrill } from "./quizzes-render";
-import type { GroupingKey } from "./quizzes-render";
+import type { GroupingKey, OngletDossier, VuesDossier } from "./quizzes-render";
+import { renderOngletsDossier, basculerVueDossier } from "./folder-progress";
 import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
@@ -183,9 +184,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   dossier ARCHIVÉ depuis sa carte de la section « Archivés » et on y voit
 	   son contenu) est calculé UNE fois par render() — mêmes quiz que les
 	   stats du header. */
+	/* L'onglet du dossier ouvert : revient à « Contenu » quand on change de
+	   dossier, reste sur un re-rendu du même dossier. */
+	let ongletDossier: OngletDossier = "contenu";
+	let ongletPour: string | null = null;
+	let vuesDossier: VuesDossier | null = null;
+
 	function renderContent(treeEl: HTMLElement, quizzes: QuizIndexEntry[], inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (openModuleFolder !== null) {
-			renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); });
+			vuesDossier = renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); }, ongletDossier);
 		} else {
 			const map = effectiveMap();
 			const archivedQuizzes = quizzes.filter(q => isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
@@ -214,6 +221,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 
 		// Transition d'entrée (spec 2026-07-20) : classe posée SEULEMENT quand la
 		// vue change — mécanisme partagé avec l'accueil (view-enter.ts).
+		if (openModuleFolder !== ongletPour) { ongletDossier = "contenu"; ongletPour = openModuleFolder; }
+		vuesDossier = null;
 		const viewKey = openModuleFolder ?? "root";
 		const entering = viewKey !== lastPaintedView;
 		lastPaintedView = viewKey;
@@ -228,8 +237,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		if (!moduleMapLoaded) { void loadModuleMap(); }
 
 		const map = effectiveMap();
-		// Quiz du dossier ouvert : calculé UNE fois, réutilisé par les stats du
-		// header ET le panneau Progrès (renderModuleDrill) — les deux comptent
+		// Quiz du dossier ouvert : calculé UNE fois, réutilisé par la grille ET
+		// l'onglet « Progression » (renderModuleDrill) — les deux comptent
 		// alors exactement les mêmes quiz, jamais deux totaux qui divergent.
 		const inModule: QuizIndexEntry[] = openModuleFolder !== null
 			? quizzes.filter(q => moduleForQuiz(q.path, map).folder === openModuleFolder)
@@ -290,6 +299,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// ── Action du header : la pilule « Nouveau quiz », à droite. Plus de
 			// compteurs « N quiz | N maîtrisés » (2026-09-25) : le nombre de
 			// quiz est dans le panneau « Progrès », qui dit aussi les maîtrisés.
+			if (!sas) {
+				renderOngletsDossier(header, ongletDossier, (onglet) => {
+					ongletDossier = onglet;
+					if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
+				});
+			}
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
 
 			// Drill-down : créer un dossier ICI n'a pas de sens (demande Ahmed

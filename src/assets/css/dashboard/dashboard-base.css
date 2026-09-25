@@ -262,15 +262,6 @@
 	grid-template-columns: 1fr;
 }
 
-/* Panneau « Progrès » du drill-down : sous la grille plutôt qu'à côté. */
-.is-mobile .qbd-quizzes-drill-layout {
-	flex-direction: column;
-}
-.is-mobile .qbd-progress-panel {
-	width: 100%;
-	flex: 1 1 auto;
-}
-
 /* Page d'un quiz : liste des questions AU-DESSUS de la question courante. */
 .is-mobile .qbd-qz-body {
 	flex-direction: column;

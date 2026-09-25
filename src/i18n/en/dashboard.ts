@@ -150,6 +150,11 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.progressMasteredOther": "mastered",
 	"dashboard.quizzes.progressInProgress": "in progress",
 	"dashboard.quizzes.progressToStart": "not started",
+	"dashboard.quizzes.tabContent": "Content",
+	"dashboard.quizzes.tabProgress": "Progress",
+	"dashboard.quizzes.progressOverall": "Folder progress",
+	"dashboard.quizzes.progressMasteredOf": "{mastered} of {total} quizzes mastered",
+	"dashboard.quizzes.nextStepMore": "Other modes",
 	/* "Mastered"/"To review" du donut réutilisent dashboard.card.mastered/review
 	   (même mot que la pastille d'état d'une carte) ; "To learn" agrège fresh
 	   ET progress (rien de tel n'existe pour une carte individuelle). */
