@@ -57,22 +57,52 @@
   filter: saturate(0.8);
 }
 
+/* L'action principale d'une question (« Vérifier », « Retourner »,
+   « Voir le score », « Recommencer ») : le bouton « à presser » de BRILLIANT,
+   comme les flèches ← → (2026-09-25), dans leur vert (#29CC57). Une tranche
+   pleine plus sombre dessous (`0 4px 0 0`, sans flou) ; au survol le vert
+   s'éclaircit sans que le bouton se soulève ; au clic la tranche disparaît
+   et le bouton descend d'autant. */
 .quiz-action-btn.success{
-  color: var(--quiz-accent-text);
-  background: var(--quiz-success);
-  border-color: var(--quiz-success);
-  box-shadow:
-    0 2px 10px color-mix(in srgb, #000 12%, transparent),
-    0 0 0 1px color-mix(in srgb, #ffffff 8%, transparent) inset;
+  --quiz-press-face: #29cc57;
+  --quiz-press-face-hover: #3ad968;
+  --quiz-press-edge: #1b9440;
+  --quiz-press-depth: 4px;
+  color: #fff;
+  background: var(--quiz-press-face);
+  border-color: transparent;
+  box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
+  transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease, opacity 120ms ease;
 }
 
 .quiz-action-btn.success:hover,
 .quiz-action-btn.success:focus-visible{
-  background: var(--quiz-success-hover);
-  border-color: var(--quiz-success-hover);
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-success) 22%, transparent),
-    0 0 22px color-mix(in srgb, var(--quiz-success) 18%, transparent);
+  background: var(--quiz-press-face-hover);
+  border-color: transparent;
+  transform: none;
+  box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
+}
+
+.quiz-action-btn.success:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.quiz-action-btn.success:active:not(:disabled){
+  transform: translateY(var(--quiz-press-depth));
+  box-shadow: 0 0 0 0 var(--quiz-press-edge);
+}
+
+.quiz-action-btn.success:disabled{
+  background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 45%, transparent);
+  box-shadow: none;
+  transform: translateY(var(--quiz-press-depth));
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-action-btn.success{ transition: none; }
 }
 
 .quiz-action-btn.quiz-save-results-btn{

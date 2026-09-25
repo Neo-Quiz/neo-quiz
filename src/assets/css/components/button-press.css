@@ -9,11 +9,11 @@
   transform-origin: center;
 }
 
-/* Hover/focus unifié */
-.quiz-action-btn:hover:not(:disabled),
-.quiz-action-btn:focus-visible:not(:disabled),
-.quiz-action-btn.success:hover:not(:disabled),
-.quiz-action-btn.success:focus-visible:not(:disabled),
+/* Hover/focus unifié. SAUF `.success` (2026-09-25) : l'action principale
+   est un bouton « à presser » façon Brilliant, avec sa propre tranche et son
+   propre enfoncement (action-buttons.css) — ces `!important` l'écrasaient. */
+.quiz-action-btn:not(.success):hover:not(:disabled),
+.quiz-action-btn:not(.success):focus-visible:not(:disabled),
 .quiz-chip:hover,
 .quiz-chip:focus-visible,
 .quiz-hint-btn:hover,
@@ -23,9 +23,8 @@
   transform: translate3d(0,-1px,0) scale(1.015) !important;
 }
 
-/* Press / active unifié */
-.quiz-action-btn:active:not(:disabled),
-.quiz-action-btn.success:active:not(:disabled),
+/* Press / active unifié (sauf `.success`, voir plus haut) */
+.quiz-action-btn:not(.success):active:not(:disabled),
 .quiz-chip:active,
 .quiz-hint-btn:active,
 .quiz-hint-modal-close:active{
