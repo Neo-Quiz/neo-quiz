@@ -204,6 +204,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizType.text": "Texte libre",
 	"dashboard.quizType.ordering": "Ordonnancement",
 	"dashboard.quizType.matching": "Association",
+	"dashboard.quizType.flashcard": "Cartes mémoire",
 
 	/* ── Temps relatif ── */
 	"dashboard.time.justNow": "À l'instant",
