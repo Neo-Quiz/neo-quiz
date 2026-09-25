@@ -110,6 +110,14 @@ export const EN_ENGINE = {
 	"engine.rating.partial": "Partly",
 	"engine.rating.review": "To review",
 
+	/* ── Carte mémoire ── */
+	"engine.flashcard.flip": "Flip",
+	"engine.flashcard.flipHint": "Space",
+	"engine.flashcard.back": "Answer",
+	"engine.flashcard.again": "Review again",
+	"engine.flashcard.knew": "I knew it",
+	"engine.flashcard.missingAnswer": "No answer on the back of this card.",
+
 	/* ── Slide de soumission ── */
 	"engine.submit.back": "Back",
 	"engine.submit.showScore": "See the score",

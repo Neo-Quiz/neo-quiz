@@ -70,6 +70,7 @@ await withSrcModule(
 			textOnly,
 			isTextQuestion: () => false,
 			isClozeQuestion: () => false,
+			isFlashcardQuestion: (q) => !!q && q.flashcard === true,
 			isOrderingQuestion: () => false,
 			isMatchingQuestion: () => false,
 			isLessonMode: () => isLessonMode,
@@ -77,6 +78,14 @@ await withSrcModule(
 			roleOfQuestion: (i) => roles[i],
 			closeHintModal: () => {},
 			clampSlideIndex: (i) => i,
+			// Carte mémoire (Case D) : renderLessonHtml (sanitizer.ts) lit ces deux
+			// méthodes, flashcardBodyHtml (text-only.ts) lit renderInlineText —
+			// identité suffisante, ce test ne vérifie pas l'assainissement.
+			sanitize: {
+				renderInlineText: (s) => s,
+				renderTextWithEmbeds: (s) => s,
+				replaceObsidianEmbedsInHtml: (s) => s,
+			},
 		};
 		// N questions + slide "submit" + slide "results" (engine.ts buildSlideMap).
 		ctx.SLIDE_RESULTS_INDEX = quiz.length + 1;
@@ -128,8 +137,9 @@ await withSrcModule(
 	}
 	function fakeTrackItem(ratingButtons) {
 		return {
-			querySelector: () => null, // textarea, check-btn : hors périmètre de ce test.
+			querySelector: () => null, // textarea, check-btn, .quiz-flashcard : hors périmètre de ce test.
 			querySelectorAll: (sel) => (sel.includes("quiz-textonly-rating-btn") ? ratingButtons : []),
+			addEventListener: () => {},
 		};
 	}
 
@@ -458,6 +468,42 @@ await withSrcModule(
 		r.check("le clic a bien appelé recordReview (une ligne journalisée)", appels, [
 			{ q: "Cours/ch1.md::recall1", grade: "understood", role: "recall" },
 		]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case D — la CARTE MÉMOIRE emprunte l'auto-évaluation, même hors Leçon.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("carte mémoire — retournée, notée, journalisée une fois");
+		const quiz = [{ id: "carte1", title: "Carte", prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "list" }];
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], isLessonMode: false, roles: [undefined], textOnly: null });
+		ctx.quizState.textOnlyAnswers = [""];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("une carte est auto-évaluée même hors Leçon", ctx.textOnly.isTextOnlyFor(0), true);
+		r.check("non notée : incomplète", ctx.isComplete(0), false);
+		const html = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
+		r.check("recto : un bouton Retourner, aucune zone de saisie",
+			[html.includes("quiz-flashcard-flip-btn"), html.includes("<textarea")], [true, false]);
+
+		ctx.quizState.textOnlyChecked[0] = true;
+		const verso = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
+		r.check("verso : deux notes seulement, review puis understood",
+			[...verso.matchAll(/data-textonly-rating="(\w+)"/g)].map(m => m[1]), ["review", "understood"]);
+
+		const bouton = fakeRatingButton("review");
+		ctx.textOnly.bindTextOnlyQuestion(fakeTrackItem([bouton]), 0);
+		bouton.click();
+		bouton.click();
+		r.check("« À revoir » : faux, complet, UNE ligne au journal",
+			[ctx.isCorrect(0), ctx.isComplete(0), appels],
+			[false, true, [{ q: "Cours/ch1.md::carte1", grade: "review" }]]);
+
+		const sansVerso = { id: "carte2", title: "Vide", prompt: "P", flashcard: true };
+		r.check("carte sans verso : « Réponse manquante », jamais une exception",
+			ctx.textOnly.questionCardBodyHtml(sansVerso, 0).includes("quiz-flashcard-missing"), true);
 		r.done();
 	}
 });

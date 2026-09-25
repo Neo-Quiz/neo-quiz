@@ -133,6 +133,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	}
 
 	function getQuestionKind(q: QuizQuestion): string {
+		if (ctx.isFlashcardQuestion(q)) return "flashcard";
 		if (ctx.isClozeQuestion(q)) return "cloze";
 		if (ctx.isTextQuestion(q)) return "text";
 		if (ctx.isOrderingQuestion(q)) return "ordering";
