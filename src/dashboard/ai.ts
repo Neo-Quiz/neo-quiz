@@ -309,6 +309,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   PREMIER `render` qui suit : joindre exige un composer rendu (les chips
 	   et la vignette d'une image y vivent), et `preset` est appelé avant. */
 	let aJoindre: string[] = [];
+	/* Lancer la génération dès que les sources du préréglage sont jointes
+	   (composer du Planning, tâche 5) : posé par `preset`, consommé et remis
+	   à `false` par le même `render` qui joint `aJoindre`. */
+	let lancerApresJointes = false;
 
 	function preset(p: AiPreset): void {
 		/* Un résultat affiché ou une erreur sont balayés par un clic sur
@@ -329,6 +333,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		noteAttachments = [];
 		destination = p.destination;
 		aJoindre = [...p.attach];
+		// Un texte du préréglage REMPLACE celui du composer : c'est la demande
+		// tapée dans le dossier, pas une consigne à empiler sur un reste.
+		if (p.prompt && p.prompt.trim()) composerText = p.prompt;
+		lancerApresJointes = !!p.lancer;
 	}
 	let images: ComposerImage[] = [];
 	/* ── Les vidéos YouTube (spec « Vidéos YouTube » § 3.4 et § 5) ──
@@ -1919,9 +1927,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (aJoindre.length > 0) {
 			const sources = aJoindre;
 			aJoindre = [];
+			const doitLancer = lancerApresJointes;
+			lancerApresJointes = false;
 			void (async () => {
 				for (const path of sources) await attachVaultPath(path);
+				if (doitLancer && canGenerate()) void startGeneration(containerRef);
 			})();
+		} else if (lancerApresJointes) {
+			// Dossier sans document à joindre (préréglage sans pièce) : lancer
+			// directement, une seule fois.
+			lancerApresJointes = false;
+			if (canGenerate()) void startGeneration(containerRef);
 		}
 	}
 

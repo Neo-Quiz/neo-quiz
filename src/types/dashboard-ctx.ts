@@ -156,6 +156,10 @@ export interface AiPreset {
 	destination: string;
 	/** Chemins du contrat à joindre, dans l'ordre. */
 	attach: string[];
+	/** Texte à mettre dans le composer (écrit dans le champ du Planning). */
+	prompt?: string;
+	/** Lancer la génération dès que les pièces sont jointes. */
+	lancer?: boolean;
 }
 
 /**

@@ -14,6 +14,7 @@ import { moyenneDossier } from "./folder-progress";
 import type { DetailsProgression } from "./folder-progress";
 import { openActionMenu } from "./ui-select";
 import { parseExamDate } from "../review/review-store";
+import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
 /* ══════════════════════════════════════════════════════════
    ONGLET « PLANNING DE RÉVISIONS » d'un dossier (tâche 4, 2026-09-26) :
@@ -202,8 +203,11 @@ export function renderFolderPlanning(
 		}
 	}
 
-	// Emplacement du composer (tâche 5) : vide jusque-là.
-	ajouter(gauche, "div", "qbd-planning-composer");
+	// ── Composer : demander un quiz sur ce dossier (tâche 5) ──
+	if (ctx.canOpen("ai")) {
+		const emplacement = ajouter(gauche, "div", "qbd-planning-composer");
+		renderComposerDossier(emplacement, ctx, details.folder);
+	}
 
 	// ── Colonne droite : anneau, étape suivante, modes ──
 	const moyenne = moyenneDossier(inModule, stats);
@@ -236,4 +240,51 @@ export function renderFolderPlanning(
 	modeLigne("rotate-ccw", t("dashboard.quizzes.progressDueAction"), t("dashboard.quizzes.nextStepReviewHelp"), dues.lignes[0]?.quiz);
 
 	return vue;
+}
+
+/** Le composer du Planning (tâche 5) : demande tapée dans le dossier ouvert →
+    page « Générer » avec ce dossier en destination, ses documents déjà
+    joints (même geste que « Ajouter du contenu » → « Créer avec l'IA »,
+    `folder-add.ts:45-46`) et la génération lancée dès les pièces jointes. */
+function renderComposerDossier(parent: HTMLElement, ctx: DashboardShellCtx, folder: string): void {
+	const boite = ajouter(parent, "div", "qbd-ai-composer qbd-ai-composer--dossier");
+	const champ = ajouter(boite, "textarea", "qbd-ai-composer-input") as HTMLTextAreaElement;
+	champ.placeholder = t("dashboard.planning.composerPlaceholder");
+	champ.setAttribute("aria-label", t("dashboard.planning.composerPlaceholder"));
+	champ.rows = 1;
+
+	const pied = ajouter(boite, "div", "qbd-ai-composer-bottom");
+	const envoyer = ajouter(pied, "button", "qbd-ai-composer-send qbd-planning-composer-send") as HTMLButtonElement;
+	envoyer.type = "button";
+	envoyer.setAttribute("aria-label", t("dashboard.planning.composerSend"));
+	currentHost().ui.setIcon(ajouter(envoyer, "span", "qbd-ai-composer-send-icon"), "arrow-up");
+	envoyer.disabled = true;
+
+	// Grandit avec le texte jusqu'à 5 lignes (même geste que le composer de
+	// « Générer », `ai.ts` — hauteur ligne 1,55 × 5, cf. CSS `--dossier`).
+	const autoGrandir = (): void => {
+		champ.style.height = "auto";
+		champ.style.height = Math.min(champ.scrollHeight, Math.round(1.55 * 5 * 13.5)) + "px";
+	};
+	const majEtat = (): void => {
+		envoyer.disabled = !champ.value.trim();
+		autoGrandir();
+	};
+	champ.addEventListener("input", majEtat);
+	champ.addEventListener("keydown", (e) => {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			envoyerDemande();
+		}
+	});
+
+	const envoyerDemande = (): void => {
+		const texte = champ.value.trim();
+		if (!texte) return;
+		envoyer.disabled = true;
+		void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
+			ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu), prompt: texte, lancer: true } });
+		});
+	};
+	envoyer.addEventListener("click", envoyerDemande);
 }

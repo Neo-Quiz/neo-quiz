@@ -336,4 +336,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.planning.modeLearn": "Learn",
 	"dashboard.planning.modePractice": "Practice",
 	"dashboard.planning.manageExams": "Gérer les examens",
+	/* ── Composer du dossier (folder-planning.ts, tâche 5, 2026-09-26) ── */
+	"dashboard.planning.composerPlaceholder": "Demande un quiz sur ce dossier…",
+	"dashboard.planning.composerSend": "Générer",
 };

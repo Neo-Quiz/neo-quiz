@@ -367,4 +367,7 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.modeLearn": "Learn",
 	"dashboard.planning.modePractice": "Practice",
 	"dashboard.planning.manageExams": "Manage exams",
+	/* ── Composer du dossier (folder-planning.ts, task 5, 2026-09-26) ── */
+	"dashboard.planning.composerPlaceholder": "Ask for a quiz on this folder…",
+	"dashboard.planning.composerSend": "Generate",
 } as const;

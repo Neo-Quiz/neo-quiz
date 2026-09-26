@@ -146,10 +146,48 @@
 .qbd-planning-exams-empty-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-normal); }
 .qbd-planning-exams-empty-hint { margin: 0 0 4px; font-size: 12.5px; color: var(--text-muted); max-width: 32ch; }
 
-/* Emplacement du composer (tâche 5) : vide jusque-là, donc sans marge propre
-   tant qu'il n'a pas de contenu — `:empty` évite un vide qui pousse la
-   colonne. */
+/* Emplacement du composer : vide quand l'hôte ne sert pas « ai »
+   (`ctx.canOpen`), donc sans marge propre tant qu'il n'a pas de contenu —
+   `:empty` évite un vide qui pousse la colonne. */
 .qbd-planning-composer:empty { display: none; }
+
+/* ── Composer « Demander un quiz sur ce dossier » (tâche 5, 2026-09-26) ──
+   Même anatomie que le composer de « Générer » (dashboard-ai.css :
+   `.qbd-ai-composer`), en plus bas : une ligne qui grandit jusqu'à 5, fond
+   verre (comme les tuiles de la colonne de droite), rayon 999 px tant qu'il
+   tient sur une ligne — la carte redevient un rectangle à coins arrondis dès
+   que le texte passe à la ligne (le rayon fixe suffit, aucune règle n'est
+   nécessaire pour ça). */
+.qbd-ai-composer--dossier {
+	flex-direction: row;
+	align-items: flex-end;
+	gap: 8px;
+	padding: 8px 8px 8px 16px;
+	border-radius: 999px;
+	border: 1px solid var(--qbd-glass-edge);
+	background: var(--qbd-glass-bg);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
+}
+.qbd-ai-composer--dossier .qbd-ai-composer-input {
+	min-height: 20px;
+	max-height: calc(1.55em * 5);
+	padding: 7px 0;
+}
+.qbd-ai-composer--dossier .qbd-ai-composer-bottom {
+	margin: 0;
+}
+.qbd-planning-composer-send {
+	display: inline-flex;
+}
+.qbd-planning-composer-send:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.qbd-planning-composer-send:disabled:hover {
+	background: var(--interactive-accent) !important;
+}
 
 /* ── Colonne de droite : tuiles verre, comme les tuiles de « Progression » ── */
 
