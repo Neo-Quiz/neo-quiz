@@ -89,15 +89,8 @@ export const EN_EDITOR = {
 	"editor.format.italic": "Italic",
 	"editor.format.code": "Code",
 	"editor.format.formula": "Formula ($…$)",
-	"editor.format.special": "Special character",
 
 	/* ── Menu « Caractère spécial » : entités HTML ── */
-	"editor.entity.gt": "Greater than",
-	"editor.entity.lt": "Less than",
-	"editor.entity.amp": "Ampersand",
-	"editor.entity.nbsp": "Non-breaking space",
-	"editor.entity.apos": "Apostrophe",
-	"editor.entity.quot": "Quotation mark",
 	"editor.entity.codeBlock": "Code block",
 
 	/* ── Section Ressource ── */

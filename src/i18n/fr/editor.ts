@@ -88,15 +88,8 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.format.italic": "Italique",
 	"editor.format.code": "Code",
 	"editor.format.formula": "Formule ($…$)",
-	"editor.format.special": "Caractère spécial",
 
 	/* ── Menu « Caractère spécial » : entités HTML ── */
-	"editor.entity.gt": "Supérieur",
-	"editor.entity.lt": "Inférieur",
-	"editor.entity.amp": "Esperluette",
-	"editor.entity.nbsp": "Espace insécable",
-	"editor.entity.apos": "Apostrophe",
-	"editor.entity.quot": "Guillemet",
 	"editor.entity.codeBlock": "Bloc de code",
 
 	/* ── Section Ressource ── */

@@ -46,8 +46,6 @@
 .qbd-qz-list-title {
 	font-size: 11px;
 	font-weight: 600;
-	letter-spacing: 0.07em;
-	text-transform: uppercase;
 	color: color-mix(in srgb, var(--text-normal) 70%, transparent);
 	/* Posé à même le fond d'écran : l'ombre le garde lisible sur une photo. */
 	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
@@ -244,8 +242,6 @@
 	gap: 4px 8px;
 	font-size: 11px;
 	font-weight: 600;
-	letter-spacing: 0.07em;
-	text-transform: uppercase;
 	color: var(--text-muted);
 }
 /* Le type à côté de « Réponses » : du texte, pas une étiquette. */
@@ -370,12 +366,6 @@
 	outline-offset: -1px;
 }
 .qb-format-btn svg { width: 15px; height: 15px; }
-.qb-format-sep {
-	width: 1px;
-	height: 16px;
-	margin: 0 4px;
-	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
-}
 
 /* Les sous-libellés du type (« Situations », « Correspondances »…) et des
    sections repliables : du texte discret, pas des capitales. */

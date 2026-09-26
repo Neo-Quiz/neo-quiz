@@ -329,8 +329,6 @@
 	font: inherit;
 	font-size: 11px;
 	font-weight: 600;
-	letter-spacing: 0.07em;
-	text-transform: uppercase;
 	text-align: left;
 	cursor: pointer;
 	transition: color 0.14s ease, background 0.14s ease;

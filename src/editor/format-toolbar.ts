@@ -2,7 +2,6 @@ import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
-import { openActionMenu } from "../dashboard/ui-select";
 
 /* ══════════════════════════════════════════════════════════
    BARRE DE MISE EN FORME d'un champ multiligne de l'éditeur
@@ -11,10 +10,9 @@ import { openActionMenu } from "../dashboard/ui-select";
    `> < & _ ' " ```` devient une barre d'ICÔNES Lucide, compacte, collée au
    haut du champ. Chaque action d'avant est gardée :
    - le bloc de code (`<pre><code>`) a son bouton ;
-   - les six caractères échappés (`&gt;`, `&lt;`, `&amp;`, `&nbsp;`,
-     `&#39;`, `&quot;`) passent dans un menu « Caractère spécial » : ils
-     servent dans un énoncé en HTML, rarement ailleurs, et six boutons pour
-     eux chargeaient la barre.
+   - PAS de caractères spéciaux (`>`, `<`, `&`, espace insécable,
+     apostrophe, guillemet) : tous les claviers les ont (retirés le
+     2026-09-26).
    S'y ajoutent gras, italique, code et formule, qui ENTOURENT la sélection
    (ou posent la paire et le curseur entre les deux). Dans un champ HTML, les
    balises remplacent le markdown : `**x**` n'y serait pas rendu.
@@ -44,20 +42,6 @@ function entourer(ta: HTMLTextAreaElement, ouvre: string, ferme: string, cb: (va
 	ta.selectionEnd = s + ouvre.length + sel.length;
 	ta.focus();
 	cb(ta.value);
-}
-
-/* FONCTION et non constante : les infobulles sont traduites au RENDU, pas
-   figées dans la langue du chargement du module. `insert` est une entité
-   HTML — jamais traduite ; `glyph` est le caractère qu'elle donne. */
-function entites(): { glyph: string; insert: string; title: string }[] {
-	return [
-		{ glyph: ">", insert: "&gt;", title: t("editor.entity.gt") },
-		{ glyph: "<", insert: "&lt;", title: t("editor.entity.lt") },
-		{ glyph: "&", insert: "&amp;", title: t("editor.entity.amp") },
-		{ glyph: "␣", insert: "&nbsp;", title: t("editor.entity.nbsp") },
-		{ glyph: "'", insert: "&#39;", title: t("editor.entity.apos") },
-		{ glyph: "\"", insert: "&quot;", title: t("editor.entity.quot") },
-	];
 }
 
 /** Pose la barre dans `parent`, au-dessus du champ `ta`. `apres` suit chaque
@@ -91,14 +75,5 @@ export function poserBarreFormat(parent: HTMLElement, ta: HTMLTextAreaElement, h
 	bouton("square-code", "editor.entity.codeBlock", () => insererTexte(ta, "<pre><code>\n</code></pre>", onChange));
 	paire("sigma", "editor.format.formula", ["$", "$"], ["$", "$"]);
 
-	ajouter(barre, "span", "qb-format-sep").setAttribute("aria-hidden", "true");
-
-	bouton("ampersand", "editor.format.special", (btn) => {
-		openActionMenu(btn, entites().map(ent => ({
-			label: ent.title,
-			hint: ent.glyph,
-			onClick: () => { insererTexte(ta, ent.insert, onChange); apres(); },
-		})));
-	});
 	return barre;
 }
