@@ -160,12 +160,16 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 		}, { code: false, lignes: [] }).lignes.join("\n")
 			.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, " $2 ")
 			.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g, "$1");
-		const enTexte = (v, estHtml) => (estHtml
+		/* `converti` : la paire est un champ `*Html` devenu markdown. SEULEMENT
+		   là, les marqueurs de bloc et les `|` de tableau sont retirés (revue du
+		   2026-09-26, M5) ; ailleurs, un aller-retour qui perdrait un `|`
+		   (`a || b`) ou une puce doit toujours se voir. */
+		const enTexte = (v, estHtml, converti = false) => (estHtml
 			? String(v ?? "").replace(INLINE_HTML, "")
 				.replace(/&#(\d+);/g, (_m, n) => String.fromCodePoint(Number(n)))
 				.replace(/&#x([0-9a-f]+);/gi, (_m, n) => String.fromCodePoint(parseInt(n, 16)))
 				.replace(/&([a-z]+);/gi, (m, n) => ENTITES[n] ?? m)
-			: marqueursDeBloc(String(v ?? "")).replace(/</g, ABRI))
+			: (converti ? marqueursDeBloc(String(v ?? "")) : String(v ?? "")).replace(/</g, ABRI))
 			// Un `![[fichier]]` et le `<img src="fichier">` que md2html en fait
 			// désignent la MÊME image : les ramener tous deux au nom de fichier.
 			.replace(/!\[\[([^\]|]+)[^\]]*\]\]/g, " $1 ")
@@ -179,7 +183,8 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 			.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&")
 			// Les marqueurs markdown eux-mêmes ne comptent pas : `**gras**` en
 			// texte et `<strong>gras</strong>` en HTML disent la même chose.
-			.replace(/[*_`~|]/g, "")
+			.replace(/[*_`~]/g, "")
+			.replace(/\|/g, converti ? "" : "|")
 			.replace(/\s+/g, " ").trim()
 			// Les `<` d'un champ texte, mis à l'abri plus haut, reviennent.
 			.replace(new RegExp(ABRI, "g"), "<");
@@ -265,13 +270,15 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 				   forme commune à un champ texte et à son jumeau HTML. */
 				for (const [avantCle, apresCles] of PAIRES) {
 					if (avant[avantCle] === undefined) continue;
-					const a = enTexte(avant[avantCle], /Html$/.test(avantCle));
 					const bCle = apresCles.find(k => apres[k] !== undefined);
 					const b = bCle === undefined ? undefined : apres[bCle];
 					if (b === undefined) continue;   // déjà signalé comme perdu
-					if (a === enTexte(b, /Html$/.test(bCle))) continue;
+					// Un champ `*Html` devenu markdown (editor/html-vers-markdown.ts).
+					const converti = /Html$/.test(avantCle) && !/Html$/.test(bCle);
+					const a = enTexte(avant[avantCle], /Html$/.test(avantCle), converti);
+					const c = enTexte(b, /Html$/.test(bCle), converti);
+					if (a === c) continue;
 					altere++;
-					const c = enTexte(b, /Html$/.test(bCle));
 					let d = 0;
 					while (d < a.length && d < c.length && a[d] === c[d]) d++;
 					console.error("ALTÉRÉ     " + f + "\n           question " + (i + 1)

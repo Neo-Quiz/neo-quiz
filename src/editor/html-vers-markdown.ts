@@ -37,8 +37,8 @@ type Noeud = Texte | Element;
 
 /* ── Lecture stricte du HTML ─────────────────────────────── */
 
-/* Les entit\u00e9s nomm\u00e9es courantes d'un texte fran\u00e7ais ou technique. Une autre
-   fait garder le HTML plut\u00f4t que de deviner son caract\u00e8re. */
+/* Les entités nommées courantes d'un texte français ou technique. Toute autre
+   entité fait garder le HTML plutôt que de deviner son caractère. */
 const ENTITES: Record<string, string> = {
 	amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: "\u00a0",
 	hellip: "\u2026", mdash: "\u2014", ndash: "\u2013", laquo: "\u00ab", raquo: "\u00bb",
@@ -77,7 +77,12 @@ const FERMENT_P = new Set(["p", "ul", "ol", "pre", "table", "blockquote", "li", 
 /** Ce que le navigateur ferme de lui-même quand un parent se ferme. */
 const FERMETURE_IMPLICITE = new Set(["p", "li", "td", "th", "tr", "thead", "tbody"]);
 
-const MOTIF_OUVRANTE = /^<([a-zA-Z][a-zA-Z0-9]*)((?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/;
+/** La profondeur d'imbrication lue au plus (M1 de la revue du 2026-09-26 :
+    5 000 `<strong>` imbriqués faisaient déborder la pile et rendaient le quiz
+    entier inouvrable dans l'éditeur). */
+const PROFONDEUR_MAX = 64;
+
+const MOTIF_OUVRANTE =/^<([a-zA-Z][a-zA-Z0-9]*)((?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/;
 const MOTIF_ATTR = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 
 /** L'arbre d'un fragment HTML, ou `null` s'il sort de ce que ce lecteur sait
@@ -136,6 +141,9 @@ function analyser(html: string): Noeud[] | null {
 			const el: Element = { type: "el", nom, attrs, enfants: [] };
 			haut().enfants.push(el);
 			if (!VIDES.has(nom)) pile.push(el);
+			// Au-delà de cette profondeur, aucun quiz réel : le HTML est gardé,
+			// avant que les lectures récursives ne débordent la pile.
+			if (pile.length > PROFONDEUR_MAX) return null;
 			i += ouv[0].length;
 			continue;
 		}
@@ -444,18 +452,50 @@ function rendMeme(markdown: string, cible: string): boolean {
  * le HTML.
  */
 export function htmlVersMarkdown(html: string): string | null {
-	const arbre = analyser(html);
-	if (!arbre) return null;
-	let md: string;
+	return sansException(() => {
+		const arbre = analyser(html);
+		if (!arbre) return null;
+		const md = blocs(arbre).join("\n\n");
+		const cible = formeNormale(html);
+		if (cible === null || !md.trim() || !rendMeme(md, cible)) return null;
+		return md;
+	});
+}
+
+/** Une conversion qui échoue, de QUELQUE façon que ce soit (un `Refus`, mais
+    aussi une pile débordée), rend `null` : le HTML est gardé, et la page du
+    quiz s'ouvre quand même. */
+function sansException(f: () => string | null): string | null {
 	try {
-		md = blocs(arbre).join("\n\n");
-	} catch (e) {
-		if (e instanceof Refus) return null;
-		throw e;
+		return f();
+	} catch {
+		return null;
 	}
-	const cible = formeNormale(html);
-	if (cible === null || !md.trim() || !rendMeme(md, cible)) return null;
-	return md;
+}
+
+/** Les balises qui s'ouvrent et se ferment dans un texte : autant d'ouvrantes
+    que de fermantes, pour chacune. */
+function balisesAppariees(texte: string, noms: readonly string[]): boolean {
+	return noms.every(nom => {
+		const ouvrantes = (texte.match(new RegExp(`<${nom}(\\s[^<>]*)?>`, "gi")) || []).length;
+		const fermantes = (texte.match(new RegExp(`</${nom}\\s*>`, "gi")) || []).length;
+		return ouvrantes === fermantes;
+	});
+}
+
+const NOMS_DE_BLOC = ["p", "pre", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "table", "thead", "tbody", "tr", "th", "td"];
+const NOMS_EN_LIGNE = ["strong", "b", "em", "i", "code", "del", "s", "a"];
+
+/** Un champ TEXTE n'est lu comme du HTML que s'il en a la FORME ENTIÈRE : il
+    commence par une balise de bloc, chaque bloc ouvert est refermé
+    explicitement, et aucun texte ne traîne hors des blocs. « Quelle balise
+    ouvre un paragraphe : <p> ? » CITE une balise : c'est du texte, dont la
+    balise est la réponse (I1 de la revue du 2026-09-26). */
+function formeHtmlEntiere(texte: string): boolean {
+	if (!/^\s*<(p|pre|ul|ol|h[1-6]|blockquote|table)(\s[^<>]*)?>/i.test(texte)) return false;
+	if (!balisesAppariees(texte, NOMS_DE_BLOC)) return false;
+	const arbre = analyser(texte);
+	return !!arbre && arbre.every(n => (n.type === "texte" ? !n.valeur.trim() : NOMS_DE_BLOC.includes(n.nom)));
 }
 
 /** Des balises que ce module sait convertir, hors code inline. */
@@ -476,17 +516,15 @@ const BALISE_DE_BLOC = /<(p|pre|ul|ol|li|h[1-6]|blockquote|table)(\s[^<>]*)?>/i;
 export function texteBaliseVersMarkdown(texte: string): string | null {
 	const horsCode = texte.replace(/``[^\n]+?``|`[^`\n]+`/g, "");
 	if (!BALISE_CONVERTIBLE.test(horsCode)) return null;
-	if (BALISE_DE_BLOC.test(horsCode)) return htmlVersMarkdown(texte);
-	const arbre = analyser(texte.replace(/\r?\n/g, "<br>"));
-	if (!arbre) return null;
-	let md: string;
-	try {
-		md = blocs(arbre).join("\n\n");
-	} catch (e) {
-		if (e instanceof Refus) return null;
-		throw e;
-	}
-	const cible = formeNormale(rendreTexteQuiz(texte, IMAGES_CANON));
-	if (cible === null || !md.trim() || md === texte || !rendMeme(md, cible)) return null;
-	return md;
+	// Au moindre doute, rien : une balise citée reste du texte.
+	if (BALISE_DE_BLOC.test(horsCode)) return formeHtmlEntiere(texte) ? htmlVersMarkdown(texte) : null;
+	if (!balisesAppariees(horsCode, NOMS_EN_LIGNE)) return null;
+	return sansException(() => {
+		const arbre = analyser(texte.replace(/\r?\n/g, "<br>"));
+		if (!arbre) return null;
+		const md = blocs(arbre).join("\n\n");
+		const cible = formeNormale(rendreTexteQuiz(texte, IMAGES_CANON));
+		if (cible === null || !md.trim() || md === texte || !rendMeme(md, cible)) return null;
+		return md;
+	});
 }

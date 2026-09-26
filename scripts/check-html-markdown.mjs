@@ -92,11 +92,36 @@ const CAS_TEXTE = [
 	["une balise dans un code : rien", "tape `<b>` ici", null],
 	["de la prose à chevrons : rien", "Ici 3 <x et y> 4", null],
 	["balise attribuée : rien (le chemin HTML de l'export)", "Use <strong data-x=\"1\">bold</strong> ici", null],
+
+	/* Revue du 2026-09-26 (I1) : une balise CITÉE est du texte — souvent la
+	   réponse même. Elle ne disparaît jamais. */
+	["balise citée : <p>", "Quelle balise ouvre un paragraphe : <p> ?", null],
+	["deux balises citées", "Balises : <p> et <br>", null],
+	["balise <pre> citée", "La balise <pre> garde les espaces", null],
+	["balise <h1> citée", "Le titre <h1> est le plus grand", null],
+	["option qui cite une balise", "La balise <p>", null],
+	["commence par une balise citée, jamais refermée", "<p> est la balise du paragraphe", null],
+	["texte hors des blocs", "<p>a</p> puis du texte", null],
+	["balise inline citée, jamais refermée", "La balise <strong> met en gras", null],
 ];
 
 await withSrcModule("src/editor/html-vers-markdown.ts", ({ htmlVersMarkdown, texteBaliseVersMarkdown }) => {
 	const r = makeReporter("HTML → markdown");
 	for (const [nom, html, attendu] of CAS) r.check(nom, htmlVersMarkdown(html), attendu);
+	/* Revue du 2026-09-26 (M1) : une imbrication profonde débordait la pile,
+	   et l'exception rendait le quiz entier inouvrable. Le HTML est gardé. */
+	const profond = (o, f, n) => o.repeat(n) + "x" + f.repeat(n);
+	const sansErreur = (f) => { try { return f(); } catch (e) { return "exception : " + e.name; } };
+	r.check("20 000 <span> imbriqués : HTML gardé, sans exception",
+		sansErreur(() => htmlVersMarkdown(profond("<span>", "</span>", 20000))), null);
+	r.check("5 000 <blockquote> imbriqués : HTML gardé, sans exception",
+		sansErreur(() => htmlVersMarkdown(profond("<blockquote>", "</blockquote>", 5000))), null);
+	r.check("3 000 listes imbriquées : HTML gardé, sans exception",
+		sansErreur(() => htmlVersMarkdown(profond("<ul><li>", "</li></ul>", 3000))), null);
+	r.check("champ texte profond : rien, sans exception",
+		sansErreur(() => texteBaliseVersMarkdown(profond("<strong>", "</strong>", 5000))), null);
+	r.check("imbrication raisonnable : convertie",
+		htmlVersMarkdown("<p>" + profond("<span>", "</span>", 30) + "</p>"), "x");
 	r.done();
 	const t = makeReporter("Champ texte à balises");
 	for (const [nom, texte, attendu] of CAS_TEXTE) t.check(nom, texteBaliseVersMarkdown(texte), attendu);
