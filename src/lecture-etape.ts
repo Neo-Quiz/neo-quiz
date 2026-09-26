@@ -96,7 +96,10 @@ export function lecturesCourtes(items: readonly unknown[], estLecon: boolean): M
 		const s = trancheDe(it);
 		if (s === null) return;
 		const hote = items.findIndex(q => trancheDe(q) === s && roleDe(q) !== "read" && roleDe(q) !== "pre");
-		if (hote >= 0) out.set(i, hote);
+		/* Une hôte ne porte qu'UNE lecture : la première de son étape. Une
+		   suivante qui la viserait aussi GARDE SON ÉCRAN — jamais perdue (revue
+		   du 2026-09-26 : elle n'avait ni écran ni place au-dessus). */
+		if (hote >= 0 && ![...out.values()].includes(hote)) out.set(i, hote);
 	});
 	return out;
 }

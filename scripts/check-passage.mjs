@@ -61,6 +61,15 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 	r.check("brouillon de l'éditeur : style et méthode lus dans `_extraFields`",
 		le.estLectureCourte({ role: "read", prompt: mots(90), _extraFields: { lecture: "etapes", etapes: ["a"], methode: true } }), true);
 
+	/* Revue du 2026-09-26 : deux lectures courtes pour la même hôte — la
+	   seconde n'avait ni écran ni place au-dessus. Elle garde son écran. */
+	const deux = [
+		{ slice: 1, role: "read", lecture: "etapes", prompt: "A", etapes: ["a"] },
+		{ slice: 1, role: "read", lecture: "etapes", prompt: "B", etapes: ["b"] },
+		{ slice: 1, role: "test" },
+	];
+	r.check("deux lectures courtes, une hôte : la première au-dessus, la seconde garde son écran",
+		[[...le.lecturesCourtes(deux, true)], le.questionsVisibles(deux, true), le.nombreDeLectures(deux, true)], [[[0, 2]], [1, 2], 1]);
 	r.check("lecture courte de l'hôte, rien pour les autres",
 		[0, 2, 3, 6, 9, 11].map(i => le.lectureCourteDe(quiz, true, i)), [null, 1, null, null, 7, null]);
 	r.check("numéros : AUCUNE lecture n'en a en Learn, les questions se suivent",

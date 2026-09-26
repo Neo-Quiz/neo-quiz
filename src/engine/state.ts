@@ -575,10 +575,13 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			for (let i = 0; i < ctx.quiz.length; i++) {
 				if (ctx.quizState.recorded[i]) continue;
 				const role = ctx.originalQuizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
-				/* Une lecture ABSORBÉE (2026-09-26) reste une lecture pour le
-				   journal : `seen` en Leçon, sans signal de mémoire, comme
-				   avant. Après une bascule en Examen, elle n'a été ni montrée
-				   ni répondue : rien ne s'est passé, rien n'est écrit. */
+				/* Une lecture SANS ÉCRAN (lecture courte, lue au-dessus de sa
+				   question hôte, src/lecture-etape.ts) reste une lecture pour le
+				   journal : `seen` en Leçon, sans signal de mémoire. Après une
+				   bascule Leçon → Examen, elle n'a été ni montrée ni répondue :
+				   rien n'est écrit. Condition bien ATTEIGNABLE : l'ensemble est
+				   figé sur le mode D'ORIGINE (engine.ts), `isLessonMode()` lit le
+				   mode COURANT — `check:engine-review` éprouve ce cas. */
 				if (ctx.lecturesAbsorbees?.has(i) && !ctx.isLessonMode()) continue;
 				let grade: ReviewGrade;
 				if (ctx.isLessonMode() && role === "read") grade = "seen";
