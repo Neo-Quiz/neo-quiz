@@ -144,6 +144,19 @@ export function nombreDeQuestions(items: readonly unknown[], estLecon: boolean):
 	return numerosAffiches(items, estLecon).filter(n => n > 0).length;
 }
 
+/** Le nombre de LECTURES d'un bloc (compteur « N lectures », à côté de « N
+    questions ») : TOUTES les lectures de l'étape (`role: "read"`), qu'elles
+    soient absorbées au-dessus des questions ou restées un écran à part
+    (`styleDeLecture` ne compte pas ici, contrairement à `lecturesAbsorbees`).
+    0 hors Learn : une lecture y est jouée comme une question ordinaire, déjà
+    comptée par `nombreDeQuestions` (revue du 2026-09-26, compteur d'une fiche). */
+export function nombreDeLectures(items: readonly unknown[], estLecon: boolean): number {
+	if (!estLecon) return 0;
+	let n = 0;
+	items.forEach(it => { if (roleDe(it) === "read") n++; });
+	return n;
+}
+
 /**
  * L'index de la lecture ABSORBÉE de l'étape de `qi`, ou `null` : hors
  * Learn, `qi` est lui-même une lecture, n'a pas d'étape, ou son étape n'a

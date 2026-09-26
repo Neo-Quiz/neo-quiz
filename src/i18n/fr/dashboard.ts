@@ -7,6 +7,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.common.questionsOther": "{count} questions",
 	"dashboard.common.questionsOfOne": "{done}/{total} question",
 	"dashboard.common.questionsOfOther": "{done}/{total} questions",
+	"dashboard.common.readingsOne": "{count} lecture",
+	"dashboard.common.readingsOther": "{count} lectures",
 	"dashboard.common.questionUnitOne": "question",
 	"dashboard.common.questionUnitOther": "questions",
 

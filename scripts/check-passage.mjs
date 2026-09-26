@@ -48,6 +48,8 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 	r.check("numéros : AUCUNE lecture n'en a en Learn (absorbée ou écran), les questions se suivent",
 		le.numerosAffiches(quiz, true), [1, 0, 2, 0, 3, 0, 0, 0, 4, 5, 6, 0, 7, 0, 8, 0, 9, 0, 10]);
 	r.check("nombre de questions : les lectures ne comptent pas", le.nombreDeQuestions(quiz, true), 10);
+	r.check("nombre de lectures : TOUTES, absorbées ou écran (styles etapes/tableau/page/inconnu, sans style)", le.nombreDeLectures(quiz, true), 9);
+	r.check("nombre de lectures : 0 hors Learn (une lecture y est déjà une question)", le.nombreDeLectures(quiz, false), 0);
 	r.check("questions visibles : les écrans de lecture restent, les absorbées non",
 		le.questionsVisibles(quiz, true), [0, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18]);
 	r.check("cours de l'étape absorbé, pour TOUS les rôles (lectureDeLEtape)", [0, 2, 4, 10].map(i => le.lectureDeLEtape(quiz, true, i)), [1, 1, 3, 11]);

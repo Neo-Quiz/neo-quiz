@@ -139,8 +139,18 @@ export function renderQuizCard(
 	const texte = ajouter(haut, "div", "qbd-quiz-card-text");
 	ajouter(texte, "p", "qbd-quiz-card-title", quiz.title);
 	const totalQuestions = quiz.questions + (frere ? frere.questions : 0);
-	ajouter(texte, "p", "qbd-quiz-card-count",
+	const totalReadings = quiz.readings + (frere ? frere.readings : 0);
+	const compte = ajouter(texte, "p", "qbd-quiz-card-count");
+	ajouter(compte, "span", undefined,
 		t(totalQuestions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: totalQuestions }));
+	/* Le nombre de LECTURES, jamais à 0 : même « · » que la ligne d'origine de
+	   la fiche (`.qbd-fiche-meta .qbd-fiche-origin-date::before`), posé ici par
+	   la même classe partagée (`qbd-count-sep`) plutôt que réécrit. */
+	if (totalReadings > 0) {
+		ajouter(compte, "span", "qbd-count-sep");
+		ajouter(compte, "span", undefined,
+			t(totalReadings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: totalReadings }));
+	}
 
 	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans
 	// la grille d'un dossier, le dossier EST le titre de la page (2026-09-24).

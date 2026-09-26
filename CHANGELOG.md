@@ -26,6 +26,7 @@ release notes.
 - Every time you reach a quiz's score is kept as an attempt: the Progress tab of a folder shows each course's best score, and lists its attempts (date, score) with a button to delete one — the best score is recalculated, and Undo puts it back. Scores from before this version appear as one "before history" attempt. Spaced review is never affected.
 - A Review plan tab in every folder: related tasks (review the questions due today), upcoming exams (several per folder, each with a name and a date, added, edited and deleted there), the folder's ring, the next step button and the study modes. Questions only become due once the folder has an upcoming exam; the nearest one sets the review pace. To review today and the exam date left the Progress tab, and Edit folder links to the exams.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
+- Learn quizzes show how many readings they hold next to the number of questions.
 
 ### Changed
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.

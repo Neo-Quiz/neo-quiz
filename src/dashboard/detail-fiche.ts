@@ -285,6 +285,17 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 
+	/* Le nombre de LECTURES, à côté : jamais montré à 0 ni hors Learn
+	   (deps.quiz.readings vaut alors 0, src/lecture-etape.ts). Une pastille de
+	   PLUS, sans icône (comme la date de l'origine juste dessous) : le « · »
+	   qui les sépare est le MÊME que celui de l'origine, posé par la même
+	   règle CSS (`.qbd-fiche-meta .qbd-fiche-chip + .qbd-fiche-chip::before`) —
+	   rien à écrire ici, il suffit d'ajouter une pastille de plus. */
+	if (deps.quiz.readings > 0) {
+		const lectures = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-readings");
+		ajouter(lectures, "span", undefined, t(deps.quiz.readings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: deps.quiz.readings }));
+	}
+
 	/* D'où vient le quiz : le logo, le modèle, puis la date, sur une ligne ;
 	   l'infobulle donne l'identifiant exact. */
 	if (deps.origine) {

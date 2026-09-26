@@ -10,6 +10,11 @@ export const EN_DASHBOARD = {
 	"dashboard.common.questionsOther": "{count} questions",
 	"dashboard.common.questionsOfOne": "{done}/{total} question",
 	"dashboard.common.questionsOfOther": "{done}/{total} questions",
+	/** Le nombre de LECTURES (`role: "read"`) d'un Learn, à côté du nombre de
+	    questions : jamais montré si 0, ni hors Learn (src/lecture-etape.ts
+	    `nombreDeLectures`). */
+	"dashboard.common.readingsOne": "{count} reading",
+	"dashboard.common.readingsOther": "{count} readings",
 	/** Le mot seul, sans le nombre : pour un champ où le nombre est déjà
 	    affiché à côté (le champ personnalisé du nombre de questions). */
 	"dashboard.common.questionUnitOne": "question",

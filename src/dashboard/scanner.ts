@@ -5,7 +5,7 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { nombreDeQuestions } from "../lecture-etape";
+import { nombreDeQuestions, nombreDeLectures } from "../lecture-etape";
 import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
@@ -67,6 +67,10 @@ export interface QuizItemRef {
 /** Métadonnées extraites d'un bloc quiz-blocks (parseQuizMeta). */
 export interface QuizMeta {
 	questions: number;
+	/** Le nombre de LECTURES (`role: "read"`) du bloc, TOUTES comptées,
+	    absorbées ou restées un écran (src/lecture-etape.ts `nombreDeLectures`) ;
+	    0 hors Learn. Affiché à côté de `questions`, jamais inclus dedans. */
+	readings: number;
 	items: QuizItemRef[];
 	types: QuestionTypeTag[];
 	quizType: QuizTypeTag;
@@ -185,6 +189,7 @@ export function createScanner(host: Host): Scanner {
 				   `items`, lui, les garde toutes — c'est le catalogue de
 				   l'ordonnanceur, rangé par identifiant. */
 				questions: nombreDeQuestions(questions.map(x => x.q), lecon),
+				readings: nombreDeLectures(questions.map(x => x.q), lecon),
 				items,
 				lecon,
 				types: Array.from(typeSet),
