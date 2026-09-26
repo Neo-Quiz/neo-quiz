@@ -44,7 +44,12 @@ function resume(d: DemandeFile): string {
 	return noms.length ? noms.join(", ") : t("ai.result.untitled");
 }
 
-export function creerVueFile(opts: { file: FileGenerationApp; ouvrir: (chemin: string) => void }): VueFile {
+export function creerVueFile(opts: {
+	file: FileGenerationApp;
+	ouvrir: (chemin: string) => void;
+	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
+	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
+}): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
 	let desabonner: (() => void) | null = null;
@@ -78,7 +83,7 @@ export function creerVueFile(opts: { file: FileGenerationApp; ouvrir: (chemin: s
 		const ligne = ajouter(parent, "div", "qbd-ai-file-ligne qbd-ai-file-ligne--" + l.etat);
 		ligne.setAttribute("role", "listitem");
 		const icone = ajouter(ligne, "span", "qbd-ai-file-etat");
-		host.ui.setIcon(icone, l.etat === "attente" ? "clock" : l.etat === "cours" ? "sparkles" : l.etat === "prete" ? "check" : "alert-triangle");
+		host.ui.setIcon(icone, l.etat === "attente" ? "clock" : l.etat === "cours" ? "sparkles" : l.etat === "enregistrement" ? "save" : l.etat === "prete" ? "check" : "alert-triangle");
 
 		const corps = ajouter(ligne, "div", "qbd-ai-file-corps");
 		ajouter(corps, "div", "qbd-ai-file-resume", resume(d));
@@ -108,23 +113,33 @@ export function creerVueFile(opts: { file: FileGenerationApp; ouvrir: (chemin: s
 		} else if (l.etat === "prete") etat.textContent = l.resultat?.titre ?? "";
 		else if (l.etat === "echouee") etat.textContent = l.erreur ?? "";
 
+		else if (l.etat === "enregistrement") etat.textContent = t("ai.queue.saving");
+
 		const actions = ajouter(ligne, "div", "qbd-ai-file-actions");
 		if (l.etat === "prete" && l.resultat) {
 			const chemin = l.resultat.chemin;
-			const ouvrir = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-ai-file-ouvrir", t("ai.queue.open"));
-			ouvrir.type = "button";
-			ouvrir.addEventListener("click", () => opts.ouvrir(chemin));
+			bouton(actions, t("ai.queue.open"), () => opts.ouvrir(chemin));
 		}
-		if (l.etat === "echouee") {
-			const reessayer = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-ai-file-ouvrir", t("ai.error.retry"));
-			reessayer.type = "button";
-			reessayer.addEventListener("click", () => opts.file.reessayer(l.id));
+		if (l.etat === "echouee" && l.echec === "enregistrement") {
+			/* Le quiz est là, seule la note manque : on réécrit sans relancer le
+			   modèle, ou on l'ouvre tel quel dans la page résultat. */
+			bouton(actions, t("ai.queue.retrySave"), () => opts.file.reessayerEnregistrement(l.id));
+			bouton(actions, t("ai.queue.openUnsaved"), () => opts.ouvrirSansEnregistrer(l));
+		} else if (l.etat === "echouee") {
+			bouton(actions, t("ai.error.retry"), () => opts.file.reessayer(l.id));
 		}
 		if (l.etat === "attente" || l.etat === "cours") {
 			boutonIcone(actions, "square", l.etat === "cours" ? t("ai.composer.stop") : t("ai.queue.cancel"), () => opts.file.annuler(l.id));
-		} else {
+		} else if (l.etat !== "enregistrement") {
 			boutonIcone(actions, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
 		}
+	}
+
+	/** Un bouton texte de la ligne (Ouvrir, Réessayer…). */
+	function bouton(parent: HTMLElement, libelle: string, action: () => void): void {
+		const b = ajouter(parent, "button", "qbd-btn qbd-btn--ghost qbd-ai-file-ouvrir", libelle);
+		b.type = "button";
+		b.addEventListener("click", action);
 	}
 
 	function peindre(): void {

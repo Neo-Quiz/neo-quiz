@@ -27,7 +27,7 @@ import { LOG_PREFIX } from "../branding";
 import { createAiClient } from "./ai-client";
 import type { AiClient, ImagePayload } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
-import type { AiUsageEntry } from "./usage-format";
+import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
 import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
 import type { DemandeTexte } from "./generation-demande";
@@ -56,6 +56,19 @@ export interface DemandeFile extends DemandeTexte {
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
 	destination: string;
 	reglages: ReglagesFiges;
+	/** Le quiz que le modèle a produit, gardé dès sa réception : si l'écriture
+	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
+	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
+	produit?: ProduitGeneration;
+}
+
+/** Ce qu'une génération a rapporté, de quoi écrire la note sans le modèle. */
+export interface ProduitGeneration {
+	questions: unknown[];
+	titre?: string;
+	usage: AiUsage | null;
+	planTranches?: { slice: number; titre: string }[];
+	noteLearn?: string;
 }
 
 /** Ce qu'une ligne prête a produit : le nom de la note et son chemin, relu
@@ -80,6 +93,8 @@ export interface FileGenerationApp {
 	envoyer(demande: DemandeFile): void;
 	annuler(id: number): void;
 	reessayer(id: number): void;
+	/** Réécrit la note d'une ligne dont seul l'enregistrement a échoué. */
+	reessayerEnregistrement(id: number): void;
 	fermer(id: number): void;
 	/** `affichee` dit si l'abonné est à l'écran : sans aucun abonné affiché,
 	    un quiz prêt se signale par un avis. Rend le désabonnement. */
@@ -158,14 +173,12 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				try { await deps.recordUsage({ ...usage, at: Date.now(), questionCount: questions.length }); }
 				catch (e) { console.warn(LOG_PREFIX, "usage non enregistré:", e); }
 			}
-			const entree = await enregistrerQuiz({
-				draft: brouillonDe(questions), questions, modeDemande: d.mode, titreModele: reponse.titre,
-				demande: d, destination: d.destination, reglages: { ...deps.settings.get(), ...d.reglages },
-				usage, planTranches: learn.plan, noteLearn: learn.note, scanner: deps.scanner,
-			});
-			if (!entree) throw new Error(t("ai.notice.saveFailed"));
-			file = F.terminer(file, ligne.id, { titre: entree.title || entree.basename, chemin: entree.path });
-			if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: entree.title || entree.basename }));
+			/* Ici, relire le forfait du fournisseur (`AiUsageDeps.fetchPlan`)
+			   pour le survol du bouton d'usage, si un hôte de la page le fournit
+			   un jour : l'application ne fournit pas `usage`, et le greffon n'a
+			   plus la page « Générer ». */
+			// Le quiz est GARDÉ avec la demande avant toute écriture.
+			await enregistrer(ligne.id, { ...d, produit: { questions, titre: reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } });
 		} catch (err) {
 			const e = err as Error & { aborted?: boolean };
 			// Un arrêt voulu n'est pas un échec : `solder` retire la ligne.
@@ -177,8 +190,37 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 	}
 
+	/** Écrit la note du quiz produit. Un échec ne perd rien : la ligne passe
+	    en « échec d'enregistrement » avec son quiz, et ne relancera jamais le
+	    CLI. */
+	async function enregistrer(id: number, d: DemandeFile): Promise<void> {
+		const p = d.produit;
+		if (!p) return;
+		const deps = lireDeps();
+		const entree = await enregistrerQuiz({
+			draft: brouillonDe(p.questions), questions: p.questions, modeDemande: d.mode, titreModele: p.titre,
+			demande: d, destination: d.destination, reglages: { ...deps.settings.get(), ...d.reglages },
+			usage: p.usage, planTranches: p.planTranches, noteLearn: p.noteLearn, scanner: deps.scanner,
+		});
+		if (!entree) {
+			file = F.echouerEnregistrement(file, id, t("ai.notice.saveFailed"), d);
+			return;
+		}
+		const titre = entree.title || entree.basename;
+		file = F.terminer(file, id, { titre, chemin: entree.path });
+		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
+	}
+
 	return {
 		lignes: () => file.lignes,
+		reessayerEnregistrement(id) {
+			const avant = file;
+			file = F.reessayerEnregistrement(file, id);
+			if (file === avant) return;
+			publier();
+			const d = F.ligne(file, id)?.demande;
+			if (d) void enregistrer(id, d).finally(publier);
+		},
 		envoyer(demande) {
 			file = F.ajouter(file, demande).file;
 			pomper();

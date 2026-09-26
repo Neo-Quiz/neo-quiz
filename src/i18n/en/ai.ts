@@ -256,6 +256,12 @@ export const EN_AI = {
 	"ai.queue.close": "Close",
 	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
 	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
+	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
+	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
+	"ai.queue.saving": "Saving…",
+	"ai.queue.retrySave": "Try saving again",
+	"ai.queue.openUnsaved": "Open without saving",
+	"ai.queue.busy": "Finish or cancel the request in progress first.",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",

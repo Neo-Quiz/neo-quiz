@@ -55,7 +55,8 @@
 
 .qbd-ai-file-etat svg { width: 16px; height: 16px; }
 .qbd-ai-file-ligne--cours .qbd-ai-file-etat { color: var(--interactive-accent); }
-.qbd-ai-file-ligne--prete .qbd-ai-file-etat { color: var(--interactive-accent); }
+.qbd-ai-file-ligne--prete .qbd-ai-file-etat,
+.qbd-ai-file-ligne--enregistrement .qbd-ai-file-etat { color: var(--interactive-accent); }
 .qbd-ai-file-ligne--echouee .qbd-ai-file-etat { color: var(--text-error); }
 
 .qbd-ai-file-corps {

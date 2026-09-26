@@ -7,7 +7,7 @@ import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
-import type { FileGenerationApp } from "./file-generation-app";
+import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
 import { creerVueFile } from "./file-generation-vue";
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
@@ -290,7 +290,31 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
 			else host.ui.notice(t("ai.queue.missing"));
 		},
+		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 	});
+
+	/** « Ouvrir sans enregistrer » : le quiz d'une ligne dont seule la note a
+	    échoué s'affiche dans la page résultat (la même que pour un site), avec
+	    son bouton Enregistrer et « Insérer dans une note ». La ligne reste dans
+	    la file tant que la note n'est pas écrite : quitter la page ne perd rien. */
+	function ouvrirSansEnregistrer(l: LigneGeneration): void {
+		const p = l.demande.produit;
+		if (!p) return;
+		// Une attente de site ou de connexion tient la page : ne pas l'écraser.
+		if (phase === "web" || phase === "connexion") { host.ui.notice(t("ai.queue.busy")); return; }
+		dropSentMessage();
+		sentMessage = { text: l.demande.text, notes: l.demande.notes, images: [] };
+		generatedQuestions = p.questions;
+		generatedTitre = p.titre;
+		lastUsage = p.usage;
+		planTranchesEnvoye = p.planTranches;
+		noteLearnLiee = p.noteLearn;
+		resultatFige = { mode: l.demande.mode, destination: l.demande.destination, reglages: l.demande.reglages, ligne: l.id };
+		generationId++;
+		generatedDraft = null;
+		phase = "result";
+		void render(containerRef);
+	}
 	/* Les sources qu'un préréglage demande de joindre, consommées par le
 	   PREMIER `render` qui suit : joindre exige un composer rendu (les chips
 	   et la vignette d'une image y vivent), et `preset` est appelé avant. */
@@ -518,6 +542,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/* Le nom de la note Learn dont ce plan vient : le lien `learn: "[[…]]"`
 	   du Practice enregistré. */
 	let noteLearnLiee: string | undefined;
+	/* Le quiz affiché en page résultat vient d'une ligne de la FILE dont
+	   l'enregistrement a échoué (« Ouvrir sans enregistrer ») : son mode, sa
+	   destination et ses réglages figés à l'envoi, et la ligne à fermer une
+	   fois la note écrite. `null` pour le canal web. */
+	let resultatFige: { mode: ModeQuiz; destination: string; reglages: ReglagesFiges; ligne: number } | null = null;
 	/* La réponse copiée VIENT D'ARRIVER : la modale d'attente le dit sur
 	   place (coche, « Réponse reçue », le nom du quiz) pendant que le quiz
 	   s'enregistre, avant de se fermer sur sa page. Sans cet état, la page
@@ -3346,10 +3375,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   joint), c'est le sous-message du fichier, pas l'envoi entier — sinon
 		   chaque note prendrait le nom du premier fichier. */
 		const demande = options.demande ?? sentMessage;
+		/* Un quiz de la FILE ouvert sans note garde le mode, la destination et
+		   les réglages de SON envoi, pas ceux du composer d'aujourd'hui. */
+		const fige = resultatFige;
+		const mode = fige ? fige.mode : modeGeneration;
 		/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
 		   Learn (`completerConfigLearn`) : AVANT le brouillon, qui lit
 		   `generatedQuestions`. */
-		if (modeGeneration === "learn") {
+		if (mode === "learn") {
 			const complete = completerConfigLearn(generatedQuestions);
 			if (complete.length !== generatedQuestions.length || modeDuBloc(complete) !== modeDuBloc(generatedQuestions)) {
 				generatedQuestions = complete;
@@ -3361,14 +3394,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const draft = loadGeneratedDraft();
 		if (!draft.questions.length) return false;
 		const entry = await enregistrerQuiz({
-			draft, questions: generatedQuestions, modeDemande: modeGeneration,
-			titreModele: generatedTitre, demande, destination, reglages: settings(), usage: lastUsage,
+			draft, questions: generatedQuestions, modeDemande: mode, titreModele: generatedTitre, demande,
+			destination: fige ? fige.destination : destination, reglages: { ...settings(), ...fige?.reglages }, usage: lastUsage,
 			planTranches: planTranchesEnvoye, noteLearn: noteLearnLiee, scanner: deps.scanner,
 		});
 		if (!entry) {
 			host.ui.notice(t("ai.notice.saveFailed"));
 			return false;
 		}
+		// Enregistré depuis la page résultat : la ligne en échec n'a plus d'objet.
+		if (fige) fileGen.fermer(fige.ligne);
 		/* La page du quiz ENTRE avec une animation quand elle vient d'une
 		   génération (`entree: "generation"`), pas quand on l'ouvre depuis
 		   « Mes quiz » (Ahmed, 2026-09-19). */
@@ -3454,6 +3489,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		generatedQuestions = [];
 		generatedTitre = undefined;
 		generatedDraft = null;
+		resultatFige = null;
 		dropSentMessage();
 		viderComposer();
 		/* Les modales de phase suivent `phase`, mais ne se synchronisaient qu'à
@@ -3853,6 +3889,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const reponse = parseReponseQuiz(texte);
 			generatedQuestions = reponse.questions;
 			generatedTitre = reponse.titre;
+			resultatFige = null;
 			if (generatedQuestions.length === 0) throw new Error(t("ai.err.notAnArray"));
 		} catch (err) {
 			errorMessage = (err as Error).message || t("ai.error.checkSettings");

@@ -17,7 +17,7 @@ release notes.
 - A ⋯ button at the top right of a folder opens the same menu as its card (edit, open the folder, copy its path, archive, move, delete).
 - Share a folder or a quiz: a Share button at the top right of a folder, and a Share entry in the ⋯ menu of every card. Discord puts the file (a .zip for a folder, a .md for a quiz) in the clipboard and brings Discord to the front, ready to paste; Save file asks where to save it and shows it in the explorer.
 - The back and forward buttons of a mouse move through the pages you visited, like in a browser: home, My quizzes, a folder, a quiz page. On a quiz being played, the back button returns to the list.
-- Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, generated one after the other ("Quiz 2 of 3"), each saved as soon as it is ready. A document that fails is reported and the others go on; with a website, the site reopens for the next document once the previous answer is received.
+- Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, each with its own line in the generation queue, generated one after the other and saved as soon as it is ready. A document that fails shows its error on its line and the others go on; with a website, the site reopens for the next document once the previous answer is received.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 - Flashcards: a Learn recall can be a card that you flip, then rate "Review again" or "I knew it" (Space or Enter flips, 1 and 2 rate); your rating counts in spaced review. The editor has a Flashcard type, and a course page shows a cards icon for a quiz made only of flashcards.
 - Resume where you left off: a quiz you close in the middle — even by closing the app — reopens on the same question with your answers, from its folder's button (Resume · quiz · Q7/23), its card or its course page. Try again starts over; timed exams are not resumed.
@@ -60,7 +60,7 @@ release notes.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 - Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
 - The editor's text fields show their text as the quiz will: code as a code pill, bold, italic and formulas rendered. The markdown signs (backticks, stars, dollars) only reappear around the cursor, like in Obsidian.
-- Generating a quiz no longer opens a blocking window: each request appears as a sent message under the composer, you can keep sending more while one is running, and they run one after another in a queue you can cancel.
+- Generating a quiz no longer opens a blocking window: each request appears as a sent message under the composer, you can keep sending more while one is running, and they run one after another in a queue you can cancel. If a generated quiz cannot be saved, it stays on its line: save it again or open it without saving, without generating it twice.
 - In Learn quizzes the reading is no longer a separate question: the course is shown collapsed above every question of its step, with "Try to answer without reading", opens on demand and unfolds after answering; numbers and counts skip it.
 
 ### Fixed

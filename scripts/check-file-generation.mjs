@@ -78,5 +78,35 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
 	r.check("réessayer une ligne qui n'a pas échoué ne fait rien", etats(F.reessayer(f, 4)), "TP2:attente");
 	r.check("annuler une ligne inconnue ne fait rien", F.annuler(f, 99).arreter, false);
 
+	// ÉCHEC D'ENREGISTREMENT : le quiz produit n'est jamais perdu, et le
+	// nouvel essai n'est qu'une écriture — un seul lancement de CLI au total.
+	let g = F.fileVide();
+	let lancements = 0;
+	const demarrer = (t) => { const x = F.demarrerSuivant(g, t); g = x.file; if (x.ligne) lancements++; return x.ligne; };
+	g = F.ajouter(g, { texte: "CM4" }).file;
+	g = F.ajouter(g, { texte: "CM5" }).file;
+	demarrer(100);
+	g = F.echouerEnregistrement(g, 1, "disque plein", { texte: "CM4", produit: ["q1", "q2"] });
+	const echec = F.ligne(g, 1);
+	r.check("échec d'enregistrement : la ligne échoue en gardant le quiz produit",
+		[echec?.etat, echec?.echec, echec?.demande.produit], ["echouee", "enregistrement", ["q1", "q2"]]);
+	r.check("« Réessayer » (la génération) est refusé : il relancerait le CLI", F.ligne(F.reessayer(g, 1), 1)?.etat, "echouee");
+	demarrer(200);
+	r.check("la file continue avec la demande suivante", F.ligne(g, 2)?.etat, "cours");
+	// CM5 finit : la file est libre, un réessai qui passerait par elle relancerait le CLI.
+	g = F.terminer(g, 2, { titre: "CM5 — Learn" });
+	g = F.reessayerEnregistrement(g, 1);
+	r.check("réessayer l'enregistrement : la ligne réécrit, à sa place", [F.ligne(g, 1)?.etat, g.lignes.map(l => l.id)], ["enregistrement", [1, 2]]);
+	r.check("l'essai d'enregistrement n'occupe pas la file et ne relance rien", demarrer(300), null);
+	g = F.echouerEnregistrement(g, 1, "encore plein", { texte: "CM4", produit: ["q1", "q2"] });
+	g = F.reessayerEnregistrement(g, 1);
+	g = F.terminer(g, 1, { titre: "CM4 — Learn" });
+	r.check("le second essai aboutit : la ligne est prête", F.ligne(g, 1)?.etat, "prete");
+	r.check("un seul lancement de CLI pour CM4, un pour CM5", lancements, 2);
+	g = F.ajouter(g, { texte: "CM6" }).file;
+	demarrer(400);
+	r.check("réessayer l'enregistrement d'un échec de GÉNÉRATION ne fait rien",
+		F.ligne(F.reessayerEnregistrement(F.echouer(g, 3, "boom"), 3), 3)?.etat, "echouee");
+
 	r.done();
 });

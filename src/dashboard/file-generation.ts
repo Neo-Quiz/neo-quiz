@@ -19,10 +19,16 @@
      démarrer la suivante avant se heurterait au verrou du même CLI. C'est
      `solder` qui la retire, quand la génération s'est réellement terminée ;
    - `prete`   : le quiz est enregistré ;
-   - `echouee` : l'erreur est gardée pour être lue.
+   - `echouee` : l'erreur est gardée pour être lue. `echec` dit si c'est la
+     GÉNÉRATION qui a échoué (« Réessayer » relance le CLI) ou seulement
+     l'ENREGISTREMENT de la note : le quiz produit est alors gardé dans la
+     demande, et il ne doit jamais être perdu — une génération coûte des
+     minutes et du quota ;
+   - `enregistrement` : nouvel essai d'écriture de la note, SANS relancer le
+     CLI. Il n'occupe pas la file : aucun processus ne tourne.
 ══════════════════════════════════════════════════════════ */
 
-export type EtatLigne = "attente" | "cours" | "arret" | "prete" | "echouee";
+export type EtatLigne = "attente" | "cours" | "arret" | "enregistrement" | "prete" | "echouee";
 
 export interface LigneFile<D, R> {
 	readonly id: number;
@@ -36,6 +42,8 @@ export interface LigneFile<D, R> {
 	readonly resultat?: R;
 	/** Le message d'une ligne `echouee`. */
 	readonly erreur?: string;
+	/** Ce qui a échoué sur une ligne `echouee`. */
+	readonly echec?: "generation" | "enregistrement";
 }
 
 export interface FileGeneration<D, R> {
@@ -87,17 +95,36 @@ export function demarrerSuivant<D, R>(file: FileGeneration<D, R>, maintenant: nu
 	return { file: remplacer(file, suivante.id, () => partie), ligne: partie };
 }
 
-/** La génération en cours a produit son quiz. Sans effet sur une ligne qui
-    ne tourne plus (annulée entre-temps). */
+/** La génération en cours (ou le nouvel essai d'enregistrement) a produit
+    sa note. Sans effet sur une ligne qui ne travaille plus (annulée
+    entre-temps). */
 export function terminer<D, R>(file: FileGeneration<D, R>, id: number, resultat: R): FileGeneration<D, R> {
-	if (ligne(file, id)?.etat !== "cours") return file;
+	const etat = ligne(file, id)?.etat;
+	if (etat !== "cours" && etat !== "enregistrement") return file;
 	return remplacer(file, id, l => ({ id: l.id, etat: "prete", demande: l.demande, resultat }));
 }
 
 /** La génération en cours a échoué. Même garde que `terminer`. */
 export function echouer<D, R>(file: FileGeneration<D, R>, id: number, erreur: string): FileGeneration<D, R> {
 	if (ligne(file, id)?.etat !== "cours") return file;
-	return remplacer(file, id, l => ({ id: l.id, etat: "echouee", demande: l.demande, erreur }));
+	return remplacer(file, id, l => ({ id: l.id, etat: "echouee", demande: l.demande, erreur, echec: "generation" }));
+}
+
+/** Le modèle a répondu mais la note n'a pas pu être écrite. `demande` est la
+    demande COMPLÉTÉE du quiz produit, qui la suit désormais : un nouvel essai
+    d'enregistrement n'a plus besoin du CLI. */
+export function echouerEnregistrement<D, R>(file: FileGeneration<D, R>, id: number, erreur: string, demande: D): FileGeneration<D, R> {
+	const etat = ligne(file, id)?.etat;
+	if (etat !== "cours" && etat !== "enregistrement") return file;
+	return remplacer(file, id, l => ({ id: l.id, etat: "echouee", demande, erreur, echec: "enregistrement" }));
+}
+
+/** « Réessayer l'enregistrement » : seulement après un échec d'écriture. La
+    ligne ne repasse pas par la file — aucun CLI n'est relancé. */
+export function reessayerEnregistrement<D, R>(file: FileGeneration<D, R>, id: number): FileGeneration<D, R> {
+	const l = ligne(file, id);
+	if (l?.etat !== "echouee" || l.echec !== "enregistrement") return file;
+	return remplacer(file, id, x => ({ id: x.id, etat: "enregistrement", demande: x.demande }));
 }
 
 /** Le bouton ■ : une ligne en attente QUITTE la file ; une ligne en cours
@@ -120,7 +147,8 @@ export function solder<D, R>(file: FileGeneration<D, R>, id: number): FileGenera
     qui attendaient déjà — pas devant elles. */
 export function reessayer<D, R>(file: FileGeneration<D, R>, id: number): FileGeneration<D, R> {
 	const l = ligne(file, id);
-	if (l?.etat !== "echouee") return file;
+	// Un échec d'ENREGISTREMENT garde son quiz : il ne relance jamais le CLI.
+	if (l?.etat !== "echouee" || l.echec !== "generation") return file;
 	return { ...file, lignes: [...file.lignes.filter(x => x.id !== id), { id: l.id, etat: "attente", demande: l.demande }] };
 }
 
