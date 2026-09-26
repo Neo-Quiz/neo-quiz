@@ -79,6 +79,72 @@ export const EMPHASES: ReadonlyArray<{ genre: GenreEmphase; delim: string; long:
 	{ genre: "barre", delim: "~~", long: 2 },
 ];
 
+/* ── Images et liens : le découpage en MORCEAUX ─────────────────
+   Avant les passes inline, le texte est coupé autour de ce qui n'est pas du
+   texte : les `![[…]]` d'Obsidian (comme toujours, et avant tout le reste),
+   puis les images `![alt](src)` et les liens `[texte](https://…)` du
+   markdown. Un lien ne s'ouvre que sur `http(s)://` ou `mailto:` : tout
+   autre schéma (`javascript:`…) n'est pas un lien et reste du texte. Une
+   image ou un lien écrits DANS un code inline (`` `![a](b)` ``) restent du
+   code. Les `![[…]]` gardent leur règle historique : coupés partout. */
+
+export type Morceau =
+	| { genre: "texte"; debut: number; fin: number }
+	| { genre: "embed"; debut: number; fin: number; spec: string }
+	| { genre: "image"; debut: number; fin: number; alt: string; src: string }
+	| { genre: "lien"; debut: number; fin: number; texteDebut: number; texteFin: number; url: string };
+
+const MOTIF_EMBED = /!\[\[([^\]]+)\]\]/g;
+const MOTIF_LIEN_IMAGE = /(!?)\[([^[\]\n]*)\]\(([^\s()<>]+)\)/g;
+const URL_DE_LIEN = /^(https?:\/\/|mailto:)/i;
+
+/** Les codes inline d'un morceau (double accent grave d'abord), en zones. */
+function zonesDeCode(texte: string): Array<[number, number]> {
+	const zones: Array<[number, number]> = [];
+	let masque = texte;
+	for (const motif of [motifCodeDouble(), motifCodeSimple()]) {
+		for (const m of [...masque.matchAll(motif)]) {
+			const d = m.index ?? 0;
+			zones.push([d, d + m[0].length]);
+			masque = masque.slice(0, d) + MD_MARK.repeat(m[0].length) + masque.slice(d + m[0].length);
+		}
+	}
+	return zones;
+}
+
+function decouperImagesEtLiens(texte: string, base: number, sortie: Morceau[]): void {
+	if (!texte) return;
+	const codes = zonesDeCode(texte);
+	let curseur = 0;
+	for (const m of texte.matchAll(MOTIF_LIEN_IMAGE)) {
+		const d = m.index ?? 0;
+		const f = d + m[0].length;
+		if (codes.some(([a, b]) => d < b && f > a)) continue;
+		const image = m[1] === "!";
+		if (!image && (!m[2].trim() || !URL_DE_LIEN.test(m[3]))) continue;
+		if (d > curseur) sortie.push({ genre: "texte", debut: base + curseur, fin: base + d });
+		if (image) sortie.push({ genre: "image", debut: base + d, fin: base + f, alt: m[2], src: m[3] });
+		else sortie.push({ genre: "lien", debut: base + d, fin: base + f, texteDebut: base + d + 1, texteFin: base + d + 1 + m[2].length, url: m[3] });
+		curseur = f;
+	}
+	if (curseur < texte.length) sortie.push({ genre: "texte", debut: base + curseur, fin: base + texte.length });
+}
+
+/** Le texte coupé en morceaux : texte, `![[…]]`, image, lien. Les morceaux de
+    texte ne sont jamais vides. */
+export function decouperMorceaux(texte: string): Morceau[] {
+	const sortie: Morceau[] = [];
+	let debut = 0;
+	for (const m of texte.matchAll(MOTIF_EMBED)) {
+		const d = m.index ?? 0;
+		decouperImagesEtLiens(texte.slice(debut, d), debut, sortie);
+		sortie.push({ genre: "embed", debut: d, fin: d + m[0].length, spec: m[1] });
+		debut = d + m[0].length;
+	}
+	decouperImagesEtLiens(texte.slice(debut), debut, sortie);
+	return sortie;
+}
+
 /* ── Le découpage en POSITIONS ─────────────────────────────── */
 
 export type GenreSegment = "formule" | "code" | GenreEmphase;
@@ -102,8 +168,9 @@ export interface SegmentInline {
  * vu des passes suivantes, c'est équivalent — ni lettre, ni chiffre en bord de
  * jeton, ni blanc, ni étoile —, et les positions restent celles du texte
  * source. Deux traits du rendu sont reproduits :
- * - les `![[…]]` coupent le texte en morceaux traités à part
- *   (`renderTextWithEmbeds`) ;
+ * - les `![[…]]`, images et liens coupent le texte en morceaux traités à
+ *   part (`decouperMorceaux`, `renderTextWithEmbeds`) ; le texte d'un lien
+ *   est découpé comme un morceau à lui seul ;
  * - un saut de ligne y devient `<br>` AVANT les passes : il n'est donc pas un
  *   blanc pour elles, et un `MD_MARK` le remplace ici.
  * Le HTML n'est pas interprété, sauf un `<code>…</code>` écrit à la main, dont
@@ -111,13 +178,11 @@ export interface SegmentInline {
  */
 export function decouperInline(texte: string): SegmentInline[] {
 	const sortie: SegmentInline[] = [];
-	const embed = /!\[\[[^\]]+\]\]/g;
-	let debut = 0;
-	for (let m = embed.exec(texte); m; m = embed.exec(texte)) {
-		decouperMorceau(texte.slice(debut, m.index), debut, sortie);
-		debut = m.index + m[0].length;
+	for (const m of decouperMorceaux(texte)) {
+		if (m.genre === "texte") decouperMorceau(texte.slice(m.debut, m.fin), m.debut, sortie);
+		else if (m.genre === "lien") decouperMorceau(texte.slice(m.texteDebut, m.texteFin), m.texteDebut, sortie);
 	}
-	decouperMorceau(texte.slice(debut), debut, sortie);
+	sortie.sort((a, b) => a.debut - b.debut || b.fin - a.fin);
 	return sortie;
 }
 

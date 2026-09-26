@@ -4,7 +4,8 @@ import { currentHost } from "../host/current";
 import { md2html, _setIcon } from "./utils";
 import type { DraftQuestion } from "./utils";
 import { mathifyElement } from "../engine/mathjax";
-import { sanitizeQuizHtml } from "../engine/sanitizer";
+import { sanitizeQuizHtml, rendreTexteQuiz } from "../engine/sanitizer";
+import type { RenduImages } from "../engine/sanitizer";
 /* IMPORT STATIQUE, plus un `require` paresseux : `require` n'existe pas dans
    le rendu de l'application (Vite, modules ES), et l'ancien appel faisait
    échouer la page de TOUT quiz portant une question `text` avec « require is
@@ -105,6 +106,28 @@ export function resolveImagesInHtml(html: string, sourcePath = ""): string {
 	return sanitizeQuizHtml(tpl.innerHTML);
 }
 
+const attrApercu = (v: string): string =>
+	v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Les images d'un texte, laissées à `resolveImagesInHtml` : un chemin du
+    vault devient un `img.qb-md-img` qu'il résout, une URL web reste telle
+    quelle — puis tout passe par la liste blanche. */
+const IMAGES_APERCU: RenduImages = {
+	embed: spec => `<img src="${attrApercu(spec)}" class="qb-md-img" />`,
+	image: (alt, src) => /^(https?:\/\/|data:image\/)/i.test(src)
+		? `<img src="${attrApercu(src)}" alt="${attrApercu(alt)}">`
+		: `<img src="${attrApercu(src)}" alt="${attrApercu(alt)}" class="qb-md-img" />`,
+};
+
+/** Un texte de quiz (énoncé, option, support) rendu par la MÊME fonction
+    que le moteur (`rendreTexteQuiz`) : paragraphes, listes, blocs de code,
+    tableaux, images et liens s'y affichent comme dans le quiz. `md2html`,
+    une seconde grammaire, montrait autre chose que ce que l'apprenant
+    verrait. */
+export function texteQuizHtml(raw: string, sourcePath?: string): string {
+	return resolveImagesInHtml(rendreTexteQuiz(raw, IMAGES_APERCU), sourcePath);
+}
+
 /** Écrit un libellé COURT en rendant son markdown inline (gras, code…) —
     le moteur le fait désormais partout, l'aperçu ne doit pas afficher les
     accents graves d'une adresse IP là où le quiz montre du code. Le `<p>`
@@ -140,7 +163,7 @@ function renderPassage(card: HTMLElement, q: DraftQuestion, sourcePath?: string)
 	inlineInto(ajouter(head, "span", "quiz-passage-title"), title, sourcePath);
 	const body = ajouter(wrap, "div", "quiz-passage-body");
 	const content = ajouter(body, "div", "quiz-passage-content");
-	content.innerHTML = resolveImagesInHtml(html || md2html(text), sourcePath);
+	content.innerHTML = html ? resolveImagesInHtml(html, sourcePath) : texteQuizHtml(text, sourcePath);
 }
 
 /** Construit la carte de question dans `host` et la renvoie. */
@@ -170,10 +193,9 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 
 	if (q._promptHtml || q.prompt) {
 		const promptEl = ajouter(card, "div", "quiz-question");
-		const raw = q._promptHtml
-			? q._promptHtml.replace(/!\[\[([^\]]+)\]\]/g, '<img src="$1" class="qb-md-img" />')
-			: md2html(q.prompt);
-		promptEl.innerHTML = resolveImagesInHtml(raw, opts.sourcePath);
+		promptEl.innerHTML = q._promptHtml
+			? resolveImagesInHtml(q._promptHtml.replace(/!\[\[([^\]]+)\]\]/g, '<img src="$1" class="qb-md-img" />'), opts.sourcePath)
+			: texteQuizHtml(q.prompt, opts.sourcePath);
 		// `_promptHtml` s'édite en HTML dans « Plus » (tâche 5), pas ici.
 		if (opts.corrige && !q._promptHtml) promptEl.setAttribute("data-edit", "prompt");
 	}
@@ -194,7 +216,7 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 			const opt = ajouter(list, "div", cls);
 			opt.setAttribute("role", "button");
 			opt.setAttribute("tabindex", "0");
-			opt.innerHTML = resolveImagesInHtml(md2html(o || "..."), opts.sourcePath);
+			opt.innerHTML = texteQuizHtml(o || "...", opts.sourcePath);
 			if (opts.corrige) {
 				opt.setAttribute("data-edit", "option");
 				opt.setAttribute("data-index", String(oi));

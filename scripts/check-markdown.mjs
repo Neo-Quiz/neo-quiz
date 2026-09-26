@@ -150,6 +150,93 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"
 		if (!ok) { divergences++; console.log("  divergence rendu / champ :", nom); }
 	}
 	r.check("même nombre de balises que le rendu, sur tout le corpus", divergences, 0);
+	r.check("le texte d'un lien est découpé, son URL jamais",
+		vu("voir [**doc**](https://a.b/*x*) ici"), "gras:**doc**");
+	r.check("une image coupe le texte", vu("*a ![b](c.png) d*"), "");
+	r.done();
+});
+
+/* LE MARKDOWN DE BLOC (engine/grammaire-blocs.ts) et les images et liens,
+   par la VRAIE fonction du moteur (`rendreTexteQuiz`, et
+   `renderTextWithEmbeds` d'un vrai `createSanitizer`). Du markdown partout,
+   comme dans Discord et Obsidian (2026-09-26) — et toujours l'échappement
+   AVANT le markdown : un quiz peut venir de quelqu'un d'autre. */
+await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"], ({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }) => {
+	const r = makeReporter("Blocs, images et liens");
+	const IMG = { embed: s => `[embed:${s}]`, image: (a, s) => `[image:${a}|${s}]` };
+	const rendre = (t) => rendreTexteQuiz(t, IMG);
+	const NL = "\n";
+	const P = (x) => `<p class="quiz-md-p">${x}</p>`;
+
+	r.check("paragraphes", rendre("un" + NL + NL + "deux"), P("un") + P("deux"));
+	r.check("liste à puces", rendre("Choisis :" + NL + "- `a`" + NL + "- **b**"),
+		P("Choisis :") + `<ul class="quiz-md-liste"><li><code>a</code></li><li><strong>b</strong></li></ul>`);
+	r.check("liste numérotée qui commence à 3", rendre("x" + NL + "3. a" + NL + "4. b"),
+		P("x") + `<ol class="quiz-md-liste" start="3"><li>a</li><li>b</li></ol>`);
+	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
+		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
+	r.check("bloc de code : littéral et échappé",
+		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-python">print(&quot;&lt;script&gt;&quot;)${NL}**x** $y$</code></pre>`);
+	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
+		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
+	r.check("tableau : en-tête, alignements, `|` dans un code",
+		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
+		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`
+		+ `<tbody><tr><td style="text-align: center"><code>a|b</code></td><td style="text-align: right">&lt;script&gt;</td></tr></tbody></table>`);
+	r.check("titre et citation", rendre("## T" + NL + "> **a**" + NL + "> b"),
+		`<h2 class="quiz-md-titre">T</h2><blockquote class="quiz-md-citation"><strong>a</strong><br>b</blockquote>`);
+	r.check("une balise dans une liste reste du texte", rendre("- <img src=x onerror=alert(1)>" + NL + "- b"),
+		`<ul class="quiz-md-liste"><li>&lt;img src=x onerror=alert(1)&gt;</li><li>b</li></ul>`);
+	r.check("formule $$ sur plusieurs lignes : un seul paragraphe", rendre("$$" + NL + "a" + NL + NL + "- b" + NL + "$$" + NL + NL + "c"),
+		P("$$<br>a<br><br>- b<br>$$") + P("c"));
+
+	// Images et liens.
+	r.check("lien web", rendre("voir [la **doc**](https://ex.com/a?b=1&c=2)"),
+		`voir <a class="quiz-md-lien" href="https://ex.com/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">la <strong>doc</strong></a>`);
+	r.check("lien javascript: reste du texte", rendre("[x](javascript:alert(1))"), "[x](javascript:alert(1))");
+	r.check("guillemet d'une URL échappé dans l'attribut", rendre("[x](https://a.b/\"onmouseover=alert;'x')"),
+		`<a class="quiz-md-lien" href="https://a.b/&quot;onmouseover=alert;&#39;x&#39;" target="_blank" rel="noopener noreferrer">x</a>`);
+	r.check("image et embed passent par l'hôte", rendre("![schéma](img/a.png) et ![[b.png]]"), "[image:schéma|img/a.png] et [embed:b.png]");
+	r.check("image dans un code : du code", rendre("tape `![a](b)`"), "tape <code>![a](b)</code>");
+
+	// La règle de compatibilité : un seul paragraphe = le rendu d'avant.
+	const avant = (t) => renderInlineText(t.replace(/\n/g, "<br>"));
+	r.check("une ligne « - x » reste du texte", rendre("- x"), "- x");
+	r.check("une ligne « > x » reste du texte", rendre("> écrase"), "&gt; écrase");
+	r.check("plusieurs lignes d'un paragraphe : <br> comme avant", rendre("a" + NL + "**b**" + NL), avant("a" + NL + "**b**" + NL));
+	/* Au hasard : des textes d'un seul paragraphe, sans lien ni image (le seul
+	   ajout inline), faits des caractères qui ont coûté des bugs. Le rendu doit
+	   être celui d'avant, octet pour octet. */
+	const alphabet = ["a", "b", " ", "*", "**", "`", "$", "~~", NL, "<b>", "</b>", "<", "&", "\\", "-", "1.", "é", "|", "#", ">"];
+	let graine = 7;
+	const hasard = () => { graine = (graine * 1103515245 + 12345) % 2147483648; return graine / 2147483648; };
+	let essais = 0, ecarts = 0;
+	for (let k = 0; k < 20000; k++) {
+		let t = "";
+		const n = 1 + Math.floor(hasard() * 14);
+		for (let j = 0; j < n; j++) t += alphabet[Math.floor(hasard() * alphabet.length)];
+		if (aDesBlocs(decouperBlocs(t)) || /\]\(/.test(t)) continue;
+		essais++;
+		if (rendre(t) !== avant(t)) { ecarts++; if (ecarts < 4) console.log("  écart :", JSON.stringify(t)); }
+	}
+	r.check(`un paragraphe : identique à avant (${essais} textes au hasard)`, ecarts, 0);
+	r.check("assez de textes au hasard pour que l'identité dise quelque chose", essais > 5000, true);
+
+	// Le vrai `renderTextWithEmbeds` : une image du vault résolue, une URL web
+	// telle quelle, une image introuvable lisible en code.
+	const fichier = { path: "img/a.png", name: "a.png" };
+	const ctx = { sourcePath: "note.md", host: { links: {
+		resolve: (p) => (p === "img/a.png" ? fichier : null),
+		resourceUrl: (f) => (f === fichier ? "app://img/a.png" : null),
+	} } };
+	const s = createSanitizer(ctx);
+	r.check("image du vault résolue", s.renderTextWithEmbeds("![vue](img/a.png)"),
+		`<div class="quiz-question-embed-wrap"><img class="quiz-question-embed" src="app://img/a.png" alt="vue" loading="eager"></div>`);
+	r.check("image web", s.renderTextWithEmbeds("![x](https://ex.com/i.png)"),
+		`<div class="quiz-question-embed-wrap"><img class="quiz-question-embed" src="https://ex.com/i.png" alt="x" loading="eager"></div>`);
+	r.check("image introuvable : sa source en code", s.renderTextWithEmbeds("![x](manque.png)"), "<code>![x](manque.png)</code>");
+	r.check("paragraphes par le vrai moteur", s.renderTextWithEmbeds("a" + NL + NL + "b"), P("a") + P("b"));
 	r.done();
 });
 

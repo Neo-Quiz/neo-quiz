@@ -4,9 +4,10 @@ import type { QuestionBase } from "../types/quiz";
 import { pickLessonFields } from "../quiz-utils";
 import {
 	MD_MARK, EMPHASES, motifFormule, motifCodeDouble, motifCodeSimple,
-	motifEtoilesMultiples, motifFlanc,
+	motifEtoilesMultiples, motifFlanc, decouperMorceaux,
 } from "./grammaire-inline";
 import type { GenreEmphase } from "./grammaire-inline";
+import { rendreBlocs } from "./grammaire-blocs";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -168,6 +169,55 @@ export function stripInlineMarkdown(raw: unknown): string {
 		.replace(/\&amp;/g, "&");
 }
 
+/* ── Le texte d'un quiz en markdown COMPLET ─────────────────────────
+   Énoncés, lectures, explications, leçons, indices, options : tout texte
+   d'un quiz s'écrit en markdown, comme dans Discord et Obsidian (demande du
+   2026-09-26) — plus jamais en HTML. Au-dessus de l'inline, les blocs
+   (paragraphes, listes, code, tableaux : engine/grammaire-blocs.ts), et
+   les images et liens (`decouperMorceaux`, grammaire-inline.ts).
+
+   Toujours la première porte : chaque morceau de texte est ÉCHAPPÉ avant
+   toute passe markdown ; les seules balises produites sont les nôtres ; une
+   URL n'entre dans un attribut qu'échappée, et un lien qu'en `http(s)` ou
+   `mailto:`. PUR, exporté : l'aperçu de l'éditeur et le convertisseur HTML →
+   markdown (editor/html-vers-markdown.ts) passent par la même fonction que
+   le moteur. */
+
+/** Ce qu'un hôte fait d'une image : les `![[…]]` d'un vault et les
+    `![alt](src)` du markdown. Le moteur les résout dans le vault
+    (`createSanitizer`), l'aperçu les laisse à `resolveImagesInHtml`. */
+export interface RenduImages {
+	embed(spec: string): string;
+	image(alt: string, src: string): string;
+}
+
+/** Un morceau de texte SANS bloc : les sauts de ligne en `<br>`, puis
+    l'inline — exactement le rendu d'avant les blocs. */
+function rendreMorceaux(texte: string, images: RenduImages): string {
+	const inline = (s: string): string =>
+		inlineMarkdown(restoreAllowedInlineTags(escapeHtmlText(s).replace(/\n/g, "<br>")));
+	return decouperMorceaux(texte).map(m => {
+		switch (m.genre) {
+			case "texte": return inline(texte.slice(m.debut, m.fin));
+			case "embed": return images.embed(m.spec);
+			case "image": return images.image(m.alt, m.src);
+			case "lien":
+				return `<a class="quiz-md-lien" href="${escapeHtmlAttr(m.url)}" target="_blank" rel="noopener noreferrer">${inline(texte.slice(m.texteDebut, m.texteFin))}</a>`;
+		}
+	}).join("");
+}
+
+/**
+ * Le HTML d'un texte de quiz en markdown. Un texte d'un seul paragraphe est
+ * rendu comme avant, octet pour octet (grammaire-blocs.ts, règle de
+ * compatibilité) ; les autres, bloc par bloc.
+ */
+export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
+	const texte = String(raw ?? "");
+	return rendreBlocs(texte, { inline: m => rendreMorceaux(m, images), echapper: escapeHtmlText })
+		?? rendreMorceaux(texte, images);
+}
+
 /* ── Liste blanche du HTML PRÉ-RENDU ──────────────────────────────────
    Ce bloc ne dépend d'aucun contexte : il vit au niveau du MODULE pour que
    l'aperçu de l'éditeur (editor/question-preview.ts) puisse l'appeler lui
@@ -230,7 +280,9 @@ const QUIZ_HTML_TAG_ATTRS: Record<string, Set<string>> = {
 	img: new Set(["src", "alt", "width", "height"]),
 	td: new Set(["colspan", "rowspan"]),
 	th: new Set(["colspan", "rowspan"]),
-	font: new Set(["color"])
+	font: new Set(["color"]),
+	// Le numéro de départ d'une liste (`3. …`) rendue depuis le markdown.
+	ol: new Set(["start"])
 };
 
 function escapeHtmlAttr(value: unknown): string {
@@ -373,7 +425,7 @@ export function sanitizeQuizHtml(html: unknown): string {
 			}
 
 			if (
-				(name === "width" || name === "height" || name === "colspan" || name === "rowspan") &&
+				(name === "width" || name === "height" || name === "colspan" || name === "rowspan" || name === "start") &&
 				!/^\d{1,4}$/.test(String(value).trim())
 			) {
 				el.removeAttribute(attr.name);
@@ -458,36 +510,32 @@ export function createSanitizer(ctx: EngineCtx): SanitizerHandlers {
 		return `<code>${escapeHtmlText(`![[${embedSpec}]]`)}</code>`;
 	}
 
+	/** Une image `![alt](src)` du markdown. Une URL web (ou une image
+	    `data:`) est affichée telle quelle — la liste blanche des champs
+	    `*Html` l'accepte déjà, rien de neuf n'est ouvert ; tout autre `src`
+	    est un chemin du vault, résolu comme un `![[…]]`. Introuvable : la
+	    source reste lisible en code, comme un embed mort. */
+	function imageMarkdownHtml(alt: string, src: string, { wrapClass, imgClass }: Required<EmbedClassOptions>): string {
+		if (/^(https?:\/\/|data:image\/)/i.test(src) && isSafeQuizUrl(src, { image: true })) {
+			return `<div class="${wrapClass}"><img class="${imgClass}" src="${escapeHtmlAttr(src)}" alt="${escapeHtmlAttr(alt)}" loading="eager"></div>`;
+		}
+		let chemin = src;
+		try { chemin = decodeURI(src); } catch { /* `%` isolé : le chemin tel qu'écrit */ }
+		const file = resolveEmbedFile(chemin);
+		const url = file ? ctx.host.links.resourceUrl(file) : null;
+		if (url && file) {
+			return `<div class="${wrapClass}"><img class="${imgClass}" src="${url}" alt="${escapeHtmlAttr(alt || file.name || "Image")}" loading="eager"></div>`;
+		}
+		return `<code>${escapeHtmlText(`![${alt}](${src})`)}</code>`;
+	}
+
 	function renderTextWithEmbeds(raw: unknown, { wrapClass = "quiz-question-embed-wrap", imgClass = "quiz-question-embed" }: EmbedClassOptions = {}): string {
-		const text = String(raw ?? "");
-		const embedRe = /!\[\[([^\]]+)\]\]/g;
-
-		let html = "";
-		let lastIndex = 0;
-		let match: RegExpExecArray | null;
-
-		while ((match = embedRe.exec(text)) !== null) {
-			const before = text.slice(lastIndex, match.index);
-
-			if (before) {
-				html += inlineMarkdown(restoreAllowedInlineTags(
-					escapeHtmlText(before).replace(/\n/g, "<br>")
-				));
-			}
-
-			html += buildEmbedImgHtml(match[1], { wrapClass, imgClass });
-			lastIndex = match.index + match[0].length;
-		}
-
-		const tail = text.slice(lastIndex);
-
-		if (tail) {
-			html += inlineMarkdown(restoreAllowedInlineTags(
-				escapeHtmlText(tail).replace(/\n/g, "<br>")
-			));
-		}
-
-		return html;
+		/* Le markdown complet (blocs, images, liens) : `rendreTexteQuiz`. Les
+		   images seules dépendent de l'hôte, qui les résout dans le vault. */
+		return rendreTexteQuiz(raw, {
+			embed: spec => buildEmbedImgHtml(spec, { wrapClass, imgClass }),
+			image: (alt, src) => imageMarkdownHtml(alt, src, { wrapClass, imgClass }),
+		});
 	}
 
 	function renderHintWithCodeAndEmbeds(raw: unknown): string {

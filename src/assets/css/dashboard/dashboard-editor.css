@@ -378,6 +378,32 @@
 	color: var(--text-muted);
 }
 .qbd-root .qb-direct .qb-direct-formule { cursor: pointer; }
+/* Les BLOCS du markdown (editor/champ-direct-deco.ts), comme dans le quiz :
+   un bloc ```…``` en police de code sur son fond, ses clôtures en retrait ;
+   une liste avec sa puce ; un tableau aligné ; une citation avec sa barre. */
+.qb-direct .cm-line.qb-direct-bloc-code {
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+	background: var(--code-background);
+	padding-left: 8px;
+	padding-right: 8px;
+}
+.qb-direct .cm-line.qb-direct-cloture { color: var(--text-faint); }
+.qb-direct .cm-line.qb-direct-tableau { font-family: var(--font-monospace); font-size: 0.9em; }
+.qb-direct .cm-line.qb-direct-citation {
+	border-left: 3px solid var(--background-modifier-border);
+	padding-left: 10px;
+	color: var(--text-muted);
+}
+.qb-direct .cm-line.qb-direct-titre { font-weight: 700; }
+.qb-direct .cm-line.qb-direct-titre-1,
+.qb-direct .cm-line.qb-direct-titre-2 { font-size: 1.2em; }
+.qb-direct .qb-direct-puce {
+	display: inline-block;
+	min-width: 1.1em;
+	margin-left: -1.1em;
+	color: var(--text-muted);
+}
 
 /* La barre d'outils : des icônes, compacte. */
 .qb-format-bar {

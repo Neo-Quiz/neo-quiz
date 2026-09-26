@@ -3,6 +3,8 @@ import type { DecorationSet, EditorView, ViewUpdate } from "@codemirror/view";
 import type { Range } from "@codemirror/state";
 import { decouperInline } from "../engine/grammaire-inline";
 import type { GenreSegment, SegmentInline } from "../engine/grammaire-inline";
+import { aDesBlocs, decouperBlocs } from "../engine/grammaire-blocs";
+import type { Zone } from "../engine/grammaire-blocs";
 import { hasMath, mathifyElement } from "../engine/mathjax";
 
 /* ══════════════════════════════════════════════════════════
@@ -14,8 +16,9 @@ import { hasMath, mathifyElement } from "../engine/mathjax";
    segment. Le DOCUMENT, lui, reste toujours la source : seules des
    décorations la recouvrent, la valeur enregistrée ne change pas.
 
-   Les segments viennent de `decouperInline`, la grammaire du rendu du quiz
-   (engine/grammaire-inline.ts) : le champ ne peut pas rendre en italique ce
+   Les segments viennent de `decouperInline` et `decouperBlocs`, les
+   grammaires du rendu du quiz (engine/grammaire-inline.ts,
+   engine/grammaire-blocs.ts) : le champ ne peut pas rendre en italique ce
    que le quiz laisserait tel quel.
 ══════════════════════════════════════════════════════════ */
 
@@ -60,10 +63,104 @@ function actif(s: SegmentInline, vue: EditorView): boolean {
 	return vue.state.selection.ranges.some(r => r.from <= s.fin && r.to >= s.debut);
 }
 
+/* ── Les BLOCS (2026-09-26) ──
+   Les mêmes que le quiz (engine/grammaire-blocs.ts) : chaque ligne d'un bloc
+   reçoit sa classe — police de code dans un bloc ```…```, retrait d'une
+   liste, tableau aligné —, et le marqueur d'une liste, d'un titre ou d'une
+   citation s'efface hors du curseur, comme l'emphase. L'inline n'est
+   découpé que DANS les zones que le rendu passe à l'inline : jamais dans un
+   bloc de code. */
+const LIGNE_CODE = Decoration.line({ class: "qb-direct-bloc-code" });
+const LIGNE_CLOTURE = Decoration.line({ class: "qb-direct-bloc-code qb-direct-cloture" });
+const LIGNE_TABLEAU = Decoration.line({ class: "qb-direct-tableau" });
+const LIGNE_CITATION = Decoration.line({ class: "qb-direct-citation" });
+const ligneTitre = (n: number): Decoration => Decoration.line({ class: `qb-direct-titre qb-direct-titre-${n}` });
+const ligneListe = (indent: number): Decoration =>
+	Decoration.line({ class: "qb-direct-liste", attributes: { style: `padding-left: ${1.1 + indent * 0.55}em` } });
+
+/** La puce ou le numéro d'une liste, à la place de son marqueur. */
+class WidgetPuce extends WidgetType {
+	constructor(readonly texte: string) { super(); }
+	eq(autre: WidgetPuce): boolean { return autre.texte === this.texte; }
+	toDOM(): HTMLElement {
+		const el = document.createElement("span");
+		el.className = "qb-direct-puce";
+		el.textContent = this.texte;
+		return el;
+	}
+	ignoreEvent(): boolean { return false; }
+}
+
+/** Le curseur est-il sur l'une des lignes `[debut, fin]` ? */
+function surLignes(debut: number, fin: number, vue: EditorView): boolean {
+	if (!vue.hasFocus) return false;
+	return vue.state.selection.ranges.some(r => r.from <= fin && r.to >= debut);
+}
+
+/** Les décorations de ligne et de marqueur des blocs ; rend les zones à
+    découper en inline. */
+function decorerBlocs(texte: string, vue: EditorView, deco: Range<Decoration>[]): Zone[] {
+	const blocs = decouperBlocs(texte);
+	// Texte simple : tout est inline, comme au rendu (règle de compatibilité).
+	if (!aDesBlocs(blocs)) return [{ debut: 0, fin: texte.length }];
+	const doc = vue.state.doc;
+	const lignes = (d: number, f: number, dec: Decoration): void => {
+		for (let n = doc.lineAt(d).number; n <= doc.lineAt(f).number; n++) deco.push(dec.range(doc.line(n).from));
+	};
+	const marqueur = (z: Zone, actif: boolean, remplacement?: WidgetType): void => {
+		if (z.fin <= z.debut) return;
+		if (actif) deco.push(MARQUEUR.range(z.debut, z.fin));
+		else deco.push((remplacement ? Decoration.replace({ widget: remplacement }) : MASQUE).range(z.debut, z.fin));
+	};
+	const zones: Zone[] = [];
+	for (const b of blocs) {
+		switch (b.genre) {
+			case "paragraphe": zones.push(b.zone); break;
+			case "titre":
+				lignes(b.debut, b.fin, ligneTitre(b.niveau));
+				marqueur(b.marqueur, surLignes(b.debut, b.fin, vue));
+				zones.push(b.zone);
+				break;
+			case "citation":
+				for (const l of b.lignes) {
+					lignes(l.marqueur.debut, l.zone.fin, LIGNE_CITATION);
+					marqueur(l.marqueur, surLignes(l.marqueur.debut, l.zone.fin, vue));
+					zones.push(l.zone);
+				}
+				break;
+			case "liste":
+				for (const it of b.items) {
+					lignes(it.debut, it.fin, ligneListe(it.indent));
+					marqueur(it.marqueur, surLignes(it.debut, it.fin, vue),
+						new WidgetPuce(it.ordonne ? `${it.numero}.` : "•"));
+					zones.push(it.zone);
+				}
+				break;
+			case "code":
+				lignes(b.ouverture.debut, b.ouverture.fin, LIGNE_CLOTURE);
+				if (b.contenu) lignes(b.contenu.debut, b.contenu.fin, LIGNE_CODE);
+				if (b.fermeture) lignes(b.fermeture.debut, b.fermeture.fin, LIGNE_CLOTURE);
+				break;
+			case "tableau":
+				lignes(b.debut, b.fin, LIGNE_TABLEAU);
+				zones.push(...b.entete);
+				for (const r of b.rangees) zones.push(...r);
+				break;
+		}
+	}
+	return zones;
+}
+
 function construire(vue: EditorView): DecorationSet {
 	const texte = vue.state.doc.toString();
 	const deco: Range<Decoration>[] = [];
-	for (const s of decouperInline(texte)) {
+	const segments: SegmentInline[] = [];
+	for (const z of decorerBlocs(texte, vue, deco)) {
+		for (const s of decouperInline(texte.slice(z.debut, z.fin))) {
+			segments.push({ ...s, debut: s.debut + z.debut, fin: s.fin + z.debut });
+		}
+	}
+	for (const s of segments) {
 		const dedans = [s.debut + s.ouvre, s.fin - s.ferme] as const;
 		const ouvert = actif(s, vue);
 		if (s.genre === "formule") {
