@@ -33,8 +33,16 @@
 	box-shadow: none !important;
 	height: auto;
 	/* color !important : .theme-dark button (0,1,1) impose sinon
-	   --text-normal — le label actif deviendrait blanc sur carte blanche. */
-	color: var(--text-muted) !important;
+	   --text-normal — le label actif deviendrait blanc sur carte blanche.
+	   `--text-normal` AU REPOS, et non plus `--text-muted` (2026-09-26) :
+	   le rail est sorti du panneau et se pose directement sur le fond
+	   d'écran et sa lueur colorée. Le gris s'y perdait sur une image claire ;
+	   le texte clair, avec l'ombre serrée que la coquille de l'app lui
+	   ajoute (`shell.css`, `--nq-ombre-lisible`), se détache de n'importe
+	   quelle image. L'icône garde son opacité de repos (0,7) : c'est elle qui
+	   distingue le repos du survol, et l'entrée active reste la carte
+	   inversée. */
+	color: var(--text-normal) !important;
 	font-size: 11px;
 	font-weight: 600;
 	cursor: pointer;

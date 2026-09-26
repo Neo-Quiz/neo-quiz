@@ -185,6 +185,19 @@ const historiqueNav = creerHistorique<EtatNav>(memeEtatNav);
 let questionInitiale: number | undefined;
 
 /**
+ * Teinte la LUEUR de la fenêtre (`shell.css`, `--nq-lueur`) : l'accent d'un
+ * dossier, ou `null` pour revenir au bleu de l'app (la valeur initiale de la
+ * propriété enregistrée). Posée sur la racine du document, là où vit la
+ * transition de 400 ms, et non dans la coquille : la lueur est derrière tout,
+ * y compris le quiz lancé, qui démonte la coquille.
+ */
+function poserLueur(accent: string | null): void {
+	const racine = document.documentElement;
+	if (accent) racine.style.setProperty("--nq-lueur", accent);
+	else racine.style.removeProperty("--nq-lueur");
+}
+
+/**
  * Pose l'état de la coquille AVANT le tout premier `monterDashboard`, pour
  * reprendre la session précédente : appelée par `main.ts`, juste après avoir
  * chargé le réglage (`chargerReprise`) et juste avant de monter. Fonction de
@@ -332,6 +345,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			const numeros = numerosAffiches(quiz.items, lecon);
 			return { question: numeros[questionHote(quiz.items, lecon, i)] || i + 1, total: quiz.questions, ecrite: s.ecrite };
 		},
+		ambiance: (accent) => poserLueur(accent),
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
@@ -753,6 +767,11 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		// dans un module puis revenir par le rail doit rouvrir la GRILLE, pas
 		// le module laissé ouvert.
 		if (vue === "quizzes") quizzes.resetDrilldown();
+		/* Hors d'un dossier, la lueur reprend le bleu de l'app ; « Mes quiz »
+		   la reteinte aussitôt s'il rouvre un dossier. La page d'un quiz, elle,
+		   garde la couleur du dossier d'où on l'a ouverte (branche `detail`
+		   plus haut, qui ne passe pas ici). */
+		poserLueur(null);
 		vueCourante = vue;
 		nav.setActive(vue);
 		noterVue({ vue });
@@ -760,6 +779,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	}
 
 	nav.render(navEl);
+	/* Le logo de l'app en tête du rail, au-dessus d'Accueil (2026-09-26,
+	   référence StudySmarter) : une décoration, masquée aux lecteurs d'écran
+	   et sans aucun état interactif (`shell.css`, `.nq-rail-logo`). Posé par
+	   la coquille et non par `nav.ts` : c'est l'identité de l'APPLICATION. */
+	const logo = document.createElement("div");
+	logo.className = "nq-rail-logo";
+	logo.setAttribute("aria-hidden", "true");
+	navEl.prepend(logo);
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement
 	// au pont pour toute la fenêtre (`mise-a-jour.ts`).

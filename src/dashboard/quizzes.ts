@@ -260,6 +260,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		const openModuleAccent = openModuleFolder !== null
 			? moduleAccent(openModuleInfo ?? { folder: openModuleFolder }, { generated: sas })
 			: null;
+		// La lueur de l'hôte prend la couleur du dossier ouvert (null hors dossier).
+		ctx.ambiance?.(openModuleAccent);
 
 		/* Le dossier ouvert possède sa bannière. Plus de halo derrière le
 		   titre (2026-09-25) : la lueur salissait toute la page ; la couleur

@@ -86,18 +86,95 @@ body {
    Obsidian ce fond vient du thème ; dans la fenêtre il n'y avait rien
    derrière, et les surfaces de verre tombaient à plat sur un aplat uni.
 
-   Le voile sombre par-dessus n'est pas une coquetterie : il tient le
-   CONTRASTE du texte quelle que soit l'image. Sans lui, un fond clair rendrait
-   `--text-muted` illisible, et on ne s'en apercevrait que sur cette image-là.
-   `background-attachment: fixed` garde le paysage immobile quand une liste
-   défile — c'est un décor, pas un contenu. */
-body {
+   `ui/dashboard-shell.ts` pose la couleur de la LUEUR dans `--nq-lueur`, sur
+   la racine du document.
+
+   TROIS COUCHES, de bas en haut :
+   1. `html` : un aplat noir bleuté (`--nq-lueur-fond`), visible le temps que
+      l'image charge ;
+   2. `body::before` : l'IMAGE seule, sur sa propre couche — c'est ce qui
+      permettra de la régler (luminosité, flou) sans toucher à la lueur ;
+   3. `body::after` : la LUEUR et un assombrissement neutre très léger.
+   Les deux pseudo-éléments sont `fixed` : le paysage reste immobile quand
+   une liste défile, c'est un décor, pas un contenu. `z-index: -1` les place
+   sous le contenu de la page, dans le contexte de la racine.
+
+   ── LA LUEUR (2026-09-26), référence StudySmarter en sombre ──
+   Une BANDE en haut de la fenêtre : la couleur du DOSSIER ouvert (l'accent
+   de son icône et de son titre), le bleu d'accent de l'app partout ailleurs,
+   à 50 % d'alpha tout en haut, éteinte à mi-hauteur. En dessous, le fond
+   d'écran ne porte AUCUNE teinte.
+
+   HUIT RETOURS D'AHMED LE MÊME JOUR, qui ont fixé l'équilibre. Un voile
+   léger (22-34 %) laissait un ciel clair éblouir ; une lueur couvrante (94 %)
+   éteignait une montagne sombre ; une lueur étalée sur toute la hauteur se
+   lisait comme un voile bleu (« elle devrait n'être appliquée que sur une
+   partie ») ; un plafond de luminosité posé en `darken` sur l'image, puis
+   un voile de 20 %, rendaient encore l'ensemble « trop sombre ». Reste un
+   assombrissement de 8 % (`--nq-voile`) : c'est l'IMAGE qui doit se voir
+   franchement autour du panneau.
+
+   LISIBILITÉ DE CE QUI SE POSE SUR LE FOND : la barre de titre et les
+   libellés du rail n'ont plus de voile épais sous eux. Ils passent en
+   `--text-normal` (`.nq-barre-controle` plus bas, `dashboard-nav.css`) et
+   portent une ombre sombre serrée (`--nq-ombre-lisible`), qui détache le
+   glyphe d'un fond clair sans dessiner de boîte.
+
+   LE FONDU : `--nq-lueur` est une propriété ENREGISTRÉE (`@property`, type
+   `<color>`), sans quoi le navigateur ne sait pas l'interpoler et la couleur
+   basculerait d'un coup en entrant dans un dossier. La transition vit sur la
+   racine, où la variable est posée ; `body::after` en hérite à chaque image. */
+@property --nq-lueur {
+	syntax: "<color>";
+	inherits: true;
+	/* Le bleu d'accent de l'app (`--quiz-primary`, tokens.css). Une valeur
+	   initiale d'`@property` ne peut pas lire une autre variable. */
+	initial-value: #3b62f6;
+}
+
+/* Sur `:root` et non sur `.qbd-root` avec les jetons du panneau : le fond
+   est peint AU-DESSUS de `.qbd-root`, par `html` et `body`. */
+:root {
+	/* Le noir bleuté (StudySmarter : ≈ #070b14) vers lequel l'accent est
+	   tiré : la lueur est un vert ou un bleu SOUTENU, pas l'accent pur, qui
+	   laisserait mal lire la barre de titre sur un jaune ou un vert anis. */
+	--nq-lueur-fond: #070b14;
+	/* La part d'accent dans la teinte de la lueur. */
+	--nq-lueur-part: 60%;
+	/* L'alpha de la lueur tout en haut, et la hauteur où elle s'éteint. */
+	--nq-lueur-haut: 50%;
+	--nq-lueur-fin: 50%;
+	/* L'assombrissement neutre et uniforme de toute la fenêtre. */
+	--nq-voile: 8%;
+	/* L'ombre qui garde lisibles les glyphes et libellés posés sur le fond. */
+	--nq-ombre-lisible: 0 0 2px rgba(0, 0, 0, 0.75), 0 0 6px rgba(0, 0, 0, 0.45);
+	/* La même, pour un glyphe SVG (`filter`, qui ne lit pas une liste). */
+	--nq-ombre-lisible-filtre: drop-shadow(0 0 2px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.45));
+	transition: --nq-lueur 400ms ease;
+	background: var(--nq-lueur-fond);
+}
+
+body::before,
+body::after {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+}
+
+body::before {
+	background: var(--nq-fond-image, url("/wallpaper.jpg")) center / cover no-repeat;
+}
+
+body::after {
 	background:
 		linear-gradient(
-			color-mix(in srgb, var(--background-primary) 78%, transparent),
-			color-mix(in srgb, var(--background-primary) 88%, transparent)
+			180deg,
+			color-mix(in srgb, color-mix(in srgb, var(--nq-lueur) var(--nq-lueur-part), var(--nq-lueur-fond)) var(--nq-lueur-haut), transparent) 0%,
+			transparent var(--nq-lueur-fin)
 		),
-		var(--background-primary) var(--nq-fond-image, url("/wallpaper.jpg")) center / cover no-repeat fixed;
+		color-mix(in srgb, #000 var(--nq-voile), transparent);
 }
 
 #neo-quiz-root {
@@ -870,15 +947,26 @@ body {
 .nq-barre-gauche { display: flex; align-items: center; flex: none; height: 100%; padding-left: 10px; box-sizing: border-box; }
 .nq-barre-glisse { flex: 1 1 auto; align-self: stretch; }
 .nq-barre-controles { display: flex; align-items: center; gap: 15.5px; padding-right: 24px; }
-.nq-barre-menu, .nq-barre-controle { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
+/* AU REPOS EN `--text-normal`, et non plus `--text-muted` (2026-09-26) : la
+   barre se pose sur le fond d'écran et sa LUEUR (voir « Le fond d'écran »),
+   sans voile épais dessous. Le gris y tombait à ≈ 2:1 sur un dossier jaune,
+   sous les 3:1 d'un élément graphique (WCAG 1.4.11). Le glyphe clair porte
+   en plus une ombre serrée (`--nq-ombre-lisible-filtre`) qui le détache
+   d'une image claire. */
+.nq-barre-menu, .nq-barre-controle { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-normal); cursor: pointer; }
 /* Le survol, comme Neo Calendar (`DesktopWindowShell.css`) : le chevron du
    menu reçoit une surface, les trois contrôles de fenêtre NON — leur glyphe
-   passe seulement du gris au blanc. Un fond sous la croix ressemblerait au
-   bouton rouge de Windows, et ce n'est pas la référence. */
-.nq-barre-menu:hover, .nq-barre-menu[data-open] { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
-.nq-barre-controle:hover, .nq-barre-controle:focus-visible { color: var(--text-normal); }
+   passe seulement au blanc. Un fond sous la croix ressemblerait au bouton
+   rouge de Windows, et ce n'est pas la référence. */
+.nq-barre-menu:hover, .nq-barre-menu[data-open] { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: #fff; }
+.nq-barre-controle:hover, .nq-barre-controle:focus-visible { color: #fff; }
 .nq-barre-controle:focus-visible { outline: 1px solid color-mix(in srgb, var(--text-normal) 50%, transparent); outline-offset: -1px; }
-.nq-barre-controle svg, .nq-barre-menu svg { transition: opacity 100ms ease; }
+.nq-barre-controle svg, .nq-barre-menu svg { transition: opacity 100ms ease; filter: var(--nq-ombre-lisible-filtre); }
+/* Les libellés et icônes du rail, posés eux aussi sur le fond depuis que le
+   rail est sorti du panneau. Pas sur l'entrée active : sa carte claire porte
+   déjà son contraste, une ombre noire y salirait le texte sombre. */
+.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active) { text-shadow: var(--nq-ombre-lisible); }
+.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active) .qbd-nav-icon svg { filter: var(--nq-ombre-lisible-filtre); }
 .nq-barre-controle { transition: color 100ms ease; }
 /* Les glyphes portent leur taille (attributs `width`/`height`, reprise de
    Neo Calendar : 16, 20, 24) ; seul « restaurer », icône Lucide, est fixé ici
@@ -886,6 +974,98 @@ body {
 .nq-barre-controle svg.svg-icon { width: 16px; height: 16px; }
 .nq-barre[data-focused="false"] .nq-barre-menu svg, .nq-barre[data-focused="false"] .nq-barre-controle svg { opacity: 0.3; }
 #neo-quiz-root { padding-top: var(--nq-barre-hauteur); box-sizing: border-box; }
+
+/* ══════════════════════════════════════════════════════════
+   LE PANNEAU CENTRAL (2026-09-26)
+
+   Référence : StudySmarter en sombre. La PAGE tient dans un panneau de verre
+   dépoli ; le rail d'icônes est posé à sa GAUCHE, hors du panneau, sur la
+   lueur. L'ensemble rail + panneau est centré. Deux écrans le portent, les
+   deux enfants directs possibles de la racine : le tableau de bord
+   (`.qbd-layout` : rail + `.qbd-content`, qui est le panneau) et le quiz
+   lancé (`.qbd-qz`, monté seul par `ui/quiz-page.ts`, qui est lui-même le
+   panneau). Les valeurs vivent dans `src/assets/css/tokens.css`
+   (`--nq-panel-*`, `--qbd-surface-*`).
+
+   LARGEUR : `calc(100% - 2 × marge)` + `max-width` — 1 400 px au plus, et
+   quand la fenêtre est plus étroite que 1 400 + 32, toute la largeur moins
+   la marge, sans jamais déborder (aucun défilement horizontal).
+
+   HAUTEUR : des marges ÉGALES en haut et en bas, À L'ŒIL. La barre de titre
+   est transparente : mesurée depuis son bas, une marge de 16 px en haut se
+   lisait 61 px au-dessus du panneau contre 16 en dessous (« ce n'est pas
+   propre », Ahmed). La marge vaut donc la hauteur de la barre des deux côtés :
+   le panneau commence où finit la barre (la racine porte déjà ce
+   `padding-top`) et s'arrête à la même distance du bas de la fenêtre. Les
+   glyphes de la barre vivent dans la marge du haut, jamais sur le panneau.
+   Le rail s'étire sur la même hauteur : même haut, même bas que le panneau.
+   ══════════════════════════════════════════════════════════ */
+#neo-quiz-root > .qbd-layout,
+#neo-quiz-root > .qbd-qz {
+	box-sizing: border-box;
+	width: calc(100% - 2 * var(--nq-panel-gap));
+	max-width: var(--nq-panel-max-width);
+	height: calc(100% - var(--nq-barre-hauteur));
+	margin: 0 auto;
+	/* La racine est un conteneur flex en colonne (`.qbd-root`), et le quiz
+	   lancé porte `.qbd-content`, qui pose `flex: 1` : sans ce `none`, il
+	   s'étirait jusqu'au bas de la fenêtre et la marge du bas disparaissait. */
+	flex: none;
+
+	/* DANS LE PANNEAU, PLUS DE VERRE : les --qbd-glass-* sont rebranchés sur
+	   les surfaces plates. Une carte en verre posée sur un panneau de verre
+	   ferait une tuile dans une tuile ; changer les variables plutôt que
+	   chaque règle garde UNE source, et toute carte future qui lit le verre
+	   devient plate d'elle-même. `0 0 #0000` et non `none` pour le reflet et
+	   l'ombre : ils entrent dans des LISTES (`box-shadow: var(--qbd-glass-
+	   sheen), var(--qbd-glass-shadow)`), où un `none` rendrait la
+	   déclaration entière invalide. Les menus portalés au <body>
+	   (`.qbd-select-menu`, `.nq-usage-popover`) sont hors du panneau : ils
+	   gardent leur verre dense, c'est ce qui les détache de la page. Posé sur
+	   l'ENSEMBLE (rail compris) : le rail n'a pas de carte, mais une surface
+	   future qui s'y poserait suivrait la même règle. */
+	--qbd-glass-bg: var(--qbd-surface-bg);
+	--qbd-glass-bg-dense: var(--qbd-surface-bg-raised);
+	--qbd-glass-blur: none;
+	--qbd-glass-blur-dense: none;
+	--qbd-glass-edge: var(--qbd-surface-edge);
+	--qbd-glass-sheen: 0 0 #0000;
+	--qbd-glass-shadow: 0 0 #0000;
+}
+
+/* Le rail et le panneau, côte à côte : un petit écart entre les deux, le
+   rail garde sa largeur (88 px, dashboard-base.css). */
+#neo-quiz-root > .qbd-layout {
+	gap: 8px;
+}
+
+/* LA MATIÈRE DU PANNEAU : verre dépoli, 60 % d'opacité portée par la
+   couleur, flou réglable. Le coin arrondi découpe aussi ce qui défile
+   dedans ; la page défile DANS le panneau, jamais la fenêtre. */
+#neo-quiz-root > .qbd-layout > .qbd-content,
+#neo-quiz-root > .qbd-qz {
+	border-radius: var(--nq-panel-radius);
+	border: 1px solid var(--nq-panel-edge);
+	background: var(--nq-panel-bg);
+	backdrop-filter: var(--nq-panel-blur);
+	-webkit-backdrop-filter: var(--nq-panel-blur);
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+/* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
+   DÉCORATION, pas un bouton — ni curseur, ni survol, ni cible au clavier.
+   Il avait été retiré du rail le 2026-09-23 parce qu'il « ne menait nulle
+   part et ressemblait à un bouton » : sans aucun état interactif, il ne se
+   lit plus comme tel. L'icône de l'application elle-même, sans texte. */
+.nq-rail-logo {
+	flex: none;
+	width: 40px;
+	height: 40px;
+	margin: 6px auto 14px;
+	background: url("../../icons/icon.png") center / contain no-repeat;
+	pointer-events: none;
+}
 
 /* ── LE MENU D'APPLICATION ── */
 .nq-menu-couche { position: fixed; inset: 0; z-index: 10002; }

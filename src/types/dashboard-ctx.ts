@@ -211,6 +211,11 @@ export interface DashboardShellCtx {
 	    numéro 1-based de la question courante, total, heure d'écriture.
 	    Absent côté hôte sans reprise : pas de « Reprendre ». */
 	sessionOf?(path: string): { question: number; total: number; ecrite: number } | null;
+	/** La couleur d'AMBIANCE de l'hôte (2026-09-26) : « Mes quiz » l'appelle
+	    à chaque rendu avec l'accent du dossier ouvert, `null` hors dossier.
+	    L'application en teinte la lueur autour de son panneau central.
+	    Absente = pas d'ambiance, la page n'en dépend pas. */
+	ambiance?(accent: string | null): void;
 	/** OUVRE le menu « ⋯ » d'une carte de quiz sur `anchor` (le bouton « ⋯ »),
 	    appelée par la page avec SON propre `rerender` — le menu doit pouvoir
 	    repeindre la page qui l'affiche. Absente = pas de bouton « ⋯ », ce que

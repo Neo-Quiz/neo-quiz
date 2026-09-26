@@ -787,7 +787,9 @@
 	height: 3px;
 	border-radius: 2px;
 	background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 5%, transparent));
-	box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+	/* Plus de halo sous le trait (2026-09-26) : la lueur de la fenêtre prend
+	   déjà la couleur du dossier (apps/windows shell.css, `--nq-lueur`) ; un
+	   second halo au titre faisait doublon. Le trait dégradé reste. */
 }
 
 

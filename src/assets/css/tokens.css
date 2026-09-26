@@ -25,6 +25,45 @@
   --qbd-glass-edge: color-mix(in srgb, var(--text-normal) 14%, transparent);
   --qbd-glass-sheen: inset 0 1px 0 color-mix(in srgb, var(--text-normal) 10%, transparent);
   --qbd-glass-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.45);
+
+  /* ── LE PANNEAU CENTRAL et ses SURFACES PLATES (2026-09-26) ──
+     La page tient dans UN panneau centré, le rail posé à sa gauche, sur la
+     lueur de fond (références : StudySmarter en sombre, la carte centrale
+     d'Obsidian). Le panneau est la seule surface translucide ; dans le
+     panneau, une carte en verre ferait une tuile dans une tuile. Les cartes
+     deviennent donc des surfaces PLATES : pleines, un cran plus claires que
+     le panneau, un liseré fin, ni flou ni reflet.
+     La coquille de l'app (`apps/windows/src/assets/shell.css`) pose la
+     géométrie du panneau et REBRANCHE les --qbd-glass-* sur ces valeurs à
+     l'intérieur ; les menus portalés au <body> gardent leur verre.
+     Toutes dérivent du thème, comme le verre : rien de figé. */
+  /* Le panneau : un VERRE DÉPOLI, le fond secondaire à 60 % d'opacité sous
+     un flou de 24 px — réglage d'Ahmed (d'abord 70 % sans flou, comme la
+     carte centrale de son Obsidian, puis 60 % avec flou). La lueur et le fond
+     d'écran se devinent à travers, le flou les empêche de gêner la lecture.
+     L'alpha est porté par la COULEUR, jamais par `opacity` sur l'élément,
+     qui rendrait le texte translucide lui aussi. */
+  --nq-panel-alpha: 0.6;
+  --nq-panel-blur: blur(24px);
+  --nq-panel-bg: color-mix(in srgb, var(--background-secondary) calc(var(--nq-panel-alpha) * 100%), transparent);
+  --nq-panel-edge: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  /* Le rayon des grandes surfaces de l'app (carte « Reprendre », section
+     de dossier, composer du planning : 18 px). */
+  --nq-panel-radius: 18px;
+  --nq-panel-max-width: 1400px;
+  /* La marge LATÉRALE de l'ensemble rail + panneau quand la fenêtre est plus
+     étroite que lui. (Les marges du haut et du bas valent la hauteur de la
+     barre de titre : shell.css.) */
+  --nq-panel-gap: 16px;
+  /* La surface plate d'une carte : OPAQUE — posée sur un panneau à 60 %,
+     elle doit, elle, tenir le texte sur n'importe quel fond —, le fond
+     secondaire éclairci de 5 % du texte (≈ rgb(33, 33, 49) sur le thème
+     d'Ahmed). `-raised` : un
+     cran de plus, pour ce qui se pose SUR une carte ou s'en détache (panneau
+     d'édition, puce), sans redevenir du verre. */
+  --qbd-surface-bg: color-mix(in srgb, var(--text-normal) 5%, var(--background-secondary));
+  --qbd-surface-bg-raised: color-mix(in srgb, var(--text-normal) 8%, var(--background-secondary));
+  --qbd-surface-edge: color-mix(in srgb, var(--text-normal) 9%, transparent);
 }
 
 body{
