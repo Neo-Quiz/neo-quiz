@@ -12,10 +12,10 @@ import { formatDateHeure } from "./format-date";
 /* ══════════════════════════════════════════════════════════
    LES TUILES DU BAS de l'onglet « Progression » (2026-09-25) :
 
-   - « À réviser aujourd'hui » : ce que l'ordonnanceur a mis au programme du
-     jour POUR CE DOSSIER, par note, et un bouton qui ouvre la plus chargée.
-     Une séance mêlant plusieurs notes n'existe pas encore : même geste que
-     la section du même nom sur l'accueil (`home.ts`).
+   - `duesDuDossier` : ce que l'ordonnanceur a mis au programme du jour POUR
+     CE DOSSIER, par note. Sa tuile « À réviser aujourd'hui » est partie
+     (plus aucun appelant) : l'étape suivante (`folder-next.ts`) et l'onglet
+     « Planning » (`folder-planning.ts`) lisent ce décompte eux-mêmes.
    - « Cours » : l'avancement de chaque cours, mode par mode — le détail que
      les pastilles des cartes ne portent plus.
 
@@ -56,45 +56,6 @@ export function duesDuDossier(ctx: DashboardShellCtx, inModule: QuizIndexEntry[]
 
 export const questions = (n: number): string =>
 	t(n === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: n });
-
-export function renderRevisionDuJour(parent: HTMLElement, ctx: DashboardShellCtx, inModule: QuizIndexEntry[]): void {
-	const tuile = ajouter(parent, "div", "qbd-folder-progress-tile qbd-folder-progress-tile--due");
-	ajouter(tuile, "div", "qbd-folder-progress-label", t("dashboard.review.title"));
-	const { total, reportees, lignes } = duesDuDossier(ctx, inModule);
-
-	const tete = ajouter(tuile, "div", "qbd-folder-due-head");
-	const chiffre = ajouter(tete, "div", "qbd-folder-due-count");
-	ajouter(chiffre, "b", undefined, String(total));
-	ajouter(chiffre, "span", undefined, t(total === 1 ? "dashboard.quizzes.progressDueOne" : "dashboard.quizzes.progressDueOther"));
-
-	if (total === 0) {
-		ajouter(tuile, "div", "qbd-folder-progress-sub", t("dashboard.quizzes.progressDueNone"));
-		return;
-	}
-	if (lignes.length === 0) return;
-
-	const reviser = ajouter(tete, "button", "qbd-folder-due-action");
-	reviser.type = "button";
-	currentHost().ui.setIcon(ajouter(reviser, "span", "qbd-btn-icon"), "play");
-	ajouter(reviser, "span", undefined, t("dashboard.quizzes.progressDueAction"));
-	reviser.title = lignes[0].quiz.title;
-	reviser.addEventListener("click", () => ctx.openQuiz(lignes[0].quiz));
-
-	const liste = ajouter(tuile, "div", "qbd-folder-due-list");
-	for (const { quiz, n } of lignes.slice(0, 5)) {
-		const ligne = ajouter(liste, "button", "qbd-folder-due-row");
-		ligne.type = "button";
-		ajouter(ligne, "span", "qbd-folder-due-title", quiz.title);
-		ajouter(ligne, "span", "qbd-folder-due-n", questions(n));
-		ligne.addEventListener("click", () => ctx.openQuiz(quiz));
-	}
-	/* Le report est une INFORMATION, pas un reproche : le budget du jour a
-	   tenu (même phrase que l'accueil). */
-	if (reportees > 0) {
-		ajouter(tuile, "div", "qbd-folder-progress-sub",
-			t(reportees === 1 ? "dashboard.review.deferredOne" : "dashboard.review.deferredOther", { count: reportees }));
-	}
-}
 
 /** Une tentative supprimée mais pas encore confirmée : montrée en place
     (« Tentative supprimée » + Annuler) jusqu'au prochain rendu de la page —
@@ -207,7 +168,7 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 	}
 	ajouter(row, "span", "qbd-folder-attempt-date", formatDateHeure(new Date(tentative.date)));
 	const infos = ajouter(row, "span", "qbd-folder-attempt-info");
-	ajouter(infos, "span", "qbd-folder-attempt-pct", tentative.pct === null ? t("dashboard.quizzes.attemptFree") : `${tentative.pct} %`);
+	ajouter(infos, "span", "qbd-folder-attempt-pct", tentative.pct === null ? t("dashboard.quizzes.attemptFree") : t("dashboard.quizzes.attemptPct", { pct: tentative.pct }));
 	if (tentative.ancienne) ajouter(infos, "span", "qbd-folder-attempt-old", t("dashboard.quizzes.attemptOld"));
 	const supprimer = ajouter(row, "button", "qbd-folder-attempt-delete");
 	supprimer.type = "button";

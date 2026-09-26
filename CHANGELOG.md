@@ -52,6 +52,7 @@ release notes.
 - The quiz page opens on a sheet: on the left the folder, the title, the goal and the question count on one line (hovering them explains the mode and names the question type), the model that generated the quiz with the date below it, the progress once started, a large Start button and the editor; on the right every question, readable at a glance and without the answers, along a numbered path with its type icon and, in a Learn note, its role; short choices sit side by side, long ones in a column, and only the list scrolls. Clicking a question makes the Start button shine instead of opening it, the same shine that plays on arrival and every few seconds, and leaving the editor returns to the sheet. The stat tiles under the title are now one line of text, and models show their readable name (Sonnet 5 rather than claude-sonnet-5).
 - The Practice hint now says the bank prepares you for your exam, rather than promising your exam's format.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
+- Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
 
 ### Fixed
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.

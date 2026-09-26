@@ -79,15 +79,19 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examDate"));
 			const dateInput = ajouter(c, "input", "qbd-medit-input");
 			dateInput.type = "date";
+			// Un examen se planifie dans l'avenir : le calendrier natif grise
+			// les jours passés, et une date passée tapée au clavier (que `min`
+			// n'empêche pas de saisir) laisse Enregistrer désactivé.
+			dateInput.min = aujourdhuiIsoLocal(Date.now());
 			dateInput.value = date;
 
 			const save = ajouter(c, "button", "qbd-medit-save", t("dashboard.planning.examSave"));
 			save.type = "button";
-			const majEtat = (): void => { save.disabled = !dateInput.value; };
+			const majEtat = (): void => { save.disabled = !dateInput.value || dateInput.validity.rangeUnderflow; };
 			majEtat();
 			dateInput.addEventListener("input", () => { date = dateInput.value; majEtat(); });
 			save.addEventListener("click", () => {
-				if (!dateInput.value) return;
+				if (!dateInput.value || dateInput.validity.rangeUnderflow) return;
 				// Un nom fait uniquement d'espaces vaut une absence — jamais
 				// persisté tel quel (fix round 1, 2026-09-26).
 				ctx.enregistrerExamen?.(group, { id: examen?.id ?? Date.now().toString(36), nom: nom.trim(), date: dateInput.value });
@@ -290,6 +294,9 @@ function renderComposerDossier(parent: HTMLElement, ctx: DashboardShellCtx, fold
 		envoiEnCours = true;
 		envoyer.disabled = true;
 		void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
+			// Pendant la lecture, on a pu quitter le dossier : ne pas arracher
+			// l'utilisateur à la vue où il est allé entre-temps.
+			if (!champ.isConnected) return;
 			ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu), prompt: texte, lancer: true } });
 		});
 	};
