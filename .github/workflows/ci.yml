@@ -147,6 +147,12 @@ jobs:
       - name: Gestes d'édition d'une question
         run: npm run check:gestes
 
+      # LA FILE DE GÉNÉRATION : une génération à la fois, dans l'ordre
+      # d'envoi ; la suivante n'attend pas qu'on le lui dise, mais elle attend
+      # que le processus annulé ait rendu le verrou de son CLI.
+      - name: Generation queue
+        run: npm run check:file-generation
+
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à
       # l'écran. Ce contrôle charge le noyau réellement appelé par l'installeur.

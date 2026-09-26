@@ -60,6 +60,7 @@ release notes.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 - Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
 - The editor's text fields show their text as the quiz will: code as a code pill, bold, italic and formulas rendered. The markdown signs (backticks, stars, dollars) only reappear around the cursor, like in Obsidian.
+- Generating a quiz no longer opens a blocking window: each request appears as a sent message under the composer, you can keep sending more while one is running, and they run one after another in a queue you can cancel.
 - In Learn quizzes the reading is no longer a separate question: the course is shown collapsed above every question of its step, with "Try to answer without reading", opens on demand and unfolds after answering; numbers and counts skip it.
 
 ### Fixed

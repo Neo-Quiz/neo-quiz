@@ -62,6 +62,7 @@
 @import url('./dashboard/dashboard-detail.css');
 @import url('./dashboard/dashboard-fiche.css');
 @import url('./dashboard/dashboard-ai.css');
+@import url('./dashboard/dashboard-ai-file.css');
 
 /* Editor */
 @import url('./editor/editor-base.css');

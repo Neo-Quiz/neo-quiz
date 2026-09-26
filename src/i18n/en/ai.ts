@@ -243,12 +243,19 @@ export const EN_AI = {
 
 	/* ── Scène : chargement, erreur, résultat ── */
 	"ai.loading.title": "Creating your quiz…",
-	/* Un quiz par fichier joint : où en est le lot, et ce qui s'y passe. */
-	"ai.batch.progress": "Quiz {index} of {total} · {file}",
-	"ai.batch.ready": "“{file}” is ready ({index} of {total}). The next one is on its way.",
-	"ai.batch.failed": "“{file}” could not be generated: {error}",
-	"ai.batch.stopped": "Stopped. {count} quiz(zes) already saved are kept.",
+	/* Un quiz par fichier joint, sur un site : le suivant s'ouvre. */
 	"ai.batch.webNext": "“{file}” is saved. Next file: {next}.",
+	/* La file de génération (spec 2026-09-26) : une ligne par envoi, sous le
+	   composer. « Creating your quiz… » (ai.loading.title) dit la ligne en
+	   cours, « Try again » (ai.error.retry) et « Stop » (ai.composer.stop)
+	   sont repris tels quels. */
+	"ai.queue.label": "Generation queue",
+	"ai.queue.waiting": "Waiting",
+	"ai.queue.open": "Open",
+	"ai.queue.cancel": "Remove from the queue",
+	"ai.queue.close": "Close",
+	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
+	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",

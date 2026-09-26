@@ -214,11 +214,14 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 
 	/* ── Scène : chargement, erreur, résultat ── */
 	"ai.loading.title": "Quiz en cours de création…",
-	"ai.batch.progress": "Quiz {index} sur {total} · {file}",
-	"ai.batch.ready": "« {file} » est prêt ({index} sur {total}). Le suivant arrive.",
-	"ai.batch.failed": "« {file} » n'a pas pu être généré : {error}",
-	"ai.batch.stopped": "Arrêté. Les {count} quiz déjà enregistrés sont gardés.",
 	"ai.batch.webNext": "« {file} » est enregistré. Fichier suivant : {next}.",
+	"ai.queue.label": "File de génération",
+	"ai.queue.waiting": "En attente",
+	"ai.queue.open": "Ouvrir",
+	"ai.queue.cancel": "Retirer de la file",
+	"ai.queue.close": "Fermer",
+	"ai.queue.readyNotice": "« {title} » est prêt. Ouvrez-le depuis Générer.",
+	"ai.queue.missing": "Ce quiz est introuvable. Il a peut-être été déplacé ou supprimé.",
 	"ai.error.title": "Échec de la génération",
 	"ai.error.retry": "Réessayer",
 	"ai.error.checkSettings": "Vérifiez vos paramètres IA dans les paramètres du plugin.",

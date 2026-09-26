@@ -20,7 +20,6 @@
    de centrée (vu dans la VM le 2026-09-19). Toute phase qui n'est pas
    `result` doit y figurer. */
 .qbd-ai-stage--idle,
-.qbd-ai-stage--loading,
 .qbd-ai-stage--error,
 .qbd-ai-stage--web,
 .qbd-ai-stage--connexion {
@@ -35,7 +34,6 @@
 }
 
 .qbd-ai-stage--idle::before,
-.qbd-ai-stage--loading::before,
 .qbd-ai-stage--error::before,
 .qbd-ai-stage--web::before,
 .qbd-ai-stage--connexion::before {
@@ -44,7 +42,6 @@
 }
 
 .qbd-ai-stage--idle::after,
-.qbd-ai-stage--loading::after,
 .qbd-ai-stage--error::after,
 .qbd-ai-stage--web::after,
 .qbd-ai-stage--connexion::after {
@@ -67,7 +64,6 @@
    Scopé aux états centrés — en résultat (composer en bas) il garde sa
    version compacte. */
 .qbd-ai-stage--idle .qbd-ai-composer,
-.qbd-ai-stage--loading .qbd-ai-composer,
 .qbd-ai-stage--error .qbd-ai-composer,
 .qbd-ai-stage--web .qbd-ai-composer,
 .qbd-ai-stage--connexion .qbd-ai-composer {
@@ -77,7 +73,6 @@
 }
 
 .qbd-ai-stage--idle .qbd-ai-composer-input,
-.qbd-ai-stage--loading .qbd-ai-composer-input,
 .qbd-ai-stage--error .qbd-ai-composer-input,
 .qbd-ai-stage--web .qbd-ai-composer-input,
 .qbd-ai-stage--connexion .qbd-ai-composer-input {
@@ -1031,41 +1026,6 @@
 @keyframes qbd-send-in {
 	from { opacity: 0; transform: scale(0.7); }
 	to   { opacity: 1; transform: scale(1); }
-}
-
-/* Bouton STOP pendant la génération (référence Claude Code : fond GRIS
-   NEUTRE discret — pas teinté par l'accent —, petit carré en contour
-   clair, tooltip « Arrêter  Esc » au survol). */
-/* Theme-aware (2026-07-11) : fond/carré basés sur --text-normal, pas
-   sur du blanc fixe — en thème clair le carré blanc disparaissait. */
-.qbd-ai-composer-send.is-stop {
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent) !important;
-	color: var(--text-normal);
-}
-
-.qbd-ai-composer-send.is-stop:hover {
-	background: color-mix(in srgb, var(--text-normal) 13%, transparent) !important;
-}
-
-/* Carré du stop : dessiné en CSS — GRAND (14px), trait épais (2.5px),
-   coins arrondis, comme la référence. */
-.qbd-ai-stop-square {
-	width: 14px;
-	height: 14px;
-	border: 2.5px solid currentColor;
-	border-radius: 4px;
-}
-
-/* Raccourci dans le tooltip du stop (« Arrêter  Esc ») */
-.qbd-hover-tip-row {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.qbd-hover-tip-esc {
-	font-size: 11px;
-	color: var(--text-faint);
 }
 
 /* ── Page « quiz » de la zone résultat ──
@@ -2955,13 +2915,11 @@
 .qbd-login-wait-modal .qbd-ai-loading-title { font-size: 16px; }
 .qbd-login-wait-modal .qbd-ai-login-hint { margin: 0; font-size: 13.5px; max-width: 40ch; }
 
-/* La GÉNÉRATION et l'ERREUR dans la même modale que l'attente : la carte y
-   perd sa surface (la modale est déjà la surface) et garde son contenu —
-   icône, titre, points ou message, action. Fermer la modale de génération,
-   c'est Stop ; fermer celle d'erreur rend la demande au composer. */
-.qbd-web-wait-modal.qbd-loading-modal,
+/* L'ERREUR dans la même modale que l'attente : la carte y perd sa surface
+   (la modale est déjà la surface) et garde son contenu — icône, titre,
+   message, action. La fermer rend la demande au composer. (La génération
+   n'a plus de modale : elle passe par la file, dashboard-ai-file.css.) */
 .qbd-web-wait-modal.qbd-error-modal { width: 480px; }
-.qbd-loading-modal .qbd-ai-preview-loading,
 .qbd-error-modal .qbd-ai-preview-error {
 	min-height: 220px;
 	width: auto;
@@ -2970,7 +2928,6 @@
 	padding: 32px 16px 24px;
 	gap: 14px;
 }
-.qbd-loading-modal .qbd-ai-preview-loading::before { display: none; }
 .qbd-error-modal .qbd-ai-error-msg { max-width: 42ch; }
 
 /* Les fichiers à glisser depuis la modale : les PILES de l'aperçu PDF
@@ -3548,37 +3505,8 @@
 	z-index: 1;
 }
 
-/* Un quiz par fichier joint : « Quiz 2 sur 3 · CM2.pdf », sous le titre. Le
-   nom passe à la ligne plutôt que d'être coupé : son extension reste
-   visible, toujours. */
-.qbd-ai-loading-batch {
-	margin: -4px 0 0;
-	max-width: 100%;
-	font-size: 12.5px;
-	color: var(--text-muted);
-	text-align: center;
-	overflow-wrap: anywhere;
-	position: relative;
-	z-index: 1;
-}
-
-.qbd-ai-loading-dots {
-	display: flex;
-	gap: 6px;
-	position: relative;
-	z-index: 1;
-}
-
-.qbd-ai-loading-dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--interactive-accent);
-	animation: qbd-pulse-dot 1.2s ease-in-out infinite;
-}
-
-.qbd-ai-loading-dot:nth-child(2) { animation-delay: 0.2s; }
-.qbd-ai-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+/* Les trois points qui battent : repris par la ligne en cours de la file
+   de génération (`.qbd-ai-file-point`, dashboard-ai-file.css). */
 
 @keyframes qbd-pulse-dot {
 	0%, 100% { opacity: 0.15; transform: scale(0.7); }

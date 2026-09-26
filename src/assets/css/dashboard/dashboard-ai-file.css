@@ -1,0 +1,166 @@
+/* ══════════════════════════════════════════════════════════
+   LA FILE DE GÉNÉRATION — les lignes sous le composer
+   (`src/dashboard/file-generation-vue.ts`, spec 2026-09-26)
+
+   Une ligne est du TEXTE avec une icône d'état, pas une carte : ni fond
+   vitré, ni bordure de tuile, ni pastille, ni capitales. Un filet fin sépare
+   deux lignes, comme deux messages d'un fil. La ligne en cours reprend
+   l'animation du chargement d'avant (le balayage `qbd-glide` et les trois
+   points `qbd-pulse-dot`, déclarés dans dashboard-ai.css), à la taille d'une
+   ligne.
+══════════════════════════════════════════════════════════ */
+
+.qbd-ai-stage .qbd-ai-file {
+	width: min(732px, 100%);
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	margin-top: 10px;
+	text-align: left;
+}
+
+.qbd-ai-file:empty { display: none; }
+
+.qbd-ai-file-ligne {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 12px 4px;
+	overflow: hidden;
+	min-width: 0;
+}
+
+.qbd-ai-file-ligne + .qbd-ai-file-ligne {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Le balayage de la ligne en cours : le même dégradé que la carte de
+   chargement, sous le texte. */
+.qbd-ai-file-ligne--cours::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--interactive-accent) 8%, transparent) 50%, transparent 100%);
+	animation: qbd-glide 2.2s ease-in-out infinite;
+	pointer-events: none;
+}
+
+.qbd-ai-file-etat {
+	display: inline-flex;
+	flex-shrink: 0;
+	margin-top: 1px;
+	color: var(--text-faint);
+}
+
+.qbd-ai-file-etat svg { width: 16px; height: 16px; }
+.qbd-ai-file-ligne--cours .qbd-ai-file-etat { color: var(--interactive-accent); }
+.qbd-ai-file-ligne--prete .qbd-ai-file-etat { color: var(--interactive-accent); }
+.qbd-ai-file-ligne--echouee .qbd-ai-file-etat { color: var(--text-error); }
+
+.qbd-ai-file-corps {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+/* Le résumé passe à la ligne plutôt que d'être coupé : le nom d'une pièce
+   jointe garde son extension, toujours. */
+.qbd-ai-file-resume {
+	font-size: 14px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-file-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 10px;
+	font-size: 12.5px;
+	color: var(--text-muted);
+}
+
+.qbd-ai-file-modele {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+}
+
+.qbd-ai-file-modele .qbd-provider-logo { width: 14px; height: 14px; }
+.qbd-ai-file-modele .qbd-provider-logo svg,
+.qbd-ai-file-modele .qbd-provider-logo img { width: 13px; height: 13px; }
+
+.qbd-ai-file-statut {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+	font-size: 12.5px;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-file-ligne--prete .qbd-ai-file-statut { color: var(--text-normal); font-weight: 600; }
+.qbd-ai-file-ligne--echouee .qbd-ai-file-statut { color: var(--text-error); }
+
+.qbd-ai-file-temps { font-variant-numeric: tabular-nums; color: var(--text-faint); }
+
+.qbd-ai-file-points { display: inline-flex; gap: 4px; }
+
+.qbd-ai-file-point {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	animation: qbd-pulse-dot 1.2s ease-in-out infinite;
+}
+
+.qbd-ai-file-point:nth-child(2) { animation-delay: 0.2s; }
+.qbd-ai-file-point:nth-child(3) { animation-delay: 0.4s; }
+
+.qbd-ai-file-actions {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.qbd-ai-file-ouvrir {
+	padding: 4px 12px;
+	font-size: 13px;
+}
+
+/* ■ et × : des icônes nues, qui ne prennent un fond qu'au survol. */
+.qbd-ai-file-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.qbd-ai-file-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-ai-file-btn svg { width: 15px; height: 15px; }
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-file-ligne--cours::before { animation: none; opacity: 0; }
+	.qbd-ai-file-point { animation: none; opacity: 0.6; }
+}
