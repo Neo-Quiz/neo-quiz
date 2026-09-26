@@ -623,6 +623,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			origine: origineDe(quiz),
 			onStart: (el) => { void flushSave(); start.onClick(el); },
 			onEdit: () => toggleEditing(page),
+			onEditQuestion: (i) => { activeIdx = i; toggleEditing(page); },
 			onBack: () => { void flushSave(); spec.onBack(); },
 			autreMode: spec.autreMode ? { mode: spec.autreMode.quiz.mode, open: () => { void flushSave(); spec.autreMode!.open(); } } : undefined,
 			menu: spec.menu,

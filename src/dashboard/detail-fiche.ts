@@ -34,8 +34,8 @@ import { attachHoverTip } from "./hover-tip";
    AUCUNE RÉPONSE ici : on relit le quiz pour savoir ce qui attend, pas pour
    en apprendre la solution. Seules les options d'un QCM sont montrées, sans
    la bonne ; les autres types n'affichent que leur énoncé. Répondre ne se
-   fait qu'en jouant le quiz : cliquer une question fait briller
-   « Commencer le quiz » (règle du 2026-09-23, gardée).
+   fait qu'en jouant le quiz. Cliquer une question ouvre l'éditeur
+   dessus (2026-09-26 ; avant, le clic faisait briller « Commencer »).
 
    L'en-tête de la page est masqué sur cet écran (classe `qbd-qz--fiche`) :
    la flèche retour et l'éditeur vivent dans celui de la fiche.
@@ -64,6 +64,9 @@ export interface FicheDeps {
 	onStart(el: HTMLElement): void;
 	/** Passe la page en édition. */
 	onEdit(): void;
+	/** Ouvre l'éditeur sur CETTE question (clic sur sa carte). Absente : le
+	    clic fait briller « Commencer le quiz », comme avant. */
+	onEditQuestion?(index: number): void;
 	/** Quitte la page. */
 	onBack(): void;
 	/** L'autre mode du même cours : la pastille du mode devient un sélecteur
@@ -365,6 +368,20 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		renderTop(card, q, i + 1);
 		texte(card, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
 		renderOptions(card, q);
-		card.addEventListener("click", attirer);
+		/* CLIC = ÉDITER CETTE QUESTION (2026-09-26) : la carte ouvre l'éditeur
+		   dessus. Toujours aucune réponse ici ; répondre se fait en jouant. */
+		const editer = deps.onEditQuestion;
+		if (!editer) { card.addEventListener("click", attirer); continue; }
+		card.classList.add("is-editable");
+		card.tabIndex = 0;
+		card.setAttribute("role", "button");
+		card.setAttribute("aria-label", t("dashboard.fiche.editQuestion", { n: i + 1 }));
+		card.title = t("dashboard.fiche.editQuestion", { n: i + 1 });
+		card.addEventListener("click", () => editer(i));
+		card.addEventListener("keydown", (e) => {
+			if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+			e.preventDefault();
+			editer(i);
+		});
 	}
 }

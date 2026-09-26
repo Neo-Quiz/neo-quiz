@@ -273,6 +273,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.previewBack": "Retour au départ",
 	/* La fiche d'un quiz (detail-fiche.ts). */
 	"dashboard.fiche.part": "Partie {n}",
+	"dashboard.fiche.editQuestion": "Modifier la question {n}",
 	"dashboard.fiche.search": "Rechercher",
 	"dashboard.fiche.searchEmpty": "Aucune question ne correspond à cette recherche.",
 	"dashboard.quiz.editTitle": "Titre",

@@ -594,3 +594,8 @@
 /* « 23 questions » reste du texte (ce n'est pas un bouton), sans point
    séparateur devant (2026-09-26). */
 .qbd-fiche-meta .qbd-fiche-count::before { content: none !important; }
+/* Une carte qui ouvre l'éditeur : curseur de lien, liseré bleu au survol
+   et au focus clavier. Pas de levée : la carte défile, elle ne bouge pas. */
+.qbd-fiche-card.is-editable { cursor: pointer; transition: border-color 0.15s ease; }
+.qbd-fiche-card.is-editable:hover { border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent); }
+.qbd-fiche-card.is-editable:focus-visible { outline: 2px solid var(--quiz-primary); outline-offset: 2px; }
