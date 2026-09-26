@@ -504,8 +504,11 @@
 	padding: 2px 4px 12px 0;
 }
 .qbd-fiche-big {
-	flex: 1;
-	justify-content: center;
+	/* Jamais plus petite que son contenu (`0 auto`) : rétrécie à la hauteur
+	   du cadre, une longue lecture débordait par-dessus les flèches. Centrée
+	   tant qu'elle tient (`safe`), calée en haut sinon ; le cadre défile. */
+	flex: 1 0 auto;
+	justify-content: safe center;
 	gap: 18px;
 	padding: 28px 32px 32px;
 	min-height: 320px;
@@ -518,6 +521,8 @@
 	font-weight: 700;
 	overflow-wrap: anywhere;
 }
+.qbd-fiche-big-text.is-long { font-size: 18px; line-height: 1.6; font-weight: 600; }
+.qbd-fiche-big-text.is-tres-long { font-size: 15.5px; line-height: 1.65; font-weight: 500; }
 .qbd-fiche-big .qbd-fiche-opt { font-size: 15px; }
 .qbd-fiche-nav {
 	display: flex;

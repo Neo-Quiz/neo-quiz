@@ -448,7 +448,12 @@ function renderListe(body: HTMLElement, idx: number[], deps: FicheDeps, attirer:
 	// Pas un bouton : on répond en jouant le quiz ; un clic fait briller « Commencer ».
 	const card = ajouter(detail, "div", "qbd-fiche-q qbd-fiche-big");
 	renderTop(card, q, etat.selection + 1);
-	texte(card, "p", "qbd-fiche-big-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+	/* La TAILLE suit la longueur (2026-09-26) : une question d'une ligne se
+	   lit en grand, une lecture de quinze lignes en 22 px débordait de sa
+	   carte. Trois paliers, comptés sur le texte brut. */
+	const enonce = questionText(q) || t("dashboard.quiz.promptEmpty");
+	const taille = enonce.length > 600 ? " is-tres-long" : enonce.length > 220 ? " is-long" : "";
+	texte(card, "p", "qbd-fiche-big-text" + taille, enonce);
 	renderOptions(card, q);
 	card.addEventListener("click", attirer);
 
