@@ -321,6 +321,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   Une génération EN COURS, elle, est arrêtée d'abord (`abort`, le même
 		   geste que le bouton Stop) : on ne joint pas des sources à un composer
 		   dont le CLI tourne encore. */
+		epochPreset++;
 		if (phase === "loading") activeClient?.abort();
 		if (phase !== "idle") resetGeneration();
 		/* Les pièces du dossier REMPLACENT celles du composer : arriver depuis
@@ -555,6 +556,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let reponseRecue: { titre?: string } | null = null;
 	let errorMessage = "";
 	let containerRef: HTMLElement | null = null;
+	/* La SCÈNE posée par le dernier `render` dans `containerRef`. Le conteneur,
+	   lui, est celui de la coquille : il reste dans le document quand elle y
+	   peint une AUTRE vue, et `containerRef.isConnected` ne dit donc jamais si
+	   « Générer » est à l'écran. La scène, si : la coquille la détache en
+	   peignant ailleurs. `null` = la prochaine peinture est une vraie entrée. */
+	let stageRef: HTMLElement | null = null;
+	/* Incrémentée à chaque préréglage : la jonction en arrière-plan d'un
+	   préréglage s'arrête dès qu'un autre est posé, pour que deux dossiers ne
+	   mêlent pas leurs pièces dans un même composer. */
+	let epochPreset = 0;
 	/* Ce que la DERNIÈRE génération a consommé — null quand le fournisseur ne
 	   publie aucun compteur, auquel cas l'écran le dit. */
 	let lastUsage: AiUsage | null = null;
@@ -813,8 +824,19 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 	}
 
+	/* L'entrée de la COQUILLE (et de tout hôte) : une vraie navigation vers
+	   « Générer » doit peindre, même si la scène précédente a été détachée. */
+	function entrer(container: HTMLElement): Promise<void> {
+		stageRef = null;
+		return render(container);
+	}
+
 	async function render(container: HTMLElement | null): Promise<void> {
 		if (!container) return;
+		/* Repeint INTERNE (une pièce jointe lue en arrière-plan, une réponse,
+		   un statut) alors que la coquille a peint une autre vue : ne pas
+		   écraser cette vue. Seule `entrer` rouvre la page. */
+		if (stageRef && !stageRef.isConnected) return;
 		containerRef = container;
 		closeAllSelects();
 		// Tooltips portalés au <body> (stop, effort) : un re-render détruit
@@ -833,6 +855,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// le composer EN BAS (variante B « chat »). `formCol` reste le
 		// nom du parent du composer pour ne pas réécrire tout le bloc.
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase);
+		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
@@ -1929,15 +1952,25 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			aJoindre = [];
 			const doitLancer = lancerApresJointes;
 			lancerApresJointes = false;
+			const epoque = epochPreset;
 			void (async () => {
-				for (const path of sources) await attachVaultPath(path);
-				if (doitLancer && canGenerate()) void startGeneration(containerRef);
+				for (const path of sources) {
+					// Un autre préréglage est arrivé : ses pièces remplacent
+					// celles-ci, on n'en joint pas une de plus.
+					if (epoque !== epochPreset) return;
+					await attachVaultPath(path);
+				}
+				if (epoque !== epochPreset) return;
+				/* Pas de génération hors de l'écran : si l'on a quitté
+				   « Générer » pendant la jonction, les pièces restent dans le
+				   composer et l'envoi attend un geste. */
+				if (doitLancer && stageRef?.isConnected && canGenerate()) void startGeneration(containerRef);
 			})();
 		} else if (lancerApresJointes) {
 			// Dossier sans document à joindre (préréglage sans pièce) : lancer
 			// directement, une seule fois.
 			lancerApresJointes = false;
-			if (canGenerate()) void startGeneration(containerRef);
+			if (stageRef?.isConnected && canGenerate()) void startGeneration(containerRef);
 		}
 	}
 
@@ -4156,8 +4189,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   sans que la page « Générer » soit à l'écran) : `render(containerRef)`
 		   plus bas repeindrait alors la vue courante par-dessus. On revient
 		   d'abord sur « Générer » — le chemin de succès d'une génération CLI le
-		   fait déjà pour la page détail, ceci est son équivalent en entrée. */
-		if (!containerRef?.isConnected) deps.navigate("ai");
+		   fait déjà pour la page détail, ceci est son équivalent en entrée.
+		   La SCÈNE et non le conteneur : celui de la coquille reste dans le
+		   document quelle que soit la vue peinte. */
+		if (!stageRef?.isConnected) deps.navigate("ai");
 		try {
 			const reponse = parseReponseQuiz(texte);
 			generatedQuestions = reponse.questions;
@@ -4300,7 +4335,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		zoneVideo = null;
 		zoneNoticeVideo = null;
 		containerRef = null;
+		stageRef = null;
 	}
 
-	return { render, openAddFiles, dispose, preset };
+	return { render: entrer, openAddFiles, dispose, preset };
 }
