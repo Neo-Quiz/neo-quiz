@@ -220,12 +220,39 @@
 	min-width: 0;
 }
 .qbd-planning-mode-title { font-size: 13.5px; font-weight: 700; }
+/* Phrase d'aide : PAS d'ellipsis (fix round 1, 2026-09-26) — coupée à 300 px
+   de large, elle ne se lisait plus (« Pour s'entraîner à l'examen, exercice
+   a… »). Elle passe donc à la ligne, sur autant de lignes qu'il faut. */
 .qbd-planning-mode-help {
 	font-size: 12px;
 	color: var(--text-muted);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	white-space: normal;
+}
+
+/* ── L'étape suivante (folder-next.ts), SCOPÉE à la colonne de droite du
+   Planning (fix round 1, 2026-09-26) : à 300 px de large, le libellé
+   « Reprendre · CM2 - Programmation Python · Q2/26 » se coupait
+   (« Reprendre · CM2 - Program… »). Ici, et nulle part ailleurs (le bouton
+   du drill « Contenu » garde une seule ligne tronquée) : le mode passe en
+   première ligne, le titre du quiz peut passer à la ligne en dessous, les
+   deux centrés. ── */
+.qbd-planning-col--right .qbd-next-step-main {
+	flex-wrap: wrap;
+	justify-content: center;
+	text-align: center;
+	padding: 12px 16px;
+}
+.qbd-planning-col--right .qbd-next-step-mode::after {
+	/* Le séparateur « · » n'a plus de sens une fois le titre sur sa propre
+	   ligne : il collerait au bord droit du mode, seul sur sa ligne. */
+	content: none;
+}
+.qbd-planning-col--right .qbd-next-step-title {
+	flex-basis: 100%;
+	overflow: visible;
+	text-overflow: unset;
+	white-space: normal;
+	text-align: center;
 }
 
 /* ── « Gérer les examens » (module-edit.ts) : même style que les autres

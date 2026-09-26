@@ -87,7 +87,9 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			dateInput.addEventListener("input", () => { date = dateInput.value; majEtat(); });
 			save.addEventListener("click", () => {
 				if (!dateInput.value) return;
-				ctx.enregistrerExamen?.(group, { id: examen?.id ?? Date.now().toString(36), nom, date: dateInput.value });
+				// Un nom fait uniquement d'espaces vaut une absence — jamais
+				// persisté tel quel (fix round 1, 2026-09-26).
+				ctx.enregistrerExamen?.(group, { id: examen?.id ?? Date.now().toString(36), nom: nom.trim(), date: dateInput.value });
 				m.close();
 				rerender();
 			});
@@ -127,8 +129,13 @@ export function renderFolderPlanning(
 	// ── « Tâches associées » ──
 	const aVenir = examensAVenir(ctx, group);
 	const dues = duesDuDossier(ctx, inModule);
-	const tacheCorps = renderCollapsibleSection(collapse, gauche, "planning:tasks", t("dashboard.planning.tasks"),
-		aVenir.length === 0 ? 0 : dues.total);
+	// Le compteur de l'en-tête est le nombre de LIGNES de tâche affichées (une
+	// seule ligne existe pour l'instant), jamais le nombre de questions
+	// qu'elle porte — fix round 1 (2026-09-26) : « 2 » quand une seule ligne
+	// disait « Réviser 2 questions » n'avait pas de sens pour un compteur de
+	// tâches.
+	const tacheLignes = aVenir.length > 0 && dues.total > 0 && dues.lignes.length > 0 ? 1 : 0;
+	const tacheCorps = renderCollapsibleSection(collapse, gauche, "planning:tasks", t("dashboard.planning.tasks"), tacheLignes);
 	if (aVenir.length === 0) {
 		ajouter(tacheCorps, "p", "qbd-planning-empty-line", t("dashboard.planning.tasksNeedExam"));
 	} else if (dues.total > 0 && dues.lignes.length > 0) {
