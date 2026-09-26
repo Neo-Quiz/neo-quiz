@@ -761,6 +761,9 @@
 
 /* La barre : « Type [menu] Rôle [menu] », fine, sur une ligne qui passe à
    la ligne quand la carte est étroite. */
+/* Le type et son libellé, groupés pour être cachés ensemble (lecture). */
+.qbd-qz-er-barre-zone { display: contents; }
+.qbd-qz-er-barre-zone[hidden] { display: none; }
 .qbd-qz-er-barre {
 	display: flex;
 	flex-wrap: wrap;
@@ -886,7 +889,9 @@
    réponses acceptées ne sont plus des pastilles décoratives en édition : ce
    sont de vrais boutons (aucun style natif : `all: unset`, chaque geste pose
    sa propre taille et sa propre position). */
-.qb-er button.qb-er-geste {
+/* `:where` : la remise à zéro ne doit pas l'emporter sur la taille et la
+   position de chaque geste (sinon `all: unset` gagne par spécificité). */
+.qb-er :where(button.qb-er-geste) {
 	all: unset;
 	box-sizing: border-box;
 	display: flex;
@@ -965,10 +970,14 @@
 	border-radius: 999px;
 	background: var(--background-primary);
 	color: var(--text-faint);
-	opacity: 0.35;
+	opacity: 0;
 	z-index: 4;
 	transition: opacity 120ms ease, color 120ms ease;
 }
+/* Caché au repos comme la corbeille : visible au survol de l'option,
+   qui passe alors devant sa voisine pour que le « + » ne soit pas recouvert. */
+.qb-er .quiz-option:hover { z-index: 5; }
+.qb-er .quiz-option:hover .qb-er-ajouter-option,
 .qb-er .qb-er-ajouter-option:hover,
 .qb-er .qb-er-ajouter-option:focus-visible {
 	opacity: 1;

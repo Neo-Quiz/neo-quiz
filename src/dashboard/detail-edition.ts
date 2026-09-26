@@ -132,8 +132,13 @@ function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks
 	const barre = ajouter(parent, "div", "qbd-qz-er-barre");
 	const ui = currentHost().ui;
 
-	ajouter(barre, "span", "qbd-qz-er-barre-nom", t("editor.render.type"));
-	const type = createSelect(barre, {
+	/* Une LECTURE n'a pas de réponse, donc pas de type : le moteur la rend
+	   sans contrôle quel que soit `_type`. Le sélecteur est caché tant que
+	   le rôle vaut « read », et revient si on change le rôle. */
+	const zoneType = ajouter(barre, "span", "qbd-qz-er-barre-zone");
+	zoneType.hidden = q.role === "read";
+	ajouter(zoneType, "span", "qbd-qz-er-barre-nom", t("editor.render.type"));
+	const type = createSelect(zoneType, {
 		value: q._type,
 		options: Q_TYPES.map(d => ({ value: d.key, label: d.label })),
 		// L'icône du type devant son nom, comme dans la liste de gauche.
@@ -177,6 +182,7 @@ function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks
 			// Sans rôle, une question EST un test : rien à écrire.
 			if (r === "test" && !q.role) return;
 			q.role = r;
+			zoneType.hidden = r === "read";
 			cb.onChange();
 			cb.onListeChange();
 		},
