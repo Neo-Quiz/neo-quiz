@@ -397,6 +397,11 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
 	champ.addEventListener("input", () => { etat.recherche = champ.value; peindre(); });
 
 	const body = ajouter(root, "div", "qbd-fiche-body");
+	/* La GRILLE défile dans la page : elle s'efface en fondu à ses bords au
+	   lieu d'être coupée net sous une carte (2026-09-26). Même mécanisme que
+	   les cartes ; la grille étant repeinte à chaque recherche, `peindre`
+	   relance le calcul en fin de rendu. */
+	suivreDebord(body);
 
 	function peindre(): void {
 		body.replaceChildren();
@@ -406,6 +411,7 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
 			return;
 		}
 		renderGrille(body, idx, deps, attirer);
+		body.dispatchEvent(new Event("scroll"));
 		if (etat.fondu) {
 			etat.fondu = false;
 			body.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
