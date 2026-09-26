@@ -9,9 +9,10 @@ import type { LectureStylee, Retenir, TableauLecture } from "../lecture-style";
    Maquettes validées : B (page), E (étapes), R4 (tableau), R5 (cartes à
    retourner), R6 (récapitulatif coché).
 
-   Sert le cours d'une étape déplié au-dessus d'une question
-   (engine/passage.ts) comme la lecture restée autonome (engine/cards.ts) :
-   le style décrit le CONTENU de l'élément `read`, pas un écran.
+   Sert l'ÉCRAN d'une lecture (`corpsLectureHtml`, engine/cards.ts) et la
+   version légère d'une lecture sans écran, lue au-dessus de sa question
+   hôte (`corpsLectureCourteHtml`, src/lecture-etape.ts) : le style décrit
+   le CONTENU de l'élément `read`.
 
    PUR, et sans porte à lui : chaque texte passe par une fonction que
    l'appelant lui DONNE (`PortesLecture`), qui sont les portes du sanitizer
@@ -91,6 +92,20 @@ function retenirHtml(r: Retenir, p: PortesLecture): string {
  *   carte porte déjà le titre.
  */
 export function corpsLectureHtml(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture): CorpsLecture {
+	return rendre(item, brut, texteHtml, titre, p, false);
+}
+
+/**
+ * La version LÉGÈRE d'une lecture COURTE (src/lecture-etape.ts
+ * `estLectureCourte`), lue au-dessus de sa question hôte : le même style
+ * (texte, étapes, tableau, « À retenir »), sans titre, sans temps de
+ * lecture ni lettrine, sans surface — lecture.css `.quiz-lecture--courte`.
+ */
+export function corpsLectureCourteHtml(item: unknown, brut: string, texteHtml: string, p: PortesLecture): CorpsLecture {
+	return rendre(item, brut, texteHtml, undefined, p, true);
+}
+
+function rendre(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture, courte: boolean): CorpsLecture {
 	const l = lireLecture(item);
 	let corps: string;
 	if (l.style === "etapes") {
@@ -106,12 +121,14 @@ export function corpsLectureHtml(item: unknown, brut: string, texteHtml: string,
 	} else if (l.style === "tableau") {
 		// Un tableau annoncé mais absent ou vide : le texte, simplement.
 		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
+	} else if (courte) {
+		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
 	} else {
 		corps = `<div class="quiz-lecture-meta">${p.inline(tempsDeLecture(brut, l))}</div><div class="quiz-lecture-texte">${texteHtml}</div>`;
 	}
 	const retenir = l.retenir ? retenirHtml(l.retenir, p) : "";
 	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${p.inline(titre)}</h3>` : "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}">${tete}${corps}${retenir}</div>` };
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${corps}${retenir}</div>` };
 }
 
 /**

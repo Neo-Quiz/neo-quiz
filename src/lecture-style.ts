@@ -156,6 +156,40 @@ export function paragraphes(texte: string): string[] {
 	return out.filter(p => p.trim() !== "");
 }
 
+/** La lecture est-elle une MÉTHODE à appliquer sur la question qui la suit
+    (`methode: true`, clé du format, jamais traduite) ? Seul `true` compte :
+    une chaîne « true » ou 1 n'en font pas une. */
+export function estMethode(item: unknown): boolean {
+	return champ(item, "methode") === true;
+}
+
+/** Les mots d'un texte. */
+function mots(texte: string): number {
+	return texte.split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * La LONGUEUR d'une lecture, en mots, juste d'un style à l'autre : son texte
+ * (`prompt`, sinon `promptHtml` sans ses balises), ses étapes, les cases de
+ * son tableau (en-têtes compris) et ses points à retenir (recto et verso).
+ * C'est elle, et elle seule, qui décide si une lecture tient au-dessus de sa
+ * question (src/lecture-etape.ts `estLectureCourte`).
+ */
+export function motsDeLecture(item: unknown): number {
+	const texte = champ(item, "prompt");
+	const html = champ(item, "promptHtml") ?? champ(item, "_promptHtml");
+	let n = typeof texte === "string" && texte.trim()
+		? mots(texte)
+		: mots(String(html ?? "").replace(/<[^>]*>/g, " "));
+	n += mots(etapesDeLecture(item).join(" "));
+	const tab = tableauDeLecture(item);
+	if (tab) n += mots([...tab.colonnes, ...tab.lignes.flat()].join(" "));
+	const r = retenirDeLecture(item);
+	if (r?.forme === "cartes") n += mots(r.items.map(c => `${c.recto} ${c.verso}`).join(" "));
+	else if (r?.forme === "recap") n += mots(r.items.join(" "));
+	return n;
+}
+
 /** Minutes de lecture annoncées sur une page : mots / 200, arrondi, au moins 1. */
 export function minutesDeLecture(texte: string): number {
 	const mots = texte.split(/\s+/).filter(Boolean).length;

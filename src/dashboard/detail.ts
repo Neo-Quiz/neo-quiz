@@ -23,7 +23,7 @@ import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlid
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
-import { lectureDeLEtape, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
+import { lectureCourteDe, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ PAGE — ce qu'on voit en cliquant un quiz (refonte 2026-07-21,
@@ -280,14 +280,16 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function numeroDe(i: number): number {
 		return draft ? numeroAffiche(draft.questions, estLecon(), i) : i + 1;
 	}
-	/** La question visible qui montre `i` (lui-même, sauf une lecture absorbée). */
+	/** La question visible qui montre `i` (lui-même, sauf une lecture courte,
+	    qui se lit au-dessus de sa question hôte). */
 	function hote(i: number): number {
 		return draft ? questionHote(draft.questions, estLecon(), i) : i;
 	}
-	/** L'élément `read` de l'étape de `i`, s'il est absorbé. */
+	/** La lecture COURTE lue au-dessus de `i` (src/lecture-etape.ts), qui
+	    s'y modifie ; toute autre lecture a sa propre entrée. */
 	function lectureDe(i: number): DraftQuestion | undefined {
 		if (!draft) return undefined;
-		const l = lectureDeLEtape(draft.questions, estLecon(), i);
+		const l = lectureCourteDe(draft.questions, estLecon(), i);
 		return l === null ? undefined : draft.questions[l];
 	}
 	/** La question visible voisine de `i` (`dir` = ±1), ou -1 au bout. */

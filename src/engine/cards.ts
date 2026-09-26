@@ -10,7 +10,7 @@ import type {
 } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
-import { corpsLecture } from "./passage";
+import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
@@ -602,17 +602,28 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   plafond de hauteur garde tout son sens. */
 		const roleClass = ctx.isLessonMode() ? ` quiz-role-${ctx.roleOfQuestion(qi)}` : "";
 
-		/* Une lecture AUTONOME (étape sans autre question) prend les mêmes
-		   styles que le cours déplié au-dessus d'une question (2026-09-26) :
-		   même appel, `corpsLecture` (engine/passage.ts). */
+		/* Une LECTURE a son propre écran (2026-09-26), dans son style
+		   (`corpsLecture`, engine/passage.ts). Son titre est écrit DANS la
+		   page (serif, maquette B) : le `<h2>` de la carte n'est alors pas posé. */
 		const promptHtml = renderQuizPromptHtml(q);
-		/* Son titre est écrit DANS la page (serif, maquette B), comme au-dessus
-		   d'une question : le `<h2>` de la carte n'est alors pas posé. */
 		const lecture = isRead ? corpsLecture(ctx, q, String(q.prompt ?? ""), promptHtml, String(q.title ?? "")) : null;
+
+		/* Une lecture COURTE n'a pas d'écran : elle se lit ouverte, en version
+		   légère, sans cadre, au-dessus de sa question hôte, et nulle part
+		   ailleurs (src/lecture-etape.ts `lecturesCourtes`). */
+		const iCourte = ctx.lectureCourteDe?.(qi) ?? null;
+		let courteHtml = "";
+		if (iCourte !== null) {
+			const l = ctx.quiz[iCourte];
+			const lHtml = l.promptHtml || l._promptHtml;
+			const texte = lHtml ? ctx.sanitize.replaceObsidianEmbedsInHtml(lHtml) : ctx.sanitize.renderTextWithEmbeds(String(l.prompt ?? ""));
+			courteHtml = corpsLectureCourte(ctx, l, String(l.prompt ?? ""), texte).html;
+		}
 
 		return `<div class="quiz-track-item${roleClass}" data-slide-kind="question" data-qi="${qi}">
 			<section class="quiz-card"${sectionIdAttr}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
 				${passageSection}
+				${courteHtml}
 				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
 				${ctx.sanitize.resourceButtonHtml(q)}
 				<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>

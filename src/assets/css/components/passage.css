@@ -68,29 +68,6 @@
   white-space: nowrap;
 }
 
-/* L'invite du cours d'une étape de Learn, replié d'office au-dessus d'une
-   question « Avant la lecture » (engine/passage.ts, régime "folded") :
-   « Tentez de répondre sans lire ». Elle ne dit plus rien une fois le cours
-   déplié. */
-.quiz-passage-invite{
-  flex: 0 1 auto;
-  min-width: 0;
-  font-size: 0.78em;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.quiz-passage:not(.is-collapsed) .quiz-passage-invite{
-  display: none;
-}
-
-/* L'en-tête entier ouvre un cours replié d'office : c'est là qu'on clique. */
-.quiz-passage[data-passage-fold="1"] .quiz-passage-head{
-  cursor: pointer;
-}
-
 .quiz-passage-toggle{
   flex: 0 0 auto;
   display: inline-flex;
@@ -133,42 +110,6 @@
    après le clic (passage.ts). */
 .quiz-passage.is-collapsed .quiz-passage-body{
   display: none;
-}
-
-/* Le COURS d'une étape de Learn (2026-09-26), déplié au-dessus d'une
-   question : il se déplie en glissant, SANS hauteur fixe — la rangée de
-   grille passe de 0fr à 1fr, la hauteur réelle du contenu, quelle qu'elle
-   soit. `visibility` retardée : replié, rien n'y reste atteignable au
-   clavier (les cartes « À retenir » sont des boutons). La piste est
-   resynchronisée par son ResizeObserver pendant le mouvement. */
-.quiz-passage[data-lecture] .quiz-passage-body,
-.quiz-passage[data-lecture].is-collapsed .quiz-passage-body{
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows var(--quiz-dur-mid, 250ms) var(--quiz-ease-smooth, ease);
-}
-
-.quiz-passage[data-lecture].is-collapsed .quiz-passage-body{
-  grid-template-rows: 0fr;
-}
-
-.quiz-passage-clip{
-  min-height: 0;
-}
-
-.quiz-passage[data-lecture] .quiz-passage-clip{
-  overflow: hidden;
-  visibility: visible;
-}
-
-.quiz-passage[data-lecture].is-collapsed .quiz-passage-clip{
-  visibility: hidden;
-  transition: visibility 0s linear var(--quiz-dur-mid, 250ms);
-}
-
-@media (prefers-reduced-motion: reduce){
-  .quiz-passage[data-lecture] .quiz-passage-body{ transition: none; }
-  .quiz-passage[data-lecture].is-collapsed .quiz-passage-clip{ transition: none; }
 }
 
 .quiz-passage-content{
@@ -265,19 +206,6 @@
    démo : 900 caractères par carte de lecture.
    ========================================================= */
 .quiz-role-read .quiz-passage-content{
-  max-height: none;
-  overflow-y: visible;
-}
-
-/* La même règle pour le COURS affiché au-dessus de chaque question d'une
-   étape (2026-09-26, rappel d'Ahmed : « on a de la place, pour ces blocs de
-   lecture on ne doit jamais avoir besoin de scroller ») : déplié, il
-   s'affiche EN ENTIER, dans tous les styles ; c'est la page qui défile,
-   jamais le bloc. Toute carte d'un Learn porte sa classe de rôle
-   (engine/cards.ts), et tout cours d'étape son `data-lecture`. */
-.quiz-passage[data-lecture] .quiz-passage-content,
-.quiz-track-item[class*="quiz-role-"] .quiz-passage-content,
-.is-mobile .quiz-passage[data-lecture] .quiz-passage-content{
   max-height: none;
   overflow-y: visible;
 }

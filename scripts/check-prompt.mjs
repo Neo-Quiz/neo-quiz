@@ -43,8 +43,14 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	/* Styles de lecture (2026-09-26) : le modèle CHOISIT selon le contenu, et
 	   jamais en Practice, qui n'a pas de lecture. */
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
-	r.check("Learn : le style se choisit selon le contenu (texte suivi, procédure, comparaison)",
-		["CHOOSE for each read card, from its content", '"lecture": "page" for a CONTINUOUS text', '"lecture": "etapes" for a PROCEDURE', '"lecture": "tableau" to COMPARE'].filter(p => !learnP.includes(p)), []);
+	r.check("Learn : le style se choisit selon le contenu, varie, et jamais `page` par défaut",
+		["CHOOSE for each read card, from its content", "VARY the style between slices", "NEVER take \"page\" by default",
+			'"lecture": "etapes" for ONE IDEA PER LINE', '"lecture": "tableau" to COMPARE two or three things on several criteria',
+			'"lecture": "page" ONLY for a CONTINUOUS text'].filter(p => !learnP.includes(p)), []);
+	r.check("Learn : un exemple court pour chaque style",
+		['{ "lecture": "etapes", "prompt"', '"colonnes": ["", "Python", "C"]', '{ "lecture": "page", "prompt"'].filter(p => !learnP.includes(p)), []);
+	r.check("Learn : lecture courte et méthode (`methode: true`) au-dessus de la question",
+		['set "methode": true on the read card', "a METHOD to apply in the question that follows", "at most about 60 words and 4 steps"].filter(p => !learnP.includes(p)), []);
 	r.check("Learn : « À retenir », cartes pour des termes, récapitulatif pour des faits",
 		['"forme": "cartes"', "for TERMS to memorize", '"forme": "recap"', "for FACTS to keep"].filter(p => !learnP.includes(p)), []);
 	r.check("Practice : aucun style de lecture",

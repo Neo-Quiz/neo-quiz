@@ -20,7 +20,7 @@ import { createResultsSaver } from "./engine/results-save";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
-import { lecturesAbsorbees as calculerLecturesAbsorbees, numerosAffiches, questionHote } from "./lecture-etape";
+import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
 import { photographier, restaurer, type SessionSink } from "./engine/session";
@@ -358,26 +358,28 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const initOrderingPicks = () => quiz.map(() => null);
 	const initMatchPicks = () => quiz.map(() => null);
 
-	/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : dans un Learn,
-	   la carte de lecture d'une étape qui a d'autres questions n'est plus une
-	   diapositive — son cours s'affiche, replié, au-dessus de chacune d'elles
-	   (engine/passage.ts). FIGÉES à l'assemblage sur le mode D'ORIGINE, comme
-	   `slideMap` : une bascule Leçon → Examen garde la même piste, et la
-	   lecture n'y redevient pas une question à laquelle on ne peut rien
-	   répondre. Hors Learn : ensemble vide, rien ne change. */
+	/* NUMÉROS (src/lecture-etape.ts) : dans un Learn, chaque lecture a son
+	   écran mais pas de numéro de question (0 ; son onglet est un livre,
+	   engine/cards.ts `navHtml`). FIGÉS à l'assemblage sur le mode
+	   D'ORIGINE, comme `slideMap`. */
 	const estLecon = buildLessonModel(quiz, originalQuizMode).isLesson;
-	const lecturesAbsorbees: ReadonlySet<number> = calculerLecturesAbsorbees(quiz, estLecon);
-	const numeros = numerosAffiches(quiz, estLecon, lecturesAbsorbees);
-	ctx.lecturesAbsorbees = lecturesAbsorbees;
-	// 0 pour une lecture de Learn restée un écran : elle n'a pas de numéro
-	// de question (son onglet est un livre, engine/cards.ts `navHtml`).
+	const numeros = numerosAffiches(quiz, estLecon);
 	ctx.numeroAffiche = (qi: number): number => numeros[qi] ?? qi + 1;
+	/* Les LECTURES COURTES (même règle) n'ont pas d'écran : elles se lisent
+	   au-dessus de leur question hôte (engine/cards.ts). Figées elles aussi :
+	   une bascule Leçon → Examen ne leur rend pas une diapositive vide. */
+	const courtes = lecturesCourtes(quiz, estLecon);
+	ctx.lecturesAbsorbees = new Set(courtes.keys());
+	ctx.lectureCourteDe = (qi: number): number | null => {
+		for (const [lecture, hote] of courtes) if (hote === qi) return lecture;
+		return null;
+	};
 
 	// ── Slide Map : index dynamique basé sur le mode ──
 	function buildSlideMap(): SlideMapEntry[] {
 		const map: SlideMapEntry[] = [];
 		for (let i = 0; i < quiz.length; i++) {
-			if (lecturesAbsorbees.has(i)) continue;
+			if (courtes.has(i)) continue;
 			map.push({ type: "question", questionIndex: i });
 		}
 		map.push({ type: "submit" });
@@ -437,12 +439,11 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const isResultsSlideIndex = (i: number): boolean => slideMap[i]?.type === "results";
 	const clampSlideIndex = (i: number): number => Math.max(0, Math.min(TOTAL_SLIDES - 1, i));
 	const getSlidingWindow = (): { from: number; to: number } => ({ from: Math.max(0, Math.min(quizState.prevCurrent, quizState.current)), to: Math.min(TOTAL_SLIDES - 1, Math.max(quizState.prevCurrent, quizState.current)) });
-	/* Une lecture absorbée n'a pas de diapositive : elle renvoie à la
-	   question de son étape qui la montre (`questionHote`). C'est ce qui fait
-	   tomber une reprise, un onglet ou un « suivant » qui la visait sur une
-	   vraie question plutôt que sur rien. */
+	/* Une lecture courte n'a pas de diapositive : elle renvoie à sa question
+	   hôte, qui la montre. Une reprise ou un onglet qui la visait tombe sur
+	   une vraie diapositive plutôt que sur rien. */
 	const getSlideIndexForQuestion = (qi: number): number => {
-		const cible = questionHote(quiz, estLecon, qi, lecturesAbsorbees);
+		const cible = courtes.get(qi) ?? qi;
 		for (let si = 0; si < slideMap.length; si++) {
 			const entry = slideMap[si];
 			if (entry.type === "question" && entry.questionIndex === cible) return si;

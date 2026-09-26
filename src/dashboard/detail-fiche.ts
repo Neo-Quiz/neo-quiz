@@ -16,7 +16,7 @@ import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
-import { lectureDeLEtape, numerosAffiches, questionsVisibles } from "../lecture-etape";
+import { lectureCourteDe, numerosAffiches, questionsVisibles } from "../lecture-etape";
 
 /* ══════════════════════════════════════════════════════════
    FICHE D'UN QUIZ — ce que la page montre à l'ouverture
@@ -379,7 +379,9 @@ function filtrer(questions: DraftQuestion[], lecon: boolean, recherche: string):
 	if (!r) return tous;
 	return tous.filter(i => {
 		const q = questions[i];
-		const l = lectureDeLEtape(questions, lecon, i);
+		// Une lecture courte n'a pas de carte : son texte se cherche dans
+		// celle de sa question hôte. Toute autre lecture a SA carte.
+		const l = lectureCourteDe(questions, lecon, i);
 		const cours = l === null ? [] : [questions[l].title || "", questionText(questions[l])];
 		return plier([questionText(q), ...(q.options ?? []), ...cours].join(" ")).includes(r);
 	});
@@ -460,12 +462,15 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		   net), en haut dès qu'on a descendu (2026-09-26). Le fondu porte sur
 		   cette zone, pas sur la carte : sa bordure reste entière. */
 		const corps = ajouter(card, "div", "qbd-fiche-card-corps");
-		// Le cours de l'étape, au-dessus de la question : son titre seul.
-		const l = lectureDeLEtape(deps.questions, deps.lecon, i);
-		if (l !== null) {
-			const ligne = ajouter(corps, "span", "qbd-fiche-q-lecture");
-			icone(ligne, "book-open");
-			texte(ligne, "span", "qbd-fiche-q-lecture-titre", deps.questions[l].title || t("engine.passage.defaultTitle"));
+		/* Une lecture COURTE (src/lecture-etape.ts) n'a pas de carte : son
+		   texte se lit au-dessus de sa question hôte, comme dans le quiz, en
+		   texte atténué et sans cadre. Toute autre lecture a SA carte. */
+		const l = lectureCourteDe(deps.questions, deps.lecon, i);
+		const texteCourt = l === null ? "" : (deps.questions[l].prompt || "");
+		if (texteCourt.trim()) {
+			const el = ajouter(corps, "div", "qbd-fiche-q-lecture-courte");
+			el.innerHTML = texteQuizHtml(texteCourt);
+			if (texteCourt.includes("$")) void mathifyElement(el);
 		}
 		/* L'énoncé ENTIER, rendu comme dans le quiz (paragraphes, listes, blocs
 		   de code colorés) : en texte nu d'une ligne, un bloc de code montrait

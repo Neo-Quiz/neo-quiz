@@ -1,44 +1,38 @@
 import { QUESTION_ROLES } from "./types/quiz";
 import type { QuestionRole } from "./types/quiz";
-import { styleDeLecture } from "./lecture-style";
+import { estMethode, etapesDeLecture, motsDeLecture, paragraphes, retenirDeLecture, styleDeLecture } from "./lecture-style";
 
 /* ══════════════════════════════════════════════════════════
-   LE COURS D'UNE ÉTAPE, ABSORBÉ PAR SES QUESTIONS (2026-09-26)
+   LES LECTURES D'UN LEARN : UN ÉCRAN CHACUNE, SANS NUMÉRO (2026-09-26)
 
-   Dans un Learn, la carte de LECTURE (`role: "read"`) d'une étape
-   (`slice`) n'est plus un écran : le cours s'affiche, replié, au-dessus de
-   CHAQUE question de son étape (engine/passage.ts). Un cours seul n'est pas
-   une question, et le montrer deux fois était du gaspillage.
+   Décision d'Ahmed, la dernière du 2026-09-26, qui remplace toutes les
+   règles d'« absorption » de la journée : TOUTE lecture (`role: "read"`),
+   quel que soit son style (`page`, `etapes`, `tableau`,
+   src/lecture-style.ts), a SON PROPRE ÉCRAN dans le quiz, à sa place dans
+   son étape. Elle n'apparaît plus jamais au-dessus d'une question. Dans un
+   Learn, elle n'a pas de numéro de question, ne compte pas dans le score ni
+   dans le nombre de questions, et son onglet est un livre.
 
    UNE SEULE RÈGLE, ici, PURE (ni hôte, ni DOM) : le moteur, la page d'un
    quiz, l'éditeur, le scanner et la coquille de l'application la lisent
-   tous. Deux lectures de « qui est absorbé » qui divergent, et la question
-   Q3 d'un écran devient la Q4 d'un autre — ou un clic ouvre l'éditeur sur
-   la mauvaise question.
+   tous. Deux numérotations qui divergent, et la Q3 d'un écran devient la
+   Q4 d'un autre.
 
-   Règle : dans un bloc LEARN (`estLecon`, le mode du bloc normalisé comme
-   le moteur le fait : `extractExamOptions(...).quizMode === "lesson"`), la
-   PREMIÈRE lecture d'une étape est ABSORBÉE si l'étape contient AU MOINS
-   UNE question qui n'est pas une lecture, quel que soit son rôle. Hors
-   Learn, rien n'est absorbé : le moteur joue alors chaque lecture comme un
-   écran, et tous les lecteurs doivent compter pareil (revue du
-   2026-09-26). Une seconde lecture dans la même étape reste un écran
-   autonome : elle n'a pas de place au-dessus des questions, qui n'en
-   montrent qu'une, et l'absorber la ferait disparaître.
+   EXCEPTION, règle finale d'Ahmed le même soir : une lecture `etapes` sans
+   « À retenir », COURTE ou marquée MÉTHODE (`methode: true`) — voir
+   `estLectureCourte` — n'a pas d'écran. Elle s'affiche ouverte, en
+   étapes légères, sans cadre, au-dessus de la PREMIÈRE question de son étape
+   qui n'est ni une lecture ni une « Avant la lecture » — sa question
+   HÔTE —, et nulle part ailleurs. Sans hôte (étape faite de lectures et de
+   pré-questions), elle garde son écran. Elle ne compte pas dans
+   « N lectures » : ce n'est pas un écran.
 
-   RÉVISION DU MÊME JOUR, décision d'Ahmed : le STYLE de la lecture
-   (src/lecture-style.ts) départage. Une lecture `page` — ou sans champ
-   `lecture`, donc tous les quiz d'avant — n'est JAMAIS absorbée : elle
-   redevient un écran à part, à sa place dans l'étape, sans numéro de
-   question. Seules les lectures `etapes` et `tableau` sont absorbées.
-   `coursDeLEtape` dit, pour une question, quelle lecture est son cours,
-   absorbée ou non ; le moteur décide selon le style et le rôle s'il le
-   montre (engine/passage.ts `passageVisibility`).
+   Learn (`estLecon`) : le mode du bloc normalisé comme le moteur le fait
+   (`extractExamOptions(...).quizMode === "lesson"`). Hors Learn, une
+   lecture est jouée et numérotée comme une question ordinaire.
 
-   Les INDEX ne changent jamais : les lectures restent dans les données, à
-   leur place. Seuls l'affichage, la numérotation et les comptes les sautent.
-
-   `npm run check:passage` éprouve ce module.
+   Les INDEX ne changent jamais : seuls la numérotation et les comptes
+   sautent les lectures. `npm run check:passage` éprouve ce module.
 ══════════════════════════════════════════════════════════ */
 
 /** Ce que la règle lit d'un élément du tableau : rien d'autre. */
@@ -60,58 +54,78 @@ function trancheDe(item: unknown): number | null {
 	return item && typeof item === "object" ? trancheValide((item as Brut)?.slice) : null;
 }
 
-/** Les étapes qui ont au moins une question qui n'est pas une lecture. */
-function etapesAvecQuestion(items: readonly unknown[]): Set<number> {
-	const avecQuestion = new Set<number>();
-	items.forEach(it => {
-		const s = trancheDe(it);
-		if (s !== null && roleDe(it) !== "read") avecQuestion.add(s);
-	});
-	return avecQuestion;
+/** Au plus ce nombre de mots (texte et étapes : `motsDeLecture`), une
+    lecture `etapes` est COURTE. « Environ 60 mots » : la décision d'Ahmed. */
+export const SEUIL_LECTURE_COURTE = 60;
+
+/** Au plus ce nombre d'étapes, une lecture `etapes` est COURTE : au-delà,
+    même en peu de mots, elle déborderait de la question qu'elle surplombe. */
+export const PLAFOND_ETAPES_COURTES = 4;
+
+/**
+ * Une lecture SANS ÉCRAN, lue au-dessus de sa question hôte (règle finale
+ * d'Ahmed, 2026-09-26). SEUL le style `etapes`, sans « À retenir », et
+ * dans l'un de deux cas :
+ * 1. COURTE : au plus `SEUIL_LECTURE_COURTE` mots et
+ *    `PLAFOND_ETAPES_COURTES` étapes (les écrites, sinon les paragraphes du
+ *    texte, qui en tiennent lieu au rendu) ;
+ * 2. une MÉTHODE à appliquer sur la question qui suit (`methode: true`,
+ *    écrit par l'IA ou l'éditeur), quelle que soit sa longueur.
+ * `page` (ou sans style), `tableau` et toute lecture avec « À retenir » ont
+ * TOUJOURS leur écran.
+ */
+export function estLectureCourte(item: unknown): boolean {
+	if (roleDe(item) !== "read" || styleDeLecture(item) !== "etapes" || retenirDeLecture(item) !== null) return false;
+	if (estMethode(item)) return true;
+	const etapes = etapesDeLecture(item).length || paragraphes(String((item as { prompt?: unknown }).prompt ?? "")).length;
+	if (etapes > PLAFOND_ETAPES_COURTES) return false;
+	const n = motsDeLecture(item);
+	return n > 0 && n <= SEUIL_LECTURE_COURTE;
 }
 
-/** Les index des lectures absorbées par leur étape. Vide hors Learn.
-
-    LE STYLE COMPTE (décision du 2026-09-26, plus récente que l'en-tête) :
-    une lecture en style `page` (maquette B, un texte suivi) n'est JAMAIS
-    absorbée — elle reste un écran à part, à sa place dans l'étape, après
-    les questions « Avant la lecture ». Seules les lectures `etapes` et
-    `tableau` s'affichent au-dessus des questions. Une lecture SANS champ
-    `lecture` (tous les quiz d'avant les styles) vaut `page`
-    (src/lecture-style.ts `styleDeLecture`). */
-export function lecturesAbsorbees(items: readonly unknown[], estLecon: boolean): Set<number> {
-	const out = new Set<number>();
+/** Les lectures SANS ÉCRAN d'un Learn (`estLectureCourte` : étapes courtes
+    ou méthode — « courtes » pour faire court) et leur question HÔTE : index de la
+    lecture → index de la question au-dessus de laquelle elle se lit. Vide
+    hors Learn. Une lecture courte sans hôte n'y figure pas : elle garde son
+    écran. */
+export function lecturesCourtes(items: readonly unknown[], estLecon: boolean): Map<number, number> {
+	const out = new Map<number, number>();
 	if (!estLecon) return out;
-	const avecQuestion = etapesAvecQuestion(items);
-	/* Une seule lecture absorbée par étape : la première. */
-	const dejaAbsorbee = new Set<number>();
 	items.forEach((it, i) => {
+		if (!estLectureCourte(it)) return;
 		const s = trancheDe(it);
-		if (s === null || roleDe(it) !== "read" || !avecQuestion.has(s) || dejaAbsorbee.has(s)) return;
-		dejaAbsorbee.add(s);
-		if (styleDeLecture(it) !== "page") out.add(i);
+		if (s === null) return;
+		const hote = items.findIndex(q => trancheDe(q) === s && roleDe(q) !== "read" && roleDe(q) !== "pre");
+		if (hote >= 0) out.set(i, hote);
 	});
 	return out;
 }
 
-/**
- * Le COURS montré au-dessus de la question `qi`, ou `null` : la PREMIÈRE
- * lecture de son étape, qu'elle soit absorbée (`etapes`, `tableau`) ou
- * restée un écran (`page`). La même lecture que `lecturesAbsorbees`
- * considère : une seconde lecture de l'étape n'est jamais un cours.
- * `null` hors Learn, pour une lecture, sans étape, ou dans une étape sans
- * lecture. Le moteur (engine/passage.ts) décide ensuite, selon le style et
- * le rôle, s'il le montre et comment.
- */
-export function coursDeLEtape(items: readonly unknown[], estLecon: boolean, qi: number): { index: number; absorbee: boolean } | null {
-	if (!estLecon) return null;
-	const s = trancheDe(items[qi]);
-	if (s === null || roleDe(items[qi]) === "read") return null;
-	for (let i = 0; i < items.length; i++) {
-		if (trancheDe(items[i]) !== s || roleDe(items[i]) !== "read") continue;
-		return { index: i, absorbee: styleDeLecture(items[i]) !== "page" };
-	}
+/** La lecture courte à lire au-dessus de la question `qi`, ou `null`. Une
+    hôte n'en porte qu'une : la première de son étape. */
+export function lectureCourteDe(items: readonly unknown[], estLecon: boolean, qi: number): number | null {
+	for (const [lecture, hote] of lecturesCourtes(items, estLecon)) if (hote === qi) return lecture;
 	return null;
+}
+
+/** La question à MONTRER pour l'index `i` : sa question hôte pour une
+    lecture courte, qui n'a pas d'écran ; `i` lui-même sinon. Sert à
+    reprendre une session ou à ouvrir l'éditeur sur un index qui la visait. */
+export function questionHote(items: readonly unknown[], estLecon: boolean, i: number): number {
+	return lecturesCourtes(items, estLecon).get(i) ?? i;
+}
+
+/** Les index qui ont un ÉCRAN (tout sauf les lectures courtes), dans l'ordre. */
+export function questionsVisibles(items: readonly unknown[], estLecon: boolean): number[] {
+	const courtes = lecturesCourtes(items, estLecon);
+	return items.map((_, i) => i).filter(i => !courtes.has(i));
+}
+
+/** Le NUMÉRO affiché de chaque index (à partir de 1) ; 0 pour une lecture
+    de Learn, qui n'en a pas. Hors Learn, tout est numéroté. */
+export function numerosAffiches(items: readonly unknown[], estLecon: boolean): number[] {
+	let n = 0;
+	return items.map(it => (estLecon && roleDe(it) === "read" ? 0 : ++n));
 }
 
 /** Le numéro AFFICHÉ de l'index `i`, 0 pour une lecture de Learn (elle
@@ -125,83 +139,34 @@ export function numeroAffiche(items: readonly unknown[], estLecon: boolean, i: n
 }
 
 /** Le numéro à annoncer pour une session posée sur l'index `i`
-    (« Reprendre · Q3/7 ») : celui de la question qui le montre
-    (`questionHote`) ; pour une lecture restée un écran, qui n'a pas de
+    (« Reprendre · Q3/7 ») : le sien ; pour une lecture, qui n'a pas de
     numéro, celui de la question qui la suit, à défaut de la précédente ;
     1 si le bloc n'a aucune question numérotée. */
-export function numeroDeReprise(items: readonly unknown[], estLecon: boolean, i: number): number {
+export function numeroDeReprise(items: readonly unknown[], estLecon: boolean, index: number): number {
 	const numeros = numerosAffiches(items, estLecon);
-	const hote = questionHote(items, estLecon, i);
-	if (numeros[hote] > 0) return numeros[hote];
-	for (let k = hote + 1; k < numeros.length; k++) if (numeros[k] > 0) return numeros[k];
-	for (let k = hote - 1; k >= 0; k--) if (numeros[k] > 0) return numeros[k];
+	// Une lecture courte se lit sur sa question hôte : son numéro.
+	const i = questionHote(items, estLecon, index);
+	if (numeros[i] > 0) return numeros[i];
+	for (let k = i + 1; k < numeros.length; k++) if (numeros[k] > 0) return numeros[k];
+	for (let k = i - 1; k >= 0; k--) if (numeros[k] > 0) return numeros[k];
 	return 1;
 }
 
 /** Le nombre de QUESTIONS d'un bloc, tel que les compteurs l'annoncent :
-    en Learn, aucune lecture (absorbée ou écran à part) n'en est une. */
+    en Learn, aucune lecture n'en est une. */
 export function nombreDeQuestions(items: readonly unknown[], estLecon: boolean): number {
 	return numerosAffiches(items, estLecon).filter(n => n > 0).length;
 }
 
 /** Le nombre de LECTURES d'un bloc (compteur « N lectures », à côté de « N
-    questions ») : TOUTES les lectures de l'étape (`role: "read"`), qu'elles
-    soient absorbées au-dessus des questions ou restées un écran à part
-    (`styleDeLecture` ne compte pas ici, contrairement à `lecturesAbsorbees`).
-    0 hors Learn : une lecture y est jouée comme une question ordinaire, déjà
-    comptée par `nombreDeQuestions` (revue du 2026-09-26, compteur d'une fiche). */
+    questions ») : ses lectures qui ont un ÉCRAN — une lecture courte, lue
+    au-dessus de sa question hôte, n'en est pas un. 0 hors Learn : une
+    lecture y est jouée comme une question ordinaire, déjà comptée par
+    `nombreDeQuestions` (revue du 2026-09-26, compteur d'une fiche). */
 export function nombreDeLectures(items: readonly unknown[], estLecon: boolean): number {
 	if (!estLecon) return 0;
+	const courtes = lecturesCourtes(items, estLecon);
 	let n = 0;
-	items.forEach(it => { if (roleDe(it) === "read") n++; });
+	items.forEach((it, i) => { if (roleDe(it) === "read" && !courtes.has(i)) n++; });
 	return n;
-}
-
-/**
- * L'index de la lecture ABSORBÉE de l'étape de `qi`, ou `null` : hors
- * Learn, `qi` est lui-même une lecture, n'a pas d'étape, ou son étape n'a
- * pas de lecture absorbée.
- */
-export function lectureDeLEtape(items: readonly unknown[], estLecon: boolean, qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number | null {
-	const s = trancheDe(items[qi]);
-	if (s === null || roleDe(items[qi]) === "read") return null;
-	for (let i = 0; i < items.length; i++) {
-		if (absorbees.has(i) && trancheDe(items[i]) === s) return i;
-	}
-	return null;
-}
-
-/**
- * La question à MONTRER pour `qi` : `qi` lui-même, sauf pour une lecture
- * absorbée — elle n'a plus d'écran — qui renvoie à la première question de
- * son étape placée APRÈS elle (la question qu'on lisait en la quittant), à
- * défaut à la première de son étape. Sert à reprendre une session, ou à
- * ouvrir l'éditeur, sur un index qui pointait une lecture.
- */
-export function questionHote(items: readonly unknown[], estLecon: boolean, qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number {
-	if (!absorbees.has(qi)) return qi;
-	const s = trancheDe(items[qi]);
-	let premiere = -1;
-	for (let i = 0; i < items.length; i++) {
-		if (absorbees.has(i) || trancheDe(items[i]) !== s || roleDe(items[i]) === "read") continue;
-		if (i > qi) return i;
-		if (premiere < 0) premiere = i;
-	}
-	return premiere >= 0 ? premiere : qi;
-}
-
-/** Les index VISIBLES (tout sauf les lectures absorbées), dans l'ordre. */
-export function questionsVisibles(items: readonly unknown[], estLecon: boolean, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number[] {
-	const out: number[] = [];
-	for (let i = 0; i < items.length; i++) if (!absorbees.has(i)) out.push(i);
-	return out;
-}
-
-/** Le NUMÉRO affiché de chaque index (à partir de 1), qui saute les
-    lectures ; 0 pour une lecture, qui n'en a pas. En Learn, AUCUNE lecture
-    n'est numérotée, absorbée ou restée un écran (décision du 2026-09-26) :
-    ce n'est pas une question. Hors Learn, tout est numéroté. */
-export function numerosAffiches(items: readonly unknown[], estLecon: boolean, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number[] {
-	let n = 0;
-	return items.map((it, i) => (absorbees.has(i) || (estLecon && roleDe(it) === "read") ? 0 : ++n));
 }

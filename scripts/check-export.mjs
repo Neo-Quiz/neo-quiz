@@ -326,12 +326,13 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
 	const r = makeReporter("Styles de lecture (aller-retour)");
 	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
-	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir });
+	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir, methode: o.methode });
 	const lecture = (o) => ({ id: "l", title: "Lecture", prompt: "Texte.", slice: 1, role: "read", ...o });
 	const cas = {
 		"page + cartes": lecture({ lecture: "page", retenir: { forme: "cartes", items: [{ recto: "`d.get`", verso: "Renvoie **None**" }] } }),
 		"étapes + récapitulatif": lecture({ lecture: "etapes", etapes: ["Créer `.venv`", "L'activer : `.venv\\Scripts\\activate`"], retenir: { forme: "recap", items: ["On active d'abord", "$x^2$"] } }),
-		"tableau aux lignes inégales": lecture({ lecture: "tableau", tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"]] } }),
+		"étapes marquées méthode": lecture({ lecture: "etapes", etapes: ["Un", "Deux"], methode: true }),
+		"tableau aux lignes inégales":lecture({ lecture: "tableau", tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"]] } }),
 		"valeurs inconnues ou mal formées": lecture({ lecture: "callout", etapes: "pas une liste", retenir: { forme: "glossaire", items: 3 } }),
 		"aucun champ (quiz d'avant)": lecture({}),
 	};
@@ -341,7 +342,7 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	const deux = tour(tour(cas["tableau aux lignes inégales"]));
 	r.check("deux écritures de suite : toujours identique", champs(deux), champs(cas["tableau aux lignes inégales"]));
 	r.check("une lecture sans champ n'en gagne aucun",
-		Object.keys(tour(cas["aucun champ (quiz d'avant)"])).filter(k => ["lecture", "etapes", "tableau", "retenir"].includes(k)), []);
+		Object.keys(tour(cas["aucun champ (quiz d'avant)"])).filter(k => ["lecture", "etapes", "tableau", "retenir", "methode"].includes(k)), []);
 	r.done();
 });
 

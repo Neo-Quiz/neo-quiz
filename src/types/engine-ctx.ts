@@ -211,11 +211,14 @@ export interface EngineCtx {
 	clampSlideIndex(i: number): number;
 	getSlidingWindow(): { from: number; to: number };
 	getSlideIndexForQuestion(qi: number): number;
-	/** Lectures ABSORBÉES par leur étape (src/lecture-etape.ts) : figées à
-	    l'assemblage, vides hors d'un Learn d'origine. Pas de diapositive, pas
-	    de numéro, pas de réponse. */
+	/** Lectures SANS ÉCRAN : les lectures courtes d'un Learn, lues au-dessus
+	    de leur question hôte (src/lecture-etape.ts `lecturesCourtes`). Figées
+	    à l'assemblage, vides hors d'un Learn d'origine. Pas de diapositive,
+	    pas de numéro, pas de réponse. */
 	lecturesAbsorbees: ReadonlySet<number>;
-	/** Numéro AFFICHÉ de la question `qi` (Q1…Qn), qui saute les lectures absorbées. */
+	/** La lecture courte à lire au-dessus de la question `qi`, ou `null`. */
+	lectureCourteDe(qi: number): number | null;
+	/** Numéro AFFICHÉ de la question `qi` (Q1…Qn) ; 0 pour une lecture de Learn. */
 	numeroAffiche(qi: number): number;
 	/** La question de la diapositive suivante, ou `null` après la dernière. */
 	questionSuivante(qi: number): number | null;

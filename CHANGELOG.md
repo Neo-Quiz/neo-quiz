@@ -70,11 +70,10 @@ release notes.
 - Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
 - The editor's text fields show their text as the quiz will: code as a code pill, bold, italic and formulas rendered. The markdown signs (backticks, stars, dollars) only reappear around the cursor, like in Obsidian.
 - Generating a quiz no longer opens a blocking window: each request appears as a sent message under the composer, you can keep sending more while one is running, and they run one after another in a queue you can cancel. If a generated quiz cannot be saved, it stays on its line: save it again or open it without saving, without generating it twice.
-- In Learn quizzes a reading is no longer counted as a question: it has no number, and its tab is a book. A reading page is its own screen after the "before the reading" questions, and is no longer repeated above any question. Steps and tables are shown above the questions of their step instead: collapsed with "Try to answer without reading" above a "before the reading" question until you open it or answer, open above the others. A course is always shown in full, never in a scrolling box.
+- In Learn quizzes a reading is no longer counted as a question: it has no number, and its tab is a book. Every reading is its own screen, after the "before the reading" questions, shown in full without a scrolling box, and is never repeated above a question. Only short steps, or steps marked as a method to apply, are shown open above the first question that follows.
 - After checking an answer written in your own words, the quiz shows only the correct answer and its explanation, then a short "Did you get it?" row, instead of stacked boxes.
 
 ### Fixed
-- In a Learn quiz, the course above a "before the reading" question no longer shows up already open when you skip past the question or come back to it without answering.
 - Inline code containing a dollar sign, such as `$HOME` and `$PATH` in the same sentence, is shown in full instead of losing part of the text.
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.
 - The AI tools (Claude Code, Codex, Antigravity) can only be started with the exact options Neo Quiz uses for a generation: an option that would let them run commands on their own is refused.

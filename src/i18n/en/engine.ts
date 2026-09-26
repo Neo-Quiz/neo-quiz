@@ -24,8 +24,6 @@ export const EN_ENGINE = {
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Hide the document",
 	"engine.passage.expand": "Show the document",
-	/* Le cours d'une étape de Learn, replié au-dessus d'une question « Avant la lecture ». */
-	"engine.passage.tryWithoutReading": "Try to answer without reading",
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */
 	"engine.lecture.readingTimeOne": "About {count} minute of reading",

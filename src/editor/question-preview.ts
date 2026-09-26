@@ -5,7 +5,7 @@ import { md2html, _setIcon } from "./utils";
 import type { DraftQuestion } from "./utils";
 import { mathifyElement } from "../engine/mathjax";
 import { sanitizeQuizHtml, rendreTexteQuiz, renderInlineText, stripInlineMarkdown, escapeHtmlAttr } from "../engine/sanitizer";
-import { corpsLectureHtml, brancherCartes } from "../engine/lecture-rendu";
+import { corpsLectureHtml, corpsLectureCourteHtml, brancherCartes } from "../engine/lecture-rendu";
 import type { CorpsLecture } from "../engine/lecture-rendu";
 import type { RenduImages } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
@@ -195,26 +195,14 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
 	// Un cours vide ne s'affiche que là où l'on peut l'écrire.
 	if (!texte && !html && !opts.corrige) return;
 
-	/* Déplié, le cours est une PAGE dans son STYLE (page, étapes, tableau,
-	   « À retenir »), rendue par le MÊME `corpsLectureHtml` que le moteur
-	   (revue du 2026-09-26) : l'auteur voit l'effet du style qu'il choisit
-	   dans « Plus ». Le titre est celui de la page (serif), et c'est lui
-	   qui se modifie ; la barre du cours se réduit au chevron (lecture.css),
-	   qu'un aperçu sans état n'a pas à poser. */
-	const titreTexte = lecture.title || t("engine.passage.defaultTitle");
-	const corps = corpsLectureApercu(lecture, opts.sourcePath, titreTexte);
-	const wrap = ajouter(card, "div", "quiz-passage quiz-passage--lecture");
-	wrap.setAttribute("data-lecture", corps.style);
-	const head = ajouter(wrap, "div", "quiz-passage-head");
-	const icon = ajouter(head, "span", "quiz-passage-icon");
-	icon.setAttribute("aria-hidden", "true");
-	_setIcon(icon, "book-open");
-	const body = ajouter(wrap, "div", "quiz-passage-body");
-	const content = ajouter(ajouter(body, "div", "quiz-passage-clip"), "div", "quiz-passage-content");
+	/* Une lecture COURTE (src/lecture-etape.ts), comme dans le quiz : ouverte,
+	   en version LÉGÈRE de son style, sans cadre ni titre, au-dessus de sa
+	   question hôte. Le même `corpsLectureCourteHtml` que le moteur :
+	   l'auteur voit l'effet du style qu'il choisit dans « Plus ». */
+	const corps = corpsLectureApercu(lecture, opts.sourcePath, undefined, true);
+	const content = ajouter(card, "div", "quiz-lecture-courte-apercu");
 	content.innerHTML = corps.html;
 	brancherCartes(content);
-	const titre = content.querySelector<HTMLElement>(".quiz-lecture-titre");
-	if (opts.corrige && titre) titre.setAttribute("data-edit", "lecture-title");
 	/* Un cours resté en HTML (import) s'affiche tel quel, et reste
 	   modifiable d'ici : sa carte n'a plus d'écran, il n'y a pas d'autre
 	   endroit où le reprendre. Le champ montre son texte (`prompt`, dérivé
@@ -227,7 +215,7 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
 		// Étapes ou tableau SANS texte d'introduction : une place pour l'écrire.
 		zoneTexte = document.createElement("div");
 		zoneTexte.className = "quiz-lecture-intro";
-		(titre ?? content.querySelector(".quiz-lecture"))?.insertAdjacentElement(titre ? "afterend" : "afterbegin", zoneTexte);
+		content.querySelector(".quiz-lecture")?.insertAdjacentElement("afterbegin", zoneTexte);
 	}
 	if (zoneTexte && !texte && !html) zoneTexte.textContent = t("editor.render.addPrompt");
 	if (opts.corrige && zoneTexte) zoneTexte.setAttribute("data-edit", "lecture");
@@ -237,15 +225,18 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
     (engine/lecture-rendu.ts) avec les portes de l'aperçu — le rendu
     markdown partagé (`texteQuizHtml`), `renderInlineText`, et
     `stripInlineMarkdown` ré-échappé pour un attribut. */
-function corpsLectureApercu(item: DraftQuestion, sourcePath: string | undefined, titre?: string): CorpsLecture {
+function corpsLectureApercu(item: DraftQuestion, sourcePath: string | undefined, titre?: string, courte = false): CorpsLecture {
 	const texte = (item.prompt || "").trim();
 	const html = (item._promptHtml || "").trim();
 	const texteHtml = html ? resolveImagesInHtml(html, sourcePath) : (texte ? texteQuizHtml(texte, sourcePath) : "");
-	return corpsLectureHtml(item, texte, texteHtml, titre, {
-		bloc: s => texteQuizHtml(s, sourcePath),
-		inline: s => renderInlineText(s),
-		attribut: s => escapeHtmlAttr(stripInlineMarkdown(s)),
-	});
+	const portes = {
+		bloc: (s: string) => texteQuizHtml(s, sourcePath),
+		inline: (s: string) => renderInlineText(s),
+		attribut: (s: string) => escapeHtmlAttr(stripInlineMarkdown(s)),
+	};
+	return courte
+		? corpsLectureCourteHtml(item, texte, texteHtml, portes)
+		: corpsLectureHtml(item, texte, texteHtml, titre, portes);
 }
 
 /** Construit la carte de question dans `host` et la renvoie. */

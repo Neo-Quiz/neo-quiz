@@ -25,7 +25,7 @@ export type ModeQuiz = "learn" | "practice";
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"',
 		// Styles de lecture (2026-09-26, spec des styles §4) : les clés et leurs valeurs.
-		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"'],
+		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 

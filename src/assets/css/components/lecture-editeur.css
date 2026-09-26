@@ -25,6 +25,15 @@
   white-space: nowrap;
 }
 
+.qbd-lecture-style-methode{
+  cursor: pointer;
+}
+
+.qbd-lecture-style-methode input{
+  margin: 0;
+  accent-color: var(--quiz-primary);
+}
+
 .qbd-lecture-style-liste{
   display: grid;
   gap: 6px;

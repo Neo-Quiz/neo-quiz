@@ -76,6 +76,23 @@ export function renderStyleLecture(box: HTMLElement, cible: DraftQuestion, cb: E
 	style.el.setAttribute("aria-label", t("editor.lecture.style"));
 
 	if (l.style === "etapes") {
+		/* MÉTHODE (`methode: true`, clé du format) : des étapes à appliquer
+		   sur la question qui suit, lues au-dessus d'elle même longues
+		   (src/lecture-etape.ts `estLectureCourte`). Un interrupteur : la
+		   case native, annoncée comme telle. */
+		const ligneMethode = ajouter(sec, "label", "qbd-lecture-style-ligne qbd-lecture-style-methode");
+		const caseMethode = ajouter(ligneMethode, "input");
+		caseMethode.type = "checkbox";
+		caseMethode.setAttribute("role", "switch");
+		caseMethode.checked = extras.methode === true;
+		ajouter(ligneMethode, "span", undefined, t("editor.lecture.methode"));
+		caseMethode.addEventListener("change", () => {
+			if (caseMethode.checked) extras.methode = true; else delete extras.methode;
+			cb.onChange();
+			// Au-dessus de la question ou écran à part : la liste change.
+			onListeChange();
+		});
+		ajouter(sec, "div", "qbd-qz-section-help", t("editor.lecture.methodeHelp"));
 		listeTextes(sec, t("editor.lecture.etapes"), l.etapes, t("editor.lecture.etapePlaceholder"), bridge, cb,
 			items => { if (items.length) extras.etapes = items; else delete extras.etapes; });
 	}

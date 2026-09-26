@@ -102,7 +102,7 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 /* Les STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : la seule
    lecture des champs `lecture`, `etapes`, `tableau`, `retenir`. Une valeur
    qu'elle ne comprend pas retombe sur le comportement d'avant, sans erreur. */
-await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tableauDeLecture, retenirDeLecture, etapesDeLecture, paragraphes, minutesDeLecture }) => {
+await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tableauDeLecture, retenirDeLecture, etapesDeLecture, paragraphes, minutesDeLecture, estMethode, motsDeLecture }) => {
 	const r = makeReporter("Styles de lecture (format)");
 	r.check("style : les trois valeurs connues",
 		["page", "etapes", "tableau"].map(v => styleDeLecture({ lecture: v })), ["page", "etapes", "tableau"]);
@@ -137,6 +137,11 @@ await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tabl
 	r.check("paragraphes : coupés sur la ligne vide, jamais dans un bloc de code",
 		paragraphes("Un.\n\nDeux\nsuite.\n\n```python\na = 1\n\nb = 2\n```\n\n\nTrois."),
 		["Un.", "Deux\nsuite.", "```python\na = 1\n\nb = 2\n```", "Trois."]);
+	r.check("méthode : seul le booléen `true`, sur l'élément ou dans `_extraFields`",
+		[estMethode({ methode: true }), estMethode({ methode: "true" }), estMethode({ methode: 1 }), estMethode({}), estMethode({ _extraFields: { methode: true } })],
+		[true, false, false, false, true]);
+	r.check("longueur d'une lecture : texte, étapes, cases du tableau et points à retenir",
+		motsDeLecture({ prompt: "un deux", etapes: ["trois quatre"], tableau: { colonnes: ["cinq"], lignes: [["six", "sept"]] }, retenir: { forme: "cartes", items: [{ recto: "huit", verso: "neuf dix" }] } }), 10);
 	r.check("minutes de lecture : mots / 200, arrondi, au moins 1",
 		[minutesDeLecture(""), minutesDeLecture("mot ".repeat(250)), minutesDeLecture("mot ".repeat(350)), minutesDeLecture("mot ".repeat(1000))], [1, 1, 2, 5]);
 	r.done();
