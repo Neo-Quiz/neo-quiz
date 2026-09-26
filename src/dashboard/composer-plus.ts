@@ -1,6 +1,5 @@
-import { currentHost } from "../host/current";
 import { t } from "../i18n";
-import { openActionMenu, openNotePicker } from "./ui-select";
+import { openActionMenu } from "./ui-select";
 import type { ActionMenuItem } from "./ui-select";
 
 /* ══════════════════════════════════════════════════════════
@@ -15,27 +14,16 @@ export interface MenuPlusDeps {
 	/** Le raccourci d'« Ajouter des fichiers », déjà formaté (« Ctrl+U »). */
 	raccourci: string;
 	ajouterFichiers(): void;
-	/** Joint une note du vault par son chemin. */
-	joindreNote(chemin: string): void;
-	/** Les notes ouvertes, en tête du sélecteur (hôte à onglets seulement). */
-	notesOuvertes?: () => { path: string; basename: string }[];
 	/** Le champ du composer, où « Mentionner » tape le « @ ». */
 	champ: HTMLTextAreaElement;
 }
 
 export function ouvrirMenuPlus(ancre: HTMLElement, deps: MenuPlusDeps): void {
-	const host = currentHost();
+	/* Plus d'entrée « Ajouter une note du vault » (2026-09-26) : elle faisait
+	   doublon avec la mention « @ », qui joint déjà une note. */
 	const items: ActionMenuItem[] = [
 		{ icon: "paperclip", label: t("ai.add.files"), hint: deps.raccourci, onClick: deps.ajouterFichiers },
-		{
-			icon: "notebook-text", label: t("ai.add.note"), sepBefore: true,
-			onClick: () => openNotePicker(ancre, {
-				openFiles: deps.notesOuvertes?.() ?? [],
-				allFiles: host.fs.listMarkdown(),
-				onPick: (f) => deps.joindreNote(f.path)
-			})
-		},
-		{ icon: "at-sign", label: t("ai.add.mention"), hint: "@", onClick: () => taperArobase(deps.champ) }
+		{ icon: "at-sign", label: t("ai.add.mention"), hint: "@", sepBefore: true, onClick: () => taperArobase(deps.champ) }
 	];
 	openActionMenu(ancre, items, { className: "qbd-menu-claude qbd-ai-plus-menu" });
 }

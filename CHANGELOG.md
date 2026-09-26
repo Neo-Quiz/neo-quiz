@@ -29,7 +29,7 @@ release notes.
 - Generating a quiz now reads like a conversation on claude.ai: each request appears as your message, with a live "working" reply underneath that turns into the finished quiz, and the composer stays at the bottom.
 - A PDF attached in Generate shows up at once, with its name and a small loading wheel; its first page and its text follow, and sending waits until the text is read. A PDF that cannot be read says so on its card.
 - Attaching a file in the Generate composer now animates like claude.ai: the tile rises in at once with a soft shimmer while it loads, then the page preview fades in from blur.
-- The + button of the Generate composer opens a claude.ai-style menu: add files or images (now Ctrl+U), add a note from the vault, or mention a note or document.
+- The + button of the Generate composer opens a claude.ai-style menu: add files or images (now Ctrl+U), or mention a note or document with @.
 - In a folder, "New quiz" sits in the header between the view tabs and the menu, instead of the full-width "Add content" bar above the quizzes.
 - The quiz editor shows each question as it looks once answered and corrected, and you edit it right there: click a text to change it, click an answer's letter to mark it right, hover to add or remove an answer, click to reorder or re-pair; rarely used fields are under More.
 - In the editor, the correct answer, options, orderings and matchings are changed directly in the question's corrected render.

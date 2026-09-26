@@ -1810,8 +1810,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		addBtn.addEventListener("click", () => ouvrirMenuPlus(addBtn, {
 			raccourci: formatHotkey(settings().hotkeyAddFiles),
 			ajouterFichiers: openAddFiles,
-			joindreNote: (chemin) => { void attachVaultPath(chemin); },
-			notesOuvertes: deps.openFiles,
 			champ: composerInput
 		}));
 
