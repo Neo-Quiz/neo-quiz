@@ -27,6 +27,7 @@ import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
+import { ouvrirMenuPlus } from "./composer-plus";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -1786,12 +1787,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 		fileInputRef = fileInput;
 
-		// Le « + » ouvre DIRECTEMENT le sélecteur de fichiers : « Add notes »
-		// a disparu (le picker « @ » fait la même chose, mieux), et un menu à
-		// une seule entrée serait un détour. L'infobulle porte le raccourci.
-		addBtn.title = t("ai.add.filesTip", { hotkey: formatHotkey(settings().hotkeyAddFiles) });
-		addBtn.setAttribute("aria-label", addBtn.title);
-		addBtn.addEventListener("click", () => openAddFiles());
+		/* Le « + » ouvre son MENU, réplique de celui de claude.ai (2026-09-26) :
+		   « Ajouter des fichiers ou des images » avec le raccourci, une note
+		   du vault, la mention « @ ». */
+		addBtn.title = t("ai.composer.addContent");
+		addBtn.addEventListener("click", () => ouvrirMenuPlus(addBtn, {
+			raccourci: formatHotkey(settings().hotkeyAddFiles),
+			ajouterFichiers: openAddFiles,
+			joindreNote: (chemin) => { void attachVaultPath(chemin); },
+			notesOuvertes: deps.openFiles,
+			champ: composerInput
+		}));
 
 		// Toute la carte est cliquable pour écrire (demande 2026-07-10) :
 		// un clic hors des contrôles focus le champ, caret en fin de texte.

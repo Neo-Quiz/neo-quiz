@@ -26,6 +26,7 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 
 ### Changed
+- The + button of the Generate composer opens a claude.ai-style menu: add files or images (now Ctrl+U), add a note from the vault, or mention a note or document.
 - In a folder, "New quiz" sits in the header between the view tabs and the menu, instead of the full-width "Add content" bar above the quizzes.
 - The quiz editor shows each question as it looks once answered and corrected, and you edit it right there: click a text to change it, click an answer's letter to mark it right, hover to add or remove an answer, click to reorder or re-pair; rarely used fields are under More.
 - In the editor, the correct answer, options, orderings and matchings are changed directly in the question's corrected render.

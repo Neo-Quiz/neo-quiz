@@ -26,6 +26,10 @@ export const EN_AI = {
 	"ai.composer.stop": "Stop",
 	"ai.composer.open": "Open",
 	"ai.add.filesTip": "Add files or images ({hotkey})",
+	/* ── Menu « + » du composer (référence claude.ai) ── */
+	"ai.add.files": "Add files or images",
+	"ai.add.note": "Add a note from the vault",
+	"ai.add.mention": "Mention a note or document",
 	/* Picker « @ » : aucune entrée pour le token tapé. */
 	"ai.mention.noMatch": "No matching file",
 	/* Pied du menu : une garde anti-explosion a coupé l'indexation d'une ou

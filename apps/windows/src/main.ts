@@ -100,6 +100,12 @@ let reglagesIaCache: AiSettings = aiSettingsDefaults();
 async function chargerReglagesIa(): Promise<void> {
 	const lu = await pont().reglages.lire(CLE_REGLAGES_IA);
 	const persiste = lu && typeof lu === "object" && !Array.isArray(lu) ? (lu as Partial<AiSettings>) : {};
+	/* L'ancien DÉFAUT d'« Ajouter des fichiers » (Ctrl+E, 2026-09-17) a été
+	   écrit sur le disque avec le reste des réglages au premier `save` : aucun
+	   écran ne le règle, ce n'est donc jamais un choix. Il suit le nouveau
+	   défaut (Ctrl+U, celui de claude.ai, 2026-09-26). */
+	const hk = persiste.hotkeyAddFiles;
+	if (hk && hk.key === "e" && (hk.modifiers || []).join("+") === "Mod") delete persiste.hotkeyAddFiles;
 	reglagesIaCache = { ...aiSettingsDefaults(), ...persiste };
 }
 
