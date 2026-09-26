@@ -112,8 +112,13 @@ export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 	}
 	const root = ajouter(parent, "div", "qbd-fiche");
 	renderHead(root, deps);
-	const attirer = renderActions(renderMeta(root, deps), deps);
-	renderBody(root, attirer, deps);
+	renderMeta(root, deps);
+	/* La barre : la recherche au centre, les actions à droite, sur la MÊME
+	   ligne (2026-09-26 : les boutons, plus haut, n'étaient alignés sur rien). */
+	const tools = ajouter(root, "div", "qbd-fiche-tools");
+	const recherche = ajouter(tools, "div", "qbd-fiche-tools-center");
+	const attirer = renderActions(tools, deps);
+	renderBody(root, recherche, attirer, deps);
 }
 
 /** L'en-tête : la flèche retour, le dossier et le titre. */
@@ -330,9 +335,8 @@ function filtrer(questions: DraftQuestion[], recherche: string): number[] {
 }
 
 /** La recherche, et les questions dessous, en grille. */
-function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): void {
-	const tools = ajouter(root, "div", "qbd-fiche-tools");
-	const recherche = ajouter(tools, "label", "qbd-fiche-search");
+function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, deps: FicheDeps): void {
+	const recherche = ajouter(place, "label", "qbd-fiche-search");
 	icone(recherche, "search", "qbd-fiche-search-icon");
 	const champ = ajouter(recherche, "input", "qbd-fiche-search-input");
 	champ.type = "search";

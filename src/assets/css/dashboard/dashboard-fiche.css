@@ -251,7 +251,7 @@
 
 /* Dans la ligne d'infos, l'origine tient sur UNE ligne ; les actions
    (Modifier, Commencer le quiz, ⋮) sont poussées au bout. */
-.qbd-fiche-meta .qbd-fiche-actions { margin-left: auto; }
+
 .qbd-fiche-meta .qbd-fiche-origin {
 	display: flex;
 	align-items: center;
@@ -266,12 +266,19 @@
 
 /* ── La recherche ── */
 .qbd-fiche-tools {
-	display: flex;
+	/* Trois colonnes : vide | recherche AU CENTRE | actions à droite, pour
+	   que la recherche reste centrée sur la page quelle que soit la largeur
+	   des boutons (2026-09-26). */
+	display: grid;
+	/* La colonne des actions n'est jamais plus étroite que ses boutons
+	   (sinon « Commencer le quiz » passait sur deux lignes). */
+	grid-template-columns: minmax(0, 1fr) minmax(220px, 420px) minmax(max-content, 1fr);
 	align-items: center;
-	/* La recherche AU CENTRE, au-dessus de la grille (2026-09-26). */
-	justify-content: center;
 	gap: 10px;
 }
+.qbd-fiche-tools-center { grid-column: 2; display: flex; justify-content: center; min-width: 0; }
+.qbd-fiche-tools-center .qbd-fiche-search { width: 100%; }
+.qbd-fiche-tools .qbd-fiche-actions { grid-column: 3; justify-self: end; white-space: nowrap; }
 .qbd-fiche-search {
 	display: flex;
 	align-items: center;
@@ -475,6 +482,9 @@
 	.qbd-fiche-head { flex-wrap: wrap; }
 	.qbd-fiche-actions { width: 100%; }
 	.qbd-fiche-body { flex: none; overflow: visible; }
+	/* Étroit : la recherche puis les actions, l'une sous l'autre. */
+	.qbd-fiche-tools { grid-template-columns: minmax(0, 1fr); }
+	.qbd-fiche-tools-center, .qbd-fiche-tools .qbd-fiche-actions { grid-column: 1; justify-self: stretch; }
 }
 
 /* ── La ligne d'infos et la recherche : CHACUNE SA FORME (2026-09-26).
