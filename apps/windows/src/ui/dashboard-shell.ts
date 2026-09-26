@@ -184,17 +184,64 @@ const historiqueNav = creerHistorique<EtatNav>(memeEtatNav);
  */
 let questionInitiale: number | undefined;
 
+/** La séquence de la lueur, en millisecondes : à l'entrée d'un dossier, sa
+    couleur MONTE, TIENT puis S'ÉTEINT ; à la sortie, le bleu REVIENT. */
+const LUEUR_MONTE = 300;
+const LUEUR_TIENT = 600;
+const LUEUR_ETEINT = 900;
+const LUEUR_RETOUR = 400;
+
+/** L'accent pour lequel la lueur est posée (`null` : hors dossier, le bleu),
+    et l'animation en cours. Au niveau du MODULE : la lueur vit sur la racine
+    du document et survit au démontage de la coquille (quiz lancé). */
+let lueurCourante: string | null = null;
+let lueurAnimation: Animation | null = null;
+
 /**
- * Teinte la LUEUR de la fenêtre (`shell.css`, `--nq-lueur`) : l'accent d'un
- * dossier, ou `null` pour revenir au bleu de l'app (la valeur initiale de la
- * propriété enregistrée). Posée sur la racine du document, là où vit la
- * transition de 400 ms, et non dans la coquille : la lueur est derrière tout,
- * y compris le quiz lancé, qui démonte la coquille.
+ * La LUEUR de la fenêtre (`shell.css`, `--nq-lueur` et `--nq-lueur-force`).
+ *
+ * HORS DOSSIER (`null`) : la bande BLEUE, à pleine intensité ; si elle était
+ * éteinte (on sort d'un dossier), elle revient en fondu.
+ * DANS UN DOSSIER : la couleur du dossier ne fait que PASSER (Ahmed,
+ * 2026-09-26, « la lueur devient étouffante » sur un fond d'écran) — elle
+ * monte, tient, s'éteint, et il ne reste aucune lueur dans le dossier.
+ *
+ * « Mes quiz » appelle ceci à CHAQUE rendu (un changement du catalogue
+ * redessine la page) : le même accent ne rejoue donc rien. Un changement en
+ * cours de séquence (entrer puis ressortir aussitôt) ANNULE l'animation, et
+ * la suivante repart de l'intensité où l'autre en était : aucune lueur
+ * coincée, aucun saut. L'état FINAL est toujours écrit en style en ligne,
+ * sous l'animation : annulée ou non jouée (mouvement réduit), la lueur est
+ * juste.
  */
 function poserLueur(accent: string | null): void {
+	if (accent === lueurCourante) return;
+	lueurCourante = accent;
 	const racine = document.documentElement;
+	// Lue AVANT l'annulation : c'est la valeur animée, celle qu'on voit.
+	const depart = Number.parseFloat(getComputedStyle(racine).getPropertyValue("--nq-lueur-force"));
+	lueurAnimation?.cancel();
+	lueurAnimation = null;
+
 	if (accent) racine.style.setProperty("--nq-lueur", accent);
 	else racine.style.removeProperty("--nq-lueur");
+	racine.style.setProperty("--nq-lueur-force", accent ? "0" : "1");
+
+	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+	const de = Number.isFinite(depart) ? String(depart) : "1";
+	const animation = accent
+		? racine.animate([
+			{ "--nq-lueur-force": de, offset: 0, easing: "ease-out" },
+			{ "--nq-lueur-force": "1", offset: LUEUR_MONTE / (LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT) },
+			{ "--nq-lueur-force": "1", offset: (LUEUR_MONTE + LUEUR_TIENT) / (LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT), easing: "ease-in-out" },
+			{ "--nq-lueur-force": "0", offset: 1 },
+		], { duration: LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT })
+		: racine.animate([
+			{ "--nq-lueur-force": de },
+			{ "--nq-lueur-force": "1" },
+		], { duration: LUEUR_RETOUR, easing: "ease" });
+	lueurAnimation = animation;
+	animation.addEventListener("finish", () => { if (lueurAnimation === animation) lueurAnimation = null; });
 }
 
 /**
@@ -756,6 +803,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			// Aucun bouton du rail ne porte "detail" : `setActive` éteint donc
 			// la carte active, comme sous Obsidian.
 			nav.setActive("detail");
+			// La page d'un quiz est HORS dossier : la bande bleue revient.
+			poserLueur(null);
 			// Notée SANS la question : `onQuestionChange` la précisera au premier
 			// changement. Ouvrir un quiz montre sa fiche ; sa question courante
 			// reste celle sur laquelle l'éditeur s'ouvre.
@@ -768,10 +817,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		// dans un module puis revenir par le rail doit rouvrir la GRILLE, pas
 		// le module laissé ouvert.
 		if (vue === "quizzes") quizzes.resetDrilldown();
-		/* Hors d'un dossier, la lueur reprend le bleu de l'app ; « Mes quiz »
-		   la reteinte aussitôt s'il rouvre un dossier. La page d'un quiz, elle,
-		   garde la couleur du dossier d'où on l'a ouverte (branche `detail`
-		   plus haut, qui ne passe pas ici). */
+		/* Hors d'un dossier, la bande bleue ; « Mes quiz » rejoue le passage de
+		   la couleur s'il rouvre un dossier (`ambiance`). */
 		poserLueur(null);
 		vueCourante = vue;
 		nav.setActive(vue);
@@ -796,6 +843,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	// quiz », par exemple) : `createNavHandlers` démarre chaque fois avec son
 	// propre `activeNav` interne à "home".
 	nav.setActive(vueCourante);
+	/* Au remontage (retour d'un quiz lancé depuis un dossier), la lueur est
+	   restée celle du dossier, éteinte : hors « Mes quiz », la bande bleue
+	   revient. Dans « Mes quiz », son rendu décide (`ambiance`). */
+	if (vueCourante !== "quizzes") poserLueur(null);
 	peindre();
 
 	// Redessine la page courante à chaque changement du catalogue — `entering:

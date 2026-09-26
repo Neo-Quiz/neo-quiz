@@ -120,16 +120,34 @@ body {
    portent une ombre sombre serrée (`--nq-ombre-lisible`), qui détache le
    glyphe d'un fond clair sans dessiner de boîte.
 
-   LE FONDU : `--nq-lueur` est une propriété ENREGISTRÉE (`@property`, type
-   `<color>`), sans quoi le navigateur ne sait pas l'interpoler et la couleur
-   basculerait d'un coup en entrant dans un dossier. La transition vit sur la
-   racine, où la variable est posée ; `body::after` en hérite à chaque image. */
+   BLEUE HORS DOSSIER, ET LA COULEUR DU DOSSIER NE FAIT QUE PASSER (Ahmed,
+   2026-09-26 : « comme on a des fonds d'écran, la lueur devient
+   étouffante », et seul le bleu embellit les fonds). Hors dossier, la bande
+   bleue reste. En entrant dans un dossier, la lueur prend sa couleur,
+   monte, tient, puis s'éteint d'elle-même : un signal d'entrée, et plus
+   AUCUNE lueur dans le dossier. En sortant, le bleu revient en fondu. La
+   séquence est jouée par `ui/dashboard-shell.ts` (`poserLueur`) sur
+   `--nq-lueur-force`, le multiplicateur de l'alpha.
+
+   LE FONDU : `--nq-lueur` et `--nq-lueur-force` sont des propriétés
+   ENREGISTRÉES (`@property`), sans quoi le navigateur ne sait pas les
+   interpoler et la lueur basculerait d'un coup. Elles vivent sur la racine ;
+   `body::after` en hérite à chaque image. */
 @property --nq-lueur {
 	syntax: "<color>";
 	inherits: true;
 	/* Le bleu d'accent de l'app (`--quiz-primary`, tokens.css). Une valeur
 	   initiale d'`@property` ne peut pas lire une autre variable. */
 	initial-value: #3b62f6;
+}
+
+/* L'intensité de la lueur, de 0 (éteinte) à 1 (la bande bleue hors
+   dossier). Animée par l'API d'animation du navigateur, jamais par une
+   transition CSS : la séquence d'entrée a trois temps. */
+@property --nq-lueur-force {
+	syntax: "<number>";
+	inherits: true;
+	initial-value: 1;
 }
 
 /* Sur `:root` et non sur `.qbd-root` avec les jetons du panneau : le fond
@@ -152,6 +170,12 @@ body {
 	--nq-ombre-lisible-filtre: drop-shadow(0 0 2px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.45));
 	transition: --nq-lueur 400ms ease;
 	background: var(--nq-lueur-fond);
+}
+
+/* Mouvement réduit : la couleur change d'un coup, comme l'intensité
+   (`poserLueur` ne joue alors aucune animation). */
+@media (prefers-reduced-motion: reduce) {
+	:root { transition: none; }
 }
 
 body::before,
@@ -181,7 +205,7 @@ body::after {
 	background:
 		linear-gradient(
 			180deg,
-			color-mix(in srgb, color-mix(in srgb, var(--nq-lueur) var(--nq-lueur-part), var(--nq-lueur-fond)) var(--nq-lueur-haut), transparent) 0%,
+			color-mix(in srgb, color-mix(in srgb, var(--nq-lueur) var(--nq-lueur-part), var(--nq-lueur-fond)) calc(var(--nq-lueur-haut) * var(--nq-lueur-force)), transparent) 0%,
 			transparent var(--nq-lueur-fin)
 		),
 		color-mix(in srgb, #000 var(--nq-voile), transparent);
