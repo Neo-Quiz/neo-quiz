@@ -266,6 +266,17 @@ export const EN_AI = {
 	"ai.queue.retrySave": "Try saving again",
 	"ai.queue.openUnsaved": "Open without saving",
 	"ai.queue.busy": "Finish or cancel the request in progress first.",
+	/* La page en CONVERSATION (référence claude.ai, 2026-09-26) : chaque envoi
+	   est un message, la réponse dit l'étape en cours. */
+	"ai.queue.stepPreparing": "Preparing…",
+	"ai.queue.stepReading": "Reading the document…",
+	"ai.queue.stepWriting": "Writing the questions…",
+	"ai.queue.newRequest": "New request",
+	"ai.queue.newRequestBusy": "Available once nothing is generating",
+	/* Une pièce jointe encore en lecture : l'envoi attend. */
+	"ai.attach.reading": "Reading the document…",
+	"ai.attach.readFailed": "Could not read this file",
+	"ai.attach.noText": "No text in this PDF",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",

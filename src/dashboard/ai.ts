@@ -501,6 +501,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	// ResizeObserver de la carte composer (mesure du text-indent des chips) :
 	// déconnecté et recréé à chaque render (composer recréé) — cf. layoutChipsRow.
 	let composerResizeObserver: ResizeObserver | null = null;
+	/* Le bouton d'envoi du DERNIER rendu : une lecture de PDF qui finit, ou la
+	   file qui change, le remet à jour sans redessiner la page. */
+	let boutonEnvoi: HTMLButtonElement | null = null;
 	let phase: Phase = "idle";
 	/* Demande PARTIE vers un site. Non nulle dès l'envoi, remise à null quand
 	   la demande est rendue au composer (annulation) ou qu'on recommence. Le
@@ -607,6 +610,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// uniquement » explique déjà pourquoi.
 		const provider = aiProviders.getProvider(providerId);
 		if (provider && provider.desktopOnly && host.platform.isMobile) return false;
+		/* Un document encore EN LECTURE (ou dont la lecture a échoué) : son
+		   texte n'est pas là, rien ne part sans lui. */
+		if (noteAttachments.some(n => n.lecture)) return false;
 		return !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
 	}
 
@@ -615,7 +621,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    dans les deux cas ; le tooltip natif porte le chemin entier. */
 	function poserCarte(chip: HTMLElement, note: NoteAttachment): void {
 		chip.title = note.path || note.name;
-		if (note.thumb) {
+		/* En LECTURE : la roue discrète de claude.ai, par-dessus le nom (ou la
+		   page, dès qu'elle est dessinée). En ÉCHEC : le message sur la carte
+		   même, la croix reste pour la retirer. */
+		if (note.lecture === "cours") {
+			chip.classList.add("qbd-ai-note-chip--lecture");
+			ajouter(chip, "span", "qbd-install-spinner qbd-ai-note-chip-spinner").setAttribute("aria-label", t("ai.attach.reading"));
+		} else if (note.lecture === "erreur") {
+			chip.classList.add("qbd-ai-note-chip--erreur");
+			chip.title = `${note.name} — ${note.erreurLecture ?? ""}`;
+		}
+		if (note.thumb && note.lecture !== "erreur") {
 			/* La page SEULE, posée dans la carte : ni badge ni nom par-dessus
 			   (retour Ahmed 2026-09-17, référence claude.ai). Sa forme — paysage
 			   ou portrait — est ce qu'on lit d'un coup d'œil, et le nom vit dans
@@ -646,7 +662,90 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				ajouter(nom, "span", "qbd-ai-note-chip-name-tail", note.name.slice(-QUEUE));
 			}
 		}
+		if (note.lecture === "erreur") ajouter(chip, "span", "qbd-ai-note-chip-erreur", note.erreurLecture ?? t("ai.attach.readFailed"));
 		ajouter(chip, "span", "qbd-ai-note-chip-badge", badgeDeFichier(note.name));
+	}
+
+	/** Toute la carte d'une pièce jointe : son contenu et sa croix. Appelée au
+	    rendu, puis EN PLACE quand la vignette ou la lecture d'un PDF arrive
+	    (`repeindreCarte`) : un re-rendu de la page couperait la frappe. */
+	function peindreCarteNote(chip: HTMLElement, note: NoteAttachment): void {
+		chip.replaceChildren();
+		chip.className = "qbd-ai-note-chip";
+		cartesNotes.set(note, chip);
+		poserCarte(chip, note);
+		/* Le clic OUVRE L'APERÇU (Ahmed, 2026-09-17, référence claude.ai) — pas
+		   tant que le document n'est pas lu. */
+		chip.classList.toggle("qbd-ai-note-chip--toggle", !note.lecture);
+		const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
+		host.ui.setIcon(chipRemove, "x");
+		chipRemove.addEventListener("click", (e) => {
+			e.stopPropagation(); // n'ouvre pas l'aperçu
+			const i = noteAttachments.indexOf(note);
+			if (i >= 0) noteAttachments.splice(i, 1);
+			render(containerRef);
+		});
+	}
+
+	function repeindreCarte(note: NoteAttachment): void {
+		const chip = cartesNotes.get(note);
+		if (chip && chip.isConnected) peindreCarteNote(chip, note);
+	}
+
+	/* La carte de chaque pièce jointe, pour la repeindre en place. */
+	const cartesNotes = new WeakMap<NoteAttachment, HTMLElement>();
+	/* Les lectures de PDF, UNE à la fois et dans l'ordre des cartes : deux
+	   documents lus de front doublent la mémoire pour rien. */
+	let lecturesPdf: Promise<void> = Promise.resolve();
+
+	/** Joint un PDF comme claude.ai : la carte paraît AU CHOIX du fichier, avec
+	    son nom et une roue ; la première page la remplace dès qu'elle est
+	    dessinée ; le texte se lit derrière, et l'envoi l'attend (`canGenerate`).
+	    `lire` rend les octets : une lecture disque se fait donc APRÈS
+	    l'apparition de la carte. La promesse rendue se résout à la fin de la
+	    lecture du texte — le préréglage d'un dossier l'attend avant d'envoyer. */
+	function joindrePdf(nom: string, lire: () => Promise<Uint8Array>, source: AttachmentSource, path?: string): Promise<void> {
+		/* Le texte d'un PDF vient de l'HÔTE (`host.pdf`, membre OPTIONNEL) :
+		   sans lui, on le dit plutôt que de joindre un PDF vide en silence. */
+		const pdf = host.pdf;
+		if (!pdf) { host.ui.notice(t("ai.error.pdfUnsupportedInApp")); return Promise.resolve(); }
+		if (noteAttachments.some(n => attachmentKey(n) === attachmentKey({ source, path, name: nom }))) {
+			host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: nom }));
+			return Promise.resolve();
+		}
+		const note: NoteAttachment = { name: nom, content: "", path, source, lecture: "cours" };
+		noteAttachments.push(note);
+		void render(containerRef);
+		const suite = lecturesPdf.then(async () => {
+			if (!noteAttachments.includes(note)) return; // retirée avant sa lecture
+			try {
+				const bytes = await lire();
+				note.bytes = bytes;
+				/* La vignette n'attend pas le texte, ni le texte la vignette :
+				   pdf.js dessine image par image, et une fenêtre en arrière-plan
+				   n'en dessine plus aucune — le texte, lui, ne s'arrête pas.
+				   (La vignette à la largeur de la carte, 2×, le CSS ramène.) */
+				void pdf.renderPages?.(bytes, { width: 124, max: 1 }).then(r => {
+					note.thumb = r.pages[0];
+					repeindreCarte(note);
+				}).catch(e => {
+					// NOMMÉ dans la console : une vignette absente sans trace a
+					// déjà coûté une matinée (paramètre `canvas` de pdf.js 5).
+					console.warn(LOG_PREFIX, "vignette PDF impossible:", nom, e);
+				});
+				const content = await pdf.extractText(bytes);
+				if (content.trim()) { note.content = content; delete note.lecture; }
+				else { note.lecture = "erreur"; note.erreurLecture = t("ai.attach.noText"); }
+			} catch (e) {
+				console.warn(LOG_PREFIX, "lecture PDF impossible:", nom, e);
+				note.lecture = "erreur";
+				note.erreurLecture = t("ai.attach.readFailed");
+			}
+			repeindreCarte(note);
+			updateGenerateBtn(boutonEnvoi);
+		});
+		lecturesPdf = suite.catch(() => undefined);
+		return suite;
 	}
 
 	/** Le contenu d'une carte d'IMAGE : la photo remplit la carte, recadrée
@@ -1433,29 +1532,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					render(containerRef);
 				});
 			}
-			for (let i = 0; i < noteAttachments.length; i++) {
-				const note = noteAttachments[i];
+			for (const note of noteAttachments) {
 				/* Une CARTE, pas une pastille (retour Ahmed 2026-09-17, référence
 				   claude.ai) : le nom sur deux lignes, et l'EXTENSION en badge en
 				   bas — pas d'icône, le badge dit le type. */
 				const chip = ajouter(chipsRow, "div", "qbd-ai-note-chip");
-				poserCarte(chip, note);
-				/* Le clic OUVRE L'APERÇU (Ahmed, 2026-09-17, référence claude.ai) :
-				   le texte d'une note, les pages d'un PDF. L'ancienne bascule
-				   nom ⇄ chemin complet est partie avec : le chemin est dans la
-				   modale, et le tooltip natif le porte encore. */
-				chip.classList.add("qbd-ai-note-chip--toggle");
+				peindreCarteNote(chip, note);
+				/* Le clic OUVRE L'APERÇU : le texte d'une note, les pages d'un
+				   PDF — une fois lu. Le chemin est dans la modale, et le tooltip
+				   natif le porte encore. */
 				chip.addEventListener("click", (e) => {
 					if ((e.target as HTMLElement).closest(".qbd-ai-note-chip-remove")) return;
-					ouvrirApercu(note);
-				});
-				const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
-				host.ui.setIcon(chipRemove, "x");
-				const idx = i;
-				chipRemove.addEventListener("click", (e) => {
-					e.stopPropagation(); // ne déclenche pas le basculement du chip
-					noteAttachments.splice(idx, 1);
-					render(containerRef);
+					if (!note.lecture) ouvrirApercu(note);
 				});
 			}
 		}
@@ -1770,6 +1858,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			});
 		}
 		generateBtnRef = sendBtn;
+		boutonEnvoi = sendBtn;
 		updateGenerateBtn(generateBtnRef);
 
 		// PAS d'attribut accept : le dialogue Windows affiche alors « Tous
@@ -2579,43 +2668,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	): Promise<void> {
 		const imgs: File[] = [];
 		const rejected: string[] = [];
+		const lectures: Promise<void>[] = [];
 		const source: AttachmentSource = origin?.source ?? "file";
 		for (const file of files) {
 			if (file.type.startsWith("image/")) {
 				imgs.push(file);
 			} else if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
-				/* Le texte d'un PDF vient de l'HÔTE (`host.pdf`, membre OPTIONNEL) :
-				   l'application n'en a pas, et le dit plutôt que de joindre un
-				   PDF vide en silence — voir `HostPdf` dans le contrat. */
-				if (!host.pdf) { host.ui.notice(t("ai.error.pdfUnsupportedInApp")); continue; }
-				try {
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					const content = await host.pdf.extractText(bytes);
-					if (!content.trim()) {
-						host.ui.notice(t("ai.notice.pdfNoText", { name: file.name }));
-					} else {
-						const key = attachmentKey({ source, path: origin?.path, name: file.name });
-						if (noteAttachments.some(n => attachmentKey(n) === key)) {
-							host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: file.name }));
-						} else {
-							/* La vignette : la première page, à la largeur de la carte
-							   (2×, le CSS ramène). Un échec de dessin n'empêche pas de
-							   joindre : la carte montre alors son nom, comme une note. */
-							let thumb: string | undefined;
-							try {
-								thumb = (await host.pdf.renderPages?.(bytes, { width: 124, max: 1 }))?.pages[0];
-							} catch (e) {
-								// NOMMÉ dans la console : une vignette absente sans trace a
-								// déjà coûté une matinée (paramètre `canvas` de pdf.js 5).
-								console.warn(LOG_PREFIX, "vignette PDF impossible:", file.name, e);
-								thumb = undefined;
-							}
-							noteAttachments.push({ name: file.name, content, path: origin?.path, source, bytes, thumb });
-						}
-					}
-				} catch (e) {
-					rejected.push(file.name);
-				}
+				// La carte paraît tout de suite, la lecture suit (`joindrePdf`).
+				lectures.push(joindrePdf(file.name, async () => new Uint8Array(await file.arrayBuffer()), source, origin?.path));
 			} else if (/\.(md|txt)$/i.test(file.name) || file.type.startsWith("text/")) {
 				try {
 					const content = await file.text();
@@ -2640,6 +2700,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (rejected.length) {
 			host.ui.notice(t("ai.notice.unsupportedFormat", { files: rejected.join(", ") }));
 		}
+		await Promise.all(lectures);
 	}
 
 	/* Attache une note du vault comme source du quiz (menu « Ajouter des
@@ -2691,6 +2752,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (!f) return;
 		const ext = f.extension.toLowerCase();
 		if (ext === "md" || ext === "txt") { await attachNoteVaultFile(f); return; }
+		// Un PDF : sa carte AVANT la lecture disque.
+		if (ext === "pdf") { await joindrePdf(f.name, () => host.fs.readBinary(f.path), "vault", f.path); return; }
 		try {
 			const octets = await host.fs.readBinary(f.path);
 			// `slice()` : un `Uint8Array` sur un tampon partagé n'est pas un `BlobPart`.
@@ -2718,6 +2781,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.notice(t("ai.notice.noteAlreadyAttached", { name }));
 			return;
 		}
+		// Un PDF : sa carte AVANT la lecture disque.
+		if (/\.pdf$/i.test(name)) { await joindrePdf(name, () => host.fs.externe.readBinary(path), "external", path); return; }
 		try {
 			/* Par le contrat (`externe.readBinary`, chemin ABSOLU) : dans
 			   l'application, c'est un canal BORNÉ au périmètre, pas un `fs`. */
@@ -2741,9 +2806,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   `<input type="file">` du navigateur, dont le File n'a aucun chemin. */
 		const natif = host.fs.externe.pickFiles;
 		if (natif) {
-			void natif("documents").then(async (chemins) => {
-				for (const abs of chemins) await attachExternalPath(abs);
-			});
+			/* Toutes les cartes D'UN COUP (référence claude.ai) : les lectures
+			   de PDF, elles, se suivent d'elles-mêmes (`lecturesPdf`). */
+			void natif("documents").then(chemins => Promise.all(chemins.map(attachExternalPath)));
 			return;
 		}
 		if (fileInputRef && fileInputRef.isConnected) fileInputRef.click();
@@ -3530,6 +3595,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		btn.classList.toggle("is-visible", hasContent);
 		btn.disabled = !canGen;
 		btn.classList.toggle("qbd-ai-composer-send--disabled", !canGen);
+		// La flèche grisée dit POURQUOI quand c'est une lecture qui la retient.
+		btn.title = noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading") : "";
 	}
 
 	/* Nomme un bouton-icône SANS déclencher de seconde bulle. `aria-label` (et

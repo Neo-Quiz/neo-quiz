@@ -57,6 +57,13 @@ export interface NoteAttachment {
 	bytes?: Uint8Array;
 	/** La première page en image (`data:` URL), pour la carte. */
 	thumb?: string;
+	/** Un PDF dont la LECTURE n'est pas finie (`cours`) ou a échoué
+	    (`erreur`) : sa carte est déjà là (référence claude.ai, la pièce
+	    apparaît au choix du fichier), mais `content` n'est pas encore son
+	    texte. Tant que ce champ existe, rien ne part. */
+	lecture?: "cours" | "erreur";
+	/** Le message d'une lecture en `erreur`, affiché sur la carte. */
+	erreurLecture?: string;
 }
 
 /** Ce qu'une demande porte au modèle : la consigne, les documents lus, les
