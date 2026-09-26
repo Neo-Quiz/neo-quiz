@@ -505,32 +505,37 @@
 .qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
 .qbd-fiche-meta .qbd-fiche-modes,
 .qbd-fiche-search {
-	/* Le matériau des boutons « Semaine » et « Aujourd'hui » de Neo Calendar
-	   (CalendarHeader.css, .nc-btn-today) : primaire presque opaque, flou et
-	   ÉCLAIRCI par le filtre, liseré fin, coins de 8 px — un verre de
-	   CONTRÔLE, distinct du verre translucide des cartes. */
-	background: color-mix(in srgb, var(--background-primary) 92%, transparent);
-	backdrop-filter: blur(12px) brightness(1.18);
-	-webkit-backdrop-filter: blur(12px) brightness(1.18);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
+	/* EXACTEMENT les boutons « Semaine » et « Aujourd'hui » de l'application
+	   Neo Calendar (apps/windows/src/DesktopTitlebar.css, .nc-btn-today) :
+	   30 px de haut, rayon 6 px, fond du texte à 7 %, liseré à 9 %, flou de
+	   20 px, graisse 500 ; survol à 12 %, focus en contour à 50 %. */
+	--qbd-nc-bouton: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	--qbd-nc-bouton-survol: color-mix(in srgb, var(--text-normal) 12%, transparent);
+	height: 30px;
+	box-sizing: border-box;
+	border-radius: 6px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
+	background: var(--qbd-nc-bouton);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	font-weight: 500;
 	text-shadow: none;
+	transition: background-color 100ms ease, color 100ms ease;
 }
-.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:not(.is-active) { color: color-mix(in srgb, var(--text-normal) 85%, transparent); }
-.qbd-fiche-meta .qbd-fiche-mode-indic { background: var(--quiz-primary); }
-.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg.is-active { color: #fff; }
 .qbd-fiche-search {
+	padding: 0 12px;
 	color: var(--text-normal);
-	transition: border-color 0.15s ease;
 }
-/* Survol : la même couche que Neo Calendar, qui n'éclaircit que le fond. */
 .qbd-fiche-meta .qbd-fiche-modes:hover,
-.qbd-fiche-search:hover {
-	background:
-		linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)),
-		color-mix(in srgb, var(--background-primary) 92%, transparent);
+.qbd-fiche-search:hover { background: var(--qbd-nc-bouton-survol); }
+.qbd-fiche-search:focus-within {
+	outline: 1px solid color-mix(in srgb, var(--text-normal) 50%, transparent);
+	outline-offset: 2px;
 }
-.qbd-fiche-search:focus-within { border-color: var(--quiz-primary); }
+/* Dans le sélecteur, les segments tiennent dans les 30 px. */
+.qbd-fiche-meta .qbd-fiche-modes { align-items: center; padding: 2px; }
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg { font-weight: 500; padding: 2px 10px; }
+.qbd-fiche-meta .qbd-fiche-mode-indic { border-radius: 4px; }
 .qbd-root .qbd-fiche-search-input::placeholder { color: var(--text-muted); }
 .qbd-fiche-meta-infos {
 	display: flex;
