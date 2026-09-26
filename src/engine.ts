@@ -364,10 +364,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	   `slideMap` : une bascule Leçon → Examen garde la même piste, et la
 	   lecture n'y redevient pas une question à laquelle on ne peut rien
 	   répondre. Hors Learn : ensemble vide, rien ne change. */
-	const lecturesAbsorbees: ReadonlySet<number> = buildLessonModel(quiz, originalQuizMode).isLesson
-		? calculerLecturesAbsorbees(quiz)
-		: new Set<number>();
-	const numeros = numerosAffiches(quiz, lecturesAbsorbees);
+	const estLecon = buildLessonModel(quiz, originalQuizMode).isLesson;
+	const lecturesAbsorbees: ReadonlySet<number> = calculerLecturesAbsorbees(quiz, estLecon);
+	const numeros = numerosAffiches(quiz, estLecon, lecturesAbsorbees);
 	ctx.lecturesAbsorbees = lecturesAbsorbees;
 	ctx.numeroAffiche = (qi: number): number => numeros[qi] || qi + 1;
 
@@ -440,7 +439,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	   tomber une reprise, un onglet ou un « suivant » qui la visait sur une
 	   vraie question plutôt que sur rien. */
 	const getSlideIndexForQuestion = (qi: number): number => {
-		const cible = questionHote(quiz, qi, lecturesAbsorbees);
+		const cible = questionHote(quiz, estLecon, qi, lecturesAbsorbees);
 		for (let si = 0; si < slideMap.length; si++) {
 			const entry = slideMap[si];
 			if (entry.type === "question" && entry.questionIndex === cible) return si;

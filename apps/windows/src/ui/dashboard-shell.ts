@@ -327,8 +327,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			   étape (src/lecture-etape.ts), comme les onglets du quiz ; une
 			   photo posée sur une lecture absorbée désigne la question qui la
 			   montre. Le total est celui de la carte (`quiz.questions`). */
-			const numeros = numerosAffiches(quiz.items);
-			return { question: numeros[questionHote(quiz.items, i)] || i + 1, total: quiz.questions, ecrite: s.ecrite };
+			// Hors Learn (au sens du moteur, `quiz.lecon`), rien n'est absorbé.
+			const lecon = !!quiz.lecon;
+			const numeros = numerosAffiches(quiz.items, lecon);
+			return { question: numeros[questionHote(quiz.items, lecon, i)] || i + 1, total: quiz.questions, ecrite: s.ecrite };
 		},
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);

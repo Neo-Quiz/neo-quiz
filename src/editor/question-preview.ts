@@ -193,13 +193,13 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
 	if (opts.corrige) titre.setAttribute("data-edit", "lecture-title");
 	const body = ajouter(wrap, "div", "quiz-passage-body");
 	const content = ajouter(body, "div", "quiz-passage-content");
-	if (html) {
-		// Un cours resté en HTML se lit ici et se modifie sur sa carte : il n'a
-		// pas d'écran, mais l'élément `read` garde son HTML tel quel.
-		content.innerHTML = resolveImagesInHtml(html, opts.sourcePath);
-		return;
-	}
-	if (texte) content.innerHTML = texteQuizHtml(texte, opts.sourcePath);
+	/* Un cours resté en HTML (import) s'affiche tel quel, et reste
+	   modifiable d'ici : sa carte n'a plus d'écran, il n'y a pas d'autre
+	   endroit où le reprendre. Le champ montre son texte (`prompt`, dérivé
+	   du HTML par editor/convert.ts) ; le valider remplace le HTML, comme
+	   pour l'énoncé d'une question. */
+	if (html) content.innerHTML = resolveImagesInHtml(html, opts.sourcePath);
+	else if (texte) content.innerHTML = texteQuizHtml(texte, opts.sourcePath);
 	else content.textContent = t("editor.render.addPrompt");
 	if (opts.corrige) content.setAttribute("data-edit", "lecture");
 }

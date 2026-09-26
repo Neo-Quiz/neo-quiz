@@ -9,15 +9,21 @@ import type { QuestionRole } from "./types/quiz";
    CHAQUE question de son étape (engine/passage.ts). Un cours seul n'est pas
    une question, et le montrer deux fois était du gaspillage.
 
-   UNE SEULE RÈGLE, ici, PURE (ni hôte, ni DOM, ni mode) : le moteur, la
-   page d'un quiz, l'éditeur, le scanner et la coquille de l'application la
-   lisent tous. Deux lectures de « qui est absorbé » qui divergent, et la
-   question Q3 d'un écran devient la Q4 d'un autre — ou un clic ouvre
-   l'éditeur sur la mauvaise question.
+   UNE SEULE RÈGLE, ici, PURE (ni hôte, ni DOM) : le moteur, la page d'un
+   quiz, l'éditeur, le scanner et la coquille de l'application la lisent
+   tous. Deux lectures de « qui est absorbé » qui divergent, et la question
+   Q3 d'un écran devient la Q4 d'un autre — ou un clic ouvre l'éditeur sur
+   la mauvaise question.
 
-   Règle : une lecture est ABSORBÉE si son étape contient AU MOINS UNE
-   question qui n'est pas une lecture, quel que soit son rôle. Sinon elle
-   reste un écran autonome (quiz anciens ou écrits à la main).
+   Règle : dans un bloc LEARN (`estLecon`, le mode du bloc normalisé comme
+   le moteur le fait : `extractExamOptions(...).quizMode === "lesson"`), la
+   PREMIÈRE lecture d'une étape est ABSORBÉE si l'étape contient AU MOINS
+   UNE question qui n'est pas une lecture, quel que soit son rôle. Hors
+   Learn, rien n'est absorbé : le moteur joue alors chaque lecture comme un
+   écran, et tous les lecteurs doivent compter pareil (revue du
+   2026-09-26). Une seconde lecture dans la même étape reste un écran
+   autonome : elle n'a pas de place au-dessus des questions, qui n'en
+   montrent qu'une, et l'absorber la ferait disparaître.
 
    Les INDEX ne changent jamais : les lectures restent dans les données, à
    leur place. Seuls l'affichage, la numérotation et les comptes les sautent.
@@ -44,28 +50,33 @@ function trancheDe(item: unknown): number | null {
 	return item && typeof item === "object" ? trancheValide((item as Brut)?.slice) : null;
 }
 
-/** Les index des lectures absorbées par leur étape. */
-export function lecturesAbsorbees(items: readonly unknown[]): Set<number> {
+/** Les index des lectures absorbées par leur étape. Vide hors Learn. */
+export function lecturesAbsorbees(items: readonly unknown[], estLecon: boolean): Set<number> {
+	const out = new Set<number>();
+	if (!estLecon) return out;
 	/* Les étapes qui ont au moins une question qui n'est pas une lecture. */
 	const avecQuestion = new Set<number>();
 	items.forEach(it => {
 		const s = trancheDe(it);
 		if (s !== null && roleDe(it) !== "read") avecQuestion.add(s);
 	});
-	const out = new Set<number>();
+	/* Une seule lecture absorbée par étape : la première. */
+	const dejaAbsorbee = new Set<number>();
 	items.forEach((it, i) => {
 		const s = trancheDe(it);
-		if (s !== null && roleDe(it) === "read" && avecQuestion.has(s)) out.add(i);
+		if (s === null || roleDe(it) !== "read" || !avecQuestion.has(s) || dejaAbsorbee.has(s)) return;
+		dejaAbsorbee.add(s);
+		out.add(i);
 	});
 	return out;
 }
 
 /**
- * L'index de la lecture ABSORBÉE de l'étape de `qi` (la première, dans
- * l'ordre du tableau), ou `null` : `qi` est lui-même une lecture, n'a pas
- * d'étape, ou son étape n'a pas de lecture.
+ * L'index de la lecture ABSORBÉE de l'étape de `qi`, ou `null` : hors
+ * Learn, `qi` est lui-même une lecture, n'a pas d'étape, ou son étape n'a
+ * pas de lecture absorbée.
  */
-export function lectureDeLEtape(items: readonly unknown[], qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items)): number | null {
+export function lectureDeLEtape(items: readonly unknown[], estLecon: boolean, qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number | null {
 	const s = trancheDe(items[qi]);
 	if (s === null || roleDe(items[qi]) === "read") return null;
 	for (let i = 0; i < items.length; i++) {
@@ -81,7 +92,7 @@ export function lectureDeLEtape(items: readonly unknown[], qi: number, absorbees
  * défaut à la première de son étape. Sert à reprendre une session, ou à
  * ouvrir l'éditeur, sur un index qui pointait une lecture.
  */
-export function questionHote(items: readonly unknown[], qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items)): number {
+export function questionHote(items: readonly unknown[], estLecon: boolean, qi: number, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number {
 	if (!absorbees.has(qi)) return qi;
 	const s = trancheDe(items[qi]);
 	let premiere = -1;
@@ -94,7 +105,7 @@ export function questionHote(items: readonly unknown[], qi: number, absorbees: R
 }
 
 /** Les index VISIBLES (tout sauf les lectures absorbées), dans l'ordre. */
-export function questionsVisibles(items: readonly unknown[], absorbees: ReadonlySet<number> = lecturesAbsorbees(items)): number[] {
+export function questionsVisibles(items: readonly unknown[], estLecon: boolean, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number[] {
 	const out: number[] = [];
 	for (let i = 0; i < items.length; i++) if (!absorbees.has(i)) out.push(i);
 	return out;
@@ -102,7 +113,7 @@ export function questionsVisibles(items: readonly unknown[], absorbees: Readonly
 
 /** Le NUMÉRO affiché de chaque index (à partir de 1), qui saute les
     lectures absorbées ; 0 pour une lecture absorbée, qui n'en a pas. */
-export function numerosAffiches(items: readonly unknown[], absorbees: ReadonlySet<number> = lecturesAbsorbees(items)): number[] {
+export function numerosAffiches(items: readonly unknown[], estLecon: boolean, absorbees: ReadonlySet<number> = lecturesAbsorbees(items, estLecon)): number[] {
 	let n = 0;
 	return items.map((_, i) => (absorbees.has(i) ? 0 : ++n));
 }

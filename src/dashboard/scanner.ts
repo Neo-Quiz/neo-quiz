@@ -74,6 +74,12 @@ export interface QuizMeta {
 	    Practice sinon. Affiché en badge, à droite du type ; son suffixe
 	    éventuel (« — Learn ») est retiré du titre (`titreSansMode`). */
 	mode: ModeQuiz;
+	/** Le bloc est une Leçon POUR LE MOTEUR (`extractExamOptions(...).quizMode
+	    === "lesson"`, qui accepte aussi `mode: 'lesson'`, contrairement à
+	    `mode`) : ce que la règle des lectures absorbées lit
+	    (src/lecture-etape.ts). Optionnel pour les entrées fabriquées ailleurs
+	    (absent = pas une Leçon). */
+	lecon?: boolean;
 }
 
 /**
@@ -123,9 +129,11 @@ export function createScanner(host: Host): Scanner {
 			// La détection de la configuration reste partagée avec le moteur : deux
 			// filtres locaux finiraient par construire des catalogues différents.
 			const brut = parseQuizSource(source, { logErrors: false });
-			const sansConfig = (
-				extractExamOptions(brut).questions
-			) as unknown as Array<RawQuizItem | null | undefined>;
+			const extrait = extractExamOptions(brut);
+			const sansConfig = extrait.questions as unknown as Array<RawQuizItem | null | undefined>;
+			// Le mode tel que le MOTEUR le lit : c'est lui qui décide si les
+			// lectures d'étape sont absorbées (src/lecture-etape.ts).
+			const lecon = extrait.quizMode === "lesson";
 
 			// Conserver les positions du tableau BRUT est aussi important que la
 			// déduplication : l'éditeur attribue un qN même aux éléments parasites.
@@ -175,8 +183,9 @@ export function createScanner(host: Host): Scanner {
 				   lectures absorbées par leur étape (src/lecture-etape.ts) : un
 				   cours n'est pas une question. `items`, lui, les garde toutes —
 				   c'est le catalogue de l'ordonnanceur, rangé par identifiant. */
-				questions: questions.length - lecturesAbsorbees(questions.map(x => x.q)).size,
+				questions: questions.length - lecturesAbsorbees(questions.map(x => x.q), lecon).size,
 				items,
+				lecon,
 				types: Array.from(typeSet),
 				quizType,
 				mode: modeDuBloc(brut as unknown[])

@@ -162,6 +162,10 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	await scanner.scanFile(fichierHote);
 	r.check("une lecture absorbée n'est pas comptée, mais reste au catalogue",
 		[scanner.getQuiz(fichierHote.path)?.questions, scanner.getQuiz(fichierHote.path)?.items?.length], [2, 3]);
+	// Hors Learn, le moteur joue la lecture comme un écran : elle est comptée.
+	content = content.replace("{ mode: 'learn' }", "{ mode: 'quiz' }");
+	await scanner.scanFile(fichierHote);
+	r.check("hors Learn, une lecture à étape reste une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 3);
 
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners

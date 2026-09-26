@@ -56,6 +56,9 @@ export interface FicheOrigine {
 export interface FicheDeps {
 	quiz: QuizIndexEntry;
 	questions: DraftQuestion[];
+	/** Le brouillon est un Learn (mode lu comme le moteur) : seules ses
+	    lectures d'étape sont absorbées (src/lecture-etape.ts). */
+	lecon: boolean;
 	stat: QuizStatRecord;
 	/** Absente pour une note écrite à la main ou un quiz partagé. */
 	origine: FicheOrigine | null;
@@ -349,13 +352,13 @@ function plier(s: string): string {
     options, ou le cours de leur étape). Une lecture absorbée par son étape
     (src/lecture-etape.ts) n'a pas de carte : son texte se trouve dans les
     cartes des questions qu'elle surplombe. */
-function filtrer(questions: DraftQuestion[], recherche: string): number[] {
+function filtrer(questions: DraftQuestion[], lecon: boolean, recherche: string): number[] {
 	const r = plier(recherche.trim());
-	const tous = questionsVisibles(questions);
+	const tous = questionsVisibles(questions, lecon);
 	if (!r) return tous;
 	return tous.filter(i => {
 		const q = questions[i];
-		const l = lectureDeLEtape(questions, i);
+		const l = lectureDeLEtape(questions, lecon, i);
 		const cours = l === null ? [] : [questions[l].title || "", questionText(questions[l])];
 		return plier([questionText(q), ...(q.options ?? []), ...cours].join(" ")).includes(r);
 	});
@@ -376,7 +379,7 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
 
 	function peindre(): void {
 		body.replaceChildren();
-		const idx = filtrer(deps.questions, etat.recherche);
+		const idx = filtrer(deps.questions, deps.lecon, etat.recherche);
 		if (idx.length === 0) {
 			ajouter(body, "p", "qbd-fiche-empty", t("dashboard.fiche.searchEmpty"));
 			return;
@@ -418,7 +421,7 @@ function suivreDebord(zone: HTMLElement): void {
 function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer: () => void): void {
 	const grille = ajouter(body, "div", "qbd-fiche-grid");
 	// Numéros AFFICHÉS : ils sautent les lectures absorbées, comme le quiz.
-	const numeros = numerosAffiches(deps.questions);
+	const numeros = numerosAffiches(deps.questions, deps.lecon);
 	for (const i of idx) {
 		const q = deps.questions[i];
 		const n = numeros[i] || i + 1;
@@ -430,7 +433,7 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		   cette zone, pas sur la carte : sa bordure reste entière. */
 		const corps = ajouter(card, "div", "qbd-fiche-card-corps");
 		// Le cours de l'étape, au-dessus de la question : son titre seul.
-		const l = lectureDeLEtape(deps.questions, i);
+		const l = lectureDeLEtape(deps.questions, deps.lecon, i);
 		if (l !== null) {
 			const ligne = ajouter(corps, "span", "qbd-fiche-q-lecture");
 			icone(ligne, "book-open");

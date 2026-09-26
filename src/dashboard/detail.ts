@@ -266,21 +266,27 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	   chaque usage, jamais gardé : l'édition change rôles, étapes et ordre, et
 	   supprimer la dernière question d'une étape rend sa lecture autonome —
 	   donc de nouveau visible. `activeIdx` reste un index du BROUILLON. */
+	/** Le brouillon est un Learn — le mode que le moteur lit
+	    (`readModeConfig` normalise comme `extractExamOptions`). Hors Learn,
+	    rien n'est absorbé : le moteur jouerait chaque lecture comme un écran. */
+	function estLecon(): boolean {
+		return draft?.examOptions?.mode === "lesson";
+	}
 	function visibles(): number[] {
-		return draft ? questionsVisibles(draft.questions) : [];
+		return draft ? questionsVisibles(draft.questions, estLecon()) : [];
 	}
 	/** Numéro affiché de l'index `i` (1…n), qui saute les lectures absorbées. */
 	function numeroDe(i: number): number {
-		return (draft ? numerosAffiches(draft.questions)[i] : 0) || i + 1;
+		return (draft ? numerosAffiches(draft.questions, estLecon())[i] : 0) || i + 1;
 	}
 	/** La question visible qui montre `i` (lui-même, sauf une lecture absorbée). */
 	function hote(i: number): number {
-		return draft ? questionHote(draft.questions, i) : i;
+		return draft ? questionHote(draft.questions, estLecon(), i) : i;
 	}
 	/** L'élément `read` de l'étape de `i`, s'il est absorbé. */
 	function lectureDe(i: number): DraftQuestion | undefined {
 		if (!draft) return undefined;
-		const l = lectureDeLEtape(draft.questions, i);
+		const l = lectureDeLEtape(draft.questions, estLecon(), i);
 		return l === null ? undefined : draft.questions[l];
 	}
 	/** La question visible voisine de `i` (`dir` = ±1), ou -1 au bout. */
@@ -587,6 +593,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		renderFiche(body, {
 			quiz,
 			questions: draft.questions,
+			lecon: estLecon(),
 			stat: statOf(quiz),
 			origine: origineDe(quiz),
 			onStart: (el) => { void flushSave(); start.onClick(el); },
@@ -849,7 +856,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				onListeChange: () => paint(listCol, panel, nav, spec),
 				plusOuvert,
 				setPlusOuvert: (v) => { plusOuvert = v; },
-				estLecon: draft?.examOptions?.mode === "lesson",
+				estLecon: estLecon(),
 				lecture,
 			// Le chemin de la NOTE : une image collée doit atterrir là où le
 			// réglage de l'utilisateur le dit, y compris dans ses modes
@@ -1037,7 +1044,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function renumberAuto(questions: DraftQuestion[]): void {
 		// Le numéro AFFICHÉ, qui saute les lectures absorbées (elles n'en ont
 		// pas, et gardent leur titre).
-		const numeros = numerosAffiches(questions);
+		const numeros = numerosAffiches(questions, estLecon());
 		questions.forEach((qq, idx) => {
 			if (!numeros[idx]) return;
 			if (!qq._userModifiedTitle && /^Question \d+$/.test(qq.title || "")) qq.title = `Question ${numeros[idx]}`;

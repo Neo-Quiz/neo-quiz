@@ -219,7 +219,8 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 	    `null` hors Learn, pour une lecture, ou sans lecture dans l'étape. */
 	function lectureDeLEtape(qi: number): ResolvedPassage | null {
 		if (!ctx.isLessonMode()) return null;
-		const i = indexLectureDeLEtape(ctx.quiz, qi, ctx.lecturesAbsorbees);
+		// L'ensemble figé du moteur fait foi (vide hors Learn d'origine).
+		const i = indexLectureDeLEtape(ctx.quiz, true, qi, ctx.lecturesAbsorbees);
 		if (i === null) return null;
 		const lecture = ctx.quiz[i];
 		const texte = String(lecture?.prompt ?? "").trim();
