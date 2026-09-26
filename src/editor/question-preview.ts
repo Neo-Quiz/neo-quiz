@@ -4,7 +4,6 @@ import { currentHost } from "../host/current";
 import { md2html, _setIcon } from "./utils";
 import type { DraftQuestion } from "./utils";
 import { mathifyElement } from "../engine/mathjax";
-import { markSlots, fillSlots } from "../engine/cloze";
 import { sanitizeQuizHtml } from "../engine/sanitizer";
 /* IMPORT STATIQUE, plus un `require` paresseux : `require` n'existe pas dans
    le rendu de l'application (Vite, modules ES), et l'ancien appel faisait
@@ -13,6 +12,14 @@ import { sanitizeQuizHtml } from "../engine/sanitizer";
    (bundle CommonJS) ne s'en apercevait pas. Aucun cycle : `math-input`
    n'importe rien de l'éditeur. */
 import { usesMathField, createMathField } from "../engine/math-input";
+import {
+	correctOptionIndices,
+	acceptedAnswersCorrige,
+	explainCorrigeHtml,
+	renderOrderingBlock,
+	renderMatchingBlock,
+	renderClozeBlock,
+} from "./question-preview-corrige";
 
 /* ══════════════════════════════════════════════════════════
    QUESTION PREVIEW — la question telle que l'apprenant la verra
@@ -23,9 +30,17 @@ import { usesMathField, createMathField } from "../engine/math-input";
    même typo. C'est la seule façon d'être fidèle au quiz : réécrire un
    rendu « qui ressemble » diverge dès la première retouche du moteur.
 
-   ÉTAT INITIAL uniquement, jamais l'état corrigé : aucune option verte,
-   aucun slot pré-rempli, aucune explication, aucune réponse de terminal.
-   Les acceptedAnswers / correctOrder / correctMap SONT la solution.
+   ÉTAT INITIAL par défaut (`opts.corrige` absent ou faux) : aucune option
+   verte, aucun slot pré-rempli, aucune explication, aucune réponse de
+   terminal — c'est la règle historique, INCHANGÉE pour tout appelant qui ne
+   demande pas `corrige`. Les acceptedAnswers / correctOrder / correctMap
+   restent la solution.
+
+   Avec `opts.corrige: true` (édition dans le rendu, chantier 2026-09-26) :
+   la carte s'affiche comme APRÈS correction — mêmes classes d'état que le
+   moteur (`correct`, `.quiz-explain good`…) — et chaque élément que l'auteur
+   peut modifier porte `data-edit="<champ>"` (+ `data-index`), lu par
+   `dashboard/edition-rendu.ts` (tâche 3).
 
    Partagé par l'aperçu de l'éditeur (editor/preview.ts) et par la page
    d'un quiz du dashboard (dashboard/detail-question.ts).
@@ -46,6 +61,10 @@ export interface QuizPreviewOptions {
 	 * en mémoire, qui n'a pas de note.
 	 */
 	sourcePath?: string;
+	/** Rend la question dans son état CORRIGÉ (bonne réponse visible,
+	    explication…), avec les attributs `data-edit` que l'édition dans le
+	    rendu (tâche 3) accroche. Sans lui : état INITIAL, inchangé. */
+	corrige?: boolean;
 }
 
 /**
@@ -91,7 +110,7 @@ export function resolveImagesInHtml(html: string, sourcePath = ""): string {
     accents graves d'une adresse IP là où le quiz montre du code. Le `<p>`
     que md2html ajoute autour d'un texte d'une ligne est retiré : ces
     libellés vivent dans une cellule, pas dans un paragraphe. */
-function inlineInto(el: HTMLElement, raw: string, sourcePath?: string): void {
+export function inlineInto(el: HTMLElement, raw: string, sourcePath?: string): void {
 	el.innerHTML = resolveImagesInHtml(md2html(raw).replace(/^<p>|<\/p>$/g, ""), sourcePath);
 }
 
@@ -136,7 +155,9 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 	// Le TITRE aussi rend son markdown : le moteur le fait (engine/cards.ts),
 	// et un titre de question technique cite volontiers une commande entre
 	// accents graves — ils s'affichaient bruts dans l'aperçu.
-	inlineInto(ajouter(card, "h2"), q.title || fallbackTitle, opts.sourcePath);
+	const titleEl = ajouter(card, "h2");
+	inlineInto(titleEl, q.title || fallbackTitle, opts.sourcePath);
+	if (opts.corrige) titleEl.setAttribute("data-edit", "title");
 
 	if (q.resourceButton) {
 		const rbtn = ajouter(card, "button", "quiz-resource-btn");
@@ -153,6 +174,8 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 			? q._promptHtml.replace(/!\[\[([^\]]+)\]\]/g, '<img src="$1" class="qb-md-img" />')
 			: md2html(q.prompt);
 		promptEl.innerHTML = resolveImagesInHtml(raw, opts.sourcePath);
+		// `_promptHtml` s'édite en HTML dans « Plus » (tâche 5), pas ici.
+		if (opts.corrige && !q._promptHtml) promptEl.setAttribute("data-edit", "prompt");
 	}
 
 	if (type === "single" || type === "multi") {
@@ -161,66 +184,45 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		// .quiz-options-wrap : le conteneur du moteur (colonne flex) — sans lui
 		// les options perdent leur rythme vertical.
 		const list = ajouter(card, "div", "quiz-options-wrap");
-		(q.options || []).forEach((o) => {
-			const opt = ajouter(list, "div", `quiz-option ${isMulti ? "multi" : ""}`.trim());
+		// Classe `correct` du moteur (engine/cards.ts optionClass) : en corrigé,
+		// la ou les bonnes réponses la portent, comme une sélection juste — les
+		// autres n'ont AUCUNE classe d'état (jamais `wrong`/`missed` : l'auteur
+		// n'a rien « raté », il relit la solution).
+		const correct = opts.corrige ? correctOptionIndices(q, isMulti) : new Set<number>();
+		(q.options || []).forEach((o, oi) => {
+			const cls = `quiz-option ${isMulti ? "multi" : ""} ${correct.has(oi) ? "correct" : ""}`.trim();
+			const opt = ajouter(list, "div", cls);
 			opt.setAttribute("role", "button");
 			opt.setAttribute("tabindex", "0");
 			opt.innerHTML = resolveImagesInHtml(md2html(o || "..."), opts.sourcePath);
+			if (opts.corrige) {
+				opt.setAttribute("data-edit", "option");
+				opt.setAttribute("data-index", String(oi));
+			}
 		});
 	}
 
-	if (type === "ordering") {
-		ajouter(card, "div", "quiz-multi-indicator", t("editor.preview.orderingHint"));
-		const orderingWrap = ajouter(card, "div", "quiz-ordering");
-		const slotsWrap = ajouter(orderingWrap, "div", "quiz-ordering-slots");
-		(q.slots || []).forEach((slotLabel) => {
-			const slot = ajouter(slotsWrap, "div", "quiz-slot");
-			inlineInto(ajouter(slot, "div", "quiz-slot-label"), slotLabel, opts.sourcePath);
-			ajouter(slot, "div", "quiz-slot-value", "…");
-		});
-		// Pool dans l'ordre STOCKÉ (celui montré à l'élève), pas l'ordre correct.
-		const pool = ajouter(orderingWrap, "div", "quiz-ordering-pool");
-		(q.possibilities || []).forEach(p => inlineInto(ajouter(pool, "span", "quiz-pool-item"), p, opts.sourcePath));
-	}
+	if (type === "ordering") renderOrderingBlock(card, q, opts);
 
-	if (type === "matching") {
-		ajouter(card, "div", "quiz-multi-indicator", t("editor.preview.matchingHint"));
-		const matchWrap = ajouter(card, "div", "quiz-ordering");
-		const slotsWrap = ajouter(matchWrap, "div", "quiz-ordering-slots");
-		(q.rows || []).forEach((row, ri) => {
-			const slot = ajouter(slotsWrap, "div", "quiz-slot");
-			inlineInto(ajouter(slot, "div", "quiz-slot-label"), row || t("editor.matching.rowFallback", { n: ri }), opts.sourcePath);
-			ajouter(slot, "div", "quiz-slot-value", "…");
-		});
-		const pool = ajouter(matchWrap, "div", "quiz-ordering-pool");
-		(q.choices || []).forEach(c => inlineInto(ajouter(pool, "span", "quiz-pool-item"), c, opts.sourcePath));
-	}
+	if (type === "matching") renderMatchingBlock(card, q, opts);
 
-	if (type === "cloze") {
-		/* Le gabarit, avec ses trous VIDES : mêmes classes que le moteur
-		   (engine/cloze.ts clozeCardHtml), donc mêmes cases tiretées. Sans
-		   cette branche, un texte à trous n'affichait que son énoncé.
-
-		   Le gabarit ENTIER passe par md2html, trous marqués — comme dans le
-		   moteur : rendre chaque segment séparément couperait les paires
-		   markdown qui enjambent un trou (`` `git {{checkout}} -b` ``). */
-		const { marked, blanks } = markSlots(q.cloze);
-		ajouter(card, "div", "quiz-multi-indicator", t("engine.cloze.instructions", { count: blanks.length }));
-		const body = ajouter(card, "div", "quiz-cloze");
-		body.innerHTML = fillSlots(
-			resolveImagesInHtml(md2html(marked).replace(/^<p>|<\/p>$/g, ""), opts.sourcePath),
-			(index) => `<span class="quiz-cloze-slot"><input class="quiz-cloze-input" type="text" readonly `
-				+ `aria-label="${t("engine.cloze.blankAria", { n: index + 1 }).replace(/"/g, "&quot;")}"></span>`,
-		);
-	}
+	if (type === "cloze") renderClozeBlock(card, q, opts);
 
 	if (type === "flashcard") {
 		/* Aperçu : le recto est l'énoncé déjà rendu ; le verso en sourdine
-		   dessous, pour que l'auteur relise sa réponse sans jouer la carte. */
+		   dessous, pour que l'auteur relise sa réponse sans jouer la carte —
+		   TOUJOURS visible, corrigé ou non (« flashcard : recto et verso
+		   visibles » ne change donc rien ici, c'était déjà le cas). */
 		const back = ajouter(card, "div", "quiz-flashcard-back");
 		ajouter(back, "div", "quiz-textonly-label", t("engine.flashcard.back"));
-		if (q.answer && q.answer.trim()) inlineInto(ajouter(back, "div", "quiz-flashcard-answer"), q.answer, opts.sourcePath);
-		else ajouter(back, "div", "quiz-flashcard-missing", t("engine.flashcard.missingAnswer"));
+		if (q.answer && q.answer.trim()) {
+			const ansEl = ajouter(back, "div", "quiz-flashcard-answer");
+			inlineInto(ansEl, q.answer, opts.sourcePath);
+			if (opts.corrige) ansEl.setAttribute("data-edit", "answer");
+		} else {
+			const missing = ajouter(back, "div", "quiz-flashcard-missing", t("engine.flashcard.missingAnswer"));
+			if (opts.corrige) missing.setAttribute("data-edit", "answer");
+		}
 	}
 
 	if (type === "numeric") {
@@ -230,38 +232,63 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		   ici montrerait à l'auteur un élément que l'apprenant ne voit pas, et
 		   soufflerait la forme attendue de la réponse. */
 		const wrap = ajouter(card, "div", "qcm-options quiz-text-wrap");
-		const ta = ajouter(wrap, "textarea", "quiz-textarea");
+		const ta = ajouter(wrap, "textarea", "quiz-textarea" + (opts.corrige ? " correct" : ""));
 		ta.readOnly = true;
 		ta.setAttribute("aria-readonly", "true");
 		ta.rows = 1;
 		ta.placeholder = q.placeholder || "";
-		ta.value = "";
+		if (opts.corrige) {
+			const { primary, variantsHtml } = acceptedAnswersCorrige(q);
+			ta.value = primary;
+			ta.setAttribute("data-edit", "accepted");
+			ta.setAttribute("data-index", "0");
+			if (variantsHtml) wrap.insertAdjacentHTML("afterend", variantsHtml);
+		} else {
+			ta.value = "";
+		}
 	}
 
 	if (type === "text") {
 		if (usesMathField(q)) {
 			// Question math : le même éditeur d'équations que le quiz, en
-			// lecture seule, gabarit affiché s'il existe.
-			const mathWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-math-wrap");
+			// lecture seule, gabarit affiché s'il existe (ou la réponse
+			// acceptée, en corrigé — même priorité que createMathField : la
+			// valeur l'emporte sur le gabarit).
+			const mathWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-math-wrap" + (opts.corrige ? " correct" : ""));
+			const accepted = opts.corrige ? acceptedAnswersCorrige(q) : null;
 			createMathField(mathWrap, {
 				readOnly: true,
+				value: accepted?.primary || "",
 				// `_extraFields` est un sac non typé : on ne garde le gabarit que
 				// s'il est une chaîne, le type réel de `template`.
 				template: [q._extraFields?.answerTemplate, q.answerTemplate].find((v): v is string => typeof v === "string") ?? "",
 			});
+			if (opts.corrige) {
+				mathWrap.setAttribute("data-edit", "accepted");
+				mathWrap.setAttribute("data-index", "0");
+				if (accepted?.variantsHtml) mathWrap.insertAdjacentHTML("afterend", accepted.variantsHtml);
+			}
 		} else {
 			const textWrap = ajouter(card, "div", "qcm-options quiz-text-wrap");
-			const ta = ajouter(textWrap, "textarea", "quiz-textarea");
+			const ta = ajouter(textWrap, "textarea", "quiz-textarea" + (opts.corrige ? " correct" : ""));
 			ta.readOnly = true;
 			ta.setAttribute("aria-readonly", "true");
 			ta.placeholder = q.placeholder || t("editor.text.defaultPlaceholder");
-			ta.value = "";
+			if (opts.corrige) {
+				const { primary, variantsHtml } = acceptedAnswersCorrige(q);
+				ta.value = primary;
+				ta.setAttribute("data-edit", "accepted");
+				ta.setAttribute("data-index", "0");
+				if (variantsHtml) textWrap.insertAdjacentHTML("afterend", variantsHtml);
+			} else {
+				ta.value = "";
+			}
 		}
 	}
 
 	if (type === "cmd" || type === "powershell" || type === "bash") {
 		const shellWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-text-wrap-command");
-		const shell = ajouter(shellWrap, "div", "quiz-command-shell quiz-terminal-variant-" + type);
+		const shell = ajouter(shellWrap, "div", "quiz-command-shell quiz-terminal-variant-" + type + (opts.corrige ? " correct" : ""));
 		if (type === "bash") {
 			const prefixSpan = ajouter(shell, "span", "quiz-command-prefix quiz-command-prefix-bash");
 			prefixSpan.innerHTML = '<span class="quiz-bash-prefix-userhost">user@hostname</span><span class="quiz-bash-prefix-colon">:</span><span class="quiz-bash-prefix-path">~</span><span class="quiz-bash-prefix-dollar">$ </span>';
@@ -273,6 +300,13 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		cmdTa.readOnly = true;
 		cmdTa.rows = 1;
 		cmdTa.wrap = "off";
+		if (opts.corrige) {
+			const { primary, variantsHtml } = acceptedAnswersCorrige(q);
+			cmdTa.value = primary;
+			cmdTa.setAttribute("data-edit", "accepted");
+			cmdTa.setAttribute("data-index", "0");
+			if (variantsHtml) shellWrap.insertAdjacentHTML("afterend", variantsHtml);
+		}
 	}
 
 	if (opts.onHint && q.hint && q.hint.trim()) {
@@ -282,8 +316,13 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		hintBtn.addEventListener("click", () => opts.onHint?.(hint));
 	}
 
-	// Pas d'explication : elle contient la réponse (le quiz réel ne la montre
-	// qu'après validation).
+	// L'explication ne s'affiche qu'en corrigé : elle contient la réponse (le
+	// quiz réel ne la montre qu'après validation, et l'aperçu initial ne
+	// distingue toujours pas la bonne réponse — demande d'Ahmed inchangée).
+	if (opts.corrige) {
+		const explainHtml = explainCorrigeHtml(q, opts.sourcePath);
+		if (explainHtml) card.insertAdjacentHTML("beforeend", explainHtml);
+	}
 
 	// LaTeX $...$ / $$...$$ : même rendu MathJax natif que le moteur.
 	void mathifyElement(card);
