@@ -92,13 +92,17 @@
    dans src/assets/fonts/jetbrains-mono/, copiés de @fontsource/jetbrains-mono).
    Nom de famille INTERNE (« Neo Quiz Mono ») pour ne jamais dépendre d'une
    police du même nom installée par l'utilisateur avec un métrage différent. */
+/* Plages `unicode-range` recopiées EXACTEMENT de @fontsource/jetbrains-mono
+   5.3.0 (node_modules/@fontsource/jetbrains-mono/{400,400-italic,700}.css) —
+   la revue du 2026-09-26 (M4) avait relevé une ancienne table Google, avec un
+   `U+2074` en trop côté latin. */
 @font-face{
   font-family: "Neo Quiz Mono";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-400-normal.woff2") format("woff2");
-  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 @font-face{
   font-family: "Neo Quiz Mono";
@@ -106,7 +110,7 @@
   font-weight: 400;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2") format("woff2");
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 @font-face{
   font-family: "Neo Quiz Mono";
@@ -114,7 +118,7 @@
   font-weight: 400;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-400-italic.woff2") format("woff2");
-  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 @font-face{
   font-family: "Neo Quiz Mono";
@@ -122,7 +126,7 @@
   font-weight: 400;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-400-italic.woff2") format("woff2");
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 @font-face{
   font-family: "Neo Quiz Mono";
@@ -130,7 +134,7 @@
   font-weight: 700;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-700-normal.woff2") format("woff2");
-  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 @font-face{
   font-family: "Neo Quiz Mono";
@@ -138,7 +142,7 @@
   font-weight: 700;
   font-display: swap;
   src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2") format("woff2");
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 
 /* Le style du bloc de code d'un quiz REPREND celui du snippet Obsidian de
@@ -178,16 +182,44 @@
   font-size: inherit;
   color: var(--qmc-fg);
 }
-.quiz-md-code .token.comment{ color: var(--qmc-comment); font-style: italic; }
-.quiz-md-code .token.keyword{ color: var(--qmc-keyword); }
-.quiz-md-code .token.operator{ color: var(--qmc-operator); }
-.quiz-md-code .token.function{ color: var(--qmc-function); }
-.quiz-md-code .token.string{ color: var(--qmc-string); }
-.quiz-md-code :is(.token.number, .token.boolean, .token.constant){ color: var(--qmc-number); }
-.quiz-md-code :is(.token.class-name, .token.builtin){ color: var(--qmc-class); }
-.quiz-md-code .token.punctuation{ color: var(--qmc-punctuation); }
-.quiz-md-code .token.tag{ color: var(--qmc-tag); }
-.quiz-md-code .token.attr-name{ color: var(--qmc-attr); }
+/* Revue du 2026-09-26 (I1) : les couleurs de jetons doivent battre TOUJOURS
+   celles de l'hôte, y compris `.language-css .token.string` / `.style
+   .token.string` de l'`app.css` d'Obsidian — que notre propre markup peut
+   déclencher (`class="language-css"` sur `<code>`, ou un span `.token.style`
+   à l'intérieur d'un bloc markup). `.quiz-md-code code .token.x` chaîne deux
+   classes de plus que ces sélecteurs-là (0,3,1 pièces), donc l'emporte sans
+   `!important`. Une base neutralise D'ABORD tout `.token` (couleur du texte,
+   jamais de style hérité) puis les familles précises la RECOUVRENT — dans
+   cet ordre, pour que rien ne reste sur une couleur de thème, clair ou
+   sombre, ni sous MathJax. Un jeton d'un type que Prism ajouterait un jour
+   sans que nous l'ayons prévu hérite donc de `--qmc-fg`, jamais de l'hôte. */
+.quiz-md-code code .token{
+  color: var(--qmc-fg);
+  font-style: normal;
+  font-weight: inherit;
+  background: none;
+  text-shadow: none;
+}
+.quiz-md-code code :is(.token.comment, .token.prolog, .token.doctype, .token.cdata){
+  color: var(--qmc-comment); font-style: italic;
+}
+.quiz-md-code code :is(.token.keyword, .token.control, .token.directive, .token.important, .token.atrule){
+  color: var(--qmc-keyword);
+}
+.quiz-md-code code .token.operator{ color: var(--qmc-operator); }
+.quiz-md-code code :is(.token.function, .token.method){ color: var(--qmc-function); }
+.quiz-md-code code :is(.token.string, .token.char, .token.regex, .token.attr-value){ color: var(--qmc-string); }
+.quiz-md-code code :is(.token.number, .token.boolean, .token.constant, .token.symbol, .token.inserted){ color: var(--qmc-number); }
+.quiz-md-code code :is(.token.class-name, .token.builtin, .token.type){ color: var(--qmc-class); }
+.quiz-md-code code :is(.token.punctuation, .token.deleted){ color: var(--qmc-punctuation); }
+.quiz-md-code code :is(.token.tag, .token.selector, .token.namespace){ color: var(--qmc-tag); }
+.quiz-md-code code .token.attr-name{ color: var(--qmc-attr); }
+/* Le reste — pas dans le snippet Obsidian, jamais rencontrés en pratique sur
+   nos langages, mais listés par la revue (I1) : couleur du texte, comme la
+   base, pour ne dépendre d'aucun thème d'hôte. */
+.quiz-md-code code :is(.token.variable, .token.parameter, .token.property, .token.property-access, .token.entity, .token.url){
+  color: var(--qmc-fg);
+}
 .quiz-md-citation{
   border-left: 3px solid var(--background-modifier-border);
   padding-left: 12px;

@@ -213,6 +213,44 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 			// le reste du contenu du bloc doit être échappé, jeton par jeton.
 			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span"].includes(m[1].toLowerCase()));
 		}), LANGUES_INJECTION.map(() => true));
+	r.check("alias `c++` : reconnu comme cpp",
+		rendre("```c++" + NL + "int x = 1;" + NL + "```").includes('<span class="token keyword">int</span>'), true);
+	/* Revue du 2026-09-26 (M1) : une langue comme `constructor` ou `__proto__`
+	   ne doit jamais lire la propriété héritée du même nom sur
+	   `Object.prototype` (ici la fonction `Object`, ou l'objet prototype
+	   lui-même) — juste retomber sur `null`, texte échappé nu. */
+	r.check("langage `constructor` : jamais la propriété héritée, texte échappé",
+		rendre("```constructor" + NL + "<i>x</i>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-constructor">&lt;i&gt;x&lt;/i&gt;</code></pre>`);
+	r.check("langage `__proto__` : idem",
+		rendre("```__proto__" + NL + "<i>x</i>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-__proto__">&lt;i&gt;x&lt;/i&gt;</code></pre>`);
+	/* Plafond PAR BLOC (revue du 2026-09-26, C2) : au-delà d'environ 3000
+	   caractères, le reste d'un bloc s'affiche échappé sans couleurs. 1600
+	   nombres séparés d'une espace (3199 caractères) : loin sous le plafond
+	   pour la moitié, loin au-delà pour l'autre — si TOUS étaient colorés, la
+	   troncature ne servirait à rien. */
+	{
+		const NOMBRES = 1600;
+		const gros = Array.from({ length: NOMBRES }, () => "1").join(" ");
+		const html = rendre("```python" + NL + gros + NL + "```");
+		const colores = (html.match(/<span class="token number">1<\/span>/g) || []).length;
+		r.check("plafond par bloc : coloration tronquée avant la fin d'un bloc trop long",
+			colores > 0 && colores < NOMBRES, true);
+	}
+	/* Budget CUMULÉ par texte (C2) : huit blocs de 3199 caractères (donc
+	   chacun plafonné à 3000 s'il restait assez de budget) dépassent le
+	   budget de 20 000 avant la fin du texte — le dernier bloc doit sortir
+	   entièrement NU, alors que le premier reste coloré. */
+	{
+		const unBloc = () => "```python" + NL + Array.from({ length: 1600 }, () => "1").join(" ") + NL + "```";
+		const huitBlocs = Array.from({ length: 8 }, unBloc).join(NL + NL);
+		const html = rendre(huitBlocs);
+		const comptes = html.split('<pre class="quiz-md-code">').slice(1)
+			.map(segment => (segment.match(/<span class="token number">1<\/span>/g) || []).length);
+		r.check("budget cumulé : le premier bloc d'un texte reste coloré", comptes[0] > 0, true);
+		r.check("budget cumulé : le dernier bloc d'un texte trop riche en code perd sa coloration", comptes[7], 0);
+	}
 	r.check("tableau : en-tête, alignements, `|` dans un code",
 		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
 		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`

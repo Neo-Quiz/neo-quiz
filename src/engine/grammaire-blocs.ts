@@ -361,7 +361,17 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 			case "code": {
 				/* La langue n'entre que sous sa forme sûre (lettres, chiffres,
 				   `+#.-`), dans une classe : c'est ce que le motif de clôture
-				   accepte, rien d'autre ne peut y arriver. */
+				   accepte, rien d'autre ne peut y arriver.
+				   M3 (revue du 2026-09-26) : cette classe `language-xxx` est
+				   aussi celle que le post-processeur d'Obsidian cherche
+				   (`code[class*="language-"]:not(.is-loaded)`) pour lancer SON
+				   PROPRE surligneur — elle existait déjà avant la coloration
+				   (ce commit n'en change pas le risque). La faire remplacer par
+				   `data-langue` toucherait le contrat de `html-vers-markdown.ts`
+				   (attributsCanon) et ne se vérifie que dans le VRAI greffon,
+				   ce que cette tâche ne peut pas faire (pas de build, pas
+				   d'Obsidian) : laissé tel quel, à reprendre avec un test dans
+				   le greffon réel plutôt qu'ici. */
 				const classe = b.langue ? ` class="language-${o.echapper(b.langue)}"` : "";
 				const contenu = b.contenu ? tranche(b.contenu) : "";
 				// Coloré si un langage est nommé ET reconnu ; sinon le texte

@@ -71,6 +71,7 @@
     "check:pdf": "node scripts/check-pdf.mjs",
     "check:folder-contents": "node scripts/check-folder-contents.mjs",
     "check:md-preview": "node scripts/check-md-preview.mjs",
+    "check:code-highlight": "node scripts/check-code-highlight.mjs",
     "test": "node --test scripts/set-version.test.mjs scripts/ship.test.mjs scripts/changelog.test.mjs",
     "version:set": "node scripts/set-version.mjs",
     "version:patch": "node scripts/set-version.mjs patch",
@@ -78,14 +79,13 @@
     "version:major": "node scripts/set-version.mjs major"
   },
   "dependencies": {
-    "@fontsource/jetbrains-mono": "^5.3.0",
     "json5": "^2.2.3",
     "mathlive": "^0.110.0",
-    "prismjs": "^1.30.0"
+    "refractor": "^5.0.0"
   },
   "devDependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@types/node": "^26.4.0",
-    "@types/prismjs": "^1.26.6",
     "esbuild": "^0.28.2",
     "linkedom": "^0.18.13",
     "obsidian": "^1.13.1",

@@ -1,0 +1,6 @@
+Fichiers copiés octet pour octet depuis @fontsource/jetbrains-mono 5.3.0
+(node_modules/@fontsource/jetbrains-mono/files/), licence OFL-1.1 (voir LICENSE
+à côté). Le paquet reste en devDependency du dépôt (package.json) : source de
+vérité pour régénérer ces fichiers un jour, jamais importé par le code — les
+deux hôtes servent les .woff2 par chemin relatif depuis ce dossier
+(src/assets/css/components/quiz-card.css).
