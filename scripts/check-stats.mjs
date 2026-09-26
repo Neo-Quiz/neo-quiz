@@ -1,0 +1,62 @@
+/**
+ * L'HISTORIQUE DES TENTATIVES du magasin de stats (`src/dashboard/stats-store.ts`).
+ * Ce qu'il empêche : un meilleur score qui ne redescend pas quand on supprime
+ * la tentative qui le portait, un score d'avant l'historique perdu ou
+ * impossible à supprimer, une annulation qui ne remet pas l'état d'avant.
+ *     npm run check:stats
+ */
+import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
+
+await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentativesDe, MAX_TENTATIVES }) => {
+	const r = makeReporter("Stats — historique des tentatives");
+	const fabriquer = (initial = {}) => {
+		let ecrit = null;
+		const store = createStatsStore({ getStats: () => structuredClone(initial), saveStats: async (d) => { ecrit = d; } });
+		store.load();
+		return { store, ecrit: () => ecrit };
+	};
+
+	const { store } = fabriquer();
+	store.updateRecord("a.md", { bestScore: 40, questionsDone: 5, totalQuestions: 10 });
+	store.updateRecord("a.md", { bestScore: 80, questionsDone: 8, totalQuestions: 10 });
+	store.updateRecord("a.md", { bestScore: 60, questionsDone: 7, totalQuestions: 10 });
+	const a = store.getRecord("a.md");
+	r.check("trois tentatives gardées", a.tentatives.length, 3);
+	r.check("meilleur score et tentatives dérivés", [a.bestScore, a.attempts], [80, 3]);
+	const la80 = a.tentatives.find(x => x.pct === 80);
+	const retiree = store.supprimerTentative("a.md", la80.date);
+	r.check("supprimer rend la tentative retirée", retiree?.pct, 80);
+	r.check("le meilleur redescend à la suivante", store.getRecord("a.md").bestScore, 60);
+	r.check("le nombre de tentatives suit", store.getRecord("a.md").attempts, 2);
+	store.restaurerTentative("a.md", retiree);
+	r.check("annuler remet le meilleur", [store.getRecord("a.md").bestScore, store.getRecord("a.md").attempts], [80, 3]);
+	for (const x of [...store.getRecord("a.md").tentatives]) store.supprimerTentative("a.md", x.date);
+	const vide = store.getRecord("a.md");
+	r.check("plus aucune tentative : 0 %, 0 tentative, 0 question faite", [vide.bestScore, vide.attempts, vide.questionsDone], [0, 0, 0]);
+	r.check("supprimer une date inconnue ne fait rien", store.supprimerTentative("a.md", 12345), null);
+
+	const { store: s2 } = fabriquer({ "b.md": { bestScore: 0, questionsDone: 3, totalQuestions: 10, lastPlayed: 1000, attempts: 3 } });
+	r.check("un score d'avant l'historique se lit comme une tentative", tentativesDe(s2.getRecord("b.md")), [{ date: 1000, pct: 0, ancienne: true }]);
+	r.check("et se supprime", s2.supprimerTentative("b.md", 1000)?.ancienne, true);
+	r.check("il ne reste rien", [s2.getRecord("b.md").attempts, s2.getRecord("b.md").bestScore], [0, 0]);
+
+	const { store: s3 } = fabriquer({ "c.md": { bestScore: 70, questionsDone: 3, totalQuestions: 10, lastPlayed: 500, attempts: 2 } });
+	s3.updateRecord("c.md", { bestScore: 50, questionsDone: 4, totalQuestions: 10 });
+	const c = s3.getRecord("c.md");
+	r.check("l'ancien score devient la première tentative de la liste", c.tentatives.map(x => x.ancienne === true), [false, true]);
+	r.check("le meilleur tient compte de l'ancien", c.bestScore, 70);
+
+	const { store: s4 } = fabriquer();
+	s4.updateRecord("d.md", { bestScore: 0, questionsDone: 4, totalQuestions: 4, texteLibre: true });
+	r.check("réponses libres : pourcentage nul (null)", s4.getRecord("d.md").tentatives[0].pct, null);
+	r.check("réponses libres : meilleur score 0", s4.getRecord("d.md").bestScore, 0);
+
+	const { store: s5 } = fabriquer();
+	s5.updateRecord("e.md", { bestScore: 95, questionsDone: 1, totalQuestions: 1 });
+	for (let i = 0; i < MAX_TENTATIVES + 5; i++) s5.updateRecord("e.md", { bestScore: 10, questionsDone: 1, totalQuestions: 1 });
+	const e = s5.getRecord("e.md");
+	r.check("plafond de tentatives", e.tentatives.length, MAX_TENTATIVES);
+	r.check("la meilleure est toujours gardée", e.bestScore, 95);
+	r.check("tentativesDe : du plus récent au plus ancien", tentativesDe(e)[0].date >= tentativesDe(e)[1].date, true);
+	r.done();
+});

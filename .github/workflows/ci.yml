@@ -116,6 +116,11 @@ jobs:
       - name: Quiz session snapshot
         run: npm run check:session
 
+      # L'HISTORIQUE DES TENTATIVES : meilleur score dérivé, anciens scores
+      # lus sans perte, suppression et annulation symétriques.
+      - name: Stats attempts
+        run: npm run check:stats
+
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à
       # l'écran. Ce contrôle charge le noyau réellement appelé par l'installeur.

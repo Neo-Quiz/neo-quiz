@@ -176,6 +176,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   question, quiz modifié entre deux sessions (question supprimée, ajoutée,
   options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
   s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Dans la CI.
+- `npm run check:stats` — l'HISTORIQUE DES TENTATIVES du magasin de stats
+  (`src/dashboard/stats-store.ts`) : meilleur score et nombre de tentatives
+  DÉRIVÉS de la liste (supprimer la meilleure le fait redescendre), un score
+  d'avant l'historique lu comme une tentative « ancienne » supprimable,
+  annulation symétrique, plafond qui garde la meilleure. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

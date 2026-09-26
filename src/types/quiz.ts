@@ -447,6 +447,8 @@ export interface StatsRecord {
 	bestScore: number;
 	questionsDone: number;
 	totalQuestions: number;
+	/** Quiz à réponses libres seulement : pas de pourcentage (tentative `pct: null`). */
+	texteLibre?: boolean;
 }
 
 /**

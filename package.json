@@ -63,6 +63,7 @@
     "check:reprise": "node scripts/check-reprise.mjs",
     "check:historique-nav": "node scripts/check-historique-nav.mjs",
     "check:langue": "node scripts/check-langue.mjs",
+    "check:stats": "node scripts/check-stats.mjs",
     "check:format-heure": "node scripts/check-format-heure.mjs",
     "check:fond": "node scripts/check-fond.mjs",
     "check:pdf": "node scripts/check-pdf.mjs",

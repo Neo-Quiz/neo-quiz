@@ -544,7 +544,8 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				statsStore.updateRecord(ctx.sourcePath, {
 					bestScore: modeTexte ? 0 : pct,
 					questionsDone,
-					totalQuestions: total || ctx.quiz.length
+					totalQuestions: total || ctx.quiz.length,
+					texteLibre: modeTexte
 				});
 			}
 
