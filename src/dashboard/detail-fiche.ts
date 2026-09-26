@@ -281,8 +281,10 @@ const ROLE_KEYS: Partial<Record<QuestionRole, TransKey>> = {
    liste passe en colonne. Compté sur le texte BRUT, LaTeX compris. */
 const OPTION_COURTE = 32;
 
-/** L'en-tête d'une carte : son numéro, l'icône et le nom du type, puis le rôle d'un Learn. */
-function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): void {
+/** L'en-tête d'une carte : son numéro, l'icône et le nom du type, puis le rôle d'un Learn.
+    Partagé avec les cartes de la liste de l'éditeur (detail.ts), qui y
+    ajoutent leurs commandes : rendu, pour qu'elles s'y greffent. */
+export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
 	const top = ajouter(card, "span", "qbd-fiche-q-top");
 	ajouter(top, "span", "qbd-fiche-num", String(numero));
 	const roleKey = q.role ? ROLE_KEYS[q.role] : undefined;
@@ -292,9 +294,10 @@ function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): void {
 	if (q.role !== "read" && q.role !== "explain") {
 		const def = Q_TYPES.find(d => d.key === q._type);
 		if (def) icone(top, def.lucide, "qbd-fiche-q-icon");
-		ajouter(top, "span", undefined, def?.label ?? q._type);
+		ajouter(top, "span", "qbd-fiche-q-type", def?.label ?? q._type);
 	}
 	if (roleKey) ajouter(top, "span", "qbd-fiche-q-role", t(roleKey));
+	return top;
 }
 
 /** Les options d'un QCM, SANS la bonne, marquées A, B, C… : rien ne se

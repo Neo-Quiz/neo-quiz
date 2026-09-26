@@ -1,0 +1,692 @@
+/* ══════════════════════════════════════════════════════════
+   ÉDITEUR D'UN QUIZ — refonte du 2026-09-26
+   (detail.ts, detail-head.ts, detail-question.ts, editor/editor-form.ts,
+   editor/format-toolbar.ts)
+
+   - L'en-tête est celui de la fiche (classes `qbd-fiche-*`,
+     dashboard-fiche.css) : seul ce qui lui est propre vit ici.
+   - Les cartes de la liste reprennent celles de la grille de la fiche.
+   - Le formulaire est une CARTE de verre (le panneau `.is-editing`), en
+     sections nommées ; ses CHAMPS ont le style des contrôles de Neo
+     Calendar (la recherche de la fiche) — fond du texte à 7 %, liseré à
+     9 %, focus bleu avec un halo doux. Pas le verre des cartes : la tuile
+     reste aux contenus, un champ a l'air d'un champ.
+   - Les flèches du bas sont celles du quiz (action-buttons.css).
+
+   Importé APRÈS les feuilles `editor/*` (index.css) : les classes `qb-*`
+   du formulaire y sont habillées pour l'ancien éditeur en trois colonnes,
+   souvent en `!important`. Les règles ci-dessous sont toutes bornées à
+   `.qbd-qz-form`, le seul endroit où ce formulaire vit encore.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── En-tête ── */
+.qbd-qz-top {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	flex-shrink: 0;
+	min-width: 0;
+}
+.qbd-qz-top .qbd-fiche-actions {
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+/* Seul le triangle de « Lancer » est plein (comme « Commencer le quiz ») : une
+   coche, un crayon ou une disquette remplis deviendraient des taches. */
+.qbd-qz-top .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
+.qbd-qz-top .qbd-cta3d-face .qbd-btn-icon .lucide-play { fill: currentColor; }
+.qbd-qz-top .qbd-btn-icon { display: inline-flex; }
+
+@media (max-width: 820px) {
+	.qbd-qz-top .qbd-fiche-head { flex-wrap: wrap; }
+	.qbd-qz-top .qbd-fiche-actions { width: 100%; justify-content: flex-start; }
+}
+
+/* ── Liste des questions ── */
+.qbd-qz-list-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--text-normal) 70%, transparent);
+	/* Posé à même le fond d'écran : l'ombre le garde lisible sur une photo. */
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Une carte : celle de la grille de la fiche, en plus serré. */
+.qbd-qz-card {
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+	padding: 11px 12px 12px 14px;
+	border-radius: 12px;
+	background: var(--qbd-glass-bg);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
+	box-shadow: var(--qbd-glass-sheen);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	color: var(--text-normal);
+	cursor: pointer;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.qbd-qz-card:hover {
+	border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+}
+/* La question courante : un liseré bleu, et un trait plein à gauche. */
+.qbd-qz-card.is-active {
+	border-color: var(--quiz-primary);
+	box-shadow: var(--qbd-glass-sheen), inset 3px 0 0 var(--quiz-primary);
+}
+
+/* La ligne du numéro : le nom du type et le rôle s'abrègent, le numéro et les
+   commandes jamais. */
+.qbd-qz-card-top {
+	min-width: 0;
+	font-size: 11.5px;
+}
+.qbd-qz-card-top > * { flex-shrink: 0; }
+.qbd-qz-card-top .qbd-fiche-q-type,
+.qbd-qz-card-top .qbd-fiche-q-role {
+	flex-shrink: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.qbd-qz-card-top .qbd-fiche-q-role { font-size: 11px; padding: 1px 8px; }
+
+.qbd-qz-card-text {
+	min-width: 0;
+	font-size: 13px;
+	line-height: 1.45;
+	font-weight: 500;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.qbd-qz-card-text.is-empty {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
+/* Réordonner / supprimer : au bout de la ligne du numéro, révélés au survol
+   de la carte (et toujours visibles sur la courante). Des icônes nues : pas
+   de bouton encadré dans une carte. */
+.qbd-qz-card-acts {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	opacity: 0;
+	transition: opacity 0.14s ease;
+}
+.qbd-qz-card:hover .qbd-qz-card-acts,
+.qbd-qz-card.is-active .qbd-qz-card-acts,
+.qbd-qz-card-acts:focus-within {
+	opacity: 1;
+}
+.qbd-root .qbd-qz-card-act {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 22px;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 5px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+.qbd-root .qbd-qz-card-act:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	color: var(--text-normal);
+}
+.qbd-root .qbd-qz-card-del:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--quiz-danger) 16%, transparent);
+	color: var(--quiz-danger);
+}
+.qbd-root .qbd-qz-card-act:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
+}
+/* Aux extrémités la flèche reste VISIBLE mais inerte : une rangée qui
+   change de largeur d'une carte à l'autre ferait sautiller la liste. */
+.qbd-root .qbd-qz-card-act:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+.qbd-qz-card-act svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* « + Ajouter une question » : un bouton TEXTE, sous la liste. */
+.qbd-root .qbd-qz-list-add {
+	flex-shrink: 0;
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 2px 0 0;
+	padding: 6px 10px 6px 8px;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	box-shadow: none;
+	color: color-mix(in srgb, var(--text-normal) 80%, transparent);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+	cursor: pointer;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+.qbd-root .qbd-qz-list-add:hover {
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-normal);
+}
+.qbd-root .qbd-qz-list-add:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
+}
+.qbd-qz-list-add-icon { display: inline-flex; }
+.qbd-qz-list-add-icon svg { width: 15px; height: 15px; }
+
+/* ── Le formulaire : une carte ── */
+.qbd-qz-panel.is-editing {
+	padding: 18px 20px 20px;
+	border-radius: 14px;
+	background: var(--qbd-glass-bg-dense);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
+	box-shadow: var(--qbd-glass-sheen);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	/* Les règles « étroit » du formulaire se mesurent sur la carte. */
+	container: qbd-qz-form / inline-size;
+}
+@media (max-width: 900px) {
+	.qbd-qz-panel.is-editing { padding: 14px 14px 16px; }
+}
+
+.qbd-qz-form {
+	/* Les contrôles de Neo Calendar (la recherche de la fiche). */
+	--qbd-champ: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	--qbd-champ-survol: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	--qbd-champ-bord: color-mix(in srgb, var(--text-normal) 9%, transparent);
+	--qbd-champ-focus: color-mix(in srgb, var(--quiz-primary) 75%, transparent);
+	--qbd-champ-halo: 0 0 0 3px color-mix(in srgb, var(--quiz-primary) 22%, transparent);
+	gap: 22px;
+	min-width: 0;
+	/* Le halo du focus déborde de 3 px : la piste du carrousel coupe tout ce
+	   qui dépasse (overflow-x). */
+	padding: 3px;
+}
+
+/* Une section nommée : son libellé en petites capitales, puis ses champs. */
+.qbd-qz-fsec {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+.qbd-qz-fsec-label {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+/* Le type à côté de « Réponses » : du texte, pas une étiquette. */
+.qbd-qz-fsec-type {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	font-size: 12px;
+	color: var(--text-faint);
+}
+.qbd-qz-fsec-type::before {
+	content: "·";
+	margin-right: 3px;
+}
+.qbd-qz-fsec-type-icon { display: inline-flex; }
+.qbd-qz-fsec-type-icon svg { width: 13px; height: 13px; }
+
+/* ── Les champs ──
+   `!important` sur le fond, la bordure et l'ombre : editor-forms.css les pose
+   eux-mêmes en `!important` (`.qb-field-input`, `:focus`). */
+.qbd-root .qbd-qz-form :is(.qbd-qz-input, .qb-field-input, .qb-answer-input, .qb-rich, .qbd-select) {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	min-height: 36px;
+	margin: 0;
+	padding: 7px 12px;
+	border: 1px solid var(--qbd-champ-bord) !important;
+	border-radius: 8px;
+	background: var(--qbd-champ) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-family: var(--font-interface, inherit);
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1.45;
+	outline: none;
+	transition: background-color 120ms ease, border-color 120ms ease, box-shadow 160ms ease;
+}
+.qbd-root .qbd-qz-form :is(.qbd-qz-input, .qb-field-input, .qb-answer-input, .qb-rich, .qbd-select):hover {
+	background: var(--qbd-champ-survol) !important;
+}
+.qbd-root .qbd-qz-form :is(.qbd-qz-input, .qb-field-input, .qb-answer-input, .qbd-select):focus-visible,
+.qbd-root .qbd-qz-form :is(.qbd-qz-input, .qb-field-input, .qb-answer-input):focus,
+.qbd-root .qbd-qz-form .qbd-select[aria-expanded="true"],
+.qbd-root .qbd-qz-form .qb-rich:focus-within {
+	border-color: var(--qbd-champ-focus) !important;
+	background: var(--qbd-champ-survol) !important;
+	box-shadow: var(--qbd-champ-halo) !important;
+}
+.qbd-qz-form :is(.qbd-qz-input, .qb-field-input, .qb-answer-input, .qb-field-textarea)::placeholder {
+	color: var(--text-faint);
+}
+/* Le titre pèse plus qu'un champ ordinaire, moins que la question. */
+.qbd-root .qbd-qz-form .qbd-qz-input { font-weight: 600; }
+
+/* Un champ multiligne : un CADRE (`.qb-rich`), la barre collée en haut, la
+   zone dessous, sans cadre à elle. */
+.qbd-root .qbd-qz-form .qb-rich {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+}
+.qbd-root .qbd-qz-form .qb-rich .qb-field-textarea {
+	display: block;
+	width: 100%;
+	min-height: 0;
+	margin: 0;
+	padding: 9px 12px 10px;
+	border: none !important;
+	border-radius: 0;
+	background: none !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-family: var(--font-interface, inherit);
+	font-size: 14px;
+	line-height: 1.5;
+	resize: vertical;
+	outline: none;
+}
+/* L'énoncé : un cran plus grand, c'est la question elle-même. */
+.qbd-root .qbd-qz-form .qbd-qz-fsec--prompt .qb-field-textarea {
+	font-size: 15px;
+	font-weight: 500;
+}
+
+/* La barre d'outils : des icônes, compacte. */
+.qb-format-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 1px;
+	padding: 3px 4px;
+	border-bottom: 1px solid var(--qbd-champ-bord, color-mix(in srgb, var(--text-normal) 9%, transparent));
+}
+.qbd-root .qb-format-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 26px;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 5px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: background-color 100ms ease, color 100ms ease;
+}
+.qbd-root .qb-format-btn:hover {
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	color: var(--text-normal);
+}
+.qbd-root .qb-format-btn:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: -1px;
+}
+.qb-format-btn svg { width: 15px; height: 15px; }
+.qb-format-sep {
+	width: 1px;
+	height: 16px;
+	margin: 0 4px;
+	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+}
+
+/* Les sous-libellés du type (« Situations », « Correspondances »…) et des
+   sections repliables : du texte discret, pas des capitales. */
+.qbd-root .qbd-qz-form .qb-field-label {
+	display: block;
+	margin: 0 0 6px !important;
+	padding: 0;
+	font-size: 12.5px;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--text-muted);
+}
+.qbd-qz-form .qb-field-label:empty { display: none; }
+.qbd-qz-form .qb-field + .qb-field { margin-top: 12px; }
+.qbd-qz-form .qb-field-help {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--text-faint);
+}
+.qbd-qz-form .qb-field-help:empty { display: none; }
+.qbd-qz-form .qb-field-help--warn {
+	color: var(--quiz-hint-text, var(--text-warning));
+	font-weight: 600;
+}
+
+/* ── Les champs du type : un rythme régulier ── */
+.qbd-qz-type-box {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.qbd-qz-type-box > * + * { margin-top: 10px; }
+/* Un sous-libellé ouvre un nouveau groupe : plus d'air au-dessus. */
+.qbd-qz-type-box > .qb-field-label:not(:first-child) { margin-top: 18px !important; }
+.qbd-qz-type-box > .qb-field-label + * { margin-top: 0; }
+
+/* QCM : une ligne par réponse — le champ, l'interrupteur, supprimer. */
+.qbd-qz-form .qb-answers {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0;
+}
+.qbd-qz-form .qb-answer-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+.qbd-root .qbd-qz-form .qb-answer-row .qb-answer-input { flex: 1; }
+/* La bonne réponse : un liseré vert fin, rien de plein. */
+.qbd-root .qbd-qz-form .qb-answer-row.is-correct .qb-answer-input:not(:focus) {
+	border-color: color-mix(in srgb, var(--quiz-success) 80%, transparent) !important;
+}
+
+.qbd-root .qb-answer-switch {
+	position: relative;
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	padding: 4px 6px;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 12.5px;
+	font-weight: 500;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+.qbd-root .qb-answer-switch:hover { color: var(--text-normal); }
+.qbd-root .qb-answer-switch:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
+}
+.qbd-root .qb-answer-switch[aria-checked="true"] {
+	color: color-mix(in srgb, var(--quiz-success) 45%, var(--text-normal));
+}
+/* L'interrupteur, et celui des options du type (sensible à la casse) :
+   un seul dessin. */
+.qb-answer-switch-track,
+.qbd-qz-form .qb-toggle-track {
+	position: relative;
+	flex-shrink: 0;
+	width: 32px;
+	height: 18px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 20%, transparent);
+	transition: background-color 0.18s ease;
+}
+.qb-answer-switch-track::after,
+.qbd-qz-form .qb-toggle-thumb {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+	transform: none;
+	transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.qb-answer-switch[aria-checked="true"] .qb-answer-switch-track {
+	background: var(--quiz-success);
+}
+.qb-answer-switch[aria-checked="true"] .qb-answer-switch-track::after,
+.qbd-qz-form .qb-toggle-track.on .qb-toggle-thumb {
+	transform: translateX(14px);
+}
+.qbd-qz-form .qb-toggle-track.on { background: var(--quiz-primary); }
+.qbd-qz-form .qb-toggle-wrap {
+	display: inline-flex;
+	align-self: flex-start;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+	font-size: 13px;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.qbd-qz-form .qb-toggle-wrap:hover { color: var(--text-normal); }
+
+/* Supprimer une réponse, une ligne de liste : une icône nue. */
+.qbd-root .qbd-qz-form :is(.qb-answer-delete, .qb-arr-del) {
+	position: static;
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-faint);
+	opacity: 1;
+	cursor: pointer;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+.qbd-root .qbd-qz-form :is(.qb-answer-delete, .qb-arr-del):hover:not(:disabled) {
+	background: color-mix(in srgb, var(--quiz-danger) 14%, transparent);
+	color: var(--quiz-danger);
+}
+.qbd-root .qbd-qz-form :is(.qb-answer-delete, .qb-arr-del):focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
+}
+.qbd-root .qbd-qz-form .qb-arr-del:disabled { opacity: 0.3; cursor: default; }
+/* Interdit (bonne réponse, deux réponses au plus) : la place reste, pour que
+   les interrupteurs restent alignés. */
+.qbd-root .qbd-qz-form .qb-answer-delete.is-hidden { visibility: hidden; }
+.qbd-qz-form :is(.qb-answer-delete, .qb-arr-del) svg { width: 15px; height: 15px; }
+
+/* « + Ajouter » des listes : un bouton TEXTE discret, à gauche, sous la liste. */
+.qbd-root .qbd-qz-form :is(.qb-answer-add, .qb-arr-add) {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: 6px;
+	width: auto;
+	margin: 8px 0 0;
+	padding: 5px 9px 5px 6px;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	filter: none;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+.qbd-root .qbd-qz-form :is(.qb-answer-add, .qb-arr-add):hover {
+	background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	color: var(--text-normal);
+}
+.qbd-root .qbd-qz-form :is(.qb-answer-add, .qb-arr-add):focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
+}
+.qbd-qz-form .qb-add-icon { display: inline-flex; margin: 0; }
+.qbd-qz-form .qb-add-icon svg { width: 14px; height: 14px; }
+
+/* Listes (classement, appariement, réponses acceptées) : une ligne = un
+   champ et sa corbeille, sans boîte autour. */
+.qbd-qz-form .qb-arr-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+.qbd-qz-form .qb-arr-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	background: none;
+	border: none;
+	border-radius: 0;
+}
+.qbd-root .qbd-qz-form .qb-arr-row .qb-field-input { flex: 1; }
+.qbd-qz-form .qb-arr-idx {
+	flex: 1;
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* L'ordre attendu : un petit champ numérique (largeur posée en ligne). */
+.qbd-root .qbd-qz-form .qb-arr-row .qb-field-sm {
+	flex: none;
+	min-width: 64px;
+	padding: 6px 8px;
+	text-align: center;
+}
+
+/* Appariement : « situation → choix » en deux colonnes alignées — la même
+   grille pour chaque ligne, le menu à la largeur de sa colonne. */
+.qbd-qz-form .qb-match-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+.qbd-qz-form .qb-match-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	background: none;
+	border: none;
+}
+.qbd-qz-form .qb-match-label {
+	min-width: 0;
+	font-size: 13.5px;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-qz-form .qb-match-arrow {
+	display: inline-flex;
+	justify-content: center;
+	margin: 0;
+	color: var(--text-faint);
+}
+.qbd-qz-form .qb-match-arrow svg { width: 14px; height: 14px; }
+.qbd-root .qbd-qz-form .qbd-select {
+	justify-content: space-between;
+	padding: 6px 10px 6px 12px;
+	cursor: pointer;
+}
+.qbd-qz-form .qbd-select .qbd-select-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Formulaire ÉTROIT (mesuré sur la carte, pas sur la fenêtre : à 901 px la
+   liste reste à côté et la carte n'a que ~400 px) : l'interrupteur perd son
+   libellé (il reste lu par `role=switch` et se voit à sa couleur), la
+   situation passe au-dessus de son choix. */
+@container qbd-qz-form (max-width: 420px) {
+	.qb-answer-switch-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	.qbd-qz-form .qb-match-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+	.qbd-qz-form .qb-match-arrow { display: none; }
+}
+
+/* ── Navigation du bas : les flèches bleues du quiz, et la position ── */
+.qbd-qz-nav.quiz-question-nav {
+	align-items: center;
+	gap: 16px;
+	margin: 6px 0 auto;
+	/* La tranche des flèches (4 px) ne doit pas toucher le bas. */
+	padding: 0 0 4px;
+}
+.qbd-qz-nav-pos {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	color: var(--text-normal);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}

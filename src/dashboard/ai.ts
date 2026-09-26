@@ -3346,9 +3346,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// Ligne discrète du header : ce que la génération a coûté, là où
 			// un quiz du vault affiche son chemin.
 			subtitle: usageLine(),
-			// Compté sur le BROUILLON, pas sur la réponse brute : celle-ci
-			// contient aussi l'objet de mode, qui n'est pas une question.
-			questionCount: loadGeneratedDraft().questions.length,
 			load: () => Promise.resolve(loadGeneratedDraft()),
 			// Cette page ne reste visible que si l'enregistrement automatique a
 			// échoué. Le brouillon édité permet alors de réessayer sans perte.

@@ -66,8 +66,11 @@
 /* Editor */
 @import url('./editor/editor-base.css');
 @import url('./editor/editor-forms.css');
-@import url('./editor/editor-answers.css');
 @import url('./editor/editor-ui-components.css');
 @import url('./editor/editor-wysiwyg.css');
 @import url('./editor/editor-forms-extra.css');
 @import url('./editor/editor-icons.css');
+
+/* L'éditeur d'un quiz (page du tableau de bord) : APRÈS les feuilles editor/*,
+   dont il réhabille les classes qb-* du formulaire. */
+@import url('./dashboard/dashboard-editor.css');

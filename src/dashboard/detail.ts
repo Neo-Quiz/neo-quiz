@@ -7,15 +7,15 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import { quizFrere } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
-import { quizModeLabel, quizTypeLabel } from "./quiz-card";
-import { getCanal, getProvider, setBrandLogo, libelleModele } from "./ai-providers";
+import { getCanal, getProvider, libelleModele } from "./ai-providers";
+import { renderEntete, dossierDuQuiz } from "./detail-head";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
-import { oublierFiche, renderFiche } from "./detail-fiche";
+import { oublierFiche, renderFiche, renderTop } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
@@ -49,10 +49,10 @@ export interface QuizPageSpec {
 	/** Identité de la page : changer de clé remet son état à zéro. */
 	key: string;
 	title: string;
-	/** Ligne sous le titre (chemin de la note). Vide → ligne masquée. */
+	/** Ligne sous le titre, pour une page SANS entrée du catalogue (la ligne
+	    d'usage d'une génération). Un quiz du catalogue montre son dossier,
+	    tiré de `stats.path`. Vide → ligne masquée. */
 	subtitle: string;
-	/** Compte ANNONCÉ, le temps du chargement (badge du header). */
-	questionCount: number;
 	load(): Promise<QuizDraft | QuizLoadError>;
 	/** Écrit les modifications. Absent : quiz en mémoire, rien à persister. */
 	save?(draft: QuizDraft): Promise<boolean>;
@@ -167,7 +167,6 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				key: quiz.path,
 				title: quiz.title,
 				subtitle: quiz.path,
-				questionCount: quiz.questions,
 				stats: quiz,
 				load: () => loadQuizDraft(quiz.path),
 				save: (draft) => saveQuizDraft(draft),
@@ -249,10 +248,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	}
 	/** Piste du carrousel du panneau — recréée à chaque paintPanel. */
 	let slideHost: SlideHost | null = null;
-	/** Badge du header : le compte ANNONCÉ (spec) devient le compte RÉEL dès
-	    que le brouillon est lu — un onglet qui ne connaît pas son quiz à
-	    l'avance affichait « 0 » jusqu'au premier repaint. */
-	let countEl: HTMLElement | null = null;
 	/** Détache l'écoute clavier de la page précédente. */
 	let keyCleanup: (() => void) | null = null;
 
@@ -381,70 +376,31 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			}
 			draft = result;
 			activeIdx = Math.min(activeIdx, Math.max(0, draft.questions.length - 1));
-			if (countEl) countEl.textContent = String(draft.questions.length);
 			paint(listCol, panel, nav, spec);
 		});
 	}
 
-	/* ── Header : fil d'Ariane, nom + chemin, Editor / Start ── */
+	/* ── En-tête : celui de la fiche (detail-head.ts) ── */
 	function renderHeader(page: HTMLElement, spec: QuizPageSpec): void {
-		const header = ajouter(page, "div", "qbd-qz-header");
-
-		// Flèche SUR LA LIGNE du titre, à sa gauche (capture StudySmarter
-		// 2026-07-21) — pas au-dessus. Mêmes classes que le retour du
-		// drill-down : un seul bouton retour dans tout le dashboard.
-		const back = ajouter(header, "button", "qbd-quizzes-crumb-back qbd-qz-back");
-		back.type = "button";
-		back.setAttribute("aria-label", t("dashboard.quiz.back"));
-		// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
-		ajouter(back, "span", "qbd-quizzes-crumb-icon");
-		back.addEventListener("click", () => {
+		// Chaque action écrit d'abord ce qui est en attente : on quitte la
+		// page, on lance le quiz, on insère le brouillon — la dernière frappe
+		// doit y être.
+		const avant = (fn: (el: HTMLElement) => void) => (el: HTMLElement): void => {
 			void flushSave();
-			spec.onBack();
+			fn(el);
+		};
+		const start = spec.start;
+		renderEntete(page, {
+			title: spec.title,
+			// Un quiz du catalogue montre son DOSSIER, pas son chemin ; la page
+			// « Générer » garde sa ligne d'usage.
+			kicker: spec.stats ? dossierDuQuiz(spec.stats.path) : spec.subtitle,
+			editing,
+			onBack: () => { void flushSave(); spec.onBack(); },
+			onToggleEditing: () => toggleEditing(page),
+			actions: (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) })),
+			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
 		});
-
-		const info = ajouter(header, "div", "qbd-qz-headline");
-		const titleRow = ajouter(info, "div", "qbd-qz-title-row");
-		ajouter(titleRow, "h2", "qbd-qz-title", spec.title);
-		const count = draft ? draft.questions.length : spec.questionCount;
-		countEl = ajouter(titleRow, "span", "qbd-qz-count", String(count));
-		if (spec.subtitle) ajouter(info, "p", "qbd-qz-path", spec.subtitle);
-		renderMeta(info, spec);
-
-		const actions = ajouter(header, "div", "qbd-qz-actions");
-
-		// Modifier ↔ Terminé : la MÊME page bascule (référence : « Éditeur »
-		// n'ouvre pas un autre écran, il change le contenu de la carte).
-		const edit = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn" + (editing ? " is-on" : ""));
-		currentHost().ui.setIcon(ajouter(edit, "span", "qbd-btn-icon"), editing ? "check" : "square-pen");
-		// « Editor » (et non « Edit ») : le bouton ouvre un MODE, il ne
-		// déclenche pas une action — demande d'Ahmed 2026-07-21.
-		ajouter(edit, "span", undefined, t(editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"));
-		edit.addEventListener("click", () => toggleEditing(page));
-
-		for (const action of spec.actions || []) {
-			const btn = ajouter(actions, "button", "qbd-btn qbd-btn--ghost");
-			currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), action.icon);
-			ajouter(btn, "span", undefined, action.label);
-			btn.addEventListener("click", () => {
-				void flushSave();
-				action.onClick(btn);
-			});
-		}
-
-		// Pilule INVERSÉE (blanche sur thème sombre) : le même bouton que
-		// « Nouveau dossier » — demande d'Ahmed « mets Start en blanc comme
-		// nos autres boutons ». Jamais l'accent bleu.
-		const startSpec = spec.start;
-		if (startSpec) {
-			const start = ajouter(actions, "button", "qbd-btn--create qbd-qz-start");
-			currentHost().ui.setIcon(ajouter(start, "span", "qbd-btn-icon"), startSpec.icon);
-			ajouter(start, "span", undefined, startSpec.label);
-			start.addEventListener("click", () => {
-				void flushSave();
-				startSpec.onClick(start);
-			});
-		}
 	}
 
 	/** Bascule consultation ⇄ édition AVEC transition : le corps s'estompe et
@@ -518,49 +474,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function statOf(quiz: QuizIndexEntry): QuizStatRecord {
 		const rec = ctx.statsStore ? ctx.statsStore.getRecord(quiz.path) : null;
 		return rec || { bestScore: 0, questionsDone: 0, totalQuestions: quiz.questions, lastPlayed: 0, attempts: 0 };
-	}
-
-	/* ── Ligne d'infos sous le titre ──
-	   Elle remplace la rangée de tuiles d'avant : des tuiles pour des
-	   métadonnées se lisaient comme des boutons, et se confondaient avec les
-	   tuiles des questions — les seules qu'on clique (Ahmed, 2026-09-23).
-	   Absente pour un quiz qui n'existe pas encore (résultat d'une
-	   génération) : ni score, ni tentative, ni date. */
-	function renderMeta(parent: HTMLElement, spec: QuizPageSpec): void {
-		const quiz = spec.stats;
-		if (!quiz) return;
-		const stat = statOf(quiz);
-		const line = ajouter(parent, "div", "qbd-qz-meta");
-		const item = (text: string, title?: string): HTMLElement => {
-			const el = ajouter(line, "span", "qbd-qz-meta-item");
-			ajouter(el, "span", undefined, text);
-			if (title) el.title = title;
-			return el;
-		};
-
-		item(t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions }));
-		item(quizTypeLabel(quiz.quizType));
-		item(quizModeLabel(quiz.mode));
-
-		// Qui a généré ce quiz, et QUAND — absente pour une note écrite à la
-		// main ou pour un quiz partagé sans frontmatter.
-		const o = origineDe(quiz);
-		if (o) {
-			const el = item(t("dashboard.detail.metaGenerated", { model: o.source, date: o.date }), o.tooltip);
-			const logo = ajouter(el, "span", "qbd-provider-logo qbd-qz-meta-logo qbd-provider-logo--" + o.logo);
-			el.prepend(logo);
-			setBrandLogo(logo, o.logo);
-		}
-
-		// Jamais joué : ni meilleur score, ni date, ni tentatives — rien que
-		// des tirets à montrer (demande d'Ahmed 2026-07-21).
-		if (stat.attempts > 0) {
-			const best = item(t("dashboard.detail.metaBest", { score: stat.bestScore }));
-			if (stat.bestScore >= 80) best.classList.add("is-good");
-			else if (stat.bestScore >= 60) best.classList.add("is-fair");
-			if (ctx.statsStore) item(t("dashboard.detail.metaLast", { when: ctx.statsStore.formatRelativeTime(stat.lastPlayed) }));
-			item(t(stat.attempts === 1 ? "dashboard.detail.metaAttemptsOne" : "dashboard.detail.metaAttemptsOther", { count: stat.attempts }));
-		}
 	}
 
 	/** Qui a généré le quiz, et quand — partagé par la ligne d'infos et la
@@ -693,37 +606,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 		const head = ajouter(listCol, "div", "qbd-qz-list-head");
 		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: draft.questions.length }));
-		if (editing) {
-			const add = ajouter(head, "button", "qbd-qz-list-add");
-			add.type = "button";
-			add.setAttribute("aria-label", t("dashboard.quiz.addQuestion"));
-			currentHost().ui.setIcon(add, "plus");
-			// Le TYPE se choisit à la création, comme dans l'éditeur : une
-			// question ajoutée d'office en « choix unique » puis reconvertie
-			// perdrait ses réponses au passage.
-			add.addEventListener("click", () => {
-				openTypePickerModal((key) => {
-					if (!draft) return;
-					const q = makeDefault(key);
-					// « Question N » non traduit : motif du titre auto écrit dans
-					// le .md et relu par l'éditeur (cf. editor/ui.ts).
-					q.title = `Question ${draft.questions.length + 1}`;
-					draft.questions.push(q);
-					activeIdx = draft.questions.length - 1;
-					// Le mode ÉDITION s'ouvre avec la question : on vient de la
-					// créer vide, la relire n'apprendrait rien.
-					editing = true;
-					scheduleSave();
-					repaint();
-				});
-			});
-		}
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
 		draft.questions.forEach((q, i) => {
+			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,
+			   2026-09-26) : numéro en rond, icône et nom du type, rôle d'un
+			   Learn en pastille, puis l'énoncé sur deux lignes. */
 			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx && !showingWelcome() ? " is-active" : ""));
-			const num = ajouter(card, "span", "qbd-qz-card-num", String(i + 1));
-			num.setAttribute("aria-hidden", "true");
+			const top = renderTop(card, q, i + 1);
+			top.classList.add("qbd-qz-card-top");
 			const text = questionText(q);
 			const label = ajouter(card, "span", "qbd-qz-card-text" + (text ? "" : " is-empty"), text || t("dashboard.quiz.promptEmpty"));
 			// LaTeX $…$ de la vignette : rendu comme dans la liste de l'éditeur
@@ -734,7 +625,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 			if (!editing || !draft) return;
 
-			const acts = ajouter(card, "div", "qbd-qz-card-acts");
+			// Au bout de la ligne du numéro, DANS son flux : posées en absolu,
+			// elles recouvraient le nom du type au survol.
+			const acts = ajouter(top, "div", "qbd-qz-card-acts");
 
 			// Réordonnancement : l'ordre des questions EST le déroulé du quiz.
 			// Les flèches restent visibles (grisées) aux extrémités plutôt que
@@ -796,6 +689,34 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				});
 			}
 		});
+
+		/* « + Ajouter une question » EN BAS de la liste (refonte 2026-09-26) :
+		   le « + » seul de l'en-tête de liste ne se remarquait pas. Même
+		   action. Le TYPE se choisit à la création, comme dans l'éditeur : une
+		   question ajoutée d'office en « choix unique » puis reconvertie
+		   perdrait ses réponses au passage. */
+		if (editing) {
+			const add = ajouter(listCol, "button", "qbd-qz-list-add");
+			add.type = "button";
+			currentHost().ui.setIcon(ajouter(add, "span", "qbd-qz-list-add-icon"), "plus");
+			ajouter(add, "span", undefined, t("dashboard.quiz.addQuestion"));
+			add.addEventListener("click", () => {
+				openTypePickerModal((key) => {
+					if (!draft) return;
+					const q = makeDefault(key);
+					// « Question N » non traduit : motif du titre auto écrit dans
+					// le .md et relu par l'éditeur (cf. editor/ui.ts).
+					q.title = `Question ${draft.questions.length + 1}`;
+					draft.questions.push(q);
+					activeIdx = draft.questions.length - 1;
+					// Le mode ÉDITION s'ouvre avec la question : on vient de la
+					// créer vide, la relire n'apprendrait rien.
+					editing = true;
+					scheduleSave();
+					repaint();
+				});
+			});
+		}
 
 		/* Plus de bloc « Mode du quiz » sous la liste (retiré le 2026-09-26) :
 		   le mode d'un quiz se choisit à la génération, et un Learn et son
@@ -901,8 +822,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function availableHeight(panel: HTMLElement): number {
 		const main = panel.parentElement;
 		if (!main) return 0;
-		// 40px de chevrons + 10px de gouttière + 8px de padding du panneau.
-		return Math.max(0, main.clientHeight - 58);
+		// 40px de flèches + 4px de tranche + 10px de gouttière + 8px de padding du panneau.
+		return Math.max(0, main.clientHeight - 62);
 	}
 
 	function paintPanel(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
@@ -913,6 +834,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		if (slideHost) finishSlide(slideHost);
 		panel.replaceChildren();
 		slideHost = null;
+		// En édition, le panneau devient la CARTE du formulaire (verre) : posé
+		// à même une photo de fond, un formulaire ne se lisait pas.
+		panel.classList.toggle("is-editing", editing);
 		// La fiche occupe le corps : `paint` l'a déjà peinte à la place du panneau.
 		if (showingWelcome()) return;
 		const q = draft.questions[activeIdx];
@@ -947,22 +871,29 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		);
 	}
 
-	/** Navigation ‹ › — deux cercles nus, comme StudySmarter : aucun compteur
-	    entre eux (la position se lit dans la liste de gauche). Repeinte seule
-	    à chaque glissement, pour que l'état désactivé suive sans reconstruire
-	    la question. */
+	/** Navigation ‹ › — les flèches bleues 3D du quiz (`.quiz-question-nav
+	    .quiz-nav-btn`, action-buttons.css : face bleue, tranche, enfoncement
+	    au clic, grise et à plat quand désactivée), et la position entre les
+	    deux (refonte de l'éditeur, 2026-09-26 : les deux ronds fantômes gris
+	    d'avant ne se lisaient pas comme des flèches). Repeinte seule à chaque
+	    glissement, pour que l'état désactivé suive sans reconstruire la
+	    question. */
 	function paintNav(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		nav.replaceChildren();
 		if (!draft || draft.questions.length <= 1) return;
+		nav.classList.add("quiz-question-nav");
 
-		const prev = ajouter(nav, "button", "qbd-qz-nav-btn");
+		const prev = ajouter(nav, "button", "quiz-nav-btn");
 		prev.type = "button";
 		prev.setAttribute("aria-label", t("dashboard.quiz.prev"));
 		currentHost().ui.setIcon(prev, "chevron-left");
 		prev.disabled = activeIdx === 0;
 		prev.addEventListener("click", () => goToQuestion(activeIdx - 1, listCol, panel, nav, spec));
 
-		const next = ajouter(nav, "button", "qbd-qz-nav-btn");
+		ajouter(nav, "span", "qbd-qz-nav-pos",
+			t("dashboard.quiz.position", { n: activeIdx + 1, total: draft.questions.length }));
+
+		const next = ajouter(nav, "button", "quiz-nav-btn");
 		next.type = "button";
 		next.setAttribute("aria-label", t("dashboard.quiz.next"));
 		currentHost().ui.setIcon(next, "chevron-right");
@@ -1015,7 +946,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		currentSpec = null;
 		currentContainer = null;
 		currentPath = null;
-		countEl = null;
 		return ecrit;
 	}
 
