@@ -360,6 +360,36 @@ await withSrcModule(
 	}
 
 	{
+		/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : la lecture
+		   d'une étape qui a d'autres questions n'a plus d'écran. En Leçon elle
+		   reste journalisée `seen` (aucun signal de mémoire) et ne compte ni
+		   au score ni aux questions faites ; basculée en Examen, elle n'a été
+		   ni montrée ni répondue : rien n'est journalisé, et elle ne manque pas. */
+		const r = makeReporter("goToResults — lecture absorbée par son étape");
+		const quiz = [
+			{ id: "pre1", title: "Avant", options: ["a", "b"], correctIndex: 0 },
+			{ id: "read1", title: "Cours" },
+			{ id: "q1", title: "Test", options: ["a", "b"], correctIndex: 0 },
+		];
+		const roles = ["pre", "read", "test"];
+		const lecon = makeCtx({ quiz, selections: [0, null, 0], isLessonMode: true, roles });
+		lecon.ctx.lecturesAbsorbees = new Set([1]);
+		lecon.ctx.goToResults();
+		r.check("Leçon : la lecture absorbée est journalisée seen",
+			lecon.appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "seen", role: "read" });
+		r.check("Leçon : le score ignore la lecture absorbée", lecon.ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2 });
+
+		const examen = makeCtx({ quiz, selections: [0, null, 1], isLessonMode: false, originalQuizMode: "lesson", roles });
+		examen.ctx.lecturesAbsorbees = new Set([1]);
+		r.check("Examen après bascule : la lecture absorbée ne manque pas", examen.ctx.isComplete(1), true);
+		examen.ctx.goToResults();
+		r.check("Examen après bascule : rien n'est journalisé pour la lecture absorbée",
+			examen.appels.some(a => a.q.endsWith("::read1")), false);
+		r.check("Examen après bascule : le score ignore la lecture absorbée", examen.ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2 });
+		r.done();
+	}
+
+	{
 		const r = makeReporter("goToResults — hors mode Leçon, verdict QCM ordinaire, pas de rôle");
 		const quiz = [
 			{ id: "q1", title: "Q1", options: ["a", "b"], correctIndex: 0 },

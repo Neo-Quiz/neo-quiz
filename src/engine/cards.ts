@@ -50,6 +50,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	const plural = (count: number, one: TransKey, other: TransKey): string =>
 		t(count > 1 ? other : one, { count });
 
+	/** Le numéro AFFICHÉ (Q1…Qn), qui saute les lectures absorbées. */
+	const numero = (i: number): number => ctx.numeroAffiche?.(i) ?? i + 1;
+
 	function tabClass(i: number): string {
 		const cur = ctx.quizState.current;
 		// slideMap[cur].questionIndex n'existe que sur la variante « question » —
@@ -74,7 +77,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 	function navHtml(): string {
 		const resultsActive = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
-		return `<div class="quiz-nav">${ctx.quiz.map((_, i) => `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${i + 1}</a>`).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
+		// Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
+		// numéros la sautent (la question qui la suit devient Q2, pas Q3).
+		const onglets = ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
+		return `<div class="quiz-nav">${onglets.map(i => `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${numero(i)}</a>`).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
 	}
 
 	/* Précédente / suivante sous chaque question (2026-09-23) : des ICÔNES
@@ -84,8 +90,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   libellé le dit. Les classes `quiz-prev-btn`/`quiz-next-btn` sont lues par
 	   focus.ts pour rendre le focus après un re-rendu. */
 	function questionNavHtml(qi: number): string {
-		const isFirst = qi <= 0;
-		const isLast = qi >= ctx.quiz.length - 1;
+		// Première et dernière DIAPOSITIVE de question, pas premier et dernier
+		// index : une lecture absorbée en tête ou en fin de tableau n'en a pas.
+		const slide = ctx.getSlideIndexForQuestion(qi);
+		const isFirst = slide <= 0;
+		const isLast = ctx.questionSuivante(qi) === null;
 		const nextLabel = t(!isLast
 			? "engine.nav.nextQuestion"
 			: ctx.textOnly.isExamAnswerPhase() ? "engine.exam.finish" : "engine.nav.results");
@@ -319,7 +328,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   fonction pour les trois écrans (QCM, auto-évaluation, réponse libre en
 	   examen) : il n'y a qu'UNE notion de "question à revoir" sur cette carte. */
 	function reviewableIndices(): number[] {
-		return ctx.quiz.map((_, i) => i).filter(i => !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
+		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i) && !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
 	}
 
 	function submitSlideHtml(): string {
@@ -337,15 +346,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				const intro = mac > 0
 					? `<div class="quiz-warn">${plural(mac, "engine.submit.missingFreeAnswers.one", "engine.submit.missingFreeAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>`
 					: `<div class="quiz-submit-sub">${t("engine.submit.allFreeAnswered")}</div>`;
-				return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mac > 0 ? missingAnswers : reviewableIndices()).map(i => `<button class="quiz-chip ${mac > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.exam.finish")}</button></div></div></div></div>`;
+				return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mac > 0 ? missingAnswers : reviewableIndices()).map(i => `<button class="quiz-chip ${mac > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.exam.finish")}</button></div></div></div></div>`;
 			}
 
 			const intro = mc > 0
 				? `<div class="quiz-warn">${plural(mc, "engine.submit.missingRatings.one", "engine.submit.missingRatings.other")}</div><div class="quiz-submit-sub">${t("engine.submit.toRateList")}</div>`
 				: `<div class="quiz-submit-sub">${t("engine.submit.allRated")}</div>`;
-			return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showResults")}</button></div></div></div></div>`;
+			return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showResults")}</button></div></div></div></div>`;
 		}
-		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${mc > 0 ? `<div class="quiz-warn">${plural(mc, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>` : `<div class="quiz-submit-sub">${t("engine.submit.reviewList")}</div>`}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showScore")}</button></div></div></div></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${mc > 0 ? `<div class="quiz-warn">${plural(mc, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>` : `<div class="quiz-submit-sub">${t("engine.submit.reviewList")}</div>`}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showScore")}</button></div></div></div></div>`;
 	}
 
 	function saveResultsButtonHtml(): string {
@@ -552,10 +561,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 		// Le support de compréhension précède le titre : on lit le document AVANT
 		// de savoir ce qu'on nous en demande, comme sur un sujet d'examen papier.
-		// En mode Leçon, `passageHtml` peut rendre une chaîne VIDE selon le rôle
-		// de la question (Task 4 : "pre" avant lecture, "recall" avant
-		// verrouillage) — décision tranchée par `passageVisibility`
-		// (engine/passage.ts), jamais recalculée ici.
+		// En Learn, c'est aussi là que s'affiche le cours de l'étape, replié
+		// tant que la question n'est pas répondue (2026-09-26) — décision
+		// tranchée par `passageVisibility` (engine/passage.ts), jamais
+		// recalculée ici.
 		const passageSection = ctx.passage.passageHtml(qi);
 
 		/* Classe de RÔLE sur la carte : le CSS doit pouvoir distinguer une carte

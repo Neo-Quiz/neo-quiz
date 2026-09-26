@@ -50,6 +50,10 @@ export interface EditionCallbacks {
 	setPlusOuvert(ouvert: boolean): void;
 	/** Le quiz est un Learn : la barre propose le rôle. */
 	estLecon: boolean;
+	/** L'élément `read` de l'étape de la question (src/lecture-etape.ts) :
+	    son cours s'affiche au-dessus du rendu, son titre et son texte s'y
+	    modifient. Le même élément pour toutes les questions de l'étape. */
+	lecture?: DraftQuestion;
 }
 
 /** Pause avant de repeindre le rendu après une frappe dans « Plus ». */
@@ -91,6 +95,7 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 		demonter = monterEditionRendu(hoteRendu, q, {
 			sourcePath,
 			titreDeRepli: `Question ${index + 1}`,
+			lecture: cb.lecture,
 			onChange: cb.onChange,
 			rendre: peindrePlus,
 		});

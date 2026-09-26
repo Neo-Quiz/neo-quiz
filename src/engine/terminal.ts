@@ -429,7 +429,9 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			},
 			onEnter: () => {
 				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
-				if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+				// La diapositive suivante (une lecture absorbée n'en a pas).
+				const suivante = ctx.questionSuivante(qi);
+				if (suivante !== null) ctx.goToQuestion(suivante);
 			},
 		});
 		applyStatus(field.getValue());
@@ -816,15 +818,15 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 				commitValue();
 
-				if (qi < ctx.quiz.length - 1) {
-					ctx.goToQuestion(qi + 1);
-				}
+				const suivante = ctx.questionSuivante(qi);
+				if (suivante !== null) ctx.goToQuestion(suivante);
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && qi < ctx.quiz.length - 1) {
+			const suivante = ctx.questionSuivante(qi);
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && suivante !== null) {
 				e.preventDefault();
-				ctx.goToQuestion(qi + 1);
+				ctx.goToQuestion(suivante);
 			}
 
 			queueSync();

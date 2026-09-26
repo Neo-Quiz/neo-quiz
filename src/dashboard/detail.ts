@@ -23,6 +23,7 @@ import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlid
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
+import { lectureDeLEtape, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ PAGE — ce qu'on voit en cliquant un quiz (refonte 2026-07-21,
@@ -257,6 +258,37 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	/** « Plus » ouvert ou fermé, gardé d'une question et d'un repeint à
 	    l'autre tant que la page vit : le rouvrir à chaque question lassait. */
 	let plusOuvert = false;
+
+	/* LECTURES ABSORBÉES (src/lecture-etape.ts, 2026-09-26) : dans un Learn,
+	   la carte de lecture d'une étape qui a d'autres questions n'est ni une
+	   carte de la liste ni une question de la navigation ; son cours
+	   s'affiche au-dessus de chaque question de l'étape. Tout est RECALCULÉ à
+	   chaque usage, jamais gardé : l'édition change rôles, étapes et ordre, et
+	   supprimer la dernière question d'une étape rend sa lecture autonome —
+	   donc de nouveau visible. `activeIdx` reste un index du BROUILLON. */
+	function visibles(): number[] {
+		return draft ? questionsVisibles(draft.questions) : [];
+	}
+	/** Numéro affiché de l'index `i` (1…n), qui saute les lectures absorbées. */
+	function numeroDe(i: number): number {
+		return (draft ? numerosAffiches(draft.questions)[i] : 0) || i + 1;
+	}
+	/** La question visible qui montre `i` (lui-même, sauf une lecture absorbée). */
+	function hote(i: number): number {
+		return draft ? questionHote(draft.questions, i) : i;
+	}
+	/** L'élément `read` de l'étape de `i`, s'il est absorbé. */
+	function lectureDe(i: number): DraftQuestion | undefined {
+		if (!draft) return undefined;
+		const l = lectureDeLEtape(draft.questions, i);
+		return l === null ? undefined : draft.questions[l];
+	}
+	/** La question visible voisine de `i` (`dir` = ±1), ou -1 au bout. */
+	function voisine(i: number, dir: 1 | -1): number {
+		const v = visibles();
+		const p = v.indexOf(i);
+		return p < 0 ? -1 : (v[p + dir] ?? -1);
+	}
 
 	/** Démonte la question en édition : un texte ouvert y est validé, ses
 	    écouteurs et ses champs retirés. Avant tout repeint du panneau. */
@@ -593,6 +625,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	/* ── Corps : liste des questions + question courante ── */
 	function paint(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
+		// Une reprise, une suppression ou un changement de rôle peut laisser
+		// `activeIdx` sur une lecture absorbée : on montre la question qui l'affiche.
+		activeIdx = hote(activeIdx);
 		if (paintFiche(listCol, panel, nav, spec)) return;
 		paintList(listCol, panel, nav, spec);
 		paintPanel(listCol, panel, nav, spec);
@@ -603,7 +638,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    la direction du glissement se déduit de l'écart. */
 	function goToQuestion(target: number, listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
-		const clamped = Math.max(0, Math.min(target, draft.questions.length - 1));
+		const clamped = hote(Math.max(0, Math.min(target, draft.questions.length - 1)));
 		// Depuis la fiche : pas de glissement, la page change de nature
 		// (fiche → aperçu), elle est repeinte.
 		if (showingWelcome()) {
@@ -615,7 +650,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		}
 		if (!slideHost || clamped === activeIdx) return;
 		const dir: 1 | -1 = clamped > activeIdx ? 1 : -1;
-		const hops = Math.abs(clamped - activeIdx);
+		// L'écart en questions VISIBLES : une lecture absorbée n'est pas un cran.
+		const v = visibles();
+		const hops = Math.max(1, Math.abs(v.indexOf(clamped) - v.indexOf(activeIdx)));
 		activeIdx = clamped;
 		spec.onQuestionChange?.(activeIdx);
 		const q = draft.questions[activeIdx];
@@ -629,16 +666,23 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		listCol.replaceChildren();
 
 		const head = ajouter(listCol, "div", "qbd-qz-list-head");
-		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: draft.questions.length }));
+		// Les lectures absorbées n'ont pas de carte : leur cours s'édite
+		// au-dessus de chaque question de leur étape.
+		const vis = visibles();
+		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.length }));
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
-		draft.questions.forEach((q, i) => {
+		vis.forEach((i, pos) => {
+			const q = draft!.questions[i];
 			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,
 			   2026-09-26) : numéro en rond, une seule étiquette en texte simple
 			   (icône + libellé du type, ou du rôle Lecture/Avec vos mots),
 			   puis l'énoncé sur deux lignes. */
 			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx && !showingWelcome() ? " is-active" : ""));
-			const top = renderTop(card, q, i + 1);
+			// L'index du BROUILLON : la vignette se retrouve par lui, pas par
+			// sa position dans la liste (qui saute les lectures absorbées).
+			card.dataset.qi = String(i);
+			const top = renderTop(card, q, pos + 1);
 			top.classList.add("qbd-qz-card-top");
 			const text = questionText(q);
 			const label = ajouter(card, "span", "qbd-qz-card-text" + (text ? "" : " is-empty"), text || t("dashboard.quiz.promptEmpty"));
@@ -662,13 +706,17 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// Les flèches restent visibles (grisées) aux extrémités plutôt que
 			// de disparaître — une rangée d'actions qui change de largeur d'une
 			// carte à l'autre fait sautiller la liste.
+			/* Échange avec la question VISIBLE voisine : une lecture absorbée
+			   entre les deux ne bouge pas, et comme son étape tient à son champ
+			   `slice` (pas à sa place dans le tableau), elle reste dans son
+			   étape. */
 			const move = (dir: -1 | 1, icon: string, aria: string): void => {
 				const btn = ajouter(acts, "button", "qbd-qz-card-act");
 				btn.type = "button";
 				btn.setAttribute("aria-label", aria);
 				currentHost().ui.setIcon(btn, icon);
-				const target = i + dir;
-				btn.disabled = target < 0 || target >= draft!.questions.length;
+				const target = voisine(i, dir);
+				btn.disabled = target < 0;
 				btn.addEventListener("click", (e) => {
 					e.stopPropagation();
 					if (!draft || btn.disabled) return;
@@ -694,7 +742,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				del.addEventListener("click", (e) => {
 					e.stopPropagation();
 					if (!draft) return;
-					const title = q.title || `Question ${i + 1}`;
+					const title = q.title || `Question ${pos + 1}`;
 					// Confirmation, comme dans l'éditeur : la croix est révélée au
 					// survol, l'écriture dans la note est immédiate, et rien ne
 					// rattrape une question supprimée par erreur.
@@ -735,7 +783,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 					const q = makeDefault(key);
 					// « Question N » non traduit : motif du titre auto écrit dans
 					// le .md et relu par l'éditeur (cf. editor/ui.ts).
-					q.title = `Question ${draft.questions.length + 1}`;
+					q.title = `Question ${visibles().length + 1}`;
 					draft.questions.push(q);
 					activeIdx = draft.questions.length - 1;
 					// Le mode ÉDITION s'ouvre avec la question : on vient de la
@@ -758,7 +806,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function refreshListLabels(listCol: HTMLElement): void {
 		if (!draft) return;
 		const q = draft.questions[activeIdx];
-		const el = listCol.querySelectorAll<HTMLElement>(".qbd-qz-card-text")[activeIdx];
+		const el = listCol.querySelector<HTMLElement>(`.qbd-qz-card[data-qi="${activeIdx}"] .qbd-qz-card-text`);
 		if (!q || !el) return;
 		const text = questionText(q);
 		// La classe est ajustée AVANT le retour anticipé : saisir exactement le
@@ -777,13 +825,17 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// Pas de bandeau « Question i / n » : le rendu réel affiche déjà le
 		// TITRE de la question (h2 du moteur) — deux titres l'un sur l'autre.
 		const content = ajouter(slide, "div", "qbd-qz-panel-body");
+		// Le cours de l'étape (Learn), et le numéro AFFICHÉ pour le titre de
+		// repli : « Question 2 » pour la question qui suit une lecture absorbée.
+		const lecture = lectureDe(index);
+		const numero = numeroDe(index) - 1;
 		if (editing) {
 			/* La question s'édite dans son RENDU corrigé (detail-edition.ts).
 			   Une seule question est montée à la fois : l'instance précédente
 			   est démontée d'abord — sinon ses écouteurs et ses champs
 			   CodeMirror survivraient à la slide qui s'en va. */
 			demonterEdition();
-			demonterEditionCourante = renderQuestionEditRendu(content, q, index, {
+			demonterEditionCourante = renderQuestionEditRendu(content, q, numero, {
 				onChange: () => {
 					scheduleSave();
 					// Rafraîchir les LIBELLÉS, pas reconstruire la liste : à chaque
@@ -798,12 +850,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				plusOuvert,
 				setPlusOuvert: (v) => { plusOuvert = v; },
 				estLecon: draft?.examOptions?.mode === "lesson",
+				lecture,
 			// Le chemin de la NOTE : une image collée doit atterrir là où le
 			// réglage de l'utilisateur le dit, y compris dans ses modes
 			// relatifs à la note. Absent pour un quiz encore en mémoire.
 			}, draft?.file?.path);
 		} else {
-			renderQuestionView(content, q, index, draft?.file?.path);
+			renderQuestionView(content, q, numero, draft?.file?.path, lecture);
 		}
 	}
 
@@ -848,7 +901,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			   même raison. */
 			if (showingWelcome()) return;
 			e.preventDefault();
-			goToQuestion(activeIdx + (e.key === "ArrowRight" ? 1 : -1), listCol, panel, nav, spec);
+			// La question VISIBLE voisine : une lecture absorbée n'est pas un cran.
+			const cible = voisine(activeIdx, e.key === "ArrowRight" ? 1 : -1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
 		};
 		const detach = (): void => {
 			doc.removeEventListener("keydown", onKey);
@@ -909,7 +964,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const questions = draft.questions;
 		reserveTallest(
 			slideHost,
-			questions.map((qq, i) => (slide: HTMLElement) => fillSlide(slide, qq, i, listCol, panel, nav, spec)),
+			visibles().map(i => (slide: HTMLElement) => fillSlide(slide, questions[i], i, listCol, panel, nav, spec)),
 			availableHeight(panel),
 		);
 	}
@@ -923,25 +978,35 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    question. */
 	function paintNav(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		nav.replaceChildren();
-		if (!draft || draft.questions.length <= 1) return;
+		// Position et bouts comptés sur les questions VISIBLES (sans les
+		// lectures absorbées), comme la liste et les onglets du quiz.
+		const vis = visibles();
+		if (!draft || vis.length <= 1) return;
 		nav.classList.add("quiz-question-nav");
+		const pos = vis.indexOf(activeIdx);
 
 		const prev = ajouter(nav, "button", "quiz-nav-btn");
 		prev.type = "button";
 		prev.setAttribute("aria-label", t("dashboard.quiz.prev"));
 		currentHost().ui.setIcon(prev, "chevron-left");
-		prev.disabled = activeIdx === 0;
-		prev.addEventListener("click", () => goToQuestion(activeIdx - 1, listCol, panel, nav, spec));
+		prev.disabled = pos <= 0;
+		prev.addEventListener("click", () => {
+			const cible = voisine(activeIdx, -1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
+		});
 
 		ajouter(nav, "span", "qbd-qz-nav-pos",
-			t("dashboard.quiz.position", { n: activeIdx + 1, total: draft.questions.length }));
+			t("dashboard.quiz.position", { n: pos + 1, total: vis.length }));
 
 		const next = ajouter(nav, "button", "quiz-nav-btn");
 		next.type = "button";
 		next.setAttribute("aria-label", t("dashboard.quiz.next"));
 		currentHost().ui.setIcon(next, "chevron-right");
-		next.disabled = activeIdx >= draft.questions.length - 1;
-		next.addEventListener("click", () => goToQuestion(activeIdx + 1, listCol, panel, nav, spec));
+		next.disabled = pos < 0 || pos >= vis.length - 1;
+		next.addEventListener("click", () => {
+			const cible = voisine(activeIdx, 1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
+		});
 	}
 
 	/** Écrit MAINTENANT ce qui est en attente (sortie de page, lancement,
@@ -970,8 +1035,12 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    tout déplacement ET toute suppression — sans quoi supprimer « Question
 	    2 » laissait « Question 1, Question 3… » dans la note. */
 	function renumberAuto(questions: DraftQuestion[]): void {
+		// Le numéro AFFICHÉ, qui saute les lectures absorbées (elles n'en ont
+		// pas, et gardent leur titre).
+		const numeros = numerosAffiches(questions);
 		questions.forEach((qq, idx) => {
-			if (!qq._userModifiedTitle && /^Question \d+$/.test(qq.title || "")) qq.title = `Question ${idx + 1}`;
+			if (!numeros[idx]) return;
+			if (!qq._userModifiedTitle && /^Question \d+$/.test(qq.title || "")) qq.title = `Question ${numeros[idx]}`;
 		});
 	}
 

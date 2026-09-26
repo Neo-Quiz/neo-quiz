@@ -1,24 +1,63 @@
 /**
- * Vérification du SUPPORT affiché au-dessus d'une question (engine/passage.ts).
+ * Vérification du SUPPORT affiché au-dessus d'une question (engine/passage.ts)
+ * et de la règle des LECTURES ABSORBÉES (src/lecture-etape.ts).
  *
- * Dans un Learn, chaque rôle a sa règle : le cours est caché avant la lecture
- * ("pre") et pendant un rappel de mémoire ("recall"), ouvert sur la lecture,
- * et OUVERT au-dessus d'une question "explain" — on explique avec le cours
- * sous les yeux (2026-09-24). Un Learn généré n'a pas de champ `passage` :
- * le cours d'une "explain" est la carte de lecture de la même étape.
+ * Dans un Learn (décision du 2026-09-26), la carte de lecture d'une étape
+ * n'est plus un écran dès que l'étape a une autre question : son cours
+ * s'affiche REPLIÉ au-dessus de chaque question de l'étape, quel que soit le
+ * rôle, avec « Tentez de répondre sans lire », et se déplie une fois la
+ * question répondue. Plus aucun rôle ne cache le cours. Une étape sans autre
+ * question garde sa lecture en écran autonome.
  *
  *     npm run check:passage
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/engine/passage.ts"], ({ passageVisibility, createPassageHandlers }) => {
+await withSrcModule(["src/lecture-etape.ts"], (le) => {
+	const r = makeReporter("Lectures absorbées (règle pure)");
+	const quiz = [
+		{ title: "Avant", slice: 1, role: "pre" },            // 0
+		{ title: "Les tubes", prompt: "Cours 1", slice: 1, role: "read" }, // 1 absorbée
+		{ title: "À toi", slice: 1, role: "explain" },        // 2
+		{ title: "Lecture 2", prompt: "Cours 2", slice: 2, role: "read" }, // 3 absorbée (étape avec un test)
+		{ title: "Test", slice: 2 },                          // 4 (rôle absent : test)
+		{ title: "Lecture seule", prompt: "Cours 3", slice: 3, role: "read" }, // 5 AUTONOME
+		{ title: "Sans étape", role: "read" },                // 6 autonome (pas d'étape)
+		{ title: "Étape texte", slice: "4", role: "read" },    // 7 autonome (étape invalide)
+		{ title: "Q", slice: 4, role: "recall" },             // 8
+		null,                                                  // 9 élément parasite
+		{ title: "Lecture après", prompt: "Cours 5", slice: 5, role: "read" }, // 10 absorbée, en fin d'étape
+	];
+	quiz.splice(10, 0, { title: "Avant la lecture 5", slice: 5, role: "recall" }); // 10 ; la lecture passe en 11
+	const abs = le.lecturesAbsorbees(quiz);
+	r.check("absorbées : étape avec une autre question, quel que soit son rôle", [...abs].sort((a, b) => a - b), [1, 3, 11]);
+	r.check("autonomes : étape seule, sans étape, étape invalide", [5, 6, 7].map(i => abs.has(i)), [false, false, false]);
+	r.check("numéros affichés : les absorbées sautées (0), la suivante devient Q2",
+		le.numerosAffiches(quiz), [1, 0, 2, 0, 3, 4, 5, 6, 7, 8, 9, 0]);
+	r.check("questions visibles", le.questionsVisibles(quiz), [0, 2, 4, 5, 6, 7, 8, 9, 10]);
+	r.check("cours de l'étape pour TOUS les rôles", [0, 2, 4, 10].map(i => le.lectureDeLEtape(quiz, i)), [1, 1, 3, 11]);
+	r.check("pas de cours : lecture, autonome, sans étape, étape sans lecture",
+		[1, 5, 6, 8].map(i => le.lectureDeLEtape(quiz, i)), [null, null, null, null]);
+	r.check("question hôte : l'absorbée renvoie à la question qui la suit dans l'étape", le.questionHote(quiz, 1), 2);
+	r.check("question hôte : lecture en fin d'étape → première question de l'étape", le.questionHote(quiz, 11), 10);
+	r.check("question hôte : toute autre question est sa propre hôte", [0, 5, 9].map(i => le.questionHote(quiz, i)), [0, 5, 9]);
+	r.check("tranche valide : entier ≥ 1 seulement", [1, 3, 0, -1, 1.5, "2", null].map(le.trancheValide), [1, 3, null, null, null, null, null]);
+	// Supprimer la seule question d'une étape rend la lecture AUTONOME.
+	const orpheline = [{ slice: 1, role: "read", prompt: "x" }];
+	r.check("étape vidée : la lecture redevient autonome", le.lecturesAbsorbees(orpheline).size, 0);
+	r.done();
+});
+
+await withSrcModule(["src/engine/passage.ts", "src/lecture-etape.ts"], ({ passageVisibility, createPassageHandlers }, { lecturesAbsorbees }) => {
 	const r = makeReporter("Support d'une question");
 
-	const vis = (role, checked = false) => passageVisibility({ role, checked, isLesson: true });
-	r.check("Learn : visibilité par rôle",
-		[vis("pre"), vis("read"), vis("recall"), vis("recall", true), vis("explain"), vis("test")],
-		["hidden", "open", "hidden", "open", "open", "collapsible"]);
-	r.check("hors Learn : repliable", passageVisibility({ role: "explain", checked: false, isLesson: false }), "collapsible");
+	const vis = (role, answered = false) => passageVisibility({ role, answered, isLesson: true });
+	r.check("Learn : replié tant que non répondu, pour TOUS les rôles",
+		["pre", "explain", "recall", "test"].map(ro => vis(ro)), ["folded", "folded", "folded", "folded"]);
+	r.check("Learn : ouvert une fois répondu",
+		["pre", "explain", "recall", "test"].map(ro => vis(ro, true)), ["open", "open", "open", "open"]);
+	r.check("Learn : une lecture autonome est ouverte", vis("read"), "open");
+	r.check("hors Learn : repliable", passageVisibility({ role: "explain", answered: false, isLesson: false }), "collapsible");
 
 	const quiz = [
 		{ title: "Avant", prompt: "?", slice: 1, role: "pre" },
@@ -31,17 +70,29 @@ await withSrcModule(["src/engine/passage.ts"], ({ passageVisibility, createPassa
 	];
 	const ctx = (lesson) => ({
 		quiz,
+		lecturesAbsorbees: lesson ? lecturesAbsorbees(quiz) : new Set(),
 		isLessonMode: () => lesson,
-		roleOfQuestion: (i) => quiz[i].role,
+		roleOfQuestion: (i) => quiz[i].role ?? "test",
 		sliceOfQuestion: (i) => quiz[i].slice ?? null,
 		textOnly: { isChecked: () => false },
+		quizState: { locked: false, lessonPreSkipped: [] },
+		isComplete: () => false,
 	});
 	const h = createPassageHandlers(ctx(true));
 	const lu = (qi) => { const p = h.resolvePassage(qi); return p ? [p.title, p.text] : null; };
-	r.check("explain : la lecture de SON étape", [lu(2), lu(4)],
-		[["Les tubes", "Un tube relie la sortie d'une commande à l'entrée de la suivante."], ["Lecture 2", "Les redirections."]]);
-	r.check("explain sans lecture dans l'étape : rien", lu(6), null);
-	r.check("les autres rôles ne reçoivent pas la lecture", [lu(0), lu(5)], [null, null]);
+	const cours1 = ["Les tubes", "Un tube relie la sortie d'une commande à l'entrée de la suivante."];
+	const cours2 = ["Lecture 2", "Les redirections."];
+	r.check("chaque question de l'étape reçoit le cours, quel que soit son rôle", [lu(0), lu(2), lu(4), lu(5)],
+		[cours1, cours1, cours2, cours2]);
+	r.check("étape sans lecture : rien", lu(6), null);
+	r.check("clé de repli PROPRE à chaque question", [h.resolvePassage(0).key, h.resolvePassage(2).key], ["lecture-1-q0", "lecture-1-q2"]);
 	r.check("hors Learn : rien", createPassageHandlers(ctx(false)).resolvePassage(2), null);
+
+	const repondu = { ...ctx(true), isComplete: (i) => i === 0 };
+	const h2 = createPassageHandlers(repondu);
+	r.check("la question répondue voit son cours ouvert, la suivante replié",
+		[h2.passageVisibilityFor(0), h2.passageVisibilityFor(2)], ["open", "folded"]);
+	r.check("« Je ne sais pas » ouvre le cours",
+		createPassageHandlers({ ...ctx(true), quizState: { locked: false, lessonPreSkipped: [true] } }).passageVisibilityFor(0), "open");
 	r.done();
 });

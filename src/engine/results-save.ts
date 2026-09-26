@@ -370,7 +370,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		   "read" ici aussi, pour rester sur le MEME ensemble que `total`. */
 		let answered = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read")) continue;
 			if (ctx.hasAnyAnswer(i)) answered++;
 		}
 		return {

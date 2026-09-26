@@ -174,7 +174,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const counts = { understood: 0, partial: 0, review: 0, pending: 0 };
 		let total = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read")) continue;
 			total++;
 			const rating = normalizeRating(ctx.quizState.textOnlyRatings?.[i]);
 			if (rating) counts[rating]++;

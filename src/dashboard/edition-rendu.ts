@@ -39,6 +39,10 @@ export interface DepsEditionRendu {
 	sourcePath?: string;
 	/** Titre affiché quand la question n'en porte pas (« Question 3 »). */
 	titreDeRepli?: string;
+	/** L'élément `read` de l'étape de la question, dans un Learn : son cours
+	    s'affiche au-dessus, et son titre et son texte se modifient d'ici
+	    (`data-edit="lecture-title"` / `"lecture"`). */
+	lecture?: DraftQuestion;
 	/** Une donnée a changé : la sauvegarde différée existante. */
 	onChange(): void;
 	/** Repeindre la question (et ce que l'appelant affiche autour). */
@@ -76,6 +80,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			fallbackTitle: deps.titreDeRepli || t("editor.render.untitled"),
 			sourcePath: deps.sourcePath,
 			corrige: true,
+			lecture: deps.lecture,
 		});
 		carte.classList.add("qb-er");
 		// Énoncé et explication ABSENTS : un emplacement cliquable pour les créer.
@@ -111,7 +116,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		o.champ.detruire();
 		const change = garder && v !== o.initiale;
 		if (change) {
-			ecrire(q, o.cible, v);
+			ecrire(q, o.cible, v, deps.lecture);
 			deps.onChange();
 		}
 		if (!repeindre) return;
@@ -176,7 +181,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			return;
 		}
 		const multiligne = MULTILIGNES.has(cible.champ);
-		const initiale = valeurSource(q, cible);
+		const initiale = valeurSource(q, cible, deps.lecture);
 
 		/* MÊME encombrement : le champ prend place DANS l'élément (il garde ses
 		   classes, donc sa typo et son cadre de quiz). Une zone de saisie ne
@@ -213,7 +218,8 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		const champ = creerChampDirect(place, {
 			valeur: initiale,
 			multiligne,
-			placeholder: cible.champ === "title" ? deps.titreDeRepli : undefined,
+			placeholder: cible.champ === "title" ? deps.titreDeRepli
+				: cible.champ === "lecture-title" ? t("engine.passage.defaultTitle") : undefined,
 			etiquette: t("editor.render.clickToEdit"),
 			onChange: () => { /* lu à la validation */ },
 			onEntree: () => fermer(true, true, true),
@@ -228,7 +234,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 				   orpheline dans le vault. Pas de repeint si un autre champ est
 				   ouvert entre-temps : il serait détruit sous le curseur. */
 				collageImage((v) => {
-					ecrire(q, cible, v);
+					ecrire(q, cible, v, deps.lecture);
 					deps.onChange();
 					if (!vivant || ouvert) return;
 					deps.rendre();

@@ -211,6 +211,14 @@ export interface EngineCtx {
 	clampSlideIndex(i: number): number;
 	getSlidingWindow(): { from: number; to: number };
 	getSlideIndexForQuestion(qi: number): number;
+	/** Lectures ABSORBÉES par leur étape (src/lecture-etape.ts) : figées à
+	    l'assemblage, vides hors d'un Learn d'origine. Pas de diapositive, pas
+	    de numéro, pas de réponse. */
+	lecturesAbsorbees: ReadonlySet<number>;
+	/** Numéro AFFICHÉ de la question `qi` (Q1…Qn), qui saute les lectures absorbées. */
+	numeroAffiche(qi: number): number;
+	/** La question de la diapositive suivante, ou `null` après la dernière. */
+	questionSuivante(qi: number): number | null;
 	invalidateSavedResults(): void;
 
 	/* ════════════════════════════════════════════════

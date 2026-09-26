@@ -37,9 +37,11 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
             return t(minutes > 1 ? "engine.exam.duration.other" : "engine.exam.duration.one", { minutes });
         };
         const summaryLabel = durationLabel();
+        // Les lectures absorbées (Learn basculé en examen) ne sont pas des questions.
+        const nbQuestions = ctx.quiz.length - (ctx.lecturesAbsorbees?.size ?? 0);
         const questionCount = t(
-            ctx.quiz.length > 1 ? "engine.exam.questionCount.other" : "engine.exam.questionCount.one",
-            { count: ctx.quiz.length }
+            nbQuestions > 1 ? "engine.exam.questionCount.other" : "engine.exam.questionCount.one",
+            { count: nbQuestions }
         );
         return `<div class="quiz-exam-start-screen" data-exam-start-screen="1">
             <div class="quiz-exam-start-content">

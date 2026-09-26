@@ -16,8 +16,11 @@ import type { DraftQuestion } from "../editor/utils";
 /** Ce qu'un élément `data-edit` désigne dans le brouillon. */
 export interface Cible { champ: string; index: number }
 
-/** Les textes LONGS : champ multiligne, barre de mise en forme au-dessus. */
-export const MULTILIGNES = new Set(["prompt", "explain", "answer", "cloze"]);
+/** Les textes LONGS : champ multiligne, barre de mise en forme au-dessus.
+    `lecture` : le texte du cours de l'étape, affiché au-dessus de chaque
+    question d'un Learn (2026-09-26) ; `lecture-title`, son titre. Tous deux
+    s'écrivent dans l'élément `read` de l'étape, pas dans la question. */
+export const MULTILIGNES = new Set(["prompt", "explain", "answer", "cloze", "lecture"]);
 
 export function lireCible(el: HTMLElement): Cible | null {
 	const champ = el.getAttribute("data-edit");
@@ -25,10 +28,13 @@ export function lireCible(el: HTMLElement): Cible | null {
 	return { champ, index: Number(el.getAttribute("data-index") ?? "0") || 0 };
 }
 
-/** Le texte SOURCE que désigne une cible — ce que le formulaire montrerait. */
-export function valeurSource(q: DraftQuestion, c: Cible): string {
+/** Le texte SOURCE que désigne une cible — ce que le formulaire montrerait.
+    `lecture` : l'élément `read` de l'étape de `q`, s'il y en a un. */
+export function valeurSource(q: DraftQuestion, c: Cible, lecture?: DraftQuestion): string {
 	const de = (liste: string[] | undefined): string => (liste || [])[c.index] ?? "";
 	switch (c.champ) {
+		case "lecture-title": return lecture?.title || "";
+		case "lecture": return lecture?.prompt || "";
 		case "title": return q.title || "";
 		case "prompt": return q.prompt || "";
 		case "explain": return q.explain || "";
@@ -45,9 +51,18 @@ export function valeurSource(q: DraftQuestion, c: Cible): string {
 }
 
 /** Écrit `v` dans le brouillon, par les mêmes setters que le formulaire. */
-export function ecrire(q: DraftQuestion, c: Cible, v: string): void {
+export function ecrire(q: DraftQuestion, c: Cible, v: string, lecture?: DraftQuestion): void {
 	const dans = (liste: string[]): void => { liste[c.index] = v; };
 	switch (c.champ) {
+		/* Le COURS de l'étape : le même élément `read` pour toutes ses
+		   questions — le modifier depuis l'une le modifie pour toutes. Mêmes
+		   setters que le titre et l'énoncé d'une question. */
+		case "lecture-title":
+			if (lecture) ecrire(lecture, { champ: "title", index: 0 }, v);
+			return;
+		case "lecture":
+			if (lecture) ecrire(lecture, { champ: "prompt", index: 0 }, v);
+			return;
 		case "title":
 			q.title = v;
 			// Un titre SAISI est un titre d'auteur : sans ce drapeau, le prochain
@@ -78,7 +93,7 @@ export function ecrire(q: DraftQuestion, c: Cible, v: string): void {
 }
 
 export function selecteur(c: Cible): string {
-	return `[data-edit="${c.champ}"]` + (c.champ === "title" || MULTILIGNES.has(c.champ) ? "" : `[data-index="${c.index}"]`);
+	return `[data-edit="${c.champ}"]` + (c.champ === "title" || c.champ === "lecture-title" || MULTILIGNES.has(c.champ) ? "" : `[data-index="${c.index}"]`);
 }
 
 /** Un emplacement VIDE : une ligne discrète (icône « + » et libellé), qui

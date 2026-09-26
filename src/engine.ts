@@ -18,7 +18,8 @@ import { createTextOnlyHandlers } from "./engine/text-only";
 import { createResultsSaver } from "./engine/results-save";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
-import { createLessonHandlers } from "./engine/lesson";
+import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
+import { lecturesAbsorbees as calculerLecturesAbsorbees, numerosAffiches, questionHote } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
 import { photographier, restaurer, type SessionSink } from "./engine/session";
@@ -356,10 +357,25 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const initOrderingPicks = () => quiz.map(() => null);
 	const initMatchPicks = () => quiz.map(() => null);
 
+	/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : dans un Learn,
+	   la carte de lecture d'une étape qui a d'autres questions n'est plus une
+	   diapositive — son cours s'affiche, replié, au-dessus de chacune d'elles
+	   (engine/passage.ts). FIGÉES à l'assemblage sur le mode D'ORIGINE, comme
+	   `slideMap` : une bascule Leçon → Examen garde la même piste, et la
+	   lecture n'y redevient pas une question à laquelle on ne peut rien
+	   répondre. Hors Learn : ensemble vide, rien ne change. */
+	const lecturesAbsorbees: ReadonlySet<number> = buildLessonModel(quiz, originalQuizMode).isLesson
+		? calculerLecturesAbsorbees(quiz)
+		: new Set<number>();
+	const numeros = numerosAffiches(quiz, lecturesAbsorbees);
+	ctx.lecturesAbsorbees = lecturesAbsorbees;
+	ctx.numeroAffiche = (qi: number): number => numeros[qi] || qi + 1;
+
 	// ── Slide Map : index dynamique basé sur le mode ──
 	function buildSlideMap(): SlideMapEntry[] {
 		const map: SlideMapEntry[] = [];
 		for (let i = 0; i < quiz.length; i++) {
+			if (lecturesAbsorbees.has(i)) continue;
 			map.push({ type: "question", questionIndex: i });
 		}
 		map.push({ type: "submit" });
@@ -419,12 +435,23 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const isResultsSlideIndex = (i: number): boolean => slideMap[i]?.type === "results";
 	const clampSlideIndex = (i: number): number => Math.max(0, Math.min(TOTAL_SLIDES - 1, i));
 	const getSlidingWindow = (): { from: number; to: number } => ({ from: Math.max(0, Math.min(quizState.prevCurrent, quizState.current)), to: Math.min(TOTAL_SLIDES - 1, Math.max(quizState.prevCurrent, quizState.current)) });
+	/* Une lecture absorbée n'a pas de diapositive : elle renvoie à la
+	   question de son étape qui la montre (`questionHote`). C'est ce qui fait
+	   tomber une reprise, un onglet ou un « suivant » qui la visait sur une
+	   vraie question plutôt que sur rien. */
 	const getSlideIndexForQuestion = (qi: number): number => {
+		const cible = questionHote(quiz, qi, lecturesAbsorbees);
 		for (let si = 0; si < slideMap.length; si++) {
 			const entry = slideMap[si];
-			if (entry.type === "question" && entry.questionIndex === qi) return si;
+			if (entry.type === "question" && entry.questionIndex === cible) return si;
 		}
 		return -1;
+	};
+	/** La question de la diapositive qui suit celle de `qi` ; `null` après la dernière. */
+	const questionSuivante = (qi: number): number | null => {
+		const si = getSlideIndexForQuestion(qi);
+		const suivante = si >= 0 ? slideMap[si + 1] : undefined;
+		return suivante?.type === "question" ? suivante.questionIndex : null;
 	};
 
 	// Exposer les fonctions utilitaires dans ctx
@@ -434,6 +461,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.clampSlideIndex = clampSlideIndex;
 	ctx.getSlidingWindow = getSlidingWindow;
 	ctx.getSlideIndexForQuestion = getSlideIndexForQuestion;
+	ctx.questionSuivante = questionSuivante;
 	/* La photo de session : prise après chaque réponse (`invalidateSavedResults`
 	   est appelé par TOUTE interaction), à chaque changement de question
 	   (state.ts) et à la destruction du moteur (un texte tapé sans quitter la
@@ -978,11 +1006,14 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		if (reprise) {
 			const { courante, ...champs } = reprise;
 			Object.assign(quizState, champs);
-			const slide = slideMap.findIndex(e => e.type === "question" && e.questionIndex === courante);
+			// `getSlideIndexForQuestion`, pas une recherche directe : une photo
+			// prise quand la lecture était encore un écran peut désigner une
+			// lecture ABSORBÉE depuis — on rouvre sur la question qui la montre.
+			const slide = getSlideIndexForQuestion(courante);
 			if (slide >= 0) {
 				quizState.current = slide;
 				quizState.prevCurrent = slide;
-				quizState.lastQuestionIndex = courante;
+				quizState.lastQuestionIndex = (slideMap[slide] as { questionIndex: number }).questionIndex;
 			}
 		}
 	}

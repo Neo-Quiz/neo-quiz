@@ -68,6 +68,28 @@
   white-space: nowrap;
 }
 
+/* L'invite du cours d'une étape de Learn, replié d'office au-dessus de chaque
+   question (engine/passage.ts, régime "folded") : « Tentez de répondre sans
+   lire ». Elle ne dit plus rien une fois le cours déplié. */
+.quiz-passage-invite{
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 0.78em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quiz-passage:not(.is-collapsed) .quiz-passage-invite{
+  display: none;
+}
+
+/* L'en-tête entier ouvre un cours replié d'office : c'est là qu'on clique. */
+.quiz-passage[data-passage-fold="1"] .quiz-passage-head{
+  cursor: pointer;
+}
+
 .quiz-passage-toggle{
   flex: 0 0 auto;
   display: inline-flex;

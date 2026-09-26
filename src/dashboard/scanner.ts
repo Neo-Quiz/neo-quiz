@@ -5,6 +5,7 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
+import { lecturesAbsorbees } from "../lecture-etape";
 import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
@@ -170,7 +171,11 @@ export function createScanner(host: Host): Scanner {
 			// Le titre affiché vient du nom de la note (défini au niveau du cache),
 			// pas de la 1re question (qui vaut souvent « Question 1 »).
 			return {
-				questions: questions.length,
+				/* Le NOMBRE de questions affiché (carte, fiche, infos) saute les
+				   lectures absorbées par leur étape (src/lecture-etape.ts) : un
+				   cours n'est pas une question. `items`, lui, les garde toutes —
+				   c'est le catalogue de l'ordonnanceur, rangé par identifiant. */
+				questions: questions.length - lecturesAbsorbees(questions.map(x => x.q)).size,
 				items,
 				types: Array.from(typeSet),
 				quizType,

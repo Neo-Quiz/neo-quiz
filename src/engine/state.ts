@@ -67,11 +67,19 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		return sel !== null;
 	}
 
+	/** Une carte SANS RÉPONSE : une lecture en Leçon (task 6b), ou une
+	    lecture ABSORBÉE par son étape (2026-09-26), qui n'a même plus de
+	    diapositive — quel que soit le mode courant, une bascule Leçon →
+	    Examen comprise : elle n'y redevient pas une question inatteignable. */
+	function sansReponse(i: number): boolean {
+		return !!ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read");
+	}
+
 	function isComplete(i: number): boolean {
 		// Une carte "read" (task 6b) n'a rien à répondre : elle est toujours
 		// considérée complète, pour ne jamais apparaître dans getMissingIndices
 		// (donc ne bloquer ni la navigation, ni l'écran de soumission).
-		if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") return true;
+		if (sansReponse(i)) return true;
 
 		// Même bascule PAR QUESTION que hasAnyAnswer ci-dessus.
 		if (ctx.textOnly?.isTextOnlyFor?.(i)) {
@@ -151,7 +159,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// le pourcentage final d'un quiz Leçon (une carte jamais "correcte").
 		let correct = 0, total = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (sansReponse(i)) continue;
 			total++;
 			if (isCorrect(i)) correct++;
 		}
@@ -538,7 +546,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				   comme `computeScorePercent` le fait pour `total`. */
 				let questionsDone = 0;
 				for (let i = 0; i < ctx.quiz.length; i++) {
-					if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+					if (sansReponse(i)) continue;
 					if (isComplete(i)) questionsDone++;
 				}
 				statsStore.updateRecord(ctx.sourcePath, {
@@ -567,6 +575,11 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			for (let i = 0; i < ctx.quiz.length; i++) {
 				if (ctx.quizState.recorded[i]) continue;
 				const role = ctx.originalQuizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
+				/* Une lecture ABSORBÉE (2026-09-26) reste une lecture pour le
+				   journal : `seen` en Leçon, sans signal de mémoire, comme
+				   avant. Après une bascule en Examen, elle n'a été ni montrée
+				   ni répondue : rien ne s'est passé, rien n'est écrit. */
+				if (ctx.lecturesAbsorbees?.has(i) && !ctx.isLessonMode()) continue;
 				let grade: ReviewGrade;
 				if (ctx.isLessonMode() && role === "read") grade = "seen";
 				else if (ctx.quizState.lessonPreSkipped[i]) grade = "skipped";

@@ -66,6 +66,11 @@ export interface QuizPreviewOptions {
 	    explication…), avec les attributs `data-edit` que l'édition dans le
 	    rendu (tâche 3) accroche. Sans lui : état INITIAL, inchangé. */
 	corrige?: boolean;
+	/** L'élément `read` de l'étape de la question (Learn, 2026-09-26) : son
+	    cours s'affiche au-dessus de la question, déplié — l'aperçu est inerte
+	    et l'éditeur doit pouvoir le lire. Avec `corrige`, son titre et son
+	    texte portent `data-edit="lecture-title"` / `"lecture"`. */
+	lecture?: DraftQuestion;
 }
 
 /**
@@ -143,11 +148,11 @@ export function inlineInto(el: HTMLElement, raw: string, sourcePath?: string): v
     pouvait pas la relire. Toujours déplié ici (l'aperçu n'a pas d'état) et
     sans le compte « questions 2 à 4 », qui demanderait de connaître tout le
     quiz alors que la carte ne voit qu'une question. */
-function renderPassage(card: HTMLElement, q: DraftQuestion, sourcePath?: string): void {
+function renderPassage(card: HTMLElement, q: DraftQuestion, sourcePath?: string): boolean {
 	const extras = q._extraFields || {};
 	const text = typeof extras.passage === "string" ? extras.passage : "";
 	const html = typeof extras.passageHtml === "string" ? extras.passageHtml : "";
-	if (!text && !html) return;
+	if (!text && !html) return false;
 
 	const title = typeof extras.passageTitle === "string" && extras.passageTitle.trim()
 		? extras.passageTitle
@@ -164,6 +169,39 @@ function renderPassage(card: HTMLElement, q: DraftQuestion, sourcePath?: string)
 	const body = ajouter(wrap, "div", "quiz-passage-body");
 	const content = ajouter(body, "div", "quiz-passage-content");
 	content.innerHTML = html ? resolveImagesInHtml(html, sourcePath) : texteQuizHtml(text, sourcePath);
+	return true;
+}
+
+/** Le COURS de l'étape (carte `read` absorbée, 2026-09-26), au-dessus de la
+    question, mêmes classes que le moteur (engine/passage.ts). Déplié : le
+    moteur le replie pour l'apprenant, l'auteur doit pouvoir le lire et le
+    modifier. Même priorité que le moteur : un support propre à la question
+    passe avant. */
+function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPreviewOptions): void {
+	const texte = (lecture.prompt || "").trim();
+	const html = (lecture._promptHtml || "").trim();
+	// Un cours vide ne s'affiche que là où l'on peut l'écrire.
+	if (!texte && !html && !opts.corrige) return;
+
+	const wrap = ajouter(card, "div", "quiz-passage quiz-passage--lecture");
+	const head = ajouter(wrap, "div", "quiz-passage-head");
+	const icon = ajouter(head, "span", "quiz-passage-icon");
+	icon.setAttribute("aria-hidden", "true");
+	_setIcon(icon, "book-open");
+	const titre = ajouter(head, "span", "quiz-passage-title");
+	inlineInto(titre, lecture.title || t("engine.passage.defaultTitle"), opts.sourcePath);
+	if (opts.corrige) titre.setAttribute("data-edit", "lecture-title");
+	const body = ajouter(wrap, "div", "quiz-passage-body");
+	const content = ajouter(body, "div", "quiz-passage-content");
+	if (html) {
+		// Un cours resté en HTML se lit ici et se modifie sur sa carte : il n'a
+		// pas d'écran, mais l'élément `read` garde son HTML tel quel.
+		content.innerHTML = resolveImagesInHtml(html, opts.sourcePath);
+		return;
+	}
+	if (texte) content.innerHTML = texteQuizHtml(texte, opts.sourcePath);
+	else content.textContent = t("editor.render.addPrompt");
+	if (opts.corrige) content.setAttribute("data-edit", "lecture");
 }
 
 /** Construit la carte de question dans `host` et la renvoie. */
@@ -173,7 +211,7 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 	const wrap = ajouter(host, "div", "quiz-blocks-host");
 	const card = ajouter(wrap, "section", "quiz-card");
 
-	renderPassage(card, q, opts.sourcePath);
+	if (!renderPassage(card, q, opts.sourcePath) && opts.lecture) renderLecture(card, opts.lecture, opts);
 
 	// Le TITRE aussi rend son markdown : le moteur le fait (engine/cards.ts),
 	// et un titre de question technique cite volontiers une commande entre

@@ -58,7 +58,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		// pas de doublon ici, meme convention que bindBinaryQuestion/trySelect.
 		ctx.quizState.lessonPreSkipped[qi] = true;
 		commitQuestionInteraction(qi, { syncHeight: true });
-		if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+		// La diapositive SUIVANTE, pas l'index suivant : une lecture absorbée
+		// entre les deux n'a pas d'écran.
+		const suivante = ctx.questionSuivante(qi);
+		if (suivante !== null) ctx.goToQuestion(suivante);
 	}
 
 	function bindBinaryQuestion(trackItem: HTMLElement, qi: number, isMulti: boolean): void {
@@ -402,11 +405,18 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		}
 
 		const prevBtn = trackItem.querySelector(".quiz-prev-btn");
-		if (prevBtn) prevBtn.addEventListener("click", () => ctx.goToQuestion(qi - 1));
+		// Précédente / suivante par DIAPOSITIVE : `qi ± 1` visait une lecture
+		// absorbée, qui n'en a pas (et renvoie à la question qui la montre —
+		// parfois celle-ci même).
+		if (prevBtn) prevBtn.addEventListener("click", () => {
+			const precedente = ctx.slideMap[ctx.getSlideIndexForQuestion(qi) - 1];
+			if (precedente?.type === "question") ctx.goToQuestion(precedente.questionIndex);
+		});
 
 		const nextBtn = trackItem.querySelector(".quiz-next-btn");
 		if (nextBtn) nextBtn.addEventListener("click", () => {
-			if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+			const suivante = ctx.questionSuivante(qi);
+			if (suivante !== null) ctx.goToQuestion(suivante);
 			else goPastLastQuestion();
 		});
 	}
@@ -524,7 +534,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			if (e.key === "ArrowRight") {
 				if (ctx.isQuestionSlideIndex(cur)) {
 					const qi = (ctx.slideMap[cur] as { questionIndex: number }).questionIndex;
-					if (qi < ctx.quiz.length - 1) {
+					if (ctx.questionSuivante(qi) !== null) {
 						ctx.goToSlide(cur + 1, { forceRender: false });
 						navigated = true;
 					} else {

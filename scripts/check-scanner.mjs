@@ -153,6 +153,15 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'learn', objectives: ['Lire'] },\n]\n```\n";
 	await scanner.scanFile(fichierHote);
 	r.check("un bloc { mode: 'learn' } est un Learn", scanner.getQuiz(fichierHote.path)?.mode, "learn");
+	r.check("une lecture seule dans son étape reste une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 1);
+
+	/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : le cours d'une
+	   étape qui a d'autres questions n'est pas compté ; le catalogue de
+	   l'ordonnanceur (`items`) le garde, par identifiant. */
+	content = "```quiz-blocks\n[\n  { title: 'Avant', prompt: '?', role: 'pre', slice: 1 },\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { title: 'Avec vos mots', prompt: '?', role: 'explain', type: 'text', slice: 1 },\n  { mode: 'learn' },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	r.check("une lecture absorbée n'est pas comptée, mais reste au catalogue",
+		[scanner.getQuiz(fichierHote.path)?.questions, scanner.getQuiz(fichierHote.path)?.items?.length], [2, 3]);
 
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners

@@ -24,6 +24,8 @@ export const EN_ENGINE = {
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Hide the document",
 	"engine.passage.expand": "Show the document",
+	/* Le cours d'une étape de Learn, replié au-dessus de chaque question. */
+	"engine.passage.tryWithoutReading": "Try to answer without reading",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Results",

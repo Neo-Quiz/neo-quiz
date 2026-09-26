@@ -442,6 +442,29 @@
 .qbd-fiche-card:hover .qbd-fiche-card-corps::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text-normal) 32%, transparent); }
 .qbd-fiche-card-corps::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent); }
 .qbd-fiche-card-corps::-webkit-scrollbar-button { display: none; height: 0; }
+/* Le cours de l'étape (Learn, 2026-09-26) : au-dessus de la question, une
+   ligne de texte discrète — son titre, pas son texte, que la carte n'a pas
+   la place de montrer. Il se lit et se modifie dans l'éditeur. */
+.qbd-fiche-q-lecture {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	font-size: 12.5px;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+.qbd-fiche-q-lecture .qbd-fiche-i {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+.qbd-fiche-q-lecture .qbd-fiche-i svg { width: 14px; height: 14px; }
+.qbd-fiche-q-lecture-titre {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .qbd-fiche-q-text {
 	font-size: 14.5px;
 	line-height: 1.55;

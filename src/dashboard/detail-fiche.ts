@@ -13,6 +13,7 @@ import { questionText } from "./detail-io";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
+import { lectureDeLEtape, numerosAffiches, questionsVisibles } from "../lecture-etape";
 
 /* ══════════════════════════════════════════════════════════
    FICHE D'UN QUIZ — ce que la page montre à l'ouverture
@@ -344,14 +345,19 @@ function plier(s: string): string {
 	return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
-/** Les indices des questions qui contiennent la recherche (énoncé ou options). */
+/** Les indices des questions VISIBLES qui contiennent la recherche (énoncé,
+    options, ou le cours de leur étape). Une lecture absorbée par son étape
+    (src/lecture-etape.ts) n'a pas de carte : son texte se trouve dans les
+    cartes des questions qu'elle surplombe. */
 function filtrer(questions: DraftQuestion[], recherche: string): number[] {
 	const r = plier(recherche.trim());
-	const tous = questions.map((_, i) => i);
+	const tous = questionsVisibles(questions);
 	if (!r) return tous;
 	return tous.filter(i => {
 		const q = questions[i];
-		return plier([questionText(q), ...(q.options ?? [])].join(" ")).includes(r);
+		const l = lectureDeLEtape(questions, i);
+		const cours = l === null ? [] : [questions[l].title || "", questionText(questions[l])];
+		return plier([questionText(q), ...(q.options ?? []), ...cours].join(" ")).includes(r);
 	});
 }
 
@@ -411,15 +417,25 @@ function suivreDebord(zone: HTMLElement): void {
 
 function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer: () => void): void {
 	const grille = ajouter(body, "div", "qbd-fiche-grid");
+	// Numéros AFFICHÉS : ils sautent les lectures absorbées, comme le quiz.
+	const numeros = numerosAffiches(deps.questions);
 	for (const i of idx) {
 		const q = deps.questions[i];
+		const n = numeros[i] || i + 1;
 		const card = ajouter(grille, "div", "qbd-fiche-q qbd-fiche-card");
-		renderTop(card, q, i + 1);
+		renderTop(card, q, n);
 		/* Le CONTENU défile dans sa propre zone, sous l'en-tête de la carte :
 		   un fondu en bas tant qu'il reste à lire (jamais une ligne coupée
 		   net), en haut dès qu'on a descendu (2026-09-26). Le fondu porte sur
 		   cette zone, pas sur la carte : sa bordure reste entière. */
 		const corps = ajouter(card, "div", "qbd-fiche-card-corps");
+		// Le cours de l'étape, au-dessus de la question : son titre seul.
+		const l = lectureDeLEtape(deps.questions, i);
+		if (l !== null) {
+			const ligne = ajouter(corps, "span", "qbd-fiche-q-lecture");
+			icone(ligne, "book-open");
+			texte(ligne, "span", "qbd-fiche-q-lecture-titre", deps.questions[l].title || t("engine.passage.defaultTitle"));
+		}
 		texte(corps, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
 		renderOptions(corps, q);
 		suivreDebord(corps);
@@ -430,8 +446,8 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		card.classList.add("is-editable");
 		card.tabIndex = 0;
 		card.setAttribute("role", "button");
-		card.setAttribute("aria-label", t("dashboard.fiche.editQuestion", { n: i + 1 }));
-		card.title = t("dashboard.fiche.editQuestion", { n: i + 1 });
+		card.setAttribute("aria-label", t("dashboard.fiche.editQuestion", { n }));
+		card.title = t("dashboard.fiche.editQuestion", { n });
 		card.addEventListener("click", () => editer(i));
 		card.addEventListener("keydown", (e) => {
 			if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;

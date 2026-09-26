@@ -53,6 +53,7 @@ import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner"
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
+import { numerosAffiches, questionHote } from "../../../../src/lecture-etape";
 import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
@@ -321,7 +322,13 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			const quiz = deps.scanner.getQuiz(path);
 			if (!s || !quiz || s.courante === null) return null;
 			const i = quiz.items.findIndex(it => it.id === s.courante);
-			return i < 0 ? null : { question: i + 1, total: quiz.items.length, ecrite: s.ecrite };
+			if (i < 0) return null;
+			/* Le numéro AFFICHÉ, qui saute les lectures absorbées par leur
+			   étape (src/lecture-etape.ts), comme les onglets du quiz ; une
+			   photo posée sur une lecture absorbée désigne la question qui la
+			   montre. Le total est celui de la carte (`quiz.questions`). */
+			const numeros = numerosAffiches(quiz.items);
+			return { question: numeros[questionHote(quiz.items, i)] || i + 1, total: quiz.questions, ecrite: s.ecrite };
 		},
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);

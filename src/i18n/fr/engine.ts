@@ -17,6 +17,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Masquer le document",
 	"engine.passage.expand": "Afficher le document",
+	"engine.passage.tryWithoutReading": "Tentez de répondre sans lire",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Résultats",
