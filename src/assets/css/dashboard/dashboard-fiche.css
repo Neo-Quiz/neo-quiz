@@ -82,6 +82,10 @@
 	padding: 0 22px;
 	font-size: 14.5px;
 }
+/* Le « ⋮ » de l'en-tête d'un dossier déborde de 6 px à droite (marge
+   négative, pour aligner ses points sur le bord) ; la fiche coupe ce qui
+   dépasse (`overflow: hidden`), et le rond du survol était tronqué. */
+.qbd-root .qbd-fiche-actions .qbd-folder-more-btn { margin-right: 0; }
 .qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }
 .qbd-root .qbd-fiche-edit {
 	justify-content: center;
