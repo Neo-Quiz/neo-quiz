@@ -1,7 +1,7 @@
 import { currentHost } from "../host/current";
 import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
-import { poserBouton3d } from "./cta3d";
+import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
@@ -156,10 +156,11 @@ function renderHead(root: HTMLElement, deps: FicheDeps): void {
     à celle des pastilles, la main les trouve plus vite. */
 function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
 	const actions = ajouter(meta, "div", "qbd-fiche-actions");
-	const edit = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");
+	const edit = ajouter(actions, "button", "qbd-fiche-edit");
 	edit.type = "button";
 	icone(edit, "square-pen", "qbd-btn-icon");
 	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
+	poserBouton3dNeutre(edit);
 	edit.addEventListener("click", () => deps.onEdit());
 
 	const start = ajouter(actions, "button", "qbd-fiche-start");

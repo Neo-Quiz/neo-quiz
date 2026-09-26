@@ -1139,6 +1139,15 @@
 	cursor: pointer;
 	transition: opacity 100ms ease-out;
 }
+/* Variante NEUTRE (`poserBouton3dNeutre`) : une face grise claire sur le
+   fond sombre, sa tranche plus sombre dessous ; texte normal, pas blanc. */
+.qbd-root .qbd-cta3d--neutre {
+	--qbd-cta3d-face: color-mix(in srgb, #fff 16%, var(--background-primary));
+	--qbd-cta3d-edge: color-mix(in srgb, #000 45%, var(--qbd-cta3d-face));
+	color: var(--text-normal);
+}
+.qbd-cta3d--neutre .qbd-cta3d-face { text-shadow: none; }
+.qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
 .qbd-root .qbd-cta3d:hover:not(:disabled) {
 	background: none;
 	opacity: 0.85;

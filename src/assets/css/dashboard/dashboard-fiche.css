@@ -73,11 +73,13 @@
 	align-items: center;
 	gap: 10px;
 }
-/* « Commencer le quiz » : le bouton 3D (.qbd-cta3d, dashboard-components.css). */
-.qbd-root .qbd-fiche-start {
+/* « Modifier » et « Commencer le quiz » : deux boutons 3D de la même
+   famille (.qbd-cta3d, dashboard-components.css), à la même taille — le
+   premier neutre et sans reflet, le second bleu. */
+.qbd-root .qbd-fiche-actions .qbd-cta3d {
 	margin-bottom: var(--qbd-cta3d-depth, 4px);
 }
-.qbd-fiche-start .qbd-cta3d-face {
+.qbd-fiche-actions .qbd-cta3d-face {
 	min-height: 40px;
 	padding: 0 22px;
 	font-size: 14.5px;
@@ -86,11 +88,6 @@
    négative, pour aligner ses points sur le bord) ; la fiche coupe ce qui
    dépasse (`overflow: hidden`), et le rond du survol était tronqué. */
 .qbd-root .qbd-fiche-actions .qbd-folder-more-btn { margin-right: 0; }
-.qbd-fiche-edit .qbd-btn-icon { display: flex; align-items: center; }
-.qbd-root .qbd-fiche-edit {
-	justify-content: center;
-	border-radius: 999px;
-}
 
 /* ── La ligne d'infos : mode, nombre, origine, progression ── */
 .qbd-fiche-meta {
@@ -413,7 +410,10 @@
    QCM à options en colonne gardait un grand vide sous son texte. */
 .qbd-fiche-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	/* TROIS colonnes au plus (2026-09-26) : en plein écran, quatre cartes
+	   étroites coupaient chaque énoncé en lignes courtes. Une colonne ne
+	   descend jamais sous 280 px, ni sous le tiers de la largeur. */
+	grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - 28px) / 3)), 1fr));
 	gap: 14px;
 	align-items: start;
 }

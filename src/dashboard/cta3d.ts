@@ -52,3 +52,14 @@ export function poserBouton3d(bouton: HTMLElement): SVGSVGElement {
 	el(cp, "rect", { width: "150", height: "56", fill: "white" });
 	return svg;
 }
+
+/** Le même bouton 3D, NEUTRE et sans reflet (2026-09-26) : le « Jump
+    ahead » gris de Brilliant, pour l'action secondaire posée à côté d'un
+    bouton 3D principal (« Modifier » à côté de « Commencer le quiz »). Même
+    hauteur, même enfoncement ; le reflet reste réservé à l'action
+    principale, qui doit ressortir. */
+export function poserBouton3dNeutre(bouton: HTMLElement): void {
+	bouton.classList.add("qbd-cta3d", "qbd-cta3d--neutre");
+	const face = ajouter(bouton, "span", "qbd-cta3d-face");
+	while (bouton.firstChild && bouton.firstChild !== face) face.appendChild(bouton.firstChild);
+}
