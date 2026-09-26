@@ -183,8 +183,9 @@ function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
     de questions, l'origine ; les actions s'y ajoutent au bout. */
 function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
-	/* Les pastilles, puis l'ORIGINE (modèle et date) à droite du nombre de
-	   questions, sur la même ligne (2026-09-26) ; les actions au bout. */
+	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous,
+	   à la place qu'occupait la recherche, partie au centre (2026-09-26) ;
+	   les actions au bout. */
 	const infos = ajouter(meta, "div", "qbd-fiche-meta-infos");
 	const chips = ajouter(infos, "div", "qbd-fiche-chips");
 	/* Le MODE, avec son icône, et au survol son explication : la bulle du
@@ -248,7 +249,7 @@ function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	   l'infobulle donne l'identifiant exact. */
 	if (deps.origine) {
 		const o = deps.origine;
-		const bloc = ajouter(chips, "div", "qbd-fiche-origin");
+		const bloc = ajouter(infos, "div", "qbd-fiche-origin");
 		bloc.title = o.tooltip;
 		const logo = ajouter(bloc, "span", "qbd-provider-logo qbd-fiche-origin-logo qbd-provider-logo--" + o.logo);
 		setBrandLogo(logo, o.logo);
