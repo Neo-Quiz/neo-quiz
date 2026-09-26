@@ -73,7 +73,7 @@ async function listerImages(dossier: string): Promise<string[]> {
 }
 
 /** Pose l'image dans la variable CSS, ou l'efface (le CSS reprend alors
-    `wallpaper.jpg`, son repli). */
+    `fonds/island-sunset.jpg`, son repli). */
 function poserVariable(reglage: ReglageFond | null): void {
 	if (reglage) {
 		document.documentElement.style.setProperty("--nq-fond-image", `url("${urlDuFond(reglage)}")`);

@@ -197,7 +197,7 @@ body::after {
    la fenêtre. 40 px de débord couvrent le flou maximal (20 px). */
 body::before {
 	inset: -40px;
-	background: var(--nq-fond-image, url("/wallpaper.jpg")) center / cover no-repeat;
+	background: var(--nq-fond-image, url("/fonds/island-sunset.jpg")) center / cover no-repeat;
 	filter: brightness(var(--nq-fond-luminosite, 0.85)) blur(var(--nq-fond-flou, 4px));
 }
 

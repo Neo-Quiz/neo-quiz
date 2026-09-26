@@ -184,11 +184,9 @@ const historiqueNav = creerHistorique<EtatNav>(memeEtatNav);
  */
 let questionInitiale: number | undefined;
 
-/** La séquence de la lueur, en millisecondes : à l'entrée d'un dossier, sa
-    couleur MONTE, TIENT puis S'ÉTEINT ; à la sortie, le bleu REVIENT. */
-const LUEUR_MONTE = 300;
-const LUEUR_TIENT = 600;
-const LUEUR_ETEINT = 900;
+/** La séquence de la lueur, en millisecondes : à l'entrée d'un dossier, le
+    bleu S'ÉTEINT ; à la sortie, il REVIENT. */
+const LUEUR_ETEINT = 600;
 const LUEUR_RETOUR = 400;
 
 /** L'accent pour lequel la lueur est posée (`null` : hors dossier, le bleu),
@@ -202,9 +200,10 @@ let lueurAnimation: Animation | null = null;
  *
  * HORS DOSSIER (`null`) : la bande BLEUE, à pleine intensité ; si elle était
  * éteinte (on sort d'un dossier), elle revient en fondu.
- * DANS UN DOSSIER : la couleur du dossier ne fait que PASSER (Ahmed,
- * 2026-09-26, « la lueur devient étouffante » sur un fond d'écran) — elle
- * monte, tient, s'éteint, et il ne reste aucune lueur dans le dossier.
+ * DANS UN DOSSIER : la lueur S'ÉTEINT simplement, sans prendre la couleur
+ * du dossier (Ahmed, 2026-09-26 : « la lueur devient étouffante » sur un
+ * fond d'écran, puis « quand on arrive dans un dossier la lueur s'éteint
+ * simplement ») — il ne reste aucune lueur dans le dossier.
  *
  * « Mes quiz » appelle ceci à CHAQUE rendu (un changement du catalogue
  * redessine la page) : le même accent ne rejoue donc rien. Un changement en
@@ -223,19 +222,17 @@ function poserLueur(accent: string | null): void {
 	lueurAnimation?.cancel();
 	lueurAnimation = null;
 
-	if (accent) racine.style.setProperty("--nq-lueur", accent);
-	else racine.style.removeProperty("--nq-lueur");
+	// La couleur reste le bleu : dans un dossier, la lueur ne fait que s'éteindre.
+	racine.style.removeProperty("--nq-lueur");
 	racine.style.setProperty("--nq-lueur-force", accent ? "0" : "1");
 
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 	const de = Number.isFinite(depart) ? String(depart) : "1";
 	const animation = accent
 		? racine.animate([
-			{ "--nq-lueur-force": de, offset: 0, easing: "ease-out" },
-			{ "--nq-lueur-force": "1", offset: LUEUR_MONTE / (LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT) },
-			{ "--nq-lueur-force": "1", offset: (LUEUR_MONTE + LUEUR_TIENT) / (LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT), easing: "ease-in-out" },
-			{ "--nq-lueur-force": "0", offset: 1 },
-		], { duration: LUEUR_MONTE + LUEUR_TIENT + LUEUR_ETEINT })
+			{ "--nq-lueur-force": de },
+			{ "--nq-lueur-force": "0" },
+		], { duration: LUEUR_ETEINT, easing: "ease-in-out" })
 		: racine.animate([
 			{ "--nq-lueur-force": de },
 			{ "--nq-lueur-force": "1" },

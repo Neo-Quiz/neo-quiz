@@ -61,8 +61,11 @@
      d'Ahmed). `-raised` : un
      cran de plus, pour ce qui se pose SUR une carte ou s'en détache (panneau
      d'édition, puce), sans redevenir du verre. */
-  --qbd-surface-bg: color-mix(in srgb, var(--text-normal) 5%, var(--background-secondary));
-  --qbd-surface-bg-raised: color-mix(in srgb, var(--text-normal) 8%, var(--background-secondary));
+  /* Le gris des cartes et du composer : le fond secondaire lui-même, plus
+     sombre que l'ancien mélange à 5 % de texte (choisi par Ahmed sur
+     capture, 2026-09-26). */
+  --qbd-surface-bg: var(--background-secondary);
+  --qbd-surface-bg-raised: color-mix(in srgb, var(--text-normal) 4%, var(--background-secondary));
   --qbd-surface-edge: color-mix(in srgb, var(--text-normal) 9%, transparent);
 }
 
