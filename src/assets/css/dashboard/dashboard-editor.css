@@ -835,18 +835,17 @@
 
 /* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ──
    Un texte modifiable ne change pas d'aspect au repos : c'est le rendu du
-   quiz. Au survol ou au focus clavier, un liseré pointillé discret dit
-   qu'on peut cliquer. `outline` et non `border` : rien ne bouge d'un pixel. */
+   quiz, comme une note d'Obsidian : aucun liseré au survol, seul le curseur
+   de texte dit qu'on peut cliquer. Le focus CLAVIER garde un anneau, sans
+   quoi Tab ne montrerait pas où il s'arrête. */
 .qb-er [data-edit] {
 	cursor: text;
 	border-radius: 4px;
-	outline: 1px dashed transparent;
-	outline-offset: 3px;
-	transition: outline-color 120ms ease;
+	outline: none;
 }
-.qb-er [data-edit]:hover,
 .qb-er [data-edit]:focus-visible {
-	outline-color: color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+	outline-offset: 3px;
 }
 .qb-er [data-edit].is-editing {
 	outline: none;
@@ -854,11 +853,7 @@
 }
 /* Un HTML pré-rendu : lisible, pas modifiable ici — l'infobulle renvoie à
    « Plus ». Un liseré plus effacé au survol, sans curseur de texte. */
-.qb-er .qb-er-html:hover {
-	outline: 1px dotted color-mix(in srgb, var(--text-faint) 60%, transparent);
-	outline-offset: 3px;
-	border-radius: 4px;
-}
+.qb-er .qb-er-html { cursor: default; }
 
 /* Le champ ouvert prend la place du texte, dans l'élément qui le portait
    (même typo, même largeur). Un champ court n'ajoute qu'un soulignement ;
@@ -874,10 +869,8 @@
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
-	border: 1px solid color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
 	border-radius: 8px;
-	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--quiz-primary) 16%, transparent);
 }
 .qb-er .qb-er-cadre--multi .qb-direct--multi {
 	padding: 8px 10px 9px;
@@ -1018,4 +1011,21 @@
 .qb-er .qb-er-ajouter-variante:focus-visible {
 	color: var(--quiz-primary);
 	border-color: var(--quiz-primary);
+}
+
+/* CodeMirror glisse des <img class="cm-widgetBuffer"> autour de chaque
+   décoration (le texte qui cache `**`, les backticks…). Le champ vit DANS
+   l'élément rendu du quiz, dont les règles d'images (embeds.css :
+   `.quiz-card .quiz-question img { display: block !important }`, bordure,
+   arrondi) les attrapaient : chaque marqueur devenait un bloc, le texte se
+   cassait en une ligne par morceau. On leur rend l'allure de CodeMirror. */
+.qb-er .cm-editor img.cm-widgetBuffer {
+	display: inline !important;
+	width: 0 !important;
+	height: 1em !important;
+	max-width: none !important;
+	margin: 0 !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
 }
