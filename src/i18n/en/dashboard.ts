@@ -295,7 +295,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.editDone": "Done",
 	"dashboard.quiz.moveUp": "Move up",
 	"dashboard.quiz.moveDown": "Move down",
-	"dashboard.quiz.modeTitle": "Quiz mode",
 	"dashboard.quiz.modeLearnHelp": "To learn the course, step by step.",
 	"dashboard.quiz.modePracticeHelp": "To train for the exam, exercise after exercise.",
 	"dashboard.quiz.welcomeProgress": "{done} of {total} questions done",

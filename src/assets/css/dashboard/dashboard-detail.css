@@ -918,42 +918,6 @@
 }
 
 
-/* ── Mode du quiz (colonne de gauche, édition seulement) ── */
-.qbd-qz-exam {
-	display: flex;
-	flex-direction: column;
-	gap: 9px;
-	margin-top: 14px;
-	padding: 12px;
-	border-radius: var(--radius-m, 12px);
-	background: var(--qbd-glass-bg);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
-}
-
-.qbd-qz-exam-head {
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	color: var(--text-muted);
-	font-size: 11px;
-	font-weight: 600;
-}
-
-.qbd-qz-exam-icon svg {
-	width: 14px;
-	height: 14px;
-}
-
-.qbd-qz-exam-help {
-	font-size: 11px;
-	line-height: 1.5;
-	color: var(--text-faint);
-}
-
-
 /* ── Bascule consultation ⇄ édition ──
    Le corps sort (estompe + léger recul), la page se repeint dans l'autre
    mode, puis le nouveau corps entre. Deux classes distinctes plutôt qu'une

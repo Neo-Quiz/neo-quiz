@@ -60,7 +60,6 @@ const LIBERES = [
 	"src/dashboard/folder-create.ts",
 	"src/dashboard/module-edit.ts",
 	"src/dashboard/detail-io.ts",
-	"src/dashboard/detail-exam.ts",
 	"src/dashboard/detail-form-bridge.ts",
 	"src/dashboard/detail-question.ts",
 	"src/dashboard/detail.ts",

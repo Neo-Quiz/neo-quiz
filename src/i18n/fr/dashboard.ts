@@ -264,7 +264,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.editDone": "Terminé",
 	"dashboard.quiz.moveUp": "Déplacer vers le haut",
 	"dashboard.quiz.moveDown": "Déplacer vers le bas",
-	"dashboard.quiz.modeTitle": "Mode du quiz",
 	"dashboard.quiz.modeLearnHelp": "Pour apprendre le cours, pas à pas.",
 	"dashboard.quiz.modePracticeHelp": "Pour s'entraîner à l'examen, exercice après exercice.",
 	"dashboard.quiz.welcomeProgress": "{done} sur {total} questions faites",

@@ -15,7 +15,6 @@ import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
-import { renderExamPanel } from "./detail-exam";
 import { oublierFiche, renderFiche } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
@@ -798,14 +797,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			}
 		});
 
-		// ── Mode du quiz (édition seulement) ──
-		if (!editing) return;
-		renderExamPanel(listCol, {
-			get: () => draft?.examOptions ?? null,
-			set: (value) => { if (draft) draft.examOptions = value; },
-			onChange: () => scheduleSave(),
-			onStructureChange: () => paintList(listCol, panel, nav, spec),
-		});
+		/* Plus de bloc « Mode du quiz » sous la liste (retiré le 2026-09-26) :
+		   le mode d'un quiz se choisit à la génération, et un Learn et son
+		   Practice sont deux notes distinctes. */
 	}
 
 	/** Met à jour le texte de la vignette de la question COURANTE — la seule
