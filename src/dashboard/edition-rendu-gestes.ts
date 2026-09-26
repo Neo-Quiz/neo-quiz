@@ -106,6 +106,14 @@ function decorerOptions(carte: HTMLElement, q: DraftQuestion, deps: DepsGestesRe
 	});
 }
 
+/** Options propres au CLASSEMENT (pas à l'appariement, le brief ne le demande
+    que là) : ↑/← et ↓/→ échangent l'emplacement focalisé avec le précédent ou
+    le suivant, sans passer par une sélection à deux clics. */
+interface OptionsFleches {
+	/** Focalise l'emplacement `i` après le prochain repeint. */
+	focuserApres(i: number): void;
+}
+
 /* ── Classement / appariement : sélection par clic (emplacement, puis
    élément de la réserve ou un autre emplacement) ── */
 function poserSelectionEmplacements(
@@ -113,6 +121,7 @@ function poserSelectionEmplacements(
 	correctArr: number[],
 	geste: (emplacement: number, element: number) => boolean,
 	deps: DepsGestesReponse,
+	fleches?: OptionsFleches,
 ): void {
 	const slots = Array.from(carte.querySelectorAll<HTMLElement>(".quiz-slot"));
 	const valeurs = slots
@@ -153,7 +162,22 @@ function poserSelectionEmplacements(
 			choisir(correctArr[si]);
 		});
 		v.addEventListener("keydown", e => {
-			if (e.key === "Enter" || e.key === " ") { e.preventDefault(); v.click(); }
+			if (e.key === "Enter" || e.key === " ") { e.preventDefault(); v.click(); return; }
+			if (!fleches) return;
+			const monte = e.key === "ArrowUp" || e.key === "ArrowLeft";
+			const descend = e.key === "ArrowDown" || e.key === "ArrowRight";
+			if (!monte && !descend) return;
+			// Aux bords : la flèche ne fait rien (pas d'`onChange`, la page ne
+			// défile pas non plus — `preventDefault` avant de sortir).
+			e.preventDefault();
+			const cible = si + (monte ? -1 : 1);
+			if (cible < 0 || cible >= valeurs.length) return;
+			// L'élément du voisin est déjà en place (édition en mode « corrigé » :
+			// chaque emplacement est toujours rempli) : `geste` l'échange avec
+			// celui de l'emplacement focalisé, dans le même sens que `placerOrdre`.
+			const elementVoisin = correctArr[cible];
+			fleches.focuserApres(cible);
+			deps.appliquer(() => geste(si, elementVoisin));
 		});
 	});
 
@@ -177,8 +201,8 @@ function poserSelectionEmplacements(
 	});
 }
 
-function decorerOrdering(carte: HTMLElement, q: DraftQuestion, deps: DepsGestesReponse): void {
-	poserSelectionEmplacements(carte, q.correctOrder || [], (emplacement, element) => placerOrdre(q, emplacement, element), deps);
+function decorerOrdering(carte: HTMLElement, q: DraftQuestion, deps: DepsGestesReponse, fleches: OptionsFleches): void {
+	poserSelectionEmplacements(carte, q.correctOrder || [], (emplacement, element) => placerOrdre(q, emplacement, element), deps, fleches);
 }
 
 function decorerMatching(carte: HTMLElement, q: DraftQuestion, deps: DepsGestesReponse): void {
@@ -224,11 +248,27 @@ function decorerVariantes(carte: HTMLElement, q: DraftQuestion, deps: DepsGestes
 /** Construit le décorateur de gestes d'une instance d'édition dans le rendu.
     Un seul par `monterEditionRendu` (appelé à chaque repeint). */
 export function creerGestesReponse(deps: DepsGestesReponse): GestesReponse {
+	// L'emplacement à refocaliser une fois le PROCHAIN repeint terminé — posé
+	// par une flèche, lu ici juste après avoir redécoré la carte (le repeint
+	// déclenché par `deps.appliquer` est synchrone : `poser` tourne à nouveau
+	// avant que `deps.appliquer` ne rende la main).
+	let focusOrdreApres: number | null = null;
+
 	function poser(carte: HTMLElement, q: DraftQuestion): void {
 		if (q._type === "single" || q._type === "multi") decorerOptions(carte, q, deps);
-		if (q._type === "ordering") decorerOrdering(carte, q, deps);
+		if (q._type === "ordering") {
+			decorerOrdering(carte, q, deps, { focuserApres: i => { focusOrdreApres = i; } });
+		}
 		if (q._type === "matching") decorerMatching(carte, q, deps);
 		decorerVariantes(carte, q, deps);
+
+		if (q._type === "ordering" && focusOrdreApres !== null) {
+			const i = focusOrdreApres;
+			focusOrdreApres = null;
+			carte.querySelectorAll<HTMLElement>(".quiz-slot")[i]
+				?.querySelector<HTMLElement>(".quiz-slot-value")
+				?.focus();
+		}
 	}
 	return { poser };
 }
