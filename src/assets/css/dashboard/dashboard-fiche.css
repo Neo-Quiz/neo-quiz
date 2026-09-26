@@ -396,37 +396,60 @@
 	gap: 14px;
 	align-items: stretch;
 }
-/* Une carte : hauteur de sa rangée, la consigne ENTIÈRE, et ce qui ne
-   tient pas défile dans la carte. Un clic fait briller « Commencer le
-   quiz » (on répond en jouant) : ni levée, ni curseur de lien. */
+/* Une carte : hauteur de sa rangée, l'en-tête fixe, la consigne ENTIÈRE
+   dans une zone qui défile (`.qbd-fiche-card-corps`). Un clic ouvre
+   l'éditeur sur la question. */
 .qbd-fiche-card {
 	height: 100%;
 	min-height: 0;
-	overflow-y: auto;
-	/* La molette fait d'abord défiler la carte, PUIS la grille une fois la
-	   carte au bout (2026-09-26) : pas de `overscroll-behavior: contain`,
-	   qui retenait la molette dans une longue carte. */
-	/* L'ascenseur ne décale pas le texte quand il apparaît. */
-	scrollbar-gutter: stable;
-	/* PAS de `scrollbar-width` / `scrollbar-color` : dans Chromium, ces
-	   propriétés standard désactivent les `::-webkit-scrollbar` ci-dessous. */
+	overflow: hidden;
 }
-/* Dans une carte de hauteur fixe, rien ne rétrécit : c'est la carte qui
-   défile, pas son texte qui disparaît. */
-.qbd-fiche-card > * { flex-shrink: 0; }
+.qbd-fiche-card > .qbd-fiche-q-top { flex-shrink: 0; }
+.qbd-fiche-card-corps {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	overflow-y: auto;
+	/* L'ascenseur ne décale pas le texte quand il apparaît. PAS de
+	   `scrollbar-width` / `scrollbar-color` : dans Chromium, ces propriétés
+	   standard désactivent les `::-webkit-scrollbar` ci-dessous. La molette
+	   passe à la grille une fois la zone au bout (pas d'`overscroll`). */
+	scrollbar-gutter: stable;
+	margin-right: -8px;
+	padding-right: 4px;
+	--fondu: 28px;
+	transition: -webkit-mask-image 0.15s ease;
+}
+.qbd-fiche-card-corps > * { flex-shrink: 0; }
+/* LE FONDU : en bas tant qu'il reste à lire, en haut dès qu'on a descendu.
+   Une ligne n'est jamais coupée net au bord de la carte. */
+.qbd-fiche-card-corps.a-suivre {
+	-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fondu)), transparent);
+	mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fondu)), transparent);
+}
+.qbd-fiche-card-corps.a-precede {
+	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu));
+	mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu));
+}
+.qbd-fiche-card-corps.a-suivre.a-precede {
+	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu), #000 calc(100% - var(--fondu)), transparent);
+	mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu), #000 calc(100% - var(--fondu)), transparent);
+}
 /* L'ASCENSEUR (Chromium) : un trait arrondi, fin, sans rail ni flèches,
    discret au repos et plus clair au survol de la carte. */
-.qbd-fiche-card::-webkit-scrollbar { width: 8px; }
-.qbd-fiche-card::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
-.qbd-fiche-card::-webkit-scrollbar-thumb {
+.qbd-fiche-card-corps::-webkit-scrollbar { width: 8px; }
+.qbd-fiche-card-corps::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+.qbd-fiche-card-corps::-webkit-scrollbar-thumb {
 	background: color-mix(in srgb, var(--text-normal) 16%, transparent);
 	border: 2px solid transparent;
 	border-radius: 999px;
 	background-clip: padding-box;
 }
-.qbd-fiche-card:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text-normal) 32%, transparent); }
-.qbd-fiche-card::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent); }
-.qbd-fiche-card::-webkit-scrollbar-button { display: none; height: 0; }
+.qbd-fiche-card:hover .qbd-fiche-card-corps::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text-normal) 32%, transparent); }
+.qbd-fiche-card-corps::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent); }
+.qbd-fiche-card-corps::-webkit-scrollbar-button { display: none; height: 0; }
 .qbd-fiche-q-text {
 	font-size: 14.5px;
 	line-height: 1.55;

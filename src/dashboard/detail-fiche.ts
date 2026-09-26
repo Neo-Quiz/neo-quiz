@@ -387,14 +387,38 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
 
 /** GRILLE : une carte par question. Pas un bouton : on répond en jouant le
     quiz ; un clic fait briller « Commencer le quiz ». */
+/** Pose `a-suivre` (reste du texte en bas) et `a-precede` (texte au-dessus)
+    sur une zone qui défile, à chaque défilement et à chaque changement de
+    taille (formules rendues, fenêtre redimensionnée). */
+function suivreDebord(zone: HTMLElement): void {
+	const maj = (): void => {
+		const bas = zone.scrollTop + zone.clientHeight < zone.scrollHeight - 2;
+		zone.classList.toggle("a-suivre", bas);
+		zone.classList.toggle("a-precede", zone.scrollTop > 2);
+	};
+	zone.addEventListener("scroll", maj, { passive: true });
+	if (typeof ResizeObserver !== "undefined") {
+		const ro = new ResizeObserver(maj);
+		ro.observe(zone);
+		for (const enfant of Array.from(zone.children)) ro.observe(enfant);
+	}
+	requestAnimationFrame(maj);
+}
+
 function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer: () => void): void {
 	const grille = ajouter(body, "div", "qbd-fiche-grid");
 	for (const i of idx) {
 		const q = deps.questions[i];
 		const card = ajouter(grille, "div", "qbd-fiche-q qbd-fiche-card");
 		renderTop(card, q, i + 1);
-		texte(card, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
-		renderOptions(card, q);
+		/* Le CONTENU défile dans sa propre zone, sous l'en-tête de la carte :
+		   un fondu en bas tant qu'il reste à lire (jamais une ligne coupée
+		   net), en haut dès qu'on a descendu (2026-09-26). Le fondu porte sur
+		   cette zone, pas sur la carte : sa bordure reste entière. */
+		const corps = ajouter(card, "div", "qbd-fiche-card-corps");
+		texte(corps, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+		renderOptions(corps, q);
+		suivreDebord(corps);
 		/* CLIC = ÉDITER CETTE QUESTION (2026-09-26) : la carte ouvre l'éditeur
 		   dessus. Toujours aucune réponse ici ; répondre se fait en jouant. */
 		const editer = deps.onEditQuestion;
