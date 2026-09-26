@@ -314,7 +314,6 @@
 
 /* ── Les questions ── */
 .qbd-fiche-body {
-	--fondu: 48px;
 	flex: 1;
 	min-height: 0;
 	display: flex;
@@ -422,19 +421,16 @@
    (`.qbd-folder-list--defile`, dashboard-folder.css) : même fondu, même
    ascenseur, une seule écriture — `suivreDebord` pose les mêmes classes. */
 .qbd-fiche-card-corps.a-suivre,
-.qbd-fiche-body.a-suivre,
 .qbd-folder-list--defile.a-suivre {
 	-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fondu)), transparent);
 	mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fondu)), transparent);
 }
 .qbd-fiche-card-corps.a-precede,
-.qbd-fiche-body.a-precede,
 .qbd-folder-list--defile.a-precede {
 	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu));
 	mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu));
 }
 .qbd-fiche-card-corps.a-suivre.a-precede,
-.qbd-fiche-body.a-suivre.a-precede,
 .qbd-folder-list--defile.a-suivre.a-precede {
 	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu), #000 calc(100% - var(--fondu)), transparent);
 	mask-image: linear-gradient(to bottom, transparent, #000 var(--fondu), #000 calc(100% - var(--fondu)), transparent);
