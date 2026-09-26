@@ -796,8 +796,30 @@
 	overflow-y: auto;
 }
 
+/* Le texte d'invite qui RÉAPPARAÎT entre en fondu, 0,5 s linéaire
+   (`cds-fade-in` de claude.ai ; classe relancée par ai.ts quand le champ se
+   vide). `::placeholder` n'anime rien lui-même : c'est une propriété
+   ENREGISTRÉE, héritée du champ, qui porte l'opacité de sa couleur. */
+@property --qbd-invite {
+	syntax: "<number>";
+	inherits: true;
+	initial-value: 1;
+}
+
 .qbd-ai-composer-input::placeholder {
-	color: var(--text-faint);
+	color: color-mix(in srgb, var(--text-faint) calc(var(--qbd-invite) * 100%), transparent);
+}
+
+.qbd-ai-composer-input--invite {
+	animation: qbd-ai-invite-in 0.5s linear;
+}
+
+@keyframes qbd-ai-invite-in {
+	0% { --qbd-invite: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-composer-input--invite { animation: none; }
 }
 
 .qbd-ai-composer-bottom {
@@ -1065,146 +1087,258 @@
    ce conteneur : ce clip ne le touche pas. */
 .qbd-ai-composer-textzone {
 	position: relative;
-	overflow: hidden;
+	/* PAS de `overflow: hidden` (2026-09-26) : la zone des pièces jointes
+	   déborde de 8 px en haut et sur les côtés pour loger la croix posée
+	   HORS de la vignette, comme sur claude.ai. Le clip ne servait qu'à la
+	   rangée superposée à la première ligne du texte, abandonnée le
+	   2026-09-17 : la rangée est en flux normal dès sa création. */
 }
 
-/* Les pièces jointes du composer : des CARTES, en rangée défilante AU-DESSUS
-   du champ (retour Ahmed 2026-09-17, référence claude.ai). Plus de
-   superposition à la première ligne du texte : `layoutChipsRow` (ai.ts) pose
-   toujours `--stacked`, et la position absolue ci-dessous n'est plus que
-   l'état d'un premier rendu, avant ce premier appel. */
+/* ── LES PIÈCES JOINTES DU COMPOSER — la séquence de claude.ai (relevé du
+   2026-09-26, `composer-attachments.ts`). ── */
+
+/* La ZONE qui s'ouvre au-dessus du texte : une grille `overflow: hidden`,
+   élargie de 8 px en haut et sur les côtés (le `-mx-2 px-2 -mt-2 pt-2` de
+   claude.ai) — la place de la croix. Elle prend sa hauteur d'un coup ; c'est
+   son CONTENU qui descend en fondu, à l'ouverture seulement. */
+.qbd-ai-composer-pieces {
+	display: grid;
+	grid-template-rows: 1fr;
+	overflow: hidden;
+	margin: -8px -8px 0;
+	padding: 8px 8px 0;
+}
+
+.qbd-ai-composer-pieces-contenu {
+	min-width: 0;
+	min-height: 0;
+	padding: 4px 4px 10px;
+	transition:
+		opacity 0.2s cubic-bezier(0.215, 0.61, 0.355, 1),
+		transform 0.2s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+@starting-style {
+	.qbd-ai-composer-pieces-contenu--entree {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+}
+
+/* La rangée : une seule ligne qui DÉFILE, jamais un retour à la ligne —
+   sept PDF font sept vignettes côte à côte et une barre. Ses marges
+   négatives et son rembourrage (`p-2 pt-2.5 pe-2.5 -m-2 -mt-2.5 -me-2.5`
+   de claude.ai) gardent la croix DANS la boîte qui défile, qui la
+   couperait sinon. La barre est fine et reste visible : c'est elle qui dit
+   qu'il y a plus à droite ; elle reçoit les clics (retour Ahmed
+   2026-09-17). */
 .qbd-ai-composer-chips {
-	position: absolute;
-	top: 0;
-	left: 0;
-	z-index: 1;
 	display: flex;
 	flex-wrap: nowrap;
-	align-items: stretch;
-	gap: 10px;
-	pointer-events: none;
-}
-
-.qbd-ai-composer-chips .qbd-ai-note-chip {
-	pointer-events: auto;
-}
-
-/* La rangée en flux normal : une seule ligne qui DÉFILE, jamais un retour à
-   la ligne — sept PDF font sept cartes côte à côte et une barre, comme sur
-   claude.ai. La barre est fine et reste visible : c'est elle qui dit qu'il y
-   a plus à droite. */
-.qbd-ai-composer-chips--stacked {
-	position: static;
-	/* La rangée reçoit les clics (retour Ahmed 2026-09-17 : la barre de
-	   défilement ne se laissait pas saisir). Le `pointer-events: none` de
-	   l'état de base laissait passer les clics vers le champ DESSOUS, quand
-	   la rangée se superposait au texte ; en flux normal elle n'a plus rien
-	   dessous, et sa barre est à elle. */
-	pointer-events: auto;
-	flex-wrap: nowrap;
+	align-items: flex-start;
+	gap: 12px;
 	overflow-x: auto;
 	overflow-y: hidden;
-	margin-bottom: 8px;
-	padding-bottom: 8px;
+	margin: -10px -10px -8px -8px;
+	padding: 10px 10px 8px 8px;
 	scrollbar-width: thin;
 	scrollbar-color: color-mix(in srgb, var(--text-normal) 22%, transparent) transparent;
 }
 
-.qbd-ai-composer-chips--stacked::-webkit-scrollbar { height: 6px; }
-.qbd-ai-composer-chips--stacked::-webkit-scrollbar-thumb {
+.qbd-ai-composer-chips::-webkit-scrollbar { height: 6px; }
+.qbd-ai-composer-chips::-webkit-scrollbar-thumb {
 	background: color-mix(in srgb, var(--text-normal) 22%, transparent);
 	border-radius: 999px;
 }
-.qbd-ai-composer-chips--stacked::-webkit-scrollbar-track { background: transparent; }
+.qbd-ai-composer-chips::-webkit-scrollbar-track { background: transparent; }
 
-/* La carte : le nom en haut sur deux lignes, le badge d'extension en bas à
-   gauche, la croix en haut à droite au survol. Largeur fixe pour que la
-   rangée reste une rangée de cartes égales, quel que soit le nom. */
+/* LA VIGNETTE : 120 × 120 dans les deux états (claude.ai : `size-[7.5rem]`
+   — les 110 px d'un relevé sont les 120 px vus à travers le `scale(.92)` de
+   l'entrée). Elle MONTE en grandissant à sa première peinture seulement
+   (`--entree`, posée par `entrerVignette`) ; la transition reste déclarée
+   sur tous ses états, pour qu'une montée commencée « en attente » se
+   poursuive quand la vignette devient « prête » sous elle. */
 .qbd-ai-note-chip {
 	position: relative;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-	gap: 10px;
+	isolation: isolate;
 	flex: 0 0 auto;
-	width: 124px;
-	/* Hauteur FIXE, pas minimale (retour Ahmed 2026-09-17 : le type doit se
-	   voir « quoi qu'il arrive, peu importe la longueur du nom »). Un nom qui
-	   déborde est COUPÉ par la zone du nom (ci-dessous), jamais poussé sous le
-	   badge : la carte ne grandit pas, le badge reste à sa place. */
-	height: 104px;
+	width: 120px;
+	height: 120px;
 	box-sizing: border-box;
-	padding: 12px 12px 10px;
-	background: color-mix(in srgb, var(--background-primary) 70%, transparent);
-	border: 1px solid var(--background-modifier-border);
 	border-radius: 12px;
-	font-size: 12.5px;
 	color: var(--text-normal);
 	cursor: default;
-	transition: border-color 0.16s ease, background 0.16s ease;
+	transition:
+		transform 0.18s cubic-bezier(0.215, 0.61, 0.355, 1),
+		opacity 0.18s cubic-bezier(0.215, 0.61, 0.355, 1);
+	/* RIEN d'autre en transition : le passage « en attente » → « prête »
+	   se fait sur le MÊME élément, et un liseré en transition partirait de
+	   `currentColor` (la vignette en attente n'en a pas) — un contour clair
+	   qui s'éteint. claude.ai remplace l'élément : aucun fondu de bord. */
 }
 
-/* Carte avec chemin connu : bascule nom ⇄ chemin complet au clic (le ×
-   garde son rôle de suppression, cf. e.stopPropagation en JS). */
+@starting-style {
+	.qbd-ai-note-chip--entree {
+		opacity: 0;
+		transform: scale(0.92) translateY(4px);
+	}
+}
+
+/* Le clic ouvre l'aperçu (la croix garde son rôle, cf. stopPropagation). */
 .qbd-ai-note-chip--toggle {
 	cursor: pointer;
 }
 
-.qbd-ai-note-chip--toggle:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
-	background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary));
+/* ── EN ATTENTE : le fond de la page (plus sombre que la carte du
+   composer), rayon 10, l'ombre `0 1px 2px` à 5 % et le liseré de carte ; le
+   contenu est là, INVISIBLE ; le voile et son reflet par-dessus. ── */
+.qbd-ai-note-chip--attente {
+	cursor: progress;
 }
 
-/* Deux lignes, puis des points de suspension : « CM1 - Introdu… à
-   Python.pdf » se reconnaît, et toutes les cartes gardent la même hauteur. */
-.qbd-ai-note-chip-name {
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	/* `flex: 1` + `min-height: 0` : le nom prend ce que le badge lui laisse,
-	   et pas un pixel de plus — la ceinture sous les bretelles du clamp. */
-	flex: 1 1 auto;
-	min-height: 0;
-	max-height: 2.7em;
+.qbd-ai-note-chip--attente::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: 10px;
+	background: var(--background-primary);
+	box-shadow:
+		inset 0 0 0 1px var(--background-modifier-border),
+		0 1px 2px rgba(0, 0, 0, 0.05);
+	pointer-events: none;
+}
+
+.qbd-ai-note-chip--attente .qbd-ai-note-chip-contenu {
+	visibility: hidden;
+}
+
+/* Le voile blanc à 7,5 % (`--cds-skeleton-base`) et son REFLET, un dégradé
+   de la même teinte qui le traverse de gauche à droite en 2 s, linéaire, en
+   boucle (`cds-shimmer`). Teinte du TEXTE plutôt que blanc pur : le thème
+   clair garde un voile visible. */
+.qbd-ai-note-chip-voile {
+	position: absolute;
+	inset: 0;
 	overflow: hidden;
-	overflow-wrap: anywhere;
-	line-height: 1.35;
-	font-weight: 500;
-	padding-right: 12px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--text-normal) 7.5%, transparent);
+	pointer-events: none;
 }
 
-.qbd-ai-note-chip-badge {
-	flex-shrink: 0;
+.qbd-ai-note-chip-voile::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text-normal) 7.5%, transparent), transparent);
+	transform: translateX(-100%);
+	animation: qbd-ai-reflet 2s linear infinite;
 }
 
-/* Le nom coupé AU MILIEU (poserCarte, ai.ts) : la tête sur la première ligne,
-   points de suspension à droite ; la queue — l'extension — sur la seconde,
-   entière. Le conteneur quitte le clamp de deux lignes : ce sont ses deux
-   enfants qui font les deux lignes. */
-.qbd-ai-note-chip-name--split {
+@keyframes qbd-ai-reflet {
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(100%); }
+}
+
+/* Le contenu d'une vignette SANS image : 12 px de marge (une zone de
+   96 × 96), le nom en haut, l'étiquette en bas. */
+.qbd-ai-note-chip-contenu {
+	position: absolute;
+	inset: 12px;
 	display: flex;
 	flex-direction: column;
-	-webkit-line-clamp: unset;
-	/* La place de la croix n'est réservée que sur la PREMIÈRE ligne : la
-	   queue prend toute la largeur, ses douze caractères doivent tenir. */
-	padding-right: 0;
+	justify-content: space-between;
+	gap: 4px;
+	min-width: 0;
+	min-height: 0;
 }
 
-.qbd-ai-note-chip-name-head {
-	padding-right: 12px;
+/* Le nom, 13 px, sur DEUX lignes au plus (`poserNom`) : la première coupée
+   en fin de ligne, la seconde coupée dans le nom, puis l'extension entière. */
+.qbd-ai-note-chip-name {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	font-size: 13px;
+	line-height: 17px;
+	font-weight: 400;
+	color: var(--text-normal);
 }
 
-.qbd-ai-note-chip-name-head,
-.qbd-ai-note-chip-name-tail {
+.qbd-ai-note-chip-name-line {
+	display: flex;
+	min-width: 0;
+}
+
+.qbd-ai-note-chip-name-part {
 	display: block;
-	white-space: nowrap;
+	min-width: 0;
 	overflow: hidden;
-}
-
-.qbd-ai-note-chip-name-head {
+	white-space: nowrap;
 	text-overflow: ellipsis;
 }
 
+.qbd-ai-note-chip-name-ext {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+/* L'ÉTIQUETTE DE TYPE, en minuscules (« pdf » — règle du dépôt). Vignette
+   PRÊTE : posée en bas à 8 px, 18 px de haut, liseré, fond à 70 % flouté,
+   l'ombre de la vignette ; elle entre en fondu (0,3 s `ease-out`) à sa
+   première apparition. */
+.qbd-ai-note-chip-bande {
+	position: absolute;
+	left: 0;
+	right: 0;
+	/* 8 px et 10 px du bord EXTÉRIEUR, liseré de 1 px compris. */
+	bottom: 7px;
+	display: flex;
+	padding: 0 9px;
+	overflow-x: clip;
+	pointer-events: none;
+}
+
+.qbd-ai-note-chip-tag {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	max-width: 100%;
+	height: 18px;
+	box-sizing: border-box;
+	padding: 0 4px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+	backdrop-filter: blur(8px);
+	box-shadow: 0 1px 2px rgba(11, 11, 11, 0.06), 0 2px 8px rgba(0, 0, 0, 0.24);
+	font-size: 11px;
+	line-height: 13px;
+	font-weight: 500;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.qbd-ai-note-chip-tag--entree {
+	animation: qbd-ai-tag-in 0.3s ease-out;
+}
+
+@keyframes qbd-ai-tag-in {
+	0% { opacity: 0; }
+}
+
+/* Vignette EN ATTENTE : l'étiquette plate, fond à 5 %, rayon 4,5. */
+.qbd-ai-note-chip-tag--attente {
+	padding: 0 6px;
+	border: none;
+	border-radius: 4.5px;
+	background: color-mix(in srgb, var(--text-normal) 5%, transparent);
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+/* Le badge des AUTRES surfaces (la page d'un site, la génération par
+   fichier) : l'extension en petit. */
 .qbd-ai-note-chip-badge {
 	align-self: flex-start;
 	padding: 2px 7px;
@@ -1218,7 +1352,6 @@
 	line-height: 1.5;
 }
 
-.qbd-ai-note-chip-remove,
 .qbd-ai-video-tile-remove {
 	position: absolute;
 	top: 6px;
@@ -1239,111 +1372,147 @@
 	transition: opacity 0.15s ease, color 0.15s ease;
 }
 
-.qbd-ai-note-chip:hover .qbd-ai-note-chip-remove,
-.qbd-ai-note-chip-remove:focus-visible,
 .qbd-ai-video-tile:hover .qbd-ai-video-tile-remove,
 .qbd-ai-video-tile-remove:focus-visible {
 	opacity: 1;
 }
 
-.qbd-ai-note-chip-remove:hover,
 .qbd-ai-video-tile-remove:hover {
 	color: var(--color-red, #f87171);
 }
 
-.qbd-ai-note-chip-remove svg,
 .qbd-ai-video-tile-remove svg {
 	width: 12px;
 	height: 12px;
 }
 
-/* La carte d'un PDF DESSINÉ : la première page remplit la carte, le badge
-   se pose dessus en bas à gauche (référence claude.ai : une carte de PDF
-   montre sa page, pas son nom — le nom est dans le tooltip et l'aperçu). */
-.qbd-ai-note-chip--thumb {
-	/* La page est POSÉE DANS la carte, jamais recadrée (retour Ahmed
-	   2026-09-17, référence claude.ai) : une diapo en paysage se voit en
-	   paysage, une page A4 en portrait se voit en portrait — la FORME du
-	   document est une information, et `object-fit: cover` la mangeait en
-	   remplissant la carte avec le coin supérieur gauche. D'où un fond sombre
-	   autour de la page plutôt qu'un fond blanc plein cadre, et plus de badge
-	   ni de nom par-dessus : la page parle d'elle-même. */
-	padding: 0;
-	overflow: hidden;
+/* ── LA CROIX DE RETRAIT d'une vignette : ronde, 20 px, en haut à droite à
+   8 px HORS du bord. Invisible au repos, visible au survol de la vignette ou
+   au focus clavier. ── */
+.qbd-ai-note-chip-remove {
+	position: absolute;
+	top: -8px;
+	right: -8px;
+	z-index: 2;
+	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 0;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--background-primary) 90%, transparent) !important;
+	box-shadow: none !important;
+	color: var(--text-faint);
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+		background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+		color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qbd-ai-note-chip:hover > .qbd-ai-note-chip-remove,
+.qbd-ai-note-chip:focus-within > .qbd-ai-note-chip-remove {
+	opacity: 1;
+}
+
+.qbd-ai-note-chip-remove:hover {
+	color: var(--text-normal);
+}
+
+.qbd-ai-note-chip-remove svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* En ATTENTE, la croix de claude.ai est plus pleine : fond de surface,
+   liseré INTÉRIEUR à 10 %, icône secondaire — et sans transition. */
+.qbd-ai-note-chip--attente > .qbd-ai-note-chip-remove {
+	border: none;
+	background: var(--background-secondary) !important;
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+	color: var(--text-muted);
+	transition: none;
+}
+
+/* ── PRÊTE : rayon 8, liseré, l'ombre double de claude.ai. Pas de
+   `overflow: hidden` — la croix déborde ; c'est l'image qui porte le rayon
+   intérieur (7 px). ── */
+.qbd-ai-note-chip--prete {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--text-normal) 4%, var(--background-primary));
+	box-shadow: 0 1px 2px rgba(11, 11, 11, 0.06), 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+/* Le liseré est sur la vignette même (chez claude.ai, sur un cadre
+   intérieur) : les positions se comptent depuis le bord INTÉRIEUR, d'où un
+   pixel de moins pour tomber aux mêmes 8 px du bord extérieur. */
+.qbd-ai-note-chip--prete > .qbd-ai-note-chip-remove {
+	top: -9px;
+	right: -9px;
+}
+
+.qbd-ai-note-chip--prete.qbd-ai-note-chip--toggle:hover {
+	border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+}
+
+/* Sans image, le contenu garde ses 12 px de marge moins le liseré, et
+   s'arrête au-dessus de l'étiquette posée en bas. */
+.qbd-ai-note-chip--prete .qbd-ai-note-chip-contenu {
+	inset: 11px 11px 30px;
+	justify-content: flex-start;
+}
+
+/* La page d'un PDF, POSÉE dans la vignette, jamais recadrée (`object-fit:
+   contain`, retour Ahmed 2026-09-17 et claude.ai) : sa forme, paysage ou
+   portrait, est une information ; le fond sombre autour la montre. Elle
+   passe du FLOU AU NET à son chargement : 0,4 s, `cubic-bezier(.4,0,.2,1)`
+   (`poserImage` pose `--nette` au `load`). */
+.qbd-ai-note-chip--thumb {
 	background: color-mix(in srgb, var(--background-primary) 88%, #000);
 }
 
 .qbd-ai-note-chip-thumb {
-	position: static;
+	position: absolute;
+	inset: 0;
 	display: block;
-	/* AUCUNE marge (Ahmed, 2026-09-17, deux fois : « trop dézoomé », puis
-	   « réduit encore ») : la page touche les bords de la carte par son côté
-	   long. Ce qui dit la forme, c'est le fond qu'on voit sur le côté COURT —
-	   deux bandes pour un portrait, deux bandeaux pour un paysage — et il n'a
-	   pas besoin d'une marge de plus pour se voir. */
-	max-width: 100%;
-	max-height: 100%;
-	width: auto;
-	height: auto;
-	border-radius: 2px;
-	/* L'ombre dit que c'est une feuille posée, et détache une page blanche du
-	   fond sombre sans lui mettre de cadre. */
-	box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.55);
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	border-radius: 7px;
+	opacity: 0;
+	filter: blur(8px);
+	transition:
+		opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		filter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 	pointer-events: none;
 }
 
-/* La carte d'une IMAGE (poserCarteImage) : la photo REMPLIT la carte,
-   recadrée — référence claude.ai (retour Ahmed 2026-09-19). Contrairement à
-   la page d'un PDF, sa forme n'est pas une information : pas de fond visible,
-   pas d'ombre de feuille. */
-.qbd-ai-note-chip--image .qbd-ai-note-chip-thumb {
-	width: 100%;
-	height: 100%;
-	max-width: none;
-	max-height: none;
-	object-fit: cover;
-	border-radius: 0;
-	box-shadow: none;
+.qbd-ai-note-chip-thumb--nette {
+	opacity: 1;
+	filter: blur(0);
 }
 
-/* Sur une vignette, le badge et le nom ne sont PAS rendus (poserCarte) : rien
-   ne recouvre la page. Seule la croix reste, sur un fond qui la détache quelle
-   que soit la couleur dessous. */
-.qbd-ai-note-chip--thumb .qbd-ai-note-chip-remove {
-	background: rgba(20, 22, 32, 0.82) !important;
-	color: rgba(255, 255, 255, 0.88);
+/* Une IMAGE jointe remplit la vignette, recadrée (retour Ahmed 2026-09-19) :
+   sa forme n'est pas une information comme l'est celle d'une page. */
+.qbd-ai-note-chip--image .qbd-ai-note-chip-thumb {
+	object-fit: cover;
 }
 
 .qbd-ai-file-input {
 	display: none;
 }
 
-/* Un PDF EN LECTURE (joindrePdf, ai.ts) : la carte est là dès le choix du
-   fichier, une petite roue en bas à droite, comme sur claude.ai. */
-.qbd-ai-note-chip-spinner {
-	position: absolute;
-	right: 10px;
-	bottom: 10px;
-	z-index: 2;
-	width: 14px;
-	height: 14px;
-}
-
-.qbd-ai-note-chip--lecture {
-	cursor: progress;
-}
-
-/* Une lecture ÉCHOUÉE : le message sur la carte, la croix pour la retirer. */
+/* Une lecture ÉCHOUÉE : le message sur la vignette, sous le nom ; la croix
+   pour la retirer. */
 .qbd-ai-note-chip--erreur {
 	border-color: color-mix(in srgb, var(--color-red, #f87171) 45%, var(--background-modifier-border));
 }
 
-/* Le nom reste lisible sur une carte en échec : c'est le message qui se
-   serre, pas lui. */
-.qbd-ai-note-chip--erreur {
+.qbd-ai-note-chip--erreur .qbd-ai-note-chip-contenu {
 	gap: 3px;
 }
 
@@ -1363,6 +1532,24 @@
 .qbd-ai-note-chip-erreur-aide {
 	display: block;
 	color: var(--text-muted);
+}
+
+/* Mouvement réduit : les états se posent d'un coup, sans montée, sans
+   reflet (claude.ai masque aussi le reflet : `motion-reduce:after:hidden`),
+   sans flou ni fondu. */
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-composer-pieces-contenu,
+	.qbd-ai-note-chip,
+	.qbd-ai-note-chip-thumb,
+	.qbd-ai-note-chip-remove {
+		transition: none;
+	}
+	.qbd-ai-note-chip-voile::after {
+		display: none;
+	}
+	.qbd-ai-note-chip-tag--entree {
+		animation: none;
+	}
 }
 
 /* ── L'aperçu d'une pièce jointe (clic sur sa carte) : une modale large, la

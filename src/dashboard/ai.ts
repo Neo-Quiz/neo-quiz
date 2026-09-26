@@ -28,7 +28,7 @@ import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { attachmentKey, creerPiecesJointes } from "./composer-attachments";
+import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
@@ -383,6 +383,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   classe : `render` recrée le composer. */
 	let composerActif = false;
 	let veilleComposerActif: { retirer(): void } | null = null;
+	/* Depuis quand la zone des pièces jointes est-elle ouverte ? Son contenu
+	   ne descend en fondu (claude.ai : `translateY(-8px)`, 0,2 s) qu'à
+	   l'OUVERTURE — rejoué seulement par un rendu qui tombe PENDANT ces
+	   0,2 s (cf. `effetEnCours`, composer-attachments.ts). */
+	let zonePieces: object | null = null;
+	const debutsZonePieces = new WeakMap<object, number>();
 	// Listener « focus fenêtre » du re-check des statuts CLI (remplacé à
 	// chaque render, retiré quand la zone de hint disparaît).
 	let __focusRecheck: (() => void) | null = null;
@@ -635,12 +641,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    (référence claude.ai : une image jointe est un carré plein, sa forme
 	    n'est pas une information comme l'est celle d'une page). */
 	function poserCarteImage(chip: HTMLElement, image: ComposerImage): void {
-		chip.classList.add("qbd-ai-note-chip--thumb", "qbd-ai-note-chip--image");
+		/* Déjà prête (le fichier est local) : la vignette finale d'emblée,
+		   avec la montée et le fondu flou → net de claude.ai, une fois. */
+		chip.classList.add("qbd-ai-note-chip--prete", "qbd-ai-note-chip--thumb", "qbd-ai-note-chip--image");
 		chip.title = image.file.name;
-		const img = ajouter(chip, "img", "qbd-ai-note-chip-thumb");
-		img.src = image.url;
-		img.alt = image.file.name;
-		img.draggable = false;
+		entrerVignette(chip, image);
+		poserImage(chip, image, image.url, image.file.name);
 		/* Le clic OUVRE L'APERÇU, comme la carte d'un document ; la croix de
 		   retrait garde son rôle. */
 		chip.classList.add("qbd-ai-note-chip--toggle");
@@ -1408,8 +1414,19 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// normal) si elle est trop large pour laisser de la place au texte.
 		const textZone = ajouter(composer, "div", "qbd-ai-composer-textzone");
 		let chipsRow: HTMLElement | null = null;
-		if (images.length > 0 || noteAttachments.length > 0) {
-			chipsRow = ajouter(textZone, "div", "qbd-ai-composer-chips");
+		const avecPieces = images.length > 0 || noteAttachments.length > 0;
+		if (avecPieces) {
+			/* LA ZONE qui s'ouvre au-dessus du texte (claude.ai) : une grille
+			   `overflow: hidden` qui déborde de 8 px en haut et sur les côtés —
+			   la place de la croix, posée à 8 px HORS de la vignette — et dont
+			   le contenu descend en fondu à l'ouverture seulement. */
+			const zone = ajouter(textZone, "div", "qbd-ai-composer-pieces");
+			const contenuZone = ajouter(zone, "div", "qbd-ai-composer-pieces-contenu");
+			zonePieces ??= {};
+			if (effetEnCours(debutsZonePieces, zonePieces, 200)) contenuZone.classList.add("qbd-ai-composer-pieces-contenu--entree");
+			// En flux normal DÈS la création : `layoutChipsRow` attend une image,
+			// qu'une fenêtre masquée ne dessine jamais.
+			chipsRow = ajouter(contenuZone, "div", "qbd-ai-composer-chips qbd-ai-composer-chips--stacked");
 			/* Les images sont des cartes de la MÊME rangée que les documents
 			   (retour Ahmed 2026-09-19, référence claude.ai : un JPG et un PDF
 			   côte à côte, même gabarit). Elles avaient leur propre rangée de
@@ -1417,11 +1434,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			for (let i = 0; i < images.length; i++) {
 				const chip = ajouter(chipsRow, "div", "qbd-ai-note-chip");
 				poserCarteImage(chip, images[i]);
-				const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
-				host.ui.setIcon(chipRemove, "x");
-				const idx = i;
-				chipRemove.addEventListener("click", () => {
-					URL.revokeObjectURL(images[idx].url);
+				const image = images[i];
+				poserCroix(chip, image.file.name, () => {
+					const idx = images.indexOf(image);
+					if (idx < 0) return;
+					URL.revokeObjectURL(image.url);
 					images.splice(idx, 1);
 					render(containerRef);
 				});
@@ -1441,6 +1458,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				});
 			}
 		}
+		if (!avecPieces) zonePieces = null;
 
 		/* LES TUILES VIDÉO (spec « Vidéos YouTube » § 3.4) : leur rangée est
 		   TOUJOURS là, dans la même bande que les chips, pour qu'une tuile
@@ -1536,6 +1554,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		composerInput.addEventListener("input", (e) => {
 			const ta = e.target as HTMLTextAreaElement;
+			/* Le texte d'invite qui RÉAPPARAÎT (le champ vient de se vider)
+			   entre en fondu, 0,5 s linéaire — `cds-fade-in` de claude.ai.
+			   Retirer la classe et relire une mesure relance l'animation. */
+			if (!ta.value && composerText) {
+				ta.classList.remove("qbd-ai-composer-input--invite");
+				void ta.offsetWidth;
+				ta.classList.add("qbd-ai-composer-input--invite");
+			}
 			composerText = ta.value;
 			composerCaret = ta.selectionStart;
 			autoGrow();

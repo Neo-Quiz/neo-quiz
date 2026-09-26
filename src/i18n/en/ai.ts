@@ -275,6 +275,7 @@ export const EN_AI = {
 	"ai.queue.newRequestBusy": "Available once nothing is generating",
 	"ai.queue.newRequestUnsaved": "Save or close the unsaved quiz first",
 	/* Une pièce jointe encore en lecture : l'envoi attend. */
+	"ai.attach.remove": "Remove {name}",
 	"ai.attach.reading": "Reading the document…",
 	"ai.attach.readFailed": "Could not read this file",
 	"ai.attach.noText": "No text in this PDF",
