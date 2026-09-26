@@ -5,6 +5,7 @@ import { creerChampDirect, libererChamps } from "../editor/champ-direct";
 import type { ChampDirect } from "../editor/champ-direct";
 import { poserBarreFormat } from "../editor/format-toolbar";
 import type { DraftQuestion } from "../editor/utils";
+import { creerGestesReponse } from "./edition-rendu-gestes";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 
@@ -150,6 +151,10 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			   rendu… y prenaient le focus, et Entrée n'y ouvrait rien. */
 			el.querySelectorAll<HTMLElement>("input, textarea, button, a, [tabindex]").forEach(d => { d.tabIndex = -1; });
 		});
+		// Boutons de gestes (bonne réponse, options, classement, appariement,
+		// variantes) : posés APRÈS les `data-edit`, sur la même carte.
+		gestes.poser(carte, q);
+
 		/* Les `*Html` : visibles, pas éditables ici — ils le disent. */
 		const html: HTMLElement[] = [];
 		if (q._promptHtml) html.push(...carte.querySelectorAll<HTMLElement>(".quiz-question:not([data-edit])"));
@@ -202,6 +207,26 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		const el = carte.querySelector<HTMLElement>(selecteur(c));
 		if (el) ouvrir(el);
 	}
+
+	/* Les GESTES de réponse (tâche 4) : bonne réponse, options, classement,
+	   appariement, variantes. Chacun ferme d'abord un champ de texte ouvert
+	   (Review Focus 3), applique le geste pur (`editor/gestes.ts`), puis
+	   sauvegarde et repeint — même protocole que `fermer` pour un texte
+	   validé, réutilisé ici pour rouvrir la cible visée après repeint. */
+	const gestes = creerGestesReponse({
+		appliquer(fn, cible) {
+			if (ouvert) fermer(true, true);
+			if (!fn()) return;
+			deps.onChange();
+			if (cible) aRouvrir.set(host, cible);
+			deps.rendre();
+			if (!vivant) return;
+			peindre();
+			const suivante = aRouvrir.get(host);
+			aRouvrir.delete(host);
+			if (suivante) ouvrirCible(suivante);
+		},
+	});
 
 	function ouvrir(el: HTMLElement): void {
 		const cible = lireCible(el);
@@ -280,6 +305,10 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 
 	/* ── Écouteurs délégués, posés une fois sur l'hôte ── */
 	const surPointeur = (e: PointerEvent): void => {
+		// Un bouton de GESTE (bonne réponse, +/-, sélection d'emplacement) gère
+		// son propre clic : il ne doit jamais rouvrir le texte de son ancêtre
+		// `[data-edit]` (une option, une ligne…).
+		if (e.target instanceof Element && e.target.closest(".qb-er-geste")) return;
 		// Un clic sur un AUTRE texte pendant qu'un champ est ouvert : la perte
 		// du focus qui suit va valider et repeindre ; on note où rouvrir.
 		if (!ouvert || !(e.target instanceof Element)) return;
@@ -290,6 +319,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 	};
 	const surClic = (e: MouseEvent): void => {
 		if (!(e.target instanceof Element)) return;
+		if (e.target.closest(".qb-er-geste")) return; // même raison que surPointeur
 		const el = e.target.closest<HTMLElement>("[data-edit]");
 		if (!el || !host.contains(el) || el.classList.contains("is-editing")) return;
 		e.preventDefault(); // un lien rendu dans le texte ne part pas

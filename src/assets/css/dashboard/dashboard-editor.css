@@ -804,3 +804,133 @@
 	padding: 8px 10px 9px;
 }
 .qb-er .qb-er-cadre--multi .qb-direct--multi .cm-content { min-height: 3em; }
+
+/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ──
+   La pastille d'une option, l'emplacement d'un classement/appariement et les
+   réponses acceptées ne sont plus des pastilles décoratives en édition : ce
+   sont de vrais boutons (aucun style natif : `all: unset`, chaque geste pose
+   sa propre taille et sa propre position). */
+.qb-er button.qb-er-geste {
+	all: unset;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+.qb-er button.qb-er-geste svg { width: 13px; height: 13px; }
+
+/* La pastille ronde/carrée d'une option n'est qu'un `::before` en CSS —
+   jamais interactif. En édition, un vrai bouton la remplace, au même
+   endroit exactement (quiz-options.css : left 16px, 18×18). */
+.qb-er .quiz-option::before { visibility: hidden; }
+.qb-er .qb-er-bonne {
+	position: absolute;
+	left: 16px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: var(--background-primary);
+	z-index: 1;
+}
+.qb-er .quiz-option.multi .qb-er-bonne { border-radius: 4px; }
+.qb-er .qb-er-bonne[aria-pressed="true"] {
+	border-color: var(--quiz-success);
+	box-shadow: inset 0 0 0 4px var(--quiz-success);
+}
+.qb-er .qb-er-bonne:hover,
+.qb-er .qb-er-bonne:focus-visible {
+	border-color: var(--quiz-primary);
+}
+
+/* Corbeille d'une option ou d'une variante : cachée au repos, visible au
+   survol de l'option/variante ou au focus clavier du bouton lui-même. */
+.qb-er .qb-er-retirer {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 22px;
+	height: 22px;
+	border-radius: 6px;
+	color: var(--text-faint);
+	opacity: 0;
+	transition: opacity 120ms ease, color 120ms ease;
+}
+.qb-er .quiz-option:hover .qb-er-retirer,
+.qb-er .quiz-textonly-expected-item:hover .qb-er-retirer,
+.qb-er .qb-er-retirer:focus-visible {
+	opacity: 1;
+}
+.qb-er .qb-er-retirer:hover { color: var(--quiz-danger); }
+.qb-er .quiz-textonly-expected-item {
+	position: relative;
+	padding-right: 26px;
+}
+.qb-er .quiz-textonly-expected-item .qb-er-retirer {
+	top: 50%;
+	right: 4px;
+	transform: translateY(-50%);
+	width: 18px;
+	height: 18px;
+}
+
+/* « + » fin, sous chaque option : ajoute une option juste après. */
+.qb-er .qb-er-ajouter-option {
+	position: absolute;
+	left: 50%;
+	bottom: -11px;
+	transform: translateX(-50%);
+	width: 22px;
+	height: 22px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: var(--background-primary);
+	color: var(--text-faint);
+	opacity: 0.35;
+	z-index: 4;
+	transition: opacity 120ms ease, color 120ms ease;
+}
+.qb-er .qb-er-ajouter-option:hover,
+.qb-er .qb-er-ajouter-option:focus-visible {
+	opacity: 1;
+	color: var(--quiz-primary);
+}
+
+/* Classement / appariement : l'emplacement (valeur d'un slot) devient un
+   bouton de sélection ; surligné tant qu'il attend son second clic. */
+.qb-er .quiz-slot-value.qb-er-geste {
+	cursor: pointer;
+	border-radius: 4px;
+	outline: 1px dashed transparent;
+	outline-offset: 2px;
+	transition: outline-color 120ms ease;
+}
+.qb-er .quiz-slot-value.qb-er-geste:hover,
+.qb-er .quiz-slot-value.qb-er-geste:focus-visible {
+	outline-color: color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+}
+.qb-er .quiz-slot-value.qb-er-selectionne {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 2px;
+	background: color-mix(in srgb, var(--quiz-primary) 12%, transparent);
+}
+
+/* Réponses acceptées : bouton « + Variante », sous le champ principal (et
+   sous la liste des variantes si elle existe déjà). */
+.qb-er .qb-er-ajouter-variante {
+	gap: 6px;
+	margin: 6px 0 0;
+	padding: 4px 8px;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	color: var(--text-faint);
+	font-size: 12px;
+}
+.qb-er .qb-er-ajouter-variante:hover,
+.qb-er .qb-er-ajouter-variante:focus-visible {
+	color: var(--quiz-primary);
+	border-color: var(--quiz-primary);
+}

@@ -143,6 +143,14 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.render.htmlInMore": "Modifié en HTML dans Plus",
 	"editor.render.untitled": "Question sans titre",
 
+	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
+	"editor.render.markCorrect": "Marquer comme bonne réponse",
+	"editor.render.addOption": "Ajouter une option",
+	"editor.render.removeOption": "Retirer cette option",
+	"editor.render.pickSlot": "Choisir cet emplacement",
+	"editor.render.pickChoice": "Choisir cet élément",
+	"editor.render.addVariant": "Ajouter une variante",
+
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Ajouter une question",
 	"editor.typeModal.subtitle": "Choisissez le type de question",

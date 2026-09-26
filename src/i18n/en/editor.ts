@@ -144,6 +144,14 @@ export const EN_EDITOR = {
 	"editor.render.htmlInMore": "Edited as HTML in More",
 	"editor.render.untitled": "Untitled question",
 
+	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
+	"editor.render.markCorrect": "Mark as correct answer",
+	"editor.render.addOption": "Add an option",
+	"editor.render.removeOption": "Remove this option",
+	"editor.render.pickSlot": "Select this slot",
+	"editor.render.pickChoice": "Select this item",
+	"editor.render.addVariant": "Add a variant",
+
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Add a question",
 	"editor.typeModal.subtitle": "Choose the question type",
