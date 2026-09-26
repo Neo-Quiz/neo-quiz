@@ -1139,12 +1139,13 @@
 	cursor: pointer;
 	transition: opacity 100ms ease-out;
 }
-/* Variante NEUTRE (`poserBouton3dNeutre`) : une face grise claire sur le
-   fond sombre, sa tranche plus sombre dessous ; texte normal, pas blanc. */
+/* Variante NEUTRE (`poserBouton3dNeutre`) : le gris du « Jump ahead » de
+   Brilliant, en couleurs PLEINES — dérivée de `--background-primary`, la
+   face devenait transparente sur un fond d'écran photo (2026-09-26). */
 .qbd-root .qbd-cta3d--neutre {
-	--qbd-cta3d-face: color-mix(in srgb, #fff 16%, var(--background-primary));
-	--qbd-cta3d-edge: color-mix(in srgb, #000 45%, var(--qbd-cta3d-face));
-	color: var(--text-normal);
+	--qbd-cta3d-face: #4d4b57;
+	--qbd-cta3d-edge: #2d2c34;
+	color: #fff;
 }
 .qbd-cta3d--neutre .qbd-cta3d-face { text-shadow: none; }
 .qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }

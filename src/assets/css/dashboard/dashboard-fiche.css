@@ -470,3 +470,31 @@
 	.qbd-fiche-actions { width: 100%; }
 	.qbd-fiche-body { flex: none; overflow: visible; }
 }
+
+/* ── Les pastilles et la recherche, en VERRE (2026-09-26) : presque
+   transparentes, elles se perdaient sur un fond d'écran photo. Même verre
+   que les cartes des questions : fond, flou, liseré et reflet du haut. ── */
+.qbd-fiche-meta .qbd-fiche-chip,
+.qbd-fiche-meta .qbd-fiche-modes,
+.qbd-fiche-meta .qbd-fiche-origin,
+.qbd-fiche-search {
+	background: var(--qbd-glass-bg);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 12%, transparent);
+	box-shadow: var(--qbd-glass-sheen);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+}
+.qbd-fiche-meta .qbd-fiche-chip.is-accent {
+	background: color-mix(in srgb, var(--interactive-accent) 22%, var(--qbd-glass-bg));
+	border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+}
+.qbd-fiche-meta .qbd-fiche-chip { color: var(--text-normal); }
+.qbd-fiche-meta .qbd-fiche-origin {
+	padding: 4px 10px;
+	border-radius: 6px;
+	color: var(--text-normal);
+}
+.qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:not(.is-active) { color: var(--text-normal); }
+.qbd-fiche-search { color: var(--text-normal); }
+.qbd-root .qbd-fiche-search-input::placeholder { color: var(--text-muted); }
