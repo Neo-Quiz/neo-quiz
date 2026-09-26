@@ -3,7 +3,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { DraftQuestion } from "../editor/utils";
 import { renderQuizPreviewCard } from "../editor/question-preview";
-import { isRichHtml } from "../editor/utils";
+import { isRichHtml, Q_TYPES } from "../editor/utils";
 import { _htmlToText } from "../editor/modals";
 import { createFormBridge } from "./detail-form-bridge";
 import type { FormBridge } from "./detail-form-bridge";
@@ -15,8 +15,9 @@ import type { FormBridge } from "./detail-form-bridge";
    - CONSULTATION : le VRAI rendu du quiz (editor/question-preview.ts,
      mêmes classes que le moteur), à son état INITIAL — la bonne réponse
      n'y est jamais distinguée (demande explicite d'Ahmed) ;
-   - ÉDITION : énoncé, puis les champs propres au TYPE de la question, puis
-     les sections optionnelles (document, ressource, indice, explication).
+   - ÉDITION : titre, énoncé, les champs propres au TYPE de la question,
+     l'explication, puis les sections repliables (document, leçon,
+     ressource, indice).
 
    Depuis le 2026-07-31 la page édite TOUS les types, pas seulement les
    choix : les formulaires viennent de l'éditeur via `detail-form-bridge`,
@@ -57,6 +58,12 @@ export function renderQuestionEdit(parent: HTMLElement, q: DraftQuestion, cb: Ed
 		sourcePath,
 	});
 
+	/* Refonte de l'éditeur (2026-09-26) : le formulaire en SECTIONS NOMMÉES,
+	   dans cet ordre — Titre, Question, les champs du type, Explication, puis
+	   les sections repliables (Document, Leçon, Ressource, Indice). Chaque
+	   section porte son libellé en petites capitales ; les champs ont le
+	   style des contrôles de Neo Calendar (editor-page.css). */
+	parent.classList.add("qbd-qz-form");
 	renderTitleField(parent, q, cb);
 	renderPromptField(parent, q, cb, bridge);
 
@@ -64,18 +71,35 @@ export function renderQuestionEdit(parent: HTMLElement, q: DraftQuestion, cb: Ed
 	// Rendus par le formulaire de l'éditeur : mêmes classes, mêmes règles
 	// (jamais moins de deux réponses, au moins une bonne, réindexation à la
 	// suppression) que ce que produisait l'éditeur en onglet.
-	const typeBox = ajouter(parent, "div", "qbd-qz-type-box");
+	const typeSec = bloc(parent, t("dashboard.quiz.editAnswers"));
+	const def = Q_TYPES.find(d => d.key === q._type);
+	if (def) {
+		// Le TYPE à côté du libellé : « Réponses · Appariement ».
+		const type = ajouter(typeSec.firstElementChild as HTMLElement, "span", "qbd-qz-fsec-type");
+		currentHost().ui.setIcon(ajouter(type, "span", "qbd-qz-fsec-type-icon"), def.lucide);
+		ajouter(type, "span", undefined, def.label);
+	}
+	const typeBox = ajouter(typeSec, "div", "qbd-qz-type-box");
 	bridge.renderTypeFields(typeBox, q);
 
+	renderExplain(parent, q, cb, bridge);
 	renderExtras(parent, q, cb, bridge);
+}
+
+/** Une section NOMMÉE, toujours ouverte : son libellé, puis ce que
+    l'appelant y écrit. Le libellé est le premier enfant. */
+function bloc(parent: HTMLElement, label: string): HTMLElement {
+	const sec = ajouter(parent, "section", "qbd-qz-fsec");
+	const head = ajouter(sec, "div", "qbd-qz-fsec-label");
+	ajouter(head, "span", undefined, label);
+	return sec;
 }
 
 /* ── Titre et énoncé ──────────────────────────────────────── */
 
 function renderTitleField(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): void {
-	const field = ajouter(parent, "div", "qbd-qz-field");
-	ajouter(field, "div", "qbd-qz-field-label", t("dashboard.quiz.editTitle"));
-	const input = ajouter(field, "input", "qbd-qz-field-input qbd-qz-field-input--single");
+	const field = bloc(parent, t("dashboard.quiz.editTitle"));
+	const input = ajouter(field, "input", "qbd-qz-input");
 	input.type = "text";
 	input.value = q.title || "";
 	input.placeholder = t("dashboard.quiz.editTitlePlaceholder");
@@ -96,9 +120,8 @@ function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 	// raccourci ``` + Entrée et le collage d'image vers le vault — trois
 	// capacités que la version maison n'avait pas.
 	const rich = isRichHtml(q._promptHtml);
-	const field = ajouter(parent, "div", "qbd-qz-field qbd-qz-field--rich");
-	ajouter(field, "div", "qbd-qz-field-label",
-		t(rich ? "dashboard.quiz.editPromptHtml" : "dashboard.quiz.editPrompt"));
+	const field = bloc(parent, t(rich ? "dashboard.quiz.editPromptHtml" : "dashboard.quiz.editPrompt"));
+	field.classList.add("qbd-qz-fsec--prompt");
 
 	const value = rich
 		? (q._promptHtml || "").replace(/<br\s*\/?>/gi, "\n")
@@ -123,16 +146,16 @@ function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 			delete q._promptHtml;
 		}
 		cb.onChange();
-	});
+	}, rich);
 
 	if (rich) ajouter(field, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 }
 
 /* ── Sections optionnelles ────────────────────────────────── */
 
-/** Document, ressource, indice, explication : tout ce qui entoure la
-    question. Repliées par défaut, sauf celles qui portent déjà une valeur —
-    on ne cache pas à l'auteur un contenu qu'il a écrit. */
+/** Document, leçon, ressource, indice : tout ce qui entoure la question.
+    Repliées par défaut, sauf celles qui portent déjà une valeur — on ne
+    cache pas à l'auteur un contenu qu'il a écrit. */
 function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
 	const extras = (q._extraFields ||= {});
 	const readExtra = (key: string): string => {
@@ -189,7 +212,7 @@ function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, 
 				delete q._lessonHtml;
 			}
 			cb.onChange();
-		});
+		}, richLesson);
 	if (richLesson) ajouter(lesson, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 
 	// ── Bouton ressource ──
@@ -201,12 +224,16 @@ function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, 
 		q.hint = v;
 		cb.onChange();
 	});
+}
 
-	// ── Explication (après correction) ──
+/** L'explication (après correction) : une section NOMMÉE, toujours ouverte,
+    juste après les champs du type — c'est ce qu'on corrige le plus souvent
+    avec la réponse (refonte 2026-09-26 ; elle était repliée en dernier). */
+function renderExplain(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
 	// Même règle que l'énoncé : une explication qui porte du HTML s'édite en
 	// HTML, sinon la première correction l'aplatirait.
 	const richExplain = isRichHtml(q._explainHtml);
-	const explain = section(parent, "book-open", t("editor.form.explainSection"), !!(q.explain || q._explainHtml));
+	const explain = bloc(parent, t("editor.form.explainSection"));
 	const explainValue = (richExplain ? (q._explainHtml || "") : (q.explain || ""))
 		.replace(/<br\s*\/?>/gi, "\n");
 	bridge.field(explain, "", explainValue, t("editor.form.explainPlaceholder"), true, v => {
@@ -223,7 +250,7 @@ function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, 
 			delete q._explainHtml;
 		}
 		cb.onChange();
-	});
+	}, richExplain);
 	if (richExplain) ajouter(explain, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 }
 

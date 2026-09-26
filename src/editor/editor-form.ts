@@ -4,11 +4,13 @@ import { currentHost } from "../host/current";
 import { reserveFreePath, releaseReservedPath } from "../unique-path";
 import type { EditorCtx } from "../types/editor-ctx";
 import type { DraftQuestion } from "./utils";
+import { insererTexte, poserBarreFormat } from "./format-toolbar";
+import { createSelect } from "../dashboard/ui-select";
 
 /** Handlers du formulaire d'édition d'une question (champs, ressource, éditeurs par type, éditeur de tableau). */
 export interface EditorFormHandlers {
 	renderEditor(): void;
-	_field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts?: Record<string, unknown>): HTMLElement;
+	_field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts?: { html?: boolean }): HTMLElement;
 	_resourceSection(parent: HTMLElement, q: DraftQuestion): void;
 	_renderTypeFields(box: HTMLElement, q: DraftQuestion): void;
 	_arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void;
@@ -169,33 +171,8 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 			v => write("passageId", v));
 	}
 
-	// ── Entités pour la toolbar ──
-	// FONCTION et non constante : la liste était évaluée à la création des
-	// handlers (montage de l'éditeur), ce qui aurait figé les infobulles dans la
-	// langue d'alors. Appelée depuis _field, donc au rendu. `label` et `insert`
-	// sont des symboles/entités HTML — jamais traduits.
-	function entities(): { label: string; insert: string; title: string }[] {
-		return [
-			{ label: '>', insert: '&gt;', title: t("editor.entity.gt") },
-			{ label: '<', insert: '&lt;', title: t("editor.entity.lt") },
-			{ label: '&', insert: '&amp;', title: t("editor.entity.amp") },
-			{ label: '␣', insert: '&nbsp;', title: t("editor.entity.nbsp") },
-			{ label: "'", insert: "&#39;", title: t("editor.entity.apos") },
-			{ label: '"', insert: "&quot;", title: t("editor.entity.quot") },
-			{ label: '```', insert: '<pre><code>\n</code></pre>', title: t("editor.entity.codeBlock") },
-		];
-	}
-
-	function _insertAt(ta: HTMLTextAreaElement, text: string, cb: (value: string) => void): void {
-		const s = ta.selectionStart ?? 0;
-		const before = ta.value.substring(0, s);
-		const after = ta.value.substring(ta.selectionEnd ?? 0);
-		ta.value = before + text + after;
-		const nl = text.indexOf('\n');
-		ta.selectionStart = ta.selectionEnd = before.length + (nl !== -1 ? nl + 1 : text.length);
-		ta.focus();
-		cb(ta.value);
-	}
+	// La barre de mise en forme (et ses entités) vit dans format-toolbar.ts.
+	const _insertAt = insererTexte;
 
 	function _autoResize(ta: HTMLTextAreaElement): void {
 		ta.style.height = 'auto';
@@ -204,23 +181,22 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 		ta.style.height = newHeight + 'px';
 	}
 
-	function _field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts: Record<string, unknown> = {}): HTMLElement {
-		const wrap = ajouter(parent, "div");
+	function _field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts: { html?: boolean } = {}): HTMLElement {
+		const wrap = ajouter(parent, "div", "qb-field");
 		ajouter(wrap, "label", "qb-field-label", label);
 		if (multiline) {
-			// Toolbar entités
-			const toolbar = ajouter(wrap, "div", "qb-entity-toolbar");
+			/* Un seul CADRE pour la barre et la zone : la barre est collée au
+			   haut du champ, le liseré et le focus sont ceux du cadre. */
+			const cadre = ajouter(wrap, "div", "qb-rich");
 			/* Le texte passe par le CONTENU du `<textarea>`, comme le faisait
 			   `createEl({ text })` : c'est sa valeur initiale, et l'affecter par
 			   `value` la rendrait « sale » avant la moindre frappe. */
-			const ta = ajouter(wrap, "textarea", "qb-field-textarea qb-prompt-editor", value ?? "");
+			const ta = document.createElement("textarea");
+			ta.className = "qb-field-textarea qb-prompt-editor";
+			ta.textContent = value ?? "";
+			poserBarreFormat(cadre, ta, !!opts.html, onChange, () => _autoResize(ta));
+			cadre.appendChild(ta);
 			ta.placeholder = placeholder;
-
-			entities().forEach(ent => {
-				const btn = ajouter(toolbar, "button", "qb-entity-btn", ent.label);
-				btn.title = ent.title;
-				btn.addEventListener("click", (e) => { e.preventDefault(); _insertAt(ta, ent.insert, onChange); _autoResize(ta); });
-			});
 
 			// Input + auto-resize
 			ta.addEventListener("input", () => { onChange(ta.value); _autoResize(ta); });
@@ -344,7 +320,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				alerteMulti.classList.toggle("qb-field-help--warn", aucune);
 				alerteMulti.textContent = aucune ? t("editor.answer.noneCorrect") : "";
 			};
-			const cardsContainer = ajouter(box, "div", "qb-answer-cards");
+			const cardsContainer = ajouter(box, "div", "qb-answers");
 
 			const renderCards = () => {
 				majAlerte();
@@ -352,47 +328,12 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 				q.options!.forEach((o, i) => {
 					const isCorrect = isMulti ? (q.correctIndices || []).includes(i) : i === q.correctIndex;
-					const card = ajouter(cardsContainer, "div", `qb-answer-card ${isCorrect ? "qb-answer-correct" : "qb-answer-wrong"}`);
-
-					const toggleRow = ajouter(card, "div", "qb-answer-toggle-row");
-					ajouter(toggleRow, "span", "qb-answer-toggle-label", t(isCorrect ? "editor.answer.correct" : "editor.answer.wrong"));
-
-					const toggle = ajouter(toggleRow, "div", "qb-answer-toggle");
-					const track = ajouter(toggle, "div", "qb-answer-toggle-track");
-					const thumb = ajouter(track, "div", "qb-answer-toggle-thumb");
-					_setIcon(thumb, isCorrect ? "check" : "x");
-
-					const triggerFlash = (toCorrect: boolean) => {
-						card.classList.remove("qb-answer-flash-green", "qb-answer-flash-red");
-						void card.offsetWidth;
-						card.classList.add(toCorrect ? "qb-answer-flash-green" : "qb-answer-flash-red");
-						setTimeout(() => {
-							card.classList.remove("qb-answer-flash-green", "qb-answer-flash-red");
-						}, 500);
-					};
-
-					toggle.addEventListener("click", () => {
-						if (isMulti) {
-							const a = q.correctIndices || [];
-							if (a.includes(i)) {
-								if (a.length > 1) {
-									triggerFlash(false);
-									q.correctIndices = a.filter(x => x !== i);
-									view.render(); view.scheduleSave?.();
-								}
-							} else {
-								triggerFlash(true);
-								q.correctIndices = [...a, i].sort((a, b) => a - b);
-								view.render(); view.scheduleSave?.();
-							}
-						} else {
-							if (!isCorrect) {
-								triggerFlash(true);
-								q.correctIndex = i;
-								view.render(); view.scheduleSave?.();
-							}
-						}
-					});
+					/* Refonte de l'éditeur (2026-09-26) : une LIGNE sobre par
+					   réponse — le champ, l'interrupteur « Bonne réponse » vert,
+					   supprimer. La bonne réponse se lit au liseré vert fin du
+					   champ et à l'interrupteur, plus à une grande boîte pleine
+					   rouge ou verte. */
+					const card = ajouter(cardsContainer, "div", "qb-answer-row" + (isCorrect ? " is-correct" : ""));
 
 					const input = ajouter(card, "input", "qb-answer-input");
 					input.type = "text";
@@ -441,9 +382,47 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 						}
 					});
 
-					if (!isCorrect && q.options!.length > 2) {
-						const delBtn = ajouter(card, "button", "qb-answer-delete");
-						_setIcon(delBtn, "x");
+					/* L'interrupteur « Bonne réponse » : un vrai bouton (clavier,
+					   lecteur d'écran), même règle qu'avant — en choix unique,
+					   cliquer la bonne ne fait rien ; en choix multiple, la
+					   dernière bonne ne se retire pas. */
+					const toggle = ajouter(card, "button", "qb-answer-switch");
+					toggle.type = "button";
+					toggle.setAttribute("role", "switch");
+					toggle.setAttribute("aria-checked", String(isCorrect));
+					ajouter(toggle, "span", "qb-answer-switch-track");
+					ajouter(toggle, "span", "qb-answer-switch-label", t("editor.answer.correct"));
+					toggle.addEventListener("click", () => {
+						if (isMulti) {
+							const a = q.correctIndices || [];
+							if (a.includes(i)) {
+								if (a.length > 1) {
+									q.correctIndices = a.filter(x => x !== i);
+									view.render(); view.scheduleSave?.();
+								}
+							} else {
+								q.correctIndices = [...a, i].sort((a, b) => a - b);
+								view.render(); view.scheduleSave?.();
+							}
+						} else if (!isCorrect) {
+							q.correctIndex = i;
+							view.render(); view.scheduleSave?.();
+						}
+					});
+
+					/* Supprimer : jamais une bonne réponse, jamais sous deux
+					   réponses (mêmes règles qu'avant). Quand c'est interdit, la
+					   place reste réservée, invisible : les interrupteurs restent
+					   alignés d'une ligne à l'autre. */
+					const delBtn = ajouter(card, "button", "qb-answer-delete");
+					delBtn.type = "button";
+					delBtn.title = t("editor.action.delete");
+					delBtn.setAttribute("aria-label", t("editor.action.delete"));
+					_setIcon(delBtn, "trash-2");
+					if (isCorrect || q.options!.length <= 2) {
+						delBtn.disabled = true;
+						delBtn.classList.add("is-hidden");
+					} else {
 						delBtn.addEventListener("click", () => {
 							q.options!.splice(i, 1);
 							if (isMulti) {
@@ -458,6 +437,8 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				});
 
 				const addBtn = ajouter(box, "button", "qb-answer-add");
+				addBtn.type = "button";
+				_iconSpan(addBtn, "plus", "qb-add-icon");
 				addBtn.appendChild(document.createTextNode(t("editor.answer.add")));
 				addBtn.addEventListener("click", () => {
 					q.options!.push("");
@@ -504,21 +485,21 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				rerender();
 			}, t("editor.matching.choicePlaceholder"), t("editor.action.add"));
 
+			/* « situation → choix » en DEUX COLONNES alignées (refonte
+			   2026-09-26) : chaque ligne a la même grille, le menu prend toute
+			   la largeur de sa colonne. `ui-select` et non un `<select>` natif,
+			   dont le menu n'est pas thémable. */
 			ajouter(box, "label", "qb-field-label", t("editor.matching.mapping"));
+			const grille = ajouter(box, "div", "qb-match-grid");
 			(q.rows || []).forEach((row, i) => {
-				const r = ajouter(box, "div", "qb-match-row");
+				const r = ajouter(grille, "div", "qb-match-row");
 				ajouter(r, "span", "qb-match-label", row || t("editor.matching.rowFallback", { n: i }));
 				_iconSpan(r, "arrow-right", "qb-match-arrow");
-				const sel = ajouter(r, "select", "qb-field-select");
-				(q.choices || []).forEach((c, ci) => {
-					/* `value` APRÈS le texte : sans attribut `value`, un `<option>`
-					   vaut son propre texte — l'index doit donc être posé une fois
-					   le contenu en place. */
-					const opt = ajouter(sel, "option", undefined, c || "...");
-					opt.value = String(ci);
-					if ((q.correctMap?.[i] ?? 0) === ci) opt.selected = true;
+				createSelect(r, {
+					value: String(q.correctMap?.[i] ?? 0),
+					options: (q.choices || []).map((c, ci) => ({ value: String(ci), label: c || "..." })),
+					onChange: (v) => { q.correctMap![i] = parseInt(v) || 0; rerender(); },
 				});
-				sel.addEventListener("change", () => { q.correctMap![i] = parseInt(sel.value) || 0; rerender(); });
 			});
 		}
 
@@ -600,7 +581,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 	function _arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void {
 		ajouter(parent, "label", "qb-field-label", label);
-		const container = ajouter(parent, "div");
+		const container = ajouter(parent, "div", "qb-arr-list");
 		const renderItems = () => {
 			container.replaceChildren();
 			items.forEach((item, i) => {
@@ -609,12 +590,17 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				inp.placeholder = `${placeholder} ${i + 1}`;
 				inp.value = item ?? "";
 				inp.addEventListener("input", () => { items[i] = inp.value; onChange(); });
-				const del = ajouter(row, "button", "qb-btn-icon qb-btn-sm qb-btn-danger"); _setIcon(del, "x");
+				const del = ajouter(row, "button", "qb-arr-del");
+				del.type = "button";
+				del.title = t("editor.action.delete");
+				del.setAttribute("aria-label", t("editor.action.delete"));
+				_setIcon(del, "trash-2");
 				if (items.length <= 1) del.disabled = true;
 				del.addEventListener("click", () => { if (items.length <= 1) return; items.splice(i, 1); onChange(); renderItems(); });
 			});
 			const addBtn = ajouter(container, "button", "qb-arr-add");
-			_iconSpan(addBtn, "plus", "qb-arr-add-icon");
+			addBtn.type = "button";
+			_iconSpan(addBtn, "plus", "qb-add-icon");
 			addBtn.appendChild(document.createTextNode(addLabel));
 			addBtn.addEventListener("click", () => { items.push(""); onChange(); renderItems(); });
 		};

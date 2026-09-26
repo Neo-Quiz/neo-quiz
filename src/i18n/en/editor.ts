@@ -81,13 +81,20 @@ export const EN_EDITOR = {
 	"editor.form.promptPlaceholder": "Your question...",
 	"editor.hint.label": "Hint",
 	"editor.hint.placeholder": "A hint to help...",
-	"editor.form.explainSection": "Explanation (Markdown)",
+	"editor.form.explainSection": "Explanation",
 	"editor.form.explainPlaceholder": "### Key points\n- **Term** — Definition",
 
-	/* ── Toolbar entités HTML (infobulles) ── */
-	"editor.entity.gt": "Greater than (>)",
-	"editor.entity.lt": "Less than (<)",
-	"editor.entity.amp": "Ampersand (&)",
+	/* ── Barre de mise en forme (infobulles) ── */
+	"editor.format.bold": "Bold",
+	"editor.format.italic": "Italic",
+	"editor.format.code": "Code",
+	"editor.format.formula": "Formula ($…$)",
+	"editor.format.special": "Special character",
+
+	/* ── Menu « Caractère spécial » : entités HTML ── */
+	"editor.entity.gt": "Greater than",
+	"editor.entity.lt": "Less than",
+	"editor.entity.amp": "Ampersand",
 	"editor.entity.nbsp": "Non-breaking space",
 	"editor.entity.apos": "Apostrophe",
 	"editor.entity.quot": "Quotation mark",
@@ -105,7 +112,6 @@ export const EN_EDITOR = {
 
 	/* ── Réponses (choix unique / multiple) ── */
 	"editor.answer.correct": "Correct answer",
-	"editor.answer.wrong": "Wrong answer",
 	"editor.answer.placeholder": "Enter the answer",
 	"editor.answer.add": "Add an answer",
 

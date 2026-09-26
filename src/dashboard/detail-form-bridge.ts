@@ -40,6 +40,9 @@ export interface FormBridge {
 		placeholder: string,
 		multiline: boolean,
 		onChange: (value: string) => void,
+		/** Le champ édite du HTML : la barre de mise en forme insère alors des
+		    balises (`<strong>`…) au lieu du markdown (`**`…). */
+		html?: boolean,
 	): HTMLElement;
 }
 
@@ -95,7 +98,7 @@ export function createFormBridge(opts: FormBridgeOptions): FormBridge {
 
 	return {
 		renderTypeFields: (box, q) => handlers._renderTypeFields(box, q),
-		field: (parent, label, value, placeholder, multiline, onChange) =>
-			handlers._field(parent, label, value, placeholder, multiline, onChange),
+		field: (parent, label, value, placeholder, multiline, onChange, html) =>
+			handlers._field(parent, label, value, placeholder, multiline, onChange, { html: !!html }),
 	};
 }

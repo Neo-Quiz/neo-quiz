@@ -80,13 +80,20 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.form.promptPlaceholder": "Votre question...",
 	"editor.hint.label": "Indice",
 	"editor.hint.placeholder": "Un indice pour aider...",
-	"editor.form.explainSection": "Explication (Markdown)",
+	"editor.form.explainSection": "Explication",
 	"editor.form.explainPlaceholder": "### Rappels\n- **Terme** — Définition",
 
-	/* ── Toolbar entités HTML (infobulles) ── */
-	"editor.entity.gt": "Supérieur (>)",
-	"editor.entity.lt": "Inférieur (<)",
-	"editor.entity.amp": "Esperluette (&)",
+	/* ── Barre de mise en forme (infobulles) ── */
+	"editor.format.bold": "Gras",
+	"editor.format.italic": "Italique",
+	"editor.format.code": "Code",
+	"editor.format.formula": "Formule ($…$)",
+	"editor.format.special": "Caractère spécial",
+
+	/* ── Menu « Caractère spécial » : entités HTML ── */
+	"editor.entity.gt": "Supérieur",
+	"editor.entity.lt": "Inférieur",
+	"editor.entity.amp": "Esperluette",
 	"editor.entity.nbsp": "Espace insécable",
 	"editor.entity.apos": "Apostrophe",
 	"editor.entity.quot": "Guillemet",
@@ -104,7 +111,6 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Réponses (choix unique / multiple) ── */
 	"editor.answer.correct": "Bonne réponse",
-	"editor.answer.wrong": "Mauvaise réponse",
 	"editor.answer.placeholder": "Saisir la réponse",
 	"editor.answer.add": "Ajouter une réponse",
 

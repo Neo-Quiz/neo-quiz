@@ -88,6 +88,10 @@ const LIBERES = [
 	// Tâche 4, 2026-09-26 : l'onglet Planning de révisions, né directement
 	// sans Obsidian.
 	"src/dashboard/folder-planning.ts",
+	// Refonte de l'éditeur, 2026-09-26 : l'en-tête de la page d'un quiz hors
+	// fiche et la barre de mise en forme des champs, nés sans Obsidian.
+	"src/dashboard/detail-head.ts",
+	"src/editor/format-toolbar.ts",
 ];
 
 /** Retire les commentaires : une extension CITÉE en commentaire (par exemple
