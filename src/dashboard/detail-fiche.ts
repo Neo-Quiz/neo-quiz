@@ -402,6 +402,9 @@ function suivreDebord(zone: HTMLElement): void {
 		ro.observe(zone);
 		for (const enfant of Array.from(zone.children)) ro.observe(enfant);
 	}
+	// Tout de suite (la grille est déjà dans le document), puis au cadre
+	// suivant, une fois les polices et les formules posées.
+	maj();
 	requestAnimationFrame(maj);
 }
 
