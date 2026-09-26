@@ -254,7 +254,7 @@ function renderComposerDossier(parent: HTMLElement, ctx: DashboardShellCtx, fold
 	champ.rows = 1;
 
 	const pied = ajouter(boite, "div", "qbd-ai-composer-bottom");
-	const envoyer = ajouter(pied, "button", "qbd-ai-composer-send qbd-planning-composer-send") as HTMLButtonElement;
+	const envoyer = ajouter(pied, "button", "qbd-ai-composer-send") as HTMLButtonElement;
 	envoyer.type = "button";
 	envoyer.setAttribute("aria-label", t("dashboard.planning.composerSend"));
 	currentHost().ui.setIcon(ajouter(envoyer, "span", "qbd-ai-composer-send-icon"), "arrow-up");
@@ -278,9 +278,16 @@ function renderComposerDossier(parent: HTMLElement, ctx: DashboardShellCtx, fold
 		}
 	});
 
+	// Fix round 1 (2026-09-26) : `envoyer.disabled` seul ne protège pas contre
+	// deux Entrée pressées avant que la lecture asynchrone du dossier ne
+	// reparte ailleurs (la page « Générer ») — un drapeau local, posé AVANT
+	// cette lecture, vérifié en premier.
+	let envoiEnCours = false;
 	const envoyerDemande = (): void => {
+		if (envoiEnCours) return;
 		const texte = champ.value.trim();
 		if (!texte) return;
+		envoiEnCours = true;
 		envoyer.disabled = true;
 		void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
 			ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu), prompt: texte, lancer: true } });

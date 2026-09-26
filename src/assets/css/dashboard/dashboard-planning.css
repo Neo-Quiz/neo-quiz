@@ -26,6 +26,18 @@
 	min-width: 0;
 }
 
+/* Fix round 1 (2026-09-26) : la colonne de gauche s'étire sur toute la
+   hauteur de la ligne de grille (celle de la colonne de droite, plus
+   fournie) — `align-self: stretch` seule, sans toucher `align-items: start`
+   de `.qbd-planning` qui garde la colonne de droite à sa hauteur propre.
+   `.qbd-planning-composer` (margin-top: auto, plus bas) descend alors au
+   bas de cette colonne, comme dans StudySmarter. Sous 900 px, chaque
+   colonne est sa PROPRE ligne de grille : `align-self` n'y ajoute aucun
+   espace, le composer suit simplement le contenu. */
+.qbd-planning-col--left {
+	align-self: stretch;
+}
+
 /* ── Contenu des deux sections repliables (mêmes rangées que « Mes quiz ») ── */
 
 .qbd-planning-empty-line {
@@ -150,6 +162,7 @@
    (`ctx.canOpen`), donc sans marge propre tant qu'il n'a pas de contenu —
    `:empty` évite un vide qui pousse la colonne. */
 .qbd-planning-composer:empty { display: none; }
+.qbd-planning-composer { margin-top: auto; }
 
 /* ── Composer « Demander un quiz sur ce dossier » (tâche 5, 2026-09-26) ──
    Même anatomie que le composer de « Générer » (dashboard-ai.css :
@@ -178,15 +191,25 @@
 .qbd-ai-composer--dossier .qbd-ai-composer-bottom {
 	margin: 0;
 }
-.qbd-planning-composer-send {
+/* Fix round 1 (2026-09-26) : le composer de « Générer » ne montre son bouton
+   d'envoi qu'avec `.is-visible` (`dashboard-ai.css`, importé APRÈS ce
+   fichier — même spécificité, l'ORDRE tranchait en faveur de son
+   `display: none`) ; ici le bouton est TOUJOURS visible, plein accent dès
+   que le champ a du texte, atténué sinon — sélecteur scopé sous
+   `--dossier` pour battre la règle de base sans `!important`. */
+.qbd-ai-composer--dossier .qbd-ai-composer-send {
 	display: inline-flex;
+	background: var(--quiz-primary) !important;
+	color: #fff;
 }
-.qbd-planning-composer-send:disabled {
-	opacity: 0.45;
+.qbd-ai-composer--dossier .qbd-ai-composer-send:disabled {
+	background: var(--qbd-glass-edge) !important;
+	color: var(--text-faint);
+	opacity: 0.6;
 	cursor: not-allowed;
 }
-.qbd-planning-composer-send:disabled:hover {
-	background: var(--interactive-accent) !important;
+.qbd-ai-composer--dossier .qbd-ai-composer-send:disabled:hover {
+	background: var(--qbd-glass-edge) !important;
 }
 
 /* ── Colonne de droite : tuiles verre, comme les tuiles de « Progression » ── */
