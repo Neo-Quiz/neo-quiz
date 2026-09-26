@@ -157,6 +157,21 @@
 	margin: 0 -10px;
 }
 
+/* AU-DELÀ DE HUIT LIGNES (`LIGNES_VISIBLES`, folder-sections.ts), la liste
+   défile dans son cadre au lieu d'allonger la page. 8 × 46 px : la hauteur
+   mesurée d'une rangée (vignette 30 px + padding). Le fondu et l'ascenseur
+   sont ceux des cartes de la grille d'un quiz (dashboard-fiche.css).
+   `scrollbar-gutter` : l'ascenseur ne décale pas les rangées en apparaissant.
+   PAS de `scrollbar-width` (il désactiverait les `::-webkit-scrollbar`), ni
+   d'`overscroll-behavior` : la molette passe à la page une fois au bout. */
+.qbd-folder-list--defile {
+	max-height: calc(8 * 46px);
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+	--fondu: 28px;
+	transition: -webkit-mask-image 0.15s ease;
+}
+
 .qbd-folder-item {
 	display: flex;
 	align-items: center;

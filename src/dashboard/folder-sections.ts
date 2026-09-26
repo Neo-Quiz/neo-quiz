@@ -10,6 +10,12 @@ import { ajouterLien, lireContenuDossier, nomSansExtension, retirerLien, titreDe
 import { openConfirmModal } from "../editor/modals";
 import { estImage, fileIcon } from "./file-icons";
 import type { LienDossier } from "./folder-contents";
+import { suivreDebord } from "./detail-fiche";
+
+/** Le nombre de lignes qu'une liste de section montre avant de défiler dans
+    son cadre. Le même 8 est écrit dans `dashboard-folder.css`
+    (`.qbd-folder-list--defile`, `max-height`). */
+const LIGNES_VISIBLES = 8;
 
 /* ══════════════════════════════════════════════════════════
    LES TROIS SECTIONS D'UN DOSSIER — Documents, Liens, Notes
@@ -155,7 +161,14 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 		ajouter(vide, "div", "qbd-folder-empty-title", t(spec.emptyTitle));
 		ajouter(vide, "div", "qbd-folder-empty-hint", t(spec.emptyHint));
 	} else {
-		const liste = ajouter(section, "div", "qbd-folder-list");
+		/* AU-DELÀ DE HUIT LIGNES, la liste défile DANS son cadre (2026-09-26) :
+		   un dossier de 37 documents rendait la page interminable. Même
+		   défilement que les cartes de la grille d'un quiz (ascenseur fin,
+		   fondus haut et bas, `suivreDebord`) ; la molette passe à la page une
+		   fois la liste au bout. La hauteur vit dans le CSS
+		   (`.qbd-folder-list--defile`). */
+		const defile = spec.items.length > LIGNES_VISIBLES;
+		const liste = ajouter(section, "div", "qbd-folder-list" + (defile ? " qbd-folder-list--defile" : ""));
 		for (const it of spec.items) {
 			/* Deux boutons par rangée — ouvrir (toute la largeur) et supprimer
 			   (la corbeille, révélée au survol) — dans un `div` : un bouton dans
@@ -189,6 +202,7 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 			host.ui.setIcon(supprimer, "trash-2");
 			supprimer.addEventListener("click", (e) => { e.stopPropagation(); it.onDelete(); });
 		}
+		if (defile) suivreDebord(liste);
 	}
 
 	if (spec.onDrop) {

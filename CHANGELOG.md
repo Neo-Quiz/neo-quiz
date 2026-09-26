@@ -27,6 +27,7 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 
 ### Changed
+- In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
 - The app now sits in a centered panel, with your wallpaper fully visible around it; cards inside are plain surfaces instead of glass tiles.
 - Generating a quiz now reads like a conversation on claude.ai: each request appears as your message, with a live "working" reply underneath that turns into the finished quiz, and the composer stays at the bottom.
 - A PDF attached in Generate shows up at once, with its name and a small loading wheel; its first page and its text follow, and sending waits until the text is read. A PDF that cannot be read says so on its card.

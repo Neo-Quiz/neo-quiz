@@ -401,8 +401,9 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
     quiz ; un clic fait briller « Commencer le quiz ». */
 /** Pose `a-suivre` (reste du texte en bas) et `a-precede` (texte au-dessus)
     sur une zone qui défile, à chaque défilement et à chaque changement de
-    taille (formules rendues, fenêtre redimensionnée). */
-function suivreDebord(zone: HTMLElement): void {
+    taille (formules rendues, fenêtre redimensionnée). Exportée : les listes
+    d'un dossier (`folder-sections.ts`) défilent avec les mêmes fondus. */
+export function suivreDebord(zone: HTMLElement): void {
 	const maj = (): void => {
 		const bas = zone.scrollTop + zone.clientHeight < zone.scrollHeight - 2;
 		zone.classList.toggle("a-suivre", bas);
