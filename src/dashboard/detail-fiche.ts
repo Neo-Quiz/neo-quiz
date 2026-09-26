@@ -240,7 +240,7 @@ function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	} else {
 		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip is-accent qbd-fiche-mode", "span");
 	}
-	const count = ajouter(chips, "span", "qbd-fiche-chip");
+	const count = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-count");
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 

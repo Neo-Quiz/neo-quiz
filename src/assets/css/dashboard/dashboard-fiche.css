@@ -504,6 +504,7 @@
 }
 .qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
 .qbd-fiche-meta .qbd-fiche-modes,
+.qbd-fiche-meta .qbd-fiche-count,
 .qbd-fiche-search {
 	/* EXACTEMENT les boutons « Semaine » et « Aujourd'hui » de l'application
 	   Neo Calendar (apps/windows/src/DesktopTitlebar.css, .nc-btn-today) :
@@ -544,3 +545,11 @@
 	gap: 8px;
 	min-width: 0;
 }
+/* « 23 questions » au même style (2026-09-26) : une pastille à part
+   entière, donc sans le point séparateur des infos en texte. */
+.qbd-fiche-meta .qbd-fiche-count {
+	padding: 0 12px;
+	border-radius: 6px;
+	color: var(--text-normal);
+}
+.qbd-fiche-meta .qbd-fiche-count::before { content: none !important; }
