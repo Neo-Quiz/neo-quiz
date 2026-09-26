@@ -26,7 +26,7 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 
 ### Changed
-- A quiz page is laid out like StudySmarter: the back arrow above the folder and title, then a line with the mode, the number of questions and where the quiz comes from, ending with Edit, Start the quiz and a ⋮ menu, then a search box that filters questions by their text and options, accents ignored, above every question shown as a card in a grid. Answers are still never shown there.
+- A quiz page is laid out like StudySmarter: the back arrow above the title, the folder under it, then a line with the mode, the number of questions and where the quiz comes from, ending with Edit, Start the quiz and a ⋮ menu, then a search box that filters questions by their text and options, accents ignored, above every question shown in full as a card in a grid, each card scrolling on its own. Answers are still never shown there.
 - The colored choices of Add content and of Create a folder carry a soft glow of their color rising from the bottom, which brightens on hover.
 - Hint and I don't know are now one help button that goes up a step: Hint first, whose text then stays under the question instead of opening a window, then I don't know where it applies. The button is a neutral pill you press down, with an amber bulb or a question mark.
 - Start the quiz, on a course page, and the next step button of a folder (Resume, Review, Learn or Practice) are blue buttons raised above their edge that sink when clicked, with a light that sweeps across them every few seconds.
