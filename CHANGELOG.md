@@ -26,6 +26,7 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 
 ### Changed
+- Quizzes are written in markdown everywhere, like Discord and Obsidian: generation no longer produces HTML, and quizzes that contained HTML open in the editor as markdown.
 - A quiz page is laid out like StudySmarter: the back arrow above the title, the folder under it, then a line with the mode, the number of questions and where the quiz comes from, ending with Edit, Start the quiz and a ⋮ menu, then a search box that filters questions by their text and options, accents ignored, above every question shown in full as a card in a grid, each card scrolling on its own. Answers are still never shown there.
 - The colored choices of Add content and of Create a folder carry a soft glow of their color rising from the bottom, which brightens on hover.
 - The quiz editor was redrawn: the same header as the quiz page (title, folder, Done and Start as raised buttons), question cards like the grid's, forms in named sections with calmer fields, an icon toolbar for formatting, answers marked right by a green switch instead of full red and green boxes, and the blue arrows of the quiz to move between questions.

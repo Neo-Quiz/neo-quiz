@@ -27,8 +27,24 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 
-/** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés. */
-export const MOTS_INTERDITS: readonly RegExp[] = [/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/];
+/** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés,
+    et les champs HTML pré-rendus — un quiz s'écrit en markdown, comme dans
+    Discord et Obsidian (2026-09-26) : nommer `promptHtml` au modèle, c'est
+    l'inviter à l'écrire. */
+export const MOTS_INTERDITS: readonly RegExp[] = [
+	/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/,
+	/\bpromptHtml\b/, /\bexplainHtml\b/, /\blessonHtml\b/, /\bpassageHtml\b/, /\boptionHtml\b/,
+];
+
+/** Les passages que le prompt de CHAQUE mode doit contenir mot pour mot : la
+    consigne markdown. Sans elle, un modèle écrit volontiers ses lectures en
+    `<p>`, `<strong>`, `<code>` — que l'éditeur montrait telles quelles. */
+export const PASSAGES_REQUIS: readonly string[] = [
+	"FORMATTING — MARKDOWN ONLY",
+	"**bold**, *italic*, `code`",
+	"paragraphs separated by an empty line",
+	"NEVER write an HTML tag",
+];
 
 export type Manque =
 	| { kind: "sansExplication"; questions: string[] }

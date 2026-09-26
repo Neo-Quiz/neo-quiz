@@ -10,12 +10,15 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts }, { CHAMPS_DECRITS, MOTS_INTERDITS }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts }, { CHAMPS_DECRITS, MOTS_INTERDITS, PASSAGES_REQUIS }) => {
 	const r = makeReporter("Prompts Learn / Practice");
 	for (const mode of ["learn", "practice"]) {
 		const { systemPrompt } = composerPrompts("Python", { mode, count: null, type: "Mixte" });
 		r.check(`${mode} : chaque champ exigé est décrit`, CHAMPS_DECRITS[mode].filter(c => !systemPrompt.includes(c)), []);
 		r.check(`${mode} : aucun mode ni champ retiré n'est mentionné`, MOTS_INTERDITS.filter(re => re.test(systemPrompt)).map(String), []);
+		/* Du markdown partout (2026-09-26) : la consigne est là, et aucun champ
+		   `*Html` n'est nommé (MOTS_INTERDITS ci-dessus). */
+		r.check(`${mode} : la consigne markdown est donnée`, PASSAGES_REQUIS.filter(p => !systemPrompt.includes(p)), []);
 		r.check(`${mode} : la règle LANGUAGE est gardée`, systemPrompt.includes("THE SAME LANGUAGE AS THE USER REQUEST"), true);
 	}
 	const auto = composerPrompts("x", { mode: "practice", count: null, type: "Compréhension" }).systemPrompt;
