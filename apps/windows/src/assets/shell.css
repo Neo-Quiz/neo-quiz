@@ -1113,6 +1113,28 @@ body::after {
 	overflow-y: auto;
 }
 
+/* LA COUPURE EN BAS DU PANNEAU (2026-09-26) : ce qui défile ne s'arrête
+   plus net contre le bord, il s'efface dans un fondu vers la matière du
+   panneau. Un pseudo-élément COLLANT en dernier enfant : il reste au bas
+   de la zone visible quel que soit le défilement, et il ne capte aucun
+   clic. Le haut n'en a pas
+   besoin : l'en-tête de chaque page y est posé au repos. */
+#neo-quiz-root > .qbd-layout > .qbd-content::after,
+#neo-quiz-root > .qbd-qz::after {
+	content: "";
+	display: block;
+	position: sticky;
+	bottom: -28px;
+	height: 64px;
+	/* Pas de marge négative en haut : le fondu ne recouvre jamais la fin
+	   d'une page courte, il occupe le bas de la marge intérieure (28 px) et
+	   36 px de plus, où la dernière carte peut remonter au-dessus de lui. */
+	margin: 0 -32px -28px;
+	pointer-events: none;
+	background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background-secondary) 88%, transparent) 85%);
+	z-index: 2;
+}
+
 /* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
    DÉCORATION, pas un bouton — ni curseur, ni survol, ni cible au clavier.
    Il avait été retiré du rail le 2026-09-23 parce qu'il « ne menait nulle
