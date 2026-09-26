@@ -404,13 +404,16 @@
 	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
 }
 
-/* GRILLE : des cartes de même hauteur par rangée, texte limité à quatre
-   lignes ; la carte se soulève au survol, elle s'ouvre dans la liste. */
+/* GRILLE : texte limité à quatre lignes ; la carte se soulève au survol,
+   elle s'ouvre dans la liste (où une longue lecture se lit en entier).
+   Chaque carte garde SA hauteur (`start`, et non `stretch`) : étirées à
+   la plus haute de leur rangée, une lecture de quatre lignes à côté d'un
+   QCM à options en colonne gardait un grand vide sous son texte. */
 .qbd-fiche-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 	gap: 14px;
-	align-items: stretch;
+	align-items: start;
 }
 .qbd-root .qbd-fiche-card {
 	height: auto;
