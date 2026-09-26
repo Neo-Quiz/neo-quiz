@@ -143,6 +143,19 @@ export const EN_EDITOR = {
 	"editor.render.clickToEdit": "Click to edit",
 	"editor.render.htmlInMore": "Edited as HTML in More",
 	"editor.render.untitled": "Untitled question",
+	"editor.render.addPrompt": "Add the question text",
+	"editor.render.addExplain": "Add an explanation",
+
+	/* ── Page d'édition : barre du type et panneau « Plus » (detail-edition.ts) ── */
+	"editor.render.type": "Type",
+	"editor.render.role": "Role",
+	"editor.render.roleTest": "Check",
+	"editor.render.more": "More",
+	"editor.render.promptHtml": "Question text (HTML)",
+	"editor.render.explainHtml": "Explanation (HTML)",
+	"editor.render.typeChangeTitle": "Change the question type?",
+	"editor.render.typeChangeMessage": "Its answers don't carry over to this type: they will be replaced by empty ones.",
+	"editor.render.typeChangeConfirm": "Change type",
 
 	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
 	"editor.render.markCorrect": "Mark as correct answer",

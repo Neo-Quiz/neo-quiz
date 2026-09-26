@@ -92,6 +92,13 @@ const LIBERES = [
 	// fiche et la barre de mise en forme des champs, nés sans Obsidian.
 	"src/dashboard/detail-head.ts",
 	"src/editor/format-toolbar.ts",
+	// Édition dans le rendu corrigé, 2026-09-26 : la page d'édition, le rendu
+	// modifiable, ses gestes et ses cibles, le collage d'image partagé.
+	"src/dashboard/detail-edition.ts",
+	"src/dashboard/edition-rendu.ts",
+	"src/dashboard/edition-rendu-gestes.ts",
+	"src/dashboard/edition-rendu-cibles.ts",
+	"src/editor/collage-image.ts",
 ];
 
 /** Retire les commentaires : une extension CITÉE en commentaire (par exemple

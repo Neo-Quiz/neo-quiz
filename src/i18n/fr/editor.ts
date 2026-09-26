@@ -142,6 +142,19 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.render.clickToEdit": "Cliquez pour modifier",
 	"editor.render.htmlInMore": "Modifié en HTML dans Plus",
 	"editor.render.untitled": "Question sans titre",
+	"editor.render.addPrompt": "Ajouter l'énoncé",
+	"editor.render.addExplain": "Ajouter une explication",
+
+	/* ── Page d'édition : barre du type et panneau « Plus » (detail-edition.ts) ── */
+	"editor.render.type": "Type",
+	"editor.render.role": "Rôle",
+	"editor.render.roleTest": "Vérification",
+	"editor.render.more": "Plus",
+	"editor.render.promptHtml": "Énoncé (HTML)",
+	"editor.render.explainHtml": "Explication (HTML)",
+	"editor.render.typeChangeTitle": "Changer le type de la question ?",
+	"editor.render.typeChangeMessage": "Ses réponses ne passent pas à ce type : elles seront remplacées par des réponses vides.",
+	"editor.render.typeChangeConfirm": "Changer de type",
 
 	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
 	"editor.render.markCorrect": "Marquer comme bonne réponse",

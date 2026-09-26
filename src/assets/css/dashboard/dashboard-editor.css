@@ -111,21 +111,16 @@
 	font-style: italic;
 }
 
-/* Réordonner / supprimer : au bout de la ligne du numéro, révélés au survol
-   de la carte (et toujours visibles sur la courante). Des icônes nues : pas
-   de bouton encadré dans une carte. */
+/* Réordonner / supprimer : une seconde ligne, sous l'énoncé de la carte
+   COURANTE seulement (detail.ts paintList) — sur la ligne du numéro, elles
+   coupaient le nom du type et le rôle. Des icônes nues, alignées à droite :
+   pas de bouton encadré dans une carte. */
 .qbd-qz-card-acts {
-	margin-left: auto;
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 1px;
-	opacity: 0;
-	transition: opacity 0.14s ease;
-}
-.qbd-qz-card:hover .qbd-qz-card-acts,
-.qbd-qz-card.is-active .qbd-qz-card-acts,
-.qbd-qz-card-acts:focus-within {
-	opacity: 1;
+	margin: -4px -4px -6px 0;
 }
 .qbd-root .qbd-qz-card-act {
 	display: inline-flex;
@@ -753,6 +748,87 @@
 	color: var(--text-normal);
 	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
+
+/* ── La page d'édition : barre, rendu corrigé, « Plus »
+   (dashboard/detail-edition.ts) ──
+   Le panneau `.is-editing` reste la carte de verre : c'est le CONTENU (la
+   question). Dedans, rien d'autre n'est une tuile — la barre est du texte et
+   deux menus, « Plus » une section repliable, ses champs des champs. */
+.qbd-qz-panel-body.qbd-qz-er {
+	gap: 10px;
+	min-width: 0;
+}
+
+/* La barre : « Type [menu] Rôle [menu] », fine, sur une ligne qui passe à
+   la ligne quand la carte est étroite. */
+.qbd-qz-er-barre {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 8px;
+	min-width: 0;
+	font-size: 12.5px;
+	color: var(--text-muted);
+}
+.qbd-qz-er-barre-nom { font-weight: 500; }
+.qbd-qz-er-barre .qbd-select + .qbd-qz-er-barre-nom { margin-left: 10px; }
+/* Un menu a l'allure d'un champ (même fond et même liseré que ceux de
+   « Plus »), en plus petit : c'est une métadonnée, pas le sujet. */
+.qbd-root .qbd-qz-er-barre .qbd-select {
+	min-height: 30px;
+	max-width: 100%;
+	padding: 4px 10px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--text-normal) 7%, transparent) !important;
+	box-shadow: none !important;
+}
+.qbd-root .qbd-qz-er-barre .qbd-select:hover {
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+}
+.qbd-root .qbd-qz-er-barre .qbd-select:focus-visible,
+.qbd-root .qbd-qz-er-barre .qbd-select[aria-expanded="true"] {
+	border-color: color-mix(in srgb, var(--quiz-primary) 75%, transparent) !important;
+}
+.qbd-qz-er-barre .qbd-select-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-qz-er-barre-icone { display: inline-flex; flex-shrink: 0; }
+.qbd-qz-er-barre-icone svg { width: 14px; height: 14px; }
+
+/* Le rendu : la carte du quiz, sans la marge haute du moteur (la barre est
+   juste au-dessus). */
+.qbd-qz-er-rendu { min-width: 0; }
+.qbd-qz-er-rendu .quiz-card { margin-top: 2px; margin-bottom: 6px; }
+
+/* « Plus » : ses sections repliables (document, leçon…) se suivent dans une
+   colonne plus serrée que le formulaire d'avant — pas de retrait négatif. */
+.qbd-qz-er-plus .qbd-qz-section-inner { gap: 14px; }
+.qbd-qz-er-plus .qbd-qz-section + .qbd-qz-section { margin-top: -8px; }
+
+/* Un texte ABSENT (énoncé, explication) : une ligne discrète, un « + » et
+   son libellé, là où le texte irait (edition-rendu-cibles.ts). */
+.qb-er .qb-er-vide {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 10px 0;
+	padding: 6px 8px;
+	color: var(--text-faint);
+	font-size: 14px;
+	cursor: pointer;
+}
+.qb-er .qb-er-vide:hover,
+.qb-er .qb-er-vide:focus-visible { color: var(--quiz-primary); }
+.qb-er .qb-er-vide.is-editing { color: var(--text-normal); cursor: auto; }
+.qb-er-vide-icone { display: inline-flex; flex-shrink: 0; }
+.qb-er-vide-icone svg { width: 14px; height: 14px; }
 
 /* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ──
    Un texte modifiable ne change pas d'aspect au repos : c'est le rendu du

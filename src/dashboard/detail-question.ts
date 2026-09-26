@@ -3,10 +3,8 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { DraftQuestion } from "../editor/utils";
 import { renderQuizPreviewCard } from "../editor/question-preview";
-import { isRichHtml, Q_TYPES } from "../editor/utils";
+import { isRichHtml } from "../editor/utils";
 import { _htmlToText } from "../editor/modals";
-import { createFormBridge } from "./detail-form-bridge";
-import { creerChampDirect } from "../editor/champ-direct";
 import type { FormBridge } from "./detail-form-bridge";
 
 /* ══════════════════════════════════════════════════════════
@@ -16,14 +14,9 @@ import type { FormBridge } from "./detail-form-bridge";
    - CONSULTATION : le VRAI rendu du quiz (editor/question-preview.ts,
      mêmes classes que le moteur), à son état INITIAL — la bonne réponse
      n'y est jamais distinguée (demande explicite d'Ahmed) ;
-   - ÉDITION : titre, énoncé, les champs propres au TYPE de la question,
-     l'explication, puis les sections repliables (document, leçon,
-     ressource, indice).
-
-   Depuis le 2026-07-31 la page édite TOUS les types, pas seulement les
-   choix : les formulaires viennent de l'éditeur via `detail-form-bridge`,
-   ce qui a permis de retirer l'éditeur en trois colonnes sans rien perdre.
-   Le renvoi « ouvrir l'éditeur complet » n'a donc plus lieu d'être.
+   - ÉDITION : le rendu CORRIGÉ, modifiable sur place, et le panneau
+     « Plus » (dashboard/detail-edition.ts), qui monte d'ici les sections
+     repliables (document, leçon, ressource, indice).
 ══════════════════════════════════════════════════════════ */
 
 /* ── Consultation ─────────────────────────────────────────── */
@@ -43,7 +36,12 @@ export function renderQuestionView(parent: HTMLElement, q: DraftQuestion, index:
 	});
 }
 
-/* ── Édition ──────────────────────────────────────────────── */
+/* ── Édition : les sections du panneau « Plus » ──────────────
+   La question s'édite dans son RENDU corrigé depuis le 2026-09-26
+   (dashboard/detail-edition.ts, edition-rendu.ts) ; le formulaire complet
+   qui vivait ici (titre, énoncé, champs du type, explication) a disparu avec
+   lui. Il reste ce qui entoure la question — document, leçon, ressource,
+   indice —, monté dans « Plus ». */
 
 export interface EditCallbacks {
 	/** Une donnée a changé : persister (débounce côté appelant) + rafraîchir la liste. */
@@ -52,107 +50,13 @@ export interface EditCallbacks {
 	onStructureChange(): void;
 }
 
-export function renderQuestionEdit(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, sourcePath?: string): void {
-	const bridge = createFormBridge({
-		onChange: cb.onChange,
-		onStructureChange: cb.onStructureChange,
-		sourcePath,
-	});
-
-	/* Refonte de l'éditeur (2026-09-26) : le formulaire en SECTIONS NOMMÉES,
-	   dans cet ordre — Titre, Question, les champs du type, Explication, puis
-	   les sections repliables (Document, Leçon, Ressource, Indice). Chaque
-	   section porte son libellé en petites capitales ; les champs ont le
-	   style des contrôles de Neo Calendar (editor-page.css). */
-	parent.classList.add("qbd-qz-form");
-	renderTitleField(parent, q, cb);
-	renderPromptField(parent, q, cb, bridge);
-
-	// ── Les champs du TYPE (réponses, emplacements, paires, gabarit…) ──
-	// Rendus par le formulaire de l'éditeur : mêmes classes, mêmes règles
-	// (jamais moins de deux réponses, au moins une bonne, réindexation à la
-	// suppression) que ce que produisait l'éditeur en onglet.
-	const typeSec = bloc(parent, t("dashboard.quiz.editAnswers"));
-	const def = Q_TYPES.find(d => d.key === q._type);
-	if (def) {
-		// Le TYPE à côté du libellé : « Réponses · Appariement ».
-		const type = ajouter(typeSec.firstElementChild as HTMLElement, "span", "qbd-qz-fsec-type");
-		currentHost().ui.setIcon(ajouter(type, "span", "qbd-qz-fsec-type-icon"), def.lucide);
-		ajouter(type, "span", undefined, def.label);
-	}
-	const typeBox = ajouter(typeSec, "div", "qbd-qz-type-box");
-	bridge.renderTypeFields(typeBox, q);
-
-	renderExplain(parent, q, cb, bridge);
-	renderExtras(parent, q, cb, bridge);
-}
-
 /** Une section NOMMÉE, toujours ouverte : son libellé, puis ce que
     l'appelant y écrit. Le libellé est le premier enfant. */
-function bloc(parent: HTMLElement, label: string): HTMLElement {
+export function bloc(parent: HTMLElement, label: string): HTMLElement {
 	const sec = ajouter(parent, "section", "qbd-qz-fsec");
 	const head = ajouter(sec, "div", "qbd-qz-fsec-label");
 	ajouter(head, "span", undefined, label);
 	return sec;
-}
-
-/* ── Titre et énoncé ──────────────────────────────────────── */
-
-function renderTitleField(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): void {
-	const field = bloc(parent, t("dashboard.quiz.editTitle"));
-	// Champ direct : le titre s'affiche rendu comme dans le quiz.
-	const place = ajouter(field, "div", "qbd-qz-input qb-direct qb-direct--ligne");
-	creerChampDirect(place, {
-		valeur: q.title || "",
-		multiligne: false,
-		placeholder: t("dashboard.quiz.editTitlePlaceholder"),
-		etiquette: t("dashboard.quiz.editTitle"),
-		onChange: (v) => {
-			q.title = v;
-			// Un titre SAISI est un titre d'auteur, même s'il ressemble au motif
-			// automatique : sans ce drapeau, le prochain réordonnancement le
-			// remplacerait par « Question N ».
-			q._userModifiedTitle = true;
-			cb.onChange();
-		},
-	});
-}
-
-function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
-	// Champ NU (label + zone de saisie), pas une carte dans une carte — le
-	// double cadre gris de la première version faisait lourd. La zone vient
-	// du formulaire de l'éditeur : elle apporte la barre d'entités HTML, le
-	// raccourci ``` + Entrée et le collage d'image vers le vault — trois
-	// capacités que la version maison n'avait pas.
-	const rich = isRichHtml(q._promptHtml);
-	const field = bloc(parent, t("dashboard.quiz.editPrompt"));
-	field.classList.add("qbd-qz-fsec--prompt");
-
-	const value = rich
-		? (q._promptHtml || "").replace(/<br\s*\/?>/gi, "\n")
-		: (q.prompt || "");
-
-	bridge.field(field, "", value, t("dashboard.quiz.editPromptPlaceholder"), true, (v) => {
-		if (rich) {
-			// On édite le HTML LUI-MÊME : c'est la seule façon de garder un
-			// tableau ou un bloc de code qu'aucun texte brut ne rendrait.
-			q._promptHtml = v;
-			q._useHtmlPrompt = true;
-		} else {
-			q.prompt = v;
-			/* Ce texte vient de l'AUTEUR, pas d'un HTML aplati : le marquer est
-			   ce qui le fait réémettre s'il finit par cohabiter avec un
-			   `promptHtml` — sans quoi il disparaissait au rechargement suivant
-			   (revue codex 2026-07-31). */
-			q._promptSource = true;
-			// L'énoncé redevient du texte : le HTML pré-rendu d'un import
-			// l'écraserait au rendu suivant (et à l'export, cf. export.ts).
-			q._useHtmlPrompt = false;
-			delete q._promptHtml;
-		}
-		cb.onChange();
-	}, rich);
-
 }
 
 /* ── Sections optionnelles ────────────────────────────────── */
@@ -160,7 +64,7 @@ function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 /** Document, leçon, ressource, indice : tout ce qui entoure la question.
     Repliées par défaut, sauf celles qui portent déjà une valeur — on ne
     cache pas à l'auteur un contenu qu'il a écrit. */
-function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
+export function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
 	const extras = (q._extraFields ||= {});
 	const readExtra = (key: string): string => {
 		const v = extras[key];
@@ -229,33 +133,6 @@ function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, 
 	});
 }
 
-/** L'explication (après correction) : une section NOMMÉE, toujours ouverte,
-    juste après les champs du type — c'est ce qu'on corrige le plus souvent
-    avec la réponse (refonte 2026-09-26 ; elle était repliée en dernier). */
-function renderExplain(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
-	// Même règle que l'énoncé : une explication qui porte du HTML s'édite en
-	// HTML, sinon la première correction l'aplatirait.
-	const richExplain = isRichHtml(q._explainHtml);
-	const explain = bloc(parent, t("editor.form.explainSection"));
-	const explainValue = (richExplain ? (q._explainHtml || "") : (q.explain || ""))
-		.replace(/<br\s*\/?>/gi, "\n");
-	bridge.field(explain, "", explainValue, t("editor.form.explainPlaceholder"), true, v => {
-		if (richExplain) {
-			/* Le HTML édité ici fait foi, mais le texte de secours n'a pas à
-			   DISPARAÎTRE pour autant : l'export sait désormais écrire les deux,
-			   et le vider effaçait un champ que l'auteur n'avait pas touché
-			   (revue codex 2026-07-31). */
-			q._explainHtml = v;
-		} else {
-			q.explain = v;
-			// Le HTML pré-rendu d'un import cède la main au texte fraîchement
-			// saisi — sinon l'export réémettrait l'ancien (cf. export.ts).
-			delete q._explainHtml;
-		}
-		cb.onChange();
-	}, richExplain);
-}
-
 /** Le bouton « ressource » n'existe que s'il est activé : son interrupteur
     vit dans l'en-tête de la section, comme dans l'éditeur. */
 function renderResourceSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
@@ -308,8 +185,10 @@ function renderResourceSection(parent: HTMLElement, q: DraftQuestion, cb: EditCa
     `parentElement.previousElementSibling` quand il faut y greffer un
     interrupteur — l'inner est fils UNIQUE du corps, c'est donc le CORPS qui est
     le frère de l'en-tête. Ce cran oublié a coûté six semaines d'interrupteur
-    mort. */
-function section(parent: HTMLElement, icon: string, label: string, open: boolean): HTMLElement {
+    mort.
+    `onToggle` : appelé à chaque bascule avec le nouvel état (« Plus » s'en
+    sert pour rester ouvert d'un repeint à l'autre). */
+export function section(parent: HTMLElement, icon: string, label: string, open: boolean, onToggle?: (ouvert: boolean) => void): HTMLElement {
 	const wrap = ajouter(parent, "div", "qbd-qz-section" + (open ? "" : " is-collapsed"));
 	const head = ajouter(wrap, "button", "qbd-qz-section-head");
 	head.type = "button";
@@ -331,6 +210,7 @@ function section(parent: HTMLElement, icon: string, label: string, open: boolean
 		wrap.classList.add("is-animating");
 		wrap.classList.toggle("is-collapsed", !collapsed);
 		head.setAttribute("aria-expanded", String(collapsed));
+		onToggle?.(collapsed);
 		const stop = (): void => wrap.classList.remove("is-animating");
 		body.addEventListener("transitionend", function onEnd(e: TransitionEvent) {
 			if (e.target !== body || e.propertyName !== "grid-template-rows") return;

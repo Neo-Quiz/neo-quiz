@@ -9,6 +9,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/editor/gestes.ts", ({
 	basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante,
+	changerType, memeFamille,
 }) => {
 	const r = makeReporter("Gestes d'édition d'une question");
 
@@ -97,6 +98,32 @@ await withSrcModule("src/editor/gestes.ts", ({
 			const ok = retirerVariante(q, 1);
 			return [ok, q.acceptedAnswers];
 		})(), [true, ["seule"]]);
+	}
+
+	// --- changerType ---
+	{
+		const commun = { _id: "x", title: "T", prompt: "P", hint: "", explain: "E", resourceButton: null, _useHtmlPrompt: false };
+		const q = { ...commun, _type: "single", options: ["a", "b", "c"], correctIndex: 2 };
+		r.check("type : même type → refusé", changerType(q, { ...commun, _type: "single", options: ["", ""], correctIndex: 0 }), false);
+		r.check("type : unique → multiple garde les options, la bonne devient la seule bonne", (() => {
+			const ok = changerType(q, { ...commun, _type: "multi", options: ["", ""], correctIndices: [] });
+			return [ok, q._type, q.options, q.correctIndices, q.correctIndex];
+		})(), [true, "multi", ["a", "b", "c"], [2], undefined]);
+		r.check("type : multiple → unique, la première bonne devient LA bonne", (() => {
+			q.correctIndices = [1, 2];
+			const ok = changerType(q, { ...commun, _type: "single", options: ["", ""], correctIndex: 0 });
+			return [ok, q.options, q.correctIndex, q.correctIndices];
+		})(), [true, ["a", "b", "c"], 1, undefined]);
+		r.check("type : choix → classement, les options partent, les champs communs restent", (() => {
+			const ok = changerType(q, { ...commun, _type: "ordering", slots: ["1", "2"], possibilities: ["", ""], correctOrder: [0, 1] });
+			return [ok, q.options, q.correctIndex, q.possibilities, q.title, q.prompt, q.explain];
+		})(), [true, undefined, undefined, ["", ""], "T", "P", "E"]);
+		const s = { ...commun, _type: "cmd", acceptedAnswers: ["dir"], caseSensitive: true, commandPrefix: "C:\\>", placeholder: "", _variantKey: "terminalVariant", _variantValue: "cmd" };
+		r.check("type : terminal → texte garde les réponses et la casse, perd l'invite et la variante écrite", (() => {
+			const ok = changerType(s, { ...commun, _type: "text", acceptedAnswers: [""], caseSensitive: false, placeholder: "Réponse" });
+			return [ok, s.acceptedAnswers, s.caseSensitive, s.commandPrefix, s._variantKey, s.placeholder];
+		})(), [true, ["dir"], true, undefined, undefined, "Réponse"]);
+		r.check("type : famille — choix et saisie ne se transposent pas", [memeFamille("single", "multi"), memeFamille("text", "bash"), memeFamille("single", "text")], [true, true, false]);
 	}
 
 	r.done();

@@ -132,3 +132,81 @@ export function retirerVariante(q: DraftQuestion, i: number): boolean {
 	arr.splice(i, 1);
 	return true;
 }
+
+/* ── Changer le TYPE d'une question ──────────────────────────
+   Aucun formulaire ne savait le faire : le type se choisissait à la création
+   et restait. La barre de l'édition dans le rendu (dashboard/detail-edition.ts)
+   le permet, et la règle vit ici, pure, pour qu'elle s'éprouve. */
+
+/** Les champs qui n'appartiennent qu'à un type. Tout le reste (titre, énoncé,
+    explication, indice, document, leçon, ressource, rôle, identifiant…) est
+    COMMUN et traverse le changement. */
+const CHAMPS_DU_TYPE = [
+	"options", "correctIndex", "correctIndices", "slots", "possibilities", "correctOrder",
+	"rows", "choices", "correctMap", "placeholder", "acceptedAnswers", "caseSensitive",
+	"commandPrefix", "cloze", "answer", "unit", "tolerance", "tolerancePercent",
+	"_variantKey", "_variantValue", "_variantNested",
+] as const;
+
+/** Deux types dont les réponses se transposent : les choix (unique ⇄
+    multiple) gardent leurs options, les réponses saisies (texte, numérique,
+    terminaux) gardent leurs réponses acceptées. */
+function famille(type: string): string {
+	if (type === "single" || type === "multi") return "choix";
+	if (type === "numeric" || type === "text" || type === "cmd" || type === "powershell" || type === "bash") return "saisie";
+	return type;
+}
+
+/** `a` et `b` sont-ils de la même famille — un changement sans perte ? */
+export function memeFamille(a: string, b: string): boolean {
+	return famille(a) === famille(b);
+}
+
+/**
+ * Donne à `q` le type de `defaut` (la question par défaut de ce type, que
+ * l'appelant fabrique par `makeDefault` : ce module ne traduit rien). Les
+ * champs COMMUNS restent ; les champs de l'ancien type partent, ceux du
+ * nouveau prennent leur valeur par défaut — sauf ce qui se transpose :
+ * - choix unique ⇄ multiple : les options ; la bonne réponse devient la
+ *   seule bonne, la première bonne devient LA bonne ;
+ * - réponses saisies entre elles : les réponses acceptées, le texte d'aide et
+ *   la casse. L'invite reste celle du nouveau terminal (celle de `cmd` n'a
+ *   rien à faire dans PowerShell), et la variante ÉCRITE de l'ancien terminal
+ *   part : réémise, elle ferait relire la question dans son ancien type.
+ * Même type → refusé.
+ */
+export function changerType(q: DraftQuestion, defaut: DraftQuestion): boolean {
+	const ancien = q._type;
+	const nouveau = defaut._type;
+	if (ancien === nouveau) return false;
+	const avant: Partial<DraftQuestion> = {};
+	const sac = q as unknown as Record<string, unknown>;
+	const neuf = defaut as unknown as Record<string, unknown>;
+	for (const k of CHAMPS_DU_TYPE) {
+		(avant as Record<string, unknown>)[k] = sac[k];
+		delete sac[k];
+		if (neuf[k] !== undefined) sac[k] = neuf[k];
+	}
+	/* La variante IMBRIQUÉE (`text: { variant }`, `terminal: { variant }`) vit
+	   dans les champs personnalisés, réémis tels quels : laissée, elle ferait
+	   relire la question comme l'ancien terminal. */
+	if (avant._variantNested && q._extraFields) {
+		for (const k of ["text", "terminal"]) {
+			const v = q._extraFields[k];
+			if (v && typeof v === "object" && !Array.isArray(v)) delete q._extraFields[k];
+		}
+	}
+	q._type = nouveau;
+
+	if (famille(ancien) === "choix" && famille(nouveau) === "choix" && avant.options) {
+		q.options = avant.options;
+		if (nouveau === "multi") q.correctIndices = [avant.correctIndex ?? 0];
+		else q.correctIndex = avant.correctIndices?.[0] ?? 0;
+	}
+	if (famille(ancien) === "saisie" && famille(nouveau) === "saisie") {
+		if (avant.acceptedAnswers?.length) q.acceptedAnswers = avant.acceptedAnswers;
+		if (avant.placeholder) q.placeholder = avant.placeholder;
+		if (avant.caseSensitive !== undefined) q.caseSensitive = avant.caseSensitive;
+	}
+	return true;
+}

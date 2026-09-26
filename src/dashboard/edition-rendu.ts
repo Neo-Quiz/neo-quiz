@@ -6,6 +6,9 @@ import type { ChampDirect } from "../editor/champ-direct";
 import { poserBarreFormat } from "../editor/format-toolbar";
 import type { DraftQuestion } from "../editor/utils";
 import { creerGestesReponse } from "./edition-rendu-gestes";
+import { MULTILIGNES, ecrire, lireCible, poserVides, selecteur, valeurSource } from "./edition-rendu-cibles";
+import type { Cible } from "./edition-rendu-cibles";
+import { collageImage } from "../editor/collage-image";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 
@@ -42,79 +45,11 @@ export interface DepsEditionRendu {
 	rendre(): void;
 }
 
-/** Ce qu'un élément `data-edit` désigne dans le brouillon. */
-interface Cible { champ: string; index: number }
-
-/** Les textes LONGS : champ multiligne, barre de mise en forme au-dessus. */
-const MULTILIGNES = new Set(["prompt", "explain", "answer", "cloze"]);
-
 /* Le champ à rouvrir après un repeint : quand un clic sur un AUTRE texte
    valide le champ ouvert, l'appelant repeint (souvent en remontant une
    nouvelle instance sur le même hôte) et l'élément cliqué n'existe plus.
    La nouvelle instance le retrouve ici, par son hôte. */
 const aRouvrir = new WeakMap<HTMLElement, Cible>();
-
-function lireCible(el: HTMLElement): Cible | null {
-	const champ = el.getAttribute("data-edit");
-	if (!champ) return null;
-	return { champ, index: Number(el.getAttribute("data-index") ?? "0") || 0 };
-}
-
-/** Le texte SOURCE que désigne une cible — ce que le formulaire montrerait. */
-function valeurSource(q: DraftQuestion, c: Cible): string {
-	const de = (liste: string[] | undefined): string => (liste || [])[c.index] ?? "";
-	switch (c.champ) {
-		case "title": return q.title || "";
-		case "prompt": return q.prompt || "";
-		case "explain": return q.explain || "";
-		case "answer": return q.answer || "";
-		case "cloze": return q.cloze || "";
-		case "option": return de(q.options);
-		case "slot": return de(q.slots);
-		case "possibility": return de(q.possibilities);
-		case "row": return de(q.rows);
-		case "choice": return de(q.choices);
-		case "accepted": return de(q.acceptedAnswers);
-		default: return "";
-	}
-}
-
-/** Écrit `v` dans le brouillon, par les mêmes setters que le formulaire. */
-function ecrire(q: DraftQuestion, c: Cible, v: string): void {
-	const dans = (liste: string[]): void => { liste[c.index] = v; };
-	switch (c.champ) {
-		case "title":
-			q.title = v;
-			// Un titre SAISI est un titre d'auteur : sans ce drapeau, le prochain
-			// réordonnancement le remplacerait par « Question N ».
-			q._userModifiedTitle = true;
-			return;
-		case "prompt":
-			// Même règle que renderPromptField : le texte de l'auteur fait foi,
-			// le HTML pré-rendu d'un import lui cède la place.
-			q.prompt = v;
-			q._promptSource = true;
-			q._useHtmlPrompt = false;
-			delete q._promptHtml;
-			return;
-		case "explain":
-			q.explain = v;
-			delete q._explainHtml;
-			return;
-		case "answer": q.answer = v; return;
-		case "cloze": q.cloze = v; return;
-		case "option": dans(q.options ||= []); return;
-		case "slot": dans(q.slots ||= []); return;
-		case "possibility": dans(q.possibilities ||= []); return;
-		case "row": dans(q.rows ||= []); return;
-		case "choice": dans(q.choices ||= []); return;
-		case "accepted": dans(q.acceptedAnswers ||= []); return;
-	}
-}
-
-function selecteur(c: Cible): string {
-	return `[data-edit="${c.champ}"]` + (c.champ === "title" || MULTILIGNES.has(c.champ) ? "" : `[data-index="${c.index}"]`);
-}
 
 /**
  * Rend la question `q` corrigée dans `host` et la rend éditable. Renvoie la
@@ -143,6 +78,8 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			corrige: true,
 		});
 		carte.classList.add("qb-er");
+		// Énoncé et explication ABSENTS : un emplacement cliquable pour les créer.
+		poserVides(carte, q);
 		carte.querySelectorAll<HTMLElement>("[data-edit]").forEach(el => {
 			el.tabIndex = 0;
 			el.title = t("editor.render.clickToEdit");
@@ -281,9 +218,23 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			onChange: () => { /* lu à la validation */ },
 			onEntree: () => fermer(true, true, true),
 			onEchap: () => fermer(false, true, true),
-			extensions: multiligne
-				? [Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => { fermer(true, true, true); return true; } }]))]
-				: [],
+			extensions: [
+				...(multiligne
+					? [Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => { fermer(true, true, true); return true; } }]))]
+					: []),
+				/* Coller une image : le même chemin que le formulaire. Si le champ
+				   s'est fermé pendant l'écriture du fichier, le lien est écrit
+				   directement dans le brouillon — sinon l'image resterait
+				   orpheline dans le vault. Pas de repeint si un autre champ est
+				   ouvert entre-temps : il serait détruit sous le curseur. */
+				collageImage((v) => {
+					ecrire(q, cible, v);
+					deps.onChange();
+					if (!vivant || ouvert) return;
+					deps.rendre();
+					if (vivant) peindre();
+				}, { sourcePath: deps.sourcePath, apres: () => { /* lu à la validation */ } }),
+			],
 		});
 		if (multiligne) poserBarreFormat(cadre, champ.vue, false, () => { /* l'écouteur du champ suit */ }, () => { /* hauteur automatique */ });
 		cadre.appendChild(place);

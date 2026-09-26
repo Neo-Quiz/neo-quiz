@@ -14,7 +14,8 @@ import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
-import { renderQuestionView, renderQuestionEdit } from "./detail-question";
+import { renderQuestionView } from "./detail-question";
+import { renderQuestionEditRendu } from "./detail-edition";
 import { libererChamps } from "../editor/champ-direct";
 import { oublierFiche, renderFiche, renderInfosQuiz, renderTop } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
@@ -251,6 +252,19 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	let slideHost: SlideHost | null = null;
 	/** Détache l'écoute clavier de la page précédente. */
 	let keyCleanup: (() => void) | null = null;
+	/** Nettoyage de la question montée en édition (detail-edition.ts). */
+	let demonterEditionCourante: (() => void) | null = null;
+	/** « Plus » ouvert ou fermé, gardé d'une question et d'un repeint à
+	    l'autre tant que la page vit : le rouvrir à chaque question lassait. */
+	let plusOuvert = false;
+
+	/** Démonte la question en édition : un texte ouvert y est validé, ses
+	    écouteurs et ses champs retirés. Avant tout repeint du panneau. */
+	function demonterEdition(): void {
+		const d = demonterEditionCourante;
+		demonterEditionCourante = null;
+		d?.();
+	}
 
 	function scheduleSave(): void {
 		// Pas de `save` : le quiz n'existe qu'en mémoire (résultat d'une
@@ -279,6 +293,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	}
 
 	function render(container: HTMLElement, spec: QuizPageSpec): void {
+		// La question en édition d'abord : un texte encore ouvert est validé
+		// dans le brouillon AVANT que l'écriture en attente ne parte.
+		demonterEdition();
 		// Un glissement encore en vol vise des nœuds que container.replaceChildren() va
 		// détruire : le terminer d'abord évite un timer orphelin qui écrirait
 		// dans un DOM mort.
@@ -419,7 +436,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   pour l'endroit où répondre, n'est plus un écran où l'on atterrit
 		   (Ahmed, 2026-09-23). Sans fiche (page « Générer »), l'aperçu reste. */
 		welcome = !editing;
-		if (!editing) void flushSave();
+		// « Terminé » : un texte encore ouvert dans le rendu rejoint le
+		// brouillon avant que l'écriture ne parte.
+		if (!editing) { demonterEdition(); void flushSave(); }
 
 		const body = page.querySelector(".qbd-qz-body");
 		if (!body || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
@@ -628,11 +647,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (text.includes("$")) void mathifyElement(label);
 			card.addEventListener("click", () => goToQuestion(i, listCol, panel, nav, spec));
 
-			if (!editing || !draft) return;
+			if (!editing || !draft || i !== activeIdx) return;
 
-			// Au bout de la ligne du numéro, DANS son flux : posées en absolu,
-			// elles recouvraient le nom du type au survol.
-			const acts = ajouter(top, "div", "qbd-qz-card-acts");
+			/* Sur une SECONDE ligne, et seulement dans la carte courante (tâche 5
+			   de l'édition dans le rendu) : au bout de la ligne du numéro, même
+			   invisibles, elles gardaient leur place et coupaient le nom du type
+			   et le rôle ; posées en absolu, elles les recouvraient au survol.
+			   Révélées au survol d'une autre carte, elles la feraient grandir
+			   sous la souris. Déplacer une question : la choisir d'abord. */
+			const acts = ajouter(card, "div", "qbd-qz-card-acts");
 
 			// Réordonnancement : l'ordre des questions EST le déroulé du quiz.
 			// Les flèches restent visibles (grisées) aux extrémités plutôt que
@@ -754,18 +777,26 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// TITRE de la question (h2 du moteur) — deux titres l'un sur l'autre.
 		const content = ajouter(slide, "div", "qbd-qz-panel-body");
 		if (editing) {
-			renderQuestionEdit(content, q, {
+			/* La question s'édite dans son RENDU corrigé (detail-edition.ts).
+			   Une seule question est montée à la fois : l'instance précédente
+			   est démontée d'abord — sinon ses écouteurs et ses champs
+			   CodeMirror survivraient à la slide qui s'en va. */
+			demonterEdition();
+			demonterEditionCourante = renderQuestionEditRendu(content, q, index, {
 				onChange: () => {
 					scheduleSave();
 					// Rafraîchir les LIBELLÉS, pas reconstruire la liste : à chaque
-					// frappe on détruisait sinon les cartes (et le bloc « Mode du
-					// quiz », son sélecteur compris) sous le curseur de
+					// frappe on détruisait sinon les cartes sous le curseur de
 					// l'utilisateur, pour n'en changer qu'une ligne de texte.
 					refreshListLabels(listCol);
 				},
-				// Re-peindre le PANNEAU seul : la liste vient d'être refaite par
-				// onChange, et re-rendre tout volerait le focus de la frappe.
+				// Re-peindre le PANNEAU seul : re-rendre tout volerait le focus.
 				onStructureChange: () => paintPanel(listCol, panel, nav, spec),
+				// Le type ou le rôle : la carte de la liste les montre aussi.
+				onListeChange: () => paint(listCol, panel, nav, spec),
+				plusOuvert,
+				setPlusOuvert: (v) => { plusOuvert = v; },
+				estLecon: draft?.examOptions?.mode === "lesson",
 			// Le chemin de la NOTE : une image collée doit atterrir là où le
 			// réglage de l'utilisateur le dit, y compris dans ses modes
 			// relatifs à la note. Absent pour un quiz encore en mémoire.
@@ -790,6 +821,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (!page.isConnected) { detach(); return; }
 			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 			if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+			/* Déjà pris en charge plus bas dans la page : dans le rendu en
+			   édition, les flèches déplacent un emplacement du classement
+			   (edition-rendu-gestes.ts) — elles ne changent pas de question. */
+			if (e.defaultPrevented) return;
 			// Page HORS ÉCRAN (onglet en arrière-plan, autre vue du dashboard) :
 			// son DOM existe encore et son écoute est toujours posée sur le
 			// document. Sans ce garde, une flèche pressée ailleurs faisait aussi
@@ -837,6 +872,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// une piste que `panel.replaceChildren()` va détacher : le conclure d'abord, sinon
 		// ils survivent jusqu'à leur échéance en visant un DOM mort.
 		if (slideHost) finishSlide(slideHost);
+		demonterEdition();
 		panel.replaceChildren();
 		libererChamps();
 		slideHost = null;
@@ -940,6 +976,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 
 	function dispose(): Promise<void> {
+		// Un texte encore ouvert dans le rendu rejoint le brouillon, et
+		// l'écriture qu'il planifie part avec le reste juste en dessous.
+		demonterEdition();
 		// L'écriture est CAPTURÉE avant que l'état ne soit remis à zéro : le
 		// brouillon en attente est figé dans `pendingSave`, pas relu ici.
 		const ecrit = flushSave();

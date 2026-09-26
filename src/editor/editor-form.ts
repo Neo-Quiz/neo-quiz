@@ -1,13 +1,14 @@
 import { t } from "../i18n";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
-import { reserveFreePath, releaseReservedPath } from "../unique-path";
+import { releaseReservedPath } from "../unique-path";
 import type { EditorCtx } from "../types/editor-ctx";
 import type { DraftQuestion } from "./utils";
 import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante } from "./gestes";
 import { insererTexte, poserBarreFormat } from "./format-toolbar";
 import { createSelect } from "../dashboard/ui-select";
-import { EditorView, keymap } from "@codemirror/view";
+import { keymap } from "@codemirror/view";
+import { cheminImageCollee, collageImage as collageImagePartage } from "./collage-image";
 import type { Extension } from "@codemirror/state";
 import { creerChampDirect } from "./champ-direct";
 import type { ChampDirect } from "./champ-direct";
@@ -30,60 +31,21 @@ const raccourciBlocCode = keymap.of([{
 	},
 }]);
 
+/** Options des champs d'un type. `rares` : seulement ce que l'édition dans le
+    RENDU corrigé ne sait pas faire (panneau « Plus », dashboard/detail-edition.ts)
+    — l'ajout et le retrait d'éléments d'un classement ou d'un appariement,
+    l'invite, le texte d'aide, la casse, l'unité et les marges. Les textes,
+    la bonne réponse, l'ordre, les paires et les variantes se modifient dans
+    le rendu : les remontrer ici en ferait deux endroits pour la même chose. */
+export interface OptionsChampsType { rares?: boolean }
+
 /** Handlers du formulaire d'édition d'une question (champs, ressource, éditeurs par type, éditeur de tableau). */
 export interface EditorFormHandlers {
 	renderEditor(): void;
 	_field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts?: { html?: boolean }): HTMLElement;
 	_resourceSection(parent: HTMLElement, q: DraftQuestion): void;
-	_renderTypeFields(box: HTMLElement, q: DraftQuestion): void;
+	_renderTypeFields(box: HTMLElement, q: DraftQuestion, opts?: OptionsChampsType): void;
 	_arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void;
-}
-
-/**
- * Chemin où écrire une image collée, décidé par L'HÔTE.
- *
- * `paths.attachmentPathFor` (`src/host/types.ts`) résout ce que l'hôte est
- * seul à savoir : sous Obsidian le réglage « dossier des pièces jointes » — y
- * compris ses modes relatifs `./` (le dossier de la note) et `./sous-dossier`
- * —, dans la fenêtre le dossier de la note elle-même. Le calculer à la main
- * donnait `.//Pasted image….png`, et écrivait à la RACINE du vault ce qui
- * devait aller à côté de la note (revue codex 2026-07-31).
- *
- * `sourcePath` est la note à laquelle l'image appartient. Les deux hôtes n'en
- * font PAS la même chose quand elle manque, et le contrat le dit plutôt que de
- * l'uniformiser : Obsidian retombe sur son fichier ACTIF ; la fenêtre REJETTE
- * avec une cause nommée, n'ayant pas de fichier actif et ne pouvant pas
- * choisir une racine sans risquer de poser l'image hors de celle où la note
- * finira. Le `catch` de l'appelant transforme ce rejet en message.
- */
-async function cheminImageCollee(ext: string, sourcePath?: string): Promise<{ fileName: string; filePath: string }> {
-	const now = new Date();
-	const ts = now.getFullYear().toString() +
-		String(now.getMonth() + 1).padStart(2, "0") +
-		String(now.getDate()).padStart(2, "0") +
-		String(now.getHours()).padStart(2, "0") +
-		String(now.getMinutes()).padStart(2, "0") +
-		String(now.getSeconds()).padStart(2, "0");
-	/* L'HÔTE décide du DOSSIER (et déduplique contre ce qui EXISTE déjà), la
-	   réservation décide du NOM quand deux collages se suivent : mesuré, deux
-	   appels rapprochés rendent le MÊME chemin tant que le fichier n'existe pas
-	   encore, et la seconde image écrasait la première.
-	   Elle reste ici et NON dans l'hôte, parce que le contrat le dit
-	   (`HostPaths.attachmentPathFor`) : un hôte qui réserverait à notre place
-	   ferait tomber CETTE réservation sur un nom déjà pris par lui, chaque
-	   collage sortirait en « ….-2.png » et le nom de base resterait brûlé sans
-	   jamais être écrit. */
-	const propose = await currentHost().paths.attachmentPathFor(
-		`Pasted image ${ts}.${ext}`, sourcePath);
-	const point = propose.lastIndexOf(".");
-	const filePath = await reserveFreePath(
-		point > 0 ? propose.slice(0, point) : propose,
-		point > 0 ? propose.slice(point) : "",
-		(c) => currentHost().fs.exists(c));
-	/* Le lien `![[…]]` porte le NOM, pas le chemin : c'est la forme qu'Obsidian
-	   résout lui-même, et celle que le moteur attend (engine/sanitizer.ts
-	   resolveObsidianEmbedFile). */
-	return { fileName: filePath.split("/").pop() || filePath, filePath };
 }
 
 export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
@@ -197,51 +159,11 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 	// La barre de mise en forme (et ses entités) vit dans format-toolbar.ts.
 	const _insertAt = insererTexte;
 
-	/** Coller une image dans un champ direct : même chemin que la zone de
-	    texte — le fichier écrit par l'hôte, un `![[…]]` inséré au curseur. Le
-	    `preventDefault` part AVANT l'écriture asynchrone : sinon CodeMirror
-	    collerait aussi le presse-papiers.
-	    `onChange` est celui du champ : si le formulaire s'est repeint pendant
-	    l'écriture (la vue est alors détruite, détachée), le lien passe par lui
-	    au lieu d'être inséré dans une vue morte — sinon l'image restait
-	    orpheline dans le vault, sans lien dans la note. */
-	function collageImage(onChange: (value: string) => void): Extension {
-		return EditorView.domEventHandlers({
-			paste(e, vue) {
-				const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith("image/"));
-				const file = item?.getAsFile();
-				if (!item || !file) return false;
-				e.preventDefault();
-				void (async () => {
-					/* Un rejet ici ne remonterait NULLE PART : sans ce `try`, une
-					   image qui ne pouvait pas s'écrire disparaissait en silence. */
-					try {
-						const ext = item.type.split("/")[1] || "png";
-						const { fileName, filePath } = await cheminImageCollee(ext, view.sourcePath);
-						const buffer = await file.arrayBuffer();
-						try {
-							await currentHost().fs.writeBinary(filePath, new Uint8Array(buffer));
-						} catch (err) { releaseReservedPath(filePath); throw err; }
-						const lien = `![[${fileName}]]`;
-						if (vue.dom.isConnected) {
-							insererTexte(vue, lien, () => { /* l'écouteur du champ notifie */ });
-						} else {
-							// Vue détruite : son dernier état reste lisible, et la
-							// sélection d'alors dit où le lien devait aller.
-							const { from, to } = vue.state.selection.main;
-							const doc = vue.state.doc.toString();
-							onChange(doc.slice(0, from) + lien + doc.slice(to));
-						}
-						view.schedulePreview();
-					} catch (err) {
-						console.error("[quiz-blocks] collage d'image impossible :", err);
-						currentHost().ui.notice(t("editor.paste.imageFailed"));
-					}
-				})();
-				return true;
-			},
-		});
-	}
+	/** Coller une image dans un champ direct (editor/collage-image.ts, partagé
+	    avec l'édition dans le rendu) : `schedulePreview` est le signal qui fait
+	    sauvegarder la page une fois le lien posé. */
+	const collageImage = (onChange: (value: string) => void): Extension =>
+		collageImagePartage(onChange, { sourcePath: view.sourcePath, apres: () => view.schedulePreview() });
 
 	/** Un texte de quiz d'UNE ligne (réponse, élément, variante) dans un champ
 	    direct. `classe` porte le style du contrôle qu'il remplace. */
@@ -404,13 +326,14 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 		ajouter(helpNote, "span", undefined, t("editor.form.resourceHelp"));
 	}
 
-	function _renderTypeFields(box: HTMLElement, q: DraftQuestion): void {
+	function _renderTypeFields(box: HTMLElement, q: DraftQuestion, opts: OptionsChampsType = {}): void {
 		// Renommé `t` → `qType` : le type de question masquait la fonction de
 		// traduction t() importée en tête de module.
 		const qType = q._type;
 		const rerender = () => { onEdit(); };
+		const rares = !!opts.rares;
 
-		if (qType === "single" || qType === "multi") {
+		if ((qType === "single" || qType === "multi") && !rares) {
 			const isMulti = qType === "multi";
 			/* Une question à choix MULTIPLES sans aucune bonne réponse ne peut
 			   être réussie par personne, et rien ne le disait : elle
@@ -500,8 +423,9 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			}, t("editor.ordering.itemPlaceholder"), t("editor.action.add"));
 			_arrayEditor(box, t("editor.ordering.slotLabels"), q.slots!, rerender, t("editor.ordering.slotPlaceholder"), t("editor.action.add"));
 
-			ajouter(box, "label", "qb-field-label", t("editor.ordering.correctOrder"));
-			(q.correctOrder || []).forEach((val, i) => {
+			// L'ordre attendu se change dans le rendu (clic ou flèches).
+			if (!rares) ajouter(box, "label", "qb-field-label", t("editor.ordering.correctOrder"));
+			if (!rares) (q.correctOrder || []).forEach((val, i) => {
 				const row = ajouter(box, "div", "qb-arr-row");
 				ajouter(row, "span", "qb-arr-idx", (q.slots?.[i] || `S${i}`) + " →");
 				const inp = ajouter(row, "input", "qb-field-input qb-field-sm");
@@ -526,10 +450,11 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			/* « situation → choix » en DEUX COLONNES alignées (refonte
 			   2026-09-26) : chaque ligne a la même grille, le menu prend toute
 			   la largeur de sa colonne. `ui-select` et non un `<select>` natif,
-			   dont le menu n'est pas thémable. */
-			ajouter(box, "label", "qb-field-label", t("editor.matching.mapping"));
-			const grille = ajouter(box, "div", "qb-match-grid");
-			(q.rows || []).forEach((row, i) => {
+			   dont le menu n'est pas thémable. Les paires se changent dans le
+			   rendu : la grille n'est pas reprise dans « Plus ». */
+			if (!rares) ajouter(box, "label", "qb-field-label", t("editor.matching.mapping"));
+			const grille = rares ? null : ajouter(box, "div", "qb-match-grid");
+			if (grille) (q.rows || []).forEach((row, i) => {
 				const r = ajouter(grille, "div", "qb-match-row");
 				ajouter(r, "span", "qb-match-label", row || t("editor.matching.rowFallback", { n: i }));
 				_iconSpan(r, "arrow-right", "qb-match-arrow");
@@ -545,7 +470,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			// Le gabarit EST la question : un seul champ, multiligne, avec la
 			// syntaxe rappelée au-dessus — personne ne devine les doubles accolades.
 			ajouter(box, "div", "qb-field-help", t("editor.cloze.help"));
-			_field(box, t("editor.cloze.templateLabel"), q.cloze, t("editor.cloze.templatePlaceholder"), true,
+			if (!rares) _field(box, t("editor.cloze.templateLabel"), q.cloze, t("editor.cloze.templatePlaceholder"), true,
 				v => { q.cloze = v; rerender(); });
 
 			// Compte des trous : la seule vérification qui compte, et elle dit
@@ -562,7 +487,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			czWrap.addEventListener("click", () => { q.caseSensitive = !q.caseSensitive; view.render(); view.scheduleSave?.(); });
 		}
 
-		if (qType === "flashcard") {
+		if (qType === "flashcard" && !rares) {
 			// Le recto est l'énoncé du formulaire, déjà affiché plus haut : ici,
 			// seul le verso — un champ, comme pour le gabarit d'un texte à trous.
 			ajouter(box, "label", "qb-field-label", t("editor.flashcard.section"));
@@ -573,7 +498,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 		if (qType === "numeric") {
 			ajouter(box, "div", "qb-field-help", t("editor.numeric.help"));
-			_variantEditor(box, t("editor.numeric.answers"), q, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
+			if (!rares) _variantEditor(box, t("editor.numeric.answers"), q, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
 			_field(box, t("editor.numeric.unit"), q.unit, t("editor.numeric.unitPlaceholder"), false,
 				v => { q.unit = v; rerender(); });
 			/* Les deux marges s'EXCLUENT : renseigner l'une efface l'autre.
@@ -608,7 +533,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 					v => { q.commandPrefix = v; rerender(); });
 			}
 			_field(box, t("editor.text.placeholderLabel"), q.placeholder, t("editor.text.placeholderHint"), false, v => { q.placeholder = v; rerender(); });
-			_variantEditor(box, t("editor.text.acceptedAnswers"), q, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
+			if (!rares) _variantEditor(box, t("editor.text.acceptedAnswers"), q, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
 			const toggleWrap = ajouter(box, "div", "qb-toggle-wrap");
 			const track = ajouter(toggleWrap, "div", `qb-toggle-track ${q.caseSensitive ? "on" : ""}`);
 			ajouter(track, "div", "qb-toggle-thumb");
