@@ -1139,15 +1139,26 @@
 	cursor: pointer;
 	transition: opacity 100ms ease-out;
 }
-/* Variante NEUTRE (`poserBouton3dNeutre`) : le gris du « Jump ahead » de
-   Brilliant, en couleurs PLEINES — dérivée de `--background-primary`, la
+/* Variante NEUTRE (`poserBouton3dNeutre`) : un gris SOMBRE (plus foncé que
+   le « Jump ahead » de Brilliant, 2026-09-26), en couleurs PLEINES — dérivée de `--background-primary`, la
    face devenait transparente sur un fond d'écran photo (2026-09-26). */
 .qbd-root .qbd-cta3d--neutre {
-	--qbd-cta3d-face: #4d4b57;
-	--qbd-cta3d-edge: #2d2c34;
+	--qbd-cta3d-face: #2b2a33;
+	--qbd-cta3d-edge: #141319;
 	color: #fff;
 }
-.qbd-cta3d--neutre .qbd-cta3d-face { text-shadow: none; }
+.qbd-cta3d--neutre .qbd-cta3d-face {
+	text-shadow: none;
+	/* Un liseré clair en haut : sombre sur fond sombre, la face disparaîtrait. */
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 var(--qbd-cta3d-depth) 0 0 var(--qbd-cta3d-edge);
+}
+/* Survol : la face s'éclaircit au lieu de pâlir (une face sombre qui
+   devient translucide laisserait voir le fond au travers). */
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { opacity: 1; }
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { --qbd-cta3d-face: #36353f; }
 .qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
 .qbd-root .qbd-cta3d:hover:not(:disabled) {
 	background: none;
