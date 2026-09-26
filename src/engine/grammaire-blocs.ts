@@ -26,6 +26,8 @@
    et les seules balises écrites ici sont les nôtres.
 ══════════════════════════════════════════════════════════ */
 
+import { motifCodeDouble, motifCodeSimple } from "./grammaire-inline";
+
 /** Un intervalle `[debut, fin[` du texte source. */
 export interface Zone { debut: number; fin: number }
 
@@ -93,6 +95,20 @@ function cellules(l: Ligne): Zone[] {
 			i += n - 1;
 			continue;
 		}
+		/* Une formule non plus : `$|x|$`, `P(A|B)` ou `\{x | x > 0\}` dans une
+		   cellule sont des maths, pas trois cellules (I3, revue du 2026-09-26).
+		   `$$…$$`, ou `$…$` collé à son contenu des deux côtés (l'heuristique
+		   d'Obsidian, celle de engine/mathjax.ts) : « | 5$ | 10$ | » reste deux
+		   prix dans deux cellules. Un `\$` n'ouvre rien. */
+		if (t[i] === "$" && t[i - 1] !== "\\") {
+			if (t[i + 1] === "$") {
+				const fin = t.indexOf("$$", i + 2);
+				if (fin > i + 2) { i = fin + 1; continue; }
+			} else if (t[i + 1] && !/\s/.test(t[i + 1])) {
+				const fin = t.indexOf("$", i + 1);
+				if (fin > i + 1 && !/\s/.test(t[fin - 1])) { i = fin; continue; }
+			}
+		}
 		if (t[i] === "|") bornes.push(i);
 	}
 	let d = 0;
@@ -145,7 +161,10 @@ function ouvreUnBloc(lignes: Ligne[], i: number): boolean {
 
 /** Nombre de `$$` d'un texte : impair, une formule de bloc est encore
     ouverte, et ses lignes (même vides) appartiennent au paragraphe. */
-const doublesDollars = (t: string): number => (t.match(/\$\$/g) || []).length;
+const doublesDollars = (t: string): number =>
+	// Un `$$` DANS un code inline (`` `$$` `` de bash) n'ouvre rien : le
+	// compter figeait tout le texte en un paragraphe (M4, revue du 2026-09-26).
+	(t.replace(motifCodeDouble(), "").replace(motifCodeSimple(), "").match(/\$\$/g) || []).length;
 
 /**
  * Les blocs d'un texte de quiz, dans l'ordre, avec leurs positions. Les

@@ -22,11 +22,17 @@
     formatage. */
 export const MD_MARK = String.fromCharCode(0);
 
+/** Pour `decouperMorceau` : un saut de ligne, et un U+0000 venu du texte. */
+const SAUT_MASQUE = String.fromCharCode(0xe011);
+const HORS_JETON_MASQUE = String.fromCharCode(0xfffd);
+
 /** Formule mise à l'abri AVANT toute autre passe : `$$…$$` ou `$…$`. Un `\$`
     ÉCHAPPÉ n'ouvre pas une formule (« Prix \$5 … \$10 »). Groupe 1 : le
     caractère qui précède (à rendre tel quel), groupe 2 : la formule. */
 export function motifFormule(): RegExp {
-	return /(^|[^\\])(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g;
+	/* Jamais à travers un jeton de mise à l'abri (`MD_MARK`) : le code passe
+	   AVANT la formule, et une formule qui enjamberait un code le couperait. */
+	return new RegExp("(^|[^\\\\])(\\$\\$[^" + MD_MARK + "]*?\\$\\$|\\$[^$\\n" + MD_MARK + "]+\\$)", "g");
 }
 
 /** Code en double accent grave, testé AVANT le simple : c'est la forme
@@ -172,7 +178,7 @@ export interface SegmentInline {
  *   part (`decouperMorceaux`, `renderTextWithEmbeds`) ; le texte d'un lien
  *   est découpé comme un morceau à lui seul ;
  * - un saut de ligne y devient `<br>` AVANT les passes : il n'est donc pas un
- *   blanc pour elles, et un `MD_MARK` le remplace ici.
+ *   blanc pour elles, et un caractère d'usage privé le remplace ici.
  * Le HTML n'est pas interprété, sauf un `<code>…</code>` écrit à la main, dont
  * le rendu fait un code : son contenu est littéral, rien n'y est découpé.
  */
@@ -189,44 +195,39 @@ export function decouperInline(texte: string): SegmentInline[] {
 function decouperMorceau(source: string, base: number, sortie: SegmentInline[]): void {
 	if (!source) return;
 	const segs: SegmentInline[] = [];
-	let masque = source.replace(/\n/g, MD_MARK);
+	/* Un saut de ligne est un `<br>` pour le rendu : ni blanc, ni lettre, ni
+	   jeton. Un caractère d'usage privé le tient ici — pas `MD_MARK`, que la
+	   formule refuse de traverser alors qu'elle traverse un `<br>`. Un U+0000
+	   du texte est remplacé comme au rendu (`HORS_JETON`, sanitizer.ts). */
+	let masque = source.replace(/\n/g, SAUT_MASQUE).split(MD_MARK).join(HORS_JETON_MASQUE);
 	const couvrir = (d: number, f: number): void => {
 		masque = masque.slice(0, d) + MD_MARK.repeat(f - d) + masque.slice(f);
 	};
-	/* Un code mis à l'abri AVALE ce qui a été reconnu avant lui en son sein :
-	   `` `a $x$ b` `` est rendu `<code>a $x$ b</code>`, et une formule dans un
-	   code n'est jamais rendue. */
-	const avaler = (d: number, f: number): void => {
-		for (let i = segs.length - 1; i >= 0; i--) {
-			if (segs[i].debut >= d && segs[i].fin <= f) segs.splice(i, 1);
-		}
-	};
 
-	// 1. Les formules, sur le texte d'origine (première passe du rendu).
+	// 1. Un `<code>` écrit à la main (le rendu le restaure en balise).
+	for (const m of [...masque.matchAll(/<code>[\s\S]*?<\/code>/gi)]) {
+		const d = m.index ?? 0;
+		couvrir(d, d + m[0].length);
+	}
+
+	// 2. Le code, double accent grave avant le simple — AVANT la formule,
+	//    comme au rendu : `` `a $x$ b` `` est un code, sans formule.
+	for (const [motif, l] of [[motifCodeDouble, 2], [motifCodeSimple, 1]] as const) {
+		for (const m of [...masque.matchAll(motif())]) {
+			const d = m.index ?? 0;
+			const f = d + m[0].length;
+			segs.push({ genre: "code", debut: d, fin: f, ouvre: l, ferme: l });
+			couvrir(d, f);
+		}
+	}
+
+	// 3. Les formules, qui ne traversent aucun code déjà couvert.
 	for (const m of [...masque.matchAll(motifFormule())]) {
 		const d = (m.index ?? 0) + m[1].length;
 		const f = (m.index ?? 0) + m[0].length;
 		const l = m[2].startsWith("$$") ? 2 : 1;
 		segs.push({ genre: "formule", debut: d, fin: f, ouvre: l, ferme: l });
 		couvrir(d, f);
-	}
-
-	// 2. Un `<code>` écrit à la main (le rendu le restaure en balise).
-	for (const m of [...masque.matchAll(/<code>[\s\S]*?<\/code>/gi)]) {
-		const d = m.index ?? 0;
-		avaler(d, d + m[0].length);
-		couvrir(d, d + m[0].length);
-	}
-
-	// 3. Le code, double accent grave avant le simple.
-	for (const [motif, l] of [[motifCodeDouble, 2], [motifCodeSimple, 1]] as const) {
-		for (const m of [...masque.matchAll(motif())]) {
-			const d = m.index ?? 0;
-			const f = d + m[0].length;
-			avaler(d, f);
-			segs.push({ genre: "code", debut: d, fin: f, ouvre: l, ferme: l });
-			couvrir(d, f);
-		}
 	}
 
 	// 4. Quatre étoiles et plus : littérales.

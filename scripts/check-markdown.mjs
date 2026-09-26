@@ -63,6 +63,16 @@ const CAS = [
 	["multiplication en arabe", "resultat س*ص*ع voila", "resultat س*ص*ع voila"],
 	["quatre etoiles ne sont pas de l emphase", "voir ****ceci**** ici", "voir ****ceci**** ici"],
 	["emphase imbriquee", "**fort *italique* ici**", "<strong>fort <em>italique</em> ici</strong>"],
+
+	/* Revue du 2026-09-26 (I2) : le code prime sur la formule. Dans l'autre
+	   ordre, une formule enjambait deux codes, et le jeton de mise à l'abri
+	   s'affichait (« 0PATH ») — 35 champs réels de cours shell. */
+	["deux codes à dollar", "`$HOME` et `$PATH`", "<code>$HOME</code> et <code>$PATH</code>"],
+	["formule entière dans un code", "tape `a $x$ b` ici", "tape <code>a $x$ b</code> ici"],
+	["accolades shell dans un code", "`echo {$DEBUT..$FIN}`", "<code>echo {$DEBUT..$FIN}</code>"],
+	["U+0000 du texte : aucun jeton forgé",
+		String.fromCharCode(0) + "0" + String.fromCharCode(0) + " et `a`",
+		String.fromCharCode(0xfffd) + "0" + String.fromCharCode(0xfffd) + " et <code>a</code>"],
 ];
 
 /* Texte NU : mêmes règles de flanc, sortie sans balises. Là où le HTML
@@ -127,6 +137,8 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"
 	r.check("formule", vu("soit $x^2$ ici"), "formule:$x^2$");
 	r.check("formule bloc", vu("$$\\int f$$"), "formule:$$\\int f$$");
 	r.check("formule dans un code : avalée", vu("tape `a $x$ b` ici"), "code:`a $x$ b`");
+	r.check("deux codes à dollar : deux codes, aucune formule", vu("`$HOME` et `$PATH`"), "code:`$HOME` | code:`$PATH`");
+	r.check("formule sur deux lignes : comme au rendu", vu("$a" + "\n" + "b$ **c**"), "formule:$a" + "\n" + "b$ | gras:**c**");
 	r.check("gras dans un code : rien", vu("tape `a**b**c` ici"), "code:`a**b**c`");
 	r.check("multiplication collée : rien", vu("3*4*5"), "");
 	r.check("étoile dans une formule : rien d'autre", vu("aire $a*b*c$"), "formule:$a*b*c$");
@@ -184,6 +196,15 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
 		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`
 		+ `<tbody><tr><td style="text-align: center"><code>a|b</code></td><td style="text-align: right">&lt;script&gt;</td></tr></tbody></table>`);
+	r.check("tableau : un `|` dans une formule ne coupe pas la cellule (I3)",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| $|x|$ | 2 |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>$|x|$</td><td>2</td></tr></tbody></table>`);
+	r.check("tableau : deux prix restent deux cellules",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| 5$ | 10$ |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>5$</td><td>10$</td></tr></tbody></table>`);
+	r.check("un `$$` dans un code n'empêche pas les blocs (M4)",
+		rendre("Le prompt `$$` de bash" + NL + "- a" + NL + "- b" + NL + NL + "fin"),
+		P("Le prompt <code>$$</code> de bash") + `<ul class="quiz-md-liste"><li>a</li><li>b</li></ul>` + P("fin"));
 	r.check("titre et citation", rendre("## T" + NL + "> **a**" + NL + "> b"),
 		`<h2 class="quiz-md-titre">T</h2><blockquote class="quiz-md-citation"><strong>a</strong><br>b</blockquote>`);
 	r.check("une balise dans une liste reste du texte", rendre("- <img src=x onerror=alert(1)>" + NL + "- b"),
@@ -211,17 +232,20 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 	const alphabet = ["a", "b", " ", "*", "**", "`", "$", "~~", NL, "<b>", "</b>", "<", "&", "\\", "-", "1.", "é", "|", "#", ">"];
 	let graine = 7;
 	const hasard = () => { graine = (graine * 1103515245 + 12345) % 2147483648; return graine / 2147483648; };
-	let essais = 0, ecarts = 0;
+	let essais = 0, ecarts = 0, fuites = 0;
 	for (let k = 0; k < 20000; k++) {
 		let t = "";
 		const n = 1 + Math.floor(hasard() * 14);
 		for (let j = 0; j < n; j++) t += alphabet[Math.floor(hasard() * alphabet.length)];
+		// Aucun jeton interne ne s'affiche jamais, quel que soit le texte.
+		if (rendre(t).includes(String.fromCharCode(0))) fuites++;
 		if (aDesBlocs(decouperBlocs(t)) || /\]\(/.test(t)) continue;
 		essais++;
 		if (rendre(t) !== avant(t)) { ecarts++; if (ecarts < 4) console.log("  écart :", JSON.stringify(t)); }
 	}
 	r.check(`un paragraphe : identique à avant (${essais} textes au hasard)`, ecarts, 0);
 	r.check("assez de textes au hasard pour que l'identité dise quelque chose", essais > 5000, true);
+	r.check("aucun jeton de mise à l'abri dans le rendu (20 000 textes)", fuites, 0);
 
 	// Le vrai `renderTextWithEmbeds` : une image du vault résolue, une URL web
 	// telle quelle, une image introuvable lisible en code.

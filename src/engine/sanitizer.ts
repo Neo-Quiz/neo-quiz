@@ -86,24 +86,35 @@ function restoreAllowedInlineTags(html: unknown): string {
    jamais de HTML venu de l'utilisateur : uniquement les balises que
    cette fonction écrit elle-même.
 
-   Ce qui est mis à l'abri AVANT toute substitution :
-   - les formules LaTeX ($…$, $$…$$) — MathJax lit la source telle
-     quelle, et un `*` ou un `_` y appartient à la formule ;
-   - les <code> déjà présents — leur contenu est littéral par nature. */
+   Ce qui est mis à l'abri AVANT toute substitution, dans cet ordre :
+   - les <code> déjà présents et le code inline — leur contenu est
+     littéral par nature, formule comprise (`` `$HOME` ``) ;
+   - puis les formules LaTeX ($…$, $$…$$) — MathJax lit la source telle
+     quelle, et un `*` ou un `_` y appartient à la formule.
+   Le code AVANT la formule, comme dans Obsidian : dans l'autre ordre,
+   `` `$HOME` et `$PATH` `` voyait une formule « $HOME` et `$ » enjamber
+   deux codes, et le jeton de mise à l'abri s'affichait (« 0PATH », revue du
+   2026-09-26, 35 champs réels touchés). */
+
+/** Ce qui remplace un U+0000 venu du texte : sans ça, un auteur pourrait
+    forger un jeton de mise à l'abri (`MD_MARK` + index + `MD_MARK`). */
+const HORS_JETON = String.fromCharCode(0xfffd);
+
 function inlineMarkdown(escaped: string): string {
 	const stash: string[] = [];
 	const keep = (html: string): string => MD_MARK + (stash.push(html) - 1) + MD_MARK;
 
-	let out = escaped
-		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
-		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
-		// gras au milieu restait littéral).
-		.replace(motifFormule(), (_m, before: string, math: string) => before + keep(math))
+	let out = escaped.split(MD_MARK).join(HORS_JETON)
 		.replace(/<code>[\s\S]*?<\/code>/g, m => keep(m))
 		// Double accent grave AVANT le simple : c'est la forme markdown
 		// d'un code qui CONTIENT un accent grave (``a ` b``).
 		.replace(motifCodeDouble(), (_m, code: string) => keep(`<code>${code}</code>`))
-		.replace(motifCodeSimple(), (_m, code: string) => keep(`<code>${code}</code>`));
+		.replace(motifCodeSimple(), (_m, code: string) => keep(`<code>${code}</code>`))
+		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
+		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
+		// gras au milieu restait littéral). Une formule n'enjambe jamais un
+		// code déjà mis à l'abri (`motifFormule` refuse le jeton).
+		.replace(motifFormule(), (_m, before: string, math: string) => before + keep(math));
 
 	// Une suite de QUATRE étoiles ou plus n'est pas de l'emphase, et la
 	// laisser passer faisait produire des balises croisées. Mise à l'abri
@@ -115,7 +126,17 @@ function inlineMarkdown(escaped: string): string {
 		out = out.replace(motifFlanc(delim), (_m, avant: string, contenu: string) => avant + o + contenu + f);
 	}
 
-	return out.replace(new RegExp(MD_MARK + "(\\d+)" + MD_MARK, "g"), (_m, i: string) => stash[Number(i)]);
+	/* Restauration RÉPÉTÉE : une entrée du stash peut en contenir une autre.
+	   Chaque entrée ne cite que des entrées plus anciennes, donc la boucle
+	   s'arrête ; la borne n'est qu'un filet. Aucun jeton ne sort jamais : un
+	   reste improbable est retiré plutôt qu'affiché. */
+	const jeton = new RegExp(MD_MARK + "(\\d+)" + MD_MARK, "g");
+	for (let tour = 0; tour <= stash.length; tour++) {
+		const suivant = out.replace(jeton, (_m, i: string) => stash[Number(i)] ?? "");
+		if (suivant === out) break;
+		out = suivant;
+	}
+	return out.split(MD_MARK).join("");
 }
 
 /** Texte d'affichage : échappé, puis markdown inline. Le pendant de
