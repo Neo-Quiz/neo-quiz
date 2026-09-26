@@ -29,16 +29,14 @@ import { stripInlineMarkdown } from "./sanitizer";
 ══════════════════════════════════════════════════════════ */
 
 /**
- * Cinq régimes d'affichage du support :
+ * Quatre régimes d'affichage du support :
  * - "open" : rendu et déplié, sans repli par défaut.
  * - "collapsible" : rendu, déplié, repliable à la demande.
  * - "folded" : rendu REPLIÉ par défaut, avec l'invite « Tentez de répondre
  *   sans lire » ; un clic le déplie, une réponse aussi.
- * - "reminder" : rendu REPLIÉ par défaut, SANS invite, et une réponse ne
- *   le déplie pas : un rappel à un clic d'un cours déjà lu à l'écran.
  * - "hidden" : pas rendu du tout.
  */
-export type PassageVisibility = "open" | "collapsible" | "folded" | "reminder" | "hidden";
+export type PassageVisibility = "open" | "collapsible" | "folded" | "hidden";
 
 /** D'où vient le cours affiché au-dessus d'une question de Learn :
     - "absorbe" : une lecture `etapes` ou `tableau`, qui n'a pas d'écran ;
@@ -56,10 +54,12 @@ export type OrigineCours = "absorbe" | "page";
  * En Learn — DÉCISION D'AHMED DU 2026-09-26 (soir), qui remplace celle du
  * matin (« replié partout, avec l'invite ») :
  * - une carte "read" affichée comme écran : le cours est son contenu, ouvert ;
- * - un cours `page` (un écran à part, placé après les pré-questions) :
- *   INVISIBLE au-dessus d'une pré-question (`pre`) — on tente sans avoir
- *   lu, et la page vient ensuite ; au-dessus des questions suivantes, un
- *   RAPPEL replié, sans invite, déplié à la demande seulement ;
+ * - un cours `page` (ou sans style) : INVISIBLE au-dessus de TOUTE question
+ *   (décision du 2026-09-26, dernière en date : « maintenant qu'on a créé
+ *   des blocs de reading, ça ne sert plus à rien d'en mettre ici »). Il vit
+ *   seulement sur son écran à part, placé après les pré-questions ;
+ *   `lectureDeLEtape` ne le résout d'ailleurs plus, cette branche est le
+ *   filet si un appelant passait tout de même son origine ;
  * - un cours `etapes`/`tableau` (absorbé, sans écran) ou un support propre :
  *   au-dessus d'une pré-question, REPLIÉ avec l'invite tant qu'elle n'est
  *   pas RÉPONDUE, puis ouvert pour comparer ; au-dessus de toute autre
@@ -69,7 +69,7 @@ export type OrigineCours = "absorbe" | "page";
 export function passageVisibility({ role, answered, isLesson, cours }: { role: QuestionRole; answered: boolean; isLesson: boolean; cours?: OrigineCours }): PassageVisibility {
 	if (!isLesson) return "collapsible";
 	if (role === "read") return "open";
-	if (cours === "page") return role === "pre" ? "hidden" : "reminder";
+	if (cours === "page") return "hidden";
 	if (role === "pre") return answered ? "open" : "folded";
 	return "collapsible";
 }
@@ -320,10 +320,10 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 		const style = p.lecture !== undefined ? corpsLecture(ctx, p.lecture, p.text, texteHtml, p.title) : null;
 		const contentHtml = style ? style.html : texteHtml;
 
-		// Repli par défaut des régimes "folded" et "reminder", et seulement à
-		// la première apparition de la clé (`seedCollapsedOnce` est un no-op
-		// ensuite) : un cours déplié à la main le reste d'un re-rendu à l'autre.
-		const replie = visibility === "folded" || visibility === "reminder";
+		// Repli par défaut du régime "folded", et seulement à la première
+		// apparition de la clé (`seedCollapsedOnce` est un no-op ensuite) : un
+		// cours déplié à la main le reste d'un re-rendu à l'autre.
+		const replie = visibility === "folded";
 		if (replie) collapseState.seedCollapsedOnce(p.key);
 		// "open" force le dépli — y compris si un support PARTAGÉ (`passageId`)
 		// a été replié par une autre question du même groupe — pour garantir la

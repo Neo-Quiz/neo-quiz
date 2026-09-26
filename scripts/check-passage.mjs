@@ -4,9 +4,8 @@
  *
  * Décision d'Ahmed du 2026-09-26 (soir), la plus récente :
  * - une lecture en style `page` (ou sans style : tous les quiz d'avant) est
- *   un ÉCRAN à part, sans numéro de question ; son cours n'apparaît pas
- *   au-dessus d'une pré-question, et reste en RAPPEL replié, sans invite,
- *   au-dessus des questions suivantes ;
+ *   un ÉCRAN à part, sans numéro de question ; son cours n'apparaît au-dessus
+ *   d'AUCUNE question (dernière décision du même jour) ;
  * - une lecture `etapes` ou `tableau` est ABSORBÉE : pas d'écran, son cours
  *   est replié avec « Tentez de répondre sans lire » au-dessus d'une
  *   pré-question (ouvert une fois répondue), déplié d'office au-dessus des
@@ -107,9 +106,11 @@ await withSrcModule(["src/engine/passage.ts", "src/lecture-etape.ts"], ({ passag
 		ROLES.map(ro => vis(ro, false, "absorbe")), ["folded", "collapsible", "collapsible", "collapsible"]);
 	r.check("cours absorbé, répondu : ouvert sur `pre`, déplié ailleurs",
 		ROLES.map(ro => vis(ro, true, "absorbe")), ["open", "collapsible", "collapsible", "collapsible"]);
-	r.check("cours `page` : invisible sur `pre`, rappel replié ailleurs, répondu ou non",
+	/* Dernière décision d'Ahmed (2026-09-26) : une lecture `page` vit sur son
+	   écran à part, et n'apparaît plus au-dessus d'AUCUNE question. */
+	r.check("cours `page` : invisible au-dessus de toute question, répondue ou non",
 		[...ROLES.map(ro => vis(ro, false, "page")), ...ROLES.map(ro => vis(ro, true, "page"))],
-		["hidden", "reminder", "reminder", "reminder", "hidden", "reminder", "reminder", "reminder"]);
+		["hidden", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden", "hidden"]);
 	r.check("support propre (`passage`) en Learn : comme un cours absorbé",
 		ROLES.map(ro => vis(ro, false, undefined)), ["folded", "collapsible", "collapsible", "collapsible"]);
 	r.check("Learn : une lecture affichée comme écran est ouverte", vis("read", false, undefined), "open");
@@ -145,10 +146,10 @@ await withSrcModule(["src/engine/passage.ts", "src/lecture-etape.ts"], ({ passag
 	r.check("étape sans lecture : rien", lu(8), null);
 	r.check("clé de repli PROPRE à chaque question", [h.resolvePassage(0).key, h.resolvePassage(2).key], ["lecture-1-q0", "lecture-1-q2"]);
 	r.check("hors Learn : rien", createPassageHandlers(ctx(false)).resolvePassage(2), null);
-	r.check("régime par question : pre absorbé, explain absorbé, pre page, recall page",
-		[0, 2, 3, 5].map(i => h.passageVisibilityFor(i)), ["folded", "collapsible", "hidden", "reminder"]);
-	r.check("un cours `page` au-dessus d'une pré-question n'est pas rendu du tout", h.passageHtml(3), "");
-
+	r.check("régime par question et par style : pre étapes, explain étapes, pre page, recall page, pre tableau",
+		[0, 2, 3, 5, 6].map(i => h.passageVisibilityFor(i)), ["folded", "collapsible", "hidden", "hidden", "folded"]);
+	r.check("un cours `page` n'est rendu au-dessus d'aucune question, pré-question ou non",
+		[h.passageHtml(3), h.passageHtml(5)], ["", ""]);
 	const repondu = createPassageHandlers(ctx(true, { isComplete: (i) => i === 0 }));
 	r.check("la pré-question répondue voit son cours ouvert, la suivante non répondue replié",
 		[repondu.passageVisibilityFor(0), repondu.passageVisibilityFor(6)], ["open", "folded"]);
