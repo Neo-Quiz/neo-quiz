@@ -29,7 +29,7 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	r.check("le meilleur redescend à la suivante", store.getRecord("a.md").bestScore, 60);
 	r.check("le nombre de tentatives suit", store.getRecord("a.md").attempts, 2);
 	store.restaurerTentative("a.md", retiree);
-	r.check("annuler remet le meilleur", [store.getRecord("a.md").bestScore, store.getRecord("a.md").attempts], [80, 3]);
+	r.check("annuler remet le meilleur", [store.getRecord("a.md").bestScore, store.getRecord("a.md").attempts, store.getRecord("a.md").questionsDone], [80, 3, 8]);
 	for (const x of [...store.getRecord("a.md").tentatives]) store.supprimerTentative("a.md", x.date);
 	const vide = store.getRecord("a.md");
 	r.check("plus aucune tentative : 0 %, 0 tentative, 0 question faite", [vide.bestScore, vide.attempts, vide.questionsDone], [0, 0, 0]);
@@ -45,6 +45,21 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	const c = s3.getRecord("c.md");
 	r.check("l'ancien score devient la première tentative de la liste", c.tentatives.map(x => x.ancienne === true), [false, true]);
 	r.check("le meilleur tient compte de l'ancien", c.bestScore, 70);
+
+	const { store: s6 } = fabriquer();
+	s6.updateRecord("f.md", { bestScore: 50, questionsDone: 5, totalQuestions: 10 });
+	const seule = s6.supprimerTentative("f.md", s6.getRecord("f.md").tentatives[0].date);
+	r.check("supprimer la seule tentative : 0 question faite", s6.getRecord("f.md").questionsDone, 0);
+	s6.restaurerTentative("f.md", seule);
+	r.check("annuler cette suppression rend l'avancement", s6.getRecord("f.md").questionsDone, 5);
+
+	const { store: s7 } = fabriquer({ "g.md": { bestScore: 90, questionsDone: 2, totalQuestions: 2, lastPlayed: 3000, attempts: 3,
+		tentatives: [{ date: 3000, pct: 90 }, { date: 2000, pct: 40 }, { date: 1000, pct: 10 }] } });
+	s7.supprimerTentative("g.md", 3000);
+	r.check("la dernière partie jouée suit la tentative restante la plus récente", s7.getRecord("g.md").lastPlayed, 2000);
+	s7.supprimerTentative("g.md", 2000);
+	s7.supprimerTentative("g.md", 1000);
+	r.check("plus aucune tentative : dernière partie à 0", s7.getRecord("g.md").lastPlayed, 0);
 
 	const { store: s4 } = fabriquer();
 	s4.updateRecord("d.md", { bestScore: 0, questionsDone: 4, totalQuestions: 4, texteLibre: true });

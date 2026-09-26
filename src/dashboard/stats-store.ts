@@ -92,6 +92,10 @@ function recalculer(r: QuizStatRecord, liste: Tentative[]): QuizStatRecord {
 		bestScore: pcts.length ? Math.max(...pcts) : 0,
 		attempts: liste.length,
 		questionsDone: liste.length ? r.questionsDone : 0,
+		// La dernière partie jouée est celle de la tentative la plus récente
+		// qui RESTE : supprimer la plus récente ne doit pas laisser « il y a
+		// 2 min » sur une carte dont l'historique dit autre chose.
+		lastPlayed: liste.length ? Math.max(...liste.map(x => x.date)) : 0,
 	};
 }
 
@@ -110,6 +114,12 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastTimestamp = 0;
 	let data: Record<string, QuizStatRecord> = {}; // path → { bestScore, questionsDone, totalQuestions, lastPlayed, attempts, tentatives }
+	/* L'avancement (`questionsDone`) d'un quiz dont on vient de supprimer la
+	   DERNIÈRE tentative : `recalculer` le remet à 0, et rien dans la liste
+	   ne permet de le retrouver. On le garde ici pour que l'annulation de
+	   cette suppression le rende. Mémoire seulement : une annulation ne
+	   survit pas à un redémarrage. */
+	const questionsAvantVidage = new Map<string, number>();
 
 	/* ── Charger les stats depuis l'hôte ── */
 	function load(): void {
@@ -226,6 +236,7 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 		const i = liste.findIndex(x => x.date === date);
 		if (i < 0) return null;
 		const [retiree] = liste.splice(i, 1);
+		if (liste.length === 0) questionsAvantVidage.set(path, r.questionsDone);
 		data[path] = recalculer(r, liste);
 		scheduleSave();
 		return retiree;
@@ -235,7 +246,10 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 		const r = data[path];
 		if (!r) return;
 		const liste = tentativesDe(r).filter(x => x.date !== tentative.date);
-		data[path] = recalculer(r, plafonner([...liste, tentative]));
+		const avant = questionsAvantVidage.get(path);
+		questionsAvantVidage.delete(path);
+		const base = avant === undefined ? r : { ...r, questionsDone: Math.max(r.questionsDone, avant) };
+		data[path] = recalculer(base, plafonner([...liste, tentative]));
 		scheduleSave();
 	}
 
