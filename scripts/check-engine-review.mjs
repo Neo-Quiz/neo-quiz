@@ -538,4 +538,29 @@ await withSrcModule(
 			ctx.textOnly.questionCardBodyHtml(sansVerso, 0).includes("quiz-flashcard-missing"), true);
 		r.done();
 	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case E — un "recall" ne force la réponse libre QUE pour un type à
+	   CHOIX (single/multiple). Un "recall" d'association (matching) garde sa
+	   VRAIE interaction : forcer la réponse libre dessus masquerait la
+	   correction réelle (paires attendues) derrière une auto-évaluation.
+	   Rougit sans le correctif (isTextOnlyFor testait alors uniquement le
+	   rôle, jamais le type de la question).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("text-only.ts — un recall matching garde sa vraie interaction, un recall single reste en réponse libre");
+		const single = { id: "q1", title: "Choix", role: "recall", options: ["a", "b"], correctIndex: 0 };
+		const matching = { id: "q2", title: "Association", role: "recall", matching: true, rows: ["x"], choices: ["y"], correctMap: [0] };
+		const quiz = [single, matching];
+		const { ctx } = makeCtx({ quiz, selections: [null, null], isLessonMode: true, roles: ["recall", "recall"] });
+		// makeCtx câble un stub `isMatchingQuestion` toujours faux (aucun test
+		// antérieur n'en avait besoin) : ici la variante DOIT être reconnue,
+		// donc on la remplace par le vrai prédicat (même forme qu'engine.ts).
+		ctx.isMatchingQuestion = (q) => !!q && (q.matching === true || typeof q.matching === "object");
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("recall à choix (single) : réponse libre", ctx.textOnly.isTextOnlyFor(0), true);
+		r.check("recall matching : vraie interaction, jamais de réponse libre", ctx.textOnly.isTextOnlyFor(1), false);
+		r.done();
+	}
 });

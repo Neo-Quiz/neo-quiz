@@ -90,12 +90,28 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   du même quiz restent en QCM. Le chemin historique (`practiceMode ===
 	   "text"`) reste une clause OU : un bloc hors Leçon qui active encore ce
 	   mode par sa configuration (démarrage « Entraînement ») continue de tout
-	   afficher en réponse libre, question par question. */
+	   afficher en réponse libre, question par question.
+	   CORRECTIF (2026-09-26) : un "recall" ne force la réponse libre que pour
+	   les types à CHOIX (single/multiple) — voir la question, ce serait donner
+	   la réponse. Pour tout autre type (matching, ordering, cloze, numérique,
+	   text, terminal…), la vraie interaction force déjà le rappel : forcer en
+	   plus la réponse libre ne fait que masquer une correction réelle derrière
+	   une auto-évaluation. */
+	function isRecallForcedTextOnly(q: QuizQuestion): boolean {
+		return !ctx.isOrderingQuestion(q)
+			&& !ctx.isMatchingQuestion(q)
+			&& !ctx.isClozeQuestion(q)
+			&& !ctx.isTextQuestion(q)
+			&& !ctx.isFlashcardQuestion(q);
+	}
+
 	function isTextOnlyFor(qi: number): boolean {
+		const q = ctx.quiz[qi];
 		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
 		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
-		if (ctx.isFlashcardQuestion(ctx.quiz[qi])) return true;
-		return isTextOnlyMode() || (ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall");
+		if (ctx.isFlashcardQuestion(q)) return true;
+		if (isTextOnlyMode()) return true;
+		return ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall" && isRecallForcedTextOnly(q);
 	}
 
 	/* Décision GLOBALE DÉRIVÉE : au moins une question du quiz est actuellement

@@ -83,6 +83,7 @@ release notes.
 - "Create with AI" from a folder no longer keeps the files of the previous folder in the request.
 - A quiz copied from a website is read even when the model forgot a comma between two fields or inserted section headings between questions, instead of being rejected.
 - A Learn path whose model forgot to mark it as Learn is saved as Learn, not as a Practice bank.
+- In Learn quizzes, a "from memory" matching, ordering or fill-in question keeps its real interaction instead of turning into a free-text answer.
 
 ## [1.19.0] - 2026-09-23
 
