@@ -259,13 +259,6 @@ export function renderModuleDrill(
 	if (!sas) {
 		const rangee = ajouter(principal, "div", "qbd-quizzes-drill-next");
 		principal.insertBefore(rangee, grid);
-		if (ctx.createQuiz) {
-			const ajout = ajouter(rangee, "button", "qbd-add-content-btn");
-			ajout.type = "button";
-			currentHost().ui.setIcon(ajouter(ajout, "span", "qbd-btn-icon"), "plus");
-			ajouter(ajout, "span", undefined, t("dashboard.folder.addContent"));
-			ajout.addEventListener("click", () => ctx.createQuiz!(dossier, rerender));
-		}
 		renderNextStep(rangee, ctx, ordre, stats);
 		if (!rangee.firstChild) rangee.remove();
 	}

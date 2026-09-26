@@ -61,6 +61,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.importEmpty": "Archive vide ou illisible",
 	"dashboard.quizzes.importError": "Échec de l'import",
 	"dashboard.quizzes.importDone": "Dossier importé : {name} ({count} quiz)",
+	"dashboard.quizzes.newQuiz": "Nouveau quiz",
 	"dashboard.quizzes.newQuizDefaultName": "Nouveau quiz",
 	"dashboard.quizzes.newQuizError": "Impossible de créer le quiz",
 	"dashboard.quizzes.createQuizEmptyTitle": "Créer un quiz vierge",

@@ -70,6 +70,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.importEmpty": "Empty or unreadable archive",
 	"dashboard.quizzes.importError": "Import failed",
 	"dashboard.quizzes.importDone": "Imported {name} ({count} quizzes)",
+	"dashboard.quizzes.newQuiz": "New quiz",
 	"dashboard.quizzes.newQuizDefaultName": "New quiz",
 	"dashboard.quizzes.newQuizError": "Could not create the quiz",
 	"dashboard.quizzes.createQuizEmptyTitle": "Create an empty quiz",

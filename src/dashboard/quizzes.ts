@@ -313,6 +313,20 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			}
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
 
+			/* « Nouveau quiz », entre les onglets et le ⋯ (2026-09-26) : la
+			   barre « Ajouter du contenu » pleine largeur au-dessus de la grille
+			   est partie. Même pilule que « Nouveau dossier » de « Mes quiz ».
+			   Absent dans le sas, qui ne se remplit que par la génération. */
+			const { createQuiz } = ctx;
+			if (createQuiz && !sas) {
+				const nouveau = ajouter(headerActions, "button", "qbd-btn--create");
+				nouveau.type = "button";
+				currentHost().ui.setIcon(ajouter(nouveau, "span", "qbd-btn-icon"), "plus");
+				ajouter(nouveau, "span", undefined, t("dashboard.quizzes.newQuiz"));
+				const dossier = cheminOuvert ?? openModuleFolder;
+				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
+			}
+
 			/* « Partager » le dossier (2026-09-25, comme StudySmarter) : le même
 			   modal que l'entrée « Partager » du menu ⋯ de sa carte, sur les
 			   mêmes quiz que la grille. Absent si l'hôte ne sait pas partager. */
