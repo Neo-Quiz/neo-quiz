@@ -16,7 +16,7 @@ import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./deta
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
 import { libererChamps } from "../editor/champ-direct";
-import { oublierFiche, renderFiche, renderTop } from "./detail-fiche";
+import { oublierFiche, renderFiche, renderInfosQuiz, renderTop } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
@@ -404,6 +404,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onToggleEditing: () => toggleEditing(page),
 			actions: (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) })),
 			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
+			infos: spec.stats ? (p) => { renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!)); } : undefined,
 		});
 	}
 

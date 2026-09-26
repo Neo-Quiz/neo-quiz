@@ -209,7 +209,14 @@ function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
 
 /** La ligne d'infos : le mode (ou le sélecteur Learn | Practice), le nombre
     de questions, l'origine ; les actions s'y ajoutent au bout. */
-function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
+/** La même ligne d'infos pour l'en-tête de l'ÉDITEUR (2026-09-26) : le
+    mode seul (sans bascule Learn | Practice : on édite CE quiz), le nombre
+    de questions, l'origine. */
+export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null): HTMLElement {
+	return renderMeta(parent, { quiz, origine });
+}
+
+function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" | "autreMode">): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
 	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous,
 	   à la place qu'occupait la recherche, partie au centre (2026-09-26) ;

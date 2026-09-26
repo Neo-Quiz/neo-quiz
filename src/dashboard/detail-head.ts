@@ -39,6 +39,9 @@ export interface EnteteDeps {
 	actions: EnteteAction[];
 	/** Bouton principal (« Lancer », « Enregistrer »). Absent → masqué. */
 	start?: EnteteAction;
+	/** La ligne d'infos sous le titre (mode, nombre de questions, origine),
+	    celle de la fiche. Absente (page « Générer ») → rien. */
+	infos?(parent: HTMLElement): void;
 }
 
 /** Le dossier d'un quiz — le seul segment du chemin qui dise d'où il sort,
@@ -73,6 +76,7 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
 	const titres = ajouter(head, "div", "qbd-fiche-titles");
 	ajouter(titres, "h2", "qbd-fiche-title", deps.title);
 	if (deps.kicker) ajouter(titres, "div", "qbd-fiche-kicker", deps.kicker);
+	if (deps.infos) deps.infos(ajouter(titres, "div", "qbd-qz-infos"));
 
 	const actions = ajouter(head, "div", "qbd-fiche-actions qbd-qz-actions");
 

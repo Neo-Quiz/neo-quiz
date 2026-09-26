@@ -637,3 +637,6 @@
 .qbd-fiche-card.is-editable { cursor: pointer; transition: border-color 0.15s ease; }
 .qbd-fiche-card.is-editable:hover { border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent); }
 .qbd-fiche-card.is-editable:focus-visible { outline: 2px solid var(--quiz-primary); outline-offset: 2px; }
+
+/* La ligne d'infos de la fiche, reprise sous le titre de l'éditeur (2026-09-26). */
+.qbd-qz-infos { margin-top: 10px; }
