@@ -733,8 +733,11 @@
 	flex-direction: column;
 	gap: 6px;
 	padding: 14px 14px 10px;
-	background: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
+	/* Surface plate du panneau central (tokens.css), et non plus le fond
+	   opaque de l'hôte : dans le verre dépoli, il ressortait plus sombre
+	   que les cartes voisines. */
+	background: var(--qbd-surface-bg);
+	border: 1px solid var(--qbd-surface-edge);
 	border-radius: 16px;
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
