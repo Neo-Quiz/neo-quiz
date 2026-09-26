@@ -92,22 +92,3 @@
 .theme-light .quiz-exam-btn{
   box-shadow: none !important;
 }
-/* ── Le rôle d'une question de Learn, en tête de carte ──
-   Une pastille, la même que sur la fiche du quiz : « Avant la lecture »,
-   « Lecture », « Avec vos mots », « De mémoire ». Du texte brut au-dessus
-   du titre se lisait comme une ligne de plus de l'énoncé (2026-09-24). */
-.quiz-lesson-progress{
-  margin: 0 0 10px;
-}
-
-.quiz-lesson-progress-role{
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.75em;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-}

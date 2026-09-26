@@ -73,7 +73,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.lesson.rolePre": "Avant la lecture",
 	"engine.lesson.roleRead": "Lecture",
 	"engine.lesson.roleRecall": "De mémoire",
-	"engine.lesson.roleTest": "Vérification",
 	"engine.lesson.dontKnow": "Je ne sais pas",
 
 	/* ── Question texte / terminal ── */

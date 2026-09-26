@@ -7,7 +7,6 @@ import type {
 	MatchingQuestion,
 	TextQuestion,
 	ClozeQuestion,
-	QuestionRole,
 } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
 import { renderLessonHtml } from "./sanitizer";
@@ -448,45 +447,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		}
 	}
 
-	/* Libellé du rôle affiché en sous-titre de la progression en tranches
-	   (Task 6, mode Leçon) : une FONCTION, jamais une table
-	   `{ pre: t(...), recall: t(...), test: t(...) }` figée au niveau du
-	   module — c'est exactement le piège documenté dans CLAUDE.md (TUTORIALS) :
-	   une chaîne traduite dans une constante de premier niveau se fige à la
-	   langue de démarrage et ignore tout changement de langue en cours de vie
-	   du plugin. `t()` n'est appelé qu'ici, à chaque rendu de carte. */
-	function lessonRoleLabel(role: QuestionRole): string {
-		if (role === "pre") return t("engine.lesson.rolePre");
-		// "read" (task 6b) : le libellé doit dire qu'on LIT, pas qu'on répond —
-		// sans cette branche le défaut "Check" ci-dessous mentirait sur une
-		// carte qui n'a justement aucune réponse à vérifier.
-		if (role === "read") return t("engine.lesson.roleRead");
-		if (role === "recall") return t("engine.lesson.roleRecall");
-		// "explain" : répondre avec ses mots, jamais une « vérification ».
-		if (role === "explain") return t("engine.lesson.roleExplain");
-		return t("engine.lesson.roleTest");
-	}
-
-	/* En-tête : le RÔLE de la question dans un Learn. La ligne « Tranche X
-	   sur Y » qui le surmontait est retirée (2026-09-23) : les étapes d'un
-	   Learn ne se montrent plus nulle part, un compteur de tranches sur un
-	   long parcours décourageait avant même de commencer.
-	   Hors mode Leçon (ou pour un quiz ordinaire, question sans `slice`
-	   valide), `sliceOfQuestion` renvoie déjà `null` (engine/lesson.ts) : ce
-	   bloc ne peut donc RIEN changer à l'en-tête des 48 quiz ordinaires
-	   d'Ahmed. Il n'y avait jusqu'ici aucun compteur de questions dans l'en-
-	   tête de carte (seuls les onglets `navHtml` en affichent un, hors du
-	   périmètre de cette tâche) : ce bloc s'AJOUTE, il ne remplace rien.
-	   Chaque accessor de tranches est appelé UNE SEULE fois ici et son
-	   résultat réutilisé localement — `lesson.ts` reconstruit son modèle à
-	   chaque appel (accessor vivant sur `ctx.quizMode`, jamais un cache). */
-	function lessonProgressHtml(qi: number): string {
-		if (ctx.sliceOfQuestion(qi) === null) return "";
-		const role = ctx.roleOfQuestion(qi);
-		return `<div class="quiz-lesson-progress">
-			<div class="quiz-lesson-progress-role">${lessonRoleLabel(role)}</div>
-		</div>`;
-	}
+	/* PLUS DE PASTILLE DE RÔLE en tête de carte (2026-09-26 : « retire toutes
+	   les pastilles, ça ne sert à rien ») : « Avant la lecture », « Lecture »,
+	   « Avec vos mots », « De mémoire » ne s'affichent plus pendant le quiz. Le
+	   rôle reste une classe de la carte (`quiz-role-*`) pour la mise en page. */
 
 	function questionCardHtml(qi: number): string {
 		const q = ctx.quiz[qi];
@@ -593,7 +557,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// verrouillage) — décision tranchée par `passageVisibility`
 		// (engine/passage.ts), jamais recalculée ici.
 		const passageSection = ctx.passage.passageHtml(qi);
-		const lessonProgress = lessonProgressHtml(qi);
 
 		/* Classe de RÔLE sur la carte : le CSS doit pouvoir distinguer une carte
 		   de LECTURE des autres. Sur une carte "read", le support de cours EST
@@ -606,7 +569,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 		return `<div class="quiz-track-item${roleClass}" data-slide-kind="question" data-qi="${qi}">
 			<section class="quiz-card"${sectionIdAttr}>
-				${lessonProgress}
 				${passageSection}
 				<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>
 				${ctx.sanitize.resourceButtonHtml(q)}

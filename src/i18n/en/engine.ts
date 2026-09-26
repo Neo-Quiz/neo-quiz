@@ -88,7 +88,6 @@ export const EN_ENGINE = {
 	"engine.lesson.rolePre": "Before reading",
 	"engine.lesson.roleRead": "Reading",
 	"engine.lesson.roleRecall": "From memory",
-	"engine.lesson.roleTest": "Check",
 	/* Task 7 : la pré-question ne peut pas être sautée sans tentative explicite. */
 	"engine.lesson.dontKnow": "I don't know",
 
