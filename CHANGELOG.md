@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- Learn courses come in several reading styles chosen by the AI for the content: a reading page, numbered steps or a comparison table, with key points as flip cards or a checked recap; the style can be changed in the editor.
 - Wallpaper brightness and blur sliders in Settings, under the wallpaper, applied live as you drag.
 - A ⋯ button at the top right of a folder opens the same menu as its card (edit, open the folder, copy its path, archive, move, delete).
 - Share a folder or a quiz: a Share button at the top right of a folder, and a Share entry in the ⋯ menu of every card. Discord puts the file (a .zip for a folder, a .md for a quiz) in the clipboard and brings Discord to the front, ready to paste; Save file asks where to save it and shows it in the explorer.
@@ -68,9 +69,11 @@ release notes.
 - Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
 - The editor's text fields show their text as the quiz will: code as a code pill, bold, italic and formulas rendered. The markdown signs (backticks, stars, dollars) only reappear around the cursor, like in Obsidian.
 - Generating a quiz no longer opens a blocking window: each request appears as a sent message under the composer, you can keep sending more while one is running, and they run one after another in a queue you can cancel. If a generated quiz cannot be saved, it stays on its line: save it again or open it without saving, without generating it twice.
-- In Learn quizzes the reading is no longer a separate question: the course is shown collapsed above every question of its step, with "Try to answer without reading", opens on demand and unfolds after answering; numbers and counts skip it.
+- In Learn quizzes the reading is no longer a separate question: the course is shown above every question of its step, open as a reading page, except above a "before the reading" question, where it stays collapsed with "Try to answer without reading" until you open it or answer; numbers and counts skip it.
+- After checking an answer written in your own words, the quiz shows only the correct answer and its explanation, then a short "Did you get it?" row, instead of stacked boxes.
 
 ### Fixed
+- In a Learn quiz, the course above a "before the reading" question no longer shows up already open when you skip past the question or come back to it without answering.
 - Inline code containing a dollar sign, such as `$HOME` and `$PATH` in the same sentence, is shown in full instead of losing part of the text.
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.
 - The AI tools (Claude Code, Codex, Antigravity) can only be started with the exact options Neo Quiz uses for a generation: an option that would let them run commands on their own is refused.

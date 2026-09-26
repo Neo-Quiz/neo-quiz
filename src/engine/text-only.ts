@@ -10,6 +10,11 @@ import type {
 import { renderLessonHtml } from "./sanitizer";
 import { t, type TransKey } from "../i18n";
 
+/* Icône Lucide `check` inline, même tracé que celle du cours (lecture-rendu.ts
+   ICON_BOOK/`quiz-lecture-coche`) : le moteur n'a pas d'autre canal d'icône
+   pour du HTML construit en chaîne (voir engine/passage.ts, même remarque). */
+const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
 export interface TextOnlyResults {
 	understood: number;
 	partial: number;
@@ -40,8 +45,7 @@ export interface TextOnlyHandlers {
 	computeResults(): TextOnlyResults;
 	getCorrectOptionIndices(q: QuizQuestion): number[];
 	expectedAnswerHtml(q: QuizQuestion): string;
-	learningHtml(q: QuizQuestion): string;
-	comparisonOptionsHtml(q: QuizQuestion, qi: number): string;
+	learningHtml(q: QuizQuestion, opts?: { plain?: boolean }): string;
 	ratingButtonsHtml(qi: number): string;
 	questionCardBodyHtml(q: QuizQuestion, qi: number): string;
 	bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void;
@@ -200,29 +204,35 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return [];
 	}
 
+	/* Ligne « coche verte + texte » d'une bonne réponse — porte `renderInlineText`
+	   (ou `optionContentHtml`, qui l'appelle déjà pour une option QCM) en amont :
+	   ce n'est qu'un habillage autour d'un fragment déjà assaini. */
+	function correctLine(html: string): string {
+		return `<div class="quiz-textonly-correct-line"><span class="quiz-textonly-correct-icon" aria-hidden="true">${ICON_CHECK}</span><span class="quiz-textonly-correct-text">${html}</span></div>`;
+	}
+
 	function expectedAnswerHtml(q: QuizQuestion): string {
 		const indices = getCorrectOptionIndices(q);
 		if (indices.length > 0) {
-			const items = indices.map(oi => {
-				// Invariant : indices non vides ⇒ question QCM.
-				const content = ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi);
-				return `<div class="quiz-textonly-expected-item">${content}</div>`;
-			}).join("");
-			return `<div class="quiz-textonly-expected-list">${items}</div>`;
+			// Invariant : indices non vides ⇒ question QCM.
+			const items = indices
+				.map(oi => correctLine(ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi)))
+				.join("");
+			return `<div class="quiz-textonly-correct">${items}</div>`;
 		}
 
 		// getTextAcceptedAnswers est tolérant (champs texte optionnels) : pour une
 		// variante non-texte il renvoie [] — cast documenté.
 		const accepted = ctx.terminal?.getTextAcceptedAnswers?.(q as TextQuestion) || [];
 		if (accepted.length > 0) {
-			return `<div class="quiz-textonly-expected-item">${ctx.sanitize.renderInlineText(accepted[0])}</div>`;
+			return `<div class="quiz-textonly-correct">${correctLine(ctx.sanitize.renderInlineText(accepted[0]))}</div>`;
 		}
 
 		if (ctx.isOrderingQuestion(q)) {
 			const items = ctx.getOrderingItems(q);
 			const order = ctx.getOrderingCorrectOrder(q);
 			const answer = order.map(i => items[i]).filter(v => v !== undefined).join(" -> ");
-			if (answer) return `<div class="quiz-textonly-expected-item">${ctx.sanitize.renderInlineText(answer)}</div>`;
+			if (answer) return `<div class="quiz-textonly-correct">${correctLine(ctx.sanitize.renderInlineText(answer))}</div>`;
 		}
 
 		if (ctx.isMatchingQuestion(q)) {
@@ -232,20 +242,28 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			if (Array.isArray(map) && map.length === rows.length) {
 				const rowsHtml = rows.map((row, i) => {
 					const choice = choices[map[i]] ?? "";
-					return `<div class="quiz-textonly-expected-pair"><strong>${ctx.sanitize.renderInlineText(row)}</strong><span>${ctx.sanitize.renderInlineText(choice)}</span></div>`;
+					return correctLine(`<strong>${ctx.sanitize.renderInlineText(row)}</strong><span class="quiz-textonly-correct-sep">→</span><span>${ctx.sanitize.renderInlineText(choice)}</span>`);
 				}).join("");
-				return `<div class="quiz-textonly-expected-list">${rowsHtml}</div>`;
+				return `<div class="quiz-textonly-correct">${rowsHtml}</div>`;
 			}
 		}
 
-		return `<div class="quiz-textonly-expected-item">${t("engine.textOnly.noExpectedAnswer")}</div>`;
+		return `<div class="quiz-textonly-correct-empty">${t("engine.textOnly.noExpectedAnswer")}</div>`;
 	}
 
-	function learningHtml(q: QuizQuestion): string {
+	/* `opts.plain` (écran de correction réponse-libre, 2026-09-26) : ni titre
+	   ni cadre, juste le contenu — par opposition au verso d'une carte mémoire
+	   (flashcardBodyHtml), qui garde le cadre/label d'origine. Même contenu,
+	   deux habillages, pour ne pas toucher la carte mémoire hors du périmètre
+	   de cette tâche. */
+	function learningHtml(q: QuizQuestion, opts?: { plain?: boolean }): string {
+		const plain = !!opts?.plain;
 		const chunks: string[] = [];
 		const lessonContent = renderLessonHtml(q, ctx.sanitize);
 		if (lessonContent) {
-			chunks.push(`<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.lesson.label")}</div><div class="quiz-textonly-explain-content">${lessonContent}</div></div>`);
+			chunks.push(plain
+				? `<div class="quiz-textonly-explain-plain">${lessonContent}</div>`
+				: `<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.lesson.label")}</div><div class="quiz-textonly-explain-content">${lessonContent}</div></div>`);
 		}
 
 		const explainHtml = q.explainHtml || q._explainHtml;
@@ -253,41 +271,29 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			const content = explainHtml
 				? ctx.sanitize.replaceObsidianEmbedsInHtml(explainHtml)
 				: ctx.sanitize.renderTextWithEmbeds(q.explain || "");
-			chunks.push(`<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.textOnly.explanationLabel")}</div><div class="quiz-textonly-explain-content">${content}</div></div>`);
+			chunks.push(plain
+				? `<div class="quiz-textonly-explain-plain">${content}</div>`
+				: `<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.textOnly.explanationLabel")}</div><div class="quiz-textonly-explain-content">${content}</div></div>`);
 		}
 
 		return chunks.join("");
 	}
 
-	function comparisonOptionsHtml(q: QuizQuestion, qi: number): string {
-		const qOptions = (q as { options?: string[] }).options;
-		if (!Array.isArray(qOptions) || qOptions.length === 0) return "";
-		const correct = new Set(getCorrectOptionIndices(q));
-		const shuf = ctx.quizState.shuffleMap?.[qi];
-		const order: number[] = Array.isArray(shuf) ? shuf : [...Array(qOptions.length).keys()];
-
-		const options = order.map(oi => {
-			const cls = correct.has(oi) ? "correct" : "";
-			return `<div class="quiz-option quiz-textonly-option ${cls}" data-textonly-orig="${oi}">${ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi)}</div>`;
-		}).join("");
-
-		const hasImg = /<img[\s>]/i.test(options);
-		return `<div class="quiz-textonly-comparison">
-			<div class="quiz-textonly-label">${t("engine.textOnly.optionsLabel")}</div>
-			<div class="quiz-options-wrap${hasImg ? " quiz-options-image-grid" : ""}">${options}</div>
-		</div>`;
-	}
-
+	/* Trois boutons plats, sans cadre ni libellé de tête (précision Ahmed du
+	   2026-09-26) : `quiz-textonly-rating-btn` reste pour le câblage
+	   (bindTextOnlyQuestion cible ce sélecteur), `quiz-textonly-verdict-btn`
+	   porte le style propre à cet écran — la carte mémoire garde son style
+	   `quiz-action-btn` d'origine, inchangé. */
 	function ratingButtonsHtml(qi: number): string {
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
-		return `<div class="quiz-textonly-self">
-			<div class="quiz-textonly-label">${t("engine.textOnly.selfRating")}</div>
-			<div class="quiz-textonly-rating-row">
-				${(Object.entries(RATINGS) as Array<[TextOnlyRating, RatingMeta]>).map(([value, meta]) => {
-					const selected = current === value ? " selected" : "";
-					return `<button class="quiz-action-btn quiz-textonly-rating-btn ${meta.className}${selected}" type="button" data-textonly-rating="${value}" aria-pressed="${current === value ? "true" : "false"}">${meta.label}</button>`;
-				}).join("")}
-			</div>
+		const btn = (value: TextOnlyRating, key: TransKey) => {
+			const selected = current === value;
+			return `<button class="quiz-textonly-rating-btn quiz-textonly-verdict-btn ${RATINGS[value].className}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}">${t(key)}</button>`;
+		};
+		return `<div class="quiz-textonly-verdict-row">
+			${btn("understood", "engine.textOnly.verdict.yes")}
+			${btn("partial", "engine.textOnly.verdict.partial")}
+			${btn("review", "engine.textOnly.verdict.review")}
 		</div>`;
 	}
 
@@ -335,15 +341,25 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
 		const readOnlyAttr = revealed ? `readonly aria-readonly="true"` : "";
 
+		// Écran de correction simplifié (2026-09-26) : bonne réponse seule, puis
+		// son explication en texte simple, puis le verdict — plus de cadres à
+		// titres empilés (own answer / self-assessment / options / explanation).
 		const reviewHtml = revealed ? `<div class="quiz-textonly-review">
+			${expectedAnswerHtml(q)}
+			${learningHtml(q, { plain: true })}
 			${ratingButtonsHtml(qi)}
-			${comparisonOptionsHtml(q, qi)}
-			${learningHtml(q)}
 		</div>` : "";
+
+		// Révélé : le titre du champ disparaît (la réponse reste lisible telle
+		// quelle) — repris en `aria-label` pour ne pas perdre l'accessibilité.
+		const answerLabelHtml = revealed
+			? ""
+			: `<label class="quiz-textonly-label" for="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}">${t("engine.textOnly.answerLabel")}</label>`;
+		const ariaLabelAttr = revealed ? ` aria-label="${ctx.escapeHtmlAttr(t("engine.textOnly.answerLabel"))}"` : "";
 
 		return `<div class="quiz-textonly">
 			<div class="quiz-textonly-answer">
-				<label class="quiz-textonly-label" for="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}">${t("engine.textOnly.answerLabel")}</label>
+				${answerLabelHtml}
 				<textarea
 					id="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}"
 					class="quiz-textarea quiz-textonly-textarea"
@@ -354,7 +370,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
-					${readOnlyAttr}
+					${readOnlyAttr}${ariaLabelAttr}
 				>${ctx.escapeHtmlText(value)}</textarea>
 				${(!revealed && !examAnswerPhase) ? `<div class="quiz-actions quiz-textonly-check-actions"><button class="quiz-action-btn success quiz-textonly-check-btn" type="button">${t("engine.textOnly.check")}</button></div>` : ""}
 			</div>
@@ -520,7 +536,6 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		getCorrectOptionIndices,
 		expectedAnswerHtml,
 		learningHtml,
-		comparisonOptionsHtml,
 		ratingButtonsHtml,
 		questionCardBodyHtml,
 		bindTextOnlyQuestion

@@ -17,7 +17,13 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Masquer le document",
 	"engine.passage.expand": "Afficher le document",
-	"engine.passage.tryWithoutReading": "Tentez de répondre sans lire",
+
+	"engine.lecture.readingTimeOne": "Environ {count} minute de lecture",
+	"engine.lecture.readingTime": "Environ {count} minutes de lecture",
+	"engine.lecture.keyPoints": "À retenir",
+	"engine.lecture.flipHint": "Cliquez sur une carte, ou appuyez sur Entrée, pour la retourner.",
+	"engine.lecture.flipAria": "{front} : retourner la carte",
+	"engine.lecture.flippedAria": "{front} : {back}",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Résultats",
@@ -83,10 +89,11 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.textOnly.answerLabel": "Votre réponse libre",
 	"engine.textOnly.answerPlaceholder": "Écrivez votre réponse avec vos mots...",
 	"engine.textOnly.check": "Vérifier",
-	"engine.textOnly.selfRating": "Auto-évaluation",
-	"engine.textOnly.optionsLabel": "Options QCM",
 	"engine.textOnly.explanationLabel": "Explication",
 	"engine.textOnly.noExpectedAnswer": "Réponse attendue non renseignée.",
+	"engine.textOnly.verdict.yes": "Oui",
+	"engine.textOnly.verdict.partial": "En partie",
+	"engine.textOnly.verdict.review": "À revoir",
 
 	/* ── Auto-évaluation ── */
 	"engine.rating.understood": "Compris",

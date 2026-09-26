@@ -295,50 +295,16 @@
   margin-top: 16px;
 }
 
-.quiz-textonly-expected,
-.quiz-textonly-explain-block,
-.quiz-textonly-comparison,
-.quiz-textonly-self{
+/* Explication et cours en état "plain" (écran de correction, 2026-09-26) :
+   ni cadre ni titre, du texte simple juste sous la bonne réponse. Le cadre
+   `.quiz-textonly-explain-block` / `-content` ci-dessous reste utilisé par
+   le verso de la carte mémoire (flashcardBodyHtml), hors périmètre. */
+.quiz-textonly-explain-block{
   box-sizing: border-box;
   padding: 14px 16px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, var(--quiz-primary) 18%);
   background: color-mix(in srgb, var(--background-secondary) 76%, transparent);
-}
-
-.quiz-textonly-self{
-  padding: 12px 14px;
-  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary)) 0%,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 100%
-    );
-}
-
-.quiz-textonly-expected{
-  border-color: color-mix(in srgb, var(--quiz-success) 38%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-success) 8%, var(--background-secondary));
-}
-
-.quiz-textonly-expected-list{
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.quiz-textonly-expected-item{
-  color: var(--text-normal);
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.quiz-textonly-expected-pair{
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  line-height: 1.4;
 }
 
 .quiz-textonly-explain-content{
@@ -354,25 +320,127 @@
   margin-bottom: 0;
 }
 
-.quiz-textonly-comparison .quiz-options-wrap{
-  margin-top: 4px;
+.quiz-textonly-explain-plain{
+  color: var(--text-normal);
+  line-height: 1.55;
 }
 
-.quiz-textonly-option{
-  cursor: default;
+.quiz-textonly-explain-plain p:first-child{
+  margin-top: 0;
 }
 
-.quiz-textonly-option:not(.correct):hover,
-.quiz-textonly-option:not(.correct):focus-visible,
-.quiz-textonly-option.correct:hover,
-.quiz-textonly-option.correct:focus-visible{
-  transform: none;
+.quiz-textonly-explain-plain p:last-child{
+  margin-bottom: 0;
 }
 
-.quiz-textonly-rating-row{
+/* La bonne réponse, seule : une ligne par réponse, coche verte + texte —
+   remplace l'ancienne liste encadrée de toutes les options (quiz-textonly-
+   comparison) et la carte "expected" encadrée. Classes distinctes de
+   `.quiz-textonly-expected-*` : ces dernières restent utilisées par l'aperçu
+   de l'éditeur (question-preview-corrige.ts), hors périmètre de cette tâche. */
+.quiz-textonly-correct{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quiz-textonly-correct-line{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-normal);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.quiz-textonly-correct-icon{
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15em;
+  color: var(--quiz-success);
+}
+
+.quiz-textonly-correct-icon svg{
+  width: 100%;
+  height: 100%;
+}
+
+.quiz-textonly-correct-text{
+  min-width: 0;
+}
+
+.quiz-textonly-correct-sep{
+  margin: 0 6px;
+  color: var(--text-muted);
+}
+
+.quiz-textonly-correct-empty{
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Trois boutons plats, sans cadre : « Oui / En partie / À revoir », au style
+   des contrôles de l'app (hauteur ~30px, rayon 7px, graisse 500). */
+.quiz-textonly-verdict-row{
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+}
+
+.quiz-textonly-verdict-btn{
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.quiz-textonly-verdict-btn.understood{
+  color: var(--quiz-success);
+  background: color-mix(in srgb, var(--quiz-success) 12%, transparent);
+}
+
+.quiz-textonly-verdict-btn.partial{
+  color: var(--quiz-hint);
+  background: color-mix(in srgb, var(--quiz-hint) 12%, transparent);
+}
+
+.quiz-textonly-verdict-btn.review{
+  color: var(--quiz-danger);
+  background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
+}
+
+.quiz-textonly-verdict-btn.understood:hover{ background: color-mix(in srgb, var(--quiz-success) 22%, transparent); }
+.quiz-textonly-verdict-btn.partial:hover{ background: color-mix(in srgb, var(--quiz-hint) 22%, transparent); }
+.quiz-textonly-verdict-btn.review:hover{ background: color-mix(in srgb, var(--quiz-danger) 22%, transparent); }
+
+.quiz-textonly-verdict-btn.understood.selected{ color: var(--quiz-accent-text); background: var(--quiz-success); }
+.quiz-textonly-verdict-btn.partial.selected{ color: var(--quiz-accent-text); background: var(--quiz-hint); }
+.quiz-textonly-verdict-btn.review.selected{ color: var(--quiz-accent-text); background: var(--quiz-danger); }
+
+.quiz-textonly-verdict-row:has(.selected) .quiz-textonly-verdict-btn:not(.selected){
+  opacity: 0.5;
+}
+
+.quiz-textonly-verdict-btn:focus-visible{
+  outline: 2px solid var(--quiz-primary);
+  outline-offset: 2px;
 }
 
 .quiz-textonly-rating-btn.understood{

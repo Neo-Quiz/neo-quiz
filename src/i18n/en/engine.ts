@@ -24,8 +24,14 @@ export const EN_ENGINE = {
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Hide the document",
 	"engine.passage.expand": "Show the document",
-	/* Le cours d'une étape de Learn, replié au-dessus de chaque question. */
-	"engine.passage.tryWithoutReading": "Try to answer without reading",
+
+	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */
+	"engine.lecture.readingTimeOne": "About {count} minute of reading",
+	"engine.lecture.readingTime": "About {count} minutes of reading",
+	"engine.lecture.keyPoints": "Key points",
+	"engine.lecture.flipHint": "Click a card, or press Enter, to flip it.",
+	"engine.lecture.flipAria": "{front}: flip the card",
+	"engine.lecture.flippedAria": "{front}: {back}",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Results",
@@ -100,10 +106,11 @@ export const EN_ENGINE = {
 	"engine.textOnly.answerLabel": "Your own answer",
 	"engine.textOnly.answerPlaceholder": "Write your answer in your own words...",
 	"engine.textOnly.check": "Check",
-	"engine.textOnly.selfRating": "Self-assessment",
-	"engine.textOnly.optionsLabel": "Multiple-choice options",
 	"engine.textOnly.explanationLabel": "Explanation",
 	"engine.textOnly.noExpectedAnswer": "No expected answer was provided.",
+	"engine.textOnly.verdict.yes": "Got it",
+	"engine.textOnly.verdict.partial": "Partly",
+	"engine.textOnly.verdict.review": "To review",
 
 	/* ── Auto-évaluation ── */
 	"engine.rating.understood": "Got it",
