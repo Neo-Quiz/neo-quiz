@@ -200,8 +200,12 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 	/** Coller une image dans un champ direct : même chemin que la zone de
 	    texte — le fichier écrit par l'hôte, un `![[…]]` inséré au curseur. Le
 	    `preventDefault` part AVANT l'écriture asynchrone : sinon CodeMirror
-	    collerait aussi le presse-papiers. */
-	function collageImage(): Extension {
+	    collerait aussi le presse-papiers.
+	    `onChange` est celui du champ : si le formulaire s'est repeint pendant
+	    l'écriture (la vue est alors détruite, détachée), le lien passe par lui
+	    au lieu d'être inséré dans une vue morte — sinon l'image restait
+	    orpheline dans le vault, sans lien dans la note. */
+	function collageImage(onChange: (value: string) => void): Extension {
 		return EditorView.domEventHandlers({
 			paste(e, vue) {
 				const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith("image/"));
@@ -218,7 +222,16 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 						try {
 							await currentHost().fs.writeBinary(filePath, new Uint8Array(buffer));
 						} catch (err) { releaseReservedPath(filePath); throw err; }
-						insererTexte(vue, `![[${fileName}]]`, () => { /* l'écouteur du champ notifie */ });
+						const lien = `![[${fileName}]]`;
+						if (vue.dom.isConnected) {
+							insererTexte(vue, lien, () => { /* l'écouteur du champ notifie */ });
+						} else {
+							// Vue détruite : son dernier état reste lisible, et la
+							// sélection d'alors dit où le lien devait aller.
+							const { from, to } = vue.state.selection.main;
+							const doc = vue.state.doc.toString();
+							onChange(doc.slice(0, from) + lien + doc.slice(to));
+						}
 						view.schedulePreview();
 					} catch (err) {
 						console.error("[quiz-blocks] collage d'image impossible :", err);
@@ -239,7 +252,7 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 			multiligne: false,
 			placeholder,
 			onChange,
-			extensions: [collageImage()],
+			extensions: [collageImage(onChange)],
 		});
 	}
 
@@ -268,7 +281,7 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 				placeholder,
 				etiquette: label || placeholder,
 				onChange,
-				extensions: [raccourciBlocCode, collageImage()],
+				extensions: [raccourciBlocCode, collageImage(onChange)],
 			});
 			poserBarreFormat(cadre, champ.vue, false, onChange, () => { /* hauteur automatique */ });
 			cadre.appendChild(place);

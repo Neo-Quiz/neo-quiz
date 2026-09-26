@@ -78,5 +78,19 @@ export function historiqueMinimal(): Extension {
 			{ key: "Mod-y", run: v => rejouer(v, "retablir"), preventDefault: true },
 			{ key: "Mod-Shift-z", run: v => rejouer(v, "retablir"), preventDefault: true },
 		]),
+		/* « Annuler » / « Rétablir » du MENU de l'app (`webContents.undo()`)
+		   n'envoie pas de touche : Chromium émet un `beforeinput` de type
+		   `historyUndo` / `historyRedo`. Sans ce relais, il annulait dans le
+		   `contenteditable` en contournant cette pile, et le document de
+		   CodeMirror divergeait de ce qu'elle croit défaire. */
+		EditorView.domEventHandlers({
+			beforeinput(e, vue) {
+				const sens = e.inputType === "historyUndo" ? "annuler"
+					: e.inputType === "historyRedo" ? "retablir" : null;
+				if (!sens) return false;
+				e.preventDefault();
+				return rejouer(vue, sens);
+			},
+		}),
 	];
 }

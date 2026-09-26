@@ -57,6 +57,25 @@ function menage(): void {
 	}
 }
 
+/**
+ * Libère les champs que la page vient de quitter. Appelée par la page d'un
+ * quiz (dashboard/detail.ts) quand elle se repeint — juste après avoir vidé
+ * son conteneur, AVANT de construire les nouveaux champs — et quand elle est
+ * fermée. À ce moment-là, aucun champ n'est en cours de construction : toute
+ * vue détachée est morte, y compris celle qui n'a jamais été affichée (que le
+ * ménage de `creerChampDirect` doit, lui, épargner). `racine` : les champs
+ * encore dans ce nœud sont libérés aussi (la page fermée n'est pas forcément
+ * déjà retirée du document).
+ */
+export function libererChamps(racine?: HTMLElement | null): void {
+	for (const vue of [...vivantes.keys()]) {
+		if (!vue.dom.isConnected || (racine && racine.contains(vue.dom))) {
+			vivantes.delete(vue);
+			vue.destroy();
+		}
+	}
+}
+
 /** Un champ d'une ligne ne reçoit jamais de saut de ligne, même collé : il
     devient une espace (même longueur, donc la sélection reste valable). */
 const uneSeuleLigne = EditorState.transactionFilter.of(tr => {

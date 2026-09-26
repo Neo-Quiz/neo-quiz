@@ -15,6 +15,7 @@ import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView, renderQuestionEdit } from "./detail-question";
+import { libererChamps } from "../editor/champ-direct";
 import { oublierFiche, renderFiche, renderTop } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
@@ -286,6 +287,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// il resterait ouvert au-dessus d'une page qui n'existe plus.
 		closeAllSelects();
 		container.replaceChildren();
+		// Les champs CodeMirror du formulaire qu'on vient de détacher gardent
+		// sinon leurs écouteurs sur le document.
+		libererChamps();
 		currentContainer = container;
 		currentSpec = spec;
 		// Une ARRIVÉE sur la page : un autre quiz, ou le même rouvert par
@@ -833,6 +837,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// ils survivent jusqu'à leur échéance en visant un DOM mort.
 		if (slideHost) finishSlide(slideHost);
 		panel.replaceChildren();
+		libererChamps();
 		slideHost = null;
 		// En édition, le panneau devient la CARTE du formulaire (verre) : posé
 		// à même une photo de fond, un formulaire ne se lisait pas.
@@ -942,6 +947,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		closeAllSelects();
 		if (keyCleanup) keyCleanup();
 		if (slideHost) { finishSlide(slideHost); slideHost = null; }
+		// Les champs du formulaire : la page n'est pas forcément déjà retirée
+		// du document, d'où la racine passée en plus des champs détachés.
+		libererChamps(currentContainer);
 		draft = null;
 		currentSpec = null;
 		currentContainer = null;
