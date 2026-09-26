@@ -208,5 +208,22 @@ export function changerType(q: DraftQuestion, defaut: DraftQuestion): boolean {
 		if (avant.placeholder) q.placeholder = avant.placeholder;
 		if (avant.caseSensitive !== undefined) q.caseSensitive = avant.caseSensitive;
 	}
+	/* Les indices BORNÉS aux listes qu'ils désignent, quelle que soit leur
+	   provenance (transposés ou par défaut) : aucun ne doit viser une option
+	   ou un élément qui n'existe pas. */
+	const nOptions = q.options?.length ?? 0;
+	if (q.correctIndices) {
+		q.correctIndices = q.correctIndices.filter(i => i >= 0 && i < nOptions);
+		if (q.correctIndices.length === 0 && nOptions > 0) q.correctIndices = [0];
+	}
+	if (q.correctIndex !== undefined && (q.correctIndex < 0 || q.correctIndex >= nOptions)) q.correctIndex = 0;
+	if (q.correctOrder && q.possibilities) {
+		const n = q.possibilities.length;
+		const ordre = q.correctOrder.slice(0, n);
+		// Un indice hors bornes ou en double : l'ordre naturel, jamais deux
+		// emplacements sur le même élément.
+		const valide = ordre.length === n && ordre.every(i => i >= 0 && i < n) && new Set(ordre).size === n;
+		q.correctOrder = valide ? ordre : Array.from({ length: n }, (_, i) => i);
+	}
 	return true;
 }

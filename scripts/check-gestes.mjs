@@ -123,6 +123,19 @@ await withSrcModule("src/editor/gestes.ts", ({
 			const ok = changerType(s, { ...commun, _type: "text", acceptedAnswers: [""], caseSensitive: false, placeholder: "Réponse" });
 			return [ok, s.acceptedAnswers, s.caseSensitive, s.commandPrefix, s._variantKey, s.placeholder];
 		})(), [true, ["dir"], true, undefined, undefined, "Réponse"]);
+		r.check("type : indices bornés aux nouvelles longueurs (bonnes réponses, ordre)", (() => {
+			// Un défaut qui viserait des éléments absents, une source hors bornes.
+			const o = { ...commun, _type: "single", options: ["a", "b"], correctIndex: 0 };
+			const okO = changerType(o, { ...commun, _type: "ordering", slots: ["1", "2"], possibilities: ["", ""], correctOrder: [0, 7, 1] });
+			const u = { ...commun, _type: "multi", options: ["a", "b"], correctIndices: [4, 9] };
+			const okU = changerType(u, { ...commun, _type: "single", options: ["", ""], correctIndex: 0 });
+			return [okO, o.correctOrder, okU, u.correctIndex];
+		})(), [true, [0, 1], true, 0]);
+		r.check("type : unique → multiple, une bonne hors bornes retombe sur la première", (() => {
+			const x = { ...commun, _type: "single", options: ["a", "b"], correctIndex: 6 };
+			changerType(x, { ...commun, _type: "multi", options: ["", ""], correctIndices: [] });
+			return x.correctIndices;
+		})(), [0]);
 		r.check("type : famille — choix et saisie ne se transposent pas", [memeFamille("single", "multi"), memeFamille("text", "bash"), memeFamille("single", "text")], [true, true, false]);
 	}
 

@@ -54,6 +54,8 @@ export interface EditionCallbacks {
 
 /** Pause avant de repeindre le rendu après une frappe dans « Plus ». */
 const PAUSE_RENDU_MS = 300;
+/** Attente maximale depuis le premier changement non repeint. */
+const ATTENTE_MAX_RENDU_MS = 1000;
 
 /** Le nom de chaque rôle d'une question de Learn. `test`, le rôle par défaut
     (une question sans rôle en est une), n'avait pas de libellé : la fiche ne
@@ -74,11 +76,15 @@ const ROLE_LIBELLES: Record<QuestionRole, TransKey> = {
  */
 export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, index: number, cb: EditionCallbacks, sourcePath?: string): () => void {
 	parent.classList.add("qbd-qz-er");
-	renderBarre(parent, q, cb);
+	/** Faux dès le nettoyage : une modale restée ouverte ne touche plus rien. */
+	let vivant = true;
+	renderBarre(parent, q, cb, () => vivant);
 
 	const hoteRendu = ajouter(parent, "div", "qbd-qz-er-rendu");
 	let demonter: (() => void) | null = null;
 	let minuterie: number | null = null;
+	/** Instant du premier changement de « Plus » pas encore repeint. */
+	let enAttenteDepuis: number | null = null;
 
 	function monter(): void {
 		demonter?.();
@@ -90,13 +96,20 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 		});
 	}
 	/* Un texte OUVERT dans le rendu n'est jamais remonté sous le curseur : la
-	   frappe dans « Plus » attendra le repeint suivant. */
+	   frappe dans « Plus » attendra le repeint suivant.
+	   La pause repart à chaque changement, mais jamais au-delà de
+	   `ATTENTE_MAX_RENDU_MS` après le premier non repeint : une frappe
+	   continue ne repousse pas le repeint indéfiniment. */
 	function repeindreRenduPlusTard(): void {
 		if (minuterie !== null) window.clearTimeout(minuterie);
+		const maintenant = Date.now();
+		enAttenteDepuis ??= maintenant;
+		const reste = enAttenteDepuis + ATTENTE_MAX_RENDU_MS - maintenant;
 		minuterie = window.setTimeout(() => {
 			minuterie = null;
-			if (hoteRendu.isConnected && !hoteRendu.querySelector(".is-editing")) monter();
-		}, PAUSE_RENDU_MS);
+			enAttenteDepuis = null;
+			if (vivant && hoteRendu.isConnected && !hoteRendu.querySelector(".is-editing")) monter();
+		}, Math.max(0, Math.min(PAUSE_RENDU_MS, reste)));
 	}
 
 	const cbPlus: EditCallbacks = {
@@ -119,6 +132,7 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 	peindrePlus();
 
 	return () => {
+		vivant = false;
 		if (minuterie !== null) { window.clearTimeout(minuterie); minuterie = null; }
 		demonter?.();
 		demonter = null;
@@ -128,7 +142,7 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 
 /* ── La barre : type et rôle ──────────────────────────────── */
 
-function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks): void {
+function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks, estVivant: () => boolean): void {
 	const barre = ajouter(parent, "div", "qbd-qz-er-barre");
 	const ui = currentHost().ui;
 
@@ -163,7 +177,13 @@ function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks
 				t("editor.render.typeChangeMessage"),
 				t("editor.render.typeChangeConfirm"),
 				t("editor.action.cancel"),
-				(ok) => { if (ok) appliquer(); else type.setValue(q._type); },
+				/* La modale attend un clic : entre-temps on a pu changer de
+				   question ou quitter la page. La question démontée n'est plus
+				   celle qu'on regarde, et son menu est détaché : rien. */
+				(ok) => {
+					if (!estVivant() || !type.el.isConnected) return;
+					if (ok) appliquer(); else type.setValue(q._type);
+				},
 			);
 		},
 	});
