@@ -393,7 +393,9 @@
 	height: 100%;
 	min-height: 0;
 	overflow-y: auto;
-	overscroll-behavior: contain;
+	/* La molette fait d'abord défiler la carte, PUIS la grille une fois la
+	   carte au bout (2026-09-26) : pas de `overscroll-behavior: contain`,
+	   qui retenait la molette dans une longue carte. */
 	/* L'ascenseur ne décale pas le texte quand il apparaît. */
 	scrollbar-gutter: stable;
 	/* PAS de `scrollbar-width` / `scrollbar-color` : dans Chromium, ces
