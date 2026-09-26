@@ -4,6 +4,7 @@ import { createFocusHandlers } from "./engine/focus";
 import { createLifecycleHandlers } from "./engine/lifecycle";
 import { createWarmingHandlers } from "./engine/warming";
 import { createSanitizer } from "./engine/sanitizer";
+import { reinitialiserBudgetRendu } from "./engine/code-highlight";
 import { createResourceHandlers } from "./engine/resources";
 import { createExamHandlers } from "./engine/exam";
 import { createCardRenderers } from "./engine/cards";
@@ -817,6 +818,10 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		ctx.viewport.unobserveTrackItemInAllSlidesResizeObserver(oldItem);
 		if (slideIdx >= 0) ctx.lifecycle.bumpSlideGeneration(slideIdx);
 
+		// Budget de coloration remis à zéro : ce re-rendu d'UNE carte est son
+		// propre « rendu complet », indépendant de celui qui a construit le
+		// track initial (revue du 2026-09-26, tour 4).
+		reinitialiserBudgetRendu();
 		const tmp = document.createElement("div");
 			tmp.innerHTML = ctx.cards.questionCardHtml(qi).trim();
 		// firstElementChild : la carte de question rendue est toujours un <div>
@@ -907,6 +912,12 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	    const examChromeHtml = ctx.exam.examTimerHtml();
 
+	    // Budget de coloration des blocs de code (code-highlight.ts) remis à
+	    // zéro UNE fois pour TOUT ce rendu — pas par carte, sans quoi un quiz
+	    // de 50 questions rechargeait 50 budgets pleins (re-revue du
+	    // 2026-09-26, tour 4 : 8,4 s mesurés pour 50 cartes contre ~150 ms
+	    // attendus). Toutes les cartes du track partagent ce budget.
+	    reinitialiserBudgetRendu();
 	    // Construire le HTML des slides à partir du slideMap
 	    const slidesHtml = slideMap.map(entry => {
 	        if (entry.type === "question") return ctx.cards.questionCardHtml(entry.questionIndex);

@@ -132,7 +132,72 @@ async function verifierDureeBornee() {
 	return r;
 }
 
+/* ── Budget PAR RENDU, pas par carte (tour 4) ──────────────────────── */
+
+/**
+ * La re-revue du tour 3 a mesuré 8,4 s pour un quiz moteur de 50 questions,
+ * 8,2 s pour la grille de 50 cartes, 3,5 s pour une seule carte d'aperçu à
+ * 21 champs — parce que le budget se remettait à zéro À CHAQUE CARTE
+ * (`questionCardHtml`, `texteQuizHtml`) au lieu d'une fois par rendu
+ * complet. Le tour 4 retire ce reset des deux et le pose à la place dans
+ * `engine.ts` (avant `slideMap.map` et dans `refreshQuestionSlide`),
+ * `dashboard/detail-fiche.ts` (avant la boucle de la grille) et
+ * `editor/question-preview.ts` (`renderQuizPreviewCard`, une fois par
+ * carte de l'aperçu).
+ *
+ * Ce script ne charge ni `engine.ts` (assemblage de `ctx` trop lourd pour
+ * ce contrôle) ni `question-preview.ts` (a besoin d'un DOM) : il reproduit
+ * le MÊME MÉCANISME que ces appelants réels partagent — un seul
+ * `reinitialiserBudgetRendu()` puis PLUSIEURS appels à `rendreTexteQuiz`
+ * sans reset entre eux — directement sur `sanitizer.ts`, ce qui est
+ * exactement ce que `code-highlight.ts` voit dans les deux cas (le module
+ * ne sait pas, et n'a pas à savoir, s'il est appelé depuis une boucle de
+ * cartes moteur ou une boucle de cartes de grille).
+ */
+async function verifierBudgetParRenduPasParCarte() {
+	const r = makeReporter("Coloration — budget par RENDU, pas par carte (tour 4)");
+
+	await withSrcModule(
+		["src/engine/sanitizer.ts", "src/engine/code-highlight.ts"],
+		({ rendreTexteQuiz }, { reinitialiserBudgetRendu, BUDGET_COLORATION_PAR_RENDU, PLAFOND_CARACTERES_PAR_BLOC }) => {
+			const IMG = { embed: () => "", image: () => "" };
+			const q3 = "\"'`";
+			// Une « carte » : un seul bloc bash largement au-dessus du plafond,
+			// pour que chaque carte colorée EN CONSOMME LE MAXIMUM.
+			const carte = () => "```bash\n" + q3.repeat(1000).slice(0, 3000) + "\n```\n\n";
+			const N = 50;
+			const estColoree = (html) => /<code class="language-bash">(?=<span)/.test(html);
+			const cartesMaxColorables = Math.ceil(BUDGET_COLORATION_PAR_RENDU / PLAFOND_CARACTERES_PAR_BLOC);
+
+			// LE COMPORTEMENT RÉEL (tour 4) : un seul reset avant la boucle de
+			// N cartes, comme `engine.ts` / `detail-fiche.ts`.
+			reinitialiserBudgetRendu();
+			let coloreesUnSeulReset = 0;
+			for (let i = 0; i < N; i++) if (estColoree(rendreTexteQuiz(carte(), IMG))) coloreesUnSeulReset++;
+			r.check(`${N} cartes à la suite, UN SEUL reset : au plus ${cartesMaxColorables} colorées (budget ${BUDGET_COLORATION_PAR_RENDU} / plafond ${PLAFOND_CARACTERES_PAR_BLOC})`,
+				coloreesUnSeulReset <= cartesMaxColorables, true);
+			r.check(`${N} cartes à la suite, UN SEUL reset : au moins une carte reste colorée`,
+				coloreesUnSeulReset > 0, true);
+
+			// LA PREUVE QUE ÇA ROUGIT AVEC L'ANCIEN COMPORTEMENT (reset PAR
+			// CARTE, retiré de `questionCardHtml`/`texteQuizHtml` par ce tour) :
+			// reproduit ici à l'identique, sur les MÊMES données.
+			let coloreesResetParCarte = 0;
+			for (let i = 0; i < N; i++) {
+				reinitialiserBudgetRendu(); // le point que le tour 4 a retiré
+				if (estColoree(rendreTexteQuiz(carte(), IMG))) coloreesResetParCarte++;
+			}
+			r.check(`${N} cartes, reset PAR CARTE (ancien comportement, tour 3) : TOUTES colorées — dépasserait le budget d'un rendu (rougirait sur l'assertion précédente)`,
+				coloreesResetParCarte, N);
+		},
+	);
+
+	r.done();
+	return r;
+}
+
 // `makeReporter(...).done()` pose déjà `process.exitCode = 1` en cas
 // d'échec (voir scripts/lib/load-src.mjs) : rien à agréger ici.
 await verifierAucunEffetGlobal();
 await verifierDureeBornee();
+await verifierBudgetParRenduPasParCarte();

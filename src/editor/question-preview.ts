@@ -131,20 +131,15 @@ const IMAGES_APERCU: RenduImages = {
     une seconde grammaire, montrait autre chose que ce que l'apprenant
     verrait. */
 export function texteQuizHtml(raw: string, sourcePath?: string): string {
-	/* Budget de coloration des blocs de code (code-highlight.ts) remis à zéro
-	   à CHAQUE appel : c'est le seul point commun à l'aperçu de l'éditeur
-	   (renderQuizPreviewCard, plusieurs appels par carte — prompt, options,
-	   support…) ET à la grille de la page d'un quiz
-	   (dashboard/detail-fiche.ts, qui appelle CETTE fonction directement, UNE
-	   fois par carte de la grille, jamais via renderQuizPreviewCard) —
-	   revue du 2026-09-26, tour 3. Remettre le budget ICI, plutôt que dans
-	   renderQuizPreviewCard, est le point le plus simple qui borne chaque
-	   carte de la grille indépendamment sans toucher detail-fiche.ts (hors
-	   périmètre de cette tâche) ; le prix, documenté dans le rapport, est que
-	   dans l'aperçu de l'éditeur (une seule question, jamais une longue
-	   liste), chaque option repart avec son propre budget plein au lieu d'un
-	   budget partagé par la carte entière. */
-	reinitialiserBudgetRendu();
+	// Le budget de coloration N'EST PLUS remis à zéro ici (retiré au tour 4) :
+	// cette fonction est appelée PLUSIEURS FOIS par carte (prompt, chaque
+	// option…), et un reset ici redonnait un budget plein à chaque champ —
+	// un aperçu à 21 champs coloriait jusqu'à 21 fois le budget voulu
+	// (3,5 s mesurés pour une seule carte). Le reset vit maintenant au
+	// niveau du RENDU COMPLET : `renderQuizPreviewCard` (l'aperçu de
+	// l'éditeur) et `dashboard/detail-fiche.ts` (la grille de la page d'un
+	// quiz, qui appelle CETTE fonction directement, une fois par carte,
+	// sans jamais passer par `renderQuizPreviewCard`).
 	return resolveImagesInHtml(rendreTexteQuiz(raw, IMAGES_APERCU), sourcePath);
 }
 
@@ -221,6 +216,12 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
 
 /** Construit la carte de question dans `host` et la renvoie. */
 export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts: QuizPreviewOptions): HTMLElement {
+	// Budget de coloration des blocs de code (code-highlight.ts) remis à zéro
+	// UNE fois pour TOUTE cette carte (tour 4) : elle appelle `texteQuizHtml`
+	// plusieurs fois (prompt, chaque option, support, cours…), qui ne remet
+	// plus le budget lui-même — sans quoi chaque champ obtenait son propre
+	// budget plein (3,5 s mesurés sur une carte à 21 champs).
+	reinitialiserBudgetRendu();
 	const { fallbackTitle } = opts;
 	const type = q._type;
 	const wrap = ajouter(host, "div", "quiz-blocks-host");

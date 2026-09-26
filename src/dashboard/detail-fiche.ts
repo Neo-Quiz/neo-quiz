@@ -11,6 +11,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
 import { texteQuizHtml } from "../editor/question-preview";
+import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
@@ -420,6 +421,11 @@ function suivreDebord(zone: HTMLElement): void {
 }
 
 function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer: () => void): void {
+	// Budget de coloration des blocs de code (code-highlight.ts) remis à zéro
+	// UNE fois pour TOUTE la grille (tour 4) : `texteQuizHtml`, appelé une
+	// fois par carte plus bas, ne remet plus le budget lui-même — sans quoi
+	// une grille de 50 cartes rechargeait 50 budgets pleins (8,2 s mesurés).
+	reinitialiserBudgetRendu();
 	const grille = ajouter(body, "div", "qbd-fiche-grid");
 	// Numéros AFFICHÉS : ils sautent les lectures absorbées, comme le quiz.
 	const numeros = numerosAffiches(deps.questions, deps.lecon);

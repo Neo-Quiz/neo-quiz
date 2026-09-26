@@ -1,5 +1,6 @@
 import { rendreTexteQuiz } from "../engine/sanitizer";
 import type { RenduImages } from "../engine/sanitizer";
+import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 
 /* ══════════════════════════════════════════════════════════
    HTML → MARKDOWN, sans perte ou pas du tout (2026-09-26)
@@ -439,8 +440,16 @@ const IMAGES_CANON: RenduImages = {
 	image: (alt, src) => `<img src="${attrCanon(src)}" alt="${attrCanon(alt)}">`,
 };
 
-/** Le markdown rend-il le même HTML que `cible` (déjà normalisée) ? */
+/** Le markdown rend-il le même HTML que `cible` (déjà normalisée) ? Budget de
+    coloration (code-highlight.ts) remis à zéro avant l'appel : cette
+    comparaison est HORS de tout rendu réel (pas de carte, pas de page), et
+    ne doit ni consommer le budget d'un rendu en cours, ni dépendre de ce
+    qu'un appel précédent en a déjà consommé. `canon()` (plus bas)
+    déballe de toute façon tous les `<span>`, coloration comprise : la
+    forme comparée est donc identique, colorée ou non — ce reset la rend
+    aussi INDÉPENDANTE du reste du budget, sans reposer sur ce seul fait. */
 function rendMeme(markdown: string, cible: string): boolean {
+	reinitialiserBudgetRendu();
 	return formeNormale(rendreTexteQuiz(markdown, IMAGES_CANON)) === cible;
 }
 
@@ -523,6 +532,11 @@ export function texteBaliseVersMarkdown(texte: string): string | null {
 		const arbre = analyser(texte.replace(/\r?\n/g, "<br>"));
 		if (!arbre) return null;
 		const md = blocs(arbre).join("\n\n");
+		// Même raison qu'au-dessus de `rendMeme` : ce rendu-ci n'est pas un
+		// rendu réel, et `rendMeme` remet le budget à zéro pour le SIEN — les
+		// deux appels comparés partent donc chacun d'un budget plein et
+		// identique, sans dépendre l'un de l'autre ni d'un rendu extérieur.
+		reinitialiserBudgetRendu();
 		const cible = formeNormale(rendreTexteQuiz(texte, IMAGES_CANON));
 		if (cible === null || !md.trim() || md === texte || !rendMeme(md, cible)) return null;
 		return md;
