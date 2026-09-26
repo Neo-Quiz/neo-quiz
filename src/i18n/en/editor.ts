@@ -139,6 +139,11 @@ export const EN_EDITOR = {
 	"editor.preview.orderingHint": "Put the items in the right order",
 	"editor.preview.matchingHint": "Match each situation with a medium",
 
+	/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ── */
+	"editor.render.clickToEdit": "Click to edit",
+	"editor.render.htmlInMore": "Edited as HTML in More",
+	"editor.render.untitled": "Untitled question",
+
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Add a question",
 	"editor.typeModal.subtitle": "Choose the question type",

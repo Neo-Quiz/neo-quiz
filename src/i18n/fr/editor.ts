@@ -138,6 +138,11 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.preview.orderingHint": "Classez les éléments dans le bon ordre",
 	"editor.preview.matchingHint": "Associez chaque situation à un support",
 
+	/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ── */
+	"editor.render.clickToEdit": "Cliquez pour modifier",
+	"editor.render.htmlInMore": "Modifié en HTML dans Plus",
+	"editor.render.untitled": "Question sans titre",
+
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Ajouter une question",
 	"editor.typeModal.subtitle": "Choisissez le type de question",

@@ -727,3 +727,54 @@
 	color: var(--text-normal);
 	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
+
+/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ──
+   Un texte modifiable ne change pas d'aspect au repos : c'est le rendu du
+   quiz. Au survol ou au focus clavier, un liseré pointillé discret dit
+   qu'on peut cliquer. `outline` et non `border` : rien ne bouge d'un pixel. */
+.qb-er [data-edit] {
+	cursor: text;
+	border-radius: 4px;
+	outline: 1px dashed transparent;
+	outline-offset: 3px;
+	transition: outline-color 120ms ease;
+}
+.qb-er [data-edit]:hover,
+.qb-er [data-edit]:focus-visible {
+	outline-color: color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+}
+.qb-er [data-edit].is-editing {
+	outline: none;
+	cursor: auto;
+}
+/* Un HTML pré-rendu : lisible, pas modifiable ici — l'infobulle renvoie à
+   « Plus ». Un liseré plus effacé au survol, sans curseur de texte. */
+.qb-er .qb-er-html:hover {
+	outline: 1px dotted color-mix(in srgb, var(--text-faint) 60%, transparent);
+	outline-offset: 3px;
+	border-radius: 4px;
+}
+
+/* Le champ ouvert prend la place du texte, dans l'élément qui le portait
+   (même typo, même largeur). Un champ court n'ajoute qu'un soulignement ;
+   un champ long reçoit un cadre avec sa barre d'outils en haut. */
+.qb-er .qb-er-cadre {
+	min-width: 0;
+	width: 100%;
+}
+.qb-er .qb-er-cadre:not(.qb-er-cadre--multi) {
+	border-bottom: 1px solid color-mix(in srgb, var(--quiz-primary) 70%, transparent);
+}
+.qb-er .qb-er-cadre--multi {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--quiz-primary) 16%, transparent);
+}
+.qb-er .qb-er-cadre--multi .qb-direct--multi {
+	padding: 8px 10px 9px;
+}
+.qb-er .qb-er-cadre--multi .qb-direct--multi .cm-content { min-height: 3em; }
