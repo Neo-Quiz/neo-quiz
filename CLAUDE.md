@@ -181,6 +181,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   DÉRIVÉS de la liste (supprimer la meilleure le fait redescendre), un score
   d'avant l'historique lu comme une tentative « ancienne » supprimable,
   annulation symétrique, plafond qui garde la meilleure. Dans la CI.
+- `npm run check:gestes` — les GESTES d'édition d'une question (`src/editor/gestes.ts`),
+  partagés par le formulaire et l'édition dans le rendu : jamais une question sans
+  bonne réponse, jamais deux emplacements d'un classement sur le même élément,
+  indices décalés à l'ajout et au retrait. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

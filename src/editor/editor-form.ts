@@ -4,6 +4,7 @@ import { currentHost } from "../host/current";
 import { reserveFreePath, releaseReservedPath } from "../unique-path";
 import type { EditorCtx } from "../types/editor-ctx";
 import type { DraftQuestion } from "./utils";
+import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante } from "./gestes";
 import { insererTexte, poserBarreFormat } from "./format-toolbar";
 import { createSelect } from "../dashboard/ui-select";
 
@@ -393,21 +394,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 					ajouter(toggle, "span", "qb-answer-switch-track");
 					ajouter(toggle, "span", "qb-answer-switch-label", t("editor.answer.correct"));
 					toggle.addEventListener("click", () => {
-						if (isMulti) {
-							const a = q.correctIndices || [];
-							if (a.includes(i)) {
-								if (a.length > 1) {
-									q.correctIndices = a.filter(x => x !== i);
-									view.render(); view.scheduleSave?.();
-								}
-							} else {
-								q.correctIndices = [...a, i].sort((a, b) => a - b);
-								view.render(); view.scheduleSave?.();
-							}
-						} else if (!isCorrect) {
-							q.correctIndex = i;
-							view.render(); view.scheduleSave?.();
-						}
+						if (basculerBonne(q, i)) { view.render(); view.scheduleSave?.(); }
 					});
 
 					/* Supprimer : jamais une bonne réponse, jamais sous deux
@@ -424,14 +411,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 						delBtn.classList.add("is-hidden");
 					} else {
 						delBtn.addEventListener("click", () => {
-							q.options!.splice(i, 1);
-							if (isMulti) {
-								q.correctIndices = (q.correctIndices || []).filter(idx => idx !== i).map(idx => idx > i ? idx - 1 : idx);
-							} else {
-								if (q.correctIndex === i) q.correctIndex = 0;
-								else if ((q.correctIndex ?? 0) > i) q.correctIndex = (q.correctIndex ?? 0) - 1;
-							}
-							view.render(); view.scheduleSave?.();
+							if (retirerOption(q, i)) { view.render(); view.scheduleSave?.(); }
 						});
 					}
 				});
@@ -441,11 +421,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				_iconSpan(addBtn, "plus", "qb-add-icon");
 				addBtn.appendChild(document.createTextNode(t("editor.answer.add")));
 				addBtn.addEventListener("click", () => {
-					q.options!.push("");
-					if (isMulti && q.options!.length === 1) {
-						q.correctIndices = [0];
-					}
-					view.render(); view.scheduleSave?.();
+					if (ajouterOption(q, q.options!.length - 1)) { view.render(); view.scheduleSave?.(); }
 				});
 			};
 
@@ -470,7 +446,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				inp.type = "number";
 				inp.value = String(val);
 				inp.min = "0"; inp.max = String(q.possibilities!.length - 1); inp.style.width = "55px";
-				inp.addEventListener("input", () => { q.correctOrder![i] = parseInt(inp.value) || 0; rerender(); });
+				inp.addEventListener("input", () => { placerOrdre(q, i, parseInt(inp.value) || 0); rerender(); });
 			});
 		}
 
@@ -498,7 +474,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				createSelect(r, {
 					value: String(q.correctMap?.[i] ?? 0),
 					options: (q.choices || []).map((c, ci) => ({ value: String(ci), label: c || "..." })),
-					onChange: (v) => { q.correctMap![i] = parseInt(v) || 0; rerender(); },
+					onChange: (v) => { associer(q, i, parseInt(v) || 0); rerender(); },
 				});
 			});
 		}
@@ -535,7 +511,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 		if (qType === "numeric") {
 			ajouter(box, "div", "qb-field-help", t("editor.numeric.help"));
-			_arrayEditor(box, t("editor.numeric.answers"), q.acceptedAnswers!, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
+			_variantEditor(box, t("editor.numeric.answers"), q, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
 			_field(box, t("editor.numeric.unit"), q.unit, t("editor.numeric.unitPlaceholder"), false,
 				v => { q.unit = v; rerender(); });
 			/* Les deux marges s'EXCLUENT : renseigner l'une efface l'autre.
@@ -570,7 +546,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 					v => { q.commandPrefix = v; rerender(); });
 			}
 			_field(box, t("editor.text.placeholderLabel"), q.placeholder, t("editor.text.placeholderHint"), false, v => { q.placeholder = v; rerender(); });
-			_arrayEditor(box, t("editor.text.acceptedAnswers"), q.acceptedAnswers!, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
+			_variantEditor(box, t("editor.text.acceptedAnswers"), q, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
 			const toggleWrap = ajouter(box, "div", "qb-toggle-wrap");
 			const track = ajouter(toggleWrap, "div", `qb-toggle-track ${q.caseSensitive ? "on" : ""}`);
 			ajouter(track, "div", "qb-toggle-thumb");
@@ -603,6 +579,39 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			_iconSpan(addBtn, "plus", "qb-add-icon");
 			addBtn.appendChild(document.createTextNode(addLabel));
 			addBtn.addEventListener("click", () => { items.push(""); onChange(); renderItems(); });
+		};
+		renderItems();
+	}
+
+	/* Même rendu que `_arrayEditor`, mais pour `q.acceptedAnswers` : ajouter et
+	   retirer passent par les GESTES partagés (`ajouterVariante` /
+	   `retirerVariante`), qui refusent de retirer la dernière variante — plutôt
+	   que de recopier ici la règle que `_arrayEditor` applique en générique. */
+	function _variantEditor(parent: HTMLElement, label: string, q: DraftQuestion, onChange: () => void, placeholder: string, addLabel: string): void {
+		ajouter(parent, "label", "qb-field-label", label);
+		const container = ajouter(parent, "div", "qb-arr-list");
+		const renderItems = () => {
+			const items = q.acceptedAnswers || [];
+			container.replaceChildren();
+			items.forEach((item, i) => {
+				const row = ajouter(container, "div", "qb-arr-row");
+				const inp = ajouter(row, "input", "qb-field-input");
+				inp.placeholder = `${placeholder} ${i + 1}`;
+				inp.value = item ?? "";
+				inp.addEventListener("input", () => { items[i] = inp.value; onChange(); });
+				const del = ajouter(row, "button", "qb-arr-del");
+				del.type = "button";
+				del.title = t("editor.action.delete");
+				del.setAttribute("aria-label", t("editor.action.delete"));
+				_setIcon(del, "trash-2");
+				if (items.length <= 1) del.disabled = true;
+				del.addEventListener("click", () => { if (retirerVariante(q, i)) { onChange(); renderItems(); } });
+			});
+			const addBtn = ajouter(container, "button", "qb-arr-add");
+			addBtn.type = "button";
+			_iconSpan(addBtn, "plus", "qb-add-icon");
+			addBtn.appendChild(document.createTextNode(addLabel));
+			addBtn.addEventListener("click", () => { if (ajouterVariante(q)) { onChange(); renderItems(); } });
 		};
 		renderItems();
 	}

@@ -121,6 +121,12 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # Les gestes d'édition d'une question, partagés par le formulaire et
+      # l'édition dans le rendu : jamais une question sans bonne réponse,
+      # jamais deux emplacements d'un classement sur le même élément.
+      - name: Gestes d'édition d'une question
+        run: npm run check:gestes
+
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à
       # l'écran. Ce contrôle charge le noyau réellement appelé par l'installeur.
