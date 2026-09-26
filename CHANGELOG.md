@@ -41,12 +41,11 @@ release notes.
 - Inside a folder, Documents, Links and Notes share one dashed tile with a tab for each, instead of three stacked frames, with the tab's button (Upload files, Add a link, Create a note) at the top right; the folder remembers the last tab opened.
 - My quizzes can be grouped by Recent (the default) or by Folder, which puts each folder under the folder that contains it; grouping by course unit moves to a Custom section of the menu, since it depends on your own course.
 - A folder without a chosen icon gets one that fits its name instead of a book everywhere: a bug for Ethical Hacking, blocks for software architecture, a terminal for scripting, a router for networks, a radar for technology watch. The icon picker offers about a hundred icons grouped by theme.
-- In a Learn path, a question that asks you to explain in your own words shows the lesson of its step above it, open.
 - Generated quizzes put code, commands, identifiers and paths between backticks, so they show in a code font and Python names such as __init__ keep their underscores.
 - A timed quiz opens on a screen that announces the timer (duration, number of questions, one Start button) instead of asking to choose between learning and exam mode.
-- Question cards show a single plain label (the question type, or Reading / In your own words) instead of type and role badges.
+- Question cards show a single plain label (the question type, or In your own words) instead of type and role badges.
 - The button that opens a quiz in the editor now reads "Edit".
-- Easier reading in a quiz: the question text is larger than before and its title smaller, the role of a Learn question shows as a badge, and the note's location under the quiz title uses the interface font instead of a code font.
+- Easier reading in a quiz: the question text is larger than before and its title smaller, and the note's location under the quiz title uses the interface font instead of a code font.
 - Code blocks in quizzes use the same look as Obsidian (Tokyo Night colors, JetBrains Mono) with syntax highlighting, and generated quizzes always name the code language.
 - Math in quiz text blends in with the sentence: numbers, signs and brackets use the interface font and formulas are slightly larger, while variables stay in math italics.
 - A generated Learn note now stays short: at most 20 questions unless the course truly needs more, and a Practice bank holds 10 to 20. Every question asked before the reading comes with a hint, and a note that lacks one says so.
