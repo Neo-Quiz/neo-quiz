@@ -350,7 +350,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					data-textonly-answer="1"
 					name="${textareaName}"
 					placeholder="${ctx.escapeHtmlAttr(t("engine.textOnly.answerPlaceholder"))}"
-					spellcheck="true"
+					spellcheck="false"
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"

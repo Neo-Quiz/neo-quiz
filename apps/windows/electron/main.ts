@@ -236,6 +236,9 @@ function creerFenetre(): void {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
+			/* AUCUN correcteur d'orthographe dans l'application (2026-09-26) :
+			   il soulignait en rouge le code Python et le HTML d'un énoncé. */
+			spellcheck: false,
 		},
 	});
 
