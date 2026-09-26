@@ -634,8 +634,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
 		draft.questions.forEach((q, i) => {
 			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,
-			   2026-09-26) : numéro en rond, icône et nom du type, rôle d'un
-			   Learn en pastille, puis l'énoncé sur deux lignes. */
+			   2026-09-26) : numéro en rond, une seule étiquette en texte simple
+			   (icône + libellé du type, ou du rôle Lecture/Avec vos mots),
+			   puis l'énoncé sur deux lignes. */
 			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx && !showingWelcome() ? " is-active" : ""));
 			const top = renderTop(card, q, i + 1);
 			top.classList.add("qbd-qz-card-top");

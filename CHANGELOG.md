@@ -44,6 +44,7 @@ release notes.
 - In a Learn path, a question that asks you to explain in your own words shows the lesson of its step above it, open.
 - Generated quizzes put code, commands, identifiers and paths between backticks, so they show in a code font and Python names such as __init__ keep their underscores.
 - A timed quiz opens on a screen that announces the timer (duration, number of questions, one Start button) instead of asking to choose between learning and exam mode.
+- Question cards show a single plain label (the question type, or Reading / In your own words) instead of type and role badges.
 - The button that opens a quiz in the editor now reads "Edit".
 - Easier reading in a quiz: the question text is larger than before and its title smaller, the role of a Learn question shows as a badge, and the note's location under the quiz title uses the interface font instead of a code font.
 - Math in quiz text blends in with the sentence: numbers, signs and brackets use the interface font and formulas are slightly larger, while variables stay in math italics.

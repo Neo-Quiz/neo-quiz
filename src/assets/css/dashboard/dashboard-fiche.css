@@ -374,14 +374,6 @@
 	color: var(--interactive-accent);
 }
 .qbd-fiche-q-icon svg { width: 14px; height: 14px; }
-.qbd-fiche-q-role {
-	font-size: 11.5px;
-	font-weight: 600;
-	color: var(--interactive-accent);
-	padding: 2px 9px;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-}
 
 /* GRILLE, la seule vue de la page (2026-09-26 : la vue liste est partie,
    les cartes montrent désormais toute la consigne en défilant). */

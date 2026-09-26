@@ -3,11 +3,9 @@ import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
 import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 import { t } from "../i18n";
-import type { TransKey } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
 import { Q_TYPES } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
-import type { QuestionRole } from "../types/quiz";
 import type { ModeQuiz } from "../quiz-format";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
@@ -298,37 +296,33 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 	return meta;
 }
 
-/* Le RÔLE d'une question de Learn, quand il en change la nature : une
-   lecture étiquetée « Choix unique » mentait sur ce qu'elle est. `test`
-   (la vérification de fin de partie) est une question ordinaire : son type
-   suffit. */
-const ROLE_KEYS: Partial<Record<QuestionRole, TransKey>> = {
-	pre: "engine.lesson.rolePre",
-	read: "engine.lesson.roleRead",
-	explain: "engine.lesson.roleExplain",
-	recall: "engine.lesson.roleRecall",
-};
-
 /* Au-delà, une option ne tient plus dans une bulle à côté des autres : la
    liste passe en colonne. Compté sur le texte BRUT, LaTeX compris. */
 const OPTION_COURTE = 32;
 
-/** L'en-tête d'une carte : son numéro, l'icône et le nom du type, puis le rôle d'un Learn.
-    Partagé avec les cartes de la liste de l'éditeur (detail.ts), qui y
-    ajoutent leurs commandes : rendu, pour qu'elles s'y greffent. */
+/** L'en-tête d'une carte : son numéro, puis UNE SEULE étiquette en texte simple
+    (icône + libellé), jamais de pastille de rôle en plus du type (2026-09-26 —
+    « une seule étiquette par carte »). `pre`/`recall`/`test` n'ont plus de
+    libellé propre ici : leur type suffit, le rôle reste modifiable dans la
+    barre « Rôle » de l'éditeur (detail-edition.ts). Partagé avec les cartes
+    de la liste de l'éditeur (detail.ts), qui y ajoutent leurs commandes :
+    rendu, pour qu'elles s'y greffent. */
 export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
 	const top = ajouter(card, "span", "qbd-fiche-q-top");
 	ajouter(top, "span", "qbd-fiche-num", String(numero));
-	const roleKey = q.role ? ROLE_KEYS[q.role] : undefined;
-	// Une lecture n'attend pas de réponse, une explication est toujours libre :
-	// leur type n'apprendrait rien.
-	if (q.role === "read") icone(top, "book-open", "qbd-fiche-q-icon");
-	if (q.role !== "read" && q.role !== "explain") {
+	if (q.role === "read") {
+		// Une lecture n'attend pas de réponse : son type n'apprendrait rien.
+		icone(top, "book-open", "qbd-fiche-q-icon");
+		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleRead"));
+	} else if (q.role === "explain") {
+		// Une explication est toujours libre : son type n'apprendrait rien non plus.
+		icone(top, "pen-line", "qbd-fiche-q-icon");
+		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleExplain"));
+	} else {
 		const def = Q_TYPES.find(d => d.key === q._type);
 		if (def) icone(top, def.lucide, "qbd-fiche-q-icon");
 		ajouter(top, "span", "qbd-fiche-q-type", def?.label ?? q._type);
 	}
-	if (roleKey) ajouter(top, "span", "qbd-fiche-q-role", t(roleKey));
 	return top;
 }
 
