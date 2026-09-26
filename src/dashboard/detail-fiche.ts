@@ -10,6 +10,7 @@ import type { ModeQuiz } from "../quiz-format";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
+import { texteQuizHtml } from "../editor/question-preview";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
@@ -439,7 +440,18 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 			icone(ligne, "book-open");
 			texte(ligne, "span", "qbd-fiche-q-lecture-titre", deps.questions[l].title || t("engine.passage.defaultTitle"));
 		}
-		texte(corps, "span", "qbd-fiche-q-text", questionText(q) || t("dashboard.quiz.promptEmpty"));
+		/* L'énoncé ENTIER, rendu comme dans le quiz (paragraphes, listes, blocs
+		   de code colorés) : en texte nu d'une ligne, un bloc de code montrait
+		   ses ``` et perdait ses retours à la ligne (2026-09-26). Même porte
+		   que l'aperçu de l'éditeur, qui repasse par la liste blanche. */
+		const enonce = q.prompt || q.title || "";
+		if (enonce.trim()) {
+			const el = ajouter(corps, "div", "qbd-fiche-q-text");
+			el.innerHTML = texteQuizHtml(enonce);
+			if (enonce.includes("$")) void mathifyElement(el);
+		} else {
+			texte(corps, "span", "qbd-fiche-q-text", t("dashboard.quiz.promptEmpty"));
+		}
 		renderOptions(corps, q);
 		suivreDebord(corps);
 		/* CLIC = ÉDITER CETTE QUESTION (2026-09-26) : la carte ouvre l'éditeur

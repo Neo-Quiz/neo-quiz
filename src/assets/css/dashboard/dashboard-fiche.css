@@ -472,6 +472,18 @@
 	color: var(--text-normal);
 	overflow-wrap: anywhere;
 }
+/* Énoncé rendu en markdown : des paragraphes serrés, un bloc de code qui
+   défile en largeur dans la carte plutôt que de la déborder. */
+.qbd-fiche-q-text > :first-child { margin-top: 0; }
+.qbd-fiche-q-text > :last-child { margin-bottom: 0; }
+.qbd-fiche-q-text p { margin: 0 0 8px; }
+.qbd-fiche-q-text .quiz-md-code {
+	margin: 8px 0;
+	font-weight: 400;
+	font-size: 12.5px;
+	overflow-x: auto;
+	overflow-wrap: normal;
+}
 
 /* Options longues : une colonne, sans fond. Toutes courtes (`is-pills`) :
    des bulles côte à côte. */
