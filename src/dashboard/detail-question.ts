@@ -27,7 +27,8 @@ import type { FormBridge } from "./detail-form-bridge";
     l'aperçu de l'éditeur — un seul markup à suivre si le moteur change. */
 export function renderQuestionView(parent: HTMLElement, q: DraftQuestion, index: number, sourcePath?: string, lecture?: DraftQuestion): void {
 	renderQuizPreviewCard(parent, q, {
-		fallbackTitle: `Question ${index + 1}`,
+		// Une lecture de Learn (index -1) n'a pas de numéro : repli neutre.
+		fallbackTitle: index >= 0 ? `Question ${index + 1}` : t("editor.render.untitled"),
 		// Le cours de l'étape (Learn), au-dessus de la question.
 		lecture,
 		// Le chemin de la NOTE, pour que ses `![[…]]` se résolvent comme dans le

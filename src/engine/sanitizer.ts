@@ -325,7 +325,10 @@ const QUIZ_HTML_TAG_ATTRS: Record<string, Set<string>> = {
 	ol: new Set(["start"])
 };
 
-function escapeHtmlAttr(value: unknown): string {
+/** Exporté pour la porte « attribut » du corps d'une lecture dans l'aperçu
+    de l'éditeur (editor/question-preview.ts) : le même échappement que le
+    moteur, pas une réplique. */
+export function escapeHtmlAttr(value: unknown): string {
 	return String(value ?? "")
 		.replace(/\&/g, "\&amp;")
 		.replace(/"/g, "\&quot;")

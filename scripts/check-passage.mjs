@@ -61,6 +61,11 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 	r.check("question hôte : l'absorbée renvoie à la question qui la suit dans l'étape", le.questionHote(quiz, true, 1), 2);
 	r.check("question hôte : absorbée en fin d'étape → première question de l'étape", le.questionHote(quiz, true, 11), 10);
 	r.check("question hôte : une page est son propre écran", [13, 15].map(i => le.questionHote(quiz, true, i)), [13, 15]);
+	/* Revue du 2026-09-26 : la page d'un quiz (dashboard/detail.ts numeroDe)
+	   retombait sur l'index + 1 pour une lecture (`||` sur un 0 légitime) et
+	   lui fabriquait un « Question N ». */
+	r.check("numéro affiché d'une lecture : 0, jamais l'index + 1 ; d'une question : son numéro",
+		[le.numeroAffiche(quiz, true, 13), le.numeroAffiche(quiz, true, 1), le.numeroAffiche(quiz, true, 14), le.numeroAffiche(quiz, false, 13)], [0, 0, 8, 14]);
 	r.check("reprise : une question garde son numéro, une absorbée donne celui de sa question hôte",
 		[le.numeroDeReprise(quiz, true, 4), le.numeroDeReprise(quiz, true, 1)], [3, 2]);
 	r.check("reprise sur un écran de lecture : le numéro de la question qui suit (jamais l'index + 1)",

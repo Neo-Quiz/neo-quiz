@@ -95,7 +95,8 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 		demonter?.();
 		demonter = monterEditionRendu(hoteRendu, q, {
 			sourcePath,
-			titreDeRepli: `Question ${index + 1}`,
+			// Une lecture de Learn (index -1) n'a pas de numéro : repli neutre.
+			titreDeRepli: index >= 0 ? `Question ${index + 1}` : undefined,
 			lecture: cb.lecture,
 			onChange: cb.onChange,
 			rendre: peindrePlus,

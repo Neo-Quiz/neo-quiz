@@ -23,7 +23,7 @@ import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlid
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
-import { lectureDeLEtape, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
+import { lectureDeLEtape, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ PAGE — ce qu'on voit en cliquant un quiz (refonte 2026-07-21,
@@ -275,9 +275,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function visibles(): number[] {
 		return draft ? questionsVisibles(draft.questions, estLecon()) : [];
 	}
-	/** Numéro affiché de l'index `i` (1…n), qui saute les lectures absorbées. */
+	/** Numéro affiché de l'index `i` (1…n), 0 pour une lecture de Learn,
+	    qui n'en a pas (src/lecture-etape.ts `numeroAffiche`). */
 	function numeroDe(i: number): number {
-		return (draft ? numerosAffiches(draft.questions, estLecon())[i] : 0) || i + 1;
+		return draft ? numeroAffiche(draft.questions, estLecon(), i) : i + 1;
 	}
 	/** La question visible qui montre `i` (lui-même, sauf une lecture absorbée). */
 	function hote(i: number): number {
@@ -834,6 +835,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const content = ajouter(slide, "div", "qbd-qz-panel-body");
 		// Le cours de l'étape (Learn), et le numéro AFFICHÉ pour le titre de
 		// repli : « Question 2 » pour la question qui suit une lecture absorbée.
+		// -1 pour une lecture de Learn, qui n'a pas de numéro : pas de
+		// « Question N » de repli (detail-edition.ts, detail-question.ts).
 		const lecture = lectureDe(index);
 		const numero = numeroDe(index) - 1;
 		if (editing) {

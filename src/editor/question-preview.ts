@@ -4,7 +4,9 @@ import { currentHost } from "../host/current";
 import { md2html, _setIcon } from "./utils";
 import type { DraftQuestion } from "./utils";
 import { mathifyElement } from "../engine/mathjax";
-import { sanitizeQuizHtml, rendreTexteQuiz } from "../engine/sanitizer";
+import { sanitizeQuizHtml, rendreTexteQuiz, renderInlineText, stripInlineMarkdown, escapeHtmlAttr } from "../engine/sanitizer";
+import { corpsLectureHtml, brancherCartes } from "../engine/lecture-rendu";
+import type { CorpsLecture } from "../engine/lecture-rendu";
 import type { RenduImages } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 /* IMPORT STATIQUE, plus un `require` paresseux : `require` n'existe pas dans
@@ -193,25 +195,57 @@ function renderLecture(card: HTMLElement, lecture: DraftQuestion, opts: QuizPrev
 	// Un cours vide ne s'affiche que là où l'on peut l'écrire.
 	if (!texte && !html && !opts.corrige) return;
 
+	/* Déplié, le cours est une PAGE dans son STYLE (page, étapes, tableau,
+	   « À retenir »), rendue par le MÊME `corpsLectureHtml` que le moteur
+	   (revue du 2026-09-26) : l'auteur voit l'effet du style qu'il choisit
+	   dans « Plus ». Le titre est celui de la page (serif), et c'est lui
+	   qui se modifie ; la barre du cours se réduit au chevron (lecture.css),
+	   qu'un aperçu sans état n'a pas à poser. */
+	const titreTexte = lecture.title || t("engine.passage.defaultTitle");
+	const corps = corpsLectureApercu(lecture, opts.sourcePath, titreTexte);
 	const wrap = ajouter(card, "div", "quiz-passage quiz-passage--lecture");
+	wrap.setAttribute("data-lecture", corps.style);
 	const head = ajouter(wrap, "div", "quiz-passage-head");
 	const icon = ajouter(head, "span", "quiz-passage-icon");
 	icon.setAttribute("aria-hidden", "true");
 	_setIcon(icon, "book-open");
-	const titre = ajouter(head, "span", "quiz-passage-title");
-	inlineInto(titre, lecture.title || t("engine.passage.defaultTitle"), opts.sourcePath);
-	if (opts.corrige) titre.setAttribute("data-edit", "lecture-title");
 	const body = ajouter(wrap, "div", "quiz-passage-body");
-	const content = ajouter(body, "div", "quiz-passage-content");
+	const content = ajouter(ajouter(body, "div", "quiz-passage-clip"), "div", "quiz-passage-content");
+	content.innerHTML = corps.html;
+	brancherCartes(content);
+	const titre = content.querySelector<HTMLElement>(".quiz-lecture-titre");
+	if (opts.corrige && titre) titre.setAttribute("data-edit", "lecture-title");
 	/* Un cours resté en HTML (import) s'affiche tel quel, et reste
 	   modifiable d'ici : sa carte n'a plus d'écran, il n'y a pas d'autre
 	   endroit où le reprendre. Le champ montre son texte (`prompt`, dérivé
 	   du HTML par editor/convert.ts) ; le valider remplace le HTML, comme
-	   pour l'énoncé d'une question. */
-	if (html) content.innerHTML = resolveImagesInHtml(html, opts.sourcePath);
-	else if (texte) content.innerHTML = texteQuizHtml(texte, opts.sourcePath);
-	else content.textContent = t("editor.render.addPrompt");
-	if (opts.corrige) content.setAttribute("data-edit", "lecture");
+	   pour l'énoncé d'une question. La zone modifiable est le TEXTE de la
+	   lecture ; les étapes, le tableau et « À retenir » se modifient dans
+	   « Plus » (dashboard/detail-lecture-style.ts). */
+	let zoneTexte = content.querySelector<HTMLElement>(".quiz-lecture-texte, .quiz-lecture-intro");
+	if (!zoneTexte && opts.corrige) {
+		// Étapes ou tableau SANS texte d'introduction : une place pour l'écrire.
+		zoneTexte = document.createElement("div");
+		zoneTexte.className = "quiz-lecture-intro";
+		(titre ?? content.querySelector(".quiz-lecture"))?.insertAdjacentElement(titre ? "afterend" : "afterbegin", zoneTexte);
+	}
+	if (zoneTexte && !texte && !html) zoneTexte.textContent = t("editor.render.addPrompt");
+	if (opts.corrige && zoneTexte) zoneTexte.setAttribute("data-edit", "lecture");
+}
+
+/** Le corps stylé d'une lecture pour l'APERÇU : `corpsLectureHtml`
+    (engine/lecture-rendu.ts) avec les portes de l'aperçu — le rendu
+    markdown partagé (`texteQuizHtml`), `renderInlineText`, et
+    `stripInlineMarkdown` ré-échappé pour un attribut. */
+function corpsLectureApercu(item: DraftQuestion, sourcePath: string | undefined, titre?: string): CorpsLecture {
+	const texte = (item.prompt || "").trim();
+	const html = (item._promptHtml || "").trim();
+	const texteHtml = html ? resolveImagesInHtml(html, sourcePath) : (texte ? texteQuizHtml(texte, sourcePath) : "");
+	return corpsLectureHtml(item, texte, texteHtml, titre, {
+		bloc: s => texteQuizHtml(s, sourcePath),
+		inline: s => renderInlineText(s),
+		attribut: s => escapeHtmlAttr(stripInlineMarkdown(s)),
+	});
 }
 
 /** Construit la carte de question dans `host` et la renvoie. */
@@ -245,7 +279,18 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 			q.resourceButton.label || t("editor.preview.resourceFallback"), opts.sourcePath);
 	}
 
-	if (q._promptHtml || q.prompt) {
+	if (q.role === "read" && (q._promptHtml || q.prompt)) {
+		/* Une LECTURE affichée comme écran : son texte dans son STYLE, par le
+		   même rendu que le moteur (engine/cards.ts) ; le titre reste le
+		   `<h2>` ci-dessus, qui se modifie. Seul le TEXTE se modifie ici. */
+		const corps = corpsLectureApercu(q, opts.sourcePath);
+		card.setAttribute("data-lecture", corps.style);
+		const promptEl = ajouter(card, "div", "quiz-question");
+		promptEl.innerHTML = corps.html;
+		brancherCartes(promptEl);
+		const zone = promptEl.querySelector<HTMLElement>(".quiz-lecture-texte, .quiz-lecture-intro");
+		if (opts.corrige && !q._promptHtml && zone) zone.setAttribute("data-edit", "prompt");
+	} else if (q._promptHtml || q.prompt) {
 		const promptEl = ajouter(card, "div", "quiz-question");
 		promptEl.innerHTML = q._promptHtml
 			? resolveImagesInHtml(q._promptHtml.replace(/!\[\[([^\]]+)\]\]/g, '<img src="$1" class="qb-md-img" />'), opts.sourcePath)

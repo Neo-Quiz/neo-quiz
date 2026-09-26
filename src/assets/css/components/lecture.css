@@ -110,6 +110,13 @@
   color: color-mix(in srgb, var(--quiz-primary) 82%, white);
 }
 
+/* Un premier paragraphe d'UNE ligne ne descend pas jusqu'au pied de la
+   lettrine : sans `flow-root`, elle débordait dans le paragraphe suivant
+   et le décalait vers la droite. */
+.quiz-lecture--page .quiz-lecture-texte > p:first-child{
+  display: flow-root;
+}
+
 /* Une lecture affichée comme ÉCRAN (style `page`, ou étape sans autre
    question) : la même page que le cours déplié, sur la même surface. Son
    titre est dans la page ; la carte ne pose pas de `<h2>`. */

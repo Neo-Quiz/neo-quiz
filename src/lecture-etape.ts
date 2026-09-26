@@ -114,6 +114,16 @@ export function coursDeLEtape(items: readonly unknown[], estLecon: boolean, qi: 
 	return null;
 }
 
+/** Le numéro AFFICHÉ de l'index `i`, 0 pour une lecture de Learn (elle
+    n'en a pas) ; l'index + 1 seulement pour un index hors du tableau.
+    `??` et JAMAIS `||` : le 0 d'une lecture est une valeur, pas une
+    absence — `||` lui fabriquait un numéro de question (revue du
+    2026-09-26, page d'un quiz). Même règle que `ctx.numeroAffiche` du
+    moteur (engine.ts). */
+export function numeroAffiche(items: readonly unknown[], estLecon: boolean, i: number): number {
+	return numerosAffiches(items, estLecon)[i] ?? i + 1;
+}
+
 /** Le numéro à annoncer pour une session posée sur l'index `i`
     (« Reprendre · Q3/7 ») : celui de la question qui le montre
     (`questionHote`) ; pour une lecture restée un écran, qui n'a pas de
