@@ -51,7 +51,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.createFolderTitle": "Créer un dossier",
 	"dashboard.quizzes.createAiTitle": "Créer avec l'IA",
 	"dashboard.quizzes.createAiDesc": "Décrivez un sujet ou déposez vos notes, l'IA les transforme en quiz interactifs",
-	"dashboard.quizzes.createEmptyTitle": "Créer un dossier vide",
+	"dashboard.quizzes.createEmptyTitle": "Créer un nouveau dossier",
 	"dashboard.quizzes.createEmptyDesc": "Un dossier vide à remplir de vos propres quiz quand vous voulez",
 	"dashboard.quizzes.createOpenTitle": "Ouvrir un dossier existant",
 	"dashboard.quizzes.createOpenDesc": "Désignez un dossier que vous avez déjà — un dossier de vault Obsidian, par exemple — et créez vos quiz dedans",
