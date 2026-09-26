@@ -547,3 +547,4 @@
 /* « 23 questions » reste du texte (ce n'est pas un bouton), sans point
    séparateur devant (2026-09-26). */
 .qbd-fiche-meta .qbd-fiche-count::before { content: none !important; }
+.qbd-fiche-chips .qbd-fiche-origin { margin-left: 10px; }
