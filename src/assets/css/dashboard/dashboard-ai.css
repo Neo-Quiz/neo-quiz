@@ -977,6 +977,13 @@
 	animation: qbd-send-in 0.16s ease-out;
 }
 
+/* Sans fournisseur, rien ne peut partir : pas de flèche du tout, même si
+   un texte reste dans le composer. La bulle « Choisissez un fournisseur »
+   est la seule action. */
+.qbd-ai-composer--sans-fournisseur .qbd-ai-composer-send.is-visible {
+	display: none;
+}
+
 .qbd-ai-composer-send:hover {
 	background: var(--interactive-accent-hover) !important;
 }
