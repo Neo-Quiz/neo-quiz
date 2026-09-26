@@ -2,6 +2,11 @@ import type { HostFile } from "../host/types";
 import type { EngineCtx } from "../types/engine-ctx";
 import type { QuestionBase } from "../types/quiz";
 import { pickLessonFields } from "../quiz-utils";
+import {
+	MD_MARK, EMPHASES, motifFormule, motifCodeDouble, motifCodeSimple,
+	motifEtoilesMultiples, motifFlanc,
+} from "./grammaire-inline";
+import type { GenreEmphase } from "./grammaire-inline";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -37,34 +42,18 @@ export interface SanitizerHandlers {
 	replaceObsidianEmbedsInHtml(html: unknown, opts?: EmbedClassOptions): string;
 }
 
-/** Balise de mise à l'abri de `inlineMarkdown` (maths, code) : U+0000, un
-    caractère de contrôle qu'aucun texte de quiz réel ne contient. Un
-    placeholder fait de lettres finirait, lui, par apparaître dans une
-    question qui en parle. Construit par code — un NUL littéral dans une
-    source TypeScript ne survit pas à un outil de formatage. */
-const MD_MARK = String.fromCharCode(0);
+/* Les MOTIFS (formule, code, flanc des emphases) et la balise de mise à
+   l'abri `MD_MARK` vivent dans `grammaire-inline.ts`, partagés avec le champ
+   à aperçu en direct de l'éditeur : une seule grammaire pour le rendu et pour
+   l'édition. */
 
-/**
- * Motif d'un délimiteur markdown apparié (`**`, `*`, `~~`), avec la règle de
- * FLANC GAUCHE : le délimiteur ouvrant ne peut suivre ni une lettre, ni un
- * chiffre, ni un antislash. C'est ce qui distingue de l'emphase deux cas très
- * courants dans un quiz technique :
- *   - `3*4*5` — une multiplication, pas de l'italique ;
- *   - `C:\Users\*\AppData\*\Cache` — un chemin Windows, où `\*` est d'ailleurs
- *     la forme markdown d'une étoile littérale.
- * Le contenu, lui, doit commencer et finir collé au délimiteur (`(?=\S)` …
- * `\S`) : « 3 * 4 * 5 », espacé, n'est pas non plus de l'emphase.
- */
-function FLANK(delim: string): RegExp {
-	// `\p{L}\p{N}` et non `0-9A-Za-zÀ-ÿ` : une multiplication écrite avec des
-	// variables grecques, arabes ou chinoises (`α*β*γ`, `甲*乙*丙`) est une
-	// multiplication elle aussi — la classe ASCII la rendait en italique.
-	return new RegExp(
-		"(^|[^\\p{L}\\p{N}\\\\" + delim.replace(/\\/g, "") + "])"
-		+ delim + "(?=\\S)((?:(?!" + delim + ")[\\s\\S])*?\\S)" + delim,
-		"gu",
-	);
-}
+/** Balises HTML de chaque emphase de la grammaire partagée. */
+const BALISES_EMPHASE: Record<GenreEmphase, [string, string]> = {
+	grasItalique: ["<strong><em>", "</em></strong>"],
+	gras: ["<strong>", "</strong>"],
+	italique: ["<em>", "</em>"],
+	barre: ["<del>", "</del>"],
+};
 
 function escapeHtmlText(value: unknown): string {
 	return String(value ?? "")
@@ -108,25 +97,22 @@ function inlineMarkdown(escaped: string): string {
 		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
 		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
 		// gras au milieu restait littéral).
-		.replace(/(^|[^\\])(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g, (_m, before: string, math: string) => before + keep(math))
+		.replace(motifFormule(), (_m, before: string, math: string) => before + keep(math))
 		.replace(/<code>[\s\S]*?<\/code>/g, m => keep(m))
 		// Double accent grave AVANT le simple : c'est la forme markdown
 		// d'un code qui CONTIENT un accent grave (``a ` b``).
-		.replace(/``([^\n]+?)``/g, (_m, code: string) => keep(`<code>${code}</code>`))
-		.replace(/`([^`\n]+)`/g, (_m, code: string) => keep(`<code>${code}</code>`));
+		.replace(motifCodeDouble(), (_m, code: string) => keep(`<code>${code}</code>`))
+		.replace(motifCodeSimple(), (_m, code: string) => keep(`<code>${code}</code>`));
 
-	out = out
-		// Une suite de QUATRE étoiles ou plus n'est pas de l'emphase : aucune
-		// combinaison de gras et d'italique ne s'écrit ainsi, et la laisser
-		// passer faisait produire des balises croisées. Mise à l'abri telle
-		// quelle, comme le ferait un lecteur markdown.
-		.replace(/\*{4,}/g, m => keep(m))
-		// Triple AVANT double avant simple : `***x***` traité en une passe,
-		// sinon les balises se croisent (<strong><em>…</strong></em>).
-		.replace(FLANK("\\*\\*\\*"), "$1<strong><em>$2</em></strong>")
-		.replace(FLANK("\\*\\*"), "$1<strong>$2</strong>")
-		.replace(FLANK("\\*"), "$1<em>$2</em>")
-		.replace(FLANK("~~"), "$1<del>$2</del>");
+	// Une suite de QUATRE étoiles ou plus n'est pas de l'emphase, et la
+	// laisser passer faisait produire des balises croisées. Mise à l'abri
+	// telle quelle, comme le ferait un lecteur markdown.
+	out = out.replace(motifEtoilesMultiples(), m => keep(m));
+	// Triple AVANT double avant simple (ordre de `EMPHASES`).
+	for (const { genre, delim } of EMPHASES) {
+		const [o, f] = BALISES_EMPHASE[genre];
+		out = out.replace(motifFlanc(delim), (_m, avant: string, contenu: string) => avant + o + contenu + f);
+	}
 
 	return out.replace(new RegExp(MD_MARK + "(\\d+)" + MD_MARK, "g"), (_m, i: string) => stash[Number(i)]);
 }

@@ -6,6 +6,7 @@ import { renderQuizPreviewCard } from "../editor/question-preview";
 import { isRichHtml, Q_TYPES } from "../editor/utils";
 import { _htmlToText } from "../editor/modals";
 import { createFormBridge } from "./detail-form-bridge";
+import { creerChampDirect } from "../editor/champ-direct";
 import type { FormBridge } from "./detail-form-bridge";
 
 /* ══════════════════════════════════════════════════════════
@@ -99,17 +100,21 @@ function bloc(parent: HTMLElement, label: string): HTMLElement {
 
 function renderTitleField(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): void {
 	const field = bloc(parent, t("dashboard.quiz.editTitle"));
-	const input = ajouter(field, "input", "qbd-qz-input");
-	input.type = "text";
-	input.value = q.title || "";
-	input.placeholder = t("dashboard.quiz.editTitlePlaceholder");
-	input.addEventListener("input", () => {
-		q.title = input.value;
-		// Un titre SAISI est un titre d'auteur, même s'il ressemble au motif
-		// automatique : sans ce drapeau, le prochain réordonnancement le
-		// remplacerait par « Question N ».
-		q._userModifiedTitle = true;
-		cb.onChange();
+	// Champ direct : le titre s'affiche rendu comme dans le quiz.
+	const place = ajouter(field, "div", "qbd-qz-input qb-direct qb-direct--ligne");
+	creerChampDirect(place, {
+		valeur: q.title || "",
+		multiligne: false,
+		placeholder: t("dashboard.quiz.editTitlePlaceholder"),
+		etiquette: t("dashboard.quiz.editTitle"),
+		onChange: (v) => {
+			q.title = v;
+			// Un titre SAISI est un titre d'auteur, même s'il ressemble au motif
+			// automatique : sans ce drapeau, le prochain réordonnancement le
+			// remplacerait par « Question N ».
+			q._userModifiedTitle = true;
+			cb.onChange();
+		},
 	});
 }
 

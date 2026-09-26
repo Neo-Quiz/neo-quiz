@@ -19,6 +19,8 @@
     "pack:linux": "npm run build && electron-builder --linux --publish never --config electron-builder.config.mjs"
   },
   "dependencies": {
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.38.6",
     "chokidar": "^5.0.0",
     "electron-updater": "^6.8.9",
     "lucide": "^1.41.0",

@@ -36,6 +36,16 @@ export default defineConfig({
 		   pour un fichier qu'elle ne charge pas. */
 		watch: { ignored: ["**/dist-electron/**"] },
 	},
+	/*
+	 * CodeMirror est une dépendance de l'APP, mais c'est le code partagé
+	 * (`src/editor/champ-direct.ts`) qui l'importe : résolu depuis `src/`, il
+	 * trouverait la copie de la racine du dépôt (tirée par `obsidian`), et un
+	 * autre module pourrait trouver celle de l'app. Deux instances de
+	 * `@codemirror/state` font refuser les extensions de l'une par l'autre
+	 * (« Unrecognized extension value »). `dedupe` force l'unique copie de
+	 * `apps/windows/node_modules`, celle que fixe son lockfile.
+	 */
+	resolve: { dedupe: ["@codemirror/state", "@codemirror/view"] },
 	envPrefix: ["VITE_"],
 	build: {
 		target: "es2021",

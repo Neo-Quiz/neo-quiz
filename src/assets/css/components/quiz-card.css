@@ -47,7 +47,11 @@
   line-height: 1.5;
 }
 
-.quiz-question code{
+/* La pastille de code du quiz, partagée avec le champ à aperçu en direct
+   de l'éditeur (editor/champ-direct-deco.ts) : UNE règle, pour que le champ
+   montre exactement la pastille que le quiz affichera. */
+.quiz-question code,
+.qb-direct code.qb-direct-code{
   background: var(--code-background);
   border-radius: 4px;
   padding: 2px 5px;

@@ -7,6 +7,28 @@ import type { DraftQuestion } from "./utils";
 import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante } from "./gestes";
 import { insererTexte, poserBarreFormat } from "./format-toolbar";
 import { createSelect } from "../dashboard/ui-select";
+import { EditorView, keymap } from "@codemirror/view";
+import type { Extension } from "@codemirror/state";
+import { creerChampDirect } from "./champ-direct";
+import type { ChampDirect } from "./champ-direct";
+
+/** ``` + Entrée pose un bloc de code : le raccourci de la zone de texte,
+    gardé tel quel dans le champ direct. */
+const raccourciBlocCode = keymap.of([{
+	key: "Enter",
+	run: (v) => {
+		const pos = v.state.selection.main.head;
+		const ligne = v.state.doc.lineAt(pos);
+		if (v.state.sliceDoc(ligne.from, pos).trim() !== "```") return false;
+		const ouvre = "<pre><code>\n";
+		v.dispatch({
+			changes: { from: ligne.from, to: pos, insert: ouvre + "</code></pre>" },
+			selection: { anchor: ligne.from + ouvre.length },
+			userEvent: "input",
+		});
+		return true;
+	},
+}]);
 
 /** Handlers du formulaire d'édition d'une question (champs, ressource, éditeurs par type, éditeur de tableau). */
 export interface EditorFormHandlers {
@@ -175,6 +197,52 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 	// La barre de mise en forme (et ses entités) vit dans format-toolbar.ts.
 	const _insertAt = insererTexte;
 
+	/** Coller une image dans un champ direct : même chemin que la zone de
+	    texte — le fichier écrit par l'hôte, un `![[…]]` inséré au curseur. Le
+	    `preventDefault` part AVANT l'écriture asynchrone : sinon CodeMirror
+	    collerait aussi le presse-papiers. */
+	function collageImage(): Extension {
+		return EditorView.domEventHandlers({
+			paste(e, vue) {
+				const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith("image/"));
+				const file = item?.getAsFile();
+				if (!item || !file) return false;
+				e.preventDefault();
+				void (async () => {
+					/* Un rejet ici ne remonterait NULLE PART : sans ce `try`, une
+					   image qui ne pouvait pas s'écrire disparaissait en silence. */
+					try {
+						const ext = item.type.split("/")[1] || "png";
+						const { fileName, filePath } = await cheminImageCollee(ext, view.sourcePath);
+						const buffer = await file.arrayBuffer();
+						try {
+							await currentHost().fs.writeBinary(filePath, new Uint8Array(buffer));
+						} catch (err) { releaseReservedPath(filePath); throw err; }
+						insererTexte(vue, `![[${fileName}]]`, () => { /* l'écouteur du champ notifie */ });
+						view.schedulePreview();
+					} catch (err) {
+						console.error("[quiz-blocks] collage d'image impossible :", err);
+						currentHost().ui.notice(t("editor.paste.imageFailed"));
+					}
+				})();
+				return true;
+			},
+		});
+	}
+
+	/** Un texte de quiz d'UNE ligne (réponse, élément, variante) dans un champ
+	    direct. `classe` porte le style du contrôle qu'il remplace. */
+	function _champLigne(parent: HTMLElement, classe: string, value: string, placeholder: string, onChange: (value: string) => void): ChampDirect {
+		const place = ajouter(parent, "div", classe + " qb-direct qb-direct--ligne");
+		return creerChampDirect(place, {
+			valeur: value,
+			multiligne: false,
+			placeholder,
+			onChange,
+			extensions: [collageImage()],
+		});
+	}
+
 	function _autoResize(ta: HTMLTextAreaElement): void {
 		ta.style.height = 'auto';
 		const minHeight = 100; // Hauteur minimale plus grande pour être plus propre
@@ -185,6 +253,27 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 	function _field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts: { html?: boolean } = {}): HTMLElement {
 		const wrap = ajouter(parent, "div", "qb-field");
 		ajouter(wrap, "label", "qb-field-label", label);
+		if (multiline && !opts.html) {
+			/* Un TEXTE de quiz (markdown) : le champ à aperçu en direct
+			   (2026-09-26), rendu comme le quiz, la syntaxe n'apparaissant
+			   qu'autour du curseur. Même cadre, même barre, même `onChange`.
+			   Un champ HTML garde sa zone de texte : c'est du balisage qu'on y
+			   édite, pas un texte à rendre. */
+			const cadre = ajouter(wrap, "div", "qb-rich");
+			const place = document.createElement("div");
+			place.className = "qb-direct qb-direct--multi";
+			const champ = creerChampDirect(place, {
+				valeur: value ?? "",
+				multiligne: true,
+				placeholder,
+				etiquette: label || placeholder,
+				onChange,
+				extensions: [raccourciBlocCode, collageImage()],
+			});
+			poserBarreFormat(cadre, champ.vue, false, onChange, () => { /* hauteur automatique */ });
+			cadre.appendChild(place);
+			return wrap;
+		}
 		if (multiline) {
 			/* Un seul CADRE pour la barre et la zone : la barre est collée au
 			   haut du champ, le liseré et le focus sont ceux du cadre. */
@@ -336,51 +425,11 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 					   rouge ou verte. */
 					const card = ajouter(cardsContainer, "div", "qb-answer-row" + (isCorrect ? " is-correct" : ""));
 
-					const input = ajouter(card, "input", "qb-answer-input");
-					input.type = "text";
-					input.value = o || "";
-					input.placeholder = t("editor.answer.placeholder");
-
-					input.addEventListener("input", () => {
-						q.options![i] = input.value;
+					// Champ direct : l'option s'affiche rendue, sa syntaxe
+					// n'apparaît qu'autour du curseur ; le collage d'image suit.
+					_champLigne(card, "qb-answer-input", o || "", t("editor.answer.placeholder"), (v) => {
+						q.options![i] = v;
 						rerender();
-					});
-
-					input.addEventListener("paste", async (e) => {
-						const items = e.clipboardData?.items;
-						if (!items) return;
-
-						for (const item of Array.from(items)) {
-							if (item.type.startsWith("image/")) {
-								e.preventDefault();
-								const file = item.getAsFile();
-								if (!file) continue;
-
-								try {
-									const ext = file.type?.split("/")[1] || "png";
-									const { fileName, filePath: path } = await cheminImageCollee(ext, view.sourcePath);
-
-									const buf = await file.arrayBuffer();
-									try {
-										await currentHost().fs.writeBinary(path, new Uint8Array(buf));
-									} catch (err) { releaseReservedPath(path); throw err; }
-
-									const before = input.value.slice(0, input.selectionStart ?? 0);
-									const after = input.value.slice(input.selectionEnd ?? 0);
-									const wikiLink = `![[${fileName}]]`;
-									input.value = before + wikiLink + after;
-									input.selectionStart = input.selectionEnd = before.length + wikiLink.length;
-
-									q.options![i] = input.value;
-									view.schedulePreview();
-									view.renderCode();
-								} catch (err) {
-									console.error("[quiz-blocks] collage d'image impossible :", err);
-									currentHost().ui.notice(t("editor.paste.imageFailed"));
-								}
-								break;
-							}
-						}
 					});
 
 					/* L'interrupteur « Bonne réponse » : un vrai bouton (clavier,
@@ -562,10 +611,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			container.replaceChildren();
 			items.forEach((item, i) => {
 				const row = ajouter(container, "div", "qb-arr-row");
-				const inp = ajouter(row, "input", "qb-field-input");
-				inp.placeholder = `${placeholder} ${i + 1}`;
-				inp.value = item ?? "";
-				inp.addEventListener("input", () => { items[i] = inp.value; onChange(); });
+				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
 				const del = ajouter(row, "button", "qb-arr-del");
 				del.type = "button";
 				del.title = t("editor.action.delete");
@@ -595,10 +641,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			container.replaceChildren();
 			items.forEach((item, i) => {
 				const row = ajouter(container, "div", "qb-arr-row");
-				const inp = ajouter(row, "input", "qb-field-input");
-				inp.placeholder = `${placeholder} ${i + 1}`;
-				inp.value = item ?? "";
-				inp.addEventListener("input", () => { items[i] = inp.value; onChange(); });
+				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
 				const del = ajouter(row, "button", "qb-arr-del");
 				del.type = "button";
 				del.title = t("editor.action.delete");

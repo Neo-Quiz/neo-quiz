@@ -2,6 +2,7 @@ import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
+import type { EditorView } from "@codemirror/view";
 
 /* ══════════════════════════════════════════════════════════
    BARRE DE MISE EN FORME d'un champ multiligne de l'éditeur
@@ -18,22 +19,58 @@ import { currentHost } from "../host/current";
    balises remplacent le markdown : `**x**` n'y serait pas rendu.
 ══════════════════════════════════════════════════════════ */
 
+/** Le champ que la barre sert : une `<textarea>` (champs HTML) ou le champ
+    à aperçu en direct (sa vue CodeMirror). */
+export type CibleFormat = HTMLTextAreaElement | EditorView;
+
+function estTextarea(c: CibleFormat): c is HTMLTextAreaElement {
+	return c instanceof HTMLTextAreaElement;
+}
+
 /** Insère `text` à la place de la sélection, curseur après — ou à la
-    première ligne vide de `text` quand il en contient une (bloc de code). */
-export function insererTexte(ta: HTMLTextAreaElement, text: string, cb: (value: string) => void): void {
+    première ligne vide de `text` quand il en contient une (bloc de code).
+    Sur le champ direct, `cb` n'est pas appelé ici : son écouteur de
+    modifications le fait déjà, une fois. */
+export function insererTexte(cible: CibleFormat, text: string, cb: (value: string) => void): void {
+	const nl = text.indexOf("\n");
+	const decalage = nl !== -1 ? nl + 1 : text.length;
+	if (!estTextarea(cible)) {
+		const { from, to } = cible.state.selection.main;
+		cible.dispatch({
+			changes: { from, to, insert: text },
+			selection: { anchor: from + decalage },
+			userEvent: "input",
+			scrollIntoView: true,
+		});
+		cible.focus();
+		return;
+	}
+	const ta = cible;
 	const s = ta.selectionStart ?? 0;
 	const before = ta.value.substring(0, s);
 	const after = ta.value.substring(ta.selectionEnd ?? 0);
 	ta.value = before + text + after;
-	const nl = text.indexOf("\n");
-	ta.selectionStart = ta.selectionEnd = before.length + (nl !== -1 ? nl + 1 : text.length);
+	ta.selectionStart = ta.selectionEnd = before.length + decalage;
 	ta.focus();
 	cb(ta.value);
 }
 
 /** Entoure la sélection de `ouvre`…`ferme` et la garde sélectionnée ; sans
     sélection, pose la paire et le curseur entre les deux. */
-function entourer(ta: HTMLTextAreaElement, ouvre: string, ferme: string, cb: (value: string) => void): void {
+function entourer(cible: CibleFormat, ouvre: string, ferme: string, cb: (value: string) => void): void {
+	if (!estTextarea(cible)) {
+		const { from, to } = cible.state.selection.main;
+		const sel = cible.state.sliceDoc(from, to);
+		cible.dispatch({
+			changes: { from, to, insert: ouvre + sel + ferme },
+			selection: { anchor: from + ouvre.length, head: from + ouvre.length + sel.length },
+			userEvent: "input",
+			scrollIntoView: true,
+		});
+		cible.focus();
+		return;
+	}
+	const ta = cible;
 	const s = ta.selectionStart ?? 0;
 	const e = ta.selectionEnd ?? s;
 	const sel = ta.value.substring(s, e);
@@ -44,9 +81,9 @@ function entourer(ta: HTMLTextAreaElement, ouvre: string, ferme: string, cb: (va
 	cb(ta.value);
 }
 
-/** Pose la barre dans `parent`, au-dessus du champ `ta`. `apres` suit chaque
-    insertion (l'ajustement de la hauteur du champ). */
-export function poserBarreFormat(parent: HTMLElement, ta: HTMLTextAreaElement, html: boolean, onChange: (value: string) => void, apres: () => void): HTMLElement {
+/** Pose la barre dans `parent`, au-dessus du champ `cible`. `apres` suit
+    chaque insertion (l'ajustement de la hauteur d'une zone de texte). */
+export function poserBarreFormat(parent: HTMLElement, cible: CibleFormat, html: boolean, onChange: (value: string) => void, apres: () => void): HTMLElement {
 	const barre = ajouter(parent, "div", "qb-format-bar");
 	barre.setAttribute("role", "toolbar");
 
@@ -65,14 +102,14 @@ export function poserBarreFormat(parent: HTMLElement, ta: HTMLTextAreaElement, h
 	const paire = (icon: string, titre: TransKey, md: [string, string], balise: [string, string]): void => {
 		bouton(icon, titre, () => {
 			const [o, f] = html ? balise : md;
-			entourer(ta, o, f, onChange);
+			entourer(cible, o, f, onChange);
 		});
 	};
 
 	paire("bold", "editor.format.bold", ["**", "**"], ["<strong>", "</strong>"]);
 	paire("italic", "editor.format.italic", ["*", "*"], ["<em>", "</em>"]);
 	paire("code", "editor.format.code", ["`", "`"], ["<code>", "</code>"]);
-	bouton("square-code", "editor.entity.codeBlock", () => insererTexte(ta, "<pre><code>\n</code></pre>", onChange));
+	bouton("square-code", "editor.entity.codeBlock", () => insererTexte(cible, "<pre><code>\n</code></pre>", onChange));
 	paire("sigma", "editor.format.formula", ["$", "$"], ["$", "$"]);
 
 	return barre;

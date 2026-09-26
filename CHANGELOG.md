@@ -54,6 +54,7 @@ release notes.
 - The Practice hint now says the bank prepares you for your exam, rather than promising your exam's format.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 - Edit is a neutral raised button next to Start the quiz, the question grid shows at most three columns, and every card has the same height, its extra content scrolling inside it.
+- The editor's text fields show their text as the quiz will: code as a code pill, bold, italic and formulas rendered. The markdown signs (backticks, stars, dollars) only reappear around the cursor, like in Obsidian.
 
 ### Fixed
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.

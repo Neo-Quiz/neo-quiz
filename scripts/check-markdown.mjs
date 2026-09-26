@@ -110,6 +110,49 @@ await withSrcModule("src/engine/sanitizer.ts", ({ renderInlineText, stripInlineM
 	rn.done();
 });
 
+/* Le DÉCOUPAGE en positions du champ à aperçu en direct
+   (engine/grammaire-inline.ts, lu par editor/champ-direct.ts). Il doit voir
+   EXACTEMENT ce que le rendu voit : un `*` que le champ montrerait en
+   italique et que le quiz laisserait tel quel, et l'éditeur mentirait.
+   Deux contrôles : des cas écrits (les positions), puis, sur TOUT le corpus
+   du rendu ci-dessus, le même nombre de chaque balise des deux côtés. */
+await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"], ({ renderInlineText }, { decouperInline }) => {
+	const r = makeReporter("Découpage du champ direct");
+	const vu = (texte) => decouperInline(texte)
+		.map(s => `${s.genre}:${texte.slice(s.debut, s.fin)}`).join(" | ");
+
+	r.check("code inline", vu("Quand on lance `python3 main.py` ici"), "code:`python3 main.py`");
+	r.check("gras et italique", vu("**A** et *b*"), "gras:**A** | italique:*b*");
+	r.check("triple", vu("un ***point*** ici"), "grasItalique:***point***");
+	r.check("formule", vu("soit $x^2$ ici"), "formule:$x^2$");
+	r.check("formule bloc", vu("$$\\int f$$"), "formule:$$\\int f$$");
+	r.check("formule dans un code : avalée", vu("tape `a $x$ b` ici"), "code:`a $x$ b`");
+	r.check("gras dans un code : rien", vu("tape `a**b**c` ici"), "code:`a**b**c`");
+	r.check("multiplication collée : rien", vu("3*4*5"), "");
+	r.check("étoile dans une formule : rien d'autre", vu("aire $a*b*c$"), "formule:$a*b*c$");
+	r.check("dollars échappés : pas de formule", vu("Prix \\$5 et **promo** \\$10"), "gras:**promo**");
+	r.check("emphase imbriquée", vu("**fort *it* ici**"), "gras:**fort *it* ici** | italique:*it*");
+	r.check("double accent grave", vu("tape ``a ` b`` ici"), "code:``a ` b``");
+	r.check("un <code> écrit à la main est littéral", vu("<code>*a*</code>"), "");
+	r.check("les ![[…]] coupent le texte", vu("*a ![[x.png]] b*"), "");
+	r.check("positions après un embed", vu("![[x.png]] `c`"), "code:`c`");
+	r.check("quatre étoiles : rien", vu("voir ****ceci**** ici"), "");
+
+	const compter = (html, balise) => (html.match(new RegExp("<" + balise + ">", "g")) || []).length;
+	const genres = (texte, ...g) => decouperInline(texte).filter(s => g.includes(s.genre)).length;
+	let divergences = 0;
+	for (const [nom, entree] of CAS) {
+		const html = renderInlineText(entree);
+		const ok = compter(html, "strong") === genres(entree, "gras", "grasItalique")
+			&& compter(html, "em") === genres(entree, "italique", "grasItalique")
+			&& compter(html, "code") === genres(entree, "code")
+			&& compter(html, "del") === genres(entree, "barre");
+		if (!ok) { divergences++; console.log("  divergence rendu / champ :", nom); }
+	}
+	r.check("même nombre de balises que le rendu, sur tout le corpus", divergences, 0);
+	r.done();
+});
+
 /* Texte à trous : une paire markdown qui ENJAMBE un trou doit rester une
    paire. Rendre chaque segment séparément laissait « `git ` » et « ` -b` »
    avec un accent grave chacun, tous deux affichés bruts. */
