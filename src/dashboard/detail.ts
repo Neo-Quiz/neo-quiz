@@ -1,7 +1,8 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { markViewEnter } from "./view-enter";
-import { t, currentLang, hourOptions } from "../i18n";
+import { t } from "../i18n";
+import { formatDateHeure } from "./format-date";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import { quizFrere } from "./course-pairs";
@@ -511,11 +512,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function formatGeneratedAt(iso: string): string {
 		const d = new Date(iso);
 		if (Number.isNaN(d.getTime())) return iso;
-		/* L'heure suit le RÉGLAGE (24 h par défaut), pas la langue : l'anglais
-		   écrivait « 06:35 PM » (`hourOptions`, src/i18n.ts). */
-		return d.toLocaleString(currentLang() === "fr" ? "fr-FR" : "en-US", {
-			day: "numeric", month: "short", year: "numeric", minute: "2-digit", ...hourOptions(),
-		});
+		return formatDateHeure(d);
 	}
 
 	/** Stats du quiz, un enregistrement neutre s'il n'a jamais été joué. */

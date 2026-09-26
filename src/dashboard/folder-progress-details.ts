@@ -1,5 +1,5 @@
 import { ajouter } from "../dom";
-import { currentLang, hourOptions, t } from "../i18n";
+import { currentLang, t } from "../i18n";
 import { currentHost } from "../host/current";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
@@ -10,6 +10,7 @@ import { computeQuizState } from "./quiz-mastery";
 import { quizModeLabel } from "./quiz-card";
 import { openModuleEditModal } from "./module-edit";
 import { parseExamDate } from "../review/review-store";
+import { formatDateHeure } from "./format-date";
 
 /* ══════════════════════════════════════════════════════════
    LES TROIS TUILES DU BAS de l'onglet « Progression » (2026-09-25),
@@ -126,15 +127,6 @@ export function renderExamen(parent: HTMLElement, ctx: DashboardShellCtx, group:
 	bouton.addEventListener("click", () => openModuleEditModal(ctx, group, map, rerender));
 }
 
-/** Date et heure d'une tentative — MÊME format que l'origine d'un quiz
-    (`detail.ts`, `origineDe`/`formatGeneratedAt`) : jour, mois court, année,
-    heure selon le réglage 24 h / 12 h (`hourOptions`), pas la langue. */
-function formatDateTentative(ms: number): string {
-	return new Date(ms).toLocaleString(currentLang() === "fr" ? "fr-FR" : "en-US", {
-		day: "numeric", month: "short", year: "numeric", minute: "2-digit", ...hourOptions(),
-	});
-}
-
 /** Une tentative supprimée mais pas encore confirmée : montrée en place
     (« Tentative supprimée » + Annuler) jusqu'au prochain rendu de la page —
     survit donc au redessin de la LIGNE (chevron compris), pas à celui de la
@@ -244,7 +236,7 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 		});
 		return;
 	}
-	ajouter(row, "span", "qbd-folder-attempt-date", formatDateTentative(tentative.date));
+	ajouter(row, "span", "qbd-folder-attempt-date", formatDateHeure(new Date(tentative.date)));
 	const infos = ajouter(row, "span", "qbd-folder-attempt-info");
 	ajouter(infos, "span", "qbd-folder-attempt-pct", tentative.pct === null ? t("dashboard.quizzes.attemptFree") : `${tentative.pct} %`);
 	if (tentative.ancienne) ajouter(infos, "span", "qbd-folder-attempt-old", t("dashboard.quizzes.attemptOld"));
