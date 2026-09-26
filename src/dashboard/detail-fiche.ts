@@ -112,10 +112,11 @@ export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 	}
 	const root = ajouter(parent, "div", "qbd-fiche");
 	renderHead(root, deps);
-	renderMeta(root, deps);
-	/* La barre : la recherche au centre, les actions à droite, sur la MÊME
-	   ligne (2026-09-26 : les boutons, plus haut, n'étaient alignés sur rien). */
+	/* UNE ligne sous le titre : les infos à gauche, la recherche au centre,
+	   les actions à droite (2026-09-26 : chacune à sa hauteur, elles
+	   n'étaient alignées sur rien). */
 	const tools = ajouter(root, "div", "qbd-fiche-tools");
+	renderMeta(tools, deps);
 	const recherche = ajouter(tools, "div", "qbd-fiche-tools-center");
 	const attirer = renderActions(tools, deps);
 	renderBody(root, recherche, attirer, deps);

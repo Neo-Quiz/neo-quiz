@@ -276,6 +276,7 @@
 	align-items: center;
 	gap: 10px;
 }
+.qbd-fiche-tools .qbd-fiche-meta { grid-column: 1; justify-self: start; min-width: 0; }
 .qbd-fiche-tools-center { grid-column: 2; display: flex; justify-content: center; min-width: 0; }
 .qbd-fiche-tools-center .qbd-fiche-search { width: 100%; }
 .qbd-fiche-tools .qbd-fiche-actions { grid-column: 3; justify-self: end; white-space: nowrap; }
@@ -484,7 +485,7 @@
 	.qbd-fiche-body { flex: none; overflow: visible; }
 	/* Étroit : la recherche puis les actions, l'une sous l'autre. */
 	.qbd-fiche-tools { grid-template-columns: minmax(0, 1fr); }
-	.qbd-fiche-tools-center, .qbd-fiche-tools .qbd-fiche-actions { grid-column: 1; justify-self: stretch; }
+	.qbd-fiche-tools .qbd-fiche-meta, .qbd-fiche-tools-center, .qbd-fiche-tools .qbd-fiche-actions { grid-column: 1; justify-self: stretch; }
 }
 
 /* ── La ligne d'infos et la recherche : CHACUNE SA FORME (2026-09-26).
