@@ -22,6 +22,16 @@
 	overflow: hidden;
 }
 
+/* La grille va jusqu'au BORD DU PANNEAU (2026-09-26, comme StudySmarter) :
+   sans la marge intérieure du bas, une carte n'est plus coupée net sur
+   une ligne au-dessus du bord, c'est le bord arrondi du panneau lui-même
+   qui la découpe. La grille garde sa propre marge basse (12 px) pour que
+   la dernière rangée puisse remonter entièrement. */
+.qbd-content:has(> .qbd-qz .qbd-fiche),
+.qbd-content:has(> .qbd-fiche) {
+	padding-bottom: 0;
+}
+
 .qbd-fiche-i { display: inline-flex; }
 .qbd-fiche-i svg { width: 16px; height: 16px; }
 
