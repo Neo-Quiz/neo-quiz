@@ -1183,6 +1183,8 @@
 	transform: translateY(calc(-1 * var(--qbd-cta3d-depth)));
 	transition: transform 100ms ease-out, box-shadow 100ms ease-out;
 }
+/* `.is-pressing` : l'enfoncement déclenché au clavier (Entrée), identique au clic. */
+.qbd-cta3d.is-pressing .qbd-cta3d-face,
 .qbd-cta3d:active:not(:disabled) .qbd-cta3d-face {
 	transform: none;
 	box-shadow: none;

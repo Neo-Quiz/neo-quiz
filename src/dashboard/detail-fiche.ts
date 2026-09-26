@@ -168,6 +168,25 @@ function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
 	   part, pour que `attirer` puisse relancer son cycle (cta3d.ts). */
 	const reflet = poserBouton3d(start);
 	start.addEventListener("click", () => deps.onStart(start));
+	/* ENTRÉE = « Commencer le quiz » quand rien n'a le focus (2026-09-26),
+	   avec l'enfoncement du clic : la face descend, PUIS le quiz part. Pas
+	   quand on écrit (recherche), ni sur un bouton ou une carte focalisés
+	   (Entrée leur appartient), ni sous une modale. L'écouteur se retire
+	   de lui-même dès que la fiche quitte le document. */
+	const surEntree = (e: KeyboardEvent): void => {
+		if (!start.isConnected) { document.removeEventListener("keydown", surEntree); return; }
+		if (e.key !== "Enter" || e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+		const cible = e.target instanceof HTMLElement ? e.target : null;
+		if (cible && cible !== document.body && cible.closest("input, textarea, select, button, a, [contenteditable], [role=button], [tabindex]")) return;
+		if (document.querySelector(".modal-container, [role=dialog], [aria-modal=true]")) return;
+		e.preventDefault();
+		start.classList.add("is-pressing");
+		window.setTimeout(() => {
+			start.classList.remove("is-pressing");
+			if (start.isConnected) deps.onStart(start);
+		}, reduit() ? 0 : 130);
+	};
+	document.addEventListener("keydown", surEntree);
 
 	/* « ⋮ » : le menu de la carte du quiz, comme l'en-tête d'un dossier. */
 	const menu = deps.menu;
