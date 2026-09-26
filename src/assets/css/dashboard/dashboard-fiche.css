@@ -33,8 +33,9 @@
 	padding-top: 2px;
 }
 .qbd-root .qbd-fiche-back {
+	align-self: flex-start;
 	flex-shrink: 0;
-	margin-left: -6px;
+	margin: 0 0 -8px -6px;
 }
 .qbd-fiche-titles {
 	flex: 1;
@@ -93,7 +94,6 @@
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 10px 18px;
-	padding-left: 34px;
 }
 
 /* UNE ligne, toujours : l'objectif, puis le nombre de questions qui porte
@@ -619,7 +619,6 @@
 	.qbd-fiche { overflow-y: auto; }
 	.qbd-fiche-head { flex-wrap: wrap; }
 	.qbd-fiche-actions { width: 100%; }
-	.qbd-fiche-meta { padding-left: 0; }
 	.qbd-fiche-body, .qbd-fiche-body[data-vue="liste"] { flex: none; overflow: visible; }
 	.qbd-fiche-split { grid-template-columns: 1fr; }
 	.qbd-fiche-rail { max-height: 40vh; }

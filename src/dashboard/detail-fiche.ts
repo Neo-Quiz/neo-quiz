@@ -129,15 +129,18 @@ export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 
 /** L'en-tête, et la fonction qui attire l'œil sur « Commencer le quiz ». */
 function renderHead(root: HTMLElement, deps: FicheDeps): () => void {
-	const head = ajouter(root, "header", "qbd-fiche-head");
-
-	// Même bouton que le retour de l'en-tête : un seul retour dans tout le dashboard.
-	const back = ajouter(head, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
+	/* La flèche retour AU-DESSUS du titre (2026-09-26), comme dans un
+	   dossier : à gauche, dossier, titre, ligne d'infos et barre partent
+	   tous de la même verticale. Même bouton que le retour de l'en-tête :
+	   un seul retour dans tout le dashboard. */
+	const back = ajouter(root, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
 	back.type = "button";
 	back.setAttribute("aria-label", t("dashboard.quiz.back"));
 	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
 	ajouter(back, "span", "qbd-quizzes-crumb-icon");
 	back.addEventListener("click", () => deps.onBack());
+
+	const head = ajouter(root, "header", "qbd-fiche-head");
 
 	// Le DOSSIER du quiz, au-dessus du titre — le seul segment du chemin qui
 	// dise d'où il sort (même règle que les cartes). Racine du vault : rien.
