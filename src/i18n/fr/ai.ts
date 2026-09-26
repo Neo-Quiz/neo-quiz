@@ -234,6 +234,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.queue.stepWriting": "Génération des questions…",
 	"ai.queue.newRequest": "Nouvelle demande",
 	"ai.queue.newRequestBusy": "Possible une fois les générations terminées",
+	"ai.queue.newRequestUnsaved": "Enregistrez ou fermez d'abord le quiz non enregistré",
 	"ai.attach.reading": "Lecture du document…",
 	"ai.attach.readFailed": "Lecture impossible",
 	"ai.attach.noText": "Aucun texte dans ce PDF",

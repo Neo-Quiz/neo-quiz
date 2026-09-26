@@ -1,88 +1,189 @@
 /* ══════════════════════════════════════════════════════════
-   LA FILE DE GÉNÉRATION — les lignes sous le composer
-   (`src/dashboard/file-generation-vue.ts`, spec 2026-09-26)
+   LA FILE DE GÉNÉRATION, EN CONVERSATION
+   (`src/dashboard/file-generation-vue.ts`, référence claude.ai relevée le
+   2026-09-26)
 
-   Une ligne est du TEXTE avec une icône d'état, pas une carte : ni fond
-   vitré, ni bordure de tuile, ni pastille, ni capitales. Un filet fin sépare
-   deux lignes, comme deux messages d'un fil. La ligne en cours reprend
-   l'animation du chargement d'avant (le balayage `qbd-glide` et les trois
-   points `qbd-pulse-dot`, déclarés dans dashboard-ai.css), à la taille d'une
-   ligne.
+   Dès qu'une demande est partie, la page devient une conversation : le fil
+   des tours défile au-dessus, le composer reste collé en bas, au même style
+   qu'avant. Un tour = le message de l'utilisateur à droite (bulle sur fond
+   à peine plus clair, rayon 12 px, padding 12 × 16 px, texte 15/20 px, au
+   plus 85 % de la largeur — mesures de claude.ai), puis la réponse à
+   gauche : l'étincelle animée et l'étape en cours, puis la carte du quiz.
+   Ni pastille ni capitales ; seule la carte du quiz, qui est un contenu, a
+   sa tuile.
 ══════════════════════════════════════════════════════════ */
 
+/* ── La page en conversation : le fil prend la hauteur, le composer en bas ── */
+.qbd-ai-stage--conversation {
+	overflow: hidden;
+	gap: 10px;
+	padding-bottom: 16px;
+}
+
+.qbd-ai-stage--conversation::before,
+.qbd-ai-stage--conversation::after {
+	display: none;
+}
+
+.qbd-ai-fil-tete {
+	width: min(732px, 100%);
+	flex-shrink: 0;
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* « Nouvelle demande » : un bouton texte discret, comme « Nouveau » de
+   claude.ai — un fond seulement au survol. */
+.qbd-ai-nouvelle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.qbd-ai-nouvelle:hover:not(:disabled) {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+}
+
+.qbd-ai-nouvelle:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.qbd-ai-nouvelle-icone { display: inline-flex; }
+.qbd-ai-nouvelle-icone svg { width: 15px; height: 15px; }
+
+.qbd-ai-fil {
+	flex: 1 1 auto;
+	min-height: 0;
+	width: 100%;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb-bg) transparent;
+}
+
+/* ── Les tours ── */
 .qbd-ai-stage .qbd-ai-file {
 	width: min(732px, 100%);
 	flex-shrink: 0;
 	display: flex;
 	flex-direction: column;
+	gap: 28px;
 	margin-top: 10px;
 	text-align: left;
 }
 
+.qbd-ai-fil .qbd-ai-file {
+	margin-top: 0;
+	padding: 8px 4px 24px;
+	box-sizing: border-box;
+}
+
 .qbd-ai-file:empty { display: none; }
 
-.qbd-ai-file-ligne {
-	position: relative;
-	display: flex;
-	align-items: flex-start;
-	gap: 12px;
-	padding: 12px 4px;
-	overflow: hidden;
-	min-width: 0;
-}
-
-.qbd-ai-file-ligne + .qbd-ai-file-ligne {
-	border-top: 1px solid var(--background-modifier-border);
-}
-
-/* Le balayage de la ligne en cours : le même dégradé que la carte de
-   chargement, sous le texte. */
-.qbd-ai-file-ligne--cours::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--interactive-accent) 8%, transparent) 50%, transparent 100%);
-	animation: qbd-glide 2.2s ease-in-out infinite;
-	pointer-events: none;
-}
-
-.qbd-ai-file-etat {
-	display: inline-flex;
-	flex-shrink: 0;
-	margin-top: 1px;
-	color: var(--text-faint);
-}
-
-.qbd-ai-file-etat svg { width: 16px; height: 16px; }
-.qbd-ai-file-ligne--cours .qbd-ai-file-etat { color: var(--interactive-accent); }
-.qbd-ai-file-ligne--prete .qbd-ai-file-etat,
-.qbd-ai-file-ligne--enregistrement .qbd-ai-file-etat { color: var(--interactive-accent); }
-.qbd-ai-file-ligne--echouee .qbd-ai-file-etat { color: var(--text-error); }
-
-.qbd-ai-file-corps {
-	position: relative;
-	flex: 1 1 auto;
-	min-width: 0;
+.qbd-ai-tour {
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: 14px;
+	min-width: 0;
 }
 
-/* Le résumé passe à la ligne plutôt que d'être coupé : le nom d'une pièce
-   jointe garde son extension, toujours. */
-.qbd-ai-file-resume {
-	font-size: 14px;
-	line-height: 1.4;
+/* Le message de l'utilisateur, à droite. */
+.qbd-ai-message {
+	align-self: flex-end;
+	max-width: 85%;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
+	min-width: 0;
+}
+
+.qbd-ai-bulle {
+	padding: 12px 16px;
+	border-radius: 12px;
+	background: var(--background-secondary);
 	color: var(--text-normal);
+	font-size: 15px;
+	line-height: 20px;
+	white-space: pre-wrap;
 	overflow-wrap: anywhere;
+	text-align: left;
 }
 
-.qbd-ai-file-meta {
+.qbd-ai-message-pieces {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+/* Les pièces jointes en petites vignettes : la page d'un PDF, une image, ou
+   le nom coupé au milieu — l'extension toujours visible — et son badge. */
+.qbd-ai-message-piece {
+	width: 88px;
+	height: 72px;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	gap: 6px;
+	padding: 8px;
+	border-radius: 10px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	overflow: hidden;
+	font-size: 11.5px;
+	line-height: 1.3;
+	color: var(--text-normal);
+}
+
+.qbd-ai-message-piece--image { padding: 0; }
+
+.qbd-ai-message-piece img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: top;
+	display: block;
+}
+
+.qbd-ai-message-piece-nom {
+	display: flex;
+	min-width: 0;
+}
+
+.qbd-ai-message-piece-tete {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.qbd-ai-message-piece-queue {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+.qbd-ai-message-meta {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 4px 10px;
-	font-size: 12.5px;
+	font-size: 12px;
 	color: var(--text-muted);
 }
 
@@ -97,45 +198,151 @@
 .qbd-ai-file-modele .qbd-provider-logo svg,
 .qbd-ai-file-modele .qbd-provider-logo img { width: 13px; height: 13px; }
 
-.qbd-ai-file-statut {
+/* ── La réponse, à gauche ── */
+.qbd-ai-reponse {
 	display: flex;
-	flex-wrap: wrap;
 	align-items: center;
-	gap: 4px 8px;
-	font-size: 12.5px;
+	gap: 10px;
+	min-height: 28px;
+	min-width: 0;
+	font-size: 14px;
+	line-height: 20px;
 	color: var(--text-muted);
-	overflow-wrap: anywhere;
 }
 
-.qbd-ai-file-ligne--prete .qbd-ai-file-statut { color: var(--text-normal); font-weight: 600; }
-.qbd-ai-file-ligne--echouee .qbd-ai-file-statut { color: var(--text-error); }
-
-.qbd-ai-file-temps { font-variant-numeric: tabular-nums; color: var(--text-faint); }
-
-.qbd-ai-file-points { display: inline-flex; gap: 4px; }
-
-.qbd-ai-file-point {
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	background: var(--interactive-accent);
-	animation: qbd-pulse-dot 1.2s ease-in-out infinite;
-}
-
-.qbd-ai-file-point:nth-child(2) { animation-delay: 0.2s; }
-.qbd-ai-file-point:nth-child(3) { animation-delay: 0.4s; }
-
-.qbd-ai-file-actions {
-	position: relative;
-	display: flex;
-	align-items: center;
-	gap: 6px;
+.qbd-ai-reponse-fin {
+	margin-left: auto;
+	display: inline-flex;
 	flex-shrink: 0;
 }
 
-.qbd-ai-file-ouvrir {
-	padding: 4px 12px;
+.qbd-ai-reponse-icone {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.qbd-ai-reponse-icone svg { width: 18px; height: 18px; }
+
+/* L'étincelle de claude.ai pendant la réflexion : elle tourne et respire. */
+.qbd-ai-etincelle {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--interactive-accent);
+	animation: qbd-ai-etincelle 2.4s ease-in-out infinite;
+}
+
+.qbd-ai-etincelle svg { width: 20px; height: 20px; }
+
+@keyframes qbd-ai-etincelle {
+	0%   { transform: rotate(0deg) scale(1); opacity: 1; }
+	50%  { transform: rotate(180deg) scale(0.82); opacity: 0.7; }
+	100% { transform: rotate(360deg) scale(1); opacity: 1; }
+}
+
+/* Le texte d'état balayé d'un reflet, comme « Réflexion… » de claude.ai. */
+.qbd-ai-reponse-etape {
+	background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 35%, var(--text-normal) 50%, var(--text-muted) 65%, var(--text-muted) 100%);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: qbd-ai-reflet 2.2s linear infinite;
+}
+
+@keyframes qbd-ai-reflet {
+	from { background-position: 100% 0; }
+	to   { background-position: -150% 0; }
+}
+
+.qbd-ai-file-temps {
+	font-variant-numeric: tabular-nums;
 	font-size: 13px;
+	color: var(--text-faint);
+}
+
+.qbd-ai-reponse--echouee { align-items: flex-start; }
+.qbd-ai-reponse--echouee .qbd-ai-reponse-icone { color: var(--text-error); margin-top: 1px; }
+
+.qbd-ai-reponse-corps {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.qbd-ai-reponse-erreur {
+	color: var(--text-error);
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-reponse-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-left: -8px;
+}
+
+/* Les actions d'une réponse : du texte en accent, un fond au survol —
+   jamais un bouton encadré dans la carte du quiz. */
+.qbd-ai-reponse-action {
+	height: 28px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 6px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--interactive-accent);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.qbd-ai-reponse-action:hover {
+	background: var(--background-modifier-hover) !important;
+}
+
+/* La carte du quiz prêt : un contenu, donc une tuile. */
+.qbd-ai-resultat {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: min(460px, 100%);
+	box-sizing: border-box;
+	padding: 12px 10px 12px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--qbd-glass-edge, var(--background-modifier-border));
+	background: var(--qbd-glass-bg, var(--background-secondary));
+	backdrop-filter: var(--qbd-glass-blur, none);
+	-webkit-backdrop-filter: var(--qbd-glass-blur, none);
+}
+
+.qbd-ai-resultat-icone {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--interactive-accent);
+}
+
+.qbd-ai-resultat-icone svg { width: 22px; height: 22px; }
+
+.qbd-ai-resultat-corps {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.qbd-ai-resultat-titre {
+	color: var(--text-normal);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-resultat-sous {
+	font-size: 12.5px;
+	color: var(--text-muted);
 }
 
 /* ■ et × : des icônes nues, qui ne prennent un fond qu'au survol. */
@@ -145,6 +352,7 @@
 	justify-content: center;
 	width: 28px;
 	height: 28px;
+	flex-shrink: 0;
 	padding: 0;
 	border: none;
 	border-radius: 8px;
@@ -161,7 +369,15 @@
 
 .qbd-ai-file-btn svg { width: 15px; height: 15px; }
 
+/* Le bouton d'envoi devenu ■ (composer vide, une génération tourne). */
+.qbd-ai-composer-send--stop .qbd-ai-composer-send-icon svg {
+	fill: currentColor;
+	width: 13px;
+	height: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
-	.qbd-ai-file-ligne--cours::before { animation: none; opacity: 0; }
-	.qbd-ai-file-point { animation: none; opacity: 0.6; }
+	.qbd-ai-etincelle,
+	.qbd-ai-reponse-etape { animation: none; }
+	.qbd-ai-reponse-etape { color: var(--text-muted); background: none; }
 }

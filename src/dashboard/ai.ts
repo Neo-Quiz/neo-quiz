@@ -294,6 +294,43 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 	});
 
+	/* ── La page en CONVERSATION (référence claude.ai, 2026-09-26) ── */
+	/** La mise en page du dernier rendu : conversation ou page vide. */
+	let modeConversation = false;
+	let boutonNouvelle: HTMLButtonElement | null = null;
+	/** Une demande est-elle dans la file ? (`arret` ne se montre pas.) */
+	const enConversation = (): boolean => fileGen.lignes().some(l => l.etat !== "arret");
+	/** Plus rien ne tourne, et aucun quiz n'attend d'être enregistré :
+	    « Nouvelle demande » peut vider la liste sans rien perdre. */
+	function libreDeRepartir(): "oui" | "occupee" | "nonEnregistre" {
+		const ls = fileGen.lignes();
+		if (ls.some(l => l.etat === "attente" || l.etat === "cours" || l.etat === "arret" || l.etat === "enregistrement")) return "occupee";
+		if (ls.some(l => l.etat === "echouee" && l.echec === "enregistrement")) return "nonEnregistre";
+		return "oui";
+	}
+	function majNouvelle(): void {
+		const b = boutonNouvelle;
+		if (!b || !b.isConnected) return;
+		const etat = libreDeRepartir();
+		b.disabled = etat !== "oui";
+		b.title = etat === "occupee" ? t("ai.queue.newRequestBusy") : etat === "nonEnregistre" ? t("ai.queue.newRequestUnsaved") : "";
+	}
+	/** « Nouvelle demande » (le « Nouveau » de claude.ai) : ferme les réponses
+	    finies ; la liste vide, la page redevient la page d'accueil. */
+	function nouvelleDemande(): void {
+		if (libreDeRepartir() !== "oui") return;
+		for (const l of [...fileGen.lignes()]) fileGen.fermer(l.id);
+	}
+	/* La page suit la file : elle passe en conversation au premier envoi et
+	   en sort quand la liste se vide ; entre-temps, seuls le bouton d'envoi
+	   (■ pendant une génération) et « Nouvelle demande » bougent. */
+	const desabonnerPage = fileGen.abonner(() => {
+		if (!stageRef || !stageRef.isConnected) return;
+		if ((phase === "idle" || phase === "error") && enConversation() !== modeConversation) { void render(containerRef); return; }
+		updateGenerateBtn(boutonEnvoi);
+		majNouvelle();
+	}, () => !!stageRef?.isConnected);
+
 	/** « Ouvrir sans enregistrer » : le quiz d'une ligne dont seule la note a
 	    échoué s'affiche dans la page résultat (la même que pour un site), avec
 	    son bouton Enregistrer et « Insérer dans une note ». La ligne reste dans
@@ -953,18 +990,36 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// « Aperçu » vide) ; result → l'ÉDITEUR embarqué pleine page et
 		// le composer EN BAS (variante B « chat »). `formCol` reste le
 		// nom du parent du composer pour ne pas réécrire tout le bloc.
-		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase);
+		/* EN CONVERSATION dès qu'une demande est partie dans la file (référence
+		   claude.ai, 2026-09-26 : /new devient une conversation à l'envoi) : le
+		   titre s'efface, les tours s'empilent dans un fil qui défile, et le
+		   composer se range en bas. On en sort par « Nouvelle demande », ou
+		   quand la liste se vide. */
+		const conversation = (phase === "idle" || phase === "error") && enConversation();
+		modeConversation = conversation;
+		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
+		if (conversation) {
+			const tete = ajouter(stage, "div", "qbd-ai-fil-tete");
+			const nouvelle = ajouter(tete, "button", "qbd-ai-nouvelle");
+			nouvelle.type = "button";
+			host.ui.setIcon(ajouter(nouvelle, "span", "qbd-ai-nouvelle-icone"), "square-pen");
+			ajouter(nouvelle, "span", undefined, t("ai.queue.newRequest"));
+			nouvelle.addEventListener("click", nouvelleDemande);
+			boutonNouvelle = nouvelle;
+			majNouvelle();
+			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
+		}
 
 		// ── Page header ──
 		// Absent en résultat (la page du quiz porte son propre titre) et dès
 		// qu'une demande est partie : sur claude.ai le hero d'accueil cède la
 		// place à la conversation à la seconde où l'on envoie. Le garder
 		// au-dessus de la bulle donnerait l'impression de n'être jamais parti.
-		if (phase !== "result" && !sentMessage) {
+		if (phase !== "result" && !sentMessage && !conversation) {
 			const titleRow = ajouter(formCol, "div", "qbd-ai-title-row");
 			const titleIcon = ajouter(titleRow, "span", "qbd-ai-title-icon");
 			// Glyphe de marque NU à côté du titre serif, comme l'astérisque de
@@ -1854,6 +1909,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			sendBtn.setAttribute("aria-label", t("ai.composer.generate"));
 			host.ui.setIcon(sendIcon, "arrow-up");
 			sendBtn.addEventListener("click", () => {
+				/* Le ■ de claude.ai : composer vide pendant une génération, le
+				   bouton ARRÊTE celle qui tourne (`updateGenerateBtn`). */
+				if (sendBtn.classList.contains("qbd-ai-composer-send--stop")) {
+					const enCours = fileGen.lignes().find(l => l.etat === "cours");
+					if (enCours) fileGen.annuler(enCours.id);
+					return;
+				}
 				if (canGenerate()) void startGeneration(containerRef);
 			});
 		}
@@ -1978,9 +2040,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// :empty → masqué ; rempli par refreshProviderStatuses/renderHint.
 		if (provider) hintZone = ajouter(formCol, "div", "qbd-ai-model-hint");
 
-		// Les lignes de la file de génération, sous le composer : chaque
-		// envoi y est un message parti (spec 2026-09-26).
-		vueFile.rendre(formCol);
+		/* Hors conversation (un site ou une connexion tient la page), les tours
+		   de la file restent sous le composer ; la page d'un quiz ouvert
+		   (`result`) ne les montre pas — rien ne s'y perd, on les retrouve en
+		   revenant. */
+		if (!conversation && phase !== "result") vueFile.rendre(formCol);
 
 		// Détections async (statut fournisseur + modèles réels) : APRÈS la
 		// création de hintZone — l'appel fige ses arguments, et un hintZone
@@ -3591,12 +3655,23 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// connexion, `canGenerate` est faux : le bouton reste visible (le
 		// composer garde la demande) mais grisé.
 		const hasContent = !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
-		const canGen = canGenerate();
-		btn.classList.toggle("is-visible", hasContent);
+		/* Composer VIDE pendant qu'une génération tourne : le bouton devient le
+		   ■ de claude.ai, qui l'arrête. Avec du contenu, la flèche envoie dans
+		   la file, derrière elle. Pas sur le bouton « Ouvrir » d'un site. */
+		const arret = !hasContent && !btn.classList.contains("qbd-ai-composer-send--wide")
+			&& fileGen.lignes().some(l => l.etat === "cours");
+		if (btn.classList.contains("qbd-ai-composer-send--stop") !== arret) {
+			btn.classList.toggle("qbd-ai-composer-send--stop", arret);
+			const icone = btn.querySelector<HTMLElement>(".qbd-ai-composer-send-icon");
+			if (icone) host.ui.setIcon(icone, arret ? "square" : "arrow-up");
+			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t("ai.composer.generate"));
+		}
+		const canGen = arret || canGenerate();
+		btn.classList.toggle("is-visible", hasContent || arret);
 		btn.disabled = !canGen;
 		btn.classList.toggle("qbd-ai-composer-send--disabled", !canGen);
 		// La flèche grisée dit POURQUOI quand c'est une lecture qui la retient.
-		btn.title = noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading") : "";
+		btn.title = arret ? t("ai.composer.stop") : noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading") : "";
 	}
 
 	/* Nomme un bouton-icône SANS déclencher de seconde bulle. `aria-label` (et
@@ -4075,6 +4150,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   prochain montage de la page. */
 		disposed = true;
 		vueFile.liberer();
+		desabonnerPage();
 		if (ollamaPoll) { window.clearInterval(ollamaPoll); ollamaPoll = null; }
 		couperSondeConnexion();
 		arreterAttenteWeb();

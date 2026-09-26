@@ -76,7 +76,14 @@ export interface ProduitGeneration {
 export interface ResultatFile {
 	titre: string;
 	chemin: string;
+	/** Le nombre de questions écrites, pour la carte de résultat. */
+	questions?: number;
 }
+
+/** L'étape d'une génération en cours, que la réponse affiche comme le texte
+    d'état de claude.ai. Connue de l'application seule : le noyau pur n'en
+    sait rien. */
+export type EtapeGeneration = "preparation" | "lecture" | "redaction" | "enregistrement";
 
 export type LigneGeneration = LigneFile<DemandeFile, ResultatFile>;
 
@@ -90,6 +97,8 @@ export interface DepsFile {
 
 export interface FileGenerationApp {
 	lignes(): readonly LigneGeneration[];
+	/** L'étape de la ligne en cours, `null` hors génération. */
+	etape(id: number): EtapeGeneration | null;
 	envoyer(demande: DemandeFile): void;
 	annuler(id: number): void;
 	reessayer(id: number): void;
@@ -118,6 +127,12 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	let file: FileGeneration<DemandeFile, ResultatFile> = F.fileVide();
 	const abonnes = new Set<{ ecouteur: () => void; affichee: () => boolean }>();
 	let clientCourant: AiClient | null = null;
+	const etapes = new Map<number, EtapeGeneration>();
+	/** Change l'étape affichée d'une ligne et prévient les abonnés. */
+	function etapeDe(id: number, e: EtapeGeneration | null): void {
+		if (e) etapes.set(id, e); else etapes.delete(id);
+		publier();
+	}
 
 	function publier(): void {
 		/* Le SIGNAL du rail (l'icône « Générer » s'anime tant qu'une
@@ -156,12 +171,15 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const client = createAiClient(figes);
 		clientCourant = client;
 		try {
+			// « Lecture du document… » quand la demande en porte un.
+			etapeDe(ligne.id, d.notes.length || d.images.length ? "lecture" : "preparation");
 			const { source, prompt } = composerDemande(d);
 			const images = await encoderImages(d.images);
 			const dossier = d.destination || dossierParDefaut(d.reglages.aiOutputFolder);
 			const learn = await lienLearn(deps.scanner, d.mode, dossier, d);
 			// Annulée pendant la préparation : aucun processus n'est encore lancé.
 			if (!tourne(ligne.id)) return;
+			etapeDe(ligne.id, "redaction");
 			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images });
 			if (!tourne(ligne.id)) return;
 			/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
@@ -178,6 +196,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			   un jour : l'application ne fournit pas `usage`, et le greffon n'a
 			   plus la page « Générer ». */
 			// Le quiz est GARDÉ avec la demande avant toute écriture.
+			etapeDe(ligne.id, "enregistrement");
 			await enregistrer(ligne.id, { ...d, produit: { questions, titre: reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } });
 		} catch (err) {
 			const e = err as Error & { aborted?: boolean };
@@ -185,6 +204,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
 			if (clientCourant === client) clientCourant = null;
+			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
 			pomper();
 		}
@@ -207,12 +227,13 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			return;
 		}
 		const titre = entree.title || entree.basename;
-		file = F.terminer(file, id, { titre, chemin: entree.path });
+		file = F.terminer(file, id, { titre, chemin: entree.path, questions: p.questions.length });
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 
 	return {
 		lignes: () => file.lignes,
+		etape: (id) => etapes.get(id) ?? null,
 		reessayerEnregistrement(id) {
 			const avant = file;
 			file = F.reessayerEnregistrement(file, id);
