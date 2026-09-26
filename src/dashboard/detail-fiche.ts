@@ -122,13 +122,13 @@ export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
 		etat.recherche = "";
 	}
 	const root = ajouter(parent, "div", "qbd-fiche");
-	const attirer = renderHead(root, deps);
-	renderMeta(root, deps);
+	renderHead(root, deps);
+	const attirer = renderActions(renderMeta(root, deps), deps);
 	renderBody(root, attirer, deps);
 }
 
-/** L'en-tête, et la fonction qui attire l'œil sur « Commencer le quiz ». */
-function renderHead(root: HTMLElement, deps: FicheDeps): () => void {
+/** L'en-tête : la flèche retour, le dossier et le titre. */
+function renderHead(root: HTMLElement, deps: FicheDeps): void {
 	/* La flèche retour AU-DESSUS du titre (2026-09-26), comme dans un
 	   dossier : à gauche, dossier, titre, ligne d'infos et barre partent
 	   tous de la même verticale. Même bouton que le retour de l'en-tête :
@@ -148,8 +148,14 @@ function renderHead(root: HTMLElement, deps: FicheDeps): () => void {
 	const dossier = deps.quiz.path.split("/").slice(0, -1).filter(Boolean).pop();
 	if (dossier) ajouter(titres, "div", "qbd-fiche-kicker", dossier);
 	ajouter(titres, "h2", "qbd-fiche-title", deps.quiz.title);
+}
 
-	const actions = ajouter(head, "div", "qbd-fiche-actions");
+/** Les actions, au bout de la ligne d'infos, et la fonction qui attire
+    l'œil sur « Commencer le quiz ». DESCENDUES d'une ligne (2026-09-26) :
+    à la hauteur du titre, elles étaient loin de la barre et des questions ;
+    à celle des pastilles, la main les trouve plus vite. */
+function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
+	const actions = ajouter(meta, "div", "qbd-fiche-actions");
 	const edit = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn qbd-fiche-edit");
 	edit.type = "button";
 	icone(edit, "square-pen", "qbd-btn-icon");
@@ -186,8 +192,8 @@ function renderHead(root: HTMLElement, deps: FicheDeps): () => void {
 }
 
 /** La ligne d'infos : le mode (ou le sélecteur Learn | Practice), le nombre
-    de questions, l'origine, la progression. */
-function renderMeta(root: HTMLElement, deps: FicheDeps): void {
+    de questions, l'origine ; les actions s'y ajoutent au bout. */
+function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
 	const chips = ajouter(meta, "div", "qbd-fiche-chips");
 	/* Le MODE, avec son icône, et au survol son explication : la bulle du
@@ -259,22 +265,10 @@ function renderMeta(root: HTMLElement, deps: FicheDeps): void {
 		ajouter(bloc, "span", "qbd-fiche-origin-date", o.date);
 	}
 
-	/* La progression, seulement quand elle dit quelque chose : une barre vide
-	   sous un quiz jamais commencé n'apprend rien, le bouton suffit. */
-	const total = deps.stat.totalQuestions || deps.quiz.questions;
-	const done = Math.min(deps.stat.questionsDone, total);
-	if (done > 0 || deps.stat.attempts > 0) {
-		const progress = ajouter(meta, "div", "qbd-fiche-progress");
-		const bar = ajouter(progress, "div", "qbd-fiche-bar");
-		ajouter(bar, "div", "qbd-fiche-fill").style.width = `${total > 0 ? Math.round(done / total * 100) : 0}%`;
-		const legend = ajouter(progress, "div", "qbd-fiche-legend");
-		ajouter(legend, "span", undefined, t("dashboard.quiz.welcomeProgress", { done, total }));
-		if (deps.stat.attempts > 0) {
-			const best = ajouter(legend, "span", "qbd-fiche-best", t("dashboard.detail.metaBest", { score: deps.stat.bestScore }));
-			if (deps.stat.bestScore >= 80) best.classList.add("is-good");
-			else if (deps.stat.bestScore >= 60) best.classList.add("is-fair");
-		}
-	}
+	/* PLUS DE PROGRESSION ICI (2026-09-26) : la barre et le meilleur score
+	   vivent dans l'onglet Progression du dossier, où l'on peut aussi gérer
+	   ses scores ; leur place laisse descendre les actions sur cette ligne. */
+	return meta;
 }
 
 /* Le RÔLE d'une question de Learn, quand il en change la nature : une
