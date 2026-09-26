@@ -84,15 +84,91 @@
 .quiz-md-liste{ padding-left: 1.4em; }
 .quiz-md-liste .quiz-md-liste{ margin-top: 0.2em; margin-bottom: 0.2em; }
 .quiz-md-titre{ font-size: 1.1em; font-weight: 700; line-height: 1.3; }
+/* Police embarquée (2026-09-26) : « JetBrains Mono » n'est installée sur
+   aucune machine par défaut — sans la fonte réelle, le bloc retombait sur
+   Fira Code ou une monospace système selon l'ordinateur, jamais le même
+   rendu que le snippet Obsidian de référence. Sous-ensembles latin +
+   latin-ext, 400 normal/italique et 700 normal (licence OFL-1.1, fichiers
+   dans src/assets/fonts/jetbrains-mono/, copiés de @fontsource/jetbrains-mono).
+   Nom de famille INTERNE (« Neo Quiz Mono ») pour ne jamais dépendre d'une
+   police du même nom installée par l'utilisateur avec un métrage différent. */
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-400-italic.woff2") format("woff2");
+  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-400-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-ext-700-normal.woff2") format("woff2");
+  unicode-range: U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face{
+  font-family: "Neo Quiz Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../fonts/jetbrains-mono/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+/* Le style du bloc de code d'un quiz REPREND celui du snippet Obsidian de
+   référence (c-code-tokyo-night.css, thème Tokyo Night) : couleurs FIXES,
+   jamais celles de l'hôte — un quiz partagé doit avoir le même rendu chez
+   tout le monde. Variables posées ICI (et non dans le thème de l'app) pour
+   que check:theme les voie DÉFINIES et n'en exige rien de l'hôte. */
 .quiz-md-code{
-  background: var(--code-background);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  padding: 10px 12px;
+  --qmc-bg: #1a1b26;
+  --qmc-border: #24283b;
+  --qmc-fg: #c0caf5;
+  --qmc-comment: #565f89;
+  --qmc-keyword: #7aa2f7;
+  --qmc-operator: #89ddff;
+  --qmc-function: #7dcfff;
+  --qmc-string: #9ece6a;
+  --qmc-number: #ff9e64;
+  --qmc-class: #2ac3de;
+  --qmc-punctuation: #c0caf5;
+  --qmc-tag: #f7768e;
+  --qmc-attr: #e0af68;
+
+  background: var(--qmc-bg);
+  border: 1px solid var(--qmc-border);
+  border-radius: 12px;
+  padding: 16px;
   overflow-x: auto;
-  font-family: var(--font-monospace);
-  font-size: 0.85em;
-  line-height: 1.5;
+  font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.90em;
+  line-height: 1.65;
   white-space: pre;
 }
 .quiz-md-code code{
@@ -100,7 +176,18 @@
   border-radius: 0;
   padding: 0;
   font-size: inherit;
+  color: var(--qmc-fg);
 }
+.quiz-md-code .token.comment{ color: var(--qmc-comment); font-style: italic; }
+.quiz-md-code .token.keyword{ color: var(--qmc-keyword); }
+.quiz-md-code .token.operator{ color: var(--qmc-operator); }
+.quiz-md-code .token.function{ color: var(--qmc-function); }
+.quiz-md-code .token.string{ color: var(--qmc-string); }
+.quiz-md-code :is(.token.number, .token.boolean, .token.constant){ color: var(--qmc-number); }
+.quiz-md-code :is(.token.class-name, .token.builtin){ color: var(--qmc-class); }
+.quiz-md-code .token.punctuation{ color: var(--qmc-punctuation); }
+.quiz-md-code .token.tag{ color: var(--qmc-tag); }
+.quiz-md-code .token.attr-name{ color: var(--qmc-attr); }
 .quiz-md-citation{
   border-left: 3px solid var(--background-modifier-border);
   padding-left: 12px;

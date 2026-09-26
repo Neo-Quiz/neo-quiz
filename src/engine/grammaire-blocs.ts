@@ -311,6 +311,11 @@ export interface OutilsRendu {
 	inline(morceau: string): string;
 	/** Échappement du texte littéral (le contenu d'un bloc de code). */
 	echapper(texte: string): string;
+	/** Coloration syntaxique d'un bloc de code (engine/code-highlight.ts),
+	    ou `null` si l'appelant n'en fournit pas — le bloc reste alors du
+	    texte échappé nu, comme avant. La fonction elle-même retombe sur
+	    `null` pour un langage inconnu ou toute erreur de tokenisation. */
+	colorerCode?(code: string, langue: string): string | null;
 }
 
 function rendreListe(texte: string, items: ItemListe[], o: OutilsRendu): string {
@@ -358,7 +363,11 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				   `+#.-`), dans une classe : c'est ce que le motif de clôture
 				   accepte, rien d'autre ne peut y arriver. */
 				const classe = b.langue ? ` class="language-${o.echapper(b.langue)}"` : "";
-				return `<pre class="quiz-md-code"><code${classe}>${o.echapper(b.contenu ? tranche(b.contenu) : "")}</code></pre>`;
+				const contenu = b.contenu ? tranche(b.contenu) : "";
+				// Coloré si un langage est nommé ET reconnu ; sinon le texte
+				// échappé nu, exactement comme avant l'ajout de la coloration.
+				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
+				return `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
 			}
 			case "tableau": {
 				/* Autant de colonnes que la rangée la plus longue : les cases

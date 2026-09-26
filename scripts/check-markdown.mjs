@@ -187,11 +187,32 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 		P("x") + `<ol class="quiz-md-liste" start="3"><li>a</li><li>b</li></ol>`);
 	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
 		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
-	r.check("bloc de code : littéral et échappé",
+	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
-		`<pre class="quiz-md-code"><code class="language-python">print(&quot;&lt;script&gt;&quot;)${NL}**x** $y$</code></pre>`);
+		`<pre class="quiz-md-code"><code class="language-python">`
+		+ `<span class="token keyword">print</span><span class="token punctuation">(</span>`
+		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
+		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`);
 	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
 		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
+	r.check("langage inconnu : texte échappé, aucun span",
+		rendre("```mystere" + NL + "<script>a</script>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-mystere">&lt;script&gt;a&lt;/script&gt;</code></pre>`);
+	r.check("aucun langage : texte échappé, aucun span",
+		rendre("```" + NL + "<script>a</script>" + NL + "```"),
+		`<pre class="quiz-md-code"><code>&lt;script&gt;a&lt;/script&gt;</code></pre>`);
+	r.check("langage en MAJUSCULES : reconnu quand même",
+		rendre("```PYTHON" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
+	r.check("alias `py` : reconnu comme python",
+		rendre("```py" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
+	const LANGUES_INJECTION = ["python", "bash", "javascript", "sql", "markup", "mystere"];
+	r.check("injection dans un bloc de code coloré : jamais de balise brute, dans plusieurs langages",
+		LANGUES_INJECTION.map(langue => {
+			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
+			// Seules nos propres balises (pre/code/span) peuvent apparaître : tout
+			// le reste du contenu du bloc doit être échappé, jeton par jeton.
+			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span"].includes(m[1].toLowerCase()));
+		}), LANGUES_INJECTION.map(() => true));
 	r.check("tableau : en-tête, alignements, `|` dans un code",
 		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
 		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`

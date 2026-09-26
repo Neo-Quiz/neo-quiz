@@ -47,6 +47,7 @@ release notes.
 - Question cards show a single plain label (the question type, or Reading / In your own words) instead of type and role badges.
 - The button that opens a quiz in the editor now reads "Edit".
 - Easier reading in a quiz: the question text is larger than before and its title smaller, the role of a Learn question shows as a badge, and the note's location under the quiz title uses the interface font instead of a code font.
+- Code blocks in quizzes use the same look as Obsidian (Tokyo Night colors, JetBrains Mono) with syntax highlighting, and generated quizzes always name the code language.
 - Math in quiz text blends in with the sentence: numbers, signs and brackets use the interface font and formulas are slightly larger, while variables stay in math italics.
 - A generated Learn note now stays short: at most 20 questions unless the course truly needs more, and a Practice bank holds 10 to 20. Every question asked before the reading comes with a hint, and a note that lacks one says so.
 - The quiz no longer shows "Slice N of M" above a Learn question: only its role remains, and "In your own words" is now named as such instead of "Check".

@@ -44,6 +44,9 @@ export const PASSAGES_REQUIS: readonly string[] = [
 	"**bold**, *italic*, `code`",
 	"paragraphs separated by an empty line",
 	"NEVER write an HTML tag",
+	// Demande du 2026-09-26 : un bloc de code sans langage se rend sans
+	// couleurs (engine/code-highlight.ts) — le prompt doit toujours l'exiger.
+	"A code block ALWAYS names its language right on the opening backticks",
 ];
 
 export type Manque =

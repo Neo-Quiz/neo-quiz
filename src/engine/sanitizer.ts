@@ -8,6 +8,7 @@ import {
 } from "./grammaire-inline";
 import type { GenreEmphase } from "./grammaire-inline";
 import { rendreBlocs } from "./grammaire-blocs";
+import { colorerCode } from "./code-highlight";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -235,8 +236,10 @@ function rendreMorceaux(texte: string, images: RenduImages): string {
  */
 export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
 	const texte = String(raw ?? "");
-	return rendreBlocs(texte, { inline: m => rendreMorceaux(m, images), echapper: escapeHtmlText })
-		?? rendreMorceaux(texte, images);
+	return rendreBlocs(texte, {
+		inline: m => rendreMorceaux(m, images), echapper: escapeHtmlText,
+		colorerCode: (code, langue) => colorerCode(code, langue, escapeHtmlText),
+	}) ?? rendreMorceaux(texte, images);
 }
 
 /* ── Liste blanche du HTML PRÉ-RENDU ──────────────────────────────────
