@@ -333,9 +333,10 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.check("multiplication non convertie", mult.prompt, "Ici 3*4*5 est une multiplication.");
 	r.check("pas de promptHtml invente", mult.promptHtml, undefined);
 
-	// Le markdown de BLOC, lui, a toujours besoin du HTML.
+	// Le markdown de BLOC reste du markdown : le moteur le rend (2026-09-26,
+	// engine/grammaire-blocs.ts) ; il partait avant vers `md2html`.
 	const liste = tour({ ...base, prompt: "Choisis :" + BR + "- un" + BR + "- deux", options: ["a", "b"], correctIndex: 0 });
-	r.check("liste convertie en HTML", typeof liste.promptHtml, "string");
+	r.check("liste gardee en markdown", [liste.prompt, liste.promptHtml], ["Choisis :" + BR + "- un" + BR + "- deux", undefined]);
 
 	// Une explication en HTML RICHE survit a une sauvegarde qui ne la touche pas.
 	const riche = tour({ ...base, prompt: "P", options: ["a", "b"], correctIndex: 0,
@@ -417,10 +418,13 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 		options: ["a", "b"], correctIndex: 0 });
 	r.check("les deux enonces conserves",
 		[deuxEnonces.promptHtml, deuxEnonces.prompt], ["<strong>riche</strong>", "texte de repli"]);
-	// ... mais un texte DERIVE du HTML par la lecture n'est pas ajoute a une
-	// note qui ne l'avait pas.
-	const htmlSeul = tour({ ...base, promptHtml: "<strong>riche</strong>", options: ["a", "b"], correctIndex: 0 });
-	r.check("pas de prompt invente", htmlSeul.prompt, undefined);
+	// ... mais un texte DERIVE d'un HTML que le markdown ne sait pas dire n'est
+	// pas ajoute a une note qui ne l'avait pas.
+	const htmlSeul = tour({ ...base, promptHtml: "<u>riche</u>", options: ["a", "b"], correctIndex: 0 });
+	r.check("pas de prompt invente", [htmlSeul.prompt, htmlSeul.promptHtml], [undefined, "<u>riche</u>"]);
+	// Un HTML seul CONVERTIBLE, lui, devient le markdown de l'enonce (2026-09-26).
+	const converti = tour({ ...base, promptHtml: "<strong>riche</strong>", options: ["a", "b"], correctIndex: 0 });
+	r.check("HTML seul converti en markdown", [converti.prompt, converti.promptHtml], ["**riche**", undefined]);
 
 	// PROSE qui ressemble a du HTML : elle ne doit PAS partir vers md2html,
 	// sinon on rouvre la corruption que tout le reste evite.

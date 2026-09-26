@@ -136,18 +136,50 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 		    SEULEMENT pour un champ HTML. Les retirer d'un champ texte mangeait
 		    un `<IPv6dePC2>` écrit littéralement par l'auteur, que le moteur
 		    échappe et affiche très bien. */
-		const enTexte = (v, estHtml) => (estHtml ? String(v ?? "") : String(v ?? "").replace(/</g, ABRI))
+		/* DU MARKDOWN PARTOUT (2026-09-26) : un champ `*Html` convertible ressort
+		   en markdown (editor/html-vers-markdown.ts). Le texte VU se compare
+		   alors d'un côté sans balises, de l'autre sans marqueurs de bloc :
+		   - une balise INLINE (`<strong>`, `<code>`…) ne sépare pas deux mots —
+		     « l'<strong>humain</strong> » se lit « l'humain », pas « l' humain » ;
+		   - puces, numéros, `#`, `>`, clôtures ```, séparateurs et `|` de
+		     tableau, syntaxe des liens et images ne sont pas du texte lu. */
+		const INLINE_HTML = /<\/?(strong|b|em|i|code|a|span|del|s|strike|u|mark|kbd|samp|small|sub|sup|font)\b[^>]*>/gi;
+		const ENTITES = { nbsp: " ", hellip: "…", mdash: "—", ndash: "–", laquo: "«", raquo: "»", rsquo: "’", lsquo: "‘", eacute: "é", egrave: "è", agrave: "à", ccedil: "ç", rarr: "→" };
+		// Une ligne SEULE n'a pas de blocs au rendu (engine/grammaire-blocs.ts) :
+		// « + public, - privé » s'y lit tel quel.
+		// Le contenu d'un bloc ``` est littéral : un `# commentaire` Python y
+		// reste lu.
+		const marqueursDeBloc = (s) => !s.includes("\n") ? s : s.split("\n").reduce((acc, ligne) => {
+			if (/^[ \t]*(`{3,}|~{3,})/.test(ligne)) { acc.code = !acc.code; acc.lignes.push(" "); return acc; }
+			acc.lignes.push(acc.code ? ligne : ligne
+				.replace(/^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/, " ")
+				.replace(/^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+/, "")
+				.replace(/^[ \t]{0,3}#{1,6}[ \t]+/, "")
+				.replace(/^[ \t]{0,3}>[ \t]?/, ""));
+			return acc;
+		}, { code: false, lignes: [] }).lignes.join("\n")
+			.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, " $2 ")
+			.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g, "$1");
+		const enTexte = (v, estHtml) => (estHtml
+			? String(v ?? "").replace(INLINE_HTML, "")
+				.replace(/&#(\d+);/g, (_m, n) => String.fromCodePoint(Number(n)))
+				.replace(/&#x([0-9a-f]+);/gi, (_m, n) => String.fromCodePoint(parseInt(n, 16)))
+				.replace(/&([a-z]+);/gi, (m, n) => ENTITES[n] ?? m)
+			: marqueursDeBloc(String(v ?? "")).replace(/</g, ABRI))
 			// Un `![[fichier]]` et le `<img src="fichier">` que md2html en fait
 			// désignent la MÊME image : les ramener tous deux au nom de fichier.
 			.replace(/!\[\[([^\]|]+)[^\]]*\]\]/g, " $1 ")
 			.replace(/<img[^>]*\bsrc="([^"]*)"[^>]*>/gi, " $1 ")
 			.replace(/<br\s*\/?>/gi, " ")
-			.replace(/<[^>]*>/g, " ")
+			// Une balise commence par une lettre, comme pour le navigateur : le
+			// `<< EOF >` d'un bloc de code écrit par md2html est du TEXTE, qu'il
+			// affiche — le prendre pour une balise le faisait disparaître.
+			.replace(/<\/?[a-zA-Z][^>]*>/g, " ")
 			.replace(/&lt;/g, "<").replace(/&gt;/g, ">")
 			.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&")
 			// Les marqueurs markdown eux-mêmes ne comptent pas : `**gras**` en
 			// texte et `<strong>gras</strong>` en HTML disent la même chose.
-			.replace(/[*_`~]/g, "")
+			.replace(/[*_`~|]/g, "")
 			.replace(/\s+/g, " ").trim()
 			// Les `<` d'un champ texte, mis à l'abri plus haut, reviennent.
 			.replace(new RegExp(ABRI, "g"), "<");

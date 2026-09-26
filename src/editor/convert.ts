@@ -6,6 +6,7 @@ import type { EditorExamOptions } from "../types/editor-ctx";
 import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
 import { normalizeTerminalVariantName } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
+import { htmlVersMarkdown, texteBaliseVersMarkdown } from "./html-vers-markdown";
 
 /* ══════════════════════════════════════════════════════════
    CONVERT — item JSON5 brut → DraftQuestion (forme d'édition)
@@ -140,21 +141,35 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	question.title = q.title || "";
 	// « Question N » non localisé : motif du titre auto écrit dans le .md.
 	question._userModifiedTitle = !/^Question \d+$/.test(question.title);
-	question.hint = q.hint || "";
+	question.hint = q.hint ? texteBaliseVersMarkdown(q.hint) ?? q.hint : "";
 
-	if (q.prompt) {
-		question.prompt = q.prompt;
+	/* DU MARKDOWN PARTOUT (2026-09-26) : un texte stocké en HTML est converti
+	   en markdown à l'ouverture, quand la conversion est PROUVÉE sans perte
+	   (editor/html-vers-markdown.ts) — le champ `*Html` quitte alors le
+	   brouillon, et l'écriture suivante enregistre le markdown. Sinon (tableau
+	   fusionné, couleur, balise inconnue…), le HTML reste tel quel.
+	   Seulement quand le HTML est SEUL : un texte écrit à côté est une donnée
+	   de l'auteur, et la conversion l'écraserait (zéro cas dans les vaults). */
+	const promptMd = q.promptHtml && !q.prompt ? htmlVersMarkdown(q.promptHtml) : null;
+	if (promptMd !== null) {
+		question.prompt = promptMd;
+		question._promptSource = true;
+	} else if (q.prompt) {
+		// Un énoncé TEXTE généré avec des balises (`<p>`, `<strong>`…).
+		question.prompt = texteBaliseVersMarkdown(q.prompt) ?? q.prompt;
 		question._promptSource = true;
 	} else if (q.promptHtml) {
 		question.prompt = _htmlToText(q.promptHtml);
 	}
-	if (q.promptHtml) {
+	if (q.promptHtml && promptMd === null) {
 		question._promptHtml = q.promptHtml;
 		// Si promptHtml existe, activer par défaut l'édition HTML
 		question._useHtmlPrompt = true;
 	}
 
-	if (q.explain) question.explain = q.explain;
+	const explainMd = q.explainHtml && !q.explain ? htmlVersMarkdown(q.explainHtml) : null;
+	if (explainMd !== null) question.explain = explainMd;
+	else if (q.explain) question.explain = texteBaliseVersMarkdown(q.explain) ?? q.explain;
 	else if (q.explainHtml && !isRichHtml(q.explainHtml)) {
 		/* Uniquement si le HTML est une simple enveloppe (`<p>`, `<br>`) : le
 		   remplir depuis un HTML RICHE faisait reprendre à l'export la version
@@ -165,7 +180,7 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		   le fait déjà pour l'énoncé. */
 		question.explain = _htmlToText(q.explainHtml);
 	}
-	if (q.explainHtml) {
+	if (q.explainHtml && explainMd === null) {
 		question._explainHtml = q.explainHtml;
 	}
 
@@ -185,9 +200,17 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   revue, FINDING 2). L'affichage non-HTML d'une leçon sans texte propre
 	   dérive son texte à la VOLÉE côté UI (dashboard/detail-question.ts),
 	   sans jamais l'écrire ici. */
+	/* Exception à la règle ci-dessus, et la seule : la conversion markdown
+	   SANS PERTE d'un HTML seul (2026-09-26). Le `lesson` qui en sort n'est
+	   pas un texte fabriqué pour l'affichage mais la même leçon, réécrite ; et
+	   `_lessonHtml` n'est alors pas posé, donc l'écriture n'émet que `lesson`. */
 	const { text: lessonText, html: lessonHtmlBrut } = pickLessonFields(q);
-	if (lessonText) question.lesson = lessonText;
-	if (lessonHtmlBrut) question._lessonHtml = lessonHtmlBrut;
+	const lessonMd = lessonHtmlBrut && !lessonText ? htmlVersMarkdown(lessonHtmlBrut) : null;
+	if (lessonMd !== null) question.lesson = lessonMd;
+	else {
+		if (lessonText) question.lesson = texteBaliseVersMarkdown(lessonText) ?? lessonText;
+		if (lessonHtmlBrut) question._lessonHtml = lessonHtmlBrut;
+	}
 
 	if (q.resourceButton) {
 		question.resourceButton = { ...q.resourceButton };
@@ -225,7 +248,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		   l'éditeur — l'écriture les recopiait, et chaque Learn généré en
 		   portait sur toutes ses cartes de lecture (2026-09-23). */
 		const lectureSansOptions = question.role === "read" && !Array.isArray(q.options);
-		question.options = q.options || (lectureSansOptions ? [] : ["", ""]);
+		// Une option générée avec des balises s'édite en markdown, elle aussi.
+		question.options = q.options
+			? q.options.map(o => typeof o === "string" ? texteBaliseVersMarkdown(o) ?? o : o)
+			: (lectureSansOptions ? [] : ["", ""]);
 		if (type === "single") {
 			question.correctIndex = q.correctIndex ?? 0;
 		} else {

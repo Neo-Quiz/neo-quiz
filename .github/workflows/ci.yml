@@ -36,6 +36,11 @@ jobs:
       - name: Learn and Practice prompts
         run: npm run check:prompt
 
+      # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
+      # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
+      - name: HTML to markdown conversion
+        run: npm run check:html-markdown
+
       # UNE RÉPONSE NUMÉRIQUE TAPÉE DANS L'ÉDITEUR D'ÉQUATIONS arrive en LaTeX
       # (« 1{,}5 », « \frac{3}{4} ») : ramenée à un nombre, jamais juste à tort.
       - name: Numeric answers typed in LaTeX
