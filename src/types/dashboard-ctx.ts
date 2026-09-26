@@ -20,6 +20,7 @@ import type { ModelDef, OllamaCatalogEntry } from "../dashboard/ai-providers";
 import type { AiUsageEntry } from "../dashboard/usage-format";
 import type { ModuleOverride, ModuleGroup, ModuleMap } from "../dashboard/quiz-modules";
 import type { ReviewStore } from "../review/review-store";
+import type { OngletDossier } from "../dashboard/quizzes-render";
 
 /**
  * Un examen d'un dossier (« plusieurs examens par dossier », 2026-09-26).
@@ -226,9 +227,9 @@ export interface DashboardShellCtx {
 	    opt-in — l'application ne la fournit pas (menus et modals = tranche
 	    2.6, D5). */
 	openModuleMenu?: (group: ModuleGroup, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
-	/* ── LA DATE D'EXAMEN D'UN DOSSIER ──
+	/* ── LES EXAMENS D'UN DOSSIER ──
 
-	   Elle ne passe PAS par `quizzesModuleOverrides`, alors que le modal
+	   Ils ne passent PAS par `quizzesModuleOverrides`, alors que le modal
 	   « Modifier dossier » écrit tout le reste là-bas, et c'est une correction
 	   de bug : les overrides sont indexés par `ModuleGroup.folder`, qui est un
 	   NOM DE SEGMENT (« Generated »), sans l'identifiant de la racine. Deux
@@ -241,17 +242,20 @@ export interface DashboardShellCtx {
 	   l'HÔTE qui fait la conversion : le code partagé ne connaît ni les racines
 	   ni leurs identifiants.
 
-	   Absents = le champ de date n'est pas rendu dans le modal. */
-	examDate?: (group: ModuleGroup) => string | undefined;
-	setExamDate?: (group: ModuleGroup, date: string | undefined) => void;
-	/** TOUS les examens d'un dossier, triés par date (« plusieurs examens par
-	    dossier », 2026-09-26) — remplace progressivement `examDate` ci-dessus,
-	    qui n'en gardait qu'un. Absent = pas de liste d'examens dans le modal. */
+	   « Plusieurs examens par dossier » (2026-09-26) : PLUS d'`examDate`/
+	   `setExamDate` (une seule date) — l'onglet Planning (tâche 4) les a
+	   remplacés. Absents = pas de liste d'examens dans l'onglet. */
 	examens?: (group: ModuleGroup) => ExamenDossier[];
 	/** Ajoute ou remplace (même `id`) un examen du dossier. */
 	enregistrerExamen?: (group: ModuleGroup, e: ExamenDossier) => void;
 	/** Retire un examen du dossier par son `id`. */
 	retirerExamen?: (group: ModuleGroup, id: string) => void;
+	/** Ouvre « Mes quiz » sur ce dossier, à l'onglet donné — appelé par
+	    « Modifier dossier » (bouton « Gérer les examens ») qui a fermé son
+	    modal et n'a plus de champ de date à éditer sur place. Absent = le
+	    bouton n'a nulle part où aller (aucun hôte ne le fournit encore sans
+	    onglet Planning). */
+	openFolderTab?: (folder: string, onglet: OngletDossier) => void;
 	/** Sélecteur d'icône d'un module (clic sur la pastille de la carte).
 	    Absent = la pastille n'est pas cliquable — `renderModuleCard` prévoit
 	    déjà `onPickIcon?` en opt-in. `suggestions` (calculées par la PAGE

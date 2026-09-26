@@ -1,0 +1,237 @@
+/* ══════════════════════════════════════════════════════════
+   L'ONGLET « PLANNING DE RÉVISIONS » d'un dossier (tâche 4, 2026-09-26) :
+   deux colonnes — à gauche les tâches du jour et les examens à venir
+   (ajout/modif/suppression sur place), à droite l'anneau du dossier,
+   l'étape suivante et les trois modes. Une seule colonne sous 900 px, comme
+   toute grille à deux colonnes du dashboard.
+══════════════════════════════════════════════════════════ */
+
+.qbd-planning {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 300px;
+	align-items: start;
+	gap: 20px;
+}
+
+@media (max-width: 900px) {
+	.qbd-planning {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.qbd-planning-col {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 0;
+}
+
+/* ── Contenu des deux sections repliables (mêmes rangées que « Mes quiz ») ── */
+
+.qbd-planning-empty-line {
+	margin: 0;
+	padding: 4px 0 10px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.qbd-root .qbd-planning-task-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	height: auto;
+	margin: 0;
+	padding: 10px;
+	border: 0;
+	border-radius: 10px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+.qbd-root .qbd-planning-task-row:hover { background: color-mix(in srgb, var(--text-normal) 7%, transparent); }
+.qbd-root .qbd-planning-task-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.qbd-planning-task-icon { display: inline-flex; flex-shrink: 0; color: var(--qbd-state-progress); }
+.qbd-planning-task-icon svg { width: 15px; height: 15px; }
+.qbd-planning-task-label { min-width: 0; }
+
+/* Le « + » de l'en-tête « Examens à venir », à droite du bouton d'en-tête —
+   jamais DANS lui (deux boutons imbriqués sont invalides). */
+.qbd-planning-exams-head-row {
+	display: flex;
+	align-items: center;
+}
+.qbd-root .qbd-planning-exam-add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	margin: 0 4px 0 auto;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-muted);
+	box-shadow: none;
+	cursor: pointer;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+.qbd-root .qbd-planning-exam-add:hover { background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal); }
+.qbd-root .qbd-planning-exam-add:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.qbd-planning-exam-add svg { width: 15px; height: 15px; }
+
+.qbd-planning-exam-list {
+	display: flex;
+	flex-direction: column;
+	margin: 0 -10px;
+}
+.qbd-planning-exam-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px;
+	border-radius: 10px;
+}
+.qbd-planning-exam-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+.qbd-planning-exam-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.qbd-planning-exam-name {
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-planning-exam-infos {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+/* État vide : icône dans une pastille, centré (StudySmarter, capture citée
+   par le brief), comme une section vide du reste du dashboard. */
+.qbd-planning-exams-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 22px 10px;
+	text-align: center;
+}
+.qbd-planning-exams-empty-icon {
+	display: inline-grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	margin-bottom: 4px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-muted);
+}
+.qbd-planning-exams-empty-icon svg { width: 18px; height: 18px; }
+.qbd-planning-exams-empty-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-normal); }
+.qbd-planning-exams-empty-hint { margin: 0 0 4px; font-size: 12.5px; color: var(--text-muted); max-width: 32ch; }
+
+/* Emplacement du composer (tâche 5) : vide jusque-là, donc sans marge propre
+   tant qu'il n'a pas de contenu — `:empty` évite un vide qui pousse la
+   colonne. */
+.qbd-planning-composer:empty { display: none; }
+
+/* ── Colonne de droite : tuiles verre, comme les tuiles de « Progression » ── */
+
+.qbd-planning-ring-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	padding: 22px 18px;
+	border-radius: 18px;
+	border: 1px solid var(--qbd-glass-edge);
+	background: var(--qbd-glass-bg);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
+	text-align: center;
+}
+
+.qbd-planning-modes {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border-radius: 18px;
+	border: 1px solid var(--qbd-glass-edge);
+	background: var(--qbd-glass-bg);
+	backdrop-filter: var(--qbd-glass-blur);
+	-webkit-backdrop-filter: var(--qbd-glass-blur);
+	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
+}
+
+.qbd-root .qbd-planning-mode-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	height: auto;
+	margin: 0;
+	padding: 10px;
+	border: 0;
+	border-radius: 12px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+.qbd-root .qbd-planning-mode-row:hover:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 7%, transparent); }
+.qbd-root .qbd-planning-mode-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+.qbd-root .qbd-planning-mode-row:disabled { opacity: 0.45; cursor: default; }
+.qbd-planning-mode-icon {
+	display: inline-grid;
+	place-items: center;
+	flex-shrink: 0;
+	width: 32px;
+	height: 32px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-normal);
+}
+.qbd-planning-mode-icon svg { width: 16px; height: 16px; }
+.qbd-planning-mode-text {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+.qbd-planning-mode-title { font-size: 13.5px; font-weight: 700; }
+.qbd-planning-mode-help {
+	font-size: 12px;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── « Gérer les examens » (module-edit.ts) : même style que les autres
+   actions de panneau du modal (« Modifier dossier »), pleine largeur. ── */
+.qbd-medit-manage-exams {
+	justify-content: center;
+	width: 100%;
+	margin-top: 4px;
+}

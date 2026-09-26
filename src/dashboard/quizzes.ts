@@ -43,6 +43,11 @@ export interface QuizzesHandlers {
 	    2026-07-21) — et la correspondance chemin → dossier de module vit ici,
 	    avec la note de correspondance et les overrides. */
 	openFolderOfQuiz(quizPath: string): void;
+	/** Ouvre un dossier à un ONGLET donné (« Gérer les examens » de
+	    module-edit.ts, via `ctx.openFolderTab`) : même geste qu'`openFolder`,
+	    mais fixe aussi l'onglet AVANT le rendu — sans quoi `render()` le
+	    ramènerait à « Contenu » (changement de dossier détecté). */
+	openFolderTab(folder: string, onglet: OngletDossier): void;
 }
 
 export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
@@ -419,6 +424,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		resetDrilldown() { openModuleFolder = null; dossierAttenduPour = null; lastPaintedView = null; },
 		getOpenFolder() { return openModuleFolder; },
 		openFolder(folder: string) { openModule(folder); },
+		openFolderTab(folder: string, onglet: OngletDossier) {
+			ctx.recordNav();
+			openModuleFolder = folder;
+			// Fixé AVANT le rendu : `render()` ne réinitialise l'onglet que
+			// quand `openModuleFolder !== ongletPour` (changement de dossier).
+			ongletDossier = onglet;
+			ongletPour = folder;
+			if (containerRef) render(containerRef);
+		},
 		openFolderOfQuiz(quizPath: string) {
 			// Table pas encore lue (`lireModuleMap` rend toujours un objet, même
 			// vide : `null` veut dire « en cours ») : c'est `loadModuleMap` qui

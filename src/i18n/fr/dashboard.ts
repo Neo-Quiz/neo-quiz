@@ -131,6 +131,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.progressToStart": "à commencer",
 	"dashboard.quizzes.tabContent": "Contenu",
 	"dashboard.quizzes.tabProgress": "Progression",
+	"dashboard.quizzes.tabPlanning": "Planning de révisions",
 	"dashboard.quizzes.progressOverall": "Avancement du dossier",
 	"dashboard.quizzes.progressMasteredOf": "{mastered} quiz maîtrisés sur {total}",
 	"dashboard.quizzes.progressDueOne": "question à réviser",
@@ -212,10 +213,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.moduleIconAll": "Toutes",
 	"dashboard.quizzes.moduleIconNoResult": "Aucune icône trouvée",
 	"dashboard.quizzes.moduleEditCustomColor": "Couleur personnalisée",
-
-	/* ── Date d'examen (ordonnanceur) ── */
-	"dashboard.module.examDate": "Date d'examen",
-	"dashboard.module.examDateHint": "Détermine le resserrement des révisions. Laissée vide, la matière est révisée pour être retenue durablement.",
 
 	/* ── À réviser aujourd'hui (ordonnanceur) ── */
 	"dashboard.review.title": "À réviser aujourd'hui",
@@ -324,4 +321,24 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.noteAll": "Toutes les notes",
 	"dashboard.select.noteNotFound": "Aucune note trouvée",
 	"dashboard.select.noteEmpty": "Aucune note ouverte — tapez pour chercher",
+
+	/* ── Planning de révisions (folder-planning.ts, tâche 4, 2026-09-26) ── */
+	"dashboard.planning.tasks": "Tâches associées",
+	"dashboard.planning.taskReview": "Réviser {count} questions dans « {folder} »",
+	"dashboard.planning.taskReviewOne": "Réviser 1 question dans « {folder} »",
+	"dashboard.planning.tasksNone": "Rien à réviser aujourd'hui.",
+	"dashboard.planning.tasksNeedExam": "Ajoute un examen pour recevoir des révisions.",
+	"dashboard.planning.exams": "Examens à venir",
+	"dashboard.planning.examAdd": "Ajouter un examen",
+	"dashboard.planning.examEdit": "Modifier",
+	"dashboard.planning.examDelete": "Supprimer",
+	"dashboard.planning.examUnnamed": "Examen",
+	"dashboard.planning.examName": "Nom (facultatif)",
+	"dashboard.planning.examDate": "Date",
+	"dashboard.planning.examSave": "Enregistrer",
+	"dashboard.planning.examsEmptyTitle": "Pas d'examens à venir",
+	"dashboard.planning.examsEmptyHint": "Ajoute une date d'examen pour recevoir des révisions planifiées.",
+	"dashboard.planning.modeLearn": "Learn",
+	"dashboard.planning.modePractice": "Practice",
+	"dashboard.planning.manageExams": "Gérer les examens",
 };

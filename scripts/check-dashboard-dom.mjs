@@ -86,6 +86,9 @@ const LIBERES = [
 	"src/dashboard/folder-contents.ts",
 	"src/dashboard/folder-sections.ts",
 	"src/dashboard/file-icons.ts",
+	// Tâche 4, 2026-09-26 : l'onglet Planning de révisions, né directement
+	// sans Obsidian.
+	"src/dashboard/folder-planning.ts",
 ];
 
 /** Retire les commentaires : une extension CITÉE en commentaire (par exemple

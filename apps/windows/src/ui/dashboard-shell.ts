@@ -53,7 +53,7 @@ import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner"
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
-import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examDates, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders, setExamDate as setExamDateReglage } from "../host/folder";
+import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
@@ -394,11 +394,21 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		openModuleMenu: (group, anchor, rerender, map) => {
 			openActionMenu(anchor, buildModuleCardMenu(ctx, rerender, map)(group, anchor));
 		},
-		/* LA DATE D'EXAMEN D'UN DOSSIER, saisie dans « Modifier dossier »
-		   (menu « ⋯ » d'une carte de module) — elle n'a plus de section dans
-		   les Réglages depuis le 2026-09-17 : la régler à l'endroit où on voit
-		   le dossier vaut mieux qu'une liste plate de toutes les matières,
-		   dont deux pouvaient porter le même nom.
+		/* « Gérer les examens » (module-edit.ts) ferme son modal et retombe
+		   ici : naviguer vers « Mes quiz » PUIS ouvrir le dossier au bon onglet
+		   sur l'instance de `quizzes` restée vivante — même geste que
+		   `onBack` (`quizzes.openFolderOfQuiz`) plus bas. `quizzes` n'est
+		   assigné que quelques lignes plus loin ; la fermeture ne le lit qu'à
+		   l'appel, jamais à la construction de `ctx`. */
+		openFolderTab: (folder, onglet) => {
+			naviguer("quizzes");
+			quizzes.openFolderTab(folder, onglet);
+		},
+		/* LES EXAMENS D'UN DOSSIER, gérés dans l'onglet Planning (tâche 4,
+		   2026-09-26) — plus de section dans les Réglages depuis le
+		   2026-09-17 : les régler à l'endroit où on voit le dossier vaut mieux
+		   qu'une liste plate de toutes les matières, dont deux pouvaient porter
+		   le même nom.
 
 		   LA CONVERSION DE CLÉ EST ICI, et nulle part ailleurs : le code
 		   partagé ne connaît qu'un nom de segment, l'ordonnanceur veut une clé
@@ -406,19 +416,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   sont tous dans le même dossier, donc tous sous la même clé (la page
 		   n'appelle jamais ces membres sur un groupe vide, et `cleModule`
 		   n'aurait alors rien à lire). */
-		examDate: group => {
-			const quiz = group.quizzes[0];
-			return quiz ? examDates()[cleModule(quiz.path, currentHost().paths)] : undefined;
-		},
-		setExamDate: (group, date) => {
-			const quiz = group.quizzes[0];
-			if (!quiz) return;
-			/* `setExamDate` met la table à jour EN MÉMOIRE de façon synchrone
-			   avant d'écrire : le plan, qui la relit à chaque calcul, est déjà
-			   juste quand la promesse d'écriture est encore en vol. */
-			void setExamDateReglage(cleModule(quiz.path, currentHost().paths), date ?? "");
-		},
-		/* PLUSIEURS EXAMENS PAR DOSSIER (2026-09-26) : mêmes clés que ci-dessus. */
 		examens: group => {
 			const quiz = group.quizzes[0];
 			return quiz ? (examens()[cleModule(quiz.path, currentHost().paths)] ?? []) : [];

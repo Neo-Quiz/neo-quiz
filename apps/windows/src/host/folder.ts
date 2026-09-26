@@ -562,22 +562,25 @@ export async function estVaultObsidian(racine: string): Promise<boolean> {
 
    `examDates()` lit le réglage EN MÉMOIRE plutôt que le pont à chaque appel :
    le plan de l'ordonnanceur est recalculé souvent (chaque réponse jouée), et
-   un aller-retour IPC à chaque calcul serait payé pour rien. D'où
-   `chargerExamDates()`, appelé une fois au démarrage.
+   un aller-retour IPC à chaque calcul serait payé pour rien — le cache est
+   `tableExamens`, chargé une fois au démarrage par `chargerExamens()`
+   ci-dessous.
+
+   `chargerExamDates`/`datesExamen`/`setExamDate`/`appliquerExamDate` (une
+   seule date par module) sont partis à la tâche 4 (« plusieurs examens par
+   dossier », 2026-09-26) : plus aucun appelant depuis que l'onglet Planning
+   remplace le champ de « Modifier dossier ». `CLE_EXAM_DATES` reste : c'est
+   la clé de la MIGRATION lue par `chargerExamens` (`lireExamens`, plus bas).
 ══════════════════════════════════════════════════════════ */
 
 const CLE_EXAM_DATES = "examDates";
 
-/** Les dates d'examen par module, telles que saisies (`AAAA-MM-JJ`).
-    Valeur PERSISTÉE : jamais traduite, jamais reformatée. */
-let datesExamen: Record<string, string> = {};
-
 /**
- * `examDates()` DÉRIVE désormais du cache `tableExamens` (plusieurs examens
- * par module) : elle rend, pour chaque module, la date du PROCHAIN examen —
- * ainsi tout lecteur déjà branché sur cette fonction (l'ordonnanceur, entre
- * autres) voit sans rien changer l'examen qui compte pour resserrer les
- * révisions, même quand plusieurs sont saisis.
+ * `examDates()` DÉRIVE de `tableExamens` (plusieurs examens par module) :
+ * elle rend, pour chaque module, la date du PROCHAIN examen — ainsi tout
+ * lecteur déjà branché sur cette fonction (l'ordonnanceur) voit sans rien
+ * changer l'examen qui compte pour resserrer les révisions, même quand
+ * plusieurs sont saisis.
  */
 export function examDates(): Record<string, string> {
 	return Object.fromEntries(
@@ -585,17 +588,6 @@ export function examDates(): Record<string, string> {
 			.map(([m, l]) => [m, examenProchain(l, aujourdhuiIso(Date.now()))?.date] as const)
 			.filter((e): e is [string, string] => !!e[1]),
 	);
-}
-
-export async function chargerExamDates(): Promise<Record<string, string>> {
-	try {
-		const brut = await pont().reglages.lire(CLE_EXAM_DATES);
-		datesExamen = brut && typeof brut === "object" ? brut as Record<string, string> : {};
-	} catch (e) {
-		console.warn(LOG_PREFIX, "dates d'examen illisibles:", e);
-		datesExamen = {};
-	}
-	return datesExamen;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -708,31 +700,6 @@ export async function enregistrerExamen(module: string, e: Examen): Promise<void
 export async function retirerExamen(module: string, id: string): Promise<void> {
 	tableExamens = retirerExamenDe(tableExamens, module, id);
 	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
-}
-
-/**
- * La table des dates d'examen une fois celle d'un module réglée (ou effacée).
- *
- * PURE, et c'est délibéré : `setExamDate` est impure (elle écrit par le pont),
- * donc c'est cette règle-ci que `npm run check:folders` exécute. Une date
- * effacée RETIRE la clé, elle n'est pas gardée vide : `horizonFor` retomberait
- * de toute façon sur l'horizon par défaut, mais le réglage accumulerait des
- * entrées mortes qu'on n'oserait plus nettoyer.
- */
-export function appliquerExamDate(
-	courant: Record<string, string>,
-	module: string,
-	date: string,
-): Record<string, string> {
-	const suivant = { ...courant };
-	if (date) suivant[module] = date; else delete suivant[module];
-	return suivant;
-}
-
-export async function setExamDate(module: string, date: string): Promise<void> {
-	const suivant = appliquerExamDate(datesExamen, module, date);
-	datesExamen = suivant;
-	await pont().reglages.ecrire(CLE_EXAM_DATES, suivant);
 }
 
 /* ══════════════════════════════════════════════════════════

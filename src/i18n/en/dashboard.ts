@@ -152,6 +152,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.progressToStart": "not started",
 	"dashboard.quizzes.tabContent": "Content",
 	"dashboard.quizzes.tabProgress": "Progress",
+	"dashboard.quizzes.tabPlanning": "Review plan",
 	"dashboard.quizzes.progressOverall": "Folder progress",
 	"dashboard.quizzes.progressMasteredOf": "{mastered} of {total} quizzes mastered",
 	"dashboard.quizzes.progressDueOne": "question to review",
@@ -241,10 +242,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moduleIconAll": "All",
 	"dashboard.quizzes.moduleIconNoResult": "No icon found",
 	"dashboard.quizzes.moduleEditCustomColor": "Custom color",
-
-	/* ── Date d'examen (ordonnanceur) ── */
-	"dashboard.module.examDate": "Exam date",
-	"dashboard.module.examDateHint": "Sets how tightly this module is reviewed. Left empty, it is scheduled for long-term retention.",
 
 	/* ── À réviser aujourd'hui (ordonnanceur) ── */
 	"dashboard.review.title": "Due today",
@@ -355,4 +352,24 @@ export const EN_DASHBOARD = {
 	"dashboard.select.noteAll": "All notes",
 	"dashboard.select.noteNotFound": "No note found",
 	"dashboard.select.noteEmpty": "No note open — type to search",
+
+	/* ── Review plan (folder-planning.ts, task 4, 2026-09-26) ── */
+	"dashboard.planning.tasks": "Related tasks",
+	"dashboard.planning.taskReview": "Review {count} questions in \"{folder}\"",
+	"dashboard.planning.taskReviewOne": "Review 1 question in \"{folder}\"",
+	"dashboard.planning.tasksNone": "Nothing to review today.",
+	"dashboard.planning.tasksNeedExam": "Add an exam to get review tasks.",
+	"dashboard.planning.exams": "Upcoming exams",
+	"dashboard.planning.examAdd": "Add an exam",
+	"dashboard.planning.examEdit": "Edit",
+	"dashboard.planning.examDelete": "Delete",
+	"dashboard.planning.examUnnamed": "Exam",
+	"dashboard.planning.examName": "Name (optional)",
+	"dashboard.planning.examDate": "Date",
+	"dashboard.planning.examSave": "Save",
+	"dashboard.planning.examsEmptyTitle": "No upcoming exams",
+	"dashboard.planning.examsEmptyHint": "Add an exam date to get review tasks planned for it.",
+	"dashboard.planning.modeLearn": "Learn",
+	"dashboard.planning.modePractice": "Practice",
+	"dashboard.planning.manageExams": "Manage exams",
 } as const;

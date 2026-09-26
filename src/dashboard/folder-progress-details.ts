@@ -1,30 +1,28 @@
 import { ajouter } from "../dom";
-import { currentLang, t } from "../i18n";
+import { t } from "../i18n";
 import { currentHost } from "../host/current";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import { tentativesDe, type QuizStatRecord, type Tentative } from "./stats-store";
-import type { ModuleGroup, ModuleMap } from "./quiz-modules";
 import type { CarteCours } from "./course-pairs";
 import { computeQuizState } from "./quiz-mastery";
 import { quizModeLabel } from "./quiz-card";
-import { openModuleEditModal } from "./module-edit";
-import { parseExamDate } from "../review/review-store";
 import { formatDateHeure } from "./format-date";
 
 /* ══════════════════════════════════════════════════════════
-   LES TROIS TUILES DU BAS de l'onglet « Progression » (2026-09-25),
-   reprises du « Planning de révisions » de StudySmarter sans ce qui en
-   sortirait de Learn / Practice (examen blanc, épreuve orale, XP) :
+   LES TUILES DU BAS de l'onglet « Progression » (2026-09-25) :
 
    - « À réviser aujourd'hui » : ce que l'ordonnanceur a mis au programme du
      jour POUR CE DOSSIER, par note, et un bouton qui ouvre la plus chargée.
      Une séance mêlant plusieurs notes n'existe pas encore : même geste que
      la section du même nom sur l'accueil (`home.ts`).
-   - « Examen » : la date déjà réglable dans « Modifier » du dossier, qui
-     resserre les révisions à son approche. Montrée ici, et modifiable d'ici.
    - « Cours » : l'avancement de chaque cours, mode par mode — le détail que
      les pastilles des cartes ne portent plus.
+
+   L'EXAMEN (plusieurs par dossier, ajout/modif/suppression) a quitté cet
+   onglet à la tâche 4 (2026-09-26) : il vit désormais dans l'onglet
+   « Planning » (`folder-planning.ts`), qui l'affiche ET l'édite —
+   `renderExamen`, ici, est parti avec lui (plus aucun appelant).
 ══════════════════════════════════════════════════════════ */
 
 /** Les clés de question `chemin::id` d'une liste, rangées par note du dossier. */
@@ -96,35 +94,6 @@ export function renderRevisionDuJour(parent: HTMLElement, ctx: DashboardShellCtx
 		ajouter(tuile, "div", "qbd-folder-progress-sub",
 			t(reportees === 1 ? "dashboard.review.deferredOne" : "dashboard.review.deferredOther", { count: reportees }));
 	}
-}
-
-export function renderExamen(parent: HTMLElement, ctx: DashboardShellCtx, group: ModuleGroup, map: ModuleMap, rerender: () => void): void {
-	/* Le réglage n'existe que si l'hôte sait le lire ET l'écrire, et que le
-	   dossier a des quiz (même garde que le champ de « Modifier »). */
-	if (!ctx.examDate || !ctx.setExamDate || group.quizzes.length === 0) return;
-	const tuile = ajouter(parent, "div", "qbd-folder-progress-tile qbd-folder-progress-tile--exam");
-	ajouter(tuile, "div", "qbd-folder-progress-label", t("dashboard.module.examDate"));
-	const ms = parseExamDate(ctx.examDate(group));
-	if (ms === null) {
-		ajouter(tuile, "div", "qbd-folder-exam-date qbd-folder-exam-date--none", t("dashboard.quizzes.progressExamNone"));
-		ajouter(tuile, "div", "qbd-folder-progress-sub", t("dashboard.quizzes.progressExamHint"));
-	} else {
-		ajouter(tuile, "div", "qbd-folder-exam-date",
-			new Intl.DateTimeFormat(currentLang(), { dateStyle: "long" }).format(new Date(ms)));
-		const aujourdhui = new Date();
-		aujourdhui.setHours(0, 0, 0, 0);
-		const jours = Math.round((ms - aujourdhui.getTime()) / 86_400_000);
-		ajouter(tuile, "div", "qbd-folder-progress-sub",
-			jours < 0 ? t("dashboard.quizzes.progressExamPast")
-				: jours === 0 ? t("dashboard.quizzes.progressExamToday")
-				: jours === 1 ? t("dashboard.quizzes.progressExamTomorrow")
-				: t("dashboard.quizzes.progressExamIn", { count: jours }));
-	}
-	const bouton = ajouter(tuile, "button", "qbd-folder-section-action qbd-folder-exam-action");
-	bouton.type = "button";
-	currentHost().ui.setIcon(ajouter(bouton, "span", "qbd-folder-section-action-icon"), ms === null ? "calendar-plus" : "calendar");
-	ajouter(bouton, "span", undefined, t(ms === null ? "dashboard.quizzes.progressExamAdd" : "dashboard.quizzes.progressExamEdit"));
-	bouton.addEventListener("click", () => openModuleEditModal(ctx, group, map, rerender));
 }
 
 /** Une tentative supprimée mais pas encore confirmée : montrée en place

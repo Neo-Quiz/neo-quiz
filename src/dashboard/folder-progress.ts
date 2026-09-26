@@ -37,17 +37,29 @@ export interface DetailsProgression {
    compte comme « en cours » : pas encore acquis.
 ══════════════════════════════════════════════════════════ */
 
-export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, details: DetailsProgression): HTMLElement {
-	const total = inModule.length;
-	let masteredN = 0, enCoursN = 0, freshN = 0, somme = 0;
+/** La moyenne d'avancement du dossier (anneau de Progression ET de Planning) :
+    « maîtrisé » compte pour 100, sinon le pourcentage de progression — mêmes
+    deux tuiles à s'accorder, jamais deux formules qui divergent. */
+export function moyenneDossier(inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): number {
+	if (inModule.length === 0) return 0;
+	let somme = 0;
 	for (const quiz of inModule) {
 		const { state, pct } = computeQuizState(quiz, stats[quiz.path]);
 		somme += state === "mastered" ? 100 : pct;
+	}
+	return Math.round(somme / inModule.length);
+}
+
+export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, details: DetailsProgression): HTMLElement {
+	const total = inModule.length;
+	let masteredN = 0, enCoursN = 0, freshN = 0;
+	for (const quiz of inModule) {
+		const { state } = computeQuizState(quiz, stats[quiz.path]);
 		if (state === "mastered") masteredN++;
 		else if (state === "fresh") freshN++;
 		else enCoursN++;
 	}
-	const moyenne = total > 0 ? Math.round(somme / total) : 0;
+	const moyenne = moyenneDossier(inModule, stats);
 
 	const vue = ajouter(parent, "div", "qbd-folder-progress");
 
@@ -77,8 +89,12 @@ export function renderOngletsDossier(parent: HTMLElement, actif: OngletDossier, 
 	barre.setAttribute("role", "tablist");
 	const indic = ajouter(barre, "div", "qbd-folder-view-tabs-indic");
 	const boutons = new Map<OngletDossier, HTMLButtonElement>();
-	const cles: Record<OngletDossier, TransKey> = { contenu: "dashboard.quizzes.tabContent", progression: "dashboard.quizzes.tabProgress" };
-	for (const onglet of ["contenu", "progression"] as const) {
+	const cles: Record<OngletDossier, TransKey> = {
+		contenu: "dashboard.quizzes.tabContent",
+		progression: "dashboard.quizzes.tabProgress",
+		planning: "dashboard.quizzes.tabPlanning",
+	};
+	for (const onglet of ["contenu", "progression", "planning"] as const) {
 		const b = ajouter(barre, "button", "qbd-folder-view-tab", t(cles[onglet]));
 		b.type = "button";
 		b.setAttribute("role", "tab");
@@ -94,12 +110,16 @@ export function renderOngletsDossier(parent: HTMLElement, actif: OngletDossier, 
 	requestAnimationFrame(() => placerIndicateur(indic, boutons.get(actif)!, false));
 }
 
-/** Montre la vue de l'onglet choisi, qui entre en fondu. */
+/** Montre la vue de l'onglet choisi, qui entre en fondu. `progression` et
+    `planning` sont absentes dans le sas (`null`) : un onglet sans vue retombe
+    sur « Contenu ». */
 export function basculerVueDossier(vues: VuesDossier, onglet: OngletDossier): void {
-	if (!vues.progression) return;
-	const montree = onglet === "progression" ? vues.progression : vues.contenu;
+	if (!vues.progression && !vues.planning) return;
+	const disponibles: Record<OngletDossier, HTMLElement | null> = vues;
+	const montree = disponibles[onglet] ?? vues.contenu;
 	vues.contenu.hidden = montree !== vues.contenu;
-	vues.progression.hidden = montree !== vues.progression;
+	if (vues.progression) vues.progression.hidden = montree !== vues.progression;
+	if (vues.planning) vues.planning.hidden = montree !== vues.planning;
 	if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 		montree.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 220, easing: "ease-out" });
 	}

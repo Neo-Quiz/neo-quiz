@@ -150,33 +150,23 @@ export function openModuleEditModal(
 				})));
 			});
 
-			/* La date d'examen pilote l'horizon de rétention de l'ordonnanceur :
-			   20 à 40 % de l'échéance pour une semaine, 5 à 10 % pour un an
-			   (Cepeda 2008). Vide = horizon durable, jamais deviné ailleurs.
-
-			   ELLE NE PASSE PAS PAR `apply()` : c'est l'hôte qui la garde, sous
-			   une clé qui porte la racine du dossier, là où les overrides ne
-			   connaissent qu'un nom de segment (voir `DashboardShellCtx`).
-			   Sans les deux membres — ou sur un dossier qui n'a aucun quiz,
-			   donc aucune clé de module — le champ n'est PAS rendu : un champ
-			   de date qui n'a aucun effet est pire que son absence. */
-			const setExamDate = ctx.setExamDate;
-			if (ctx.examDate && setExamDate && group.quizzes.length) {
-				const dateWrap = ajouter(c, "div");
-				const dateLabel = ajouter(dateWrap, "label", "qbd-medit-label", t("dashboard.module.examDate"));
-				const dateInput = ajouter(dateWrap, "input", "qbd-medit-input");
-				dateInput.type = "date";
-				// Le lien explicite fournit le nom accessible et rend le libellé cliquable.
-				dateInput.id = "qbd-medit-exam-date";
-				dateLabel.htmlFor = dateInput.id;
-				dateInput.value = ctx.examDate(group) ?? "";
-				dateInput.addEventListener("change", () => {
-					setExamDate(group, dateInput.value || undefined);
-					/* `onSaved` et non `apply()` : rien n'a changé dans les
-					   overrides, mais la grille affiche l'échéance du dossier. */
-					onSaved();
+			/* « Gérer les examens » (tâche 4, 2026-09-26) remplace le champ de
+			   date unique : plusieurs examens par dossier vivent désormais dans
+			   l'onglet Planning (`folder-planning.ts`), qui les affiche ET les
+			   édite — un seul champ ici aurait dupliqué cette édition à deux
+			   endroits. Le bouton ferme CE modal (il n'a plus rien à faire ici)
+			   et ouvre directement l'onglet. Absent si l'hôte ne sait pas y
+			   naviguer (même garde qu'avant : `group.quizzes.length` — un
+			   dossier sans quiz n'a aucune clé de module où ranger un examen). */
+			if (ctx.openFolderTab && group.quizzes.length) {
+				const gererBtn = ajouter(c, "button", "qbd-folder-section-action qbd-medit-manage-exams");
+				gererBtn.type = "button";
+				currentHost().ui.setIcon(ajouter(gererBtn, "span", "qbd-folder-section-action-icon"), "calendar-days");
+				ajouter(gererBtn, "span", undefined, t("dashboard.planning.manageExams"));
+				gererBtn.addEventListener("click", () => {
+					m.close();
+					ctx.openFolderTab!(group.folder, "planning");
 				});
-				ajouter(dateWrap, "p", "qbd-medit-hint", t("dashboard.module.examDateHint"));
 			}
 
 			// ── Couleur (8 pastilles ; re-cliquer la pastille active la retire →

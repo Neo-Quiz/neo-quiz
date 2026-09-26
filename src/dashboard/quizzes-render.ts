@@ -12,6 +12,7 @@ import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, est
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
 import { renderFolderProgress } from "./folder-progress";
+import { renderFolderPlanning } from "./folder-planning";
 import { renderNextStep } from "./folder-next";
 import { buildRecentModuleGroups } from "./quiz-recent";
 import type { RecentGroupKey } from "./quiz-recent";
@@ -176,14 +177,16 @@ export function renderQuizGrid(
 	}
 }
 
-/** Les deux onglets d'un dossier ouvert (2026-09-25) : son contenu, et sa
-    progression, qui a quitté la colonne de droite. */
-export type OngletDossier = "contenu" | "progression";
+/** Les trois onglets d'un dossier ouvert (2026-09-25, planning 2026-09-26) :
+    son contenu, sa progression, et son planning de révisions. */
+export type OngletDossier = "contenu" | "progression" | "planning";
 
-/** Les deux vues d'un dossier ; `progression` est absente dans le sas. */
+/** Les trois vues d'un dossier ; `progression` et `planning` sont absentes
+    dans le sas. */
 export interface VuesDossier {
 	contenu: HTMLElement;
 	progression: HTMLElement | null;
+	planning: HTMLElement | null;
 }
 
 /** Drill-down d'un module ouvert : l'étape suivante, la grille de ses quiz et
@@ -241,6 +244,14 @@ export function renderModuleDrill(
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
 	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture (« Ajouter du
+	   contenu ») veut un chemin du contrat (correctif 2026-09-17), et
+	   `renderFolderPlanning` en a besoin pour le même geste dans son propre
+	   composer (tâche 5). */
+	const dossier = cheminOuvert ?? openModuleFolder;
+	// Le Learn avant le Practice d'un même cours : ordre des cartes,
+	// consommé par l'étape suivante (ci-dessous) ET par le Planning.
+	const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
 	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
 	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
 	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
@@ -253,12 +264,8 @@ export function renderModuleDrill(
 			ajout.type = "button";
 			currentHost().ui.setIcon(ajouter(ajout, "span", "qbd-btn-icon"), "plus");
 			ajouter(ajout, "span", undefined, t("dashboard.folder.addContent"));
-			/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture veut un
-			   chemin du contrat (correctif 2026-09-17, cf. quizzes.ts). */
-			const dossier = cheminOuvert ?? openModuleFolder;
 			ajout.addEventListener("click", () => ctx.createQuiz!(dossier, rerender));
 		}
-		const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
 		renderNextStep(rangee, ctx, ordre, stats);
 		if (!rangee.firstChild) rangee.remove();
 	}
@@ -292,14 +299,19 @@ export function renderModuleDrill(
 		renderFolderSections(principal, { ctx, folder: cheminOuvert, rerender });
 	}
 
-	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, {
-		ctx, map, rerender, cartes,
-		group: {
-			folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
-			color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
-		},
-	});
-	layout.hidden = onglet === "progression" && progression !== null;
-	if (progression) progression.hidden = !layout.hidden;
-	return { contenu: layout, progression };
+	// Le groupe du dossier ouvert : même forme pour Progression et Planning,
+	// jamais deux constructions qui pourraient diverger.
+	const group: ModuleGroup = {
+		folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
+		color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
+	};
+	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, cartes, group });
+	const planning = sas ? null : renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, cartes, group, folder: dossier });
+	const vues: VuesDossier = { contenu: layout, progression, planning };
+	const disponibles: Record<OngletDossier, HTMLElement | null> = vues;
+	const montree = disponibles[onglet] ?? layout;
+	layout.hidden = montree !== layout;
+	if (progression) progression.hidden = montree !== progression;
+	if (planning) planning.hidden = montree !== planning;
+	return vues;
 }

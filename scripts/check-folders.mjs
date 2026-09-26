@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, appliquerExamDate, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines, lireExamens, enregistrerExamenDans, retirerExamenDe, examenProchain, aujourdhuiIso }) => {
+await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines, lireExamens, enregistrerExamenDans, retirerExamenDe, examenProchain, aujourdhuiIso }) => {
 	const r = makeReporter("Dossiers — réglage et identifiants");
 
 	r.check("aucun réglage : aucune racine", lireDossiers({}), []);
@@ -88,23 +88,6 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 	   qui ouvrirait la racine du disque. */
 	r.check("une entrée sans chemin est ignorée",
 		lireDossiers({ folders: [{ name: "vide" }, { path: "C:/ok", name: "ok" }] }).map(d => d.path), ["C:/ok"]);
-
-	/* LES DATES D'EXAMEN (tâche 10, mineur reporté de la tâche 8). Régler une
-	   date ajoute la clé, l'effacer la RETIRE — elle n'est pas gardée vide.
-	   Sans cette règle, le réglage accumulerait des entrées mortes qu'on
-	   n'oserait plus nettoyer (`setExamDate` impure n'a que ce filet-ci,
-	   `appliquerExamDate` étant la partie pure qu'il appelle). */
-	r.check("régler une date ajoute la clé",
-		appliquerExamDate({}, "Efrei/Reseaux", "2027-06-01"),
-		{ "Efrei/Reseaux": "2027-06-01" });
-	r.check("effacer une date RETIRE la clé, elle n'est pas gardée vide",
-		appliquerExamDate({ "Efrei/Reseaux": "2027-06-01" }, "Efrei/Reseaux", ""),
-		{});
-	r.check("effacer la date d'un module laisse les autres matières intactes",
-		appliquerExamDate(
-			{ "Efrei/Reseaux": "2027-06-01", "Efrei/BDD": "2027-05-01" },
-			"Efrei/Reseaux", ""),
-		{ "Efrei/BDD": "2027-05-01" });
 
 	/* ── `saveFolders` : DISPARU n'est pas INACCESSIBLE (tâche 4, ronde 1) ──
 
