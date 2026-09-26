@@ -574,7 +574,10 @@
 .qbd-fiche-meta .qbd-fiche-chip + .qbd-fiche-chip::before,
 .qbd-fiche-meta .qbd-fiche-modes + .qbd-fiche-chip::before {
 	content: "·";
-	margin: 0 8px 0 4px;
+	/* La pastille est en `inline-flex` avec `gap: 6px` : ce `::before` en
+	   devient un élément, et le gap s'ajoutait à la marge (espace en trop
+	   après le point). 1 px + 6 px de gap = les 7 px de la ligne d'origine. */
+	margin: 0 1px 0 4px;
 	color: var(--text-faint);
 }
 .qbd-fiche-meta .qbd-fiche-chip.is-accent {
