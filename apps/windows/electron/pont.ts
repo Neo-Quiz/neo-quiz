@@ -880,6 +880,12 @@ export const CLE_DOSSIER_DEFAUT = "defaultFolder";
     `app:` (403), il ne donne aucun accès disque supplémentaire au rendu. */
 export const CLE_REGLAGES_FOND = "fond";
 
+/** La luminosité et le flou du fond d'écran (`neo.reglages`) : `{ luminosite:
+    number; flou: number }`, relu par `normaliserEffetsFond`
+    (`ui/fond-pur.ts`). Écrite par la page Réglages seule. Aucune garde : ce
+    n'est ni un chemin ni une URL, deux nombres d'affichage. */
+export const CLE_REGLAGES_FOND_EFFETS = "fondEffets";
+
 declare global {
 	interface Window {
 		/** Posé par le préchargement (`contextBridge.exposeInMainWorld`). Le

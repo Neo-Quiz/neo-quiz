@@ -33,7 +33,7 @@ import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
 import { renderSettings } from "./ui/settings";
 import { monterBarreTitre } from "./ui/barre-titre";
-import { appliquerFond, fondSuivant } from "./ui/fond";
+import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
 
 /*
  * Démarrage de l'application.
@@ -261,6 +261,8 @@ async function demarrer(): Promise<void> {
 	   (`perimetreInitial`, avant l'ouverture de la fenêtre) : le rendu n'a
 	   qu'à poser l'image, sans attendre les dossiers de quiz ci-dessous. */
 	await appliquerFond();
+	// Luminosité et flou de l'image : lus en même temps que l'image elle-même.
+	await appliquerEffetsFond();
 	try {
 		/* AVANT de lire les dossiers : tout vault Obsidian de la machine qui
 		   n'est ni ouvert ni écarté est ouvert ici, sans un clic (voir

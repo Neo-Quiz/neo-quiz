@@ -131,6 +131,11 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.fond.remove": "Retirer",
 	"app.fond.disparue": "L'image du fond a disparu ; la première du dossier est utilisée.",
 	"app.fond.dossierVide": "Aucune image dans ce dossier ; le fond embarqué est utilisé.",
+	"app.fond.luminosite": "Luminosité du fond",
+	"app.fond.flou": "Flou du fond",
+	"app.fond.pourcent": "{n} %",
+	"app.fond.pixels": "{n} px",
+	"app.fond.effetsNonEcrits": "La luminosité et le flou du fond n'ont pas pu être enregistrés.",
 
 	"app.installCli.title": "Installer {name} ?",
 	"app.installCli.message": "Neo Quiz va ouvrir PowerShell et y lancer l'installation officielle de {name}.",

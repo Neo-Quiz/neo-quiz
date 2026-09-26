@@ -163,8 +163,18 @@ body::after {
 	pointer-events: none;
 }
 
+/* LUMINOSITÉ ET FLOU, réglables dans les Réglages (`ui/fond.ts`, sous la
+   rangée du fond d'écran). Sur l'IMAGE seule : la lueur (`::after`) et le
+   panneau se posent par-dessus, inchangés. Les replis sont les défauts de
+   `EFFETS_FOND_DEFAUT` (`ui/fond-pur.ts`), pour le premier rendu, avant que
+   le réglage soit lu.
+   `inset` NÉGATIF : un flou fait fondre le bord de l'image vers le
+   transparent, et l'aplat de `html` apparaîtrait en liseré sombre autour de
+   la fenêtre. 40 px de débord couvrent le flou maximal (20 px). */
 body::before {
+	inset: -40px;
 	background: var(--nq-fond-image, url("/wallpaper.jpg")) center / cover no-repeat;
+	filter: brightness(var(--nq-fond-luminosite, 0.85)) blur(var(--nq-fond-flou, 4px));
 }
 
 body::after {
@@ -399,6 +409,32 @@ body::after {
 	border-radius: var(--radius-s);
 	border: 1px solid var(--background-modifier-border);
 	background: center / cover no-repeat;
+}
+
+/* Les deux curseurs du fond (luminosité, flou) : libellé, piste, valeur. La
+   valeur a une largeur fixe et des chiffres tabulaires, sinon la piste
+   tremblerait en passant de « 9 px » à « 10 px ». La piste native prend
+   l'accent de l'app (`accent-color`) : aucune boîte de plus autour. */
+.nq-fond-curseur {
+	display: grid;
+	grid-template-columns: minmax(0, 150px) minmax(0, 1fr) 56px;
+	align-items: center;
+	gap: 12px;
+	font-size: 12.5px;
+	color: var(--text-normal);
+}
+
+.nq-fond-curseur-entree {
+	width: 100%;
+	margin: 0;
+	accent-color: var(--interactive-accent);
+	cursor: pointer;
+}
+
+.nq-fond-curseur-valeur {
+	text-align: end;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
 }
 
 /* ── Comptes IA (Réglages) ──

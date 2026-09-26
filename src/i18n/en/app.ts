@@ -197,6 +197,11 @@ export const EN_APP = {
 	"app.fond.remove": "Remove",
 	"app.fond.disparue": "The wallpaper image is gone; the first image of the folder is used.",
 	"app.fond.dossierVide": "No image in that folder; the built-in wallpaper is used.",
+	"app.fond.luminosite": "Wallpaper brightness",
+	"app.fond.flou": "Wallpaper blur",
+	"app.fond.pourcent": "{n}%",
+	"app.fond.pixels": "{n} px",
+	"app.fond.effetsNonEcrits": "The wallpaper brightness and blur could not be saved.",
 
 	/* ── Installer un CLI depuis l'app : la confirmation NATIVE du principal ── */
 	"app.installCli.title": "Install {name}?",
