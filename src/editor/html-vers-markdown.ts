@@ -1,6 +1,6 @@
 import { rendreTexteQuiz } from "../engine/sanitizer";
 import type { RenduImages } from "../engine/sanitizer";
-import { reinitialiserBudgetRendu } from "../engine/code-highlight";
+import { sansColoration } from "../engine/code-highlight";
 
 /* ══════════════════════════════════════════════════════════
    HTML → MARKDOWN, sans perte ou pas du tout (2026-09-26)
@@ -440,17 +440,23 @@ const IMAGES_CANON: RenduImages = {
 	image: (alt, src) => `<img src="${attrCanon(src)}" alt="${attrCanon(alt)}">`,
 };
 
-/** Le markdown rend-il le même HTML que `cible` (déjà normalisée) ? Budget de
-    coloration (code-highlight.ts) remis à zéro avant l'appel : cette
-    comparaison est HORS de tout rendu réel (pas de carte, pas de page), et
-    ne doit ni consommer le budget d'un rendu en cours, ni dépendre de ce
-    qu'un appel précédent en a déjà consommé. `canon()` (plus bas)
-    déballe de toute façon tous les `<span>`, coloration comprise : la
-    forme comparée est donc identique, colorée ou non — ce reset la rend
-    aussi INDÉPENDANTE du reste du budget, sans reposer sur ce seul fait. */
+/** La forme normale du HTML que le quiz rend pour `texte`, SANS coloration
+    (`sansColoration`, code-highlight.ts) : cette comparaison est HORS de
+    tout rendu affiché, et `canon()` déballe de toute façon tous les
+    `<span>` — colorer ici ne servait à rien et coûtait tout. Le tour 3
+    remettait au contraire le budget À PLEIN à chaque appel : chaque champ
+    de chaque question, à l'ouverture d'une page de quiz, recolorait jusqu'à
+    5 000 caractères deux fois (9 à 18 s mesurés sur un quiz partagé
+    hostile, revue du 2026-09-26, tour 4). À budget nul, les deux côtés
+    comparés sont rendus à l'identique et indépendamment l'un de l'autre, et
+    le budget du rendu en cours est rendu intact. */
+function rendreCanon(texte: string): string | null {
+	return sansColoration(() => formeNormale(rendreTexteQuiz(texte, IMAGES_CANON)));
+}
+
+/** Le markdown rend-il le même HTML que `cible` (déjà normalisée) ? */
 function rendMeme(markdown: string, cible: string): boolean {
-	reinitialiserBudgetRendu();
-	return formeNormale(rendreTexteQuiz(markdown, IMAGES_CANON)) === cible;
+	return rendreCanon(markdown) === cible;
 }
 
 /* ── Les deux entrées ────────────────────────────────────── */
@@ -532,12 +538,8 @@ export function texteBaliseVersMarkdown(texte: string): string | null {
 		const arbre = analyser(texte.replace(/\r?\n/g, "<br>"));
 		if (!arbre) return null;
 		const md = blocs(arbre).join("\n\n");
-		// Même raison qu'au-dessus de `rendMeme` : ce rendu-ci n'est pas un
-		// rendu réel, et `rendMeme` remet le budget à zéro pour le SIEN — les
-		// deux appels comparés partent donc chacun d'un budget plein et
-		// identique, sans dépendre l'un de l'autre ni d'un rendu extérieur.
-		reinitialiserBudgetRendu();
-		const cible = formeNormale(rendreTexteQuiz(texte, IMAGES_CANON));
+		// Sans coloration, comme `rendMeme` : voir `rendreCanon`.
+		const cible = rendreCanon(texte);
 		if (cible === null || !md.trim() || md === texte || !rendMeme(md, cible)) return null;
 		return md;
 	});

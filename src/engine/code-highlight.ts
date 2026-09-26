@@ -138,10 +138,12 @@ let budgetRestantDuRendu = BUDGET_COLORATION_PAR_RENDU;
 /** À appeler UNE FOIS, tout au DÉBUT du rendu d'une carte de question
     entière — jamais à chaque champ, sans quoi chaque champ obtiendrait son
     propre budget plein et la carte entière pourrait dépasser de loin la
-    borne voulue. Deux appelants : `engine/cards.ts` (`questionCardHtml`,
-    une carte du quiz joué) et `editor/question-preview.ts`
-    (`renderQuizPreviewCard`, l'aperçu de l'éditeur ET la grille de la page
-    d'un quiz — les deux passent par cette même fonction). */
+    borne voulue. Appelants (tour 4) : `engine.ts` (`render`, tout le track ;
+    `refreshQuestionSlide`, une carte re-rendue), `engine/hint.ts`
+    (`openHintModal`, l'indice ouvert au clic), `dashboard/detail-fiche.ts`
+    (`renderGrille`, toute la grille) et `editor/question-preview.ts`
+    (`renderQuizPreviewCard`, une carte d'aperçu). Un rendu qui n'est PAS
+    affiché passe par `sansColoration` à la place. */
 export function reinitialiserBudgetRendu(): void {
 	budgetRestantDuRendu = BUDGET_COLORATION_PAR_RENDU;
 }
@@ -149,6 +151,26 @@ export function reinitialiserBudgetRendu(): void {
 /** Le budget qu'il reste à colorer pour le rendu en cours. */
 export function budgetRestant(): number {
 	return budgetRestantDuRendu;
+}
+
+/** Exécute `f` SANS AUCUNE coloration (blocs rendus échappés), puis rend au
+    rendu en cours EXACTEMENT le budget qu'il avait avant l'appel, même si
+    `f` jette. Pour un rendu qui n'est PAS affiché, et dont la coloration
+    serait jetée : la comparaison de `editor/html-vers-markdown.ts`, faite
+    pour chaque champ de chaque question à l'ouverture d'une page de quiz
+    (`canon()` y déballe de toute façon tous les `<span>`). La revue du
+    2026-09-26 (tour 4) y a mesuré 9 à 18 s sur un quiz partagé hostile
+    quand ce chemin REMETTAIT le budget à plein à chaque appel ; à budget
+    nul, les deux côtés comparés sont rendus de la même façon, sans dépendre
+    l'un de l'autre, et le rendu en cours n'est ni vidé ni rechargé. */
+export function sansColoration<T>(f: () => T): T {
+	const sauvegarde = budgetRestantDuRendu;
+	budgetRestantDuRendu = 0;
+	try {
+		return f();
+	} finally {
+		budgetRestantDuRendu = sauvegarde;
+	}
 }
 
 /** Décompte `n` caractères du budget du rendu en cours (appelé par

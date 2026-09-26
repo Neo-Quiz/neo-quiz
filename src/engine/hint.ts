@@ -1,5 +1,6 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { mathifyElement } from "./mathjax";
+import { reinitialiserBudgetRendu } from "./code-highlight";
 import { t } from "../i18n";
 
 export interface HintHandlers {
@@ -123,6 +124,11 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 		const body = overlay.querySelector<HTMLElement>(".quiz-hint-modal-body");
 		const modal = overlay.querySelector<HTMLElement>(".quiz-hint-modal");
 		if (body) {
+			// Budget de coloration remis à zéro : l'indice s'ouvre AU CLIC, hors
+			// de tout rendu de carte — c'est son propre « rendu complet ». Sans
+			// ce reset, il héritait du budget qu'un quiz lourd venait d'épuiser
+			// et s'affichait sans couleurs (revue du 2026-09-26, tour 4).
+			reinitialiserBudgetRendu();
 			body.innerHTML = ctx.sanitize.renderHintWithCodeAndEmbeds(text);
 			// LaTeX $...$ des indices : même rendu MathJax que les slides.
 			void mathifyElement(body);

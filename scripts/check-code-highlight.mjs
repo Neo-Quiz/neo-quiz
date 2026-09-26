@@ -132,63 +132,152 @@ async function verifierDureeBornee() {
 	return r;
 }
 
-/* ── Budget PAR RENDU, pas par carte (tour 4) ──────────────────────── */
+/* ── Budget PAR RENDU, éprouvé sur les VRAIS appelants (tour 4) ─────── */
+
+/* Le motif `q3` en bash, bien au-delà du plafond : chaque bloc coloré
+   consomme le plafond entier. */
+const Q3 = "\"'`";
+const CODE_HOSTILE = Q3.repeat(1000).slice(0, 3000);
+const BLOC_HOSTILE = "```bash\n" + CODE_HOSTILE + "\n```";
+/** Nombre de blocs bash COLORÉS dans un HTML (un bloc échappé n'a pas de
+    `<span>` de jeton en tête de son `<code>`). */
+const blocsColores = (html) => (html.match(/<code class="language-bash">(?=<span)/g) || []).length;
 
 /**
- * La re-revue du tour 3 a mesuré 8,4 s pour un quiz moteur de 50 questions,
- * 8,2 s pour la grille de 50 cartes, 3,5 s pour une seule carte d'aperçu à
- * 21 champs — parce que le budget se remettait à zéro À CHAQUE CARTE
- * (`questionCardHtml`, `texteQuizHtml`) au lieu d'une fois par rendu
- * complet. Le tour 4 retire ce reset des deux et le pose à la place dans
- * `engine.ts` (avant `slideMap.map` et dans `refreshQuestionSlide`),
- * `dashboard/detail-fiche.ts` (avant la boucle de la grille) et
- * `editor/question-preview.ts` (`renderQuizPreviewCard`, une fois par
- * carte de l'aperçu).
- *
- * Ce script ne charge ni `engine.ts` (assemblage de `ctx` trop lourd pour
- * ce contrôle) ni `question-preview.ts` (a besoin d'un DOM) : il reproduit
- * le MÊME MÉCANISME que ces appelants réels partagent — un seul
- * `reinitialiserBudgetRendu()` puis PLUSIEURS appels à `rendreTexteQuiz`
- * sans reset entre eux — directement sur `sanitizer.ts`, ce qui est
- * exactement ce que `code-highlight.ts` voit dans les deux cas (le module
- * ne sait pas, et n'a pas à savoir, s'il est appelé depuis une boucle de
- * cartes moteur ou une boucle de cartes de grille).
+ * Un DOM (linkedom) pour les appelants réels, qui posent leur HTML dans des
+ * éléments. `getComputedStyle`, `requestAnimationFrame` : les deux seuls
+ * points du navigateur que `openHintModal` touche avant de rendre l'indice
+ * (le reste est gardé par `typeof`). `requestAnimationFrame` ne rappelle
+ * jamais : l'animation d'ouverture n'est pas ce qu'on vérifie ici.
  */
-async function verifierBudgetParRenduPasParCarte() {
-	const r = makeReporter("Coloration — budget par RENDU, pas par carte (tour 4)");
+async function installerDom() {
+	const { parseHTML, NodeFilter } = await import("linkedom");
+	const { document, window, Node } = parseHTML("<html><body></body></html>");
+	globalThis.document = document;
+	// `sanitizeQuizHtml` lit `Node.COMMENT_NODE` : une globale du navigateur.
+	globalThis.Node = Node;
+	globalThis.NodeFilter = NodeFilter;
+	globalThis.getComputedStyle = () => ({ getPropertyValue: () => "" });
+	globalThis.requestAnimationFrame = () => 0;
+	globalThis.cancelAnimationFrame = () => {};
+	globalThis.window = globalThis.window || window;
+}
+
+/**
+ * La re-revue du tour 3 avait mesuré 8,4 s pour un quiz de 50 questions,
+ * 3,5 s pour une carte d'aperçu à 21 champs : le budget se remettait à zéro
+ * à CHAQUE CHAMP (`texteQuizHtml`). La revue du tour 4 a ensuite montré que
+ * l'ancien cas de ce script ne prouvait rien — il REPRODUISAIT la boucle au
+ * lieu d'appeler le code — et trouvé deux défauts qu'il ne voyait pas :
+ * la conversion HTML → markdown (`html-vers-markdown.ts`) remettait le
+ * budget à plein à chaque comparaison (9 à 18 s à l'ouverture d'un quiz
+ * hostile), et l'indice ouvert au clic héritait d'un budget épuisé.
+ * Chaque cas ci-dessous charge le VRAI appelant :
+ *   A. `renderQuizPreviewCard` (l'aperçu de l'éditeur) sur UNE carte de 50
+ *      champs hostiles — rougit si `texteQuizHtml` remet le budget ;
+ *   B. `htmlVersMarkdown` / `texteBaliseVersMarkdown` sur 50 champs
+ *      hostiles — rougit si la comparaison colore (temps) ou touche au
+ *      budget du rendu en cours (valeur rendue intacte) ;
+ *   C. `openHintModal` après un rendu qui a épuisé le budget — rougit si
+ *      l'indice ne remet pas le budget à zéro.
+ * `engine.ts` (`render`, `refreshQuestionSlide`) et `detail-fiche.ts`
+ * (`renderGrille`, privée, atteinte seulement par `renderFiche` qui monte
+ * toute la page) ne sont pas chargés ici : voir le rapport de la tâche.
+ */
+async function verifierBudgetSurLesVraisAppelants() {
+	const r = makeReporter("Coloration — budget par rendu, sur les vrais appelants (tour 4)");
+	// Seuil LARGE : mesuré ~0,1 s pour chaque cas corrigé, contre 3,5 à 17 s
+	// avant (voir le rapport).
+	const SEUIL_MS = 1500;
+	await installerDom();
 
 	await withSrcModule(
-		["src/engine/sanitizer.ts", "src/engine/code-highlight.ts"],
-		({ rendreTexteQuiz }, { reinitialiserBudgetRendu, BUDGET_COLORATION_PAR_RENDU, PLAFOND_CARACTERES_PAR_BLOC }) => {
-			const IMG = { embed: () => "", image: () => "" };
-			const q3 = "\"'`";
-			// Une « carte » : un seul bloc bash largement au-dessus du plafond,
-			// pour que chaque carte colorée EN CONSOMME LE MAXIMUM.
-			const carte = () => "```bash\n" + q3.repeat(1000).slice(0, 3000) + "\n```\n\n";
-			const N = 50;
-			const estColoree = (html) => /<code class="language-bash">(?=<span)/.test(html);
-			const cartesMaxColorables = Math.ceil(BUDGET_COLORATION_PAR_RENDU / PLAFOND_CARACTERES_PAR_BLOC);
+		[
+			"src/editor/question-preview.ts",
+			"src/editor/html-vers-markdown.ts",
+			"src/engine/hint.ts",
+			"src/engine/sanitizer.ts",
+			"src/engine/code-highlight.ts",
+			"src/host/current.ts",
+		],
+		(apercu, conversion, indice, sanitizer, budget, hote) => {
+			const { BUDGET_COLORATION_PAR_RENDU, PLAFOND_CARACTERES_PAR_BLOC } = budget;
+			const maxColores = Math.ceil(BUDGET_COLORATION_PAR_RENDU / PLAFOND_CARACTERES_PAR_BLOC);
+			hote.installHost({
+				links: { resourceUrl: () => null },
+				ui: { setIcon: () => {} },
+			});
 
-			// LE COMPORTEMENT RÉEL (tour 4) : un seul reset avant la boucle de
-			// N cartes, comme `engine.ts` / `detail-fiche.ts`.
-			reinitialiserBudgetRendu();
-			let coloreesUnSeulReset = 0;
-			for (let i = 0; i < N; i++) if (estColoree(rendreTexteQuiz(carte(), IMG))) coloreesUnSeulReset++;
-			r.check(`${N} cartes à la suite, UN SEUL reset : au plus ${cartesMaxColorables} colorées (budget ${BUDGET_COLORATION_PAR_RENDU} / plafond ${PLAFOND_CARACTERES_PAR_BLOC})`,
-				coloreesUnSeulReset <= cartesMaxColorables, true);
-			r.check(`${N} cartes à la suite, UN SEUL reset : au moins une carte reste colorée`,
-				coloreesUnSeulReset > 0, true);
-
-			// LA PREUVE QUE ÇA ROUGIT AVEC L'ANCIEN COMPORTEMENT (reset PAR
-			// CARTE, retiré de `questionCardHtml`/`texteQuizHtml` par ce tour) :
-			// reproduit ici à l'identique, sur les MÊMES données.
-			let coloreesResetParCarte = 0;
-			for (let i = 0; i < N; i++) {
-				reinitialiserBudgetRendu(); // le point que le tour 4 a retiré
-				if (estColoree(rendreTexteQuiz(carte(), IMG))) coloreesResetParCarte++;
+			/* A. Une carte d'aperçu de 50 champs : l'énoncé et 49 options. */
+			{
+				const q = {
+					_type: "single",
+					title: "Q",
+					prompt: "Énoncé\n\n" + BLOC_HOSTILE,
+					options: Array.from({ length: 49 }, (_, i) => `Option ${i}\n\n${BLOC_HOSTILE}`),
+					correctIndex: 0,
+				};
+				const conteneur = document.createElement("div");
+				const t0 = performance.now();
+				apercu.renderQuizPreviewCard(conteneur, q, { fallbackTitle: "Q" });
+				const dt = performance.now() - t0;
+				const colores = blocsColores(conteneur.innerHTML);
+				const total = (conteneur.innerHTML.match(/<code class="language-bash">/g) || []).length;
+				console.log(`  A. aperçu, 1 carte de 50 champs hostiles : ${dt.toFixed(0)} ms, ${colores} blocs colorés`);
+				r.check("A. aperçu : les 50 blocs sont rendus", total, 50);
+				r.check(`A. aperçu, 1 carte de 50 champs : au plus ${maxColores} blocs colorés (obtenu ${colores})`, colores <= maxColores, true);
+				r.check("A. aperçu : au moins un bloc reste coloré", colores > 0, true);
+				r.check(`A. aperçu : sous ${SEUIL_MS} ms (mesuré ${dt.toFixed(0)} ms)`, dt < SEUIL_MS, true);
 			}
-			r.check(`${N} cartes, reset PAR CARTE (ancien comportement, tour 3) : TOUTES colorées — dépasserait le budget d'un rendu (rougirait sur l'assertion précédente)`,
-				coloreesResetParCarte, N);
+
+			/* B. La conversion HTML → markdown, faite pour chaque champ à
+			   l'ouverture d'une page de quiz (detail-io.ts → convert.ts). */
+			{
+				const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+				const html = "<p>x</p>" + `<pre><code class="language-bash">${esc(CODE_HOSTILE)}</code></pre>`.repeat(7);
+				const texte = "<b>x</b>\n\n" + (BLOC_HOSTILE + "\n\n").repeat(7);
+				// Un rendu EN COURS a déjà consommé une partie de son budget : la
+				// conversion ne doit ni le recharger ni le vider.
+				budget.reinitialiserBudgetRendu();
+				budget.consommerBudget(1234);
+				const avant = budget.budgetRestant();
+				const t0 = performance.now();
+				let convertis = 0;
+				for (let i = 0; i < 25; i++) if (conversion.htmlVersMarkdown(html) !== null) convertis++;
+				for (let i = 0; i < 25; i++) if (conversion.texteBaliseVersMarkdown(texte) !== null) convertis++;
+				const dt = performance.now() - t0;
+				console.log(`  B. conversion de 50 champs hostiles : ${dt.toFixed(0)} ms`);
+				r.check("B. conversion : les 50 champs sont convertis", convertis, 50);
+				r.check("B. conversion : le budget du rendu en cours est rendu INTACT", budget.budgetRestant(), avant);
+				r.check(`B. conversion de 50 champs hostiles : sous ${SEUIL_MS} ms (mesuré ${dt.toFixed(0)} ms)`, dt < SEUIL_MS, true);
+				// Et une conversion qui jette rend quand même le budget.
+				budget.reinitialiserBudgetRendu();
+				budget.consommerBudget(77);
+				try { budget.sansColoration(() => { throw new Error("x"); }); } catch { /* attendu */ }
+				r.check("B. `sansColoration` rend le budget même si la fonction jette",
+					budget.budgetRestant(), BUDGET_COLORATION_PAR_RENDU - 77);
+			}
+
+			/* C. L'indice ouvert au clic, APRÈS un rendu qui a épuisé le budget. */
+			{
+				budget.reinitialiserBudgetRendu();
+				for (let i = 0; i < maxColores + 2; i++) sanitizer.rendreTexteQuiz(BLOC_HOSTILE, { embed: () => "", image: () => "" });
+				r.check("C. préalable : le budget est épuisé", budget.budgetRestant() <= 0, true);
+				const ctx = {
+					HINT_OVERLAY_ID: "indice-test",
+					HINT_TITLE_ID: "indice-test-titre",
+					escapeHtmlAttr: (s) => String(s),
+					__quizGlobalCleanups: [],
+					currentAsyncEpoch: () => 0,
+					isQuizInstanceAlive: () => false,
+				};
+				ctx.sanitize = sanitizer.createSanitizer({ host: hote.currentHost(), sourcePath: "" });
+				indice.createHintHandlers(ctx).openHintModal("Indice\n\n" + BLOC_HOSTILE);
+				const corps = document.getElementById("indice-test")?.querySelector(".quiz-hint-modal-body");
+				r.check("C. l'indice ouvert au clic est coloré malgré un budget épuisé", corps ? blocsColores(corps.innerHTML) : "pas de corps", 1);
+			}
+
+			hote.uninstallHost();
 		},
 	);
 
@@ -200,4 +289,4 @@ async function verifierBudgetParRenduPasParCarte() {
 // d'échec (voir scripts/lib/load-src.mjs) : rien à agréger ici.
 await verifierAucunEffetGlobal();
 await verifierDureeBornee();
-await verifierBudgetParRenduPasParCarte();
+await verifierBudgetSurLesVraisAppelants();
