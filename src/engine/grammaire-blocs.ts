@@ -109,6 +109,8 @@ function cellules(l: Ligne): Zone[] {
 				if (fin > i + 1 && !/\s/.test(t[fin - 1])) { i = fin; continue; }
 			}
 		}
+		// `\|` est une barre LITTÉRALE (GFM), rendue « | » dans sa cellule.
+		if (t[i] === "\\" && t[i + 1] === "|") { i++; continue; }
 		if (t[i] === "|") bornes.push(i);
 	}
 	let d = 0;
@@ -245,8 +247,9 @@ export function decouperBlocs(texte: string): Bloc[] {
 			const rangees: Zone[][] = [];
 			let j = i + 2;
 			while (j < lignes.length && !vide(lignes[j]) && lignes[j].texte.includes("|")) {
-				const cs = cellules(lignes[j]).slice(0, entete.length);
-				rangees.push(cs);
+				// Une rangée plus longue que l'en-tête ne perd rien : le tableau
+				// s'élargit au rendu (`rendreBlocs`).
+				rangees.push(cellules(lignes[j]));
 				j++;
 			}
 			blocs.push({
@@ -358,9 +361,16 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				return `<pre class="quiz-md-code"><code${classe}>${o.echapper(b.contenu ? tranche(b.contenu) : "")}</code></pre>`;
 			}
 			case "tableau": {
-				const tete = b.entete.map((z, k) => `<th${STYLE_ALIGNEMENT(b.alignements[k])}>${o.inline(tranche(z))}</th>`).join("");
-				const corps = b.rangees.map(r => "<tr>" + b.entete.map((_, k) =>
-					`<td${STYLE_ALIGNEMENT(b.alignements[k])}>${r[k] ? o.inline(tranche(r[k])) : ""}</td>`).join("") + "</tr>").join("");
+				/* Autant de colonnes que la rangée la plus longue : les cases
+				   manquantes (en-tête ou rangée) restent vides. Le `\|` d'une
+				   cellule devient « | » AVANT l'inline, qui l'échappe comme tout
+				   texte. */
+				const colonnes = Math.max(b.entete.length, ...b.rangees.map(r => r.length));
+				const cellule = (z: Zone | undefined): string => (z ? o.inline(tranche(z).replace(/\\\|/g, "|")) : "");
+				const indices = Array.from({ length: colonnes }, (_, k) => k);
+				const tete = indices.map(k => `<th${STYLE_ALIGNEMENT(b.alignements[k] ?? null)}>${cellule(b.entete[k])}</th>`).join("");
+				const corps = b.rangees.map(r => "<tr>" + indices.map(k =>
+					`<td${STYLE_ALIGNEMENT(b.alignements[k] ?? null)}>${cellule(r[k])}</td>`).join("") + "</tr>").join("");
 				return `<table class="quiz-md-table"><thead><tr>${tete}</tr></thead><tbody>${corps}</tbody></table>`;
 			}
 		}

@@ -199,6 +199,13 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 	r.check("tableau : un `|` dans une formule ne coupe pas la cellule (I3)",
 		rendre("| a | b |" + NL + "|---|---|" + NL + "| $|x|$ | 2 |"),
 		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>$|x|$</td><td>2</td></tr></tbody></table>`);
+	r.check("tableau : `\\|` est une barre littérale (GFM)",
+		rendre("| a \\| b | c |" + NL + "|---|---|" + NL + "| 1 | <i>2</i> \\| 3 |"),
+		`<table class="quiz-md-table"><thead><tr><th>a | b</th><th>c</th></tr></thead><tbody><tr><td>1</td><td><i>2</i> | 3</td></tr></tbody></table>`);
+	r.check("tableau : une rangée plus longue que l'en-tête ne perd rien",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| 1 | 2 | <script> |" + NL + "| x |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th><th></th></tr></thead><tbody>`
+		+ `<tr><td>1</td><td>2</td><td>&lt;script&gt;</td></tr><tr><td>x</td><td></td><td></td></tr></tbody></table>`);
 	r.check("tableau : deux prix restent deux cellules",
 		rendre("| a | b |" + NL + "|---|---|" + NL + "| 5$ | 10$ |"),
 		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>5$</td><td>10$</td></tr></tbody></table>`);
