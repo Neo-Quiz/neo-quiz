@@ -149,8 +149,27 @@
    référence (c-code-tokyo-night.css, thème Tokyo Night) : couleurs FIXES,
    jamais celles de l'hôte — un quiz partagé doit avoir le même rendu chez
    tout le monde. Variables posées ICI (et non dans le thème de l'app) pour
-   que check:theme les voie DÉFINIES et n'en exige rien de l'hôte. */
-.quiz-md-code{
+   que check:theme les voie DÉFINIES et n'en exige rien de l'hôte.
+
+   ANCRÉ SUR `.quiz-md-code` SEUL, sans ancêtre `.quiz-card` : ce bloc rend
+   aussi HORS d'une carte (la grille de la page d'un quiz,
+   dashboard/detail-fiche.ts `.qbd-fiche-q-text`, commit 20036635) — une
+   règle qui exigerait `.quiz-card .quiz-md-code` n'y aurait jamais
+   matché. `.quiz-md-code.quiz-md-code` (la classe doublée, sans
+   `!important`) porte la spécificité à deux classes : assez pour battre
+   un sélecteur d'hôte à une classe et une balise (`.markdown-rendered
+   pre`, par exemple), le genre de règle qu'Obsidian pose sur TOUT bloc de
+   code d'une note en lecture — la même préoccupation que celle qui a fait
+   ajouter des classes à la chaîne des couleurs de jetons plus bas (I1).
+   Revue du 2026-09-26, tour 3 : la police restait sur la monospace du
+   navigateur (`.qbd-fiche-q-text .quiz-md-code` de dashboard-fiche.css,
+   qu'on garde intact pour sa taille réduite, ne redéfinit QUE `margin`,
+   `font-weight`, `font-size`, `overflow-x`, `overflow-wrap` — jamais
+   `font-family`) : la vraie cause n'était pas la spécificité de `.quiz-md-
+   code` elle-même, mais l'absence de `font-family` sur SON `<code>`
+   interne — voir la feuille de style par défaut du navigateur juste
+   après. */
+.quiz-md-code.quiz-md-code{
   --qmc-bg: #1a1b26;
   --qmc-border: #24283b;
   --qmc-fg: #c0caf5;
@@ -175,10 +194,19 @@
   line-height: 1.65;
   white-space: pre;
 }
-.quiz-md-code code{
+/* `font-family` n'est PAS reprise par la feuille de style par défaut du
+   navigateur pour `<pre>`, mais l'EST pour `<code>` (`code, kbd, samp, pre
+   { font-family: monospace }`, universelle) : une valeur DÉCLARÉE sur
+   l'élément — même par cette feuille par défaut — bat toujours une valeur
+   HÉRITÉE de son parent, quelle que soit la spécificité de la règle du
+   parent. `font-size: inherit` s'en protégeait déjà ; `font-family:
+   inherit` manquait, et c'est lui que la re-revue a trouvé (le bloc restait
+   monospace, jamais « Neo Quiz Mono »/« JetBrains Mono »/« Fira Code »). */
+.quiz-md-code.quiz-md-code code{
   background: transparent;
   border-radius: 0;
   padding: 0;
+  font-family: inherit;
   font-size: inherit;
   color: var(--qmc-fg);
 }
@@ -199,6 +227,11 @@
   font-weight: inherit;
   background: none;
   text-shadow: none;
+  /* Contre `.token.namespace` de l'`app.css` d'Obsidian, qui l'estompe
+     (opacity réduite) : sans cette ligne, un jeton `namespace` (un
+     `use`/`namespace` de C#, PHP, Rust…) resterait plus pâle que le reste du
+     bloc, même avec la bonne couleur (mineur de la re-revue, 2026-09-26). */
+  opacity: 1;
 }
 .quiz-md-code code :is(.token.comment, .token.prolog, .token.doctype, .token.cdata){
   color: var(--qmc-comment); font-style: italic;

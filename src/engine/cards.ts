@@ -10,6 +10,7 @@ import type {
 } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
 import { renderLessonHtml } from "./sanitizer";
+import { reinitialiserBudgetRendu } from "./code-highlight";
 import { t, type TransKey } from "../i18n";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
@@ -462,6 +463,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   rôle reste une classe de la carte (`quiz-role-*`) pour la mise en page. */
 
 	function questionCardHtml(qi: number): string {
+		// Budget de coloration des blocs de code (code-highlight.ts) remis à
+		// zéro pour CETTE carte : partagé par tous ses champs (énoncé, options,
+		// explication…), jamais réparti à nouveau à l'intérieur d'un même appel
+		// (revue du 2026-09-26, tour 3).
+		reinitialiserBudgetRendu();
 		const q = ctx.quiz[qi];
 		// Rôle "read" (Task 6c) : étape de LECTURE du support, sans rien à
 		// répondre. `isLessonMode()` garde cette branche fermée sur les quiz

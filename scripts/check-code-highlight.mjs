@@ -1,6 +1,6 @@
 /**
- * COLORATION SYNTAXIQUE — les deux propriétés qu'une revue de code a
- * démontré manquantes après le commit 9f214809 (docs/…/blocs-code-review.md) :
+ * COLORATION SYNTAXIQUE — les propriétés que deux revues de code ont
+ * démontré manquantes (docs/…/blocs-code-review.md, puis une re-revue) :
  *
  * C1. Aucun effet de bord global. Le greffon tourne DANS Obsidian, qui a son
  *     PROPRE `window.Prism`/`globalThis.Prism` (chargé à la demande par son
@@ -13,7 +13,13 @@
  *     perdu, hooks écrasés). Ce script prouve que le code ACTUEL (refractor)
  *     ne fait rien de tel.
  * C2. Durée bornée même sur des motifs RÉPÉTÉS hostiles (pas seulement
- *     aléatoires) : bash, csharp et php, les trois pires de la revue.
+ *     aléatoires). Le premier plafond (3000 caractères par bloc, tour 2)
+ *     ne suffisait pas : une re-revue a trouvé `q3` (un guillemet, une
+ *     apostrophe, un accent grave, répétés) à 334-408 ms sur du bash à
+ *     3000 caractères. Ce script mesure `q3`, sur CE plafond (1000
+ *     caractères), pour CHAQUE langage chargé — voir « Preuve historique »
+ *     du rapport pour la mesure qui montre l'ancien plafond dépasser le
+ *     seuil sur ce même motif.
  *
  *     npm run check:code-highlight
  */
@@ -75,37 +81,50 @@ async function verifierAucunEffetGlobal() {
 
 /* ── C2 : durée bornée sur des motifs RÉPÉTÉS hostiles ─────────────── */
 
-/** Les pires motifs mesurés dans la revue (superlinéaires sur ces
-    grammaires), répétés bien au-delà du plafond par bloc : la fonction doit
-    les couper à `PLAFOND_CARACTERES_PAR_BLOC` avant de tokeniser, donc rester
-    rapide quelle que soit la longueur de départ. */
+/** TOUS les langages enregistrés par `code-highlight.ts` (la même liste que
+    ses imports) : la re-revue exige `q3` sur chacun, pas seulement les
+    trois pires trouvés au tour précédent. */
+const TOUS_LES_LANGAGES = [
+	"clike", "markup", "css", "javascript", "typescript", "python", "c", "cpp",
+	"java", "bash", "powershell", "sql", "json", "yaml", "go", "rust", "php", "csharp",
+];
+
+/** Les motifs hostiles à mesurer sur chaque langage. `q3` (un guillemet,
+    une apostrophe, un accent grave) est celui que la re-revue a trouvé pire
+    que tout ce que le tour précédent avait essayé — jusqu'à 408 ms sur du
+    bash à 3000 caractères, avec l'ancien plafond. Les deux autres viennent
+    de la première revue (bash/php, csharp) : gardés pour ne pas perdre leur
+    couverture. */
 const MOTIFS_HOSTILES = {
-	bash: "'\"`/*<!--${(",
-	csharp: "a.",
-	php: "'\"`/*<!--${(",
+	q3: "\"'`",
+	melange: "'\"`/*<!--${(",
+	point: "a.",
 };
 
 async function verifierDureeBornee() {
 	const r = makeReporter("Coloration — durée bornée sur des motifs répétés (C2)");
-	// Un seuil LARGE (300 ms) : le pire mesuré dans la revue, une fois coupé
-	// au plafond de 3000 caractères, tombe autour de 70-100 ms sur une
-	// machine rapide (voir le rapport) — la marge absorbe une machine modeste.
+	// Un seuil LARGE (300 ms), demandé explicitement : le pire mesuré (`q3`
+	// sur bash), une fois coupé au plafond de 1000 caractères, tombe autour
+	// de 34 ms sur une machine rapide (voir le rapport) — la marge absorbe
+	// une machine modeste ou un motif encore pire qu'on n'aurait pas essayé.
 	const SEUIL_MS = 300;
 
 	await withSrcModule("src/engine/code-highlight.ts", ({ colorerCode, PLAFOND_CARACTERES_PAR_BLOC }) => {
-		for (const [langue, motif] of Object.entries(MOTIFS_HOSTILES)) {
-			// Bien au-delà du plafond, pour que la coupe soit ce qui est
-			// mesuré (pas la taille d'entrée).
-			const taille = PLAFOND_CARACTERES_PAR_BLOC * 4;
-			let code = "";
-			while (code.length < taille) code += motif;
-			const t0 = performance.now();
-			const resultat = colorerCode(code, langue, (s) => s, PLAFOND_CARACTERES_PAR_BLOC);
-			const dt = performance.now() - t0;
-			r.check(`${langue} : coloré (motif répété, ${taille} caractères en entrée)`, !!resultat, true);
-			r.check(`${langue} : coloré sur au plus le plafond (${PLAFOND_CARACTERES_PAR_BLOC})`,
-				resultat ? resultat.colore <= PLAFOND_CARACTERES_PAR_BLOC : "aucun résultat", true);
-			r.check(`${langue} : sous ${SEUIL_MS} ms (mesuré ${dt.toFixed(1)} ms)`, dt < SEUIL_MS, true);
+		for (const langue of TOUS_LES_LANGAGES) {
+			for (const [nomMotif, motif] of Object.entries(MOTIFS_HOSTILES)) {
+				// Bien au-delà du plafond, pour que la coupe soit ce qui est
+				// mesuré (pas la taille d'entrée).
+				const taille = PLAFOND_CARACTERES_PAR_BLOC * 4;
+				let code = "";
+				while (code.length < taille) code += motif;
+				const t0 = performance.now();
+				const resultat = colorerCode(code, langue, (s) => s, PLAFOND_CARACTERES_PAR_BLOC);
+				const dt = performance.now() - t0;
+				r.check(`${langue}/${nomMotif} : coloré (motif répété, ${taille} caractères en entrée)`, !!resultat, true);
+				r.check(`${langue}/${nomMotif} : coloré sur au plus le plafond (${PLAFOND_CARACTERES_PAR_BLOC})`,
+					resultat ? resultat.colore <= PLAFOND_CARACTERES_PAR_BLOC : "aucun résultat", true);
+				r.check(`${langue}/${nomMotif} : sous ${SEUIL_MS} ms (mesuré ${dt.toFixed(1)} ms)`, dt < SEUIL_MS, true);
+			}
 		}
 	});
 

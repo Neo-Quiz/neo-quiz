@@ -4,6 +4,14 @@
    complément pour la classe "code"). Utilisé par les deux hôtes via
    engine/sanitizer.ts.
 
+   UNE SEULE EXCEPTION À LA PURETÉ (tour 3 de la revue) : le budget cumulé de
+   coloration par rendu de carte (`budgetRestantDuRendu` plus bas) est un
+   compteur de MODULE, remis à zéro par ses deux appelants. Voir le
+   commentaire sur `BUDGET_COLORATION_PAR_RENDU` pour pourquoi, et le
+   rapport de la tâche pour ce que ça change si un jour ce module tourne
+   dans un contexte qui rendrait deux cartes en parallèle (il ne le fait pas
+   aujourd'hui : JS est mono-thread et un rendu de carte est synchrone).
+
    BIBLIOTHÈQUE (revue du 2026-09-26, C1) : `refractor`, jamais `prismjs`
    directement. `prismjs` (même son entrée « core » seule) pose une globale
    (`window.Prism`/`global.Prism`) et programme un `highlightAll()` si
@@ -96,18 +104,59 @@ const ALIAS_SUPPLEMENTAIRES: Readonly<Record<string, string>> = {
 
 /** Un plafond de caractères réellement colorés PAR BLOC : au-delà, le reste
     du code s'affiche échappé, sans couleurs. Choisi après mesure sur des
-    motifs RÉPÉTÉS hostiles (revue du 2026-09-26, C2 : jusqu'à 6,25 s pour
-    20 000 caractères de bash `'"`/*<!--${(`) — 3 000 caractères, le pire
-    motif mesuré (bash) y reste sous 100 ms sur une machine rapide, avec une
-    marge large pour une machine modeste. Voir `scripts/check-code-highlight.mjs`. */
-export const PLAFOND_CARACTERES_PAR_BLOC = 3_000;
+    motifs RÉPÉTÉS hostiles (re-revue du 2026-09-26, tour 3) : le motif `q3`
+    (`"'`` , un guillemet, une apostrophe, un accent grave, répété) tokenisé
+    par `refractor` prend 334 à 408 ms pour 3 000 caractères de bash — le
+    premier plafond (3 000) ne suffisait pas. 1 000 caractères, le même
+    motif sur bash, restent sous ~35 ms sur une machine rapide (mesuré :
+    ~34 ms), avec une marge large pour une machine modeste. Voir
+    `scripts/check-code-highlight.mjs`. */
+export const PLAFOND_CARACTERES_PAR_BLOC = 1_000;
 
-/** Un budget CUMULÉ de caractères colorés pour TOUT un texte de quiz (un
-    champ peut contenir plusieurs blocs de code) : au-delà, les blocs
-    suivants s'affichent échappés sans couleurs, même reconnus. Tenu par
-    l'appelant (`sanitizer.ts`, `rendreTexteQuiz`), pas ici — cette valeur
-    n'est qu'une référence partagée pour ne pas dupliquer le nombre. */
-export const BUDGET_COLORATION_PAR_TEXTE = 20_000;
+/** Un budget CUMULÉ de caractères colorés pour TOUT LE RENDU d'une carte de
+    question (titre, énoncé, options, indice, explication, cours… peuvent
+    contenir chacun un ou plusieurs blocs de code) : au-delà, les blocs
+    suivants s'affichent échappés sans couleurs, même reconnus. La re-revue
+    du tour 2 avait montré qu'un budget par TEXTE (un seul champ) laissait un
+    champ de 7 blocs bash de 3 000 caractères prendre 2,1 s à lui seul, et
+    qu'aucune borne ne tenait sur un quiz entier (plusieurs champs, chacun
+    reparti avec un budget plein). Ce budget-ci est partagé par TOUS les
+    champs d'une carte, quel que soit leur nombre — voir
+    `reinitialiserBudgetRendu` plus bas pour le point exact où il se remet à
+    zéro, et le rapport de la tâche pour le choix de ce point. */
+export const BUDGET_COLORATION_PAR_RENDU = 5_000;
+
+/* Le budget lui-même : un compteur de MODULE, pas un paramètre — c'est
+   l'exception PURE de ce module (voir l'en-tête) : partagé par tous les
+   appels de `colorerCode` faits par le rendu EN COURS, quel que soit le
+   champ ou l'appelant. Sûr en l'état : JavaScript est mono-thread, et
+   `questionCardHtml`/`renderQuizPreviewCard` rendent une carte de façon
+   entièrement SYNCHRONE (aucun `await` entre le premier champ et le
+   dernier) — deux rendus ne s'entrelacent jamais. */
+let budgetRestantDuRendu = BUDGET_COLORATION_PAR_RENDU;
+
+/** À appeler UNE FOIS, tout au DÉBUT du rendu d'une carte de question
+    entière — jamais à chaque champ, sans quoi chaque champ obtiendrait son
+    propre budget plein et la carte entière pourrait dépasser de loin la
+    borne voulue. Deux appelants : `engine/cards.ts` (`questionCardHtml`,
+    une carte du quiz joué) et `editor/question-preview.ts`
+    (`renderQuizPreviewCard`, l'aperçu de l'éditeur ET la grille de la page
+    d'un quiz — les deux passent par cette même fonction). */
+export function reinitialiserBudgetRendu(): void {
+	budgetRestantDuRendu = BUDGET_COLORATION_PAR_RENDU;
+}
+
+/** Le budget qu'il reste à colorer pour le rendu en cours. */
+export function budgetRestant(): number {
+	return budgetRestantDuRendu;
+}
+
+/** Décompte `n` caractères du budget du rendu en cours (appelé par
+    `sanitizer.ts` après chaque coloration réussie, avec le `colore` que
+    `colorerCode` a rendu). */
+export function consommerBudget(n: number): void {
+	budgetRestantDuRendu -= n;
+}
 
 /** Un nom de type ou d'alias de jeton, sûr à poser dans une classe. */
 const NOM_SUR = /^[a-z0-9-]+$/;

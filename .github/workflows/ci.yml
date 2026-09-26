@@ -36,6 +36,21 @@ jobs:
       - name: Learn and Practice prompts
         run: npm run check:prompt
 
+      # LE MARKDOWN DE BLOC ET DE LIGNE d'un texte de quiz (paragraphes,
+      # listes, tableaux, blocs de code colorés, images, liens) : gras et
+      # italique interprétés, une formule LaTeX ou un chemin Windows laissés
+      # intacts, jamais une balise HTML tapée à la main qui s'exécute.
+      - name: Quiz markdown rendering
+        run: npm run check:md
+
+      # LA COLORATION SYNTAXIQUE D'UN BLOC DE CODE : aucun effet de bord sur
+      # le `Prism` de l'hôte (Obsidian a le sien), et une durée bornée même
+      # sur des motifs RÉPÉTÉS hostiles (pas seulement aléatoires) — une
+      # re-revue a trouvé un motif qui prenait plus de 400 ms sur du bash
+      # avec le premier plafond.
+      - name: Code block syntax highlighting
+        run: npm run check:code-highlight
+
       # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
       # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
       - name: HTML to markdown conversion

@@ -6,6 +6,7 @@ import type { DraftQuestion } from "./utils";
 import { mathifyElement } from "../engine/mathjax";
 import { sanitizeQuizHtml, rendreTexteQuiz } from "../engine/sanitizer";
 import type { RenduImages } from "../engine/sanitizer";
+import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 /* IMPORT STATIQUE, plus un `require` paresseux : `require` n'existe pas dans
    le rendu de l'application (Vite, modules ES), et l'ancien appel faisait
    échouer la page de TOUT quiz portant une question `text` avec « require is
@@ -130,6 +131,20 @@ const IMAGES_APERCU: RenduImages = {
     une seconde grammaire, montrait autre chose que ce que l'apprenant
     verrait. */
 export function texteQuizHtml(raw: string, sourcePath?: string): string {
+	/* Budget de coloration des blocs de code (code-highlight.ts) remis à zéro
+	   à CHAQUE appel : c'est le seul point commun à l'aperçu de l'éditeur
+	   (renderQuizPreviewCard, plusieurs appels par carte — prompt, options,
+	   support…) ET à la grille de la page d'un quiz
+	   (dashboard/detail-fiche.ts, qui appelle CETTE fonction directement, UNE
+	   fois par carte de la grille, jamais via renderQuizPreviewCard) —
+	   revue du 2026-09-26, tour 3. Remettre le budget ICI, plutôt que dans
+	   renderQuizPreviewCard, est le point le plus simple qui borne chaque
+	   carte de la grille indépendamment sans toucher detail-fiche.ts (hors
+	   périmètre de cette tâche) ; le prix, documenté dans le rapport, est que
+	   dans l'aperçu de l'éditeur (une seule question, jamais une longue
+	   liste), chaque option repart avec son propre budget plein au lieu d'un
+	   budget partagé par la carte entière. */
+	reinitialiserBudgetRendu();
 	return resolveImagesInHtml(rendreTexteQuiz(raw, IMAGES_APERCU), sourcePath);
 }
 

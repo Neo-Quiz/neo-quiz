@@ -8,7 +8,7 @@ import {
 } from "./grammaire-inline";
 import type { GenreEmphase } from "./grammaire-inline";
 import { rendreBlocs } from "./grammaire-blocs";
-import { colorerCode, BUDGET_COLORATION_PAR_TEXTE } from "./code-highlight";
+import { colorerCode, budgetRestant, consommerBudget } from "./code-highlight";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -236,19 +236,23 @@ function rendreMorceaux(texte: string, images: RenduImages): string {
  */
 export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
 	const texte = String(raw ?? "");
-	/* Budget CUMULÉ de caractères colorés pour CE texte (plusieurs blocs de
-	   code peuvent s'y trouver) : au-delà, les blocs suivants s'affichent
-	   échappés sans couleurs, même reconnus (revue du 2026-09-26, C2).
-	   Fermeture locale à cet appel : chaque texte de quiz reparties avec un
-	   budget plein, jamais partagé entre deux champs. */
-	let budgetRestant = BUDGET_COLORATION_PAR_TEXTE;
+	/* Budget CUMULÉ de caractères colorés, partagé par TOUS les champs d'une
+	   même carte de question (titre, énoncé, options, indice, explication,
+	   cours…) — un champ de plus n'obtient PAS son propre budget plein.
+	   Tenu par `code-highlight.ts` (compteur de module), remis à zéro une
+	   fois par carte par ses appelants (`engine/cards.ts questionCardHtml`,
+	   `editor/question-preview.ts renderQuizPreviewCard`) — jamais ici :
+	   remettre le budget à chaque appel de `rendreTexteQuiz` reviendrait au
+	   budget par TEXTE du tour 2, insuffisant sur un champ à plusieurs blocs
+	   (revue du 2026-09-26, tour 3). */
 	return rendreBlocs(texte, {
 		inline: m => rendreMorceaux(m, images), echapper: escapeHtmlText,
 		colorerCode: (code, langue) => {
-			if (budgetRestant <= 0) return null;
-			const resultat = colorerCode(code, langue, escapeHtmlText, budgetRestant);
+			const disponible = budgetRestant();
+			if (disponible <= 0) return null;
+			const resultat = colorerCode(code, langue, escapeHtmlText, disponible);
 			if (!resultat) return null;
-			budgetRestant -= resultat.colore;
+			consommerBudget(resultat.colore);
 			return resultat.html;
 		},
 	}) ?? rendreMorceaux(texte, images);

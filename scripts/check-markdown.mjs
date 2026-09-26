@@ -173,9 +173,17 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"
    `renderTextWithEmbeds` d'un vrai `createSanitizer`). Du markdown partout,
    comme dans Discord et Obsidian (2026-09-26) — et toujours l'échappement
    AVANT le markdown : un quiz peut venir de quelqu'un d'autre. */
-await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"], ({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }) => {
+await withSrcModule(
+	["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts", "src/engine/code-highlight.ts"],
+	({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }, { reinitialiserBudgetRendu }) => {
 	const r = makeReporter("Blocs, images et liens");
 	const IMG = { embed: s => `[embed:${s}]`, image: (a, s) => `[image:${a}|${s}]` };
+	/* `rendreTexteQuiz` partage désormais un budget de coloration de MODULE
+	   (code-highlight.ts), remis à zéro par ses appelants réels une fois par
+	   carte (revue du 2026-09-26, tour 3) — jamais ici. Ce script appelle
+	   `rendreTexteQuiz` directement, en dehors de tout appelant : chaque cas
+	   qui dépend d'un budget frais le remet lui-même à zéro AVANT de rendre,
+	   pour ne pas dépendre de l'ordre des cas précédents. */
 	const rendre = (t) => rendreTexteQuiz(t, IMG);
 	const NL = "\n";
 	const P = (x) => `<p class="quiz-md-p">${x}</p>`;
@@ -187,6 +195,7 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 		P("x") + `<ol class="quiz-md-liste" start="3"><li>a</li><li>b</li></ol>`);
 	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
 		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
+	reinitialiserBudgetRendu();
 	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
 		`<pre class="quiz-md-code"><code class="language-python">`
@@ -225,12 +234,13 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 	r.check("langage `__proto__` : idem",
 		rendre("```__proto__" + NL + "<i>x</i>" + NL + "```"),
 		`<pre class="quiz-md-code"><code class="language-__proto__">&lt;i&gt;x&lt;/i&gt;</code></pre>`);
-	/* Plafond PAR BLOC (revue du 2026-09-26, C2) : au-delà d'environ 3000
-	   caractères, le reste d'un bloc s'affiche échappé sans couleurs. 1600
-	   nombres séparés d'une espace (3199 caractères) : loin sous le plafond
-	   pour la moitié, loin au-delà pour l'autre — si TOUS étaient colorés, la
-	   troncature ne servirait à rien. */
+	/* Plafond PAR BLOC (re-revue du 2026-09-26, tour 3) : au-delà d'environ
+	   1000 caractères, le reste d'un bloc s'affiche échappé sans couleurs.
+	   1600 nombres séparés d'une espace (3199 caractères) : loin sous le
+	   plafond pour une partie, loin au-delà pour l'autre — si TOUS étaient
+	   colorés, la troncature ne servirait à rien. */
 	{
+		reinitialiserBudgetRendu();
 		const NOMBRES = 1600;
 		const gros = Array.from({ length: NOMBRES }, () => "1").join(" ");
 		const html = rendre("```python" + NL + gros + NL + "```");
@@ -238,19 +248,30 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts"]
 		r.check("plafond par bloc : coloration tronquée avant la fin d'un bloc trop long",
 			colores > 0 && colores < NOMBRES, true);
 	}
-	/* Budget CUMULÉ par texte (C2) : huit blocs de 3199 caractères (donc
-	   chacun plafonné à 3000 s'il restait assez de budget) dépassent le
-	   budget de 20 000 avant la fin du texte — le dernier bloc doit sortir
-	   entièrement NU, alors que le premier reste coloré. */
+	/* Budget CUMULÉ par RENDU (tour 3, remplace le budget par texte du
+	   tour 2 — insuffisant : un seul champ à 7 blocs de 3000 prenait 2,1 s).
+	   Le budget est un compteur de MODULE (code-highlight.ts), partagé par
+	   tous les appels à `rendreTexteQuiz`, jamais remis à zéro tout seul —
+	   `reinitialiserBudgetRendu()` simule ici le début du rendu d'UNE carte
+	   (ce que font pour de vrai `engine/cards.ts questionCardHtml` et
+	   `editor/question-preview.ts texteQuizHtml`). Huit blocs de 3199
+	   caractères (chacun plafonné à 1000 caractères coloré au plus)
+	   dépassent le budget de 5000 avant la fin du texte — le dernier bloc
+	   doit sortir entièrement NU, alors que le premier reste coloré. */
 	{
+		reinitialiserBudgetRendu();
 		const unBloc = () => "```python" + NL + Array.from({ length: 1600 }, () => "1").join(" ") + NL + "```";
 		const huitBlocs = Array.from({ length: 8 }, unBloc).join(NL + NL);
 		const html = rendre(huitBlocs);
 		const comptes = html.split('<pre class="quiz-md-code">').slice(1)
 			.map(segment => (segment.match(/<span class="token number">1<\/span>/g) || []).length);
-		r.check("budget cumulé : le premier bloc d'un texte reste coloré", comptes[0] > 0, true);
-		r.check("budget cumulé : le dernier bloc d'un texte trop riche en code perd sa coloration", comptes[7], 0);
+		r.check("budget cumulé : le premier bloc d'un rendu reste coloré", comptes[0] > 0, true);
+		r.check("budget cumulé : le dernier bloc d'un rendu trop riche en code perd sa coloration", comptes[7], 0);
 	}
+	// Remis à zéro pour ne pas laisser un budget épuisé fuiter vers les cas
+	// suivants de ce même bloc de test (tableaux, listes…), tous insensibles
+	// à la coloration mais par hygiène.
+	reinitialiserBudgetRendu();
 	r.check("tableau : en-tête, alignements, `|` dans un code",
 		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
 		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`
