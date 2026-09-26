@@ -306,8 +306,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.editTitle": "Title",
 	"dashboard.quiz.editTitlePlaceholder": "Name this question…",
 	"dashboard.quiz.editPrompt": "Question",
-	"dashboard.quiz.editPromptHtml": "Question (HTML)",
-	"dashboard.quiz.editPromptHtmlHint": "This question carries structured HTML (a table, a list, a code block). It is edited as HTML so that structure survives.",
 	"dashboard.quiz.editPromptPlaceholder": "Type your question…",
 	"dashboard.quiz.externalChange": "This note changed outside the plugin. It has been reloaded, and your last edits were not written.",
 	"dashboard.quiz.saveError": "Couldn't save the quiz",

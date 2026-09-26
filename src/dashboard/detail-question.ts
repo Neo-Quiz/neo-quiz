@@ -120,7 +120,7 @@ function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 	// raccourci ``` + Entrée et le collage d'image vers le vault — trois
 	// capacités que la version maison n'avait pas.
 	const rich = isRichHtml(q._promptHtml);
-	const field = bloc(parent, t(rich ? "dashboard.quiz.editPromptHtml" : "dashboard.quiz.editPrompt"));
+	const field = bloc(parent, t("dashboard.quiz.editPrompt"));
 	field.classList.add("qbd-qz-fsec--prompt");
 
 	const value = rich
@@ -148,7 +148,6 @@ function renderPromptField(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 		cb.onChange();
 	}, rich);
 
-	if (rich) ajouter(field, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 }
 
 /* ── Sections optionnelles ────────────────────────────────── */
@@ -213,7 +212,6 @@ function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, 
 			}
 			cb.onChange();
 		}, richLesson);
-	if (richLesson) ajouter(lesson, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 
 	// ── Bouton ressource ──
 	renderResourceSection(parent, q, cb, bridge);
@@ -251,7 +249,6 @@ function renderExplain(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks,
 		}
 		cb.onChange();
 	}, richExplain);
-	if (richExplain) ajouter(explain, "div", "qbd-qz-section-help", t("dashboard.quiz.editPromptHtmlHint"));
 }
 
 /** Le bouton « ressource » n'existe que s'il est activé : son interrupteur
