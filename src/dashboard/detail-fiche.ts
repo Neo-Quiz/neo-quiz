@@ -183,7 +183,10 @@ function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
     de questions, l'origine ; les actions s'y ajoutent au bout. */
 function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
-	const chips = ajouter(meta, "div", "qbd-fiche-chips");
+	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous
+	   (2026-09-26) ; les actions restent au bout, à droite des deux lignes. */
+	const infos = ajouter(meta, "div", "qbd-fiche-meta-infos");
+	const chips = ajouter(infos, "div", "qbd-fiche-chips");
 	/* Le MODE, avec son icône, et au survol son explication : la bulle du
 	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
 	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
@@ -245,7 +248,7 @@ function renderMeta(root: HTMLElement, deps: FicheDeps): HTMLElement {
 	   l'infobulle donne l'identifiant exact. */
 	if (deps.origine) {
 		const o = deps.origine;
-		const bloc = ajouter(meta, "div", "qbd-fiche-origin");
+		const bloc = ajouter(infos, "div", "qbd-fiche-origin");
 		bloc.title = o.tooltip;
 		const logo = ajouter(bloc, "span", "qbd-provider-logo qbd-fiche-origin-logo qbd-provider-logo--" + o.logo);
 		setBrandLogo(logo, o.logo);

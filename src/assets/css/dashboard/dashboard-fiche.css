@@ -471,30 +471,71 @@
 	.qbd-fiche-body { flex: none; overflow: visible; }
 }
 
-/* ── Les pastilles et la recherche, en VERRE (2026-09-26) : presque
-   transparentes, elles se perdaient sur un fond d'écran photo. Même verre
-   que les cartes des questions : fond, flou, liseré et reflet du haut. ── */
+/* ── La ligne d'infos et la recherche : CHACUNE SA FORME (2026-09-26).
+   Habillées du même verre que les cartes, pastilles, recherche et cartes
+   se confondaient (« le même type de tuile partout »). La tuile reste aux
+   cartes des questions ; ici :
+   - les métadonnées (nombre de questions, origine) sont du TEXTE, icône et
+     séparateur, avec une ombre portée pour rester lisibles sur une photo ;
+   - Learn | Practice est un SÉLECTEUR à segments sur un rail plein sombre ;
+   - la recherche est un CHAMP plein sombre, sans verre ni liseré. ── */
+.qbd-fiche-meta {
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
 .qbd-fiche-meta .qbd-fiche-chip,
-.qbd-fiche-meta .qbd-fiche-modes,
-.qbd-fiche-meta .qbd-fiche-origin,
-.qbd-fiche-search {
-	background: var(--qbd-glass-bg);
-	border: 1px solid color-mix(in srgb, var(--text-normal) 12%, transparent);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
+.qbd-fiche-meta .qbd-fiche-origin {
+	padding: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+	color: color-mix(in srgb, var(--text-normal) 88%, transparent);
+	font-size: 12.5px;
+}
+.qbd-fiche-meta .qbd-fiche-chip:hover { transform: none; }
+.qbd-fiche-meta .qbd-fiche-chip + .qbd-fiche-chip::before,
+.qbd-fiche-meta .qbd-fiche-modes + .qbd-fiche-chip::before {
+	content: "·";
+	margin: 0 8px 0 4px;
+	color: var(--text-faint);
 }
 .qbd-fiche-meta .qbd-fiche-chip.is-accent {
-	background: color-mix(in srgb, var(--interactive-accent) 22%, var(--qbd-glass-bg));
-	border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
-}
-.qbd-fiche-meta .qbd-fiche-chip { color: var(--text-normal); }
-.qbd-fiche-meta .qbd-fiche-origin {
-	padding: 4px 10px;
-	border-radius: 6px;
-	color: var(--text-normal);
+	color: var(--interactive-accent);
+	font-weight: 600;
 }
 .qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
-.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:not(.is-active) { color: var(--text-normal); }
-.qbd-fiche-search { color: var(--text-normal); }
+.qbd-fiche-meta .qbd-fiche-modes,
+.qbd-fiche-search {
+	/* Le matériau des boutons « Semaine » et « Aujourd'hui » de Neo Calendar
+	   (CalendarHeader.css, .nc-btn-today) : primaire presque opaque, flou et
+	   ÉCLAIRCI par le filtre, liseré fin, coins de 8 px — un verre de
+	   CONTRÔLE, distinct du verre translucide des cartes. */
+	background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+	backdrop-filter: blur(12px) brightness(1.18);
+	-webkit-backdrop-filter: blur(12px) brightness(1.18);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	text-shadow: none;
+}
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:not(.is-active) { color: color-mix(in srgb, var(--text-normal) 85%, transparent); }
+.qbd-fiche-meta .qbd-fiche-mode-indic { background: var(--quiz-primary); }
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg.is-active { color: #fff; }
+.qbd-fiche-search {
+	color: var(--text-normal);
+	transition: border-color 0.15s ease;
+}
+/* Survol : la même couche que Neo Calendar, qui n'éclaircit que le fond. */
+.qbd-fiche-meta .qbd-fiche-modes:hover,
+.qbd-fiche-search:hover {
+	background:
+		linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)),
+		color-mix(in srgb, var(--background-primary) 92%, transparent);
+}
+.qbd-fiche-search:focus-within { border-color: var(--quiz-primary); }
 .qbd-root .qbd-fiche-search-input::placeholder { color: var(--text-muted); }
+.qbd-fiche-meta-infos {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-width: 0;
+}
