@@ -304,11 +304,8 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.previewBack": "Back to start",
 	/* La fiche d'un quiz (detail-fiche.ts). */
 	"dashboard.fiche.part": "Part {n}",
-	"dashboard.fiche.viewGrid": "Grid view",
-	"dashboard.fiche.viewList": "List view",
 	"dashboard.fiche.search": "Search",
 	"dashboard.fiche.searchEmpty": "No question matches this search.",
-	"dashboard.fiche.position": "{n} of {total}",
 	"dashboard.quiz.editTitle": "Title",
 	"dashboard.quiz.editTitlePlaceholder": "Name this question…",
 	"dashboard.quiz.editPrompt": "Question",
