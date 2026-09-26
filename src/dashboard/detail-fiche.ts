@@ -11,6 +11,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
 import { texteQuizHtml } from "../editor/question-preview";
+import { renderInlineText } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
@@ -343,7 +344,12 @@ function renderOptions(card: HTMLElement, q: DraftQuestion): void {
 	q.options.forEach((o, j) => {
 		const line = ajouter(opts, "span", "qbd-fiche-opt");
 		ajouter(line, "span", "qbd-fiche-opt-letter", String.fromCharCode(65 + j));
-		texte(line, "span", "qbd-fiche-opt-text", o);
+		/* Une option est du texte de quiz : même porte que dans le quiz
+		   (`renderInlineText`), sans quoi `[10, 20, 30]` s'affichait
+		   avec ses accents graves (2026-09-26). */
+		const txt = ajouter(line, "span", "qbd-fiche-opt-text");
+		txt.innerHTML = renderInlineText(o);
+		if (o.includes("$")) void mathifyElement(txt);
 	});
 }
 
