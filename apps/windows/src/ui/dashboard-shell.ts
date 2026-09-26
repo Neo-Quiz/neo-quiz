@@ -290,7 +290,25 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   juste avant d'entrer dans un dossier ou d'en sortir, qui ne passe pas
 		   par `navigate`. */
 		recordNav: () => enregistrerNav(),
-		openQuiz: (quiz) => deps.onOpenQuiz(quiz),
+		/* JOUER DEPUIS N'IMPORTE OÙ RAMÈNE À LA PAGE DU QUIZ (2026-09-26). La
+		   coquille est démontée pendant le jeu puis remontée au retour, sur
+		   `vueCourante` : lancé depuis la pastille Learn d'une carte, le retour
+		   retombait sur « Mes quiz »… à la grille RACINE, le dossier ouvert
+		   étant un état de l'instance détruite. On se place donc sur la fiche
+		   du quiz AVANT de partir ; sa flèche retour rouvre ensuite le dossier
+		   (`openFolderOfQuiz`, voir `onBack` plus bas). Depuis la fiche
+		   elle-même, rien ne change. */
+		openQuiz: (quiz) => {
+			if (vueCourante !== "detail" || quizSelectionne?.path !== quiz.path) {
+				if (!memeEtatNav(etatCourant(), { vue: "detail", dossier: null, quiz })) enregistrerNav();
+				if (vueCourante !== "detail") vuePrecedente = vueCourante;
+				quizSelectionne = quiz;
+				vueCourante = "detail";
+				ouvertureEnAttente = true;
+				noterVue({ vue: "detail", quiz: quiz.path });
+			}
+			deps.onOpenQuiz(quiz);
+		},
 		openSettings: () => deps.onOpenSettings(),
 		/* Toutes les vues, la génération comprise (tranche 5, tâche 6) : la page
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à

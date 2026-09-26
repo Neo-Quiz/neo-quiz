@@ -51,6 +51,7 @@ release notes.
 - The quiz mode picker in the editor offers Learn and Practice, and no longer shows the Quiz, Lesson and Exam modes or their timer settings.
 
 ### Fixed
+- Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.
 - The AI tools (Claude Code, Codex, Antigravity) can only be started with the exact options Neo Quiz uses for a generation: an option that would let them run commands on their own is refused.
 - Opening a file from a quiz refuses more kinds of programs and scripts, including when the name ends with a dot or a space, which Windows ignores.
 - A typographic apostrophe (’) in a translated message or a folder path no longer breaks the scripts that install and connect the AI tools, and can no longer be used to run something else in them.
