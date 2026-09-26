@@ -56,9 +56,12 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	const entry = scanner.getQuiz(fichierHote.path);
 
 	/* La configuration et le parasite ne sont pas des questions indexées : les
-	   sept références correspondent uniquement aux objets du bloc. */
-	r.check("une fence CRLF indentée est indexée sans compter la configuration",
-		entry?.questions, 7);
+	   sept références correspondent uniquement aux objets du bloc. Le COMPTE
+	   affiché en retire la lecture (`dup-2`, rôle `read`) : le bloc est joué en
+	   leçon, et depuis le 2026-09-26 aucune lecture d'un Learn n'est une
+	   question (src/lecture-etape.ts `nombreDeQuestions`). */
+	r.check("une fence CRLF indentée est indexée sans compter la configuration ni la lecture",
+		[entry?.questions, entry?.items.length], [6, 7]);
 	/* Calcul manuel : le parasite consomme q1, donc la question sans titre reçoit
 	   q2. Puis dup prend sa clé ; le second dup évite dup déjà attribué
 	   ET dup-2 réservé plus bas, donc devient dup-3 ; dup-2 garde ensuite sa
@@ -153,7 +156,9 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'learn', objectives: ['Lire'] },\n]\n```\n";
 	await scanner.scanFile(fichierHote);
 	r.check("un bloc { mode: 'learn' } est un Learn", scanner.getQuiz(fichierHote.path)?.mode, "learn");
-	r.check("une lecture seule dans son étape reste une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 1);
+	/* Décision du 2026-09-26 (soir) : une lecture de Learn, même restée un
+	   écran à part, n'est jamais une question comptée. */
+	r.check("une lecture seule dans son étape n'est pas une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 0);
 
 	/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : le cours d'une
 	   étape qui a d'autres questions n'est pas compté ; le catalogue de

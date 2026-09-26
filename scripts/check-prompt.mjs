@@ -40,5 +40,14 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		composerPrompts("x", { mode: "learn" }).systemPrompt.includes("ONLY when the answer fits in one sentence, one formula or one line of code"), true);
 	r.check("Learn : le texte complet du flashcard du brief",
 		composerPrompts("x", { mode: "learn" }).systemPrompt.includes("A recall can also be a FLASHCARD: set \"flashcard\": true, put the question in \"prompt\" (front) and the expected answer in \"answer\" (back), add \"explain\"; no \"options\", no \"type\". Use a flashcard ONLY when the answer fits in one sentence, one formula or one line of code (a definition, a syntax, the output of a short expression), never for a question that needs reasoning or several lines, and for at most half of the recalls of a slice."), true);
+	/* Styles de lecture (2026-09-26) : le modèle CHOISIT selon le contenu, et
+	   jamais en Practice, qui n'a pas de lecture. */
+	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
+	r.check("Learn : le style se choisit selon le contenu (texte suivi, procédure, comparaison)",
+		["CHOOSE for each read card, from its content", '"lecture": "page" for a CONTINUOUS text', '"lecture": "etapes" for a PROCEDURE', '"lecture": "tableau" to COMPARE'].filter(p => !learnP.includes(p)), []);
+	r.check("Learn : « À retenir », cartes pour des termes, récapitulatif pour des faits",
+		['"forme": "cartes"', "for TERMS to memorize", '"forme": "recap"', "for FACTS to keep"].filter(p => !learnP.includes(p)), []);
+	r.check("Practice : aucun style de lecture",
+		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
 	r.done();
 });

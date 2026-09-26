@@ -12,6 +12,7 @@ import type { QuestionRole } from "../types/quiz";
 import { createSelect } from "./ui-select";
 import { monterEditionRendu } from "./edition-rendu";
 import { createFormBridge } from "./detail-form-bridge";
+import { renderStyleLecture } from "./detail-lecture-style";
 import type { FormBridge } from "./detail-form-bridge";
 import { bloc, renderExtras, section } from "./detail-question";
 import type { EditCallbacks } from "./detail-question";
@@ -131,6 +132,15 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 		libererChamps(plus);
 		plus.replaceChildren();
 		remplirPlus(plus, q, cbPlus, bridge);
+		/* Le STYLE de lecture (2026-09-26) : de la lecture elle-même, ou du
+		   cours de l'étape affiché au-dessus de la question. En tête de
+		   « Plus » : c'est le premier réglage d'une lecture. */
+		const cible = q.role === "read" ? q : cb.lecture;
+		if (cible && cb.estLecon) {
+			const zone = ajouter(plus, "div", "qbd-lecture-style-zone");
+			plus.prepend(zone);
+			renderStyleLecture(zone, cible, cbPlus, bridge, cb.onListeChange);
+		}
 	}
 
 	monter();

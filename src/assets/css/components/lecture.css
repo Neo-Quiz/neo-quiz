@@ -1,0 +1,360 @@
+/* =========================================================
+   STYLES DE LECTURE d'un cours de Learn (engine/lecture-rendu.ts)
+
+   Spec : docs/superpowers/specs/2026-09-26-styles-de-lecture-design.md §3.
+   Reprise AU PLUS PRÈS des maquettes validées (lectures-rendus.html B et E,
+   lectures-rendus-2.html R4, R5, R6 ; « ici c'est parfait », Ahmed, pour
+   B) : mêmes tailles, mêmes marges, mêmes teintes, passées par les
+   variables du thème pour rester lisibles en clair comme en sombre.
+
+   Le corps vit DANS le cours déplié au-dessus d'une question
+   (.quiz-passage[data-lecture]) ou dans une lecture autonome
+   (.quiz-card[data-lecture] .quiz-question).
+
+   Règles de l'utilisateur tenues ici : jamais d'ascenseur dans un cours
+   (c'est la page qui défile), aucune capitale forcée, aucune pastille
+   décorative (le rond d'une étape porte son NUMÉRO), jamais l'habillage
+   d'une carte de question.
+   ========================================================= */
+
+/* ── Le cours déplié devient une PAGE (maquette B, `.b .page`) ──
+   Surface arrondie, 40 px en haut et en bas ; sa barre (livre, titre,
+   chevron) se réduit au chevron, en haut à droite : le titre est écrit en
+   serif DANS la page, pas deux fois. Replié, la barre reste entière. */
+.quiz-passage[data-lecture]{
+  position: relative;
+}
+
+.quiz-passage[data-lecture]:not(.is-collapsed){
+  border-radius: 18px;
+}
+
+.quiz-passage[data-lecture]:not(.is-collapsed) .quiz-passage-head{
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.quiz-passage[data-lecture]:not(.is-collapsed) .quiz-passage-icon,
+.quiz-passage[data-lecture]:not(.is-collapsed) .quiz-passage-title,
+.quiz-passage[data-lecture]:not(.is-collapsed) .quiz-passage-scope{
+  display: none;
+}
+
+.quiz-passage[data-lecture] .quiz-passage-content{
+  padding: 40px 28px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* ── La colonne ── */
+
+.quiz-lecture{
+  /* Le support est en `break-spaces` (indentation du code collé) ; les
+     blocs d'ici se mettent en page eux-mêmes. */
+  white-space: normal;
+  max-width: 62ch;
+  margin: 0 auto;
+}
+
+.quiz-lecture p{
+  margin: 0 0 14px;
+}
+
+.quiz-lecture p:last-child{
+  margin-bottom: 0;
+}
+
+.quiz-lecture-titre{
+  margin: 0 0 18px;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-normal);
+}
+
+.quiz-lecture-intro{
+  margin: 0 0 14px;
+}
+
+/* ── Page de lecture (B) : titre serif, méta, lettrine ── */
+
+.quiz-lecture--page .quiz-lecture-titre{
+  margin: 0 0 6px;
+  font: 700 26px/1.3 Georgia, "Times New Roman", serif;
+}
+
+.quiz-lecture-meta{
+  margin: 0 0 22px;
+  font-size: 13px;
+  color: var(--text-faint, var(--text-muted));
+}
+
+.quiz-lecture--page .quiz-lecture-texte{
+  font-size: 16.5px;
+  line-height: 1.8;
+}
+
+/* La lettrine de la maquette, telle quelle : serif 44 px, flottante. Elle
+   vise le premier paragraphe, ou le texte lui-même quand il n'en a qu'un
+   (rendu sans <p>). */
+.quiz-lecture--page .quiz-lecture-texte > p:first-child::first-letter,
+.quiz-lecture--page .quiz-lecture-texte:not(:has(> p))::first-letter{
+  float: left;
+  margin: 6px 8px 0 0;
+  font: 700 44px/0.9 Georgia, "Times New Roman", serif;
+  color: color-mix(in srgb, var(--quiz-primary) 82%, white);
+}
+
+/* Une lecture affichée comme ÉCRAN (style `page`, ou étape sans autre
+   question) : la même page que le cours déplié, sur la même surface. Son
+   titre est dans la page ; la carte ne pose pas de `<h2>`. */
+.quiz-card[data-lecture] .quiz-question{
+  padding: 40px 28px;
+  border-radius: 18px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* L'onglet d'une lecture : un livre, sans numéro de question. */
+.quiz-tab.is-lecture{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quiz-tab.is-lecture svg{
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Une idée par ligne (E) : numérotée, séparée par un filet ── */
+
+.quiz-lecture-etapes{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quiz-lecture-etape{
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.quiz-lecture-etape:first-child{
+  border-top: 0;
+  padding-top: 0;
+}
+
+.quiz-lecture-num{
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--quiz-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quiz-lecture-etape-texte{
+  min-width: 0;
+}
+
+/* ── Tableau de comparaison (R4) : en-têtes colorés, 1re colonne atténuée ── */
+
+.quiz-lecture-tableau-wrap{
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.quiz-lecture-tableau{
+  width: 100%;
+  margin-top: 18px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.quiz-lecture-intro + .quiz-lecture-tableau-wrap .quiz-lecture-tableau,
+.quiz-lecture-titre + .quiz-lecture-tableau-wrap .quiz-lecture-tableau{
+  margin-top: 4px;
+}
+
+.quiz-lecture-tableau th,
+.quiz-lecture-tableau td{
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.quiz-lecture-tableau th{
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.quiz-lecture-tableau th.quiz-lecture-col-1{ color: var(--color-blue); }
+.quiz-lecture-tableau th.quiz-lecture-col-2{ color: var(--color-orange); }
+.quiz-lecture-tableau th.quiz-lecture-col-3{ color: var(--color-purple); }
+
+.quiz-lecture-tableau td:first-child{
+  color: var(--text-muted);
+}
+
+/* ── « À retenir » ── */
+
+.quiz-lecture-cartes-bloc,
+.quiz-lecture-recap{
+  margin-top: 18px;
+}
+
+.quiz-lecture-cartes-bloc .quiz-lecture-retenir-titre{
+  margin: 26px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Cartes à retourner (R5) : recto bleu, verso vert. Un vrai bouton, qui se
+   retourne au clic, à Entrée et à Espace — jamais au seul survol. Les deux
+   faces sont empilées dans la même case de grille : la carte prend au moins
+   la hauteur de la maquette (110 px), plus si son texte le demande. */
+.quiz-lecture-cartes{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.quiz-lecture-carte{
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 110px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  perspective: 800px;
+}
+
+.quiz-lecture-carte:hover,
+.quiz-lecture-carte:active{
+  background: none;
+  box-shadow: none;
+}
+
+.quiz-lecture-carte:focus-visible{
+  outline: 2px solid var(--quiz-primary);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+.quiz-lecture-carte-in{
+  display: grid;
+  min-height: 110px;
+  transform-style: preserve-3d;
+  transition: transform 0.45s;
+}
+
+.quiz-lecture-carte.is-retournee .quiz-lecture-carte-in{
+  transform: rotateY(180deg);
+}
+
+.quiz-lecture-face{
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  overflow-wrap: anywhere;
+}
+
+.quiz-lecture-face.is-recto{
+  background: color-mix(in srgb, var(--quiz-primary) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--quiz-primary) 45%, transparent);
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.quiz-lecture-face.is-verso{
+  background: color-mix(in srgb, var(--color-green) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-green) 40%, transparent);
+  font-size: 13.5px;
+  transform: rotateY(180deg);
+}
+
+.quiz-lecture-indice{
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-faint, var(--text-muted));
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-lecture-carte-in{ transition: none; }
+}
+
+/* Récapitulatif coché (R6) : un encadré vert, une ligne cochée par point. */
+.quiz-lecture-recap{
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-green) 10%, transparent);
+}
+
+.quiz-lecture-recap .quiz-lecture-retenir-titre{
+  margin: 0 0 10px;
+  font-weight: 700;
+  color: var(--color-green);
+}
+
+.quiz-lecture-recap ul{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.quiz-lecture-recap li{
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.quiz-lecture-coche{
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--color-green);
+  color: #07210f;
+}
+
+.quiz-lecture-coche svg{
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Petit écran : la page garde de l'air, sans déborder ── */
+.is-mobile .quiz-passage[data-lecture] .quiz-passage-content,
+.is-mobile .quiz-card[data-lecture] .quiz-question{
+  padding: 28px 16px;
+}

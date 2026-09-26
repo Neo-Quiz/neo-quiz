@@ -53,7 +53,7 @@ import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner"
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
-import { numerosAffiches, questionHote } from "../../../../src/lecture-etape";
+import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
@@ -342,8 +342,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			   montre. Le total est celui de la carte (`quiz.questions`). */
 			// Hors Learn (au sens du moteur, `quiz.lecon`), rien n'est absorbé.
 			const lecon = !!quiz.lecon;
-			const numeros = numerosAffiches(quiz.items, lecon);
-			return { question: numeros[questionHote(quiz.items, lecon, i)] || i + 1, total: quiz.questions, ecrite: s.ecrite };
+			// Une lecture restée un écran n'a pas de numéro (2026-09-26) :
+			// `numeroDeReprise` annonce la question qui la suit.
+			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite };
 		},
 		ambiance: (accent) => poserLueur(accent),
 		pickIcon: (anchor, courante, onPick, suggestions) => {

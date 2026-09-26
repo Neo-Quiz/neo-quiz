@@ -319,6 +319,32 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.done();
 });
 
+/* STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : chaque style et
+   chaque forme de « À retenir » font l'aller-retour lecture → écriture →
+   lecture À L'IDENTIQUE, valeurs inconnues comprises — seul leur RENDU
+   retombe sur « page » (src/lecture-style.ts), la note ne change pas. */
+await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
+	const r = makeReporter("Styles de lecture (aller-retour)");
+	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
+	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir });
+	const lecture = (o) => ({ id: "l", title: "Lecture", prompt: "Texte.", slice: 1, role: "read", ...o });
+	const cas = {
+		"page + cartes": lecture({ lecture: "page", retenir: { forme: "cartes", items: [{ recto: "`d.get`", verso: "Renvoie **None**" }] } }),
+		"étapes + récapitulatif": lecture({ lecture: "etapes", etapes: ["Créer `.venv`", "L'activer : `.venv\\Scripts\\activate`"], retenir: { forme: "recap", items: ["On active d'abord", "$x^2$"] } }),
+		"tableau aux lignes inégales": lecture({ lecture: "tableau", tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"]] } }),
+		"valeurs inconnues ou mal formées": lecture({ lecture: "callout", etapes: "pas une liste", retenir: { forme: "glossaire", items: 3 } }),
+		"aucun champ (quiz d'avant)": lecture({}),
+	};
+	for (const [nom, brut] of Object.entries(cas)) {
+		r.check(`${nom} : relu à l'identique`, champs(tour(brut)), champs(brut));
+	}
+	const deux = tour(tour(cas["tableau aux lignes inégales"]));
+	r.check("deux écritures de suite : toujours identique", champs(deux), champs(cas["tableau aux lignes inégales"]));
+	r.check("une lecture sans champ n'en gagne aucun",
+		Object.keys(tour(cas["aucun champ (quiz d'avant)"])).filter(k => ["lecture", "etapes", "tableau", "retenir"].includes(k)), []);
+	r.done();
+});
+
 /* CONTENU QUI NE DOIT PAS BOUGER A L'ECRITURE. Chacun de ces cas a ete une
    perte ou une corruption reelle : rien ne levait, rien ne s'affichait, et la
    sauvegarde annoncait un succes. */

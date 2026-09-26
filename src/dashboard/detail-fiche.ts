@@ -315,7 +315,9 @@ const OPTION_COURTE = 32;
     rendu, pour qu'elles s'y greffent. */
 export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
 	const top = ajouter(card, "span", "qbd-fiche-q-top");
-	ajouter(top, "span", "qbd-fiche-num", String(numero));
+	// 0 : une lecture de Learn restée un écran, qui n'a pas de numéro de
+	// question (src/lecture-etape.ts) — son icône de livre suffit.
+	if (numero > 0) ajouter(top, "span", "qbd-fiche-num", String(numero));
 	if (q.role === "read") {
 		// Une lecture n'attend pas de réponse : son type n'apprendrait rien.
 		icone(top, "book-open", "qbd-fiche-q-icon");
@@ -434,7 +436,8 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		const q = deps.questions[i];
 		const n = numeros[i] || i + 1;
 		const card = ajouter(grille, "div", "qbd-fiche-q qbd-fiche-card");
-		renderTop(card, q, n);
+		// Une lecture de Learn n'a pas de numéro (0) : la carte n'en montre pas.
+		renderTop(card, q, numeros[i] ?? n);
 		/* Le CONTENU défile dans sa propre zone, sous l'en-tête de la carte :
 		   un fondu en bas tant qu'il reste à lire (jamais une ligne coupée
 		   net), en haut dès qu'on a descendu (2026-09-26). Le fondu porte sur

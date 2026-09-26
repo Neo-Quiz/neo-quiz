@@ -369,7 +369,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const lecturesAbsorbees: ReadonlySet<number> = calculerLecturesAbsorbees(quiz, estLecon);
 	const numeros = numerosAffiches(quiz, estLecon, lecturesAbsorbees);
 	ctx.lecturesAbsorbees = lecturesAbsorbees;
-	ctx.numeroAffiche = (qi: number): number => numeros[qi] || qi + 1;
+	// 0 pour une lecture de Learn restée un écran : elle n'a pas de numéro
+	// de question (son onglet est un livre, engine/cards.ts `navHtml`).
+	ctx.numeroAffiche = (qi: number): number => numeros[qi] ?? qi + 1;
 
 	// ── Slide Map : index dynamique basé sur le mode ──
 	function buildSlideMap(): SlideMapEntry[] {

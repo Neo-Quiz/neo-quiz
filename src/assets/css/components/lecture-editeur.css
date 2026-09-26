@@ -1,0 +1,74 @@
+/* Le style de lecture d'un cours, dans « Plus » de l'éditeur de l'APP
+   (importé par index.css seulement : le greffon n'a plus d'éditeur)
+   (dashboard/detail-lecture-style.ts). Des champs et des lignes, pas de
+   tuile : c'est un formulaire, pas du contenu. */
+
+.qbd-lecture-style-ligne{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.qbd-lecture-style-nom,
+.qbd-lecture-style-titre{
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.qbd-lecture-style-titre{
+  margin: 10px 0 4px;
+}
+
+.qbd-lecture-style-nom{
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.qbd-lecture-style-liste{
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.qbd-lecture-style-item{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.qbd-lecture-style-item.is-carte{
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.qbd-lecture-style-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.qbd-lecture-style-btn:hover,
+.qbd-lecture-style-btn:focus-visible{
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.qbd-lecture-style-btn-icone{
+  display: inline-flex;
+}
+
+.qbd-lecture-style-btn-icone svg{
+  width: 14px;
+  height: 14px;
+}

@@ -99,6 +99,49 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.done();
 });
 
+/* Les STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : la seule
+   lecture des champs `lecture`, `etapes`, `tableau`, `retenir`. Une valeur
+   qu'elle ne comprend pas retombe sur le comportement d'avant, sans erreur. */
+await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tableauDeLecture, retenirDeLecture, etapesDeLecture, paragraphes, minutesDeLecture }) => {
+	const r = makeReporter("Styles de lecture (format)");
+	r.check("style : les trois valeurs connues",
+		["page", "etapes", "tableau"].map(v => styleDeLecture({ lecture: v })), ["page", "etapes", "tableau"]);
+	r.check("style : absent, inconnu, mal typé → page",
+		[styleDeLecture({}), styleDeLecture({ lecture: "Etapes" }), styleDeLecture({ lecture: "callout" }), styleDeLecture({ lecture: 2 }), styleDeLecture(null)],
+		["page", "page", "page", "page", "page"]);
+	r.check("étapes : les chaînes non vides seulement",
+		etapesDeLecture({ etapes: ["a", "", "  ", 3, null, "b"] }), ["a", "b"]);
+	r.check("étapes absentes ou pas une liste : vide", [etapesDeLecture({}), etapesDeLecture({ etapes: "a" })], [[], []]);
+	r.check("tableau aux lignes inégales : complété de cases vides",
+		tableauDeLecture({ tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"], ["Typage", "Dyn", "Stat", "en trop"]] } }),
+		{ colonnes: ["", "Python", "C", ""], lignes: [["Exécution", "Interprété", "Compilé", ""], ["Mémoire", "Auto", "", ""], ["Typage", "Dyn", "Stat", "en trop"]] });
+	r.check("tableau : nombres écrits, autres cases vides, lignes qui ne sont pas des listes écartées",
+		tableauDeLecture({ tableau: { colonnes: ["A", 2], lignes: [[1, { x: 1 }], "pas une ligne", [null]] } }),
+		{ colonnes: ["A", "2"], lignes: [["1", ""], ["", ""]] });
+	r.check("tableau sans ligne, mal formé ou absent : null",
+		[tableauDeLecture({ tableau: { colonnes: ["a"], lignes: [] } }), tableauDeLecture({ tableau: [] }), tableauDeLecture({ tableau: "x" }), tableauDeLecture({})],
+		[null, null, null, null]);
+	r.check("tableau à en-tête vide : pas d'en-tête",
+		tableauDeLecture({ tableau: { colonnes: ["", ""], lignes: [["a", "b"]] } }).colonnes, []);
+	r.check("retenir cartes : recto ET verso exigés",
+		retenirDeLecture({ retenir: { forme: "cartes", items: [{ recto: "Terme", verso: "Sens" }, { recto: "Seul" }, "texte", { recto: " ", verso: "x" }] } }),
+		{ forme: "cartes", items: [{ recto: "Terme", verso: "Sens" }] });
+	r.check("retenir recap : chaînes non vides",
+		retenirDeLecture({ retenir: { forme: "recap", items: ["Fait", "", 3, "Autre"] } }), { forme: "recap", items: ["Fait", "Autre"] });
+	r.check("retenir mal formé ignoré sans erreur : forme inconnue, items absent ou pas une liste, aucun élément valide, pas un objet",
+		[{ forme: "glossaire", items: ["a"] }, { forme: "recap" }, { forme: "cartes", items: "a" }, { forme: "cartes", items: [{ recto: "a" }] }, "recap", ["a"], null]
+			.map(v => retenirDeLecture({ retenir: v })),
+		[null, null, null, null, null, null, null]);
+	r.check("lecture ancienne (aucun champ) : page, rien d'autre",
+		lireLecture({ role: "read", prompt: "Texte." }), { style: "page", etapes: [], tableau: null, retenir: null });
+	r.check("paragraphes : coupés sur la ligne vide, jamais dans un bloc de code",
+		paragraphes("Un.\n\nDeux\nsuite.\n\n```python\na = 1\n\nb = 2\n```\n\n\nTrois."),
+		["Un.", "Deux\nsuite.", "```python\na = 1\n\nb = 2\n```", "Trois."]);
+	r.check("minutes de lecture : mots / 200, arrondi, au moins 1",
+		[minutesDeLecture(""), minutesDeLecture("mot ".repeat(250)), minutesDeLecture("mot ".repeat(350)), minutesDeLecture("mot ".repeat(1000))], [1, 1, 2, 5]);
+	r.done();
+});
+
 await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemande, trouverLearn }) => {
 	const r = makeReporter("Source d'une note, et son Learn");
 	r.check("la première pièce jointe, sans extension", nomDeSource([{ name: "CM1 - Introduction à Python.pdf" }, { name: "TP1.md" }], "Fais-moi un quiz", "Nouveau quiz"), "CM1 - Introduction à Python");

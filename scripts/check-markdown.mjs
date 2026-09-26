@@ -390,3 +390,29 @@ await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots }) => {
 
 	r.done();
 });
+
+/* Les STYLES DE LECTURE (2026-09-26) : étapes, cases de tableau, cartes et
+   récapitulatif passent par la MÊME grammaire que le reste du quiz — le
+   rendu RÉEL (engine/lecture-rendu.ts) avec les portes RÉELLES. Un champ
+   affiché sans porte montrerait ses astérisques. */
+await withSrcModule(["src/engine/lecture-rendu.ts", "src/engine/sanitizer.ts"], ({ corpsLectureHtml }, san) => {
+	const r = makeReporter("Markdown des styles de lecture");
+	const portes = {
+		bloc: (s) => san.rendreTexteQuiz(s, { embed: () => "", image: () => "" }),
+		inline: san.renderInlineText,
+		attribut: (s) => san.stripInlineMarkdown(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"),
+	};
+	const html = (item) => corpsLectureHtml(item, item.prompt ?? "", portes.bloc(item.prompt ?? ""), "", portes).html;
+	const md = "**gras** et `code`";
+	const attendu = san.renderInlineText(md);
+	r.check("étape : markdown rendu", html({ lecture: "etapes", prompt: "", etapes: [md] }).includes(attendu), true);
+	r.check("case de tableau et en-tête : markdown rendu",
+		(html({ lecture: "tableau", prompt: "", tableau: { colonnes: [md], lignes: [[md]] } }).split(attendu).length - 1), 2);
+	r.check("carte recto et verso : markdown rendu",
+		(html({ prompt: "", retenir: { forme: "cartes", items: [{ recto: md, verso: md }] } }).split(attendu).length - 1), 2);
+	r.check("libellé de carte (attribut) : marqueurs retirés, pas d'astérisque",
+		/aria-label="[^"]*\*\*/.test(html({ prompt: "", retenir: { forme: "cartes", items: [{ recto: md, verso: md }] } })), false);
+	r.check("récapitulatif : markdown rendu", html({ prompt: "", retenir: { forme: "recap", items: [md] } }).includes(attendu), true);
+	r.check("aucun marqueur brut ne reste", /\*\*gras\*\*|`code`/.test(html({ lecture: "tableau", prompt: md, tableau: { colonnes: [md], lignes: [[md]] }, retenir: { forme: "recap", items: [md] } })), false);
+	r.done();
+});

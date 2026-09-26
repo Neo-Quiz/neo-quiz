@@ -20,6 +20,7 @@
 @import url('./components/nav-tabs.css');
 @import url('./components/quiz-card.css');
 @import url('./components/passage.css');
+@import url('./components/lecture.css');
 @import url('./components/cloze.css');
 @import url('./components/flashcard.css');
 @import url('./components/quiz-options.css');
@@ -72,6 +73,7 @@
 @import url('./editor/editor-wysiwyg.css');
 @import url('./editor/editor-forms-extra.css');
 @import url('./editor/editor-icons.css');
+@import url('./components/lecture-editeur.css');
 
 /* L'éditeur d'un quiz (page du tableau de bord) : APRÈS les feuilles editor/*,
    dont il réhabille les classes qb-* du formulaire. */

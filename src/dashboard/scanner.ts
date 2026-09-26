@@ -5,7 +5,7 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { lecturesAbsorbees } from "../lecture-etape";
+import { nombreDeQuestions } from "../lecture-etape";
 import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
@@ -180,10 +180,11 @@ export function createScanner(host: Host): Scanner {
 			// pas de la 1re question (qui vaut souvent « Question 1 »).
 			return {
 				/* Le NOMBRE de questions affiché (carte, fiche, infos) saute les
-				   lectures absorbées par leur étape (src/lecture-etape.ts) : un
-				   cours n'est pas une question. `items`, lui, les garde toutes —
-				   c'est le catalogue de l'ordonnanceur, rangé par identifiant. */
-				questions: questions.length - lecturesAbsorbees(questions.map(x => x.q), lecon).size,
+				   lectures d'un Learn, absorbées par leur étape ou restées un
+				   écran (src/lecture-etape.ts) : un cours n'est pas une question.
+				   `items`, lui, les garde toutes — c'est le catalogue de
+				   l'ordonnanceur, rangé par identifiant. */
+				questions: nombreDeQuestions(questions.map(x => x.q), lecon),
 				items,
 				lecon,
 				types: Array.from(typeSet),

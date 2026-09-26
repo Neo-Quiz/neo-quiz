@@ -9,7 +9,8 @@ import type {
 	ClozeQuestion,
 } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
-import { renderLessonHtml } from "./sanitizer";
+import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
+import { corpsLecture } from "./passage";
 import { t, type TransKey } from "../i18n";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
@@ -17,7 +18,9 @@ import { t, type TransKey } from "../i18n";
    canal d'icône à cet endroit. */
 const ICON_ARROW_LEFT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>';
 /* Les icônes du bouton d'aide (Lucide « lightbulb » et « circle-help »). */
-const ICON_BULB = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
+/* Lucide book-open : l'onglet d'une lecture de Learn, qui n'a pas de numéro. */
+const ICON_LIVRE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
+const ICON_BULB ='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
 const ICON_HELP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
@@ -53,7 +56,14 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	/** Le numéro AFFICHÉ (Q1…Qn), qui saute les lectures absorbées. */
 	const numero = (i: number): number => ctx.numeroAffiche?.(i) ?? i + 1;
 
+	/** Classes d'un onglet : son état, et `is-lecture` pour une lecture de
+	    Learn sans numéro (un livre) — ici et non dans le gabarit, parce que
+	    `updateNavHighlight` (state.ts) réécrit la classe à chaque déplacement. */
 	function tabClass(i: number): string {
+		return `${numero(i) === 0 ? "is-lecture " : ""}${tabEtat(i)}`.trim();
+	}
+
+	function tabEtat(i: number): string {
 		const cur = ctx.quizState.current;
 		// slideMap[cur].questionIndex n'existe que sur la variante « question » —
 		// cast pour lire l'optionnel `?.questionIndex` sans changer le runtime.
@@ -80,7 +90,16 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
 		// numéros la sautent (la question qui la suit devient Q2, pas Q3).
 		const onglets = ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
-		return `<div class="quiz-nav">${onglets.map(i => `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${numero(i)}</a>`).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
+		/* Une lecture de Learn restée un écran (style `page`) n'a pas de
+		   numéro de question (src/lecture-etape.ts) : son onglet est un livre,
+		   nommé par son titre au survol et pour un lecteur d'écran. */
+		const onglet = (i: number): string => {
+			const n = numero(i);
+			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${n}</a>`;
+			const nom = ctx.escapeHtmlAttr(stripInlineMarkdown(ctx.quiz[i]?.title || t("engine.lesson.roleRead")));
+			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" title="${nom}">${ICON_LIVRE}</a>`;
+		};
+		return `<div class="quiz-nav">${onglets.map(onglet).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
 	}
 
 	/* Précédente / suivante sous chaque question (2026-09-23) : des ICÔNES
@@ -583,12 +602,20 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   plafond de hauteur garde tout son sens. */
 		const roleClass = ctx.isLessonMode() ? ` quiz-role-${ctx.roleOfQuestion(qi)}` : "";
 
+		/* Une lecture AUTONOME (étape sans autre question) prend les mêmes
+		   styles que le cours déplié au-dessus d'une question (2026-09-26) :
+		   même appel, `corpsLecture` (engine/passage.ts). */
+		const promptHtml = renderQuizPromptHtml(q);
+		/* Son titre est écrit DANS la page (serif, maquette B), comme au-dessus
+		   d'une question : le `<h2>` de la carte n'est alors pas posé. */
+		const lecture = isRead ? corpsLecture(ctx, q, String(q.prompt ?? ""), promptHtml, String(q.title ?? "")) : null;
+
 		return `<div class="quiz-track-item${roleClass}" data-slide-kind="question" data-qi="${qi}">
-			<section class="quiz-card"${sectionIdAttr}>
+			<section class="quiz-card"${sectionIdAttr}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
 				${passageSection}
-				<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>
+				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
 				${ctx.sanitize.resourceButtonHtml(q)}
-				<div class="quiz-question">${renderQuizPromptHtml(q)}</div>
+				<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>
 				${body}
 				${learnSection}
 				${indiceHtml}

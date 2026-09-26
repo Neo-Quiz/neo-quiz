@@ -373,6 +373,12 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		// être TUE à l'écriture, pas réapparaître recopiée telle quelle via
 		// `_extraFields` sous prétexte que sa forme de base n'a pas été retenue.
 		'slice','role']);
+	/* Les STYLES DE LECTURE (`lecture`, `etapes`, `tableau`, `retenir`,
+	   2026-09-26) ne sont PAS dans cette liste, exprès : ils voyagent par
+	   `_extraFields`, relus et réécrits tels quels (export.ts), valeurs
+	   inconnues comprises — seul leur rendu les normalise
+	   (src/lecture-style.ts). L'éditeur les modifie là
+	   (dashboard/detail-lecture-style.ts). `check:export` le vérifie. */
 	/* `Object.create(null)` : un objet ordinaire ABSORBE une clé nommée
 	   `__proto__` au lieu de la stocker, et le champ personnalisé
 	   disparaissait sans un mot. */
