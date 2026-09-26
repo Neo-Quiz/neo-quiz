@@ -1341,10 +1341,28 @@
 	border-color: color-mix(in srgb, var(--color-red, #f87171) 45%, var(--background-modifier-border));
 }
 
+/* Le nom reste lisible sur une carte en échec : c'est le message qui se
+   serre, pas lui. */
+.qbd-ai-note-chip--erreur {
+	gap: 3px;
+}
+
+.qbd-ai-note-chip--erreur .qbd-ai-note-chip-name {
+	flex-shrink: 0;
+}
+
 .qbd-ai-note-chip-erreur {
-	font-size: 11px;
+	min-height: 0;
+	overflow: hidden;
+	font-size: 10.5px;
 	line-height: 1.3;
 	color: var(--color-red, #f87171);
+}
+
+/* Ce qu'il faut faire : l'envoi reste bloqué tant que le document est là. */
+.qbd-ai-note-chip-erreur-aide {
+	display: block;
+	color: var(--text-muted);
 }
 
 /* ── L'aperçu d'une pièce jointe (clic sur sa carte) : une modale large, la

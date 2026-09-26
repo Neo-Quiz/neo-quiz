@@ -70,7 +70,8 @@ export function creerVueFile(opts: {
 	let zone: HTMLElement | null = null;
 	let desabonner: (() => void) | null = null;
 	let horloge: number | null = null;
-	let toursPeints = 0;
+	/** L'identifiant du dernier tour peint ; -1 force le retour en bas. */
+	let dernierPeint = -1;
 
 	const affichee = (): boolean => !!zone?.isConnected;
 
@@ -220,8 +221,12 @@ export function creerVueFile(opts: {
 			peindreMessage(tour, l);
 			peindreReponse(tour, l);
 		}
-		const nouveau = visibles.length > toursPeints;
-		toursPeints = visibles.length;
+		/* Un tour NOUVEAU se lit à l'identifiant du dernier, pas au nombre de
+		   tours : une réponse fermée pendant qu'une demande part laisse le
+		   nombre inchangé. */
+		const dernier = visibles.length ? visibles[visibles.length - 1].id : 0;
+		const nouveau = dernier !== dernierPeint;
+		dernierPeint = dernier;
 		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
 		const enCours = visibles.some(l => l.etat === "cours");
 		if (enCours && horloge === null) {
@@ -241,7 +246,7 @@ export function creerVueFile(opts: {
 			zone.setAttribute("aria-label", t("ai.queue.label"));
 			zone.setAttribute("aria-live", "polite");
 			if (!desabonner) desabonner = opts.file.abonner(peindre, affichee);
-			toursPeints = 0; // un rendu neuf de la page : on se cale en bas
+			dernierPeint = -1; // un rendu neuf de la page : on se cale en bas
 			peindre();
 		},
 		liberer,

@@ -28,6 +28,8 @@ import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
 import { ouvrirMenuPlus } from "./composer-plus";
+import { attachmentKey, creerPiecesJointes } from "./composer-attachments";
+import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -83,15 +85,6 @@ const SONDE_CONNEXION_MS = 3000;
 /* Les pièces jointes et la demande vivent dans `generation-demande.ts`,
    partagé avec la file de génération ; ré-exportées pour leurs lecteurs. */
 export type { AttachmentSource, NoteAttachment } from "./generation-demande";
-
-/** Clé d'identité d'une pièce jointe : origine + chemin quand il existe, nom
-    sinon. Calculée en UN SEUL endroit et réutilisée à tous les points
-    d'ajout (addComposerFiles, attachNoteVaultFile, attachExternalPath) —
-    la régression corrigée ici venait précisément d'un dédoublonnage recopié
-    à la main à chaque appelant, divergent entre `path` et `name`. */
-function attachmentKey(a: { source: AttachmentSource; path?: string; name: string }): string {
-	return a.source + ":" + (a.path || a.name);
-}
 
 /** Une tuile de la modale d'attente du canal web : ce qui s'affiche, et le
     fichier que l'hôte fera partir au glisser (`HostDepot.glisser`). */
@@ -294,39 +287,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 	});
 
-	/* ── La page en CONVERSATION (référence claude.ai, 2026-09-26) ── */
-	/** La mise en page du dernier rendu : conversation ou page vide. */
+	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
+	   file, passe en conversation au premier envoi et en sort quand la liste
+	   se vide ; entre-temps, seuls le bouton d'envoi (■ pendant une
+	   génération) et « Nouvelle demande » bougent. ── */
 	let modeConversation = false;
-	let boutonNouvelle: HTMLButtonElement | null = null;
-	/** Une demande est-elle dans la file ? (`arret` ne se montre pas.) */
-	const enConversation = (): boolean => fileGen.lignes().some(l => l.etat !== "arret");
-	/** Plus rien ne tourne, et aucun quiz n'attend d'être enregistré :
-	    « Nouvelle demande » peut vider la liste sans rien perdre. */
-	function libreDeRepartir(): "oui" | "occupee" | "nonEnregistre" {
-		const ls = fileGen.lignes();
-		if (ls.some(l => l.etat === "attente" || l.etat === "cours" || l.etat === "arret" || l.etat === "enregistrement")) return "occupee";
-		if (ls.some(l => l.etat === "echouee" && l.echec === "enregistrement")) return "nonEnregistre";
-		return "oui";
-	}
-	function majNouvelle(): void {
-		const b = boutonNouvelle;
-		if (!b || !b.isConnected) return;
-		const etat = libreDeRepartir();
-		b.disabled = etat !== "oui";
-		b.title = etat === "occupee" ? t("ai.queue.newRequestBusy") : etat === "nonEnregistre" ? t("ai.queue.newRequestUnsaved") : "";
-	}
-	/** « Nouvelle demande » (le « Nouveau » de claude.ai) : ferme les réponses
-	    finies ; la liste vide, la page redevient la page d'accueil. */
-	function nouvelleDemande(): void {
-		if (libreDeRepartir() !== "oui") return;
-		for (const l of [...fileGen.lignes()]) fileGen.fermer(l.id);
-	}
-	/* La page suit la file : elle passe en conversation au premier envoi et
-	   en sort quand la liste se vide ; entre-temps, seuls le bouton d'envoi
-	   (■ pendant une génération) et « Nouvelle demande » bougent. */
+	let majNouvelle: () => void = () => {};
 	const desabonnerPage = fileGen.abonner(() => {
 		if (!stageRef || !stageRef.isConnected) return;
-		if ((phase === "idle" || phase === "error") && enConversation() !== modeConversation) { void render(containerRef); return; }
+		if ((phase === "idle" || phase === "error") && enConversation(fileGen) !== modeConversation) { void render(containerRef); return; }
 		updateGenerateBtn(boutonEnvoi);
 		majNouvelle();
 	}, () => !!stageRef?.isConnected);
@@ -653,137 +622,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
 	}
 
-	/** Le contenu d'une carte de pièce jointe : la première page en image pour
-	    un PDF dessiné, sinon le nom sur deux lignes ; le badge d'extension
-	    dans les deux cas ; le tooltip natif porte le chemin entier. */
-	function poserCarte(chip: HTMLElement, note: NoteAttachment): void {
-		chip.title = note.path || note.name;
-		/* En LECTURE : la roue discrète de claude.ai, par-dessus le nom (ou la
-		   page, dès qu'elle est dessinée). En ÉCHEC : le message sur la carte
-		   même, la croix reste pour la retirer. */
-		if (note.lecture === "cours") {
-			chip.classList.add("qbd-ai-note-chip--lecture");
-			ajouter(chip, "span", "qbd-install-spinner qbd-ai-note-chip-spinner").setAttribute("aria-label", t("ai.attach.reading"));
-		} else if (note.lecture === "erreur") {
-			chip.classList.add("qbd-ai-note-chip--erreur");
-			chip.title = `${note.name} — ${note.erreurLecture ?? ""}`;
-		}
-		if (note.thumb && note.lecture !== "erreur") {
-			/* La page SEULE, posée dans la carte : ni badge ni nom par-dessus
-			   (retour Ahmed 2026-09-17, référence claude.ai). Sa forme — paysage
-			   ou portrait — est ce qu'on lit d'un coup d'œil, et le nom vit dans
-			   l'infobulle et dans l'aperçu. */
-			chip.classList.add("qbd-ai-note-chip--thumb");
-			const img = ajouter(chip, "img", "qbd-ai-note-chip-thumb");
-			img.src = note.thumb;
-			img.alt = note.name;
-			img.draggable = false;
-			return;
-		}
-		{
-			/* LA FIN DU NOM RESTE VISIBLE, quelle que soit sa longueur (retour
-			   Ahmed 2026-09-17, référence claude.ai : « TP2 - Entrées… » sur la
-			   première ligne, « xceptions.md » sur la seconde). Un nom court
-			   s'affiche tel quel ; un nom long est coupé AU MILIEU : la tête sur
-			   une ligne avec ses points de suspension, la queue — les douze
-			   derniers caractères, l'extension comprise — sur la ligne du
-			   dessous, jamais tronquée. Une troncature en fin de nom perdait
-			   l'extension, la seule chose qu'on cherche des yeux. */
-			const nom = ajouter(chip, "span", "qbd-ai-note-chip-name");
-			const QUEUE = 12;
-			if (note.name.length <= QUEUE + 4) {
-				nom.textContent = note.name;
-			} else {
-				nom.classList.add("qbd-ai-note-chip-name--split");
-				ajouter(nom, "span", "qbd-ai-note-chip-name-head", note.name.slice(0, -QUEUE));
-				ajouter(nom, "span", "qbd-ai-note-chip-name-tail", note.name.slice(-QUEUE));
-			}
-		}
-		if (note.lecture === "erreur") ajouter(chip, "span", "qbd-ai-note-chip-erreur", note.erreurLecture ?? t("ai.attach.readFailed"));
-		ajouter(chip, "span", "qbd-ai-note-chip-badge", badgeDeFichier(note.name));
-	}
-
-	/** Toute la carte d'une pièce jointe : son contenu et sa croix. Appelée au
-	    rendu, puis EN PLACE quand la vignette ou la lecture d'un PDF arrive
-	    (`repeindreCarte`) : un re-rendu de la page couperait la frappe. */
-	function peindreCarteNote(chip: HTMLElement, note: NoteAttachment): void {
-		chip.replaceChildren();
-		chip.className = "qbd-ai-note-chip";
-		cartesNotes.set(note, chip);
-		poserCarte(chip, note);
-		/* Le clic OUVRE L'APERÇU (Ahmed, 2026-09-17, référence claude.ai) — pas
-		   tant que le document n'est pas lu. */
-		chip.classList.toggle("qbd-ai-note-chip--toggle", !note.lecture);
-		const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
-		host.ui.setIcon(chipRemove, "x");
-		chipRemove.addEventListener("click", (e) => {
-			e.stopPropagation(); // n'ouvre pas l'aperçu
-			const i = noteAttachments.indexOf(note);
-			if (i >= 0) noteAttachments.splice(i, 1);
-			render(containerRef);
-		});
-	}
-
-	function repeindreCarte(note: NoteAttachment): void {
-		const chip = cartesNotes.get(note);
-		if (chip && chip.isConnected) peindreCarteNote(chip, note);
-	}
-
-	/* La carte de chaque pièce jointe, pour la repeindre en place. */
-	const cartesNotes = new WeakMap<NoteAttachment, HTMLElement>();
-	/* Les lectures de PDF, UNE à la fois et dans l'ordre des cartes : deux
-	   documents lus de front doublent la mémoire pour rien. */
-	let lecturesPdf: Promise<void> = Promise.resolve();
-
-	/** Joint un PDF comme claude.ai : la carte paraît AU CHOIX du fichier, avec
-	    son nom et une roue ; la première page la remplace dès qu'elle est
-	    dessinée ; le texte se lit derrière, et l'envoi l'attend (`canGenerate`).
-	    `lire` rend les octets : une lecture disque se fait donc APRÈS
-	    l'apparition de la carte. La promesse rendue se résout à la fin de la
-	    lecture du texte — le préréglage d'un dossier l'attend avant d'envoyer. */
-	function joindrePdf(nom: string, lire: () => Promise<Uint8Array>, source: AttachmentSource, path?: string): Promise<void> {
-		/* Le texte d'un PDF vient de l'HÔTE (`host.pdf`, membre OPTIONNEL) :
-		   sans lui, on le dit plutôt que de joindre un PDF vide en silence. */
-		const pdf = host.pdf;
-		if (!pdf) { host.ui.notice(t("ai.error.pdfUnsupportedInApp")); return Promise.resolve(); }
-		if (noteAttachments.some(n => attachmentKey(n) === attachmentKey({ source, path, name: nom }))) {
-			host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: nom }));
-			return Promise.resolve();
-		}
-		const note: NoteAttachment = { name: nom, content: "", path, source, lecture: "cours" };
-		noteAttachments.push(note);
-		void render(containerRef);
-		const suite = lecturesPdf.then(async () => {
-			if (!noteAttachments.includes(note)) return; // retirée avant sa lecture
-			try {
-				const bytes = await lire();
-				note.bytes = bytes;
-				/* La vignette n'attend pas le texte, ni le texte la vignette :
-				   pdf.js dessine image par image, et une fenêtre en arrière-plan
-				   n'en dessine plus aucune — le texte, lui, ne s'arrête pas.
-				   (La vignette à la largeur de la carte, 2×, le CSS ramène.) */
-				void pdf.renderPages?.(bytes, { width: 124, max: 1 }).then(r => {
-					note.thumb = r.pages[0];
-					repeindreCarte(note);
-				}).catch(e => {
-					// NOMMÉ dans la console : une vignette absente sans trace a
-					// déjà coûté une matinée (paramètre `canvas` de pdf.js 5).
-					console.warn(LOG_PREFIX, "vignette PDF impossible:", nom, e);
-				});
-				const content = await pdf.extractText(bytes);
-				if (content.trim()) { note.content = content; delete note.lecture; }
-				else { note.lecture = "erreur"; note.erreurLecture = t("ai.attach.noText"); }
-			} catch (e) {
-				console.warn(LOG_PREFIX, "lecture PDF impossible:", nom, e);
-				note.lecture = "erreur";
-				note.erreurLecture = t("ai.attach.readFailed");
-			}
-			repeindreCarte(note);
-			updateGenerateBtn(boutonEnvoi);
-		});
-		lecturesPdf = suite.catch(() => undefined);
-		return suite;
-	}
+	/* Les cartes de pièces jointes et la lecture immédiate d'un PDF
+	   (`composer-attachments.ts`). */
+	const pieces = creerPiecesJointes({
+		notes: () => noteAttachments,
+		rendre: () => { void render(containerRef); },
+		majEnvoi: () => updateGenerateBtn(boutonEnvoi),
+	});
+	const joindrePdf = pieces.joindrePdf;
 
 	/** Le contenu d'une carte d'IMAGE : la photo remplit la carte, recadrée
 	    (référence claude.ai : une image jointe est un carré plein, sa forme
@@ -995,7 +841,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   titre s'efface, les tours s'empilent dans un fil qui défile, et le
 		   composer se range en bas. On en sort par « Nouvelle demande », ou
 		   quand la liste se vide. */
-		const conversation = (phase === "idle" || phase === "error") && enConversation();
+		const conversation = (phase === "idle" || phase === "error") && enConversation(fileGen);
 		modeConversation = conversation;
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
@@ -1003,14 +849,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
 		if (conversation) {
-			const tete = ajouter(stage, "div", "qbd-ai-fil-tete");
-			const nouvelle = ajouter(tete, "button", "qbd-ai-nouvelle");
-			nouvelle.type = "button";
-			host.ui.setIcon(ajouter(nouvelle, "span", "qbd-ai-nouvelle-icone"), "square-pen");
-			ajouter(nouvelle, "span", undefined, t("ai.queue.newRequest"));
-			nouvelle.addEventListener("click", nouvelleDemande);
-			boutonNouvelle = nouvelle;
-			majNouvelle();
+			majNouvelle = poserNouvelleDemande(ajouter(stage, "div", "qbd-ai-fil-tete"), fileGen);
 			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
 		}
 
@@ -1592,7 +1431,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				   claude.ai) : le nom sur deux lignes, et l'EXTENSION en badge en
 				   bas — pas d'icône, le badge dit le type. */
 				const chip = ajouter(chipsRow, "div", "qbd-ai-note-chip");
-				peindreCarteNote(chip, note);
+				pieces.peindreCarte(chip, note);
 				/* Le clic OUVRE L'APERÇU : le texte d'une note, les pages d'un
 				   PDF — une fois lu. Le chemin est dans la modale, et le tooltip
 				   natif le porte encore. */
@@ -3671,7 +3510,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		btn.disabled = !canGen;
 		btn.classList.toggle("qbd-ai-composer-send--disabled", !canGen);
 		// La flèche grisée dit POURQUOI quand c'est une lecture qui la retient.
-		btn.title = arret ? t("ai.composer.stop") : noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading") : "";
+		btn.title = arret ? t("ai.composer.stop")
+			: noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading")
+			: noteAttachments.some(n => n.lecture === "erreur") ? t("ai.attach.blocked") : "";
 	}
 
 	/* Nomme un bouton-icône SANS déclencher de seconde bulle. `aria-label` (et

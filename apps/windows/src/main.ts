@@ -103,7 +103,9 @@ async function chargerReglagesIa(): Promise<void> {
 	/* L'ancien DÉFAUT d'« Ajouter des fichiers » (Ctrl+E, 2026-09-17) a été
 	   écrit sur le disque avec le reste des réglages au premier `save` : aucun
 	   écran ne le règle, ce n'est donc jamais un choix. Il suit le nouveau
-	   défaut (Ctrl+U, celui de claude.ai, 2026-09-26). */
+	   défaut (Ctrl+U, celui de claude.ai, 2026-09-26). HYPOTHÈSE FRAGILE : le
+	   jour où un écran permet de CHOISIR ce raccourci, un Ctrl+E voulu serait
+	   pris pour l'ancien défaut — retirer alors cette migration. */
 	const hk = persiste.hotkeyAddFiles;
 	if (hk && hk.key === "e" && (hk.modifiers || []).join("+") === "Mod") delete persiste.hotkeyAddFiles;
 	reglagesIaCache = { ...aiSettingsDefaults(), ...persiste };

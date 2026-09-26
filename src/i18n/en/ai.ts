@@ -278,6 +278,8 @@ export const EN_AI = {
 	"ai.attach.reading": "Reading the document…",
 	"ai.attach.readFailed": "Could not read this file",
 	"ai.attach.noText": "No text in this PDF",
+	"ai.attach.removeToSend": "Remove it to send.",
+	"ai.attach.blocked": "Remove the document that could not be read to send",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",

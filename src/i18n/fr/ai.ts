@@ -238,6 +238,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.attach.reading": "Lecture du document…",
 	"ai.attach.readFailed": "Lecture impossible",
 	"ai.attach.noText": "Aucun texte dans ce PDF",
+	"ai.attach.removeToSend": "Retirez-le pour envoyer.",
+	"ai.attach.blocked": "Retirez le document illisible pour envoyer",
 	"ai.error.title": "Échec de la génération",
 	"ai.error.retry": "Réessayer",
 	"ai.error.checkSettings": "Vérifiez vos paramètres IA dans les paramètres du plugin.",
