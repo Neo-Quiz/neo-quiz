@@ -403,22 +403,25 @@
 	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
 }
 
-/* GRILLE : texte limité à quatre lignes ; la carte se soulève au survol,
-   elle s'ouvre dans la liste (où une longue lecture se lit en entier).
-   Chaque carte garde SA hauteur (`start`, et non `stretch`) : étirées à
-   la plus haute de leur rangée, une lecture de quatre lignes à côté d'un
-   QCM à options en colonne gardait un grand vide sous son texte. */
+/* GRILLE : la carte se soulève au survol et s'ouvre dans la liste (où
+   une longue lecture se lit en entier). */
 .qbd-fiche-grid {
+	/* TROIS colonnes au plus : une colonne ne descend jamais sous 280 px, ni
+	   sous le tiers de la largeur. TOUTES LES CARTES À LA MÊME TAILLE
+	   (2026-09-26, comme StudySmarter) : une hauteur fixe par rangée ; ce
+	   qui dépasse défile DANS la carte (fin ascenseur), comme chez eux. */
 	display: grid;
-	/* TROIS colonnes au plus (2026-09-26) : en plein écran, quatre cartes
-	   étroites coupaient chaque énoncé en lignes courtes. Une colonne ne
-	   descend jamais sous 280 px, ni sous le tiers de la largeur. */
 	grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - 28px) / 3)), 1fr));
+	grid-auto-rows: 216px;
 	gap: 14px;
-	align-items: start;
+	align-items: stretch;
 }
 .qbd-root .qbd-fiche-card {
-	height: auto;
+	height: 100%;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in srgb, var(--text-normal) 25%, transparent) transparent;
 	margin: 0;
 	white-space: normal;
 	font: inherit;
@@ -427,6 +430,10 @@
 	align-items: stretch;
 	transition: border-color 0.15s ease, transform 0.15s ease;
 }
+/* Dans une carte de hauteur fixe, rien ne rétrécit : le texte (boîte
+   limitée à quatre lignes, `overflow: hidden`) tombait à 0 px quand les
+   options remplissaient la carte ; c'est la carte qui défile. */
+.qbd-fiche-card > * { flex-shrink: 0; }
 .qbd-root .qbd-fiche-card:hover {
 	border-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
 	transform: translateY(-2px);
