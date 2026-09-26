@@ -885,8 +885,13 @@
 	min-width: 0;
 }
 
+/* Les trois vues d'un dossier se masquent par `hidden` ; chacune pose son
+   propre `display` (grid, flex), qui l'emporterait sur celui du navigateur.
+   Une vue neuve s'ajoute ICI, sinon elle reste affichée sous les autres
+   (le Planning l'a été, sous Contenu, le 2026-09-26). */
 .qbd-quizzes-drill-layout[hidden],
-.qbd-folder-progress[hidden] {
+.qbd-folder-progress[hidden],
+.qbd-planning[hidden] {
 	display: none;
 }
 
