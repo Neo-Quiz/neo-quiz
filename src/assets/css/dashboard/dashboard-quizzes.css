@@ -1267,6 +1267,82 @@
 .qbd-folder-course-bar--progress i { background: var(--qbd-state-progress); }
 .qbd-folder-course-bar--done i { background: var(--qbd-state-done); }
 
+/* Tentatives d'un mode (2026-09-26) : pastille « Meilleur » + chevron après
+   le pourcentage, liste dépliable en retrait sous la ligne. */
+.qbd-folder-course-mode-extra { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.qbd-folder-course-mode-best { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.qbd-root .qbd-folder-course-mode-toggle {
+	height: 20px;
+	width: 20px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.qbd-folder-course-mode-toggle:hover { color: var(--text-normal); }
+.qbd-folder-course-mode-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.qbd-folder-course-mode-chevron { display: flex; transition: transform 0.15s ease; }
+.qbd-folder-course-mode-bloc.is-open .qbd-folder-course-mode-chevron { transform: rotate(90deg); }
+
+.qbd-folder-attempts { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 2px 74px; }
+.qbd-folder-attempt-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 3px 4px;
+	border-radius: 4px;
+	font-size: 11.5px;
+	color: var(--text-muted);
+}
+.qbd-folder-attempt-row:hover, .qbd-folder-attempt-row:focus-within { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+.qbd-folder-attempt-date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbd-folder-attempt-info { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qbd-folder-attempt-old { color: var(--text-faint); }
+.qbd-root .qbd-folder-attempt-delete {
+	height: 20px;
+	width: 20px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+	opacity: 0;
+}
+.qbd-folder-attempt-row:hover .qbd-folder-attempt-delete,
+.qbd-folder-attempt-row:focus-within .qbd-folder-attempt-delete,
+.qbd-root .qbd-folder-attempt-delete:focus-visible { opacity: 1; }
+.qbd-root .qbd-folder-attempt-delete:hover { color: var(--color-red); }
+.qbd-root .qbd-folder-attempt-delete:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.qbd-folder-attempt-row--deleted { justify-content: flex-start; }
+.qbd-folder-attempt-deleted-label { color: var(--text-faint); }
+.qbd-root .qbd-folder-attempt-undo {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--quiz-primary);
+	font: inherit;
+	font-size: inherit;
+	cursor: pointer;
+	text-decoration: underline;
+}
+.qbd-root .qbd-folder-attempt-undo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+
 @media (max-width: 620px) {
 	.qbd-folder-progress { grid-template-columns: minmax(0, 1fr); }
 	.qbd-folder-progress-tile--due { grid-column: auto; }

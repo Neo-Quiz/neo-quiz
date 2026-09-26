@@ -21,6 +21,7 @@ release notes.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
 - Flashcards: a Learn recall can be a card that you flip, then rate "Review again" or "I knew it" (Space or Enter flips, 1 and 2 rate); your rating counts in spaced review. The editor has a Flashcard type, and a course page shows a cards icon for a quiz made only of flashcards.
 - Resume where you left off: a quiz you close in the middle — even by closing the app — reopens on the same question with your answers, from its folder's button (Resume · quiz · Q7/23), its card or its course page. Try again starts over; timed exams are not resumed.
+- Every time you reach a quiz's score is kept as an attempt: the Progress tab of a folder shows each course's best score, and lists its attempts (date, score) with a button to delete one — the best score is recalculated, and Undo puts it back. Scores from before this version appear as one "before history" attempt. Spaced review is never affected.
 
 ### Changed
 - A quiz page is laid out like StudySmarter: the back arrow above the folder and title, then a line with the mode, the number of questions and where the quiz comes from, ending with Edit, Start the quiz and a ⋮ menu, then a bar to switch between a grid of questions and a list with the chosen question shown large (← and → move between them), and a search box that filters questions by their text and options, accents ignored. Answers are still never shown there.

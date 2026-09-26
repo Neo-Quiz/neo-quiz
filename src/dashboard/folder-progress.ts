@@ -10,7 +10,7 @@ import type { OngletDossier, VuesDossier } from "./quizzes-render";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
 import type { CarteCours } from "./course-pairs";
-import { renderExamen, renderListeCours, renderRevisionDuJour } from "./folder-progress-details";
+import { renderListeCours } from "./folder-progress-details";
 
 /** Ce que les tuiles du bas demandent en plus des chiffres. */
 export interface DetailsProgression {
@@ -31,8 +31,8 @@ export interface DetailsProgression {
    déjà. Il a son onglet, comme la page d'un cours chez StudySmarter, et y
    devient des TUILES de chiffres : une grande pour l'avancement du dossier,
    trois petites pour les quiz maîtrisés, en cours, à commencer ; puis
-   ce qui est à réviser aujourd'hui, la date d'examen, et chaque cours mode
-   par mode (`folder-progress-details.ts`).
+   les scores de chaque cours, mode par mode (`folder-progress-details.ts`) —
+   le jour à réviser et les examens vivent dans le Planning.
    `inModule` = TOUS les quiz du dossier. « À revoir » (fini sous le seuil)
    compte comme « en cours » : pas encore acquis.
 ══════════════════════════════════════════════════════════ */
@@ -66,8 +66,6 @@ export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEnt
 	tuile("progress", enCoursN, t("dashboard.quizzes.progressInProgress"));
 	tuile("fresh", freshN, t("dashboard.quizzes.progressToStart"));
 
-	renderRevisionDuJour(vue, details.ctx, inModule);
-	renderExamen(vue, details.ctx, details.group, details.map, details.rerender);
 	renderListeCours(vue, details.ctx, details.cartes, stats);
 	return vue;
 }
