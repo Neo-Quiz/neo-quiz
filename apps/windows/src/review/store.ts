@@ -3,9 +3,8 @@ import type { Host } from "../../../../src/host/types";
 import type { Scanner } from "../../../../src/dashboard/scanner";
 import { migrateReviewLog } from "../../../../src/review/migration";
 import { createReviewStore, parseExamDate, type ReviewStore } from "../../../../src/review/review-store";
-import { construireCatalogue, cleModule } from "./catalogue";
+import { construireCatalogue } from "./catalogue";
 import { examDates } from "../host/folder";
-import { garderSiExamen } from "./garde-examen";
 
 /**
  * Le journal de l'application : un fichier par dossier, un plan unique.
@@ -34,19 +33,24 @@ export async function creerJournalApp(host: Host, scanner: Scanner): Promise<Rev
 		fs: host.fs,
 		watcher: host.watcher,
 		paths: host.paths,
-		catalogue: () => construireCatalogue(scanner.getQuizzes(), host.paths),
+		/* PAS D'EXAMEN, PAS DE RÉVISION (2026-09-26) : une question n'entre au
+		   plan que si le module de sa note a un examen À VENIR (`examDates()`
+		   ne rend que ceux-là). UNE seule porte, et sur le CATALOGUE, pas sur
+		   le plan : filtrer `today` APRÈS coup laissait le budget du jour se
+		   dépenser sur des modules sans examen, puis les retirait — un jour
+		   chargé ailleurs rendait une liste vide ou tronquée pour le module
+		   qui a un partiel. Filtré ici, le noyau ne voit que ce qui compte,
+		   et `forecast`/`stats` disent la même chose que `today`. Le journal,
+		   lui, continue d'être écrit : ajouter un examen fait réapparaître ce
+		   que l'historique rend dû. */
+		catalogue: () => {
+			const avecExamen = examDates();
+			return construireCatalogue(scanner.getQuizzes(), host.paths).filter(it => !!avecExamen[it.module]);
+		},
 		horizons: examDatesEnMs,
 		now: () => Date.now(),
 	});
 	await store.load();
-	/* PAS D'EXAMEN, PAS DE RÉVISION (garde-examen.ts) : une seule porte, ici. */
-	const planBrut = store.plan.bind(store);
-	store.plan = (now: number) => {
-		const p = planBrut(now);
-		const avec = examDates();
-		const aExamen = (chemin: string): boolean => !!avec[cleModule(chemin, host.paths)];
-		return { ...p, today: garderSiExamen(p.today, aExamen), deferred: garderSiExamen(p.deferred, aExamen) };
-	};
 	return store;
 }
 

@@ -618,8 +618,9 @@ export function examens(): Record<string, Examen[]> {
 
 /**
  * Valide la forme du réglage `examens`, ignore les entrées invalides, et
- * MIGRE chaque date de `anciennes` (l'ancien réglage `examDates`) absente du
- * réglage neuf en un examen `{ id: "migre-" + module, nom: "", date }`. PURE
+ * MIGRE, tant que le réglage neuf n'a jamais été écrit (`brut` absent),
+ * chaque date de `anciennes` (l'ancien réglage `examDates`) en un examen
+ * `{ id: "migre-" + module, nom: "", date }`. PURE
  * : c'est cette fonction, et non `chargerExamens`, que `check:folders`
  * éprouve.
  */
@@ -636,7 +637,11 @@ export function lireExamens(brut: unknown, anciennes: unknown): Record<string, E
 			if (valides.length) out[module] = valides.sort((a, b) => a.date.localeCompare(b.date));
 		}
 	}
-	if (anciennes && typeof anciennes === "object" && !Array.isArray(anciennes)) {
+	/* La migration ne joue que si la clé `examens` n'a JAMAIS été écrite. Une
+	   table écrite puis vidée (`{}`, ou un module retiré) est une décision :
+	   l'ancien réglage `examDates`, jamais effacé, ferait sinon revenir au
+	   lancement suivant l'examen qu'on vient de supprimer. */
+	if ((brut === undefined || brut === null) && anciennes && typeof anciennes === "object" && !Array.isArray(anciennes)) {
 		for (const [module, date] of Object.entries(anciennes as Record<string, unknown>)) {
 			if (out[module] || typeof date !== "string" || !DATE_ISO.test(date)) continue;
 			out[module] = [{ id: "migre-" + module, nom: "", date }];

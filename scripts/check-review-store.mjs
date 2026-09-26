@@ -856,3 +856,54 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
 	});
 	r.done();
 });
+
+/* ══════════════════════════════════════════════════════════
+   PARTIE 3 — le CÂBLAGE de l'application (`apps/windows/src/review/store.ts`)
+   : pas d'examen, pas de révision. La porte est posée sur le CATALOGUE, avant
+   le budget du jour : un module sans examen chargé de questions neuves ne
+   doit pas manger la place d'un module qui a un partiel. `store.ts` et
+   `host/folder.ts` sont chargés dans UN build (le module des examens est
+   partagé), avec un faux `window.neo` qui ne sert que les réglages.
+══════════════════════════════════════════════════════════ */
+
+await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/folder.ts"], async ({ creerJournalApp }, { chargerExamens, enregistrerExamen }) => {
+	const r = makeReporter("Application — pas d'examen, pas de révision (catalogue)");
+	const reglages = new Map();
+	const fenetreAvant = globalThis.window;
+	globalThis.window = { neo: { reglages: {
+		lire: async (k) => reglages.get(k),
+		ecrire: async (k, v) => { reglages.set(k, structuredClone(v)); },
+	} } };
+	try {
+		await withManualDebounce(async () => {
+			const { host } = fauxHote();
+			const items = (n) => Array.from({ length: n }, (_, i) => ({ id: "q" + i }));
+			// 300 questions neuves dans un module SANS examen, 30 dans celui qui
+			// en a un : plus que la part de neuf du budget, pour que le budget
+			// soit l'enjeu. Le module sans examen est sous la racine « A » : le
+			// noyau trie les neuves par clé, il passerait donc EN PREMIER.
+			const quizzes = [
+				{ path: "A/Loisirs/Tout.md", items: items(300) },
+				{ path: "B/Reseaux/CM1.md", items: items(30) },
+			];
+			await chargerExamens();
+			const store = await creerJournalApp(host, { getQuizzes: () => quizzes });
+			r.check("sans examen : rien à réviser aujourd'hui", store.plan(Date.now()).today, []);
+			await enregistrerExamen("B/Reseaux", { id: "e1", nom: "", date: "2099-06-01" });
+			const today = store.plan(Date.now()).today;
+			r.check("avec examen : les questions du module reviennent",
+				today.some(q => q.startsWith("B/Reseaux/CM1.md::")), true);
+			r.check("et rien du module sans examen",
+				today.filter(q => q.startsWith("A/")).length, 0);
+			// La référence : le même plan SANS le module sans examen. Si la porte
+			// filtrait après coup, ce module aurait mangé une part du budget.
+			quizzes.splice(0, 1);
+			r.check("le module sans examen ne prend rien au budget du jour",
+				today, store.plan(Date.now()).today);
+			store.destroy();
+		});
+	} finally {
+		if (fenetreAvant === undefined) delete globalThis.window; else globalThis.window = fenetreAvant;
+	}
+	r.done();
+});

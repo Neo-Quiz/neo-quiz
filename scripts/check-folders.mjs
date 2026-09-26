@@ -338,7 +338,9 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 		const m = "Efrei/Reseaux";
 		const migre = lireExamens(undefined, { [m]: "2027-06-01" });
 		r.check("migration : l'ancienne date devient un examen", migre[m], [{ id: "migre-" + m, nom: "", date: "2027-06-01" }]);
-		r.check("migration : n'écrase pas un module déjà migré", lireExamens({ [m]: [{ id: "x", nom: "Partiel", date: "2027-01-10" }] }, { [m]: "2027-06-01" })[m].map(e => e.id), ["x"]);
+		r.check("migration : la clé null vaut jamais écrite", lireExamens(null, { [m]: "2027-06-01" })[m]?.map(e => e.id), ["migre-" + m]);
+		r.check("migration : ne joue plus une fois la clé écrite", lireExamens({ [m]: [{ id: "x", nom: "Partiel", date: "2027-01-10" }] }, { [m]: "2027-06-01" })[m].map(e => e.id), ["x"]);
+		r.check("examen migré puis supprimé : ne revient pas", lireExamens({}, { [m]: "2027-06-01" }), {});
 		r.check("réglage corrompu (tableau) : vide", lireExamens([], undefined), {});
 		r.check("réglage corrompu (chaîne) : vide", lireExamens("x", undefined), {});
 		r.check("entrée sans date ignorée", lireExamens({ [m]: [{ id: "a", nom: "", date: "" }, { id: "b", nom: "", date: "2027-02-02" }] }, undefined)[m].map(e => e.id), ["b"]);
@@ -354,14 +356,5 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 		r.check("date locale ISO", aujourdhuiIso(new Date(2027, 0, 5, 23, 30).getTime()), "2027-01-05");
 	}
 
-	r.done();
-});
-
-await withSrcModule("apps/windows/src/review/garde-examen.ts", ({ garderSiExamen }) => {
-	const r = makeReporter("Pas d'examen, pas de révision");
-	const avec = (chemin) => chemin.startsWith("Efrei/Reseaux/");
-	r.check("garde les clés des modules avec examen", garderSiExamen(["Efrei/Reseaux/CM1.md::q1", "Perso/Maths/A.md::q2"], avec), ["Efrei/Reseaux/CM1.md::q1"]);
-	r.check("clé sans séparateur écartée", garderSiExamen(["sansSeparateur"], () => true), []);
-	r.check("aucun examen : rien de dû", garderSiExamen(["Efrei/Reseaux/CM1.md::q1"], () => false), []);
 	r.done();
 });

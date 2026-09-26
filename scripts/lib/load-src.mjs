@@ -144,18 +144,20 @@ export async function withSrcModule(entry, run) {
 				format: "esm",
 				platform: "node",
 				outdir,
-				// `outbase` fixé à "src" : sans lui, esbuild le déduit du plus
-				// petit ancêtre commun des entrées demandées (parfois
-				// "src/editor/" au lieu de "src/"), et le chemin de sortie
-				// recalculé ci-dessous ne correspondrait plus au fichier réel.
-				outbase: "src",
+				// `outbase` fixé à la racine du dépôt : sans lui, esbuild le
+				// déduit du plus petit ancêtre commun des entrées demandées
+				// (parfois "src/editor/" au lieu de "src/"), et le chemin de
+				// sortie recalculé ci-dessous ne correspondrait plus au fichier
+				// réel. La racine, et non "src" : une entrée sous `apps/` sort
+				// alors de `outbase`, et esbuild réécrit son `..` en `_.._`.
+				outbase: ".",
 				logLevel: "warning",
 				banner: { js: BANNER },
 				plugins: [stubPlugin],
 			});
-			// `outbase: "src"` fixe la racine : "src/host/current.ts" devient
-			// toujours "<outdir>/host/current.js", quelles que soient les entrées.
-			sorties = entries.map((e) => join(outdir, e.replace(/^src\//, "").replace(/\.tsx?$/, ".js")));
+			// `outbase: "."` fixe la racine : "src/host/current.ts" devient
+			// toujours "<outdir>/src/host/current.js", quelles que soient les entrées.
+			sorties = entries.map((e) => join(outdir, e.replace(/\.tsx?$/, ".js")));
 		} else {
 			// Une seule entrée : `outdir` déduirait le nom du chemin source, ce
 			// qui suffit ici (pas de risque de collision à une seule sortie).
