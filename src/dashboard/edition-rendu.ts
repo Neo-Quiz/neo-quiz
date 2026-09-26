@@ -122,7 +122,16 @@ function selecteur(c: Cible): string {
 export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: DepsEditionRendu): () => void {
 	let vivant = true;
 	let carte: HTMLElement;
-	let ouvert: { cible: Cible; el: HTMLElement; champ: ChampDirect; initiale: string } | null = null;
+	let ouvert: {
+		cible: Cible;
+		/** L'élément qui porte le champ (un `<div>` quand l'origine était une zone de saisie). */
+		el: HTMLElement;
+		/** L'élément du rendu, remis en place par `restaurer`. */
+		origine: HTMLElement;
+		champ: ChampDirect;
+		initiale: string;
+		restaurer(): void;
+	} | null = null;
 
 	function peindre(): void {
 		libererChamps(host);
@@ -136,6 +145,10 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		carte.querySelectorAll<HTMLElement>("[data-edit]").forEach(el => {
 			el.tabIndex = 0;
 			el.title = t("editor.render.clickToEdit");
+			/* Tab s'arrête sur le TEXTE éditable, pas sur ce qu'il contient :
+			   les trous (`<input>` en lecture seule) d'un texte à trous, un lien
+			   rendu… y prenaient le focus, et Entrée n'y ouvrait rien. */
+			el.querySelectorAll<HTMLElement>("input, textarea, button, a, [tabindex]").forEach(d => { d.tabIndex = -1; });
 		});
 		/* Les `*Html` : visibles, pas éditables ici — ils le disent. */
 		const html: HTMLElement[] = [];
@@ -148,17 +161,32 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 	}
 
 	/** Ferme le champ ouvert. `garder` : écrire la valeur si elle a changé. */
-	function fermer(garder: boolean, repeindre: boolean): void {
+	function fermer(garder: boolean, repeindre: boolean, auClavier = false): void {
 		const o = ouvert;
 		if (!o) return;
 		ouvert = null; // avant tout : le `focusout` du retrait ne revalide pas.
 		const v = o.champ.valeur();
 		o.champ.detruire();
-		if (garder && v !== o.initiale) {
+		const change = garder && v !== o.initiale;
+		if (change) {
 			ecrire(q, o.cible, v);
 			deps.onChange();
 		}
 		if (!repeindre) return;
+		if (!change) {
+			/* Rien d'écrit : l'élément d'origine reprend sa place tel quel (son
+			   rendu, ses formules déjà composées). Repeindre toute la carte
+			   pour un texte identique la faisait clignoter et recomposait
+			   chaque formule. */
+			o.restaurer();
+			// Fermé au clavier : le focus, qui était dans le champ retiré,
+			// revient sur le texte. À la souris, il va où l'on a cliqué.
+			if (auClavier) o.origine.focus();
+			const suivante = aRouvrir.get(host);
+			aRouvrir.delete(host);
+			if (suivante) ouvrirCible(suivante);
+			return;
+		}
 		deps.rendre();
 		/* L'appelant a pu remonter une instance neuve (celle-ci est alors
 		   nettoyée) ; sinon, c'est à celle-ci de retrouver le rendu. */
@@ -192,6 +220,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		   classes, donc sa typo et son cadre de quiz). Une zone de saisie ne
 		   peut pas avoir d'enfants : un `<div>` aux mêmes classes la remplace. */
 		let boite = el;
+		let restaurer: () => void;
 		if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
 			boite = document.createElement("div");
 			boite.className = el.className;
@@ -200,6 +229,17 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 				if (v !== null) boite.setAttribute(a, v);
 			}
 			el.replaceWith(boite);
+			restaurer = () => boite.replaceWith(el);
+		} else {
+			// Les nœuds rendus sont GARDÉS, pas recréés : les rendre tels quels
+			// suffit quand rien n'a changé.
+			const enfants = [...el.childNodes];
+			const titre = el.title;
+			restaurer = () => {
+				el.replaceChildren(...enfants);
+				el.classList.remove("is-editing");
+				el.title = titre;
+			};
 		}
 		boite.replaceChildren();
 		boite.classList.add("is-editing");
@@ -214,10 +254,10 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			placeholder: cible.champ === "title" ? deps.titreDeRepli : undefined,
 			etiquette: t("editor.render.clickToEdit"),
 			onChange: () => { /* lu à la validation */ },
-			onEntree: () => fermer(true, true),
-			onEchap: () => fermer(false, true),
+			onEntree: () => fermer(true, true, true),
+			onEchap: () => fermer(false, true, true),
 			extensions: multiligne
-				? [Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => { fermer(true, true); return true; } }]))]
+				? [Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => { fermer(true, true, true); return true; } }]))]
 				: [],
 		});
 		if (multiligne) poserBarreFormat(cadre, champ.vue, false, () => { /* l'écouteur du champ suit */ }, () => { /* hauteur automatique */ });
@@ -233,7 +273,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			fermer(true, true);
 		});
 
-		ouvert = { cible, el: boite, champ, initiale };
+		ouvert = { cible, el: boite, origine: el, champ, initiale, restaurer };
 		champ.focus();
 		champ.vue.dispatch({ selection: { anchor: champ.vue.state.doc.length } });
 	}
