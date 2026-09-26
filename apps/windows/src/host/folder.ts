@@ -25,6 +25,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { LOG_PREFIX } from "../../../../src/branding";
+import type { ExamenDossier } from "../../../../src/types/dashboard-ctx";
 /* `pont()` lit `window.neo` À L'APPEL — voir `./pont.ts` pour le pourquoi.
    `npm run check:folders` charge ce module hors de toute fenêtre : les
    fonctions PURES qu'il éprouve (`lireDossiers`, `idUnique`,
@@ -571,8 +572,19 @@ const CLE_EXAM_DATES = "examDates";
     Valeur PERSISTÉE : jamais traduite, jamais reformatée. */
 let datesExamen: Record<string, string> = {};
 
+/**
+ * `examDates()` DÉRIVE désormais du cache `tableExamens` (plusieurs examens
+ * par module) : elle rend, pour chaque module, la date du PROCHAIN examen —
+ * ainsi tout lecteur déjà branché sur cette fonction (l'ordonnanceur, entre
+ * autres) voit sans rien changer l'examen qui compte pour resserrer les
+ * révisions, même quand plusieurs sont saisis.
+ */
 export function examDates(): Record<string, string> {
-	return datesExamen;
+	return Object.fromEntries(
+		Object.entries(tableExamens)
+			.map(([m, l]) => [m, examenProchain(l, aujourdhuiIso(Date.now()))?.date] as const)
+			.filter((e): e is [string, string] => !!e[1]),
+	);
 }
 
 export async function chargerExamDates(): Promise<Record<string, string>> {
@@ -584,6 +596,118 @@ export async function chargerExamDates(): Promise<Record<string, string>> {
 		datesExamen = {};
 	}
 	return datesExamen;
+}
+
+/* ══════════════════════════════════════════════════════════
+   PLUSIEURS EXAMENS PAR DOSSIER (2026-09-26)
+
+   `examDates()` ci-dessus ne gardait qu'UNE date par module : un semestre
+   avec partiel ET final resserrait les révisions sur le mauvais des deux dès
+   que le premier était passé, sans que rien ne le signale. `tableExamens`
+   remplace `datesExamen` comme source de vérité ; `datesExamen` et
+   `CLE_EXAM_DATES` restent lus une seule fois, à la MIGRATION.
+
+   `Examen` est déclaré dans `src/types/dashboard-ctx.ts` (`ExamenDossier`) et
+   réexporté ici : `src/` ne peut pas importer `apps/`, donc le type vit côté
+   partagé et c'est ce fichier qui l'importe, jamais l'inverse.
+══════════════════════════════════════════════════════════ */
+
+export type Examen = ExamenDossier;
+
+const CLE_EXAMENS = "examens";
+const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** La table des examens par module (cache mémoire, comme `datesExamen`). */
+let tableExamens: Record<string, Examen[]> = {};
+
+export function examens(): Record<string, Examen[]> {
+	return tableExamens;
+}
+
+/**
+ * Valide la forme du réglage `examens`, ignore les entrées invalides, et
+ * MIGRE chaque date de `anciennes` (l'ancien réglage `examDates`) absente du
+ * réglage neuf en un examen `{ id: "migre-" + module, nom: "", date }`. PURE
+ * : c'est cette fonction, et non `chargerExamens`, que `check:folders`
+ * éprouve.
+ */
+export function lireExamens(brut: unknown, anciennes: unknown): Record<string, Examen[]> {
+	const out: Record<string, Examen[]> = {};
+	if (brut && typeof brut === "object" && !Array.isArray(brut)) {
+		for (const [module, liste] of Object.entries(brut as Record<string, unknown>)) {
+			if (!Array.isArray(liste)) continue;
+			const valides = liste.filter((e): e is Examen => !!e && typeof e === "object"
+				&& typeof (e as Examen).id === "string" && (e as Examen).id !== ""
+				&& typeof (e as Examen).nom === "string"
+				&& typeof (e as Examen).date === "string" && DATE_ISO.test((e as Examen).date))
+				.map(e => ({ id: e.id, nom: e.nom, date: e.date }));
+			if (valides.length) out[module] = valides.sort((a, b) => a.date.localeCompare(b.date));
+		}
+	}
+	if (anciennes && typeof anciennes === "object" && !Array.isArray(anciennes)) {
+		for (const [module, date] of Object.entries(anciennes as Record<string, unknown>)) {
+			if (out[module] || typeof date !== "string" || !DATE_ISO.test(date)) continue;
+			out[module] = [{ id: "migre-" + module, nom: "", date }];
+		}
+	}
+	return out;
+}
+
+/** Ajoute ou remplace (même `id`) un examen d'un module, triée par date. */
+export function enregistrerExamenDans(t: Record<string, Examen[]>, module: string, e: Examen): Record<string, Examen[]> {
+	const liste = (t[module] ?? []).filter(x => x.id !== e.id);
+	return { ...t, [module]: [...liste, { ...e }].sort((a, b) => a.date.localeCompare(b.date)) };
+}
+
+/** Retire un examen d'un module ; un module vidé perd sa clé. */
+export function retirerExamenDe(t: Record<string, Examen[]>, module: string, id: string): Record<string, Examen[]> {
+	const suivant = { ...t };
+	const liste = (t[module] ?? []).filter(x => x.id !== id);
+	if (liste.length) suivant[module] = liste; else delete suivant[module];
+	return suivant;
+}
+
+/** Le premier examen de date `>= aujourdhui` (comparaison de chaînes
+    `AAAA-MM-JJ`), sinon `null`. */
+export function examenProchain(liste: readonly Examen[], aujourdhui: string): Examen | null {
+	return [...liste].sort((a, b) => a.date.localeCompare(b.date)).find(e => e.date >= aujourdhui) ?? null;
+}
+
+/** `AAAA-MM-JJ` LOCAL — jamais UTC, sans quoi un examen du jour même
+    disparaîtrait après le coucher du soleil UTC. */
+export function aujourdhuiIso(now: number): string {
+	const d = new Date(now);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export async function chargerExamens(): Promise<void> {
+	let brutExamens: unknown;
+	let brutAnciennes: unknown;
+	try {
+		brutExamens = await pont().reglages.lire(CLE_EXAMENS);
+	} catch (e) {
+		console.warn(LOG_PREFIX, "examens illisibles:", e);
+		brutExamens = undefined;
+	}
+	try {
+		brutAnciennes = await pont().reglages.lire(CLE_EXAM_DATES);
+	} catch (e) {
+		console.warn(LOG_PREFIX, "anciennes dates d'examen illisibles:", e);
+		brutAnciennes = undefined;
+	}
+	// Pas de réécriture ici : la migration ne se matérialise qu'à la
+	// première écriture (`enregistrerExamen`/`retirerExamen`).
+	tableExamens = lireExamens(brutExamens, brutAnciennes);
+}
+
+export async function enregistrerExamen(module: string, e: Examen): Promise<void> {
+	tableExamens = enregistrerExamenDans(tableExamens, module, e);
+	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
+}
+
+export async function retirerExamen(module: string, id: string): Promise<void> {
+	tableExamens = retirerExamenDe(tableExamens, module, id);
+	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
 }
 
 /**

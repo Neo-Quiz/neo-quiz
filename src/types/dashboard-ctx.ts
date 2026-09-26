@@ -21,6 +21,19 @@ import type { AiUsageEntry } from "../dashboard/usage-format";
 import type { ModuleOverride, ModuleGroup, ModuleMap } from "../dashboard/quiz-modules";
 import type { ReviewStore } from "../review/review-store";
 
+/**
+ * Un examen d'un dossier (« plusieurs examens par dossier », 2026-09-26).
+ * Déclaré ici et non dans `apps/windows/src/host/folder.ts` : `src/` ne peut
+ * pas importer `apps/`, alors que le sens inverse est permis — `folder.ts`
+ * réexporte `export type Examen = ExamenDossier` en l'important en
+ * `import type` depuis ce fichier. Date au format `AAAA-MM-JJ`.
+ */
+export interface ExamenDossier {
+	id: string;
+	nom: string;
+	date: string;
+}
+
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */
 export type DashboardViewName = "home" | "quizzes" | "detail" | "ai";
 
@@ -231,6 +244,14 @@ export interface DashboardShellCtx {
 	   Absents = le champ de date n'est pas rendu dans le modal. */
 	examDate?: (group: ModuleGroup) => string | undefined;
 	setExamDate?: (group: ModuleGroup, date: string | undefined) => void;
+	/** TOUS les examens d'un dossier, triés par date (« plusieurs examens par
+	    dossier », 2026-09-26) — remplace progressivement `examDate` ci-dessus,
+	    qui n'en gardait qu'un. Absent = pas de liste d'examens dans le modal. */
+	examens?: (group: ModuleGroup) => ExamenDossier[];
+	/** Ajoute ou remplace (même `id`) un examen du dossier. */
+	enregistrerExamen?: (group: ModuleGroup, e: ExamenDossier) => void;
+	/** Retire un examen du dossier par son `id`. */
+	retirerExamen?: (group: ModuleGroup, id: string) => void;
 	/** Sélecteur d'icône d'un module (clic sur la pastille de la carte).
 	    Absent = la pastille n'est pas cliquable — `renderModuleCard` prévoit
 	    déjà `onPickIcon?` en opt-in. `suggestions` (calculées par la PAGE

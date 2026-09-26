@@ -53,7 +53,7 @@ import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner"
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
-import { ecrireReglage, estVaultObsidian, examDates, lireReglage, pickFolder, savedFolders, setExamDate as setExamDateReglage } from "../host/folder";
+import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examDates, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders, setExamDate as setExamDateReglage } from "../host/folder";
 import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
@@ -417,6 +417,19 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			   avant d'écrire : le plan, qui la relit à chaque calcul, est déjà
 			   juste quand la promesse d'écriture est encore en vol. */
 			void setExamDateReglage(cleModule(quiz.path, currentHost().paths), date ?? "");
+		},
+		/* PLUSIEURS EXAMENS PAR DOSSIER (2026-09-26) : mêmes clés que ci-dessus. */
+		examens: group => {
+			const quiz = group.quizzes[0];
+			return quiz ? (examens()[cleModule(quiz.path, currentHost().paths)] ?? []) : [];
+		},
+		enregistrerExamen: (group, e) => {
+			const quiz = group.quizzes[0];
+			if (quiz) void enregistrerExamenReglage(cleModule(quiz.path, currentHost().paths), e);
+		},
+		retirerExamen: (group, id) => {
+			const quiz = group.quizzes[0];
+			if (quiz) void retirerExamenReglage(cleModule(quiz.path, currentHost().paths), id);
 		},
 		// « Nouveau quiz » : une note vierge, puis sa page en ÉDITION par
 		// `openQuizPath` ci-dessous — l'éditeur existe désormais dans la fenêtre.

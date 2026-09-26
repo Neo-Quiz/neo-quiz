@@ -16,7 +16,7 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
-import { chargerExamDates, estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
+import { chargerExamens, estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
@@ -306,7 +306,7 @@ async function demarrer(): Promise<void> {
 		   d'examen, elles, n'ont pas cet ordre à respecter — mais les charger
 		   avant de monter évite un premier plan calculé sans l'horizon d'une
 		   matière déjà saisie lors d'une session précédente. */
-		await chargerExamDates();
+		await chargerExamens();
 		/* Même raison que `chargerExamDates` ci-dessus : sans ce chargement,
 		   le tout premier montage de la coquille (plus bas) verrait des
 		   réglages de page vides (aucun dossier déplié, axe par défaut) au

@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, appliquerExamDate, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines }) => {
+await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, appliquerExamDate, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines, lireExamens, enregistrerExamenDans, retirerExamenDe, examenProchain, aujourdhuiIso }) => {
 	const r = makeReporter("Dossiers — réglage et identifiants");
 
 	r.check("aucun réglage : aucune racine", lireDossiers({}), []);
@@ -351,5 +351,34 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 		}
 	}
 
+	{
+		const m = "Efrei/Reseaux";
+		const migre = lireExamens(undefined, { [m]: "2027-06-01" });
+		r.check("migration : l'ancienne date devient un examen", migre[m], [{ id: "migre-" + m, nom: "", date: "2027-06-01" }]);
+		r.check("migration : n'écrase pas un module déjà migré", lireExamens({ [m]: [{ id: "x", nom: "Partiel", date: "2027-01-10" }] }, { [m]: "2027-06-01" })[m].map(e => e.id), ["x"]);
+		r.check("réglage corrompu (tableau) : vide", lireExamens([], undefined), {});
+		r.check("réglage corrompu (chaîne) : vide", lireExamens("x", undefined), {});
+		r.check("entrée sans date ignorée", lireExamens({ [m]: [{ id: "a", nom: "", date: "" }, { id: "b", nom: "", date: "2027-02-02" }] }, undefined)[m].map(e => e.id), ["b"]);
+		const t1 = enregistrerExamenDans({}, m, { id: "a", nom: "Final", date: "2027-06-01" });
+		const t2 = enregistrerExamenDans(t1, m, { id: "b", nom: "Partiel", date: "2027-03-01" });
+		r.check("deux examens, triés par date", t2[m].map(e => e.id), ["b", "a"]);
+		r.check("modifier = même id remplacé", enregistrerExamenDans(t2, m, { id: "a", nom: "Final", date: "2027-02-01" })[m].map(e => e.date), ["2027-02-01", "2027-03-01"]);
+		r.check("retirer", retirerExamenDe(t2, m, "b")[m].map(e => e.id), ["a"]);
+		r.check("module vidé : clé retirée", Object.keys(retirerExamenDe(t1, m, "a")), []);
+		r.check("prochain : aujourd'hui compris", examenProchain(t2[m], "2027-03-01")?.id, "b");
+		r.check("prochain : le passé exclu, le suivant pris", examenProchain(t2[m], "2027-03-02")?.id, "a");
+		r.check("prochain : tout passé", examenProchain(t2[m], "2027-07-01"), null);
+		r.check("date locale ISO", aujourdhuiIso(new Date(2027, 0, 5, 23, 30).getTime()), "2027-01-05");
+	}
+
+	r.done();
+});
+
+await withSrcModule("apps/windows/src/review/garde-examen.ts", ({ garderSiExamen }) => {
+	const r = makeReporter("Pas d'examen, pas de révision");
+	const avec = (chemin) => chemin.startsWith("Efrei/Reseaux/");
+	r.check("garde les clés des modules avec examen", garderSiExamen(["Efrei/Reseaux/CM1.md::q1", "Perso/Maths/A.md::q2"], avec), ["Efrei/Reseaux/CM1.md::q1"]);
+	r.check("clé sans séparateur écartée", garderSiExamen(["sansSeparateur"], () => true), []);
+	r.check("aucun examen : rien de dû", garderSiExamen(["Efrei/Reseaux/CM1.md::q1"], () => false), []);
 	r.done();
 });

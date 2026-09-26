@@ -3,8 +3,9 @@ import type { Host } from "../../../../src/host/types";
 import type { Scanner } from "../../../../src/dashboard/scanner";
 import { migrateReviewLog } from "../../../../src/review/migration";
 import { createReviewStore, parseExamDate, type ReviewStore } from "../../../../src/review/review-store";
-import { construireCatalogue } from "./catalogue";
+import { construireCatalogue, cleModule } from "./catalogue";
 import { examDates } from "../host/folder";
+import { garderSiExamen } from "./garde-examen";
 
 /**
  * Le journal de l'application : un fichier par dossier, un plan unique.
@@ -38,6 +39,14 @@ export async function creerJournalApp(host: Host, scanner: Scanner): Promise<Rev
 		now: () => Date.now(),
 	});
 	await store.load();
+	/* PAS D'EXAMEN, PAS DE RÉVISION (garde-examen.ts) : une seule porte, ici. */
+	const planBrut = store.plan.bind(store);
+	store.plan = (now: number) => {
+		const p = planBrut(now);
+		const avec = examDates();
+		const aExamen = (chemin: string): boolean => !!avec[cleModule(chemin, host.paths)];
+		return { ...p, today: garderSiExamen(p.today, aExamen), deferred: garderSiExamen(p.deferred, aExamen) };
+	};
 	return store;
 }
 
