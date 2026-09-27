@@ -88,6 +88,8 @@ release notes.
 - A quiz copied from a website is read even when the model forgot a comma between two fields or inserted section headings between questions, instead of being rejected.
 - A Learn path whose model forgot to mark it as Learn is saved as Learn, not as a Practice bank.
 - In Learn quizzes, a "from memory" matching, ordering or fill-in question keeps its real interaction instead of turning into a free-text answer.
+- A terminal question whose language is a real program (Python, Java…) is now an editable code block labelled "Program output", instead of a command prompt ("C:\>") that suggested typing a command; real shell prompts (cmd, PowerShell, bash) keep an adapted prompt (`C:\>`, `PS>`, `$`).
+- Every written-answer field now starts at the height of the expected answer (one to a few lines) instead of always opening ten lines tall, and grows as you type.
 
 ## [1.19.0] - 2026-09-23
 

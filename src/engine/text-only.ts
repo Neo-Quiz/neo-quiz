@@ -8,6 +8,7 @@ import type {
 	FlashcardQuestion,
 } from "../types/quiz";
 import { renderLessonHtml } from "./sanitizer";
+import { countAnswerLines } from "./terminal";
 import { t, type TransKey } from "../i18n";
 
 /* Icône Lucide `check` inline, même tracé que celle du cours (lecture-rendu.ts
@@ -418,6 +419,23 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   (persistAnswer/commitAnswer, plus bas), et on passe à la suivante —
 	   l'auto-évaluation attend l'écran des résultats (writtenReviewCardHtml).
 	   Le champ reste donc TOUJOURS éditable ici, jamais en lecture seule. */
+	/* Hauteur DE DÉPART du champ « avec tes mots » (précision du 27/09, règle
+	   générale de tout champ de réponse écrite) : le nombre de lignes de la
+	   réponse attendue — la bonne option d'un QCM forcé en rappel, ou la
+	   réponse acceptée d'une question texte — entre 1 et 6, jamais un champ
+	   de 10 lignes pour une réponse d'une ligne. Aucune référence connue
+	   (classement, appariement…) : 1 ligne, elle grandit avec la saisie. */
+	function expectedWrittenRows(q: QuizQuestion): number {
+		const indices = getCorrectOptionIndices(q);
+		if (indices.length > 0) {
+			const qc = q as QcmQuestion | MultiSelectQuestion;
+			const texte = indices.map(oi => String((qc.options || [])[oi] ?? "")).join("\n");
+			return countAnswerLines(texte, 6);
+		}
+		const accepted = ctx.terminal?.getTextAcceptedAnswers?.(q as TextQuestion) || [];
+		return countAnswerLines(accepted[0] ?? "", 6);
+	}
+
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
 		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
 		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
@@ -436,6 +454,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
+					rows="${expectedWrittenRows(q)}"
 				>${ctx.escapeHtmlText(value)}</textarea>
 			</div>
 		</div>`;
@@ -446,8 +465,10 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			ctx.terminal.syncTextAreaHeight(textarea);
 			return;
 		}
+		// Même règle que engine/terminal.ts : pas de plancher fixe, la hauteur de
+		// départ vient de l'attribut `rows` (expectedWrittenRows ci-dessus).
 		textarea.style.height = "auto";
-		textarea.style.height = `${Math.max(220, textarea.scrollHeight)}px`;
+		textarea.style.height = `${textarea.scrollHeight}px`;
 	}
 
 	function bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void {

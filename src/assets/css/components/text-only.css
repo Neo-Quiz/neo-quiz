@@ -278,9 +278,10 @@
   font-weight: 800;
 }
 
-.quiz-textonly-answer .quiz-textarea{
-  min-height: 180px;
-}
+/* Plus de plancher fixe (précision du 27/09) : la hauteur de DÉPART vient de
+   l'attribut `rows` posé au rendu (questionCardBodyHtml, text-only.ts),
+   calé sur la réponse attendue — jamais un champ de 10 lignes pour une
+   réponse d'une ligne. */
 
 /* Explication et cours en état "plain" (écran de correction, 2026-09-26) :
    ni cadre ni titre, du texte simple juste sous la bonne réponse. Le cadre

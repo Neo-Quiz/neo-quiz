@@ -37,6 +37,7 @@
 @import url('./components/terminal-cmd.css');
 @import url('./components/terminal-powershell.css');
 @import url('./components/terminal-bash.css');
+@import url('./components/terminal-program.css');
 @import url('./components/resource-btn.css');
 @import url('./components/settings-code.css');
 @import url('./components/ui-select.css');

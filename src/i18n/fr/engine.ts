@@ -84,6 +84,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Votre réponse...",
+	"engine.terminal.programOutputLabel": "Sortie du programme",
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Votre réponse libre",

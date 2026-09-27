@@ -103,6 +103,10 @@ export const EN_ENGINE = {
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Your answer...",
+	/* Variante terminal qui n'est PAS une vraie invite de commande (retour #2,
+	   2026-09-26 soir) : le champ devient un bloc de code éditable, avec ce
+	   libellé au-dessus au lieu d'une invite « C:\> ». */
+	"engine.terminal.programOutputLabel": "Program output",
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Your own answer",
