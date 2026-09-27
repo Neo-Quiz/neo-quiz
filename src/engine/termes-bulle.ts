@@ -44,6 +44,17 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 	let definitionEl: HTMLElement | null = null;
 	// Le `.qb-terme` actuellement décrit par la bulle ouverte, ou `null`.
 	let ancreOuverte: HTMLElement | null = null;
+	// Ce qui a OUVERT la bulle actuelle (défaut #1, revue du 2026-09-27) : un
+	// clic sur un terme dont la bulle est déjà ouverte par survol ou focus la
+	// GARDE ouverte — seul un clic sur une bulle ouverte PAR UN CLIC la referme.
+	let causeOuverture: "survol" | "clavier" | "clic" | null = null;
+	// Le terme dont le PROCHAIN `focusin` ne doit PAS ouvrir la bulle (défaut
+	// #1 et #6) : posé sur `pointerdown` (le focus qu'il donne précède le
+	// `click`, qui décide seul), et avant un refocus PROGRAMMATIQUE après
+	// Échap (`surEchap`, plus bas) — sans quoi ce refocus rouvrirait aussitôt
+	// une bulle qu'on vient de fermer. Consommé (remis à `null`) au premier
+	// `focusin` qui le voit, qu'il corresponde ou non.
+	let ignorerProchainFocusDe: HTMLElement | null = null;
 	let minuteurOuverture = 0;
 	let minuteurFermeture = 0;
 	let veilleRaf = 0;
@@ -118,7 +129,7 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		veilleRaf = requestAnimationFrame(boucle);
 	}
 
-	function ouvrir(cible: HTMLElement): void {
+	function ouvrir(cible: HTMLElement, cause: "survol" | "clavier" | "clic"): void {
 		const i = Number(cible.dataset.terme);
 		const entree = ctx.glossaire[i];
 		if (!entree) return;
@@ -126,11 +137,18 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 
 		const { bulle: el, terme, definition } = assurerBulle();
 		ancreOuverte = cible;
+		causeOuverture = cause;
 		terme.textContent = entree.term;
 		// Porte n°1 du sanitizer (déjà échappée) : la définition est une
 		// donnée du quiz, potentiellement partagée/hostile.
 		definition.innerHTML = ctx.sanitize.renderInlineText(entree.definition);
-		void mathifyElement(definition);
+		// La formule d'une définition grandit la bulle une fois rendue (MathJax
+		// est asynchrone) : la repositionner ALORS, mais seulement si elle est
+		// toujours ouverte sur la MÊME ancre (défaut #8, revue du 2026-09-27) —
+		// sinon on déplacerait la bulle d'un AUTRE terme, ouvert entre-temps.
+		void mathifyElement(definition).then(() => {
+			if (bulle && !bulle.hidden && ancreOuverte === cible) positionner(bulle, cible);
+		});
 
 		el.hidden = false;
 		el.setAttribute("aria-hidden", "false");
@@ -146,6 +164,7 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 
 	function fermer(): void {
 		if (veilleRaf) { cancelAnimationFrame(veilleRaf); veilleRaf = 0; }
+		causeOuverture = null;
 		if (!bulle || bulle.hidden) { ancreOuverte = null; return; }
 		bulle.classList.remove("is-open");
 		bulle.setAttribute("aria-hidden", "true");
@@ -163,7 +182,7 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 	function planifierOuverture(cible: HTMLElement): void {
 		annulerFermeture();
 		annulerOuverture();
-		minuteurOuverture = window.setTimeout(() => { minuteurOuverture = 0; ouvrir(cible); }, DELAI_OUVERTURE_MS);
+		minuteurOuverture = window.setTimeout(() => { minuteurOuverture = 0; ouvrir(cible, "survol"); }, DELAI_OUVERTURE_MS);
 	}
 	function planifierFermeture(): void {
 		annulerFermeture();
@@ -171,10 +190,26 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 	}
 
 	// ── Écouteurs délégués, un seul jeu pour toute l'instance ──
+	/* Posé en CAPTURE, avant tout : le `pointerdown` d'un clic/tap donne le
+	   FOCUS (tabindex=0) avant même le `click` qui suit — sans ce drapeau,
+	   `surFocusIn` ouvrirait déjà la bulle, et `surClic` la verrait ouverte et
+	   la refermerait aussitôt (défaut #1, revue du 2026-09-27). Posé pour
+	   n'importe quelle cible (y compris `null`, hors d'un terme) : ça purge
+	   aussi un drapeau resté en place après un pointerdown qui n'a pas mené à
+	   un focus (glissé hors de l'ancre avant relâche). */
+	function surPointerDown(e: PointerEvent): void {
+		ignorerProchainFocusDe = elementTerme(e.target);
+	}
 	function surPointerOver(e: PointerEvent): void {
 		if (e.pointerType !== "mouse") return; // tactile : voir surClic
 		const cible = elementTerme(e.target);
-		if (!cible || cible === ancreOuverte) return;
+		if (!cible) return;
+		if (cible === ancreOuverte) {
+			// Revenir sur l'ancre (depuis la bulle, ou un aller-retour de souris)
+			// ne doit pas laisser filer une fermeture déjà planifiée (défaut #7).
+			annulerFermeture();
+			return;
+		}
 		planifierOuverture(cible);
 	}
 	function surPointerOut(e: PointerEvent): void {
@@ -187,9 +222,16 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 	function surFocusIn(e: FocusEvent): void {
 		const cible = elementTerme(e.target);
 		if (!cible) return;
+		if (ignorerProchainFocusDe === cible) {
+			// Focus provoqué par un pointeur (défaut #1) ou par le refocus
+			// PROGRAMMATIQUE d'Échap (défaut #6) — jamais une vraie navigation
+			// clavier : ne PAS ouvrir, `click` ou l'état déjà fermé décident.
+			ignorerProchainFocusDe = null;
+			return;
+		}
 		annulerOuverture();
 		annulerFermeture();
-		ouvrir(cible);
+		ouvrir(cible, "clavier");
 	}
 	function surFocusOut(e: FocusEvent): void {
 		const cible = elementTerme(e.target);
@@ -206,8 +248,18 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		}
 		e.preventDefault();
 		annulerOuverture();
-		if (bulle && !bulle.hidden && ancreOuverte === cible) { fermer(); return; }
-		ouvrir(cible);
+		annulerFermeture();
+		if (bulle && !bulle.hidden && ancreOuverte === cible) {
+			// Un clic sur un terme dont la bulle est déjà ouverte PAR LE SURVOL
+			// ou LE FOCUS la GARDE ouverte ; seul un clic sur une bulle ouverte
+			// PAR UN CLIC la referme (défaut #1, revue : mémorise la cause
+			// d'ouverture). Un clic explicite en devient désormais le « propriétaire » :
+			// un second clic la refermera bien, comme sur un simple bouton.
+			if (causeOuverture === "clic") { fermer(); return; }
+			causeOuverture = "clic";
+			return;
+		}
+		ouvrir(cible, "clic");
 	}
 	/* En CAPTURE et arrêté : Échap ferme d'abord la bulle, et elle seule — la
 	   modale d'indice qui la contient (son propre `keydown` sur `document`)
@@ -217,15 +269,28 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		e.stopPropagation();
 		const aRefocuser = ancreOuverte;
 		fermer();
+		// Le refocus ci-dessous peut donner à `aRefocuser` un focus qu'il
+		// n'avait pas (bulle ouverte par SURVOL) : sans ce drapeau, le
+		// `focusin` qu'il déclenche rouvrirait aussitôt la bulle qu'on vient de
+		// fermer (défaut #6, revue).
+		ignorerProchainFocusDe = aRefocuser;
 		try { aRefocuser?.focus(); } catch (_) { /* meilleur effort */ }
 	}
-	/** Le défilement (page, ou un support replié qui défile) déplace l'ancre
-	    sous une bulle en `position: fixed` : fermer plutôt que d'afficher une
-	    bulle mal placée. */
+	/** Le défilement (page, ou un support replié qui défile) — REPOSITIONNE la
+	    bulle tant que son ancre reste visible dans la fenêtre (un Tab vers un
+	    terme hors vue fait défiler le navigateur : fermer la couperait avant
+	    même qu'elle soit lue, défaut #3) ; ferme SEULEMENT si l'ancre en sort
+	    (ou quitte le DOM). Même logique pour un redimensionnement. */
 	function surDefilement(): void {
-		if (bulle && !bulle.hidden) fermer();
+		if (!bulle || bulle.hidden || !ancreOuverte) return;
+		if (!ancreOuverte.isConnected) { fermer(); return; }
+		const r = ancreOuverte.getBoundingClientRect();
+		const visible = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+		if (!visible) { fermer(); return; }
+		positionner(bulle, ancreOuverte);
 	}
 
+	document.addEventListener("pointerdown", surPointerDown, true);
 	document.addEventListener("pointerover", surPointerOver);
 	document.addEventListener("pointerout", surPointerOut);
 	document.addEventListener("focusin", surFocusIn);
@@ -241,7 +306,9 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		fermer();
 		annulerOuverture();
 		annulerFermeture();
+		ignorerProchainFocusDe = null;
 		if (veilleRaf) { cancelAnimationFrame(veilleRaf); veilleRaf = 0; }
+		document.removeEventListener("pointerdown", surPointerDown, true);
 		document.removeEventListener("pointerover", surPointerOver);
 		document.removeEventListener("pointerout", surPointerOut);
 		document.removeEventListener("focusin", surFocusIn);

@@ -127,6 +127,21 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 		}
 	}
 
+	/** La carte de la question actuellement affichée (défaut #4, revue du
+	    2026-09-27) — celle sur laquelle « Indice » vient d'être cliqué, seule
+	    référence possible pour la garde anti-fuite de `openHintModal` puisque
+	    la modale elle-même n'est pas DANS une carte. `null` hors d'une
+	    diapositive de question, ou sur un `ctx` minimal de test (repli
+	    optionnel sur chaque accès : `scripts/check-code-highlight.mjs` ouvre
+	    cette modale avec un `ctx` sans `quizState`). */
+	function carteQuestionCourante(): Element | null {
+		const si = ctx.quizState?.current;
+		if (si === undefined || !ctx.isQuestionSlideIndex?.(si)) return null;
+		const qi = (ctx.slideMap?.[si] as { questionIndex?: number } | undefined)?.questionIndex;
+		if (qi === undefined) return null;
+		return ctx.container?.querySelector(`.quiz-track-item[data-slide-kind="question"][data-qi="${qi}"]`) ?? null;
+	}
+
 	function ensureHintModal(): HTMLElement {
 		let overlay = document.getElementById(ctx.HINT_OVERLAY_ID);
 		if (overlay) {
@@ -194,7 +209,12 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 			body.innerHTML = ctx.sanitize.renderHintWithCodeAndEmbeds(text);
 			// Termes du glossaire AVANT mathifyElement — même ordre, même
 			// raison que le repeint d'une carte (engine.ts, engine/termes.ts).
-			ctx.termes.poserTermes(body);
+			// La modale est portalée HORS de toute carte (termes-bulle.ts, « zone
+			// hors carte ») : la garde anti-fuite (défaut #4, revue du 2026-09-27)
+			// n'a alors rien à trouver en remontant depuis `body` — on lui passe
+			// explicitement la carte de la question COURANTE, la seule que cette
+			// modale puisse jamais montrer.
+			ctx.termes.poserTermes(body, carteQuestionCourante());
 			// LaTeX $...$ des indices : même rendu MathJax que les slides.
 			void mathifyElement(body);
 			// Bouton « Exécuter » d'un bloc Python de l'indice (engine/code-run.ts).
