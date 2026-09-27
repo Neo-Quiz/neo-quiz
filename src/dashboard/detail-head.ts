@@ -25,6 +25,9 @@ export interface EnteteAction {
 	label: string;
 	icon: string;
 	onClick(el: HTMLElement): void;
+	/** Pastille numérique après le libellé (compteur de termes du glossaire,
+	    tâche 4 du lot D) — absente ou vide : pas de pastille. */
+	badge?: string;
 }
 
 export interface EnteteDeps {
@@ -50,12 +53,23 @@ export function dossierDuQuiz(path: string): string {
 	return path.split("/").slice(0, -1).filter(Boolean).pop() ?? "";
 }
 
-function bouton(parent: HTMLElement, cls: string, icon: string, label: string): HTMLButtonElement {
+function bouton(parent: HTMLElement, cls: string, icon: string, label: string, badge?: string): HTMLButtonElement {
 	const btn = ajouter(parent, "button", cls);
 	btn.type = "button";
 	currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), icon);
 	ajouter(btn, "span", undefined, label);
+	if (badge) ajouter(btn, "span", "qbd-qz-action-badge", badge);
 	return btn;
+}
+
+/** Met à jour (ou retire) la pastille d'un bouton d'action déjà peint, sans
+    repeindre tout l'en-tête — la modale « Vocabulaire » (tâche 4 du lot D)
+    s'en sert à sa fermeture, une fois le compteur de termes connu. */
+export function setActionBadge(btn: HTMLElement, badge?: string): void {
+	let pastille = btn.querySelector<HTMLElement>(".qbd-qz-action-badge");
+	if (!badge) { pastille?.remove(); return; }
+	if (!pastille) pastille = ajouter(btn, "span", "qbd-qz-action-badge");
+	pastille.textContent = badge;
 }
 
 export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
@@ -88,7 +102,7 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
 	edit.addEventListener("click", () => deps.onToggleEditing());
 
 	for (const action of deps.actions) {
-		const btn = bouton(actions, "qbd-qz-action", action.icon, action.label);
+		const btn = bouton(actions, "qbd-qz-action", action.icon, action.label, action.badge);
 		poserBouton3dNeutre(btn);
 		btn.addEventListener("click", () => action.onClick(btn));
 	}

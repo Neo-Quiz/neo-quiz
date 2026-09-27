@@ -9,6 +9,7 @@ import { quizFrere } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz } from "./detail-head";
+import { glossaryHeaderAction } from "./glossaire-modal";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
@@ -475,6 +476,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			fn(el);
 		};
 		const start = spec.start;
+		const actions = (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) }));
+		// « Vocabulaire » (tâche 4 du lot D) : en édition seulement, et seulement
+		// une fois le brouillon chargé — rien à glosser avant.
+		if (editing && draft) {
+			const gloss = glossaryHeaderAction(draft, scheduleSave);
+			actions.push({ ...gloss, onClick: avant(gloss.onClick) });
+		}
 		renderEntete(page, {
 			title: spec.title,
 			// Un quiz du catalogue montre son DOSSIER, pas son chemin ; la page
@@ -483,7 +491,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			editing,
 			onBack: () => { void flushSave(); spec.onBack(); },
 			onToggleEditing: () => toggleEditing(page),
-			actions: (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) })),
+			actions,
 			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
 			infos: spec.stats ? (p) => { renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!)); } : undefined,
 		});

@@ -198,6 +198,19 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.typeModal.title": "Ajouter une question",
 	"editor.typeModal.subtitle": "Choisissez le type de question",
 
+	/* ── Modale « Vocabulaire » (dashboard/glossaire-modal.ts, lot D) ── */
+	"editor.glossary.button": "Vocabulaire",
+	"editor.glossary.title": "Vocabulaire du quiz",
+	"editor.glossary.term": "Terme",
+	"editor.glossary.definition": "Définition",
+	"editor.glossary.aliases": "Autres formes, séparées par des virgules",
+	"editor.glossary.add": "Ajouter un terme",
+	"editor.glossary.remove": "Supprimer ce terme",
+	"editor.glossary.close": "Fermer",
+	"editor.glossary.empty": "Aucun terme pour l'instant. Ajoutez ceux qu'une lecture, une explication ou un indice doit relier à leur définition.",
+	"editor.glossary.countOne": "{count} terme",
+	"editor.glossary.countOther": "{count} termes",
+
 	/* ── Modale d'import ── */
 
 	/* ── Sélecteurs de note (import / ouverture) ── */

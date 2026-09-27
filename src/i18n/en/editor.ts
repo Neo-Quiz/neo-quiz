@@ -201,6 +201,19 @@ export const EN_EDITOR = {
 	"editor.typeModal.title": "Add a question",
 	"editor.typeModal.subtitle": "Choose the question type",
 
+	/* ── Modale « Vocabulaire » (dashboard/glossaire-modal.ts, lot D) ── */
+	"editor.glossary.button": "Vocabulary",
+	"editor.glossary.title": "Quiz vocabulary",
+	"editor.glossary.term": "Term",
+	"editor.glossary.definition": "Definition",
+	"editor.glossary.aliases": "Other forms, comma-separated",
+	"editor.glossary.add": "Add a term",
+	"editor.glossary.remove": "Remove this term",
+	"editor.glossary.close": "Close",
+	"editor.glossary.empty": "No terms yet. Add the ones a reading, an explanation or a hint should link to their definition.",
+	"editor.glossary.countOne": "{count} term",
+	"editor.glossary.countOther": "{count} terms",
+
 	/* ── Modale d'import ── */
 
 	/* ── Sélecteurs de note (import / ouverture) ── */

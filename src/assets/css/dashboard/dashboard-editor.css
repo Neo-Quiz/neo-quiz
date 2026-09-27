@@ -1053,3 +1053,208 @@
 	border-radius: 0 !important;
 	box-shadow: none !important;
 }
+
+/* ══════════════════════════════════════════════════════════
+   BOUTON « VOCABULAIRE » DE L'EN-TÊTE (tâche 4 du lot D, 2026-09-27)
+   La pastille du compteur de termes, posée par `detail-head.ts` (générique :
+   n'importe quelle action de l'en-tête peut en porter une), à l'intérieur de
+   la face 3D du bouton — donc en couleurs PLEINES comme le reste de cette
+   face (`.qbd-cta3d-face`, dashboard-components.css), jamais par une
+   variable du thème : cette face-là ne l'est déjà pas.
+   ══════════════════════════════════════════════════════════ */
+.qbd-qz-action-badge {
+	display: inline-flex;
+	align-items: center;
+	font-size: 11.5px;
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.72);
+	white-space: nowrap;
+}
+.qbd-qz-action-badge::before {
+	content: "·";
+	margin-right: 6px;
+	color: rgba(255, 255, 255, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════
+   MODALE « VOCABULAIRE » (dashboard/glossaire-modal.ts, tâche 4 du lot D)
+
+   Un éditeur de set façon Quizlet : une ligne = Terme | Définition côte à
+   côte, « Autres formes » discrète en dessous, corbeille nue. La modale est
+   PORTALÉE au `<body>` par l'hôte (`HostModals.open`), hors de `.qbd-root` :
+   les règles `.qbd-root .qb-direct` / `.qbd-root .qbd-qz-form …` plus haut
+   dans ce fichier ne l'atteignent pas — cette section reprend donc, SANS ce
+   préfixe, ce dont un `creerChampDirect` a besoin (police héritée, curseur
+   texte, marqueurs discrets) plutôt que d'en dépendre.
+   ══════════════════════════════════════════════════════════ */
+.qbd-gloss-modal {
+	width: 640px;
+	max-width: calc(100vw - 32px);
+	/* Les jetons du champ de la page (dashboard-editor.css plus haut,
+	   `.qbd-qz-form`), recalculés ICI : la modale vit hors de `.qbd-root`, ces
+	   propriétés personnalisées ne lui arrivent donc pas par héritage. */
+	--qbd-gloss-champ: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	--qbd-gloss-champ-survol: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	--qbd-gloss-champ-bord: color-mix(in srgb, var(--text-normal) 9%, transparent);
+	--qbd-gloss-champ-focus: color-mix(in srgb, var(--quiz-primary) 75%, transparent);
+	--qbd-gloss-champ-halo: 0 0 0 3px color-mix(in srgb, var(--quiz-primary) 22%, transparent);
+}
+
+.qbd-gloss-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-height: min(50vh, 420px);
+	overflow-y: auto;
+	padding: 2px 2px 2px 0;
+}
+
+.qbd-gloss-row {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.qbd-gloss-fields {
+	display: flex;
+	align-items: stretch;
+	gap: 8px;
+}
+
+/* Les deux champs de la ligne : le fond, le liseré et le focus de la page
+   (Neo Calendar), mais recalculés localement — voir `.qbd-gloss-modal`. */
+.qbd-gloss-term,
+.qbd-gloss-def {
+	box-sizing: border-box;
+	min-width: 0;
+	min-height: 36px;
+	padding: 7px 12px;
+	border: 1px solid var(--qbd-gloss-champ-bord);
+	border-radius: 8px;
+	background: var(--qbd-gloss-champ);
+	color: var(--text-normal);
+	font-size: 14px;
+	line-height: 1.45;
+	transition: background-color 120ms ease, border-color 120ms ease, box-shadow 160ms ease;
+}
+.qbd-gloss-term { flex: 0 0 32%; font-weight: 600; }
+.qbd-gloss-def { flex: 1 1 auto; }
+.qbd-gloss-term:hover, .qbd-gloss-def:hover { background: var(--qbd-gloss-champ-survol); }
+.qbd-gloss-term:focus-within, .qbd-gloss-def:focus-within {
+	border-color: var(--qbd-gloss-champ-focus);
+	background: var(--qbd-gloss-champ-survol);
+	box-shadow: var(--qbd-gloss-champ-halo);
+}
+
+/* La corbeille : un bouton NU, comme les gestes de réponse du rendu corrigé
+   (`.qb-er-geste`) — aucun cadre, aucune tuile, juste une icône qui rougit
+   au survol. */
+.qbd-gloss-del {
+	flex-shrink: 0;
+	align-self: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: pointer;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+.qbd-gloss-del:hover, .qbd-gloss-del:focus-visible {
+	background: color-mix(in srgb, #ef4466 12%, transparent);
+	color: #ef4466;
+}
+.qbd-gloss-del svg { width: 15px; height: 15px; }
+
+/* « Autres formes » : discrète, sans cadre au repos — un champ de moins
+   qu'on remarque tant qu'on n'en a pas besoin. */
+.qbd-gloss-aliases {
+	box-sizing: border-box;
+	padding: 5px 10px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--text-muted);
+	font-size: 12.5px;
+	transition: background-color 120ms ease, border-color 120ms ease;
+}
+.qbd-gloss-aliases:hover { background: color-mix(in srgb, var(--text-normal) 5%, transparent); }
+.qbd-gloss-aliases:focus-within {
+	border-color: var(--qbd-gloss-champ-bord);
+	background: var(--qbd-gloss-champ);
+}
+
+/* État vide : icône dans une pastille, centrée — même patron que la section
+   « Examens » vide de la planification (`.qbd-planning-exams-empty`). */
+.qbd-gloss-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 26px 12px;
+	text-align: center;
+}
+.qbd-gloss-empty-icon {
+	display: inline-grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-muted);
+}
+.qbd-gloss-empty-icon svg { width: 18px; height: 18px; }
+.qbd-gloss-empty-text {
+	margin: 0;
+	max-width: 42ch;
+	font-size: 13px;
+	color: var(--text-muted);
+	line-height: 1.5;
+}
+
+/* Pied : « Ajouter un terme » (pilule pleine, comme le bouton d'installation
+   automatique) à gauche, « Fermer » (bordé, comme « Annuler » d'une
+   confirmation) à droite. */
+.qbd-gloss-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ── Le champ à aperçu en direct, HORS `.qbd-root` (voir l'en-tête) ──
+   Repris de `.qbd-root .qb-direct` (plus haut dans ce fichier), sans le
+   préfixe : cette modale ne descend pas de `.qbd-root`. */
+.qbd-gloss-modal .qb-direct { cursor: text; }
+.qbd-gloss-modal .qb-direct .cm-editor {
+	background: none;
+	color: inherit;
+	font: inherit;
+}
+.qbd-gloss-modal .qb-direct .cm-editor.cm-focused { outline: none; }
+.qbd-gloss-modal .qb-direct .cm-scroller {
+	font-family: inherit;
+	line-height: inherit;
+	overflow: visible;
+}
+.qbd-gloss-modal .qb-direct .cm-content {
+	padding: 0;
+	font-family: inherit;
+	color: var(--text-normal);
+	caret-color: var(--text-normal);
+}
+.qbd-gloss-modal .qb-direct .cm-line { padding: 0; }
+.qbd-gloss-modal .qb-direct .cm-placeholder { color: var(--text-faint); }
+.qbd-gloss-modal .qb-direct .qb-direct-marqueur { color: var(--text-faint); }
+.qbd-gloss-modal .qb-direct .qb-direct-formule-source {
+	font-family: var(--font-monospace);
+	font-size: 0.92em;
+	color: var(--text-muted);
+}
+.qbd-gloss-modal .qb-direct .qb-direct-formule { cursor: pointer; }
