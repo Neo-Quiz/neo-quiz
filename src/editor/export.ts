@@ -4,6 +4,7 @@ import type { EditorExamOptions } from "../types/editor-ctx";
 import { pickLessonFields } from "../quiz-utils";
 import { assignQuestionIds } from "../quiz-ids";
 import { QUESTION_ROLES } from "../types/quiz";
+import type { EntreeGlossaire } from "../glossaire";
 
 /**
  * Une valeur quelconque, écrite en JSON5.
@@ -333,6 +334,43 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 	return L.join("\n");
 }
 
+/**
+ * Le glossaire, prêt à être écrit : entrées incomplètes (terme ou définition
+ * vide après `trim`) ignorées, `aliases` filtré aux formes non vides et omis
+ * s'il n'en reste aucune — même tolérance que `lireGlossaire`
+ * (src/glossaire.ts), réappliquée ICI plutôt que supposée acquise : la modale
+ * « Vocabulaire » (tâche 4 du lot) modifie `examOptions.glossary` en mémoire,
+ * sans repasser par cette validation avant chaque sauvegarde différée.
+ */
+function glossaryEntries(glossary: EntreeGlossaire[] | undefined): EntreeGlossaire[] {
+	if (!glossary) return [];
+	const sortie: EntreeGlossaire[] = [];
+	for (const brut of glossary) {
+		const term = (brut.term ?? "").trim();
+		const definition = (brut.definition ?? "").trim();
+		if (!term || !definition) continue;
+		const entree: EntreeGlossaire = { term, definition };
+		const aliases = (brut.aliases ?? []).map(a => a.trim()).filter(a => a !== "");
+		if (aliases.length > 0) entree.aliases = aliases;
+		sortie.push(entree);
+	}
+	return sortie;
+}
+
+/**
+ * La ligne `glossary: [...],` de l'objet de configuration, ou une chaîne vide
+ * quand il n'y a rien à écrire — c'est cette chaîne vide qui garantit qu'un
+ * quiz SANS glossaire ressort octet pour octet comme avant ce champ.
+ * `json5Value` (même fonction que le reste du fichier) échappe chaque chaîne
+ * via `esc5` : une apostrophe, une barre oblique inverse ou un `$\frac{a}{b}$`
+ * dans une définition se relisent à l'identique.
+ */
+function glossaryLine(glossary: EntreeGlossaire[] | undefined): string {
+	const entrees = glossaryEntries(glossary);
+	if (entrees.length === 0) return "";
+	return `\t\tglossary: ${json5Value(entrees)},\n`;
+}
+
 function exportAll(questions: DraftQuestion[], examOptions: EditorExamOptions | null = null): string {
 	/* La règle d'identité (id explicite prioritaire, repli sur un slug du
 	   titre puis `qN`, suffixe anti-collision qui respecte aussi les
@@ -359,19 +397,33 @@ function exportAll(questions: DraftQuestion[], examOptions: EditorExamOptions | 
 	   personnelles à la première sauvegarde. */
 	const extra = Object.entries(examOptions?._extra || {})
 		.map(([k, v]) => `\t\t${json5Key(k)}: ${json5Value(v)},\n`).join("");
+	// Glossaire (lot D, 2026-09-27) : chaîne vide sans entrée exploitable — voir
+	// `glossaryLine`. Ajouté APRÈS `extra` dans chaque branche, comme dans
+	// l'exemple de la spec (`{ mode: 'learn', objectives: [...], glossary: [...] }`).
+	const glossaire = glossaryLine(examOptions?.glossary);
 	if (mode === "lesson") {
 		/* Learn (2026-09-23) : le nom interne canonique reste "lesson" tant que
 		   le moteur de leçon joue ces blocs (plan 2 le remplace), mais la note
 		   porte le nom du format, `mode: 'learn'` — que `normalizeQuizMode`
 		   relit en "lesson". */
-		parts.push(`\t// Learn\n\t{\n\t\tmode: 'learn',\n${examOptions?.enabled ? timing : ""}${extra}\t}`);
+		parts.push(`\t// Learn\n\t{\n\t\tmode: 'learn',\n${examOptions?.enabled ? timing : ""}${extra}${glossaire}\t}`);
 	} else if (examOptions && examOptions.enabled) {
-		parts.push(`\t// Options mode examen\n\t{\n\t\texamMode: true,\n${timing}${extra}\t}`);
+		parts.push(`\t// Options mode examen\n\t{\n\t\texamMode: true,\n${timing}${extra}${glossaire}\t}`);
 	} else if (mode === "quiz") {
 		/* Le mode `quiz` est le comportement par défaut, mais s'il est ÉCRIT
 		   dans la note c'est un choix : le taire faisait disparaître l'objet de
 		   configuration entier — et ses clés personnalisées avec. */
-		parts.push(`\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n${extra}\t}`);
+		parts.push(`\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n${extra}${glossaire}\t}`);
+	} else if (glossaire) {
+		/* Glossaire à écrire mais AUCUN mode reconnu par les trois branches
+		   ci-dessus (`readModeConfig` en attribue pourtant toujours un dès qu'un
+		   objet de configuration existe — cette branche ne se déclenche donc que
+		   pour un `EditorExamOptions` construit à la main, ex. la modale
+		   « Vocabulaire » sur un Practice qui n'avait PAS d'objet de
+		   configuration). `mode: 'quiz'` est écrit explicitement : une version
+		   PLUS ANCIENNE du greffon reconnaît `mode`, pas `glossary` seul (spec §2)
+		   — sans lui, l'objet redeviendrait une question fantôme pour elle. */
+		parts.push(`\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n${extra}${glossaire}\t}`);
 	} else if (extra) {
 		// Un objet de mode sans mode reconnaissable, mais porteur de contenu.
 		parts.push(`\t{\n${extra}\t}`);

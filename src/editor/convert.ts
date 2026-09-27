@@ -4,6 +4,7 @@ import { _htmlToText } from "./modals";
 import type { ParsedQuizItem } from "./modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
+import { lireGlossaire } from "../glossaire";
 import { normalizeTerminalVariantName, defaultTerminalPromptPrefix } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
 import { htmlVersMarkdown, texteBaliseVersMarkdown } from "./html-vers-markdown";
@@ -52,15 +53,22 @@ export function readModeConfig(q: ParsedQuizItem): EditorExamOptions {
 		durationMinutes: Math.max(1, Math.min(180, Number(q.examDurationMinutes) || 10)),
 		autoSubmit: q.examAutoSubmit !== false,
 		showTimer: q.examShowTimer !== false,
+		// Glossaire (lot D, 2026-09-27) : lu par `lireGlossaire` (src/glossaire.ts),
+		// qui filtre déjà les entrées incomplètes — un tableau vide quand le bloc
+		// n'en porte pas.
+		glossary: lireGlossaire(q.glossary),
 		_extra: extraModeFields(q),
 	};
 }
 
 /** Les clés de l'objet de mode que le plugin ne connaît pas. Même principe que
-    `_extraFields` sur une question : ce qu'on ne comprend pas, on le rend. */
+    `_extraFields` sur une question : ce qu'on ne comprend pas, on le rend.
+    `glossary` est EXCLUE : elle est lue explicitement ci-dessus dans
+    `EditorExamOptions.glossary`, et la laisser ici la ferait écrire DEUX fois
+    à l'export (une fois par le champ dédié, une fois via `_extra`). */
 function extraModeFields(q: ParsedQuizItem): Record<string, unknown> | undefined {
 	const connues = new Set(["mode", "examMode", "learnMode",
-		"examDurationMinutes", "examAutoSubmit", "examShowTimer"]);
+		"examDurationMinutes", "examAutoSubmit", "examShowTimer", "glossary"]);
 	// `Object.create(null)`, comme `_extraFields` : un objet ordinaire absorbe
 	// une clé nommée `__proto__` au lieu de la stocker.
 	const extra: Record<string, unknown> = Object.create(null) as Record<string, unknown>;

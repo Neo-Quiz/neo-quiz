@@ -35,6 +35,7 @@
 import type { ExamOptions } from "./quiz";
 import type * as EditorUtils from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
+import type { EntreeGlossaire } from "../glossaire";
 
 /**
  * Options d'examen côté ÉDITION. Sur-ensemble de `ExamOptions` (types/quiz.ts),
@@ -62,6 +63,15 @@ export interface EditorExamOptions extends ExamOptions {
 	 * que `_extraFields` sur une question.
 	 */
 	_extra?: Record<string, unknown>;
+	/**
+	 * Glossaire du quiz (lot D, 2026-09-27), lu par `readModeConfig`
+	 * (editor/convert.ts) via `lireGlossaire` — déjà validé (`term`/`definition`
+	 * non vides, `aliases` filtré). Sorti de `_extra` pour ne pas être réémis
+	 * deux fois : c'est `editor/export.ts` `exportAll` qui l'écrit
+	 * explicitement, dans l'objet de configuration. La modale « Vocabulaire »
+	 * (tâche 4 du lot) modifie ce champ directement.
+	 */
+	glossary?: EntreeGlossaire[];
 }
 
 /**

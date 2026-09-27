@@ -213,6 +213,86 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 	r.check("slice non entier tu a l'ecriture",
 		relire([{ id: "d", slice: 1.5, prompt: "P" }], p => p[0].slice), undefined);
 
+	/* GLOSSAIRE (lot D, 2026-09-27, tâche 3 du plan) : `glossary` s'écrit dans
+	   l'objet de configuration, avec les MÊMES échappements que le reste du
+	   fichier (json5Value/esc5). Garde-fou de non-régression : un quiz SANS
+	   glossaire doit ressortir OCTET POUR OCTET comme avant l'ajout de ce
+	   champ — capturé juste avant `glossaryLine` (exportAll), une seule
+	   chaîne vide ajoutée en trop suffirait à le faire rougir. */
+	const SANS_GLOSSAIRE = {
+		quiz: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n\t}\n]",
+		exam: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Options mode examen\n\t{\n\t\texamMode: true,\n\t\texamDurationMinutes: 20,\n\t\texamAutoSubmit: true,\n\t\texamShowTimer: false,\n\t}\n]",
+		lesson: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Learn\n\t{\n\t\tmode: 'learn',\n\t}\n]",
+		extraOnly: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t{\n\t\tsource: '[[Note]]',\n\t}\n]",
+		nul: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t}\n]",
+	};
+	r.check("quiz sans glossaire : octet pour octet inchangé",
+		exportAll([question({})], { mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true }),
+		SANS_GLOSSAIRE.quiz);
+	r.check("examen sans glossaire : octet pour octet inchangé",
+		exportAll([question({})], { mode: "exam", enabled: true, durationMinutes: 20, autoSubmit: true, showTimer: false }),
+		SANS_GLOSSAIRE.exam);
+	r.check("lesson sans glossaire : octet pour octet inchangé",
+		exportAll([question({})], { mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true }),
+		SANS_GLOSSAIRE.lesson);
+	r.check("objet sans mode reconnu, sans glossaire : octet pour octet inchangé",
+		exportAll([question({})], { enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, _extra: { source: "[[Note]]" } }),
+		SANS_GLOSSAIRE.extraOnly);
+	r.check("aucune configuration, sans glossaire : octet pour octet inchangé",
+		exportAll([question({})], null),
+		SANS_GLOSSAIRE.nul);
+	// Un glossaire VIDE (tableau `[]`) ne doit rien ajouter non plus.
+	r.check("glossaire vide : aucun champ `glossary` écrit",
+		exportAll([question({})], { mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [] }),
+		SANS_GLOSSAIRE.quiz);
+
+	// Le glossaire s'ajoute APRÈS `_extra`, dans les trois branches qui
+	// reconnaissent un mode. Définition PIÉGÉE : gras markdown, apostrophe
+	// droite ET typographique, barre oblique inverse, `$\frac{a}{b}$`, saut
+	// de ligne — tout doit se relire à l'identique.
+	const BR = String.fromCharCode(10);
+	const definitionPiegee = "Structure où le **dernier** élément ajouté sort en premier. Backslash \\ et $\\frac{a}{b}$."
+		+ BR + "Deuxième ligne, apostrophes l'une et l’autre.";
+	const glossaireDeTest = [
+		{ term: "pile", definition: definitionPiegee, aliases: ["LIFO"] },
+	];
+	const lessonAvecGlossaire = exportAll([question({})],
+		{ mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: glossaireDeTest });
+	const configLesson = JSON5.parse(lessonAvecGlossaire).at(-1);
+	r.check("glossaire écrit dans l'objet Learn", configLesson.glossary?.length, 1);
+	r.check("définition (gras, backslash, latex, apostrophes, saut de ligne) intacte",
+		configLesson.glossary[0].definition, definitionPiegee);
+	r.check("alias conservé", configLesson.glossary[0].aliases, ["LIFO"]);
+
+	// Entrées incomplètes ignorées (terme ou définition vide après trim) ;
+	// aliases vides omis.
+	const glossaireSale = [
+		{ term: "   ", definition: "ignorée : terme vide" },
+		{ term: "sans définition", definition: "   " },
+		{ term: "propre", definition: "d", aliases: ["  ", ""] },
+	];
+	const nettoye = JSON5.parse(exportAll([question({})],
+		{ mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: glossaireSale })).at(-1);
+	r.check("entrées incomplètes ignorées", nettoye.glossary.length, 1);
+	r.check("l'entrée propre survit", nettoye.glossary[0].term, "propre");
+	r.check("aliases entièrement vides omis", "aliases" in nettoye.glossary[0], false);
+
+	/* Practice SANS objet de configuration existant : c'est ce que produira
+	   la modale « Vocabulaire » (tâche 4) sur un quiz qui n'en avait pas —
+	   `mode` reste absent de l'`EditorExamOptions` construit à la main. Sans
+	   `mode: 'quiz'` explicite, une version PLUS ANCIENNE du greffon (qui ne
+	   reconnaît pas `glossary` seul) verrait l'objet comme une question
+	   fantôme (spec §2). */
+	const practiceSansConfig = exportAll([question({}), question({ title: "Deuxième" })],
+		{ enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [{ term: "x", definition: "y" }] });
+	r.check("Practice sans config + glossaire : `mode: 'quiz'` ajouté",
+		practiceSansConfig.includes("mode: 'quiz',"), true);
+	const parsedPractice = JSON5.parse(practiceSansConfig);
+	r.check("Practice sans config + glossaire : glossaire écrit",
+		parsedPractice.at(-1).glossary, [{ term: "x", definition: "y" }]);
+	r.check("Practice sans config + glossaire : nombre de questions inchangé",
+		parsedPractice.length - 1, 2);
+
 	r.done();
 });
 
@@ -269,6 +349,73 @@ await withSrcModule(["src/quiz-utils.ts", "src/editor/convert.ts"], (qu, convert
 	// canonique (task 0 du lot mode leçon, 2026-08-31).
 	r.check("lecture normalisee", convert.readModeConfig({ mode: "Learn" }).mode, "lesson");
 	r.check("lecture d'un booleen", convert.readModeConfig({ examMode: true }).mode, "exam");
+
+	r.done();
+});
+
+/* GLOSSAIRE — ALLER-RETOUR LECTURE → EXPORT → RELECTURE (lot D, 2026-09-27,
+   tâche 3 du plan). Le chemin RÉEL qu'emprunte la page (readModeConfig puis
+   exportAll, comme dashboard/detail-io.ts — non touché par cette tâche) doit
+   produire un bloc qui se relit à l'identique, glossaire compris, sans qu'il
+   finisse DEUX FOIS dans `_extra` (une fois par le champ dédié, une fois via
+   les clés inconnues). */
+await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-utils.ts"], (convert, exp, qu) => {
+	const r = makeReporter("Glossaire (aller-retour lecture → export)");
+	const q = { id: "q1", title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0 };
+
+	const BR = String.fromCharCode(10);
+	const definitionPiegee = "Apostrophe droite l'une, typographique l’autre, backslash \\ et $\\frac{a}{b}$."
+		+ BR + "Deuxième ligne.";
+	const configBrute = {
+		mode: "learn", objectives: ["Définir une pile"],
+		glossary: [{ term: "pile", definition: definitionPiegee, aliases: ["LIFO"] }],
+	};
+
+	// 1) LECTURE, comme detail-io.ts : findQuizModeConfigIndex puis readModeConfig.
+	const brut = [q, configBrute];
+	const idx = qu.findQuizModeConfigIndex(brut);
+	r.check("l'objet de configuration est reconnu", idx, 1);
+	const lu = convert.readModeConfig(brut[idx]);
+	r.check("glossaire lu depuis le bloc",
+		lu.glossary, [{ term: "pile", definition: definitionPiegee, aliases: ["LIFO"] }]);
+	r.check("`_extra` ne contient plus `glossary`",
+		lu._extra ? Object.prototype.hasOwnProperty.call(lu._extra, "glossary") : false, false);
+	r.check("`_extra` garde les AUTRES clés inconnues (objectives)",
+		lu._extra?.objectives, ["Définir une pile"]);
+
+	// 2) ÉCRITURE, puis RELECTURE : le bloc doit se relire à l'identique.
+	const questionConvertie = convert.convertParsedToInternal(q);
+	const source1 = exp.exportAll([questionConvertie], lu);
+	const parsed1 = JSON5.parse(source1);
+	const relu1 = convert.readModeConfig(parsed1.at(-1));
+	r.check("glossaire relu après un aller-retour : identique", relu1.glossary, lu.glossary);
+
+	// 3) DEUXIÈME écriture : le bloc ne bouge plus (idempotence).
+	const source2 = exp.exportAll([questionConvertie], relu1);
+	r.check("deux écritures de suite : bloc identique", source1, source2);
+	r.check("nombre de questions inchangé", parsed1.length - 1, 1);
+
+	/* Practice SANS objet de configuration existant : `findQuizModeConfigIndex`
+	   ne trouve rien (-1), un futur appelant (modale Vocabulaire, tâche 4)
+	   ajoute alors un `EditorExamOptions` SANS `mode`. Après écriture, l'objet
+	   doit être RECONNU comme configuration — pas comme une question fantôme —
+	   et les DEUX questions d'origine doivent survivre. */
+	const q2 = { id: "q2", title: "Autre", prompt: "Autre énoncé ?", options: ["a", "b"], correctIndex: 1 };
+	r.check("sans configuration : aucun index reconnu", qu.findQuizModeConfigIndex([q, q2]), -1);
+	const questionsConverties = [q, q2].map(convert.convertParsedToInternal);
+	const sourcePractice = exp.exportAll(questionsConverties,
+		{ enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [{ term: "x", definition: "y" }] });
+	const parsedPractice = JSON5.parse(sourcePractice);
+	const idxPractice = qu.findQuizModeConfigIndex(parsedPractice);
+	r.check("Practice sans config + glossaire : l'objet écrit est reconnu comme configuration",
+		idxPractice, parsedPractice.length - 1);
+	r.check("Practice sans config + glossaire : `mode: 'quiz'` écrit",
+		parsedPractice[idxPractice].mode, "quiz");
+	r.check("Practice sans config + glossaire : même nombre de questions",
+		parsedPractice.length - 1, 2);
+	r.check("Practice sans config + glossaire : glossaire relu",
+		convert.readModeConfig(parsedPractice[idxPractice]).glossary,
+		[{ term: "x", definition: "y" }]);
 
 	r.done();
 });

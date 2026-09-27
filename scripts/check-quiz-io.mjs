@@ -371,6 +371,86 @@ await withSrcModule(
 			io.draftIsStale(lu), true);
 	}
 
+	/* ─────────── 10. le GLOSSAIRE traverse l'aller-retour réel ─────────── */
+
+	{
+		/* Bloc écrit à la main, comme un utilisateur l'écrirait : un objet Learn
+		   avec un glossaire dont la définition porte les mêmes pièges que le cas
+		   7 (apostrophes, backslash) plus un `$…$` et un saut de ligne — le
+		   CHEMIN RÉEL (`loadQuizDraft` → `saveQuizDraft` → `loadQuizDraft`), pas
+		   seulement `exportAll` isolé (déjà couvert par check-export.mjs). */
+		/* Échappements (apostrophe, backslash, `$\frac{a}{b}$`) déjà couverts
+		   octet pour octet par check-export.mjs (bloc « Glossaire ») — ici, la
+		   définition reste simple : ce cas éprouve le CÂBLAGE réel
+		   (loadQuizDraft/saveQuizDraft), pas une deuxième fois la grammaire
+		   d'échappement. Une seule apostrophe, en double quotes JSON5 (pas
+		   besoin d'échapper), suffit à prouver que le câblage ne la casse pas. */
+		const sourceAvecGlossaire = [
+			"[",
+			"	{",
+			"		id: 'q1',",
+			"		title: 'Unite',",
+			"		prompt: \"Enonce.\",",
+			"		options: ['un', 'deux'],",
+			"		correctIndex: 0,",
+			"	},",
+			"",
+			"	// Learn",
+			"	{",
+			"		mode: 'learn',",
+			"		glossary: [",
+			"			{ term: \"pile\", definition: \"Structure ou le dernier sort en premier.\" },",
+			"			{ term: \"l'appel\", definition: \"Definition avec une apostrophe.\", aliases: [\"LIFO\"] },",
+			"		],",
+			"	},",
+			"]",
+		].join(LF);
+		const v = vault(note({ source: sourceAvecGlossaire }));
+		const lu = await io.loadQuizDraft(v.chemin);
+		r.check("10. lecture d'un bloc réel avec glossaire", typeof lu, "object");
+		r.check("10. le glossaire est lu dans examOptions.glossary",
+			lu.examOptions?.glossary?.length, 2);
+		r.check("10. `_extra` ne contient plus `glossary`",
+			lu.examOptions?._extra ? Object.prototype.hasOwnProperty.call(lu.examOptions._extra, "glossary") : false,
+			false);
+
+		// Une frappe SANS toucher au glossaire : il doit survivre, intact.
+		lu.questions[0].prompt = "Enonce modifie";
+		r.check("10. la sauvegarde passe", await io.saveQuizDraft(lu), true);
+		const relu = await io.loadQuizDraft(v.chemin);
+		r.check("10. le glossaire survit à l'aller-retour réel (definition et alias)",
+			typeof relu === "object" ? relu.examOptions?.glossary : relu,
+			lu.examOptions.glossary);
+		r.check("10. la question survit aussi",
+			typeof relu === "object" ? relu.questions[0].prompt : relu, "Enonce modifie");
+	}
+
+	/* ─────────── 11. Practice SANS configuration : le glossaire en gagne une ─────────── */
+
+	{
+		/* Un quiz qui n'a ENCORE aucun objet de configuration (donc
+		   `examOptions === null` après lecture) : c'est le cas que la modale
+		   « Vocabulaire » (tâche 4, pas encore écrite) rencontrera en premier —
+		   simulé ici en construisant l'`EditorExamOptions` à la main, SANS
+		   `mode`, comme le ferait cette modale. */
+		const v = vault(note());
+		const lu = await io.loadQuizDraft(v.chemin);
+		r.check("11. pas encore de configuration", lu.examOptions, null);
+		lu.examOptions = {
+			enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true,
+			glossary: [{ term: "pile", definition: "Structure LIFO." }],
+		};
+		r.check("11. la sauvegarde passe", await io.saveQuizDraft(lu), true);
+		r.check("11. `mode: 'quiz'` a été écrit pour rester reconnaissable",
+			v.contenu.includes("mode: 'quiz',"), true);
+		const relu = await io.loadQuizDraft(v.chemin);
+		r.check("11. relu comme une configuration, glossaire compris",
+			typeof relu === "object" ? relu.examOptions?.glossary : relu,
+			[{ term: "pile", definition: "Structure LIFO." }]);
+		r.check("11. la question d'origine survit seule (pas de question fantôme)",
+			typeof relu === "object" ? relu.questions.length : relu, 1);
+	}
+
 	r.done();
 	hote.uninstallHost();
 });
