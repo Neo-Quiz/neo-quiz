@@ -20,7 +20,7 @@ import { duesDuDossier, questions } from "./folder-progress-details";
 const ICONES = { learn: "book-open", practice: "dumbbell" } as const;
 
 /** Un choix du bouton : ce qu'il affiche et ce qu'il lance. */
-interface Choix { icone: string; mode: string; titre: string; aide: string; lancer: () => void }
+interface Choix { icone: string; mode: string; titre: string; lancer: () => void }
 
 /** `ordre` : les quiz dans l'ordre des cartes, le Learn avant le Practice
     d'un même cours. Le bouton propose d'abord de REPRENDRE un quiz entamé
@@ -42,7 +42,7 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 		choix.push({
 			icone: "play", mode: t("dashboard.quizzes.nextStepResume"),
 			titre: `${q.title} · Q${s.question}/${s.total}`,
-			aide: t("dashboard.quizzes.nextStepResumeHelp"), lancer: () => ctx.openQuiz(q),
+			lancer: () => ctx.openQuiz(q),
 		});
 	}
 
@@ -51,7 +51,7 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 		const note = dues.lignes[0].quiz;
 		choix.push({
 			icone: "rotate-ccw", mode: t("dashboard.quizzes.progressDueAction"), titre: questions(dues.total),
-			aide: t("dashboard.quizzes.nextStepReviewHelp"), lancer: () => ctx.openQuiz(note),
+			lancer: () => ctx.openQuiz(note),
 		});
 	}
 	for (const mode of ["learn", "practice"] as const) {
@@ -59,7 +59,6 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 		if (!q) continue;
 		choix.push({
 			icone: ICONES[mode], mode: quizModeLabel(mode), titre: q.title,
-			aide: t(mode === "learn" ? "dashboard.quiz.modeLearnHelp" : "dashboard.quiz.modePracticeHelp"),
 			lancer: () => ctx.openQuiz(q),
 		});
 	}
@@ -73,7 +72,6 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 	const split = ajouter(parent, "div", "qbd-next-step");
 	const main = ajouter(split, "button", "qbd-next-step-main");
 	main.type = "button";
-	main.title = premier.aide;
 	currentHost().ui.setIcon(ajouter(main, "span", "qbd-next-step-icon"), "play");
 	ajouter(main, "span", "qbd-next-step-mode", premier.mode);
 	ajouter(main, "span", "qbd-next-step-title", premier.titre);

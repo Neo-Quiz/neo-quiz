@@ -87,7 +87,6 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		poserVides(carte, q);
 		carte.querySelectorAll<HTMLElement>("[data-edit]").forEach(el => {
 			el.tabIndex = 0;
-			el.title = t("editor.render.clickToEdit");
 			/* Tab s'arrête sur le TEXTE éditable, pas sur ce qu'il contient :
 			   les trous (`<input>` en lecture seule) d'un texte à trous, un lien
 			   rendu… y prenaient le focus, et Entrée n'y ouvrait rien. */

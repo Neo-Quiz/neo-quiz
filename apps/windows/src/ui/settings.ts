@@ -133,7 +133,6 @@ export function renderSettings(
 			ajouter(texte, "span", "nq-reglages-chemin", d.path);
 			const retirer = ajouter(ligne, "button", "nq-reglages-retirer");
 			retirer.type = "button";
-			retirer.title = t("review.settings.removeFolder");
 			retirer.setAttribute("aria-label", t("review.settings.removeFolder"));
 			currentHost().ui.setIcon(retirer, "x");
 			retirer.addEventListener("click", () => {

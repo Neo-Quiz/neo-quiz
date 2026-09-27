@@ -167,7 +167,6 @@ function boutonIcone(parent: HTMLElement, icone: string, libelle: string, texteV
 	const b = ajouter(parent, "button", "qbd-lecture-style-btn");
 	b.type = "button";
 	b.setAttribute("aria-label", libelle);
-	b.title = libelle;
 	currentHost().ui.setIcon(ajouter(b, "span", "qbd-lecture-style-btn-icone"), icone);
 	if (texteVisible) ajouter(b, "span", undefined, libelle);
 	return b;

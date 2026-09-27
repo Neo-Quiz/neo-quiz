@@ -120,8 +120,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const prevLabel = ctx.escapeHtmlAttr(t("engine.nav.prevQuestion"));
 		const nextAttr = ctx.escapeHtmlAttr(nextLabel);
 		return `<div class="quiz-question-nav">
-			<button class="quiz-nav-btn quiz-prev-btn" type="button" aria-label="${prevLabel}" title="${prevLabel}"${isFirst ? " disabled" : ""}>${ICON_ARROW_LEFT}</button>
-			<button class="quiz-nav-btn quiz-next-btn" type="button" aria-label="${nextAttr}" title="${nextAttr}">${ICON_ARROW_RIGHT}</button>
+			<button class="quiz-nav-btn quiz-prev-btn" type="button" aria-label="${prevLabel}"${isFirst ? " disabled" : ""}>${ICON_ARROW_LEFT}</button>
+			<button class="quiz-nav-btn quiz-next-btn" type="button" aria-label="${nextAttr}">${ICON_ARROW_RIGHT}</button>
 		</div>`;
 	}
 

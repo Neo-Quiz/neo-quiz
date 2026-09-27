@@ -171,7 +171,6 @@ function boutonIndice(parent: HTMLElement, icone: string, libelle: string, texte
 	const b = ajouter(parent, "button", "qbd-lecture-style-btn");
 	b.type = "button";
 	b.setAttribute("aria-label", libelle);
-	b.title = libelle;
 	currentHost().ui.setIcon(ajouter(b, "span", "qbd-lecture-style-btn-icone"), icone);
 	if (texteVisible) ajouter(b, "span", undefined, libelle);
 	return b;
@@ -200,7 +199,7 @@ function renderResourceSection(parent: HTMLElement, q: DraftQuestion, cb: EditCa
 		const toggle = ajouter(head, "button", "qbd-qz-section-toggle" + (has ? " is-on" : ""));
 		toggle.type = "button";
 		toggle.setAttribute("aria-pressed", String(has));
-		toggle.title = t(has ? "editor.toggle.disable" : "editor.toggle.enable");
+		toggle.setAttribute("aria-label", t(has ? "editor.toggle.disable" : "editor.toggle.enable"));
 		ajouter(toggle, "span", "qbd-qz-section-toggle-dot");
 		toggle.addEventListener("click", (e) => {
 			// L'en-tête ouvre/ferme la section : l'interrupteur, lui, active la

@@ -66,7 +66,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	boutonReduire.type = "button";
 	boutonReduire.className = "nq-barre-controle";
 	boutonReduire.setAttribute("aria-label", t("app.titlebar.minimize"));
-	boutonReduire.title = t("app.titlebar.minimize");
 	poserGlyphe(boutonReduire, "minimize");
 
 	const boutonAgrandir = document.createElement("button");
@@ -77,7 +76,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	boutonFermer.type = "button";
 	boutonFermer.className = "nq-barre-controle";
 	boutonFermer.setAttribute("aria-label", t("app.titlebar.close"));
-	boutonFermer.title = t("app.titlebar.close");
 	poserGlyphe(boutonFermer, "close");
 
 	controles.append(boutonReduire, boutonAgrandir, boutonFermer);
@@ -86,7 +84,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	function poserAgrandirOuRestaurer(agrandie: boolean): void {
 		const cle = agrandie ? "app.titlebar.restore" : "app.titlebar.maximize";
 		boutonAgrandir.setAttribute("aria-label", t(cle));
-		boutonAgrandir.title = t(cle);
 		// Restaurer : le `copy` de Lucide à 16 px, exactement comme Neo Calendar.
 		if (agrandie) poserIcone(boutonAgrandir, "copy"); else poserGlyphe(boutonAgrandir, "maximize");
 	}

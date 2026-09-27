@@ -118,7 +118,7 @@ export function renderModuleCard(
 	if (onMenu) {
 		const moreBtn = ajouter(footer, "button", "qbd-card-more qbd-module-card__menu");
 		moreBtn.type = "button";
-		moreBtn.title = t("dashboard.card.more");
+		moreBtn.setAttribute("aria-label", t("dashboard.card.more"));
 		currentHost().ui.setIcon(moreBtn, "ellipsis");
 		moreBtn.addEventListener("click", (e) => {
 			// Ouvrir le menu ne doit PAS aussi entrer dans le module.

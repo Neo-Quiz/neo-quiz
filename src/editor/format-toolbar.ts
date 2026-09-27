@@ -90,7 +90,6 @@ export function poserBarreFormat(parent: HTMLElement, cible: CibleFormat, html: 
 	const bouton = (icon: string, titre: TransKey, action: (btn: HTMLButtonElement) => void): HTMLButtonElement => {
 		const btn = ajouter(barre, "button", "qb-format-btn");
 		btn.type = "button";
-		btn.title = t(titre);
 		btn.setAttribute("aria-label", t(titre));
 		currentHost().ui.setIcon(btn, icon);
 		// `mousedown` sans défaut : le champ garde le focus ET sa sélection,

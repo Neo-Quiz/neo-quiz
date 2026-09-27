@@ -311,7 +311,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const btn = (value: "understood" | "review", cls: string, icon: string, labelKey: TransKey) => {
 			const selected = current === value;
 			const label = t(labelKey);
-			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}" title="${ctx.escapeHtmlAttr(label)}">${icon}</button>`;
+			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}">${icon}</button>`;
 		};
 		return `<div class="quiz-textonly-verdict-icon-row">
 			${btn("understood", "right", ICON_CHECK, "engine.textOnly.verdict.right")}

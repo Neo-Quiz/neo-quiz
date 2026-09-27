@@ -77,7 +77,7 @@ export function openIconPicker(
 		const cell = ajouter(grid, "button", "qbd-icon-cell");
 		cell.type = "button";
 		currentHost().ui.setIcon(cell, name);
-		cell.title = name;
+		cell.setAttribute("aria-label", name);
 		if (name === current) cell.classList.add("is-active");
 		cell.addEventListener("click", () => { onChange(name); close(); });
 	};

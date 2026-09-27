@@ -197,7 +197,6 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 			ouvrir.addEventListener("click", it.onOpen);
 			const supprimer = ajouter(item, "button", "qbd-folder-item-delete");
 			supprimer.type = "button";
-			supprimer.title = t("dashboard.folder.deleteAction");
 			supprimer.setAttribute("aria-label", t("dashboard.folder.deleteAction"));
 			host.ui.setIcon(supprimer, "trash-2");
 			supprimer.addEventListener("click", (e) => { e.stopPropagation(); it.onDelete(); });

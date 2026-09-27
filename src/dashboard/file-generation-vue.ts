@@ -86,13 +86,12 @@ export function creerVueFile(opts: {
 		zone = null;
 	}
 
-	/** Un bouton-icône, nommé pour la souris et le lecteur d'écran. */
+	/** Un bouton-icône, nommé pour le lecteur d'écran. */
 	function boutonIcone(parent: HTMLElement, icone: string, libelle: string, action: () => void): void {
 		const b = ajouter(parent, "button", "qbd-ai-file-btn");
 		b.type = "button";
 		host.ui.setIcon(b, icone);
 		b.setAttribute("aria-label", libelle);
-		b.title = libelle;
 		b.addEventListener("click", action);
 	}
 

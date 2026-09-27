@@ -300,7 +300,7 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 		// Toggle dans le header pour activer/désactiver
 		const toggle = ajouter(summary, "button", "qb-resource-toggle-btn");
 		toggle.type = "button";
-		toggle.title = t(has ? "editor.toggle.disable" : "editor.toggle.enable");
+		toggle.setAttribute("aria-label", t(has ? "editor.toggle.disable" : "editor.toggle.enable"));
 		ajouter(toggle, "span", "qb-resource-toggle-dot" + (has ? " is-on" : ""));
 		toggle.addEventListener("click", (e) => {
 			e.preventDefault();
@@ -389,7 +389,6 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 					   alignés d'une ligne à l'autre. */
 					const delBtn = ajouter(card, "button", "qb-answer-delete");
 					delBtn.type = "button";
-					delBtn.title = t("editor.action.delete");
 					delBtn.setAttribute("aria-label", t("editor.action.delete"));
 					_setIcon(delBtn, "trash-2");
 					if (isCorrect || q.options!.length <= 2) {
@@ -567,7 +566,6 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
 				const del = ajouter(row, "button", "qb-arr-del");
 				del.type = "button";
-				del.title = t("editor.action.delete");
 				del.setAttribute("aria-label", t("editor.action.delete"));
 				_setIcon(del, "trash-2");
 				if (items.length <= 1) del.disabled = true;
@@ -601,7 +599,6 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
 				const del = ajouter(row, "button", "qb-arr-del");
 				del.type = "button";
-				del.title = t("editor.action.delete");
 				del.setAttribute("aria-label", t("editor.action.delete"));
 				_setIcon(del, "trash-2");
 				if (items.length <= 1) del.disabled = true;

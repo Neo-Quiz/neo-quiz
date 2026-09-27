@@ -152,7 +152,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.attemptUndo": "Annuler",
 	"dashboard.quizzes.nextStepReviewHelp": "Les questions dues aujourd'hui dans ce dossier.",
 	"dashboard.quizzes.nextStepResume": "Reprendre",
-	"dashboard.quizzes.nextStepResumeHelp": "Reprendre ce quiz là où vous l'aviez laissé.",
 	"dashboard.quizzes.groupByActivity": "Récent",
 	"dashboard.quizzes.recentWeek": "7 derniers jours",
 	"dashboard.quizzes.recentMonth": "30 derniers jours",

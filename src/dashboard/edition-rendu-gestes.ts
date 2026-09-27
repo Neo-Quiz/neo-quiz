@@ -55,7 +55,6 @@ function bouton(cls: string, etiquette: string): HTMLButtonElement {
 	b.type = "button";
 	b.className = "qb-er-geste " + cls;
 	b.setAttribute("aria-label", etiquette);
-	b.title = etiquette;
 	return b;
 }
 
@@ -183,7 +182,6 @@ function poserSelectionEmplacements(
 
 	pool.forEach((item, pi) => {
 		item.setAttribute("aria-label", t("editor.render.pickChoice"));
-		item.title = t("editor.render.pickChoice");
 		// Capture : devance le clic délégué d'edition-rendu.ts (ouverture du
 		// texte) tant qu'un emplacement est sélectionné — sinon, laisse passer
 		// pour que le texte reste éditable normalement (tâche 3, inchangée).

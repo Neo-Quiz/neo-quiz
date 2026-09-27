@@ -324,7 +324,6 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 	const detail = ajouter(texte, "span", "nq-reglages-chemin");
 	const retirer = ajouter(rangee, "button", "nq-reglages-retirer");
 	retirer.type = "button";
-	retirer.title = t("app.fond.remove");
 	retirer.setAttribute("aria-label", t("app.fond.remove"));
 	currentHost().ui.setIcon(retirer, "x");
 

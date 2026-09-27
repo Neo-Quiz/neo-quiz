@@ -192,7 +192,6 @@ export function openModuleEditModal(
 				const custom = ajouter(row, "button", "qbd-medit-dot qbd-medit-dot--custom");
 				custom.type = "button";
 				custom.setAttribute("aria-label", t("dashboard.quizzes.moduleEditCustomColor"));
-				custom.title = t("dashboard.quizzes.moduleEditCustomColor");
 				const isCustom = !!color && !MODULE_PALETTE.includes(color);
 				if (isCustom && color) {
 					custom.style.background = color;

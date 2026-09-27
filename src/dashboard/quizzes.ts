@@ -353,7 +353,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				const plus = ajouter(headerActions, "button", "qbd-folder-more-btn");
 				plus.type = "button";
 				plus.setAttribute("aria-label", t("dashboard.card.more"));
-				plus.title = t("dashboard.card.more");
 				currentHost().ui.setIcon(plus, "ellipsis-vertical");
 				const groupe = {
 					folder: openModuleFolder, name: openModuleInfo?.name || openModuleFolder, ue: openModuleInfo?.ue ?? null,

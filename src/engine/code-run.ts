@@ -127,7 +127,6 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 
 			btn.hidden = false;
 			btn.setAttribute("aria-label", t("engine.code.run"));
-			btn.title = t("engine.code.run");
 
 			if (!prechauffe) {
 				prechauffe = true;

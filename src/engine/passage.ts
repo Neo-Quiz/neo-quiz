@@ -237,7 +237,7 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 				<span class="quiz-passage-icon" aria-hidden="true">${ICON_BOOK}</span>
 				<span class="quiz-passage-title">${ctx.sanitize.renderInlineText(p.title)}</span>
 				${scope ? `<span class="quiz-passage-scope">${ctx.sanitize.renderInlineText(scope)}</span>` : ""}
-				<button class="quiz-passage-toggle" type="button" data-passage-toggle="1" aria-expanded="${isCollapsed ? "false" : "true"}" aria-label="${ctx.escapeHtmlAttr(toggleLabel)}" title="${ctx.escapeHtmlAttr(toggleLabel)}">${ICON_CHEVRON}</button>
+				<button class="quiz-passage-toggle" type="button" data-passage-toggle="1" aria-expanded="${isCollapsed ? "false" : "true"}" aria-label="${ctx.escapeHtmlAttr(toggleLabel)}">${ICON_CHEVRON}</button>
 			</div>
 			<div class="quiz-passage-body"><div class="quiz-passage-content">${contentHtml}</div></div>
 		</div>`;
@@ -279,7 +279,6 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 				if (!btn) return;
 				btn.setAttribute("aria-expanded", nowCollapsed ? "false" : "true");
 				btn.setAttribute("aria-label", label);
-				btn.setAttribute("title", label);
 			});
 
 			/* Chaque carte touchée change de hauteur : leurs entrées de cache sont

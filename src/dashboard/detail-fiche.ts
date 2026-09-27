@@ -199,7 +199,6 @@ function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
 		const plus = ajouter(actions, "button", "qbd-folder-more-btn");
 		plus.type = "button";
 		plus.setAttribute("aria-label", t("dashboard.card.more"));
-		plus.title = t("dashboard.card.more");
 		currentHost().ui.setIcon(plus, "ellipsis-vertical");
 		plus.addEventListener("click", () => menu(plus));
 	}
@@ -494,7 +493,6 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		card.tabIndex = 0;
 		card.setAttribute("role", "button");
 		card.setAttribute("aria-label", t("dashboard.fiche.editQuestion", { n }));
-		card.title = t("dashboard.fiche.editQuestion", { n });
 		card.addEventListener("click", () => editer(i));
 		card.addEventListener("keydown", (e) => {
 			if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;

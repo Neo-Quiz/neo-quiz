@@ -1840,7 +1840,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* Le « + » ouvre son MENU, réplique de celui de claude.ai (2026-09-26) :
 		   « Ajouter des fichiers ou des images » avec le raccourci, une note
 		   du vault, la mention « @ ». */
-		addBtn.title = t("ai.composer.addContent");
 		addBtn.addEventListener("click", () => ouvrirMenuPlus(addBtn, {
 			raccourci: formatHotkey(settings().hotkeyAddFiles),
 			ajouterFichiers: openAddFiles,

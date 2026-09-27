@@ -79,7 +79,6 @@ export async function openQuizPage(
 	   « un seul bouton retour »). En créer un second dans `app` donnerait deux
 	   traductions du même mot, qui divergeraient à la première retouche. */
 	retour.setAttribute("aria-label", t("dashboard.quiz.back"));
-	retour.title = t("dashboard.quiz.back");
 	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
 	ajouter(retour, "span", "qbd-quizzes-crumb-icon");
 	retour.addEventListener("click", () => onBack());
