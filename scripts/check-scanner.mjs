@@ -172,6 +172,32 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	await scanner.scanFile(fichierHote);
 	r.check("hors Learn, une lecture à étape reste une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 3);
 
+	/* NON-RÉGRESSION — GLOSSAIRE (lot D, revue du 2026-09-27) : ajouter un
+	   glossaire à la configuration finale ne doit CHANGER ni le compte de
+	   questions ni les IDENTIFIANTS des questions déjà là. Une clé qui
+	   bougerait perdrait l'historique de révision (src/quiz-ids.ts,
+	   assignQuestionIds) — le même quiz, rescanné après une génération qui
+	   lui a ajouté un glossaire, doit rester le même quiz pour l'ordonnanceur. */
+	content = "```quiz-blocks\n[\n  { title: 'Q1', prompt: 'Une pile ?', options: ['a', 'b'], correctIndex: 0 },\n  { title: 'Q2', prompt: 'Une file ?', options: ['a', 'b'], correctIndex: 1 },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	const practiceSansGlossaire = scanner.getQuiz(fichierHote.path);
+	content = "```quiz-blocks\n[\n  { title: 'Q1', prompt: 'Une pile ?', options: ['a', 'b'], correctIndex: 0 },\n  { title: 'Q2', prompt: 'Une file ?', options: ['a', 'b'], correctIndex: 1 },\n  { mode: 'quiz', glossary: [{ term: 'pile', definition: 'Structure LIFO.' }] },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	const practiceAvecGlossaire = scanner.getQuiz(fichierHote.path);
+	r.check("Practice : un glossaire en fin de tableau ne change ni le compte ni les identifiants des questions",
+		[practiceAvecGlossaire?.questions, practiceAvecGlossaire?.items.map(it => it.id)],
+		[practiceSansGlossaire?.questions, practiceSansGlossaire?.items.map(it => it.id)]);
+
+	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { title: 'Avec vos mots', prompt: '?', role: 'explain', type: 'text', slice: 1 },\n  { mode: 'learn', objectives: ['Définir une pile'] },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	const learnSansGlossaire = scanner.getQuiz(fichierHote.path);
+	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { title: 'Avec vos mots', prompt: '?', role: 'explain', type: 'text', slice: 1 },\n  { mode: 'learn', objectives: ['Définir une pile'], glossary: [{ term: 'pile', definition: 'Structure LIFO.' }] },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	const learnAvecGlossaire = scanner.getQuiz(fichierHote.path);
+	r.check("Learn : un glossaire dans la configuration ne change ni le compte ni les identifiants des questions",
+		[learnAvecGlossaire?.questions, learnAvecGlossaire?.items.map(it => it.id)],
+		[learnSansGlossaire?.questions, learnSansGlossaire?.items.map(it => it.id)]);
+
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners
 	   coexistent une fraction de seconde. */

@@ -14,7 +14,7 @@
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
+import { fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
 import { nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
@@ -125,13 +125,35 @@ export async function lienLearn(scanner: Scanner, mode: ModeQuiz, dossier: strin
 /** Brouillon éditable à partir des questions générées. Passe par la MÊME
     conversion que la lecture d'une note (editor/convert.ts) : un quiz
     généré et un quiz relu d'un .md doivent être le même objet. `file: null` :
-    ce quiz n'a pas encore de note. */
+    ce quiz n'a pas encore de note.
+    PREMIER point du chemin de retour qui relit le tableau brut rendu par le
+    modèle (file comme canal web l'appellent, directement ou par
+    `enregistrerQuiz`) : `fusionnerConfigsFinales` (lot D §5) y tourne AVANT
+    `findQuizModeConfigIndex`, pour qu'une configuration scindée en deux
+    objets consécutifs (mode d'un côté, glossaire de l'autre) ne perde ni
+    l'un ni l'autre — filet de sécurité même quand l'appelant l'a déjà
+    fusionnée plus haut (idempotent sur un tableau déjà fusionné). */
+/** Le nombre de QUESTIONS d'un tableau généré, l'objet de configuration final
+    (glossaire, mode, objectifs) exclu — ce que la file de génération affiche
+    (`ResultatFile.questions`) et journalise dans l'usage (`questionCount`).
+    Régression du lot D (revue) : compter `questions.length` tout court y
+    comptait cet objet comme une question de plus, dès qu'un glossaire lui
+    était ajouté. `fusionnerConfigsFinales` D'ABORD, comme `brouillonDe` :
+    une configuration encore scindée en deux objets compterait sinon deux
+    questions fantômes plutôt qu'une. PURE. */
+export function nombreDeQuestions(generated: readonly unknown[]): number {
+	const fusionne = fusionnerConfigsFinales(generated);
+	const idx = findQuizModeConfigIndex(fusionne as ParsedQuizItem[]);
+	return fusionne.length - (idx >= 0 ? 1 : 0);
+}
+
 export function brouillonDe(generated: unknown[]): QuizDraft {
+	const fusionne = fusionnerConfigsFinales(generated);
 	const questions: DraftQuestion[] = [];
 	let examOptions: EditorExamOptions | null = null;
 	// Par son INDEX : le critère dépend de la POSITION dans le bloc.
-	const configIdx = findQuizModeConfigIndex(generated as ParsedQuizItem[]);
-	(generated as ParsedQuizItem[]).forEach((raw, i) => {
+	const configIdx = findQuizModeConfigIndex(fusionne as ParsedQuizItem[]);
+	(fusionne as ParsedQuizItem[]).forEach((raw, i) => {
 		if (i === configIdx) { examOptions = readModeConfig(raw); return; }
 		questions.push(convertParsedToInternal(raw));
 	});

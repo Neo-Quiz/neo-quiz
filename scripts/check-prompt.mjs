@@ -82,6 +82,11 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		const p = composerPrompts("x", { mode }).systemPrompt;
 		r.check(`${mode} : la consigne du glossaire est donnée`,
 			['"glossary"', "GLOSSARY:", "5 to 15 KEY TERMS", "Write \"term\" EXACTLY as it appears in the readings and explanations"].filter(s => !p.includes(s)), []);
+		/* Un terme de code (lot D, revue) : "term" en texte simple, jamais entre
+		   backticks — un mot-clé ou une fonction du langage garde son nom nu
+		   ("yield"), reconnu tel quel dans le code en ligne. */
+		r.check(`${mode} : « term » ne s'écrit jamais entre backticks, même pour un mot-clé`,
+			['Write "term" in PLAIN TEXT, NEVER between backticks', 'the bare name is the term (e.g. "yield", not `yield`)'].filter(s => !p.includes(s)), []);
 	}
 	r.check("Practice : l'objet de configuration porte mode: \"quiz\"",
 		composerPrompts("x", { mode: "practice" }).systemPrompt.includes('{ mode: "quiz", "glossary"'), true);
@@ -118,5 +123,34 @@ await withSrcModule(["src/dashboard/ai-client.ts"], ({ composerPrompts }) => {
 	r.check("Learn : le style reste choisi selon le contenu", learnP.includes("CHOOSE for each read card, from its content"), true);
 	r.check("Practice : aucun style de lecture",
 		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
+	r.done();
+});
+
+/* LA RÉPONSE STRUCTURÉE D'OLLAMA (lot D, revue du 2026-09-27) : le schéma
+   `format` décrit `mode`, `objectives` et `glossary` au NIVEAU RACINE de
+   l'objet, à côté de `questions` — jamais dans le schéma d'une question, qui
+   exige "title" et "prompt". `assemblerQuestionsOllama` réassemble le
+   tableau final ; noyau PUR, éprouvé isolément ici plutôt que via un vrai
+   appel HTTP. */
+await withSrcModule("src/dashboard/ai-client.ts", ({ assemblerQuestionsOllama, parseOllamaResponse }) => {
+	const r = makeReporter("Lecture de la réponse Ollama — glossaire et mode racine");
+	const q1 = { title: "Q1", prompt: "Une pile ?", options: ["a", "b"], correctIndex: 0 };
+	r.check("mode + objectives + glossary racine : ajoutés en un seul objet de configuration final",
+		assemblerQuestionsOllama({ questions: [q1], mode: "learn", objectives: ["Définir une pile"], glossary: [{ term: "pile", definition: "LIFO." }] }),
+		[q1, { mode: "learn", objectives: ["Définir une pile"], glossary: [{ term: "pile", definition: "LIFO." }] }]);
+	r.check("glossary racine seul (Practice) : { glossary } en fin de tableau",
+		assemblerQuestionsOllama({ questions: [q1], glossary: [{ term: "pile", definition: "LIFO." }] }),
+		[q1, { glossary: [{ term: "pile", definition: "LIFO." }] }]);
+	r.check("aucun champ racine renseigné : le tableau de questions, inchangé",
+		assemblerQuestionsOllama({ questions: [q1] }), [q1]);
+	r.check("champs racine vides (mode blanc, tableaux vides) : rien n'est ajouté",
+		assemblerQuestionsOllama({ questions: [q1], mode: "  ", objectives: [], glossary: [] }), [q1]);
+	const dejaConfig = { mode: "quiz", glossary: [{ term: "pile", definition: "LIFO." }] };
+	r.check("une configuration déjà glissée dans questions (schéma ignoré par le modèle) : pas de doublon",
+		assemblerQuestionsOllama({ questions: [q1, dejaConfig], mode: "quiz", glossary: [{ term: "autre", definition: "x" }] }),
+		[q1, dejaConfig]);
+	r.check("bout en bout : parseOllamaResponse lit {questions, mode, glossary} et rend le tableau fusionné",
+		parseOllamaResponse(JSON.stringify({ title: "T", questions: [q1], mode: "learn", objectives: ["Définir"], glossary: [{ term: "pile", definition: "LIFO." }] })).questions,
+		[q1, { mode: "learn", objectives: ["Définir"], glossary: [{ term: "pile", definition: "LIFO." }] }]);
 	r.done();
 });

@@ -11,7 +11,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, estCarte }) => {
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, fusionnerConfigsFinales, estCarte }) => {
 	const r = makeReporter("Format Learn / Practice");
 
 	/* Le mode reste dans le NOM du fichier (lisible dans Obsidian) mais pas
@@ -111,6 +111,36 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		completerConfigLearn([q(), q({ title: "R" })]).length, 2);
 	r.check("déjà un Learn : inchangé",
 		JSON.stringify(completerConfigLearn([...tranche(1), config])), JSON.stringify([...tranche(1), config]));
+
+	/* CONFIGURATION SCINDÉE en deux objets consécutifs (lot D, revue du
+	   2026-09-27) : un modèle répond parfois `{ mode: "learn", objectives }`
+	   puis `{ glossary }` à la suite, ou l'inverse. Avant `fusionnerConfigsFinales`,
+	   un seul des deux survivait selon l'ordre — le mode (Learn enregistré
+	   Practice) ou le glossaire — et l'autre devenait une question fantôme.
+	   `trierClefs` : l'ORDRE des clés du résultat suit l'ordre de fusion (donc
+	   l'ordre d'ENTRÉE), non pertinent pour le comportement (chaque lecteur du
+	   format lit un champ par son NOM) — sans lui, la comparaison par
+	   JSON.stringify de `r.check` distinguerait deux objets identiques. */
+	const trierClefs = (v) => Array.isArray(v) ? v.map(trierClefs)
+		: v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, trierClefs(v[k])]))
+		: v;
+	const glossairePile = [{ term: "pile", definition: "Structure LIFO." }];
+	const configLearn = { mode: "learn", objectives: ["Définir une pile"] };
+	const configGloss = { glossary: glossairePile };
+	const fusion = trierClefs({ mode: "learn", objectives: ["Définir une pile"], glossary: glossairePile });
+	r.check("fusionnerConfigsFinales : mode+objectives puis glossary, ou l'inverse — un seul objet final dans les deux ordres",
+		[fusionnerConfigsFinales([...tranche(1), configLearn, configGloss]), fusionnerConfigsFinales([...tranche(1), configGloss, configLearn])]
+			.map(items => [items.length, trierClefs(items.at(-1))]),
+		[[tranche(1).length + 1, fusion], [tranche(1).length + 1, fusion]]);
+	r.check("fusionnerConfigsFinales : une seule configuration, ou aucune — inchangé",
+		[fusionnerConfigsFinales([...tranche(1), configLearn]), fusionnerConfigsFinales([q(), q({ title: "R" })])],
+		[[...tranche(1), configLearn], [q(), q({ title: "R" })]]);
+	r.check("fusionnerConfigsFinales : un objet du MILIEU n'est jamais fusionné (ce serait toucher une vraie question)",
+		fusionnerConfigsFinales([configGloss, ...tranche(1), configLearn]).length, tranche(1).length + 2);
+	r.check("completerConfigLearn : le mode ET le glossaire d'une configuration scindée survivent, dans les deux ordres",
+		[completerConfigLearn([...tranche(1), configLearn, configGloss]), completerConfigLearn([...tranche(1), configGloss, configLearn])]
+			.map(items => [modeDuBloc(items), items.length, trierClefs(items.at(-1))]),
+		[["learn", tranche(1).length + 1, fusion], ["learn", tranche(1).length + 1, fusion]]);
 
 	r.check("plan des tranches : titre de la lecture, sinon de la première question, trié",
 		planDesTranches([q({ title: "pre2", slice: 2, role: "pre" }), ...tranche(1), q({ title: "x", slice: 2, role: "recall" }), config]),

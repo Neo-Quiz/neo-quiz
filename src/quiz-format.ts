@@ -178,20 +178,61 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 	return manques;
 }
 
+/** Deux (ou plus) objets de configuration CONSÉCUTIFS en fin de tableau — un
+    modèle répond parfois en deux morceaux qui s'enchaînent, un pour le mode
+    et les objectifs, un autre pour le glossaire, dans un ordre quelconque :
+    `{ mode: "learn", objectives }` puis `{ glossary }`, ou l'inverse. Sans
+    fusion, `findQuizModeConfigIndex` (quiz-utils.ts) n'en retient qu'UN
+    SEUL — le premier ordre enregistre le Learn comme Practice avec une
+    question fantôme (le mode se perd, resté sur l'objet du milieu) ; le
+    second perd le glossaire ET ajoute la question fantôme (spec lot D §5).
+    PURE : réutilise la reconnaissance de `findQuizModeConfigIndex`
+    (`src/quiz-utils.ts`) plutôt que d'en écrire une seconde — retire les
+    objets reconnus comme configuration UN PAR UN depuis la fin, tant que
+    chacun occupe la DERNIÈRE position (jamais un objet du milieu : ce
+    serait fusionner une vraie question). En cas de clé en double entre deux
+    configurations fusionnées, `mode` et `glossary` non vides l'emportent —
+    ce sont les deux champs qui font tout le prix de la fusion ; les autres
+    clés retiennent la DERNIÈRE occurrence rencontrée. Rend un nouveau
+    tableau ; 0 ou 1 configuration trouvée → rien à fusionner, copie inchangée. */
+export function fusionnerConfigsFinales(items: readonly unknown[]): unknown[] {
+	const reste = [...items];
+	const configs: Record<string, unknown>[] = [];
+	while (reste.length > 0 && findQuizModeConfigIndex(reste) === reste.length - 1) {
+		configs.unshift(reste.pop() as Record<string, unknown>);
+	}
+	if (configs.length <= 1) return [...items];
+	const nonVide = (v: unknown): boolean =>
+		Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim() !== "" : v != null;
+	const fusion: Record<string, unknown> = {};
+	for (const config of configs) {
+		for (const [cle, valeur] of Object.entries(config)) {
+			if ((cle === "mode" || cle === "glossary") && !nonVide(valeur) && nonVide(fusion[cle])) continue;
+			fusion[cle] = valeur;
+		}
+	}
+	reste.push(fusion);
+	return reste;
+}
+
 /** Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` : la configuration
     est complétée plutôt que le parcours enregistré comme banque Practice.
     Gemini 3.5 Flash-Lite a rendu un parcours complet (rôles pre / read /
     explain / recall) avec `{ objectives: [...] }` en dernier, sans `mode`
     (2026-09-24) : la note s'étiquetait Practice et l'objet des objectifs
     devenait une question vide. Rien n'est touché si aucune question ne porte
-    un rôle de parcours : ce serait inventer un Learn. PURE : rend un nouveau
-    tableau. */
+    un rôle de parcours : ce serait inventer un Learn. Fusionne d'abord les
+    configurations scindées (`fusionnerConfigsFinales`, lot D) : sans ça, un
+    Learn dont le glossaire arrive dans un second objet gagnerait quand même
+    son `mode`, mais garderait une question fantôme pour le glossaire perdu.
+    PURE : rend un nouveau tableau. */
 export function completerConfigLearn(items: readonly unknown[]): unknown[] {
-	if (modeDuBloc(items) === "learn") return [...items];
-	const { questions } = separer(items);
+	const fusionne = fusionnerConfigsFinales(items);
+	if (modeDuBloc(fusionne) === "learn") return fusionne;
+	const { questions } = separer(fusionne);
 	const parcours = questions.some(({ q }) => q.role === "pre" || q.role === "read" || q.role === "explain" || q.role === "recall");
-	if (!parcours) return [...items];
-	const copie = [...items];
+	if (!parcours) return fusionne;
+	const copie = [...fusionne];
 	/* L'objet des objectifs, sans énoncé : c'est la configuration qu'il
 	   voulait écrire. Il garde ses objectifs et reçoit le mode. */
 	const idx = copie.findIndex(it => !!it && typeof it === "object" && !Array.isArray(it)

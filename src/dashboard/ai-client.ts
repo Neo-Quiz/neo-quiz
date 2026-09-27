@@ -333,7 +333,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 
 	EXPLANATIONS: in every "explain", put the two or three KEY WORDS in **bold** — no more; the reader colors them.
 
-	GLOSSARY: the configuration object at the end of the array (see above) carries a "glossary" of 5 to 15 KEY TERMS of the source — the technical notions a student must know, never everyday words. Each entry is { "term": "...", "definition": "..." }, plus an optional "aliases": ["..."] for another form of the SAME term used in the text (an acronym, an abbreviation, e.g. "LIFO" for "stack"). Write "term" EXACTLY as it appears in the readings and explanations — same spelling, same form; a term written differently is never matched and never underlined. "definition" is ONE OR TWO SENTENCES in markdown (**bold**, \`code\`, a $formula$), understandable on its own WITHOUT the course, and NEVER a copy of a question's answer or explanation. No duplicate term, no filler word.
+	GLOSSARY: the configuration object at the end of the array (see above) carries a "glossary" of 5 to 15 KEY TERMS of the source — the technical notions a student must know, never everyday words. Each entry is { "term": "...", "definition": "..." }, plus an optional "aliases": ["..."] for another form of the SAME term used in the text (an acronym, an abbreviation, e.g. "LIFO" for "stack"). Write "term" EXACTLY as it appears in the readings and explanations — same spelling, same form; a term written differently is never matched and never underlined. Write "term" in PLAIN TEXT, NEVER between backticks, even for a keyword or a function of the language: the bare name is the term (e.g. "yield", not \`yield\`) — it is still recognized wherever that name appears inside inline \`code\`. "definition" is ONE OR TWO SENTENCES in markdown (**bold**, \`code\`, a $formula$), understandable on its own WITHOUT the course, and NEVER a copy of a question's answer or explanation. No duplicate term, no filler word.
 ${categorieBloc}
 	QUIZ TITLE: the very first line of the array, right after the opening bracket, is a JSON5 line comment giving the quiz a name: '// title: <name>'. The name is what a student would write on the cover: 3 to 8 words naming its subject and scope (e.g. "Python : types, listes et exceptions"), in the language of the content, WITHOUT the word "quiz" and without a trailing period. Exactly one such line, nowhere else.
 
@@ -417,19 +417,54 @@ function retirerFence(content: string): string {
 	return lignes.slice(ouvre + 1, ferme).join("\n").trim();
 }
 
-function parseOllamaResponse(content: string): ReponseQuiz {
+/** Un élément SANS énoncé qui porte déjà `mode`, `objectives` ou `glossary` :
+    le modèle a glissé sa configuration DANS `questions`, comme avant ce
+    correctif (le schéma `format` ne la décrivait nulle part). Même
+    reconnaissance minimale que `quiz-format.ts` (`separer`) : la position
+    dépend surtout de l'ABSENCE d'énoncé, pas d'une liste de marqueurs
+    complète — une confusion ici ne coûte qu'un glossaire dupliqué, jamais
+    une question perdue (l'objet existant reste, dans tous les cas). */
+function estDejaUneConfig(q: unknown): boolean {
+	if (!q || typeof q !== "object" || Array.isArray(q)) return false;
+	const o = q as { prompt?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
+	return !o.prompt && ("mode" in o || "objectives" in o || "glossary" in o);
+}
+
+/** Réassemble le tableau `questions` attendu par le reste du pipeline
+ * (`findQuizModeConfigIndex`, `extractExamOptions`…) à partir de la réponse
+ * STRUCTURÉE d'Ollama : `mode`, `objectives` et `glossary` y arrivent au
+ * NIVEAU RACINE de l'objet (à côté de `questions`, jamais DANS le schéma
+ * d'une question — voir le commentaire du schéma `format` ci-dessus), donc
+ * jamais dans le tableau lui-même. Un objet de configuration final est
+ * ajouté EN QUEUE à partir de ces champs racine ; SAUF si le modèle en a
+ * déjà glissé un dans `questions` malgré le schéma (`estDejaUneConfig`) —
+ * dans ce cas rien n'est ajouté, l'objet existant suffit et en ajouter un
+ * second aurait scindé la configuration (spec lot D §5). PURE : ne mute
+ * jamais `obj.questions`.
+ */
+export function assemblerQuestionsOllama(obj: { questions: unknown[]; mode?: unknown; objectives?: unknown; glossary?: unknown }): unknown[] {
+	if (obj.questions.some(estDejaUneConfig)) return obj.questions;
+	const config: Record<string, unknown> = {};
+	if (typeof obj.mode === "string" && obj.mode.trim()) config.mode = obj.mode;
+	if (Array.isArray(obj.objectives) && obj.objectives.length > 0) config.objectives = obj.objectives;
+	if (Array.isArray(obj.glossary) && obj.glossary.length > 0) config.glossary = obj.glossary;
+	if (Object.keys(config).length === 0) return obj.questions;
+	return [...obj.questions, config];
+}
+
+export function parseOllamaResponse(content: string): ReponseQuiz {
 	let cleaned = retirerFence(content);
 	cleaned = repairLatexBackslashes(cleaned);
 
 	// Ollama with format: structured JSON wraps the array in an object
-	// e.g. { "title": "…", "questions": [...] }
+	// e.g. { "title": "…", "questions": [...], "mode": "…", "glossary": [...] }
 	try {
 		const parsed: unknown = JSON5.parse(cleaned);
 
 		// If it's an object with a "questions" key, extract the array
 		if (parsed && !Array.isArray(parsed) && Array.isArray((parsed as { questions?: unknown }).questions)) {
-			const obj = parsed as { questions: unknown[]; title?: unknown };
-			return { questions: obj.questions, titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
+			const obj = parsed as { questions: unknown[]; title?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
+			return { questions: assemblerQuestionsOllama(obj), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
 		}
 
 		if (Array.isArray(parsed)) {
@@ -1251,6 +1286,15 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 					],
 					stream: false,
 					...(thinkLevel ? { think: thinkLevel } : {}),
+					/* `mode`, `objectives` et `glossary` sont décrits au NIVEAU RACINE,
+					   à CÔTÉ de `questions` — jamais DANS le schéma de chaque question,
+					   qui exige "title" et "prompt" : l'objet de configuration final
+					   n'a ni l'un ni l'autre, et le décrire là en aurait fait une
+					   question fantôme (revue lot D, 2026-09-27). Avant ce correctif, le
+					   schéma ne connaissait ni l'un ni l'autre : Ollama les OMETTAIT du
+					   quiz, ou improvisait un objet qui devenait une question vide.
+					   `assemblerQuestionsOllama` (plus bas) réassemble le tableau final
+					   à partir de ces trois champs. */
 					format: {
 						type: "object",
 						properties: {
@@ -1274,6 +1318,20 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 										passageTitle: { type: "string" }
 									},
 									required: ["title", "prompt"]
+								}
+							},
+							mode: { type: "string" },
+							objectives: { type: "array", items: { type: "string" } },
+							glossary: {
+								type: "array",
+								items: {
+									type: "object",
+									properties: {
+										term: { type: "string" },
+										definition: { type: "string" },
+										aliases: { type: "array", items: { type: "string" } }
+									},
+									required: ["term", "definition"]
 								}
 							}
 						},

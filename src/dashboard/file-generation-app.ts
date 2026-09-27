@@ -21,7 +21,7 @@
 
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { completerConfigLearn } from "../quiz-format";
+import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
@@ -30,7 +30,7 @@ import type { AiClient, ImagePayload } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
-import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
+import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
 import type { DemandeTexte } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
@@ -186,13 +186,18 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, "redaction");
 			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie });
 			if (!tourne(ligne.id)) return;
+			/* La configuration finale D'ABORD, fusionnée : un modèle qui répond en
+			   deux objets consécutifs (mode d'un côté, glossaire de l'autre, dans
+			   un ordre quelconque) ne doit perdre ni l'un ni l'autre — AVANT tout
+			   ce qui suit lit la position du DERNIER élément (lot D §5). */
+			const brut = fusionnerConfigsFinales(reponse.questions);
 			/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
 			   Learn, comme avant la file. */
-			const questions = d.mode === "learn" ? completerConfigLearn(reponse.questions) : reponse.questions;
+			const questions = d.mode === "learn" ? completerConfigLearn(brut) : brut;
 			if (!questions.length) throw new Error(t("ai.error.checkSettings"));
 			const usage = client.lastUsage;
 			if (usage && deps.recordUsage) {
-				try { await deps.recordUsage({ ...usage, at: Date.now(), questionCount: questions.length }); }
+				try { await deps.recordUsage({ ...usage, at: Date.now(), questionCount: nombreDeQuestions(questions) }); }
 				catch (e) { console.warn(LOG_PREFIX, "usage non enregistré:", e); }
 			}
 			/* Ici, relire le forfait du fournisseur (`AiUsageDeps.fetchPlan`)
@@ -221,8 +226,12 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const p = d.produit;
 		if (!p) return;
 		const deps = lireDeps();
+		// Le brouillon UNE FOIS (lot D) : `draft.questions` exclut déjà l'objet
+		// de configuration final — sa longueur est le compteur affiché,
+		// `p.questions.length` comptait le glossaire comme une question.
+		const draft = brouillonDe(p.questions);
 		const entree = await enregistrerQuiz({
-			draft: brouillonDe(p.questions), questions: p.questions, modeDemande: d.mode, titreModele: p.titre,
+			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre,
 			demande: d, destination: d.destination, reglages: { ...deps.settings.get(), ...d.reglages },
 			usage: p.usage, planTranches: p.planTranches, noteLearn: p.noteLearn, scanner: deps.scanner,
 		});
@@ -231,7 +240,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			return;
 		}
 		const titre = entree.title || entree.basename;
-		file = F.terminer(file, id, { titre, chemin: entree.path, questions: p.questions.length });
+		file = F.terminer(file, id, { titre, chemin: entree.path, questions: draft.questions.length });
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 

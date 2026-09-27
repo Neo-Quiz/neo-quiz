@@ -117,7 +117,7 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
    web (`ai.ts`) l'appellent tel quel. Le glossaire écrit dans l'objet de
    configuration final doit y survivre, PAS finir dans une question fantôme
    ni disparaître avec le reste de la configuration. */
-await withSrcModule("src/dashboard/generation-demande.ts", ({ brouillonDe }) => {
+await withSrcModule("src/dashboard/generation-demande.ts", ({ brouillonDe, nombreDeQuestions }) => {
 	const r = makeReporter("Réception d'une génération — glossaire");
 	const genere = [
 		{ title: "Q", prompt: "Qu'est-ce qu'une pile ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." },
@@ -130,5 +130,18 @@ await withSrcModule("src/dashboard/generation-demande.ts", ({ brouillonDe }) => 
 		draft.questions.length, 1);
 	r.check("sans glossaire dans la réponse : un brouillon sans glossaire, pas une erreur",
 		brouillonDe([genere[0]]).examOptions, null);
+
+	/* LE COMPTEUR DE LA FILE (lot D, régression relevée en revue) :
+	   `ResultatFile.questions` et le `questionCount` journalisé dans l'usage
+	   (`file-generation-app.ts`) comptent `nombreDeQuestions`, jamais
+	   `questions.length` tout court — sans quoi ajouter un glossaire à un
+	   Practice de deux questions en affichait trois. Discriminant : le même
+	   tableau, avec et sans configuration finale, doit rendre le MÊME compte. */
+	r.check("nombreDeQuestions : l'objet de configuration final n'est pas une question",
+		nombreDeQuestions(genere), 1);
+	r.check("nombreDeQuestions : sans configuration, inchangé",
+		nombreDeQuestions([genere[0]]), 1);
+	r.check("nombreDeQuestions : une configuration SCINDÉE en deux objets ne compte que pour un objet",
+		nombreDeQuestions([genere[0], { mode: "quiz" }, { glossary: [{ term: "pile", definition: "LIFO." }] }]), 1);
 	r.done();
 });

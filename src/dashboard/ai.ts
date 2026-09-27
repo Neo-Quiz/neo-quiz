@@ -2,7 +2,7 @@ import JSON5 from "json5";
 import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { completerConfigLearn, modeDuBloc } from "../quiz-format";
+import { completerConfigLearn, fusionnerConfigsFinales, modeDuBloc } from "../quiz-format";
 import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
@@ -3961,7 +3961,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (!stageRef?.isConnected) deps.navigate("ai");
 		try {
 			const reponse = parseReponseQuiz(texte);
-			generatedQuestions = reponse.questions;
+			// Configuration scindée en deux objets consécutifs (lot D §5) : fusionnée
+			// ICI, avant toute lecture de la position du dernier élément.
+			generatedQuestions = fusionnerConfigsFinales(reponse.questions);
 			generatedTitre = reponse.titre;
 			resultatFige = null;
 			if (generatedQuestions.length === 0) throw new Error(t("ai.err.notAnArray"));
