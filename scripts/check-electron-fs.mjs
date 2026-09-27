@@ -44,6 +44,10 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
  * le dossier temporaire.
  */
 async function verrouiller(chemin) {
+	// Hors Windows, pas de `powershell.exe` ni de verrou sans partage : le
+	// cas appelant se déclare IGNORÉ plutôt que de faire mourir le script
+	// (le `spawn` échoué émet une erreur que `cas()` ne capture pas).
+	if (process.platform !== "win32") return null;
 	const enfant = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
 		`$f = [IO.File]::Open('${chemin}', [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::Read); Start-Sleep -Seconds 20; $f.Close()`,
 	], { stdio: "ignore" });
@@ -90,7 +94,7 @@ async function cas(r, nom, fn) {
 	}
 }
 
-await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers, statEntree, renameParCopie }) => {
+await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers, statEntree, renameParCopie, retirerSourceApresPose, memeFichier }) => {
 	const r = makeReporter("Primitives de fichiers Electron");
 	const dir = await mkdtemp(join(tmpdir(), "electron-fs-check-"));
 
@@ -357,6 +361,7 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			const de = join(dir, "o-source.txt");
 			await fichiers.write(de, "verrouille-moi");
 			const liberer = await verrouiller(de);
+			if (!liberer) { console.log("  (ignoré hors Windows : verrou sans FILE_SHARE_DELETE)"); return; }
 			try {
 				const vers = join(dir, "o-dest.txt");
 				const rejette = await aRejete(() => fichiers.rename(de, vers));
@@ -374,6 +379,7 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			const de = join(dir, "p-source.txt");
 			await fichiers.write(de, "verrouille-copie");
 			const liberer = await verrouiller(de);
+			if (!liberer) { console.log("  (ignoré hors Windows : verrou sans FILE_SHARE_DELETE)"); return; }
 			try {
 				const vers = join(dir, "p-dest.txt");
 				const rejette = await aRejete(() => renameParCopie(de, vers));
@@ -382,6 +388,36 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			} finally {
 				await liberer();
 			}
+		});
+
+		/* LA SOURCE DÉJÀ PARTIE après la pose de la cible (2026-09-27) : un
+		   autre acteur a retiré `de` entre le `link` (ou la copie) et son
+		   `unlink`. La donnée est à `vers`, rien n'est plus à `de` : le
+		   déplacement a RÉUSSI et ne doit pas rejeter — sinon « Déplacer
+		   vers » l'annonçait comme un échec et sautait la transposition de
+		   l'historique. Provoqué ici sans course : `de` n'existe pas. */
+		for (const parIno of [true, false]) {
+			const nom = `retirerSourceApresPose : une source déjà partie est un déplacement réussi (${parIno ? "lien" : "copie"})`;
+			await cas(r, nom, async () => {
+				const de = join(dir, `s-source-${parIno}.txt`);
+				const vers = join(dir, `s-dest-${parIno}.txt`);
+				await fichiers.write(vers, "posee");
+				const rejette = await aRejete(() => retirerSourceApresPose(de, vers, parIno));
+				r.check(nom, [rejette, await fichiers.read(vers)], [false, "posee"]);
+			});
+		}
+
+		/* L'IDENTITÉ D'UN FICHIER en `bigint` (2026-09-27) : deux
+		   identifiants NTFS voisins au-delà de 2^53 sont DISTINCTS, alors
+		   qu'en `number` ils s'arrondissent au même — la garde retirerait
+		   alors un fichier étranger. */
+		await cas(r, "memeFichier : deux identifiants voisins au-delà de 2^53 restent distincts", async () => {
+			const a = { ino: 2n ** 60n, dev: 7n };
+			const b = { ino: 2n ** 60n + 1n, dev: 7n };
+			r.check("préalable : en number, ces deux identifiants se confondent", Number(a.ino) === Number(b.ino), true);
+			r.check("memeFichier : deux identifiants voisins au-delà de 2^53 restent distincts",
+				[memeFichier(a, b), memeFichier(a, { ino: 2n ** 60n, dev: 7n }), memeFichier(a, { ino: a.ino, dev: 8n })],
+				[false, true, false]);
 		});
 
 		/* Le repli copie (`renameParCopie`, emprunté par `rename` sur

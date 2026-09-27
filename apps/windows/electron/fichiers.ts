@@ -126,27 +126,54 @@ async function cheminLibre(base: string, ext: string): Promise<string> {
 	throw new Error("aucun nom de fichier libre après 50 essais : " + base + ext);
 }
 
+/** Deux `stat` désignent-ils le MÊME fichier ? Lus en `bigint`, jamais en
+    `number` : un identifiant de fichier NTFS porte son numéro de séquence
+    dans ses 16 bits hauts et dépasse presque toujours 2^53 — en `number`,
+    deux fichiers voisins dans la table MFT s'arrondissent au même `ino`, et
+    la garde de `retirerSourceApresPose` retirerait un fichier que quelqu'un
+    d'autre vient de poser. Le type exige des `bigint` : un appel qui
+    oublierait `{ bigint: true }` ne compile pas (`check:app`). */
+export function memeFichier(a: { ino: bigint; dev: bigint }, b: { ino: bigint; dev: bigint }): boolean {
+	return a.ino === b.ino && a.dev === b.dev;
+}
+
 /**
- * Retire `vers` avant de relancer `erreur`, mais SEULEMENT si `vers` est
- * encore, sans le moindre doute, la même donnée que `de` — jamais un fichier
- * que quelqu'un d'autre aurait posé là entre-temps. `de` doit encore exister
- * (l'`unlink` qui a échoué l'a laissé en place) : sans lui, impossible de
- * comparer, et on ne retire alors RIEN — un doublon coûte moins cher qu'un
- * retrait sur un pari.
+ * Achève un déplacement dont la cible `vers` est DÉJÀ posée (lien dur ou
+ * copie) en retirant la source `de`.
+ *
+ * `ENOENT` : la source est déjà partie — un autre acteur (l'Explorateur, une
+ * synchronisation) l'a retirée entre la pose de `vers` et ce retrait. La
+ * donnée est à `vers`, plus rien n'est à `de` : c'est un déplacement RÉUSSI,
+ * qui ne doit pas être annoncé comme un échec (ni priver l'appelant de la
+ * transposition de l'historique qui suit un succès).
+ *
+ * Tout autre échec : `vers` est retiré avant de relancer l'erreur, mais
+ * SEULEMENT s'il est encore, sans le moindre doute, la même donnée que `de`
+ * — jamais un fichier que quelqu'un d'autre aurait posé là entre-temps. `de`
+ * existe encore (l'`unlink` qui a échoué l'a laissé en place) ; si la
+ * comparaison est impossible, on ne retire RIEN — un doublon coûte moins
+ * cher qu'un retrait sur un pari.
  *
  * `parIno` : `true` compare `ino`/`dev` (cas du lien dur — `vers` et `de`
  * sont alors littéralement le même fichier). `false` retire `vers`
  * inconditionnellement (cas de la copie — `vers` est une donnée que CE code
  * vient de créer lui-même, personne d'autre n'a pu s'en emparer entre la
  * copie et cet appel).
+ *
+ * EXPORTÉE pour que le contrôle éprouve le cas `ENOENT` de façon
+ * déterministe : la course réelle (source retirée entre deux `await`) ne se
+ * provoque pas à coup sûr.
  */
-async function retirerCibleEtRelancer(de: string, vers: string, parIno: boolean, erreur: unknown): Promise<never> {
-	const code = (erreur as NodeJS.ErrnoException)?.code;
-	if (code !== "ENOENT") {
+export async function retirerSourceApresPose(de: string, vers: string, parIno: boolean): Promise<void> {
+	try {
+		await fs.unlink(de);
+		return;
+	} catch (erreur) {
+		if ((erreur as NodeJS.ErrnoException)?.code === "ENOENT") return;
 		try {
 			if (parIno) {
-				const [infoDe, infoVers] = await Promise.all([fs.stat(de), fs.stat(vers)]);
-				if (infoDe.ino === infoVers.ino && infoDe.dev === infoVers.dev) await fs.unlink(vers);
+				const [infoDe, infoVers] = await Promise.all([fs.stat(de, { bigint: true }), fs.stat(vers, { bigint: true })]);
+				if (memeFichier(infoDe, infoVers)) await fs.unlink(vers);
 			} else {
 				await fs.unlink(vers);
 			}
@@ -155,8 +182,8 @@ async function retirerCibleEtRelancer(de: string, vers: string, parIno: boolean,
 			// échoué) : on laisse le doublon plutôt que de risquer de retirer
 			// autre chose que ce qu'on vient de poser.
 		}
+		throw erreur;
 	}
-	throw erreur;
 }
 
 /**
@@ -186,11 +213,7 @@ export async function renameParCopie(de: string, vers: string): Promise<void> {
 		if ((e as NodeJS.ErrnoException)?.code === "EEXIST") throw new Error(`${vers} existe déjà`);
 		throw e;
 	}
-	try {
-		await fs.unlink(de);
-	} catch (e) {
-		await retirerCibleEtRelancer(de, vers, false, e);
-	}
+	await retirerSourceApresPose(de, vers, false);
 }
 
 /** Crée un dossier et ses parents ; ne rejette pas s'il existe déjà — une
@@ -414,25 +437,16 @@ export function creerFichiers(): PrimitivesFichiers {
 			await renameParCopie(de, vers);
 			return;
 		}
-		// Le lien est posé : la source devient superflue, la retirer achève
-		// le déplacement.
-		try {
-			await fs.unlink(de);
-		} catch (e) {
-			/* REVUE (2026-09-27, Important 2) : reproduit de façon
-			   déterministe dès qu'un AUTRE processus tient la source ouverte
-			   sans `FILE_SHARE_DELETE` (OneDrive, un antivirus, un éditeur) —
-			   `link` réussit (poser un second nom ne demande pas la même
-			   permission), puis cet `unlink` échoue. Sans ce rattrapage, la
-			   source ET la cible existaient TOUTES LES DEUX ensuite : un
-			   doublon silencieux, jamais annoncé puisque l'appelant ne voit
-			   qu'un rejet. `retirerCibleEtRelancer` retire `vers` (le lien
-			   qu'on vient de poser) AVANT de relancer — mais seulement s'il
-			   porte encore le même `ino`/`dev` que `de`, pour ne jamais
-			   retirer un fichier que quelqu'un d'autre aurait posé là entre
-			   ce `link` et cet `unlink`. */
-			await retirerCibleEtRelancer(de, vers, true, e);
-		}
+		/* Le lien est posé : la source devient superflue, la retirer achève
+		   le déplacement. REVUE (2026-09-27, Important 2) : un AUTRE processus
+		   qui tient la source ouverte sans `FILE_SHARE_DELETE` (OneDrive, un
+		   antivirus, un éditeur) laisse `link` réussir puis fait échouer cet
+		   `unlink` — sans rattrapage, la source ET la cible existaient toutes
+		   les deux, un doublon silencieux. `retirerSourceApresPose` retire alors
+		   le lien qu'on vient de poser (s'il porte encore le même `ino`/`dev`
+		   que `de`) avant de relancer ; une source déjà partie, elle, est un
+		   succès. */
+		await retirerSourceApresPose(de, vers, true);
 	}
 
 	return primitives;

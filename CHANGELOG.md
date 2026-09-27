@@ -83,6 +83,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- Move to no longer reports a failure when the quiz did move, if its old file had already disappeared at the last moment; and a failed move can no longer remove another file created under the same name in the meantime.
 - Moving a folder to another vault (Move to in its menu) failed with "already exists" whenever the folder was not at the root of its vault; the current vault is no longer offered as a destination.
 - Inline code containing a dollar sign, such as `$HOME` and `$PATH` in the same sentence, is shown in full instead of losing part of the text.
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.
