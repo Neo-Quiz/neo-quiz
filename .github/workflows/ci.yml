@@ -60,6 +60,12 @@ jobs:
       - name: Code block syntax highlighting
         run: npm run check:code-highlight
 
+      # LE BOUTON « EXÉCUTER » D'UN BLOC PYTHON : la sortie d'un programme
+      # (un quiz partagé est hostile) n'apparaît jamais comme élément HTML
+      # sous `.quiz-code-output`, seulement comme texte (`textContent`).
+      - name: Python run button output never interpreted
+        run: npm run check:code-run
+
       # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
       # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
       - name: HTML to markdown conversion

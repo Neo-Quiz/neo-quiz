@@ -45,7 +45,10 @@ async function mathifyElement(root: HTMLElement | null | undefined): Promise<voi
 			// .quiz-terminal : zones shell (bash/cmd/powershell) — les $ y
 			// sont des variables ($PATH:$HOME), pas des maths ; review
 			// 2026-07-11. code/pre/textarea/mjx : zones littérales.
-			if (!p || p.closest("code, pre, textarea, script, style, mjx-container, .math, .quiz-terminal")) {
+			// .quiz-code-output : sortie d'exécution Python (stdout/erreur),
+			// du texte de programme potentiellement hostile — jamais composé
+			// par MathJax (revue du 2026-09-26, mineur 1).
+			if (!p || p.closest("code, pre, textarea, script, style, mjx-container, .math, .quiz-terminal, .quiz-code-output")) {
 				return NodeFilter.FILTER_REJECT;
 			}
 			return NodeFilter.FILTER_ACCEPT;

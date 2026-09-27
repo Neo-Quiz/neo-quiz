@@ -604,6 +604,10 @@ async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: st
 	const source = g.path;
 	if (!source) return false;
 	const localFrom = host.paths.localPath(source);
+	// Une RACINE entière (un quiz posé à la racine, `localFrom === ""`) ne se
+	// déplace jamais par ce chemin : le menu la masque déjà (B-mineur,
+	// 2026-09-27), ce second garde-fou protège l'appel direct.
+	if (localFrom === "") return false;
 	// Dernier segment du chemin local : « B1/Cours/Reseaux » → « Reseaux ».
 	// Le dossier arrive à la racine cible SOUS LE MÊME NOM (spec §2.3), pas
 	// sous son chemin complet — un module d'un vault n'a pas à recréer toute
@@ -688,7 +692,12 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		// `anchorEl` manquant (appelant qui n'aurait pas encore été mis à jour) :
 		// même chose, plutôt que d'ouvrir un sous-menu sans rien à y ancrer.
 		const roots = host.paths.roots();
-		if (anchorEl && roots.length > 1 && g.path) {
+		// `localPath(g.path) === ""` : `g` n'est pas un DOSSIER mais la
+		// RACINE elle-même (un quiz posé à la racine, sans sous-dossier —
+		// `quiz-modules.ts` lui donne alors `path = <rootId>`). La déplacer
+		// déplacerait tout le vault ; masquer l'entrée plutôt que de laisser
+		// `moveModuleTo` échouer sur « existe déjà » (revue du 2026-09-27, B-mineur).
+		if (anchorEl && roots.length > 1 && g.path && host.paths.localPath(g.path) !== "") {
 			// Sous-menu au survol, comme « Move to » d'un quiz (2026-09-27).
 			const rootDeG = host.paths.rootOf(g.path);
 			const cibles = roots.filter(root => root.id !== rootDeG?.id);

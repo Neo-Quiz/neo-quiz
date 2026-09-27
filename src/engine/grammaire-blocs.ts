@@ -27,6 +27,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { motifCodeDouble, motifCodeSimple } from "./grammaire-inline";
+import { t } from "../i18n";
 
 /** Un intervalle `[debut, fin[` du texte source. */
 export interface Zone { debut: number; fin: number }
@@ -328,6 +329,15 @@ export interface OutilsRendu {
 	    texte échappé nu, comme avant. La fonction elle-même retombe sur
 	    `null` pour un langage inconnu ou toute erreur de tokenisation. */
 	colorerCode?(code: string, langue: string): string | null;
+	/** Faux par défaut : un bloc Python reste alors un `<pre>` nu, sans
+	    bouton « Exécuter » ni panneau de sortie. Vrai UNIQUEMENT pour les
+	    rendus AFFICHÉS à l'apprenant (`renderTextWithEmbeds` du moteur) —
+	    jamais pour le rendu canonique de `html-vers-markdown.ts`
+	    (`rendreCanon`) ni l'aperçu de l'éditeur, qui comparent ou affichent
+	    du markdown sans exécution possible : l'enveloppe `<div>/<button>/
+	    <svg>` y ferait échouer la relecture stricte de `formeNormale`
+	    (constat A-IMPORTANT 1 de la revue du 2026-09-26). */
+	executable?: boolean;
 }
 
 function rendreListe(texte: string, items: ItemListe[], o: OutilsRendu): string {
@@ -401,9 +411,11 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				// Un bloc non-Python reste EXACTEMENT comme avant l'ajout du bouton
 				// (aucun `<div>` supplémentaire) : la preuve d'équivalence de
 				// `check:md` porte sur cette sortie, octet pour octet.
-				if (!ESTIME_PYTHON.test(b.langue.trim().toLowerCase())) return pre;
+				if (!o.executable || !ESTIME_PYTHON.test(b.langue.trim().toLowerCase())) return pre;
 				const barre = `<div class="quiz-code-toolbar"><button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>${ICON_PLAY}</button></div>`;
-				return `<div class="quiz-code-block quiz-code-block-executable">${barre}${pre}<div class="quiz-code-output" hidden></div></div>`;
+				// `aria-label` sur le panneau de sortie (clé engine.code.output,
+				// jusque-là posée dans le dictionnaire mais jamais lue).
+				return `<div class="quiz-code-block quiz-code-block-executable">${barre}${pre}<div class="quiz-code-output" hidden aria-label="${o.echapper(t("engine.code.output"))}"></div></div>`;
 			}
 			case "tableau": {
 				/* Autant de colonnes que la rangée la plus longue : les cases

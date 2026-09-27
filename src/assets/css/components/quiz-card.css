@@ -332,6 +332,11 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   opacity: 0.6;
   cursor: pointer;
 }
+/* `[hidden]` doit l'emporter sur le `display: flex` ci-dessus : sans cette
+   règle, une règle d'auteur bat la feuille du navigateur et le bouton reste
+   visible (et inerte) partout où `bindCodeRunButtons` n'a pas tourné (revue
+   du 2026-09-26, A-IMPORTANT 2). */
+.quiz-code-run-btn[hidden]{ display: none; }
 .quiz-code-run-btn svg{ width: 15px; height: 15px; }
 .quiz-code-run-btn:hover{ opacity: 1; background: color-mix(in srgb, var(--qmc-fg, currentColor) 12%, transparent); }
 .quiz-code-run-btn:disabled{ cursor: default; opacity: 0.5; }

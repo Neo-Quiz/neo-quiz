@@ -257,8 +257,14 @@ function rendreMorceaux(texte: string, images: RenduImages): string {
  * Le HTML d'un texte de quiz en markdown. Un texte d'un seul paragraphe est
  * rendu comme avant, octet pour octet (grammaire-blocs.ts, règle de
  * compatibilité) ; les autres, bloc par bloc.
+ *
+ * `executable` (faux par défaut) n'enveloppe un bloc Python d'un bouton
+ * « Exécuter » que pour un rendu AFFICHÉ à l'apprenant — voir la
+ * documentation d'`OutilsRendu.executable` (grammaire-blocs.ts). Le rendu
+ * canonique (`html-vers-markdown.ts`) et l'aperçu de l'éditeur
+ * (`question-preview.ts`) le laissent à faux.
  */
-export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
+export function rendreTexteQuiz(raw: unknown, images: RenduImages, executable = false): string {
 	const texte = String(raw ?? "");
 	/* Budget CUMULÉ de caractères colorés, partagé par TOUS les champs d'une
 	   même carte de question (titre, énoncé, options, indice, explication,
@@ -279,6 +285,7 @@ export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
 			consommerBudget(resultat.colore);
 			return resultat.html;
 		},
+		executable,
 	}) ?? rendreMorceaux(texte, images);
 }
 
@@ -598,11 +605,13 @@ export function createSanitizer(ctx: EngineCtx): SanitizerHandlers {
 
 	function renderTextWithEmbeds(raw: unknown, { wrapClass = "quiz-question-embed-wrap", imgClass = "quiz-question-embed" }: EmbedClassOptions = {}): string {
 		/* Le markdown complet (blocs, images, liens) : `rendreTexteQuiz`. Les
-		   images seules dépendent de l'hôte, qui les résout dans le vault. */
+		   images seules dépendent de l'hôte, qui les résout dans le vault.
+		   `executable: true` — c'est le rendu AFFICHÉ à l'apprenant, le seul
+		   qui doit envelopper un bloc Python d'un bouton « Exécuter ». */
 		return rendreTexteQuiz(raw, {
 			embed: spec => buildEmbedImgHtml(spec, { wrapClass, imgClass }),
 			image: (alt, src) => imageMarkdownHtml(alt, src, { wrapClass, imgClass }),
-		});
+		}, true);
 	}
 
 	function renderHintWithCodeAndEmbeds(raw: unknown): string {

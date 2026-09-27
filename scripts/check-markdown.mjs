@@ -216,7 +216,10 @@ await withSrcModule(
 	   `rendreTexteQuiz` directement, en dehors de tout appelant : chaque cas
 	   qui dépend d'un budget frais le remet lui-même à zéro AVANT de rendre,
 	   pour ne pas dépendre de l'ordre des cas précédents. */
-	const rendre = (t) => rendreTexteQuiz(t, IMG);
+	// `executable: true` : ce script éprouve le rendu AFFICHÉ à l'apprenant
+	// (celui de `renderTextWithEmbeds`), qui seul enveloppe un bloc Python
+	// d'un bouton « Exécuter » (revue du 2026-09-26, A-IMPORTANT 1).
+	const rendre = (t) => rendreTexteQuiz(t, IMG, true);
 	const NL = "\n";
 	const P = (x) => `<p class="quiz-md-p">${x}</p>`;
 
@@ -242,7 +245,7 @@ await withSrcModule(
 		+ `<span class="token keyword">print</span><span class="token punctuation">(</span>`
 		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
 		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`
-		+ `<div class="quiz-code-output" hidden></div></div>`);
+		+ `<div class="quiz-code-output" hidden aria-label="Output"></div></div>`);
 	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
 		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
 	r.check("langage inconnu : texte échappé, aucun span",
@@ -259,12 +262,20 @@ await withSrcModule(
 	r.check("injection dans un bloc de code coloré : jamais de balise brute, dans plusieurs langages",
 		LANGUES_INJECTION.map(langue => {
 			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
-			// Seules nos propres balises (pre/code/span) peuvent apparaître : tout
-			// le reste du contenu du bloc doit être échappé, jeton par jeton.
-			// Un bloc Python ajoute ses propres balises de confiance (bouton
-			// « Exécuter », `div`/`button`/`svg`/`polygon` — jamais le contenu
-			// injecté, qui reste dans `pre`/`code`/`span`).
-			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span", "div", "button", "svg", "polygon"].includes(m[1].toLowerCase()));
+			// Seules nos propres balises (pre/code/span) peuvent apparaître à
+			// l'intérieur de `pre…/pre` : tout le reste du contenu du bloc doit
+			// être échappé, jeton par jeton. `div`/`button`/`svg`/`polygon`
+			// (le bouton « Exécuter ») ne sont admis QUE pour python, et
+			// seulement HORS du `<pre>` (revue du 2026-09-26, mineur 2) — les
+			// admettre pour tout langage aurait laissé passer une injection
+			// future de ces mêmes balises dans un langage sans enveloppe.
+			const dansPre = html.replace(/^.*?<pre[^>]*>/s, "").replace(/<\/pre>.*$/s, "");
+			const horsPre = html.replace(/<pre[^>]*>.*?<\/pre>/s, "");
+			const balisesPre = [...dansPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["code", "span"].includes(m[1].toLowerCase()));
+			const balisesHorsPre = langue === "python"
+				? [...horsPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["div", "button", "svg", "polygon"].includes(m[1].toLowerCase()))
+				: [...horsPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].length === 0;
+			return balisesPre && balisesHorsPre;
 		}), LANGUES_INJECTION.map(() => true));
 	r.check("alias `c++` : reconnu comme cpp",
 		rendre("```c++" + NL + "int x = 1;" + NL + "```").includes('<span class="token keyword">int</span>'), true);

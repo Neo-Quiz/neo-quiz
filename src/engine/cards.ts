@@ -454,6 +454,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			oldNode.replaceWith(newNode);
 			// LaTeX des slides submit/results (récap des réponses).
 			mathifyElement(newNode);
+			// Bouton « Exécuter » des blocs Python (recap du mode texte
+			// libre, par exemple) : sans cet appel le bouton restait visible
+			// mais inerte (revue du 2026-09-26, A-IMPORTANT 2).
+			ctx.codeRun.bindCodeRunButtons(newNode);
 			ctx.viewport.observeTrackItemInAllSlidesResizeObserver(newNode);
 			binder(newNode);
 		};
