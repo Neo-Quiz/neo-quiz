@@ -83,6 +83,28 @@ export function vuesARetirer<V>(sortants: readonly V[], utiles: readonly V[]): V
 }
 
 /**
+ * RETOUR vers une vue gardée (pile de feuilles, `main.ts`, `vueGardee`) :
+ * l'écran affiché jusque-là — le quiz, tenu par `demonterCourant` — DOIT être
+ * démonté, la vue gardée devenant l'écran actif à sa place. Pur : dit QUOI
+ * faire, jamais QUAND (asynchrone, DOM) — `main.ts` appelle `.demonter()` sur
+ * `aDemonter` lui-même, sans l'attendre, exactement comme `demonter()`
+ * ci-dessus le fait pour le cas sans garde.
+ *
+ * L'oubli de cet appel — reconstruire `demonterCourant` directement sans
+ * passer par cette fonction — a laissé vivre le moteur du quiz (et ses deux
+ * écouteurs souris de `quiz-page.ts`) à chaque retour NORMAL vers une vue
+ * gardée, le chemin le plus emprunté de l'app (constat critique de la revue
+ * du 2026-09-27, `pile-feuilles-review.md`). En forçant l'appelant à
+ * détruire `{ aDemonter, nouveauCourant }`, un futur retour au littéral
+ * `demonterCourant = gardee.ecran` (qui jette l'ancien écran sans le
+ * démonter) ne compile plus : il n'y a plus de `gardee.ecran` isolé à
+ * affecter directement.
+ */
+export function retourVersGardee<E>(quizActif: E | null, gardeeEcran: E): { aDemonter: E | null; nouveauCourant: E } {
+	return { aDemonter: quizActif, nouveauCourant: gardeeEcran };
+}
+
+/**
  * Une fin qui ne s'exécute qu'UNE fois, quel que soit le chemin qui y
  * arrive le premier (événement `finish`, fenêtre masquée en cours de route,
  * minuteur de secours) : les vues sortantes ne sont jamais retirées deux

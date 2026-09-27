@@ -19,7 +19,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/src/ui/transition-etat.ts", ({ etatInitial, demander, finir, choisirMode, uneFois, vuesARetirer }) => {
+await withSrcModule("apps/windows/src/ui/transition-etat.ts", ({ etatInitial, demander, finir, choisirMode, uneFois, vuesARetirer, retourVersGardee }) => {
 	const r = makeReporter("Transition d'écran — noyau pur");
 
 	{
@@ -84,6 +84,20 @@ await withSrcModule("apps/windows/src/ui/transition-etat.ts", ({ etatInitial, de
 	r.check("une vue GARDÉE n'est jamais retirée, même seule sortante", vuesARetirer(["coquille"], ["quiz", "coquille"]), []);
 	r.check("… la vue gardée protège aussi une AUTRE sortante", vuesARetirer(["coquille", "reglages"], ["quiz", "coquille"]), ["reglages"]);
 	r.check("retour vers une vue gardée : elle redevient l'entrante, seul le quiz est retiré", vuesARetirer(["coquille", "quiz"], ["coquille"]), ["quiz"]);
+
+	/* `retourVersGardee` : le quiz sortant doit être rendu à démonter — c'est
+	   le point critique de la revue du 2026-09-27 (le moteur du quiz restait
+	   vivant à chaque retour normal). */
+	{
+		const r1 = retourVersGardee("quiz-actif", "coquille");
+		r.check("retour vers une vue gardée : le quiz sortant est rendu à démonter", r1.aDemonter, "quiz-actif");
+		r.check("… la vue gardée devient l'écran actif", r1.nouveauCourant, "coquille");
+	}
+	{
+		// Pas de quiz encore posé (résidu, ne devrait pas arriver) : rien à démonter.
+		const r2 = retourVersGardee(null, "coquille");
+		r.check("retour vers une vue gardée sans écran actif : rien à démonter", r2.aDemonter, null);
+	}
 
 	r.done();
 });

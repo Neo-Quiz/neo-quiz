@@ -33,7 +33,7 @@ import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
 import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
-import { demander, etatInitial, finir, vuesARetirer } from "./ui/transition-etat";
+import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
 import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
@@ -157,7 +157,7 @@ const reglagesIa: AiSettingsHost = {
  * pas la coquille seule (`.qbd-layout`) : dans ce cas, l'ancien
  * comportement s'applique, sans guarde.
  */
-let vueGardee: { layout: HTMLElement; ecran: EcranActif } | null = null;
+let vueGardee: { layout: HTMLElement; ecran: EcranActif; declencheur: HTMLElement | null } | null = null;
 
 /** Démonte l'écran courant ET la vue gardée s'il y en a une, et rend ce qu'il
     reste à attendre (l'écriture en attente de la page d'un quiz), ou rien.
@@ -227,7 +227,18 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 	if (vueGardee) {
 		const gardee = vueGardee;
 		vueGardee = null;
-		demonterCourant = gardee.ecran;
+		/* LE QUIZ SORTANT (l'ancien `demonterCourant`, posé par `ouvrirQuiz` sur
+		   le retour d'`openQuizPage`) DOIT être démonté ici : c'est lui qui tient
+		   l'instance du moteur (`__quizDestroy`) et les deux écouteurs souris de
+		   `quiz-page.ts`. Sans cet appel, la branche « vue gardée » — le chemin
+		   NORMAL de retour depuis la pile de feuilles — les laissait vivre pour
+		   toujours (constat critique de la revue du 2026-09-27). `void` : un
+		   changement d'écran n'attend jamais ce démontage (même règle que
+		   `demonter()` ci-dessus), et `openQuizPage` le rend idempotent (`fait`)
+		   au cas où un autre chemin (fermeture de l'app) l'aurait déjà appelé. */
+		const { aDemonter, nouveauCourant } = retourVersGardee(demonterCourant, gardee.ecran);
+		void aDemonter?.demonter();
+		demonterCourant = nouveauCourant;
 		gardee.layout.classList.remove("nq-pile-fond");
 		gardee.layout.removeAttribute("aria-hidden");
 		gardee.layout.inert = false;
@@ -237,7 +248,17 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		   pas de rejeu de l'entrée CSS par-dessus le retour animé (constat n°1
 		   de `transition-review.md`). */
 		gardee.ecran.repaint?.();
-		void jouerTransition(root, sortants, gardee.layout, "sortie").finally(transitionFinie);
+		/* LE FOCUS : à l'élément qui avait lancé le quiz, s'il vit encore dans
+		   la vue gardée (une carte peut avoir disparu — quiz renommé/déplacé
+		   pendant qu'on le jouait) ; sinon, au conteneur principal de la vue.
+		   `preventScroll` : ni l'un ni l'autre ne doit faire défiler la page,
+		   déjà à la bonne position (elle n'a jamais bougé). */
+		const cible = gardee.declencheur && gardee.layout.contains(gardee.declencheur) ? gardee.declencheur : gardee.layout;
+		if (cible === gardee.layout && cible.tabIndex < 0) cible.tabIndex = -1;
+		void jouerTransition(root, sortants, gardee.layout, "sortie").finally(() => {
+			cible.focus({ preventScroll: true });
+			transitionFinie();
+		});
 		return;
 	}
 
@@ -347,14 +368,23 @@ function ouvrirReglages(): void {
 async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
 	if (!soumettre("ouvrir", () => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); })) return;
 	const sortants = ecransDe(root);
-	for (const s of sortants) s.inert = true;
+	/* `aria-hidden` posé EN MÊME TEMPS que `inert`, jamais des centaines de
+	   millisecondes plus tard (`retirer()`, `transition-quiz.ts`) : sinon la
+	   vue sortante est inerte au clavier sans l'être encore pour un lecteur
+	   d'écran pendant toute l'animation. */
+	for (const s of sortants) { s.inert = true; s.setAttribute("aria-hidden", "true"); }
+	/* L'ÉLÉMENT QUI A LANCÉ LE QUIZ (la carte, le bouton « Commencer ») : gardé
+	   pour lui rendre le focus au retour plutôt que de le laisser retomber sur
+	   `<body>`. `null` s'il n'y en a pas (ouverture au clavier depuis un
+	   endroit qui n'a jamais pris le focus, ou hors DOM après coup). */
+	const declencheur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
 	/* Une seule coquille GARDABLE : l'écran affiché est ELLE SEULE, et son
 	   `EcranActif` expose `repaint` (c'est ce qui la distingue de l'écran d'un
 	   quiz, qui n'en a pas). Sinon, comportement d'avant : démontage complet. */
 	const garder: HTMLElement[] = [];
 	if (sortants.length === 1 && sortants[0].classList.contains("qbd-layout") && demonterCourant?.repaint) {
-		vueGardee = { layout: sortants[0], ecran: demonterCourant };
+		vueGardee = { layout: sortants[0], ecran: demonterCourant, declencheur };
 		demonterCourant = null;
 		garder.push(sortants[0]);
 	} else {
