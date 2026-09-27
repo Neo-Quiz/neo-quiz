@@ -38,7 +38,7 @@ release notes.
 - A Learn reading no longer shows "About N minutes of reading".
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
 - The app now sits in a centered panel, with your wallpaper fully visible around it; cards inside are plain surfaces instead of glass tiles. A soft blue glow lights the top of the window; entering a folder briefly flashes the folder's color, then the glow fades away inside the folder and comes back when you leave.
-- Generating a quiz now reads like a conversation on claude.ai: each request appears as your message, with a live "working" reply underneath that turns into the finished quiz, and the composer stays at the bottom.
+- Generating a quiz now reads like a conversation on claude.ai: each request appears as your message, with a live "working" reply underneath that turns into the finished quiz, and the composer stays at the bottom; a running generation is stopped from the composer button only.
 - A PDF attached in Generate shows up at once, with its name and a small loading wheel; its first page and its text follow, and sending waits until the text is read. A PDF that cannot be read says so on its card.
 - Attaching a file in the Generate composer now animates like claude.ai: the tile rises in at once with a soft shimmer while it loads, then the page preview fades in from blur.
 - The + button of the Generate composer opens a claude.ai-style menu: add files or images (now Ctrl+U), or mention a note or document with @.

@@ -162,7 +162,8 @@ export function creerVueFile(opts: {
 				temps.dataset.debut = String(l.debut ?? Date.now());
 				// Redessiné chaque seconde : un lecteur d'écran ne doit pas l'annoncer.
 				temps.setAttribute("aria-hidden", "true");
-				boutonIcone(ajouter(rep, "span", "qbd-ai-reponse-fin"), "square", t("ai.composer.stop"), () => opts.file.annuler(l.id));
+				/* Pas de ■ sur la ligne en cours (Ahmed, 2026-09-27) : l'arrêt
+				   est celui du composer, comme sur claude.ai. */
 			}
 			return;
 		}
