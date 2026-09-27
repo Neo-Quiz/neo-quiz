@@ -26,6 +26,7 @@
     "check:text-search": "node scripts/check-text-search.mjs",
     "check:ai-providers": "node scripts/check-ai-providers.mjs",
     "check:prompt": "node scripts/check-prompt.mjs",
+    "check:categorie": "node scripts/check-categorie.mjs",
     "check:web-channel": "node scripts/check-web-channel.mjs",
     "check:dashboard-dom": "node scripts/check-dashboard-dom.mjs",
     "check:view-enter": "node scripts/check-view-enter.mjs",

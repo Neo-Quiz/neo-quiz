@@ -36,6 +36,12 @@ jobs:
       - name: Learn and Practice prompts
         run: npm run check:prompt
 
+      # LA CATÉGORIE D'UN QUIZ (Python, C, réseau…) : déduite des pièces
+      # jointes, puis du dossier, puis de la demande ; la lettre C d'une
+      # phrase n'est pas le langage C, une égalité ne tranche rien.
+      - name: Quiz category detection
+        run: npm run check:categorie
+
       # LE MARKDOWN DE BLOC ET DE LIGNE d'un texte de quiz (paragraphes,
       # listes, tableaux, blocs de code colorés, images, liens) : gras et
       # italique interprétés, une formule LaTeX ou un chemin Windows laissés

@@ -28,6 +28,9 @@ import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
 import { ouvrirMenuPlus } from "./composer-plus";
+import { categorieChoisie, detecterCategorie } from "./categorie-quiz";
+import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
+import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
@@ -270,6 +273,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
 	   reste du composer (spec de la file, 2026-09-26). */
 	let destinationDuPreset = false;
+	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
+	   déduite à l'envoi des pièces jointes, du dossier et de la demande
+	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
+	   nombre et le type, elle vaut pour la session de la page. */
+	let categorieChoix: CategorieQuiz | null = null;
+	/** L'avis « Python détecté » près du bouton des options. */
+	let avisCategorieEl: HTMLElement | null = null;
 	/* La file de génération de l'APPLICATION, partagée par toutes les pages :
 	   la page s'y abonne pour peindre ses lignes, elle ne la possède pas. */
 	const fileGen: FileGenerationApp = fileDeGeneration({
@@ -1701,7 +1711,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				folder: destination,
 				onCount: (n) => { questionCount = n; },
 				onType: (label) => { questionType = typeValue(label); },
-				onFolder: (value) => { destination = value; destinationDuPreset = false; },
+				onFolder: (value) => { destination = value; destinationDuPreset = false; majAvisCategorie(); },
+				/* La catégorie : Automatique dit ce qu'elle détecte, sinon le
+				   choix force celle du prompt (retour #7). */
+				categories: choixCategories(),
+				categorie: categorieChoix,
+				categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
+				onCategorie: (value) => {
+					categorieChoix = choixCategories().find(c => c.value === value)?.value ?? null;
+					majAvisCategorie();
+				},
 				// Barème et durée : avec le Mock exam, sous-projet à part.
 			});
 		});
@@ -1749,6 +1768,21 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (buildModelControl) buildModelControl(composerTools);
 		// L'icône Options est à droite du modèle (2026-09-23).
 		composerTools.appendChild(optsBtn);
+		/* L'avis de CATÉGORIE, juste avant l'icône Options (retour #7) :
+		   « Python détecté », texte et icône, sans pastille ; caché pour
+		   `general`. Repeint à chaque changement du composer
+		   (`updateGenerateBtn`). */
+		// Sans fournisseur, les options sont cachées (plus bas) : l'avis aussi.
+		avisCategorieEl = null;
+		if (provider) {
+			const avis = document.createElement("span");
+			avis.className = "qbd-ai-categorie";
+			avis.hidden = true;
+			composerTools.insertBefore(avis, optsBtn);
+			attachHoverTip(avis, (tip) => { ajouter(tip, "div", "qbd-hover-tip-body", t("ai.categorie.tip")); });
+			avisCategorieEl = avis;
+			majAvisCategorie();
+		}
 
 		// Bouton générer dans le composer (façon bouton d'envoi claude.ai) :
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.
@@ -3510,7 +3544,30 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		images = [];
 	}
 
+	/** Ce que la détection de catégorie lit d'une demande : les noms des
+	    pièces jointes, le dossier de destination, le texte. */
+	function indicesCategorie(notes: readonly { name: string }[], texte: string): IndicesCategorie {
+		return {
+			pieces: notes.map(n => n.name),
+			dossier: destination || dossierParDefaut(settings().aiOutputFolder),
+			demande: texte,
+		};
+	}
+
+	/** La catégorie qui partirait maintenant avec le composer. */
+	function categorieCourante(): CategorieQuiz {
+		return categorieChoisie(categorieChoix ?? "auto", indicesCategorie(noteAttachments, composerText));
+	}
+
+	/** Repeint l'avis près du bouton des options (texte, pièces, dossier
+	    ou choix changé). Rien pour `general`. */
+	function majAvisCategorie(): void {
+		if (!avisCategorieEl) return;
+		peindreAvisCategorie(avisCategorieEl, categorieCourante(), categorieChoix === null);
+	}
+
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
+		majAvisCategorie();
 		if (!btn) return;
 		// Le bouton d'envoi n'apparaît qu'avec du contenu (texte/image/note),
 		// et reste désactivé tant que la génération n'est pas possible
@@ -3704,7 +3761,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
 		const reglages = figerReglages(settings());
 		for (const d of decouperParFichier(envoi)) {
-			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: questionType, destination, reglages });
+			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
+			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
+			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
+			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: questionType, destination, reglages, categorie });
 		}
 		viderComposer();
 		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
@@ -3771,7 +3831,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const jeton = nouveauJeton();
 		await preparerLienLearn(msg);
 		const planTranches = planTranchesEnvoye;
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches }), jeton);
+		const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(msg.notes, msg.text));
+		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;

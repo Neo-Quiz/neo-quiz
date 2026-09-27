@@ -82,6 +82,21 @@ export const EN_AI = {
 	"ai.mode.group": "Goal",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
+	/* La catégorie d'un quiz (categorie-quiz.ts) : son nom, et l'avis
+	   « détecté » près du bouton des options. */
+	"ai.categorie.auto": "Automatic",
+	"ai.categorie.python": "Python",
+	"ai.categorie.c": "C",
+	"ai.categorie.bash": "Bash / Linux",
+	"ai.categorie.sql": "SQL",
+	"ai.categorie.web": "Web",
+	"ai.categorie.maths": "Maths",
+	"ai.categorie.reseau": "Networking",
+	"ai.categorie.general": "General",
+	"ai.categorie.detected": "{name} detected",
+	/* « Maths détectées » en français : l'accord suit un nom pluriel féminin. */
+	"ai.categorie.detectedPlural": "{name} detected",
+	"ai.categorie.tip": "The quiz is written for this subject. Change it in the quiz options.",
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Select a provider",

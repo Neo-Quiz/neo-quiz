@@ -14,6 +14,8 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- Generate detects the subject of a quiz (Python, C, Bash / Linux, SQL, Web, Maths, Networking) from the attached files' names, the destination folder and your request, and says so next to the options button ("Python detected"). The prompt is then adapted to the subject: for Python, fenced runnable examples, questions on what `print` displays, and each idiom shown in its compact form, its result and its loop equivalent. The subject can be changed in the quiz options (Automatic by default).
+- Generated quizzes give every Learn question a hint, with key words in bold, a concrete example and, for a hard question, two or three levels; explanations put their two or three key words in bold; a reading explains every compact line in full; a step that introduces terms has at least one flashcard; ordering items are single lines of inline code.
 - Hints with several levels: a hard question can give a light clue first, then "Next hint" reveals a more precise one, up to the last; the levels already seen stay on screen. The editor adds or removes levels under Hint. Written answers now have their hint too, and the key words of a hint or an explanation are shown in blue.
 - Learn courses come in several reading styles chosen by the AI for the content: a reading page, numbered steps or a comparison table, with key points as flip cards or a checked recap; the style can be changed in the editor.
 - Wallpaper brightness and blur sliders in Settings, under the wallpaper, applied live as you drag.

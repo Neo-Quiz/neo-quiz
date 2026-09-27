@@ -66,6 +66,18 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.mode.group": "Objectif",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Choisi par l'IA",
+	"ai.categorie.auto": "Automatique",
+	"ai.categorie.python": "Python",
+	"ai.categorie.c": "C",
+	"ai.categorie.bash": "Bash / Linux",
+	"ai.categorie.sql": "SQL",
+	"ai.categorie.web": "Web",
+	"ai.categorie.maths": "Maths",
+	"ai.categorie.reseau": "Réseau",
+	"ai.categorie.general": "Général",
+	"ai.categorie.detected": "{name} détecté",
+	"ai.categorie.detectedPlural": "{name} détectées",
+	"ai.categorie.tip": "Le quiz est rédigé pour ce sujet. Changez-le dans les options du quiz.",
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Choisissez un fournisseur",

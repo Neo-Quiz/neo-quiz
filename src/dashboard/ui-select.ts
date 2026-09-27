@@ -1694,6 +1694,17 @@ export interface OpenOptionsMenuOptions {
 	/** Dossier courant (une `value` de `folders`). */
 	folder?: string;
 	onFolder?: (value: string) => void;
+	/**
+	 * CATÉGORIE du quiz (retour #7, 2026-09-26) : « Automatique » en tête,
+	 * dont l'indice dit ce qui est détecté, puis la liste. Absente = pas de
+	 * ligne Catégorie.
+	 */
+	categories?: { value: string; label: string; icon: string }[];
+	/** La catégorie choisie (une `value` de `categories`), `null` = Automatique. */
+	categorie?: string | null;
+	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
+	categorieDetectee?: string;
+	onCategorie?: (value: string | null) => void;
 }
 
 /*
@@ -1896,6 +1907,21 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 				label: f.label, icon: f.icon, color: f.color, sub: f.sub, actif: f.value === folder,
 				choisir: () => { folder = f.value; if (opts.onFolder) opts.onFolder(folder); },
 			})));
+	}
+
+	/* ── Catégorie : Automatique (la détection), ou une catégorie forcée ── */
+	const categories = opts.categories ?? [];
+	if (categories.length > 0) {
+		let categorie: string | null = categories.some(c => c.value === opts.categorie) ? String(opts.categorie) : null;
+		ligne("tag", t("dashboard.select.optionsCategory"),
+			() => categorie === null ? t("ai.categorie.auto") : (categories.find(c => c.value === categorie)?.label ?? t("ai.categorie.auto")),
+			() => [
+				{ label: t("ai.categorie.auto"), hint: opts.categorieDetectee, actif: categorie === null, choisir: () => { categorie = null; if (opts.onCategorie) opts.onCategorie(null); } },
+				...categories.map(c => ({
+					label: c.label, icon: c.icon, actif: categorie === c.value,
+					choisir: () => { categorie = c.value; if (opts.onCategorie) opts.onCategorie(c.value); },
+				})),
+			]);
 	}
 
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──

@@ -22,6 +22,7 @@
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
 import { completerConfigLearn } from "../quiz-format";
+import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
 import { createAiClient } from "./ai-client";
@@ -56,6 +57,9 @@ export interface DemandeFile extends DemandeTexte {
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
 	destination: string;
 	reglages: ReglagesFiges;
+	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi comme le
+	    reste : son complément part dans le prompt système. */
+	categorie: CategorieQuiz;
 	/** Le quiz que le modèle a produit, gardé dès sa réception : si l'écriture
 	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
 	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
@@ -180,7 +184,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			// Annulée pendant la préparation : aucun processus n'est encore lancé.
 			if (!tourne(ligne.id)) return;
 			etapeDe(ligne.id, "redaction");
-			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images });
+			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie });
 			if (!tourne(ligne.id)) return;
 			/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
 			   Learn, comme avant la file. */

@@ -304,6 +304,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.optionsType": "Type",
 	"dashboard.select.optionsCustom": "Personnalisé",
 	"dashboard.select.optionsDestination": "Dossier",
+	"dashboard.select.optionsCategory": "Sujet",
 	"dashboard.select.noteSearch": "Rechercher une note…",
 	"dashboard.select.noteOpen": "Notes ouvertes",
 	"dashboard.select.noteAll": "Toutes les notes",

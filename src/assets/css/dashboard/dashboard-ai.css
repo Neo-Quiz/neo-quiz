@@ -882,6 +882,42 @@
 	display: none;
 }
 
+/* L'avis de CATÉGORIE (retour #7, 2026-09-26) : « Python détecté », juste
+   avant l'icône Options. Du TEXTE avec son icône, discret, sans pastille ni
+   bordure : une métadonnée, pas un bouton. */
+.qbd-ai-categorie {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-right: 2px;
+	color: var(--text-muted);
+	font-size: 12px;
+	white-space: nowrap;
+	animation: qbd-ai-categorie-in 200ms ease-out;
+}
+
+.qbd-ai-categorie[hidden] {
+	display: none;
+}
+
+.qbd-ai-categorie-icone {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.qbd-ai-categorie-icone svg {
+	width: 14px;
+	height: 14px;
+}
+
+@keyframes qbd-ai-categorie-in {
+	from { opacity: 0; transform: translateY(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-categorie { animation: none; }
+}
+
 .qbd-ai-provider-nudge {
 	position: absolute;
 	/* L'apparition grandit depuis la pointe, pas depuis le centre. */
