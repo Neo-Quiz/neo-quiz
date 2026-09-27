@@ -78,13 +78,13 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	   github.com n'a pas ce plafond, et `latest.yml` est le fichier
 	   qu'electron-updater lit déjà. Casser l'un des trois fichiers → rouge. */
 	r.check("source : le repli reste latest.yml par la redirection releases/latest",
-		URL_LATEST_YML, "https://github.com/ahmed-mili/neo-quiz/releases/latest/download/latest.yml");
+		URL_LATEST_YML, "https://github.com/Neo-Quiz/neo-quiz/releases/latest/download/latest.yml");
 	/* ÉPINGLÉ depuis la 1.5.0 : `NeoQuiz-X.Y.Z.exe` lit le `latest.yml` de SA
 	   release, pas de la dernière. Un exe nommé 1.4.0 qui installait la 1.5.0
 	   était une surprise, et c'est ce qui interdisait à la page de
 	   téléchargement de le servir pour une ancienne version. */
 	r.check("source : un bootstrapper X.Y.Z lit le latest.yml de la release desktop-vX.Y.Z",
-		urlLatestYml("1.6.0"), "https://github.com/ahmed-mili/neo-quiz/releases/download/desktop-v1.6.0/latest.yml");
+		urlLatestYml("1.6.0"), "https://github.com/Neo-Quiz/neo-quiz/releases/download/desktop-v1.6.0/latest.yml");
 	/* La version ENTRE DANS L'URL. Elle vient d'`app.getVersion()`, donc du
 	   `package.json` embarqué — un fichier qu'un exe trafiqué peut porter.
 	   Tout ce qui n'est pas `X.Y.Z` retombe sur `latest` : jamais un segment
@@ -93,7 +93,7 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	   release ne porte ce numéro. */
 	r.check("source : une version qui n'est pas X.Y.Z ne compose aucune URL et retombe sur latest",
 		["0.0.0-repetition", "../../evil", "1.6.0/../../x", "", undefined, null, "v1.6.0", "1.6"].map(urlLatestYml),
-		Array(8).fill("https://github.com/ahmed-mili/neo-quiz/releases/latest/download/latest.yml"));
+		Array(8).fill("https://github.com/Neo-Quiz/neo-quiz/releases/latest/download/latest.yml"));
 	r.check("source : versionEpinglee ne laisse passer que X.Y.Z",
 		[versionEpinglee("1.6.0"), versionEpinglee("10.20.30"), versionEpinglee("1.6.0-beta"), versionEpinglee(" 1.6.0")],
 		["1.6.0", "10.20.30", null, null]);
@@ -129,7 +129,7 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	const attendu = {
 		version,
 		nom,
-		url: `https://github.com/ahmed-mili/neo-quiz/releases/download/desktop-v${version}/${nom}`,
+		url: `https://github.com/Neo-Quiz/neo-quiz/releases/download/desktop-v${version}/${nom}`,
 		taille,
 		sha512,
 		tailleInstallee: null,
@@ -582,10 +582,10 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	r.check("légal : l'URL est composée depuis deux constantes, dans la langue voulue",
 		[urlLegale("terms", "en"), urlLegale("privacy", "en"), urlLegale("terms", "fr"), urlLegale("privacy", "fr")],
 		[
-			"https://ahmed-mili.github.io/neo-quiz/terms.html",
-			"https://ahmed-mili.github.io/neo-quiz/privacy.html",
-			"https://ahmed-mili.github.io/neo-quiz/fr/terms.html",
-			"https://ahmed-mili.github.io/neo-quiz/fr/privacy.html",
+			"https://neo-quiz.github.io/neo-quiz/terms.html",
+			"https://neo-quiz.github.io/neo-quiz/privacy.html",
+			"https://neo-quiz.github.io/neo-quiz/fr/terms.html",
+			"https://neo-quiz.github.io/neo-quiz/fr/privacy.html",
 		]);
 	r.check("légal : les quatre pages existent dans docs/",
 		["docs/terms.html", "docs/privacy.html", "docs/fr/terms.html", "docs/fr/privacy.html"]

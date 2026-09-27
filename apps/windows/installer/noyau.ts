@@ -11,7 +11,7 @@
 
 /** Le dépôt d'où viennent le paquet ET sa description : le bootstrapper ne
     télécharge jamais ailleurs, quoi que dise un fichier. */
-const DEPOT_RELEASES = "https://github.com/ahmed-mili/neo-quiz/releases";
+const DEPOT_RELEASES = "https://github.com/Neo-Quiz/neo-quiz/releases";
 
 /** Le `latest.yml` de la dernière release, par la redirection
     `releases/latest/download/…` de github.com. Ce n'est plus la lecture
@@ -435,7 +435,7 @@ export function langueDepuisLocale(locale: string): LangueInstallateur {
    comme la page de téléchargement. Le rendu ne transmet que le nom de la
    page (`LienLegal`) : l'URL est composée ICI, depuis deux constantes. */
 
-const SITE = "https://ahmed-mili.github.io/neo-quiz/";
+const SITE = "https://neo-quiz.github.io/neo-quiz/";
 const PAGES_LEGALES = { terms: "terms.html", privacy: "privacy.html" } as const;
 
 export type PageLegale = keyof typeof PAGES_LEGALES;

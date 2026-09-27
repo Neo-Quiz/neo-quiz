@@ -76,7 +76,7 @@ r.check("Linux produit AppImage x64, AppImage arm64 et deb amd64",
    sortie sans sa partie Linux. Leur disparition doit rougir ici, pas en CI. */
 r.check("le .deb a la page d'accueil et le mainteneur qu'il exige",
 	[config.extraMetadata?.homepage, (config.linux?.maintainer ?? "").includes("@")],
-	["https://ahmed-mili.github.io/neo-quiz/", true]);
+	["https://neo-quiz.github.io/neo-quiz/", true]);
 /* Le champ Maintainer voyage dans chaque paquet public. */
 r.check("le mainteneur du .deb ne publie pas d'adresse personnelle",
 	/users\.noreply\.github\.com>$/.test(config.linux?.maintainer ?? ""), true);
@@ -173,7 +173,7 @@ r.check("la réécriture après signature préserve installedSize",
 		"sha512: BBB", "installedSize: 314159265", "releaseDate: 'x'", ""].join("\n"));
 r.check("publish vise les releases GitHub du dépôt",
 	[config.publish?.provider, config.publish?.owner, config.publish?.repo],
-	["github", "ahmed-mili", "neo-quiz"]);
+	["github", "Neo-Quiz", "neo-quiz"]);
 r.done();
 
 /* LE PAQUET, s'il a été construit (`npm run pack:win` laisse `win-unpacked/`).
@@ -207,7 +207,7 @@ if (existsSync(asar)) {
 		[/^provider:\s*(.+)$/m.exec(updateBrut)?.[1]?.trim(),
 			/^owner:\s*(.+)$/m.exec(updateBrut)?.[1]?.trim(),
 			/^repo:\s*(.+)$/m.exec(updateBrut)?.[1]?.trim()],
-		["github", "ahmed-mili", "neo-quiz"]);
+		["github", "Neo-Quiz", "neo-quiz"]);
 	const latest = `${appWindows}dist-installer/latest.yml`;
 	p.check("latest.yml existe à côté de l'installeur", existsSync(latest), true);
 	p.check("latest.yml porte la version de l'application",

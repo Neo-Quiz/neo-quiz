@@ -29,5 +29,5 @@ app read, so review history follows you across hosts.
 ## Creating and editing quizzes
 
 Creating and editing quizzes lives in the Neo Quiz desktop app:
-<https://github.com/ahmed-mili/neo-quiz>. This plugin only plays the blocks
+<https://github.com/Neo-Quiz/neo-quiz>. This plugin only plays the blocks
 it finds in your vault.

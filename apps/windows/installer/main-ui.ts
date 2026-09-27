@@ -5,7 +5,7 @@ import { CANAUX_INSTALLATEUR, type InfosDisqueInstallateur } from "./protocole";
 import { urlLegale } from "./noyau";
 import { langueInstallateur } from "./main";
 
-const URL_COMMENTAIRES = "https://github.com/ahmed-mili/neo-quiz/issues/new";
+const URL_COMMENTAIRES = "https://github.com/Neo-Quiz/neo-quiz/issues/new";
 const LARGEUR_FENETRE = 720;
 const HAUTEUR_FENETRE = 640;
 

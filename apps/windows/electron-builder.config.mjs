@@ -49,7 +49,7 @@ export default async function () {
 			   electron-builder s'arrête sur « Please specify project homepage »
 			   — la CI l'a refusé le 2026-09-16. Les AppImage n'en demandaient
 			   aucune, d'où son absence jusqu'ici. */
-			homepage: "https://ahmed-mili.github.io/neo-quiz/",
+			homepage: "https://neo-quiz.github.io/neo-quiz/",
 			/* Ces deux-là ne bloquent AUCUN build — c'est pour ça qu'elles
 			   manquaient — mais elles se lisent dans `apt show neo-quiz` : sans
 			   elles le control file du 1.0.7 portait « Description: » vide et
@@ -79,7 +79,7 @@ export default async function () {
 		   fournisseur github de coexister avec deux familles de tags
 		   (`desktop-vX.Y.Z` et `vX.Y.Z`) sans qu'electron-updater ne confonde
 		   jamais une release de greffon avec une mise à jour de l'app. */
-		publish: { provider: "github", owner: "ahmed-mili", repo: "neo-quiz" },
+		publish: { provider: "github", owner: "Neo-Quiz", repo: "neo-quiz" },
 		/* Les DEUX sorties et rien d'autre. Le principal est bundlé par esbuild
 		   (`chokidar` compris — raison 2 de l'en-tête de `construire.mjs`), le
 		   rendu par Vite (`lucide` compris) : rien dans le paquet n'appelle
