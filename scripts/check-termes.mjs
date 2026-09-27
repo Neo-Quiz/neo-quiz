@@ -68,6 +68,22 @@ await withSrcModule(
 			r.check("dejaVus partagé entre deux appels : la 2e occurrence n'est pas reprise", [t1.length, t2.length], [1, 0]);
 		}
 
+		// --- revue du 2026-09-27 : apostrophes et termes courts ---
+		r.check("apostrophe typographique dans le texte, droite dans le glossaire",
+			trouverTermes("La pile d’appel grandit.", index, new Set()).map(o => o.entree), [1]);
+		{
+			const typo = indexerGlossaire(lireGlossaire([{ term: "loi d’Ohm", definition: "U = RI." }]));
+			r.check("apostrophe typographique dans le glossaire, droite dans le texte",
+				trouverTermes("La loi d'Ohm relie U et I.", typo, new Set()).length, 1);
+		}
+		{
+			const court = indexerGlossaire(lireGlossaire([{ term: "s", definition: "La seconde." }, { term: "ms", definition: "Milliseconde." }]));
+			r.check("un terme d'une lettre n'apparie pas « ses » (pas de pluriel sous trois caractères)",
+				trouverTermes("On regarde ses résultats.", court, new Set()), []);
+			r.check("… ni un terme de deux lettres « mss »", trouverTermes("Les mss anciens.", court, new Set()), []);
+			r.check("… mais le symbole seul est apparié", trouverTermes("En 3 s exactement.", court, new Set()).map(o => o.entree), [0]);
+		}
+
 		// --- reconnaissance de la configuration (quiz-utils.ts) ---
 		const question = { prompt: "2 + 2 ?", options: ["3", "4"], correctIndex: 1 };
 		r.check("un objet sans énoncé porteur d'un glossaire est la configuration",
@@ -76,6 +92,8 @@ await withSrcModule(
 			findQuizModeConfigIndex([question, { glossary: [] }]), 1);
 		r.check("une question qui porte un glossaire reste une question",
 			findQuizModeConfigIndex([{ prompt: "x", glossary: [] }]), -1);
+		r.check("une question SANS énoncé mais à marqueurs (options) qui porte un glossaire reste une question",
+			findQuizModeConfigIndex([{ options: ["a", "b"], correctIndex: 0, glossary: [{ term: "a", definition: "b" }] }]), -1);
 
 		// --- extractExamOptions rend le glossaire lu ---
 		{
@@ -158,6 +176,29 @@ async function verifierPasseDom() {
 			const avant = racine.innerHTML;
 			poserTermesDans(racine, index);
 			r.check("un second appel laisse le DOM identique (idempotent)", racine.innerHTML, avant);
+
+			// --- l'écran d'une lecture : une zone, titre exclu, carte exclue ---
+			{
+				const lect = document.createElement("div");
+				lect.innerHTML = '<div class="quiz-question"><div class="quiz-lecture quiz-lecture--etapes">' +
+					'<h3 class="quiz-lecture-titre">La pile</h3>' +
+					'<ol class="quiz-lecture-etapes"><li><div class="quiz-lecture-etape-texte">On empile sur la pile.</div></li>' +
+					'<li><div class="quiz-lecture-etape-texte">La pile se vide.</div></li></ol>' +
+					'<button class="quiz-lecture-carte">pile</button></div></div>';
+				poserTermesDans(lect, index);
+				const termes = lect.querySelectorAll(".qb-terme");
+				r.check("lecture : un seul soulignement pour toute la lecture, dans la première étape",
+					[termes.length, termes[0]?.closest("li") === lect.querySelector("li")], [1, true]);
+				r.check("lecture : jamais dans son titre ni dans une carte à retourner",
+					[lect.querySelector("h3 .qb-terme"), lect.querySelector("button .qb-terme")], [null, null]);
+			}
+			{
+				// Une zone DANS une autre : la zone extérieure seule compte.
+				const imb = document.createElement("div");
+				imb.innerHTML = '<div class="quiz-passage-content">Une pile. <div class="quiz-lecture">Encore une pile.</div></div>';
+				poserTermesDans(imb, index);
+				r.check("zones imbriquées : un seul soulignement", imb.querySelectorAll(".qb-terme").length, 1);
+			}
 
 			// --- une zone SANS glossaire (index vide) : sortie immédiate ---
 			const videIndex = indexerGlossaire([]);

@@ -36,13 +36,21 @@ const SELECTEUR_ZONES = [
 	".quiz-hint-modal-body",
 	".quiz-learn-content",
 	".quiz-flashcard-back",
+	/* L'ÉCRAN d'une lecture et la lecture courte au-dessus d'une question
+	   (engine/lecture-rendu.ts) : texte, étapes, tableau, récapitulatif —
+	   UNE zone pour toute la lecture, pas une par étape (un terme souligné à
+	   chaque étape). Ses cartes à retourner sont des `<button>`, exclus :
+	   souligner leur recto donnerait le verso. */
+	".quiz-lecture",
 ].join(", ");
 
 /** Ancêtres dont le texte n'est JAMAIS apparié : code, liens, contrôles,
     formule déjà rendue, sortie de programme, et `.qb-terme` lui-même — sans
     cette dernière exclusion, un second passage sur le même DOM ré-envelopperait
-    le texte déjà souligné (idempotence, spec §7). */
-const SELECTEUR_EXCLUS = "code, pre, kbd, a, button, input, textarea, mjx-container, .math, .quiz-code-output, .qb-terme, script, style";
+    le texte déjà souligné (idempotence, spec §7). Les titres non plus : le
+    titre d'une lecture nomme souvent son terme, et la première occurrence
+    doit tomber dans le texte qui l'explique. */
+const SELECTEUR_EXCLUS = "code, pre, kbd, a, button, input, textarea, mjx-container, .math, .quiz-code-output, .qb-terme, script, style, h1, h2, h3, h4, h5, h6";
 
 export interface TermesHandlers {
 	/** Souligne les termes du glossaire sous `root` (toutes les zones qu'il
@@ -56,7 +64,11 @@ function zonesSous(root: Element): Element[] {
 	const zones: Element[] = [];
 	if (root.matches(SELECTEUR_ZONES)) zones.push(root);
 	root.querySelectorAll<Element>(SELECTEUR_ZONES).forEach(z => zones.push(z));
-	return zones;
+	/* Les zones les plus EXTÉRIEURES seulement : une lecture courte posée
+	   dans un support, ou toute zone dans une autre, compterait sinon deux
+	   fois — deux soulignements du même terme dans ce que l'œil lit comme un
+	   seul texte. */
+	return zones.filter(z => !zones.some(o => o !== z && o.contains(z)));
 }
 
 /** Les entrées déjà soulignées dans `zone` (un passage précédent) : leur index

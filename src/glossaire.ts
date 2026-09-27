@@ -85,6 +85,24 @@ function echapperRegex(texte: string): string {
 	return texte.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Les apostrophes qu'un texte réel mélange : droite, typographiques,
+    modificateur. Un terme écrit « pile d'appel » dans le glossaire et
+    « pile d’appel » dans la lecture (guillemets intelligents d'un éditeur)
+    est le même terme (revue du 2026-09-27). */
+const APOSTROPHES = "'\u2018\u2019\u201A\u201B\u02BC";
+
+/** Le motif d'une forme : échappée, chaque apostrophe acceptant toutes les
+    autres. */
+function motifForme(forme: string): string {
+	const classe = "[" + APOSTROPHES + "]";
+	return [...forme].map(c => (APOSTROPHES.includes(c) ? classe : echapperRegex(c))).join("");
+}
+
+/** Sous trois caractères, pas de pluriel toléré : le symbole « s »
+    (seconde) apparierait « ses », « m » apparierait « mes » — et un
+    symbole est invariable (revue du 2026-09-27). */
+const LONGUEUR_MIN_PLURIEL = 3;
+
 /**
  * Prépare un glossaire pour `trouverTermes`. Une expression par FORME (le
  * terme, puis chacun de ses alias) : deux formes de la même entrée sont deux
@@ -106,7 +124,9 @@ export function indexerGlossaire(entrees: readonly EntreeGlossaire[]): IndexGlos
 				entree: i,
 				longueur: forme.length,
 				regex: new RegExp(
-					"(?<![\\p{L}\\p{N}_])" + echapperRegex(forme) + "(?:s|x|es)?(?![\\p{L}\\p{N}_])",
+					"(?<![\\p{L}\\p{N}_])" + motifForme(forme)
+						+ ([...forme].length >= LONGUEUR_MIN_PLURIEL ? "(?:s|x|es)?" : "")
+						+ "(?![\\p{L}\\p{N}_])",
 					"giu",
 				),
 			});
