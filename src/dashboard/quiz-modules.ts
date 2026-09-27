@@ -283,6 +283,33 @@ export function buildFolderGroups(modules: ModuleGroup[]): FolderGroup[] {
 	return groupes.sort((a, b) => (a.parent === "" ? 1 : 0) - (b.parent === "" ? 1 : 0) || a.label.localeCompare(b.label));
 }
 
+/** Les dossiers que montre « Mes quiz » : ceux qui ont des quiz, ceux que
+    l'utilisateur a DÉCLARÉS (Nouveau dossier / Modifier dossier) même vides,
+    sauf les archivés, et le sas des quiz générés même vide. Une seule
+    écriture, lue par la page ET par « Déplacer vers » : le sous-menu ne
+    proposait que les dossiers qui avaient déjà un quiz (2026-09-27). */
+export function modulesAffiches(
+	quizzes: QuizIndexEntry[],
+	stats: Record<string, QuizStatRecord>,
+	map: ModuleMap,
+	declares: string[],
+	archives: string[],
+	sas: string | undefined,
+): ModuleGroup[] {
+	const modules = buildModuleGroups(quizzes, stats, map, declares.filter(f => !archives.includes(f)));
+	/* LE SAS DES QUIZ GÉNÉRÉS EXISTE MÊME VIDE : c'est là que les générations
+	   arrivent, et le vider le faisait disparaître de la page (2026-09-20).
+	   Ajouté sans quiz s'il n'y est pas déjà, avec l'override de dossier
+	   (couleur, icône) s'il en a un. */
+	if (sas && !modules.some(m => m.path === sas)) {
+		const nom = sas.split("/").pop() || sas;
+		const info = map.byFolder.get(nom);
+		modules.push({ folder: nom, name: info?.name ?? nom, ue: info?.ue ?? null, color: info?.color, icon: info?.icon, path: sas, quizzes: [], total: 0, mastered: 0 });
+		modules.sort((a, b) => a.name.localeCompare(b.name));
+	}
+	return modules;
+}
+
 /** Ce groupe est-il le SAS des quiz générés ? Par le CHEMIN, jamais par le
     nom (`DashboardShellCtx.generatedFolder`). Un groupe sans chemin (déclaré
     avant le 2026-09-17, sans quiz) n'est jamais le sas : le sas contient

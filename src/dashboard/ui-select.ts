@@ -269,6 +269,14 @@ export interface ActionMenuItem {
 	    dans un flyout latéral AU SURVOL, sans clic (« Move to », 2026-09-27).
 	    Un clic ou → l'ouvre aussi (tactile, clavier) ; `onClick` est ignoré. */
 	submenu?: ActionMenuItem[];
+	/** Un intertitre AVANT la ligne (le semestre des dossiers de « Déplacer
+	    vers ») : il tient lieu de filet, qu'il remplace. */
+	section?: string;
+	/** Couleur de l'icône (l'accent d'un dossier, « Déplacer vers »). */
+	iconColor?: string;
+	/** Pose une icône qui n'est pas Lucide (logo d'Obsidian d'un vault) à la
+	    place d'`icon`. */
+	renderIcon?: (el: HTMLElement) => void;
 }
 
 /** Réglages de SURFACE d'un menu d'actions, tous facultatifs. */
@@ -298,7 +306,8 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	   sur une ligne FEUILLE ferme tout le menu, flyout compris. */
 	function remplir(parent: HTMLElement, liste: ActionMenuItem[], racine: boolean): void {
 		for (const item of liste) {
-			if (item.sepBefore) ajouter(parent, "div", "qbd-model-menu-sep");
+			if (item.section) ajouter(parent, "div", "qbd-action-menu-section", item.section);
+			else if (item.sepBefore) ajouter(parent, "div", "qbd-model-menu-sep");
 			const sous = racine && item.submenu && item.submenu.length > 0 ? item.submenu : null;
 			const btn = ajouter(parent, "button", "qbd-select-option"
 				+ (item.disabled ? " qbd-select-option--disabled" : "")
@@ -308,7 +317,12 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 			btn.setAttribute("role", "menuitem");
 			if (item.disabled) btn.disabled = true;
 			const iconEl = ajouter(btn, "span", "qbd-select-check qbd-action-menu-icon");
-			if (item.icon) currentHost().ui.setIcon(iconEl, item.icon);
+			if (item.renderIcon) item.renderIcon(iconEl);
+			else if (item.icon) currentHost().ui.setIcon(iconEl, item.icon);
+			if (item.iconColor) {
+				iconEl.classList.add("qbd-action-menu-icon--teinte");
+				iconEl.style.color = item.iconColor;
+			}
 			// Ligne simple façon claude.ai (icône + label + accessoire à droite).
 			// `sub` reste supporté (2 lignes) pour compat, mais n'est plus utilisé ici.
 			if (item.sub) {

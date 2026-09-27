@@ -30,7 +30,7 @@ release notes.
 - A Review plan tab in every folder: related tasks (review the questions due today), upcoming exams (several per folder, each with a name and a date, added, edited and deleted there), the folder's ring, the next step button and the study modes. Questions only become due once the folder has an upcoming exam; the nearest one sets the review pace. To review today and the exam date left the Progress tab, and Edit folder links to the exams.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 - Learn quizzes show how many readings they hold next to the number of questions.
-- A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right, and moves both files of a course shown as one card (Learn and Practice).
+- A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right: every folder of My quizzes is offered, empty ones included, with its own icon and color and grouped under its course unit; a folder moved to another vault shows the Obsidian logo next to each vault. It moves both files of a course shown as one card (Learn and Practice).
 - A Run button on every Python code block shown in a quiz (readings, questions, explanations, hints): runs the code in the Python sandbox and shows its output, or its error, right below the block.
 
 ### Changed
@@ -82,6 +82,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- Moving a folder to another vault (Move to in its menu) failed with "already exists" whenever the folder was not at the root of its vault; the current vault is no longer offered as a destination.
 - Inline code containing a dollar sign, such as `$HOME` and `$PATH` in the same sentence, is shown in full instead of losing part of the text.
 - Going back from a quiz started from a card (its Learn or Practice pill, the next step button of a folder, the home page) now returns to that quiz's page, whose back arrow returns to its folder, instead of the list of folders.
 - The AI tools (Claude Code, Codex, Antigravity) can only be started with the exact options Neo Quiz uses for a generation: an option that would let them run commands on their own is refused.

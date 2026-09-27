@@ -4,7 +4,10 @@ import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
-import { buildModuleGroups, buildUeGroups, moduleForQuiz } from "./quiz-modules";
+import { buildUeGroups, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
+import { moduleIcon } from "./module-icons";
+import { moduleAccent } from "./module-color";
+import { poserLogoObsidian } from "./brand-icons";
 import { openModuleEditModal } from "./module-edit";
 import type { ActionMenuItem } from "./ui-select";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
@@ -475,7 +478,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			onClick: () => { ctx.navigate("detail", { quiz, edit: true }); },
 		});
 		/* « Déplacer vers » — juste après Edit (demande Ahmed 2026-09-27). Les
-		   dossiers CONNUS : les groupes de `buildModuleGroups`/`buildUeGroups`
+		   dossiers CONNUS : ceux de la page « Mes quiz » (`modulesAffiches`), vides compris,
 		   sur les quiz du catalogue entier (pas seulement ceux affichés/filtrés
 		   à l'écran), qui portent un CHEMIN réel (`g.path`) — un groupe déclaré
 		   sans quiz ni chemin n'est nulle part où écrire. Le dossier COURANT du
@@ -483,21 +486,31 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		   toucher au composant de menu partagé pour un état désactivé). */
 		if (anchorEl) {
 			const dossierActuel = moduleForQuiz(quiz.path, map).path;
-			const groupes = buildModuleGroups(ctx.scanner.getQuizzes(), {}, map)
-				.filter(g => g.path && g.path !== dossierActuel);
+			// Les MÊMES dossiers que la page « Mes quiz », vides compris.
+			const archives = ctx.settings.quizzesArchivedFolders || [];
+			const sas = ctx.generatedFolder?.();
+			const groupes = modulesAffiches(ctx.scanner.getQuizzes(), {}, map,
+				Object.keys(ctx.settings.quizzesModuleOverrides || {}), archives, sas)
+				.filter(g => g.path && g.path !== dossierActuel && !archives.includes(g.folder));
 			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
 			   au lieu d'un second menu qui remplaçait le premier au clic. */
 			const sousItems: ActionMenuItem[] = [];
 			let derniereUe: string | undefined;
-			for (const ue of buildUeGroups(groupes, map)) {
+			const ues = buildUeGroups(groupes, map);
+			const plusieursUe = ues.length > 1;
+			for (const ue of ues) {
 				for (const g of ue.modules) {
+					const generated = estLeSas(g, sas);
 					sousItems.push({
-						icon: "folder",
+						// L'icône et la couleur de la CARTE du dossier (2026-09-27).
+						icon: moduleIcon(g, { generated }),
+						iconColor: moduleAccent(g, { generated }),
 						label: g.name,
-						// L'UE en accessoire à droite : montre le regroupement
-						// sans ajouter d'en-tête au composant partagé.
-						hint: ue.ue ?? t("dashboard.quizzes.noUe"),
-						sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
+						/* L'UE en INTERTITRE, à la place du filet, et plus en
+						   accessoire à droite : il mangeait la place du nom du
+						   dossier (Ahmed, 2026-09-27). Seulement quand il y a
+						   plusieurs UE : seule, elle ne distingue rien. */
+						section: plusieursUe && derniereUe !== ue.key ? (ue.ue ?? t("dashboard.quizzes.noUe")) : undefined,
 						onClick: () => {
 							/* Un COURS réuni (Learn + Practice sur une seule carte,
 							   `course-pairs.ts`) part en entier : déplacer un seul de
@@ -584,7 +597,13 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
     de `buildModuleCardMenu` pour rester testable sans DOM. */
 async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: string): Promise<boolean> {
 	const host = currentHost();
-	const localFrom = host.paths.localPath(g.folder);
+	/* Le CHEMIN du dossier, jamais `g.folder`, qui n'est que son NOM
+	   (« Templates » pour « Personal/Templates ») : le renommage visait un
+	   chemin inexistant et échouait en disant « existe déjà » (2026-09-27).
+	   L'entrée n'est offerte qu'à un dossier qui a un chemin. */
+	const source = g.path;
+	if (!source) return false;
+	const localFrom = host.paths.localPath(source);
 	// Dernier segment du chemin local : « B1/Cours/Reseaux » → « Reseaux ».
 	// Le dossier arrive à la racine cible SOUS LE MÊME NOM (spec §2.3), pas
 	// sous son chemin complet — un module d'un vault n'a pas à recréer toute
@@ -592,14 +611,21 @@ async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: st
 	const nomDossier = localFrom.split("/").pop() ?? localFrom;
 	const to = host.paths.contractPath(toRootId, nomDossier);
 	try {
-		await host.fs.rename(g.folder, to);
-	} catch {
-		// Le contrat de `rename` refuse d'écraser : un homonyme existe déjà
-		// à la cible, rien n'a bougé.
-		host.ui.notice(t("dashboard.quizzes.moveExists"));
+		await host.fs.rename(source, to);
+	} catch (e) {
+		/* Le contrat de `rename` refuse d'écraser : un homonyme existe déjà
+		   à la cible, rien n'a bougé. Toute autre erreur est un échec
+		   générique — même tri, par le message, que `moveQuizTo`. */
+		const message = e instanceof Error ? e.message : String(e);
+		if (message.includes("existe déjà")) {
+			host.ui.notice(t("dashboard.quizzes.moveExists"));
+		} else {
+			console.error("[quiz-blocks] déplacement de dossier impossible :", source, "->", to, e);
+			host.ui.notice(t("dashboard.quizzes.moveFolderError"));
+		}
 		return false;
 	}
-	await ctx.reviewStore?.moved(g.folder, to);
+	await ctx.reviewStore?.moved(source, to);
 	return true;
 }
 
@@ -662,14 +688,17 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		// `anchorEl` manquant (appelant qui n'aurait pas encore été mis à jour) :
 		// même chose, plutôt que d'ouvrir un sous-menu sans rien à y ancrer.
 		const roots = host.paths.roots();
-		if (anchorEl && roots.length > 1) {
+		if (anchorEl && roots.length > 1 && g.path) {
 			// Sous-menu au survol, comme « Move to » d'un quiz (2026-09-27).
-			const rootDeG = host.paths.rootOf(g.folder);
+			const rootDeG = host.paths.rootOf(g.path);
 			const cibles = roots.filter(root => root.id !== rootDeG?.id);
 			if (cibles.length > 0) items.push({
 				icon: "folder-input",
 				label: t("dashboard.quizzes.menuMove"),
 				submenu: cibles.map(root => ({
+					// Le logo d'Obsidian pour un vault, comme au pied des cartes.
+					icon: "folder",
+					renderIcon: root.vault ? (el: HTMLElement) => { poserLogoObsidian(el, t("dashboard.quizzes.obsidianVault")); } : undefined,
 					label: root.name,
 					onClick: () => {
 						openConfirm({

@@ -245,6 +245,22 @@
 	height: 14px;
 }
 
+/* Intertitre d'un groupe de lignes (le semestre dans « Déplacer vers ») :
+   même écriture que l'en-tête « Model » du menu des modèles, jamais en
+   capitales ; il remplace le filet entre deux groupes. */
+.qbd-action-menu-section {
+	padding: 6px 10px 3px;
+	font-size: 10.5px;
+	font-weight: 600;
+	color: var(--text-faint);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.qbd-action-menu-section:not(:first-child) {
+	margin-top: 4px;
+}
+
 /* Accessoire droite (format, nom de note) — position du raccourci claude.ai */
 .qbd-action-menu-hint {
 	margin-left: auto;

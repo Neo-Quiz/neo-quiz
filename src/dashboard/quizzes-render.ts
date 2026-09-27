@@ -8,7 +8,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
 import { regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
-import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
+import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas, modulesAffiches } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
 import { renderFolderProgress } from "./folder-progress";
@@ -132,20 +132,9 @@ export function renderQuizGrid(
 	// déclarés par le modal Nouveau dossier / Modifier dossier existent même
 	// sans quiz (alwaysInclude) — SAUF archivés : leur carte vit uniquement
 	// dans la section « Archivés » (sinon elle resterait en grille à 0 quiz).
-	const alwaysInclude = Object.keys(deps.ctx.settings.quizzesModuleOverrides || {})
-		.filter(f => !archivedFolders.includes(f));
-	const modules = buildModuleGroups(filtered, stats, map, alwaysInclude);
-	/* LE SAS DES QUIZ GÉNÉRÉS EXISTE MÊME VIDE : c'est là que les générations
-	   arrivent, et le vider le faisait disparaître de la page (2026-09-20).
-	   Ajouté sans quiz s'il n'y est pas déjà, avec l'override de dossier
-	   (couleur, icône) s'il en a un. */
 	const sasVide = deps.ctx.generatedFolder?.();
-	if (sasVide && !modules.some(m => m.path === sasVide)) {
-		const nom = sasVide.split("/").pop() || sasVide;
-		const info = map.byFolder.get(nom);
-		modules.push({ folder: nom, name: info?.name ?? nom, ue: info?.ue ?? null, color: info?.color, icon: info?.icon, path: sasVide, quizzes: [], total: 0, mastered: 0 });
-		modules.sort((a, b) => a.name.localeCompare(b.name));
-	}
+	const modules = modulesAffiches(filtered, stats, map,
+		Object.keys(deps.ctx.settings.quizzesModuleOverrides || {}), archivedFolders, sasVide);
 
 	if (mode === "recent") {
 		for (const g of buildRecentModuleGroups(modules, stats, sasVide)) {
