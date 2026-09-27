@@ -52,9 +52,12 @@ window.neoPython.surTravail((job) => {
 	const surMessage = (e) => {
 		if (!e.data || e.data.id !== job.id) return;
 		if (e.data.type === "pret") {
-			/* Chargement fini : place au délai de l'essai lui-même. */
+			/* Chargement fini : place au délai de l'essai lui-même, et prévient
+			   le principal (N1 bis) pour qu'il n'arme son propre secours qu'à
+			   partir d'ici — jamais pendant le chargement de Pyodide. */
 			clearTimeout(minuterieChargement);
 			minuterieEssai = setTimeout(() => finir({ status: "timeout", stdout: "" }), job.timeoutMs);
+			window.neoPython.pret(job.id);
 			return;
 		}
 		finir(e.data.res);

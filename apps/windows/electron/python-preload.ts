@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld("neoPython", {
 		ipcRenderer.on(CANAUX_BAC.chauffe, () => cb());
 	},
 	rendre: (id: number, res: PythonRun) => ipcRenderer.send(CANAUX_BAC.resultat, id, res),
+	pret: (id: number) => ipcRenderer.send(CANAUX_BAC.pret, id),
 });

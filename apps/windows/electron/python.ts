@@ -27,6 +27,13 @@ export const SCHEMA_PYTHON = "neo-python";
 const PARTITION = "neo-python"; // sans `persist:` : en mémoire, rien sur disque
 const CSP = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'";
 const SECOURS_MS = 3000;
+/* Budget du CHARGEMENT côté principal (N1 bis) : doit couvrir le pire cas de
+   `DELAI_CHARGEMENT_MS` de `page.js` (30 s) avant que le secours du
+   principal ne recharge la fenêtre à sa place — sinon les deux se
+   chevauchent et le principal recharge une page qui aurait fini de charger
+   toute seule. Une fois le signal « pret » reçu, le secours est REARMÉ à
+   `job.timeoutMs + SECOURS_MS` (voir `armerSecours`). */
+const CHARGEMENT_MS = 35000;
 const INACTIVITE_MS = 10 * 60 * 1000;
 /* File d'attente BORNÉE (M3) : le rendu est de confiance, mais un travail
    sans limite pourrait s'accumuler indéfiniment. */
@@ -77,8 +84,16 @@ export function creerBacASable(racine: string, preload: string, options?: { csp?
 	   du rechargement le perdrait (il attendrait `timeoutMs + SECOURS_MS`
 	   pour rien). */
 	let pretApresRecharge: Promise<void> | null = null;
+	/* (N1) : résout `pretApresRecharge` même si ni `did-finish-load` ni
+	   `did-fail-load` n'arrivent (fenêtre détruite en plein rechargement) —
+	   sinon un travail ultérieur, même sur une fenêtre neuve rouverte par
+	   `ouvrir()`, resterait bloqué pour toujours sur cette promesse. */
+	let resoudrePretApresRecharge: (() => void) | null = null;
 	let minuterieInactivite: ReturnType<typeof setTimeout> | null = null;
 	const attentes = new Map<number, (r: PythonRun) => void>();
+	/* (N1 bis) : réarme le secours de CE travail au budget de l'essai dès que
+	   la page signale la fin du chargement de Pyodide. */
+	const armerAuChargement = new Map<number, () => void>();
 
 	function preparerSession(): Electron.Session {
 		const ses = session.fromPartition(PARTITION);
@@ -109,8 +124,22 @@ export function creerBacASable(racine: string, preload: string, options?: { csp?
 		const r = attentes.get(Number(id));
 		if (!r) return;
 		attentes.delete(Number(id));
+		armerAuChargement.delete(Number(id));
 		r(normaliserResultat(res));
 	});
+
+	ipcMain.on(CANAUX_BAC.pret, (e, id: unknown) => {
+		if (!fenetre || e.sender !== fenetre.webContents) return;
+		armerAuChargement.get(Number(id))?.();
+	});
+
+	/* (N2) : aucun état ne doit survivre d'un essai à l'autre — un worker neuf
+	   par essai (I1-I3) ne suffit pas : IndexedDB de l'origine `neo-python://app`
+	   (montée par un quiz qui utilise `pyodide_js.FS.filesystems.IDBFS`) vit
+	   dans la partition, pas dans le worker, et un essai suivant la relit sinon. */
+	function nettoyerPartition(): void {
+		void session.fromPartition(PARTITION).clearStorageData().catch(() => undefined);
+	}
 
 	function ouvrir(): Promise<BrowserWindow> {
 		if (pret) return pret;
@@ -125,6 +154,13 @@ export function creerBacASable(racine: string, preload: string, options?: { csp?
 			fenetre = null; pret = null;
 			for (const [, r] of attentes) r({ status: "unavailable", stdout: "" });
 			attentes.clear();
+			armerAuChargement.clear();
+			/* (N1) : la fenêtre disparaît pendant un rechargement de secours —
+			   débloquer immédiatement quiconque attend `pretApresRecharge`, sinon
+			   la fenêtre suivante rouverte par `ouvrir()` attendrait pour rien. */
+			resoudrePretApresRecharge?.();
+			resoudrePretApresRecharge = null;
+			pretApresRecharge = null;
 		});
 		fenetre = f;
 		pret = f.loadURL(`${SCHEMA_PYTHON}://app/index.html`).then(() => f, (e) => { pret = null; f.destroy(); throw e; });
@@ -136,21 +172,59 @@ export function creerBacASable(racine: string, preload: string, options?: { csp?
 		minuterieInactivite = setTimeout(() => fermer(), INACTIVITE_MS);
 	}
 
+	/* (N1) : déclenche le rechargement de secours et pose une nouvelle
+	   `pretApresRecharge`, bornée dans tous les cas (`did-finish-load`,
+	   `did-fail-load`, ou à défaut un délai dur) pour qu'aucun travail suivant
+	   ne puisse rester bloqué dessus pour toujours. Rechauffe après un
+	   chargement réussi : la page reconstruite n'a plus aucun worker préchauffé. */
+	function declencherRechargement(f: BrowserWindow): void {
+		pretApresRecharge = new Promise<void>((resolve) => {
+			resoudrePretApresRecharge = resolve;
+			const fini = (charge: boolean) => {
+				clearTimeout(delai);
+				f.webContents.removeListener("did-finish-load", surFini);
+				f.webContents.removeListener("did-fail-load", surEchec);
+				resoudrePretApresRecharge = null;
+				if (charge) f.webContents.send(CANAUX_BAC.chauffe);
+				resolve();
+			};
+			const surFini = () => fini(true);
+			const surEchec = () => fini(false);
+			f.webContents.once("did-finish-load", surFini);
+			f.webContents.once("did-fail-load", surEchec);
+			/* Filet dur : ni l'un ni l'autre n'arrive (cas non identifié). */
+			const delai = setTimeout(() => fini(false), SECOURS_MS * 2);
+		});
+		f.webContents.reload();
+	}
+
 	function executer(job: PythonJob): Promise<PythonRun> {
 		return ouvrir().then(async f => {
 			/* Un rechargement de secours est en cours : attendre qu'il finisse
-			   avant d'envoyer ce travail, sinon il part dans le vide (M3). */
+			   avant d'envoyer ce travail, sinon il part dans le vide (M3). Borné
+			   par `declencherRechargement` : cette attente ne peut jamais durer
+			   pour toujours (N1). */
 			if (pretApresRecharge) { await pretApresRecharge; pretApresRecharge = null; }
 			return new Promise<PythonRun>((resolve) => {
 				const id = prochainId++;
-				const secours = setTimeout(() => {
-					/* La page n'a pas répondu : on la recharge (le worker meurt avec). */
-					if (!attentes.delete(id)) return;
-					pretApresRecharge = new Promise<void>((r) => f.webContents.once("did-finish-load", () => r()));
-					f.webContents.reload();
-					resolve({ status: "timeout", stdout: "" });
-				}, job.timeoutMs + SECOURS_MS);
+				let secours: ReturnType<typeof setTimeout>;
+				const armerSecours = (ms: number) => {
+					clearTimeout(secours);
+					secours = setTimeout(() => {
+						/* La page n'a pas répondu : on la recharge (le worker meurt avec). */
+						if (!attentes.delete(id)) return;
+						armerAuChargement.delete(id);
+						declencherRechargement(f);
+						resolve({ status: "timeout", stdout: "" });
+					}, ms);
+				};
 				attentes.set(id, (r) => { clearTimeout(secours); resolve(r); });
+				/* (N1 bis) : secours large pendant le CHARGEMENT de Pyodide, réarmé
+				   au budget de l'essai (`timeoutMs + SECOURS_MS`) dès le signal
+				   « pret » relayé par `page.js` — jamais avant, sinon une machine
+				   lente expire au milieu du chargement pour rien. */
+				armerAuChargement.set(id, () => armerSecours(job.timeoutMs + SECOURS_MS));
+				armerSecours(CHARGEMENT_MS + SECOURS_MS);
 				f.webContents.send(CANAUX_BAC.travail, { ...job, id });
 			});
 		}, (): PythonRun => ({ status: "unavailable", stdout: "" }));
@@ -168,7 +242,10 @@ export function creerBacASable(racine: string, preload: string, options?: { csp?
 			}
 			rearmerInactivite();
 			enFile++;
-			const suite = file.then(() => executer(job)).finally(() => { enFile--; });
+			const suite = file
+				.then(() => executer(job))
+				.then((r) => { nettoyerPartition(); return r; })
+				.finally(() => { enFile--; });
 			file = suite.catch(() => undefined);
 			return suite;
 		},

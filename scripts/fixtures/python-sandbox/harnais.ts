@@ -59,11 +59,110 @@ const EVASION_AUTRE_ORIGINE = (cible: string) => [
 	"    print('REFUSE', type(e).__name__)",
 ].join("\n");
 
+/* (N2) : rien ne doit survivre d'un essai à l'autre au-delà du worker — la
+   partition (IndexedDB de l'origine `neo-python://app`) est un canal séparé,
+   PARTAGÉ par construction entre deux workers successifs. Essai 1 monte
+   IDBFS sur `/p`, écrit `trace.txt`, synchronise (JS → IndexedDB) ; essai 2,
+   dans un worker neuf, remonte `/p` et synchronise dans l'autre sens
+   (IndexedDB → JS) avant de vérifier. Sans `clearStorageData()` après chaque
+   essai, essai 2 relit ce qu'essai 1 a laissé. */
+/* `FS.syncfs` (IDBFS) appelle le rappel une fois, mais via un PyProxy créé à
+   la volée (une fonction Python passée telle quelle) qui est détruit dès la
+   fin de l'appel synchrone `FS.syncfs(...)` — avant que le callback réel
+   (asynchrone, IndexedDB) n'ait la chance de s'exécuter. `create_once_callable`
+   en fait un proxy qui survit jusqu'à son unique appel. */
+const IDBFS_ESSAI_1 = [
+	"import asyncio, pyodide_js",
+	"from pyodide.ffi import create_once_callable",
+	"try:",
+	"    FS = pyodide_js.FS",
+	"    try:",
+	"        FS.mkdir('/p')",
+	"    except Exception:",
+	"        pass",
+	"    FS.mount(FS.filesystems.IDBFS, {}, '/p')",
+	"    with open('/p/trace.txt', 'w') as fh:",
+	"        fh.write('laisse par essai 1')",
+	"    fut = asyncio.get_event_loop().create_future()",
+	"    FS.syncfs(False, create_once_callable(lambda err: (not fut.done()) and fut.set_result(True)))",
+	"    await fut",
+	"    print('ECRIT')",
+	"except Exception as e:",
+	"    print('ERREUR', type(e).__name__, str(e))",
+].join("\n");
+const IDBFS_ESSAI_2 = [
+	"import asyncio, os, pyodide_js",
+	"from pyodide.ffi import create_once_callable",
+	"try:",
+	"    FS = pyodide_js.FS",
+	"    try:",
+	"        FS.mkdir('/p')",
+	"    except Exception:",
+	"        pass",
+	"    FS.mount(FS.filesystems.IDBFS, {}, '/p')",
+	"    fut = asyncio.get_event_loop().create_future()",
+	"    FS.syncfs(True, create_once_callable(lambda err: (not fut.done()) and fut.set_result(True)))",
+	"    await fut",
+	"    print(os.path.exists('/p/trace.txt'))",
+	"except Exception as e:",
+	"    print('ERREUR', type(e).__name__, str(e))",
+].join("\n");
+
+/* I2 : une tâche `asyncio` lancée puis jamais attendue par essai 1 ne doit
+   plus tourner du tout après le résultat rendu — `terminate()` doit la tuer
+   AVEC le worker. Essai 1 programme l'écriture d'un marqueur (via IDBFS,
+   seul canal qui survit au worker, cf. N2) après un délai plus long que
+   l'essai lui-même, puis rend son résultat tout de suite ; essai 2 attend
+   plus longtemps que ce délai puis vérifie que le marqueur n'existe pas. Un
+   `terminate()` qui ne tue pas la tâche laisserait le temps à celle-ci
+   d'écrire, puisque le worker entier continuerait de tourner. */
+const ASYNCIO_ESSAI_1 = [
+	"import asyncio, pyodide_js",
+	"from pyodide.ffi import create_once_callable",
+	"FS = pyodide_js.FS",
+	"try:",
+	"    FS.mkdir('/q')",
+	"except Exception:",
+	"    pass",
+	"FS.mount(FS.filesystems.IDBFS, {}, '/q')",
+	"async def ecrire_plus_tard():",
+	"    await asyncio.sleep(2)",
+	"    with open('/q/asyncio-survit.txt', 'w') as fh:",
+	"        fh.write('encore la')",
+	"    fut = asyncio.get_event_loop().create_future()",
+	"    FS.syncfs(False, create_once_callable(lambda err: (not fut.done()) and fut.set_result(True)))",
+	"    await fut",
+	"asyncio.ensure_future(ecrire_plus_tard())",
+	"print('LANCE')",
+].join("\n");
+const ASYNCIO_ESSAI_2 = [
+	"import asyncio, os, pyodide_js",
+	"from pyodide.ffi import create_once_callable",
+	"await asyncio.sleep(3)", // laisse le temps à la tâche de l'essai 1 d'écrire, si elle a survécu
+	"FS = pyodide_js.FS",
+	"try:",
+	"    FS.mkdir('/q')",
+	"except Exception:",
+	"    pass",
+	"FS.mount(FS.filesystems.IDBFS, {}, '/q')",
+	"fut = asyncio.get_event_loop().create_future()",
+	"FS.syncfs(True, create_once_callable(lambda err: (not fut.done()) and fut.set_result(True)))",
+	"await fut",
+	"print(os.path.exists('/q/asyncio-survit.txt'))",
+].join("\n");
+
 /* I4 (a) : évasion réseau SANS `Function`/`eval` du tout — par un chemin
    RÉEL de Pyodide (`loadPackage` va chercher un `.whl` par lui-même). Si la
    CSP seule bloquait (comme les cas ci-dessus, qui passent tous par
    `Function`), celui-ci prouverait le contraire : `loadPackage` n'évalue
-   rien, seul `webRequest.onBeforeRequest` peut l'arrêter. */
+   rien, seul `webRequest.onBeforeRequest` peut l'arrêter.
+   ATTENTION (N3) : les deux cas ci-dessous NE DISCRIMINENT AUCUNE de nos
+   couches — `loadpackage-file` échoue tout seul (Pyodide refuse `file:///`
+   comme nom de paquet AVANT toute requête) et `loadpackage-http` échoue même
+   sans CSP ni `webRequest` (la requête `cors` de `loadPackage` est rejetée
+   par CORS après émission, jamais annulée par `webRequest`). Ils restent
+   comme documentation de ce chemin, mais la preuve réseau tient uniquement
+   sur `reseau`/`sanscsp-reseau` (mode `no-cors`, cf. plus haut). */
 const EVASION_LOADPACKAGE = (url: string) => [
 	"import pyodide_js",
 	"try:",
@@ -148,6 +247,10 @@ void app.whenReady().then(async () => {
 	await cas("csp", { code: CODE_CSP });
 	await cas("fuite-essai1", { code: FUITE_ESSAI_1 });
 	await cas("fuite-essai2", { code: FUITE_ESSAI_2, after: "assert False" });
+	await cas("idbfs-essai1", { code: IDBFS_ESSAI_1 });
+	await cas("idbfs-essai2", { code: IDBFS_ESSAI_2 });
+	await cas("asyncio-essai1", { code: ASYNCIO_ESSAI_1 });
+	await cas("asyncio-essai2", { code: ASYNCIO_ESSAI_2, timeoutMs: 8000 });
 	await cas("os-exit", { code: "import os\nos._exit(0)" });
 	await cas("apres-exit", { code: "print('encore-vivant')", timeoutMs: 60000 });
 	await cas("boucle", { code: "while True:\n    pass", timeoutMs: 2000 });

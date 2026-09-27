@@ -64,14 +64,15 @@ try {
 	r.check("évasion fichier : ni contenu (200) ni lecture opaque (0)", /LU (200|0)\b/.test(cas.fichier?.stdout ?? "LU manquant"), false);
 	r.check("évasion traversee : rien de lu (200)", /LU 200\b/.test(cas.traversee?.stdout ?? "LU manquant"), false);
 
-	/* I4 (a) : évasion réseau SANS eval, par un chemin réel de Pyodide
-	   (`loadPackage`, qui ne lève PAS pour un paquet en échec — il logue et
-	   continue, d'où la présence de « CHARGE » quoi qu'il arrive). La preuve
-	   que la requête n'a jamais abouti est « Failed to fetch » : c'est
-	   `webRequest.onBeforeRequest` qui annule la requête, jamais une réponse
-	   du serveur distant. */
-	r.check("évasion loadPackage(http) : requête jamais aboutie", /Failed to fetch/.test(cas["loadpackage-http"]?.stdout ?? ""), true);
-	r.check("évasion loadPackage(file) : jamais chargé", /CHARGE/.test(cas["loadpackage-file"]?.stdout ?? "CHARGE manquant"), false);
+	/* (N3) : ces deux cas ne discriminent AUCUNE de nos couches — voir le
+	   commentaire de `EVASION_LOADPACKAGE` dans le harnais. `loadpackage-http`
+	   échoue en « Failed to fetch » même sans CSP ni `webRequest` (CORS rejette
+	   la requête `cors` de `loadPackage` après émission) ; `loadpackage-file`
+	   échoue tout seul, Pyodide refusant `file:///` comme nom de paquet avant
+	   toute requête. Gardés comme documentation, pas comme preuve de sécurité :
+	   la preuve réseau tient sur `reseau`/`sanscsp-reseau` (mode `no-cors`). */
+	r.check("loadPackage(http) : requête jamais aboutie (CORS ou webRequest)", /Failed to fetch/.test(cas["loadpackage-http"]?.stdout ?? ""), true);
+	r.check("loadPackage(file) : refusé par Pyodide avant toute requête", /CHARGE/.test(cas["loadpackage-file"]?.stdout ?? "CHARGE manquant"), false);
 	/* I4 (c) : la CSP seule, sur du code qui ne touche ni réseau ni disque —
 	   Pyodide enveloppe le refus JS en `JsException`, jamais un `EvalError`
 	   Python. */
@@ -85,6 +86,15 @@ try {
 	   l'autre, même via un patch de `pyodide.code.eval_code_async`. */
 	r.check("I1 : essai 1 patche sans effet sur l'essai suivant", (cas["fuite-essai2"]?.stdout ?? "").trim(), "False");
 	r.check("I1 : l'`after` de l'essai 2 échoue bien (interpréteur neuf)", cas["fuite-essai2"]?.status, "error");
+
+	/* N2 : rien ne survit dans la partition (IndexedDB) d'un essai à l'autre. */
+	r.check("N2 : essai 1 écrit bien dans IDBFS", cas["idbfs-essai1"]?.stdout, "ECRIT\n");
+	r.check("N2 : essai 2 ne relit pas ce qu'essai 1 a laissé", cas["idbfs-essai2"]?.stdout, "False\n");
+
+	/* I2 : une tâche asyncio non attendue par essai 1 ne survit pas à son
+	   `terminate()` — elle n'a jamais l'occasion d'écrire son marqueur. */
+	r.check("I2 : essai 1 lance la tâche puis rend la main tout de suite", cas["asyncio-essai1"]?.stdout, "LANCE\n");
+	r.check("I2 : la tâche de l'essai 1 n'a pas survécu pour écrire", cas["asyncio-essai2"]?.stdout, "False\n");
 
 	/* I3 : un Pyodide qui s'arrête pour de bon (`os._exit(0)`) n'immobilise
 	   pas la session — l'essai suivant doit marcher normalement. */
