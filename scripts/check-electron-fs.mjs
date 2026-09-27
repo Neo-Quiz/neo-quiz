@@ -64,7 +64,7 @@ async function cas(r, nom, fn) {
 	}
 }
 
-await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers, statEntree }) => {
+await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers, statEntree, renameParCopie }) => {
 	const r = makeReporter("Primitives de fichiers Electron");
 	const dir = await mkdtemp(join(tmpdir(), "electron-fs-check-"));
 
@@ -225,6 +225,57 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			// partiel — sinon un renommage refusé perdrait quand même le fichier.
 			r.check("rename REJETTE si la destination existe (source intacte)",
 				[rejette, await fichiers.read(de)], [true, "source"]);
+		});
+
+		/* REVUE 2026-09-27 (constat 1) : la garde d'avant (`exists` PUIS
+		   `rename`) n'était PAS atomique — une fenêtre entre les deux `await`
+		   laissait passer une écriture concurrente, que `fs.rename` de Node
+		   écrase alors en silence. Sur l'ANCIEN code, les DEUX renommages
+		   ci-dessous réussissaient (aucun `exists(vers)` ne voyait l'autre à
+		   temps) et l'un des deux fichiers sources disparaissait sans laisser
+		   de trace nulle part — silencieusement perdu. La garde par `fs.link`
+		   (atomique au niveau du système de fichiers) fait qu'un seul des deux
+		   peut réussir, quel que soit l'ordre d'exécution. */
+		await cas(r, "rename : deux renommages concurrents vers la même cible, un seul réussit", async () => {
+			const vers = join(dir, "m-cible.txt");
+			const deA = join(dir, "m-source-a.txt");
+			const deB = join(dir, "m-source-b.txt");
+			await fichiers.write(deA, "A");
+			await fichiers.write(deB, "B");
+			const [resA, resB] = await Promise.allSettled([
+				fichiers.rename(deA, vers),
+				fichiers.rename(deB, vers),
+			]);
+			const reussis = [resA, resB].filter(x => x.status === "fulfilled").length;
+			const rejetes = [resA, resB].filter(x => x.status === "rejected").length;
+			// Exactement un des deux : jamais les deux (l'un écraserait
+			// l'autre) et jamais aucun (une vraie garde ne doit pas non plus
+			// faire échouer une course légitime des deux côtés).
+			r.check("rename : deux renommages concurrents vers la même cible, un seul réussit",
+				[reussis, rejetes], [1, 1]);
+		});
+
+		/* Le repli copie (`renameParCopie`, emprunté par `rename` sur
+		   `EXDEV`/`EPERM`, non reproductibles sans un second volume — voir le
+		   commentaire de la fonction) : mêmes garanties qu'un `fs.link`
+		   direct, éprouvées ici en l'appelant hors de tout `EXDEV` réel. */
+		await cas(r, "renameParCopie (repli) déplace le fichier ET refuse d'écraser une cible existante", async () => {
+			const de = join(dir, "m2-source.txt");
+			const vers = join(dir, "m2-dest.txt");
+			await fichiers.write(de, "contenu");
+			await renameParCopie(de, vers);
+			const dejaLa = join(dir, "m2-source-2.txt");
+			const versOccupe = join(dir, "m2-dest.txt"); // déjà écrit ci-dessus
+			await fichiers.write(dejaLa, "autre contenu");
+			const rejette = await aRejete(() => renameParCopie(dejaLa, versOccupe));
+			r.check("renameParCopie (repli) déplace le fichier ET refuse d'écraser une cible existante",
+				[
+					await existeEncore(de),
+					await fichiers.read(vers),
+					rejette,
+					await existeEncore(dejaLa),
+				],
+				[false, "contenu", true, true]);
 		});
 
 		/* Tâche 3 : « Déplacer vers… » déplace un DOSSIER, pas seulement un

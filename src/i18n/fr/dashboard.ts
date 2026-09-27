@@ -200,6 +200,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.menuMoveQuiz": "Déplacer vers",
 	"dashboard.quizzes.movedQuiz": "Déplacé vers {target}",
 	"dashboard.quizzes.moveQuizExists": "Un quiz de ce nom existe déjà là-bas.",
+	"dashboard.quizzes.moveFolderMissing": "Le dossier {target} n'existe plus.",
+	"dashboard.quizzes.moveQuizError": "Impossible de déplacer le quiz — détails dans la console.",
 
 	/* ── Modal « Modifier dossier » ── */
 	"dashboard.quizzes.moduleEditTitle": "Modifier dossier",

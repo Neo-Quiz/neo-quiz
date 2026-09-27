@@ -28,6 +28,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import * as fs from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import * as path from "node:path";
 
 /** Les primitives de fichiers du processus principal. Onze méthodes du
@@ -123,6 +124,30 @@ async function cheminLibre(base: string, ext: string): Promise<string> {
 		if (!(await existeSurDisque(candidat))) return candidat;
 	}
 	throw new Error("aucun nom de fichier libre après 50 essais : " + base + ext);
+}
+
+/**
+ * Repli de `rename` pour un FICHIER quand `fs.link` ne peut pas être posé
+ * (`EXDEV` : deux volumes ; `EPERM` : un système de fichiers qui refuse les
+ * liens durs — FAT, certains partages réseau). `COPYFILE_EXCL` rejette avec
+ * `EEXIST` si `vers` existe déjà, donc la garde anti-écrasement reste
+ * ATOMIQUE même sur ce chemin — jamais un `exists` + `copyFile` qui rouvrirait
+ * la même fenêtre de course que l'ancien `exists` + `rename`.
+ *
+ * EXPORTÉE séparément de `rename` UNIQUEMENT pour que le contrôle puisse
+ * l'éprouver directement : un `EXDEV`/`EPERM` réel ne se produit qu'entre
+ * deux volumes distincts, non reproductible dans un unique dossier temporaire
+ * de test (même limite déjà assumée par le repli `EXDEV` du renommage d'un
+ * DOSSIER, plus haut).
+ */
+export async function renameParCopie(de: string, vers: string): Promise<void> {
+	try {
+		await fs.copyFile(de, vers, fsConstants.COPYFILE_EXCL);
+	} catch (e) {
+		if ((e as NodeJS.ErrnoException)?.code === "EEXIST") throw new Error(`${vers} existe déjà`);
+		throw e;
+	}
+	await fs.unlink(de);
 }
 
 /** Crée un dossier et ses parents ; ne rejette pas s'il existe déjà — une
@@ -233,27 +258,66 @@ export function creerFichiers(): PrimitivesFichiers {
 				if (await existeSurDisque(chemin)) throw e;
 			}
 		},
-		/* Pas d'écrasement : `fs.rename` de Node remplace la destination en
-		   silence si elle existe, et la migration du journal s'appuie sur le
-		   contraire (voir `apps/windows/src/host/fs.ts`, même remarque) —
-		   écraser une sauvegarde `review-log.jsonl.migrated` déjà là la
-		   détruirait. */
+		/* Pas d'écrasement : la migration du journal s'appuie sur ce refus
+		   (voir `apps/windows/src/host/fs.ts`, même remarque) — écraser une
+		   sauvegarde `review-log.jsonl.migrated` déjà là la détruirait.
+
+		   REVUE (2026-09-27) : `if (await existe(vers)) throw` PUIS
+		   `fs.rename` porte une fenêtre de course — entre les deux `await`,
+		   un AUTRE renommage (ou une écriture) vers `vers` peut créer la
+		   cible, et `fs.rename` de Node l'écrase alors en silence (Windows
+		   comme POSIX). Pour un FICHIER, la garde est rendue atomique par
+		   `fs.link` : il pose un second nom sur les mêmes octets et REJETTE
+		   avec `EEXIST` si `vers` existe déjà — aucune fenêtre entre la
+		   vérification et l'écriture, contrairement à `exists` + `rename`.
+		   La source est ensuite retirée (`unlink`), ce qui est bien un
+		   déplacement du point de vue de l'appelant.
+		   Un DOSSIER ne peut pas se lier ainsi (`fs.link` ne sait lier que des
+		   fichiers) : la garde y reste `exists` + `rename`, avec sa fenêtre
+		   résiduelle assumée — Windows refuse déjà nativement d'écraser un
+		   dossier existant via `MoveFileEx` (pas de remplacement pour un
+		   dossier), ce qui borne le risque en pratique à une course sur un
+		   dossier CRÉÉ entre les deux `await`, plus étroite que celle d'un
+		   fichier. */
 		async rename(de, vers) {
-			if (await existeSurDisque(vers)) throw new Error(`${vers} existe déjà`);
-			try {
-				await fs.rename(de, vers);
-			} catch (e) {
-				/* EXDEV : la source et la destination sont sur deux VOLUMES
-				   distincts (« Déplacer vers… » peut traverser un vault sur `D:`
-				   et `C:\Neo Quiz`) — `fs.rename` de Node ne sait déplacer que
-				   sur un même volume. Repli : copie récursive (fichier ou
-				   dossier, `fs.cp` gère les deux) puis suppression de la
-				   source. Pas atomique, mais c'est la seule option hors du
-				   volume ; la garde d'écrasement ci-dessus a déjà eu lieu. */
-				if ((e as NodeJS.ErrnoException)?.code !== "EXDEV") throw e;
-				await fs.cp(de, vers, { recursive: true });
-				await fs.rm(de, { recursive: true, force: true });
+			const source = await fs.lstat(de).catch(() => null);
+			if (source?.isDirectory()) {
+				if (await existeSurDisque(vers)) throw new Error(`${vers} existe déjà`);
+				try {
+					await fs.rename(de, vers);
+				} catch (e) {
+					/* EXDEV : la source et la destination sont sur deux VOLUMES
+					   distincts (« Déplacer vers… » peut traverser un vault sur
+					   `D:` et `C:\Neo Quiz`) — `fs.rename` de Node ne sait
+					   déplacer que sur un même volume. Repli : copie récursive
+					   puis suppression de la source. Pas atomique, mais c'est
+					   la seule option hors du volume ; la garde d'écrasement
+					   ci-dessus a déjà eu lieu. */
+					if ((e as NodeJS.ErrnoException)?.code !== "EXDEV") throw e;
+					await fs.cp(de, vers, { recursive: true });
+					await fs.rm(de, { recursive: true, force: true });
+				}
+				return;
 			}
+			try {
+				await fs.link(de, vers);
+			} catch (e) {
+				const code = (e as NodeJS.ErrnoException)?.code;
+				if (code === "EEXIST") throw new Error(`${vers} existe déjà`);
+				/* EXDEV (deux volumes) ou EPERM (certains systèmes de fichiers
+				   réseau/FAT refusent les liens durs) : repli sur une copie
+				   EXCLUSIVE — `COPYFILE_EXCL` rejette elle aussi avec `EEXIST`
+				   si `vers` existe déjà, donc la garde reste atomique même sur
+				   ce chemin. */
+				if (code !== "EXDEV" && code !== "EPERM") throw e;
+				await renameParCopie(de, vers);
+				return;
+			}
+			// Le lien est posé : la source devient superflue, la retirer achève
+			// le déplacement. Si `unlink` échouait ici (très improbable juste
+			// après un `link` réussi), les DEUX noms resteraient sur le disque
+			// plutôt qu'une perte de données — préférable à l'inverse.
+			await fs.unlink(de);
 		},
 	};
 }

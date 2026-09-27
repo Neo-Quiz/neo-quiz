@@ -349,16 +349,43 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
    groupes de `buildUeGroups`/`buildModuleGroups`, sur la même `map`).
 
    Nom libre par `freeNotePath` (même garde que « Nouveau quiz » /
-   `folder-create.ts`) : jamais d'écrasement, un homonyme reçoit " (2)". */
-async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string): Promise<string | null> {
+   `folder-create.ts`) : jamais d'écrasement, un homonyme reçoit " (2)".
+
+   `targetName` sert UNIQUEMENT à nommer la cible dans les messages (succès,
+   dossier disparu) — jamais à écrire, où seul `targetFolder` (un chemin du
+   contrat) compte. */
+export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string, targetName: string): Promise<string | null> {
 	const host = currentHost();
+	/* REVUE (2026-09-27) : un dossier CONNU du catalogue (il a déjà un quiz,
+	   donc un `ModuleGroup`) peut avoir disparu du DISQUE depuis — supprimé
+	   hors de l'app pendant que le catalogue en mémoire le référence encore.
+	   Sans cette garde, `freeNotePath` boucle sur un dossier absent (il
+	   rendrait le premier nom, `exists` étant faux partout) et `rename`
+	   échoue ensuite avec une erreur système brute (`ENOENT` sur le dossier
+	   PARENT), que le `catch` plus bas afficherait comme une erreur générique
+	   — correct, mais moins clair que de le dire ICI, avant même d'écrire. */
+	if (!(await host.fs.exists(targetFolder))) {
+		host.ui.notice(t("dashboard.quizzes.moveFolderMissing", { target: targetName }));
+		return null;
+	}
 	const to = await freeNotePath(targetFolder, quiz.basename);
 	try {
 		await host.fs.rename(quiz.path, to);
-	} catch {
-		// Course rare entre le calcul du nom libre et le renommage : quelqu'un
-		// a écrit là-bas entre-temps. Rien n'a bougé.
-		host.ui.notice(t("dashboard.quizzes.moveQuizExists"));
+	} catch (e) {
+		/* REVUE (2026-09-27) : le `catch` affichait TOUJOURS « existe déjà »,
+		   y compris pour une panne disque ou un permis refusé sans rapport
+		   avec un homonyme. Les DEUX hôtes (`apps/windows/electron/fichiers.ts`,
+		   `apps/obsidian/host.ts`) posent le même message reconnaissable pour
+		   la collision (« <chemin> existe déjà ») — seul ce cas garde le
+		   toast précis ; tout le reste devient un échec générique, la cause
+		   réelle dans la console pour qui doit diagnostiquer. */
+		const message = e instanceof Error ? e.message : String(e);
+		if (message.includes("existe déjà")) {
+			host.ui.notice(t("dashboard.quizzes.moveQuizExists"));
+		} else {
+			console.error("[quiz-blocks] déplacement de quiz impossible :", quiz.path, "->", to, e);
+			host.ui.notice(t("dashboard.quizzes.moveQuizError"));
+		}
 		return null;
 	}
 	// Historique de révision : même appel que `moveModuleTo`, qui sait déjà
@@ -448,7 +475,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 								hint: ue.ue ?? t("dashboard.quizzes.noUe"),
 								sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
 								onClick: () => {
-									void moveQuizTo(ctx, quiz, g.path as string).then(to => {
+									void moveQuizTo(ctx, quiz, g.path as string, g.name).then(to => {
 										if (to) {
 											currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
 											rerender();

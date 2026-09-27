@@ -42,6 +42,7 @@
     "check:review-log": "node scripts/check-review-log.mjs",
     "check:module-edit": "node scripts/check-module-edit.mjs",
     "check:rename-match": "node scripts/check-rename-match.mjs",
+    "check:move-quiz": "node scripts/check-move-quiz.mjs",
     "report:multiblock": "node scripts/report-multiblock.mjs \"C:/obsidian-vaults/Personal\" \"C:/obsidian-vaults/Efrei\"",
     "report:url-max": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/report-url-max.ps1",
     "report:installation": "node scripts/mesurer-installation.mjs",
