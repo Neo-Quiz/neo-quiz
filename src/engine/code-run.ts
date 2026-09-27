@@ -47,6 +47,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		if (!sortie) {
 			sortie = document.createElement("div");
 			sortie.className = "quiz-code-output";
+			// Nommé pour un lecteur d'écran, comme celui qu'émet grammaire-blocs.ts.
+			sortie.setAttribute("aria-label", t("engine.code.output"));
 			sortie.hidden = true;
 			bloc.appendChild(sortie);
 		}

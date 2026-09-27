@@ -169,7 +169,10 @@
    code` elle-même, mais l'absence de `font-family` sur SON `<code>`
    interne — voir la feuille de style par défaut du navigateur juste
    après. */
-.quiz-md-code.quiz-md-code{
+.quiz-md-code.quiz-md-code,
+/* L'enveloppe d'un bloc exécutable porte la MÊME palette : son fond et sa
+   sortie la lisent, et sans elle ils retombaient sur les couleurs de repli. */
+.quiz-code-block-executable{
   --qmc-bg: #1a1b26;
   --qmc-border: #24283b;
   --qmc-fg: #c0caf5;
@@ -183,7 +186,8 @@
   --qmc-punctuation: #c0caf5;
   --qmc-tag: #f7768e;
   --qmc-attr: #e0af68;
-
+}
+.quiz-md-code.quiz-md-code{
   background: var(--qmc-bg);
   border: 1px solid var(--qmc-border);
   border-radius: 12px;
@@ -322,8 +326,13 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   border: 1px solid var(--qmc-border, var(--background-modifier-border));
   border-radius: 12px;
   overflow: hidden;
+  /* Le fond du CODE porté par l'enveloppe : aucune bande transparente ne
+     peut plus s'ouvrir entre le code et sa sortie (2026-09-27, « sans que ça
+     ne laisse de trou » — la marge du `<pre>` en laissait deux de 10 px). */
+  background: var(--qmc-bg, var(--background-secondary));
 }
 .quiz-code-block-executable .quiz-md-code.quiz-md-code{
+  margin: 0;
   border: none;
   border-radius: 0;
 }
@@ -353,8 +362,17 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
    du 2026-09-26, A-IMPORTANT 2). */
 .quiz-code-run-btn[hidden]{ display: none; }
 .quiz-code-run-btn svg{ width: 15px; height: 15px; }
-.quiz-code-run-btn:hover{ opacity: 1; background: color-mix(in srgb, var(--qmc-fg, currentColor) 12%, transparent); }
+/* Au survol, l'ACCENT de l'app (le bleu de « Commencer le quiz »), pas une
+   teinte du thème de code : c'est un bouton de Neo Quiz posé sur le code. */
+.quiz-code-run-btn{ transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease; }
+.quiz-code-run-btn:hover{
+  opacity: 1;
+  color: var(--quiz-primary, var(--interactive-accent));
+  background: color-mix(in srgb, var(--quiz-primary, var(--interactive-accent)) 16%, transparent);
+}
+.quiz-code-run-btn:focus-visible{ opacity: 1; outline: 2px solid var(--quiz-primary, var(--interactive-accent)); outline-offset: 1px; }
 .quiz-code-run-btn:disabled{ cursor: default; opacity: 0.5; }
+.quiz-code-run-btn.quiz-code-run-running{ opacity: 1; color: var(--quiz-primary, var(--interactive-accent)); }
 .quiz-code-run-btn.quiz-code-run-running svg{ animation: quiz-code-run-spin 0.8s linear infinite; }
 @keyframes quiz-code-run-spin{ to { transform: rotate(360deg); } }
 
@@ -365,15 +383,18 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
    simple filet, jamais un second encadré (pas de tuile dans une tuile,
    demande du 2026-09-27 — comme le panneau de sortie d'un éditeur de code) :
    même bordure, mêmes coins arrondis que le bloc, portés par l'enveloppe.
-   Son fond, un cran plus clair que celui du code (`--qmc-bg`), est ce qui la
+   Son fond, un cran plus sombre que celui du code (`--qmc-bg`), est ce qui la
    distingue — pas un encadré. */
 .quiz-code-output{
   margin: 0;
-  padding: 10px 14px;
+  padding: 10px 16px 12px;
   border: none;
-  border-top: 1px solid color-mix(in srgb, var(--qmc-border, var(--background-modifier-border)) 70%, transparent);
+  /* Pas d'intitulé « Sortie » : le fond suffit à dire ce que c'est
+     (2026-09-27). Le filet se voit à peine (référence : le panneau de sortie de VS Code) :
+     c'est le FOND, un cran plus sombre que le code, qui sépare. */
+  border-top: 1px solid color-mix(in srgb, var(--qmc-fg, var(--text-normal)) 7%, transparent);
   border-radius: 0;
-  background: color-mix(in srgb, var(--qmc-bg, var(--background-secondary)), white 6%);
+  background: color-mix(in srgb, var(--qmc-bg, var(--background-secondary)), black 22%);
   color: color-mix(in srgb, var(--qmc-fg, var(--text-normal)) 85%, transparent);
   font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.85em;
