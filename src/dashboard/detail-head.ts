@@ -28,6 +28,12 @@ export interface EnteteAction {
 	/** Pastille numérique après le libellé (compteur de termes du glossaire,
 	    tâche 4 du lot D) — absente ou vide : pas de pastille. */
 	badge?: string;
+	/** Identifiant STABLE posé en `data-qbd-key` sur le bouton peint, pour
+	    qu'un appelant retrouve un bouton déjà peint (`setActionBadge`) sans
+	    repeindre tout l'en-tête — l'action « Vocabulaire », dont la pastille
+	    se met à jour une fois le brouillon chargé (`detail.ts`). Absent pour
+	    les autres actions, qui n'ont rien à rafraîchir après coup. */
+	key?: string;
 }
 
 export interface EnteteDeps {
@@ -53,9 +59,10 @@ export function dossierDuQuiz(path: string): string {
 	return path.split("/").slice(0, -1).filter(Boolean).pop() ?? "";
 }
 
-function bouton(parent: HTMLElement, cls: string, icon: string, label: string, badge?: string): HTMLButtonElement {
+function bouton(parent: HTMLElement, cls: string, icon: string, label: string, badge?: string, key?: string): HTMLButtonElement {
 	const btn = ajouter(parent, "button", cls);
 	btn.type = "button";
+	if (key) btn.dataset.qbdKey = key;
 	currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), icon);
 	ajouter(btn, "span", undefined, label);
 	if (badge) ajouter(btn, "span", "qbd-qz-action-badge", badge);
@@ -102,7 +109,7 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
 	edit.addEventListener("click", () => deps.onToggleEditing());
 
 	for (const action of deps.actions) {
-		const btn = bouton(actions, "qbd-qz-action", action.icon, action.label, action.badge);
+		const btn = bouton(actions, "qbd-qz-action", action.icon, action.label, action.badge, action.key);
 		poserBouton3dNeutre(btn);
 		btn.addEventListener("click", () => action.onClick(btn));
 	}

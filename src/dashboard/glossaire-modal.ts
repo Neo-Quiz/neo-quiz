@@ -59,20 +59,42 @@ function compterTermes(draft: QuizDraft): number {
 	return lireGlossaire(draft.examOptions?.glossary ?? []).length;
 }
 
+/** Le texte de la pastille du bouton « Vocabulaire », ou `undefined` sans
+    brouillon chargé ni terme exploitable. Exportée pour que `detail.ts`
+    rafraîchisse la pastille une fois le brouillon chargé (voir
+    `glossaryHeaderAction` ci-dessous : posée AVANT ce chargement, elle ne
+    peut pas encore compter les termes). */
+export function texteBadgeGlossaire(draft: QuizDraft | null): string | undefined {
+	if (!draft) return undefined;
+	const compte = compterTermes(draft);
+	return compte > 0 ? t(compte === 1 ? "editor.glossary.countOne" : "editor.glossary.countOther", { count: compte }) : undefined;
+}
+
 /**
  * L'action « Vocabulaire » de l'en-tête, en édition seulement (l'appelant ne
  * la pousse dans `EnteteDeps.actions` que si `editing` vaut vrai) : icône
  * `book-a`, pastille du nombre de termes s'il y en a. Le clic ouvre la
  * modale ; sa fermeture met à jour la pastille SANS repeindre tout l'en-tête
  * (`setActionBadge`).
+ *
+ * `getDraft` est un GETTER, pas le brouillon lui-même : l'action se pose dès
+ * que `editing` est vrai (menu « Modifier », création d'un quiz), AVANT que
+ * `spec.load()` n'ait résolu — `draft` vaut alors encore `null` un instant.
+ * Lu à CHAQUE clic, jamais figé, pour refléter le brouillon du moment même
+ * si la page a fini de charger entre-temps. `key: "glossary"` permet à
+ * `detail.ts` de retrouver le bouton déjà peint pour rafraîchir sa pastille
+ * (`texteBadgeGlossaire`) sans repeindre tout l'en-tête.
  */
-export function glossaryHeaderAction(draft: QuizDraft, scheduleSave: () => void): EnteteAction {
-	const compte = compterTermes(draft);
+export function glossaryHeaderAction(getDraft: () => QuizDraft | null, scheduleSave: () => void): EnteteAction {
 	return {
 		label: t("editor.glossary.button"),
 		icon: "book-a",
-		badge: compte > 0 ? t(compte === 1 ? "editor.glossary.countOne" : "editor.glossary.countOther", { count: compte }) : undefined,
+		badge: texteBadgeGlossaire(getDraft()),
+		key: "glossary",
 		onClick: (el) => {
+			// Cliqué avant la fin du chargement (cas rare) : rien à glosser.
+			const draft = getDraft();
+			if (!draft) return;
 			openGlossaireModal({
 				glossary: garantirGlossaire(draft),
 				onChange: scheduleSave,

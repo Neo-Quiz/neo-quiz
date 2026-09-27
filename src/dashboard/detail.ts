@@ -8,8 +8,8 @@ import type { QuizIndexEntry } from "./scanner";
 import { quizFrere } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
-import { renderEntete, dossierDuQuiz } from "./detail-head";
-import { glossaryHeaderAction } from "./glossaire-modal";
+import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
+import { glossaryHeaderAction, texteBadgeGlossaire } from "./glossaire-modal";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
@@ -461,6 +461,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				return;
 			}
 			draft = result;
+			/* La pastille du bouton « Vocabulaire », posé avant que `draft`
+			   n'existe (ci-dessus) : rafraîchie ICI plutôt qu'en repeignant tout
+			   l'en-tête (`setActionBadge` retrouve le bouton par sa `key`, posée
+			   par `renderEntete`). Sans `editing`, le bouton n'a pas été peint —
+			   rien à mettre à jour. */
+			if (editing) {
+				const btn = page.querySelector<HTMLElement>('[data-qbd-key="glossary"]');
+				if (btn) setActionBadge(btn, texteBadgeGlossaire(draft));
+			}
 			activeIdx = Math.min(activeIdx, Math.max(0, draft.questions.length - 1));
 			paint(listCol, panel, nav, spec);
 		});
@@ -477,10 +486,17 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		};
 		const start = spec.start;
 		const actions = (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) }));
-		// « Vocabulaire » (tâche 4 du lot D) : en édition seulement, et seulement
-		// une fois le brouillon chargé — rien à glosser avant.
-		if (editing && draft) {
-			const gloss = glossaryHeaderAction(draft, scheduleSave);
+		/* « Vocabulaire » (tâche 4 du lot D) : dès que `editing` est vrai, PAS
+		   seulement une fois `draft` chargé — sinon le bouton manque en
+		   arrivant DIRECTEMENT en édition (menu « Modifier », création d'un
+		   quiz) : `renderHeader` tourne avant `spec.load()`, `draft` vaut
+		   encore `null`, et rien ne repeint l'en-tête à lui seul quand il
+		   arrive. `getDraft` (une closure sur `draft`, jamais sa valeur
+		   figée) laisse l'action lire le brouillon du moment, AU CLIC ; la
+		   pastille (posée à `undefined` tant que rien n'est chargé) est
+		   rafraîchie séparément une fois `draft` prêt, plus bas. */
+		if (editing) {
+			const gloss = glossaryHeaderAction(() => draft, scheduleSave);
 			actions.push({ ...gloss, onClick: avant(gloss.onClick) });
 		}
 		renderEntete(page, {
