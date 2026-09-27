@@ -5,6 +5,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { poserLogoObsidian } from "./brand-icons";
+import { couperCheminAuMilieu } from "./file-icons";
 import { moduleAccent } from "./module-color";
 
 /* ══════════════════════════════════════════════════════════
@@ -89,78 +90,30 @@ export function renderModuleCard(
 	ajouter(card, "div", "qbd-module-card__spacer");
 	ajouter(card, "div", "qbd-module-card__divider");
 	const footer = ajouter(card, "div", "qbd-module-card__footer");
-	/* LE CHEMIN, ENTIER (Ahmed, 2026-09-17). Plus de milieu réduit : la carte
-	   le montre en entier dans une piste de largeur bornée, qui DÉFILE de
-	   droite à gauche en boucle quand il déborde. Et RIEN D'AUTRE (Ahmed,
-	   2026-09-17) : aucun clic ne l'arrête, aucun curseur ne le désigne — la
-	   piste est transparente aux gestes (`pointer-events: none`, CSS), c'est
-	   la carte qui les reçoit.
-	   LA BOUCLE EST SANS COUTURE PARCE QUE LE TEXTE EST EN DEUX EXEMPLAIRES :
-	   le rail glisse de la largeur d'un exemplaire, et à l'instant où il
-	   revient à zéro le second occupe exactement la place que le premier
-	   vient de quitter. Un exemplaire unique qui repart de la droite montre
-	   une piste vide à chaque tour — c'est le saut qu'on voit dans les
-	   marquees bâclés. L'écart entre les deux est un `padding` PORTÉ PAR
-	   CHAQUE exemplaire, et non un `gap` du rail : le `gap` ne compte qu'une
-	   fois entre les deux, la boucle se décalerait de la moitié à chaque tour.
-	   La mesure est faite au rendu (`scrollWidth` contre `clientWidth`) : le
-	   CSS seul ne sait pas de combien un texte déborde, et sans elle les
-	   chemins courts défileraient aussi, pour rien.
-	   La VITESSE est constante (30 px par seconde), pas la durée : à durée
-	   fixe, « Personal/Cours » filerait pendant que le chemin d'un module
-	   d'école ramperait. */
+	/* LE CHEMIN, COUPÉ AU MILIEU (2026-09-27), comme un nom de fichier : la
+	   tête (racine, dossiers intermédiaires) se tronque avec ses points de
+	   suspension, la queue (le dossier lui-même) reste entière —
+	   `couperCheminAuMilieu`, file-icons.ts. Il remplace le chemin entier qui
+	   défilait en boucle depuis le 2026-09-17 : en mouvement, c'était le DÉBUT
+	   qui disparaissait, et c'est lui qui situe. La coupe est faite par le CSS
+	   (`text-overflow` sur la tête) : un chemin court tient en entier, sans
+	   mesure au rendu ni observateur de taille.
+	   Il ne réagit toujours à rien (`pointer-events: none`, CSS) : c'est la
+	   carte qui reçoit le survol et le clic. */
 	const racine = group.path ? currentHost().paths.rootOf(group.path) : null;
 	if (group.path && racine) {
 		const chemin = ajouter(footer, "div", "qbd-module-card__path");
-		/* La pastille du vault, AVANT la piste et hors d'elle : elle dit d'où
-		   vient le dossier, elle ne fait pas partie du chemin — la voir
-		   défiler puis disparaître serait perdre l'information au moment où
-		   on lit le chemin. */
+		/* La pastille du vault, AVANT le chemin et hors de lui : elle dit d'où
+		   vient le dossier, elle ne fait pas partie du chemin — la laisser
+		   tronquer avec la tête serait perdre l'information. */
 		if (racine.vault) {
 			const marque = ajouter(chemin, "span", "qbd-module-card__path-vault");
 			poserLogoObsidian(marque, t("dashboard.quizzes.obsidianVault"));
 		}
-		const piste = ajouter(chemin, "div", "qbd-module-card__path-piste");
-		const rail = ajouter(piste, "div", "qbd-module-card__path-rail");
-		const libelle = `${racine.name}/${currentHost().paths.localPath(group.path)}`;
-		const texte = ajouter(rail, "span", "qbd-module-card__path-texte", libelle);
-		/* Après la peinture : dans la même image, `scrollWidth` vaut encore
-		   `clientWidth` et aucune carte ne défilerait jamais.
-		   L'ÉCART VAUT LA LARGEUR DE LA PISTE, et non un nombre fixe : c'est
-		   la seule valeur qui garantisse qu'on ne voie jamais les deux
-		   exemplaires à la fois. Avec 72 px et une carte élargie — un zoom,
-		   une fenêtre agrandie —, la fin du chemin et sa reprise tenaient
-		   ensemble à l'écran, séparées par un trou : on lisait « …Python
-		   Efrei/Bachelor… » comme une seule ligne (Ahmed, 2026-09-17).
-		   Recalibré à chaque changement de largeur : le zoom de l'interface ne
-		   redessine pas les cartes, et l'écart serait resté celui d'avant. */
-		const calibrer = (): void => {
-			piste.classList.remove("is-defilant");
-			piste.style.removeProperty("--nq-ecart");
-			if (piste.scrollWidth - piste.clientWidth <= 2) {
-				rail.querySelector(".qbd-module-card__path-texte--echo")?.remove();
-				return;
-			}
-			piste.style.setProperty("--nq-ecart", `${Math.round(piste.clientWidth)}px`);
-			if (!rail.querySelector(".qbd-module-card__path-texte--echo")) {
-				const echo = ajouter(rail, "span", "qbd-module-card__path-texte qbd-module-card__path-texte--echo", libelle);
-				/* L'écho est un doublon VISUEL : une aide technique qui le lirait
-				   annoncerait le chemin deux fois de suite. */
-				echo.setAttribute("aria-hidden", "true");
-			}
-			const pas = texte.getBoundingClientRect().width;
-			piste.style.setProperty("--nq-duree", `${Math.max(6, Math.round(pas / 30))}s`);
-			piste.classList.add("is-defilant");
-		};
-		requestAnimationFrame(calibrer);
-		/* L'observateur se DÉBRANCHE dès que la piste quitte le document : une
-		   grille se redessine à chaque navigation, et autant d'observateurs
-		   restés derrière retiendraient autant de cartes mortes. */
-		const observateur = new ResizeObserver(() => {
-			if (!piste.isConnected) { observateur.disconnect(); return; }
-			calibrer();
-		});
-		observateur.observe(piste);
+		const texte = ajouter(chemin, "span", "qbd-module-card__path-texte");
+		const { tete, queue } = couperCheminAuMilieu(`${racine.name}/${currentHost().paths.localPath(group.path)}`);
+		ajouter(texte, "span", "qbd-module-card__path-tete", tete);
+		if (queue) ajouter(texte, "span", "qbd-module-card__path-queue", queue);
 	}
 	if (onMenu) {
 		const moreBtn = ajouter(footer, "button", "qbd-card-more qbd-module-card__menu");

@@ -64,6 +64,19 @@ export function couperNomAuMilieu(nom: string): { tete: string; queue: string } 
 	return { tete: nom.slice(0, coupe), queue: nom.slice(coupe) };
 }
 
+/** La même coupe AU MILIEU pour un CHEMIN de dossier (pied d'une carte de
+    dossier) : la TÊTE — la racine et les dossiers intermédiaires — se
+    tronque, la QUEUE — le dernier segment, précédé de son séparateur — ne
+    se tronque jamais. Couper par le début perdait la racine, par la fin le
+    dossier lui-même : c'est le milieu qui situe le moins. Les séparateurs
+    en trop (fin de chemin, doublés) sont retirés avant la coupe, sans quoi
+    la queue serait un « / » seul. */
+export function couperCheminAuMilieu(chemin: string): { tete: string; queue: string } {
+	const net = chemin.replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "");
+	const barre = net.lastIndexOf("/");
+	return barre > 0 ? { tete: net.slice(0, barre), queue: net.slice(barre) } : { tete: net, queue: "" };
+}
+
 
 /** Ce fichier est-il une image que le rendu sait AFFICHER ? Lu dans la
     même table que l'icône : une seconde liste divergerait au premier

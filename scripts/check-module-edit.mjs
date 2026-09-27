@@ -208,3 +208,22 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ estLeSas }) => {
 	r.check("un groupe sans chemin n'est jamais le sas", estLeSas({ folder: "Generated" }, sas), false);
 	r.done();
 });
+
+/* LE CHEMIN AU PIED D'UNE CARTE DE DOSSIER, coupé AU MILIEU (2026-09-27) :
+   la tête (racine, intermédiaires) se tronque en CSS, la queue — le dernier
+   segment avec son séparateur — reste entière. Une queue vide ou réduite à
+   « / » tronquerait le dossier lui-même. */
+await withSrcModule("src/dashboard/file-icons.ts", async ({ couperCheminAuMilieu }) => {
+	const r = makeReporter("Carte de dossier — le chemin coupé au milieu");
+	r.check("un chemin profond : la queue est le dernier segment",
+		couperCheminAuMilieu("Efrei/Bachelor/B2 (2026-2027)/Reseaux"),
+		{ tete: "Efrei/Bachelor/B2 (2026-2027)", queue: "/Reseaux" });
+	r.check("la tête et la queue recomposent le chemin, rien n'est perdu",
+		Object.values(couperCheminAuMilieu("Personal/Cours/Python")).join(""), "Personal/Cours/Python");
+	r.check("une racine seule n'a pas de queue", couperCheminAuMilieu("Personal"), { tete: "Personal", queue: "" });
+	r.check("la racine d'un dossier ouvert (chemin local vide) ne finit pas par « / »",
+		couperCheminAuMilieu("Personal/"), { tete: "Personal", queue: "" });
+	r.check("des séparateurs doublés ou inversés ne font pas une queue vide",
+		couperCheminAuMilieu("Efrei//B2\\Reseaux/"), { tete: "Efrei/B2", queue: "/Reseaux" });
+	r.done();
+});

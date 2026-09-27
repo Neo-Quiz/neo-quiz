@@ -34,6 +34,7 @@ release notes.
 - A Run button on every Python code block shown in a quiz (readings, questions, explanations, hints): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
 
 ### Changed
+- The path at the bottom of a folder card is cut in the middle, like a file name: its start and the folder's own name stay visible, instead of the whole path scrolling in a loop.
 - Question and folder cards react like StudySmarter: a slightly lighter background and soft shadow on hover, a smooth press on click; folders no longer lift, and a folder's page fades in. The question list of the editor reacts the same way, its blue outline only marking the current question.
 - Starting a quiz slides it up over the page, which steps back behind it, like StudySmarter; leaving reverses it. The page now stays in place behind the quiz for as long as you play, as a stacked sheet peeking above it, and comes back to front — with its score and progress refreshed — instead of being rebuilt.
 - A Learn reading no longer shows "About N minutes of reading".
