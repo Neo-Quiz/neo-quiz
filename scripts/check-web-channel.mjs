@@ -195,13 +195,24 @@ const { readFileSync } = await import("node:fs");
 const { runInNewContext } = await import("node:vm");
 const { transform } = await import("esbuild");
 const sourcePage = readFileSync("src/dashboard/ai.ts", "utf8");
-const noms = ["startGeneration", "decouperParFichier", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
+const noms = ["startGeneration", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
 const fonctions = noms.map(nom => {
 	const debut = sourcePage.search(new RegExp(`\\t(?:async )?function ${nom}\\(`));
 	const fin = sourcePage.indexOf("\n\t}", debut);
 	if (debut < 0 || fin < 0) throw new Error(`Fonction introuvable : ${nom}`);
 	return sourcePage.slice(debut, fin + 3);
 });
+/* `decouperParFichier` a quitté la closure de la page pour
+   `generation-demande.ts`, où elle est exportée au niveau du MODULE (plus
+   d'indentation, `export` devant) : `ai.ts` l'importe. Même extraction,
+   depuis son fichier réel — une copie ici divergerait sans un mot. */
+{
+	const sourceDemande = readFileSync("src/dashboard/generation-demande.ts", "utf8");
+	const debut = sourceDemande.search(/^export function decouperParFichier[<(]/m);
+	const fin = sourceDemande.indexOf("\n}", debut);
+	if (debut < 0 || fin < 0) throw new Error("Fonction introuvable : decouperParFichier");
+	fonctions.push(sourceDemande.slice(debut, fin + 2).replace(/^export /, ""));
+}
 const codePage = (await transform(fonctions.join("\n"), { loader: "ts" })).code;
 const refus = makeReporter("Canal web : refus pendant une attente");
 for (const avecImage of [false, true]) {
