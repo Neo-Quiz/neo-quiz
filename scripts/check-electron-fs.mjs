@@ -28,10 +28,36 @@
  *
  *     npm run check:electron-fs
  */
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, link } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
+
+/**
+ * Verrouille `chemin` en ouvrant un VRAI handle Windows SANS
+ * `FILE_SHARE_DELETE` (un `powershell.exe` enfant, `[IO.File]::Open(...,
+ * [IO.FileShare]::Read)`) — c'est ce que font OneDrive, un antivirus ou un
+ * éditeur ouvert dessus, et c'est ce qui fait échouer un `unlink` avec
+ * `EBUSY` de façon DÉTERMINISTE (revue 2026-09-27, Important 2). Rend une
+ * fonction qui libère le verrou ; l'appelant doit l'attendre avant de nettoyer
+ * le dossier temporaire.
+ */
+async function verrouiller(chemin) {
+	const enfant = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+		`$f = [IO.File]::Open('${chemin}', [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::Read); Start-Sleep -Seconds 20; $f.Close()`,
+	], { stdio: "ignore" });
+	// Laisse PowerShell ouvrir le handle avant de rendre la main : sans cette
+	// attente, le `rename` du cas pourrait s'exécuter avant que le verrou
+	// n'existe et ne rien reproduire du tout.
+	await new Promise((res) => setTimeout(res, 1000));
+	return async () => {
+		enfant.kill();
+		// Laisse Windows relâcher le handle avant que le `finally` du cas
+		// n'essaie de nettoyer le dossier temporaire.
+		await new Promise((res) => setTimeout(res, 300));
+	};
+}
 
 /** `true` si l'appel a rejeté, `false` sinon — pour comparer contre un
     booléen attendu, dans le même style que le reste du dépôt. */
@@ -236,23 +262,126 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 		   de trace nulle part — silencieusement perdu. La garde par `fs.link`
 		   (atomique au niveau du système de fichiers) fait qu'un seul des deux
 		   peut réussir, quel que soit l'ordre d'exécution. */
-		await cas(r, "rename : deux renommages concurrents vers la même cible, un seul réussit", async () => {
-			const vers = join(dir, "m-cible.txt");
-			const deA = join(dir, "m-source-a.txt");
-			const deB = join(dir, "m-source-b.txt");
-			await fichiers.write(deA, "A");
-			await fichiers.write(deB, "B");
-			const [resA, resB] = await Promise.allSettled([
-				fichiers.rename(deA, vers),
-				fichiers.rename(deB, vers),
-			]);
-			const reussis = [resA, resB].filter(x => x.status === "fulfilled").length;
-			const rejetes = [resA, resB].filter(x => x.status === "rejected").length;
-			// Exactement un des deux : jamais les deux (l'un écraserait
-			// l'autre) et jamais aucun (une vraie garde ne doit pas non plus
-			// faire échouer une course légitime des deux côtés).
-			r.check("rename : deux renommages concurrents vers la même cible, un seul réussit",
-				[reussis, rejetes], [1, 1]);
+		/* REVUE 2026-09-27 (re-revue, Mineur 6) : sur l'ANCIEN code (garde par
+		   `fs.link`, mais SANS file de sérialisation), la course n'était pas
+		   fermée pour de bon — deux appels DANS LE MÊME PROCESSUS pouvaient
+		   chacun poser leur propre lien avant qu'aucun des deux n'ait retiré
+		   sa source : 21 « réussites » sur 30 essais mesurés par la re-revue.
+		   Boucler N fois ici, et vérifier pas seulement le COMPTE mais aussi
+		   le CONTENU (la cible porte celui du gagnant, la source du perdant
+		   est intacte) — un cas qui ne comptait que les succès pouvait rester
+		   vert sur un double silencieux si les deux comptes s'annulaient par
+		   hasard. */
+		await cas(r, "rename : N renommages concurrents vers la même cible, un seul réussit à chaque fois", async () => {
+			const N = 20;
+			let echecsComptage = 0;
+			let echecsContenu = 0;
+			for (let i = 0; i < N; i++) {
+				const vers = join(dir, `m-cible-${i}.txt`);
+				const deA = join(dir, `m-source-a-${i}.txt`);
+				const deB = join(dir, `m-source-b-${i}.txt`);
+				await fichiers.write(deA, "A" + i);
+				await fichiers.write(deB, "B" + i);
+				const [resA, resB] = await Promise.allSettled([
+					fichiers.rename(deA, vers),
+					fichiers.rename(deB, vers),
+				]);
+				const reussis = [resA, resB].filter(x => x.status === "fulfilled").length;
+				const rejetes = [resA, resB].filter(x => x.status === "rejected").length;
+				if (reussis !== 1 || rejetes !== 1) { echecsComptage++; continue; }
+				const gagnantA = resA.status === "fulfilled";
+				const contenuCible = await fichiers.read(vers);
+				const contenuAttendu = gagnantA ? "A" + i : "B" + i;
+				const sourcePerdante = gagnantA ? deB : deA;
+				const perdanteIntacte = await existeEncore(sourcePerdante)
+					&& await fichiers.read(sourcePerdante) === (gagnantA ? "B" + i : "A" + i);
+				if (contenuCible !== contenuAttendu || !perdanteIntacte) echecsContenu++;
+			}
+			r.check("rename : N renommages concurrents vers la même cible, un seul réussit à chaque fois",
+				[echecsComptage, echecsContenu], [0, 0]);
+		});
+
+		/* REVUE 2026-09-27 (re-revue, Important 2b / point 3 du correctif) :
+		   LA MÊME source déplacée vers DEUX cibles DIFFÉRENTES en parallèle —
+		   scénario distinct du précédent (deux SOURCES vers une même cible,
+		   déjà fermé par `fs.link`). Ici `fs.link` ne voit AUCUNE collision
+		   (les cibles diffèrent), donc les DEUX liens se posaient avant que
+		   l'un ou l'autre appel n'ait retiré la source : sur le code d'avant
+		   cette tâche, 20 essais sur 20 donnaient les DEUX cibles à la fois —
+		   un quiz devenu deux, un seul gardant l'historique. La file de
+		   sérialisation du processus principal (`serialise`, dans
+		   `creerFichiers`) ferme cette fenêtre : le second appel ne démarre
+		   qu'une fois le premier terminé, et trouve alors la source déjà
+		   partie (rejet `ENOENT` franc, jamais un second doublon). */
+		await cas(r, "rename : la même source vers deux cibles concurrentes, une seule cible existe à la fois", async () => {
+			const N = 20;
+			let doublons = 0;
+			for (let i = 0; i < N; i++) {
+				const de = join(dir, `q-source-${i}.txt`);
+				await fichiers.write(de, "contenu" + i);
+				const versX = join(dir, `q-x-${i}.txt`);
+				const versY = join(dir, `q-y-${i}.txt`);
+				await Promise.allSettled([fichiers.rename(de, versX), fichiers.rename(de, versY)]);
+				if (await existeEncore(versX) && await existeEncore(versY)) doublons++;
+			}
+			r.check("rename : la même source vers deux cibles concurrentes, une seule cible existe à la fois",
+				doublons, 0);
+		});
+
+		/* REVUE 2026-09-27 (re-revue, Important 1) : un code d'erreur de
+		   `fs.link` AUTRE que `EEXIST`/`ENOENT` doit se replier sur la copie,
+		   pas jeter — `EXDEV`/`EPERM` n'étaient pas les seuls motifs de refus
+		   (`EISDIR` sur FAT32/exFAT, `ENOTSUP` sur certains partages réseau,
+		   non reproductibles sur ce volume NTFS). La limite RÉELLE et
+		   reproductible ICI : NTFS refuse un lien dur au-delà de 1023 noms
+		   pour un même fichier — Node rend un code qui n'est ni `EEXIST` ni
+		   `EPERM` ni `EXDEV` (souvent `UNKNOWN`, faute de correspondance
+		   POSIX). C'est un CAS RÉEL de « code inattendu », pas un simulacre. */
+		await cas(r, "rename : un code de link inattendu (limite NTFS des liens durs) se replie sur la copie", async () => {
+			const de = join(dir, "n-source.txt");
+			await fichiers.write(de, "contenu-n");
+			for (let i = 0; i < 1023; i++) await link(de, join(dir, `n-lien-${i}.txt`));
+			const vers = join(dir, "n-dest.txt");
+			await fichiers.rename(de, vers);
+			r.check("rename : un code de link inattendu (limite NTFS des liens durs) se replie sur la copie",
+				[await existeEncore(de), await fichiers.read(vers)], [false, "contenu-n"]);
+		});
+
+		/* REVUE 2026-09-27 (re-revue, Important 2, reproduit déterministe) :
+		   un `unlink(de)` qui échoue APRÈS un `link` réussi (source verrouillée
+		   par un autre processus — OneDrive, un antivirus, un éditeur, sans
+		   `FILE_SHARE_DELETE`) laissait la source ET la cible sur le disque,
+		   un doublon silencieux jamais annoncé (le rejet ne le dit pas). Le
+		   correctif retire le lien qu'il vient de poser avant de relancer. */
+		await cas(r, "rename : unlink après link échoue (source verrouillée) — rejette SANS doublon", async () => {
+			const de = join(dir, "o-source.txt");
+			await fichiers.write(de, "verrouille-moi");
+			const liberer = await verrouiller(de);
+			try {
+				const vers = join(dir, "o-dest.txt");
+				const rejette = await aRejete(() => fichiers.rename(de, vers));
+				r.check("rename : unlink après link échoue (source verrouillée) — rejette SANS doublon",
+					[rejette, await existeEncore(de), await existeEncore(vers)], [true, true, false]);
+			} finally {
+				await liberer();
+			}
+		});
+
+		/* Même principe pour le repli par copie : si le retrait de la source
+		   échoue, la copie qu'on venait de poser (`vers`) est retirée à son
+		   tour plutôt que de laisser un doublon. */
+		await cas(r, "renameParCopie : si le retrait de la source échoue, la copie est retirée elle aussi", async () => {
+			const de = join(dir, "p-source.txt");
+			await fichiers.write(de, "verrouille-copie");
+			const liberer = await verrouiller(de);
+			try {
+				const vers = join(dir, "p-dest.txt");
+				const rejette = await aRejete(() => renameParCopie(de, vers));
+				r.check("renameParCopie : si le retrait de la source échoue, la copie est retirée elle aussi",
+					[rejette, await existeEncore(de), await existeEncore(vers)], [true, true, false]);
+			} finally {
+				await liberer();
+			}
 		});
 
 		/* Le repli copie (`renameParCopie`, emprunté par `rename` sur

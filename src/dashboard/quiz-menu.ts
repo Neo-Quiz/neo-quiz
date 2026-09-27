@@ -353,7 +353,19 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
 
    `targetName` sert UNIQUEMENT à nommer la cible dans les messages (succès,
    dossier disparu) — jamais à écrire, où seul `targetFolder` (un chemin du
-   contrat) compte. */
+   contrat) compte.
+
+   NON corrigés ici, signalés par la re-revue du 2026-09-27 comme ANTÉRIEURS
+   à ce chantier et hors de ce lot : `freeNotePath` (`folder-create.ts`)
+   n'échappe que les caractères interdits Windows, jamais les noms réservés
+   (`CON`, `NUL`, `COM1`…) ni un point/espace final — un nom pareil se pose
+   sur le disque mais devient quasi indélébile depuis l'Explorateur (Mineur 3,
+   `move-to-rereview.md`). Et `bornerEcriture` (`perimetre.ts`) résout le
+   chemin à CHAQUE appel plutôt qu'une fois pour la durée de l'opération : un
+   dossier intermédiaire remplacé par une jonction entre deux résolutions
+   sortirait du périmètre (Mineur 4, même revue) — il faudrait déjà un
+   acteur écrivant sur le disque en dehors de l'app, que le pont ne permet
+   pas de créer. */
 export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string, targetName: string): Promise<string | null> {
 	const host = currentHost();
 	/* REVUE (2026-09-27) : un dossier CONNU du catalogue (il a déjà un quiz,
@@ -379,6 +391,19 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 		   la collision (« <chemin> existe déjà ») — seul ce cas garde le
 		   toast précis ; tout le reste devient un échec générique, la cause
 		   réelle dans la console pour qui doit diagnostiquer. */
+		/* RE-REVUE (2026-09-27, Mineur 7) : classer par SOUS-CHAÎNE plutôt que
+		   par une propriété `code: "EEXIST"` posée par les deux hôtes — laissé
+		   ainsi volontairement. `moveQuizTo` s'exécute dans le RENDU de
+		   l'application, et l'erreur qu'il reçoit a alors déjà traversé l'IPC
+		   Electron (`ipcRenderer.invoke`), qui ne reconstruit qu'un `Error`
+		   nu (`name`, `message`, `stack`) — une propriété `code` posée côté
+		   principal ne survit pas au passage et se lirait `undefined` ici,
+		   sans qu'aucun test ne le révèle (le contrôle du greffon ne passe,
+		   lui, jamais par l'IPC). La sous-chaîne, elle, EST le message et
+		   franchit l'IPC intacte (revue précédente, confirmé). Un message
+		   `EPERM` qui contiendrait par hasard « existe déjà » (un chemin
+		   pathologique) resterait mal classé, mais c'est le risque le plus
+		   faible des deux. */
 		const message = e instanceof Error ? e.message : String(e);
 		if (message.includes("existe déjà")) {
 			host.ui.notice(t("dashboard.quizzes.moveQuizExists"));
