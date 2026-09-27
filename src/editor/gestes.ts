@@ -115,6 +115,43 @@ export function associer(q: DraftQuestion, ligne: number, choix: number): boolea
 	return true;
 }
 
+/**
+ * Classement : retire l'élément `i` de la réserve. L'ordre attendu perd la
+ * case qui le visait et les éléments au-delà descendent d'un cran — il reste
+ * une permutation, jamais une case vers un élément disparu ni deux cases sur
+ * le même (revue finale, 2026-09-27). Le dernier libellé d'emplacement suit,
+ * un emplacement par élément. Refusé sous deux éléments.
+ */
+export function retirerPossibilite(q: DraftQuestion, i: number): boolean {
+	const items = q.possibilities;
+	if (!items || items.length <= 1 || i < 0 || i >= items.length) return false;
+	items.splice(i, 1);
+	q.correctOrder = (q.correctOrder || []).filter(v => v !== i).map(v => (v > i ? v - 1 : v));
+	if (q.slots && q.slots.length > items.length) q.slots = q.slots.slice(0, items.length);
+	return true;
+}
+
+/** Appariement : retire la ligne `i` ET sa paire — les lignes suivantes
+    gardent leur choix. Refusé sous deux lignes. */
+export function retirerLigne(q: DraftQuestion, i: number): boolean {
+	const rows = q.rows;
+	if (!rows || rows.length <= 1 || i < 0 || i >= rows.length) return false;
+	rows.splice(i, 1);
+	(q.correctMap ||= []).splice(i, 1);
+	return true;
+}
+
+/** Appariement : retire le choix `i`. Les lignes qui visaient un choix
+    au-delà le suivent (indice décalé) ; celles qui visaient `i` retombent sur
+    le choix qui prend sa place, borné au dernier. Refusé sous deux choix. */
+export function retirerChoix(q: DraftQuestion, i: number): boolean {
+	const choices = q.choices;
+	if (!choices || choices.length <= 1 || i < 0 || i >= choices.length) return false;
+	choices.splice(i, 1);
+	q.correctMap = (q.correctMap || []).map(v => (v > i ? v - 1 : Math.min(v, choices.length - 1)));
+	return true;
+}
+
 /** Ajoute une variante de réponse acceptée (texte, numérique, terminal…). */
 export function ajouterVariante(q: DraftQuestion): boolean {
 	if (!q.acceptedAnswers) return false;

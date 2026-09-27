@@ -4,7 +4,7 @@ import { currentHost } from "../host/current";
 import { releaseReservedPath } from "../unique-path";
 import type { EditorCtx } from "../types/editor-ctx";
 import type { DraftQuestion } from "./utils";
-import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante } from "./gestes";
+import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante, retirerPossibilite, retirerLigne, retirerChoix } from "./gestes";
 import { insererTexte, poserBarreFormat } from "./format-toolbar";
 import { createSelect } from "../dashboard/ui-select";
 import { keymap } from "@codemirror/view";
@@ -421,7 +421,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				while (q.slots!.length < q.possibilities!.length) q.slots!.push(t("editor.ordering.slotDefault", { n: q.slots!.length + 1 }));
 				q.slots = q.slots!.slice(0, q.possibilities!.length);
 				rerender();
-			}, t("editor.ordering.itemPlaceholder"), t("editor.action.add"));
+			}, t("editor.ordering.itemPlaceholder"), t("editor.action.add"), i => retirerPossibilite(q, i));
 			_arrayEditor(box, t("editor.ordering.slotLabels"), q.slots!, rerender, t("editor.ordering.slotPlaceholder"), t("editor.action.add"));
 
 			// L'ordre attendu se change dans le rendu (clic ou flèches).
@@ -442,11 +442,11 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				while (q.correctMap!.length < q.rows!.length) q.correctMap!.push(0);
 				q.correctMap = q.correctMap!.slice(0, q.rows!.length);
 				rerender();
-			}, t("editor.matching.rowPlaceholder"), t("editor.action.add"));
+			}, t("editor.matching.rowPlaceholder"), t("editor.action.add"), i => retirerLigne(q, i));
 			_arrayEditor(box, t("editor.matching.choices"), q.choices!, () => {
 				q.correctMap = q.correctMap!.map(v => Math.min(v, q.choices!.length - 1));
 				rerender();
-			}, t("editor.matching.choicePlaceholder"), t("editor.action.add"));
+			}, t("editor.matching.choicePlaceholder"), t("editor.action.add"), i => retirerChoix(q, i));
 
 			/* « situation → choix » en DEUX COLONNES alignées (refonte
 			   2026-09-26) : chaque ligne a la même grille, le menu prend toute
@@ -555,7 +555,9 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 		}
 	}
 
-	function _arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void {
+	/* `retirer` : le GESTE qui retire l'entrée `i` et recale les indices qui la
+	   visent (gestes.ts) ; sans lui, un simple `splice`. */
+	function _arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string, retirer?: (i: number) => boolean): void {
 		ajouter(parent, "label", "qb-field-label", label);
 		const container = ajouter(parent, "div", "qb-arr-list");
 		const renderItems = () => {
@@ -569,7 +571,11 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				del.setAttribute("aria-label", t("editor.action.delete"));
 				_setIcon(del, "trash-2");
 				if (items.length <= 1) del.disabled = true;
-				del.addEventListener("click", () => { if (items.length <= 1) return; items.splice(i, 1); onChange(); renderItems(); });
+				del.addEventListener("click", () => {
+					if (items.length <= 1) return;
+					if (retirer) { if (!retirer(i)) return; } else items.splice(i, 1);
+					onChange(); renderItems();
+				});
 			});
 			const addBtn = ajouter(container, "button", "qb-arr-add");
 			addBtn.type = "button";

@@ -114,7 +114,9 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		ouvert = null; // avant tout : le `focusout` du retrait ne revalide pas.
 		const v = o.champ.valeur();
 		o.champ.detruire();
-		const change = garder && v !== o.initiale;
+		/* CodeMirror ramène les fins de ligne à `\n` : une source en CRLF
+		   passerait pour modifiée sans une frappe. */
+		const change = garder && v !== o.initiale.replace(/\r\n?/g, "\n");
 		if (change) {
 			ecrire(q, o.cible, v, deps.lecture);
 			deps.onChange();
@@ -142,6 +144,9 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			const suivante = aRouvrir.get(host);
 			aRouvrir.delete(host);
 			if (suivante) ouvrirCible(suivante);
+			// Validé au clavier : le focus revient sur le texte repeint, pas
+			// sur le document (la navigation au clavier reprenait au début).
+			else if (auClavier) carte.querySelector<HTMLElement>(selecteur(o.cible))?.focus();
 		}
 	}
 
@@ -180,8 +185,13 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 			fermer(true, true);
 			return;
 		}
-		const multiligne = MULTILIGNES.has(cible.champ);
+		/* Multiligne aussi quand la SOURCE a déjà des sauts de ligne (une
+		   option qui porte un bloc de code) et pour la réponse d'une sortie de
+		   programme, qui en a besoin : un champ d'une ligne les aplatissait à
+		   la première frappe (revue finale, 2026-09-27). */
 		const initiale = valeurSource(q, cible, deps.lecture);
+		const multiligne = MULTILIGNES.has(cible.champ) || initiale.includes("\n")
+			|| (cible.champ === "accepted" && !!carte.querySelector(".quiz-text-wrap-program"));
 
 		/* MÊME encombrement : le champ prend place DANS l'élément (il garde ses
 		   classes, donc sa typo et son cadre de quiz). Une zone de saisie ne
@@ -289,6 +299,15 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 		e.preventDefault();
 		ouvrir(el);
 	};
+	/* Un GESTE pendant qu'un texte est ouvert : le `mousedown` donnerait le
+	   focus au bouton, le `focusout` du champ validerait et repeindrait la
+	   carte AVANT le `click` — le bouton cliqué, détaché, perdait le geste.
+	   Le focus reste donc dans le champ ; `appliquer` le valide lui-même
+	   avant le geste (revue finale, 2026-09-27). */
+	const surAppui = (e: MouseEvent): void => {
+		if (ouvert && e.target instanceof Element && e.target.closest(".qb-er-geste")) e.preventDefault();
+	};
+	host.addEventListener("mousedown", surAppui, true);
 	host.addEventListener("pointerdown", surPointeur, true);
 	host.addEventListener("click", surClic);
 	host.addEventListener("keydown", surTouche);
@@ -301,6 +320,7 @@ export function monterEditionRendu(host: HTMLElement, q: DraftQuestion, deps: De
 	return () => {
 		if (!vivant) return;
 		vivant = false;
+		host.removeEventListener("mousedown", surAppui, true);
 		host.removeEventListener("pointerdown", surPointeur, true);
 		host.removeEventListener("click", surClic);
 		host.removeEventListener("keydown", surTouche);

@@ -9,7 +9,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/editor/gestes.ts", ({
 	basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante,
-	changerType, memeFamille,
+	changerType, memeFamille, retirerPossibilite, retirerLigne, retirerChoix,
 }) => {
 	const r = makeReporter("Gestes d'édition d'une question");
 
@@ -61,6 +61,29 @@ await withSrcModule("src/editor/gestes.ts", ({
 			const ok = retirerOption(q, 0);
 			return [ok, q.options, q.correctIndices];
 		})(), [true, ["b", "c", "d"], [0, 2]]);
+	}
+
+	// --- retirerOption : multi, une bonne réponse → refusé (revue finale) ---
+	{
+		const q = { options: ["a", "b", "c"], correctIndices: [0, 2] };
+		r.check("multi : retirer une option BONNE → refusé", [retirerOption(q, 2), q.options, q.correctIndices], [false, ["a", "b", "c"], [0, 2]]);
+	}
+
+	// --- retirer un élément, une ligne, un choix (revue finale, 2026-09-27) ---
+	{
+		const o = { possibilities: ["A", "B", "C"], slots: ["1", "2", "3"], correctOrder: [2, 0, 1] };
+		r.check("classement : retirer un élément garde une permutation (plus de case vers un disparu)",
+			[retirerPossibilite(o, 2), o.possibilities, o.correctOrder, o.slots], [true, ["A", "B"], [0, 1], ["1", "2"]]);
+		const o2 = { possibilities: ["A", "B", "C"], slots: ["1", "2", "3"], correctOrder: [2, 0, 1] };
+		r.check("classement : retirer le premier décale les éléments au-delà",
+			[retirerPossibilite(o2, 0), o2.correctOrder], [true, [1, 0]]);
+		r.check("classement : jamais sous un élément", retirerPossibilite({ possibilities: ["A"], correctOrder: [0] }, 0), false);
+		const m = { rows: ["x", "y", "z"], choices: ["X", "Y", "Z"], correctMap: [2, 1, 0] };
+		r.check("appariement : retirer un choix — les lignes suivent leur choix",
+			[retirerChoix(m, 0), m.choices, m.correctMap], [true, ["Y", "Z"], [1, 0, 0]]);
+		const m2 = { rows: ["x", "y", "z"], choices: ["X", "Y", "Z"], correctMap: [2, 1, 0] };
+		r.check("appariement : retirer une ligne emporte sa paire, les autres gardent la leur",
+			[retirerLigne(m2, 0), m2.rows, m2.correctMap], [true, ["y", "z"], [1, 0]]);
 	}
 
 	// --- placerOrdre ---

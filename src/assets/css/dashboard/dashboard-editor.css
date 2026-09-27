@@ -1018,19 +1018,23 @@
 
 /* Réponses acceptées : bouton « + Variante », sous le champ principal (et
    sous la liste des variantes si elle existe déjà). */
+/* Un lien discret, pas un bouton encadré : pas de cadre dans une carte. */
 .qb-er .qb-er-ajouter-variante {
 	gap: 6px;
 	margin: 6px 0 0;
-	padding: 4px 8px;
-	border: 1px dashed var(--background-modifier-border);
-	border-radius: 6px;
+	padding: 4px 0;
 	color: var(--text-faint);
 	font-size: 12px;
 }
 .qb-er .qb-er-ajouter-variante:hover,
 .qb-er .qb-er-ajouter-variante:focus-visible {
 	color: var(--quiz-primary);
-	border-color: var(--quiz-primary);
+}
+/* Une variante vide (tout juste ajoutée) : une ligne à remplir, pas un trou. */
+.qb-er .quiz-textonly-expected-item.qb-er-variante-vide {
+	min-height: 1.6em;
+	min-width: 8em;
+	border-bottom: 1px dashed var(--background-modifier-border);
 }
 
 /* CodeMirror glisse des <img class="cm-widgetBuffer"> autour de chaque

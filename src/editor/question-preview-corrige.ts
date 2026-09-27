@@ -44,10 +44,15 @@ export function correctOptionIndices(q: DraftQuestion, isMulti: boolean): Set<nu
 export function acceptedAnswersCorrige(q: DraftQuestion): { primary: string; variantsHtml: string } {
 	const list = q.acceptedAnswers || [];
 	const primary = list[0] || "";
-	const variants = list.slice(1).filter(v => typeof v === "string" && v.trim());
+	/* L'INDEX RÉEL de chaque variante, et les variantes VIDES gardées : un
+	   filtre décalait `data-index` (éditer « c » dans ["a", "", "c"] visait
+	   la case 1) et rendait invisible la variante que « + Variante » vient
+	   d'ajouter — son champ ne pouvait pas s'ouvrir (revue finale,
+	   2026-09-27). Une variante vide se montre en emplacement à remplir. */
+	const variants = list.map((v, i) => ({ v: typeof v === "string" ? v : "", i })).slice(1);
 	const variantsHtml = variants.length
-		? `<div class="quiz-textonly-expected-list">${variants.map((v, i) =>
-			`<div class="quiz-textonly-expected-item" data-edit="accepted" data-index="${i + 1}">${renderInlineText(v)}</div>`
+		? `<div class="quiz-textonly-expected-list">${variants.map(({ v, i }) =>
+			`<div class="quiz-textonly-expected-item${v.trim() ? "" : " qb-er-variante-vide"}" data-edit="accepted" data-index="${i}">${renderInlineText(v)}</div>`
 		).join("")}</div>`
 		: "";
 	return { primary, variantsHtml };
