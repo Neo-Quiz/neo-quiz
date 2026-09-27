@@ -430,16 +430,17 @@ export function langueDepuisLocale(locale: string): LangueInstallateur {
 }
 
 /* ─────────── les pages légales ───────────
-   Les deux liens du texte légal ouvrent le SITE, dans la langue de
-   l'installeur. La page française vit sous `/fr/`, l'anglaise à la racine,
-   comme la page de téléchargement. Le rendu ne transmet que le nom de la
-   page (`LienLegal`) : l'URL est composée ICI, depuis deux constantes. */
+   Les deux liens du texte légal ouvrent le SITE, en anglais quelle que soit
+   la langue de l'installeur : le site n'a plus de version française depuis
+   le 2026-09-27 (son ancienne adresse `/fr/` redirige vers la racine). Le
+   rendu ne transmet que le nom de la page (`LienLegal`) : l'URL est composée
+   ICI, depuis deux constantes. */
 
 const SITE = "https://neo-quiz.github.io/";
 const PAGES_LEGALES = { terms: "terms.html", privacy: "privacy.html" } as const;
 
 export type PageLegale = keyof typeof PAGES_LEGALES;
 
-export function urlLegale(page: PageLegale, langue: LangueInstallateur): string {
-	return `${SITE}${langue === "fr" ? "fr/" : ""}${PAGES_LEGALES[page]}`;
+export function urlLegale(page: PageLegale): string {
+	return `${SITE}${PAGES_LEGALES[page]}`;
 }

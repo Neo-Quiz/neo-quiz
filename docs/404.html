@@ -4,12 +4,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neo Quiz</title>
 <script>
-	// Le site était servi sous neo-quiz.github.io/neo-quiz/ jusqu'au
-	// 2026-09-27 : ses liens (installeurs déjà publiés, pages partagées)
-	// retombent ici, et repartent vers la même page à la racine.
+	// Deux anciennes formes d'adresse retombent ici et repartent vers la même
+	// page, en une seule redirection : le préfixe `/neo-quiz/` (site servi
+	// sous neo-quiz.github.io/neo-quiz/ jusqu'au 2026-09-27) et la version
+	// française `/fr/`, retirée le même jour — le site n'est plus qu'en
+	// anglais. Liens des installeurs déjà publiés, pages partagées.
 	var chemin = location.pathname;
-	if (/^\/neo-quiz(\/|$)/.test(chemin))
-		location.replace((chemin.replace(/^\/neo-quiz/, "") || "/") + location.search + location.hash);
+	var cible = chemin.replace(/^\/neo-quiz(?=\/|$)/, "").replace(/^\/fr(?=\/|$)/, "") || "/";
+	if (cible !== chemin) location.replace(cible + location.search + location.hash);
 </script>
 <p>Page not found. <a href="/">Neo Quiz</a></p>
 </html>

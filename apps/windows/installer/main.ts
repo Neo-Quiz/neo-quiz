@@ -56,16 +56,11 @@ let serveurTube: Server | null = null;
 let processusLancement: ReturnType<typeof spawn> | null = null;
 let installationActive = false;
 let fermetureAutorisee = false;
-/** La langue de l'installeur : celle de Windows (`detecterLangue`). Lue par
-    `main-ui.ts` pour ouvrir les pages légales dans la même langue. */
+/** La langue de l'installeur : celle de Windows (`detecterLangue`). */
 let langue: LangueInstallateur = "en";
 /** Le dossier d'installation que le rendu affiche, tenu à jour par le
     principal : c'est LUI qui compose le chemin de l'exécutable à ouvrir. */
 let dossierCourant = "";
-
-export function langueInstallateur(): LangueInstallateur {
-	return langue;
-}
 
 function argumentsTravailleur(): { tube: string; charge: string } | null {
 	const index = process.argv.indexOf(DRAPEAU_TRAVAILLEUR);

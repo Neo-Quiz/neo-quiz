@@ -20,7 +20,6 @@ const workflow = readFileSync(resolve(racine, ".github/workflows/release.yml"), 
 const ci = readFileSync(resolve(racine, ".github/workflows/ci.yml"), "utf8");
 const autoRelease = readFileSync(resolve(racine, ".github/workflows/auto-release-desktop.yml"), "utf8");
 const siteEn = readFileSync(resolve(racine, "docs/index.html"), "utf8");
-const siteFr = readFileSync(resolve(racine, "docs/fr/index.html"), "utf8");
 const renduInstallateur = readFileSync(resolve(racine, "apps/windows/installer/renderer-reference.ts"), "utf8");
 const principalInstallateur = readFileSync(resolve(racine, "apps/windows/installer/main.ts"), "utf8");
 const principalUi = readFileSync(resolve(racine, "apps/windows/installer/main-ui.ts"), "utf8");
@@ -339,8 +338,8 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 		configBootstrapper.includes('artifactName: "NeoQuiz-${version}.exe"'), true);
 	r.check("publication : plus de copie française ni d'ancien nom fixe",
 		[workflow.includes("-fr.exe"), workflow.includes("Install-NeoQuiz"), ci.includes("Install-NeoQuiz"),
-			siteEn.includes("Install-NeoQuiz"), siteFr.includes("Install-NeoQuiz")],
-		[false, false, false, false, false]);
+			siteEn.includes("Install-NeoQuiz")],
+		[false, false, false, false]);
 	r.check("publication : la CI archive le bootstrapper par son motif",
 		ci.includes("apps/windows/dist-installer-bootstrapper/NeoQuiz-*.exe"), true);
 
@@ -576,32 +575,15 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 		[true, false, false, false]);
 
 	/* Les deux liens du texte légal étaient des <span> sans cible jusqu'à la
-	   1.0.16. Ils ouvrent maintenant les pages du site, dans la langue de
-	   l'installeur, par un canal qui ne reçoit qu'un NOM de page : l'URL est
-	   composée par le noyau, et les quatre fichiers doivent exister. */
-	r.check("légal : l'URL est composée depuis deux constantes, dans la langue voulue",
-		[urlLegale("terms", "en"), urlLegale("privacy", "en"), urlLegale("terms", "fr"), urlLegale("privacy", "fr")],
-		[
-			"https://neo-quiz.github.io/terms.html",
-			"https://neo-quiz.github.io/privacy.html",
-			"https://neo-quiz.github.io/fr/terms.html",
-			"https://neo-quiz.github.io/fr/privacy.html",
-		]);
-	r.check("légal : les quatre pages existent dans docs/",
-		["docs/terms.html", "docs/privacy.html", "docs/fr/terms.html", "docs/fr/privacy.html"]
-			.map(f => existsSync(resolve(racine, f))),
-		[true, true, true, true]);
-	/* Le bouton de langue porte la langue COURANTE de la page (« Français »
-	   sur une page française), comme la page de téléchargement, jamais la
-	   langue cible : Ahmed l'a repris le 2026-09-15 sur ces pages mêmes. */
-	r.check("légal : le bouton de langue affiche la langue de la page, pas la cible",
-		[["docs/terms.html", "English"], ["docs/privacy.html", "English"],
-			["docs/fr/terms.html", "Français"], ["docs/fr/privacy.html", "Français"]]
-			.map(([f, langue]) => {
-				const m = /<a class="langue-bouton"[^>]*>\s*([^<\s][^<]*?)\s*</.exec(readFileSync(resolve(racine, f), "utf8"));
-				return m ? m[1] : null;
-			}),
-		["English", "English", "Français", "Français"]);
+	   1.0.16. Ils ouvrent maintenant les pages du site, par un canal qui ne
+	   reçoit qu'un NOM de page : l'URL est composée par le noyau. Toujours en
+	   anglais depuis le 2026-09-27 : le site n'a plus de version française. */
+	r.check("légal : l'URL est composée depuis deux constantes, en anglais",
+		[urlLegale("terms"), urlLegale("privacy")],
+		["https://neo-quiz.github.io/terms.html", "https://neo-quiz.github.io/privacy.html"]);
+	r.check("légal : les deux pages existent dans docs/",
+		["docs/terms.html", "docs/privacy.html"].map(f => existsSync(resolve(racine, f))),
+		[true, true]);
 	r.check("légal : les liens de l'installeur sont cliquables et passent par le canal nommé",
 		[
 			renduInstallateur.includes('lienLegal(ligne, "terms", t("installer.legal.terms"));'),
@@ -609,12 +591,12 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 			renduInstallateur.includes("window.neoInstaller.ouvrirLien(page);"),
 			preloadInstallateur.includes("ipcRenderer.send(CANAUX_INSTALLATEUR.ouvrirLien, page)"),
 			principalUi.includes('if (page !== "terms" && page !== "privacy") return;'),
-			principalUi.includes("shell.openExternal(urlLegale(page, langueInstallateur()))"),
+			principalUi.includes("shell.openExternal(urlLegale(page))"),
 			renduInstallateur.includes('"span", "nqi-legal-link"'),
 		],
 		[true, true, true, true, true, true, false]);
 
-	for (const [langue, site] of [["EN", siteEn], ["FR", siteFr]]) {
+	for (const [langue, site] of [["EN", siteEn]]) {
 		r.check(`site ${langue} : Windows ne pointe plus sur l'ancien NSIS`,
 			site.includes("releases/latest/download/neo-quiz-setup.exe"), false);
 		// Un seul installeur, retrouvé par MOTIF : la page ne porte aucune version.
@@ -656,20 +638,21 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 			[true, true, true, true, true, false]);
 		r.check(`site ${langue} : le pied de page mène aux deux pages légales`,
 			[site.includes('href="terms.html"'), site.includes('href="privacy.html"')], [true, true]);
-		r.check(`site ${langue} : un clic sur une langue est mémorisé comme un CHOIX`,
-			site.includes('localStorage.setItem("nq-langue", lien.getAttribute("data-langue"))'), true);
 	}
-	/* Seule la racine (anglais par défaut) devine la langue, depuis celle du
-	   NAVIGATEUR (jamais un pays par IP) et seulement sans choix mémorisé ; la
-	   page française, elle, ne renvoie personne : un lien `/fr/` partagé s'ouvre. */
-	r.check("site : la racine suit la langue du navigateur, sauf choix mémorisé",
+	/* Le site n'est plus qu'en anglais depuis le 2026-09-27 : plus de page
+	   française, plus de sélecteur ni de devinette de langue. Les anciens liens
+	   `/fr/…` (installeurs déjà publiés) repartent vers la page anglaise par la
+	   404 de la racine, comme le préfixe `/neo-quiz/` d'avant le dépôt du site. */
+	const page404 = readFileSync(resolve(racine, "docs/404.html"), "utf8");
+	r.check("site : anglais seul, anciens chemins /fr/ et /neo-quiz/ redirigés",
 		[
-			siteEn.includes('var choix = localStorage.getItem("nq-langue");'),
-			siteEn.includes("navigator.languages && navigator.languages[0]"),
-			siteEn.includes('if (cible === "fr") location.replace("fr/");'),
-			siteFr.includes("location.replace("),
+			existsSync(resolve(racine, "docs/fr")),
+			siteEn.includes("nq-langue"),
+			siteEn.includes('href="fr/'),
+			page404.includes('.replace(/^\\/neo-quiz(?=\\/|$)/, "")'),
+			page404.includes('.replace(/^\\/fr(?=\\/|$)/, "")'),
 		],
-		[true, true, true, false]);
+		[false, false, false, true, true]);
 
 	r.done();
 });

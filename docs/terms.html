@@ -55,54 +55,6 @@
 		font-size: 16px;
 	}
 	.barre-marque img { width: 28px; height: 28px; border-radius: 7px; }
-	.langue { position: relative; }
-	.langue-bouton {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		color: var(--texte-attenue);
-		text-decoration: none;
-		font-size: 13px;
-		border: 1px solid var(--bordure);
-		border-radius: 8px;
-		padding: 6px 10px;
-		background: color-mix(in srgb, var(--fond-secondaire) 60%, transparent);
-		cursor: pointer;
-	}
-	.langue-bouton:hover,
-	.langue-bouton:focus-visible { color: var(--texte); }
-	.langue-bouton svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-	.langue-menu {
-		position: absolute;
-		top: 100%;
-		right: 0;
-		margin-top: 6px;
-		width: 150px;
-		border: 1px solid var(--bordure);
-		border-radius: 12px;
-		background: color-mix(in srgb, var(--fond-secondaire) 55%, transparent);
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
-		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-		z-index: 20;
-		padding: 6px;
-		text-align: left;
-	}
-	.langue-menu[hidden] { display: none; }
-	.langue-menu .item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 8px;
-		padding: 8px 10px;
-		border-radius: 8px;
-		font-size: 13px;
-		text-decoration: none;
-		color: var(--texte);
-	}
-	.langue-menu a.item:hover,
-	.langue-menu a.item:focus-visible { background: color-mix(in srgb, var(--accent) 20%, transparent); }
-	.langue-menu .item svg { width: 14px; height: 14px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 	/* The glass card of the download page, stretched into a reading column. */
 	article {
 		width: 100%;
@@ -146,19 +98,6 @@
 <body>
 	<nav class="barre">
 		<a class="barre-marque" href="./"><img src="icon.png" alt="" width="28" height="28">Neo Quiz</a>
-		<div class="langue" id="langue">
-			<a class="langue-bouton" href="fr/terms.html" id="langue-bouton" aria-haspopup="true">
-				English
-				<svg viewBox="0 0 24 24"><path d="M7.8 9.6L12 13.8L16.2 9.6"></path></svg>
-			</a>
-			<div class="langue-menu" id="langue-menu" hidden>
-				<div class="item" aria-current="true">
-					English
-					<svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"></path></svg>
-				</div>
-				<a class="item" href="fr/terms.html" data-langue="fr">Français</a>
-			</div>
-		</div>
 	</nav>
 
 	<article>
@@ -222,25 +161,5 @@
 		<span aria-hidden="true">·</span>
 		<span>MIT</span>
 	</footer>
-	<script>
-		// Same language selector as the download page: the button names the
-		// CURRENT language, the menu offers the other one. A click on a language
-		// is a choice, remembered so the root page stops guessing.
-		(function () {
-			var conteneur = document.getElementById("langue");
-			var bouton = document.getElementById("langue-bouton");
-			var menu = document.getElementById("langue-menu");
-			if (!conteneur || !bouton || !menu) return;
-			function fermer() { menu.hidden = true; }
-			bouton.addEventListener("click", function (e) { e.preventDefault(); menu.hidden = !menu.hidden; });
-			document.addEventListener("click", function (e) { if (!conteneur.contains(e.target)) fermer(); });
-			document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermer(); });
-			Array.prototype.forEach.call(menu.querySelectorAll("a.item[data-langue]"), function (lien) {
-				lien.addEventListener("click", function () {
-					try { localStorage.setItem("nq-langue", lien.getAttribute("data-langue")); } catch (err) { /* storage blocked */ }
-				});
-			});
-		})();
-	</script>
 </body>
 </html>

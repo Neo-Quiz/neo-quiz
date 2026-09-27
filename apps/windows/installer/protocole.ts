@@ -79,7 +79,7 @@ export interface PontInstallateur {
 	commentaires(): void;
 	/** Ouvre une des deux pages légales du site dans le navigateur. Le rendu
 	    ne nomme que la PAGE : l'URL est composée par le principal
-	    (`installer/noyau.ts`, `urlLegale`), dans la langue de l'installeur —
+	    (`installer/noyau.ts`, `urlLegale`) —
 	    un rendu compromis ne fait ouvrir que l'une de ces deux adresses. */
 	ouvrirLien(page: PageLegale): void;
 	/** Ouvre l'installation DÉJÀ présente. Le rendu ne nomme aucun chemin : le
