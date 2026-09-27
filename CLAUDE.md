@@ -16,23 +16,31 @@ communautaire d'Obsidian.
 
 ## Langue du code (depuis le 2026-09-27)
 
-Le dépôt est public et doit pouvoir accueillir d'autres contributeurs : un
-code commenté en français n'est lisible que par des francophones.
+Le dépôt est public et doit pouvoir accueillir d'autres contributeurs en même
+temps qu'Ahmed : un code en français n'est lisible que par des francophones.
 
-- **Tout commentaire NEUF s'écrit en anglais** — ligne, bloc, JSDoc, dans
-  `src/`, `apps/`, `scripts/`, les workflows et les pages de `docs/`.
-- **Les commentaires français existants passent en anglais au fil de l'eau** :
-  un fichier qu'on modifie voit ses commentaires traduits dans le même commit
-  (au moins ceux de la zone touchée ; le fichier entier s'il est petit). Une
-  traduction garde le SENS entier — le pourquoi, le bug évité, la date —,
-  jamais un résumé qui perd l'information. Pas de citation d'Ahmed ni de son
-  prénom dans la version anglaise (le dépôt est public).
-- **Ce fichier (`CLAUDE.md`), la note du vault et les échanges avec Ahmed
-  restent en français.**
-- Les IDENTIFIANTS français déjà en place (`urlLegale`, `perimetre`,
-  `ajouter`…) ne se renomment PAS en passant : un renommage touche chaque
-  appelant et chaque contrôle qui cherche le nom en texte. Un identifiant
-  NEUF s'écrit en anglais.
+- **Plus RIEN de nouveau en français dans le code** : commentaires (ligne,
+  bloc, JSDoc), noms de fonctions, variables, types, constantes, fichiers et
+  dossiers, messages de log et d'erreur, sorties des scripts `check:*`,
+  workflows, pages de `docs/`. Tout ce qui s'écrit à partir d'aujourd'hui
+  s'écrit en anglais.
+- **Le français existant passe en anglais au fur et à mesure**, jamais en un
+  seul grand chantier : un fichier qu'on modifie voit son français traduit
+  dans le même commit — au moins la zone touchée, le fichier entier s'il est
+  petit.
+  - **Commentaires** : une traduction garde le SENS entier — le pourquoi, le
+    bug évité, la date —, jamais un résumé qui perd l'information. Pas de
+    citation d'Ahmed ni de son prénom dans la version anglaise (dépôt public).
+  - **Identifiants et noms de fichiers** (`urlLegale`, `perimetre`,
+    `ajouter`, `fichiers.ts`…) : un renommage touche CHAQUE appelant, et les
+    contrôles qui cherchent un nom EN TEXTE (`check-installer`, `check:host`,
+    `SANS_NODE`…) ne rougissent pas toujours à la compilation. Renommer
+    partout où il sert, puis relancer `npm run check`, `check:app` et les
+    `check:*` qui citent le nom — jamais un renommage à moitié.
+- **Ce qui RESTE en français** : ce fichier (`CLAUDE.md`), la note du vault,
+  les échanges avec Ahmed, et évidemment le dictionnaire français de l'UI
+  (`src/i18n/fr/`). Les clés persistées du format quiz ne bougent jamais
+  (voir « Langue »).
 
 ## La mémoire du projet est la note du vault, pas un fichier de mémoire
 
