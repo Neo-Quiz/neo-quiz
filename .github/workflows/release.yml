@@ -515,6 +515,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -572,3 +573,10 @@ jobs:
           git add "$FICHIER"
           git diff --cached --quiet && echo "$FICHIER inchangé" || git commit -m "site: $FICHIER pour ${{ needs.prepare.outputs.tag }}"
           git push origin main
+
+      # Ce push, fait avec le GITHUB_TOKEN, ne déclenche pas `site.yml` :
+      # sans cet appel, neo-quiz.github.io garderait l'ancien latest.json.
+      - name: Publish the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run site.yml --ref main

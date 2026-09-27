@@ -49,7 +49,7 @@ export default async function () {
 			   electron-builder s'arrête sur « Please specify project homepage »
 			   — la CI l'a refusé le 2026-09-16. Les AppImage n'en demandaient
 			   aucune, d'où son absence jusqu'ici. */
-			homepage: "https://neo-quiz.github.io/neo-quiz/",
+			homepage: "https://neo-quiz.github.io/",
 			/* Ces deux-là ne bloquent AUCUN build — c'est pour ça qu'elles
 			   manquaient — mais elles se lisent dans `apt show neo-quiz` : sans
 			   elles le control file du 1.0.7 portait « Description: » vide et

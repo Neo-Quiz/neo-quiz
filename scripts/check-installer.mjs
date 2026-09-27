@@ -582,10 +582,10 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	r.check("légal : l'URL est composée depuis deux constantes, dans la langue voulue",
 		[urlLegale("terms", "en"), urlLegale("privacy", "en"), urlLegale("terms", "fr"), urlLegale("privacy", "fr")],
 		[
-			"https://neo-quiz.github.io/neo-quiz/terms.html",
-			"https://neo-quiz.github.io/neo-quiz/privacy.html",
-			"https://neo-quiz.github.io/neo-quiz/fr/terms.html",
-			"https://neo-quiz.github.io/neo-quiz/fr/privacy.html",
+			"https://neo-quiz.github.io/terms.html",
+			"https://neo-quiz.github.io/privacy.html",
+			"https://neo-quiz.github.io/fr/terms.html",
+			"https://neo-quiz.github.io/fr/privacy.html",
 		]);
 	r.check("légal : les quatre pages existent dans docs/",
 		["docs/terms.html", "docs/privacy.html", "docs/fr/terms.html", "docs/fr/privacy.html"]

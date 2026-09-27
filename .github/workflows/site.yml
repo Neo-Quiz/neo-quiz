@@ -1,0 +1,56 @@
+name: Site
+
+# Publie `docs/` dans Neo-Quiz/neo-quiz.github.io, servi à la racine de
+# https://neo-quiz.github.io : un dépôt nommé `<orga>.github.io` est le seul
+# que GitHub Pages sert sans le nom du dépôt dans l'URL (même montage que
+# neovim/neovim.github.io). Les « Deployments » de Pages vivent donc là-bas,
+# plus dans ce dépôt. `docs/superpowers` et `docs/archive` (specs, plans) ne
+# sont pas des pages du site : ils ne sont pas copiés.
+#
+# `release.yml` pousse `latest.json` avec le GITHUB_TOKEN, et un push fait
+# avec ce jeton ne déclenche AUCUN workflow : il lance donc celui-ci
+# explicitement (`gh workflow run site.yml`), sans quoi la page de
+# téléchargement resterait sur la version précédente.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "!docs/superpowers/**"
+      - "!docs/archive/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Clé de déploiement en écriture sur le seul dépôt du site
+      # (secret SITE_DEPLOY_KEY) : le GITHUB_TOKEN ne peut pas écrire ailleurs.
+      - name: Push docs/ to Neo-Quiz/neo-quiz.github.io
+        env:
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SITE_DEPLOY_KEY" > ~/.ssh/site
+          chmod 600 ~/.ssh/site
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/site -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone --depth 1 git@github.com:Neo-Quiz/neo-quiz.github.io.git site
+          rsync -a --delete --exclude .git --exclude superpowers --exclude archive docs/ site/
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Site inchangé"; exit 0; fi
+          git commit -q -m "Site depuis ${GITHUB_REPOSITORY}@${GITHUB_SHA::8}"
+          git push origin HEAD:main

@@ -76,7 +76,7 @@ r.check("Linux produit AppImage x64, AppImage arm64 et deb amd64",
    sortie sans sa partie Linux. Leur disparition doit rougir ici, pas en CI. */
 r.check("le .deb a la page d'accueil et le mainteneur qu'il exige",
 	[config.extraMetadata?.homepage, (config.linux?.maintainer ?? "").includes("@")],
-	["https://neo-quiz.github.io/neo-quiz/", true]);
+	["https://neo-quiz.github.io/", true]);
 /* Le champ Maintainer voyage dans chaque paquet public. */
 r.check("le mainteneur du .deb ne publie pas d'adresse personnelle",
 	/users\.noreply\.github\.com>$/.test(config.linux?.maintainer ?? ""), true);

@@ -435,7 +435,7 @@ export function langueDepuisLocale(locale: string): LangueInstallateur {
    comme la page de téléchargement. Le rendu ne transmet que le nom de la
    page (`LienLegal`) : l'URL est composée ICI, depuis deux constantes. */
 
-const SITE = "https://neo-quiz.github.io/neo-quiz/";
+const SITE = "https://neo-quiz.github.io/";
 const PAGES_LEGALES = { terms: "terms.html", privacy: "privacy.html" } as const;
 
 export type PageLegale = keyof typeof PAGES_LEGALES;

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neo Quiz</title>
+<script>
+	// Le site était servi sous neo-quiz.github.io/neo-quiz/ jusqu'au
+	// 2026-09-27 : ses liens (installeurs déjà publiés, pages partagées)
+	// retombent ici, et repartent vers la même page à la racine.
+	var chemin = location.pathname;
+	if (/^\/neo-quiz(\/|$)/.test(chemin))
+		location.replace((chemin.replace(/^\/neo-quiz/, "") || "/") + location.search + location.hash);
+</script>
+<p>Page not found. <a href="/">Neo Quiz</a></p>
+</html>
