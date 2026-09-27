@@ -143,15 +143,34 @@ let cacheEtats: { etats: EtatCompte[]; ollamaSigninUrl: string | null } | null =
     relu à chaque montage. Partagée par `redessiner()` (au montage de la
     section) et `amorcerCacheComptes()` (au lancement de l'application, avant
     qu'aucun réglage ne soit ouvert) : UN SEUL endroit qui écrit le cache. */
-async function rafraichirCache(): Promise<{ etats: EtatCompte[]; ollamaSigninUrl: string | null } | null> {
-	try {
-		const resultat = await lireEtats();
-		cacheEtats = resultat;
-		return resultat;
-	} catch (e) {
-		console.warn(LOG_PREFIX, "lecture des comptes IA impossible:", e);
-		return null;
+let lectureEnCours: Promise<{ etats: EtatCompte[]; ollamaSigninUrl: string | null } | null> | null = null;
+
+/* UNE LECTURE À LA FOIS, PARTAGÉE (même patron que `usageEnCours`) : les
+   réglages ouverts pendant l'amorçage du lancement (~1 s) attendent la
+   lecture déjà partie au lieu d'en lancer une seconde — sinon huit sondes au
+   lieu de quatre, et la plus ancienne pouvait écraser la plus récente dans
+   `cacheEtats`.
+   SAUF APRÈS UNE ACTION (`fraiche`) : une déconnexion qui vient de réussir
+   ne doit pas recevoir une lecture partie AVANT elle, qui dirait encore
+   « connecté ». Elle attend la lecture en cours, puis en lance une neuve. */
+function rafraichirCache(fraiche = false): Promise<{ etats: EtatCompte[]; ollamaSigninUrl: string | null } | null> {
+	if (lectureEnCours) {
+		if (!fraiche) return lectureEnCours;
+		return lectureEnCours.then(() => rafraichirCache(true));
 	}
+	lectureEnCours = (async () => {
+		try {
+			const resultat = await lireEtats();
+			cacheEtats = resultat;
+			return resultat;
+		} catch (e) {
+			console.warn(LOG_PREFIX, "lecture des comptes IA impossible:", e);
+			return null;
+		} finally {
+			lectureEnCours = null;
+		}
+	})();
+	return lectureEnCours;
 }
 
 /** Amorce le cache EN ARRIÈRE-PLAN, peu après le lancement de l'application —
@@ -577,11 +596,12 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 	    section resterait vide EN PERMANENCE, sans un mot. `etatComptes()` est
 	    un appel IPC ; un pont qui refuse REJETTE, ce n'est pas une hypothèse
 	    d'école. */
-	async function redessiner(): Promise<void> {
+	async function redessiner(apresAction = false): Promise<void> {
 		// `rafraichirCache` écrit `cacheEtats` elle-même (partagée avec
 		// `amorcerCacheComptes`) et ne jette jamais — `null` est son seul signal
-		// d'échec, déjà journalisé par elle.
-		const resultat = await rafraichirCache();
+		// d'échec, déjà journalisé par elle. Au montage, la lecture de
+		// l'amorçage encore en vol est partagée ; après une action, jamais.
+		const resultat = await rafraichirCache(apresAction);
 		if (!resultat) {
 			if (detruit) return;
 			fermerPopoversUsage();
@@ -629,7 +649,7 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 		}
 		// `"ok"` : la ligne est RE-SONDÉE, jamais supposée déconnectée — le
 		// redessin remplace `bouton` par un bouton neuf, actif.
-		await redessiner();
+		await redessiner(true);
 	}
 
 	/**
@@ -777,7 +797,7 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 				{ name: nomOutil(outil) },
 			));
 		} finally {
-			if (!detruit) await redessiner();
+			if (!detruit) await redessiner(true);
 		}
 	}
 

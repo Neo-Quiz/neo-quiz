@@ -1561,81 +1561,6 @@ export function argumentsTerminal(titre: string, script: string): string[] {
     visible appartient à Windows Terminal, qui héberge aussi les autres
     terminaux de l'utilisateur — le tuer les fermerait tous. `WM_CLOSE` ne
     ferme que cette fenêtre-là, comme un clic sur sa croix. */
-/** LA FENÊTRE QU'UN CLI OUVRE LUI-MÊME, QUE `windowsHide` NE MASQUE JAMAIS.
-
-    Ahmed a vu une fenêtre de terminal s'ouvrir à l'ouverture des réglages, le
-    temps que la section « Comptes » se charge (2026-09-27). Investigation :
-    TOUS les lancements de CLI depuis le principal passent déjà par `lancer`,
-    qui pose `windowsHide: true` sans exception (`options`, plus bas) — et un
-    moniteur `EnumWindows` externe, posé avant/après chaque sonde réelle
-    (`claude auth status --json`, `codex login status`, `agy … models`, sur
-    ce poste déjà connecté), n'a mesuré AUCUNE fenêtre neuve créée par elles.
-    `windowsHide` fait donc son travail : la CONSOLE que Windows attacherait
-    au process ne se crée jamais.
-
-    CE QUE `windowsHide` NE COUVRE PAS, et qui reste un risque réel, DÉJÀ
-    DÉCRIT plus bas dans ce fichier (voir `poserIconeUsage` de
-    `apps/windows/src/ui/comptes.ts`, le cas Antigravity) : un CLI qui,
-    lui-même, ouvre une fenêtre ou alloue sa propre console — `agy` le fait
-    tant que sa configuration de premier lancement n'est pas faite, en
-    peignant son assistant (thème, conditions d'utilisation) au lieu de
-    répondre à `models`. `windowsHide` ne joue QUE sur la console que WINDOWS
-    attacherait au process par défaut ; il n'a aucune prise sur un
-    `CreateWindow`/`AllocConsole` que le CLI appelle lui-même après coup.
-    Cette sonde n'a pas pu reproduire CE cas précis (l'installation d'Ahmed a
-    déjà passé cette étape) — le correctif ci-dessous couvre donc la classe
-    du défaut plutôt qu'une reproduction ponctuelle, pour les prochaines
-    sondes de comptes ET pour tout appel de `lancer` (`run`, généreration
-    comprise).
-
-    LA SEULE PRISE POSSIBLE EST LE PID : une fenêtre qu'un CLI s'ouvre à
-    lui-même n'a ni titre stable ni classe qu'on ose confondre avec une
-    fenêtre de l'utilisateur. On masque donc TOUTE fenêtre visible dont le
-    thread appartient à ce PID, en boucle jusqu'à la mort du process (ou
-    20 s, filet si le PID est réutilisé entretemps par un autre process). */
-export function scriptCacherFenetresProcessus(pid: number): string {
-	return [
-		"$pidCible = " + String(pid),
-		"Add-Type -Name Win -Namespace NQH -MemberDefinition @'",
-		"public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);",
-		"[DllImport(\"user32.dll\")] public static extern bool EnumWindows(EnumWindowsProc proc, IntPtr lParam);",
-		"[DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);",
-		"[DllImport(\"user32.dll\")] public static extern bool IsWindowVisible(IntPtr h);",
-		"[DllImport(\"user32.dll\")] public static extern bool ShowWindow(IntPtr h, int cmd);",
-		"'@",
-		"$callback = [NQH.Win+EnumWindowsProc] {",
-		"  param($h, $l)",
-		"  $idProc = 0",
-		"  [NQH.Win]::GetWindowThreadProcessId($h, [ref]$idProc) | Out-Null",
-		"  if ($idProc -eq $pidCible -and [NQH.Win]::IsWindowVisible($h)) { [NQH.Win]::ShowWindow($h, 0) | Out-Null }",
-		"  return $true",
-		"}",
-		"$fin = (Get-Date).AddSeconds(20)",
-		"while ((Get-Date) -lt $fin) {",
-		"  [NQH.Win]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null",
-		"  if (-not (Get-Process -Id $pidCible -ErrorAction SilentlyContinue)) { break }",
-		"  Start-Sleep -Milliseconds 15",
-		"}",
-	].join("\n");
-}
-
-/** Lance la sonde ci-dessus, SANS attendre : best effort, comme tout ce qui
-    manipule des fenêtres dans ce fichier — une exception ici ne doit jamais
-    faire échouer l'appel du CLI qui l'a déclenchée. Appelée par `lancer`,
-    juste après un `spawn` réussi, pour CHAQUE process qu'il lance sous
-    Windows : c'est le seul endroit qui connaît le PID assez tôt pour avoir
-    une chance de masquer la fenêtre avant qu'elle ne soit visible à l'écran. */
-function cacherFenetresDe(pid: number | undefined): void {
-	if (process.platform !== "win32" || typeof pid !== "number") return;
-	try {
-		const enfant = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoderCommande(scriptCacherFenetresProcessus(pid))], { stdio: "ignore", windowsHide: true });
-		enfant.on("error", () => { /* best effort : la fenêtre visée resterait visible, jamais l'appel du CLI en échec */ });
-		enfant.unref();
-	} catch (e) {
-		console.warn(LOG_PREFIX, "masquage des fenêtres du CLI impossible:", e);
-	}
-}
-
 export function scriptFermerTerminal(titre: string): string {
 	return [
 		"$titre = " + citerPs(titre),
@@ -1865,10 +1790,37 @@ export function dossiersCli(env: NodeJS.ProcessEnv = process.env): string[] {
 	].filter((p): p is string => Boolean(p));
 }
 
+/**
+ * LA CONSOLE QUI APPARAISSAIT À L'OUVERTURE DES RÉGLAGES (2026-09-27) : c'est
+ * la mise à jour automatique d'Antigravity, pas la sonde elle-même.
+ *
+ * Tracé sur la machine réelle (Toolhelp32 + `EnumWindows` toutes les 3 ms,
+ * sonde lancée par un exécutable graphique sans console, comme le principal) :
+ * `agy --log-file … models`, lancé en `windowsHide`, lance à son tour
+ * `agy --bg-updater --app_data_dir=antigravity-cli --gemini_dir=.gemini`, qui
+ * lance `agy --version` avec une console NEUVE — que Windows 11 confie au
+ * terminal par défaut : `OpenConsole.exe` + `WindowsTerminal.exe` naissent de
+ * `svchost`, et une fenêtre « Terminal » visible vit environ 200 ms. Ça
+ * n'arrive que quand l'intervalle de vérification est écoulé
+ * (`~/.gemini/antigravity-cli/last_check.timestamp`), d'où « parfois » et
+ * « à froid » : reproduit 4 fois sur 4 en vieillissant ce fichier, jamais
+ * sinon. Aucune option de lancement n'y peut rien : ce petit-enfant est créé
+ * par `agy`, avec ses propres drapeaux.
+ *
+ * `AGY_CLI_DISABLE_AUTO_UPDATE`, lue par le binaire, coupe la vérification à
+ * la source : ni `--bg-updater`, ni console, et `last_check.timestamp` n'est
+ * même plus touché (3 fois sur 3). La valeur est `true` EN MINUSCULES : `1`
+ * et `TRUE` ont été essayées et laissent la console s'ouvrir. Posée pour
+ * CHAQUE lancement de l'application (sondes et générations), jamais dans le
+ * terminal d'installation ou de connexion, qui ne passe pas par ici : `agy`
+ * se met à jour quand l'utilisateur le lance lui-même.
+ */
+export const ENV_SANS_MAJ_AGY = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" } as const;
+
 export function environnementEnfant(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
 	const courant = env.PATH || "";
 	const fusion = courant + delimiter + dossiersCli(env).filter(p => !courant.includes(p)).join(delimiter);
-	return Object.assign({}, env, { PATH: fusion, Path: fusion });
+	return Object.assign({}, env, ENV_SANS_MAJ_AGY, { PATH: fusion, Path: fusion });
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -2132,12 +2084,6 @@ export function lancer(spec: {
 			reject(erreurCli("introuvable", "CLI introuvable : " + spec.executable));
 			return;
 		}
-		// Voir `cacherFenetresDe` : un CLI peut ouvrir sa PROPRE fenêtre en plus
-		// du process (`agy`, documenté dans `comptes.ts`, tant que son premier
-		// lancement n'est pas configuré), que `windowsHide` ne touche jamais.
-		// Sans attendre : ne doit jamais retarder ni faire échouer le
-		// lancement qu'elle protège.
-		cacherFenetresDe(enfant.pid);
 		let fini = false;
 		let minuteur: ReturnType<typeof setTimeout> | null = null;
 		let filet: ReturnType<typeof setTimeout> | null = null;

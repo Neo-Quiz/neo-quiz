@@ -96,7 +96,7 @@ release notes.
 - A single-line code block (```` ```python … ``` ````) inside an ordering item or an option is shown as inline code, syntax-highlighted when the language is recognized, instead of showing its raw backticks.
 - The explanation shown after correcting a question now uses the same font and size as the question text, instead of a smaller, harder to read one.
 - `\neq`, `\ne`, `\notin` and `\not=` now show their diagonal stroke instead of an empty box.
-- Settings no longer shows a flash of a console window while the CLI accounts (Claude Code, Codex, Antigravity) load; their status now loads in the background right after launch and Settings shows it immediately.
+- A terminal window no longer flashes on screen when the app checks the Antigravity account (Settings, generation): Antigravity's own background update check, which opened it, is now turned off for the processes the app launches. CLI account status also loads in the background right after launch, so Settings shows it immediately.
 
 ## [1.19.0] - 2026-09-23
 

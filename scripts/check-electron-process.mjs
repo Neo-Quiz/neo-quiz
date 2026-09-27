@@ -24,7 +24,7 @@
  *
  *     npm run check:electron-process
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -1674,117 +1674,170 @@ await withSrcModule("apps/windows/electron/surveillant-cli.ts", async ({ surveil
 	r.done();
 });
 
-/* ── AUCUNE CONSOLE VISIBLE, JAMAIS (tâche du 2026-09-27) ──
-   CE QU'IL EMPÊCHE. Un `spawn`/`spawnSync` du principal qui perd son
-   `windowsHide: true` (ajouté à la main, oublié à un nouveau site) rouvre
-   exactement le défaut vécu par Ahmed : une console qui flashe à l'écran,
-   ici à l'ouverture des réglages pendant la lecture des comptes CLI. Deux
-   assertions, sur le SOURCE RÉEL du fichier (texte, pas le module chargé —
-   c'est la présence littérale de l'option qui compte) :
+/* ── AUCUNE CONSOLE VISIBLE, JAMAIS (2026-09-27) ──
+   CE QU'IL EMPÊCHE. Un lancement de process du principal sans
+   `windowsHide: true` ouvre une console visible à l'écran : c'est ce que
+   `demarrerOllama` faisait sur son repli `ollama serve` (détaché, sans
+   `windowsHide`). Le contrôle lit le SOURCE de TOUT `apps/windows/electron/`
+   (hors `python/`, qui a son propre contrôle) et juge chaque appel de
+   `spawn`, `spawnSync`, `execFile`, `execFileSync`, `exec`, `execSync` et
+   `fork` :
 
-   1. CHAQUE site d'appel `spawn(`/`spawnSync(` de `process.ts` porte
-      `windowsHide` — sauf la liste blanche ci-dessous, qui ne peut que
-      RÉTRÉCIR (même cliquet que `RESTANTS` de `check-host.mjs`) : chacune de
-      ses entrées est un site qui ouvre une fenêtre EXPRÈS (le terminal
-      visible d'installation/connexion), documenté sur place.
-   2. `lancer` (le lanceur commun à `run` et aux sondes de comptes) appelle
-      bien `cacherFenetresDe` juste après avoir obtenu un PID — la fenêtre
-      qu'un CLI s'ouvre LUI-MÊME (voir l'en-tête de `scriptCacherFenetresProcessus`)
-      n'est pas couverte par `windowsHide`, qui ne joue que sur la console
-      que WINDOWS attacherait par défaut.
+   1. son objet d'options porte `windowsHide: true` EN TOUTES LETTRES, sans
+      décomposition (`...x`) APRÈS lui au même niveau, qui pourrait le
+      rabattre ; ou bien son dernier argument est l'identifiant `options`
+      NU, et CHAQUE `const options = {…}` du fichier porte alors
+      `windowsHide: true` sans décomposition. Mentionner `options` ailleurs
+      dans l'appel ne suffit plus (`{ ...options, windowsHide: false }`
+      passait) ;
+   2. `windowsHide: false` est refusé partout, sauf dans la liste nommée
+      ci-dessous ;
+   3. le module n'est atteint que par un import NOMMÉ (`import * as cp`,
+      `require("child_process")` échapperaient au motif).
 
-   DISCRIMINANCE ÉPROUVÉE À LA MAIN (2026-09-27) : retirer `windowsHide: true`
-   d'un des sites déjà couverts, ou retirer l'appel à `cacherFenetresDe` dans
-   `lancer`, fait rougir ce groupe ; les restaurer le fait reverdir. */
+   La liste des exceptions est un CLIQUET : chaque entrée nomme son fichier
+   et le texte EXACT de l'appel (blancs normalisés, commentaires retirés) :
+   un site qui change de forme retombe sous la règle générale, et une entrée
+   qui ne correspond plus à rien fait échouer le contrôle.
+
+   Ce contrôle ne voit pas les descendants qu'un CLI lance LUI-MÊME : la
+   console de l'ouverture des réglages venait de là (`agy --bg-updater`, voir
+   `ENV_SANS_MAJ_AGY` dans `process.ts`). Ce cas est tenu par le groupe
+   suivant, sur `environnementEnfant`.
+
+   DISCRIMINANCE ÉPROUVÉE À LA MAIN (2026-09-27) : `windowsHide: false` sur un
+   site, `{ ...options, windowsHide: false }`, un `windowsHide` retiré de
+   `const options`, un `execFile` de `partage.ts` sans l'option, un
+   `import * as cp` : chacun fait rougir ce groupe ; restaurés, il reverdit. */
 {
-	const r = makeReporter("Électron — aucun process lancé sans windowsHide, jamais de fenêtre propre à un CLI");
-	const brut = readFileSync("apps/windows/electron/process.ts", "utf-8");
-	// Les COMMENTAIRES retirés avant de chercher un site d'appel : ce fichier
-	// documente en prose d'anciens appels fautifs (une phrase qui nomme
-	// « ollama » et « spawn » côte à côte) — les compter comme des sites
-	// réels ferait échouer le contrôle sur une PHRASE, jamais sur du code.
-	// Retrait naïf d'un commentaire de bloc à l'autre : suffisant ici, aucune
-	// chaîne du fichier ne referme un commentaire par erreur.
-	const source = brut.replace(/\/\*[\s\S]*?\*\//g, m => " ".repeat(m.length));
+	const r = makeReporter("Électron — aucun process du principal lancé sans windowsHide: true");
+	const RACINE = "apps/windows/electron";
 
-	/* Liste blanche des sites SANS `windowsHide`, un cliquet qui ne peut que
-	   rétrécir : chaque entrée est le texte EXACT du site d'appel, tel qu'il
-	   apparaît dans le fichier (espaces compris), pour qu'un site qui change
-	   de forme retombe sous l'assertion générale plutôt que de rester couvert
-	   par erreur. */
-	const SITES_SANS_WINDOWSHIDE = [
-		'spawn("powershell.exe", argumentsTerminal(titre, script), { stdio: "ignore" })',
+	/** Fichiers source du principal, `python/` exclu. */
+	function fichiersSource(dossier) {
+		const sortie = [];
+		for (const e of readdirSync(dossier, { withFileTypes: true })) {
+			const chemin = dossier + "/" + e.name;
+			if (e.isDirectory()) {
+				if (chemin !== RACINE + "/python") sortie.push(...fichiersSource(chemin));
+			} else if (/\.(ts|mts|cts|js|mjs|cjs)$/.test(e.name)) {
+				sortie.push(chemin);
+			}
+		}
+		return sortie;
+	}
+
+	/* Les exceptions VOLONTAIRES, chacune justifiée sur place dans son fichier. */
+	const EXCEPTIONS = [
+		/* Le terminal d'installation/connexion : une fenêtre que l'utilisateur
+		   DOIT voir. `windowsHide` y redonnerait un `conhost` sans fenêtre
+		   (mesuré, en-tête d'`argumentsTerminal`). */
+		{ fichier: RACINE + "/process.ts", appel: 'spawn("powershell.exe", argumentsTerminal(titre, script), { stdio: "ignore" })' },
+		/* La fenêtre de mise à jour : l'application ELLE-MÊME (un exécutable
+		   graphique Electron, sans console), qui doit se montrer. */
+		{ fichier: RACINE + "/fenetre-maj.ts", appel: 'spawn(exeLie, [ DRAPEAU_FENETRE_MAJ, version, langue, `--user-data-dir=${join(dirname(exeLie), "profil")}`, ], { detached: true, windowsHide: false, stdio: "ignore" })' },
 	];
 
-	/** Extrait, à partir de l'indice où commence `spawn(`/`spawnSync(`
-	    (l'indice du premier caractère après le nom), le texte de l'appel
-	    ENTIER jusqu'à sa parenthèse fermante — en comptant les parenthèses
-	    imbriquées (un tableau d'arguments, un `Object.assign(...)`, un appel
-	    `encoderCommande(...)` à l'intérieur). */
-	function extraireAppel(source, indiceOuvrante) {
+	/** Commentaires retirés : la prose de ces fichiers nomme d'anciens appels
+	    fautifs, qui ne sont pas du code. Les `//` ne sont pris que précédés
+	    d'un blanc ou en début de ligne : `https://` dans une chaîne n'est pas
+	    un commentaire. */
+	function sansCommentaires(texte) {
+		return texte
+			.replace(/\/\*[\s\S]*?\*\//g, " ")
+			.replace(/(^|[ \t])\/\/[^\n]*/gm, "$1");
+	}
+
+	/** Le texte de l'appel entier, de son nom à sa parenthèse fermante. */
+	function extraireAppel(source, debutNom, indiceOuvrante) {
 		let profondeur = 0;
 		for (let i = indiceOuvrante; i < source.length; i++) {
 			if (source[i] === "(") profondeur++;
 			else if (source[i] === ")") {
 				profondeur--;
-				if (profondeur === 0) return source.slice(indiceOuvrante, i + 1);
+				if (profondeur === 0) return source.slice(debutNom, i + 1);
 			}
 		}
 		return null;
 	}
 
-	const sites = [];
-	const motif = /\bspawn(Sync)?\(/g;
-	for (let m; (m = motif.exec(source)); ) {
-		const appel = extraireAppel(source, m.index + (m[0].length - 1));
-		if (appel) sites.push("spawn" + (m[1] || "") + appel);
+	/** Une décomposition `...` au MÊME niveau, après `windowsHide`, pourrait le
+	    rabattre. Une décomposition imbriquée (`env: { ...x }`) ne le peut pas. */
+	function decomposeApres(texte, indice) {
+		let profondeur = 0;
+		for (let i = indice; i < texte.length; i++) {
+			const c = texte[i];
+			if (c === "{" || c === "[" || c === "(") profondeur++;
+			else if (c === "}" || c === "]" || c === ")") {
+				if (profondeur === 0) return false;
+				profondeur--;
+			} else if (profondeur === 0 && texte.startsWith("...", i)) return true;
+		}
+		return false;
 	}
-	r.check("au moins un site de lancement trouvé (le motif de recherche n'a pas divergé du code)",
-		sites.length > 0, true);
 
-	/* `options` (identifiant, pas le mot `windowsHide` en toutes lettres) est
-	   accepté ICI parce que TROIS sites de `lancer`/`demarrerOllama`
-	   construisent leur `spawn` avec l'objet `options` partagé — l'assertion
-	   suivante vérifie que CET objet porte bien `windowsHide: true`, ce qui
-	   ferme le trou qu'accepter l'identifiant ouvrirait sinon. */
-	const manquants = sites.filter(s => !s.includes("windowsHide") && !/\boptions\b/.test(s) && !SITES_SANS_WINDOWSHIDE.includes(s));
-	r.check("chaque site de lancement porte `windowsHide` (en toutes lettres, ou via l'objet `options` vérifié plus bas), sauf la liste blanche documentée",
-		manquants, []);
+	/** `windowsHide: true` présent, et rien après lui ne peut le rabattre. */
+	function porteWindowsHide(texte) {
+		const m = /windowsHide:\s*true\b/.exec(texte);
+		return !!m && !decomposeApres(texte, m.index + m[0].length);
+	}
 
-	const orphelins = SITES_SANS_WINDOWSHIDE.filter(s => !sites.includes(s));
-	r.check("la liste blanche ne contient que des sites qui existent VRAIMENT dans le fichier (un cliquet qui ne couvre rien de réel serait un mensonge)",
-		orphelins, []);
+	const normaliser = t => t.replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
 
-	/* Les sites ci-dessus passent l'assertion précédente parce que `options`
-	   est un IDENTIFIANT, pas `windowsHide` en toutes lettres — cette seconde
-	   assertion ferme ce trou en vérifiant que CHAQUE objet `const options = {…}`
-	   du fichier (il y en a deux : `demarrerOllama` et `lancer`) porte bien
-	   `windowsHide: true`. Un troisième qui l'oublierait resterait invisible à
-	   l'assertion précédente ; celle-ci le voit. */
-	const definitionsOptions = source.match(/const options = \{[^}]*\}/g) || [];
-	r.check("au moins deux définitions de `options` trouvées (`demarrerOllama` et `lancer`)",
-		definitionsOptions.length >= 2, true);
-	r.check("CHAQUE objet `options` que ce fichier construit pour un `spawn` porte `windowsHide: true`",
-		definitionsOptions.filter(d => !/windowsHide:\s*true/.test(d)), []);
+	const sites = [];
+	const echappees = [];
+	for (const fichier of fichiersSource(RACINE)) {
+		const source = sansCommentaires(readFileSync(fichier, "utf-8"));
+		if (/\bimport\s*\*\s*as\s+\w+\s+from\s+["'](node:)?child_process["']/.test(source)
+			|| /\brequire\(\s*["'](node:)?child_process["']\s*\)/.test(source)
+			|| /\bimport\(\s*["'](node:)?child_process["']\s*\)/.test(source)) {
+			echappees.push(fichier);
+		}
+		const definitionsOptions = source.match(/const options = \{[^}]*\}/g) || [];
+		const motif = /(?<![.\w$])(spawn|spawnSync|execFile|execFileSync|exec|execSync|fork)\s*\(/g;
+		for (let m; (m = motif.exec(source)); ) {
+			const appel = extraireAppel(source, m.index, m.index + m[0].length - 1);
+			if (appel) sites.push({ fichier, appel: normaliser(appel), definitionsOptions });
+		}
+	}
+	r.check("aucun fichier n'atteint child_process autrement que par un import nommé (le motif ne verrait pas `cp.spawn`)",
+		echappees, []);
+	r.check("au moins dix sites de lancement trouvés (le motif n'a pas divergé du code)",
+		sites.length >= 10, true);
 
-	/* La fenêtre qu'un CLI s'ouvre lui-même (voir l'en-tête de
-	   `scriptCacherFenetresProcessus`) : `windowsHide` ne la couvre pas, seul
-	   un masquage après coup, par PID, le peut. */
-	r.check("`lancer` appelle `cacherFenetresDe` juste après avoir obtenu un PID, pour CHAQUE process qu'il lance",
-		/cacherFenetresDe\(enfant\.pid\)/.test(source), true);
+	const estException = s => EXCEPTIONS.some(e => e.fichier === s.fichier && normaliser(e.appel) === s.appel);
+	const fautifs = sites.filter(s => {
+		if (estException(s)) return false;
+		if (/windowsHide:\s*false\b/.test(s.appel)) return true;
+		if (porteWindowsHide(s.appel)) return false;
+		// L'identifiant `options` NU en dernier argument (seul, ou
+		// `Object.assign({…}, options)`), et CHAQUE `options` du fichier
+		// porte `windowsHide: true`.
+		const parOptions = /, options,?\)$/.test(s.appel) || /, Object\.assign\(\{[^}]*\}, options\),?\)$/.test(s.appel);
+		return !(parOptions && s.definitionsOptions.length > 0 && s.definitionsOptions.every(porteWindowsHide));
+	}).map(s => s.fichier + " : " + s.appel.slice(0, 160));
+	r.check("chaque lancement porte `windowsHide: true` (en toutes lettres, ou par un `options` nu qui le porte), jamais `windowsHide: false` hors des exceptions nommées",
+		fautifs, []);
+
+	const orphelines = EXCEPTIONS.filter(e => !sites.some(s => s.fichier === e.fichier && s.appel === normaliser(e.appel))).map(e => e.fichier);
+	r.check("chaque exception nommée correspond à un site qui existe VRAIMENT (un cliquet qui ne couvre rien serait un mensonge)",
+		orphelines, []);
 
 	r.done();
 }
 
-await withSrcModule("apps/windows/electron/process.ts", async ({ scriptCacherFenetresProcessus }) => {
-	const r = makeReporter("Électron — le script qui masque la fenêtre qu'un CLI s'ouvre lui-même");
-	const script = scriptCacherFenetresProcessus(4242);
-	r.check("le PID cible est celui donné, en toutes lettres", script.includes("$pidCible = 4242"), true);
-	r.check("chaque fenêtre visible du PID cible est cachée par ShowWindow(0) (SW_HIDE), jamais fermée ni tuée",
-		/ShowWindow\(\$h,\s*0\)/.test(script) && !/TerminateProcess|taskkill/.test(script), true);
-	r.check("le PID est jugé par IsWindowVisible ET GetWindowThreadProcessId, jamais par un titre ou une classe",
-		/IsWindowVisible/.test(script) && /GetWindowThreadProcessId/.test(script), true);
-	r.check("la boucle s'arrête d'elle-même quand le process cible n'existe plus, sans attendre le filet des 20 s",
-		/Get-Process -Id \$pidCible -ErrorAction SilentlyContinue/.test(script), true);
+/* ── LA MISE À JOUR D'ANTIGRAVITY, COUPÉE POUR TOUT LANCEMENT (2026-09-27) ──
+   CE QU'IL EMPÊCHE. `agy`, lancé par l'application, déclenche sa propre
+   vérification de mise à jour (`agy --bg-updater`), qui lance un `agy
+   --version` avec une console NEUVE, confiée par Windows 11 à Windows
+   Terminal : une fenêtre visible. Aucune option de `spawn` n'y peut rien ;
+   seule `AGY_CLI_DISABLE_AUTO_UPDATE=true` dans l'environnement de l'enfant
+   la coupe (tracé et prouvé sur la machine réelle, voir `ENV_SANS_MAJ_AGY`).
+   La valeur exacte compte : `1` et `TRUE` laissent la console s'ouvrir. */
+await withSrcModule("apps/windows/electron/process.ts", async ({ environnementEnfant }) => {
+	const r = makeReporter("Électron — la mise à jour d'Antigravity coupée dans l'environnement de chaque CLI");
+	const env = environnementEnfant({ PATH: "C:\\x", AGY_CLI_DISABLE_AUTO_UPDATE: "0" });
+	r.check("`environnementEnfant` pose AGY_CLI_DISABLE_AUTO_UPDATE=true (minuscules), même si l'environnement hérité dit autre chose",
+		env.AGY_CLI_DISABLE_AUTO_UPDATE, "true");
 	r.done();
 });
