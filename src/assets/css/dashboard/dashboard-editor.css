@@ -67,26 +67,18 @@
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	color: var(--text-normal);
 	cursor: pointer;
-	transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+	position: relative;
+	outline: 2px solid transparent;
+	outline-offset: 0;
+	transition: outline-color 0.15s ease;
 }
-/* Fond plus clair et ombre douce au survol (StudySmarter, 2026-09-27), sans
-   levée. Au clic, léger enfoncement. */
-.qbd-qz-card:hover {
-	border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
-	background: color-mix(in srgb, var(--text-normal) 5%, var(--qbd-glass-bg));
-	box-shadow: var(--qbd-glass-sheen), 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
-}
-.qbd-qz-card:active { transform: scale(0.99); transition-duration: 60ms; }
-/* La question courante : un contour bleu (comme `.is-selected` chez
-   StudySmarter), remplace l'ancien liseré + trait plein à gauche, qui en
-   faisait doublon (2026-09-27). */
+/* Au survol comme sur la question courante : UN contour bleu, rien d'autre
+   (Ahmed, 2026-09-27 : « l'effet doit juste être un contour bleu ») — ni
+   fond qui change, ni ombre, ni échelle. Posé au ras de la carte : la liste
+   garde 2 px de marge pour qu'il ne soit pas rogné. */
+.qbd-qz-card:hover,
 .qbd-qz-card.is-active {
-	outline: 2px solid var(--quiz-primary);
-	outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-	.qbd-qz-card { transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
-	.qbd-qz-card:active { transform: none; }
+	outline-color: var(--quiz-primary);
 }
 
 /* La ligne du numéro : le nom du type et le rôle s'abrègent, le numéro et les
@@ -124,13 +116,18 @@
    COURANTE seulement (detail.ts paintList) — sur la ligne du numéro, elles
    coupaient le nom du type et le rôle. Des icônes nues, alignées à droite :
    pas de bouton encadré dans une carte. */
+/* Posées EN SURIMPRESSION en haut à droite de la carte courante : la carte
+   ne grandit plus quand on la sélectionne (2026-09-27). La ligne du numéro
+   leur laisse la place. */
 .qbd-qz-card-acts {
+	position: absolute;
+	top: 8px;
+	right: 8px;
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
 	gap: 1px;
-	margin: -4px -4px -6px 0;
 }
+.qbd-qz-card.is-active .qbd-qz-card-top { padding-right: 84px; }
 .qbd-root .qbd-qz-card-act {
 	display: inline-flex;
 	align-items: center;

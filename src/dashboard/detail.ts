@@ -17,7 +17,7 @@ import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView } from "./detail-question";
 import { renderQuestionEditRendu } from "./detail-edition";
 import { libererChamps } from "../editor/champ-direct";
-import { oublierFiche, renderFiche, renderInfosQuiz, renderTop } from "./detail-fiche";
+import { oublierFiche, renderFiche, renderInfosQuiz, renderTop, suivreDebord } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
@@ -705,6 +705,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.length }));
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
+		/* La liste s'efface en fondu à ses bords dès qu'il reste des questions
+		   au-dessus ou au-dessous (2026-09-26) : une carte n'est plus coupée
+		   net. Même mécanisme que les cartes de la grille. */
+		suivreDebord(items);
 		vis.forEach((i, pos) => {
 			const q = draft!.questions[i];
 			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,

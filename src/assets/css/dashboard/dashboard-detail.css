@@ -126,6 +126,7 @@
 /* Le titre de la liste, les cartes des questions et « + Ajouter une
    question » : dashboard-editor.css (refonte de l'éditeur, 2026-09-26). */
 .qbd-qz-list-items {
+	--fondu: 40px;
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
