@@ -220,8 +220,14 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 	   ensuite (passage, mathInput, numeric…). Une question portant une
 	   explication ET un de ces champs produisait un bloc JSON5 INVALIDE, que le
 	   moteur refusait de parser (« invalid character 'p' »). */
-	if (q.hint) {
-		L.push(`\t\thint: '${e(q.hint)}',`);
+	/* Un indice d'UN niveau s'écrit en chaîne, comme toujours ; plusieurs
+	   niveaux, en tableau du plus léger au plus révélateur (src/quiz-hint.ts).
+	   Un niveau vidé dans l'éditeur n'est pas écrit. */
+	const niveauxIndice = [q.hint, ...(q._hintMore ?? [])].filter(h => typeof h === "string" && h.trim() !== "");
+	if (niveauxIndice.length === 1) {
+		L.push(`\t\thint: '${e(niveauxIndice[0])}',`);
+	} else if (niveauxIndice.length > 1) {
+		L.push(`\t\thint: [\n${niveauxIndice.map(h => `\t\t\t'${e(h)}',`).join("\n")}\n\t\t],`);
 	}
 	// Priorité à explain modifié par l'utilisateur
 	/* Quand les DEUX existent, le moteur affiche `explainHtml` (cards.ts

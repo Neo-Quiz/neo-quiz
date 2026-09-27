@@ -66,7 +66,11 @@ export interface DraftQuestion {
 	_id: string;
 	title: string;
 	prompt: string;
+	/** Le PREMIER niveau de l'indice (le seul, le plus souvent). */
 	hint: string;
+	/** Les niveaux SUIVANTS d'un indice à plusieurs niveaux, du moins au plus
+	    révélateur (src/quiz-hint.ts). Absent pour un indice d'un niveau. */
+	_hintMore?: string[];
 	explain: string;
 	resourceButton: ResourceButton | null;
 	_useHtmlPrompt: boolean;

@@ -2,6 +2,15 @@ import type { EngineCtx } from "../types/engine-ctx";
 import { mathifyElement } from "./mathjax";
 import { reinitialiserBudgetRendu } from "./code-highlight";
 import { t } from "../i18n";
+import { niveauxIndice } from "../quiz-hint";
+
+/** Ce que la carte d'une question pose pour son indice. */
+export interface IndiceCarte {
+	/** Le bouton « Indice » ou « Indice suivant », vide quand tout est vu. */
+	bouton: string;
+	/** Les niveaux déjà révélés, affichés sous la question. */
+	revele: string;
+}
 
 export interface HintHandlers {
 	getHintThemeMode(): "light" | "dark";
@@ -9,6 +18,10 @@ export interface HintHandlers {
 	ensureHintModal(): HTMLElement;
 	openHintModal(text: string | undefined): void;
 	closeHintModal(): void;
+	/** Le bouton et les niveaux révélés de la question `qi` (cards.ts). */
+	indiceCarte(qi: number, icone: string): IndiceCarte;
+	/** Câble le bouton d'indice de la carte rendue (interactions.ts). */
+	brancherIndice(trackItem: Element, qi: number): void;
 }
 
 export function createHintHandlers(ctx: EngineCtx): HintHandlers {
@@ -17,6 +30,52 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 	let __quizHintOpenRaf1 = 0;
 	let __quizHintOpenRaf2 = 0;
 	let __quizHintFocusTimer = 0;
+
+	/* INDICE À PLUSIEURS NIVEAUX (retours du 2026-09-26, #1 et #10) : le
+	   bouton révèle le niveau 1, puis « Indice suivant » le niveau d'après,
+	   jusqu'au dernier ; les niveaux vus restent affichés. Le nombre de
+	   niveaux vus vit ICI, par question : `hintSeen[qi]` (l'état persisté et
+	   remis à zéro par « Recommencer ») dit seulement « au moins un ». Sans
+	   `hintSeen`, la question repart de zéro quoi que dise cette table — une
+	   remise à zéro de l'état suffit donc à tout effacer. */
+	const niveauxVus = new Map<number, number>();
+
+	function nombreVus(qi: number, total: number): number {
+		if (!ctx.quizState.hintSeen?.[qi]) return 0;
+		return Math.min(total, Math.max(1, niveauxVus.get(qi) ?? 1));
+	}
+
+	function indiceCarte(qi: number, icone: string): IndiceCarte {
+		const niveaux = niveauxIndice(ctx.quiz[qi]?.hint);
+		if (!niveaux.length) return { bouton: "", revele: "" };
+		const vus = nombreVus(qi, niveaux.length);
+		const libelle = vus === 0 ? t("engine.hint.button") : t("engine.hint.next");
+		const bouton = vus < niveaux.length
+			? `<button class="quiz-help-btn quiz-hint-btn" type="button">${icone}<span>${libelle}</span></button>`
+			: "";
+		const plusieurs = niveaux.length > 1;
+		const revele = niveaux.slice(0, vus).map((texte, i) => {
+			const titre = plusieurs ? t("engine.hint.level", { n: i + 1, total: niveaux.length }) : t("engine.hint.button");
+			return `<div class="quiz-hint-inline"${plusieurs ? ` data-niveau="${i + 1}"` : ""}><div class="quiz-hint-inline-label">${icone}<span>${titre}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(texte)}</div></div>`;
+		}).join("");
+		return { bouton, revele };
+	}
+
+	function brancherIndice(trackItem: Element, qi: number): void {
+		const bouton = trackItem.querySelector(".quiz-hint-btn");
+		if (!bouton) return;
+		bouton.addEventListener("click", e => {
+			e.preventDefault();
+			e.stopPropagation();
+			if (ctx.quizState.isSliding) return;
+			/* L'indice se RÉVÈLE sur place (plus de fenêtre) : un niveau de
+			   plus à chaque clic, et le re-rendu l'affiche sous la question. */
+			const total = niveauxIndice(ctx.quiz[qi]?.hint).length;
+			niveauxVus.set(qi, Math.min(total, nombreVus(qi, total) + 1));
+			ctx.quizState.hintSeen[qi] = true;
+			ctx.commitQuestionInteraction(qi, { syncHeight: true });
+		});
+	}
 
 	function getHintThemeMode(): "light" | "dark" {
 		const body = document.body;
@@ -205,6 +264,8 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 		applyHintModalTheme,
 		ensureHintModal,
 		openHintModal,
-		closeHintModal
+		closeHintModal,
+		indiceCarte,
+		brancherIndice
 	};
 }

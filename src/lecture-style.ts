@@ -189,9 +189,3 @@ export function motsDeLecture(item: unknown): number {
 	else if (r?.forme === "recap") n += mots(r.items.join(" "));
 	return n;
 }
-
-/** Minutes de lecture annoncées sur une page : mots / 200, arrondi, au moins 1. */
-export function minutesDeLecture(texte: string): number {
-	const mots = texte.split(/\s+/).filter(Boolean).length;
-	return Math.max(1, Math.round(mots / 200));
-}

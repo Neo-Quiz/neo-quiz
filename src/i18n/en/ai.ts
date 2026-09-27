@@ -426,6 +426,7 @@ export const EN_AI = {
 	"ai.format.incompleteSlice": "Slice {slice} is missing: {roles}.",
 	"ai.format.noObjectives": "The Learn note has no learning objectives.",
 	"ai.format.preNoHint": "{count} question(s) asked before the reading have no hint: {names}.",
+	"ai.format.noHint": "{count} question(s) of the learning path have no hint: {names}.",
 	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
 	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Practice bank.",
 

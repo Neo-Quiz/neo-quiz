@@ -145,8 +145,9 @@ await withSrcModule(["src/engine/lecture-rendu.ts", "src/engine/sanitizer.ts"], 
 	};
 	const rendre = (item, titre) => corpsLectureHtml(item, item.prompt ?? "", portes.bloc(item.prompt ?? ""), titre, portes);
 	const page = rendre({ prompt: "Un **dict**.\n\nSuite." }, "Les `dict`");
-	r.check("page : style, titre en tête (rendu inline), temps de lecture",
-		[page.style, page.html.includes('<h3 class="quiz-lecture-titre">Les <code'), page.html.includes("quiz-lecture-meta")], ["page", true, true]);
+	// Plus de temps de lecture (retour #8 du 2026-09-26) : une étape n'est pas un article.
+	r.check("page : style, titre en tête (rendu inline), sans temps de lecture",
+		[page.style, page.html.includes('<h3 class="quiz-lecture-titre">Les <code'), page.html.includes("quiz-lecture-meta")], ["page", true, false]);
 	r.check("page : aucun saut de ligne ajouté entre nos balises (le support est en break-spaces)", /<\/div>\n<div/.test(page.html), false);
 	const etapes = rendre({ lecture: "etapes", prompt: "Intro.", etapes: ["Un `a`", "Deux"] });
 	r.check("étapes écrites : introduction puis une ligne numérotée par étape",

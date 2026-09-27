@@ -319,6 +319,28 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.done();
 });
 
+/* INDICE À PLUSIEURS NIVEAUX (2026-09-26) : `hint` en chaîne reste une
+   chaîne, un tableau de niveaux reste un tableau, dans l'ordre ; une valeur
+   invalide est ignorée ; un niveau vidé dans l'éditeur n'est pas écrit. */
+await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
+	const r = makeReporter("Indice à niveaux (aller-retour)");
+	const base = { id: "h", title: "T", prompt: "P ?", options: ["a", "b"], correctIndex: 0 };
+	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
+	r.check("chaîne : relue en chaîne", tour({ ...base, hint: "Pense à **range**." }).hint, "Pense à **range**.");
+	r.check("tableau : relu en tableau, dans l'ordre",
+		tour({ ...base, hint: ["Léger", "Comme `range(1, 3)` qui donne `[1, 2]`.", "Révélateur"] }).hint,
+		["Léger", "Comme `range(1, 3)` qui donne `[1, 2]`.", "Révélateur"]);
+	r.check("deux écritures de suite : identique", tour(tour({ ...base, hint: ["a", "b"] })).hint, ["a", "b"]);
+	r.check("tableau d'un seul niveau utile : écrit en chaîne", tour({ ...base, hint: ["", "Seul"] }).hint, "Seul");
+	r.check("valeur invalide ignorée : nombre, objet, tableau sans texte",
+		[tour({ ...base, hint: 42 }).hint, tour({ ...base, hint: { a: 1 } }).hint, tour({ ...base, hint: ["", 3] }).hint], [undefined, undefined, undefined]);
+	const brouillon = convert.convertParsedToInternal({ ...base, hint: ["un", "deux", "trois"] });
+	r.check("brouillon : premier niveau dans hint, les suivants à part", [brouillon.hint, brouillon._hintMore], ["un", ["deux", "trois"]]);
+	brouillon._hintMore = ["", "trois"];
+	r.check("un niveau vidé n'est pas écrit", JSON5.parse(exp.exportAll([brouillon], null))[0].hint, ["un", "trois"]);
+	r.done();
+});
+
 /* STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : chaque style et
    chaque forme de « À retenir » font l'aller-retour lecture → écriture →
    lecture À L'IDENTIQUE, valeurs inconnues comprises — seul leur RENDU

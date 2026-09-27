@@ -563,13 +563,14 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   tant que l'indice n'a pas été révélé ; révélé, l'indice reste AFFICHÉ
 		   sous la question (il se relit sans rouvrir de fenêtre) et le bouton
 		   devient « Je ne sais pas » là où il existe, disparaît ailleurs.
-		   Chercher, se faire aider, puis seulement abandonner. */
-		const aIndice = !isRead && !isTextOnly && !!(q.hint && String(q.hint).trim());
-		const indiceVu = aIndice && !!ctx.quizState.hintSeen?.[qi];
-		const hintBtn = aIndice && !indiceVu ? `<button class="quiz-help-btn quiz-hint-btn" type="button">${ICON_BULB}<span>${t("engine.hint.button")}</span></button>` : "";
-		const indiceHtml = indiceVu
-			? `<div class="quiz-hint-inline"><div class="quiz-hint-inline-label">${ICON_BULB}<span>${t("engine.hint.button")}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(q.hint)}</div></div>`
-			: "";
+		   Chercher, se faire aider, puis seulement abandonner. Un indice à
+		   plusieurs niveaux garde « Indice suivant » jusqu'au dernier
+		   (engine/hint.ts indiceCarte). Une réponse libre a son indice aussi
+		   (retour #1 : CHAQUE question d'un Learn en a un) ; seule la carte
+		   mémoire n'en a pas, puisqu'elle se retourne pour se lire. */
+		const indice = !isRead && !ctx.isFlashcardQuestion(q) ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
+		const hintBtn = indice.bouton;
+		const indiceHtml = indice.revele;
 		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une
 		// tentative VIDE mais EXPLICITE. Passer à la suite sans répondre donne
 		// désormais le même verdict (engine/state.ts marquerPreNonTentees). Gardée par !ctx.quizState.locked comme hintBtn/

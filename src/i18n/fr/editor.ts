@@ -80,6 +80,11 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.form.promptPlaceholder": "Votre question...",
 	"editor.hint.label": "Indice",
 	"editor.hint.placeholder": "Un indice pour aider...",
+	"editor.hint.levelsHelp": "Une question difficile peut avoir plusieurs niveaux, du plus léger au plus révélateur.",
+	"editor.hint.level": "Niveau {n}",
+	"editor.hint.placeholderNext": "Un indice plus révélateur...",
+	"editor.hint.addLevel": "Ajouter un niveau",
+	"editor.hint.removeLevel": "Retirer ce niveau",
 	"editor.form.explainSection": "Explication",
 	"editor.form.explainPlaceholder": "### Rappels\n- **Terme** — Définition",
 

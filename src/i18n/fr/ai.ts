@@ -366,6 +366,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.format.incompleteSlice": "Il manque à la tranche {slice} : {roles}.",
 	"ai.format.noObjectives": "La note Learn n'a pas d'objectifs d'apprentissage.",
 	"ai.format.preNoHint": "{count} question(s) posée(s) avant la lecture n'ont pas d'indice : {names}.",
+	"ai.format.noHint": "{count} question(s) du parcours n'ont pas d'indice : {names}.",
 	"ai.format.flashcardNoAnswer": "{count} carte(s) n'ont pas de réponse au verso : {names}.",
 	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme banque Practice.",
 

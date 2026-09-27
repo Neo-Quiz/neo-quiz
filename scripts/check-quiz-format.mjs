@@ -42,8 +42,9 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	const tranche = (s) => [
 		q({ title: `pre${s}`, slice: s, role: "pre", hint: "Pense à la définition." }),
 		{ title: `Lecture ${s}`, prompt: "Passage.", slice: s, role: "read" },
-		{ title: `expl${s}`, prompt: "Explique.", type: "text", answer: "Modèle.", slice: s, role: "explain" },
-		q({ title: `rec${s}`, slice: s, role: "recall" }),
+		{ title: `expl${s}`, prompt: "Explique.", type: "text", answer: "Modèle.", slice: s, role: "explain", hint: "Relis le paragraphe sur les listes." },
+		// Un indice à deux niveaux, du plus léger au plus révélateur.
+		q({ title: `rec${s}`, slice: s, role: "recall", hint: ["Pense à **range**.", "Comme `range(1, 3)` qui donne `[1, 2]`."] }),
 	];
 	const config = { mode: "learn", objectives: ["Définir une liste"] };
 	r.check("Learn complet : aucun manque", verifierFormat("learn", [...tranche(1), ...tranche(2), config]), []);
@@ -54,12 +55,29 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 			{ kind: "sansTranche", questions: ["Orpheline"] },
 			{ kind: "trancheIncomplete", slice: 1, rolesManquants: ["read", "recall"] },
 				{ kind: "preSansIndice", questions: ["pre1"] },
+				{ kind: "sansIndice", questions: ["Orpheline"] },
 		]);
 
 	r.check("Learn : une pré-question sans indice est nommée, un indice vide aussi",
 		verifierFormat("learn", [...tranche(1), q({ title: "Sans", slice: 1, role: "pre" }), q({ title: "Vide", slice: 1, role: "pre", hint: "  " }), config]),
 		[{ kind: "preSansIndice", questions: ["Sans", "Vide"] }]);
 	r.check("Practice : l'indice n'est pas exigé", verifierFormat("practice", [q({ role: "pre" })]), []);
+	/* CHAQUE question d'un Learn a un indice (retours du 2026-09-26, #1 et
+	   #10) : un rappel, une explication aussi. Un indice en TABLEAU de niveaux
+	   compte ; un tableau sans texte, un nombre, non. La lecture et la carte
+	   mémoire n'en ont pas besoin. */
+	r.check("Learn : un rappel ou une explication sans indice est nommé, un indice invalide aussi",
+		verifierFormat("learn", [...tranche(1),
+			q({ title: "RappelSans", slice: 1, role: "recall" }),
+			{ title: "ExplSans", prompt: "Explique.", type: "text", answer: "M.", slice: 1, role: "explain" },
+			q({ title: "Nombre", slice: 1, role: "recall", hint: 42 }),
+			q({ title: "TableauVide", slice: 1, role: "recall", hint: ["", "  ", 3] }),
+			q({ title: "Niveaux", slice: 1, role: "recall", hint: ["", "Un seul niveau utile."] }),
+			{ title: "CarteSans", prompt: "x", flashcard: true, answer: "y", slice: 1, role: "recall" },
+			config]),
+		[{ kind: "sansIndice", questions: ["RappelSans", "ExplSans", "Nombre", "TableauVide"] }]);
+	r.check("Learn : une pré-question avec un indice en tableau n'est pas signalée",
+		verifierFormat("learn", [...tranche(1), q({ title: "PreN", slice: 1, role: "pre", hint: ["a", "b"] }), config]), []);
 
 	const carte = (o) => ({ title: "Carte", prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "`<class 'list'>`", ...o });
 	r.check("estCarte : flashcard === true seulement",
@@ -102,7 +120,7 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 /* Les STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : la seule
    lecture des champs `lecture`, `etapes`, `tableau`, `retenir`. Une valeur
    qu'elle ne comprend pas retombe sur le comportement d'avant, sans erreur. */
-await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tableauDeLecture, retenirDeLecture, etapesDeLecture, paragraphes, minutesDeLecture, estMethode, motsDeLecture }) => {
+await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tableauDeLecture, retenirDeLecture, etapesDeLecture, paragraphes, estMethode, motsDeLecture }) => {
 	const r = makeReporter("Styles de lecture (format)");
 	r.check("style : les trois valeurs connues",
 		["page", "etapes", "tableau"].map(v => styleDeLecture({ lecture: v })), ["page", "etapes", "tableau"]);
@@ -142,8 +160,20 @@ await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tabl
 		[true, false, false, false, true]);
 	r.check("longueur d'une lecture : texte, étapes, cases du tableau et points à retenir",
 		motsDeLecture({ prompt: "un deux", etapes: ["trois quatre"], tableau: { colonnes: ["cinq"], lignes: [["six", "sept"]] }, retenir: { forme: "cartes", items: [{ recto: "huit", verso: "neuf dix" }] } }), 10);
-	r.check("minutes de lecture : mots / 200, arrondi, au moins 1",
-		[minutesDeLecture(""), minutesDeLecture("mot ".repeat(250)), minutesDeLecture("mot ".repeat(350)), minutesDeLecture("mot ".repeat(1000))], [1, 1, 2, 5]);
+	r.done();
+});
+
+/* Les NIVEAUX D'UN INDICE (2026-09-26) : `hint` est une chaîne OU un tableau
+   de chaînes ; une valeur invalide est ignorée. */
+await withSrcModule("src/quiz-hint.ts", ({ niveauxIndice, aIndice }) => {
+	const r = makeReporter("Niveaux d'un indice");
+	r.check("une chaîne : un niveau, texte d'origine gardé", niveauxIndice(" Pense à range. "), [" Pense à range. "]);
+	r.check("un tableau : ses textes non vides, dans l'ordre",
+		niveauxIndice(["léger", "", "  ", "révélateur"]), ["léger", "révélateur"]);
+	r.check("valeurs invalides ignorées : nombre, objet, null, tableau sans texte, élément non texte",
+		[niveauxIndice(42), niveauxIndice({ a: 1 }), niveauxIndice(null), niveauxIndice(["", 3]), niveauxIndice(["ok", 3, null])],
+		[[], [], [], [], ["ok"]]);
+	r.check("aIndice suit niveauxIndice", [aIndice("x"), aIndice(["", "y"]), aIndice("  "), aIndice([]), aIndice(undefined)], [true, true, false, false, false]);
 	r.done();
 });
 

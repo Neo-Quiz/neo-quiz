@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- Hints with several levels: a hard question can give a light clue first, then "Next hint" reveals a more precise one, up to the last; the levels already seen stay on screen. The editor adds or removes levels under Hint. Written answers now have their hint too, and the key words of a hint or an explanation are shown in blue.
 - Learn courses come in several reading styles chosen by the AI for the content: a reading page, numbered steps or a comparison table, with key points as flip cards or a checked recap; the style can be changed in the editor.
 - Wallpaper brightness and blur sliders in Settings, under the wallpaper, applied live as you drag.
 - A ⋯ button at the top right of a folder opens the same menu as its card (edit, open the folder, copy its path, archive, move, delete).
@@ -29,6 +30,7 @@ release notes.
 - Learn quizzes show how many readings they hold next to the number of questions.
 
 ### Changed
+- A Learn reading no longer shows "About N minutes of reading".
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
 - The app now sits in a centered panel, with your wallpaper fully visible around it; cards inside are plain surfaces instead of glass tiles. A soft blue glow lights the top of the window; entering a folder briefly flashes the folder's color, then the glow fades away inside the folder and comes back when you leave.
 - Generating a quiz now reads like a conversation on claude.ai: each request appears as your message, with a live "working" reply underneath that turns into the finished quiz, and the composer stays at the bottom.

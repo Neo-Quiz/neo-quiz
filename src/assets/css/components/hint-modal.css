@@ -97,6 +97,19 @@
 .quiz-hint-inline-body > :first-child{ margin-top: 0; }
 .quiz-hint-inline-body > :last-child{ margin-bottom: 0; }
 
+/* Les niveaux d'un indice révélés l'un après l'autre (engine/hint.ts) :
+   empilés de près, ils se lisent comme une suite. */
+.quiz-hint-inline + .quiz-hint-inline{ margin-top: 8px; }
+
+/* LES MOTS CLÉS d'un indice (retours #1 et #5 du 2026-09-26) : le **gras**
+   que le prompt pose sur eux prend le bleu d'accent, en graisse 600. Même
+   règle sur l'explication (explanations.css). */
+.quiz-hint-inline-body strong,
+.quiz-hint-modal-body strong{
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
 @keyframes quiz-hint-inline-in{
   from{ opacity: 0; transform: translateY(-4px); }
 }

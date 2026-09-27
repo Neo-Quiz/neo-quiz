@@ -7,6 +7,7 @@ import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
 import { normalizeTerminalVariantName } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
 import { htmlVersMarkdown, texteBaliseVersMarkdown } from "./html-vers-markdown";
+import { niveauxIndice } from "../quiz-hint";
 
 /* ══════════════════════════════════════════════════════════
    CONVERT — item JSON5 brut → DraftQuestion (forme d'édition)
@@ -141,7 +142,12 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	question.title = q.title || "";
 	// « Question N » non localisé : motif du titre auto écrit dans le .md.
 	question._userModifiedTitle = !/^Question \d+$/.test(question.title);
-	question.hint = q.hint ? texteBaliseVersMarkdown(q.hint) ?? q.hint : "";
+	/* `hint` : une chaîne ou un tableau de niveaux (src/quiz-hint.ts). Le
+	   premier niveau reste dans `hint`, les suivants dans `_hintMore` ; une
+	   valeur invalide est ignorée. */
+	const niveaux = niveauxIndice(q.hint).map(h => texteBaliseVersMarkdown(h) ?? h);
+	question.hint = niveaux[0] ?? "";
+	if (niveaux.length > 1) question._hintMore = niveaux.slice(1);
 
 	/* DU MARKDOWN PARTOUT (2026-09-26) : un texte stocké en HTML est converti
 	   en markdown à l'ouverture, quand la conversion est PROUVÉE sans perte

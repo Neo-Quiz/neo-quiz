@@ -129,11 +129,52 @@ export function renderExtras(parent: HTMLElement, q: DraftQuestion, cb: EditCall
 	renderResourceSection(parent, q, cb, bridge);
 
 	// ── Indice ──
-	const hint = section(parent, "lightbulb", t("editor.hint.label"), !!q.hint);
-	bridge.field(hint, "", (q.hint || "").replace(/<br\s*\/?>/gi, "\n"), t("editor.hint.placeholder"), true, v => {
+	renderHintSection(parent, q, cb, bridge);
+}
+
+/** L'indice, et ses NIVEAUX SUIVANTS (2026-09-26) : le premier niveau
+    reste le champ d'avant ; « Ajouter un niveau » en pose un de plus, du
+    moins au plus révélateur (src/quiz-hint.ts). Un niveau vidé n'est pas
+    écrit (editor/export.ts). */
+function renderHintSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks, bridge: FormBridge): void {
+	const suite = q._hintMore ?? [];
+	const hint = section(parent, "lightbulb", t("editor.hint.label"), !!q.hint || suite.length > 0);
+	ajouter(hint, "div", "qbd-qz-section-help", t("editor.hint.levelsHelp"));
+	bridge.field(hint, suite.length ? t("editor.hint.level", { n: 1 }) : "", (q.hint || "").replace(/<br\s*\/?>/gi, "\n"), t("editor.hint.placeholder"), true, v => {
 		q.hint = v;
 		cb.onChange();
 	});
+	suite.forEach((valeur, i) => {
+		const ligne = ajouter(hint, "div", "qbd-lecture-style-item");
+		bridge.field(ligne, t("editor.hint.level", { n: i + 2 }), valeur.replace(/<br\s*\/?>/gi, "\n"), t("editor.hint.placeholderNext"), true, v => {
+			suite[i] = v;
+			q._hintMore = suite;
+			cb.onChange();
+		});
+		boutonIndice(ligne, "x", t("editor.hint.removeLevel")).addEventListener("click", () => {
+			suite.splice(i, 1);
+			if (suite.length) q._hintMore = suite; else delete q._hintMore;
+			cb.onChange();
+			cb.onStructureChange();
+		});
+	});
+	boutonIndice(hint, "plus", t("editor.hint.addLevel"), true).addEventListener("click", () => {
+		q._hintMore = [...suite, ""];
+		cb.onChange();
+		cb.onStructureChange();
+	});
+}
+
+/** Un bouton à icône, du même habillage que les listes d'une lecture
+    (`qbd-lecture-style-btn`, detail-lecture-style.ts). */
+function boutonIndice(parent: HTMLElement, icone: string, libelle: string, texteVisible = false): HTMLButtonElement {
+	const b = ajouter(parent, "button", "qbd-lecture-style-btn");
+	b.type = "button";
+	b.setAttribute("aria-label", libelle);
+	b.title = libelle;
+	currentHost().ui.setIcon(ajouter(b, "span", "qbd-lecture-style-btn-icone"), icone);
+	if (texteVisible) ajouter(b, "span", undefined, libelle);
+	return b;
 }
 
 /** Le bouton « ressource » n'existe que s'il est activé : son interrupteur

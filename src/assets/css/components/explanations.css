@@ -135,3 +135,16 @@
   padding: 1px 4px;
   border-radius: 4px;
 }
+
+/* LES MOTS CLÉS d'une explication (retour #12 du 2026-09-26) : les deux ou
+   trois mots que le prompt met en **gras** prennent le bleu d'accent, en
+   graisse 600 — aucune autre couleur. Même règle sur l'indice
+   (hint-modal.css). Un titre garde sa couleur. */
+.quiz-explain strong{
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.quiz-explain h3 strong{
+  color: inherit;
+}

@@ -1,5 +1,6 @@
 import type { QuestionRole } from "./types/quiz";
 import { findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
+import { aIndice } from "./quiz-hint";
 
 /**
  * LE FORMAT LEARN / PRACTICE — module PUR : ni hôte, ni DOM, ni horloge.
@@ -60,6 +61,10 @@ export type Manque =
 	/** Une pré-question sans indice : on la pose AVANT la lecture, sans rien
 	    savoir — sans aide du tout, elle décourage (Ahmed, 2026-09-23). */
 	| { kind: "preSansIndice"; questions: string[] }
+	/** Une AUTRE question de Learn sans indice (explication, rappel) : CHAQUE
+	    question d'un Learn en a un (retours du 2026-09-26, #1 et #10). Hors
+	    lecture et carte mémoire, qui n'ont rien à deviner. */
+	| { kind: "sansIndice"; questions: string[] }
 	/** Une carte sans verso : retournée, elle ne montrerait rien à comparer. */
 	| { kind: "carteSansReponse"; questions: string[] };
 
@@ -157,8 +162,13 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 		const rolesManquants = exiges.filter(r => !presents.has(r));
 		if (rolesManquants.length) manques.push({ kind: "trancheIncomplete", slice, rolesManquants });
 	}
-	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !texte(q.hint)).map(({ q, i }) => nom(q, i));
+	// `hint` : une chaîne ou un tableau de niveaux (src/quiz-hint.ts).
+	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !aIndice(q.hint)).map(({ q, i }) => nom(q, i));
 	if (preSansIndice.length) manques.push({ kind: "preSansIndice", questions: preSansIndice });
+	const sansIndice = questions
+		.filter(({ q }) => q.role !== "pre" && q.role !== "read" && !estCarte(q) && !aIndice(q.hint))
+		.map(({ q, i }) => nom(q, i));
+	if (sansIndice.length) manques.push({ kind: "sansIndice", questions: sansIndice });
 	if (cartesSansVerso.length) manques.push({ kind: "carteSansReponse", questions: cartesSansVerso });
 	return manques;
 }

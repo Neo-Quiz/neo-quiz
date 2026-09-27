@@ -81,6 +81,12 @@ export const EN_EDITOR = {
 	"editor.form.promptPlaceholder": "Your question...",
 	"editor.hint.label": "Hint",
 	"editor.hint.placeholder": "A hint to help...",
+	/* Un indice à plusieurs niveaux (2026-09-26). */
+	"editor.hint.levelsHelp": "A hard question can have several levels, from the lightest clue to the most revealing one.",
+	"editor.hint.level": "Level {n}",
+	"editor.hint.placeholderNext": "A more revealing hint...",
+	"editor.hint.addLevel": "Add a level",
+	"editor.hint.removeLevel": "Remove this level",
 	"editor.form.explainSection": "Explanation",
 	"editor.form.explainPlaceholder": "### Key points\n- **Term** — Definition",
 

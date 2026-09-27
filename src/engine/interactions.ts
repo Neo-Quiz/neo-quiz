@@ -372,19 +372,8 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 
 		ctx.passage.bindPassage(trackItem, qi);
 
-		const hintBtn = trackItem.querySelector(".quiz-hint-btn");
-		if (hintBtn) {
-			hintBtn.addEventListener("click", e => {
-				e.preventDefault();
-				e.stopPropagation();
-				if (ctx.quizState.isSliding) return;
-				/* L'indice se RÉVÈLE sur place (plus de fenêtre) : l'état le
-				   retient, le re-rendu l'affiche sous la question et fait
-				   monter le bouton d'aide d'un cran (cards.ts). */
-				ctx.quizState.hintSeen[qi] = true;
-				ctx.commitQuestionInteraction(qi, { syncHeight: true });
-			});
-		}
+		// L'indice se révèle sur place, un niveau par clic (engine/hint.ts).
+		ctx.hint.brancherIndice(trackItem, qi);
 
 		// Task 7 (mode Lesson) : « Je ne sais pas » — le seul moyen de passer
 		// une carte "pre" sans y répondre : son bouton suivant bute sur la garde

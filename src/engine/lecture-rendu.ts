@@ -1,5 +1,5 @@
 import { t } from "../i18n";
-import { lireLecture, minutesDeLecture, paragraphes } from "../lecture-style";
+import { lireLecture, paragraphes } from "../lecture-style";
 import type { LectureStylee, Retenir, TableauLecture } from "../lecture-style";
 
 /* ══════════════════════════════════════════════════════════
@@ -42,13 +42,6 @@ export interface CorpsLecture {
 	html: string;
 }
 
-/** « Environ N minutes de lecture » : mots de tout ce qui se lit / 200. */
-function tempsDeLecture(brut: string, l: LectureStylee): string {
-	const tout = [brut, ...l.etapes, ...(l.tableau ? [...l.tableau.colonnes, ...l.tableau.lignes.flat()] : [])].join(" ");
-	const n = minutesDeLecture(tout);
-	return t(n === 1 ? "engine.lecture.readingTimeOne" : "engine.lecture.readingTime", { count: n });
-}
-
 function etapesHtml(items: string[], p: PortesLecture): string {
 	return `<ol class="quiz-lecture-etapes">${items.map((e, i) =>
 		`<li class="quiz-lecture-etape"><span class="quiz-lecture-num" aria-hidden="true">${i + 1}</span><div class="quiz-lecture-etape-texte">${p.bloc(e)}</div></li>`
@@ -85,7 +78,7 @@ function retenirHtml(r: Retenir, p: PortesLecture): string {
 /**
  * Le corps stylé d'une lecture.
  * @param item l'élément `read` brut (ses champs `lecture`, `etapes`, `tableau`, `retenir`).
- * @param brut son texte (`prompt`), pour le découpage en étapes et le temps de lecture.
+ * @param brut son texte (`prompt`), pour le découpage en étapes.
  * @param texteHtml le HTML DÉJÀ sûr de ce texte (prompt rendu, ou `promptHtml` assaini).
  * @param titre le titre à écrire EN TÊTE de la page (cours déplié au-dessus
  *   d'une question, maquette B) ; absent pour une lecture autonome, dont la
@@ -98,8 +91,8 @@ export function corpsLectureHtml(item: unknown, brut: string, texteHtml: string,
 /**
  * La version LÉGÈRE d'une lecture COURTE (src/lecture-etape.ts
  * `estLectureCourte`), lue au-dessus de sa question hôte : le même style
- * (texte, étapes, tableau, « À retenir »), sans titre, sans temps de
- * lecture ni lettrine, sans surface — lecture.css `.quiz-lecture--courte`.
+ * (texte, étapes, tableau, « À retenir »), sans titre ni lettrine, sans
+ * surface — lecture.css `.quiz-lecture--courte`.
  */
 export function corpsLectureCourteHtml(item: unknown, brut: string, texteHtml: string, p: PortesLecture): CorpsLecture {
 	return rendre(item, brut, texteHtml, undefined, p, true);
@@ -121,10 +114,10 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	} else if (l.style === "tableau") {
 		// Un tableau annoncé mais absent ou vide : le texte, simplement.
 		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
-	} else if (courte) {
-		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
 	} else {
-		corps = `<div class="quiz-lecture-meta">${p.inline(tempsDeLecture(brut, l))}</div><div class="quiz-lecture-texte">${texteHtml}</div>`;
+		/* Plus de « Environ N minutes de lecture » (retour #8 du 2026-09-26) :
+		   une étape de cours n'est pas un article. */
+		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
 	}
 	const retenir = l.retenir ? retenirHtml(l.retenir, p) : "";
 	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${p.inline(titre)}</h3>` : "";
