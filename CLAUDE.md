@@ -404,6 +404,12 @@ Vérification d'un changement = `npm run check`, plus `check:md` / `check:export
   code »). Le français reste la langue de ce fichier et de la note du vault.
 - Les sondes locales `.tmp-*` à la racine sont ignorées (`.gitignore`) : ne
   jamais les commiter.
+- **`CONTRIBUTING.md` et `SECURITY.md` à la racine** (onglets de la page du
+  dépôt), en anglais. Ils résument des règles de ce fichier (langue du code,
+  commits, i18n, valeurs immuables, `git ship`) : une règle qui change ici se
+  reporte là-bas. Les failles arrivent par le signalement PRIVÉ de GitHub
+  (activé sur le dépôt). Pas de `CODE_OF_CONDUCT.md` tant qu'il n'y a pas
+  d'autre contributeur (choix d'Ahmed, 2026-09-27).
 
 ## Boucle de dev (appliquer une modif dans Obsidian)
 
