@@ -296,7 +296,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	: `MODE: PRACTICE. You are writing an exam-preparation bank on the source, in the FORMAT OF A UNIVERSITY EXAM on it.
 	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
 	EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.
-	EVERY question has "hint": a nudge shown after a first wrong attempt, which never gives the answer away.
+	EVERY question has "hint" (see HINTS below).
 	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
 	"slice": when a SLICE PLAN of the learning path is given in the request, the number of the slice that teaches what the question tests; otherwise omit it.
 	"timeLimit": a number of seconds, ONLY on a question that tests an automatism; omit it everywhere else.
@@ -329,7 +329,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 
 	${blocMode}
 
-	HINTS: a "hint" helps without giving the answer away. Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
+	HINTS: a "hint" helps without giving the answer away. The learner can open it BEFORE any attempt, from a button under the question: never write it as if an answer had already been given ("you got it wrong", "try again"). Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
 
 	EXPLANATIONS: in every "explain", put the two or three KEY WORDS in **bold** — no more; the reader colors them.
 ${categorieBloc}

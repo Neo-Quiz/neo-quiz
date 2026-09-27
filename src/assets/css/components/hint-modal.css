@@ -101,6 +101,14 @@
    empilés de près, ils se lisent comme une suite. */
 .quiz-hint-inline + .quiz-hint-inline{ margin-top: 8px; }
 
+/* Le dernier niveau reçoit le focus au clavier quand le bouton disparaît
+   (engine/focus.ts) : un anneau au clavier seulement, jamais à la souris. */
+.quiz-hint-inline:focus{ outline: none; }
+.quiz-hint-inline:focus-visible{
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
 /* LES MOTS CLÉS d'un indice (retours #1 et #5 du 2026-09-26) : le **gras**
    que le prompt pose sur eux prend le bleu d'accent, en graisse 600. Même
    règle sur l'explication (explanations.css). */

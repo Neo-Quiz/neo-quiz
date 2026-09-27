@@ -63,6 +63,10 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		r.check(`${mode} : deux ou trois mots clés en gras dans l'explication`, p.includes("put the two or three KEY WORDS in **bold** — no more"), true);
 		r.check(`${mode} : un élément de classement est une ligne en code inline, jamais un bloc`,
 			p.includes("Each item of \"possibilities\" is ONE single line: a line of code is written as inline `code` between single backticks, NEVER as a fenced ``` block"), true);
+		/* Le rendu montre l'indice AVANT toute tentative (engine/cards.ts,
+		   engine/hint.ts) : aucun mode ne doit dire le contraire au modèle. */
+		r.check(`${mode} : l'indice s'ouvre avant toute tentative, aucune consigne contraire`,
+			[p.includes("The learner can open it BEFORE any attempt"), /after a (first )?wrong attempt/i.test(p)], [true, false]);
 	}
 	r.check("Learn : CHAQUE question a un indice, pas seulement les pré-questions",
 		learnP.includes("EVERY question of the path has \"hint\" — pre, explain and recall alike"), true);

@@ -56,7 +56,10 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 		const plusieurs = niveaux.length > 1;
 		const revele = niveaux.slice(0, vus).map((texte, i) => {
 			const titre = plusieurs ? t("engine.hint.level", { n: i + 1, total: niveaux.length }) : t("engine.hint.button");
-			return `<div class="quiz-hint-inline"${plusieurs ? ` data-niveau="${i + 1}"` : ""}><div class="quiz-hint-inline-label">${icone}<span>${titre}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(texte)}</div></div>`;
+			/* Le DERNIER niveau révélé peut recevoir le focus (tabindex -1) :
+			   c'est là qu'il passe quand le bouton disparaît (engine/focus.ts). */
+			const dernier = i === vus - 1 ? ` data-hint-dernier tabindex="-1"` : "";
+			return `<div class="quiz-hint-inline"${plusieurs ? ` data-niveau="${i + 1}"` : ""}${dernier}><div class="quiz-hint-inline-label">${icone}<span>${titre}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(texte)}</div></div>`;
 		}).join("");
 		return { bouton, revele };
 	}
