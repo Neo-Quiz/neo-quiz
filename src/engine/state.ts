@@ -62,6 +62,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return Array.isArray(sel) && sel.some(v => v !== null);
 		}
 
+		if (ctx.isCodeQuestion(q)) return typeof sel === "string" && sel.trim().length > 0;
 		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
@@ -109,6 +110,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return Array.isArray(sel) && sel.length > 0 && sel.every(v => v !== null);
 		}
 
+		if (ctx.isCodeQuestion(q)) return typeof sel === "string" && sel.trim().length > 0;
 		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
@@ -151,6 +153,10 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			const rows = ctx.getMatchRows(q), cm = ctx.getMatchCorrectMap(q);
 			if (!Array.isArray(sel) || sel.length !== rows.length || !Array.isArray(cm) || cm.length !== rows.length) return false;
 			return cm.every((v, k) => sel[k] === v);
+		}
+
+		if (ctx.isCodeQuestion(q)) {
+			return false; // Correction gérée par engine/code.ts
 		}
 
 		if (ctx.isFlashcardQuestion(q)) return false;

@@ -235,6 +235,11 @@ const pont: Pont = {
 		transcrire: id => ipcRenderer.invoke(CANAUX.videoTranscrire, id),
 		annuler: id => ipcRenderer.invoke(CANAUX.videoAnnuler, id),
 	},
+
+	python: {
+		run: job => ipcRenderer.invoke(CANAUX.pythonRun, job),
+		warm: () => ipcRenderer.invoke(CANAUX.pythonWarm),
+	},
 };
 
 contextBridge.exposeInMainWorld("neo", pont);

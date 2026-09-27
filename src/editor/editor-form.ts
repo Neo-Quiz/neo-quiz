@@ -488,6 +488,13 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			czWrap.addEventListener("click", () => { q.caseSensitive = !q.caseSensitive; view.render(); view.scheduleSave?.(); });
 		}
 
+		/* Un exercice de code ne s'édite pas ici : il n'a qu'à TRAVERSER
+		   (editor/convert.ts). Un seul message, pas de champ — modifier
+		   `solution`/`starter`/`inputs`/`asserts`/`hints` se fait dans la note. */
+		if (qType === "code") {
+			ajouter(box, "div", "qb-field-help", t("editor.codeEditInNote"));
+		}
+
 		if (qType === "flashcard" && !rares) {
 			// Le recto est l'énoncé du formulaire, déjà affiché plus haut : ici,
 			// seul le verso — un champ, comme pour le gabarit d'un texte à trous.

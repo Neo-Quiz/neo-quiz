@@ -77,6 +77,12 @@ import type { CodeErreurVideo, ResultatVideo } from "./video";
 import { etat as etatInstallation, infosInstallation, installer as installerYtDlp, mettreAJourSiDu } from "./video-installation";
 import type { CodeInstallation } from "./video-installation";
 import { estErreurInstallation } from "./video-installation";
+/* L'EXÉCUTION PYTHON (tâche 4) : `BacASable` vient du noyau du principal
+   (`./python.ts`, tâche 3), qui tient la fenêtre cachée et son isolement.
+   Import de VALEUR interdit ici : ce module n'instancie rien, `main.ts` seul
+   crée le bac à sable et le passe par `deps.python`. */
+import type { PythonRun } from "../../../src/host/types";
+import type { BacASable } from "./python";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -125,6 +131,9 @@ export interface DependancesCanaux {
 		recharger(): void;
 		outilsDev(): void;
 	};
+	/** Le bac à sable Python (tâche 3, `./python.ts`), créé et fermé par
+	    `main.ts` — ce fichier ne fait que relayer ses appels. */
+	python: BacASable;
 }
 
 /** L'état du disque tenu par ce processus — voir `enregistrerCanaux`. */
@@ -1431,6 +1440,21 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   erreur — la même réponse « trop tard » qu'au réseau. */
 		if (typeof id === "string") annulerVideo(id);
 	});
+
+	/* L'EXÉCUTION PYTHON. Les arguments viennent du rendu : revalidés ici,
+	   bornés en taille (64 Ko), délai ramené entre 100 ms et 10 s. Le bac à
+	   sable fait le reste (python.ts). */
+	const PLAFOND_PYTHON = 64 * 1024;
+	ipcMain.handle(CANAUX.pythonRun, (_e, job: unknown): Promise<PythonRun> => {
+		const o = (job ?? {}) as Record<string, unknown>;
+		const texte = (v: unknown) => typeof v === "string" && v.length <= PLAFOND_PYTHON;
+		if (!texte(o.code) || !texte(o.stdin ?? "") || (o.after !== undefined && !texte(o.after))) {
+			return Promise.resolve({ status: "unavailable", stdout: "", error: "travail refusé" });
+		}
+		const delai = Math.min(10000, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
+		return deps.python.run({ code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
+	});
+	ipcMain.handle(CANAUX.pythonWarm, () => { deps.python.warm(); });
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {

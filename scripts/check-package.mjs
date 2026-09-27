@@ -190,6 +190,9 @@ if (existsSync(asar)) {
 	p.check("les deux sorties sont là",
 		[chemins.includes("/dist-electron/main.cjs"), chemins.includes("/dist-electron/preload.cjs"), chemins.includes("/dist/index.html")],
 		[true, true, true]);
+	for (const f of ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]) {
+		p.check(`Pyodide embarqué : ${f}`, chemins.some(c => c.endsWith(`/dist-electron/python/pyodide/${f}`)), true);
+	}
 	/* Le paquet porte son flux (`app-update.yml`, écrit par electron-builder à
 	   côté de l'asar), et le dossier de sortie porte les métadonnées que la
 	   release publie. La version de `latest.yml` DOIT être celle du manifeste :

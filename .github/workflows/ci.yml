@@ -31,6 +31,9 @@ jobs:
       - name: Learn and Practice format
         run: npm run check:quiz-format
 
+      - name: check:code-exercise
+        run: npm run check:code-exercise
+
       # LE PROMPT DE CHAQUE MODE DÉCRIT CE QUE LE CONTRÔLE EXIGE : un champ tu
       # dans le prompt n'est jamais produit (explain, le 2026-09-23).
       - name: Learn and Practice prompts
@@ -274,6 +277,9 @@ jobs:
       - name: Install dependencies (apps/windows)
         run: npm ci
         working-directory: apps/windows
+
+      - name: Python sandbox (Pyodide isolation)
+        run: npm run check:python-sandbox
 
       - name: Build and package (NSIS)
         run: npm run pack:win

@@ -38,6 +38,7 @@ import type {
 	MatchingQuestion,
 	TextQuestion,
 	ClozeQuestion,
+	CodeQuestion,
 	FlashcardQuestion,
 } from "./types/quiz";
 
@@ -142,6 +143,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// vide est un texte à trous, quels que soient ses autres champs.
 	const isClozeQuestion = (q: QuizQuestion): q is ClozeQuestion =>
 		!!(q && typeof (q as { cloze?: unknown }).cloze === "string" && (q as { cloze: string }).cloze.trim().length > 0);
+	// La PRÉSENCE de `language` non vide discrimine un exercice de code.
+	const isCodeQuestion = (q: QuizQuestion): q is CodeQuestion =>
+		!!(q && typeof (q as { language?: unknown }).language === "string" && (q as { language: string }).language.trim().length > 0);
 	const isFlashcardQuestion = (q: QuizQuestion): q is FlashcardQuestion =>
 		!!(q && (q as { flashcard?: unknown }).flashcard === true);
 
@@ -202,6 +206,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		isMatchingQuestion,
 		isTextQuestion,
 		isClozeQuestion,
+		isCodeQuestion,
 		isFlashcardQuestion
 	} as EngineCtx;
 
@@ -320,6 +325,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			if (isTextQuestion(q)) return null;
 			// Un texte à trous se lit dans l'ordre où il est écrit : rien à mélanger.
 			if (isClozeQuestion(q)) return null;
+			// Un exercice de code n'a pas d'options à mélanger.
+			if (isCodeQuestion(q)) return null;
 			// Une carte se retourne : rien à mélanger.
 			if (isFlashcardQuestion(q)) return null;
 
@@ -345,6 +352,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			// ces valeurs à chaque frappe et un trou absent ferait un `undefined`
 			// dans la valeur de l'input.
 			if (isClozeQuestion(q)) return new Array<string>(cloze.getBlanks(q).length).fill("");
+			if (isCodeQuestion(q)) return "";
 			if (isOrderingQuestion(q)) return new Array<number | null>(questions.getOrderingItems(q).length).fill(null);
 			if (isMatchingQuestion(q)) return new Array<number | null>(questions.getMatchRows(q).length).fill(null);
 			if (isFlashcardQuestion(q)) return null;

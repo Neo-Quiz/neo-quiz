@@ -8,6 +8,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.lesson.help": "Affichée avant la question, en mode Leçon.",
 	"editor.lesson.placeholder": "Ce que l'apprenant lit d'abord…",
 	"editor.paste.imageFailed": "Impossible de coller l'image",
+	"editor.codeEditInNote": "Un exercice de programmation se modifie directement dans la note.",
 
 	/* ── Actions communes ── */
 	"editor.action.add": "Ajouter",

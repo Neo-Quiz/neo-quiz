@@ -873,6 +873,33 @@ export interface HostVideo {
  * texte qui porte le jeton ; le rendu ne lit rien lui-même. Membre OPTIONNEL :
  * absent sous le greffon, la page attend alors un collage manuel.
  */
+/** Un essai Python à exécuter dans le bac à sable — voir `HostPython`. */
+export interface PythonJob {
+	code: string;
+	stdin: string;
+	after?: string;
+	timeoutMs: number;
+}
+
+/** Ce que rend le bac à sable, jamais plus que ces champs. */
+export interface PythonRun {
+	status: "ok" | "error" | "timeout" | "too-long" | "unavailable";
+	stdout: string;
+	/** Traceback BRUTE ; le nettoyage est pur et partagé (src/code-exercise). */
+	error?: string;
+}
+
+/**
+ * LE BAC À SABLE PYTHON — un membre OPTIONNEL, l'application seule (voir
+ * `apps/windows/electron/python.ts` pour la spec de sécurité : deux couches,
+ * chacune mesurée). Le greffon n'exécute pas de code Python.
+ */
+export interface HostPython {
+	run(job: PythonJob): Promise<PythonRun>;
+	/** Charge Python en tâche de fond ; sans effet s'il est déjà chargé. */
+	warm(): void;
+}
+
 export interface HostCollage {
 	/** Démarre l'attente ; la fonction rendue l'arrête. Une nouvelle attente
 	    remplace la précédente. `surTexte` est appelé AU PLUS une fois. */
@@ -972,6 +999,8 @@ export interface Host {
 	pdf?: HostPdf;
 	/** Absent sous le greffon — voir `HostVideo`. */
 	video?: HostVideo;
+	/** Absent sous le greffon — voir `HostPython`. */
+	python?: HostPython;
 	/** Absent sous le greffon — voir `HostCollage`. */
 	collage?: HostCollage;
 	/** Absent sous le greffon — voir `HostDepot`. */

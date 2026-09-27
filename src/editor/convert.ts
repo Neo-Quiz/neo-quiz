@@ -101,6 +101,12 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   choix unique, et la sauvegarde suivante remplaçait `cloze` par des
 	   options fantômes (revue codex 2026-07-31). Le MOTEUR, lui, a raison
 	   d'exiger du contenu : il ne peut rien afficher d'un gabarit vide. */
+	/* Un exercice de code (`language`, spec 2026-09-23-exercice-python) ne
+	   s'édite pas dans le formulaire : il n'a qu'à TRAVERSER. Lu comme un
+	   choix unique, la sauvegarde suivante lui écrivait des options
+	   fantômes. Ses champs passent par `_extraFields`, comme toute clé que
+	   l'éditeur ne connaît pas, écrits par `json5Value`. */
+	else if (typeof q.language === "string" && q.language.trim().length > 0) type = "code";
 	/* Carte mémoire : `flashcard: true` discrimine, AVANT le repli sur le choix
 	   unique — sans cette ligne, la sauvegarde suivante réécrivait la carte en
 	   QCM à options vides (même piège que pour `cloze`). */

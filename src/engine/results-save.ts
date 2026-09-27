@@ -280,6 +280,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	function buildQcmAnswer(q: QuizQuestion, qi: number) {
 		if (ctx.isClozeQuestion(q)) return buildClozeResult(q, qi);
 		if (ctx.isTextQuestion(q)) return buildTextQuestionResult(q, qi);
+		if (ctx.isCodeQuestion(q)) return null; // Résultat géré par engine/code.ts
 		if (ctx.isOrderingQuestion(q)) return buildOrderingResult(q, qi);
 		if (ctx.isMatchingQuestion(q)) return buildMatchingResult(q, qi);
 		if (ctx.isFlashcardQuestion(q)) return null;
@@ -335,7 +336,12 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			});
 		}
 
+		if (ctx.isCodeQuestion(q)) {
+			return null; // Réponse attendue gérée par engine/code.ts
+		}
+
 		if (ctx.isFlashcardQuestion(q)) return null;
+
 		return optionEntries(q, getCorrectOptionIndices(q));
 	}
 
