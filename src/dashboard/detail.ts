@@ -24,6 +24,9 @@ import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
 import { lectureCourteDe, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
+import { applyModuleOverrides } from "./quiz-modules";
+import type { ModuleMap } from "./quiz-modules";
+import { lireModuleMap } from "./module-map-note";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ PAGE — ce qu'on voit en cliquant un quiz (refonte 2026-07-21,
@@ -164,8 +167,28 @@ export interface DetailHandlers {
 export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 	const page = createQuizPage({ statsStore: ctx.statsStore });
 
+	/* Table des modules pour le sous-menu « Déplacer vers » (menu ⋯ de la
+	   fiche) — même patron paresseux que home.ts : chargée en tâche de fond,
+	   au pire absente au premier clic (le menu montre alors moins de
+	   dossiers, jamais une erreur), présente dès le rendu suivant. Cette page
+	   n'a pas de `repaint()` exposé à l'extérieur pour forcer un rafraîchissement
+	   dès que la lecture aboutit ; ce n'est pas nécessaire ici puisque le menu
+	   ne lit `moduleMap` qu'AU CLIC, longtemps après ce premier rendu. */
+	let moduleMap: ModuleMap | null = null;
+	let moduleMapLoaded = false;
+	async function loadModuleMap(): Promise<void> {
+		moduleMapLoaded = true;
+		await Promise.resolve();
+		moduleMap = await lireModuleMap(ctx.settings.quizzesModuleMapNote || "Dashboard");
+	}
+
 	return {
 		render(container: HTMLElement, quiz: QuizIndexEntry, host: DetailHostSpec): void {
+			if (!moduleMapLoaded) void loadModuleMap();
+			const map: ModuleMap = applyModuleOverrides(
+				moduleMap ?? { byFolder: new Map(), ueOrder: [] },
+				ctx.settings.quizzesModuleOverrides || {}
+			);
 			page.render(container, {
 				key: quiz.path,
 				title: quiz.title,
@@ -203,7 +226,7 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 					const frais = ctx.scanner.getQuiz(quiz.path);
 					if (frais) ctx.navigate("detail", { quiz: frais });
 					else host.onBack();
-				}) : undefined,
+				}, map) : undefined,
 			});
 		},
 		dispose: () => page.dispose(),

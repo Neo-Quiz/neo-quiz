@@ -229,6 +229,11 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moveConfirmCta": "Move",
 	"dashboard.quizzes.moved": "Module moved to {target}",
 	"dashboard.quizzes.moveExists": "A folder with this name already exists there.",
+	/* « Move to » d'UN quiz (menu ⋯ d'une carte de quiz), après Edit — distinct
+	   de menuMove/moved/moveExists ci-dessus, qui déplacent un MODULE entier. */
+	"dashboard.quizzes.menuMoveQuiz": "Move to",
+	"dashboard.quizzes.movedQuiz": "Moved to {target}",
+	"dashboard.quizzes.moveQuizExists": "A quiz with this name already exists there.",
 
 	/* ── Modal « Modifier dossier » (calqué StudySmarter, sans le toggle public) ── */
 	"dashboard.quizzes.moduleEditTitle": "Edit folder",

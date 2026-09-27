@@ -4,12 +4,14 @@ import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
+import { buildModuleGroups, buildUeGroups, moduleForQuiz } from "./quiz-modules";
 import { openModuleEditModal } from "./module-edit";
 import { openActionMenu, type ActionMenuItem } from "./ui-select";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
+import { freeNotePath } from "./folder-create";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
@@ -340,14 +342,62 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
 		: t("dashboard.quizzes.deleted"));
 }
 
+/* ── Déplacer UN quiz vers un autre dossier connu ──
+   Contrairement à `moveModuleTo` (qui déplace un DOSSIER entier entre deux
+   racines), ceci déplace la NOTE d'un quiz vers un dossier de « Mes quiz »
+   choisi dans le sous-menu — même dossier de destination que la page (les
+   groupes de `buildUeGroups`/`buildModuleGroups`, sur la même `map`).
+
+   Nom libre par `freeNotePath` (même garde que « Nouveau quiz » /
+   `folder-create.ts`) : jamais d'écrasement, un homonyme reçoit " (2)". */
+async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string): Promise<string | null> {
+	const host = currentHost();
+	const to = await freeNotePath(targetFolder, quiz.basename);
+	try {
+		await host.fs.rename(quiz.path, to);
+	} catch {
+		// Course rare entre le calcul du nom libre et le renommage : quelqu'un
+		// a écrit là-bas entre-temps. Rien n'a bougé.
+		host.ui.notice(t("dashboard.quizzes.moveQuizExists"));
+		return null;
+	}
+	// Historique de révision : même appel que `moveModuleTo`, qui sait déjà
+	// distinguer un déplacement DANS la même racine (un renommage, réécrit en
+	// place) d'un déplacement ENTRE deux racines (transposé).
+	await ctx.reviewStore?.moved(quiz.path, to);
+	/* STATS (indexées par chemin) : `statsStore` n'est PAS optionnel sur ctx,
+	   on l'appelle donc sans garde. Nécessaire ici et pas seulement souhaitable :
+	   sous l'hôte Obsidian, `HostFs.rename` passe par l'ADAPTATEUR direct
+	   (`apps/obsidian/host.ts`), pas par `vault.rename` — aucun évènement
+	   "rename" du vault n'est émis, donc rien n'aurait autrement appelé
+	   `statsStore.renamed`. Idempotent : si l'évènement finissait quand même
+	   par arriver (détecteur de renommage de l'app), le second appel ne
+	   trouve plus l'ancienne clé et ne fait rien. */
+	ctx.statsStore.renamed(quiz.path, to);
+	/* PHOTOS DE SESSION (`quizSessions`, apps/windows/src/review/sessions.ts) :
+	   LIMITE ACCEPTÉE (Ahmed, 2026-09-27). `SessionsApp` n'est pas un membre
+	   de `DashboardShellCtx` — il vit uniquement côté application, hors du
+	   contrat partagé — donc ce module ne peut pas la faire suivre ici. Une
+	   session en cours sur ce quiz reste indexée sous l'ANCIEN chemin après un
+	   déplacement et ne reprendra pas. Si `sessions` entre un jour dans
+	   `DashboardShellCtx`, l'appel manquant est ICI, juste après la ligne
+	   `statsStore.renamed` ci-dessus : `ctx.sessions?.renommer(quiz.path, to)`
+	   (méthode à ajouter à `SessionsApp`, sur le modèle de `statsStore.renamed`). */
+	return to;
+}
+
 /* ── Menus ── */
 
 /** Menu ⋯ d'une carte de quiz — l'ordre et la rangée rouge suivent la
     référence StudySmarter. Bâti AU CLIC (le nom du quiz peut avoir changé).
     AUCUNE entrée d'archivage : l'archivage n'existe qu'au niveau dossier
-    (Ahmed 2026-07-19). */
-export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void): (quiz: QuizIndexEntry) => ActionMenuItem[] {
-	return (quiz) => {
+    (Ahmed 2026-07-19). `map` sert au sous-menu « Déplacer vers » : les
+    dossiers connus de « Mes quiz », groupés par UE. `anchorEl`, comme pour
+    `buildModuleCardMenu`, est l'ancre où poser ce sous-menu — absent (appelant
+    qui ne le fournirait pas encore), pas d'entrée « Déplacer vers » : un
+    sous-menu sans rien où s'ancrer ne s'ouvrirait nulle part. */
+export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement) => ActionMenuItem[] {
+	return (quiz, anchorEl) => {
 		/* Capturés dans des constantes : le rétrécissement de type d'un `if`
 		   sur `ctx.shareQuiz` ne survivrait pas jusqu'au `onClick`. */
 		const { shareQuiz, renameQuiz } = ctx;
@@ -371,6 +421,48 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void):
 			// qu'un clic sur la carte mène déjà à cette page.
 			onClick: () => { ctx.navigate("detail", { quiz, edit: true }); },
 		});
+		/* « Déplacer vers » — juste après Edit (demande Ahmed 2026-09-27). Les
+		   dossiers CONNUS : les groupes de `buildModuleGroups`/`buildUeGroups`
+		   sur les quiz du catalogue entier (pas seulement ceux affichés/filtrés
+		   à l'écran), qui portent un CHEMIN réel (`g.path`) — un groupe déclaré
+		   sans quiz ni chemin n'est nulle part où écrire. Le dossier COURANT du
+		   quiz est RETIRÉ de la liste (jamais grisé : demande Ahmed, ne pas
+		   toucher au composant de menu partagé pour un état désactivé). */
+		if (anchorEl) {
+			const dossierActuel = moduleForQuiz(quiz.path, map).path;
+			const groupes = buildModuleGroups(ctx.scanner.getQuizzes(), {}, map)
+				.filter(g => g.path && g.path !== dossierActuel);
+			if (groupes.length > 0) items.push({
+				icon: "folder-input",
+				label: t("dashboard.quizzes.menuMoveQuiz"),
+				onClick: () => {
+					const sousItems: ActionMenuItem[] = [];
+					let derniereUe: string | undefined;
+					for (const ue of buildUeGroups(groupes, map)) {
+						for (const g of ue.modules) {
+							sousItems.push({
+								icon: "folder",
+								label: g.name,
+								// L'UE en accessoire à droite : montre le regroupement
+								// sans ajouter d'en-tête au composant partagé.
+								hint: ue.ue ?? t("dashboard.quizzes.noUe"),
+								sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
+								onClick: () => {
+									void moveQuizTo(ctx, quiz, g.path as string).then(to => {
+										if (to) {
+											currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
+											rerender();
+										}
+									});
+								},
+							});
+							derniereUe = ue.key;
+						}
+					}
+					openActionMenu(anchorEl, sousItems);
+				},
+			});
+		}
 		// Même règle que Partager : sans `renameQuiz`, pas d'entrée. Rendre
 		// « Renommer » sur `HostFs.rename` casserait les liens entrants en
 		// silence — une entrée qui n'existe pas vaut mieux qu'une qui ment.

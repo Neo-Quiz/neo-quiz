@@ -458,7 +458,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			// se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in. L'hôte
 			// OUVRE le menu lui-même (tour de correction 1, tâche 6) — la carte
 			// ne fait plus que signaler le clic et son ancre.
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender) : undefined,
+			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map) : undefined,
 			accent: accentOf(quiz, map),
 		});
 	}

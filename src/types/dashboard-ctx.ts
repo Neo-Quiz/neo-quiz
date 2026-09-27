@@ -228,7 +228,10 @@ export interface DashboardShellCtx {
 	    liée à Obsidian). L'ouverture appartient maintenant à l'hôte : c'est
 	    lui qui importe `ui-select.ts` (le greffon le fait déjà, `dashboard.ts`
 	    reste dans RESTANTS) et compose les items AU CLIC. */
-	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void) => void;
+	/* `map` (tranche 9, tâche « Move to ») : le sous-menu « Déplacer vers »
+	   liste les dossiers connus groupés par UE, tirés de la même table que
+	   `openModuleMenu`. */
+	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —
 	    autant de modals que l'application n'a pas encore. Absente = pas de

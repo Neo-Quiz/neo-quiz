@@ -456,8 +456,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   même `ctx` : le menu « ⋯ » ne demande que `DashboardShellCtx` depuis
 		   la tranche 3 (tâche 9), et c'est l'hôte qui l'OUVRE (`openActionMenu`,
 		   portalé au `<body>`) avec le `rerender` de la page qui l'affiche. */
-		openCardMenu: (quiz, anchor, rerender) => {
-			openActionMenu(anchor, buildQuizCardMenu(ctx, rerender)(quiz));
+		openCardMenu: (quiz, anchor, rerender, map) => {
+			openActionMenu(anchor, buildQuizCardMenu(ctx, rerender, map)(quiz, anchor));
 		},
 		openModuleMenu: (group, anchor, rerender, map) => {
 			openActionMenu(anchor, buildModuleCardMenu(ctx, rerender, map)(group, anchor));

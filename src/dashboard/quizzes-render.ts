@@ -275,7 +275,7 @@ export function renderModuleDrill(
 			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
 			// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
 			// correction 1, tâche 6).
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender) : undefined,
+			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map) : undefined,
 			accent,
 			entryIndex: index,
 		});
