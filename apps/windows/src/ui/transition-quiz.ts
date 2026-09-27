@@ -3,9 +3,11 @@
 
    Référence : StudySmarter au clic sur « Réviser N flashcards », relevée par
    `document.getAnimations()` — c'est la transition de page iOS d'Ionic.
-   - la NOUVELLE page monte depuis le bas : `translateY(100%) → 0` ;
+   - la NOUVELLE page monte depuis le bas : `translateY(100%) → 0` (ici
+     depuis le bas de la fenêtre — voir `distanceHorsFenetre`) ;
    - l'ANCIENNE recule derrière : un peu plus étroite (`scaleX(0.97)`),
-     16 px plus haut, et s'assombrit à la toute fin (opacité 0,5 à 95 %) ;
+     16 px plus haut, et s'assombrit à la toute fin (opacité 0,5 à 95 % ;
+     ici un VOILE sur le panneau, jamais une opacité — voir `RECUL`) ;
    - la barre d'outils de l'ancienne page s'efface (300 ms vers 0, 200 ms
      vers 0,6) ;
    - le contenu de la nouvelle entre en fondu, `translateY(20%) → 0`.
@@ -43,18 +45,68 @@ import { choisirMode, uneFois, vuesARetirer } from "./transition-etat";
 const DUREE_MS = 500;
 const COURBE = "cubic-bezier(0.36, 0.66, 0, 1)";
 
-/* La page qui recule derrière. Les images clés relevées telles quelles. */
+/* La page qui recule derrière : le TRANSFORM relevé, sans son opacité.
+   Une `opacity` animée sur la coquille en fait la racine d'arrière-plan
+   (« backdrop root ») de son panneau de verre : pendant les 500 ms, le
+   `backdrop-filter` du panneau ne voyait plus le fond d'écran, le panneau
+   perdait son flou dès la première image et le retrouvait d'un coup à la
+   dernière. Et l'opacité 0,5 d'arrivée n'était pas l'état figé de la pile
+   (voile de `nq-pile-fond`, opacité 1) : un saut de plus, au début du retour
+   comme à la fin de la montée. L'assombrissement est donc celui du VOILE
+   (`VOILE`, ci-dessous), le même nœud que l'état figé.
+   `RECUL_Y` : la page remonte d'autant ; `nq-pile-fond` (`shell.css`) fige
+   la même valeur, et c'est la hauteur du bandeau qui dépasse du quiz. */
+const RECUL_Y = 16;
 const RECUL: Keyframe[] = [
-	{ offset: 0, opacity: 1, transform: "translateY(0) scaleX(1)" },
-	{ offset: 0.95, opacity: 1 },
-	{ offset: 1, opacity: 0.5, transform: "translateY(-16px) scaleX(0.97)" },
+	{ transform: "translateY(0) scaleX(1)" },
+	{ transform: `translateY(-${RECUL_Y}px) scaleX(0.97)` },
 ];
-/* Le même recul, rejoué à l'envers au retour : 95 % devient 5 %. */
-const RETOUR: Keyframe[] = [
-	{ offset: 0, opacity: 0.5, transform: "translateY(-16px) scaleX(0.97)" },
-	{ offset: 0.05, opacity: 1 },
-	{ offset: 1, opacity: 1, transform: "translateY(0) scaleX(1)" },
-];
+const RETOUR: Keyframe[] = [...RECUL].reverse();
+
+/* Le voile du panneau (`::after` de `.qbd-content`, `shell.css`) : il monte
+   avec le recul, sur la même courbe, et arrive exactement sur l'opacité que
+   `nq-pile-fond` lui donne ensuite. Pas le palier tardif du relevé (95 %) :
+   25 ms pour passer d'une page claire à une page voilée se lisaient comme un
+   saut de plus. */
+const PANNEAU = ":scope > .qbd-content";
+const VOILE: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
+
+/* Le quiz monte depuis le bas de la FENÊTRE, pas `translateY(100%)` : son
+   panneau ne remplit pas la fenêtre (la barre de titre au-dessus, une marge
+   égale en dessous, `shell.css`). Décalé de sa seule hauteur, son bord haut
+   restait dans la marge du bas : ce bandeau apparaissait d'un coup à la
+   première image de la montée, et au retour le quiz s'y immobilisait, freiné
+   par la courbe, avant de disparaître net. Mesuré sur le panneau au repos,
+   avant qu'aucune animation ne le déplace. */
+function distanceHorsFenetre(panneau: HTMLElement): number {
+	return Math.max(0, window.innerHeight - panneau.getBoundingClientRect().top);
+}
+
+/* RIEN SOUS LA VITRE DU QUIZ — la mécanique de la colonne « all day » de
+   Neo Calendar : la page derrière est COUPÉE (`clip-path`) au bord haut du
+   quiz, et la coupe suit ce bord pendant tout le mouvement. Le panneau du
+   quiz est du verre : sans elle, il floutait la page encore peinte dessous
+   (le bouton bleu « Commencer le quiz » en tache floue) au lieu du seul fond
+   d'écran. Il ne reste de la page que le bandeau de `RECUL_Y` qui dépasse
+   au-dessus du quiz ; `nq-pile-fond` fige ensuite la même coupe.
+
+   Les deux panneaux partagent la même case de grille, donc le même bord
+   haut au repos. Dans le repère de la page, le bord haut du quiz est à
+   `distance · (1 − p) + RECUL_Y · p` à la progression `p` de la montée :
+   LINÉAIRE en `p`, parce que la montée du quiz et le recul de la page
+   suivent la même courbe sur la même durée. Des images clés interpolées sur
+   cette courbe tombent donc juste à chaque image. La coupe reste nulle tant
+   que le quiz est plus bas que la page (`croise`). Un `clip-path` sur la
+   coquille ne coupe PAS le flou de son panneau (vérifié à l'image), à la
+   différence de l'`opacity`. */
+function coupe(hauteurPage: number, distance: number, sens: SensTransition): Keyframe[] {
+	const ouverte = "inset(0px 0px 0px 0px)";
+	const fermee = `inset(0px 0px ${Math.max(0, hauteurPage - RECUL_Y)}px 0px)`;
+	const croise = distance > RECUL_Y ? Math.min(1, Math.max(0, (distance - hauteurPage) / (distance - RECUL_Y))) : 0;
+	return sens === "entree"
+		? [{ offset: 0, clipPath: ouverte }, { offset: croise, clipPath: ouverte }, { offset: 1, clipPath: fermee }]
+		: [{ offset: 0, clipPath: fermee }, { offset: 1 - croise, clipPath: ouverte }, { offset: 1, clipPath: ouverte }];
+}
 
 /* La « barre d'outils » de la page qui recule : chez Neo Quiz, les en-têtes
    des pages du tableau de bord (fiche d'un quiz, « Mes quiz », accueil)
@@ -150,8 +202,14 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 	const base: KeyframeAnimationOptions = { duration: DUREE_MS, easing: COURBE };
 	const animations: Animation[] = [];
 	if (sens === "entree") {
+		// Mesurée AVANT toute animation : le quiz est encore à sa place de repos.
+		const distance = distanceHorsFenetre(entrant);
 		for (const s of [...aRetirer, ...garder]) {
 			animations.push(s.animate(RECUL, { ...base, fill: "forwards" }));
+			animations.push(s.animate(coupe(s.offsetHeight, distance, "entree"), { ...base, fill: "forwards" }));
+			for (const p of s.querySelectorAll<HTMLElement>(PANNEAU)) {
+				animations.push(p.animate(VOILE, { ...base, pseudoElement: "::after", fill: "forwards" }));
+			}
 			for (const el of s.querySelectorAll<HTMLElement>(EN_TETES)) {
 				animations.push(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: COURBE, fill: "forwards" }));
 			}
@@ -159,7 +217,7 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 				animations.push(el.animate([{ opacity: 1 }, { opacity: 0.6 }], { duration: 200, easing: COURBE, fill: "forwards" }));
 			}
 		}
-		animations.push(entrant.animate([{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], { ...base, fill: "backwards" }));
+		animations.push(entrant.animate([{ transform: `translateY(${distance}px)` }, { transform: "translateY(0)" }], { ...base, fill: "backwards" }));
 		// Le contenu du quiz (en-tête, moteur) entre en fondu, à part du panneau.
 		for (const enfant of Array.from(entrant.children)) {
 			animations.push(enfant.animate(
@@ -168,15 +226,20 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 			));
 		}
 	} else {
+		const quiz = aRetirer[0];
+		if (quiz) animations.push(entrant.animate(coupe(entrant.offsetHeight, distanceHorsFenetre(quiz), "sortie"), { ...base, fill: "backwards" }));
 		for (const s of aRetirer) {
 			/* Le quiz qui redescend passe DEVANT la page qui revient, montée
 			   après lui. Ce `z-index` part avec le nœud (`retirer`) ; il est
 			   tout de même effacé à la fin, pour qu'un nœud un jour réutilisé
 			   ne le garde pas collé. */
 			s.style.zIndex = "1";
-			animations.push(s.animate([{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], { ...base, fill: "forwards" }));
+			animations.push(s.animate([{ transform: "translateY(0)" }, { transform: `translateY(${distanceHorsFenetre(s)}px)` }], { ...base, fill: "forwards" }));
 		}
 		animations.push(entrant.animate(RETOUR, { ...base, fill: "backwards" }));
+		for (const p of entrant.querySelectorAll<HTMLElement>(PANNEAU)) {
+			animations.push(p.animate([...VOILE].reverse(), { ...base, pseudoElement: "::after", fill: "backwards" }));
+		}
 		for (const el of entrant.querySelectorAll<HTMLElement>(EN_TETES)) {
 			animations.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: COURBE, fill: "backwards" }));
 		}

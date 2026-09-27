@@ -254,7 +254,14 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		   `preventScroll` : ni l'un ni l'autre ne doit faire défiler la page,
 		   déjà à la bonne position (elle n'a jamais bougé). */
 		const cible = gardee.declencheur && gardee.layout.contains(gardee.declencheur) ? gardee.declencheur : gardee.layout;
-		if (cible === gardee.layout && cible.tabIndex < 0) cible.tabIndex = -1;
+		/* Le `tabindex` du conteneur ne vit que le temps de RECEVOIR ce focus :
+		   laissé en place, chaque clic dans le vide de la page refocalisait la
+		   coquille entière, et la première touche (Shift suffit) y faisait
+		   dessiner l'anneau `:focus-visible` autour de toute la fenêtre. */
+		if (cible === gardee.layout && cible.tabIndex < 0) {
+			cible.tabIndex = -1;
+			cible.addEventListener("blur", () => cible.removeAttribute("tabindex"), { once: true });
+		}
 		void jouerTransition(root, sortants, gardee.layout, "sortie").finally(() => {
 			cible.focus({ preventScroll: true });
 			transitionFinie();

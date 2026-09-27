@@ -1099,6 +1099,16 @@ body::after {
 	gap: 8px;
 }
 
+/* LA COQUILLE N'EST PAS UN CONTRÔLE (même règle que `.modal`, modal.css) :
+   au retour d'un quiz, elle reçoit le focus quand l'élément qui l'avait
+   lancé a disparu au repeint (`main.ts`, `vueGardee`). Revenir au clavier
+   (Échap) rend ce focus `:focus-visible`, et Chromium dessinait son anneau
+   blanc autour de toute la fenêtre. */
+#neo-quiz-root > .qbd-layout:focus,
+#neo-quiz-root > .qbd-layout:focus-visible {
+	outline: none;
+}
+
 /* LA MATIÈRE DU PANNEAU : verre dépoli, 60 % d'opacité portée par la
    couleur, flou réglable. Le coin arrondi découpe aussi ce qui défile
    dedans ; la page défile DANS le panneau, jamais la fenêtre. */
@@ -1151,22 +1161,36 @@ body::after {
    `nq-empile` plus haut) et à laisser voir ses coins arrondis sur les côtés.
    L'ASSOMBRISSEMENT est un voile (`::after`) posé sur le PANNEAU seul, et
    non une opacité sur toute la coquille : le verre (`backdrop-filter`) reste
-   lisible au lieu de laisser voir le fond d'écran à travers, contrairement à
-   l'ancienne image clé `opacity: 0.5` de la transition (acceptable le temps
-   d'une animation de 500 ms, pas pour toute la durée d'un quiz). */
+   lisible au lieu de laisser voir le fond d'écran à travers. L'ancienne
+   image clé `opacity: 0.5` de la transition n'était pas acceptable non plus
+   le temps de ses 500 ms : elle coupait le flou du panneau de la première
+   à la dernière image (voir `RECUL`, `transition-quiz.ts`). */
 #neo-quiz-root > .qbd-layout.nq-pile-fond {
 	transform: translateY(-16px) scaleX(0.97);
+	/* RIEN SOUS LA VITRE DU QUIZ : la page n'est plus peinte que dans le
+	   bandeau de 16 px qui dépasse au-dessus du quiz — la coupe où finit la
+	   montée (`coupe`, `transition-quiz.ts`). Sans elle, le verre du quiz
+	   floutait la page dessous au lieu du seul fond d'écran. */
+	clip-path: inset(0 0 calc(100% - 16px) 0);
 }
-#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content {
+/* Le voile EXISTE dès que la racine empile (`nq-empile`), à opacité 0 : la
+   transition l'anime (`VOILE`, `transition-quiz.ts`) et `nq-pile-fond` le
+   fige à 1 ensuite — le même nœud d'un bout à l'autre, donc pas de saut au
+   passage de l'animation à l'état figé, dans un sens comme dans l'autre. */
+#neo-quiz-root.nq-empile > .qbd-layout > .qbd-content {
 	position: relative;
 }
-#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content::after {
+#neo-quiz-root.nq-empile > .qbd-layout > .qbd-content::after {
 	content: "";
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
 	background: rgba(0, 0, 0, 0.35);
+	opacity: 0;
 	pointer-events: none;
+}
+#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content::after {
+	opacity: 1;
 }
 /* Même repli que l'ancienne animation (en-tête effacé, rail estompé), posé
    ici en statique pour que rien ne reste en `fill: forwards`. */
