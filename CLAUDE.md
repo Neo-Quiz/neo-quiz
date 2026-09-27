@@ -589,7 +589,12 @@ entier aurait décoloré 594 fragments des quiz d'Ahmed. Mesurer avant de tranch
 ## Conventions & pièges
 
 - **Messages de commit : le dépôt est PUBLIC.** Un message dit ce qui a
-  changé dans l'app, en termes de fonctionnalité, concis, sans expliquer le
+  changé dans l'app, en termes de fonctionnalité, **en ANGLAIS, à
+  l'impératif, sur UNE ligne de 60 caractères au plus** (« Add course
+  glossary », « Fix sheet stack jump on return ») — pas de corps, sauf s'il
+  est indispensable. GitHub coupe au-delà (« … ») sur la page du dépôt. Règle
+  posée le 2026-09-27 ; l'historique antérieur, en français, reste tel quel
+  (le réécrire décalerait tous les tags de release). Sans expliquer le
   pourquoi en détail. **Jamais une citation d'Ahmed, jamais son prénom, jamais
   un jugement sur un produit tiers ou un nom d'école** (règle posée le
   2026-09-20 après un message qui citait un avis sur Copilot et le nom de

@@ -67,3 +67,6 @@ temp/
 
 # Sessions Playwright MCP
 .playwright-mcp/
+
+# Sondes locales de diagnostic (jamais publiées)
+.tmp-*
