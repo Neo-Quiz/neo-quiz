@@ -368,7 +368,9 @@ function glossaryEntries(glossary: EntreeGlossaire[] | undefined): EntreeGlossai
 function glossaryLine(glossary: EntreeGlossaire[] | undefined): string {
 	const entrees = glossaryEntries(glossary);
 	if (entrees.length === 0) return "";
-	return `\t\tglossary: ${json5Value(entrees)},\n`;
+	// Une entrée par ligne : la note reste lisible (et un diff aussi) avec
+	// quinze définitions, là où une seule ligne en faisait un mur.
+	return `\t\tglossary: [\n${entrees.map(e => `\t\t\t${json5Value(e)},\n`).join("")}\t\t],\n`;
 }
 
 function exportAll(questions: DraftQuestion[], examOptions: EditorExamOptions | null = null): string {
