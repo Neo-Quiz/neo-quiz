@@ -490,8 +490,8 @@
 .quiz-textonly-verdict-icon-btn.right:hover{ background: color-mix(in srgb, var(--quiz-success) 22%, transparent); }
 .quiz-textonly-verdict-icon-btn.wrong:hover{ background: color-mix(in srgb, var(--quiz-danger) 22%, transparent); }
 
-.quiz-textonly-verdict-icon-btn.right.selected{ color: #fff; background: var(--quiz-success); }
-.quiz-textonly-verdict-icon-btn.wrong.selected{ color: #fff; background: var(--quiz-danger); }
+.quiz-textonly-verdict-icon-btn.right.selected{ color: var(--quiz-accent-text); background: var(--quiz-success); }
+.quiz-textonly-verdict-icon-btn.wrong.selected{ color: var(--quiz-accent-text); background: var(--quiz-danger); }
 
 .quiz-textonly-verdict-icon-row:has(.selected) .quiz-textonly-verdict-icon-btn:not(.selected){
   opacity: 0.5;

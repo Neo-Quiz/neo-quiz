@@ -560,23 +560,40 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			const statsStore = ctx.statsSink;
 			if (statsStore && ctx.sourcePath) {
 				const modeTexte = !!ctx.textOnly?.isTextOnlyForAny?.();
-				const { pct, total } = computeScorePercent();
+				const { pct, total, pendingWritten } = computeScorePercent();
 				/* FIX round 1 de revue task 6b (2026-09-01) : `questionsDone` comptait
 				   TOUTES les cartes (0..ctx.quiz.length), alors que `total` ci-dessus
 				   EXCLUT deja les cartes "read" (elles n'ont pas de reponse) —
 				   une tranche read+test produisait "2/1", une progression au-dessus
 				   de 100% au tableau de bord. Les deux compteurs doivent porter sur
 				   le MEME ensemble : on saute une carte "read" ici aussi, exactement
-				   comme `computeScorePercent` le fait pour `total`. */
+				   comme `computeScorePercent` le fait pour `total`.
+				   CORRECTIF (2026-09-27, revue lot A1, I1) : « répondue »
+				   (isComplete, retour #14) et « jugée » sont deux notions
+				   distinctes depuis que le bouton Vérifier a disparu — une réponse
+				   écrite (recall à choix, hors carte mémoire) est complète dès
+				   qu'elle contient du texte, mais reste SANS verdict tant que
+				   l'utilisateur n'a pas cliqué juste/faux sur les résultats. La
+				   compter ici gonflait `questionsDone` jusqu'à égaler
+				   `totalQuestions` (barre de progression à 100 %) pour un quiz
+				   entièrement écrit et jamais auto-évalué. On l'exclut donc du
+				   même geste que `pendingWritten` de `computeScorePercent`, et
+				   `totalQuestions` suit : `total` exclut déjà ces questions-là,
+				   `pendingWritten` les rajoute au dénominateur (sans jamais les
+				   compter faites) pour qu'elles restent visibles dans la
+				   progression plutôt que de disparaître du compte — seul un quiz
+				   SANS aucune question notable (uniquement des cartes "read")
+				   retombe sur `ctx.quiz.length`, exactement comme avant. */
 				let questionsDone = 0;
 				for (let i = 0; i < ctx.quiz.length; i++) {
 					if (sansReponse(i)) continue;
+					if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
 					if (isComplete(i)) questionsDone++;
 				}
 				statsStore.updateRecord(ctx.sourcePath, {
 					bestScore: modeTexte ? 0 : pct,
 					questionsDone,
-					totalQuestions: total || ctx.quiz.length,
+					totalQuestions: (total + pendingWritten) || ctx.quiz.length,
 					texteLibre: modeTexte
 				});
 			}
@@ -607,6 +624,26 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				   figé sur le mode D'ORIGINE (engine.ts), `isLessonMode()` lit le
 				   mode COURANT — `check:engine-review` éprouve ce cas. */
 				if (ctx.lecturesAbsorbees?.has(i) && !ctx.isLessonMode()) continue;
+				/* CORRECTIF (2026-09-27, revue lot A1, C1) : une réponse écrite
+				   (recall à choix, hors carte mémoire) est « répondue » dès
+				   qu'elle contient du texte (isComplete, retour #14) mais pas
+				   encore « jugée » — son verdict juste/faux n'existe qu'après un
+				   clic sur l'écran des résultats (text-only.ts
+				   bindWrittenReviewControls). Sans cette distinction,
+				   `isCorrect(i)` valait systématiquement faux ici (pas encore
+				   notée) et journalisait "wrong" AVANT le clic ; `recordReview`
+				   posait alors `recorded[i] = true`, et le vrai verdict de
+				   l'utilisateur, journalisé ensuite par le clic, était rejeté par
+				   la garde anti-doublon — deux entrées contradictoires n'auraient
+				   jamais dû compter, mais c'est la FAUSSE qui gagnait la course.
+				   On saute ces questions-là ICI (rien n'est écrit, `recorded[i]`
+				   reste faux) : bindWrittenReviewControls reste le SEUL point qui
+				   les journalise, avec le vrai verdict, quel que soit le moment où
+				   l'utilisateur clique. Si l'utilisateur quitte les résultats sans
+				   évaluer, rien n'est donc écrit pour cette question cette
+				   session-ci — cohérent avec `!isComplete` juste en dessous, qui
+				   ne journalise pas non plus une question jamais atteinte. */
+				if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
 				let grade: ReviewGrade;
 				if (ctx.isLessonMode() && role === "read") grade = "seen";
 				else if (ctx.quizState.lessonPreSkipped[i]) grade = "skipped";

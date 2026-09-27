@@ -612,4 +612,64 @@ await withSrcModule(
 			ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
 		r.done();
 	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case H — revue lot A1, C1 (2026-09-27) : goToResults journalisait
+	   "wrong" pour une réponse écrite pas encore jugée, AVANT le clic de
+	   l'utilisateur sur juste/faux — et `recorded[i]` posé par cette écriture
+	   prématurée faisait ensuite REJETER le vrai verdict (recordReview refuse
+	   tout déjà-journalisé). Rougit sans le correctif (la boucle de
+	   goToResults journalisait "wrong" ici).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("goToResults — retour C1 : une réponse écrite pas encore jugée n'est pas journalisée à sa place du vrai verdict");
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
+		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		ctx.goToResults();
+		r.check("l'arrivée sur les résultats n'écrit rien pour elle (pas encore jugée)", appels, []);
+		r.check("recorded reste faux : le futur clic pourra journaliser le vrai verdict", ctx.quizState.recorded[0], false);
+
+		// Simule le clic « J'avais juste » (text-only.ts bindWrittenReviewControls).
+		ctx.quizState.textOnlyRatings[0] = "understood";
+		ctx.recordReview(0, "understood");
+		r.check("le clic journalise le VRAI verdict, une seule fois",
+			appels, [{ q: "Cours/ch1.md::q1", grade: "understood", role: "recall" }]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case I — revue lot A1, I1 (2026-09-27) : la progression du tableau de
+	   bord comptait une réponse écrite pas encore jugée comme faite
+	   (`questionsDone`), et pouvait retomber sur `ctx.quiz.length` pour
+	   `totalQuestions` — un quiz entièrement écrit et jamais auto-évalué
+	   affichait 100 % de progression. Rougit sans le correctif.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("goToResults — retour I1 : la progression exclut une réponse écrite pas encore jugée");
+		const quiz = [
+			{ id: "read1", title: "Support", role: "read" },
+			{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+		];
+		const updates = [];
+		const statsStore = { updateRecord(_path, rec) { updates.push(rec); } };
+		const { ctx } = makeCtx({ quiz, selections: [null, null], isLessonMode: true, roles: ["read", "recall"], statsStore });
+		ctx.quizState.textOnlyAnswers = ["", "une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false, false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		ctx.goToResults();
+		r.check("progression : 0 question faite sur 1 (la lecture ne compte pas, l'écrite non jugée non plus)",
+			[updates[0].questionsDone, updates[0].totalQuestions], [0, 1]);
+
+		ctx.quizState.textOnlyRatings[1] = "understood";
+		ctx.quizState.resultsCounted = false; // simule un nouveau passage par les résultats
+		ctx.goToResults();
+		r.check("une fois jugée : 1 question faite sur 1",
+			[updates[1].questionsDone, updates[1].totalQuestions], [1, 1]);
+		r.done();
+	}
 });
