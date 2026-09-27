@@ -26,8 +26,6 @@ export const EN_ENGINE = {
 	"engine.passage.expand": "Show the document",
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */
-	"engine.lecture.readingTimeOne": "About {count} minute of reading",
-	"engine.lecture.readingTime": "About {count} minutes of reading",
 	"engine.lecture.keyPoints": "Key points",
 	"engine.lecture.flipHint": "Click a card, or press Enter, to flip it.",
 	"engine.lecture.flipAria": "{front}: flip the card",
@@ -85,6 +83,10 @@ export const EN_ENGINE = {
 
 	/* ── Indice ── */
 	"engine.hint.button": "Hint",
+	/* Un indice à plusieurs niveaux (2026-09-26) : révéler le suivant, et
+	   le libellé de chaque niveau affiché. */
+	"engine.hint.next": "Next hint",
+	"engine.hint.level": "Hint {n} of {total}",
 	"engine.hint.title": "Hint",
 	"engine.hint.close": "Close",
 
@@ -105,12 +107,12 @@ export const EN_ENGINE = {
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Your own answer",
 	"engine.textOnly.answerPlaceholder": "Write your answer in your own words...",
-	"engine.textOnly.check": "Check",
 	"engine.textOnly.explanationLabel": "Explanation",
 	"engine.textOnly.noExpectedAnswer": "No expected answer was provided.",
-	"engine.textOnly.verdict.yes": "Got it",
-	"engine.textOnly.verdict.partial": "Partly",
-	"engine.textOnly.verdict.review": "To review",
+	"engine.textOnly.noAnswerGiven": "No answer given.",
+	"engine.textOnly.writtenQuestionNumber": "Q{n}",
+	"engine.textOnly.verdict.right": "I got it right",
+	"engine.textOnly.verdict.wrong": "I got it wrong",
 
 	/* ── Auto-évaluation ── */
 	"engine.rating.understood": "Got it",
@@ -151,6 +153,8 @@ export const EN_ENGINE = {
 	"engine.result.correctLabel": "Correct answers:",
 	"engine.result.pending.one": "Not assessed",
 	"engine.result.pending.other": "Not assessed",
+	"engine.result.pendingWritten.one": "{count} written answer is not self-assessed yet — it doesn't count in the score.",
+	"engine.result.pendingWritten.other": "{count} written answers are not self-assessed yet — they don't count in the score.",
 	"engine.result.retry": "Start over",
 	"engine.result.takeExam": "Take the exam",
 	"engine.result.retakeExam": "Retake the exam",

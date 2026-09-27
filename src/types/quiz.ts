@@ -67,8 +67,10 @@ export interface QuestionBase {
 	promptHtml?: string;
 	/** Variante interne équivalente à promptHtml (fallback lu au même endroit). */
 	_promptHtml?: string;
-	/** Texte de l'indice, affiche le bouton "Indice" si non vide (engine/cards.js questionCardHtml). */
-	hint?: string;
+	/** L'indice : une chaîne (un niveau) ou un tableau de chaînes, du plus
+	    léger au plus révélateur. Lu par `niveauxIndice` (src/quiz-hint.ts),
+	    qui ignore une valeur invalide. */
+	hint?: string | string[];
 	/** Explication texte brut affichée après verrouillage (engine/cards.js explanationHtml). */
 	explain?: string;
 	/** Explication HTML pré-rendue, prioritaire sur `explain`. */
@@ -437,6 +439,10 @@ export interface QuizResult {
 	pct: number;
 	correct: number;
 	total: number;
+	/** Réponses écrites (recall à choix, hors carte mémoire) pas encore
+	    auto-évaluées à l'écran des résultats — ni comptées justes ni fausses,
+	    donc exclues de `correct`/`total` (engine/state.ts computeScorePercent). */
+	pendingWritten: number;
 }
 
 /**
@@ -476,7 +482,7 @@ export interface ParsedQuizItem {
 	textVariant?: string;
 	id?: string;
 	title?: string;
-	hint?: string;
+	hint?: string | string[];
 	prompt?: string;
 	promptHtml?: string;
 	explain?: string;

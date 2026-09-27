@@ -405,9 +405,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				: "";
 			// Le compteur « rated/total » reste du code (mise en forme <strong>) :
 			// seule l'étiquette est traduite.
-			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div><div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
+			// Une carte par réponse écrite (2026-09-26bis) : réponse donnée, bonne
+			// réponse, explication, verdict juste/faux — jamais un champ seul,
+			// coloré, sans rien (retour #11). Rendue ICI, sur les résultats,
+			// même quand cette tranche affiche déjà la grille compris/partiel/
+			// à revoir (legacy `practiceMode: "text"`).
+			const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
+			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div>${writtenReview}<div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 		}
-		const { pct, correct, total } = ctx.computeScorePercent();
+		const { pct, correct, total, pendingWritten } = ctx.computeScorePercent();
 		// Mode leçon : bouton "Passer l'examen"
 		const lessonExamBtn = (ctx.quizMode === "lesson" && ctx.lessonExamOptions)
 			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.takeExam")}</button>`
@@ -416,8 +422,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const retakeExamBtn = (ctx.quizMode === "exam" && ctx.originalQuizMode === "lesson" && ctx.originalLessonExamOptions)
 			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.retakeExam")}</button>`
 			: "";
+		// Le score n'inclut pas les réponses écrites pas encore auto-évaluées
+		// (computeScorePercent les exclut déjà de correct/total) : le dire
+		// clairement plutôt que de les compter fausses.
+		const pendingNote = pendingWritten > 0
+			? `<p class="quiz-textonly-correction-hint">${t(pendingWritten > 1 ? "engine.result.pendingWritten.other" : "engine.result.pendingWritten.one", { count: pendingWritten })}</p>`
+			: "";
+		const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
 		// Le score (« 12/20 », « 60 % ») reste du code : seule l'étiquette est traduite.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p><div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
 	}
 
 

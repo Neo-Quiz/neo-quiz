@@ -14,6 +14,8 @@ import { t, type TransKey } from "../i18n";
    ICON_BOOK/`quiz-lecture-coche`) : le moteur n'a pas d'autre canal d'icône
    pour du HTML construit en chaîne (voir engine/passage.ts, même remarque). */
 const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+/* Icône Lucide `x` — bouton « J'avais faux » de l'écran des résultats (verdictIconButtonsHtml). */
+const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
 export interface TextOnlyResults {
 	understood: number;
@@ -46,9 +48,10 @@ export interface TextOnlyHandlers {
 	getCorrectOptionIndices(q: QuizQuestion): number[];
 	expectedAnswerHtml(q: QuizQuestion): string;
 	learningHtml(q: QuizQuestion, opts?: { plain?: boolean }): string;
-	ratingButtonsHtml(qi: number): string;
+	writtenReviewSectionHtml(): string;
 	questionCardBodyHtml(q: QuizQuestion, qi: number): string;
 	bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void;
+	bindWrittenReviewControls(rootEl: Element | null): void;
 }
 
 export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
@@ -295,22 +298,84 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return chunks.join("");
 	}
 
-	/* Trois boutons plats, sans cadre ni libellé de tête (précision Ahmed du
-	   2026-09-26) : `quiz-textonly-rating-btn` reste pour le câblage
-	   (bindTextOnlyQuestion cible ce sélecteur), `quiz-textonly-verdict-btn`
-	   porte le style propre à cet écran — la carte mémoire garde son style
-	   `quiz-action-btn` d'origine, inchangé. */
-	function ratingButtonsHtml(qi: number): string {
+	/* DEUX boutons, icône seule (précision Ahmed du 2026-09-26bis) : l'auto-
+	   évaluation d'une réponse écrite ne se fait plus sur la carte de la
+	   question (plus de bouton Vérifier) mais sur l'écran des RÉSULTATS,
+	   question par question (voir writtenReviewCardHtml plus bas). Binaire —
+	   « J'avais juste » / « J'avais faux » — jamais de « En partie » : ce
+	   troisième état reste RÉSERVÉ aux trois boutons de la carte mémoire
+	   (flashcardBodyHtml, note()), seule survivance de RATINGS.partial. */
+	function verdictIconButtonsHtml(qi: number): string {
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
-		const btn = (value: TextOnlyRating, key: TransKey) => {
+		const btn = (value: "understood" | "review", cls: string, icon: string, labelKey: TransKey) => {
 			const selected = current === value;
-			return `<button class="quiz-textonly-rating-btn quiz-textonly-verdict-btn ${RATINGS[value].className}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}">${t(key)}</button>`;
+			const label = t(labelKey);
+			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}" title="${ctx.escapeHtmlAttr(label)}">${icon}</button>`;
 		};
-		return `<div class="quiz-textonly-verdict-row">
-			${btn("understood", "engine.textOnly.verdict.yes")}
-			${btn("partial", "engine.textOnly.verdict.partial")}
-			${btn("review", "engine.textOnly.verdict.review")}
+		return `<div class="quiz-textonly-verdict-icon-row">
+			${btn("understood", "right", ICON_CHECK, "engine.textOnly.verdict.right")}
+			${btn("review", "wrong", ICON_X, "engine.textOnly.verdict.wrong")}
 		</div>`;
+	}
+
+	/* Une carte par question à réponse écrite, sur l'écran des RÉSULTATS
+	   uniquement (2026-09-26bis) : réponse donnée, bonne réponse, explication,
+	   puis le verdict. Remplace l'ancien écran de correction affiché sur la
+	   carte de la question elle-même (Check → revealed), retiré avec le
+	   bouton Vérifier. */
+	function writtenAnswerHtml(qi: number): string {
+		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
+		return value.trim()
+			? `<div class="quiz-textonly-written-answer">${ctx.sanitize.renderInlineText(value)}</div>`
+			: `<div class="quiz-textonly-written-answer quiz-textonly-written-answer-empty">${t("engine.textOnly.noAnswerGiven")}</div>`;
+	}
+
+	function writtenReviewCardHtml(qi: number): string {
+		const q = ctx.quiz[qi];
+		const numero = ctx.numeroAffiche?.(qi) ?? qi + 1;
+		return `<div class="quiz-textonly-written-card" data-textonly-written="${qi}">
+			<div class="quiz-textonly-written-head"><span class="quiz-textonly-written-num">${t("engine.textOnly.writtenQuestionNumber", { n: numero })}</span>${ctx.cards.renderQuizPromptHtml(q)}</div>
+			<div class="quiz-textonly-label">${t("engine.textOnly.answerLabel")}</div>
+			${writtenAnswerHtml(qi)}
+			${expectedAnswerHtml(q)}
+			${learningHtml(q, { plain: true })}
+			${verdictIconButtonsHtml(qi)}
+		</div>`;
+	}
+
+	/* Toutes les questions à réponse écrite (recall à choix, ou mode texte
+	   historique) hors carte mémoire — celle-ci garde son propre écran de
+	   retournement, jamais listée ici. Appelée depuis resultsSlideHtml
+	   (cards.ts), quel que soit son habillage (pourcentage QCM ou grille
+	   compris/partiel/à revoir). */
+	function writtenReviewSectionHtml(): string {
+		const indices = ctx.quiz
+			.map((_, i) => i)
+			.filter(i => isTextOnlyFor(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]));
+		if (indices.length === 0) return "";
+		return `<div class="quiz-textonly-written-review">${indices.map(writtenReviewCardHtml).join("")}</div>`;
+	}
+
+	/* Câblage des boutons de verdict de writtenReviewSectionHtml — sur l'écran
+	   des RÉSULTATS, donc plusieurs `qi` dans une seule racine (contrairement à
+	   bindTextOnlyQuestion, lié à la carte d'UNE question). */
+	function bindWrittenReviewControls(rootEl: Element | null): void {
+		if (!rootEl) return;
+		rootEl.querySelectorAll<HTMLElement>(".quiz-textonly-written-card[data-textonly-written]").forEach(card => {
+			const qi = Number(card.dataset.textonlyWritten);
+			if (!Number.isInteger(qi)) return;
+			card.querySelectorAll<HTMLButtonElement>(".quiz-textonly-verdict-icon-btn[data-textonly-rating]").forEach(btn => {
+				btn.addEventListener("click", e => {
+					e.preventDefault();
+					const rating = normalizeRating(btn.dataset.textonlyRating as TextOnlyRating | undefined);
+					if (!rating) return;
+					ctx.quizState.textOnlyRatings[qi] = rating;
+					ctx.invalidateSavedResults?.();
+					ctx.recordReview(qi, rating);
+					ctx.cards.refreshMetaSlides({ force: true });
+				});
+			});
+		});
 	}
 
 	/* CARTE MÉMOIRE (spec cartes §3). Le recto est l'énoncé, déjà rendu par
@@ -348,34 +413,19 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		</div>`;
 	}
 
+	/* Plus de bouton Vérifier ni de correction affichée sur la carte
+	   elle-même (2026-09-26bis) : on écrit sa réponse, elle est conservée
+	   (persistAnswer/commitAnswer, plus bas), et on passe à la suivante —
+	   l'auto-évaluation attend l'écran des résultats (writtenReviewCardHtml).
+	   Le champ reste donc TOUJOURS éditable ici, jamais en lecture seule. */
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
 		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
-		const checked = isChecked(qi);
-		const examAnswerPhase = isExamAnswerPhase();
-		const revealed = checked && !examAnswerPhase;
 		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
-		const readOnlyAttr = revealed ? `readonly aria-readonly="true"` : "";
-
-		// Écran de correction simplifié (2026-09-26) : bonne réponse seule, puis
-		// son explication en texte simple, puis le verdict — plus de cadres à
-		// titres empilés (own answer / self-assessment / options / explanation).
-		const reviewHtml = revealed ? `<div class="quiz-textonly-review">
-			${expectedAnswerHtml(q)}
-			${learningHtml(q, { plain: true })}
-			${ratingButtonsHtml(qi)}
-		</div>` : "";
-
-		// Révélé : le titre du champ disparaît (la réponse reste lisible telle
-		// quelle) — repris en `aria-label` pour ne pas perdre l'accessibilité.
-		const answerLabelHtml = revealed
-			? ""
-			: `<label class="quiz-textonly-label" for="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}">${t("engine.textOnly.answerLabel")}</label>`;
-		const ariaLabelAttr = revealed ? ` aria-label="${ctx.escapeHtmlAttr(t("engine.textOnly.answerLabel"))}"` : "";
 
 		return `<div class="quiz-textonly">
 			<div class="quiz-textonly-answer">
-				${answerLabelHtml}
+				<label class="quiz-textonly-label" for="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}">${t("engine.textOnly.answerLabel")}</label>
 				<textarea
 					id="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}"
 					class="quiz-textarea quiz-textonly-textarea"
@@ -386,11 +436,8 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
-					${readOnlyAttr}${ariaLabelAttr}
 				>${ctx.escapeHtmlText(value)}</textarea>
-				${(!revealed && !examAnswerPhase) ? `<div class="quiz-actions quiz-textonly-check-actions"><button class="quiz-action-btn success quiz-textonly-check-btn" type="button">${t("engine.textOnly.check")}</button></div>` : ""}
 			</div>
-			${reviewHtml}
 		</div>`;
 	}
 
@@ -436,13 +483,6 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			textarea.addEventListener("paste", () => requestAnimationFrame(commitAnswer));
 			textarea.addEventListener("focus", syncLayout);
 			textarea.addEventListener("blur", () => { persistAnswer(); syncLayout(); });
-			textarea.addEventListener("keydown", e => {
-				if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-					e.preventDefault();
-					const checkBtn = trackItem.querySelector<HTMLButtonElement>(".quiz-textonly-check-btn");
-					if (checkBtn) checkBtn.click();
-				}
-			});
 			syncLayout();
 		}
 
@@ -552,8 +592,9 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		getCorrectOptionIndices,
 		expectedAnswerHtml,
 		learningHtml,
-		ratingButtonsHtml,
+		writtenReviewSectionHtml,
 		questionCardBodyHtml,
-		bindTextOnlyQuestion
+		bindTextOnlyQuestion,
+		bindWrittenReviewControls
 	};
 }

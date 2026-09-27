@@ -437,6 +437,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 
 	function bindResultsSlideControls(rootEl: Element | null): void {
 		if (!rootEl) return;
+		// Le verdict juste/faux de chaque réponse écrite (2026-09-26bis, retour
+		// #17) : rendu par writtenReviewSectionHtml (cards.ts resultsSlideHtml),
+		// câblé ici comme les autres contrôles de cette diapositive.
+		ctx.textOnly?.bindWrittenReviewControls?.(rootEl);
 		const saveBtn = rootEl.querySelector<HTMLButtonElement>(".quiz-save-results-btn");
 		if (saveBtn) saveBtn.addEventListener("click", async e => {
 			e.preventDefault();

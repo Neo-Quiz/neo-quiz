@@ -18,8 +18,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.collapse": "Masquer le document",
 	"engine.passage.expand": "Afficher le document",
 
-	"engine.lecture.readingTimeOne": "Environ {count} minute de lecture",
-	"engine.lecture.readingTime": "Environ {count} minutes de lecture",
 	"engine.lecture.keyPoints": "À retenir",
 	"engine.lecture.flipHint": "Cliquez sur une carte, ou appuyez sur Entrée, pour la retourner.",
 	"engine.lecture.flipAria": "{front} : retourner la carte",
@@ -69,6 +67,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Indice ── */
 	"engine.hint.button": "Indice",
+	"engine.hint.next": "Indice suivant",
+	"engine.hint.level": "Indice {n} sur {total}",
 	"engine.hint.title": "Indice",
 	"engine.hint.close": "Fermer",
 
@@ -88,12 +88,12 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Votre réponse libre",
 	"engine.textOnly.answerPlaceholder": "Écrivez votre réponse avec vos mots...",
-	"engine.textOnly.check": "Vérifier",
 	"engine.textOnly.explanationLabel": "Explication",
 	"engine.textOnly.noExpectedAnswer": "Réponse attendue non renseignée.",
-	"engine.textOnly.verdict.yes": "Oui",
-	"engine.textOnly.verdict.partial": "En partie",
-	"engine.textOnly.verdict.review": "À revoir",
+	"engine.textOnly.noAnswerGiven": "Aucune réponse donnée.",
+	"engine.textOnly.writtenQuestionNumber": "Q{n}",
+	"engine.textOnly.verdict.right": "J'avais juste",
+	"engine.textOnly.verdict.wrong": "J'avais faux",
 
 	/* ── Auto-évaluation ── */
 	"engine.rating.understood": "Compris",
@@ -134,6 +134,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.result.correctLabel": "Bonnes réponses :",
 	"engine.result.pending.one": "Non évaluée",
 	"engine.result.pending.other": "Non évaluées",
+	"engine.result.pendingWritten.one": "{count} réponse écrite n'est pas encore auto-évaluée — elle ne compte pas dans le score.",
+	"engine.result.pendingWritten.other": "{count} réponses écrites ne sont pas encore auto-évaluées — elles ne comptent pas dans le score.",
 	"engine.result.retry": "Recommencer",
 	"engine.result.takeExam": "Passer l'examen",
 	"engine.result.retakeExam": "Repasser l'examen",

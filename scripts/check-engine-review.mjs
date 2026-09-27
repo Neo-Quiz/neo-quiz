@@ -377,7 +377,7 @@ await withSrcModule(
 		lecon.ctx.goToResults();
 		r.check("Leçon : la lecture absorbée est journalisée seen",
 			lecon.appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "seen", role: "read" });
-		r.check("Leçon : le score ignore la lecture absorbée", lecon.ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2 });
+		r.check("Leçon : le score ignore la lecture absorbée", lecon.ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
 
 		const examen = makeCtx({ quiz, selections: [0, null, 1], isLessonMode: false, originalQuizMode: "lesson", roles });
 		examen.ctx.lecturesAbsorbees = new Set([1]);
@@ -385,7 +385,7 @@ await withSrcModule(
 		examen.ctx.goToResults();
 		r.check("Examen après bascule : rien n'est journalisé pour la lecture absorbée",
 			examen.appels.some(a => a.q.endsWith("::read1")), false);
-		r.check("Examen après bascule : le score ignore la lecture absorbée", examen.ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2 });
+		r.check("Examen après bascule : le score ignore la lecture absorbée", examen.ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
 		r.done();
 	}
 
@@ -561,6 +561,55 @@ await withSrcModule(
 
 		r.check("recall à choix (single) : réponse libre", ctx.textOnly.isTextOnlyFor(0), true);
 		r.check("recall matching : vraie interaction, jamais de réponse libre", ctx.textOnly.isTextOnlyFor(1), false);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case F — retour #14 (2026-09-27) : « 2 answers are missing » affiché
+	   pour des questions à réponse écrite pourtant remplies. Plus de bouton
+	   Vérifier : une réponse écrite non vide doit compter comme répondue
+	   (isComplete), sans attendre une note qui n'arrive plus qu'à l'écran des
+	   résultats. Rougit sans le correctif (isComplete exigeait isRated pour
+	   TOUTE question textOnly, carte mémoire ou non).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("retour #14 — une réponse écrite non notée compte comme répondue (isComplete)");
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const { ctx } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
+		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("une réponse écrite non vide, jamais notée : complète quand même", ctx.isComplete(0), true);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case G — retour #17 (2026-09-27) : le score exclut une réponse écrite
+	   pas encore auto-évaluée (ni juste ni fausse) plutôt que de la compter
+	   fausse, et la compte dès qu'elle est notée à l'écran des résultats.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("retour #17 — le score exclut une réponse écrite pas encore évaluée, puis la compte une fois notée");
+		const quiz = [
+			{ id: "q1", title: "QCM", options: ["a", "b"], correctIndex: 0 },
+			{ id: "q2", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+		];
+		const { ctx } = makeCtx({ quiz, selections: [0, null], isLessonMode: true, roles: [undefined, "recall"] });
+		ctx.quizState.textOnlyAnswers = ["", "une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false, false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("pas encore évaluée : exclue du score (total = 1, pas 2), signalée en pendingWritten",
+			ctx.computeScorePercent(), { pct: 100, correct: 1, total: 1, pendingWritten: 1 });
+
+		ctx.quizState.textOnlyRatings[1] = "understood";
+		r.check("évaluée « juste » : entre dans le score",
+			ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
+
+		ctx.quizState.textOnlyRatings[1] = "review";
+		r.check("évaluée « faux » : entre dans le score, mais fausse",
+			ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
 		r.done();
 	}
 });

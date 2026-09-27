@@ -282,19 +282,6 @@
   min-height: 180px;
 }
 
-.quiz-textonly-check-actions{
-  width: 100%;
-  margin-top: 12px;
-  padding-bottom: 4px;
-}
-
-.quiz-textonly-review{
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
-}
-
 /* Explication et cours en état "plain" (écran de correction, 2026-09-26) :
    ni cadre ni titre, du texte simple juste sous la bonne réponse. Le cadre
    `.quiz-textonly-explain-block` / `-content` ci-dessous reste utilisé par
@@ -381,68 +368,6 @@
   font-style: italic;
 }
 
-/* Trois boutons plats, sans cadre : « Oui / En partie / À revoir », au style
-   des contrôles de l'app (hauteur ~30px, rayon 7px, graisse 500). */
-.quiz-textonly-verdict-row{
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.quiz-textonly-verdict-btn{
-  appearance: none;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  font-size: 0.82rem;
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
-}
-
-.quiz-textonly-verdict-btn.understood{
-  color: var(--quiz-success);
-  background: color-mix(in srgb, var(--quiz-success) 12%, transparent);
-}
-
-.quiz-textonly-verdict-btn.partial{
-  color: var(--quiz-hint);
-  background: color-mix(in srgb, var(--quiz-hint) 12%, transparent);
-}
-
-.quiz-textonly-verdict-btn.review{
-  color: var(--quiz-danger);
-  background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
-}
-
-.quiz-textonly-verdict-btn.understood:hover{ background: color-mix(in srgb, var(--quiz-success) 22%, transparent); }
-.quiz-textonly-verdict-btn.partial:hover{ background: color-mix(in srgb, var(--quiz-hint) 22%, transparent); }
-.quiz-textonly-verdict-btn.review:hover{ background: color-mix(in srgb, var(--quiz-danger) 22%, transparent); }
-
-.quiz-textonly-verdict-btn.understood.selected{ color: var(--quiz-accent-text); background: var(--quiz-success); }
-.quiz-textonly-verdict-btn.partial.selected{ color: var(--quiz-accent-text); background: var(--quiz-hint); }
-.quiz-textonly-verdict-btn.review.selected{ color: var(--quiz-accent-text); background: var(--quiz-danger); }
-
-.quiz-textonly-verdict-row:has(.selected) .quiz-textonly-verdict-btn:not(.selected){
-  opacity: 0.5;
-}
-
-.quiz-textonly-verdict-btn:focus-visible{
-  outline: 2px solid var(--quiz-primary);
-  outline-offset: 2px;
-}
-
 .quiz-textonly-rating-btn.understood{
   border-color: color-mix(in srgb, var(--quiz-success) 36%, var(--background-modifier-border));
 }
@@ -471,6 +396,110 @@
   color: var(--quiz-accent-text);
   background: var(--quiz-danger);
   border-color: var(--quiz-danger);
+}
+
+/* Une carte par réponse écrite, sur l'écran des résultats (retours #11/#17,
+   2026-09-26bis) : réponse donnée, bonne réponse, explication, puis un
+   verdict binaire à icône seule — jamais un champ seul, coloré, sans rien. */
+.quiz-textonly-written-review{
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0 6px;
+  text-align: left;
+}
+
+.quiz-textonly-written-card{
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: color-mix(in srgb, var(--background-secondary) 80%, transparent);
+}
+
+.quiz-textonly-written-head{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.quiz-textonly-written-num{
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-weight: 800;
+}
+
+.quiz-textonly-written-answer{
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+.quiz-textonly-written-answer-empty{
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Deux boutons carrés, icône seule, jamais de cadre autour de la paire
+   (précision Ahmed du 2026-09-27) : ~32px, coins de 8px, fond teinté à 12%
+   au repos, plein + icône blanche une fois choisi, l'autre à 0,5 d'opacité. */
+.quiz-textonly-verdict-icon-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quiz-textonly-verdict-icon-btn{
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.quiz-textonly-verdict-icon-btn svg{
+  width: 18px;
+  height: 18px;
+}
+
+.quiz-textonly-verdict-icon-btn.right{
+  color: var(--quiz-success);
+  background: color-mix(in srgb, var(--quiz-success) 12%, transparent);
+}
+
+.quiz-textonly-verdict-icon-btn.wrong{
+  color: var(--quiz-danger);
+  background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
+}
+
+.quiz-textonly-verdict-icon-btn.right:hover{ background: color-mix(in srgb, var(--quiz-success) 22%, transparent); }
+.quiz-textonly-verdict-icon-btn.wrong:hover{ background: color-mix(in srgb, var(--quiz-danger) 22%, transparent); }
+
+.quiz-textonly-verdict-icon-btn.right.selected{ color: #fff; background: var(--quiz-success); }
+.quiz-textonly-verdict-icon-btn.wrong.selected{ color: #fff; background: var(--quiz-danger); }
+
+.quiz-textonly-verdict-icon-row:has(.selected) .quiz-textonly-verdict-icon-btn:not(.selected){
+  opacity: 0.5;
+}
+
+.quiz-textonly-verdict-icon-btn:focus-visible{
+  outline: 2px solid var(--quiz-primary);
+  outline-offset: 2px;
 }
 
 .quiz-textonly-result-grid{

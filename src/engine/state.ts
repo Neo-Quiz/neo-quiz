@@ -81,9 +81,18 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// (donc ne bloquer ni la navigation, ni l'écran de soumission).
 		if (sansReponse(i)) return true;
 
-		// Même bascule PAR QUESTION que hasAnyAnswer ci-dessus.
+		// Même bascule PAR QUESTION que hasAnyAnswer ci-dessus. CORRECTIF
+		// (2026-09-27, retour #14) : une réponse écrite (recall à choix, hors
+		// carte mémoire) n'a plus de bouton Vérifier — l'auto-évaluation
+		// attend l'écran des résultats (text-only.ts writtenReviewCardHtml).
+		// L'exiger ICI (isRated) faisait apparaître Q8/Q16 comme « sans
+		// réponse » dans l'écran de soumission alors qu'elles étaient
+		// écrites : une réponse non vide suffit à les compter répondues,
+		// exactement comme une TextQuestion ordinaire. Seule la carte mémoire
+		// garde l'exigence de note (isRated) : elle se juge tout de suite en
+		// se retournant, pas plus tard.
 		if (ctx.textOnly?.isTextOnlyFor?.(i)) {
-			return ctx.textOnly.isRated(i);
+			return ctx.isFlashcardQuestion(ctx.quiz[i]) ? ctx.textOnly.isRated(i) : ctx.textOnly.hasAnyAnswer(i);
 		}
 
 		const q = ctx.quiz[i], sel = ctx.quizState.selections[i];
@@ -157,9 +166,19 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// Une carte "read" (task 6b) n'est ni juste ni fausse : elle sort du
 		// dénominateur ET du numérateur, sinon elle abaisserait mécaniquement
 		// le pourcentage final d'un quiz Leçon (une carte jamais "correcte").
-		let correct = 0, total = 0;
+		let correct = 0, total = 0, pendingWritten = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
 			if (sansReponse(i)) continue;
+			// CORRECTIF (2026-09-27, retour #17) : une réponse écrite pas encore
+			// auto-évaluée (écran des résultats) n'est ni juste ni fausse — la
+			// compter fausse pénaliserait un score qui n'a simplement pas encore
+			// de verdict. Seul le non-flashcard est concerné : une carte
+			// mémoire est toujours déjà notée à ce stade (on se juge en la
+			// retournant), donc jamais "pending" ici.
+			if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) {
+				pendingWritten++;
+				continue;
+			}
 			total++;
 			if (isCorrect(i)) correct++;
 		}
@@ -170,9 +189,14 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		   Le `pct: 100` n'est un choix assumé que pour une tranche qui existe
 		   mais est ENTIÈREMENT "read" (`ctx.quiz.length > 0`, `total === 0`) :
 		   distinction nécessaire pour ne pas faire déborder le cas générique
-		   sur un quiz ordinaire vide, qui n'a jamais eu de rôle "read". */
+		   sur un quiz ordinaire vide, qui n'a jamais eu de rôle "read". Un quiz
+		   ENTIÈREMENT fait de réponses écrites pas encore évaluées (total === 0
+		   ET pendingWritten > 0) tombe dans la même branche `pct: 100` — un
+		   choix assumé, documenté ici : `pendingWritten` reste le signal que
+		   l'écran de résultats doit afficher pour ne jamais laisser croire à un
+		   sans-faute (voir cards.ts resultsSlideHtml, engine.result.pendingWritten). */
 		const pct = total > 0 ? Math.round((correct / total) * 100) : (ctx.quiz.length > 0 ? 100 : Math.round((correct / total) * 100));
-		return { pct, correct, total };
+		return { pct, correct, total, pendingWritten };
 	}
 
 	const getSubmitSlideSignature = (): string => JSON.stringify({
