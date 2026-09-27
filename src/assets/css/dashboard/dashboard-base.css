@@ -15,6 +15,33 @@
 	font-family: var(--font-interface, inherit);
 	color: var(--text-normal);
 	background: var(--background-primary);
+	/* Survol et clic des CARTES (grille d'un quiz, liste de l'éditeur,
+	   dossiers) : une seule écriture, trois familles (2026-09-27). Le voile
+	   est discret (3 %, c'était 5 % : « la couleur devient trop claire »),
+	   et l'enfoncement se fait en 140 ms puis revient en ressort doux au
+	   lieu de claquer en 60 ms. */
+	--qbd-carte-voile-survol: 3%;
+	--qbd-carte-voile-clic: 1.5%;
+	--qbd-carte-ombre-survol: 0 1px 2px rgba(0, 0, 0, 0.18), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
+	--qbd-carte-echelle-clic: 0.985;
+	--qbd-carte-transition: background-color 0.22s ease, box-shadow 0.22s ease,
+		border-color 0.22s ease, outline-color 0.15s ease, --qbd-voile 0.22s ease,
+		--qbd-halo 0.22s ease, transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+	--qbd-carte-transition-clic: background-color 0.14s ease-out, box-shadow 0.14s ease-out,
+		--qbd-voile 0.14s ease-out, transform 0.14s cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ENREGISTRÉES pour s'animer : un dégradé ne s'interpole pas, mais les
+   nombres qui le composent, si (carte de dossier, halo et voile). */
+@property --qbd-voile {
+	syntax: "<percentage>";
+	inherits: false;
+	initial-value: 0%;
+}
+@property --qbd-halo {
+	syntax: "<percentage>";
+	inherits: false;
+	initial-value: 12%;
 }
 
 .qbd-layout {

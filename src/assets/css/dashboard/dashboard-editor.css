@@ -70,15 +70,29 @@
 	position: relative;
 	outline: 2px solid transparent;
 	outline-offset: 0;
-	transition: outline-color 0.15s ease;
+	transition: var(--qbd-carte-transition);
 }
-/* Au survol comme sur la question courante : UN contour bleu, rien d'autre
-   (Ahmed, 2026-09-27 : « l'effet doit juste être un contour bleu ») — ni
-   fond qui change, ni ombre, ni échelle. Posé au ras de la carte : la liste
-   garde 2 px de marge pour qu'il ne soit pas rogné. */
-.qbd-qz-card:hover,
+/* Survol et clic : ceux de la grille de la page d'un quiz (Ahmed,
+   2026-09-27 : « le même effet qu'ici »), jetons dans dashboard-base.css.
+   Le contour bleu ne marque plus que la question COURANTE, posé au ras de
+   la carte : la liste garde 2 px de marge pour qu'il ne soit pas rogné. */
+.qbd-qz-card:hover {
+	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-survol), var(--qbd-glass-bg));
+	box-shadow: var(--qbd-glass-sheen), var(--qbd-carte-ombre-survol);
+}
+.qbd-qz-card:active {
+	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-clic), var(--qbd-glass-bg));
+	transform: scale(var(--qbd-carte-echelle-clic));
+	transition: var(--qbd-carte-transition-clic);
+}
+/* Un clic sur ses commandes (monter, descendre, supprimer) n'enfonce pas la
+   carte : `:active` remonte aux ancêtres, le geste ne lui est pas adressé. */
+.qbd-qz-card:has(.qbd-qz-card-act:active) { transform: none; }
 .qbd-qz-card.is-active {
 	outline-color: var(--quiz-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-qz-card:active { transform: none; }
 }
 
 /* La ligne du numéro : le nom du type et le rôle s'abrègent, le numéro et les

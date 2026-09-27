@@ -693,19 +693,24 @@
    (`scale`), retiré si l'utilisateur préfère moins de mouvement. */
 .qbd-fiche-card.is-editable {
 	cursor: pointer;
-	transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+	transition: var(--qbd-carte-transition);
 }
 .qbd-fiche-card.is-editable:hover,
 .qbd-fiche-card.is-editable:focus-visible {
 	/* Pas de liseré bleu au survol (Ahmed, 2026-09-27 : « ça sert à rien ») :
-	   le fond et l'ombre suffisent. Le focus CLAVIER garde son contour. */
-	background: color-mix(in srgb, var(--text-normal) 5%, var(--qbd-glass-bg));
-	box-shadow: var(--qbd-glass-sheen), 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+	   le fond et l'ombre suffisent. Le focus CLAVIER garde son contour.
+	   Jetons partagés avec la liste de l'éditeur et les dossiers :
+	   dashboard-base.css. */
+	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-survol), var(--qbd-glass-bg));
+	box-shadow: var(--qbd-glass-sheen), var(--qbd-carte-ombre-survol);
 }
-.qbd-fiche-card.is-editable:active { transform: scale(0.99); transition-duration: 60ms; }
+.qbd-fiche-card.is-editable:active {
+	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-clic), var(--qbd-glass-bg));
+	transform: scale(var(--qbd-carte-echelle-clic));
+	transition: var(--qbd-carte-transition-clic);
+}
 .qbd-fiche-card.is-editable:focus-visible { outline: 2px solid var(--quiz-primary); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-fiche-card.is-editable { transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
 	.qbd-fiche-card.is-editable:active { transform: none; }
 }
 

@@ -339,10 +339,9 @@
 .qbd-module-card {
 	/* Base = fond du panneau « Progress » (choix Ahmed 2026-07-21) ; le halo
 	   d'angle haut-gauche est recomposé PAR-DESSUS en couche translucide
-	   (l'ancien --tile-bg opaque rendrait le coin opaque sur ce fond verre). */
+	   (un halo opaque rendrait le coin opaque sur ce fond verre ; son intensité est `--qbd-halo`). */
 	--card-bg: var(--qbd-glass-bg);
 	--card-mix-base: #181d2b;
-	--tile-bg:     color-mix(in oklab, var(--accent) 12%, transparent);
 	--border-c:    color-mix(in oklab, var(--accent) 55%, #232939);
 	--border-soft: color-mix(in oklab, var(--accent) 25%, #262d3f);
 	--glow:        color-mix(in oklab, var(--accent) 45%, transparent);
@@ -355,17 +354,17 @@
 	/* 15 px, comme la carte d'un quiz : deux familles de cartes sur la même
 	   page n'ont aucune raison d'avoir deux formes. */
 	border-radius: 15px;
+	/* Halo et voile passent par deux propriétés ENREGISTRÉES
+	   (dashboard-base.css) : le dégradé ne s'interpole pas, et changer tout
+	   le `background` au survol le faisait sauter d'une image à l'autre. */
 	background:
-		radial-gradient(360px 150px at 0% 0%, var(--tile-bg) 0%, transparent 68%),
-		var(--card-bg);
+		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 68%),
+		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
 	cursor: pointer;
-	transition: border-color .2s ease-in-out,
-		background .2s ease-in-out,
-		box-shadow .2s ease-in-out,
-		transform .2s ease-in-out;
+	transition: var(--qbd-carte-transition);
 }
 /* LE HALO D'ANGLE NE DISPARAÎT JAMAIS, SURVOL COMPRIS (Ahmed, 2026-09-17 :
    « la lumière qui vient d'en haut à gauche ne doit jamais disparaître »).
@@ -376,16 +375,17 @@
    grandit, il ne bouge pas. */
 .qbd-module-card:hover {
 	border-color: var(--border-c);
-	background:
-		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) 20%, transparent) 0%, transparent 68%),
-		color-mix(in srgb, var(--text-normal) 5%, var(--card-bg));
+	--qbd-halo: 20%;
+	--qbd-voile: var(--qbd-carte-voile-survol);
 	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft),
-		0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+		var(--qbd-carte-ombre-survol);
 }
-/* Press : un léger enfoncement, comme StudySmarter, sans levée à retomber. */
+/* Press : un léger enfoncement, comme StudySmarter, sans levée à retomber ;
+   le voile retombe d'un cran pendant qu'on appuie. */
 .qbd-module-card:active {
-	transform: scale(0.99);
-	transition-duration: 60ms;
+	--qbd-voile: var(--qbd-carte-voile-clic);
+	transform: scale(var(--qbd-carte-echelle-clic));
+	transition: var(--qbd-carte-transition-clic);
 }
 @media (prefers-reduced-motion: reduce) {
 	.qbd-module-card:active { transform: none; }

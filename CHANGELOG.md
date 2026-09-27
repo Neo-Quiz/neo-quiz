@@ -33,7 +33,7 @@ release notes.
 - A quiz can be moved to another folder from its card menu (Move to), keeping its review history.
 
 ### Changed
-- Question and folder cards react like StudySmarter: a lighter background and soft shadow on hover, a slight press on click; folders no longer lift, and a folder's page fades in.
+- Question and folder cards react like StudySmarter: a slightly lighter background and soft shadow on hover, a smooth press on click; folders no longer lift, and a folder's page fades in. The question list of the editor reacts the same way, its blue outline only marking the current question.
 - Starting a quiz slides it up over the page, which steps back behind it, like StudySmarter; leaving reverses it.
 - A Learn reading no longer shows "About N minutes of reading".
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
