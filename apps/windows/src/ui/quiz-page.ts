@@ -31,6 +31,7 @@ import { ajouter } from "../../../../src/dom";
 // et ce fichier ne doit tirer aucune implémentation de plus.
 import type { ReviewGrade } from "../../../../src/scheduler";
 import type { QuestionRole, StatsRecord } from "../../../../src/types/quiz";
+import type { SessionsApp } from "../review/sessions";
 
 
 /**
@@ -38,6 +39,11 @@ import type { QuestionRole, StatsRecord } from "../../../../src/types/quiz";
  *
  * Le retour DOIT être appelé avant tout autre montage : il détruit l'instance
  * du moteur. Voir le commentaire de `__quizDestroy` plus bas.
+ *
+ * Il NE RETIRE PAS l'écran du DOM, pas plus que ne vide `root` à l'entrée
+ * (2026-09-27) : c'est `main.ts` qui ajoute et retire les écrans, parce que
+ * la transition de lancement (`transition-quiz.ts`) garde l'ancien affiché
+ * 500 ms sous le nouveau — même contrat que la coquille du tableau de bord.
  */
 export async function openQuizPage(
 	root: HTMLElement,
@@ -55,8 +61,11 @@ export async function openQuizPage(
 	   qui permet à `StatsStore` (obsidian.Plugin ou réglages de l'app) de
 	   servir les deux hôtes sans que le moteur sache lequel l'appelle. */
 	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown },
+	/* Les SESSIONS en cours (2026-09-26) : reprendre le quiz là où on
+	   s'était arrêté. Optionnel comme les deux puits ci-dessus, pour les
+	   mêmes raisons. */
+	sessions?: SessionsApp,
 ): Promise<() => void> {
-	root.replaceChildren();
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
 	// ── En-tête : retour · titre · chemin ──
@@ -71,9 +80,21 @@ export async function openQuizPage(
 	   traductions du même mot, qui divergeraient à la première retouche. */
 	retour.setAttribute("aria-label", t("dashboard.quiz.back"));
 	retour.title = t("dashboard.quiz.back");
-	// Icône LUCIDE par l'hôte, jamais d'emoji : même silhouette que le greffon.
-	currentHost().ui.setIcon(ajouter(retour, "span", "qbd-quizzes-crumb-icon"), "arrow-left");
+	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+	ajouter(retour, "span", "qbd-quizzes-crumb-icon");
 	retour.addEventListener("click", () => onBack());
+	/* Le bouton « précédent » de la souris fait la même chose que la flèche
+	   (2026-09-25). Consommé dès l'appui, en capture ; l'action part au
+	   relâchement. Le « suivant » est consommé sans effet : il n'y a rien après
+	   un quiz qu'on joue. */
+	const surBoutonSouris = (e: MouseEvent): void => {
+		if (e.button !== 3 && e.button !== 4) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.type === "mouseup" && e.button === 3) onBack();
+	};
+	document.addEventListener("mousedown", surBoutonSouris, true);
+	document.addEventListener("mouseup", surBoutonSouris, true);
 
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");
 	const ligneTitre = ajouter(titrage, "div", "qbd-qz-title-row");
@@ -90,8 +111,12 @@ export async function openQuizPage(
 	const hote = ajouter(contenu, "div", "quiz-blocks-host");
 
 	/** Démontage d'un écran qui n'a PAS atteint le moteur (erreur de lecture,
-	    note sans bloc) : il n'y a pas d'instance à détruire. */
-	const demonterSansMoteur = (): void => { root.replaceChildren(); };
+	    note sans bloc) : il n'y a pas d'instance à détruire, seulement les
+	    écouteurs du bouton de la souris. */
+	const demonterSansMoteur = (): void => {
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
+	};
 
 	let source: string;
 	try {
@@ -141,6 +166,7 @@ export async function openQuizPage(
 			   §9.1, « deux systèmes distincts, à ne pas fusionner »). */
 			statsSink,
 			reviewSink,
+			sessionSink: sessions?.puits(entry.path),
 		});
 	} catch (e) {
 		hote.replaceChildren();
@@ -165,6 +191,8 @@ export async function openQuizPage(
 	return () => {
 		if (fait) return;
 		fait = true;
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
 		try {
 			hote.__quizDestroy?.();
 		} catch (e) {
@@ -174,6 +202,9 @@ export async function openQuizPage(
 			// traduit pas (il s'adresse au développeur, pas à l'apprenant).
 			console.warn(LOG_PREFIX + " destruction du quiz incomplète", e);
 		}
-		root.replaceChildren();
+		// APRÈS la destruction du moteur : elle a déjà appelé `enregistrer` sur
+		// le puits (sauvegarde de sortie) ; `vider()` écrit immédiatement au lieu
+		// d'attendre le délai de garde de 400 ms.
+		void sessions?.vider();
 	};
 }

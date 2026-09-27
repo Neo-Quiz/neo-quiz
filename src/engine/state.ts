@@ -63,19 +63,37 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 
 		if (ctx.isCodeQuestion(q)) return typeof sel === "string" && sel.trim().length > 0;
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
+	}
+
+	/** Une carte SANS RÉPONSE : une lecture en Leçon (task 6b), ou une
+	    lecture ABSORBÉE par son étape (2026-09-26), qui n'a même plus de
+	    diapositive — quel que soit le mode courant, une bascule Leçon →
+	    Examen comprise : elle n'y redevient pas une question inatteignable. */
+	function sansReponse(i: number): boolean {
+		return !!ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read");
 	}
 
 	function isComplete(i: number): boolean {
 		// Une carte "read" (task 6b) n'a rien à répondre : elle est toujours
 		// considérée complète, pour ne jamais apparaître dans getMissingIndices
 		// (donc ne bloquer ni la navigation, ni l'écran de soumission).
-		if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") return true;
+		if (sansReponse(i)) return true;
 
-		// Même bascule PAR QUESTION que hasAnyAnswer ci-dessus.
+		// Même bascule PAR QUESTION que hasAnyAnswer ci-dessus. CORRECTIF
+		// (2026-09-27, retour #14) : une réponse écrite (recall à choix, hors
+		// carte mémoire) n'a plus de bouton Vérifier — l'auto-évaluation
+		// attend l'écran des résultats (text-only.ts writtenReviewCardHtml).
+		// L'exiger ICI (isRated) faisait apparaître Q8/Q16 comme « sans
+		// réponse » dans l'écran de soumission alors qu'elles étaient
+		// écrites : une réponse non vide suffit à les compter répondues,
+		// exactement comme une TextQuestion ordinaire. Seule la carte mémoire
+		// garde l'exigence de note (isRated) : elle se juge tout de suite en
+		// se retournant, pas plus tard.
 		if (ctx.textOnly?.isTextOnlyFor?.(i)) {
-			return ctx.textOnly.isRated(i);
+			return ctx.isFlashcardQuestion(ctx.quiz[i]) ? ctx.textOnly.isRated(i) : ctx.textOnly.hasAnyAnswer(i);
 		}
 
 		const q = ctx.quiz[i], sel = ctx.quizState.selections[i];
@@ -93,6 +111,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 
 		if (ctx.isCodeQuestion(q)) return typeof sel === "string" && sel.trim().length > 0;
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) return sel instanceof Set && sel.size > 0;
 		return sel !== null;
 	}
@@ -140,6 +159,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			return false; // Correction gérée par engine/code.ts
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return false;
 		if (q.multiSelect) {
 			if (!(sel instanceof Set) || !Array.isArray(q.correctIndices) || sel.size !== q.correctIndices.length) return false;
 			return q.correctIndices.every(ci => sel.has(ci));
@@ -152,9 +172,19 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// Une carte "read" (task 6b) n'est ni juste ni fausse : elle sort du
 		// dénominateur ET du numérateur, sinon elle abaisserait mécaniquement
 		// le pourcentage final d'un quiz Leçon (une carte jamais "correcte").
-		let correct = 0, total = 0;
+		let correct = 0, total = 0, pendingWritten = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (sansReponse(i)) continue;
+			// CORRECTIF (2026-09-27, retour #17) : une réponse écrite pas encore
+			// auto-évaluée (écran des résultats) n'est ni juste ni fausse — la
+			// compter fausse pénaliserait un score qui n'a simplement pas encore
+			// de verdict. Seul le non-flashcard est concerné : une carte
+			// mémoire est toujours déjà notée à ce stade (on se juge en la
+			// retournant), donc jamais "pending" ici.
+			if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) {
+				pendingWritten++;
+				continue;
+			}
 			total++;
 			if (isCorrect(i)) correct++;
 		}
@@ -165,9 +195,14 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		   Le `pct: 100` n'est un choix assumé que pour une tranche qui existe
 		   mais est ENTIÈREMENT "read" (`ctx.quiz.length > 0`, `total === 0`) :
 		   distinction nécessaire pour ne pas faire déborder le cas générique
-		   sur un quiz ordinaire vide, qui n'a jamais eu de rôle "read". */
+		   sur un quiz ordinaire vide, qui n'a jamais eu de rôle "read". Un quiz
+		   ENTIÈREMENT fait de réponses écrites pas encore évaluées (total === 0
+		   ET pendingWritten > 0) tombe dans la même branche `pct: 100` — un
+		   choix assumé, documenté ici : `pendingWritten` reste le signal que
+		   l'écran de résultats doit afficher pour ne jamais laisser croire à un
+		   sans-faute (voir cards.ts resultsSlideHtml, engine.result.pendingWritten). */
 		const pct = total > 0 ? Math.round((correct / total) * 100) : (ctx.quiz.length > 0 ? 100 : Math.round((correct / total) * 100));
-		return { pct, correct, total };
+		return { pct, correct, total, pendingWritten };
 	}
 
 	const getSubmitSlideSignature = (): string => JSON.stringify({
@@ -241,10 +276,11 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	/**
 	 * Task 7, mode Lesson : la tentative sur une pré-question ("pre") est le
 	 * mécanisme qui produit l'effet (Richland 2009) — pas la simple lecture de
-	 * la question. Bloque donc UNIQUEMENT la navigation VERS L'AVANT tant que
-	 * la pré-question affichée n'a reçu ni réponse (`hasAnyAnswer`) ni un clic
-	 * explicite sur « Je ne sais pas » (`lessonPreSkipped`). Le retour en
-	 * arrière (index <= courant) n'est jamais concerné.
+	 * la question. `firstUnattemptedPreBetween` repère, sur la navigation VERS
+	 * L'AVANT, une pré-question qui n'a reçu ni réponse (`hasAnyAnswer`) ni un
+	 * clic sur « Je ne sais pas » (`lessonPreSkipped`) ; elle BLOQUAIT la
+	 * navigation, elle la marque aujourd'hui « Je ne sais pas » (voir
+	 * `marquerPreNonTentees`). Le retour en arrière n'est jamais concerné.
 	 *
 	 * Posé ici plutôt que dans chaque bouton/flèche/onglet : `goToSlide` et
 	 * `redirectSlide` sont le SEUL point de passage commun à tous les chemins
@@ -288,24 +324,33 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		return null;
 	}
 
-	function isBlockedBySkippedPreQuestion(targetIndex: number): boolean {
-		return firstUnattemptedPreBetween(targetIndex) !== null;
-	}
-
-	function warnSkipBlocked(): void {
-		ctx.host.ui.notice(t("engine.lesson.skipBlocked"));
+	/**
+	 * PLUS DE BLOCAGE (2026-09-25, demande d'Ahmed : « ça met je ne sais pas
+	 * automatiquement, c'est plus simple et moins de friction »). Une "pre"
+	 * franchie sans réponse reçoit le même verdict qu'un clic sur « Je ne sais
+	 * pas » (`lessonPreSkipped`, journalisée `skipped`) au lieu d'arrêter la
+	 * navigation sur une Notice. La tentative reste proposée — la question est
+	 * affichée, le bouton aussi — mais n'est plus imposée. Même point de
+	 * passage unique qu'avant : tous les chemins de navigation y passent.
+	 */
+	function marquerPreNonTentees(targetIndex: number): void {
+		for (let qi = firstUnattemptedPreBetween(targetIndex); qi !== null; qi = firstUnattemptedPreBetween(targetIndex)) {
+			ctx.quizState.lessonPreSkipped[qi] = true;
+			ctx.commitQuestionInteraction(qi, { syncHeight: false });
+		}
 	}
 
 	async function goToSlide(index: number, { forceRender = false }: { forceRender?: boolean } = {}): Promise<void> {
 		ctx.closeHintModal();
 		const next = ctx.clampSlideIndex(index);
-		if (isBlockedBySkippedPreQuestion(next)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(next);
 		if (next === ctx.quizState.current && !ctx.quizState.isSliding) return;
 		if (ctx.quizState.isSliding) return ctx.redirectSlide(next, { forceRender });
 		++ctx.quizState.slideToken;
 		const token = ctx.quizState.slideToken;
 		ctx.quizState.prevCurrent = ctx.quizState.current;
 		ctx.quizState.current = next;
+		ctx.saveSession();
 		// isQuestionSlideIndex garantit la variante « question » de slideMap[next].
 		if (ctx.isQuestionSlideIndex(next)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[next] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
@@ -330,13 +375,14 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 	async function redirectSlide(next: number, { forceRender = false }: { forceRender?: boolean } = {}): Promise<void> {
 		const targetIndex = ctx.clampSlideIndex(next);
-		if (isBlockedBySkippedPreQuestion(targetIndex)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(targetIndex);
 		if (targetIndex === ctx.quizState.current) return;
 		const snapshot = ctx.track.cancelRunningTrackAnimation();
 		++ctx.quizState.slideToken;
 		const token = ctx.quizState.slideToken;
 		ctx.quizState.prevCurrent = ctx.quizState.current;
 		ctx.quizState.current = targetIndex;
+		ctx.saveSession();
 		if (ctx.isQuestionSlideIndex(targetIndex)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[targetIndex] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
 		ctx.quizState.isSliding = true;
@@ -396,11 +442,15 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	};
 
 	function goToSubmit(): void {
-		// Round 1 de revue (Finding 1) : le refus doit intervenir AVANT tout
+		// Round 1 de revue (Finding 1) : le marquage doit intervenir AVANT tout
 		// effet de bord, pas seulement au `goToSlide` final - sinon
 		// `lastQuestionIndex`/`pendingResultsLock` étaient déjà mutés alors que
 		// la navigation elle-même était refusée.
-		if (isBlockedBySkippedPreQuestion(ctx.SLIDE_SUBMIT_INDEX)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(ctx.SLIDE_SUBMIT_INDEX);
+		/* PAS d'effacement de la session ici : l'écran de soumission n'est pas
+		   la fin du quiz (« Il manque N réponses », avec « Retour ») ; y passer
+		   par l'onglet Résultats puis fermer l'application perdait la reprise.
+		   Elle ne s'efface qu'au score (`goToResults`). */
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = false;
 		goToSlide(ctx.SLIDE_SUBMIT_INDEX, { forceRender: false });
@@ -465,12 +515,13 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		   refuser — un clic sur l'onglet Résultats depuis une "pre" non tentée
 		   enregistrait alors une tentative ET un score au tableau de bord SANS
 		   naviguer, et le comptage légitime ultérieur était perdu
-		   (`resultsCounted` déjà vrai). Le refus doit donc intervenir ICI, avant
+		   (`resultsCounted` déjà vrai). Le marquage des "pre" franchies se fait donc ICI, avant
 		   toute mutation — `isBlockedBySkippedPreQuestion` lit `ctx.quizState.locked`
 		   (Finding 2) : un examen qui vient de se verrouiller lui-même
 		   (`handleExamTimeUp`, engine/exam.ts) n'a donc plus rien de bloqué à ce
 		   stade et atteint bien ses résultats. */
-		if (isBlockedBySkippedPreQuestion(ctx.SLIDE_RESULTS_INDEX)) { warnSkipBlocked(); return; }
+		marquerPreNonTentees(ctx.SLIDE_RESULTS_INDEX);
+		ctx.clearSession();
 		if (ctx.isQuestionSlideIndex(ctx.quizState.current)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[ctx.quizState.current] as { questionIndex: number }).questionIndex;
 		ctx.quizState.pendingResultsLock = !ctx.textOnly?.isTextOnlyMode?.();
 
@@ -515,23 +566,41 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			const statsStore = ctx.statsSink;
 			if (statsStore && ctx.sourcePath) {
 				const modeTexte = !!ctx.textOnly?.isTextOnlyForAny?.();
-				const { pct, total } = computeScorePercent();
+				const { pct, total, pendingWritten } = computeScorePercent();
 				/* FIX round 1 de revue task 6b (2026-09-01) : `questionsDone` comptait
 				   TOUTES les cartes (0..ctx.quiz.length), alors que `total` ci-dessus
 				   EXCLUT deja les cartes "read" (elles n'ont pas de reponse) —
 				   une tranche read+test produisait "2/1", une progression au-dessus
 				   de 100% au tableau de bord. Les deux compteurs doivent porter sur
 				   le MEME ensemble : on saute une carte "read" ici aussi, exactement
-				   comme `computeScorePercent` le fait pour `total`. */
+				   comme `computeScorePercent` le fait pour `total`.
+				   CORRECTIF (2026-09-27, revue lot A1, I1) : « répondue »
+				   (isComplete, retour #14) et « jugée » sont deux notions
+				   distinctes depuis que le bouton Vérifier a disparu — une réponse
+				   écrite (recall à choix, hors carte mémoire) est complète dès
+				   qu'elle contient du texte, mais reste SANS verdict tant que
+				   l'utilisateur n'a pas cliqué juste/faux sur les résultats. La
+				   compter ici gonflait `questionsDone` jusqu'à égaler
+				   `totalQuestions` (barre de progression à 100 %) pour un quiz
+				   entièrement écrit et jamais auto-évalué. On l'exclut donc du
+				   même geste que `pendingWritten` de `computeScorePercent`, et
+				   `totalQuestions` suit : `total` exclut déjà ces questions-là,
+				   `pendingWritten` les rajoute au dénominateur (sans jamais les
+				   compter faites) pour qu'elles restent visibles dans la
+				   progression plutôt que de disparaître du compte — seul un quiz
+				   SANS aucune question notable (uniquement des cartes "read")
+				   retombe sur `ctx.quiz.length`, exactement comme avant. */
 				let questionsDone = 0;
 				for (let i = 0; i < ctx.quiz.length; i++) {
-					if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+					if (sansReponse(i)) continue;
+					if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
 					if (isComplete(i)) questionsDone++;
 				}
 				statsStore.updateRecord(ctx.sourcePath, {
 					bestScore: modeTexte ? 0 : pct,
 					questionsDone,
-					totalQuestions: total || ctx.quiz.length
+					totalQuestions: (total + pendingWritten) || ctx.quiz.length,
+					texteLibre: modeTexte
 				});
 			}
 
@@ -553,6 +622,34 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			for (let i = 0; i < ctx.quiz.length; i++) {
 				if (ctx.quizState.recorded[i]) continue;
 				const role = ctx.originalQuizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
+				/* Une lecture SANS ÉCRAN (lecture courte, lue au-dessus de sa
+				   question hôte, src/lecture-etape.ts) reste une lecture pour le
+				   journal : `seen` en Leçon, sans signal de mémoire. Après une
+				   bascule Leçon → Examen, elle n'a été ni montrée ni répondue :
+				   rien n'est écrit. Condition bien ATTEIGNABLE : l'ensemble est
+				   figé sur le mode D'ORIGINE (engine.ts), `isLessonMode()` lit le
+				   mode COURANT — `check:engine-review` éprouve ce cas. */
+				if (ctx.lecturesAbsorbees?.has(i) && !ctx.isLessonMode()) continue;
+				/* CORRECTIF (2026-09-27, revue lot A1, C1) : une réponse écrite
+				   (recall à choix, hors carte mémoire) est « répondue » dès
+				   qu'elle contient du texte (isComplete, retour #14) mais pas
+				   encore « jugée » — son verdict juste/faux n'existe qu'après un
+				   clic sur l'écran des résultats (text-only.ts
+				   bindWrittenReviewControls). Sans cette distinction,
+				   `isCorrect(i)` valait systématiquement faux ici (pas encore
+				   notée) et journalisait "wrong" AVANT le clic ; `recordReview`
+				   posait alors `recorded[i] = true`, et le vrai verdict de
+				   l'utilisateur, journalisé ensuite par le clic, était rejeté par
+				   la garde anti-doublon — deux entrées contradictoires n'auraient
+				   jamais dû compter, mais c'est la FAUSSE qui gagnait la course.
+				   On saute ces questions-là ICI (rien n'est écrit, `recorded[i]`
+				   reste faux) : bindWrittenReviewControls reste le SEUL point qui
+				   les journalise, avec le vrai verdict, quel que soit le moment où
+				   l'utilisateur clique. Si l'utilisateur quitte les résultats sans
+				   évaluer, rien n'est donc écrit pour cette question cette
+				   session-ci — cohérent avec `!isComplete` juste en dessous, qui
+				   ne journalise pas non plus une question jamais atteinte. */
+				if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
 				let grade: ReviewGrade;
 				if (ctx.isLessonMode() && role === "read") grade = "seen";
 				else if (ctx.quizState.lessonPreSkipped[i]) grade = "skipped";
@@ -594,6 +691,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// Recommencer, c'est une NOUVELLE tentative : une pré-question déjà
 		// passée en « Je ne sais pas » redevient bloquante (Task 7).
 		ctx.quizState.lessonPreSkipped = ctx.quiz.map(() => false);
+		ctx.quizState.hintSeen = ctx.quiz.map(() => false);
 		// Recommencer, c'est une NOUVELLE session pour l'ordonnanceur aussi :
 		// sans cette remise à zéro, une question déjà journalisée à la tentative
 		// précédente ne serait plus jamais recomptée (Task 8).
@@ -630,6 +728,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 
 		ctx.render();
+		ctx.clearSession();
 	}
 
 	return {

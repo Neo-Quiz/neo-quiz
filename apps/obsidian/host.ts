@@ -330,6 +330,16 @@ export function createObsidianHost(
 		   dossier depuis l'explorateur de fichiers. Pas besoin de détourner
 		   vers `app.vault.rename(TFolder)`, qui ne ferait qu'ajouter une
 		   résolution de `TAbstractFile` inutile ici. */
+		/* LIMITE CONNUE (revue 2026-09-27) : `exists` PUIS `rename` n'est PAS
+		   atomique — `DataAdapter` d'Obsidian ne propose ni lien dur ni copie
+		   exclusive pour fermer cette fenêtre (contrairement au processus
+		   principal Electron, `apps/windows/electron/fichiers.ts`, qui pose la
+		   garde sur `fs.link`/`COPYFILE_EXCL`). Une écriture concurrente vers
+		   `to` entre les deux `await` — un second déplacement lancé au même
+		   instant, ou une note créée sous ce nom pendant l'attente — peut
+		   encore faire écraser silencieusement par `adapter().rename`. Risque
+		   jugé faible sous ce hôte (un seul utilisateur, une seule fenêtre
+		   Obsidian), non corrigé faute d'API adéquate. */
 		async rename(from, to) {
 			if (await adapter().exists(to)) throw new Error(`${to} existe déjà`);
 			await adapter().rename(from, to);

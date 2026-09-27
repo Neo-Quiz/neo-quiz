@@ -16,11 +16,13 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
-import { chargerExamDates, estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
+import { chargerExamens, estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
 import { creerStatsApp } from "./review/stats";
+import { creerSessionsApp } from "./review/sessions";
+import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
 import { chargerReglagesPages, monterDashboard, reprendre } from "./ui/dashboard-shell";
 import { chargerReprise } from "./ui/reprise";
@@ -29,9 +31,12 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
+import { jouerTransition } from "./ui/transition-quiz";
+import { demander, etatInitial, finir, vuesARetirer } from "./ui/transition-etat";
+import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings } from "./ui/settings";
 import { monterBarreTitre } from "./ui/barre-titre";
-import { appliquerFond, fondSuivant } from "./ui/fond";
+import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
 
 /*
  * Démarrage de l'application.
@@ -98,6 +103,14 @@ let reglagesIaCache: AiSettings = aiSettingsDefaults();
 async function chargerReglagesIa(): Promise<void> {
 	const lu = await pont().reglages.lire(CLE_REGLAGES_IA);
 	const persiste = lu && typeof lu === "object" && !Array.isArray(lu) ? (lu as Partial<AiSettings>) : {};
+	/* L'ancien DÉFAUT d'« Ajouter des fichiers » (Ctrl+E, 2026-09-17) a été
+	   écrit sur le disque avec le reste des réglages au premier `save` : aucun
+	   écran ne le règle, ce n'est donc jamais un choix. Il suit le nouveau
+	   défaut (Ctrl+U, celui de claude.ai, 2026-09-26). HYPOTHÈSE FRAGILE : le
+	   jour où un écran permet de CHOISIR ce raccourci, un Ctrl+E voulu serait
+	   pris pour l'ancien défaut — retirer alors cette migration. */
+	const hk = persiste.hotkeyAddFiles;
+	if (hk && hk.key === "e" && (hk.modifiers || []).join("+") === "Mod") delete persiste.hotkeyAddFiles;
 	reglagesIaCache = { ...aiSettingsDefaults(), ...persiste };
 }
 
@@ -126,11 +139,50 @@ function demonter(): Promise<void> | void {
 	return d?.();
 }
 
+/**
+ * L'état des changements d'écran (lancer un quiz, en revenir), de la
+ * demande jusqu'à la fin de sa transition (`ui/transition-quiz.ts`). Les
+ * règles vivent dans le noyau pur `ui/transition-etat.ts` (`npm run
+ * check:transition`) : pendant une transition, une demande du même sens est
+ * un double clic, IGNORÉ ; une demande du sens contraire (retour cliqué
+ * pendant que le quiz monte) est MISE EN FILE et part à la fin. La demande
+ * porte de quoi se rejouer : l'appel lui-même.
+ * Posé AVANT la lecture de la note, qui est asynchrone : c'est là que le
+ * second clic arrivait.
+ */
+let etatEcran = etatInitial<() => void>();
+
+/** Soumet une demande de changement d'écran ; vrai si elle part MAINTENANT. */
+function soumettre(sens: SensEcran, rejouer: () => void): boolean {
+	const r = demander(etatEcran, { sens, donnee: rejouer });
+	etatEcran = r.etat;
+	return r.action === "lancer";
+}
+
+/** Fin d'une transition : repos, puis la demande en file, s'il y en a une. */
+function transitionFinie(): void {
+	const r = finir(etatEcran);
+	etatEcran = r.etat;
+	r.suivante?.donnee();
+}
+
+/** Les écrans affichés dans la racine, qui vont céder la place au suivant. */
+function ecransDe(root: HTMLElement): HTMLElement[] {
+	return Array.from(root.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
+}
+
 /* `document.createElement`, jamais les extensions DOM d'Obsidian (`createEl`,
-   `createDiv`, `empty`) : elles n'existent pas dans la fenêtre de l'app. */
-export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore): void {
+   `createDiv`, `empty`) : elles n'existent pas dans la fenêtre de l'app.
+   Au démarrage, la racine est vide : pas de transition. Au RETOUR d'un quiz,
+   l'écran du quiz (déjà démonté) reste affiché et redescend pendant que la
+   coquille revient derrière lui ; `jouerTransition` le retire à la fin. */
+export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp): void {
+	const sortants = ecransDe(root);
+	// Au démarrage (racine vide), pas de transition, donc rien à soumettre.
+	if (sortants.length > 0 && !soumettre("retour", () => mount(root, scanner, store, stats, sessions))) return;
 	void demonter();
-	root.textContent = "";
+	// Empilés AVANT le montage : la coquille se met en page à sa vraie place.
+	if (sortants.length > 0) root.classList.add("nq-empile");
 	demonterCourant = monterDashboard(root, {
 		scanner,
 		statsStore: stats,
@@ -138,9 +190,19 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		aiSettings: reglagesIa,
 		cheminDuContrat: (absolu) => carteCourante?.depuisAbsolu(absolu) ?? null,
 		cheminAbsolu: (contrat) => carteCourante?.absolu(contrat) ?? null,
-		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, entry); },
+		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); },
 		onOpenSettings: () => ouvrirReglages(),
+		sessions,
 	});
+	const entrant = root.lastElementChild;
+	if (sortants.length === 0) return;
+	if (!(entrant instanceof HTMLElement)) {
+		for (const s of sortants) s.remove();
+		root.classList.remove("nq-empile");
+		transitionFinie();
+		return;
+	}
+	void jouerTransition(root, sortants, entrant, "sortie").finally(transitionFinie);
 }
 
 /** La modale des réglages, quand elle est ouverte. Une SEULE à la fois : le
@@ -205,12 +267,20 @@ function ouvrirReglages(): void {
  * L'affectation de `demonterCourant` se fait APRÈS l'`await` — `openQuizPage`
  * lit le fichier avant de rendre — mais le démontage de la liste, lui, a lieu
  * AVANT : entre les deux, `demonterCourant` vaut `null`, et un second clic ne
- * démonterait rien deux fois. C'est aussi pourquoi la page fait elle-même son
- * `root.replaceChildren()` en entrée.
+ * démonterait rien deux fois. `soumettre` l'ignore même tout à fait,
+ * jusqu'à la fin de la transition.
+ *
+ * LA TRANSITION (2026-09-27, `ui/transition-quiz.ts`) : la coquille démontée
+ * RESTE affichée, inerte, pendant la lecture de la note et les 500 ms où
+ * l'écran du quiz monte par-dessus elle ; il est invisible tant qu'il charge
+ * (`nq-chargement`, `shell.css`).
  */
-async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, entry: QuizIndexEntry): Promise<void> {
+async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
+	if (!soumettre("ouvrir", () => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); })) return;
+	const sortants = ecransDe(root);
+	for (const s of sortants) s.inert = true;
 	void demonter();
-	root.textContent = "";
+	root.classList.add("nq-empile", "nq-chargement");
 	/* Le démontage rendu par `openQuizPage` appelle `__quizDestroy` : sans lui,
 	   chaque aller-retour laisserait vivre une instance de moteur complète
 	   (écouteurs document/window, ResizeObserver, timers). C'est le pendant
@@ -218,9 +288,26 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	   `store` ET `stats` PASSÉS TELS QUELS comme puits : `ReviewStore` et
 	   `StatsStore` portent déjà exactement la FORME que `openQuizPage`
 	   attend — les envelopper dans un objet littéral n'ajouterait rien. */
-	demonterCourant = await openQuizPage(root, entry, () => {
-		mount(root, scanner, store, stats);
-	}, store, stats);
+	try {
+		demonterCourant = await openQuizPage(root, entry, () => {
+			mount(root, scanner, store, stats, sessions);
+		}, store, stats, sessions);
+		root.classList.remove("nq-chargement");
+		const entrant = root.lastElementChild;
+		if (entrant instanceof HTMLElement && !sortants.includes(entrant)) {
+			await jouerTransition(root, sortants, entrant, "entree");
+		}
+	} finally {
+		/* Sur TOUTES les issues, un rejet imprévu compris : aucune coquille
+		   fantôme ne reste sous le quiz, l'écran du quiz (la vue UTILE) n'est
+		   jamais retiré, et le verrou se rouvre — puis un retour demandé
+		   pendant la montée part. Après une transition jouée, ces lignes ne
+		   trouvent plus rien à retirer. */
+		const courant = root.lastElementChild;
+		for (const s of vuesARetirer(sortants, courant && !sortants.includes(courant as HTMLElement) ? [courant] : [])) s.remove();
+		root.classList.remove("nq-empile", "nq-chargement");
+		transitionFinie();
+	}
 }
 
 async function demarrer(): Promise<void> {
@@ -250,6 +337,8 @@ async function demarrer(): Promise<void> {
 	   (`perimetreInitial`, avant l'ouverture de la fenêtre) : le rendu n'a
 	   qu'à poser l'image, sans attendre les dossiers de quiz ci-dessous. */
 	await appliquerFond();
+	// Luminosité et flou de l'image : lus en même temps que l'image elle-même.
+	await appliquerEffetsFond();
 	try {
 		/* AVANT de lire les dossiers : tout vault Obsidian de la machine qui
 		   n'est ni ouvert ni écarté est ouvert ici, sans un clic (voir
@@ -303,7 +392,7 @@ async function demarrer(): Promise<void> {
 		   d'examen, elles, n'ont pas cet ordre à respecter — mais les charger
 		   avant de monter évite un premier plan calculé sans l'horizon d'une
 		   matière déjà saisie lors d'une session précédente. */
-		await chargerExamDates();
+		await chargerExamens();
 		/* Même raison que `chargerExamDates` ci-dessus : sans ce chargement,
 		   le tout premier montage de la coquille (plus bas) verrait des
 		   réglages de page vides (aucun dossier déplié, axe par défaut) au
@@ -319,10 +408,15 @@ async function demarrer(): Promise<void> {
 		   n'ont rien en commun, mélanger leur construction les lierait pour
 		   rien. */
 		const stats = await creerStatsApp();
-		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Trois écrivains différés
+		/* LES SESSIONS en cours (2026-09-26) : reprendre un quiz là où on
+		   s'était arrêté. À côté du journal et des stats, un troisième
+		   système distinct (voir `review/sessions.ts`). */
+		const sessions = await creerSessionsApp();
+		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Quatre écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
-		   `stats` (même débounce, `dashboard/stats-store.ts`) et la page d'un
-		   quiz (600 ms, `dashboard/detail.ts`), tenue par l'écran courant.
+		   `stats` (même débounce, `dashboard/stats-store.ts`), la page d'un
+		   quiz (600 ms, `dashboard/detail.ts`), tenue par l'écran courant, et
+		   les sessions en cours (400 ms, `review/sessions.ts`, voir plus bas).
 		   Deux sorties, deux mécanismes, parce qu'aucun ne couvre les deux :
 
 		   1. FERMETURE DE LA FENÊTRE (croix, Alt+F4, barre des tâches) :
@@ -358,6 +452,13 @@ async function demarrer(): Promise<void> {
 		   les appeler des deux côtés ne double aucune écriture. C'est le pendant
 		   du `this._reviewStore?.destroy()` de l'`onunload` du greffon. */
 		window.addEventListener("beforeunload", () => { store.destroy(); stats.destroy(); });
+		/* Les sessions ne portent pas de délai d'écriture symétrique aux deux
+		   autres (`destroy()`) : `vider()` écrit immédiatement, sans annuler de
+		   minuterie propre à un `destroy` — la page d'un quiz l'a déjà appelé à
+		   son démontage. Posé ici pour couvrir le cas restant : une frappe qui
+		   photographie la session juste avant une fermeture qui saute le
+		   démontage normal. */
+		window.addEventListener("beforeunload", () => { void sessions.vider(); });
 		await pont().fenetre.surFermeture(async () => {
 			try {
 				await demonter();
@@ -368,6 +469,8 @@ async function demarrer(): Promise<void> {
 			}
 			store.destroy();
 			stats.destroy();
+			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
+			await sessions.vider();
 		});
 		/* L'appariement des renommages que le surveillant n'a pas su nommer.
 		   BRANCHÉ CÔTÉ APPLICATION SEULEMENT : Obsidian émet un vrai `rename`, que
@@ -383,7 +486,7 @@ async function demarrer(): Promise<void> {
 		   ("home"), sans Notice : une note disparue n'est pas une erreur. */
 		const derniereVue = await chargerReprise();
 		if (derniereVue) reprendre(derniereVue, scanner);
-		mount(root, scanner, store, stats);
+		mount(root, scanner, store, stats, sessions);
 	} catch (e) {
 		root.textContent = t("app.error.startup", { error: e instanceof Error ? e.message : String(e) });
 	}

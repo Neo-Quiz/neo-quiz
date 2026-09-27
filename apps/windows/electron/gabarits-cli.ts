@@ -1,0 +1,88 @@
+/* ══════════════════════════════════════════════════════════
+   LES ARGUMENTS QU'UN CLI ACCEPTE DE LA FENÊTRE (2026-09-25).
+
+   `process.run` ne jugeait que le NOM de l'outil : ses arguments venaient
+   tels quels du rendu. Or le rendu est supposé compromis (`pont.ts`), et un
+   CLI d'IA a des options qui LANCENT des commandes sans passer par le
+   modèle : `--dangerously-skip-permissions`, `--mcp-config` (un serveur
+   `{ "command": … }`) pour Claude Code, `--dangerously-bypass-approvals-and-
+   sandbox` pour Codex. La règle « le CLI est lancé sans aucun outil » n'était
+   tenue que par le code du rendu (revue de sécurité du 2026-09-25).
+
+   Ce module est une LISTE BLANCHE DE FORMES : chaque appel légitime de
+   `ai-client.ts` et `ai-providers.ts` a une forme fixe, dont seules trois
+   pièces varient — un nom de modèle, un niveau d'effort, et des jetons liés
+   au MARQUEUR de la requête. Tout le reste est comparé mot pour mot. Un
+   argument de plus, de moins, ou déplacé : refusé. Ajouter une option à un
+   appel du rendu exige donc de l'ajouter ICI — c'est voulu.
+
+   PUR (ni Node ni Electron) : `npm run check:partage` l'éprouve.
+══════════════════════════════════════════════════════════ */
+
+/** Un nom de modèle : ne commence jamais par un tiret (ce serait une
+    option), ni espace, ni `%`, ni guillemet. Couvre `claude-opus-4-1`,
+    `gpt-5.1-codex`, `gemini-2.5-pro`, `opus[1m]`, `qwen3:8b`. */
+const MODELE = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,99}$/;
+/** Un niveau d'effort Codex : `minimal`, `low`, `medium`, `high`, `xhigh`… */
+const EFFORT = /^[a-z]{1,16}$/;
+/** Le marqueur de `nouveauMarqueur` (`src/host/jetons.ts`) : 32 hexadécimaux. */
+const MARQUEUR = /^[0-9a-f]{32}$/;
+
+/** Une pièce d'une forme : un mot exact, ou une valeur jugée. */
+type Piece = string | ((arg: string) => boolean);
+
+function correspond(args: readonly string[], forme: readonly Piece[]): boolean {
+	return args.length === forme.length && forme.every((p, i) => typeof p === "string" ? args[i] === p : p(args[i]));
+}
+
+const modele = (a: string): boolean => MODELE.test(a);
+
+/** Vrai si `args` est un appel que la fenêtre a le droit de demander à
+    `tool`. `marqueur` est celui de la requête : un jeton qui en porte un
+    autre n'est pas reconnu. */
+export function argumentsAutorises(tool: string, args: unknown, marqueur: unknown): boolean {
+	if (!Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	const a = args as string[];
+	// La sonde de version, commune aux quatre outils.
+	if (correspond(a, ["--version"])) return true;
+
+	const m = typeof marqueur === "string" && MARQUEUR.test(marqueur) ? marqueur : null;
+	const jeton = (nom: string): string => "{{nq-" + m + ":" + nom + "}}";
+
+	switch (tool) {
+		case "agy":
+			return correspond(a, ["models"])
+				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json"])
+				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json", "--model", modele]);
+		case "claude":
+			/* `--tools` vaut "" (aucun outil) ou "Read", et Read seulement
+			   quand des images sont jointes : le modèle les lit par leur jeton. */
+			return correspond(a, [
+				"-p", "--output-format", "json", "--model", modele,
+				"--tools", (t: string) => t === "" || t === "Read",
+				"--no-session-persistence", "--setting-sources", "",
+			]);
+		case "codex": {
+			if (m === null) return false;
+			const tete: Piece[] = ["exec", "--json", "-m", modele, "-c", (c: string) => c.startsWith("model_reasoning_effort=") && EFFORT.test(c.slice("model_reasoning_effort=".length))];
+			const rapide: Piece[] = ["-c", "service_tier=priority"];
+			const fin: Piece[] = ["-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "-C", jeton("home"), "-o", jeton("sortie")];
+			for (const avecRapide of [false, true]) {
+				const base = [...tete, ...(avecRapide ? rapide : []), ...fin];
+				if (a.length < base.length || (a.length - base.length) % 2 !== 0) continue;
+				if (!correspond(a.slice(0, base.length), base)) continue;
+				// Les images jointes : « -i <jeton du fichier n> », n = 1, 2, 3… dans l'ordre.
+				const images = a.slice(base.length);
+				let ok = true;
+				for (let i = 0; i < images.length; i += 2) {
+					if (images[i] !== "-i" || images[i + 1] !== jeton("fichier:" + String(i / 2 + 1))) { ok = false; break; }
+				}
+				if (ok) return true;
+			}
+			return false;
+		}
+		default:
+			// Ollama ne passe pas par `process.run` (son API HTTP, `net.fetchJson`).
+			return false;
+	}
+}

@@ -133,6 +133,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	}
 
 	function getQuestionKind(q: QuizQuestion): string {
+		if (ctx.isFlashcardQuestion(q)) return "flashcard";
 		if (ctx.isClozeQuestion(q)) return "cloze";
 		if (ctx.isTextQuestion(q)) return "text";
 		if (ctx.isOrderingQuestion(q)) return "ordering";
@@ -282,6 +283,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		if (ctx.isCodeQuestion(q)) return null; // Résultat géré par engine/code.ts
 		if (ctx.isOrderingQuestion(q)) return buildOrderingResult(q, qi);
 		if (ctx.isMatchingQuestion(q)) return buildMatchingResult(q, qi);
+		if (ctx.isFlashcardQuestion(q)) return null;
 		return buildChoiceResult(q, qi);
 	}
 
@@ -338,6 +340,8 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			return null; // Réponse attendue gérée par engine/code.ts
 		}
 
+		if (ctx.isFlashcardQuestion(q)) return null;
+
 		return optionEntries(q, getCorrectOptionIndices(q));
 	}
 
@@ -372,7 +376,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		   "read" ici aussi, pour rester sur le MEME ensemble que `total`. */
 		let answered = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read")) continue;
 			if (ctx.hasAnyAnswer(i)) answered++;
 		}
 		return {

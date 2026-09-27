@@ -58,7 +58,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		// pas de doublon ici, meme convention que bindBinaryQuestion/trySelect.
 		ctx.quizState.lessonPreSkipped[qi] = true;
 		commitQuestionInteraction(qi, { syncHeight: true });
-		if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+		// La diapositive SUIVANTE, pas l'index suivant : une lecture absorbée
+		// entre les deux n'a pas d'écran.
+		const suivante = ctx.questionSuivante(qi);
+		if (suivante !== null) ctx.goToQuestion(suivante);
 	}
 
 	function bindBinaryQuestion(trackItem: HTMLElement, qi: number, isMulti: boolean): void {
@@ -369,14 +372,8 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 
 		ctx.passage.bindPassage(trackItem, qi);
 
-		const hintBtn = trackItem.querySelector(".quiz-hint-btn");
-		if (hintBtn) {
-			hintBtn.addEventListener("click", e => {
-				e.preventDefault();
-				e.stopPropagation();
-				ctx.openHintModal(q.hint);
-			});
-		}
+		// L'indice se révèle sur place, un niveau par clic (engine/hint.ts).
+		ctx.hint.brancherIndice(trackItem, qi);
 
 		// Task 7 (mode Lesson) : « Je ne sais pas » — le seul moyen de passer
 		// une carte "pre" sans y répondre : son bouton suivant bute sur la garde
@@ -397,11 +394,18 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		}
 
 		const prevBtn = trackItem.querySelector(".quiz-prev-btn");
-		if (prevBtn) prevBtn.addEventListener("click", () => ctx.goToQuestion(qi - 1));
+		// Précédente / suivante par DIAPOSITIVE : `qi ± 1` visait une lecture
+		// absorbée, qui n'en a pas (et renvoie à la question qui la montre —
+		// parfois celle-ci même).
+		if (prevBtn) prevBtn.addEventListener("click", () => {
+			const precedente = ctx.slideMap[ctx.getSlideIndexForQuestion(qi) - 1];
+			if (precedente?.type === "question") ctx.goToQuestion(precedente.questionIndex);
+		});
 
 		const nextBtn = trackItem.querySelector(".quiz-next-btn");
 		if (nextBtn) nextBtn.addEventListener("click", () => {
-			if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+			const suivante = ctx.questionSuivante(qi);
+			if (suivante !== null) ctx.goToQuestion(suivante);
 			else goPastLastQuestion();
 		});
 	}
@@ -422,6 +426,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 
 	function bindResultsSlideControls(rootEl: Element | null): void {
 		if (!rootEl) return;
+		// Le verdict juste/faux de chaque réponse écrite (2026-09-26bis, retour
+		// #17) : rendu par writtenReviewSectionHtml (cards.ts resultsSlideHtml),
+		// câblé ici comme les autres contrôles de cette diapositive.
+		ctx.textOnly?.bindWrittenReviewControls?.(rootEl);
 		const saveBtn = rootEl.querySelector<HTMLButtonElement>(".quiz-save-results-btn");
 		if (saveBtn) saveBtn.addEventListener("click", async e => {
 			e.preventDefault();
@@ -519,7 +527,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			if (e.key === "ArrowRight") {
 				if (ctx.isQuestionSlideIndex(cur)) {
 					const qi = (ctx.slideMap[cur] as { questionIndex: number }).questionIndex;
-					if (qi < ctx.quiz.length - 1) {
+					if (ctx.questionSuivante(qi) !== null) {
 						ctx.goToSlide(cur + 1, { forceRender: false });
 						navigated = true;
 					} else {

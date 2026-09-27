@@ -53,6 +53,7 @@ import type {
 	TextQuestion,
 	ClozeQuestion,
 	CodeQuestion,
+	FlashcardQuestion,
 	QuestionRole,
 	StatsRecord,
 } from "./quiz";
@@ -137,6 +138,11 @@ export interface EngineCtx {
 	 * fonction ; l'app n'a pas de `Plugin`.
 	 */
 	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown };
+	sessionSink?: import("../engine/session").SessionSink;
+	/** Photographie l'état et l'enregistre (sans effet en examen, sans puits, hors question). */
+	saveSession(): void;
+	/** Efface la session de ce quiz (fin, « Recommencer », examen). */
+	clearSession(): void;
 	/**
 	 * Jamais assigné dans le littéral `ctx` ni ailleurs dans engine.js (mort/
 	 * vestigial) ; accédé optionnellement par sanitizer.js:172 (`ctx.lucideIcons
@@ -182,6 +188,8 @@ export interface EngineCtx {
 	isClozeQuestion(q: QuizQuestion): q is ClozeQuestion;
 	/** Prédicat de variante — présence d'un `language` non vide (engine.ts). */
 	isCodeQuestion(q: QuizQuestion): q is CodeQuestion;
+	/** Prédicat de variante — `flashcard: true` (engine.ts). */
+	isFlashcardQuestion(q: QuizQuestion): q is FlashcardQuestion;
 
 	/* ── État runtime & carte des slides (engine.js:295-299) ── */
 	quizState: QuizState;
@@ -206,6 +214,17 @@ export interface EngineCtx {
 	clampSlideIndex(i: number): number;
 	getSlidingWindow(): { from: number; to: number };
 	getSlideIndexForQuestion(qi: number): number;
+	/** Lectures SANS ÉCRAN : les lectures courtes d'un Learn, lues au-dessus
+	    de leur question hôte (src/lecture-etape.ts `lecturesCourtes`). Figées
+	    à l'assemblage, vides hors d'un Learn d'origine. Pas de diapositive,
+	    pas de numéro, pas de réponse. */
+	lecturesAbsorbees: ReadonlySet<number>;
+	/** La lecture courte à lire au-dessus de la question `qi`, ou `null`. */
+	lectureCourteDe(qi: number): number | null;
+	/** Numéro AFFICHÉ de la question `qi` (Q1…Qn) ; 0 pour une lecture de Learn. */
+	numeroAffiche(qi: number): number;
+	/** La question de la diapositive suivante, ou `null` après la dernière. */
+	questionSuivante(qi: number): number | null;
 	invalidateSavedResults(): void;
 
 	/* ════════════════════════════════════════════════

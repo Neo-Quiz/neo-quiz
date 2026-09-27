@@ -5,9 +5,18 @@ import type {
 	QcmQuestion,
 	MultiSelectQuestion,
 	TextOnlyRating,
+	FlashcardQuestion,
 } from "../types/quiz";
 import { renderLessonHtml } from "./sanitizer";
-import { t } from "../i18n";
+import { countAnswerLines } from "./terminal";
+import { t, type TransKey } from "../i18n";
+
+/* Icône Lucide `check` inline, même tracé que celle du cours (lecture-rendu.ts
+   ICON_BOOK/`quiz-lecture-coche`) : le moteur n'a pas d'autre canal d'icône
+   pour du HTML construit en chaîne (voir engine/passage.ts, même remarque). */
+const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+/* Icône Lucide `x` — bouton « J'avais faux » de l'écran des résultats (verdictIconButtonsHtml). */
+const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
 export interface TextOnlyResults {
 	understood: number;
@@ -39,11 +48,11 @@ export interface TextOnlyHandlers {
 	computeResults(): TextOnlyResults;
 	getCorrectOptionIndices(q: QuizQuestion): number[];
 	expectedAnswerHtml(q: QuizQuestion): string;
-	learningHtml(q: QuizQuestion): string;
-	comparisonOptionsHtml(q: QuizQuestion, qi: number): string;
-	ratingButtonsHtml(qi: number): string;
+	learningHtml(q: QuizQuestion, opts?: { plain?: boolean }): string;
+	writtenReviewSectionHtml(): string;
 	questionCardBodyHtml(q: QuizQuestion, qi: number): string;
 	bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void;
+	bindWrittenReviewControls(rootEl: Element | null): void;
 }
 
 export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
@@ -85,9 +94,28 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   du même quiz restent en QCM. Le chemin historique (`practiceMode ===
 	   "text"`) reste une clause OU : un bloc hors Leçon qui active encore ce
 	   mode par sa configuration (démarrage « Entraînement ») continue de tout
-	   afficher en réponse libre, question par question. */
+	   afficher en réponse libre, question par question.
+	   CORRECTIF (2026-09-26) : un "recall" ne force la réponse libre que pour
+	   les types à CHOIX (single/multiple) — voir la question, ce serait donner
+	   la réponse. Pour tout autre type (matching, ordering, cloze, numérique,
+	   text, terminal…), la vraie interaction force déjà le rappel : forcer en
+	   plus la réponse libre ne fait que masquer une correction réelle derrière
+	   une auto-évaluation. */
+	function isRecallForcedTextOnly(q: QuizQuestion): boolean {
+		return !ctx.isOrderingQuestion(q)
+			&& !ctx.isMatchingQuestion(q)
+			&& !ctx.isClozeQuestion(q)
+			&& !ctx.isTextQuestion(q)
+			&& !ctx.isFlashcardQuestion(q);
+	}
+
 	function isTextOnlyFor(qi: number): boolean {
-		return isTextOnlyMode() || (ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall");
+		const q = ctx.quiz[qi];
+		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
+		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
+		if (ctx.isFlashcardQuestion(q)) return true;
+		if (isTextOnlyMode()) return true;
+		return ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall" && isRecallForcedTextOnly(q);
 	}
 
 	/* Décision GLOBALE DÉRIVÉE : au moins une question du quiz est actuellement
@@ -170,7 +198,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const counts = { understood: 0, partial: 0, review: 0, pending: 0 };
 		let total = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
-			if (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read") continue;
+			if (ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read")) continue;
 			total++;
 			const rating = normalizeRating(ctx.quizState.textOnlyRatings?.[i]);
 			if (rating) counts[rating]++;
@@ -196,29 +224,35 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return [];
 	}
 
+	/* Ligne « coche verte + texte » d'une bonne réponse — porte `renderInlineText`
+	   (ou `optionContentHtml`, qui l'appelle déjà pour une option QCM) en amont :
+	   ce n'est qu'un habillage autour d'un fragment déjà assaini. */
+	function correctLine(html: string): string {
+		return `<div class="quiz-textonly-correct-line"><span class="quiz-textonly-correct-icon" aria-hidden="true">${ICON_CHECK}</span><span class="quiz-textonly-correct-text">${html}</span></div>`;
+	}
+
 	function expectedAnswerHtml(q: QuizQuestion): string {
 		const indices = getCorrectOptionIndices(q);
 		if (indices.length > 0) {
-			const items = indices.map(oi => {
-				// Invariant : indices non vides ⇒ question QCM.
-				const content = ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi);
-				return `<div class="quiz-textonly-expected-item">${content}</div>`;
-			}).join("");
-			return `<div class="quiz-textonly-expected-list">${items}</div>`;
+			// Invariant : indices non vides ⇒ question QCM.
+			const items = indices
+				.map(oi => correctLine(ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi)))
+				.join("");
+			return `<div class="quiz-textonly-correct">${items}</div>`;
 		}
 
 		// getTextAcceptedAnswers est tolérant (champs texte optionnels) : pour une
 		// variante non-texte il renvoie [] — cast documenté.
 		const accepted = ctx.terminal?.getTextAcceptedAnswers?.(q as TextQuestion) || [];
 		if (accepted.length > 0) {
-			return `<div class="quiz-textonly-expected-item">${ctx.sanitize.renderInlineText(accepted[0])}</div>`;
+			return `<div class="quiz-textonly-correct">${correctLine(ctx.sanitize.renderInlineText(accepted[0]))}</div>`;
 		}
 
 		if (ctx.isOrderingQuestion(q)) {
 			const items = ctx.getOrderingItems(q);
 			const order = ctx.getOrderingCorrectOrder(q);
 			const answer = order.map(i => items[i]).filter(v => v !== undefined).join(" -> ");
-			if (answer) return `<div class="quiz-textonly-expected-item">${ctx.sanitize.renderInlineText(answer)}</div>`;
+			if (answer) return `<div class="quiz-textonly-correct">${correctLine(ctx.sanitize.renderInlineText(answer))}</div>`;
 		}
 
 		if (ctx.isMatchingQuestion(q)) {
@@ -228,20 +262,28 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			if (Array.isArray(map) && map.length === rows.length) {
 				const rowsHtml = rows.map((row, i) => {
 					const choice = choices[map[i]] ?? "";
-					return `<div class="quiz-textonly-expected-pair"><strong>${ctx.sanitize.renderInlineText(row)}</strong><span>${ctx.sanitize.renderInlineText(choice)}</span></div>`;
+					return correctLine(`<strong>${ctx.sanitize.renderInlineText(row)}</strong><span class="quiz-textonly-correct-sep">→</span><span>${ctx.sanitize.renderInlineText(choice)}</span>`);
 				}).join("");
-				return `<div class="quiz-textonly-expected-list">${rowsHtml}</div>`;
+				return `<div class="quiz-textonly-correct">${rowsHtml}</div>`;
 			}
 		}
 
-		return `<div class="quiz-textonly-expected-item">${t("engine.textOnly.noExpectedAnswer")}</div>`;
+		return `<div class="quiz-textonly-correct-empty">${t("engine.textOnly.noExpectedAnswer")}</div>`;
 	}
 
-	function learningHtml(q: QuizQuestion): string {
+	/* `opts.plain` (écran de correction réponse-libre, 2026-09-26) : ni titre
+	   ni cadre, juste le contenu — par opposition au verso d'une carte mémoire
+	   (flashcardBodyHtml), qui garde le cadre/label d'origine. Même contenu,
+	   deux habillages, pour ne pas toucher la carte mémoire hors du périmètre
+	   de cette tâche. */
+	function learningHtml(q: QuizQuestion, opts?: { plain?: boolean }): string {
+		const plain = !!opts?.plain;
 		const chunks: string[] = [];
 		const lessonContent = renderLessonHtml(q, ctx.sanitize);
 		if (lessonContent) {
-			chunks.push(`<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.lesson.label")}</div><div class="quiz-textonly-explain-content">${lessonContent}</div></div>`);
+			chunks.push(plain
+				? `<div class="quiz-textonly-explain-plain">${lessonContent}</div>`
+				: `<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.lesson.label")}</div><div class="quiz-textonly-explain-content">${lessonContent}</div></div>`);
 		}
 
 		const explainHtml = q.explainHtml || q._explainHtml;
@@ -249,57 +291,155 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			const content = explainHtml
 				? ctx.sanitize.replaceObsidianEmbedsInHtml(explainHtml)
 				: ctx.sanitize.renderTextWithEmbeds(q.explain || "");
-			chunks.push(`<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.textOnly.explanationLabel")}</div><div class="quiz-textonly-explain-content">${content}</div></div>`);
+			chunks.push(plain
+				? `<div class="quiz-textonly-explain-plain">${content}</div>`
+				: `<div class="quiz-textonly-explain-block"><div class="quiz-textonly-label">${t("engine.textOnly.explanationLabel")}</div><div class="quiz-textonly-explain-content">${content}</div></div>`);
 		}
 
 		return chunks.join("");
 	}
 
-	function comparisonOptionsHtml(q: QuizQuestion, qi: number): string {
-		const qOptions = (q as { options?: string[] }).options;
-		if (!Array.isArray(qOptions) || qOptions.length === 0) return "";
-		const correct = new Set(getCorrectOptionIndices(q));
-		const shuf = ctx.quizState.shuffleMap?.[qi];
-		const order: number[] = Array.isArray(shuf) ? shuf : [...Array(qOptions.length).keys()];
-
-		const options = order.map(oi => {
-			const cls = correct.has(oi) ? "correct" : "";
-			return `<div class="quiz-option quiz-textonly-option ${cls}" data-textonly-orig="${oi}">${ctx.cards.optionContentHtml(q as QcmQuestion | MultiSelectQuestion, oi)}</div>`;
-		}).join("");
-
-		const hasImg = /<img[\s>]/i.test(options);
-		return `<div class="quiz-textonly-comparison">
-			<div class="quiz-textonly-label">${t("engine.textOnly.optionsLabel")}</div>
-			<div class="quiz-options-wrap${hasImg ? " quiz-options-image-grid" : ""}">${options}</div>
+	/* DEUX boutons, icône seule (précision Ahmed du 2026-09-26bis) : l'auto-
+	   évaluation d'une réponse écrite ne se fait plus sur la carte de la
+	   question (plus de bouton Vérifier) mais sur l'écran des RÉSULTATS,
+	   question par question (voir writtenReviewCardHtml plus bas). Binaire —
+	   « J'avais juste » / « J'avais faux » — jamais de « En partie » : ce
+	   troisième état reste RÉSERVÉ aux trois boutons de la carte mémoire
+	   (flashcardBodyHtml, note()), seule survivance de RATINGS.partial. */
+	function verdictIconButtonsHtml(qi: number): string {
+		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
+		const btn = (value: "understood" | "review", cls: string, icon: string, labelKey: TransKey) => {
+			const selected = current === value;
+			const label = t(labelKey);
+			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}" title="${ctx.escapeHtmlAttr(label)}">${icon}</button>`;
+		};
+		return `<div class="quiz-textonly-verdict-icon-row">
+			${btn("understood", "right", ICON_CHECK, "engine.textOnly.verdict.right")}
+			${btn("review", "wrong", ICON_X, "engine.textOnly.verdict.wrong")}
 		</div>`;
 	}
 
-	function ratingButtonsHtml(qi: number): string {
+	/* Une carte par question à réponse écrite, sur l'écran des RÉSULTATS
+	   uniquement (2026-09-26bis) : réponse donnée, bonne réponse, explication,
+	   puis le verdict. Remplace l'ancien écran de correction affiché sur la
+	   carte de la question elle-même (Check → revealed), retiré avec le
+	   bouton Vérifier. */
+	function writtenAnswerHtml(qi: number): string {
+		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
+		return value.trim()
+			? `<div class="quiz-textonly-written-answer">${ctx.sanitize.renderInlineText(value)}</div>`
+			: `<div class="quiz-textonly-written-answer quiz-textonly-written-answer-empty">${t("engine.textOnly.noAnswerGiven")}</div>`;
+	}
+
+	function writtenReviewCardHtml(qi: number): string {
+		const q = ctx.quiz[qi];
+		const numero = ctx.numeroAffiche?.(qi) ?? qi + 1;
+		return `<div class="quiz-textonly-written-card" data-textonly-written="${qi}">
+			<div class="quiz-textonly-written-head"><span class="quiz-textonly-written-num">${t("engine.textOnly.writtenQuestionNumber", { n: numero })}</span>${ctx.cards.renderQuizPromptHtml(q)}</div>
+			<div class="quiz-textonly-label">${t("engine.textOnly.answerLabel")}</div>
+			${writtenAnswerHtml(qi)}
+			${expectedAnswerHtml(q)}
+			${learningHtml(q, { plain: true })}
+			${verdictIconButtonsHtml(qi)}
+		</div>`;
+	}
+
+	/* Toutes les questions à réponse écrite (recall à choix, ou mode texte
+	   historique) hors carte mémoire — celle-ci garde son propre écran de
+	   retournement, jamais listée ici. Appelée depuis resultsSlideHtml
+	   (cards.ts), quel que soit son habillage (pourcentage QCM ou grille
+	   compris/partiel/à revoir). */
+	function writtenReviewSectionHtml(): string {
+		const indices = ctx.quiz
+			.map((_, i) => i)
+			.filter(i => isTextOnlyFor(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]));
+		if (indices.length === 0) return "";
+		return `<div class="quiz-textonly-written-review">${indices.map(writtenReviewCardHtml).join("")}</div>`;
+	}
+
+	/* Câblage des boutons de verdict de writtenReviewSectionHtml — sur l'écran
+	   des RÉSULTATS, donc plusieurs `qi` dans une seule racine (contrairement à
+	   bindTextOnlyQuestion, lié à la carte d'UNE question). */
+	function bindWrittenReviewControls(rootEl: Element | null): void {
+		if (!rootEl) return;
+		rootEl.querySelectorAll<HTMLElement>(".quiz-textonly-written-card[data-textonly-written]").forEach(card => {
+			const qi = Number(card.dataset.textonlyWritten);
+			if (!Number.isInteger(qi)) return;
+			card.querySelectorAll<HTMLButtonElement>(".quiz-textonly-verdict-icon-btn[data-textonly-rating]").forEach(btn => {
+				btn.addEventListener("click", e => {
+					e.preventDefault();
+					const rating = normalizeRating(btn.dataset.textonlyRating as TextOnlyRating | undefined);
+					if (!rating) return;
+					ctx.quizState.textOnlyRatings[qi] = rating;
+					ctx.invalidateSavedResults?.();
+					ctx.recordReview(qi, rating);
+					ctx.cards.refreshMetaSlides({ force: true });
+				});
+			});
+		});
+	}
+
+	/* CARTE MÉMOIRE (spec cartes §3). Le recto est l'énoncé, déjà rendu par
+	   cards.ts au-dessus de ce corps ; ici : « Retourner », puis le verso.
+	   Le bouton Retourner porte AUSSI `quiz-textonly-check-btn` : le même
+	   gestionnaire que « Vérifier » pose textOnlyChecked[qi]. Les deux notes
+	   portent `quiz-textonly-rating-btn` : le même gestionnaire journalise. */
+	function flashcardBodyHtml(q: FlashcardQuestion, qi: number): string {
+		if (!isChecked(qi)) {
+			return `<div class="quiz-flashcard" data-flashcard="1">
+				<div class="quiz-actions quiz-flashcard-actions">
+					<button class="quiz-action-btn success quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space">${t("engine.flashcard.flip")}</button>
+					<span class="quiz-flashcard-kbd">${t("engine.flashcard.flipHint")}</span>
+				</div>
+			</div>`;
+		}
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
-		return `<div class="quiz-textonly-self">
-			<div class="quiz-textonly-label">${t("engine.textOnly.selfRating")}</div>
-			<div class="quiz-textonly-rating-row">
-				${(Object.entries(RATINGS) as Array<[TextOnlyRating, RatingMeta]>).map(([value, meta]) => {
-					const selected = current === value ? " selected" : "";
-					return `<button class="quiz-action-btn quiz-textonly-rating-btn ${meta.className}${selected}" type="button" data-textonly-rating="${value}" aria-pressed="${current === value ? "true" : "false"}">${meta.label}</button>`;
-				}).join("")}
+		const verso = typeof q.answer === "string" && q.answer.trim()
+			? ctx.sanitize.renderInlineText(q.answer)
+			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
+		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
+			const on = current === value;
+			return `<button class="quiz-action-btn quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}">${t(key)} <span class="quiz-flashcard-kbd">${touche}</span></button>`;
+		};
+		return `<div class="quiz-flashcard is-flipped" data-flashcard="1">
+			<div class="quiz-flashcard-back" aria-live="polite">
+				<div class="quiz-textonly-label">${t("engine.flashcard.back")}</div>
+				<div class="quiz-flashcard-answer">${verso}</div>
+				${learningHtml(q)}
+				<div class="quiz-flashcard-rating">
+					${note("review", "engine.flashcard.again", "1")}
+					${note("understood", "engine.flashcard.knew", "2")}
+				</div>
 			</div>
 		</div>`;
 	}
 
+	/* Plus de bouton Vérifier ni de correction affichée sur la carte
+	   elle-même (2026-09-26bis) : on écrit sa réponse, elle est conservée
+	   (persistAnswer/commitAnswer, plus bas), et on passe à la suivante —
+	   l'auto-évaluation attend l'écran des résultats (writtenReviewCardHtml).
+	   Le champ reste donc TOUJOURS éditable ici, jamais en lecture seule. */
+	/* Hauteur DE DÉPART du champ « avec tes mots » (précision du 27/09, règle
+	   générale de tout champ de réponse écrite) : le nombre de lignes de la
+	   réponse attendue — la bonne option d'un QCM forcé en rappel, ou la
+	   réponse acceptée d'une question texte — entre 1 et 6, jamais un champ
+	   de 10 lignes pour une réponse d'une ligne. Aucune référence connue
+	   (classement, appariement…) : 1 ligne, elle grandit avec la saisie. */
+	function expectedWrittenRows(q: QuizQuestion): number {
+		const indices = getCorrectOptionIndices(q);
+		if (indices.length > 0) {
+			const qc = q as QcmQuestion | MultiSelectQuestion;
+			const texte = indices.map(oi => String((qc.options || [])[oi] ?? "")).join("\n");
+			return countAnswerLines(texte, 6);
+		}
+		const accepted = ctx.terminal?.getTextAcceptedAnswers?.(q as TextQuestion) || [];
+		return countAnswerLines(accepted[0] ?? "", 6);
+	}
+
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
-		const checked = isChecked(qi);
-		const examAnswerPhase = isExamAnswerPhase();
-		const revealed = checked && !examAnswerPhase;
+		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
 		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
-		const readOnlyAttr = revealed ? `readonly aria-readonly="true"` : "";
-
-		const reviewHtml = revealed ? `<div class="quiz-textonly-review">
-			${ratingButtonsHtml(qi)}
-			${comparisonOptionsHtml(q, qi)}
-			${learningHtml(q)}
-		</div>` : "";
 
 		return `<div class="quiz-textonly">
 			<div class="quiz-textonly-answer">
@@ -310,15 +450,13 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					data-textonly-answer="1"
 					name="${textareaName}"
 					placeholder="${ctx.escapeHtmlAttr(t("engine.textOnly.answerPlaceholder"))}"
-					spellcheck="true"
+					spellcheck="false"
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
-					${readOnlyAttr}
+					rows="${expectedWrittenRows(q)}"
 				>${ctx.escapeHtmlText(value)}</textarea>
-				${(!revealed && !examAnswerPhase) ? `<div class="quiz-actions quiz-textonly-check-actions"><button class="quiz-action-btn success quiz-textonly-check-btn" type="button">${t("engine.textOnly.check")}</button></div>` : ""}
 			</div>
-			${reviewHtml}
 		</div>`;
 	}
 
@@ -327,8 +465,10 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			ctx.terminal.syncTextAreaHeight(textarea);
 			return;
 		}
+		// Même règle que engine/terminal.ts : pas de plancher fixe, la hauteur de
+		// départ vient de l'attribut `rows` (expectedWrittenRows ci-dessus).
 		textarea.style.height = "auto";
-		textarea.style.height = `${Math.max(220, textarea.scrollHeight)}px`;
+		textarea.style.height = `${textarea.scrollHeight}px`;
 	}
 
 	function bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void {
@@ -364,13 +504,6 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			textarea.addEventListener("paste", () => requestAnimationFrame(commitAnswer));
 			textarea.addEventListener("focus", syncLayout);
 			textarea.addEventListener("blur", () => { persistAnswer(); syncLayout(); });
-			textarea.addEventListener("keydown", e => {
-				if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-					e.preventDefault();
-					const checkBtn = trackItem.querySelector<HTMLButtonElement>(".quiz-textonly-check-btn");
-					if (checkBtn) checkBtn.click();
-				}
-			});
 			syncLayout();
 		}
 
@@ -405,6 +538,64 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		});
 	}
 
+	/* Clavier d'une carte mémoire, sur le CONTENEUR du quiz, en phase de
+	   CAPTURE (revue finale). Deux versions ont échoué avant :
+	   - sur `trackItem`, il ne voyait jamais une frappe dont le focus est
+	     ailleurs dans le quiz — l'onglet de navigation `.quiz-tab`, notamment ;
+	   - sur `document`, TOUS les quiz de la page réagissaient à la même touche
+	     (deux blocs dans une note, un onglet Obsidian en arrière-plan), Espace
+	     sur un bouton hors du quiz retournait la carte, et le `keydown` de
+	     `.quiz-tab` (interactions.ts) arrêtait de toute façon Espace avant
+	     qu'il remonte — seuls 1 et 2 passaient.
+	   La capture sur le conteneur passe AVANT l'écouteur de l'onglet, et ne
+	   voit que les frappes dont le focus est DANS ce quiz : c'est la règle des
+	   flèches (`interactions.ts`, « Bindé sur le container »). Un bouton de la
+	   carte qui a le focus garde son comportement natif (Espace et Entrée
+	   l'activent eux-mêmes). Ignore les champs de saisie, MathLive compris, et
+	   les modificateurs. Espace ou Entrée retourne (spec §3), 1 note « À
+	   revoir », 2 « Je savais » ; après le retournement, le focus passe sur
+	   « Je savais » (restauration de `focus.ts`). */
+	function currentFlashcardQuestionIndex(): number | null {
+		const si = ctx.quizState.current;
+		if (!ctx.isQuestionSlideIndex(si)) return null;
+		const qi = (ctx.slideMap[si] as { questionIndex: number }).questionIndex;
+		return ctx.isFlashcardQuestion(ctx.quiz[qi]) ? qi : null;
+	}
+
+	function bindFlashcardKeys(): void {
+		// Repli test (check-engine-review.mjs, ctx factice sans DOM).
+		if (!ctx.container || typeof ctx.container.addEventListener !== "function") return;
+		const onKeydown = (e: KeyboardEvent) => {
+			if (ctx.isDestroyed() || !ctx.container.isConnected) return;
+			const qi = currentFlashcardQuestionIndex();
+			if (qi === null) return;
+			const cible = e.target as HTMLElement | null;
+			if (cible?.closest?.("input, textarea, select, [contenteditable], math-field")) return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			const trackItem = ctx.container.querySelector<HTMLElement>(`[data-qi="${qi}"]`);
+			if (!trackItem) return;
+			// Un bouton DE LA CARTE qui a le focus s'active tout seul.
+			if ((e.key === " " || e.key === "Enter") && cible?.closest?.("button") && trackItem.contains(cible)) return;
+			const retourner = e.key === " " || e.key === "Enter";
+			const vise = retourner ? ".quiz-flashcard-flip-btn"
+				: e.key === "1" ? '.quiz-textonly-rating-btn[data-textonly-rating="review"]'
+				: e.key === "2" ? '.quiz-textonly-rating-btn[data-textonly-rating="understood"]'
+				: null;
+			if (!vise) return;
+			const bouton = trackItem.querySelector<HTMLButtonElement>(vise);
+			if (!bouton) return;
+			e.preventDefault();
+			e.stopPropagation();
+			/* Le focus suit comme après un clic : la restauration de `focus.ts`
+			   le passe de « Retourner » à « Je savais » au repeint du verso. */
+			if (retourner) bouton.focus({ preventScroll: true });
+			bouton.click();
+		};
+		ctx.container.addEventListener("keydown", onKeydown, true);
+		ctx.__quizGlobalCleanups.push(() => ctx.container.removeEventListener("keydown", onKeydown, true));
+	}
+	bindFlashcardKeys();
+
 	return {
 		RATINGS,
 		isTextOnlyMode,
@@ -422,9 +613,9 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		getCorrectOptionIndices,
 		expectedAnswerHtml,
 		learningHtml,
-		comparisonOptionsHtml,
-		ratingButtonsHtml,
+		writtenReviewSectionHtml,
 		questionCardBodyHtml,
-		bindTextOnlyQuestion
+		bindTextOnlyQuestion,
+		bindWrittenReviewControls
 	};
 }

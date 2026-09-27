@@ -67,8 +67,10 @@ export interface QuestionBase {
 	promptHtml?: string;
 	/** Variante interne équivalente à promptHtml (fallback lu au même endroit). */
 	_promptHtml?: string;
-	/** Texte de l'indice, affiche le bouton "Indice" si non vide (engine/cards.js questionCardHtml). */
-	hint?: string;
+	/** L'indice : une chaîne (un niveau) ou un tableau de chaînes, du plus
+	    léger au plus révélateur. Lu par `niveauxIndice` (src/quiz-hint.ts),
+	    qui ignore une valeur invalide. */
+	hint?: string | string[];
 	/** Explication texte brut affichée après verrouillage (engine/cards.js explanationHtml). */
 	explain?: string;
 	/** Explication HTML pré-rendue, prioritaire sur `explain`. */
@@ -235,6 +237,18 @@ export interface CodeQuestion extends QuestionBase {
 	hints?: string[];
 }
 
+/**
+ * CARTE MÉMOIRE (engine/text-only.ts, branche carte). Le recto est `prompt`,
+ * le verso `answer` (champ déjà connu du format, réutilisé plutôt qu'un
+ * `back` de plus). C'est la PRÉSENCE de `flashcard: true` qui discrimine la
+ * variante, comme `cloze` ; `type` reste absent. On la retourne, puis on se
+ * note « À revoir » / « Je savais » : la note passe par l'auto-évaluation.
+ */
+export interface FlashcardQuestion extends QuestionBase {
+	flashcard: true;
+	answer?: string;
+}
+
 /** Forme imbriquée alternative de `ordering`, lue en fallback (engine/questions.js: q?.ordering?.items/correctOrder/slotLabels). */
 export interface OrderingConfig {
 	items?: string[];
@@ -297,6 +311,7 @@ export type QuizQuestion =
 	| TextQuestion
 	| ClozeQuestion
 	| CodeQuestion
+	| FlashcardQuestion
 	| OrderingQuestion
 	| MatchingQuestion;
 
@@ -394,6 +409,13 @@ export interface QuizState {
 	 */
 	lessonPreSkipped: boolean[];
 	/**
+	 * L'indice de la question a été RÉVÉLÉ (2026-09-26) : il reste affiché
+	 * sous la question, et le bouton d'aide passe au cran suivant
+	 * (« Je ne sais pas » sur une pré-question, rien sinon). Un seul bouton
+	 * d'aide à la fois, sans rien perdre : l'indice se relit sur place.
+	 */
+	hintSeen: boolean[];
+	/**
 	 * Questions DÉJÀ journalisées pour l'ordonnanceur pendant cette session.
 	 *
 	 * Une auto-évaluation journalise immédiatement (le verdict existe) ;
@@ -439,6 +461,10 @@ export interface QuizResult {
 	pct: number;
 	correct: number;
 	total: number;
+	/** Réponses écrites (recall à choix, hors carte mémoire) pas encore
+	    auto-évaluées à l'écran des résultats — ni comptées justes ni fausses,
+	    donc exclues de `correct`/`total` (engine/state.ts computeScorePercent). */
+	pendingWritten: number;
 }
 
 /**
@@ -449,6 +475,8 @@ export interface StatsRecord {
 	bestScore: number;
 	questionsDone: number;
 	totalQuestions: number;
+	/** Quiz à réponses libres seulement : pas de pourcentage (tentative `pct: null`). */
+	texteLibre?: boolean;
 }
 
 /**
@@ -476,7 +504,7 @@ export interface ParsedQuizItem {
 	textVariant?: string;
 	id?: string;
 	title?: string;
-	hint?: string;
+	hint?: string | string[];
 	prompt?: string;
 	promptHtml?: string;
 	explain?: string;
@@ -502,6 +530,8 @@ export interface ParsedQuizItem {
 	correctMap?: number[];
 	/** Gabarit du texte à trous (engine/cloze.ts). */
 	cloze?: string;
+	/** Carte mémoire (engine/…) : `true` discrimine, le verso vit dans `answer`. */
+	flashcard?: boolean;
 	/** Réponse numérique et ses marges (engine/numeric.ts). */
 	numeric?: boolean;
 	tolerance?: number;

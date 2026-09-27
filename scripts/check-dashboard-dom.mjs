@@ -60,7 +60,6 @@ const LIBERES = [
 	"src/dashboard/folder-create.ts",
 	"src/dashboard/module-edit.ts",
 	"src/dashboard/detail-io.ts",
-	"src/dashboard/detail-exam.ts",
 	"src/dashboard/detail-form-bridge.ts",
 	"src/dashboard/detail-question.ts",
 	"src/dashboard/detail.ts",
@@ -86,6 +85,20 @@ const LIBERES = [
 	"src/dashboard/folder-contents.ts",
 	"src/dashboard/folder-sections.ts",
 	"src/dashboard/file-icons.ts",
+	// Tâche 4, 2026-09-26 : l'onglet Planning de révisions, né directement
+	// sans Obsidian.
+	"src/dashboard/folder-planning.ts",
+	// Refonte de l'éditeur, 2026-09-26 : l'en-tête de la page d'un quiz hors
+	// fiche et la barre de mise en forme des champs, nés sans Obsidian.
+	"src/dashboard/detail-head.ts",
+	"src/editor/format-toolbar.ts",
+	// Édition dans le rendu corrigé, 2026-09-26 : la page d'édition, le rendu
+	// modifiable, ses gestes et ses cibles, le collage d'image partagé.
+	"src/dashboard/detail-edition.ts",
+	"src/dashboard/edition-rendu.ts",
+	"src/dashboard/edition-rendu-gestes.ts",
+	"src/dashboard/edition-rendu-cibles.ts",
+	"src/editor/collage-image.ts",
 ];
 
 /** Retire les commentaires : une extension CITÉE en commentaire (par exemple

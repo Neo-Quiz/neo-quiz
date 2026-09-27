@@ -1,0 +1,64 @@
+/* =========================================================
+   25) SORTIE D'UN PROGRAMME
+   Retour #2 (2026-09-26 soir) + sa précision du 27/09 : une variante
+   terminal qui n'est PAS une vraie invite de commande (python, java…)
+   n'affiche plus « C:\> » — l'élève écrirait une sortie de programme,
+   pas une commande. Même look que .quiz-md-code (Tokyo Night, Neo Quiz
+   Mono, cf. quiz-card.css) : un libellé discret au lieu d'une invite,
+   une hauteur DE DÉPART posée par l'attribut `rows` (countAnswerLines,
+   engine/terminal.ts) qui grandit avec la saisie — jamais d'ascenseur.
+   ========================================================= */
+
+.quiz-text-wrap-program{
+  margin: 10px var(--quiz-option-side-gap) 0;
+}
+
+/* `.quiz-md-code` (quiz-card.css) porte déjà le fond, la bordure, le
+   rayon et la police Tokyo Night — cette classe n'ajoute que la mise en
+   colonne du libellé et le champ. */
+.quiz-program-output{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quiz-program-output-label{
+  color: var(--qmc-comment);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.quiz-program-output.correct{
+  border-color: var(--quiz-success);
+}
+
+.quiz-program-output.wrong{
+  border-color: var(--quiz-danger);
+}
+
+.quiz-textarea.quiz-textarea-program{
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--qmc-fg);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  /* Un mot trop long pour tenir sur une ligne se coupe plutôt que de
+     pousser un ascenseur horizontal (contrairement à .quiz-md-code, un
+     bloc affiché, jamais saisi). */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  box-shadow: none;
+  outline: none;
+}
+
+.quiz-textarea.quiz-textarea-program::placeholder{
+  color: var(--qmc-comment);
+}

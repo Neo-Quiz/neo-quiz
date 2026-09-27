@@ -92,82 +92,10 @@
 	white-space: nowrap;
 }
 
-.qbd-qz-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex-shrink: 0;
-}
-
-/* Bouton « Edit » : même matière que le chip « Recent » (verre dense, liseré,
-   reflet haut) — demande Ahmed 2026-07-21. La GÉOMÉTRIE reste celle du
-   header : 36px de haut comme la pilule « Start » à côté, sinon les deux
-   boutons de la rangée ne s'alignent plus. */
-.qbd-root .qbd-qz-edit-btn {
-	height: 36px;
-	padding: 0 15px;
-	border-radius: var(--radius-m, 10px);
-	font-size: 13px;
-	font-weight: 600;
-	background: var(--qbd-glass-bg-dense);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
-	color: var(--text-normal);
-}
-
-.qbd-root .qbd-qz-edit-btn:hover {
-	background: var(--qbd-glass-bg-dense);
-	border-color: color-mix(in srgb, var(--text-normal) 28%, var(--qbd-glass-edge));
-	color: var(--text-normal);
-}
-
-/* Mode édition actif : le liseré s'affirme, le fond ne change pas (une
-   surbrillance pleine ferait un troisième niveau de matière dans la rangée). */
-.qbd-root .qbd-qz-edit-btn.is-on {
-	border-color: color-mix(in srgb, var(--text-normal) 40%, var(--qbd-glass-edge));
-	color: var(--text-normal);
-}
-
-.qbd-qz-start .qbd-btn-icon {
-	display: flex;
-	align-items: center;
-}
-
-/* ── Ligne d'infos sous le titre (detail.ts renderMeta) ──
-   Du TEXTE, séparé par des points médians : seules les questions sont des
-   tuiles, parce que seules elles se cliquent. */
-.qbd-qz-meta {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	margin-top: 6px;
-	font-size: 12.5px;
-	color: var(--text-muted);
-	line-height: 1.5;
-}
-
-.qbd-qz-meta-item {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-}
-
-.qbd-qz-meta-item + .qbd-qz-meta-item::before {
-	content: "·";
-	margin: 0 8px;
-	color: var(--text-faint);
-}
-
-.qbd-qz-meta-item.is-good { color: var(--color-green); }
-.qbd-qz-meta-item.is-fair { color: var(--color-yellow); }
-
-.qbd-qz-meta-logo,
-.qbd-qz-meta-logo svg {
-	width: 13px;
-	height: 13px;
-}
+/* L'en-tête ci-dessus (`qbd-qz-header` et ses enfants) ne sert plus qu'à la
+   page du LECTEUR (apps/windows/src/ui/quiz-page.ts). Celui de l'éditeur,
+   de l'aperçu et de la page « Générer » est celui de la fiche
+   (detail-head.ts, dashboard-editor.css). */
 
 /* ── Corps : liste + panneau ── */
 .qbd-qz-body {
@@ -195,192 +123,18 @@
 	flex-shrink: 0;
 }
 
-.qbd-qz-list-title {
-	font-size: 11px;
-	font-weight: 600;
-	color: var(--text-muted);
-}
-
-.qbd-root .qbd-qz-list-add {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: none;
-	border-radius: 7px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-muted);
-	cursor: pointer;
-	transition: background 0.14s ease, color 0.14s ease;
-}
-
-.qbd-root .qbd-qz-list-add:hover {
-	background: var(--background-modifier-hover, rgba(255,255,255,0.06));
-	color: var(--text-normal);
-}
-
-.qbd-qz-list-add svg {
-	width: 15px;
-	height: 15px;
-}
-
+/* Le titre de la liste, les cartes des questions et « + Ajouter une
+   question » : dashboard-editor.css (refonte de l'éditeur, 2026-09-26). */
 .qbd-qz-list-items {
+	--fondu: 40px;
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	padding-right: 2px;
-}
-
-/* Carte de question — la vignette de la colonne gauche de la référence. */
-.qbd-qz-card {
-	position: relative;
-	display: flex;
-	gap: 10px;
-	padding: 11px 12px;
-	border-radius: var(--radius-m, 10px);
-	background: var(--qbd-glass-bg);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
-	cursor: pointer;
-	transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s ease;
-}
-
-.qbd-qz-card:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--qbd-glass-edge));
-}
-
-/* Sélection : liseré accent + fond légèrement teinté (référence : bordure
-   bleue franche sur la vignette active). */
-.qbd-qz-card.is-active {
-	border-color: var(--interactive-accent);
-	background: color-mix(in srgb, var(--interactive-accent) 10%, var(--qbd-glass-bg));
-}
-
-.qbd-qz-card-num {
-	flex-shrink: 0;
-	width: 20px;
-	height: 20px;
-	border-radius: 6px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: var(--background-modifier-border);
-	color: var(--text-muted);
-	font-size: 9px;
-	font-weight: 600;
-	font-family: var(--font-monospace, monospace);
-}
-
-.qbd-qz-card.is-active .qbd-qz-card-num {
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-}
-
-.qbd-qz-card-text {
-	flex: 1;
-	min-width: 0;
-	font-size: 12px;
-	line-height: 1.45;
-	color: var(--text-normal);
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	overflow: hidden;
-}
-
-.qbd-qz-card-text.is-empty {
-	color: var(--text-faint);
-	font-style: italic;
-}
-
-/* Suppression : n'apparaît qu'au survol de SA carte — une croix permanente
-   sur chaque vignette transformerait la colonne en champ de mines. */
-/* Rangée d'actions d'une carte (édition) : réordonner, supprimer. Révélée
-   au survol de la carte — au repos, la liste reste une liste. */
-.qbd-qz-card-acts {
-	position: absolute;
-	top: 5px;
-	right: 5px;
-	display: flex;
-	align-items: center;
-	gap: 1px;
-	opacity: 0;
-	transition: opacity 0.14s ease;
-}
-
-.qbd-qz-card:hover .qbd-qz-card-acts,
-.qbd-qz-card-acts:focus-within {
-	opacity: 1;
-}
-
-.qbd-root .qbd-qz-card-act {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: none;
-	border-radius: 6px;
-	/* Obsidian repeint tout <button> (0,1,1) : sans ces deux-là, chaque
-	   flèche redeviendrait une pilule grise sur la carte. */
-	background: transparent !important;
-	box-shadow: none !important;
-	color: var(--text-faint);
-	cursor: pointer;
-	transition: color 0.14s ease, background 0.14s ease;
-}
-
-.qbd-root .qbd-qz-card-act:hover:not(:disabled) {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal);
-}
-
-/* Aux extrémités la flèche reste VISIBLE mais inerte : une rangée qui
-   change de largeur d'une carte à l'autre ferait sautiller la liste. */
-.qbd-root .qbd-qz-card-act:disabled {
-	opacity: 0.3;
-	cursor: default;
-}
-
-.qbd-qz-card-act svg {
-	width: 13px;
-	height: 13px;
-}
-
-.qbd-root .qbd-qz-card-del {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: none;
-	border-radius: 6px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-faint);
-	cursor: pointer;
-	opacity: 0;
-	transition: opacity 0.14s ease, color 0.14s ease, background 0.14s ease;
-}
-
-.qbd-root .qbd-qz-card-del:hover {
-	background: color-mix(in srgb, var(--quiz-danger) 16%, transparent);
-	color: var(--quiz-danger);
-}
-
-.qbd-qz-card-del svg {
-	width: 13px;
-	height: 13px;
+	/* De quoi loger le liseré de la carte courante sans le rogner. */
+	padding: 2px 4px 2px 2px;
 }
 
 /* ── Panneau de la question courante ── */
@@ -539,208 +293,56 @@
 	display: none;
 }
 
-/* Cercles nus de StudySmarter (capture Ahmed 2026-07-21), habillés de la
-   MÊME matière que le chip « Recent » de Mes quiz — la recette de verre
-   validée pour un petit contrôle : variantes DENSES des tokens (la recette
-   du panneau, à 50 % d'alpha, rend délavé à cette taille), liseré et reflet
-   haut. Theme-aware de bout en bout : rien n'est figé, tout dérive de
-   --background-secondary / --text-normal. */
-.qbd-root .qbd-qz-nav-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 40px;
-	height: 40px;
-	padding: 0;
-	border-radius: 50%;
-	background: var(--qbd-glass-bg-dense);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
-	color: var(--text-muted);
-	cursor: pointer;
-	transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
-}
+/* Les flèches elles-mêmes sont celles du quiz (`.quiz-question-nav
+   .quiz-nav-btn`, action-buttons.css) ; leur rangée et la position entre
+   elles : dashboard-editor.css. */
 
-.qbd-root .qbd-qz-nav-btn:hover:not(:disabled) {
-	border-color: color-mix(in srgb, var(--text-normal) 28%, var(--qbd-glass-edge));
-	color: var(--text-normal);
-}
-
-.qbd-root .qbd-qz-nav-btn:disabled {
-	opacity: 0.3;
-	cursor: default;
-}
-
-.qbd-qz-nav-btn svg {
-	width: 18px;
-	height: 18px;
-	/* Chevron délié comme sur la capture, pas le trait gras de Lucide (2). */
-	stroke-width: 1.8;
-}
-
-/* ── Édition ──────────────────────────────────────────────
-   Les cartes de réponse NE SONT PAS redéfinies ici : la page réutilise le
-   composant de l'éditeur (.qb-answer-*, editor-answers.css) — même
-   interrupteur qui glisse, même bascule de couleur, même flash. Seuls les
-   ajustements propres à ce contexte vivent ci-dessous.
-   ──────────────────────────────────────────────────────── */
-
-/* Champ d'énoncé : label + zone de saisie, sans cadre englobant (le double
-   cadre gris de la v1 alourdissait tout). Le fond reste TRANSLUCIDE pour
-   rester dans la matière de la page. */
-.qbd-qz-field {
-	display: flex;
-	flex-direction: column;
-	gap: 7px;
-}
-
-.qbd-qz-field-label {
-	font-size: 10px;
-	font-weight: 600;
-	color: var(--text-faint);
-	padding-left: 2px;
-}
-
-/* background/box-shadow !important : le chrome natif d'Obsidian repeint les
-   textarea (et les assombrit au survol) par-dessus nos classes. */
-.qbd-qz-field-input {
-	width: 100%;
-	resize: none;
-	overflow: hidden;
-	padding: 12px 14px;
-	border-radius: var(--radius-m, 12px);
-	background: color-mix(in srgb, var(--background-secondary) 55%, transparent) !important;
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen) !important;
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
-	color: var(--text-normal);
-	font-family: var(--font-interface, inherit);
-	font-size: 17px;
-	font-weight: 600;
-	line-height: 1.4;
-	transition: border-color 0.14s ease;
-}
-
-.qbd-qz-field-input:focus {
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--qbd-glass-edge));
-	outline: none;
-}
-
-/* La carte de réponse est TRANSLUCIDE (teinte mêlée au thème, cf.
-   editor-answers.css) : sur la page, le wallpaper transparaît au travers,
-   comme pour le reste du panneau. Ici on ne règle que la densité de la pile
-   et la zone de saisie, qui est un textarea auto-grandissant et non l'input
-   d'une ligne de l'éditeur. */
-.qbd-qz-panel .qb-answer-cards {
-	margin-top: 4px;
-}
-
-.qbd-qz-panel .qb-answer-card {
-	padding: 14px 16px;
-	margin-bottom: 10px;
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
-}
-
-.qbd-qz-panel .qb-answer-input {
-	resize: none;
-	overflow: hidden;
-	font-size: 14px;
-	line-height: 1.45;
-	background: transparent !important;
-	box-shadow: none !important;
-	border: none;
-	padding: 4px 0 0;
-}
-
-.qbd-qz-panel .qb-answer-input:focus {
-	outline: none;
-}
-
-/* Le bouton d'ajout suit la matière de la page plutôt que le gris plein. */
-.qbd-root .qbd-qz-panel .qb-answer-add {
-	background: transparent;
-	border: 1.5px dashed var(--qbd-glass-edge);
-	box-shadow: none;
-}
-
-.qbd-root .qbd-qz-panel .qb-answer-add:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--qbd-glass-edge));
-	color: var(--interactive-accent);
-}
-
-.qbd-qz-add-answer-icon {
-	display: flex;
-	align-items: center;
-}
-
-.qbd-qz-add-answer-icon svg {
-	width: 15px;
-	height: 15px;
-}
-
-/* Titre de la question : une seule ligne, moins haut que l'énoncé — il ne
-   doit pas peser autant que la question elle-même. */
-.qbd-qz-field-input--single {
-	font-size: 14px;
-	font-weight: 600;
-	padding: 9px 14px;
-}
-
-/* Les champs propres au TYPE viennent du formulaire de l'éditeur (classes
-   qb-*, cf. detail-form-bridge) : on ne règle ici que leur insertion dans
-   la colonne, jamais leur apparence — elle est partagée. */
-.qbd-qz-type-box {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	margin-top: 14px;
-}
-
-.qbd-qz-panel .qbd-qz-type-box > .qb-section-box {
-	margin: 0;
-	padding: 0;
-	background: none;
-	border: none;
-}
-
-/* ── Sections optionnelles (document, ressource, indice, explication) ──
+/* ── Sections repliables (document, leçon, ressource, indice) ──
    Repliables, animées dans les DEUX sens : hauteur par grid-template-rows
    (une hauteur inconnue ne s'anime pas), chevron tourné par CSS. Le clip
    n'est posé QUE replié ou pendant l'animation — à l'état ouvert stable il
-   rognerait les menus et survols qui débordent légitimement. */
+   rognerait les menus et survols qui débordent légitimement.
+   Refonte de l'éditeur (2026-09-26) : l'en-tête a l'allure des libellés de
+   section nommée — petites capitales discrètes. */
 .qbd-qz-section {
-	margin-top: 10px;
-	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 10px;
+	border-top: 1px solid color-mix(in srgb, var(--text-normal) 9%, transparent);
+	padding-top: 4px;
 }
 
-.qbd-qz-section-head {
+/* Deux sections repliées se suivent de près : l'écart du formulaire (22 px)
+   est fait pour séparer des sections OUVERTES. */
+.qbd-qz-section + .qbd-qz-section {
+	margin-top: -14px;
+}
+
+.qbd-root .qbd-qz-section-head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	width: 100%;
-	padding: 6px 4px;
-	/* Obsidian repeint tout <button> (.theme-dark button, 0,1,1) : sans ces
-	   trois-là, la ligne d'en-tête redeviendrait une pilule grise. */
-	background: transparent !important;
-	box-shadow: none !important;
-	color: var(--text-muted) !important;
+	margin: 0;
+	padding: 8px 4px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
 	border: none;
-	border-radius: 8px;
-	font-size: 12px;
+	border-radius: 6px;
+	font: inherit;
+	font-size: 11px;
 	font-weight: 600;
 	text-align: left;
 	cursor: pointer;
 	transition: color 0.14s ease, background 0.14s ease;
 }
 
-.qbd-qz-section-head:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
+.qbd-root .qbd-qz-section-head:hover {
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	color: var(--text-normal);
+}
+
+.qbd-root .qbd-qz-section-head:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 1px;
 }
 
 .qbd-qz-section-chevron,
@@ -908,51 +510,6 @@
 	}
 }
 
-.is-mobile .qbd-qz-header {
-	flex-wrap: wrap;
-}
-
-.is-mobile .qbd-qz-actions {
-	width: 100%;
-	justify-content: flex-end;
-}
-
-
-/* ── Mode du quiz (colonne de gauche, édition seulement) ── */
-.qbd-qz-exam {
-	display: flex;
-	flex-direction: column;
-	gap: 9px;
-	margin-top: 14px;
-	padding: 12px;
-	border-radius: var(--radius-m, 12px);
-	background: var(--qbd-glass-bg);
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
-}
-
-.qbd-qz-exam-head {
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	color: var(--text-muted);
-	font-size: 11px;
-	font-weight: 600;
-}
-
-.qbd-qz-exam-icon svg {
-	width: 14px;
-	height: 14px;
-}
-
-.qbd-qz-exam-help {
-	font-size: 11px;
-	line-height: 1.5;
-	color: var(--text-faint);
-}
-
 
 /* ── Bascule consultation ⇄ édition ──
    Le corps sort (estompe + léger recul), la page se repeint dans l'autre
@@ -980,22 +537,17 @@
 	animation: qbd-qz-body-in 220ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
-/* Le bouton « Editor » accuse le coup. L'icône CHANGE avec l'état (crayon ↔
-   coche) : elle ne peut pas se transitionner d'une forme à l'autre, alors
-   c'est son APPARITION qu'on anime — une courte pulsation. La surface, elle,
-   s'enfonce au clic. */
+/* Le bouton « Modifier / Terminé » accuse le coup. L'icône CHANGE avec l'état
+   (crayon ↔ coche) : elle ne peut pas se transitionner d'une forme à
+   l'autre, alors c'est son APPARITION qu'on anime — une courte pulsation.
+   La face, elle, s'enfonce au clic (bouton 3D, cta3d.ts). */
 @keyframes qbd-qz-edit-icon-in {
 	from { opacity: 0; transform: scale(0.6) rotate(-25deg); }
 	to   { opacity: 1; transform: none; }
 }
 
-.qbd-root .qbd-qz-edit-btn .qbd-btn-icon {
-	display: inline-flex;
+.qbd-qz-edit .qbd-btn-icon {
 	animation: qbd-qz-edit-icon-in 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
-}
-
-.qbd-root .qbd-qz-edit-btn:active {
-	transform: scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1003,7 +555,7 @@
 	.qbd-qz-body--entering {
 		animation: none;
 	}
-	.qbd-root .qbd-qz-edit-btn .qbd-btn-icon { animation: none; }
+	.qbd-qz-edit .qbd-btn-icon { animation: none; }
 }
 
 
@@ -1052,49 +604,6 @@
 }
 
 
-/* ── Énoncé : la zone du formulaire de l'éditeur, habillée en champ de page ──
-   Le markup vient de `bridge.field` (classes qb-*) pour garder la barre
-   d'entités, le raccourci ``` et le collage d'image ; seule la MATIÈRE est
-   celle de la page (verre, liseré, focus d'accent). */
-.qbd-qz-field--rich .qb-entity-toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	margin-bottom: 6px;
-}
-
-.qbd-root .qbd-qz-field--rich .qb-field-textarea {
-	width: 100%;
-	min-height: 84px;
-	resize: vertical;
-	padding: 12px 14px;
-	border-radius: var(--radius-m, 12px);
-	/* !important : le chrome natif d'Obsidian repeint les textarea (et les
-	   assombrit au survol) par-dessus nos classes. */
-	background: color-mix(in srgb, var(--background-secondary) 55%, transparent) !important;
-	border: 1px solid var(--qbd-glass-edge);
-	box-shadow: var(--qbd-glass-sheen) !important;
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
-	color: var(--text-normal);
-	font-family: var(--font-interface, inherit);
-	font-size: 16px;
-	font-weight: 600;
-	line-height: 1.45;
-	transition: border-color 0.14s ease;
-}
-
-.qbd-root .qbd-qz-field--rich .qb-field-textarea:focus {
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--qbd-glass-edge));
-	outline: none;
-}
-
-/* Le label vide que `bridge.field` insère avant la zone ne doit pas creuser
-   un vide sous le nôtre. */
-.qbd-qz-field--rich .qb-field-label:empty {
-	display: none;
-}
-
 /* ══════════════════════════════════════════════════════════
    TRANSITION D'ENTRÉE — même grammaire que l'accueil et « Mes quiz »
    (keyframes qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css),
@@ -1103,7 +612,7 @@
    quiz »). `.qbd-qz-enter` tombe dès l'animation finie (view-enter.ts) ;
    `backwards`, jamais `both` : `npm run check:view-enter` y veille.
    ══════════════════════════════════════════════════════════ */
-.qbd-qz-enter .qbd-qz-header {
+.qbd-qz-enter .qbd-qz-top {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
 }
 .qbd-qz-enter .qbd-qz-list,
@@ -1114,7 +623,7 @@
 .qbd-qz-enter .qbd-qz-main { animation-delay: 180ms; }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-qz-enter .qbd-qz-header,
+	.qbd-qz-enter .qbd-qz-top,
 	.qbd-qz-enter .qbd-qz-list,
 	.qbd-qz-enter .qbd-qz-main { animation: none; }
 }

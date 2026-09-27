@@ -1,4 +1,5 @@
 import { currentHost, requireHost } from "../host/current";
+import { placerIndicateur } from "./seg-indic";
 import { ajouter } from "../dom";
 import { currentLang, t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -9,6 +10,12 @@ import { ajouterLien, lireContenuDossier, nomSansExtension, retirerLien, titreDe
 import { openConfirmModal } from "../editor/modals";
 import { estImage, fileIcon } from "./file-icons";
 import type { LienDossier } from "./folder-contents";
+import { suivreDebord } from "./detail-fiche";
+
+/** Le nombre de lignes qu'une liste de section montre avant de défiler dans
+    son cadre. Le même 8 est écrit dans `dashboard-folder.css`
+    (`.qbd-folder-list--defile`, `max-height`). */
+const LIGNES_VISIBLES = 8;
 
 /* ══════════════════════════════════════════════════════════
    LES TROIS SECTIONS D'UN DOSSIER — Documents, Liens, Notes
@@ -33,12 +40,58 @@ export interface FolderSectionsDeps {
 	rerender: () => void;
 }
 
+/* L'onglet ouvert de chaque dossier, gardé pendant la session : repeindre la
+   page (ajout d'un fichier, retour d'un quiz) ne doit pas ramener à
+   « Documents » celui qui regardait ses notes. */
+const ongletParDossier = new Map<string, number>();
+
 export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDeps): void {
+	/* UNE tuile pour les trois (2026-09-25) : Documents, Liens et Notes en
+	   ONGLETS, dans la même matière que les cartes de quiz mais bordée de
+	   POINTILLÉS — la zone des ressources se distingue sans changer de
+	   texture. Un état vide ne s'affiche plus que si l'on ouvre son onglet. */
 	const wrap = ajouter(parent, "div", "qbd-folder-sections");
 	const estQuiz = (path: string): boolean => !!deps.ctx.scanner.getQuiz(path);
 	void lireContenuDossier(deps.folder, estQuiz).then(contenu => {
 		if (!wrap.isConnected) return;
-		renderSection(wrap, deps, {
+		const onglets = ajouter(wrap, "div", "qbd-folder-tabs");
+		onglets.setAttribute("role", "tablist");
+		const indic = ajouter(onglets, "div", "qbd-folder-tabs-indic");
+		/* L'action de l'onglet ouvert, en haut à droite de la tuile, sur la
+		   ligne des onglets (2026-09-25) : en pied de liste, elle descendait
+		   avec les documents et sortait de l'écran. Une par onglet, seule
+		   celle de l'onglet ouvert est visible. */
+		const actions = ajouter(onglets, "div", "qbd-folder-tabs-actions");
+		const sections: HTMLElement[] = [];
+		const boutons: HTMLElement[] = [];
+		const boutonsAction: HTMLElement[] = [];
+		const montrer = (i: number, anime: boolean): void => {
+			ongletParDossier.set(deps.folder, i);
+			sections.forEach((sec, k) => { sec.hidden = k !== i; });
+			boutonsAction.forEach((b, k) => { b.hidden = k !== i; });
+			boutons.forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+			placerIndicateur(indic, boutons[i], anime);
+		};
+		const ajouterSection = (spec: SectionSpec): void => {
+			const i = sections.length;
+			const b = ajouter(onglets, "button", "qbd-folder-tab");
+			b.type = "button";
+			b.setAttribute("role", "tab");
+			currentHost().ui.setIcon(ajouter(b, "span", "qbd-folder-tab-icon"), spec.icon);
+			ajouter(b, "span", undefined, t(spec.title));
+			ajouter(b, "span", "qbd-folder-tab-count", String(spec.count));
+			b.addEventListener("click", () => montrer(i, true));
+			onglets.insertBefore(b, actions);
+			boutons.push(b);
+			const action = ajouter(actions, "button", "qbd-folder-section-action");
+			action.type = "button";
+			currentHost().ui.setIcon(ajouter(action, "span", "qbd-folder-section-action-icon"), spec.action.icon);
+			ajouter(action, "span", undefined, t(spec.action.label));
+			action.addEventListener("click", spec.action.onClick);
+			boutonsAction.push(action);
+			sections.push(renderSection(wrap, deps, spec));
+		};
+		ajouterSection({
 			icon: "file-text", title: "dashboard.folder.documents", count: contenu.documents.length,
 			emptyTitle: "dashboard.folder.documentsEmptyTitle", emptyHint: "dashboard.folder.documentsEmptyHint",
 			action: { icon: "upload", label: "dashboard.folder.addFiles", onClick: () => void ajouterDesFichiers(deps, choisirFichiers()) },
@@ -52,7 +105,7 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
 			})),
 		});
-		renderSection(wrap, deps, {
+		ajouterSection({
 			icon: "link", title: "dashboard.folder.links", count: contenu.liens.length,
 			emptyTitle: "dashboard.folder.linksEmptyTitle", emptyHint: "dashboard.folder.linksEmptyHint",
 			action: { icon: "plus", label: "dashboard.folder.addLink", onClick: () => ouvrirModalLien(deps) },
@@ -62,7 +115,7 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => confirmerPuis(t("dashboard.folder.deleteLinkTitle", { name: l.title }), t("dashboard.folder.deleteLinkMessage"), () => retirerLeLien(deps, l)),
 			})),
 		});
-		renderSection(wrap, deps, {
+		ajouterSection({
 			icon: "sticky-note", title: "dashboard.folder.notes", count: contenu.notes.length,
 			emptyTitle: "dashboard.folder.notesEmptyTitle", emptyHint: "dashboard.folder.notesEmptyHint",
 			action: { icon: "pen-line", label: "dashboard.folder.createNote", onClick: () => void creerUneNote(deps) },
@@ -72,6 +125,8 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
 			})),
 		});
+		// Mesuré au prochain cadre : les onglets doivent être posés.
+		requestAnimationFrame(() => montrer(ongletParDossier.get(deps.folder) ?? 0, false));
 	});
 }
 
@@ -90,26 +145,30 @@ interface SectionSpec {
 	items: { icon: string; label: string; meta: string; thumb?: string | null; onOpen: () => void; onDelete: () => void }[];
 }
 
-function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): void {
+function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): HTMLElement {
 	const host = currentHost();
 	/* UNE zone par section (retour Ahmed 2026-09-17, à l'écran) : le panneau
 	   contient tout — l'en-tête, la liste ou l'état vide, ET le bouton, dans
 	   son pied. La v1 posait le bouton en pilule blanche au-dessus d'une boîte
 	   séparée : deux objets pour une section, et une pilule qui n'était pas
-	   celle de l'application. Même surface que le panneau « Progrès ». */
+	   celle de l'application. Depuis les onglets, son bouton est sur la
+	   ligne des onglets (renderFolderSections). */
 	const section = ajouter(parent, "section", "qbd-folder-section" + (spec.items.length === 0 ? " qbd-folder-section--vide" : ""));
-	const head = ajouter(section, "div", "qbd-folder-section-head");
-	const titre = ajouter(head, "div", "qbd-folder-section-title");
-	host.ui.setIcon(ajouter(titre, "span", "qbd-folder-section-icon"), spec.icon);
-	ajouter(titre, "span", undefined, t(spec.title));
-	ajouter(head, "span", "qbd-folder-section-count", String(spec.count));
+	// Plus d'en-tête dans la section : son titre et son compteur sont l'ONGLET.
 
 	if (spec.items.length === 0) {
 		const vide = ajouter(section, "div", "qbd-folder-empty");
 		ajouter(vide, "div", "qbd-folder-empty-title", t(spec.emptyTitle));
 		ajouter(vide, "div", "qbd-folder-empty-hint", t(spec.emptyHint));
 	} else {
-		const liste = ajouter(section, "div", "qbd-folder-list");
+		/* AU-DELÀ DE HUIT LIGNES, la liste défile DANS son cadre (2026-09-26) :
+		   un dossier de 37 documents rendait la page interminable. Même
+		   défilement que les cartes de la grille d'un quiz (ascenseur fin,
+		   fondus haut et bas, `suivreDebord`) ; la molette passe à la page une
+		   fois la liste au bout. La hauteur vit dans le CSS
+		   (`.qbd-folder-list--defile`). */
+		const defile = spec.items.length > LIGNES_VISIBLES;
+		const liste = ajouter(section, "div", "qbd-folder-list" + (defile ? " qbd-folder-list--defile" : ""));
 		for (const it of spec.items) {
 			/* Deux boutons par rangée — ouvrir (toute la largeur) et supprimer
 			   (la corbeille, révélée au survol) — dans un `div` : un bouton dans
@@ -143,6 +202,7 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 			host.ui.setIcon(supprimer, "trash-2");
 			supprimer.addEventListener("click", (e) => { e.stopPropagation(); it.onDelete(); });
 		}
+		if (defile) suivreDebord(liste);
 	}
 
 	if (spec.onDrop) {
@@ -151,15 +211,7 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 		brancherDepot(section, spec.onDrop);
 	}
 
-	/* Le bouton, TOUJOURS au même endroit : le pied du panneau. Le style est
-	   celui des actions des hints de « Générer » (`qbd-ai-hint-action`) — un
-	   contrôle de panneau, pas l'action de la page. */
-	const pied = ajouter(section, "div", "qbd-folder-section-foot");
-	const b = ajouter(pied, "button", "qbd-folder-section-action");
-	b.type = "button";
-	host.ui.setIcon(ajouter(b, "span", "qbd-folder-section-action-icon"), spec.action.icon);
-	ajouter(b, "span", undefined, t(spec.action.label));
-	b.addEventListener("click", spec.action.onClick);
+	return section;
 }
 
 /* ── Documents ── */
@@ -172,7 +224,7 @@ function extensionAffichee(nom: string): string {
 /** Copie les fichiers choisis DANS le dossier : `<input type=file>` (le même
     geste que l'import d'un dossier partagé, folder-create.ts), puis
     `writeBinary` sous un nom libre — deux « CM1.pdf » ne s'écrasent pas. */
-async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[]>): Promise<void> {
+export async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[]>): Promise<void> {
 	const fichiers = await choix;
 	if (fichiers.length === 0) return;
 	const host = currentHost();
@@ -194,7 +246,7 @@ async function ajouterDesFichiers(deps: FolderSectionsDeps, choix: Promise<File[
 	}
 }
 
-function choisirFichiers(): Promise<File[]> {
+export function choisirFichiers(): Promise<File[]> {
 	return new Promise((resolve) => {
 		const input = document.createElement("input");
 		input.type = "file";
@@ -250,7 +302,7 @@ async function ouvrirFichier(deps: FolderSectionsDeps, e: DirEntry): Promise<voi
 
 /** Une note vierge dans le dossier, puis ouverte avec l'application du
     système : l'application n'a pas d'éditeur de notes, Obsidian en est un. */
-async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
+export async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
 	const host = currentHost();
 	try {
 		const path = await freeNotePath(deps.folder, t("dashboard.folder.newNoteDefaultName"));
@@ -267,7 +319,7 @@ async function creerUneNote(deps: FolderSectionsDeps): Promise<void> {
     et `dragleave` se déclenchent aussi en passant d'un ENFANT du panneau à un
     autre — d'où le compteur, sans lequel le liseré clignoterait à chaque
     rangée traversée. */
-function brancherDepot(section: HTMLElement, onDrop: (fichiers: File[]) => void): void {
+export function brancherDepot(section: HTMLElement, onDrop: (fichiers: File[]) => void): void {
 	let profondeur = 0;
 	section.addEventListener("dragenter", (e) => {
 		if (!e.dataTransfer?.types.includes("Files")) return;
@@ -353,7 +405,7 @@ async function ouvrirNote(deps: FolderSectionsDeps, e: DirEntry): Promise<void> 
 
 /* ── Liens ── */
 
-function ouvrirModalLien(deps: FolderSectionsDeps): void {
+export function ouvrirModalLien(deps: FolderSectionsDeps): void {
 	let url = "";
 	let titre = "";
 	requireHost("modals").open({

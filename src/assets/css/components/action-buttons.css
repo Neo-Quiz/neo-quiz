@@ -57,22 +57,57 @@
   filter: saturate(0.8);
 }
 
+/* L'action principale d'une question (« Vérifier », « Retourner »,
+   « Voir le score », « Recommencer ») : le bouton « à presser » de BRILLIANT,
+   comme les flèches ← → (2026-09-25). Une tranche pleine plus sombre dessous
+   (`0 4px 0 0`, sans flou) ; au survol la face s'éclaircit sans se soulever ;
+   au clic la tranche disparaît et le bouton descend d'autant.
+   BLEU, et plus vert (même jour, après examen) : le vert #29CC57 ne donnait
+   que 2,1:1 de contraste au texte blanc (il en faut 4,5) — d'où l'aspect
+   délavé ; et dans un quiz le vert veut dire « bonne réponse », pas
+   « valider ». Le bleu des flèches, posé juste à côté, fait de l'action et
+   de la navigation une seule famille (4,3:1). Pas de reflet ici : dans une
+   question, l'attention va à la question. */
 .quiz-action-btn.success{
-  color: var(--quiz-accent-text);
-  background: var(--quiz-success);
-  border-color: var(--quiz-success);
-  box-shadow:
-    0 2px 10px color-mix(in srgb, #000 12%, transparent),
-    0 0 0 1px color-mix(in srgb, #ffffff 8%, transparent) inset;
+  --quiz-press-face: var(--quiz-primary);
+  --quiz-press-face-hover: var(--quiz-primary-light);
+  --quiz-press-edge: var(--quiz-primary-edge);
+  --quiz-press-depth: 4px;
+  color: #fff;
+  background: var(--quiz-press-face);
+  border-color: transparent;
+  box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
+  transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease, opacity 120ms ease;
 }
 
 .quiz-action-btn.success:hover,
 .quiz-action-btn.success:focus-visible{
-  background: var(--quiz-success-hover);
-  border-color: var(--quiz-success-hover);
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-success) 22%, transparent),
-    0 0 22px color-mix(in srgb, var(--quiz-success) 18%, transparent);
+  background: var(--quiz-press-face-hover);
+  border-color: transparent;
+  transform: none;
+  box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
+}
+
+.quiz-action-btn.success:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.quiz-action-btn.success:active:not(:disabled){
+  transform: translateY(var(--quiz-press-depth));
+  box-shadow: 0 0 0 0 var(--quiz-press-edge);
+}
+
+.quiz-action-btn.success:disabled{
+  background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 45%, transparent);
+  box-shadow: none;
+  transform: translateY(var(--quiz-press-depth));
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-action-btn.success{ transition: none; }
 }
 
 .quiz-action-btn.quiz-save-results-btn{
@@ -119,43 +154,62 @@
   padding-bottom: 20px;
 }
 
+/* Les flèches ← → d'une question, façon BRILLIANT (2026-09-25, relevé sur
+   brilliant.org) : un bouton « à presser ». Une TRANCHE pleine plus sombre
+   dessous (`0 4px 0 0`, sans flou) lui donne son épaisseur ; au clic, la
+   tranche disparaît et le bouton descend d'autant (`translateY(4px)`),
+   comme une touche qui s'enfonce. En bleu (var(--quiz-primary), le bleu de Brilliant). */
 .quiz-question-nav .quiz-nav-btn{
+  --quiz-nav-face: var(--quiz-primary);
+  --quiz-nav-face-hover: var(--quiz-primary-light);
+  --quiz-nav-edge: var(--quiz-primary-edge);
+  --quiz-nav-depth: 4px;
   appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: none;
-  border-radius: 9px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  box-shadow: none;
+  border-radius: 12px;
+  background: var(--quiz-nav-face);
+  color: #fff;
+  box-shadow: 0 var(--quiz-nav-depth) 0 0 var(--quiz-nav-edge);
   cursor: pointer;
-  transition: background 0.14s ease, transform 0.08s ease, opacity 0.14s ease;
+  transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease, opacity 0.14s ease;
 }
 
 .quiz-question-nav .quiz-nav-btn svg{
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.5;
 }
 
-.quiz-question-nav .quiz-nav-btn:hover:not(:disabled),
+.quiz-question-nav .quiz-nav-btn:hover:not(:disabled){
+  background: var(--quiz-nav-face-hover);
+}
+
 .quiz-question-nav .quiz-nav-btn:focus-visible{
-  background: var(--interactive-accent-hover);
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
-.quiz-question-nav .quiz-nav-btn:focus-visible{
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
-}
-
+/* La touche s'enfonce : la tranche disparaît, le bouton descend d'autant. */
 .quiz-question-nav .quiz-nav-btn:active:not(:disabled){
-  transform: scale(0.93);
+  transform: translateY(var(--quiz-nav-depth));
+  box-shadow: 0 0 0 0 var(--quiz-nav-edge);
 }
 
+/* Désactivée : grise et à plat, sans tranche — rien à presser. */
 .quiz-question-nav .quiz-nav-btn:disabled{
-  opacity: 0.45;
+  background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 45%, transparent);
+  box-shadow: none;
+  transform: translateY(var(--quiz-nav-depth));
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-question-nav .quiz-nav-btn{ transition: none; }
 }

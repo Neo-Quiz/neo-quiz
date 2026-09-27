@@ -1,5 +1,6 @@
 import type { QuestionRole } from "./types/quiz";
 import { findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
+import { aIndice } from "./quiz-hint";
 
 /**
  * LE FORMAT LEARN / PRACTICE — module PUR : ni hôte, ni DOM, ni horloge.
@@ -23,12 +24,33 @@ export type ModeQuiz = "learn" | "practice";
     le contrôle à l'arrivée exige mais que le prompt tait n'est jamais produit
     (test du 2026-09-23 : `explain` absent du prompt, aucune explication). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
-	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"'],
+	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"',
+		// Styles de lecture (2026-09-26, spec des styles §4) : les clés et leurs valeurs.
+		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
 };
 
-/** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés. */
-export const MOTS_INTERDITS: readonly RegExp[] = [/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/];
+/** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés,
+    et les champs HTML pré-rendus — un quiz s'écrit en markdown, comme dans
+    Discord et Obsidian (2026-09-26) : nommer `promptHtml` au modèle, c'est
+    l'inviter à l'écrire. */
+export const MOTS_INTERDITS: readonly RegExp[] = [
+	/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/,
+	/\bpromptHtml\b/, /\bexplainHtml\b/, /\blessonHtml\b/, /\bpassageHtml\b/, /\boptionHtml\b/,
+];
+
+/** Les passages que le prompt de CHAQUE mode doit contenir mot pour mot : la
+    consigne markdown. Sans elle, un modèle écrit volontiers ses lectures en
+    `<p>`, `<strong>`, `<code>` — que l'éditeur montrait telles quelles. */
+export const PASSAGES_REQUIS: readonly string[] = [
+	"FORMATTING — MARKDOWN ONLY",
+	"**bold**, *italic*, `code`",
+	"paragraphs separated by an empty line",
+	"NEVER write an HTML tag",
+	// Demande du 2026-09-26 : un bloc de code sans langage se rend sans
+	// couleurs (engine/code-highlight.ts) — le prompt doit toujours l'exiger.
+	"A code block ALWAYS names its language right on the opening backticks",
+];
 
 export type Manque =
 	| { kind: "sansExplication"; questions: string[] }
@@ -38,15 +60,27 @@ export type Manque =
 	| { kind: "sansObjectifs" }
 	/** Une pré-question sans indice : on la pose AVANT la lecture, sans rien
 	    savoir — sans aide du tout, elle décourage (Ahmed, 2026-09-23). */
-	| { kind: "preSansIndice"; questions: string[] };
+	| { kind: "preSansIndice"; questions: string[] }
+	/** Une AUTRE question de Learn sans indice (explication, rappel) : CHAQUE
+	    question d'un Learn en a un (retours du 2026-09-26, #1 et #10). Hors
+	    lecture et carte mémoire, qui n'ont rien à deviner. */
+	| { kind: "sansIndice"; questions: string[] }
+	/** Une carte sans verso : retournée, elle ne montrerait rien à comparer. */
+	| { kind: "carteSansReponse"; questions: string[] };
 
 interface Element {
 	title?: unknown; prompt?: unknown; explain?: unknown; explainHtml?: unknown; hint?: unknown;
 	slice?: unknown; role?: unknown; mode?: unknown; objectives?: unknown;
+	flashcard?: unknown; answer?: unknown;
 }
 
 const texte = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 const estTranche = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1;
+
+/** Une carte mémoire : `flashcard: true`, rien d'autre (spec cartes §2). */
+export function estCarte(q: unknown): boolean {
+	return !!q && typeof q === "object" && (q as { flashcard?: unknown }).flashcard === true;
+}
 
 /** Le nom d'une question dans une notice : son titre, sinon le début de son
     énoncé, sinon son rang. */
@@ -99,6 +133,7 @@ export function titreSansMode(nom: string, mode: ModeQuiz): string {
 export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranchesConnues?: readonly number[]): Manque[] {
 	const { questions, config } = separer(items);
 	const manques: Manque[] = [];
+	const cartesSansVerso = questions.filter(({ q }) => estCarte(q) && !texte(q.answer)).map(({ q, i }) => nom(q, i));
 	if (mode === "practice") {
 		const sans = questions.filter(({ q }) => !texte(q.explain) && !texte(q.explainHtml)).map(({ q, i }) => nom(q, i));
 		if (sans.length) manques.push({ kind: "sansExplication", questions: sans });
@@ -107,6 +142,7 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 			const inconnues = questions.filter(({ q }) => estTranche(q.slice) && !connues.has(q.slice)).map(({ q, i }) => nom(q, i));
 			if (inconnues.length) manques.push({ kind: "trancheInconnue", questions: inconnues });
 		}
+		if (cartesSansVerso.length) manques.push({ kind: "carteSansReponse", questions: cartesSansVerso });
 		return manques;
 	}
 	const objectifs = config?.objectives;
@@ -126,9 +162,41 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 		const rolesManquants = exiges.filter(r => !presents.has(r));
 		if (rolesManquants.length) manques.push({ kind: "trancheIncomplete", slice, rolesManquants });
 	}
-	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !texte(q.hint)).map(({ q, i }) => nom(q, i));
+	// `hint` : une chaîne ou un tableau de niveaux (src/quiz-hint.ts).
+	const preSansIndice = questions.filter(({ q }) => q.role === "pre" && !aIndice(q.hint)).map(({ q, i }) => nom(q, i));
 	if (preSansIndice.length) manques.push({ kind: "preSansIndice", questions: preSansIndice });
+	const sansIndice = questions
+		.filter(({ q }) => q.role !== "pre" && q.role !== "read" && !estCarte(q) && !aIndice(q.hint))
+		.map(({ q, i }) => nom(q, i));
+	if (sansIndice.length) manques.push({ kind: "sansIndice", questions: sansIndice });
+	if (cartesSansVerso.length) manques.push({ kind: "carteSansReponse", questions: cartesSansVerso });
 	return manques;
+}
+
+/** Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` : la configuration
+    est complétée plutôt que le parcours enregistré comme banque Practice.
+    Gemini 3.5 Flash-Lite a rendu un parcours complet (rôles pre / read /
+    explain / recall) avec `{ objectives: [...] }` en dernier, sans `mode`
+    (2026-09-24) : la note s'étiquetait Practice et l'objet des objectifs
+    devenait une question vide. Rien n'est touché si aucune question ne porte
+    un rôle de parcours : ce serait inventer un Learn. PURE : rend un nouveau
+    tableau. */
+export function completerConfigLearn(items: readonly unknown[]): unknown[] {
+	if (modeDuBloc(items) === "learn") return [...items];
+	const { questions } = separer(items);
+	const parcours = questions.some(({ q }) => q.role === "pre" || q.role === "read" || q.role === "explain" || q.role === "recall");
+	if (!parcours) return [...items];
+	const copie = [...items];
+	/* L'objet des objectifs, sans énoncé : c'est la configuration qu'il
+	   voulait écrire. Il garde ses objectifs et reçoit le mode. */
+	const idx = copie.findIndex(it => !!it && typeof it === "object" && !Array.isArray(it)
+		&& Array.isArray((it as Element).objectives) && !texte((it as Element).prompt));
+	if (idx >= 0) {
+		copie[idx] = { ...(copie[idx] as object), mode: "learn" };
+		return copie;
+	}
+	copie.push({ mode: "learn" });
+	return copie;
 }
 
 export function planDesTranches(items: readonly unknown[]): { slice: number; titre: string }[] {

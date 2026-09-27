@@ -362,26 +362,33 @@
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
 	cursor: pointer;
-	transition: border-color .2s cubic-bezier(0.2, 0.7, 0.3, 1),
-		box-shadow .2s cubic-bezier(0.2, 0.7, 0.3, 1),
-		transform .2s cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: border-color .2s ease-in-out,
+		background .2s ease-in-out,
+		box-shadow .2s ease-in-out,
+		transform .2s ease-in-out;
 }
 /* LE HALO D'ANGLE NE DISPARAÎT JAMAIS, SURVOL COMPRIS (Ahmed, 2026-09-17 :
    « la lumière qui vient d'en haut à gauche ne doit jamais disparaître »).
-   Pas de `background` ici : la propriété raccourcie remplace les DEUX
-   couches du fond, et un `background: var(--card-bg)` posé « pour survoler
-   comme la carte d'un quiz » effaçait le halo au moment même où la carte
-   s'élève — elle s'éteignait au lieu de s'allumer. Le survol n'ajoute que ce
-   qui s'ajoute : l'élévation, la bordure vive et la lueur. */
+   PLUS DE LEVÉE au survol (StudySmarter, 2026-09-27, « elles ne se déplacent
+   plus vers le haut ») : la lueur s'INTENSIFIE (12 % → 20 %) et le fond
+   s'éclaircit d'un cran, avec l'ombre douce de StudySmarter, au lieu de
+   l'élévation d'avant. Le halo lui-même n'est donc jamais éteint : il
+   grandit, il ne bouge pas. */
 .qbd-module-card:hover {
-	transform: translateY(-3px);
 	border-color: var(--border-c);
-	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft);
+	background:
+		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) 20%, transparent) 0%, transparent 68%),
+		color-mix(in srgb, var(--text-normal) 5%, var(--card-bg));
+	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft),
+		0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
 }
-/* Press : retombée quasi immédiate, cohérente avec les quiz cards. */
+/* Press : un léger enfoncement, comme StudySmarter, sans levée à retomber. */
 .qbd-module-card:active {
-	transform: translateY(-1px) scale(0.985);
+	transform: scale(0.99);
 	transition-duration: 60ms;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-module-card:active { transform: none; }
 }
 
 /* LA CARTE NE S'ENFONCE PAS SOUS UN CLIC QUI NE LUI EST PAS ADRESSÉ (Ahmed,
@@ -395,8 +402,12 @@
    pendant le clic serait un second faux mouvement. Le survol, lui, reste :
    la carte EST survolée, et le curseur peut encore ressortir de l'icône pour
    l'ouvrir. */
+/* La carte ne s'enfonce plus sous un clic sur son icône (2026-09-27 : plus de
+   levée à annuler, donc plus de transform à rétablir ici — il suffit qu'elle
+   n'hérite pas du `scale(0.99)` de son propre `:active`, qu'un clic sur
+   l'icône déclenche aussi par bouillonnement de l'état). */
 .qbd-module-card:has(.qbd-module-card__icon--editable:active) {
-	transform: translateY(-3px);
+	transform: none;
 	transition-duration: 0.12s;
 }
 
@@ -660,16 +671,38 @@
 	to { opacity: 1; }
 }
 
+/* La page d'un dossier entre comme chez StudySmarter (2026-09-27) : le
+   contenu (le hero entier) en fondu, le TITRE en plus avec sa propre montée
+   de 10 px — deux animations sur deux éléments, jamais la même sur les
+   deux (le titre irait deux fois plus vite que le reste sinon). PAS de
+   transform dans `to` : la règle du haut de ce fichier vaut ici aussi. */
+@keyframes qbd-content-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes qbd-title-rise-in {
+	from { opacity: 0; transform: translateY(10px); }
+	to { opacity: 1; }
+}
+
 /* ── Transition d'ENTRÉE — classe posée par quizzes.ts sur le contenant
    quand on ARRIVE (navigation, drill in/out, bascule d'axe), jamais sur un
    re-render interne : hors de cette classe, aucun de ces éléments n'a
    d'animation — renommer/archiver ne fait pas clignoter la page.
    `>` : le header et le sélecteur RACINE seulement — en drill le header vit
    dans le hero déjà animé, l'animer aussi doublerait fondu et translation. */
-.qbd-quizzes-enter .qbd-quizzes-folder-hero,
 .qbd-quizzes-enter > .qbd-quizzes-header,
 .qbd-quizzes-enter > .qbd-quizzes-group {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
+}
+/* Entrée dans un dossier précisément : contenu en fondu 250ms, titre qui
+   monte de 10px en 200ms linéaire (StudySmarter, 2026-09-27) — remplace
+   l'animation générique ci-dessus pour ce cas précis. */
+.qbd-quizzes-enter .qbd-quizzes-folder-hero {
+	animation: qbd-content-fade-in 0.25s ease-in-out backwards;
+}
+.qbd-quizzes-enter .qbd-quizzes-folder-hero .qbd-quizzes-title {
+	animation: qbd-title-rise-in 0.2s linear backwards;
 }
 
 /* L'empty state entre avec le header (règle séparée : le contrat regex
@@ -687,75 +720,18 @@
 	animation-delay: var(--qbd-card-delay, 100ms);
 }
 
-.qbd-quizzes-enter .qbd-progress-panel {
+.qbd-quizzes-enter .qbd-quizzes-drill-next {
 	animation: qbd-folder-card-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 	animation-delay: 170ms;
 }
 
-/* Bannière autonome du dossier ouvert. Son accent est posé sur le wrapper :
-   titre, icône, halo, stats et contenu héritent tous de la même source. */
+/* Bannière autonome du dossier ouvert. Son accent est posé sur le wrapper ;
+   depuis le 2026-09-25, seule l'ICÔNE du titre le porte (plus de halo, de
+   titre coloré ni de soulignement : la couleur répétée partout salissait
+   la page). */
 .qbd-quizzes-folder-hero {
 	position: relative;
 	margin-bottom: 26px;
-}
-
-/* Trois couches réparties le long du hero (retour Ahmed 2026-07-20 — la
-   version à deux ellipses faisait une tache unique derrière le début du
-   titre) : cœur derrière l'icône, nappe qui court le long du titre et
-   s'estompe vers la droite, traînée basse qui prolonge le soulignement. */
-/* CONTRAINTE anti-coupure (retour Ahmed 2026-07-21) : la boîte ne déborde
-   jamais en négatif (un ancêtre scrollable clippait le débordement en une
-   ligne nette) et chaque ellipse reste ENTIÈREMENT dans la boîte
-   (centre ± rayon ∈ [0,100%]) — l'alpha atteint 0 avant tout bord, une
-   arête de coupe est impossible par construction. */
-.qbd-quizzes-folder-halo {
-	position: absolute;
-	/* -8px : débordement discret seulement — à -32px (tout le padding de
-	   .qbd-content) la lueur envahissait le couloir du rail (retour Ahmed
-	   2026-07-21). Le padding fait 28/32px, donc toujours aucun clip ;
-	   les ellipses restent contenues dans la boîte, donc aucun bord dur. */
-	left: -8px;
-	top: -8px;
-	width: min(1150px, calc(100% + 16px));
-	height: 260px;
-	/* Hauteur du CENTRE lumineux dans cette boîte : il doit tomber sur l'icône
-	   du module. Les 32 % d'origine dataient du temps où un fil d'Ariane
-	   occupait une ligne au-dessus du titre ; depuis que la flèche a rejoint la
-	   ligne du titre, l'icône est remontée et la lueur éclairait 50 px sous
-	   elle (retour Ahmed 2026-07-21 « le néon n'est pas au bon endroit »).
-	   Une variable plutôt que trois pourcentages recopiés : un seul chiffre à
-	   revoir si le header change encore. Mesuré in-app : 11,9 %. */
-	--halo-y: 12%;
-	/* Source lumineuse = l'ICÔNE (demande Ahmed 2026-07-21) : toutes les
-	   ellipses partagent le MÊME centre (l'icône, ~5.5%/32% de la boîte).
-	   EXTINCTION À DÉRIVÉE NULLE : un radial-gradient interpole
-	   LINÉAIREMENT entre stops, donc sans correction la lueur atteint 0
-	   avec une pente franche — l'œil voit cette rupture (bandes de Mach)
-	   sur fond sombre. Les stops suivent (1-t)^2.5 (profil quasi gaussien,
-	   pente → 0 à l'extinction) et le blur fusionne les couches et casse
-	   les micro-frontières restantes. Ellipses contenues dans la boîte. */
-	background:
-		radial-gradient(ellipse 5% 18% at 5.5% var(--halo-y),
-			color-mix(in srgb, var(--accent) 34%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 14%, transparent) 30%,
-			color-mix(in srgb, var(--accent) 3.4%, transparent) 60%,
-			color-mix(in srgb, var(--accent) 0.2%, transparent) 85%,
-			transparent 100%),
-		radial-gradient(ellipse 14% 26% at 6% var(--halo-y),
-			color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 7.8%, transparent) 25%,
-			color-mix(in srgb, var(--accent) 2.8%, transparent) 50%,
-			color-mix(in srgb, var(--accent) 0.5%, transparent) 75%,
-			transparent 100%),
-		radial-gradient(ellipse 58% 30% at 6% calc(var(--halo-y) + 1%),
-			color-mix(in srgb, var(--accent) 12%, transparent) 0%,
-			color-mix(in srgb, var(--accent) 6.9%, transparent) 20%,
-			color-mix(in srgb, var(--accent) 3.3%, transparent) 40%,
-			color-mix(in srgb, var(--accent) 1.2%, transparent) 60%,
-			color-mix(in srgb, var(--accent) 0.2%, transparent) 80%,
-			transparent 100%);
-	filter: blur(12px);
-	pointer-events: none;
 }
 
 .qbd-quizzes-folder-hero-inner {
@@ -789,48 +765,36 @@
 	transition: background 0.14s ease, color 0.14s ease;
 }
 
+/* La flèche de retour (2026-09-25) : un SVG de MASQUE, peint à la couleur du
+   texte du bouton (currentColor) — il suit donc le repos, le survol et le
+   thème sans une variante de plus. Un seul dessin pour tous les boutons
+   retour du dashboard. */
 .qbd-quizzes-crumb-icon {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.qbd-quizzes-crumb-icon svg {
+	display: block;
 	width: 21px;
 	height: 21px;
-	stroke-width: 1.7;
+	background-color: currentColor;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 5L4 12L11 19M4 12H21' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11 5L4 12L11 19M4 12H21' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-/* Dans le header d'un dossier : la flèche est SUR la ligne du titre, calée
-   sur l'axe de l'icône du module (titre 28px).
-   COULEUR (essai comparatif in-app 2026-07-21) : l'accent PLEIN se noyait
-   dans le halo du dossier — flèche verte sur lueur verte, illisible, et deux
-   éléments colorés qui se disputent l'œil. Le neutre, lui, ignorait le
-   dossier. Retenu : l'accent MÊLÉ au gris de texte — on reconnaît la teinte
-   du dossier, le titre reste le seul élément pleinement coloré. Le survol
-   passe à l'accent plein : la couleur y signale l'interaction. */
+/* Dans un dossier, la flèche est AU-DESSUS du titre (2026-09-25) : sur sa
+   ligne, elle décalait le titre. Centrée sur l'ICÔNE du titre (46 px) : le
+   bouton fait 32 px, d'où 7 px de retrait. Neutre au repos. */
 .qbd-root .qbd-quizzes-header-back {
-	flex: 0 0 auto;
-	/* -6px : le bouton fait 32px pour une flèche de 21px ; ce retrait aligne
-	   le TRAIT de la flèche sur la marge du contenu, pas la boîte du bouton.
-	   margin-right modeste : la flèche appartient au titre.  */
-	margin-left: -6px;
-	margin-right: 6px;
-	align-self: flex-start;
-	/* Cale l'axe de la flèche sur celui de l'icône du module (46px de haut). */
-	margin-top: 6px;
-	color: color-mix(in srgb, var(--accent, var(--text-muted)) 55%, var(--text-muted));
+	margin: 0 0 8px 7px;
+	color: var(--text-muted);
 }
 
 .qbd-root .qbd-quizzes-header-back:hover {
-	color: var(--accent, var(--text-normal));
-	background: color-mix(in srgb, var(--accent, var(--text-normal)) 12%, transparent);
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
 /* ══════════════════════════════════════════════════════════
    HEADER D'UN DOSSIER OUVERT — design claude.ai (capture 2026-07-20) :
-   nom en serif + soulignement dégradé lumineux (accent du dossier),
-   stats QUIZZES/MASTERED + bouton pilule alignés à droite.
+   nom en serif, blanc, et bouton pilule aligné à droite. L'accent du
+   dossier ne colore que l'icône, sans lueur (2026-09-25).
    ═════════════════════════════════════════════════════════ */
 
 /* Le bloc gauche reproduit la structure 7a : ligne icône + titre, puis trait
@@ -846,16 +810,22 @@
 	white-space: nowrap;
 }
 
-/* Trait 7a : les 61 px correspondent exactement à l'icône 46 px + gap 15 px. */
+/* Trait 7a sous le titre, à l'accent du dossier : les 61 px correspondent
+   exactement à l'icône 46 px + gap 15 px. */
 .qbd-quizzes-title-underline {
 	margin-top: 13px;
 	margin-left: 61px;
 	width: 200px;
+	max-width: calc(100% - 61px);
 	height: 3px;
 	border-radius: 2px;
 	background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 5%, transparent));
-	box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+	/* Plus de halo sous le trait (2026-09-26) : la lueur de la fenêtre prend
+	   déjà la couleur du dossier (apps/windows shell.css, `--nq-lueur`) ; un
+	   second halo au titre faisait doublon. Le trait dégradé reste. */
 }
+
+
 
 .qbd-quizzes-folder-hero .qbd-quizzes-header {
 	align-items: flex-end;
@@ -869,9 +839,11 @@
 	font-size: 34px;
 	font-weight: 700;
 	font-variant-numeric: lining-nums;
+	/* Le titre porte la couleur du dossier, comme son icône et son trait. */
 	color: var(--accent);
 	letter-spacing: -0.01em;
-	text-shadow: 0 2px 22px rgba(0, 0, 0, 0.65), 0 0 30px color-mix(in srgb, var(--accent) 30%, transparent);
+	/* Plus d'ombre portée : sur le fond d'écran, ses 22 px de flou dessinaient
+	   une tache sombre derrière le titre (2026-09-25). */
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg {
@@ -880,7 +852,10 @@
 	color: var(--accent);
 	stroke: var(--accent);
 	stroke-width: 1.5;
-	filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 55%, transparent));
+	/* Une lueur sur l'ICÔNE seule, la seule surface qui porte la couleur du
+	   dossier (2026-09-25) : deux ombres, une serrée et une large, douces. */
+	filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent))
+		drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 25%, transparent));
 }
 
 .qbd-quizzes-folder-hero .qbd-quizzes-title-icon svg > :first-child {
@@ -891,7 +866,7 @@
 	fill: none;
 }
 
-/* Stats + bouton pilule, groupés à droite du header. margin-left:auto : à la
+/* Bouton pilule, à droite du header. margin-left:auto : à la
    racine le header n'a PLUS de titre (icône retirée, elle vit dans le rail) —
    space-between seul collerait l'unique enfant à gauche. Sans effet en drill
    (le title-block flex:1 consomme déjà tout l'espace). */
@@ -906,44 +881,17 @@
 	padding-left: 24px;
 }
 
-.qbd-quizzes-header-stats {
-	display: flex;
-	align-items: center;
-	gap: 22px;
-}
 
-.qbd-quizzes-header-divider {
-	width: 1px;
-	height: 32px;
-	background: rgba(255, 255, 255, 0.18);
-}
 
-.qbd-quizzes-header-stat {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
 
-.qbd-quizzes-header-stat-num {
-	font-size: 20px;
-	font-weight: 700;
-	line-height: 1.15;
-	color: var(--text-normal);
-	font-variant-numeric: tabular-nums;
-}
 
-.qbd-quizzes-header-stat--mastered .qbd-quizzes-header-stat-num {
-	color: var(--accent);
-	text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
-}
 
-.qbd-quizzes-header-stat-label {
-	margin-top: 2px;
-	font-size: 9.5px;
-	font-weight: 600;
-	color: var(--text-faint);
-	white-space: nowrap;
-}
+
+
+
+
+
+
 
 /* Même pilule pour « Nouveau dossier » (ligne du regroupement, racine)
    que pour « Nouveau quiz » (hero du drill) — demande Ahmed 2026-07-20.
@@ -963,46 +911,198 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   DRILL-DOWN — layout 2 colonnes : grille de cartes + panneau « Progrès »
-   (design claude.ai, capture 2026-07-20). Repli 1 colonne sous une largeur
-   de panneau insuffisante (fenêtre Obsidian étroite, desktop) ET sous
-   .is-mobile (mobile réel/émulé, cf. dashboard-base.css — l'émulation garde
-   un viewport large, les media queries seules n'y suffisent pas).
+   DRILL-DOWN — deux onglets depuis le 2026-09-25 : « Contenu » (l'étape
+   suivante, la grille, les ressources) sur une seule colonne, et
+   « Progression » en tuiles. Le panneau « Progrès » de la colonne de droite
+   est parti dans le second.
    ═════════════════════════════════════════════════════════ */
 .qbd-quizzes-drill-layout {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 300px;
-	gap: 20px;
-	align-items: start;
 	min-width: 0;
 }
 
-/* Le SAS des quiz générés n'a pas de panneau « Progrès » (quizzes-render.ts,
-   `estLeSas`) : la grille prend la colonne qu'il laissait. */
-.qbd-quizzes-drill-layout--plein {
-	grid-template-columns: minmax(0, 1fr);
+/* Les trois vues d'un dossier se masquent par `hidden` ; chacune pose son
+   propre `display` (grid, flex), qui l'emporterait sur celui du navigateur.
+   Une vue neuve s'ajoute ICI, sinon elle reste affichée sous les autres
+   (le Planning l'a été, sous Contenu, le 2026-09-26). */
+.qbd-quizzes-drill-layout[hidden],
+.qbd-folder-progress[hidden],
+.qbd-planning[hidden] {
+	display: none;
 }
 
 .qbd-quizzes-drill-grid {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 14px;
 	min-width: 0;
-	/* Le drill partage la classe .qbd-home-grid, désormais plafonnée à 1082px
-	   pour l'accueil : ici la grille doit au contraire remplir toute la colonne
-	   restante à gauche du panneau « Progrès », quelle que soit la largeur de
-	   la fenêtre. */
+	/* Le drill partage la classe .qbd-home-grid, plafonnée à 1082px pour
+	   l'accueil : ici la grille remplit toute la largeur de la page. */
 	max-width: none;
 }
 
-.qbd-progress-panel {
-	--qbd-progress-neutral: rgba(255, 255, 255, 0.12);
-	--qbd-progress-review: #fbbf24;
-	width: 300px;
-	box-sizing: border-box;
-	padding: 22px 24px;
+@media (min-width: 1000px) {
+	.qbd-quizzes-drill-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 620px) {
+	.qbd-quizzes-drill-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.is-mobile .qbd-quizzes-drill-grid {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+/* ── Sélecteur Contenu | Progression, entre le titre et « Nouveau quiz ». ── */
+.qbd-folder-view-tabs {
+	position: relative;
+	display: inline-flex;
+	flex-shrink: 0;
+	align-self: center;
+	gap: 2px;
+	padding: 3px;
+	margin-left: 24px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+
+.qbd-folder-view-tabs-indic {
+	position: absolute;
+	left: 0;
+	top: 3px;
+	bottom: 3px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+	transform-origin: left center;
+	pointer-events: none;
+}
+
+.qbd-root .qbd-folder-view-tab {
+	position: relative;
+	z-index: 1;
+	height: auto;
+	margin: 0;
+	padding: 7px 20px;
+	border: 0;
+	border-radius: 999px;
+	background: none;
+	box-shadow: none;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 0.15s ease;
+}
+
+.qbd-root .qbd-folder-view-tab:hover,
+.qbd-root .qbd-folder-view-tab[aria-selected="true"] {
+	color: var(--text-normal);
+}
+
+.qbd-root .qbd-folder-view-tab:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+/* ── Au-dessus de la grille : l'étape suivante (« Nouveau quiz » est dans
+   l'en-tête du dossier depuis le 2026-09-26). ── */
+.qbd-quizzes-drill-next {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(0, 1fr);
+	gap: 14px;
+	margin-bottom: 18px;
+	animation-delay: 60ms;
+}
+
+/* L'étape suivante : le bouton 3D de « Commencer le quiz » (.qbd-cta3d,
+   dashboard-components.css), SCINDÉ — la face porte les deux boutons,
+   transparents, séparés par un filet. (2026-09-26) */
+.qbd-root .qbd-next-step.qbd-cta3d {
+	display: flex;
+	min-width: 0;
+	cursor: default;
+}
+.qbd-next-step .qbd-cta3d-face {
+	padding: 0;
+	justify-content: stretch;
+	gap: 0;
+}
+
+.qbd-root .qbd-next-step-main {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	height: auto;
+	margin: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+}
+
+.qbd-root .qbd-next-step-main {
+	flex: 1;
+	justify-content: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 14px 20px;
+	border-radius: 60px;
+}
+
+.qbd-root .qbd-next-step-main:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.qbd-root .qbd-next-step-main:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: -3px;
+}
+
+.qbd-next-step-icon {
+	flex-shrink: 0;
+}
+
+.qbd-next-step-icon svg { width: 15px; height: 15px; fill: currentColor; }
+
+.qbd-next-step-mode {
+	font-weight: 700;
+	flex-shrink: 0;
+}
+
+.qbd-next-step-mode::after {
+	content: "·";
+	margin-left: 8px;
+	opacity: 0.7;
+}
+
+.qbd-next-step-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+/* ── Onglet « Progression » : des tuiles de verre, comme les cartes. ── */
+.qbd-folder-progress {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.qbd-folder-progress-tile {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 4px;
+	min-width: 0;
+	padding: 18px 20px;
 	border-radius: 18px;
 	border: 1px solid var(--qbd-glass-edge);
 	background: var(--qbd-glass-bg);
@@ -1011,144 +1111,207 @@
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
 }
 
-@media (min-width: 1200px) {
-	.qbd-quizzes-drill-grid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
+.qbd-folder-progress-tile--wide {
+	grid-column: 1 / -1;
+	flex-direction: row;
+	align-items: center;
+	gap: 22px;
 }
 
-@media (max-width: 860px) {
-	.qbd-quizzes-drill-layout { grid-template-columns: minmax(0, 1fr); }
-	.qbd-progress-panel { width: 100%; }
-}
+.qbd-folder-progress-tile--wide .qbd-ring-pct { font-size: 24px; }
 
-@media (max-width: 620px) {
-	.qbd-quizzes-drill-grid { grid-template-columns: minmax(0, 1fr); }
-}
-
-.is-mobile .qbd-quizzes-drill-layout,
-.is-mobile .qbd-quizzes-drill-grid {
-	grid-template-columns: minmax(0, 1fr);
-}
-
-.is-mobile .qbd-progress-panel {
-	width: 100%;
-}
-
-.qbd-progress-panel-head {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 8px;
-}
-
-.qbd-progress-panel-title {
-	font-size: 15px;
+.qbd-folder-progress-label {
+	font-size: 16px;
 	font-weight: 700;
 	color: var(--text-normal);
 }
 
-.qbd-progress-panel-count {
-	font-family: var(--font-monospace, monospace);
-	font-size: 11px;
-	color: var(--text-faint);
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-}
-
-/* ── Donut (anneau SVG à 3 segments statut : mastered/review/à-apprendre —
-   cf. skill dataviz, couleurs de statut jamais une palette catégorielle). ── */
-.qbd-progress-donut-wrap {
-	display: flex;
-	justify-content: center;
-	padding: 4px 0;
-}
-
-.qbd-progress-donut {
-	width: 150px;
-	height: 150px;
-	border-radius: 50%;
-	background: conic-gradient(
-		var(--accent) 0 var(--qbd-donut-mastered-end),
-		var(--qbd-progress-review) var(--qbd-donut-mastered-end) var(--qbd-donut-review-end),
-		rgba(255, 255, 255, 0.12) var(--qbd-donut-review-end) 100%
-	);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.qbd-progress-donut-center {
-	width: 112px;
-	height: 112px;
-	border-radius: 50%;
-	background: #0d1222;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 2px;
-}
-
-.qbd-progress-donut-pct {
-	font-family: var(--font-display, inherit);
-	font-size: 32px;
-	font-weight: 700;
-	color: #f2f4fb;
-	font-variant-numeric: tabular-nums;
-}
-
-.qbd-progress-donut-pct-sign {
-	align-self: center;
-	margin-top: 8px;
-	font-size: 14px;
-	font-weight: 600;
+.qbd-folder-progress-sub {
+	margin-top: 4px;
+	font-size: 13px;
 	color: var(--text-muted);
 }
 
-/* ── Légende : puce couleur + libellé + % (identité JAMAIS portée par la
-   couleur seule — le libellé texte est toujours visible, cf. dataviz). ── */
-.qbd-progress-legend {
-	display: flex;
-	flex-direction: column;
-	gap: 11px;
+.qbd-folder-progress-tile > b {
+	font-size: 28px;
+	font-weight: 800;
+	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
 }
 
-.qbd-progress-legend-row {
-	display: flex;
+.qbd-folder-progress-tile > span {
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.qbd-folder-progress-tile > span::first-letter { text-transform: uppercase; }
+.qbd-folder-progress-tile--done > b { color: var(--qbd-state-done); }
+.qbd-folder-progress-tile--progress > b { color: var(--qbd-state-progress); }
+.qbd-folder-progress-tile--fresh > b { color: var(--text-muted); }
+
+/* ── La tuile du bas : les cours, sur toute la largeur. La tuile de
+   l'examen (`--exam`) est partie avec `renderExamen` à la tâche 4
+   (2026-09-26) : l'examen vit désormais dans l'onglet Planning
+   (`dashboard-planning.css`). Celle « à réviser aujourd'hui » (`--due`,
+   `.qbd-folder-due-*`) est partie avec `renderRevisionDuJour`, restée sans
+   appelant. ── */
+.qbd-folder-progress-tile--courses { grid-column: 1 / -1; gap: 10px; }
+
+.qbd-folder-courses { display: flex; flex-direction: column; }
+.qbd-folder-course {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
 	align-items: center;
-	gap: 10px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	gap: 16px;
+	padding: 9px 0;
+	border-top: 1px solid var(--background-modifier-border);
 }
-
-.qbd-progress-legend-dot {
-	width: 11px;
-	height: 11px;
-	border-radius: 50%;
-	flex-shrink: 0;
-}
-
-.qbd-progress-legend-dot--mastered { background: var(--accent); }
-.qbd-progress-legend-dot--review { background: var(--qbd-progress-review); }
-.qbd-progress-legend-dot--learn { background: var(--qbd-progress-neutral); }
-
-.qbd-progress-legend-label {
-	flex: 1;
-	min-width: 0;
+.qbd-folder-course:first-child { border-top: 0; }
+.qbd-root .qbd-folder-course-title {
+	justify-self: start;
+	max-width: 100%;
+	height: auto;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
 	font-size: 13.5px;
 	font-weight: 600;
-	color: #d3dae9;
+	text-align: left;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	cursor: pointer;
+}
+.qbd-root .qbd-folder-course-title:hover { text-decoration: underline; }
+.qbd-root .qbd-folder-course-title:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.qbd-folder-course-modes { display: flex; flex-direction: column; gap: 6px; }
+.qbd-folder-course-mode {
+	display: grid;
+	grid-template-columns: 64px minmax(0, 1fr) 40px;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+}
+.qbd-folder-course-mode-label { color: var(--text-muted); }
+.qbd-folder-course-pct { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.qbd-folder-course-bar {
+	height: 6px;
+	border-radius: 99px;
+	background: var(--qbd-ring-track, color-mix(in srgb, var(--text-normal) 10%, transparent));
+	overflow: hidden;
+}
+.qbd-folder-course-bar i { display: block; height: 100%; border-radius: inherit; }
+.qbd-folder-course-bar--progress i { background: var(--qbd-state-progress); }
+.qbd-folder-course-bar--done i { background: var(--qbd-state-done); }
+
+/* Tentatives d'un mode (2026-09-26) : pastille « Meilleur » + chevron après
+   le pourcentage, liste dépliable en retrait sous la ligne. */
+.qbd-folder-course-mode-extra { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.qbd-folder-course-mode-best { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.qbd-root .qbd-folder-course-mode-toggle {
+	height: 20px;
+	width: 20px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.qbd-folder-course-mode-toggle:hover { color: var(--text-normal); }
+.qbd-folder-course-mode-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.qbd-folder-course-mode-chevron { display: flex; transition: transform 0.15s ease; }
+.qbd-folder-course-mode-bloc.is-open .qbd-folder-course-mode-chevron { transform: rotate(90deg); }
+
+.qbd-folder-attempts { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 2px 74px; }
+.qbd-folder-attempt-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 3px 4px;
+	border-radius: 4px;
+	font-size: 11.5px;
+	color: var(--text-muted);
+}
+.qbd-folder-attempt-row:hover, .qbd-folder-attempt-row:focus-within { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+.qbd-folder-attempt-date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbd-folder-attempt-info { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qbd-folder-attempt-old { color: var(--text-faint); }
+.qbd-root .qbd-folder-attempt-delete {
+	height: 20px;
+	width: 20px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	flex-shrink: 0;
+	opacity: 0;
+}
+.qbd-folder-attempt-row:hover .qbd-folder-attempt-delete,
+.qbd-folder-attempt-row:focus-within .qbd-folder-attempt-delete,
+.qbd-root .qbd-folder-attempt-delete:focus-visible { opacity: 1; }
+.qbd-root .qbd-folder-attempt-delete:hover { color: var(--color-red); }
+.qbd-root .qbd-folder-attempt-delete:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.qbd-folder-attempt-row--deleted { justify-content: flex-start; }
+.qbd-folder-attempt-deleted-label { color: var(--text-faint); }
+.qbd-root .qbd-folder-attempt-undo {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--quiz-primary);
+	font: inherit;
+	font-size: inherit;
+	cursor: pointer;
+	text-decoration: underline;
+}
+.qbd-root .qbd-folder-attempt-undo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+
+@media (max-width: 620px) {
+	.qbd-folder-progress { grid-template-columns: minmax(0, 1fr); }
+	.qbd-folder-course { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
-.qbd-progress-legend-pct {
-	font-size: 13.5px;
-	font-weight: 400;
-	color: #9aa2b8;
-	font-variant-numeric: tabular-nums;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @media (max-width: 900px) {
 	.qbd-quizzes-folder-hero .qbd-quizzes-header {
@@ -1167,9 +1330,7 @@
 		font-size: 28px;
 	}
 
-	.qbd-quizzes-title-underline {
-		max-width: calc(100% - 61px);
-	}
+
 
 	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
 		justify-content: flex-start;
@@ -1177,9 +1338,7 @@
 		flex-wrap: wrap;
 	}
 
-	.qbd-quizzes-folder-hero .qbd-quizzes-header-stats {
-		gap: 14px;
-	}
+
 
 	.qbd-quizzes-folder-hero .qbd-btn--create {
 		margin-left: 0;
@@ -1188,12 +1347,13 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-quizzes-enter .qbd-quizzes-folder-hero,
+	.qbd-quizzes-enter .qbd-quizzes-folder-hero .qbd-quizzes-title,
 	.qbd-quizzes-enter > .qbd-quizzes-header,
 	.qbd-quizzes-enter > .qbd-quizzes-group,
 	.qbd-quizzes-enter .qbd-quizzes-node-head,
 	.qbd-quizzes-enter .qbd-module-card,
 	.qbd-quizzes-enter .qbd-quiz-card.qbd-quiz-card--folder,
-	.qbd-quizzes-enter .qbd-progress-panel {
+	.qbd-quizzes-enter .qbd-quizzes-drill-next {
 		animation: none;
 	}
 
@@ -1238,8 +1398,86 @@
 	color: var(--text-normal) !important;
 }
 
-/* Même traitement pour les deux surfaces du drill restées en rgba blanc :
-   invisibles sur fond clair. */
-.theme-light .qbd-progress-panel {
-	--qbd-progress-neutral: color-mix(in srgb, var(--text-normal) 14%, transparent);
+
+/* « Partager » un dossier, dans l'en-tête : même pilule que le sélecteur
+   Contenu | Progression à sa gauche. */
+.qbd-root .qbd-folder-share-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: auto;
+	margin: 0;
+	padding: 9px 16px;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.qbd-root .qbd-folder-share-btn:hover {
+	border-color: color-mix(in srgb, var(--text-normal) 24%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+
+.qbd-root .qbd-folder-share-btn:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.qbd-folder-share-btn .qbd-btn-icon svg { width: 15px; height: 15px; }
+
+/* ── L'en-tête d'un dossier, ALIGNÉ (2026-09-26) : le sélecteur Contenu |
+   Progression, « Partager » et « ⋯ » sont centrés sur la ligne du TITRE, pas
+   sur le bloc titre + soulignement (13px d'écart avant). Le titre fait 41px
+   de haut et commence 3px sous le haut de l'en-tête. ── */
+.qbd-quizzes-folder-hero .qbd-quizzes-header {
+	align-items: flex-start;
+}
+.qbd-quizzes-folder-hero .qbd-folder-view-tabs,
+.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
+	align-self: flex-start;
+	height: 39px;
+	margin-top: 4px;
+}
+.qbd-quizzes-folder-hero .qbd-quizzes-header-actions {
+	align-items: center;
+	gap: 10px;
+}
+
+/* « ⋮ » : trois points VERTICAUX, nus — ni contour ni fond, comme
+   StudySmarter ; un voile rond n'apparaît qu'au survol. */
+.qbd-root .qbd-folder-more-btn {
+	display: inline-grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	margin: 0 -6px 0 -4px;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 0.15s ease, background-color 0.15s ease;
+}
+.qbd-root .qbd-folder-more-btn:hover,
+.qbd-root .qbd-folder-more-btn[aria-expanded="true"] {
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+.qbd-root .qbd-folder-more-btn:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-folder-more-btn svg { width: 16px; height: 16px; }
+
+@media (max-width: 900px) {
+	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions { height: auto; }
 }

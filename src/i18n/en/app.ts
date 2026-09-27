@@ -166,6 +166,8 @@ export const EN_APP = {
 	"app.settings.languageAuto": "Automatic (follow Windows)",
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",
+	"app.settings.groupModes": "Group the Learn and Practice of a course",
+	"app.settings.groupModesHint": "In My quizzes, a course with both modes shows as one card, with a button for each mode.",
 	"app.settings.timeFormat24": "24-hour ({example})",
 	"app.settings.timeFormat12": "12-hour ({example})",
 
@@ -195,6 +197,11 @@ export const EN_APP = {
 	"app.fond.remove": "Remove",
 	"app.fond.disparue": "The wallpaper image is gone; the first image of the folder is used.",
 	"app.fond.dossierVide": "No image in that folder; the built-in wallpaper is used.",
+	"app.fond.luminosite": "Wallpaper brightness",
+	"app.fond.flou": "Wallpaper blur",
+	"app.fond.pourcent": "{n}%",
+	"app.fond.pixels": "{n} px",
+	"app.fond.effetsNonEcrits": "The wallpaper brightness and blur could not be saved.",
 
 	/* ── Installer un CLI depuis l'app : la confirmation NATIVE du principal ── */
 	"app.installCli.title": "Install {name}?",

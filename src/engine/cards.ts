@@ -7,16 +7,21 @@ import type {
 	MatchingQuestion,
 	TextQuestion,
 	ClozeQuestion,
-	QuestionRole,
 } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
-import { renderLessonHtml } from "./sanitizer";
+import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
+import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
    canal d'icône à cet endroit. */
 const ICON_ARROW_LEFT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>';
+/* Les icônes du bouton d'aide (Lucide « lightbulb » et « circle-help »). */
+/* Lucide book-open : l'onglet d'une lecture de Learn, qui n'a pas de numéro. */
+const ICON_LIVRE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
+const ICON_BULB ='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
+const ICON_HELP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 export interface CardHandlers {
@@ -48,7 +53,17 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	const plural = (count: number, one: TransKey, other: TransKey): string =>
 		t(count > 1 ? other : one, { count });
 
+	/** Le numéro AFFICHÉ (Q1…Qn), qui saute les lectures absorbées. */
+	const numero = (i: number): number => ctx.numeroAffiche?.(i) ?? i + 1;
+
+	/** Classes d'un onglet : son état, et `is-lecture` pour une lecture de
+	    Learn sans numéro (un livre) — ici et non dans le gabarit, parce que
+	    `updateNavHighlight` (state.ts) réécrit la classe à chaque déplacement. */
 	function tabClass(i: number): string {
+		return `${numero(i) === 0 ? "is-lecture " : ""}${tabEtat(i)}`.trim();
+	}
+
+	function tabEtat(i: number): string {
 		const cur = ctx.quizState.current;
 		// slideMap[cur].questionIndex n'existe que sur la variante « question » —
 		// cast pour lire l'optionnel `?.questionIndex` sans changer le runtime.
@@ -72,7 +87,19 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 	function navHtml(): string {
 		const resultsActive = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
-		return `<div class="quiz-nav">${ctx.quiz.map((_, i) => `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${i + 1}</a>`).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
+		// Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
+		// numéros la sautent (la question qui la suit devient Q2, pas Q3).
+		const onglets = ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
+		/* Une lecture de Learn restée un écran (style `page`) n'a pas de
+		   numéro de question (src/lecture-etape.ts) : son onglet est un livre,
+		   nommé par son titre au survol et pour un lecteur d'écran. */
+		const onglet = (i: number): string => {
+			const n = numero(i);
+			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${n}</a>`;
+			const nom = ctx.escapeHtmlAttr(stripInlineMarkdown(ctx.quiz[i]?.title || t("engine.lesson.roleRead")));
+			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" title="${nom}">${ICON_LIVRE}</a>`;
+		};
+		return `<div class="quiz-nav">${onglets.map(onglet).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
 	}
 
 	/* Précédente / suivante sous chaque question (2026-09-23) : des ICÔNES
@@ -82,8 +109,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   libellé le dit. Les classes `quiz-prev-btn`/`quiz-next-btn` sont lues par
 	   focus.ts pour rendre le focus après un re-rendu. */
 	function questionNavHtml(qi: number): string {
-		const isFirst = qi <= 0;
-		const isLast = qi >= ctx.quiz.length - 1;
+		// Première et dernière DIAPOSITIVE de question, pas premier et dernier
+		// index : une lecture absorbée en tête ou en fin de tableau n'en a pas.
+		const slide = ctx.getSlideIndexForQuestion(qi);
+		const isFirst = slide <= 0;
+		const isLast = ctx.questionSuivante(qi) === null;
 		const nextLabel = t(!isLast
 			? "engine.nav.nextQuestion"
 			: ctx.textOnly.isExamAnswerPhase() ? "engine.exam.finish" : "engine.nav.results");
@@ -317,7 +347,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   fonction pour les trois écrans (QCM, auto-évaluation, réponse libre en
 	   examen) : il n'y a qu'UNE notion de "question à revoir" sur cette carte. */
 	function reviewableIndices(): number[] {
-		return ctx.quiz.map((_, i) => i).filter(i => !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
+		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i) && !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
 	}
 
 	function submitSlideHtml(): string {
@@ -335,15 +365,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				const intro = mac > 0
 					? `<div class="quiz-warn">${plural(mac, "engine.submit.missingFreeAnswers.one", "engine.submit.missingFreeAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>`
 					: `<div class="quiz-submit-sub">${t("engine.submit.allFreeAnswered")}</div>`;
-				return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mac > 0 ? missingAnswers : reviewableIndices()).map(i => `<button class="quiz-chip ${mac > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.exam.finish")}</button></div></div></div></div>`;
+				return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mac > 0 ? missingAnswers : reviewableIndices()).map(i => `<button class="quiz-chip ${mac > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.exam.finish")}</button></div></div></div></div>`;
 			}
 
 			const intro = mc > 0
 				? `<div class="quiz-warn">${plural(mc, "engine.submit.missingRatings.one", "engine.submit.missingRatings.other")}</div><div class="quiz-submit-sub">${t("engine.submit.toRateList")}</div>`
 				: `<div class="quiz-submit-sub">${t("engine.submit.allRated")}</div>`;
-			return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showResults")}</button></div></div></div></div>`;
+			return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showResults")}</button></div></div></div></div>`;
 		}
-		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${mc > 0 ? `<div class="quiz-warn">${plural(mc, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>` : `<div class="quiz-submit-sub">${t("engine.submit.reviewList")}</div>`}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${i + 1}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showScore")}</button></div></div></div></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${mc > 0 ? `<div class="quiz-warn">${plural(mc, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>` : `<div class="quiz-submit-sub">${t("engine.submit.reviewList")}</div>`}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showScore")}</button></div></div></div></div>`;
 	}
 
 	function saveResultsButtonHtml(): string {
@@ -375,9 +405,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				: "";
 			// Le compteur « rated/total » reste du code (mise en forme <strong>) :
 			// seule l'étiquette est traduite.
-			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div><div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
+			// Une carte par réponse écrite (2026-09-26bis) : réponse donnée, bonne
+			// réponse, explication, verdict juste/faux — jamais un champ seul,
+			// coloré, sans rien (retour #11). Rendue ICI, sur les résultats,
+			// même quand cette tranche affiche déjà la grille compris/partiel/
+			// à revoir (legacy `practiceMode: "text"`).
+			const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
+			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div>${writtenReview}<div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 		}
-		const { pct, correct, total } = ctx.computeScorePercent();
+		const { pct, correct, total, pendingWritten } = ctx.computeScorePercent();
 		// Mode leçon : bouton "Passer l'examen"
 		const lessonExamBtn = (ctx.quizMode === "lesson" && ctx.lessonExamOptions)
 			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.takeExam")}</button>`
@@ -386,8 +422,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const retakeExamBtn = (ctx.quizMode === "exam" && ctx.originalQuizMode === "lesson" && ctx.originalLessonExamOptions)
 			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.retakeExam")}</button>`
 			: "";
+		// Le score n'inclut pas les réponses écrites pas encore auto-évaluées
+		// (computeScorePercent les exclut déjà de correct/total) : le dire
+		// clairement plutôt que de les compter fausses.
+		const pendingNote = pendingWritten > 0
+			? `<p class="quiz-textonly-correction-hint">${t(pendingWritten > 1 ? "engine.result.pendingWritten.other" : "engine.result.pendingWritten.one", { count: pendingWritten })}</p>`
+			: "";
+		const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
 		// Le score (« 12/20 », « 60 % ») reste du code : seule l'étiquette est traduite.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p><div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
 	}
 
 
@@ -445,47 +488,19 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		}
 	}
 
-	/* Libellé du rôle affiché en sous-titre de la progression en tranches
-	   (Task 6, mode Leçon) : une FONCTION, jamais une table
-	   `{ pre: t(...), recall: t(...), test: t(...) }` figée au niveau du
-	   module — c'est exactement le piège documenté dans CLAUDE.md (TUTORIALS) :
-	   une chaîne traduite dans une constante de premier niveau se fige à la
-	   langue de démarrage et ignore tout changement de langue en cours de vie
-	   du plugin. `t()` n'est appelé qu'ici, à chaque rendu de carte. */
-	function lessonRoleLabel(role: QuestionRole): string {
-		if (role === "pre") return t("engine.lesson.rolePre");
-		// "read" (task 6b) : le libellé doit dire qu'on LIT, pas qu'on répond —
-		// sans cette branche le défaut "Check" ci-dessous mentirait sur une
-		// carte qui n'a justement aucune réponse à vérifier.
-		if (role === "read") return t("engine.lesson.roleRead");
-		if (role === "recall") return t("engine.lesson.roleRecall");
-		// "explain" : répondre avec ses mots, jamais une « vérification ».
-		if (role === "explain") return t("engine.lesson.roleExplain");
-		return t("engine.lesson.roleTest");
-	}
-
-	/* En-tête : le RÔLE de la question dans un Learn. La ligne « Tranche X
-	   sur Y » qui le surmontait est retirée (2026-09-23) : les étapes d'un
-	   Learn ne se montrent plus nulle part, un compteur de tranches sur un
-	   long parcours décourageait avant même de commencer.
-	   Hors mode Leçon (ou pour un quiz ordinaire, question sans `slice`
-	   valide), `sliceOfQuestion` renvoie déjà `null` (engine/lesson.ts) : ce
-	   bloc ne peut donc RIEN changer à l'en-tête des 48 quiz ordinaires
-	   d'Ahmed. Il n'y avait jusqu'ici aucun compteur de questions dans l'en-
-	   tête de carte (seuls les onglets `navHtml` en affichent un, hors du
-	   périmètre de cette tâche) : ce bloc s'AJOUTE, il ne remplace rien.
-	   Chaque accessor de tranches est appelé UNE SEULE fois ici et son
-	   résultat réutilisé localement — `lesson.ts` reconstruit son modèle à
-	   chaque appel (accessor vivant sur `ctx.quizMode`, jamais un cache). */
-	function lessonProgressHtml(qi: number): string {
-		if (ctx.sliceOfQuestion(qi) === null) return "";
-		const role = ctx.roleOfQuestion(qi);
-		return `<div class="quiz-lesson-progress">
-			<div class="quiz-lesson-progress-role">${lessonRoleLabel(role)}</div>
-		</div>`;
-	}
+	/* PLUS DE PASTILLE DE RÔLE en tête de carte (2026-09-26 : « retire toutes
+	   les pastilles, ça ne sert à rien ») : « Avant la lecture », « Lecture »,
+	   « Avec vos mots », « De mémoire » ne s'affichent plus pendant le quiz. Le
+	   rôle reste une classe de la carte (`quiz-role-*`) pour la mise en page. */
 
 	function questionCardHtml(qi: number): string {
+		// Le budget de coloration des blocs de code (code-highlight.ts) n'est
+		// PLUS remis à zéro ici (retiré au tour 4) : cette fonction est appelée
+		// une fois PAR CARTE dans une boucle (engine.ts, `slideMap.map`), et un
+		// reset ici redonnait un budget plein à CHAQUE carte — un quiz de
+		// 50 questions coloriait donc jusqu'à 50 fois le budget voulu (8,4 s
+		// mesurés). Le reset vit maintenant au niveau du RENDU COMPLET
+		// (engine.ts, avant `slideMap.map` et dans `refreshQuestionSlide`).
 		const q = ctx.quiz[qi];
 		// Rôle "read" (Task 6c) : étape de LECTURE du support, sans rien à
 		// répondre. `isLessonMode()` garde cette branche fermée sur les quiz
@@ -544,18 +559,29 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			body = mi + `<div class="quiz-options-wrap${hasImg ? " quiz-options-image-grid" : ""}">${optionsHtml}</div>`;
 		}
 
-		const hintBtn = (!isRead && !isTextOnly && q.hint && String(q.hint).trim()) ? `<button class="quiz-hint-btn" type="button">${t("engine.hint.button")}</button>` : "";
-		// Task 7 (mode Lesson) : seule échappatoire à la pré-question bloquante
-		// (engine/state.ts isBlockedBySkippedPreQuestion) — une tentative VIDE
-		// mais EXPLICITE. Gardée par !ctx.quizState.locked comme hintBtn/
+		/* UN SEUL BOUTON D'AIDE, qui monte d'un cran (2026-09-26) : « Indice »
+		   tant que l'indice n'a pas été révélé ; révélé, l'indice reste AFFICHÉ
+		   sous la question (il se relit sans rouvrir de fenêtre) et le bouton
+		   devient « Je ne sais pas » là où il existe, disparaît ailleurs.
+		   Chercher, se faire aider, puis seulement abandonner. Un indice à
+		   plusieurs niveaux garde « Indice suivant » jusqu'au dernier
+		   (engine/hint.ts indiceCarte). Une réponse libre a son indice aussi
+		   (retour #1 : CHAQUE question d'un Learn en a un) ; seule la carte
+		   mémoire n'en a pas, puisqu'elle se retourne pour se lire. */
+		const indice = !isRead && !ctx.isFlashcardQuestion(q) ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
+		const hintBtn = indice.bouton;
+		const indiceHtml = indice.revele;
+		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une
+		// tentative VIDE mais EXPLICITE. Passer à la suite sans répondre donne
+		// désormais le même verdict (engine/state.ts marquerPreNonTentees). Gardée par !ctx.quizState.locked comme hintBtn/
 		// lessonContent : un quiz déjà soumis n'a plus rien à "laisser passer".
 		// Round 1 de revue (Finding 4) : masqué dès que lessonPreSkipped[qi] est
 		// déjà vrai — sur la DERNIÈRE question (aucune navigation suivante
 		// possible), le clic ne produisait sinon aucun effet visible ; sa
 		// disparition EST l'effet visible attendu, en plus du re-rendu qui la
 		// déclenche (interactions.ts markLessonPreSkipped).
-		const dontKnowBtn = (!isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.quizState.locked && !ctx.quizState.lessonPreSkipped[qi])
-			? `<button class="quiz-action-btn quiz-lesson-dontknow-btn" type="button">${t("engine.lesson.dontKnow")}</button>`
+		const dontKnowBtn = (!hintBtn && !isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.quizState.locked && !ctx.quizState.lessonPreSkipped[qi])
+			? `<button class="quiz-help-btn quiz-lesson-dontknow-btn" type="button">${ICON_HELP}<span>${t("engine.lesson.dontKnow")}</span></button>`
 			: "";
 		// Mode leçon (ex "learn") : la leçon s'affiche AVANT que la question soit
 		// verrouillée, jamais après (revoir la leçon une fois corrigé n'a pas de
@@ -575,12 +601,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 		// Le support de compréhension précède le titre : on lit le document AVANT
 		// de savoir ce qu'on nous en demande, comme sur un sujet d'examen papier.
-		// En mode Leçon, `passageHtml` peut rendre une chaîne VIDE selon le rôle
-		// de la question (Task 4 : "pre" avant lecture, "recall" avant
-		// verrouillage) — décision tranchée par `passageVisibility`
-		// (engine/passage.ts), jamais recalculée ici.
+		// En Learn, c'est aussi là que s'affiche le cours de l'étape, replié
+		// tant que la question n'est pas répondue (2026-09-26) — décision
+		// tranchée par `passageVisibility` (engine/passage.ts), jamais
+		// recalculée ici.
 		const passageSection = ctx.passage.passageHtml(qi);
-		const lessonProgress = lessonProgressHtml(qi);
 
 		/* Classe de RÔLE sur la carte : le CSS doit pouvoir distinguer une carte
 		   de LECTURE des autres. Sur une carte "read", le support de cours EST
@@ -591,15 +616,34 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   plafond de hauteur garde tout son sens. */
 		const roleClass = ctx.isLessonMode() ? ` quiz-role-${ctx.roleOfQuestion(qi)}` : "";
 
+		/* Une LECTURE a son propre écran (2026-09-26), dans son style
+		   (`corpsLecture`, engine/passage.ts). Son titre est écrit DANS la
+		   page (serif, maquette B) : le `<h2>` de la carte n'est alors pas posé. */
+		const promptHtml = renderQuizPromptHtml(q);
+		const lecture = isRead ? corpsLecture(ctx, q, String(q.prompt ?? ""), promptHtml, String(q.title ?? "")) : null;
+
+		/* Une lecture COURTE n'a pas d'écran : elle se lit ouverte, en version
+		   légère, sans cadre, au-dessus de sa question hôte, et nulle part
+		   ailleurs (src/lecture-etape.ts `lecturesCourtes`). */
+		const iCourte = ctx.lectureCourteDe?.(qi) ?? null;
+		let courteHtml = "";
+		if (iCourte !== null) {
+			const l = ctx.quiz[iCourte];
+			const lHtml = l.promptHtml || l._promptHtml;
+			const texte = lHtml ? ctx.sanitize.replaceObsidianEmbedsInHtml(lHtml) : ctx.sanitize.renderTextWithEmbeds(String(l.prompt ?? ""));
+			courteHtml = corpsLectureCourte(ctx, l, String(l.prompt ?? ""), texte).html;
+		}
+
 		return `<div class="quiz-track-item${roleClass}" data-slide-kind="question" data-qi="${qi}">
-			<section class="quiz-card"${sectionIdAttr}>
-				${lessonProgress}
+			<section class="quiz-card"${sectionIdAttr}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
 				${passageSection}
-				<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>
+				${courteHtml}
+				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
 				${ctx.sanitize.resourceButtonHtml(q)}
-				<div class="quiz-question">${renderQuizPromptHtml(q)}</div>
+				<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>
 				${body}
 				${learnSection}
+				${indiceHtml}
 				${hintBtn}
 				${dontKnowBtn}
 				${!isRead && !isTextOnly && ctx.quizState.locked ? explanationHtml(qi) : ""}

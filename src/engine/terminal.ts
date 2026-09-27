@@ -16,6 +16,7 @@ export interface TerminalHandlers {
 	getTerminalTextVariant(q: QuizQuestion): string | null;
 	isTerminalTextQuestion(q: QuizQuestion): boolean;
 	isCommandTextQuestion(q: QuizQuestion): boolean;
+	isProgramOutputQuestion(q: QuizQuestion): boolean;
 	getTerminalPromptPrefix(q: TextQuestion): string;
 	renderTerminalPromptPrefixHtml(q: TextQuestion): string;
 	getTextMaxLength(q: TextQuestion): number | null;
@@ -78,6 +79,54 @@ export function normalizeTerminalVariantName(value: unknown): string | null {
 	return raw.replace(/\s+/g, "-");
 }
 
+/** Les vraies invites de commande (retour #2, 2026-09-26 soir) : elles seules
+    gardent le fake-terminal (invite + caret simulé, une seule ligne). Toute
+    autre variante normalisée (`python`, `java`…) est un LANGAGE de
+    programme : sa réponse est une SORTIE, pas une commande à taper — voir
+    `isProgramOutputQuestion`. */
+const SHELL_VARIANTS = new Set(["cmd", "powershell", "bash", "sh", "zsh"]);
+
+/** Une variante normalisée est-elle une vraie invite de commande ? Exportée
+    au niveau du MODULE — pure, sans `ctx` — pour que l'éditeur (aperçu en
+    direct, formulaire) décide de la même façon que le moteur si une question
+    terminal montre une invite ou un bloc « sortie de programme », sans
+    dupliquer la liste `SHELL_VARIANTS`. */
+export const isShellVariant = (variant: string | null | undefined): boolean =>
+	!!variant && SHELL_VARIANTS.has(variant);
+
+/** L'invite PAR DÉFAUT d'une variante — avant l'override explicite d'une
+    question (`q.commandPrefix`…), que `getTerminalPromptPrefix` ajoute
+    par-dessus pour le moteur. Exportée au niveau du module pour que
+    l'éditeur (`editor/convert.ts`, `editor/editor-form.ts`) propose et
+    enregistre la MÊME valeur que le moteur, jamais une copie figée. */
+export function defaultTerminalPromptPrefix(variant: string | null | undefined): string {
+	switch (variant) {
+		case "cmd":
+			return "C:\\>";
+
+		case "powershell":
+			return "PS>";
+
+		/* Bash/zsh/sh : une invite ADAPTÉE (retour #2, 2026-09-26 soir), pas le
+		   `user@hostname:~$ ` complet d'avant — seule cmd garde `C:\>`. */
+		case "bash":
+		case "zsh":
+		case "sh":
+			return "$";
+	}
+	return "C:\\>";
+}
+
+/** Nombre de lignes que compte une réponse attendue — la hauteur DE DÉPART
+    d'un champ de réponse écrite est celle-ci, jamais une valeur fixe (retour
+    #2 et sa précision générale du 27/09) : jamais un champ de 10 lignes pour
+    une réponse d'une ligne. `max` borne le résultat (`Infinity` pour une
+    sortie de programme, qui n'a pas de plafond naturel de lignes). */
+export function countAnswerLines(text: unknown, max: number = Infinity): number {
+	const n = String(text ?? "").split("\n").length;
+	return Math.max(1, Math.min(n, max));
+}
+
 
 export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 	// Variable locale au module (conservée à l'identique du JS ; jamais relue).
@@ -109,7 +158,12 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 	const isTerminalTextQuestion = (q: QuizQuestion): boolean => !!getTerminalTextVariant(q);
 
-	const isCommandTextQuestion = (q: QuizQuestion): boolean => isTerminalTextQuestion(q);
+	// Une vraie invite (cmd/powershell/bash/sh/zsh) : le fake-terminal une
+	// ligne. Toute autre variante terminal (python…) est une sortie de
+	// programme (isProgramOutputQuestion), jamais une commande.
+	const isCommandTextQuestion = (q: QuizQuestion): boolean => isShellVariant(getTerminalTextVariant(q));
+
+	const isProgramOutputQuestion = (q: QuizQuestion): boolean => isTerminalTextQuestion(q) && !isCommandTextQuestion(q);
 
 	function getTerminalPromptPrefix(q: TextQuestion): string {
 		const explicitPrefix = [
@@ -121,57 +175,17 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 		if (explicitPrefix) return explicitPrefix;
 
-		const variant = getTerminalTextVariant(q);
-
-		switch (variant) {
-			case "cmd":
-				return "C:\\>";
-
-			case "powershell":
-				return "PS>";
-
-			case "bash":
-				return "user@hostname:~$ ";
-
-			case "zsh":
-				return "user@hostname %";
-
-			case "sh":
-				return "$";
-		}
-		return "C:\\>";
+		// Le DÉFAUT par variante est la même table que l'éditeur — voir
+		// `defaultTerminalPromptPrefix`, exportée au niveau du module.
+		return defaultTerminalPromptPrefix(getTerminalTextVariant(q));
 	}
 
 	function renderTerminalPromptPrefixHtml(q: TextQuestion): string {
 		const promptPrefix = String(getTerminalPromptPrefix(q) ?? "");
-		const variant = getTerminalTextVariant(q);
-
-		if (variant === "bash") {
-			const match = promptPrefix.match(/^([^:]+)(:)([^$]*)(\$ ?)$/);
-
-			if (match) {
-				const [, userHost, colon, pathPart, dollarPart] = match;
-
-				/* `renderInlineText` sur CHAQUE segment, pas `escapeHtmlText` :
-				   la forme colorée affichait ses `**` là où la forme simple les
-				   rend depuis cette nuit. Segment par segment, donc une paire
-				   qui enjamberait deux segments reste littérale — c'est le prix
-				   de la coloration, et il est visible plutôt que silencieux. */
-				const r = ctx.sanitize.renderInlineText;
-				return '<span class="quiz-command-prefix quiz-command-prefix-bash">' +
-					`<span class="quiz-bash-prefix-userhost">${r(userHost)}</span>` +
-					`<span class="quiz-bash-prefix-colon">${r(colon)}</span>` +
-					`<span class="quiz-bash-prefix-path">${r(pathPart)}</span>` +
-					`<span class="quiz-bash-prefix-dollar">${r(dollarPart)}</span>` +
-				'</span>';
-			}
-		}
-
 		/* `renderInlineText` et non `escapeHtmlText` : c'est un `<span>`, donc le
-		   markdown y a un sens. Un préfixe `**PS**>` s'affichait avec ses
-		   étoiles. La forme `user@host:~$` ci-dessus garde son échappement nu —
-		   elle est découpée en segments colorés, et le markdown n'a rien à y
-		   faire. */
+		   markdown y a un sens (un préfixe `**PS**>` s'affichait avec ses
+		   étoiles). L'ancienne forme colorée par segments (`user@host:~$`) a
+		   disparu avec l'invite bash complète — voir `getTerminalPromptPrefix`. */
 		return `<span class="quiz-command-prefix">${ctx.sanitize.renderInlineText(promptPrefix)}</span>`;
 	}
 
@@ -201,7 +215,9 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 	function sanitizeTextAnswerValue(q: TextQuestion, value: unknown): string {
 		let out = String(value ?? "");
 
-		if (isTerminalTextQuestion(q)) {
+		// Seule une vraie invite tient sur UNE ligne : une sortie de programme
+		// (isProgramOutputQuestion) garde ses sauts de ligne, elle en a besoin.
+		if (isCommandTextQuestion(q)) {
 			out = out.replace(/[\r\n]+/g, "");
 		}
 
@@ -269,10 +285,14 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		);
 	}
 
+	/* Plus de plancher fixe (précision du 27/09) : la hauteur de DÉPART vient de
+	   l'attribut `rows` (countAnswerLines, posé au rendu de la carte), pas d'un
+	   minimum arbitraire — un « 220 » ici redonnait 10 lignes à une réponse
+	   d'une ligne dès la première frappe. */
 	function syncTextAreaHeight(textarea: HTMLTextAreaElement | null): void {
 		if (!textarea) return;
 		textarea.style.height = "auto";
-		textarea.style.height = `${Math.max(220, textarea.scrollHeight)}px`;
+		textarea.style.height = `${textarea.scrollHeight}px`;
 	}
 
 	function splitTerminalVisualTokens(value: unknown, variant: string | null): TerminalVisualTokens {
@@ -325,6 +345,40 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		));
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
 
+		if (isTerminal && !isCommandTextQuestion(q)) {
+			// Sortie d'un programme (retour #2, 2026-09-26 soir) : plus d'invite
+			// « C:\> » qui donnerait à croire qu'il faut taper une commande — un
+			// bloc de code éditable, même style que .quiz-md-code, avec un
+			// libellé discret au-dessus. Hauteur DE DÉPART = le nombre de lignes
+			// de la réponse attendue (précision du 27/09), au moins une ; elle
+			// grandit ensuite avec la saisie (bindTextQuestion, branche non-shell).
+			// Plafonnée à 20 (revue du lot A2, mineur #4) : une sortie d'auteur,
+			// jamais d'utilisateur, mais un futur générateur pourrait produire une
+			// boucle de plusieurs dizaines de lignes — sans plafond, la CARTE
+			// s'ouvrirait déjà plus haute que l'écran avant la moindre saisie.
+			const rows = countAnswerLines(getTextAcceptedAnswers(q)[0], 20);
+			return `
+				<div class="qcm-options quiz-text-wrap quiz-text-wrap-program">
+					<div class="quiz-md-code quiz-program-output ${statusClass}">
+						<div class="quiz-program-output-label">${ctx.escapeHtmlText(t("engine.terminal.programOutputLabel"))}</div>
+						<textarea
+							class="quiz-textarea quiz-textarea-program"
+							data-text-answer="1"
+							data-terminal-answer="1"
+							name="${textareaName}"
+							placeholder="${placeholder}"
+							spellcheck="false"
+							autocapitalize="off"
+							autocomplete="off"
+							autocorrect="off"
+							rows="${rows}"
+							${maxLengthAttr}
+							${readOnlyAttr}
+						>${ctx.escapeHtmlText(value)}</textarea>
+					</div>
+				</div>`;
+		}
+
 		if (isTerminal) {
 			const promptPrefixHtml = renderTerminalPromptPrefixHtml(q);
 			const variantClass = `quiz-terminal-variant-${ctx.escapeHtmlAttr(terminalVariant)}`;
@@ -374,6 +428,11 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 				<div class="qcm-options quiz-text-wrap quiz-math-wrap ${statusClass}" data-math-input="1"></div>`;
 		}
 
+		// Hauteur DE DÉPART = le nombre de lignes de la réponse attendue, entre 1
+		// et 6 (précision du 27/09) : jamais un champ de 10 lignes pour une
+		// réponse d'une ligne. Elle grandit ensuite avec la saisie (sync(),
+		// branche non-command de bindTextQuestion).
+		const rows = countAnswerLines(getTextAcceptedAnswers(q)[0], 6);
 		return `
 			<div class="qcm-options quiz-text-wrap">
 				<textarea
@@ -385,6 +444,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
+					rows="${rows}"
 					${maxLengthAttr}
 					${readOnlyAttr}
 				>${ctx.escapeHtmlText(value)}</textarea>
@@ -429,7 +489,9 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			},
 			onEnter: () => {
 				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
-				if (qi < ctx.quiz.length - 1) ctx.goToQuestion(qi + 1);
+				// La diapositive suivante (une lecture absorbée n'en a pas).
+				const suivante = ctx.questionSuivante(qi);
+				if (suivante !== null) ctx.goToQuestion(suivante);
 			},
 		});
 		applyStatus(field.getValue());
@@ -816,15 +878,15 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 				commitValue();
 
-				if (qi < ctx.quiz.length - 1) {
-					ctx.goToQuestion(qi + 1);
-				}
+				const suivante = ctx.questionSuivante(qi);
+				if (suivante !== null) ctx.goToQuestion(suivante);
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && qi < ctx.quiz.length - 1) {
+			const suivante = ctx.questionSuivante(qi);
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && suivante !== null) {
 				e.preventDefault();
-				ctx.goToQuestion(qi + 1);
+				ctx.goToQuestion(suivante);
 			}
 
 			queueSync();
@@ -838,6 +900,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		getTerminalTextVariant,
 		isTerminalTextQuestion,
 		isCommandTextQuestion,
+		isProgramOutputQuestion,
 		getTerminalPromptPrefix,
 		renderTerminalPromptPrefixHtml,
 		getTextMaxLength,

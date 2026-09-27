@@ -2,6 +2,9 @@ import type { EngineCtx } from "../types/engine-ctx";
 import type { QuestionRole } from "../types/quiz";
 import { mathifyElement } from "./mathjax";
 import { t } from "../i18n";
+import { corpsLectureHtml, corpsLectureCourteHtml, brancherCartes } from "./lecture-rendu";
+import type { CorpsLecture, PortesLecture } from "./lecture-rendu";
+import { stripInlineMarkdown } from "./sanitizer";
 
 /* ══════════════════════════════════════════════════════════
    SUPPORT DE COMPRÉHENSION — le document qu'on lit avant de répondre.
@@ -16,58 +19,32 @@ import { t } from "../i18n";
    sur Q1 le garde replié en arrivant sur Q2, ce qu'attend un lecteur qui a fini
    de lire et veut la place pour répondre.
 
-   Task 4 du lot mode leçon (2026-08-31) : en mode Leçon, cette visibilité
-   suit aussi le RÔLE de la question dans la boucle en 5 temps — voir
-   `passageVisibility` ci-dessous.
+   Les LECTURES d'un Learn ne passent plus par ici (décision d'Ahmed du
+   2026-09-26, la dernière) : chacune a son propre écran (engine/cards.ts,
+   `corpsLecture` ci-dessous pour son style), sauf une lecture très courte,
+   lue en texte simple au-dessus de sa question hôte (src/lecture-etape.ts).
+   Aucune ne s'affiche plus en support replié au-dessus des questions. Ce
+   module ne rend plus que le support `passage`/`passageId` d'une question.
 ══════════════════════════════════════════════════════════ */
 
 /**
- * Trois régimes d'affichage du support, jamais un quatrième :
- * - "hidden" : rien n'est rendu (pas de HTML caché en CSS — voir `passageHtml`).
- * - "open" : rendu et déplié, sans repli par défaut.
- * - "collapsible" : rendu, repliable à la demande.
+ * Deux régimes d'affichage du support :
+ * - "open" : rendu et déplié, sans repli ;
+ * - "collapsible" : rendu, déplié, repliable à la demande.
+ * Le régime « replié avec Tentez de répondre sans lire » est parti avec le
+ * cours au-dessus des questions (2026-09-26) : aucun support n'est plus
+ * replié d'office.
  */
-export type PassageVisibility = "hidden" | "open" | "collapsible";
+export type PassageVisibility = "open" | "collapsible";
 
 /**
- * Décision PURE, vérifiable sans DOM (`scripts/check-lesson.mjs`) : le rendu
- * ne fait QUE la consulter, jamais recalculer la règle lui-même.
- *
- * Hors mode Leçon, le support garde le comportement d'aujourd'hui —
- * repliable, ouvert par défaut — quel que soit le rôle (qui vaut "test" par
- * défaut sur un quiz ordinaire, cf. `roleOfQuestion`) : les 67 quiz réels
- * d'Ahmed ne doivent voir aucune différence.
- *
- * En mode Leçon, le rôle tranche :
- * - "pre" : la question est posée AVANT la lecture (Richland 2009) — montrer
- *   le support détruirait le mécanisme de la tentative faite dans l'ignorance.
- * - "read" (task 6b, 2026-08-31) : le SEUL temps de la boucle où l'on lit —
- *   le support est ouvert, sans repli, rien d'autre à décider. Ajoutée après
- *   coup pour combler un trou de conception : avant elle, "pre" cachait le
- *   support et "recall" aussi (jusqu'à correction), si bien que l'utilisateur
- *   devait restituer de mémoire un texte qu'il n'avait jamais vu.
- * - "recall" : restitution de mémoire ; le support reste caché PENDANT la
- *   tentative (sinon le rappel ne vaut rien), puis se rouvre de lui-même une
- *   fois la question VÉRIFIÉE (auto-évaluation validée), pour la comparaison
- *   avec le texte réel.
- * - "test" (rôle par défaut) : après la lecture, le support est repliable à
- *   la demande mais jamais réaffiché d'office.
- *
- * CORRECTIF (Task 5, 2026-08-31) : le paramètre s'appelait `locked` et lisait
- * `quizState.locked`, qui est GLOBAL au quiz et ne se pose qu'à l'arrivée sur
- * l'écran de résultats (engine/track.ts) — un support de "recall" ne se
- * serait donc rouvert qu'à la toute fin du quiz, jamais juste après la
- * tentative de CETTE question. `checked` lit à la place l'état PAR QUESTION
- * `quizState.textOnlyChecked[qi]` (ctx.textOnly.isChecked), posé dès que
- * l'utilisateur valide sa réponse libre — devenu disponible pour "recall"
- * précisément parce que la Task 5 rend ce rôle en réponse libre.
+ * Décision PURE, vérifiable sans DOM (`scripts/check-passage.mjs`) : le
+ * rendu ne fait QUE la consulter. Le support d'une carte de LECTURE jouée en
+ * Learn est son contenu : ouvert. Partout ailleurs : repliable, ouvert par
+ * défaut, quel que soit le rôle.
  */
-export function passageVisibility({ role, checked, isLesson }: { role: QuestionRole; checked: boolean; isLesson: boolean }): PassageVisibility {
-	if (!isLesson) return "collapsible";
-	if (role === "pre") return "hidden";
-	if (role === "read") return "open";
-	if (role === "recall") return checked ? "open" : "hidden";
-	return "collapsible";
+export function passageVisibility({ role, isLesson }: { role: QuestionRole; isLesson: boolean }): PassageVisibility {
+	return isLesson && role === "read" ? "open" : "collapsible";
 }
 
 /** Support résolu pour une question donnée (partage `passageId` déjà appliqué). */
@@ -106,7 +83,32 @@ export interface PassageHandlers {
    d'Obsidian ne s'applique qu'à un nœud DOM déjà monté, alors que tout le
    moteur construit des chaînes HTML. */
 const ICON_BOOK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
-const ICON_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const EMBED_PASSAGE = { wrapClass: "quiz-passage-embed-wrap", imgClass: "quiz-passage-embed" };
+
+/** Les portes du sanitizer du moteur pour le corps d'une lecture. */
+function portesMoteur(ctx: EngineCtx): PortesLecture {
+	return {
+		bloc: s => ctx.sanitize.renderTextWithEmbeds(s, EMBED_PASSAGE),
+		inline: s => ctx.sanitize.renderInlineText(s),
+		attribut: s => ctx.escapeHtmlAttr(stripInlineMarkdown(s)),
+	};
+}
+
+/**
+ * Le corps STYLÉ d'une lecture sur son ÉCRAN (engine/cards.ts), par les
+ * portes du sanitizer du moteur.
+ */
+export function corpsLecture(ctx: EngineCtx, item: unknown, brut: string, texteHtml: string, titre?: string): CorpsLecture {
+	return corpsLectureHtml(item, brut, texteHtml, titre, portesMoteur(ctx));
+}
+
+/** La version LÉGÈRE d'une lecture courte, au-dessus de sa question hôte
+    (engine/cards.ts) : mêmes portes. */
+export function corpsLectureCourte(ctx: EngineCtx, item: unknown, brut: string, texteHtml: string): CorpsLecture {
+	return corpsLectureCourteHtml(item, brut, texteHtml, portesMoteur(ctx));
+}
+
+const ICON_CHEVRON ='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 
 /**
  * État de repli des supports, par CLÉ — extrait en fonction PURE (aucune
@@ -123,29 +125,17 @@ const ICON_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24
  */
 export function createPassageCollapseState() {
 	const collapsed = new Set<string>();
-	/* Une clé n'y entre qu'UNE fois PAR SESSION : le repli par défaut du rôle
-	   "test" en mode Leçon (tableau de la Task 4) ne doit s'appliquer qu'à la
-	   toute première apparition de la clé, sinon chaque re-rendu écraserait
-	   un dépli manuel de l'utilisateur en le repliant à nouveau. */
-	const seeded = new Set<string>();
 	return {
 		isCollapsed: (key: string): boolean => collapsed.has(key),
-		/** Sème le repli par défaut une seule fois par clé ; sans effet ensuite. */
-		seedCollapsedOnce(key: string): void {
-			if (seeded.has(key)) return;
-			seeded.add(key);
-			collapsed.add(key);
-		},
 		/** Bascule manuel (clic) — renvoie le nouvel état pour l'aria/le libellé. */
 		toggle(key: string): boolean {
 			const nowCollapsed = !collapsed.has(key);
 			if (nowCollapsed) collapsed.add(key); else collapsed.delete(key);
 			return nowCollapsed;
 		},
-		/** À appeler depuis `resetQuiz` : nouvelle session, nouveau repli par défaut. */
+		/** À appeler depuis `resetQuiz` : nouvelle session, tout redéplié. */
 		reset(): void {
 			collapsed.clear();
-			seeded.clear();
 		}
 	};
 }
@@ -155,11 +145,7 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 
 	/** Décision de visibilité pour `qi`, exposée sur `ctx` — voir `passageVisibility`. */
 	function passageVisibilityFor(qi: number): PassageVisibility {
-		return passageVisibility({
-			role: ctx.roleOfQuestion(qi),
-			checked: !!ctx.textOnly?.isChecked?.(qi),
-			isLesson: ctx.isLessonMode()
-		});
+		return passageVisibility({ role: ctx.roleOfQuestion(qi), isLesson: ctx.isLessonMode() });
 	}
 
 	/** Champ support d'une question, forme texte ou HTML pré-rendu. */
@@ -212,50 +198,36 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 		};
 	}
 
+	/** Numéro affiché d'une question : celui des onglets Q1…Qn, qui saute les
+	    lectures absorbées (repli sur l'index + 1 hors moteur complet). */
+	const numero = (qi: number): number => ctx.numeroAffiche?.(qi) ?? qi + 1;
+
 	/** « Q2 · questions 2 à 4 » — dit au lecteur combien de questions portent sur ce document. */
 	function scopeLabel(p: ResolvedPassage): string {
 		if (p.sharedWith.length < 2) return "";
-		const first = p.sharedWith[0] + 1;
-		const last = p.sharedWith[p.sharedWith.length - 1] + 1;
+		const first = numero(p.sharedWith[0]);
+		const last = numero(p.sharedWith[p.sharedWith.length - 1]);
 		// Groupe contigu ⇒ « questions 2 à 4 » ; groupe éclaté ⇒ le compte seul.
-		const contiguous = p.sharedWith.every((qi, k) => qi === p.sharedWith[0] + k);
+		const contiguous = p.sharedWith.every((qi, k) => numero(qi) === first + k);
 		return contiguous
 			? t("engine.passage.scopeRange", { first, last })
 			: t("engine.passage.scopeCount", { count: p.sharedWith.length });
 	}
 
 	function passageHtml(qi: number): string {
-		/* Un seul appel à chaque accessor de lesson.ts, réutilisé ci-dessous :
-		   ils recalculent leur modèle à chaque appel (engine/lesson.ts), et
-		   cette fonction est elle-même invoquée une fois PAR QUESTION à chaque
-		   rendu complet (`ctx.cards.questionCardHtml`, dans la boucle de
-		   `render()` sur `slideMap`) — les appeler une seconde fois ici serait
-		   payer deux fois le même calcul en silence. */
-		const role = ctx.roleOfQuestion(qi);
-		const isLesson = ctx.isLessonMode();
-		const visibility = passageVisibility({ role, checked: !!ctx.textOnly?.isChecked?.(qi), isLesson });
-
-		// "hidden" : rien n'est rendu, pas même le conteneur — un support caché
-		// en CSS resterait lisible par l'inspecteur, la recherche du navigateur
-		// et la sélection au clavier (exigence non négociable de la Task 4).
-		if (visibility === "hidden") return "";
-
+		/* Le support d'abord : sans support, pas de décision de visibilité à
+		   payer (elle relit le modèle de leçon, engine/lesson.ts), et cette
+		   fonction est invoquée une fois PAR QUESTION à chaque rendu complet. */
 		const p = resolvePassage(qi);
 		if (!p) return "";
+		const visibility = passageVisibilityFor(qi);
 
 		const contentHtml = p.html
-			? ctx.sanitize.replaceObsidianEmbedsInHtml(p.html, { wrapClass: "quiz-passage-embed-wrap", imgClass: "quiz-passage-embed" })
-			: ctx.sanitize.renderTextWithEmbeds(p.text, { wrapClass: "quiz-passage-embed-wrap", imgClass: "quiz-passage-embed" });
+			? ctx.sanitize.replaceObsidianEmbedsInHtml(p.html, EMBED_PASSAGE)
+			: ctx.sanitize.renderTextWithEmbeds(p.text, EMBED_PASSAGE);
 
-		// Repli par défaut : seul le rôle "test" en mode Leçon démarre replié
-		// (tableau de la Task 4), et seulement à la première apparition de la
-		// clé (`seedCollapsedOnce` est un no-op ensuite) — un rôle "recall" qui
-		// vient de s'ouvrir n'a jamais pu être replié puisqu'il n'existait pas
-		// dans le DOM avant son verrouillage.
-		if (isLesson && role === "test") collapseState.seedCollapsedOnce(p.key);
 		// "open" force le dépli — y compris si un support PARTAGÉ (`passageId`)
-		// a été replié par une autre question du même groupe — pour garantir la
-		// comparaison texte/rappel que ce rôle existe pour offrir.
+		// a été replié par une autre question du même groupe.
 		const isCollapsed = visibility === "open" ? false : collapseState.isCollapsed(p.key);
 		const scope = scopeLabel(p);
 		const toggleLabel = t(isCollapsed ? "engine.passage.expand" : "engine.passage.collapse");
@@ -272,6 +244,10 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 	}
 
 	function bindPassage(trackItem: HTMLElement, qi: number): void {
+		/* Les cartes « À retenir » d'une lecture, sur son écran ou en lecture
+		   courte au-dessus de sa question hôte (engine/cards.ts) : AVANT la
+		   sortie sans support. */
+		brancherCartes(trackItem);
 		const root = trackItem.querySelector<HTMLElement>(".quiz-passage");
 		if (!root) return;
 
@@ -309,6 +285,10 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 			/* Chaque carte touchée change de hauteur : leurs entrées de cache sont
 			   périmées. Pas d'animation de repli — un collapse animé laisse des
 			   pixels fantômes du compositeur sur la piste translatée. */
+			resynchroniser();
+		});
+
+		function resynchroniser(): void {
 			const p = resolvePassage(qi);
 			for (const twinQi of (p ? p.sharedWith : [qi])) {
 				const slideIdx = ctx.getSlideIndexForQuestion(twinQi);
@@ -318,7 +298,7 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 					ctx.viewport.scheduleViewportHeightSync({ index: slideIdx, animate: false, refresh: true });
 				}
 			}
-		});
+		}
 	}
 
 	function resetPassageState(): void {

@@ -15,6 +15,8 @@ import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage } from "./usage-format";
 import { t } from "../i18n";
 import type { ModeQuiz } from "../quiz-format";
+import type { CategorieQuiz } from "./categorie-quiz";
+import { complementCategorie } from "./categorie-prompt";
 
 /* ══════════════════════════════════════════════════════════
    AI CLIENT — Claude Code + Codex + Ollama
@@ -68,6 +70,9 @@ export interface GenerateOptions {
 	/** Practice seulement : les tranches du Learn de la même source, pour
 	    poser `slice` (spec §2). Ignoré en Learn. */
 	planTranches?: { slice: number; titre: string }[];
+	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi : son
+	    complément s'ajoute au prompt système. Absente ou `general` : rien. */
+	categorie?: CategorieQuiz;
 }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
@@ -246,7 +251,7 @@ export const PHRASE_FINALE_CLI = "Reply ONLY with the JSON5 array, with no expla
  * Un prompt PAR MODE, spec Learn/Practice §2.
  */
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
-	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches } = options;
+	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie } = options;
 	const learn = mode === "learn";
 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
@@ -274,9 +279,16 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	const blocMode = learn ? `MODE: LEARN. You are writing a guided LEARNING PATH through the source — not a test, and not a summary to read.
 	Split the source into SLICES, numbered from 1 in "slice", each small enough for ONE screen of reading. Every slice contains, in this order:
 	  1. one or two questions with "role": "pre", asked BEFORE the reading on what the slice is about to teach. The learner is expected to fail: keep them short (single choice preferred) and give "explain". EVERY pre question also has "hint": a clue that lets someone who has NOT read the slice yet reason toward the answer (the principle to apply, an analogy, what a key word means) — never the answer itself. Answering blind with no help at all is discouraging.
-	  2. exactly one card with "role": "read": "title" names the slice and "prompt" holds the passage — the slice's content REPHRASED clearly in at most about 150 words, keeping the teacher's technical terms EXACTLY as in the source. When the slice lists arbitrary items (layers, steps, keywords), add a mnemonic. A read card has no options and no answer. For a PROCEDURAL slice (code, method, calculation), the read card is a fully WORKED EXAMPLE, correct, step by step.
+	  2. exactly one card with "role": "read": "title" names the slice and "prompt" holds the passage — the slice's content REPHRASED clearly in at most about 150 words, keeping the teacher's technical terms EXACTLY as in the source. When the slice lists arbitrary items (layers, steps, keywords), add a mnemonic. A read card has no options and no answer. For a PROCEDURAL slice (code, method, calculation), the read card is a fully WORKED EXAMPLE, correct, step by step. Every idiom or compact line of a reading is explained IN FULL, the way a good tutor does: the compact form, its result, then the developed equivalent (for example \`[2 * i for i in range(4)]\` gives \`[0, 2, 4, 6]\`, the same as a \`for\` loop that calls \`append\` on an empty list); never leave a compact line unexplained.
+	  READING STYLE: CHOOSE for each read card, from its content, the "lecture" style that fits it best. VARY the style between slices according to what each one teaches, and NEVER take "page" by default:
+	    - "lecture": "etapes" for ONE IDEA PER LINE: a procedure, ideas that follow one another, a list of rules. "etapes" lists them in order, one short step per string, and "prompt" is a one-sentence introduction. Example: { "lecture": "etapes", "prompt": "Create and activate a virtual environment.", "etapes": ["Go to the project folder.", "Run \`python -m venv .venv\`.", "Activate it before installing anything."] };
+	    - "lecture": "tableau" to COMPARE two or three things on several criteria, for example Python and C: "tableau" is { "colonnes": ["", "Python", "C"], "lignes": [["Execution", "Interpreted", "Compiled"], ["Typing", "Dynamic", "Static"]] }, every row as long as "colonnes", the first cell naming the criterion, and "prompt" is a one-sentence introduction;
+	    - "lecture": "page" ONLY for a CONTINUOUS text that explains itself in one block (a reasoning, a story, a definition developed in prose). Example: { "lecture": "page", "prompt": "Python is interpreted: the interpreter runs the .py file directly…" }.
+	    Every reading is its own screen, placed after the pre questions of its slice, EXCEPT "etapes" readings that are either SHORT (a few lines: at most about 60 words and 4 steps) or a METHOD to apply in the question that follows, even long: for a method set "methode": true on the read card (for example a calculation procedure the next question asks to carry out). Such readings are shown open above that question instead. When a slice fits in a few lines of steps, you may write such a short reading.
+	  KEY POINTS: a read card may add "retenir", what to keep from it: { "forme": "cartes", "items": [{ "recto": "term", "verso": "its meaning in a few words" }, ...] } for TERMS to memorize (flip cards), or { "forme": "recap", "items": ["fact to keep", ...] } for FACTS to keep (a checked recap); 2 to 5 items, never a copy of a later question's answer. Omit "retenir" when it adds nothing.
 	  3. exactly one question with "role": "explain" and "type": "text": ask the learner to explain the slice's key idea in their own words (why, how, a relation, an example). "answer" holds a MODEL ANSWER of 2 to 4 sentences.
-	  4. two to four questions with "role": "recall": retrieval from memory of what the slice taught, each with "explain". For a procedural slice use: a "cloze" with the missing step, a text question predicting the OUTPUT of a code snippet ("terminalVariant": "python"), an "ordering" question rebuilding the lines of the code, a single-choice "find the bug".
+	  4. two to four questions with "role": "recall": retrieval from memory of what the slice taught, each with "explain". For a procedural slice use: a "cloze" with the missing step, a text question predicting the OUTPUT of a code snippet ("terminalVariant": "python"), an "ordering" question rebuilding the lines of the code, a single-choice "find the bug". A recall can also be a FLASHCARD: set "flashcard": true, put the question in "prompt" (front) and the expected answer in "answer" (back), add "explain"; no "options", no "type". Use a flashcard ONLY when the answer fits in one sentence, one formula or one line of code (a definition, a syntax, the output of a short expression), never for a question that needs reasoning or several lines, and for at most half of the recalls of a slice. A slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE flashcard among its recalls.
+	HINTS IN LEARN: EVERY question of the path has "hint" — pre, explain and recall alike; only the read cards and the flashcards have none.
 	A "read" passage NEVER contains the exact sentence that a later question of the same slice asks for: recall must be retrieval, not copying. Do not ask to "justify your answer" everywhere.
 	"topic": optional short label of a family of notions that are easily confused, shared by the questions that test it.
 	"timeLimit": a number of seconds, ONLY on a question that tests an automatism the learner must answer instantly (a keyword, a syntax); omit it everywhere else.
@@ -284,11 +296,16 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	: `MODE: PRACTICE. You are writing an exam-preparation bank on the source, in the FORMAT OF A UNIVERSITY EXAM on it.
 	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
 	EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.
-	EVERY question has "hint": a nudge shown after a first wrong attempt, which never gives the answer away.
+	EVERY question has "hint" (see HINTS below).
 	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
 	"slice": when a SLICE PLAN of the learning path is given in the request, the number of the slice that teaches what the question tests; otherwise omit it.
 	"timeLimit": a number of seconds, ONLY on a question that tests an automatism; omit it everywhere else.
 	No configuration object at the end of the array.`;
+
+	/* Le complément de la CATÉGORIE (retour #7) : une section de plus, entre
+	   les consignes du mode et le titre ; rien pour `general`. */
+	const complement = complementCategorie(categorie);
+	const categorieBloc = complement ? `\n\t${complement}\n` : "";
 
 	const systemPrompt = `You are a quiz generator. Generate the quiz questions as a JSON5 array. Each question may have:
 	- title: short question title
@@ -300,21 +317,29 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	- type: "text" for free text, omitted otherwise
 	- answer: expected answer (free text)
 	- explain: the explanation shown after the answer
-	- hint: a nudge shown on demand
+	- hint: a nudge shown on demand — a string, or for a DIFFICULT question an array of 2 or 3 levels (see HINTS below)
 	- mathInput: true for a text question whose answer is a mathematical expression (the learner answers in a visual EQUATION EDITOR)
 	- answerTemplate: a LaTeX template pre-filled in the answer field of a mathInput question, with \\\\placeholder{} for each blank to fill (e.g. 'x = \\\\placeholder{}' ; two solutions: 'x_1 = \\\\placeholder{},\\\\; x_2 = \\\\placeholder{}'). RULES for mathInput: the question text NEVER gives answer-format instructions (no "as a fraction", "comma-separated", "e.g. 1/2") — the equation editor makes all of that pointless; prefer an answerTemplate that guides instead; acceptedAnswers are the COMPLETE content of the field once the template is filled, in LaTeX (e.g. 'x_1 = \\\\frac{1}{2},\\\\; x_2 = 3'), and add variants where relevant (solutions in reverse order)
 	- terminalVariant: "python", "bash", "powershell" or "cmd" for a text question answered in a terminal (a command, or the output of a program)
 	- cloze: a FILL-IN-THE-BLANK text. Put the whole sentence, paragraph or code in this field and wrap each blank in DOUBLE BRACES, with accepted variants separated by "|": "The capital of France is {{Paris}} and its currency is {{the euro|euro}}." Use double BRACES, never double brackets — double brackets are Obsidian's internal-link syntax and would be rewritten before the quiz is read. Keep "prompt" as the SHORT instruction only ("Complete the text below"), never repeat the text there. 2 to 5 blanks per question, each on a key term, never on a word the sentence already gives away
 	- numeric / tolerance / tolerancePercent / unit: for a free-text question whose answer is a NUMBER. Set "numeric": true and the answer is compared as a value, not as a string, so "3.14", "3,14" and "3.140" all pass. Add "tolerance" (absolute margin) or "tolerancePercent" (relative margin) whenever the expected answer is a measurement or a rounded result, and "unit" (e.g. "m/s") when one is expected — the learner may write it or omit it. ALWAYS prefer this over a plain text answer for any question that asks "how much", "how many" or a computed value
-	- ordering / slots / possibilities / correctOrder: a question where the learner puts items in the RIGHT ORDER. Set "ordering": true, "slots" naming each position (e.g. ['1st','2nd','3rd','4th']), "possibilities" listing the items in a DELIBERATELY WRONG order, and "correctOrder" giving, for each slot in turn, the INDEX of the item of "possibilities" that belongs there. Use it for a chronology, a protocol exchange, the steps of a procedure or a calculation, the lines of a program
+	- ordering / slots / possibilities / correctOrder: a question where the learner puts items in the RIGHT ORDER. Set "ordering": true, "slots" naming each position (e.g. ['1st','2nd','3rd','4th']), "possibilities" listing the items in a DELIBERATELY WRONG order, and "correctOrder" giving, for each slot in turn, the INDEX of the item of "possibilities" that belongs there. Use it for a chronology, a protocol exchange, the steps of a procedure or a calculation, the lines of a program. Each item of "possibilities" is ONE single line: a line of code is written as inline \`code\` between single backticks, NEVER as a fenced \`\`\` block
 	- matching / rows / choices / correctMap: a question where the learner PAIRS two columns. Set "matching": true, "rows" (the left column: terms, devices, codes…), "choices" (the right column: definitions, roles…, listed in a different order from the rows) and "correctMap" giving, for each row in turn, the INDEX of its matching entry in "choices". Use it to oppose notions that are easily confused
 	- passage / passageId / passageTitle: a SOURCE DOCUMENT to read before answering (comprehension). "passage" holds the full text, "passageTitle" names it, and "passageId" is a shared key: every question carrying the SAME passageId shows the SAME document, so write the text ONCE on the first question of the group and give the others only their passageId
 
 	${blocMode}
 
+	HINTS: a "hint" helps without giving the answer away. The learner can open it BEFORE any attempt, from a button under the question: never write it as if an answer had already been given ("you got it wrong", "try again"). Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
+
+	EXPLANATIONS: in every "explain", put the two or three KEY WORDS in **bold** — no more; the reader colors them.
+${categorieBloc}
 	QUIZ TITLE: the very first line of the array, right after the opening bracket, is a JSON5 line comment giving the quiz a name: '// title: <name>'. The name is what a student would write on the cover: 3 to 8 words naming its subject and scope (e.g. "Python : types, listes et exceptions"), in the language of the content, WITHOUT the word "quiz" and without a trailing period. Exactly one such line, nowhere else.
 
 	LANGUAGE — THIS IS A HARD RULE: write ALL the content you produce (title, prompt, options, answer, explain, hint, objectives) in THE SAME LANGUAGE AS THE USER REQUEST BELOW. If the request is in French, write the quiz in French; in Arabic, in Arabic; in English, in English. When the request provides source material (a text, a note, images), follow the language of that material. NEVER translate the content into English just because these instructions are in English. The FIELD NAMES (title, prompt, options…) and the JSON5 structure always stay exactly as specified above, in English. Keep the technical terms of the source exactly as the source writes them.
+
+	CODE: every piece of code written inside a sentence — an identifier, a keyword, a command, an option, a file name, a path, an expression — goes between backticks in EVERY text field (prompt, options, explain, hint, answer): \`__init__\`, \`find /var/log -name '*.log'\`, \`i ** 2\`. Without them, \`__init__\` is displayed as a bold "init" and \`**\` as emphasis. A "cloze" on code wraps each line of code in backticks too; its blanks stay inside them (\`class Dog: def {{__init__}}(self, name):\`).
+
+	FORMATTING — MARKDOWN ONLY: every text field (prompt, options, explain, hint, answer, passage) is written in MARKDOWN, exactly as in Discord and Obsidian: **bold**, *italic*, \`code\`; a block of code between two lines of three backticks, the language after the opening ones (\`\`\`python); bulleted lists with "- " and numbered lists with "1. ", one item per line; paragraphs separated by an empty line (\\n\\n inside the JSON5 string); a markdown table (| A | B | then |---|---|) when comparing several notions on the same criteria; formulas between dollars as described below. NEVER write an HTML tag (no <p>, <br>, <strong>, <em>, <code>, <pre>, <ul>, <li>, <table>) and never a field whose name ends in "Html": markdown is shorter, and a tag shows up as raw markup when the quiz is edited. A code block ALWAYS names its language right on the opening backticks (\`\`\`python, \`\`\`bash, \`\`\`c…) — NEVER just \`\`\` alone: the reader colors the block from that name, and an unnamed block is shown without color.
 
 	MATHEMATICS: every mathematical expression (formula, function, equation, integral, fraction, exponent, Greek letter…) MUST be written in LaTeX delimited by dollar signs, as in Obsidian: $f(x) = x^3$ inline, $$\\int_0^2 2x\\,dx$$ for a display formula. Never pseudo-notation such as f(x) = x^3 or ∫ from 0 to 2 outside the dollars. This applies to every text field. IMPORTANT: inside JSON5 strings, DOUBLE every backslash — for LaTeX (write '$\\\\frac{a}{b}$' to get \\frac) as well as Windows paths (write 'C:\\\\Users\\\\dev') — a single backslash would be destroyed by the parser.
 
@@ -459,9 +484,22 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 	cleaned = repairLatexBackslashes(cleaned);
 
 	let parsed: unknown;
+	let lu = false;
 	try {
 		parsed = JSON5.parse(cleaned);
+		lu = true;
 	} catch (err) {
+		/* UNE VIRGULE OUBLIÉE entre deux champs ne doit pas coûter une
+		   génération : Gemini 3.5 Flash-Lite a rendu un quiz entier, juste,
+		   avec deux `"explain": "…"` suivis à la ligne d'un `"hint"` sans
+		   virgule (2026-09-24) — « invalid character '"' at 67:5 », et tout
+		   était à refaire. Seconde lecture après réparation ; si elle échoue
+		   aussi, l'erreur rapportée reste celle de la réponse d'ORIGINE. */
+		const repare = reparerVirgulesManquantes(cleaned);
+		if (repare !== cleaned) {
+			try { parsed = JSON5.parse(repare); lu = true; } catch { /* l'erreur d'origine suit */ }
+		}
+		if (lu && Array.isArray(parsed)) return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
 		   (ligne, colonne), ce qu'aucune paraphrase ne ferait mieux. Une
 		   réponse qui n'est pas un quiz du tout, elle, mérite qu'on dise ce
@@ -479,7 +517,38 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		throw new Error(t("ai.err.notAnArray"));
 	}
 
-	return { questions: parsed, titre: titreEnCommentaire(cleaned) };
+	return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+}
+
+/** Ajoute la virgule qu'un modèle a oubliée en fin de ligne, entre une
+    valeur qui se termine (chaîne, nombre, littéral, `]`, `}`) et une ligne
+    qui commence un nouvel élément ou un nouveau champ. Une ligne de
+    commentaire n'est jamais touchée. Ne sert qu'en SECONDE lecture, après
+    l'échec de la première : une réponse valide ne passe jamais ici. */
+export function reparerVirgulesManquantes(source: string): string {
+	const lignes = source.split("\n");
+	const finDeValeur = /(["'\d\]}]|\btrue|\bfalse|\bnull)\s*$/;
+	const debutDElement = /^\s*(["'{[\d-]|[A-Za-z_$][\w$]*\s*:)/;
+	for (let i = 0; i < lignes.length - 1; i++) {
+		const cur = lignes[i];
+		if (/^\s*\/\//.test(cur) || !finDeValeur.test(cur)) continue;
+		let j = i + 1;
+		while (j < lignes.length && !lignes[j].trim()) j++;
+		if (j < lignes.length && debutDElement.test(lignes[j])) lignes[i] = cur.replace(/\s*$/, ",");
+	}
+	return lignes.join("\n");
+}
+
+/** Retire les faux titres de section qu'un modèle glisse entre les
+    questions, `{ "// title": "Partie 2" }` : un objet dont TOUTES les clés
+    sont des commentaires n'est pas une question, et deviendrait une carte
+    vide dans le quiz (vu avec Gemini 3.5 Flash-Lite le 2026-09-24). */
+function sansFauxTitres(items: unknown[]): unknown[] {
+	return items.filter(it => {
+		if (!it || typeof it !== "object" || Array.isArray(it)) return true;
+		const cles = Object.keys(it);
+		return cles.length === 0 || !cles.every(k => k.trim().startsWith("//"));
+	});
 }
 
 /* Le modèle a répondu autre chose qu'un quiz : nommer QUOI, et surtout

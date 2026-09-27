@@ -62,45 +62,8 @@
 	tab-size: 4;
 }
 
-/* ─── Entity Toolbar ── */
-.qb-entity-toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.25em;
-	padding: 0.3em;
-	background: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
-	border-bottom: none;
-	border-radius: 0.375em 0.375em 0 0;
-}
-
-.qb-entity-toolbar + .qb-prompt-editor {
-	border-radius: 0 0 0.375em 0.375em;
-}
-
-.qb-entity-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	min-width: 1.8em;
-	height: 1.8em;
-	padding: 0 0.4em;
-	font-family: var(--font-monospace);
-	font-size: 0.75em;
-	font-weight: 600;
-	background: var(--background-primary);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 0.25em;
-	color: var(--text-muted);
-	cursor: pointer;
-	transition: all 0.12s;
-}
-
-.qb-entity-btn:hover {
-	background: var(--interactive-accent);
-	color: #fff;
-	border-color: var(--interactive-accent);
-}
+/* La barre de symboles d'un champ (`.qb-entity-*`) est devenue la barre de
+   mise en forme à icônes : `.qb-format-*`, dashboard-editor.css. */
 
 /* ─── WYSIWYG Editor ── */
 .qb-wysiwyg-container {

@@ -30,6 +30,7 @@ import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host"
 import type { AiSettings } from "../../../../src/types/dashboard-ctx";
 import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
+import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
 
 export function renderSettings(
 	root: HTMLElement,
@@ -243,6 +244,17 @@ export function renderSettings(
 			void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
 		},
 	});
+
+	/* Un cours, une carte : le Learn et le Practice d'un même cours réunis dans
+	   « Mes quiz » (course-pairs.ts). Décocher les sépare, comme avant le
+	   2026-09-24. */
+	const coursLigne = ajouter(general, "label", "nq-reglages-case");
+	const coursCase = ajouter(coursLigne, "input");
+	coursCase.type = "checkbox";
+	coursCase.checked = regroupementModes();
+	ajouter(coursLigne, "span", "nq-reglages-nom", t("app.settings.groupModes"));
+	coursCase.addEventListener("change", () => { void reglerRegroupementModes(coursCase.checked); });
+	ajouter(general, "p", "nq-reglages-aide", t("app.settings.groupModesHint"));
 
 	/* ── Comptes IA ── */
 	const comptes = ajouter(contenu, "section", "nq-reglages-section");

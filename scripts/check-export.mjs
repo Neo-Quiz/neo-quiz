@@ -319,6 +319,55 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.done();
 });
 
+/* INDICE À PLUSIEURS NIVEAUX (2026-09-26) : `hint` en chaîne reste une
+   chaîne, un tableau de niveaux reste un tableau, dans l'ordre ; une valeur
+   invalide est ignorée ; un niveau vidé dans l'éditeur n'est pas écrit. */
+await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
+	const r = makeReporter("Indice à niveaux (aller-retour)");
+	const base = { id: "h", title: "T", prompt: "P ?", options: ["a", "b"], correctIndex: 0 };
+	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
+	r.check("chaîne : relue en chaîne", tour({ ...base, hint: "Pense à **range**." }).hint, "Pense à **range**.");
+	r.check("tableau : relu en tableau, dans l'ordre",
+		tour({ ...base, hint: ["Léger", "Comme `range(1, 3)` qui donne `[1, 2]`.", "Révélateur"] }).hint,
+		["Léger", "Comme `range(1, 3)` qui donne `[1, 2]`.", "Révélateur"]);
+	r.check("deux écritures de suite : identique", tour(tour({ ...base, hint: ["a", "b"] })).hint, ["a", "b"]);
+	r.check("tableau d'un seul niveau utile : écrit en chaîne", tour({ ...base, hint: ["", "Seul"] }).hint, "Seul");
+	r.check("valeur invalide ignorée : nombre, objet, tableau sans texte",
+		[tour({ ...base, hint: 42 }).hint, tour({ ...base, hint: { a: 1 } }).hint, tour({ ...base, hint: ["", 3] }).hint], [undefined, undefined, undefined]);
+	const brouillon = convert.convertParsedToInternal({ ...base, hint: ["un", "deux", "trois"] });
+	r.check("brouillon : premier niveau dans hint, les suivants à part", [brouillon.hint, brouillon._hintMore], ["un", ["deux", "trois"]]);
+	brouillon._hintMore = ["", "trois"];
+	r.check("un niveau vidé n'est pas écrit", JSON5.parse(exp.exportAll([brouillon], null))[0].hint, ["un", "trois"]);
+	r.done();
+});
+
+/* STYLES DE LECTURE (2026-09-26, spec des styles §2 et §6) : chaque style et
+   chaque forme de « À retenir » font l'aller-retour lecture → écriture →
+   lecture À L'IDENTIQUE, valeurs inconnues comprises — seul leur RENDU
+   retombe sur « page » (src/lecture-style.ts), la note ne change pas. */
+await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
+	const r = makeReporter("Styles de lecture (aller-retour)");
+	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
+	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir, methode: o.methode });
+	const lecture = (o) => ({ id: "l", title: "Lecture", prompt: "Texte.", slice: 1, role: "read", ...o });
+	const cas = {
+		"page + cartes": lecture({ lecture: "page", retenir: { forme: "cartes", items: [{ recto: "`d.get`", verso: "Renvoie **None**" }] } }),
+		"étapes + récapitulatif": lecture({ lecture: "etapes", etapes: ["Créer `.venv`", "L'activer : `.venv\\Scripts\\activate`"], retenir: { forme: "recap", items: ["On active d'abord", "$x^2$"] } }),
+		"étapes marquées méthode": lecture({ lecture: "etapes", etapes: ["Un", "Deux"], methode: true }),
+		"tableau aux lignes inégales":lecture({ lecture: "tableau", tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"]] } }),
+		"valeurs inconnues ou mal formées": lecture({ lecture: "callout", etapes: "pas une liste", retenir: { forme: "glossaire", items: 3 } }),
+		"aucun champ (quiz d'avant)": lecture({}),
+	};
+	for (const [nom, brut] of Object.entries(cas)) {
+		r.check(`${nom} : relu à l'identique`, champs(tour(brut)), champs(brut));
+	}
+	const deux = tour(tour(cas["tableau aux lignes inégales"]));
+	r.check("deux écritures de suite : toujours identique", champs(deux), champs(cas["tableau aux lignes inégales"]));
+	r.check("une lecture sans champ n'en gagne aucun",
+		Object.keys(tour(cas["aucun champ (quiz d'avant)"])).filter(k => ["lecture", "etapes", "tableau", "retenir", "methode"].includes(k)), []);
+	r.done();
+});
+
 /* CONTENU QUI NE DOIT PAS BOUGER A L'ECRITURE. Chacun de ces cas a ete une
    perte ou une corruption reelle : rien ne levait, rien ne s'affichait, et la
    sauvegarde annoncait un succes. */
@@ -333,9 +382,10 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.check("multiplication non convertie", mult.prompt, "Ici 3*4*5 est une multiplication.");
 	r.check("pas de promptHtml invente", mult.promptHtml, undefined);
 
-	// Le markdown de BLOC, lui, a toujours besoin du HTML.
+	// Le markdown de BLOC reste du markdown : le moteur le rend (2026-09-26,
+	// engine/grammaire-blocs.ts) ; il partait avant vers `md2html`.
 	const liste = tour({ ...base, prompt: "Choisis :" + BR + "- un" + BR + "- deux", options: ["a", "b"], correctIndex: 0 });
-	r.check("liste convertie en HTML", typeof liste.promptHtml, "string");
+	r.check("liste gardee en markdown", [liste.prompt, liste.promptHtml], ["Choisis :" + BR + "- un" + BR + "- deux", undefined]);
 
 	// Une explication en HTML RICHE survit a une sauvegarde qui ne la touche pas.
 	const riche = tour({ ...base, prompt: "P", options: ["a", "b"], correctIndex: 0,
@@ -378,6 +428,16 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 		["python", "a = int(input('a : '))\nprint(a)", "a = ...\n", ["24\n18", "3\n7"], "assert True", ["Pense à int().", "Compare avec if."], "int() convertit."]);
 	r.check("exercice de code : ni options ni correctIndex", [code.options, code.correctIndex], [undefined, undefined]);
 
+	// Une carte mémoire : flashcard, recto, verso, explication, et RIEN d'autre.
+	const carte = tour({ ...base, prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "`<class 'list'>`", explain: "Liste vide." });
+	r.check("carte : flashcard, prompt, answer, explain conservés",
+		[carte.flashcard, carte.prompt, carte.answer, carte.explain],
+		[true, "Que renvoie `type([])` ?", "`<class 'list'>`", "Liste vide."]);
+	r.check("carte : ni type, ni options fantômes, ni correctIndex",
+		["type", "options", "correctIndex", "acceptedAnswers"].filter(k => k in carte), []);
+	const carteVide = tour({ ...base, prompt: "P", flashcard: true });
+	r.check("carte sans verso reste une carte (verso vide écrit)", [carteVide.flashcard, carteVide.answer], [true, ""]);
+
 	// Formes IMBRIQUEES, que le moteur lit en repli.
 	const ord = tour({ ...base, prompt: "P",
 		ordering: { items: ["A", "B"], correctOrder: [1, 0], slotLabels: ["Premier", "Second"] } });
@@ -418,10 +478,13 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 		options: ["a", "b"], correctIndex: 0 });
 	r.check("les deux enonces conserves",
 		[deuxEnonces.promptHtml, deuxEnonces.prompt], ["<strong>riche</strong>", "texte de repli"]);
-	// ... mais un texte DERIVE du HTML par la lecture n'est pas ajoute a une
-	// note qui ne l'avait pas.
-	const htmlSeul = tour({ ...base, promptHtml: "<strong>riche</strong>", options: ["a", "b"], correctIndex: 0 });
-	r.check("pas de prompt invente", htmlSeul.prompt, undefined);
+	// ... mais un texte DERIVE d'un HTML que le markdown ne sait pas dire n'est
+	// pas ajoute a une note qui ne l'avait pas.
+	const htmlSeul = tour({ ...base, promptHtml: "<u>riche</u>", options: ["a", "b"], correctIndex: 0 });
+	r.check("pas de prompt invente", [htmlSeul.prompt, htmlSeul.promptHtml], [undefined, "<u>riche</u>"]);
+	// Un HTML seul CONVERTIBLE, lui, devient le markdown de l'enonce (2026-09-26).
+	const converti = tour({ ...base, promptHtml: "<strong>riche</strong>", options: ["a", "b"], correctIndex: 0 });
+	r.check("HTML seul converti en markdown", [converti.prompt, converti.promptHtml], ["**riche**", undefined]);
 
 	// PROSE qui ressemble a du HTML : elle ne doit PAS partir vers md2html,
 	// sinon on rouvre la corruption que tout le reste evite.

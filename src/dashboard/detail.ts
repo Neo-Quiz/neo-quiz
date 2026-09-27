@@ -1,25 +1,32 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { markViewEnter } from "./view-enter";
-import { t, currentLang, hourOptions } from "../i18n";
+import { t } from "../i18n";
+import { formatDateHeure } from "./format-date";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
+import { quizFrere } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
-import { quizModeLabel, quizTypeLabel } from "./quiz-card";
-import { getCanal, getProvider, setBrandLogo, libelleModele } from "./ai-providers";
+import { getCanal, getProvider, libelleModele } from "./ai-providers";
+import { renderEntete, dossierDuQuiz } from "./detail-head";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
-import { renderQuestionView, renderQuestionEdit } from "./detail-question";
-import { renderExamPanel } from "./detail-exam";
-import { renderFiche } from "./detail-fiche";
+import { renderQuestionView } from "./detail-question";
+import { renderQuestionEditRendu } from "./detail-edition";
+import { libererChamps } from "../editor/champ-direct";
+import { oublierFiche, renderFiche, renderInfosQuiz, renderTop, suivreDebord } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
+import { lectureCourteDe, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
+import { applyModuleOverrides } from "./quiz-modules";
+import type { ModuleMap } from "./quiz-modules";
+import { lireModuleMap } from "./module-map-note";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ PAGE — ce qu'on voit en cliquant un quiz (refonte 2026-07-21,
@@ -48,10 +55,10 @@ export interface QuizPageSpec {
 	/** Identité de la page : changer de clé remet son état à zéro. */
 	key: string;
 	title: string;
-	/** Ligne sous le titre (chemin de la note). Vide → ligne masquée. */
+	/** Ligne sous le titre, pour une page SANS entrée du catalogue (la ligne
+	    d'usage d'une génération). Un quiz du catalogue montre son dossier,
+	    tiré de `stats.path`. Vide → ligne masquée. */
 	subtitle: string;
-	/** Compte ANNONCÉ, le temps du chargement (badge du header). */
-	questionCount: number;
 	load(): Promise<QuizDraft | QuizLoadError>;
 	/** Écrit les modifications. Absent : quiz en mémoire, rien à persister. */
 	save?(draft: QuizDraft): Promise<boolean>;
@@ -98,6 +105,11 @@ export interface QuizPageSpec {
 	/** Appelée à chaque changement de question courante, par `goToQuestion`
 	    et nulle part ailleurs — c'est le seul endroit où `activeIdx` bouge. */
 	onQuestionChange?(index: number): void;
+	/** L'AUTRE mode du même cours (course-pairs.ts) : la fiche montre alors un
+	    sélecteur Learn | Practice qui ouvre ce quiz. */
+	autreMode?: { quiz: QuizIndexEntry; open(): void };
+	/** Le menu « ⋮ » de la fiche : celui de la carte du quiz (hôte). */
+	menu?(anchor: HTMLElement): void;
 }
 
 /** Dépendances d'une page « quiz », indépendantes du dashboard — et de
@@ -155,13 +167,32 @@ export interface DetailHandlers {
 export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 	const page = createQuizPage({ statsStore: ctx.statsStore });
 
+	/* Table des modules pour le sous-menu « Déplacer vers » (menu ⋯ de la
+	   fiche) — même patron paresseux que home.ts : chargée en tâche de fond,
+	   au pire absente au premier clic (le menu montre alors moins de
+	   dossiers, jamais une erreur), présente dès le rendu suivant. Cette page
+	   n'a pas de `repaint()` exposé à l'extérieur pour forcer un rafraîchissement
+	   dès que la lecture aboutit ; ce n'est pas nécessaire ici puisque le menu
+	   ne lit `moduleMap` qu'AU CLIC, longtemps après ce premier rendu. */
+	let moduleMap: ModuleMap | null = null;
+	let moduleMapLoaded = false;
+	async function loadModuleMap(): Promise<void> {
+		moduleMapLoaded = true;
+		await Promise.resolve();
+		moduleMap = await lireModuleMap(ctx.settings.quizzesModuleMapNote || "Dashboard");
+	}
+
 	return {
 		render(container: HTMLElement, quiz: QuizIndexEntry, host: DetailHostSpec): void {
+			if (!moduleMapLoaded) void loadModuleMap();
+			const map: ModuleMap = applyModuleOverrides(
+				moduleMap ?? { byFolder: new Map(), ueOrder: [] },
+				ctx.settings.quizzesModuleOverrides || {}
+			);
 			page.render(container, {
 				key: quiz.path,
 				title: quiz.title,
 				subtitle: quiz.path,
-				questionCount: quiz.questions,
 				stats: quiz,
 				load: () => loadQuizDraft(quiz.path),
 				save: (draft) => saveQuizDraft(draft),
@@ -183,6 +214,19 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
 				ouverture: host.ouverture,
+				autreMode: (() => {
+					if (ctx.settings.quizzesGroupModes === false) return undefined;
+					const frere = quizFrere(quiz, ctx.scanner.getQuizzes());
+					return frere ? { quiz: frere, open: () => ctx.navigate("detail", { quiz: frere }) } : undefined;
+				})(),
+				/* Le menu de la carte, avec un repeint qui relit le quiz : renommé,
+				   la page le reprend ; supprimé ou déplacé hors du catalogue, on
+				   revient en arrière. */
+				menu: ctx.openCardMenu ? (anchor) => ctx.openCardMenu!(quiz, anchor, () => {
+					const frais = ctx.scanner.getQuiz(quiz.path);
+					if (frais) ctx.navigate("detail", { quiz: frais });
+					else host.onBack();
+				}, map) : undefined,
 			});
 		},
 		dispose: () => page.dispose(),
@@ -230,12 +274,61 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	}
 	/** Piste du carrousel du panneau — recréée à chaque paintPanel. */
 	let slideHost: SlideHost | null = null;
-	/** Badge du header : le compte ANNONCÉ (spec) devient le compte RÉEL dès
-	    que le brouillon est lu — un onglet qui ne connaît pas son quiz à
-	    l'avance affichait « 0 » jusqu'au premier repaint. */
-	let countEl: HTMLElement | null = null;
 	/** Détache l'écoute clavier de la page précédente. */
 	let keyCleanup: (() => void) | null = null;
+	/** Nettoyage de la question montée en édition (detail-edition.ts). */
+	let demonterEditionCourante: (() => void) | null = null;
+	/** « Plus » ouvert ou fermé, gardé d'une question et d'un repeint à
+	    l'autre tant que la page vit : le rouvrir à chaque question lassait. */
+	let plusOuvert = false;
+
+	/* LECTURES ABSORBÉES (src/lecture-etape.ts, 2026-09-26) : dans un Learn,
+	   la carte de lecture d'une étape qui a d'autres questions n'est ni une
+	   carte de la liste ni une question de la navigation ; son cours
+	   s'affiche au-dessus de chaque question de l'étape. Tout est RECALCULÉ à
+	   chaque usage, jamais gardé : l'édition change rôles, étapes et ordre, et
+	   supprimer la dernière question d'une étape rend sa lecture autonome —
+	   donc de nouveau visible. `activeIdx` reste un index du BROUILLON. */
+	/** Le brouillon est un Learn — le mode que le moteur lit
+	    (`readModeConfig` normalise comme `extractExamOptions`). Hors Learn,
+	    rien n'est absorbé : le moteur jouerait chaque lecture comme un écran. */
+	function estLecon(): boolean {
+		return draft?.examOptions?.mode === "lesson";
+	}
+	function visibles(): number[] {
+		return draft ? questionsVisibles(draft.questions, estLecon()) : [];
+	}
+	/** Numéro affiché de l'index `i` (1…n), 0 pour une lecture de Learn,
+	    qui n'en a pas (src/lecture-etape.ts `numeroAffiche`). */
+	function numeroDe(i: number): number {
+		return draft ? numeroAffiche(draft.questions, estLecon(), i) : i + 1;
+	}
+	/** La question visible qui montre `i` (lui-même, sauf une lecture courte,
+	    qui se lit au-dessus de sa question hôte). */
+	function hote(i: number): number {
+		return draft ? questionHote(draft.questions, estLecon(), i) : i;
+	}
+	/** La lecture COURTE lue au-dessus de `i` (src/lecture-etape.ts), qui
+	    s'y modifie ; toute autre lecture a sa propre entrée. */
+	function lectureDe(i: number): DraftQuestion | undefined {
+		if (!draft) return undefined;
+		const l = lectureCourteDe(draft.questions, estLecon(), i);
+		return l === null ? undefined : draft.questions[l];
+	}
+	/** La question visible voisine de `i` (`dir` = ±1), ou -1 au bout. */
+	function voisine(i: number, dir: 1 | -1): number {
+		const v = visibles();
+		const p = v.indexOf(i);
+		return p < 0 ? -1 : (v[p + dir] ?? -1);
+	}
+
+	/** Démonte la question en édition : un texte ouvert y est validé, ses
+	    écouteurs et ses champs retirés. Avant tout repeint du panneau. */
+	function demonterEdition(): void {
+		const d = demonterEditionCourante;
+		demonterEditionCourante = null;
+		d?.();
+	}
 
 	function scheduleSave(): void {
 		// Pas de `save` : le quiz n'existe qu'en mémoire (résultat d'une
@@ -264,6 +357,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	}
 
 	function render(container: HTMLElement, spec: QuizPageSpec): void {
+		// La question en édition d'abord : un texte encore ouvert est validé
+		// dans le brouillon AVANT que l'écriture en attente ne parte.
+		demonterEdition();
 		// Un glissement encore en vol vise des nœuds que container.replaceChildren() va
 		// détruire : le terminer d'abord évite un timer orphelin qui écrirait
 		// dans un DOM mort.
@@ -272,12 +368,18 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// il resterait ouvert au-dessus d'une page qui n'existe plus.
 		closeAllSelects();
 		container.replaceChildren();
+		// Les champs CodeMirror du formulaire qu'on vient de détacher gardent
+		// sinon leurs écouteurs sur le document.
+		libererChamps();
 		currentContainer = container;
 		currentSpec = spec;
 		// Une ARRIVÉE sur la page : un autre quiz, ou le même rouvert par
 		// l'utilisateur. Lue AVANT que la clé ne soit notée, consommée aussitôt.
 		const arrivee = spec.key !== currentPath || !!spec.ouverture;
 		spec.ouverture = false;
+		// Une arrivée repart d'une fiche vierge : ni recherche, ni question
+		// choisie laissées par la visite précédente du même quiz.
+		if (arrivee) oublierFiche();
 		if (spec.key !== currentPath) {
 			// Le quiz précédent part MAINTENANT : sans ça, ouvrir un autre quiz
 			// dans les 600 ms du débounce perdait la dernière frappe. `void` :
@@ -359,70 +461,32 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			}
 			draft = result;
 			activeIdx = Math.min(activeIdx, Math.max(0, draft.questions.length - 1));
-			if (countEl) countEl.textContent = String(draft.questions.length);
 			paint(listCol, panel, nav, spec);
 		});
 	}
 
-	/* ── Header : fil d'Ariane, nom + chemin, Editor / Start ── */
+	/* ── En-tête : celui de la fiche (detail-head.ts) ── */
 	function renderHeader(page: HTMLElement, spec: QuizPageSpec): void {
-		const header = ajouter(page, "div", "qbd-qz-header");
-
-		// Flèche SUR LA LIGNE du titre, à sa gauche (capture StudySmarter
-		// 2026-07-21) — pas au-dessus. Mêmes classes que le retour du
-		// drill-down : un seul bouton retour dans tout le dashboard.
-		const back = ajouter(header, "button", "qbd-quizzes-crumb-back qbd-qz-back");
-		back.type = "button";
-		back.setAttribute("aria-label", t("dashboard.quiz.back"));
-		const backIcon = ajouter(back, "span", "qbd-quizzes-crumb-icon");
-		currentHost().ui.setIcon(backIcon, "arrow-left");
-		back.addEventListener("click", () => {
+		// Chaque action écrit d'abord ce qui est en attente : on quitte la
+		// page, on lance le quiz, on insère le brouillon — la dernière frappe
+		// doit y être.
+		const avant = (fn: (el: HTMLElement) => void) => (el: HTMLElement): void => {
 			void flushSave();
-			spec.onBack();
+			fn(el);
+		};
+		const start = spec.start;
+		renderEntete(page, {
+			title: spec.title,
+			// Un quiz du catalogue montre son DOSSIER, pas son chemin ; la page
+			// « Générer » garde sa ligne d'usage.
+			kicker: spec.stats ? dossierDuQuiz(spec.stats.path) : spec.subtitle,
+			editing,
+			onBack: () => { void flushSave(); spec.onBack(); },
+			onToggleEditing: () => toggleEditing(page),
+			actions: (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) })),
+			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
+			infos: spec.stats ? (p) => { renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!)); } : undefined,
 		});
-
-		const info = ajouter(header, "div", "qbd-qz-headline");
-		const titleRow = ajouter(info, "div", "qbd-qz-title-row");
-		ajouter(titleRow, "h2", "qbd-qz-title", spec.title);
-		const count = draft ? draft.questions.length : spec.questionCount;
-		countEl = ajouter(titleRow, "span", "qbd-qz-count", String(count));
-		if (spec.subtitle) ajouter(info, "p", "qbd-qz-path", spec.subtitle);
-		renderMeta(info, spec);
-
-		const actions = ajouter(header, "div", "qbd-qz-actions");
-
-		// Modifier ↔ Terminé : la MÊME page bascule (référence : « Éditeur »
-		// n'ouvre pas un autre écran, il change le contenu de la carte).
-		const edit = ajouter(actions, "button", "qbd-btn qbd-btn--ghost qbd-qz-edit-btn" + (editing ? " is-on" : ""));
-		currentHost().ui.setIcon(ajouter(edit, "span", "qbd-btn-icon"), editing ? "check" : "square-pen");
-		// « Editor » (et non « Edit ») : le bouton ouvre un MODE, il ne
-		// déclenche pas une action — demande d'Ahmed 2026-07-21.
-		ajouter(edit, "span", undefined, t(editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"));
-		edit.addEventListener("click", () => toggleEditing(page));
-
-		for (const action of spec.actions || []) {
-			const btn = ajouter(actions, "button", "qbd-btn qbd-btn--ghost");
-			currentHost().ui.setIcon(ajouter(btn, "span", "qbd-btn-icon"), action.icon);
-			ajouter(btn, "span", undefined, action.label);
-			btn.addEventListener("click", () => {
-				void flushSave();
-				action.onClick(btn);
-			});
-		}
-
-		// Pilule INVERSÉE (blanche sur thème sombre) : le même bouton que
-		// « Nouveau dossier » — demande d'Ahmed « mets Start en blanc comme
-		// nos autres boutons ». Jamais l'accent bleu.
-		const startSpec = spec.start;
-		if (startSpec) {
-			const start = ajouter(actions, "button", "qbd-btn--create qbd-qz-start");
-			currentHost().ui.setIcon(ajouter(start, "span", "qbd-btn-icon"), startSpec.icon);
-			ajouter(start, "span", undefined, startSpec.label);
-			start.addEventListener("click", () => {
-				void flushSave();
-				startSpec.onClick(start);
-			});
-		}
 	}
 
 	/** Bascule consultation ⇄ édition AVEC transition : le corps s'estompe et
@@ -436,7 +500,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   pour l'endroit où répondre, n'est plus un écran où l'on atterrit
 		   (Ahmed, 2026-09-23). Sans fiche (page « Générer »), l'aperçu reste. */
 		welcome = !editing;
-		if (!editing) void flushSave();
+		// « Terminé » : un texte encore ouvert dans le rendu rejoint le
+		// brouillon avant que l'écriture ne parte.
+		if (!editing) { demonterEdition(); void flushSave(); }
 
 		const body = page.querySelector(".qbd-qz-body");
 		if (!body || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
@@ -489,60 +555,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function formatGeneratedAt(iso: string): string {
 		const d = new Date(iso);
 		if (Number.isNaN(d.getTime())) return iso;
-		/* L'heure suit le RÉGLAGE (24 h par défaut), pas la langue : l'anglais
-		   écrivait « 06:35 PM » (`hourOptions`, src/i18n.ts). */
-		return d.toLocaleString(currentLang() === "fr" ? "fr-FR" : "en-US", {
-			day: "numeric", month: "short", year: "numeric", minute: "2-digit", ...hourOptions(),
-		});
+		return formatDateHeure(d);
 	}
 
 	/** Stats du quiz, un enregistrement neutre s'il n'a jamais été joué. */
 	function statOf(quiz: QuizIndexEntry): QuizStatRecord {
 		const rec = ctx.statsStore ? ctx.statsStore.getRecord(quiz.path) : null;
 		return rec || { bestScore: 0, questionsDone: 0, totalQuestions: quiz.questions, lastPlayed: 0, attempts: 0 };
-	}
-
-	/* ── Ligne d'infos sous le titre ──
-	   Elle remplace la rangée de tuiles d'avant : des tuiles pour des
-	   métadonnées se lisaient comme des boutons, et se confondaient avec les
-	   tuiles des questions — les seules qu'on clique (Ahmed, 2026-09-23).
-	   Absente pour un quiz qui n'existe pas encore (résultat d'une
-	   génération) : ni score, ni tentative, ni date. */
-	function renderMeta(parent: HTMLElement, spec: QuizPageSpec): void {
-		const quiz = spec.stats;
-		if (!quiz) return;
-		const stat = statOf(quiz);
-		const line = ajouter(parent, "div", "qbd-qz-meta");
-		const item = (text: string, title?: string): HTMLElement => {
-			const el = ajouter(line, "span", "qbd-qz-meta-item");
-			ajouter(el, "span", undefined, text);
-			if (title) el.title = title;
-			return el;
-		};
-
-		item(t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions }));
-		item(quizTypeLabel(quiz.quizType));
-		item(quizModeLabel(quiz.mode));
-
-		// Qui a généré ce quiz, et QUAND — absente pour une note écrite à la
-		// main ou pour un quiz partagé sans frontmatter.
-		const o = origineDe(quiz);
-		if (o) {
-			const el = item(t("dashboard.detail.metaGenerated", { model: o.source, date: o.date }), o.tooltip);
-			const logo = ajouter(el, "span", "qbd-provider-logo qbd-qz-meta-logo qbd-provider-logo--" + o.logo);
-			el.prepend(logo);
-			setBrandLogo(logo, o.logo);
-		}
-
-		// Jamais joué : ni meilleur score, ni date, ni tentatives — rien que
-		// des tirets à montrer (demande d'Ahmed 2026-07-21).
-		if (stat.attempts > 0) {
-			const best = item(t("dashboard.detail.metaBest", { score: stat.bestScore }));
-			if (stat.bestScore >= 80) best.classList.add("is-good");
-			else if (stat.bestScore >= 60) best.classList.add("is-fair");
-			if (ctx.statsStore) item(t("dashboard.detail.metaLast", { when: ctx.statsStore.formatRelativeTime(stat.lastPlayed) }));
-			item(t(stat.attempts === 1 ? "dashboard.detail.metaAttemptsOne" : "dashboard.detail.metaAttemptsOther", { count: stat.attempts }));
-		}
 	}
 
 	/** Qui a généré le quiz, et quand — partagé par la ligne d'infos et la
@@ -600,11 +619,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		renderFiche(body, {
 			quiz,
 			questions: draft.questions,
+			lecon: estLecon(),
 			stat: statOf(quiz),
 			origine: origineDe(quiz),
 			onStart: (el) => { void flushSave(); start.onClick(el); },
 			onEdit: () => toggleEditing(page),
+			onEditQuestion: (i) => { activeIdx = i; toggleEditing(page); },
 			onBack: () => { void flushSave(); spec.onBack(); },
+			autreMode: spec.autreMode ? { mode: spec.autreMode.quiz.mode, open: () => { void flushSave(); spec.autreMode!.open(); } } : undefined,
+			menu: spec.menu,
 		});
 		return true;
 	}
@@ -635,6 +658,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	/* ── Corps : liste des questions + question courante ── */
 	function paint(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
+		// Une reprise, une suppression ou un changement de rôle peut laisser
+		// `activeIdx` sur une lecture absorbée : on montre la question qui l'affiche.
+		activeIdx = hote(activeIdx);
 		if (paintFiche(listCol, panel, nav, spec)) return;
 		paintList(listCol, panel, nav, spec);
 		paintPanel(listCol, panel, nav, spec);
@@ -645,7 +671,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    la direction du glissement se déduit de l'écart. */
 	function goToQuestion(target: number, listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		if (!draft) return;
-		const clamped = Math.max(0, Math.min(target, draft.questions.length - 1));
+		const clamped = hote(Math.max(0, Math.min(target, draft.questions.length - 1)));
 		// Depuis la fiche : pas de glissement, la page change de nature
 		// (fiche → aperçu), elle est repeinte.
 		if (showingWelcome()) {
@@ -657,7 +683,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		}
 		if (!slideHost || clamped === activeIdx) return;
 		const dir: 1 | -1 = clamped > activeIdx ? 1 : -1;
-		const hops = Math.abs(clamped - activeIdx);
+		// L'écart en questions VISIBLES : une lecture absorbée n'est pas un cran.
+		const v = visibles();
+		const hops = Math.max(1, Math.abs(v.indexOf(clamped) - v.indexOf(activeIdx)));
 		activeIdx = clamped;
 		spec.onQuestionChange?.(activeIdx);
 		const q = draft.questions[activeIdx];
@@ -671,38 +699,28 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		listCol.replaceChildren();
 
 		const head = ajouter(listCol, "div", "qbd-qz-list-head");
-		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: draft.questions.length }));
-		if (editing) {
-			const add = ajouter(head, "button", "qbd-qz-list-add");
-			add.type = "button";
-			add.setAttribute("aria-label", t("dashboard.quiz.addQuestion"));
-			currentHost().ui.setIcon(add, "plus");
-			// Le TYPE se choisit à la création, comme dans l'éditeur : une
-			// question ajoutée d'office en « choix unique » puis reconvertie
-			// perdrait ses réponses au passage.
-			add.addEventListener("click", () => {
-				openTypePickerModal((key) => {
-					if (!draft) return;
-					const q = makeDefault(key);
-					// « Question N » non traduit : motif du titre auto écrit dans
-					// le .md et relu par l'éditeur (cf. editor/ui.ts).
-					q.title = `Question ${draft.questions.length + 1}`;
-					draft.questions.push(q);
-					activeIdx = draft.questions.length - 1;
-					// Le mode ÉDITION s'ouvre avec la question : on vient de la
-					// créer vide, la relire n'apprendrait rien.
-					editing = true;
-					scheduleSave();
-					repaint();
-				});
-			});
-		}
+		// Les lectures absorbées n'ont pas de carte : leur cours s'édite
+		// au-dessus de chaque question de leur étape.
+		const vis = visibles();
+		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.length }));
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
-		draft.questions.forEach((q, i) => {
+		/* La liste s'efface en fondu à ses bords dès qu'il reste des questions
+		   au-dessus ou au-dessous (2026-09-26) : une carte n'est plus coupée
+		   net. Même mécanisme que les cartes de la grille. */
+		suivreDebord(items);
+		vis.forEach((i, pos) => {
+			const q = draft!.questions[i];
+			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,
+			   2026-09-26) : numéro en rond, une seule étiquette en texte simple
+			   (icône + libellé du type, ou du rôle Lecture/Avec vos mots),
+			   puis l'énoncé sur deux lignes. */
 			const card = ajouter(items, "div", "qbd-qz-card" + (i === activeIdx && !showingWelcome() ? " is-active" : ""));
-			const num = ajouter(card, "span", "qbd-qz-card-num", String(i + 1));
-			num.setAttribute("aria-hidden", "true");
+			// L'index du BROUILLON : la vignette se retrouve par lui, pas par
+			// sa position dans la liste (qui saute les lectures absorbées).
+			card.dataset.qi = String(i);
+			const top = renderTop(card, q, pos + 1);
+			top.classList.add("qbd-qz-card-top");
 			const text = questionText(q);
 			const label = ajouter(card, "span", "qbd-qz-card-text" + (text ? "" : " is-empty"), text || t("dashboard.quiz.promptEmpty"));
 			// LaTeX $…$ de la vignette : rendu comme dans la liste de l'éditeur
@@ -711,21 +729,31 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (text.includes("$")) void mathifyElement(label);
 			card.addEventListener("click", () => goToQuestion(i, listCol, panel, nav, spec));
 
-			if (!editing || !draft) return;
+			if (!editing || !draft || i !== activeIdx) return;
 
+			/* Sur une SECONDE ligne, et seulement dans la carte courante (tâche 5
+			   de l'édition dans le rendu) : au bout de la ligne du numéro, même
+			   invisibles, elles gardaient leur place et coupaient le nom du type
+			   et le rôle ; posées en absolu, elles les recouvraient au survol.
+			   Révélées au survol d'une autre carte, elles la feraient grandir
+			   sous la souris. Déplacer une question : la choisir d'abord. */
 			const acts = ajouter(card, "div", "qbd-qz-card-acts");
 
 			// Réordonnancement : l'ordre des questions EST le déroulé du quiz.
 			// Les flèches restent visibles (grisées) aux extrémités plutôt que
 			// de disparaître — une rangée d'actions qui change de largeur d'une
 			// carte à l'autre fait sautiller la liste.
+			/* Échange avec la question VISIBLE voisine : une lecture absorbée
+			   entre les deux ne bouge pas, et comme son étape tient à son champ
+			   `slice` (pas à sa place dans le tableau), elle reste dans son
+			   étape. */
 			const move = (dir: -1 | 1, icon: string, aria: string): void => {
 				const btn = ajouter(acts, "button", "qbd-qz-card-act");
 				btn.type = "button";
 				btn.setAttribute("aria-label", aria);
 				currentHost().ui.setIcon(btn, icon);
-				const target = i + dir;
-				btn.disabled = target < 0 || target >= draft!.questions.length;
+				const target = voisine(i, dir);
+				btn.disabled = target < 0;
 				btn.addEventListener("click", (e) => {
 					e.stopPropagation();
 					if (!draft || btn.disabled) return;
@@ -751,7 +779,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 				del.addEventListener("click", (e) => {
 					e.stopPropagation();
 					if (!draft) return;
-					const title = q.title || `Question ${i + 1}`;
+					const title = q.title || `Question ${pos + 1}`;
 					// Confirmation, comme dans l'éditeur : la croix est révélée au
 					// survol, l'écriture dans la note est immédiate, et rien ne
 					// rattrape une question supprimée par erreur.
@@ -776,14 +804,37 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			}
 		});
 
-		// ── Mode du quiz (édition seulement) ──
-		if (!editing) return;
-		renderExamPanel(listCol, {
-			get: () => draft?.examOptions ?? null,
-			set: (value) => { if (draft) draft.examOptions = value; },
-			onChange: () => scheduleSave(),
-			onStructureChange: () => paintList(listCol, panel, nav, spec),
-		});
+		/* « + Ajouter une question » EN BAS de la liste (refonte 2026-09-26) :
+		   le « + » seul de l'en-tête de liste ne se remarquait pas. Même
+		   action. Le TYPE se choisit à la création, comme dans l'éditeur : une
+		   question ajoutée d'office en « choix unique » puis reconvertie
+		   perdrait ses réponses au passage. */
+		if (editing) {
+			const add = ajouter(listCol, "button", "qbd-qz-list-add");
+			add.type = "button";
+			currentHost().ui.setIcon(ajouter(add, "span", "qbd-qz-list-add-icon"), "plus");
+			ajouter(add, "span", undefined, t("dashboard.quiz.addQuestion"));
+			add.addEventListener("click", () => {
+				openTypePickerModal((key) => {
+					if (!draft) return;
+					const q = makeDefault(key);
+					// « Question N » non traduit : motif du titre auto écrit dans
+					// le .md et relu par l'éditeur (cf. editor/ui.ts).
+					q.title = `Question ${visibles().length + 1}`;
+					draft.questions.push(q);
+					activeIdx = draft.questions.length - 1;
+					// Le mode ÉDITION s'ouvre avec la question : on vient de la
+					// créer vide, la relire n'apprendrait rien.
+					editing = true;
+					scheduleSave();
+					repaint();
+				});
+			});
+		}
+
+		/* Plus de bloc « Mode du quiz » sous la liste (retiré le 2026-09-26) :
+		   le mode d'un quiz se choisit à la génération, et un Learn et son
+		   Practice sont deux notes distinctes. */
 	}
 
 	/** Met à jour le texte de la vignette de la question COURANTE — la seule
@@ -792,7 +843,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function refreshListLabels(listCol: HTMLElement): void {
 		if (!draft) return;
 		const q = draft.questions[activeIdx];
-		const el = listCol.querySelectorAll<HTMLElement>(".qbd-qz-card-text")[activeIdx];
+		const el = listCol.querySelector<HTMLElement>(`.qbd-qz-card[data-qi="${activeIdx}"] .qbd-qz-card-text`);
 		if (!q || !el) return;
 		const text = questionText(q);
 		// La classe est ajustée AVANT le retour anticipé : saisir exactement le
@@ -811,25 +862,40 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// Pas de bandeau « Question i / n » : le rendu réel affiche déjà le
 		// TITRE de la question (h2 du moteur) — deux titres l'un sur l'autre.
 		const content = ajouter(slide, "div", "qbd-qz-panel-body");
+		// Le cours de l'étape (Learn), et le numéro AFFICHÉ pour le titre de
+		// repli : « Question 2 » pour la question qui suit une lecture absorbée.
+		// -1 pour une lecture de Learn, qui n'a pas de numéro : pas de
+		// « Question N » de repli (detail-edition.ts, detail-question.ts).
+		const lecture = lectureDe(index);
+		const numero = numeroDe(index) - 1;
 		if (editing) {
-			renderQuestionEdit(content, q, {
+			/* La question s'édite dans son RENDU corrigé (detail-edition.ts).
+			   Une seule question est montée à la fois : l'instance précédente
+			   est démontée d'abord — sinon ses écouteurs et ses champs
+			   CodeMirror survivraient à la slide qui s'en va. */
+			demonterEdition();
+			demonterEditionCourante = renderQuestionEditRendu(content, q, numero, {
 				onChange: () => {
 					scheduleSave();
 					// Rafraîchir les LIBELLÉS, pas reconstruire la liste : à chaque
-					// frappe on détruisait sinon les cartes (et le bloc « Mode du
-					// quiz », son sélecteur compris) sous le curseur de
+					// frappe on détruisait sinon les cartes sous le curseur de
 					// l'utilisateur, pour n'en changer qu'une ligne de texte.
 					refreshListLabels(listCol);
 				},
-				// Re-peindre le PANNEAU seul : la liste vient d'être refaite par
-				// onChange, et re-rendre tout volerait le focus de la frappe.
+				// Re-peindre le PANNEAU seul : re-rendre tout volerait le focus.
 				onStructureChange: () => paintPanel(listCol, panel, nav, spec),
+				// Le type ou le rôle : la carte de la liste les montre aussi.
+				onListeChange: () => paint(listCol, panel, nav, spec),
+				plusOuvert,
+				setPlusOuvert: (v) => { plusOuvert = v; },
+				estLecon: estLecon(),
+				lecture,
 			// Le chemin de la NOTE : une image collée doit atterrir là où le
 			// réglage de l'utilisateur le dit, y compris dans ses modes
 			// relatifs à la note. Absent pour un quiz encore en mémoire.
 			}, draft?.file?.path);
 		} else {
-			renderQuestionView(content, q, index, draft?.file?.path);
+			renderQuestionView(content, q, numero, draft?.file?.path, lecture);
 		}
 	}
 
@@ -848,6 +914,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (!page.isConnected) { detach(); return; }
 			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 			if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+			/* Déjà pris en charge plus bas dans la page : dans le rendu en
+			   édition, les flèches déplacent un emplacement du classement
+			   (edition-rendu-gestes.ts) — elles ne changent pas de question. */
+			if (e.defaultPrevented) return;
 			// Page HORS ÉCRAN (onglet en arrière-plan, autre vue du dashboard) :
 			// son DOM existe encore et son écoute est toujours posée sur le
 			// document. Sans ce garde, une flèche pressée ailleurs faisait aussi
@@ -870,7 +940,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			   même raison. */
 			if (showingWelcome()) return;
 			e.preventDefault();
-			goToQuestion(activeIdx + (e.key === "ArrowRight" ? 1 : -1), listCol, panel, nav, spec);
+			// La question VISIBLE voisine : une lecture absorbée n'est pas un cran.
+			const cible = voisine(activeIdx, e.key === "ArrowRight" ? 1 : -1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
 		};
 		const detach = (): void => {
 			doc.removeEventListener("keydown", onKey);
@@ -885,8 +957,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	function availableHeight(panel: HTMLElement): number {
 		const main = panel.parentElement;
 		if (!main) return 0;
-		// 40px de chevrons + 10px de gouttière + 8px de padding du panneau.
-		return Math.max(0, main.clientHeight - 58);
+		// 40px de flèches + 4px de tranche + 10px de gouttière + 8px de padding du panneau.
+		return Math.max(0, main.clientHeight - 62);
 	}
 
 	function paintPanel(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
@@ -895,8 +967,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// une piste que `panel.replaceChildren()` va détacher : le conclure d'abord, sinon
 		// ils survivent jusqu'à leur échéance en visant un DOM mort.
 		if (slideHost) finishSlide(slideHost);
+		demonterEdition();
 		panel.replaceChildren();
+		libererChamps();
 		slideHost = null;
+		// En édition, le panneau devient la CARTE du formulaire (verre) : posé
+		// à même une photo de fond, un formulaire ne se lisait pas.
+		panel.classList.toggle("is-editing", editing);
 		// La fiche occupe le corps : `paint` l'a déjà peinte à la place du panneau.
 		if (showingWelcome()) return;
 		const q = draft.questions[activeIdx];
@@ -926,32 +1003,49 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const questions = draft.questions;
 		reserveTallest(
 			slideHost,
-			questions.map((qq, i) => (slide: HTMLElement) => fillSlide(slide, qq, i, listCol, panel, nav, spec)),
+			visibles().map(i => (slide: HTMLElement) => fillSlide(slide, questions[i], i, listCol, panel, nav, spec)),
 			availableHeight(panel),
 		);
 	}
 
-	/** Navigation ‹ › — deux cercles nus, comme StudySmarter : aucun compteur
-	    entre eux (la position se lit dans la liste de gauche). Repeinte seule
-	    à chaque glissement, pour que l'état désactivé suive sans reconstruire
-	    la question. */
+	/** Navigation ‹ › — les flèches bleues 3D du quiz (`.quiz-question-nav
+	    .quiz-nav-btn`, action-buttons.css : face bleue, tranche, enfoncement
+	    au clic, grise et à plat quand désactivée), et la position entre les
+	    deux (refonte de l'éditeur, 2026-09-26 : les deux ronds fantômes gris
+	    d'avant ne se lisaient pas comme des flèches). Repeinte seule à chaque
+	    glissement, pour que l'état désactivé suive sans reconstruire la
+	    question. */
 	function paintNav(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
 		nav.replaceChildren();
-		if (!draft || draft.questions.length <= 1) return;
+		// Position et bouts comptés sur les questions VISIBLES (sans les
+		// lectures absorbées), comme la liste et les onglets du quiz.
+		const vis = visibles();
+		if (!draft || vis.length <= 1) return;
+		nav.classList.add("quiz-question-nav");
+		const pos = vis.indexOf(activeIdx);
 
-		const prev = ajouter(nav, "button", "qbd-qz-nav-btn");
+		const prev = ajouter(nav, "button", "quiz-nav-btn");
 		prev.type = "button";
 		prev.setAttribute("aria-label", t("dashboard.quiz.prev"));
 		currentHost().ui.setIcon(prev, "chevron-left");
-		prev.disabled = activeIdx === 0;
-		prev.addEventListener("click", () => goToQuestion(activeIdx - 1, listCol, panel, nav, spec));
+		prev.disabled = pos <= 0;
+		prev.addEventListener("click", () => {
+			const cible = voisine(activeIdx, -1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
+		});
 
-		const next = ajouter(nav, "button", "qbd-qz-nav-btn");
+		ajouter(nav, "span", "qbd-qz-nav-pos",
+			t("dashboard.quiz.position", { n: pos + 1, total: vis.length }));
+
+		const next = ajouter(nav, "button", "quiz-nav-btn");
 		next.type = "button";
 		next.setAttribute("aria-label", t("dashboard.quiz.next"));
 		currentHost().ui.setIcon(next, "chevron-right");
-		next.disabled = activeIdx >= draft.questions.length - 1;
-		next.addEventListener("click", () => goToQuestion(activeIdx + 1, listCol, panel, nav, spec));
+		next.disabled = pos < 0 || pos >= vis.length - 1;
+		next.addEventListener("click", () => {
+			const cible = voisine(activeIdx, 1);
+			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
+		});
 	}
 
 	/** Écrit MAINTENANT ce qui est en attente (sortie de page, lancement,
@@ -980,13 +1074,20 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	    tout déplacement ET toute suppression — sans quoi supprimer « Question
 	    2 » laissait « Question 1, Question 3… » dans la note. */
 	function renumberAuto(questions: DraftQuestion[]): void {
+		// Le numéro AFFICHÉ, qui saute les lectures absorbées (elles n'en ont
+		// pas, et gardent leur titre).
+		const numeros = numerosAffiches(questions, estLecon());
 		questions.forEach((qq, idx) => {
-			if (!qq._userModifiedTitle && /^Question \d+$/.test(qq.title || "")) qq.title = `Question ${idx + 1}`;
+			if (!numeros[idx]) return;
+			if (!qq._userModifiedTitle && /^Question \d+$/.test(qq.title || "")) qq.title = `Question ${numeros[idx]}`;
 		});
 	}
 
 
 	function dispose(): Promise<void> {
+		// Un texte encore ouvert dans le rendu rejoint le brouillon, et
+		// l'écriture qu'il planifie part avec le reste juste en dessous.
+		demonterEdition();
 		// L'écriture est CAPTURÉE avant que l'état ne soit remis à zéro : le
 		// brouillon en attente est figé dans `pendingSave`, pas relu ici.
 		const ecrit = flushSave();
@@ -995,11 +1096,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		closeAllSelects();
 		if (keyCleanup) keyCleanup();
 		if (slideHost) { finishSlide(slideHost); slideHost = null; }
+		// Les champs du formulaire : la page n'est pas forcément déjà retirée
+		// du document, d'où la racine passée en plus des champs détachés.
+		libererChamps(currentContainer);
 		draft = null;
 		currentSpec = null;
 		currentContainer = null;
 		currentPath = null;
-		countEl = null;
 		return ecrit;
 	}
 

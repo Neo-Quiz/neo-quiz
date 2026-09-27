@@ -1,14 +1,19 @@
 import { ajouter } from "../dom";
+import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
+import { regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
-import { moduleForQuiz, buildModuleGroups, buildUeGroups, estLeSas } from "./quiz-modules";
+import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
+import { renderFolderProgress } from "./folder-progress";
+import { renderFolderPlanning } from "./folder-planning";
+import { renderNextStep } from "./folder-next";
 import { buildRecentModuleGroups } from "./quiz-recent";
 import type { RecentGroupKey } from "./quiz-recent";
 import { moduleAccent } from "./module-color";
@@ -24,9 +29,11 @@ import { renderFolderSections } from "./folder-sections";
    recherche/filtres/sélecteur, dispatch vers ce module.
 ══════════════════════════════════════════════════════════ */
 
-/* Deux axes seulement depuis la demande Excalidraw 2026-07-18 (« on ne doit
-   voir que UE ou Recent ») ; « module » et « type » ont été retirés. */
-export type GroupingKey = "ue" | "recent";
+/* Trois axes depuis le 2026-09-24 : « Récent » et « Dossier », valables pour
+   tout le monde, puis « UE », PERSONNALISÉ — il suppose un cursus déclaré
+   (Ahmed : « c'est pas toutes les personnes qui utilisent l'app qui sont à
+   l'Efrei »). « module » et « type » restent retirés. */
+export type GroupingKey = "recent" | "folder" | "ue";
 
 /** Dépendances d'ÉTAT fournies par le contrôleur (réglages, recherche,
     re-rendu) — tout ce qui n'est pas pur DOM reste côté quizzes.ts. */
@@ -145,6 +152,13 @@ export function renderQuizGrid(
 			const body = renderCollapsibleSection(deps, treeEl, g.key, t(RECENT_GROUP_LABEL_KEYS[g.key]), g.modules.length, { entryDelay });
 			renderModuleGrid(deps, body, g.modules, map, entryDelay);
 		}
+	} else if (mode === "folder") {
+		// Axe Dossier : un en-tête par dossier parent. Clé « folder: » : « : »
+		// est interdit dans un chemin, aucune collision avec les autres axes.
+		for (const g of buildFolderGroups(modules)) {
+			const body = renderCollapsibleSection(deps, treeEl, "folder:" + g.parent, g.label || t("dashboard.quizzes.noFolder"), g.modules.length, { entryDelay });
+			renderModuleGrid(deps, body, g.modules, map, entryDelay);
+		}
 	} else {
 		// Axe UE (défaut) : en-tête d'UE repliable, cartes de module dessous ;
 		// « Sans UE » (modules non résolus) en dernier (garanti par buildUeGroups).
@@ -163,8 +177,20 @@ export function renderQuizGrid(
 	}
 }
 
-/** Drill-down d'un module ouvert : grille de ses quiz + panneau « Progrès »
-    (design claude.ai, capture 2026-07-20). Le fil d'Ariane et le titre vivent
+/** Les trois onglets d'un dossier ouvert (2026-09-25, planning 2026-09-26) :
+    son contenu, sa progression, et son planning de révisions. */
+export type OngletDossier = "contenu" | "progression" | "planning";
+
+/** Les trois vues d'un dossier ; `progression` et `planning` sont absentes
+    dans le sas. */
+export interface VuesDossier {
+	contenu: HTMLElement;
+	progression: HTMLElement | null;
+	planning: HTMLElement | null;
+}
+
+/** Drill-down d'un module ouvert : l'étape suivante, la grille de ses quiz et
+    les ressources du dossier, et la vue « Progression » de l'autre onglet. Le fil d'Ariane et le titre vivent
     désormais dans quizzes.ts (le header EST le titre du dossier) ; `inModule`
     arrive déjà filtré par module — mêmes quiz que les stats du header
     (calculés UNE fois par render(), cf. quizzes.ts). */
@@ -176,8 +202,9 @@ export function renderModuleDrill(
 	map: ModuleMap,
 	openModuleFolder: string,
 	/* Re-rendu SANS refermer le drill-down (reset de stats depuis le menu ⋯). */
-	rerender: () => void
-): void {
+	rerender: () => void,
+	onglet: OngletDossier
+): VuesDossier {
 	treeEl.replaceChildren();
 
 	// Module ouvert : sert à l'accent des cartes (le nom est déjà porté par le
@@ -196,16 +223,12 @@ export function renderModuleDrill(
 	   sections, et le bouton pour générer. L'état vide reste, à la place de la
 	   grille, avec la phrase qui dit quoi faire. */
 
-	// ── Layout 2 colonnes : colonne principale (grille + sections du dossier)
-	// + panneau « Progrès » (repli 1 colonne sous une largeur seuil, cf.
-	// dashboard-quizzes.css). ──
-	/* Le SAS n'a pas de panneau « Progrès » : on n'y progresse pas, on y
-	   passe. La colonne principale prend alors toute la largeur (une seule
-	   colonne de layout, cf. `.qbd-quizzes-drill-layout--plein`). Reconnu par
-	   le CHEMIN du dossier ouvert, comme la carte. */
+	/* Le SAS n'a ni onglet « Progression » ni étape suivante : on n'y
+	   progresse pas, on y passe. Reconnu par le CHEMIN du dossier ouvert,
+	   comme la carte. */
 	const sas = !!ctx.generatedFolder && cheminOuvert !== undefined && cheminOuvert === ctx.generatedFolder();
 	const accent = moduleAccent(info ?? { folder: openModuleFolder }, { generated: sas });
-	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout" + (sas ? " qbd-quizzes-drill-layout--plein" : ""));
+	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout");
 	layout.style.setProperty("--accent", accent);
 	const principal = ajouter(layout, "div", "qbd-quizzes-drill-main");
 	if (inModule.length === 0) {
@@ -218,14 +241,41 @@ export function renderModuleDrill(
 		else if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
 	}
 	const grid = ajouter(principal, "div", "qbd-home-grid qbd-quizzes-drill-grid");
-	for (const [index, quiz] of inModule.entries()) {
+	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
+	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
+	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture (« Ajouter du
+	   contenu ») veut un chemin du contrat (correctif 2026-09-17), et
+	   `renderFolderPlanning` en a besoin pour le même geste dans son propre
+	   composer (tâche 5). */
+	const dossier = cheminOuvert ?? openModuleFolder;
+	// Le Learn avant le Practice d'un même cours : ordre des cartes,
+	// consommé par l'étape suivante (ci-dessous) ET par le Planning.
+	const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
+	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
+	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
+	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
+	   la génération (son bouton « Générer » est dans l'en-tête). */
+	if (!sas) {
+		const rangee = ajouter(principal, "div", "qbd-quizzes-drill-next");
+		principal.insertBefore(rangee, grid);
+		renderNextStep(rangee, ctx, ordre, stats);
+		if (!rangee.firstChild) rangee.remove();
+	}
+	for (const [index, { quiz, frere }] of cartes.entries()) {
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
+			frere,
+			statsFrere: frere ? stats[frere.path] : undefined,
+			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
+			showPath: false,
+			// L'avancement vit dans l'onglet « Progression » du dossier.
+			showRing: false,
 			onPlay: (q) => ctx.openQuiz(q),
 			// Absent côté application (menus et modals = tranche 2.6) : la
 			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
 			// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
 			// correction 1, tâche 6).
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender) : undefined,
+			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map) : undefined,
 			accent,
 			entryIndex: index,
 		});
@@ -242,61 +292,19 @@ export function renderModuleDrill(
 		renderFolderSections(principal, { ctx, folder: cheminOuvert, rerender });
 	}
 
-	if (!sas) renderProgressPanel(layout, inModule, stats);
-}
-
-/** Donut structurel du handoff 7a : un anneau conique de 150 px et un disque
-    central opaque. Le centre fait partie du donut, le pourcentage ne peut donc
-    plus dériver hors du trou selon les métriques de police. */
-function renderDonut(container: HTMLElement, mastered: number, review: number, total: number, centerPct: number): void {
-	const masteredEnd = total > 0 ? mastered / total * 100 : 0;
-	const reviewEnd = total > 0 ? (mastered + review) / total * 100 : 0;
-	const donut = ajouter(container, "div", "qbd-progress-donut");
-	donut.style.setProperty("--qbd-donut-mastered-end", `${masteredEnd}%`);
-	donut.style.setProperty("--qbd-donut-review-end", `${reviewEnd}%`);
-	donut.setAttribute("role", "img");
-	donut.setAttribute("aria-label", `${centerPct}%`);
-
-	const centerLabel = ajouter(donut, "div", "qbd-progress-donut-center");
-	ajouter(centerLabel, "b", "qbd-progress-donut-pct", String(centerPct));
-	ajouter(centerLabel, "span", "qbd-progress-donut-pct-sign", "%");
-}
-
-/** Panneau « Progrès » : donut (mastered/review/à-apprendre) + légende, à
-    côté de la grille du module ouvert. `inModule` = TOUS les quiz du dossier
-    (pas juste ceux filtrés par une recherche) : c'est un statut du dossier
-    entier. Regroupement des 4 états de computeQuizState en 3 catégories —
-    "review" (quiz raté, seuil déjà atteint) reste seul (correspondance
-    directe avec « à réviser ») ; "progress" (en cours, pas fini) ET "fresh"
-    (jamais commencé) fusionnent dans « à apprendre » : aucun des deux n'est
-    encore acquis, et le triplé de la référence ne laisse pas de 4e case. */
-function renderProgressPanel(parent: HTMLElement, inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
-	const total = inModule.length;
-	let masteredN = 0, reviewN = 0, learnN = 0;
-	for (const quiz of inModule) {
-		const { state } = computeQuizState(quiz, stats[quiz.path]);
-		if (state === "mastered") masteredN++;
-		else if (state === "review") reviewN++;
-		else learnN++;
-	}
-	const pctOf = (n: number): number => total > 0 ? Math.round(n / total * 100) : 0;
-
-	const panel = ajouter(parent, "div", "qbd-progress-panel");
-	const head = ajouter(panel, "div", "qbd-progress-panel-head");
-	ajouter(head, "div", "qbd-progress-panel-title", t("dashboard.quizzes.progressTitle"));
-	ajouter(head, "div", "qbd-progress-panel-count", t("dashboard.quizzes.progressCount", { done: masteredN, total }));
-
-	const donutWrap = ajouter(panel, "div", "qbd-progress-donut-wrap");
-	renderDonut(donutWrap, masteredN, reviewN, total, pctOf(masteredN));
-
-	const legend = ajouter(panel, "div", "qbd-progress-legend");
-	const addRow = (dotMod: string, label: string, n: number): void => {
-		const row = ajouter(legend, "div", "qbd-progress-legend-row");
-		ajouter(row, "div", `qbd-progress-legend-dot qbd-progress-legend-dot--${dotMod}`);
-		ajouter(row, "div", "qbd-progress-legend-label", label);
-		ajouter(row, "div", "qbd-progress-legend-pct", `${pctOf(n)}%`);
+	// Le groupe du dossier ouvert : même forme pour Progression et Planning,
+	// jamais deux constructions qui pourraient diverger.
+	const group: ModuleGroup = {
+		folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
+		color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
 	};
-	addRow("mastered", t("dashboard.card.mastered"), masteredN);
-	addRow("review", t("dashboard.card.review"), reviewN);
-	addRow("learn", t("dashboard.quizzes.progressToLearn"), learnN);
+	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, cartes, group });
+	const planning = sas ? null : renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, cartes, group, folder: dossier });
+	const vues: VuesDossier = { contenu: layout, progression, planning };
+	const disponibles: Record<OngletDossier, HTMLElement | null> = vues;
+	const montree = disponibles[onglet] ?? layout;
+	layout.hidden = montree !== layout;
+	if (progression) progression.hidden = montree !== progression;
+	if (planning) planning.hidden = montree !== planning;
+	return vues;
 }

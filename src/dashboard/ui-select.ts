@@ -50,6 +50,9 @@ export interface SelectOption {
 	hint?: string;
 	/** Visible, mais pas sélectionnable : un clic appelle `onDisabledClick` (le fournisseur absent ouvre son modal d'installation). */
 	disabled?: boolean;
+	/** Intitulé de section affiché AVANT cette option (non cliquable) : le
+	    tri « Personnalisé » sépare « UE » des tris par défaut. */
+	section?: string;
 }
 
 export interface SelectOptions<T extends SelectOption = SelectOption> {
@@ -151,6 +154,7 @@ export function createSelect<T extends SelectOption = SelectOption>(parent: HTML
 		if (!menuEl) return;
 		menuEl.replaceChildren();
 		for (const o of options) {
+			if (o.section) ajouter(menuEl, "div", "qbd-select-section", o.section);
 			const optBtn = ajouter(menuEl, "button", "qbd-select-option" + (o.value === value && !o.disabled ? " is-active" : ""));
 			optBtn.type = "button";
 			optBtn.setAttribute("role", "option");
@@ -258,23 +262,32 @@ export interface ActionMenuItem {
 	/** Rangée destructrice, teintée rouge (façon « Delete Study Set » de
 	    StudySmarter) — à placer en dernier dans le menu. */
 	danger?: boolean;
+	/** Un filet AVANT la ligne : sépare les groupes (menu « + » de claude.ai). */
+	sepBefore?: boolean;
 	onClick?: () => void;
 }
 
+/** Réglages de SURFACE d'un menu d'actions, tous facultatifs. */
+export interface ActionMenuOptions {
+	/** Classe ajoutée au menu (`qbd-menu-claude` : la matière des menus de claude.ai). */
+	className?: string;
+}
+
 /*
- * openActionMenu(anchorEl, items) — menu flottant d'actions
+ * openActionMenu(anchorEl, items, options?) — menu flottant d'actions
  * (même surface visuelle que le dropdown). items :
- * [{ icon, label, sub?, disabled?, onClick }]
+ * [{ icon, label, sub?, disabled?, sepBefore?, onClick }]
  */
-export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[]): MenuHandle {
+export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], options: ActionMenuOptions = {}): MenuHandle {
 	if (toggleCloseForAnchor(anchorEl)) return { close() {} };
 	closeAllSelects();
 
 	const rect = anchorEl.getBoundingClientRect();
-	const menuEl = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu");
+	const menuEl = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu" + (options.className ? " " + options.className : ""));
 	menuEl.setAttribute("role", "menu");
 
 	for (const item of items) {
+		if (item.sepBefore) ajouter(menuEl, "div", "qbd-model-menu-sep");
 		const btn = ajouter(menuEl, "button", "qbd-select-option"
 			+ (item.disabled ? " qbd-select-option--disabled" : "")
 			+ (item.danger ? " qbd-select-option--danger" : ""));
@@ -1681,6 +1694,17 @@ export interface OpenOptionsMenuOptions {
 	/** Dossier courant (une `value` de `folders`). */
 	folder?: string;
 	onFolder?: (value: string) => void;
+	/**
+	 * CATÉGORIE du quiz (retour #7, 2026-09-26) : « Automatique » en tête,
+	 * dont l'indice dit ce qui est détecté, puis la liste. Absente = pas de
+	 * ligne Catégorie.
+	 */
+	categories?: { value: string; label: string; icon: string }[];
+	/** La catégorie choisie (une `value` de `categories`), `null` = Automatique. */
+	categorie?: string | null;
+	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
+	categorieDetectee?: string;
+	onCategorie?: (value: string | null) => void;
 }
 
 /*
@@ -1883,6 +1907,21 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 				label: f.label, icon: f.icon, color: f.color, sub: f.sub, actif: f.value === folder,
 				choisir: () => { folder = f.value; if (opts.onFolder) opts.onFolder(folder); },
 			})));
+	}
+
+	/* ── Catégorie : Automatique (la détection), ou une catégorie forcée ── */
+	const categories = opts.categories ?? [];
+	if (categories.length > 0) {
+		let categorie: string | null = categories.some(c => c.value === opts.categorie) ? String(opts.categorie) : null;
+		ligne("tag", t("dashboard.select.optionsCategory"),
+			() => categorie === null ? t("ai.categorie.auto") : (categories.find(c => c.value === categorie)?.label ?? t("ai.categorie.auto")),
+			() => [
+				{ label: t("ai.categorie.auto"), hint: opts.categorieDetectee, actif: categorie === null, choisir: () => { categorie = null; if (opts.onCategorie) opts.onCategorie(null); } },
+				...categories.map(c => ({
+					label: c.label, icon: c.icon, actif: categorie === c.value,
+					choisir: () => { categorie = c.value; if (opts.onCategorie) opts.onCategorie(c.value); },
+				})),
+			]);
 	}
 
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──

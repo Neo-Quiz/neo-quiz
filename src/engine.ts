@@ -4,6 +4,7 @@ import { createFocusHandlers } from "./engine/focus";
 import { createLifecycleHandlers } from "./engine/lifecycle";
 import { createWarmingHandlers } from "./engine/warming";
 import { createSanitizer } from "./engine/sanitizer";
+import { reinitialiserBudgetRendu } from "./engine/code-highlight";
 import { createResourceHandlers } from "./engine/resources";
 import { createExamHandlers } from "./engine/exam";
 import { createCardRenderers } from "./engine/cards";
@@ -18,9 +19,11 @@ import { createTextOnlyHandlers } from "./engine/text-only";
 import { createResultsSaver } from "./engine/results-save";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
-import { createLessonHandlers } from "./engine/lesson";
+import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
+import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
+import { photographier, restaurer, type SessionSink } from "./engine/session";
 import { t } from "./i18n";
 
 import { currentHost } from "./host/current";
@@ -36,6 +39,7 @@ import type {
 	TextQuestion,
 	ClozeQuestion,
 	CodeQuestion,
+	FlashcardQuestion,
 } from "./types/quiz";
 
 /**
@@ -58,6 +62,8 @@ interface RenderQuizContext {
 	statsSink?: EngineCtx["statsSink"];
 	/** Absent = les réponses ne sont pas journalisées. Même raison. */
 	reviewSink?: EngineCtx["reviewSink"];
+	/** Absent = pas de reprise : le quiz s'ouvre toujours de zéro. */
+	sessionSink?: SessionSink;
 }
 
 async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> {
@@ -67,7 +73,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		quiz: rawQuiz,
 		sourcePath,
 		statsSink,
-		reviewSink
+		reviewSink,
+		sessionSink
 	} = context;
 
 	container.replaceChildren();
@@ -139,6 +146,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// La PRÉSENCE de `language` non vide discrimine un exercice de code.
 	const isCodeQuestion = (q: QuizQuestion): q is CodeQuestion =>
 		!!(q && typeof (q as { language?: unknown }).language === "string" && (q as { language: string }).language.trim().length > 0);
+	const isFlashcardQuestion = (q: QuizQuestion): q is FlashcardQuestion =>
+		!!(q && (q as { flashcard?: unknown }).flashcard === true);
 
 	// Créer le contexte partagé (ctx) pour injection de dépendances
 	const originalQuizMode = quizMode;
@@ -170,6 +179,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		   reste lu par accessors de closure — cette distinction-là ne bouge pas. */
 		reviewSink,
 		statsSink,
+		sessionSink,
 		quizMode,
 		isExamMode,
 		trainingSession: false,
@@ -196,7 +206,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		isMatchingQuestion,
 		isTextQuestion,
 		isClozeQuestion,
-		isCodeQuestion
+		isCodeQuestion,
+		isFlashcardQuestion
 	} as EngineCtx;
 
 	// Instancier tous les modules avec ctx injecté
@@ -316,6 +327,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			if (isClozeQuestion(q)) return null;
 			// Un exercice de code n'a pas d'options à mélanger.
 			if (isCodeQuestion(q)) return null;
+			// Une carte se retourne : rien à mélanger.
+			if (isFlashcardQuestion(q)) return null;
 
 			if (isOrderingQuestion(q)) {
 				return shuffleArray([...Array(questions.getOrderingItems(q).length).keys()]);
@@ -342,6 +355,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			if (isCodeQuestion(q)) return "";
 			if (isOrderingQuestion(q)) return new Array<number | null>(questions.getOrderingItems(q).length).fill(null);
 			if (isMatchingQuestion(q)) return new Array<number | null>(questions.getMatchRows(q).length).fill(null);
+			if (isFlashcardQuestion(q)) return null;
 			if (q.multiSelect) return new Set<number>();
 			return null;
 		});
@@ -352,10 +366,28 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const initOrderingPicks = () => quiz.map(() => null);
 	const initMatchPicks = () => quiz.map(() => null);
 
+	/* NUMÉROS (src/lecture-etape.ts) : dans un Learn, chaque lecture a son
+	   écran mais pas de numéro de question (0 ; son onglet est un livre,
+	   engine/cards.ts `navHtml`). FIGÉS à l'assemblage sur le mode
+	   D'ORIGINE, comme `slideMap`. */
+	const estLecon = buildLessonModel(quiz, originalQuizMode).isLesson;
+	const numeros = numerosAffiches(quiz, estLecon);
+	ctx.numeroAffiche = (qi: number): number => numeros[qi] ?? qi + 1;
+	/* Les LECTURES COURTES (même règle) n'ont pas d'écran : elles se lisent
+	   au-dessus de leur question hôte (engine/cards.ts). Figées elles aussi :
+	   une bascule Leçon → Examen ne leur rend pas une diapositive vide. */
+	const courtes = lecturesCourtes(quiz, estLecon);
+	ctx.lecturesAbsorbees = new Set(courtes.keys());
+	ctx.lectureCourteDe = (qi: number): number | null => {
+		for (const [lecture, hote] of courtes) if (hote === qi) return lecture;
+		return null;
+	};
+
 	// ── Slide Map : index dynamique basé sur le mode ──
 	function buildSlideMap(): SlideMapEntry[] {
 		const map: SlideMapEntry[] = [];
 		for (let i = 0; i < quiz.length; i++) {
+			if (courtes.has(i)) continue;
 			map.push({ type: "question", questionIndex: i });
 		}
 		map.push({ type: "submit" });
@@ -387,6 +419,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		matchPick: initMatchPicks(),
 		// Task 7, mode Lesson : cf. QuizState.lessonPreSkipped (src/types/quiz.ts).
 		lessonPreSkipped: quiz.map(() => false),
+		hintSeen: quiz.map(() => false),
 		// Task 8 : cf. QuizState.recorded (src/types/quiz.ts). Vide à l'assemblage,
 		// comme resultsCounted, avant que resetQuiz() ne l'aligne sur ctx.quiz.
 		recorded: [],
@@ -414,12 +447,22 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const isResultsSlideIndex = (i: number): boolean => slideMap[i]?.type === "results";
 	const clampSlideIndex = (i: number): number => Math.max(0, Math.min(TOTAL_SLIDES - 1, i));
 	const getSlidingWindow = (): { from: number; to: number } => ({ from: Math.max(0, Math.min(quizState.prevCurrent, quizState.current)), to: Math.min(TOTAL_SLIDES - 1, Math.max(quizState.prevCurrent, quizState.current)) });
+	/* Une lecture courte n'a pas de diapositive : elle renvoie à sa question
+	   hôte, qui la montre. Une reprise ou un onglet qui la visait tombe sur
+	   une vraie diapositive plutôt que sur rien. */
 	const getSlideIndexForQuestion = (qi: number): number => {
+		const cible = courtes.get(qi) ?? qi;
 		for (let si = 0; si < slideMap.length; si++) {
 			const entry = slideMap[si];
-			if (entry.type === "question" && entry.questionIndex === qi) return si;
+			if (entry.type === "question" && entry.questionIndex === cible) return si;
 		}
 		return -1;
+	};
+	/** La question de la diapositive qui suit celle de `qi` ; `null` après la dernière. */
+	const questionSuivante = (qi: number): number | null => {
+		const si = getSlideIndexForQuestion(qi);
+		const suivante = si >= 0 ? slideMap[si + 1] : undefined;
+		return suivante?.type === "question" ? suivante.questionIndex : null;
 	};
 
 	// Exposer les fonctions utilitaires dans ctx
@@ -429,8 +472,30 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.clampSlideIndex = clampSlideIndex;
 	ctx.getSlidingWindow = getSlidingWindow;
 	ctx.getSlideIndexForQuestion = getSlideIndexForQuestion;
+	ctx.questionSuivante = questionSuivante;
+	/* La photo de session : prise après chaque réponse (`invalidateSavedResults`
+	   est appelé par TOUTE interaction), à chaque changement de question
+	   (state.ts) et à la destruction du moteur (un texte tapé sans quitter la
+	   question). Jamais en examen ; jamais hors d'une question. Un bloc
+	   d'EXAMEN d'origine (`isExamMode` à l'assemblage) n'est jamais
+	   photographié, même joué en « Apprendre » : il rouvre sur son écran de
+	   départ, qui effacerait la session — le « Reprendre » du dossier
+	   aurait promis une reprise que le moteur détruit. */
+	ctx.saveSession = () => {
+		if (!sessionSink || isExamMode || ctx.isExamMode || quizState.locked) return;
+		const entree = slideMap[quizState.current];
+		if (!entree || entree.type !== "question") return;
+		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now());
+		// Un quiz ouvert puis feuilleté sans jamais répondre n'a rien à
+		// reprendre : ne pas lui offrir « Reprendre » (règle du chantier).
+		if (Object.keys(photo.questions).length === 0) sessionSink.effacer();
+		else sessionSink.enregistrer(photo);
+	};
+	ctx.clearSession = () => { sessionSink?.effacer(); };
+
 	ctx.invalidateSavedResults = () => {
 		quizState.savedResultsPath = null;
+		ctx.saveSession();
 	};
 
 	if (typeof container.__quizDestroy === "function") {
@@ -527,7 +592,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		cancelEnsureTrackVisibleRaf,
 		currentAsyncEpoch,
 		isQuizInstanceAlive,
-		isDestroyed: () => !__quizDestroyed,
+		// Vrai une fois le quiz DÉTRUIT. Était inversé (`!__quizDestroyed`)
+		// et sans appelant jusqu'à l'écouteur clavier des cartes (2026-09-25).
+		isDestroyed: () => __quizDestroyed,
 		getSlideGeneration,
 		isSlideGenerationCurrent
 	});
@@ -693,6 +760,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// sont fournies par le module state via ctx.state.*
 
 	function destroyQuiz(): void {
+		try { ctx.saveSession(); } catch (_) {}
 		__quizDestroyed = true;
 		__quizAsyncEpoch++;
 
@@ -761,6 +829,10 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		ctx.viewport.unobserveTrackItemInAllSlidesResizeObserver(oldItem);
 		if (slideIdx >= 0) ctx.lifecycle.bumpSlideGeneration(slideIdx);
 
+		// Budget de coloration remis à zéro : ce re-rendu d'UNE carte est son
+		// propre « rendu complet », indépendant de celui qui a construit le
+		// track initial (revue du 2026-09-26, tour 4).
+		reinitialiserBudgetRendu();
 		const tmp = document.createElement("div");
 			tmp.innerHTML = ctx.cards.questionCardHtml(qi).trim();
 		// firstElementChild : la carte de question rendue est toujours un <div>
@@ -851,6 +923,12 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	    const examChromeHtml = ctx.exam.examTimerHtml();
 
+	    // Budget de coloration des blocs de code (code-highlight.ts) remis à
+	    // zéro UNE fois pour TOUT ce rendu — pas par carte, sans quoi un quiz
+	    // de 50 questions rechargeait 50 budgets pleins (re-revue du
+	    // 2026-09-26, tour 4 : 8,4 s mesurés pour 50 cartes contre ~150 ms
+	    // attendus). Toutes les cartes du track partagent ce budget.
+	    reinitialiserBudgetRendu();
 	    // Construire le HTML des slides à partir du slideMap
 	    const slidesHtml = slideMap.map(entry => {
 	        if (entry.type === "question") return ctx.cards.questionCardHtml(entry.questionIndex);
@@ -937,6 +1015,29 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.cancelEnsureTrackVisibleRaf = cancelEnsureTrackVisibleRaf;
 	ctx.stopExamTimer = exam.stopExamTimer;
 	ctx.updateExamTimerDisplay = exam.updateExamTimerDisplay;
+
+	/* REPRISE (2026-09-26) : la photo de la session précédente, restaurée
+	   AVANT le premier rendu — le quiz s'ouvre directement sur la question
+	   où l'on s'était arrêté, réponses comprises. Jamais pour un examen
+	   (décision : un examen se fait d'une traite), dont la session est
+	   effacée. Photo illisible → `null` → ouverture de zéro. */
+	if (sessionSink && ctx.isExamMode) sessionSink.effacer();
+	else if (sessionSink?.initiale) {
+		const reprise = restaurer(sessionSink.initiale, ctx.questionIds, { selections: quizState.selections, shuffleMap: quizState.shuffleMap });
+		if (reprise) {
+			const { courante, ...champs } = reprise;
+			Object.assign(quizState, champs);
+			// `getSlideIndexForQuestion`, pas une recherche directe : une photo
+			// prise quand la lecture était encore un écran peut désigner une
+			// lecture ABSORBÉE depuis — on rouvre sur la question qui la montre.
+			const slide = getSlideIndexForQuestion(courante);
+			if (slide >= 0) {
+				quizState.current = slide;
+				quizState.prevCurrent = slide;
+				quizState.lastQuestionIndex = (slideMap[slide] as { questionIndex: number }).questionIndex;
+			}
+		}
+	}
 
 	render();
 

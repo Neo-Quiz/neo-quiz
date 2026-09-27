@@ -76,8 +76,9 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		aiWebAvertissementMasque: [],
 		// Journal d'usage : purement informatif, borné à 300 entrées (ai-usage.ts).
 		aiUsageLog: [],
-		// Ctrl+E, plus facile à atteindre que Ctrl+U (demande Ahmed, 2026-09-17).
-		hotkeyAddFiles: { modifiers: ["Mod"], key: "e" },
+		// Ctrl+U, le raccourci de claude.ai, affiché dans le menu « + » (demande
+		// du 2026-09-26 ; Ctrl+E depuis le 2026-09-17 jusque-là).
+		hotkeyAddFiles: { modifiers: ["Mod"], key: "u" },
 		// Vide par défaut : le « @ » se limite au vault tant qu'on n'ajoute rien.
 		aiMentionExtraFolders: [],
 		// Donnée persistée, donc jamais traduite : les deux hôtes écrivent au même endroit.

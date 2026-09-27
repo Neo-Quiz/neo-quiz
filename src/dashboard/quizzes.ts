@@ -6,11 +6,11 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
-import { isMastered } from "./quiz-mastery";
 import type { ModuleMap } from "./quiz-modules";
 import { isFolderArchived } from "./folder-archive";
 import { renderQuizGrid, renderModuleDrill } from "./quizzes-render";
-import type { GroupingKey } from "./quizzes-render";
+import type { GroupingKey, OngletDossier, VuesDossier } from "./quizzes-render";
+import { renderOngletsDossier, basculerVueDossier } from "./folder-progress";
 import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
@@ -43,6 +43,11 @@ export interface QuizzesHandlers {
 	    2026-07-21) — et la correspondance chemin → dossier de module vit ici,
 	    avec la note de correspondance et les overrides. */
 	openFolderOfQuiz(quizPath: string): void;
+	/** Ouvre un dossier à un ONGLET donné (« Gérer les examens » de
+	    module-edit.ts, via `ctx.openFolderTab`) : même geste qu'`openFolder`,
+	    mais fixe aussi l'onglet AVANT le rendu — sans quoi `render()` le
+	    ramènerait à « Contenu » (changement de dossier détecté). */
+	openFolderTab(folder: string, onglet: OngletDossier): void;
 }
 
 export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
@@ -65,13 +70,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		ctx.saveSettings().catch(() => {});
 	}
 
-	/* Axe de regroupement : DEUX axes seulement (demande Excalidraw
-	   2026-07-18) — « UE » (défaut : en-têtes d'UE, cartes de module dessous)
-	   et « Récent » (activité). Toute valeur historique (« module », « type »,
-	   « folder »…) migre vers « ue ». */
+	/* Axe de regroupement (2026-09-24) : « Récent » (défaut) et « Dossier »
+	   pour tout le monde, puis « UE », personnalisé. Une valeur historique
+	   inconnue (« module », « type »…) retombe sur le défaut. */
 	function currentGrouping(): GroupingKey {
 		const g = ctx.settings.quizzesGrouping;
-		return g === "recent" ? g : "ue";
+		return g === "folder" || g === "ue" ? g : "recent";
 	}
 
 	function setGrouping(g: GroupingKey): void {
@@ -185,9 +189,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   dossier ARCHIVÉ depuis sa carte de la section « Archivés » et on y voit
 	   son contenu) est calculé UNE fois par render() — mêmes quiz que les
 	   stats du header. */
+	/* L'onglet du dossier ouvert : revient à « Contenu » quand on change de
+	   dossier, reste sur un re-rendu du même dossier. */
+	let ongletDossier: OngletDossier = "contenu";
+	let ongletPour: string | null = null;
+	let vuesDossier: VuesDossier | null = null;
+
 	function renderContent(treeEl: HTMLElement, quizzes: QuizIndexEntry[], inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (openModuleFolder !== null) {
-			renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); });
+			vuesDossier = renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); }, ongletDossier);
 		} else {
 			const map = effectiveMap();
 			const archivedQuizzes = quizzes.filter(q => isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
@@ -201,12 +211,13 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		}
 	}
 
-	// Ordre FIXE : « UE » (défaut) puis « Récent » — libellés SANS « By/Par »
-	// (demande Excalidraw 2026-07-18 : « on ne doit voir que UE ou Recent »).
-	const GROUPING_ORDER: GroupingKey[] = ["ue", "recent"];
+	// Ordre FIXE : les tris par défaut, puis la section « Personnalisé » —
+	// libellés SANS « By/Par » (demande Excalidraw 2026-07-18).
+	const GROUPING_ORDER: GroupingKey[] = ["recent", "folder", "ue"];
 	const GROUPING_LABEL_KEYS: Record<GroupingKey, TransKey> = {
-		ue: "dashboard.quizzes.groupByUE",
-		recent: "dashboard.quizzes.groupByActivity"
+		recent: "dashboard.quizzes.groupByActivity",
+		folder: "dashboard.quizzes.groupByFolder",
+		ue: "dashboard.quizzes.groupByUE"
 	};
 
 	function render(container: HTMLElement): void {
@@ -215,6 +226,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 
 		// Transition d'entrée (spec 2026-07-20) : classe posée SEULEMENT quand la
 		// vue change — mécanisme partagé avec l'accueil (view-enter.ts).
+		if (openModuleFolder !== ongletPour) { ongletDossier = "contenu"; ongletPour = openModuleFolder; }
+		vuesDossier = null;
 		const viewKey = openModuleFolder ?? "root";
 		const entering = viewKey !== lastPaintedView;
 		lastPaintedView = viewKey;
@@ -229,8 +242,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		if (!moduleMapLoaded) { void loadModuleMap(); }
 
 		const map = effectiveMap();
-		// Quiz du dossier ouvert : calculé UNE fois, réutilisé par les stats du
-		// header ET le panneau Progrès (renderModuleDrill) — les deux comptent
+		// Quiz du dossier ouvert : calculé UNE fois, réutilisé par la grille ET
+		// l'onglet « Progression » (renderModuleDrill) — les deux comptent
 		// alors exactement les mêmes quiz, jamais deux totaux qui divergent.
 		const inModule: QuizIndexEntry[] = openModuleFolder !== null
 			? quizzes.filter(q => moduleForQuiz(q.path, map).folder === openModuleFolder)
@@ -247,14 +260,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		const openModuleAccent = openModuleFolder !== null
 			? moduleAccent(openModuleInfo ?? { folder: openModuleFolder }, { generated: sas })
 			: null;
+		// La lueur de l'hôte prend la couleur du dossier ouvert (null hors dossier).
+		ctx.ambiance?.(openModuleAccent);
 
-		// Le dossier ouvert possède sa propre bannière : le halo doit rester
-		// derrière le breadcrumb et le header, sans affecter la vue racine.
+		/* Le dossier ouvert possède sa bannière. Plus de halo derrière le
+		   titre (2026-09-25) : la lueur salissait toute la page ; la couleur
+		   du dossier ne tient plus que dans l'icône du titre. */
 		let headerParent = container;
 		if (openModuleAccent !== null) {
 			const hero = ajouter(container, "div", "qbd-quizzes-folder-hero");
 			hero.style.setProperty("--accent", openModuleAccent);
-			ajouter(hero, "div", "qbd-quizzes-folder-halo");
 			headerParent = ajouter(hero, "div", "qbd-quizzes-folder-hero-inner");
 		}
 
@@ -263,16 +278,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		// « + New folder » sur la ligne du regroupement (demande Ahmed
 		// 2026-07-20), même ligne que le chip UE/Recent.
 		if (openModuleFolder !== null) {
+			/* Retour AU-DESSUS du titre (2026-09-25) : à sa gauche, la flèche
+			   décalait le titre et se lisait mal. Un seul bouton retour dans
+			   tout le dashboard. */
+			const back = ajouter(headerParent, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
 			const header = ajouter(headerParent, "div", "qbd-quizzes-header");
-
-			// Retour SUR LA LIGNE du titre, à sa gauche (comme la page d'un
-			// quiz) : une flèche seule au-dessus du titre faisait un étage de
-			// plus pour rien. Un seul bouton retour dans tout le dashboard.
-			const back = ajouter(header, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
 			back.type = "button";
 			back.setAttribute("aria-label", t("dashboard.quizzes.backToModules"));
-			const backIcon = ajouter(back, "span", "qbd-quizzes-crumb-icon");
-			currentHost().ui.setIcon(backIcon, "arrow-left");
+			// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
+			ajouter(back, "span", "qbd-quizzes-crumb-icon");
 			back.addEventListener("click", () => {
 				ctx.recordNav();
 				openModuleFolder = null;
@@ -289,30 +303,66 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
 			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 
-			// ── Actions du header : stats + pilule « Nouveau quiz » ── (groupées
-			// pour rester alignées à droite, comme la référence).
-			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
-			const masteredCount = inModule.filter(q => isMastered(q, stats)).length;
-			const statsWrap = ajouter(headerActions, "div", "qbd-quizzes-header-stats");
-			const addStat = (n: number, key: TransKey, modifier?: string): void => {
-				const item = ajouter(statsWrap, "div", "qbd-quizzes-header-stat");
-				if (modifier) item.classList.add(modifier);
-				ajouter(item, "div", "qbd-quizzes-header-stat-num", String(n));
-				ajouter(item, "div", "qbd-quizzes-header-stat-label", t(key));
-			};
-			addStat(inModule.length, "dashboard.quizzes.statQuizzes");
+			// ── À droite : Contenu | Progression. Plus de compteurs ni de
+			// « Nouveau quiz » (2026-09-25) : les chiffres sont dans l'onglet
+			// Progression, et « Ajouter du contenu » est à côté de l'étape
+			// suivante, au-dessus de la grille (quizzes-render.ts).
 			if (!sas) {
-				ajouter(statsWrap, "div", "qbd-quizzes-header-divider");
-				addStat(masteredCount, "dashboard.card.mastered", "qbd-quizzes-header-stat--mastered");
+				renderOngletsDossier(header, ongletDossier, (onglet) => {
+					ongletDossier = onglet;
+					if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
+				});
+			}
+			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
+
+			/* « Nouveau quiz », entre les onglets et le ⋯ (2026-09-26) : la
+			   barre « Ajouter du contenu » pleine largeur au-dessus de la grille
+			   est partie. Même pilule que « Nouveau dossier » de « Mes quiz ».
+			   Absent dans le sas, qui ne se remplit que par la génération. */
+			const { createQuiz } = ctx;
+			if (createQuiz && !sas) {
+				const nouveau = ajouter(headerActions, "button", "qbd-btn--create");
+				nouveau.type = "button";
+				currentHost().ui.setIcon(ajouter(nouveau, "span", "qbd-btn-icon"), "plus");
+				ajouter(nouveau, "span", undefined, t("dashboard.quizzes.newQuiz"));
+				const dossier = cheminOuvert ?? openModuleFolder;
+				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
 			}
 
-			// Drill-down : créer un dossier ICI n'a pas de sens (demande Ahmed
-			// 2026-07-19) → une seule pilule « Nouveau quiz », qui ouvre le MÊME
-			// modal à trois options que « Nouveau dossier » (IA / vierge /
-			// import), décliné pour le dossier OUVERT — homogénéité demandée.
-			// Absente côté application (modals = tranche 2.6, D5) : le bouton
-			// est alors MASQUÉ, pas grisé (Ruling 7 — un bouton d'action absent
-			// ne déroute personne, contrairement au rail de navigation).
+			/* « Partager » le dossier (2026-09-25, comme StudySmarter) : le même
+			   modal que l'entrée « Partager » du menu ⋯ de sa carte, sur les
+			   mêmes quiz que la grille. Absent si l'hôte ne sait pas partager. */
+			const { shareQuiz } = ctx;
+			if (shareQuiz && inModule.length > 0) {
+				const partager = ajouter(headerActions, "button", "qbd-folder-share-btn");
+				partager.type = "button";
+				currentHost().ui.setIcon(ajouter(partager, "span", "qbd-btn-icon"), "share-2");
+				ajouter(partager, "span", undefined, t("dashboard.quizzes.menuShare"));
+				const nom = openModuleInfo?.name || openModuleFolder;
+				partager.addEventListener("click", () => shareQuiz({ group: {
+					folder: openModuleFolder as string, name: nom, ue: null, path: cheminOuvert,
+					quizzes: inModule, total: inModule.length, mastered: 0,
+				} }));
+			}
+
+			/* « ⋯ » : le menu du dossier (Modifier, Ouvrir dans l'explorateur,
+			   Archiver…), le MÊME que celui de sa carte dans « Mes quiz »
+			   (2026-09-26, comme StudySmarter). Absent si l'hôte n'en a pas. */
+			const { openModuleMenu } = ctx;
+			if (openModuleMenu && openModuleFolder !== null) {
+				const plus = ajouter(headerActions, "button", "qbd-folder-more-btn");
+				plus.type = "button";
+				plus.setAttribute("aria-label", t("dashboard.card.more"));
+				plus.title = t("dashboard.card.more");
+				currentHost().ui.setIcon(plus, "ellipsis-vertical");
+				const groupe = {
+					folder: openModuleFolder, name: openModuleInfo?.name || openModuleFolder, ue: openModuleInfo?.ue ?? null,
+					path: cheminOuvert, color: openModuleInfo?.color, icon: openModuleInfo?.icon,
+					quizzes: inModule, total: inModule.length, mastered: 0,
+				};
+				plus.addEventListener("click", () => openModuleMenu(groupe, plus, () => { if (containerRef) render(containerRef); }, effectiveMap()));
+			}
+
 			/* LE SAS : « Générer », et non « Nouveau quiz » (demande d'Ahmed,
 			   2026-09-20). La génération est la SEULE façon dont un quiz arrive
 			   ici : les deux autres options du modal — vierge, import — écrivent
@@ -329,26 +379,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 					ajouter(genBtn, "span", undefined, t("dashboard.nav.generate"));
 					genBtn.addEventListener("click", () => ctx.navigate("ai"));
 				}
-			} else if (ctx.createQuiz) {
-				/* LE CHEMIN RÉEL, jamais le segment (correctif 2026-09-17) :
-				   `openModuleFolder` est une CLÉ de module (« Generated »), et
-				   l'écriture veut un chemin du contrat (« Neo Quiz/Generated »).
-				   Passer le segment faisait échouer « Nouveau quiz » dans TOUT
-				   dossier qui n'était pas posé à la racine d'un dossier ouvert —
-				   `fs.write` rendait « chemin hors des dossiers ouverts », et
-				   l'utilisateur ne voyait qu'un « Impossible de créer le quiz ».
-				   Le défaut est né avec l'application : sous Obsidian, les
-				   chemins sont relatifs au vault, donc le segment y suffisait.
-				   Ordre : la déclaration, sinon le chemin déduit d'un quiz du
-				   dossier, sinon le segment (comportement d'avant). */
-				const folder = cheminOuvert ?? openModuleFolder;
-				const newQuizBtn = ajouter(headerActions, "button", "qbd-btn--create");
-				const newQuizIcon = ajouter(newQuizBtn, "span", "qbd-btn-icon");
-				currentHost().ui.setIcon(newQuizIcon, "plus");
-				ajouter(newQuizBtn, "span", undefined, t("dashboard.quizzes.newQuiz"));
-				newQuizBtn.addEventListener("click", () => {
-					ctx.createQuiz!(folder, () => { if (containerRef) render(containerRef); });
-				});
 			}
 		}
 
@@ -378,7 +408,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// bouton pour le changer (bouton MASQUÉ, Ruling 7).
 			const groupSelect = ctx.renderGroupingSelect?.(groupWrap, {
 				value: currentGrouping(),
-				options: GROUPING_ORDER.map(g => ({ value: g, label: t(GROUPING_LABEL_KEYS[g]) })),
+				options: GROUPING_ORDER.map(g => ({ value: g, label: t(GROUPING_LABEL_KEYS[g]), section: g === "ue" ? t("dashboard.quizzes.groupCustom") : undefined })),
 				onChange: (v) => { setGrouping(v as GroupingKey); render(container); }
 			});
 			groupSelect?.el.classList.add("qbd-quizzes-group-select");
@@ -410,6 +440,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		resetDrilldown() { openModuleFolder = null; dossierAttenduPour = null; lastPaintedView = null; },
 		getOpenFolder() { return openModuleFolder; },
 		openFolder(folder: string) { openModule(folder); },
+		openFolderTab(folder: string, onglet: OngletDossier) {
+			ctx.recordNav();
+			openModuleFolder = folder;
+			// Fixé AVANT le rendu : `render()` ne réinitialise l'onglet que
+			// quand `openModuleFolder !== ongletPour` (changement de dossier).
+			ongletDossier = onglet;
+			ongletPour = folder;
+			if (containerRef) render(containerRef);
+		},
 		openFolderOfQuiz(quizPath: string) {
 			// Table pas encore lue (`lireModuleMap` rend toujours un objet, même
 			// vide : `null` veut dire « en cours ») : c'est `loadModuleMap` qui

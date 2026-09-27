@@ -251,6 +251,38 @@ export function buildUeGroups(modules: ModuleGroup[], map: ModuleMap): UeGroup[]
 }
 
 
+/** Un groupe de l'axe « Dossier » : les modules qui partagent un même
+    dossier parent. */
+export interface FolderGroup {
+	/** Chemin du dossier parent ("" si inconnu) — sert de clé. */
+	parent: string;
+	/** Ce qu'on affiche : le dernier segment du parent. */
+	label: string;
+	modules: ModuleGroup[];
+}
+
+/** L'axe « Dossier » (2026-09-24) : un en-tête par dossier PARENT des
+    modules — « B2 (2026-2027) » pour les cours, « Neo Quiz » pour les
+    générés, « Personal » pour les modèles. Il vaut pour tout le monde, là où
+    l'axe UE suppose un cursus déclaré. Groupes et modules par ordre
+    alphabétique ; un module sans chemin connu va dans un groupe sans nom, en
+    dernier. PURE. */
+export function buildFolderGroups(modules: ModuleGroup[]): FolderGroup[] {
+	const parParent = new Map<string, ModuleGroup[]>();
+	for (const m of modules) {
+		const segs = (m.path ?? "").split("/").filter(Boolean);
+		const parent = segs.slice(0, -1).join("/");
+		if (!parParent.has(parent)) parParent.set(parent, []);
+		parParent.get(parent)!.push(m);
+	}
+	const groupes = [...parParent.entries()].map(([parent, mods]) => ({
+		parent,
+		label: parent.split("/").pop() ?? "",
+		modules: [...mods].sort((a, b) => a.name.localeCompare(b.name)),
+	}));
+	return groupes.sort((a, b) => (a.parent === "" ? 1 : 0) - (b.parent === "" ? 1 : 0) || a.label.localeCompare(b.label));
+}
+
 /** Ce groupe est-il le SAS des quiz générés ? Par le CHEMIN, jamais par le
     nom (`DashboardShellCtx.generatedFolder`). Un groupe sans chemin (déclaré
     avant le 2026-09-17, sans quiz) n'est jamais le sas : le sas contient

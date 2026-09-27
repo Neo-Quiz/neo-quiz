@@ -8,6 +8,20 @@ import type { StatsRecord } from "../types/quiz";
    Mises à jour en mémoire synchrones, sauvegarde debouncée.
 ══════════════════════════════════════════════════════════ */
 
+/** Une arrivée au score (2026-09-26) : ce que l'onglet Progression liste et
+    permet de supprimer. `date` l'identifie. */
+export interface Tentative {
+	date: number;
+	/** 0..100 ; `null` pour un quiz à réponses libres (pas de pourcentage). */
+	pct: number | null;
+	/** Le résumé d'avant l'historique (meilleur score, dernière partie),
+	    lu comme UNE tentative : rien n'est perdu, et il se supprime aussi. */
+	ancienne?: true;
+}
+
+/** Au-delà, les plus anciennes tombent — la meilleure est toujours gardée. */
+export const MAX_TENTATIVES = 50;
+
 /**
  * Enregistrement de stats persisté par quiz (data[path] ci-dessous) —
  * sur-ensemble de `StatsRecord` (types/quiz.ts, la forme d'entrée de
@@ -16,6 +30,7 @@ import type { StatsRecord } from "../types/quiz";
 export interface QuizStatRecord extends StatsRecord {
 	lastPlayed: number;
 	attempts: number;
+	tentatives?: Tentative[];
 }
 
 /**
@@ -49,13 +64,62 @@ export interface StatsStore {
 	 * détecteur côté application), qui relaie vers cette méthode.
 	 */
 	renamed(oldPath: string, newPath: string): void;
+	/** Retire la tentative de cette date ; rend ce qui a été retiré (pour
+	    l'annulation), `null` si rien ne correspond. Le journal de révision
+	    n'est pas touché. */
+	supprimerTentative(path: string, date: number): Tentative | null;
+	/** Restaure une tentative (annulation d'une suppression). */
+	restaurerTentative(path: string, tentative: Tentative): void;
 	destroy(): void;
+}
+
+/** Les tentatives d'un enregistrement, de la plus récente à la plus
+    ancienne. Un enregistrement d'avant l'historique (pas de liste, mais des
+    tentatives comptées) en rend une seule, marquée `ancienne`. */
+export function tentativesDe(r: QuizStatRecord | null | undefined): Tentative[] {
+	if (!r) return [];
+	const liste = Array.isArray(r.tentatives) ? r.tentatives
+		: r.attempts > 0 ? [{ date: r.lastPlayed, pct: r.bestScore, ancienne: true as const }] : [];
+	return [...liste].sort((a, b) => b.date - a.date);
+}
+
+/** Meilleur score et nombre de tentatives, DÉRIVÉS de la liste. */
+function recalculer(r: QuizStatRecord, liste: Tentative[]): QuizStatRecord {
+	const pcts = liste.map(x => x.pct).filter((p): p is number => typeof p === "number");
+	return {
+		...r,
+		tentatives: liste,
+		bestScore: pcts.length ? Math.max(...pcts) : 0,
+		attempts: liste.length,
+		questionsDone: liste.length ? r.questionsDone : 0,
+		// La dernière partie jouée est celle de la tentative la plus récente
+		// qui RESTE : supprimer la plus récente ne doit pas laisser « il y a
+		// 2 min » sur une carte dont l'historique dit autre chose.
+		lastPlayed: liste.length ? Math.max(...liste.map(x => x.date)) : 0,
+	};
+}
+
+/** Garde les `MAX_TENTATIVES` plus récentes, et la meilleure quoi qu'il arrive. */
+function plafonner(liste: Tentative[]): Tentative[] {
+	const triee = [...liste].sort((a, b) => b.date - a.date);
+	if (triee.length <= MAX_TENTATIVES) return triee;
+	const meilleure = triee.reduce((m, x) => ((x.pct ?? -1) > (m.pct ?? -1) ? x : m), triee[0]);
+	const gardees = triee.slice(0, MAX_TENTATIVES);
+	if (!gardees.includes(meilleure)) gardees[gardees.length - 1] = meilleure;
+	return gardees;
 }
 
 export function createStatsStore(host: StatsStoreHost): StatsStore {
 	const DEBOUNCE_MS = 500;
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
-	let data: Record<string, QuizStatRecord> = {}; // path → { bestScore, questionsDone, totalQuestions, lastPlayed, attempts }
+	let lastTimestamp = 0;
+	let data: Record<string, QuizStatRecord> = {}; // path → { bestScore, questionsDone, totalQuestions, lastPlayed, attempts, tentatives }
+	/* L'avancement (`questionsDone`) d'un quiz dont on vient de supprimer la
+	   DERNIÈRE tentative : `recalculer` le remet à 0, et rien dans la liste
+	   ne permet de le retrouver. On le garde ici pour que l'annulation de
+	   cette suppression le rende. Mémoire seulement : une annulation ne
+	   survit pas à un redémarrage. */
+	const questionsAvantVidage = new Map<string, number>();
 
 	/* ── Charger les stats depuis l'hôte ── */
 	function load(): void {
@@ -74,21 +138,19 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 	/* ── Mettre à jour un enregistrement ── */
 	function updateRecord(path: string, update: StatsRecord): QuizStatRecord {
 		const existing: QuizStatRecord = data[path] || {
-			bestScore: 0,
-			questionsDone: 0,
-			totalQuestions: 0,
-			lastPlayed: 0,
-			attempts: 0
+			bestScore: 0, questionsDone: 0, totalQuestions: 0, lastPlayed: 0, attempts: 0,
 		};
-
-		data[path] = {
-			bestScore: Math.max(existing.bestScore, update.bestScore || 0),
+		let maintenant = Date.now();
+		if (maintenant <= lastTimestamp) maintenant = lastTimestamp + 1;
+		lastTimestamp = maintenant;
+		const tentative: Tentative = { date: maintenant, pct: update.texteLibre ? null : (update.bestScore || 0) };
+		const base: QuizStatRecord = {
+			...existing,
 			questionsDone: Math.max(existing.questionsDone, update.questionsDone || 0),
 			totalQuestions: update.totalQuestions || existing.totalQuestions,
-			lastPlayed: Date.now(),
-			attempts: existing.attempts + 1
+			lastPlayed: maintenant,
 		};
-
+		data[path] = recalculer(base, plafonner([...tentativesDe(existing), tentative]));
 		scheduleSave();
 		return data[path];
 	}
@@ -164,6 +226,33 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 		if (moved) scheduleSave();
 	}
 
+	/** Retire la tentative de cette date ; rend ce qui a été retiré (pour
+	    l'annulation), `null` si rien ne correspond. Le journal de révision
+	    n'est pas touché. */
+	function supprimerTentative(path: string, date: number): Tentative | null {
+		const r = data[path];
+		if (!r) return null;
+		const liste = tentativesDe(r);
+		const i = liste.findIndex(x => x.date === date);
+		if (i < 0) return null;
+		const [retiree] = liste.splice(i, 1);
+		if (liste.length === 0) questionsAvantVidage.set(path, r.questionsDone);
+		data[path] = recalculer(r, liste);
+		scheduleSave();
+		return retiree;
+	}
+
+	function restaurerTentative(path: string, tentative: Tentative): void {
+		const r = data[path];
+		if (!r) return;
+		const liste = tentativesDe(r).filter(x => x.date !== tentative.date);
+		const avant = questionsAvantVidage.get(path);
+		questionsAvantVidage.delete(path);
+		const base = avant === undefined ? r : { ...r, questionsDone: Math.max(r.questionsDone, avant) };
+		data[path] = recalculer(base, plafonner([...liste, tentative]));
+		scheduleSave();
+	}
+
 	function destroy(): void {
 		if (saveTimer) {
 			clearTimeout(saveTimer);
@@ -181,6 +270,8 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 		restoreRecord,
 		formatRelativeTime,
 		renamed,
+		supprimerTentative,
+		restaurerTentative,
 		destroy
 	};
 }

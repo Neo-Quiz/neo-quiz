@@ -3,7 +3,9 @@
  *
  * 1. `fond-pur.ts` : `estImageDeFond` (quelles extensions comptent comme une
  *    image de fond) et `suivante` (l'ordre trié, cyclique, et le repli sur la
- *    première image quand la courante a disparu du disque).
+ *    première image quand la courante a disparu du disque), puis
+ *    `normaliserEffetsFond` (la luminosité et le flou du fond, bornés, et
+ *    ramenés aux défauts quand la valeur est absente ou trafiquée).
  * 2. `fonds-catalogue.ts` : les photos LIVRÉES avec l'application. Ce que ce
  *    groupe empêche est invisible à la lecture — un identifiant qui ne
  *    correspond à aucun fichier donne une case grise dans la liste, sans une
@@ -35,6 +37,29 @@ await withSrcModule("apps/windows/src/ui/fond-pur.ts", ({ estImageDeFond, suivan
 	r.check("suivante : cyclique, revient à la première", suivante(liste, "c.webp"), "a.jpg");
 	r.check("suivante : courante disparue, première de la liste", suivante(liste, "zz.jpg"), "a.jpg");
 	r.check("suivante : liste vide, rien", suivante([], undefined), undefined);
+
+	r.done();
+});
+
+/* 3. LA LUMINOSITÉ ET LE FLOU (`normaliserEffetsFond`). Le réglage est relu
+   tel qu'il est sur le disque : une valeur absente, trafiquée ou hors bornes
+   ne doit ni casser le démarrage ni poser un `brightness(NaN)` que CSS
+   ignorerait en silence (image au plein éclat). */
+await withSrcModule("apps/windows/src/ui/fond-pur.ts", ({ normaliserEffetsFond, EFFETS_FOND_DEFAUT }) => {
+	const r = makeReporter("Fond d'écran — luminosité et flou");
+	const defaut = { ...EFFETS_FOND_DEFAUT };
+
+	r.check("défauts : 0,85 et 4 px", defaut, { luminosite: 0.85, flou: 4 });
+	r.check("absent : les défauts", normaliserEffetsFond(undefined), defaut);
+	r.check("null : les défauts", normaliserEffetsFond(null), defaut);
+	r.check("pas un objet : les défauts", normaliserEffetsFond("clair"), defaut);
+	r.check("valeurs valides : gardées", normaliserEffetsFond({ luminosite: 0.5, flou: 12 }), { luminosite: 0.5, flou: 12 });
+	r.check("bornes exactes : gardées", normaliserEffetsFond({ luminosite: 0, flou: 20 }), { luminosite: 0, flou: 20 });
+	r.check("au-delà : ramenées aux bornes", normaliserEffetsFond({ luminosite: 3, flou: 99 }), { luminosite: 1, flou: 20 });
+	r.check("en deçà : ramenées aux bornes", normaliserEffetsFond({ luminosite: -1, flou: -5 }), { luminosite: 0, flou: 0 });
+	r.check("chaîne : le défaut, pas une conversion", normaliserEffetsFond({ luminosite: "0.2", flou: "8" }), defaut);
+	r.check("NaN et Infinity : le défaut", normaliserEffetsFond({ luminosite: NaN, flou: Infinity }), defaut);
+	r.check("un seul champ trafiqué : l'autre est gardé", normaliserEffetsFond({ luminosite: 0.4, flou: "x" }), { luminosite: 0.4, flou: 4 });
 
 	r.done();
 });

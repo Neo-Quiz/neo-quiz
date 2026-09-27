@@ -4,30 +4,25 @@
 
 .quiz-action-btn,
 .quiz-chip,
-.quiz-hint-btn,
 .quiz-hint-modal-close{
   transform-origin: center;
 }
 
-/* Hover/focus unifié */
-.quiz-action-btn:hover:not(:disabled),
-.quiz-action-btn:focus-visible:not(:disabled),
-.quiz-action-btn.success:hover:not(:disabled),
-.quiz-action-btn.success:focus-visible:not(:disabled),
+/* Hover/focus unifié. SAUF `.success` (2026-09-25) : l'action principale
+   est un bouton « à presser » façon Brilliant, avec sa propre tranche et son
+   propre enfoncement (action-buttons.css) — ces `!important` l'écrasaient. */
+.quiz-action-btn:not(.success):hover:not(:disabled),
+.quiz-action-btn:not(.success):focus-visible:not(:disabled),
 .quiz-chip:hover,
 .quiz-chip:focus-visible,
-.quiz-hint-btn:hover,
-.quiz-hint-btn:focus-visible,
 .quiz-hint-modal-close:hover,
 .quiz-hint-modal-close:focus-visible{
   transform: translate3d(0,-1px,0) scale(1.015) !important;
 }
 
-/* Press / active unifié */
-.quiz-action-btn:active:not(:disabled),
-.quiz-action-btn.success:active:not(:disabled),
+/* Press / active unifié (sauf `.success`, voir plus haut) */
+.quiz-action-btn:not(.success):active:not(:disabled),
 .quiz-chip:active,
-.quiz-hint-btn:active,
 .quiz-hint-modal-close:active{
   transform: translate3d(0,3px,0) scale(0.955) !important;
   box-shadow:
@@ -45,107 +40,6 @@
   filter: none !important;
 }
 
-
-/* =========================================================
-   21) EFFET DE PRESSION — ONGLETS DE QUESTIONS / RESULTATS
-   Version unifiée, plus fluide, même sensation pour tous
-   ========================================================= */
-
-.quiz-tab{
-  --quiz-tab-press-ring: var(--quiz-primary-ring-16);
-
-  position: relative;
-  overflow: hidden;
-  transform-origin: center;
-  backface-visibility: hidden;
-  will-change: transform, box-shadow, filter, background, border-color;
-  transition:
-    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 180ms ease,
-    background 180ms ease,
-    color 180ms ease,
-    filter 180ms ease !important;
-  animation: none !important;
-}
-
-/* Couleur de ring selon le type d'onglet */
-.quiz-tab.correct,
-.quiz-tab.is-result{
-  --quiz-tab-press-ring: var(--quiz-success-ring-16);
-}
-
-.quiz-tab.wrong{
-  --quiz-tab-press-ring: var(--quiz-danger-ring-16);
-}
-
-/* léger reflet animé */
-.quiz-tab::after{
-  content: "";
-  position: absolute;
-  inset: -1px;
-  pointer-events: none;
-  opacity: 0;
-  background:
-    radial-gradient(120% 100% at 18% 0%, rgba(255,255,255,0.16) 0%, transparent 55%),
-    radial-gradient(110% 100% at 82% 120%, rgba(255,255,255,0.08) 0%, transparent 60%);
-  transition: opacity 180ms ease;
-}
-
-/* =========================================================
-   HOVER / FOCUS — même dynamique pour tous les onglets
-   ========================================================= */
-
-.quiz-tab:hover,
-.quiz-tab:focus-visible{
-  transform: translate3d(0,-1px,0) scale(1.022) !important;
-  filter: brightness(1.02) saturate(1.04) !important;
-}
-
-.quiz-tab:hover::after,
-.quiz-tab:focus-visible::after{
-  opacity: 1;
-}
-
-/* =========================================================
-   PRESSION — même effet pour tous les onglets du haut
-   Plus fluide et moins brutal
-   ========================================================= */
-
-.quiz-tab:active,
-.quiz-tab.is-pressing,
-.quiz-tab.active:active,
-.quiz-tab.active.is-pressing,
-.quiz-tab.correct:active,
-.quiz-tab.correct.is-pressing,
-.quiz-tab.correct.active:active,
-.quiz-tab.correct.active.is-pressing,
-.quiz-tab.wrong:active,
-.quiz-tab.wrong.is-pressing,
-.quiz-tab.wrong.active:active,
-.quiz-tab.wrong.active.is-pressing,
-.quiz-tab.is-result:active,
-.quiz-tab.is-result.is-pressing,
-.quiz-tab.is-result.active:active,
-.quiz-tab.is-result.active.is-pressing{
-  transform: translate3d(0,1px,0) scale(0.988) !important;
-  box-shadow:
-    0 0 0 1.5px var(--quiz-tab-press-ring),
-    inset 0 3px 8px rgba(0,0,0,0.14),
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 1px 2px rgba(0,0,0,0.08) !important;
-  filter: brightness(0.992) saturate(1.04) !important;
-  transition:
-    transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 120ms ease,
-    filter 120ms ease,
-    border-color 120ms ease,
-    background 120ms ease,
-    color 120ms ease !important;
-}
-
-/* pas d’animation parasite */
-.quiz-tab.active,
-.quiz-tab.is-result.active{
-  animation: none !important;
-}
+/* La section 21 (effet de pression des onglets de questions) a été retirée
+   le 2026-09-25 : les onglets ont leur propre appui « à presser »
+   (nav-tabs.css). */

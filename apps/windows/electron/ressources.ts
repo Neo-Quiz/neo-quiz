@@ -137,17 +137,50 @@ export const EXTENSIONS_EXECUTABLES: ReadonlySet<string> = new Set([
 	"exe", "bat", "cmd", "com", "scr", "pif", "lnk",
 	"js", "jse", "vbs", "vbe", "wsf", "wsh", "hta",
 	"msi", "ps1", "reg", "url",
+	/* Élargie le 2026-09-25 sur la liste des pièces jointes que Windows et
+	   Outlook tiennent pour dangereuses : panneaux de configuration, consoles,
+	   modules PowerShell, raccourcis d'explorateur, paquets, scripts que le
+	   système sait lancer. Refuser à tort un de ceux-là ne coûte presque rien :
+	   aucun n'est un support de cours. */
+	"ade", "adp", "app", "application", "appref-ms", "appx", "appxbundle", "appinstaller",
+	"bas", "cab", "chm", "cpl", "crt", "csh", "der", "diagcab", "gadget", "grp", "hlp",
+	"htc", "inf", "ins", "isp", "its", "jar", "jnlp", "ksh", "library-ms",
+	"mad", "maf", "mag", "mam", "maq", "mar", "mas", "mat", "mau", "mav", "maw",
+	"mcf", "mda", "mdb", "mde", "mdt", "mdw", "mdz", "msc", "msh", "msh1", "msh2",
+	"mshxml", "msh1xml", "msh2xml", "msix", "msixbundle", "msp", "mst", "msu", "ops",
+	"osd", "pcd", "pl", "plg", "prf", "prg", "printerexport", "ps1xml", "ps2",
+	"ps2xml", "psc1", "psc2", "psd1", "psm1", "py", "pyc", "pyo", "pyw", "pyz", "pyzw",
+	"scf", "sct", "search-ms", "searchconnector-ms", "settingcontent-ms", "shb", "shs",
+	"theme", "vb", "vbp", "vhd", "vhdx", "vsmacros", "vsw", "webpnp", "website", "ws",
+	"wsb", "wsc", "xbap", "xll", "xnk",
+	/* Seconde revue du même jour : une image disque se MONTE (et contourne le
+	   marquage « téléchargé d'Internet »), un `.rdp` connecte au serveur d'un
+	   tiers, un thème fait fuir l'identifiant NTLM. */
+	"iso", "img", "rdp", "appcontent-ms", "themepack", "deskthemepack", "asx",
+	"cnt", "hpj", "pssc", "psdm1",
 ]);
 
 /**
  * Vrai si `ouvrir` doit REFUSER ce chemin. Sur l'extension seule, casse
  * ignorée (`X.BAT` s'exécute autant que `x.bat`), et sur le DERNIER point du
  * nom : `notes.pdf.exe` est un `.exe`. Un chemin sans extension n'est pas
- * refusé — Windows ne l'exécute pas en double-clic.
+ * refusé — Windows ne l'exécute pas en double-clic. Un nom réduit à son
+ * extension (`.bat`), si : Windows l'exécute.
+ *
+ * Le nom est lu COMME WINDOWS LE LIT (2026-09-25) : Win32 retire les points
+ * et les espaces de fin, donc `x.bat.` et `x.bat ` OUVRENT `x.bat` — l'ancien
+ * test voyait une extension vide, ou « bat  », et laissait passer. Un « : »
+ * dans le nom désigne un flux NTFS (`x.bat::$DATA`) : refusé d'office, aucun
+ * document de cours n'en a besoin.
  */
 export function extensionRefusee(chemin: string): boolean {
-	const nom = String(chemin ?? "").replace(/\\/g, "/").split("/").pop() ?? "";
+	const brut = String(chemin ?? "").replace(/\\/g, "/").split("/").pop() ?? "";
+	if (brut.includes(":")) return true;
+	const nom = brut.replace(/[. ]+$/, "");
+	/* Un nom qui COMMENCE par le point (`.bat`) : Node n'y voit pas
+	   d'extension, mais Windows (`PathFindExtension`, qu'emploie
+	   ShellExecute) y voit `.bat`, et l'exécute. On lit comme Windows. */
 	const point = nom.lastIndexOf(".");
-	if (point <= 0) return false;
+	if (point < 0) return false;
 	return EXTENSIONS_EXECUTABLES.has(nom.slice(point + 1).toLowerCase());
 }

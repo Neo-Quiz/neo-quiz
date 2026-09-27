@@ -1,6 +1,7 @@
 import { Q_TYPES, _setIcon, _iconSpan, md2html } from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
 import { createEditorFormHandlers } from "../editor/editor-form";
+import type { OptionsChampsType } from "../editor/editor-form";
 import type { EditorCtx } from "../types/editor-ctx";
 
 /* ══════════════════════════════════════════════════════════
@@ -30,8 +31,10 @@ export interface FormBridgeOptions {
 }
 
 export interface FormBridge {
-	/** Les champs propres au type de la question (réponses, slots, paires…). */
-	renderTypeFields(box: HTMLElement, q: DraftQuestion): void;
+	/** Les champs propres au type de la question (réponses, slots, paires…).
+	    `rares` : seulement ceux que le rendu corrigé ne sait pas modifier
+	    (panneau « Plus » — voir `OptionsChampsType`). */
+	renderTypeFields(box: HTMLElement, q: DraftQuestion, opts?: OptionsChampsType): void;
 	/** Un champ libellé + saisie, au format de l'éditeur. */
 	field(
 		parent: HTMLElement,
@@ -40,6 +43,9 @@ export interface FormBridge {
 		placeholder: string,
 		multiline: boolean,
 		onChange: (value: string) => void,
+		/** Le champ édite du HTML : la barre de mise en forme insère alors des
+		    balises (`<strong>`…) au lieu du markdown (`**`…). */
+		html?: boolean,
 	): HTMLElement;
 }
 
@@ -94,8 +100,8 @@ export function createFormBridge(opts: FormBridgeOptions): FormBridge {
 	const handlers = createEditorFormHandlers(ctx);
 
 	return {
-		renderTypeFields: (box, q) => handlers._renderTypeFields(box, q),
-		field: (parent, label, value, placeholder, multiline, onChange) =>
-			handlers._field(parent, label, value, placeholder, multiline, onChange),
+		renderTypeFields: (box, q, opts) => handlers._renderTypeFields(box, q, opts),
+		field: (parent, label, value, placeholder, multiline, onChange, html) =>
+			handlers._field(parent, label, value, placeholder, multiline, onChange, { html: !!html }),
 	};
 }

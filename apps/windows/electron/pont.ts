@@ -359,6 +359,19 @@ export interface Pont {
 		supprimer(cle: string): Promise<void>;
 	};
 
+	/** Partager un quiz (.md) ou un dossier (.zip) — voir `./partage.ts`. La
+	    fenêtre ne donne qu'un NOM et des OCTETS : l'emplacement vient du
+	    dialogue natif, le chemin temporaire et le script du principal. */
+	partage: {
+		/** Le dialogue « Enregistrer sous » (Téléchargements par défaut), puis
+		    le fichier montré dans l'explorateur. Rend son chemin, `null` si
+		    l'utilisateur a annulé. */
+		enregistrer(nom: string, octets: Uint8Array): Promise<string | null>;
+		/** Windows : le FICHIER copié dans le presse-papiers, Discord au
+		    premier plan (l'utilisateur colle). `false` si rien n'est parti. */
+		discord(nom: string, octets: Uint8Array): Promise<boolean>;
+	};
+
 	systeme: {
 		/** Ouvre le fichier avec l'application par défaut du système. Rend
 		    `false` si le système a refusé : `HostShell.openExternal` rend un
@@ -701,6 +714,11 @@ export interface Pont {
  * qui rejette à l'exécution avec « No handler registered ». Une seule source
  * rend la faute impossible.
  */
+/** Le message d'erreur d'un partage refusé parce qu'un autre est en cours
+    (`electron/partage.ts`) : la fenêtre le reconnaît et le dit, au lieu d'un
+    échec muet. Ici parce que les deux côtés du pont l'importent. */
+export const PARTAGE_OCCUPE = "partage-occupe";
+
 export const CANAUX = {
 	demarrer: "neo:demarrer",
 	read: "neo:fichiers/read",
@@ -755,6 +773,8 @@ export const CANAUX = {
 	systemeCopierTexte: "neo:systeme/copier-texte",
 	systemeChoisirDossierDefaut: "neo:systeme/choisir-dossier-defaut",
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
+	partageEnregistrer: "neo:partage/enregistrer",
+	partageDiscord: "neo:partage/discord",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
@@ -871,6 +891,12 @@ export const CLE_DOSSIER_DEFAUT = "defaultFolder";
     n'a jamais transité par le sélecteur n'est simplement pas SERVABLE par
     `app:` (403), il ne donne aucun accès disque supplémentaire au rendu. */
 export const CLE_REGLAGES_FOND = "fond";
+
+/** La luminosité et le flou du fond d'écran (`neo.reglages`) : `{ luminosite:
+    number; flou: number }`, relu par `normaliserEffetsFond`
+    (`ui/fond-pur.ts`). Écrite par la page Réglages seule. Aucune garde : ce
+    n'est ni un chemin ni une URL, deux nombres d'affichage. */
+export const CLE_REGLAGES_FOND_EFFETS = "fondEffets";
 
 declare global {
 	interface Window {

@@ -2,9 +2,10 @@
    17) THEME CLAIR — corrections
    ========================================================= */
 
-.theme-light .quiz-tab:not(:hover):not(:focus-visible),
+/* Ni les onglets ni les boutons verts : leur tranche est leur ombre
+   (boutons « à presser », 2026-09-25). */
 .theme-light .quiz-option:not(:hover):not(:focus-visible),
-.theme-light .quiz-action-btn:not(:hover):not(:focus-visible),
+.theme-light .quiz-action-btn:not(.success):not(:hover):not(:focus-visible),
 .theme-light .quiz-chip:not(:hover):not(:focus-visible),
 .theme-light .quiz-submit-card,
 .theme-light .quiz-result,
@@ -14,29 +15,6 @@
 
 .theme-light .quiz-chip{
   color: var(--text-normal) !important;
-}
-
-.theme-light .quiz-hint-btn{
-  color: var(--quiz-hint-text) !important;
-}
-
-.theme-light .quiz-hint-btn:hover,
-.theme-light .quiz-hint-btn:focus-visible{
-  color: var(--quiz-hint-text-hover) !important;
-}
-
-.theme-light .quiz-tab:not(.is-result):not(.correct):not(.wrong):hover,
-.theme-light .quiz-tab:not(.is-result):not(.correct):not(.wrong):focus-visible{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-20),
-    0 0 16px var(--quiz-primary-ring-16) !important;
-}
-
-.theme-light .quiz-tab.is-result:hover,
-.theme-light .quiz-tab.is-result:focus-visible{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-success-ring-20),
-    0 0 16px var(--quiz-success-ring-14) !important;
 }
 
 .theme-light .quiz-option:not(.selected):not(.correct):not(.wrong):hover,

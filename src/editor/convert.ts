@@ -4,8 +4,10 @@ import { _htmlToText } from "./modals";
 import type { ParsedQuizItem } from "./modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
-import { normalizeTerminalVariantName } from "../engine/terminal";
+import { normalizeTerminalVariantName, defaultTerminalPromptPrefix } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
+import { htmlVersMarkdown, texteBaliseVersMarkdown } from "./html-vers-markdown";
+import { niveauxIndice } from "../quiz-hint";
 
 /* ══════════════════════════════════════════════════════════
    CONVERT — item JSON5 brut → DraftQuestion (forme d'édition)
@@ -105,6 +107,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   fantômes. Ses champs passent par `_extraFields`, comme toute clé que
 	   l'éditeur ne connaît pas, écrits par `json5Value`. */
 	else if (typeof q.language === "string" && q.language.trim().length > 0) type = "code";
+	/* Carte mémoire : `flashcard: true` discrimine, AVANT le repli sur le choix
+	   unique — sans cette ligne, la sauvegarde suivante réécrivait la carte en
+	   QCM à options vides (même piège que pour `cloze`). */
+	else if (q.flashcard === true) type = "flashcard";
 	else if (typeof q.cloze === "string") type = "cloze";
 	/* MÊME critère que le moteur (engine/numeric.ts isNumericQuestion) : une
 	   marge ou une unité suffisent à déclarer une réponse numérique. Une
@@ -142,21 +148,40 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	question.title = q.title || "";
 	// « Question N » non localisé : motif du titre auto écrit dans le .md.
 	question._userModifiedTitle = !/^Question \d+$/.test(question.title);
-	question.hint = q.hint || "";
+	/* `hint` : une chaîne ou un tableau de niveaux (src/quiz-hint.ts). Le
+	   premier niveau reste dans `hint`, les suivants dans `_hintMore` ; une
+	   valeur invalide est ignorée. */
+	const niveaux = niveauxIndice(q.hint).map(h => texteBaliseVersMarkdown(h) ?? h);
+	question.hint = niveaux[0] ?? "";
+	if (niveaux.length > 1) question._hintMore = niveaux.slice(1);
 
-	if (q.prompt) {
-		question.prompt = q.prompt;
+	/* DU MARKDOWN PARTOUT (2026-09-26) : un texte stocké en HTML est converti
+	   en markdown à l'ouverture, quand la conversion est PROUVÉE sans perte
+	   (editor/html-vers-markdown.ts) — le champ `*Html` quitte alors le
+	   brouillon, et l'écriture suivante enregistre le markdown. Sinon (tableau
+	   fusionné, couleur, balise inconnue…), le HTML reste tel quel.
+	   Seulement quand le HTML est SEUL : un texte écrit à côté est une donnée
+	   de l'auteur, et la conversion l'écraserait (zéro cas dans les vaults). */
+	const promptMd = q.promptHtml && !q.prompt ? htmlVersMarkdown(q.promptHtml) : null;
+	if (promptMd !== null) {
+		question.prompt = promptMd;
+		question._promptSource = true;
+	} else if (q.prompt) {
+		// Un énoncé TEXTE généré avec des balises (`<p>`, `<strong>`…).
+		question.prompt = texteBaliseVersMarkdown(q.prompt) ?? q.prompt;
 		question._promptSource = true;
 	} else if (q.promptHtml) {
 		question.prompt = _htmlToText(q.promptHtml);
 	}
-	if (q.promptHtml) {
+	if (q.promptHtml && promptMd === null) {
 		question._promptHtml = q.promptHtml;
 		// Si promptHtml existe, activer par défaut l'édition HTML
 		question._useHtmlPrompt = true;
 	}
 
-	if (q.explain) question.explain = q.explain;
+	const explainMd = q.explainHtml && !q.explain ? htmlVersMarkdown(q.explainHtml) : null;
+	if (explainMd !== null) question.explain = explainMd;
+	else if (q.explain) question.explain = texteBaliseVersMarkdown(q.explain) ?? q.explain;
 	else if (q.explainHtml && !isRichHtml(q.explainHtml)) {
 		/* Uniquement si le HTML est une simple enveloppe (`<p>`, `<br>`) : le
 		   remplir depuis un HTML RICHE faisait reprendre à l'export la version
@@ -167,7 +192,7 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		   le fait déjà pour l'énoncé. */
 		question.explain = _htmlToText(q.explainHtml);
 	}
-	if (q.explainHtml) {
+	if (q.explainHtml && explainMd === null) {
 		question._explainHtml = q.explainHtml;
 	}
 
@@ -187,9 +212,17 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   revue, FINDING 2). L'affichage non-HTML d'une leçon sans texte propre
 	   dérive son texte à la VOLÉE côté UI (dashboard/detail-question.ts),
 	   sans jamais l'écrire ici. */
+	/* Exception à la règle ci-dessus, et la seule : la conversion markdown
+	   SANS PERTE d'un HTML seul (2026-09-26). Le `lesson` qui en sort n'est
+	   pas un texte fabriqué pour l'affichage mais la même leçon, réécrite ; et
+	   `_lessonHtml` n'est alors pas posé, donc l'écriture n'émet que `lesson`. */
 	const { text: lessonText, html: lessonHtmlBrut } = pickLessonFields(q);
-	if (lessonText) question.lesson = lessonText;
-	if (lessonHtmlBrut) question._lessonHtml = lessonHtmlBrut;
+	const lessonMd = lessonHtmlBrut && !lessonText ? htmlVersMarkdown(lessonHtmlBrut) : null;
+	if (lessonMd !== null) question.lesson = lessonMd;
+	else {
+		if (lessonText) question.lesson = texteBaliseVersMarkdown(lessonText) ?? lessonText;
+		if (lessonHtmlBrut) question._lessonHtml = lessonHtmlBrut;
+	}
 
 	if (q.resourceButton) {
 		question.resourceButton = { ...q.resourceButton };
@@ -227,7 +260,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		   l'éditeur — l'écriture les recopiait, et chaque Learn généré en
 		   portait sur toutes ses cartes de lecture (2026-09-23). */
 		const lectureSansOptions = question.role === "read" && !Array.isArray(q.options);
-		question.options = q.options || (lectureSansOptions ? [] : ["", ""]);
+		// Une option générée avec des balises s'édite en markdown, elle aussi.
+		question.options = q.options
+			? q.options.map(o => typeof o === "string" ? texteBaliseVersMarkdown(o) ?? o : o)
+			: (lectureSansOptions ? [] : ["", ""]);
 		if (type === "single") {
 			question.correctIndex = q.correctIndex ?? 0;
 		} else {
@@ -275,6 +311,10 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		question.caseSensitive = q.caseSensitive || false;
 	}
 
+	if (type === "flashcard") {
+		question.answer = String(q.answer ?? "");
+	}
+
 	if (["numeric", "text", "cmd", "powershell", "bash"].includes(type)) {
 		/* UNION, pas alternative : le moteur agrège les cinq champs
 		   (engine/terminal.ts getTextAcceptedAnswers). Les traiter comme
@@ -308,12 +348,24 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		question.acceptedAnswers = accepted;
 		question.caseSensitive = q.caseSensitive || false;
 		question.placeholder = q.placeholder || "";
-		/* L'invite vaut pour TOUTES les variantes de terminal, bash compris
-		   (engine/terminal.ts getTerminalPromptPrefix) — la restreindre à
-		   cmd/powershell faisait disparaître « Town-Hall# » et consorts. */
+		/* La forme NORMALISÉE de la variante (`cmd`, `bash`, `python`…) — même
+		   fonction que le moteur (engine/terminal.ts normalizeTerminalVariantName),
+		   mémorisée pour l'aperçu ET le formulaire : le bucket `type` de
+		   l'éditeur, lui, ne distingue que trois variantes (`cmd`/`powershell`/
+		   `bash`), et range toute autre variante réelle (`python`, `sh`, `zsh`…)
+		   dans `bash` faute de type dédié — sans ce champ, l'aperçu d'une
+		   question `python` ne pourrait plus savoir qu'elle n'est PAS une vraie
+		   invite bash (retour de revue du lot A2). */
 		if (type === "cmd" || type === "powershell" || type === "bash") {
-			const parDefaut = type === "cmd" ? "C:\\>" : type === "powershell" ? "PS>" : "user@hostname:~$ ";
-			question.commandPrefix = q.commandPrefix || parDefaut;
+			const varianteReelle = normalizeTerminalVariantName(variantSource(q).valeur);
+			question._terminalVariant = varianteReelle;
+			/* L'invite vaut pour TOUTES les variantes de terminal, bash compris
+			   (engine/terminal.ts getTerminalPromptPrefix) — la restreindre à
+			   cmd/powershell faisait disparaître « Town-Hall# » et consorts.
+			   MÊME défaut que le moteur (defaultTerminalPromptPrefix), jamais une
+			   copie : sans elle, une question bash chargée dans l'éditeur
+			   enregistrait encore l'ancienne invite complète à la sauvegarde. */
+			question.commandPrefix = q.commandPrefix || defaultTerminalPromptPrefix(varianteReelle);
 		}
 		/* La forme EXACTE de la variante, avec la clé qui la portait : c'est
 		   elle qu'on réémettra, pas sa forme canonique. Réécrire
@@ -335,7 +387,7 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	   de configuration, jamais pour une question (revue codex 2026-07-31).
 	   L'objet de configuration, lui, ne passe pas par ici : il est repéré par
 	   son index et lu par `readModeConfig`. */
-	const knownKeys = new Set(['id','title','prompt','promptHtml','options','correctIndex','multiSelect','correctIndices','ordering','slots','possibilities','correctOrder','matching','rows','choices','correctMap','type','terminalVariant','textVariant','commandPrefix','placeholder','caseSensitive','acceptedAnswers','acceptableAnswers','correctAnswers','correctText','answer','hint','explain','explainHtml','resourceButton','cloze','numeric','tolerance','tolerancePercent','unit',
+	const knownKeys = new Set(['id','title','prompt','promptHtml','options','correctIndex','multiSelect','correctIndices','ordering','slots','possibilities','correctOrder','matching','rows','choices','correctMap','type','terminalVariant','textVariant','commandPrefix','placeholder','caseSensitive','acceptedAnswers','acceptableAnswers','correctAnswers','correctText','answer','hint','explain','explainHtml','resourceButton','cloze','flashcard','numeric','tolerance','tolerancePercent','unit',
 		// Leçon (mode "lesson") : nom canonique + alias hérités de "learn" — les
 		// deux sont lus explicitement ci-dessus, donc ni l'un ni l'autre ne doit
 		// retomber dans `_extraFields` (double écriture à l'export sinon).
@@ -345,6 +397,12 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		// être TUE à l'écriture, pas réapparaître recopiée telle quelle via
 		// `_extraFields` sous prétexte que sa forme de base n'a pas été retenue.
 		'slice','role']);
+	/* Les STYLES DE LECTURE (`lecture`, `etapes`, `tableau`, `retenir`,
+	   2026-09-26) ne sont PAS dans cette liste, exprès : ils voyagent par
+	   `_extraFields`, relus et réécrits tels quels (export.ts), valeurs
+	   inconnues comprises — seul leur rendu les normalise
+	   (src/lecture-style.ts). L'éditeur les modifie là
+	   (dashboard/detail-lecture-style.ts). `check:export` le vérifie. */
 	/* `Object.create(null)` : un objet ordinaire ABSORBE une clé nommée
 	   `__proto__` au lieu de la stocker, et le champ personnalisé
 	   disparaissait sans un mot. */

@@ -2,6 +2,13 @@ import type { HostFile } from "../host/types";
 import type { EngineCtx } from "../types/engine-ctx";
 import type { QuestionBase } from "../types/quiz";
 import { pickLessonFields } from "../quiz-utils";
+import {
+	MD_MARK, EMPHASES, motifFormule, motifCodeTriple, motifCodeDouble, motifCodeSimple,
+	motifEtoilesMultiples, motifFlanc, decouperMorceaux,
+} from "./grammaire-inline";
+import type { GenreEmphase } from "./grammaire-inline";
+import { rendreBlocs } from "./grammaire-blocs";
+import { colorerCode, budgetRestant, consommerBudget } from "./code-highlight";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -37,34 +44,18 @@ export interface SanitizerHandlers {
 	replaceObsidianEmbedsInHtml(html: unknown, opts?: EmbedClassOptions): string;
 }
 
-/** Balise de mise à l'abri de `inlineMarkdown` (maths, code) : U+0000, un
-    caractère de contrôle qu'aucun texte de quiz réel ne contient. Un
-    placeholder fait de lettres finirait, lui, par apparaître dans une
-    question qui en parle. Construit par code — un NUL littéral dans une
-    source TypeScript ne survit pas à un outil de formatage. */
-const MD_MARK = String.fromCharCode(0);
+/* Les MOTIFS (formule, code, flanc des emphases) et la balise de mise à
+   l'abri `MD_MARK` vivent dans `grammaire-inline.ts`, partagés avec le champ
+   à aperçu en direct de l'éditeur : une seule grammaire pour le rendu et pour
+   l'édition. */
 
-/**
- * Motif d'un délimiteur markdown apparié (`**`, `*`, `~~`), avec la règle de
- * FLANC GAUCHE : le délimiteur ouvrant ne peut suivre ni une lettre, ni un
- * chiffre, ni un antislash. C'est ce qui distingue de l'emphase deux cas très
- * courants dans un quiz technique :
- *   - `3*4*5` — une multiplication, pas de l'italique ;
- *   - `C:\Users\*\AppData\*\Cache` — un chemin Windows, où `\*` est d'ailleurs
- *     la forme markdown d'une étoile littérale.
- * Le contenu, lui, doit commencer et finir collé au délimiteur (`(?=\S)` …
- * `\S`) : « 3 * 4 * 5 », espacé, n'est pas non plus de l'emphase.
- */
-function FLANK(delim: string): RegExp {
-	// `\p{L}\p{N}` et non `0-9A-Za-zÀ-ÿ` : une multiplication écrite avec des
-	// variables grecques, arabes ou chinoises (`α*β*γ`, `甲*乙*丙`) est une
-	// multiplication elle aussi — la classe ASCII la rendait en italique.
-	return new RegExp(
-		"(^|[^\\p{L}\\p{N}\\\\" + delim.replace(/\\/g, "") + "])"
-		+ delim + "(?=\\S)((?:(?!" + delim + ")[\\s\\S])*?\\S)" + delim,
-		"gu",
-	);
-}
+/** Balises HTML de chaque emphase de la grammaire partagée. */
+const BALISES_EMPHASE: Record<GenreEmphase, [string, string]> = {
+	grasItalique: ["<strong><em>", "</em></strong>"],
+	gras: ["<strong>", "</strong>"],
+	italique: ["<em>", "</em>"],
+	barre: ["<del>", "</del>"],
+};
 
 function escapeHtmlText(value: unknown): string {
 	return String(value ?? "")
@@ -96,39 +87,81 @@ function restoreAllowedInlineTags(html: unknown): string {
    jamais de HTML venu de l'utilisateur : uniquement les balises que
    cette fonction écrit elle-même.
 
-   Ce qui est mis à l'abri AVANT toute substitution :
-   - les formules LaTeX ($…$, $$…$$) — MathJax lit la source telle
-     quelle, et un `*` ou un `_` y appartient à la formule ;
-   - les <code> déjà présents — leur contenu est littéral par nature. */
+   Ce qui est mis à l'abri AVANT toute substitution, dans cet ordre :
+   - les <code> déjà présents et le code inline — leur contenu est
+     littéral par nature, formule comprise (`` `$HOME` ``) ;
+   - puis les formules LaTeX ($…$, $$…$$) — MathJax lit la source telle
+     quelle, et un `*` ou un `_` y appartient à la formule.
+   Le code AVANT la formule, comme dans Obsidian : dans l'autre ordre,
+   `` `$HOME` et `$PATH` `` voyait une formule « $HOME` et `$ » enjamber
+   deux codes, et le jeton de mise à l'abri s'affichait (« 0PATH », revue du
+   2026-09-26, 35 champs réels touchés). */
+
+/** Ce qui remplace un U+0000 venu du texte : sans ça, un auteur pourrait
+    forger un jeton de mise à l'abri (`MD_MARK` + index + `MD_MARK`). */
+const HORS_JETON = String.fromCharCode(0xfffd);
+
 function inlineMarkdown(escaped: string): string {
 	const stash: string[] = [];
 	const keep = (html: string): string => MD_MARK + (stash.push(html) - 1) + MD_MARK;
 
-	let out = escaped
-		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
-		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
-		// gras au milieu restait littéral).
-		.replace(/(^|[^\\])(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g, (_m, before: string, math: string) => before + keep(math))
+	let out = escaped.split(MD_MARK).join(HORS_JETON)
 		.replace(/<code>[\s\S]*?<\/code>/g, m => keep(m))
+		/* Un bloc de code collé sur une seule ligne (```lang code```), dans un
+		   élément qui ne peut pas ouvrir de bloc — un classement, une option
+		   (retour #4 du 2026-09-26 soir) : rendu en code EN LIGNE, coloré si le
+		   langage est reconnu, même budget cumulé que les blocs de plusieurs
+		   lignes (code-highlight.ts, réinitialisé une fois par carte). AVANT le
+		   double et le simple accent grave, qui matcheraient sinon deux des
+		   trois marqueurs et laisseraient le troisième littéral.
+		   `code` est ici déjà échappé (par `escaped`, l'entrée de cette
+		   fonction) : on le déséchappe avant `colorerCode`, qui réclame le texte
+		   BRUT et réapplique lui-même l'échappement à chaque jeton — exactement
+		   ce que fait `rendreBlocs` pour un bloc de plusieurs lignes. */
+		.replace(motifCodeTriple(), (_m, langue: string | undefined, code: string) => {
+			const brut = unescapeHtmlText(code.trim());
+			const disponible = budgetRestant();
+			const colore = langue ? colorerCode(brut, langue, escapeHtmlText, disponible) : null;
+			// La classe `language-x` est posée dès qu'un langage est NOMMÉ, coloré
+			// ou non — même règle que le bloc de plusieurs lignes (grammaire-
+			// blocs.ts) : un langage inconnu reste une donnée utile (surlignage
+			// éventuel d'un autre outil), le texte, lui, reste nu sans span.
+			const classe = langue ? ` class="quiz-md-code-inline language-${escapeHtmlAttr(langue.trim().toLowerCase())}"` : ` class="quiz-md-code-inline"`;
+			if (colore) consommerBudget(colore.colore);
+			const html = colore ? colore.html : escapeHtmlText(brut);
+			return keep(`<code${classe}>${html}</code>`);
+		})
 		// Double accent grave AVANT le simple : c'est la forme markdown
 		// d'un code qui CONTIENT un accent grave (``a ` b``).
-		.replace(/``([^\n]+?)``/g, (_m, code: string) => keep(`<code>${code}</code>`))
-		.replace(/`([^`\n]+)`/g, (_m, code: string) => keep(`<code>${code}</code>`));
+		.replace(motifCodeDouble(), (_m, code: string) => keep(`<code>${code}</code>`))
+		.replace(motifCodeSimple(), (_m, code: string) => keep(`<code>${code}</code>`))
+		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
+		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
+		// gras au milieu restait littéral). Une formule n'enjambe jamais un
+		// code déjà mis à l'abri (`motifFormule` refuse le jeton).
+		.replace(motifFormule(), (_m, before: string, math: string) => before + keep(math));
 
-	out = out
-		// Une suite de QUATRE étoiles ou plus n'est pas de l'emphase : aucune
-		// combinaison de gras et d'italique ne s'écrit ainsi, et la laisser
-		// passer faisait produire des balises croisées. Mise à l'abri telle
-		// quelle, comme le ferait un lecteur markdown.
-		.replace(/\*{4,}/g, m => keep(m))
-		// Triple AVANT double avant simple : `***x***` traité en une passe,
-		// sinon les balises se croisent (<strong><em>…</strong></em>).
-		.replace(FLANK("\\*\\*\\*"), "$1<strong><em>$2</em></strong>")
-		.replace(FLANK("\\*\\*"), "$1<strong>$2</strong>")
-		.replace(FLANK("\\*"), "$1<em>$2</em>")
-		.replace(FLANK("~~"), "$1<del>$2</del>");
+	// Une suite de QUATRE étoiles ou plus n'est pas de l'emphase, et la
+	// laisser passer faisait produire des balises croisées. Mise à l'abri
+	// telle quelle, comme le ferait un lecteur markdown.
+	out = out.replace(motifEtoilesMultiples(), m => keep(m));
+	// Triple AVANT double avant simple (ordre de `EMPHASES`).
+	for (const { genre, delim } of EMPHASES) {
+		const [o, f] = BALISES_EMPHASE[genre];
+		out = out.replace(motifFlanc(delim), (_m, avant: string, contenu: string) => avant + o + contenu + f);
+	}
 
-	return out.replace(new RegExp(MD_MARK + "(\\d+)" + MD_MARK, "g"), (_m, i: string) => stash[Number(i)]);
+	/* Restauration RÉPÉTÉE : une entrée du stash peut en contenir une autre.
+	   Chaque entrée ne cite que des entrées plus anciennes, donc la boucle
+	   s'arrête ; la borne n'est qu'un filet. Aucun jeton ne sort jamais : un
+	   reste improbable est retiré plutôt qu'affiché. */
+	const jeton = new RegExp(MD_MARK + "(\\d+)" + MD_MARK, "g");
+	for (let tour = 0; tour <= stash.length; tour++) {
+		const suivant = out.replace(jeton, (_m, i: string) => stash[Number(i)] ?? "");
+		if (suivant === out) break;
+		out = suivant;
+	}
+	return out.split(MD_MARK).join("");
 }
 
 /** Texte d'affichage : échappé, puis markdown inline. Le pendant de
@@ -180,6 +213,73 @@ export function stripInlineMarkdown(raw: unknown): string {
 		.replace(/\&quot;/g, "\"").replace(/\&#39;/g, "'")
 		// `&amp;` en DERNIER : le faire avant ressusciterait « &amp;lt; » en « < ».
 		.replace(/\&amp;/g, "&");
+}
+
+/* ── Le texte d'un quiz en markdown COMPLET ─────────────────────────
+   Énoncés, lectures, explications, leçons, indices, options : tout texte
+   d'un quiz s'écrit en markdown, comme dans Discord et Obsidian (demande du
+   2026-09-26) — plus jamais en HTML. Au-dessus de l'inline, les blocs
+   (paragraphes, listes, code, tableaux : engine/grammaire-blocs.ts), et
+   les images et liens (`decouperMorceaux`, grammaire-inline.ts).
+
+   Toujours la première porte : chaque morceau de texte est ÉCHAPPÉ avant
+   toute passe markdown ; les seules balises produites sont les nôtres ; une
+   URL n'entre dans un attribut qu'échappée, et un lien qu'en `http(s)` ou
+   `mailto:`. PUR, exporté : l'aperçu de l'éditeur et le convertisseur HTML →
+   markdown (editor/html-vers-markdown.ts) passent par la même fonction que
+   le moteur. */
+
+/** Ce qu'un hôte fait d'une image : les `![[…]]` d'un vault et les
+    `![alt](src)` du markdown. Le moteur les résout dans le vault
+    (`createSanitizer`), l'aperçu les laisse à `resolveImagesInHtml`. */
+export interface RenduImages {
+	embed(spec: string): string;
+	image(alt: string, src: string): string;
+}
+
+/** Un morceau de texte SANS bloc : les sauts de ligne en `<br>`, puis
+    l'inline — exactement le rendu d'avant les blocs. */
+function rendreMorceaux(texte: string, images: RenduImages): string {
+	const inline = (s: string): string =>
+		inlineMarkdown(restoreAllowedInlineTags(escapeHtmlText(s).replace(/\n/g, "<br>")));
+	return decouperMorceaux(texte).map(m => {
+		switch (m.genre) {
+			case "texte": return inline(texte.slice(m.debut, m.fin));
+			case "embed": return images.embed(m.spec);
+			case "image": return images.image(m.alt, m.src);
+			case "lien":
+				return `<a class="quiz-md-lien" href="${escapeHtmlAttr(m.url)}" target="_blank" rel="noopener noreferrer">${inline(texte.slice(m.texteDebut, m.texteFin))}</a>`;
+		}
+	}).join("");
+}
+
+/**
+ * Le HTML d'un texte de quiz en markdown. Un texte d'un seul paragraphe est
+ * rendu comme avant, octet pour octet (grammaire-blocs.ts, règle de
+ * compatibilité) ; les autres, bloc par bloc.
+ */
+export function rendreTexteQuiz(raw: unknown, images: RenduImages): string {
+	const texte = String(raw ?? "");
+	/* Budget CUMULÉ de caractères colorés, partagé par TOUS les champs d'une
+	   même carte de question (titre, énoncé, options, indice, explication,
+	   cours…) — un champ de plus n'obtient PAS son propre budget plein.
+	   Tenu par `code-highlight.ts` (compteur de module), remis à zéro une
+	   fois par carte par ses appelants (`engine/cards.ts questionCardHtml`,
+	   `editor/question-preview.ts renderQuizPreviewCard`) — jamais ici :
+	   remettre le budget à chaque appel de `rendreTexteQuiz` reviendrait au
+	   budget par TEXTE du tour 2, insuffisant sur un champ à plusieurs blocs
+	   (revue du 2026-09-26, tour 3). */
+	return rendreBlocs(texte, {
+		inline: m => rendreMorceaux(m, images), echapper: escapeHtmlText,
+		colorerCode: (code, langue) => {
+			const disponible = budgetRestant();
+			if (disponible <= 0) return null;
+			const resultat = colorerCode(code, langue, escapeHtmlText, disponible);
+			if (!resultat) return null;
+			consommerBudget(resultat.colore);
+			return resultat.html;
+		},
+	}) ?? rendreMorceaux(texte, images);
 }
 
 /* ── Liste blanche du HTML PRÉ-RENDU ──────────────────────────────────
@@ -244,10 +344,15 @@ const QUIZ_HTML_TAG_ATTRS: Record<string, Set<string>> = {
 	img: new Set(["src", "alt", "width", "height"]),
 	td: new Set(["colspan", "rowspan"]),
 	th: new Set(["colspan", "rowspan"]),
-	font: new Set(["color"])
+	font: new Set(["color"]),
+	// Le numéro de départ d'une liste (`3. …`) rendue depuis le markdown.
+	ol: new Set(["start"])
 };
 
-function escapeHtmlAttr(value: unknown): string {
+/** Exporté pour la porte « attribut » du corps d'une lecture dans l'aperçu
+    de l'éditeur (editor/question-preview.ts) : le même échappement que le
+    moteur, pas une réplique. */
+export function escapeHtmlAttr(value: unknown): string {
 	return String(value ?? "")
 		.replace(/\&/g, "\&amp;")
 		.replace(/"/g, "\&quot;")
@@ -387,7 +492,7 @@ export function sanitizeQuizHtml(html: unknown): string {
 			}
 
 			if (
-				(name === "width" || name === "height" || name === "colspan" || name === "rowspan") &&
+				(name === "width" || name === "height" || name === "colspan" || name === "rowspan" || name === "start") &&
 				!/^\d{1,4}$/.test(String(value).trim())
 			) {
 				el.removeAttribute(attr.name);
@@ -472,36 +577,32 @@ export function createSanitizer(ctx: EngineCtx): SanitizerHandlers {
 		return `<code>${escapeHtmlText(`![[${embedSpec}]]`)}</code>`;
 	}
 
+	/** Une image `![alt](src)` du markdown. Une URL web (ou une image
+	    `data:`) est affichée telle quelle — la liste blanche des champs
+	    `*Html` l'accepte déjà, rien de neuf n'est ouvert ; tout autre `src`
+	    est un chemin du vault, résolu comme un `![[…]]`. Introuvable : la
+	    source reste lisible en code, comme un embed mort. */
+	function imageMarkdownHtml(alt: string, src: string, { wrapClass, imgClass }: Required<EmbedClassOptions>): string {
+		if (/^(https?:\/\/|data:image\/)/i.test(src) && isSafeQuizUrl(src, { image: true })) {
+			return `<div class="${wrapClass}"><img class="${imgClass}" src="${escapeHtmlAttr(src)}" alt="${escapeHtmlAttr(alt)}" loading="eager"></div>`;
+		}
+		let chemin = src;
+		try { chemin = decodeURI(src); } catch { /* `%` isolé : le chemin tel qu'écrit */ }
+		const file = resolveEmbedFile(chemin);
+		const url = file ? ctx.host.links.resourceUrl(file) : null;
+		if (url && file) {
+			return `<div class="${wrapClass}"><img class="${imgClass}" src="${url}" alt="${escapeHtmlAttr(alt || file.name || "Image")}" loading="eager"></div>`;
+		}
+		return `<code>${escapeHtmlText(`![${alt}](${src})`)}</code>`;
+	}
+
 	function renderTextWithEmbeds(raw: unknown, { wrapClass = "quiz-question-embed-wrap", imgClass = "quiz-question-embed" }: EmbedClassOptions = {}): string {
-		const text = String(raw ?? "");
-		const embedRe = /!\[\[([^\]]+)\]\]/g;
-
-		let html = "";
-		let lastIndex = 0;
-		let match: RegExpExecArray | null;
-
-		while ((match = embedRe.exec(text)) !== null) {
-			const before = text.slice(lastIndex, match.index);
-
-			if (before) {
-				html += inlineMarkdown(restoreAllowedInlineTags(
-					escapeHtmlText(before).replace(/\n/g, "<br>")
-				));
-			}
-
-			html += buildEmbedImgHtml(match[1], { wrapClass, imgClass });
-			lastIndex = match.index + match[0].length;
-		}
-
-		const tail = text.slice(lastIndex);
-
-		if (tail) {
-			html += inlineMarkdown(restoreAllowedInlineTags(
-				escapeHtmlText(tail).replace(/\n/g, "<br>")
-			));
-		}
-
-		return html;
+		/* Le markdown complet (blocs, images, liens) : `rendreTexteQuiz`. Les
+		   images seules dépendent de l'hôte, qui les résout dans le vault. */
+		return rendreTexteQuiz(raw, {
+			embed: spec => buildEmbedImgHtml(spec, { wrapClass, imgClass }),
+			image: (alt, src) => imageMarkdownHtml(alt, src, { wrapClass, imgClass }),
+		});
 	}
 
 	function renderHintWithCodeAndEmbeds(raw: unknown): string {

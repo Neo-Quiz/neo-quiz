@@ -48,6 +48,34 @@ const CAS = [
 
 	// Formes limites.
 	["code à double accent grave", "tape ``a ` b`` ici", "tape <code>a ` b</code> ici"],
+	/* Retour #4 du 2026-09-26 soir : un bloc de code collé sur une seule ligne
+	   (dans un élément de classement ou d'option, où grammaire-blocs.ts ne
+	   voit qu'un paragraphe) reste reconnu, et rendu en code EN LIGNE — plus
+	   la clôture brute affichée telle quelle. Langage inconnu : pas de span
+	   coloré, mais toujours du code. */
+	["bloc de code sur une seule ligne, langage reconnu",
+		"élément ```python def somme(n): return n``` ici",
+		"élément <code class=\"quiz-md-code-inline language-python\">"
+		+ "<span class=\"token keyword\">def</span> "
+		+ "<span class=\"token function\">somme</span>"
+		+ "<span class=\"token punctuation\">(</span>n<span class=\"token punctuation\">)</span>"
+		+ "<span class=\"token punctuation\">:</span> "
+		+ "<span class=\"token keyword\">return</span> n</code> ici"],
+	["bloc de code sur une seule ligne, langage inconnu : code nu, sans span",
+		"```mystere x < y``` ici",
+		"<code class=\"quiz-md-code-inline language-mystere\">x &lt; y</code> ici"],
+	["bloc de code sur une seule ligne, sans langage",
+		"```(n + 1) * 2``` ici",
+		"<code class=\"quiz-md-code-inline\">(n + 1) * 2</code> ici"],
+	/* Mineur #5 de la revue du lot A2 : le nom de langage n'entre dans
+	   l'attribut `class` qu'après l'échappement HTML (premier passage
+	   d'`inlineMarkdown`) — un guillemet ou un chevron y arrive déjà en
+	   entité, jamais littéral, et ne peut donc jamais refermer l'attribut ni
+	   ouvrir une balise. Figé ici plutôt que de reposer sur la seule revue
+	   manuelle ponctuelle qui l'a déjà vérifié. */
+	["bloc de code : un guillemet et un chevron dans le nom de langage n'échappent jamais l'attribut",
+		"```python\" onclick=\"alert(1) x < y``` ici",
+		"<code class=\"quiz-md-code-inline\">python&quot; onclick=&quot;alert(1) x &lt; y</code> ici"],
 	["deux gras dans la phrase", "**A** puis **B**", "<strong>A</strong> puis <strong>B</strong>"],
 	["gras en début de chaîne", "**Attention** ici", "<strong>Attention</strong> ici"],
 	["italique après parenthèse", "(*ainsi*)", "(<em>ainsi</em>)"],
@@ -63,6 +91,16 @@ const CAS = [
 	["multiplication en arabe", "resultat س*ص*ع voila", "resultat س*ص*ع voila"],
 	["quatre etoiles ne sont pas de l emphase", "voir ****ceci**** ici", "voir ****ceci**** ici"],
 	["emphase imbriquee", "**fort *italique* ici**", "<strong>fort <em>italique</em> ici</strong>"],
+
+	/* Revue du 2026-09-26 (I2) : le code prime sur la formule. Dans l'autre
+	   ordre, une formule enjambait deux codes, et le jeton de mise à l'abri
+	   s'affichait (« 0PATH ») — 35 champs réels de cours shell. */
+	["deux codes à dollar", "`$HOME` et `$PATH`", "<code>$HOME</code> et <code>$PATH</code>"],
+	["formule entière dans un code", "tape `a $x$ b` ici", "tape <code>a $x$ b</code> ici"],
+	["accolades shell dans un code", "`echo {$DEBUT..$FIN}`", "<code>echo {$DEBUT..$FIN}</code>"],
+	["U+0000 du texte : aucun jeton forgé",
+		String.fromCharCode(0) + "0" + String.fromCharCode(0) + " et `a`",
+		String.fromCharCode(0xfffd) + "0" + String.fromCharCode(0xfffd) + " et <code>a</code>"],
 ];
 
 /* Texte NU : mêmes règles de flanc, sortie sans balises. Là où le HTML
@@ -110,6 +148,241 @@ await withSrcModule("src/engine/sanitizer.ts", ({ renderInlineText, stripInlineM
 	rn.done();
 });
 
+/* Le DÉCOUPAGE en positions du champ à aperçu en direct
+   (engine/grammaire-inline.ts, lu par editor/champ-direct.ts). Il doit voir
+   EXACTEMENT ce que le rendu voit : un `*` que le champ montrerait en
+   italique et que le quiz laisserait tel quel, et l'éditeur mentirait.
+   Deux contrôles : des cas écrits (les positions), puis, sur TOUT le corpus
+   du rendu ci-dessus, le même nombre de chaque balise des deux côtés. */
+await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"], ({ renderInlineText }, { decouperInline }) => {
+	const r = makeReporter("Découpage du champ direct");
+	const vu = (texte) => decouperInline(texte)
+		.map(s => `${s.genre}:${texte.slice(s.debut, s.fin)}`).join(" | ");
+
+	r.check("code inline", vu("Quand on lance `python3 main.py` ici"), "code:`python3 main.py`");
+	r.check("gras et italique", vu("**A** et *b*"), "gras:**A** | italique:*b*");
+	r.check("triple", vu("un ***point*** ici"), "grasItalique:***point***");
+	r.check("formule", vu("soit $x^2$ ici"), "formule:$x^2$");
+	r.check("formule bloc", vu("$$\\int f$$"), "formule:$$\\int f$$");
+	r.check("formule dans un code : avalée", vu("tape `a $x$ b` ici"), "code:`a $x$ b`");
+	r.check("deux codes à dollar : deux codes, aucune formule", vu("`$HOME` et `$PATH`"), "code:`$HOME` | code:`$PATH`");
+	r.check("formule sur deux lignes : comme au rendu", vu("$a" + "\n" + "b$ **c**"), "formule:$a" + "\n" + "b$ | gras:**c**");
+	r.check("gras dans un code : rien", vu("tape `a**b**c` ici"), "code:`a**b**c`");
+	r.check("multiplication collée : rien", vu("3*4*5"), "");
+	r.check("étoile dans une formule : rien d'autre", vu("aire $a*b*c$"), "formule:$a*b*c$");
+	r.check("dollars échappés : pas de formule", vu("Prix \\$5 et **promo** \\$10"), "gras:**promo**");
+	r.check("emphase imbriquée", vu("**fort *it* ici**"), "gras:**fort *it* ici** | italique:*it*");
+	r.check("double accent grave", vu("tape ``a ` b`` ici"), "code:``a ` b``");
+	r.check("un <code> écrit à la main est littéral", vu("<code>*a*</code>"), "");
+	r.check("les ![[…]] coupent le texte", vu("*a ![[x.png]] b*"), "");
+	r.check("positions après un embed", vu("![[x.png]] `c`"), "code:`c`");
+	r.check("quatre étoiles : rien", vu("voir ****ceci**** ici"), "");
+
+	// `<code\b` et non `<code>` : un bloc de code sur une seule ligne (retour
+	// #4 du 2026-09-26 soir) rend `<code class="quiz-md-code-inline…">`, avec
+	// des attributs — toujours un SEUL `<code>` par segment "code", juste
+	// habillé, comme `<strong>`/`<em>`/`<del>` ne le sont jamais.
+	const compter = (html, balise) => (html.match(new RegExp("<" + balise + "\\b", "g")) || []).length;
+	const genres = (texte, ...g) => decouperInline(texte).filter(s => g.includes(s.genre)).length;
+	let divergences = 0;
+	for (const [nom, entree] of CAS) {
+		const html = renderInlineText(entree);
+		const ok = compter(html, "strong") === genres(entree, "gras", "grasItalique")
+			&& compter(html, "em") === genres(entree, "italique", "grasItalique")
+			&& compter(html, "code") === genres(entree, "code")
+			&& compter(html, "del") === genres(entree, "barre");
+		if (!ok) { divergences++; console.log("  divergence rendu / champ :", nom); }
+	}
+	r.check("même nombre de balises que le rendu, sur tout le corpus", divergences, 0);
+	r.check("le texte d'un lien est découpé, son URL jamais",
+		vu("voir [**doc**](https://a.b/*x*) ici"), "gras:**doc**");
+	r.check("une image coupe le texte", vu("*a ![b](c.png) d*"), "");
+	r.done();
+});
+
+/* LE MARKDOWN DE BLOC (engine/grammaire-blocs.ts) et les images et liens,
+   par la VRAIE fonction du moteur (`rendreTexteQuiz`, et
+   `renderTextWithEmbeds` d'un vrai `createSanitizer`). Du markdown partout,
+   comme dans Discord et Obsidian (2026-09-26) — et toujours l'échappement
+   AVANT le markdown : un quiz peut venir de quelqu'un d'autre. */
+await withSrcModule(
+	["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts", "src/engine/code-highlight.ts"],
+	({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }, { reinitialiserBudgetRendu }) => {
+	const r = makeReporter("Blocs, images et liens");
+	const IMG = { embed: s => `[embed:${s}]`, image: (a, s) => `[image:${a}|${s}]` };
+	/* `rendreTexteQuiz` partage désormais un budget de coloration de MODULE
+	   (code-highlight.ts), remis à zéro par ses appelants réels une fois par
+	   carte (revue du 2026-09-26, tour 3) — jamais ici. Ce script appelle
+	   `rendreTexteQuiz` directement, en dehors de tout appelant : chaque cas
+	   qui dépend d'un budget frais le remet lui-même à zéro AVANT de rendre,
+	   pour ne pas dépendre de l'ordre des cas précédents. */
+	const rendre = (t) => rendreTexteQuiz(t, IMG);
+	const NL = "\n";
+	const P = (x) => `<p class="quiz-md-p">${x}</p>`;
+
+	r.check("paragraphes", rendre("un" + NL + NL + "deux"), P("un") + P("deux"));
+	r.check("liste à puces", rendre("Choisis :" + NL + "- `a`" + NL + "- **b**"),
+		P("Choisis :") + `<ul class="quiz-md-liste"><li><code>a</code></li><li><strong>b</strong></li></ul>`);
+	r.check("liste numérotée qui commence à 3", rendre("x" + NL + "3. a" + NL + "4. b"),
+		P("x") + `<ol class="quiz-md-liste" start="3"><li>a</li><li>b</li></ol>`);
+	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
+		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
+	reinitialiserBudgetRendu();
+	r.check("bloc de code : coloré et échappé (python reconnu)",
+		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-python">`
+		+ `<span class="token keyword">print</span><span class="token punctuation">(</span>`
+		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
+		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`);
+	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
+		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
+	r.check("langage inconnu : texte échappé, aucun span",
+		rendre("```mystere" + NL + "<script>a</script>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-mystere">&lt;script&gt;a&lt;/script&gt;</code></pre>`);
+	r.check("aucun langage : texte échappé, aucun span",
+		rendre("```" + NL + "<script>a</script>" + NL + "```"),
+		`<pre class="quiz-md-code"><code>&lt;script&gt;a&lt;/script&gt;</code></pre>`);
+	r.check("langage en MAJUSCULES : reconnu quand même",
+		rendre("```PYTHON" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
+	r.check("alias `py` : reconnu comme python",
+		rendre("```py" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
+	const LANGUES_INJECTION = ["python", "bash", "javascript", "sql", "markup", "mystere"];
+	r.check("injection dans un bloc de code coloré : jamais de balise brute, dans plusieurs langages",
+		LANGUES_INJECTION.map(langue => {
+			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
+			// Seules nos propres balises (pre/code/span) peuvent apparaître : tout
+			// le reste du contenu du bloc doit être échappé, jeton par jeton.
+			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span"].includes(m[1].toLowerCase()));
+		}), LANGUES_INJECTION.map(() => true));
+	r.check("alias `c++` : reconnu comme cpp",
+		rendre("```c++" + NL + "int x = 1;" + NL + "```").includes('<span class="token keyword">int</span>'), true);
+	/* Revue du 2026-09-26 (M1) : une langue comme `constructor` ou `__proto__`
+	   ne doit jamais lire la propriété héritée du même nom sur
+	   `Object.prototype` (ici la fonction `Object`, ou l'objet prototype
+	   lui-même) — juste retomber sur `null`, texte échappé nu. */
+	r.check("langage `constructor` : jamais la propriété héritée, texte échappé",
+		rendre("```constructor" + NL + "<i>x</i>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-constructor">&lt;i&gt;x&lt;/i&gt;</code></pre>`);
+	r.check("langage `__proto__` : idem",
+		rendre("```__proto__" + NL + "<i>x</i>" + NL + "```"),
+		`<pre class="quiz-md-code"><code class="language-__proto__">&lt;i&gt;x&lt;/i&gt;</code></pre>`);
+	/* Plafond PAR BLOC (re-revue du 2026-09-26, tour 3) : au-delà d'environ
+	   1000 caractères, le reste d'un bloc s'affiche échappé sans couleurs.
+	   1600 nombres séparés d'une espace (3199 caractères) : loin sous le
+	   plafond pour une partie, loin au-delà pour l'autre — si TOUS étaient
+	   colorés, la troncature ne servirait à rien. */
+	{
+		reinitialiserBudgetRendu();
+		const NOMBRES = 1600;
+		const gros = Array.from({ length: NOMBRES }, () => "1").join(" ");
+		const html = rendre("```python" + NL + gros + NL + "```");
+		const colores = (html.match(/<span class="token number">1<\/span>/g) || []).length;
+		r.check("plafond par bloc : coloration tronquée avant la fin d'un bloc trop long",
+			colores > 0 && colores < NOMBRES, true);
+	}
+	/* Budget CUMULÉ par RENDU (tour 3, remplace le budget par texte du
+	   tour 2 — insuffisant : un seul champ à 7 blocs de 3000 prenait 2,1 s).
+	   Le budget est un compteur de MODULE (code-highlight.ts), partagé par
+	   tous les appels à `rendreTexteQuiz`, jamais remis à zéro tout seul —
+	   `reinitialiserBudgetRendu()` simule ici le début du rendu d'UNE carte
+	   (ce que font pour de vrai `engine/cards.ts questionCardHtml` et
+	   `editor/question-preview.ts texteQuizHtml`). Huit blocs de 3199
+	   caractères (chacun plafonné à 1000 caractères coloré au plus)
+	   dépassent le budget de 5000 avant la fin du texte — le dernier bloc
+	   doit sortir entièrement NU, alors que le premier reste coloré. */
+	{
+		reinitialiserBudgetRendu();
+		const unBloc = () => "```python" + NL + Array.from({ length: 1600 }, () => "1").join(" ") + NL + "```";
+		const huitBlocs = Array.from({ length: 8 }, unBloc).join(NL + NL);
+		const html = rendre(huitBlocs);
+		const comptes = html.split('<pre class="quiz-md-code">').slice(1)
+			.map(segment => (segment.match(/<span class="token number">1<\/span>/g) || []).length);
+		r.check("budget cumulé : le premier bloc d'un rendu reste coloré", comptes[0] > 0, true);
+		r.check("budget cumulé : le dernier bloc d'un rendu trop riche en code perd sa coloration", comptes[7], 0);
+	}
+	// Remis à zéro pour ne pas laisser un budget épuisé fuiter vers les cas
+	// suivants de ce même bloc de test (tableaux, listes…), tous insensibles
+	// à la coloration mais par hygiène.
+	reinitialiserBudgetRendu();
+	r.check("tableau : en-tête, alignements, `|` dans un code",
+		rendre("| A | B |" + NL + "|:-:|--:|" + NL + "| `a|b` | <script> |"),
+		`<table class="quiz-md-table"><thead><tr><th style="text-align: center">A</th><th style="text-align: right">B</th></tr></thead>`
+		+ `<tbody><tr><td style="text-align: center"><code>a|b</code></td><td style="text-align: right">&lt;script&gt;</td></tr></tbody></table>`);
+	r.check("tableau : un `|` dans une formule ne coupe pas la cellule (I3)",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| $|x|$ | 2 |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>$|x|$</td><td>2</td></tr></tbody></table>`);
+	r.check("tableau : `\\|` est une barre littérale (GFM)",
+		rendre("| a \\| b | c |" + NL + "|---|---|" + NL + "| 1 | <i>2</i> \\| 3 |"),
+		`<table class="quiz-md-table"><thead><tr><th>a | b</th><th>c</th></tr></thead><tbody><tr><td>1</td><td><i>2</i> | 3</td></tr></tbody></table>`);
+	r.check("tableau : une rangée plus longue que l'en-tête ne perd rien",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| 1 | 2 | <script> |" + NL + "| x |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th><th></th></tr></thead><tbody>`
+		+ `<tr><td>1</td><td>2</td><td>&lt;script&gt;</td></tr><tr><td>x</td><td></td><td></td></tr></tbody></table>`);
+	r.check("tableau : deux prix restent deux cellules",
+		rendre("| a | b |" + NL + "|---|---|" + NL + "| 5$ | 10$ |"),
+		`<table class="quiz-md-table"><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>5$</td><td>10$</td></tr></tbody></table>`);
+	r.check("un `$$` dans un code n'empêche pas les blocs (M4)",
+		rendre("Le prompt `$$` de bash" + NL + "- a" + NL + "- b" + NL + NL + "fin"),
+		P("Le prompt <code>$$</code> de bash") + `<ul class="quiz-md-liste"><li>a</li><li>b</li></ul>` + P("fin"));
+	r.check("titre et citation", rendre("## T" + NL + "> **a**" + NL + "> b"),
+		`<h2 class="quiz-md-titre">T</h2><blockquote class="quiz-md-citation"><strong>a</strong><br>b</blockquote>`);
+	r.check("une balise dans une liste reste du texte", rendre("- <img src=x onerror=alert(1)>" + NL + "- b"),
+		`<ul class="quiz-md-liste"><li>&lt;img src=x onerror=alert(1)&gt;</li><li>b</li></ul>`);
+	r.check("formule $$ sur plusieurs lignes : un seul paragraphe", rendre("$$" + NL + "a" + NL + NL + "- b" + NL + "$$" + NL + NL + "c"),
+		P("$$<br>a<br><br>- b<br>$$") + P("c"));
+
+	// Images et liens.
+	r.check("lien web", rendre("voir [la **doc**](https://ex.com/a?b=1&c=2)"),
+		`voir <a class="quiz-md-lien" href="https://ex.com/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">la <strong>doc</strong></a>`);
+	r.check("lien javascript: reste du texte", rendre("[x](javascript:alert(1))"), "[x](javascript:alert(1))");
+	r.check("guillemet d'une URL échappé dans l'attribut", rendre("[x](https://a.b/\"onmouseover=alert;'x')"),
+		`<a class="quiz-md-lien" href="https://a.b/&quot;onmouseover=alert;&#39;x&#39;" target="_blank" rel="noopener noreferrer">x</a>`);
+	r.check("image et embed passent par l'hôte", rendre("![schéma](img/a.png) et ![[b.png]]"), "[image:schéma|img/a.png] et [embed:b.png]");
+	r.check("image dans un code : du code", rendre("tape `![a](b)`"), "tape <code>![a](b)</code>");
+
+	// La règle de compatibilité : un seul paragraphe = le rendu d'avant.
+	const avant = (t) => renderInlineText(t.replace(/\n/g, "<br>"));
+	r.check("une ligne « - x » reste du texte", rendre("- x"), "- x");
+	r.check("une ligne « > x » reste du texte", rendre("> écrase"), "&gt; écrase");
+	r.check("plusieurs lignes d'un paragraphe : <br> comme avant", rendre("a" + NL + "**b**" + NL), avant("a" + NL + "**b**" + NL));
+	/* Au hasard : des textes d'un seul paragraphe, sans lien ni image (le seul
+	   ajout inline), faits des caractères qui ont coûté des bugs. Le rendu doit
+	   être celui d'avant, octet pour octet. */
+	const alphabet = ["a", "b", " ", "*", "**", "`", "$", "~~", NL, "<b>", "</b>", "<", "&", "\\", "-", "1.", "é", "|", "#", ">"];
+	let graine = 7;
+	const hasard = () => { graine = (graine * 1103515245 + 12345) % 2147483648; return graine / 2147483648; };
+	let essais = 0, ecarts = 0, fuites = 0;
+	for (let k = 0; k < 20000; k++) {
+		let t = "";
+		const n = 1 + Math.floor(hasard() * 14);
+		for (let j = 0; j < n; j++) t += alphabet[Math.floor(hasard() * alphabet.length)];
+		// Aucun jeton interne ne s'affiche jamais, quel que soit le texte.
+		if (rendre(t).includes(String.fromCharCode(0))) fuites++;
+		if (aDesBlocs(decouperBlocs(t)) || /\]\(/.test(t)) continue;
+		essais++;
+		if (rendre(t) !== avant(t)) { ecarts++; if (ecarts < 4) console.log("  écart :", JSON.stringify(t)); }
+	}
+	r.check(`un paragraphe : identique à avant (${essais} textes au hasard)`, ecarts, 0);
+	r.check("assez de textes au hasard pour que l'identité dise quelque chose", essais > 5000, true);
+	r.check("aucun jeton de mise à l'abri dans le rendu (20 000 textes)", fuites, 0);
+
+	// Le vrai `renderTextWithEmbeds` : une image du vault résolue, une URL web
+	// telle quelle, une image introuvable lisible en code.
+	const fichier = { path: "img/a.png", name: "a.png" };
+	const ctx = { sourcePath: "note.md", host: { links: {
+		resolve: (p) => (p === "img/a.png" ? fichier : null),
+		resourceUrl: (f) => (f === fichier ? "app://img/a.png" : null),
+	} } };
+	const s = createSanitizer(ctx);
+	r.check("image du vault résolue", s.renderTextWithEmbeds("![vue](img/a.png)"),
+		`<div class="quiz-question-embed-wrap"><img class="quiz-question-embed" src="app://img/a.png" alt="vue" loading="eager"></div>`);
+	r.check("image web", s.renderTextWithEmbeds("![x](https://ex.com/i.png)"),
+		`<div class="quiz-question-embed-wrap"><img class="quiz-question-embed" src="https://ex.com/i.png" alt="x" loading="eager"></div>`);
+	r.check("image introuvable : sa source en code", s.renderTextWithEmbeds("![x](manque.png)"), "<code>![x](manque.png)</code>");
+	r.check("paragraphes par le vrai moteur", s.renderTextWithEmbeds("a" + NL + NL + "b"), P("a") + P("b"));
+	r.done();
+});
+
 /* Texte à trous : une paire markdown qui ENJAMBE un trou doit rester une
    paire. Rendre chaque segment séparément laissait « `git ` » et « ` -b` »
    avec un accent grave chacun, tous deux affichés bruts. */
@@ -147,5 +420,31 @@ await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots }) => {
 	r.check("jeton sans lettres lisibles",
 		/CLOZE/.test(marked), false);
 
+	r.done();
+});
+
+/* Les STYLES DE LECTURE (2026-09-26) : étapes, cases de tableau, cartes et
+   récapitulatif passent par la MÊME grammaire que le reste du quiz — le
+   rendu RÉEL (engine/lecture-rendu.ts) avec les portes RÉELLES. Un champ
+   affiché sans porte montrerait ses astérisques. */
+await withSrcModule(["src/engine/lecture-rendu.ts", "src/engine/sanitizer.ts"], ({ corpsLectureHtml }, san) => {
+	const r = makeReporter("Markdown des styles de lecture");
+	const portes = {
+		bloc: (s) => san.rendreTexteQuiz(s, { embed: () => "", image: () => "" }),
+		inline: san.renderInlineText,
+		attribut: (s) => san.stripInlineMarkdown(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"),
+	};
+	const html = (item) => corpsLectureHtml(item, item.prompt ?? "", portes.bloc(item.prompt ?? ""), "", portes).html;
+	const md = "**gras** et `code`";
+	const attendu = san.renderInlineText(md);
+	r.check("étape : markdown rendu", html({ lecture: "etapes", prompt: "", etapes: [md] }).includes(attendu), true);
+	r.check("case de tableau et en-tête : markdown rendu",
+		(html({ lecture: "tableau", prompt: "", tableau: { colonnes: [md], lignes: [[md]] } }).split(attendu).length - 1), 2);
+	r.check("carte recto et verso : markdown rendu",
+		(html({ prompt: "", retenir: { forme: "cartes", items: [{ recto: md, verso: md }] } }).split(attendu).length - 1), 2);
+	r.check("libellé de carte (attribut) : marqueurs retirés, pas d'astérisque",
+		/aria-label="[^"]*\*\*/.test(html({ prompt: "", retenir: { forme: "cartes", items: [{ recto: md, verso: md }] } })), false);
+	r.check("récapitulatif : markdown rendu", html({ prompt: "", retenir: { forme: "recap", items: [md] } }).includes(attendu), true);
+	r.check("aucun marqueur brut ne reste", /\*\*gras\*\*|`code`/.test(html({ lecture: "tableau", prompt: md, tableau: { colonnes: [md], lignes: [[md]] }, retenir: { forme: "recap", items: [md] } })), false);
 	r.done();
 });

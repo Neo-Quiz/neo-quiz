@@ -132,7 +132,8 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   règle la plus importante du pont : sans lui, chaque canal `fichiers.*` est un
   accès disque total depuis la fenêtre. Et il ne borne que l'écriture et la
   lecture, pas l'EXÉCUTION : `systeme.ouvrir` refuse en plus les extensions
-  exécutables (`EXTENSIONS_EXECUTABLES`), sans quoi `write` puis `ouvrir` d'un
+  exécutables (`EXTENSIONS_EXECUTABLES`, lues comme Windows les lit : `x.bat.`,
+  `x.bat ` et `x.bat::$DATA` ouvrent `x.bat`), sans quoi `write` puis `ouvrir` d'un
   `.bat` — deux appels bornés — le contournaient. La clé `ai` des réglages est
   GARDÉE de la même façon (`garde-ia.ts`) : l'hôte d'`aiOllamaUrl` entre dans la
   liste du réseau, et `cheminClaude`/`cheminCodex` désignent un exécutable que le
@@ -154,6 +155,38 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   Il compare aussi le sha512 (calculé sur le fichier) et la taille de l'exe
   nommé par `latest.yml` aux valeurs qu'il y porte : c'est ce qui rougit
   quand l'exe signé n'a pas repassé par `scripts/update-info-after-signing.mjs`.
+- `npm run check:partage` — le PARTAGE et sa sécurité. Côté principal
+  (`apps/windows/electron/partage.ts`), la fenêtre ne donne qu'un nom et des
+  octets : un nom qui serait un CHEMIN, une extension hors de `.zip`/`.md`, un
+  contenu vide ou au-delà de 16 Mo sont refusés ; le script Discord est
+  CONSTANT (le chemin passe par une variable d'environnement) ; un verrou
+  limite à un partage à la fois, deux secondes au moins entre deux, et les
+  fichiers temporaires de plus de dix minutes sont effacés. À l'autre bout,
+  l'import d'une archive REÇUE (`nomNoteImportee`, `zip.ts`) n'écrit que des
+  `.md` au nom aplati. Et `citerPs` (`process.ts`) double les CINQ apostrophes
+  que PowerShell reconnaît (`'` et ‘ ’ ‚ ‛) : n'en doubler qu'une laissait
+  « l’an » fermer la chaîne et faire exécuter la suite — rejoué sur le vrai
+  `powershell.exe` sous Windows. Enfin `gabarits-cli.ts` : `process.run` n'accepte
+  que les FORMES d'appel connues de `ai-client.ts` (modèle, effort et jetons
+  seuls variables) ; `--dangerously-skip-permissions`, `--mcp-config` ou un
+  bac à sable ouvert sont refusés. **Ajouter une option à un appel de CLI du
+  rendu exige de l'ajouter à ce gabarit.** Dans la CI.
+- `npm run check:session` — la PHOTO DE SESSION d'un quiz (`src/engine/session.ts`),
+  pour reprendre là où on s'était arrêté : aller-retour de chaque type de
+  question, quiz modifié entre deux sessions (question supprimée, ajoutée,
+  options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
+  s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Dans la CI.
+- `npm run check:stats` — l'HISTORIQUE DES TENTATIVES du magasin de stats
+  (`src/dashboard/stats-store.ts`) : meilleur score et nombre de tentatives
+  DÉRIVÉS de la liste (supprimer la meilleure le fait redescendre), un score
+  d'avant l'historique lu comme une tentative « ancienne » supprimable,
+  annulation symétrique, plafond qui garde la meilleure. Dans la CI.
+- `npm run check:gestes` — les GESTES d'édition d'une question (`src/editor/gestes.ts`),
+  partagés par le formulaire et l'édition dans le rendu : jamais une question sans
+  bonne réponse, jamais deux emplacements d'un classement sur le même élément,
+  indices décalés à l'ajout et au retrait, et un changement de TYPE qui ne
+  garde que ce qui se transpose (choix ⇄ choix, saisie ⇄ saisie) sans jamais
+  toucher aux champs communs. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

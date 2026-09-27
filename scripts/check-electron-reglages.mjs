@@ -417,14 +417,35 @@ await withSrcModule("apps/windows/electron/perimetre.ts", async ({ creerPerimetr
 						md: extensionRefusee(join(racine, "Cours", "ch1.md")),
 						sansExtension: extensionRefusee(join(racine, "Cours", "Makefile")),
 						pointDeTete: extensionRefusee(join(racine, "Cours", ".bat")),
-						/* La liste de la revue, entière : une extension retirée « par
+						/* Le nom lu COMME WINDOWS (2026-09-25) : Win32 retire points
+						   et espaces de fin, donc ces trois-là OUVRENT `x.bat`. */
+						pointFinal: extensionRefusee(join(racine, "Cours", "x.bat.")),
+						espaceFinal: extensionRefusee(join(racine, "Cours", "x.bat ")),
+						melange: extensionRefusee(join(racine, "Cours", "x.bat. . ")),
+						flux: extensionRefusee(join(racine, "Cours", "x.bat::$DATA")),
+						cpl: extensionRefusee(join(racine, "Cours", "x.cpl")),
+						psm1: extensionRefusee(join(racine, "Cours", "x.psm1")),
+						appref: extensionRefusee(join(racine, "Cours", "x.appref-ms")),
+						docx: extensionRefusee(join(racine, "Cours", "cours.docx")),
+						ipynb: extensionRefusee(join(racine, "Cours", "tp.ipynb")),
+						pdfPointFinal: extensionRefusee(join(racine, "Cours", "fiche.pdf.")),
+						iso: extensionRefusee(join(racine, "Cours", "x.iso")),
+						rdp: extensionRefusee(join(racine, "Cours", "x.rdp")),
+						themepack: extensionRefusee(join(racine, "Cours", "x.themepack")),
+						gitignore: extensionRefusee(join(racine, "Cours", ".gitignore")),
+						/* Le socle de la revue, entier : une extension retirée « par
 						   simplification » rougirait ici, nommée. */
-						liste: [...EXTENSIONS_EXECUTABLES].sort(),
+						socle: ["bat", "cmd", "com", "exe", "hta", "js", "jse", "lnk", "msi", "pif", "ps1", "reg", "scr", "url", "vbe", "vbs", "wsf", "wsh"]
+							.filter(e => !EXTENSIONS_EXECUTABLES.has(e)),
 					},
 					{
 						bat: true, casse: true, doubleSuffixe: true, ps1: true, lnk: true,
-						pdf: false, md: false, sansExtension: false, pointDeTete: false,
-						liste: ["bat", "cmd", "com", "exe", "hta", "js", "jse", "lnk", "msi", "pif", "ps1", "reg", "scr", "url", "vbe", "vbs", "wsf", "wsh"],
+						pdf: false, md: false, sansExtension: false, pointDeTete: true,
+						pointFinal: true, espaceFinal: true, melange: true, flux: true,
+						cpl: true, psm1: true, appref: true,
+						docx: false, ipynb: false, pdfPointFinal: false,
+						iso: true, rdp: true, themepack: true, gitignore: false,
+						socle: [],
 					});
 			});
 		});

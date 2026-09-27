@@ -1,11 +1,12 @@
 /* ══════════════════════════════════════════════════════════
    LA COQUILLE DU TABLEAU DE BORD, CÔTÉ APPLICATION
 
-   Sous Obsidian, `src/dashboard.ts` est un `ItemView` : il porte le cycle de
-   vie d'un onglet, un `Scope` de raccourcis, l'historique des boutons de
-   souris. Rien de tout cela n'est portable — et rien de tout cela n'est
-   l'interface. Ce fichier fait les trois choses que `dashboard.ts` fait et
-   qui comptent : monter le rail, router entre les pages, assembler le `ctx`.
+   Sous Obsidian, `src/dashboard.ts` était un `ItemView` : il portait le cycle
+   de vie d'un onglet et un `Scope` de raccourcis, qui ne sont pas portables.
+   Ce fichier fait les choses que `dashboard.ts` faisait et qui comptent :
+   monter le rail, router entre les pages, assembler le `ctx` — et, depuis le
+   2026-09-25, l'historique des boutons « précédent » / « suivant » de la
+   souris (`historique-nav.ts`).
 
    Les PAGES, elles, sont les mêmes qu'Obsidian : `src/dashboard/nav.ts`,
    `home.ts`, `quizzes.ts`, et depuis la tranche 3 la page d'un quiz,
@@ -29,6 +30,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { ajouter } from "../../../../src/dom";
+import { creerHistorique } from "./historique-nav";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
 import { createNavHandlers } from "../../../../src/dashboard/nav";
@@ -39,7 +41,9 @@ import { createAiHandlers } from "../../../../src/dashboard/ai";
 import { aiSettingsDefaults } from "../../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { openIconPicker } from "../../../../src/dashboard/icon-picker";
-import { openCreateFolderModal, openCreateQuizModal } from "../../../../src/dashboard/folder-create";
+import { openCreateFolderModal } from "../../../../src/dashboard/folder-create";
+import { openAddContentModal } from "../../../../src/dashboard/folder-add";
+import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
@@ -49,12 +53,14 @@ import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner"
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
-import { ecrireReglage, estVaultObsidian, examDates, lireReglage, pickFolder, savedFolders, setExamDate as setExamDateReglage } from "../host/folder";
+import { numeroDeReprise } from "../../../../src/lecture-etape";
+import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import type { DerniereVue } from "./reprise";
+import type { SessionsApp } from "../review/sessions";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES DES PAGES « ACCUEIL » / « MES QUIZ »
@@ -86,8 +92,22 @@ export async function chargerReglagesPages(): Promise<DashboardPageSettings> {
 		quizzesModuleOverrides: (await lireReglage<Record<string, ModuleOverride>>("quizzesModuleOverrides")) ?? undefined,
 		quizzesModuleMapNote: (await lireReglage<string>("quizzesModuleMapNote")) ?? undefined,
 		quizzesArchivedFolders: (await lireReglage<string[]>("quizzesArchivedFolders")) ?? undefined,
+		quizzesGroupModes: (await lireReglage<boolean>("quizzesGroupModes")) ?? undefined,
 	};
 	return reglagesPagesCache;
+}
+
+/** Réunir Learn et Practice d'un même cours en une carte : oui par défaut.
+    Lu et écrit PAR LE CACHE des réglages de pages, jamais directement dans
+    le fichier : la page « Mes quiz » réécrit ce cache à chaque changement, et
+    une écriture à côté serait écrasée au suivant. */
+export function regroupementModes(): boolean {
+	return reglagesPagesCache.quizzesGroupModes !== false;
+}
+
+export async function reglerRegroupementModes(actif: boolean): Promise<void> {
+	reglagesPagesCache.quizzesGroupModes = actif;
+	await ecrireReglage("quizzesGroupModes", actif);
 }
 
 function reglagesPages(): DashboardPageSettings {
@@ -102,6 +122,7 @@ async function enregistrerReglagesPages(): Promise<void> {
 	await ecrireReglage("quizzesModuleOverrides", reglagesPagesCache.quizzesModuleOverrides ?? {});
 	await ecrireReglage("quizzesModuleMapNote", reglagesPagesCache.quizzesModuleMapNote ?? null);
 	await ecrireReglage("quizzesArchivedFolders", reglagesPagesCache.quizzesArchivedFolders ?? []);
+	await ecrireReglage("quizzesGroupModes", reglagesPagesCache.quizzesGroupModes ?? null);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -135,6 +156,24 @@ let quizSelectionne: QuizIndexEntry | null = null;
 let vuePrecedente: DashboardViewName = "home";
 
 /**
+ * L'HISTORIQUE des boutons « précédent » et « suivant » de la souris (2026-09-25,
+ * portage de l'historique de l'ancienne vue Obsidian) : la page, le dossier
+ * ouvert dans « Mes quiz » et le quiz de la page « detail ». Au niveau du
+ * MODULE, comme `vueCourante` : jouer un quiz démonte la coquille, et revenir
+ * ne doit pas effacer le chemin parcouru. État d'interface, jamais persisté.
+ */
+interface EtatNav {
+	vue: DashboardViewName;
+	/** Dossier ouvert — seulement quand `vue` vaut "quizzes". */
+	dossier: string | null;
+	/** Quiz affiché — seulement quand `vue` vaut "detail". */
+	quiz: QuizIndexEntry | null;
+}
+const memeEtatNav = (a: EtatNav, b: EtatNav): boolean =>
+	a.vue === b.vue && a.dossier === b.dossier && (a.quiz?.path ?? null) === (b.quiz?.path ?? null);
+const historiqueNav = creerHistorique<EtatNav>(memeEtatNav);
+
+/**
  * La question COURANTE au tout premier rendu de la page « detail » (celle sur
  * laquelle l'éditeur s'ouvre ; la fiche reste l'écran d'ouverture), posée
  * par `reprendre()` au démarrage (reprise de session) et consommée par le
@@ -144,6 +183,63 @@ let vuePrecedente: DashboardViewName = "home";
  * de la session précédente.
  */
 let questionInitiale: number | undefined;
+
+/** La séquence de la lueur, en millisecondes : à l'entrée d'un dossier, le
+    bleu S'ÉTEINT ; à la sortie, il REVIENT. */
+const LUEUR_ETEINT = 600;
+const LUEUR_RETOUR = 400;
+
+/** L'accent pour lequel la lueur est posée (`null` : hors dossier, le bleu),
+    et l'animation en cours. Au niveau du MODULE : la lueur vit sur la racine
+    du document et survit au démontage de la coquille (quiz lancé). */
+let lueurCourante: string | null = null;
+let lueurAnimation: Animation | null = null;
+
+/**
+ * La LUEUR de la fenêtre (`shell.css`, `--nq-lueur` et `--nq-lueur-force`).
+ *
+ * HORS DOSSIER (`null`) : la bande BLEUE, à pleine intensité ; si elle était
+ * éteinte (on sort d'un dossier), elle revient en fondu.
+ * DANS UN DOSSIER : la lueur S'ÉTEINT simplement, sans prendre la couleur
+ * du dossier (Ahmed, 2026-09-26 : « la lueur devient étouffante » sur un
+ * fond d'écran, puis « quand on arrive dans un dossier la lueur s'éteint
+ * simplement ») — il ne reste aucune lueur dans le dossier.
+ *
+ * « Mes quiz » appelle ceci à CHAQUE rendu (un changement du catalogue
+ * redessine la page) : le même accent ne rejoue donc rien. Un changement en
+ * cours de séquence (entrer puis ressortir aussitôt) ANNULE l'animation, et
+ * la suivante repart de l'intensité où l'autre en était : aucune lueur
+ * coincée, aucun saut. L'état FINAL est toujours écrit en style en ligne,
+ * sous l'animation : annulée ou non jouée (mouvement réduit), la lueur est
+ * juste.
+ */
+function poserLueur(accent: string | null): void {
+	if (accent === lueurCourante) return;
+	lueurCourante = accent;
+	const racine = document.documentElement;
+	// Lue AVANT l'annulation : c'est la valeur animée, celle qu'on voit.
+	const depart = Number.parseFloat(getComputedStyle(racine).getPropertyValue("--nq-lueur-force"));
+	lueurAnimation?.cancel();
+	lueurAnimation = null;
+
+	// La couleur reste le bleu : dans un dossier, la lueur ne fait que s'éteindre.
+	racine.style.removeProperty("--nq-lueur");
+	racine.style.setProperty("--nq-lueur-force", accent ? "0" : "1");
+
+	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+	const de = Number.isFinite(depart) ? String(depart) : "1";
+	const animation = accent
+		? racine.animate([
+			{ "--nq-lueur-force": de },
+			{ "--nq-lueur-force": "0" },
+		], { duration: LUEUR_ETEINT, easing: "ease-in-out" })
+		: racine.animate([
+			{ "--nq-lueur-force": de },
+			{ "--nq-lueur-force": "1" },
+		], { duration: LUEUR_RETOUR, easing: "ease" });
+	lueurAnimation = animation;
+	animation.addEventListener("finish", () => { if (lueurAnimation === animation) lueurAnimation = null; });
+}
 
 /**
  * Pose l'état de la coquille AVANT le tout premier `monterDashboard`, pour
@@ -198,6 +294,10 @@ export interface MonterDashboardDeps {
 	cheminAbsolu(contrat: string): string | null;
 	onOpenQuiz(entry: QuizIndexEntry): void;
 	onOpenSettings(): void;
+	/** Les sessions en cours (2026-09-26) : reprendre un quiz là où on
+	    s'était arrêté. Lues par `sessionOf` (le « Reprendre » du dossier) ;
+	    absentes, pas de « Reprendre ». */
+	sessions?: SessionsApp;
 }
 
 /**
@@ -244,13 +344,29 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		settings: reglagesPages(),
 		saveSettings: () => enregistrerReglagesPages(),
 		navigate: (vue, data) => naviguer(vue, data),
-		/* PAS d'historique de boutons de souris dans l'application : c'est un
-		   confort d'onglet Obsidian, et `recordNav` n'a donc rien à empiler.
-		   Le no-op est explicite plutôt qu'absent — les pages l'appellent, et
-		   un membre manquant serait une erreur de compilation qui inviterait à
-		   retirer l'appel côté page, donc à faire diverger les deux hôtes. */
-		recordNav: () => {},
-		openQuiz: (quiz) => deps.onOpenQuiz(quiz),
+		/* L'historique des boutons de souris : la page « Mes quiz » l'appelle
+		   juste avant d'entrer dans un dossier ou d'en sortir, qui ne passe pas
+		   par `navigate`. */
+		recordNav: () => enregistrerNav(),
+		/* JOUER DEPUIS N'IMPORTE OÙ RAMÈNE À LA PAGE DU QUIZ (2026-09-26). La
+		   coquille est démontée pendant le jeu puis remontée au retour, sur
+		   `vueCourante` : lancé depuis la pastille Learn d'une carte, le retour
+		   retombait sur « Mes quiz »… à la grille RACINE, le dossier ouvert
+		   étant un état de l'instance détruite. On se place donc sur la fiche
+		   du quiz AVANT de partir ; sa flèche retour rouvre ensuite le dossier
+		   (`openFolderOfQuiz`, voir `onBack` plus bas). Depuis la fiche
+		   elle-même, rien ne change. */
+		openQuiz: (quiz) => {
+			if (vueCourante !== "detail" || quizSelectionne?.path !== quiz.path) {
+				if (!memeEtatNav(etatCourant(), { vue: "detail", dossier: null, quiz })) enregistrerNav();
+				if (vueCourante !== "detail") vuePrecedente = vueCourante;
+				quizSelectionne = quiz;
+				vueCourante = "detail";
+				ouvertureEnAttente = true;
+				noterVue({ vue: "detail", quiz: quiz.path });
+			}
+			deps.onOpenQuiz(quiz);
+		},
 		openSettings: () => deps.onOpenSettings(),
 		/* Toutes les vues, la génération comprise (tranche 5, tâche 6) : la page
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à
@@ -258,6 +374,23 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   « fournisseur indisponible » propre, jamais un composer mort). */
 		canOpen: () => true,
 		reviewStore: deps.reviewStore,
+		sessionOf: (path) => {
+			const s = deps.sessions?.toutes()[path];
+			const quiz = deps.scanner.getQuiz(path);
+			if (!s || !quiz || s.courante === null) return null;
+			const i = quiz.items.findIndex(it => it.id === s.courante);
+			if (i < 0) return null;
+			/* Le numéro AFFICHÉ, qui saute les lectures absorbées par leur
+			   étape (src/lecture-etape.ts), comme les onglets du quiz ; une
+			   photo posée sur une lecture absorbée désigne la question qui la
+			   montre. Le total est celui de la carte (`quiz.questions`). */
+			// Hors Learn (au sens du moteur, `quiz.lecon`), rien n'est absorbé.
+			const lecon = !!quiz.lecon;
+			// Une lecture restée un écran n'a pas de numéro (2026-09-26) :
+			// `numeroDeReprise` annonce la question qui la suit.
+			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite };
+		},
+		ambiance: (accent) => poserLueur(accent),
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
@@ -323,17 +456,27 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   même `ctx` : le menu « ⋯ » ne demande que `DashboardShellCtx` depuis
 		   la tranche 3 (tâche 9), et c'est l'hôte qui l'OUVRE (`openActionMenu`,
 		   portalé au `<body>`) avec le `rerender` de la page qui l'affiche. */
-		openCardMenu: (quiz, anchor, rerender) => {
-			openActionMenu(anchor, buildQuizCardMenu(ctx, rerender)(quiz));
+		openCardMenu: (quiz, anchor, rerender, map) => {
+			openActionMenu(anchor, buildQuizCardMenu(ctx, rerender, map)(quiz, anchor));
 		},
 		openModuleMenu: (group, anchor, rerender, map) => {
 			openActionMenu(anchor, buildModuleCardMenu(ctx, rerender, map)(group, anchor));
 		},
-		/* LA DATE D'EXAMEN D'UN DOSSIER, saisie dans « Modifier dossier »
-		   (menu « ⋯ » d'une carte de module) — elle n'a plus de section dans
-		   les Réglages depuis le 2026-09-17 : la régler à l'endroit où on voit
-		   le dossier vaut mieux qu'une liste plate de toutes les matières,
-		   dont deux pouvaient porter le même nom.
+		/* « Gérer les examens » (module-edit.ts) ferme son modal et retombe
+		   ici : naviguer vers « Mes quiz » PUIS ouvrir le dossier au bon onglet
+		   sur l'instance de `quizzes` restée vivante — même geste que
+		   `onBack` (`quizzes.openFolderOfQuiz`) plus bas. `quizzes` n'est
+		   assigné que quelques lignes plus loin ; la fermeture ne le lit qu'à
+		   l'appel, jamais à la construction de `ctx`. */
+		openFolderTab: (folder, onglet) => {
+			naviguer("quizzes");
+			quizzes.openFolderTab(folder, onglet);
+		},
+		/* LES EXAMENS D'UN DOSSIER, gérés dans l'onglet Planning (tâche 4,
+		   2026-09-26) — plus de section dans les Réglages depuis le
+		   2026-09-17 : les régler à l'endroit où on voit le dossier vaut mieux
+		   qu'une liste plate de toutes les matières, dont deux pouvaient porter
+		   le même nom.
 
 		   LA CONVERSION DE CLÉ EST ICI, et nulle part ailleurs : le code
 		   partagé ne connaît qu'un nom de segment, l'ordonnanceur veut une clé
@@ -341,21 +484,21 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   sont tous dans le même dossier, donc tous sous la même clé (la page
 		   n'appelle jamais ces membres sur un groupe vide, et `cleModule`
 		   n'aurait alors rien à lire). */
-		examDate: group => {
+		examens: group => {
 			const quiz = group.quizzes[0];
-			return quiz ? examDates()[cleModule(quiz.path, currentHost().paths)] : undefined;
+			return quiz ? (examens()[cleModule(quiz.path, currentHost().paths)] ?? []) : [];
 		},
-		setExamDate: (group, date) => {
+		enregistrerExamen: (group, e) => {
 			const quiz = group.quizzes[0];
-			if (!quiz) return;
-			/* `setExamDate` met la table à jour EN MÉMOIRE de façon synchrone
-			   avant d'écrire : le plan, qui la relit à chaque calcul, est déjà
-			   juste quand la promesse d'écriture est encore en vol. */
-			void setExamDateReglage(cleModule(quiz.path, currentHost().paths), date ?? "");
+			if (quiz) void enregistrerExamenReglage(cleModule(quiz.path, currentHost().paths), e);
+		},
+		retirerExamen: (group, id) => {
+			const quiz = group.quizzes[0];
+			if (quiz) void retirerExamenReglage(cleModule(quiz.path, currentHost().paths), id);
 		},
 		// « Nouveau quiz » : une note vierge, puis sa page en ÉDITION par
 		// `openQuizPath` ci-dessous — l'éditeur existe désormais dans la fenêtre.
-		createQuiz: (folder, done) => openCreateQuizModal(ctx, folder, done),
+		createQuiz: (folder, done) => openAddContentModal(ctx, folder, done),
 		/* La page d'un quiz PAR CHEMIN, pour une note que le catalogue n'a pas
 		   forcément encore. Son seul appelant (`createQuizInFolder`,
 		   folder-create.ts) l'appelle juste après `fs.write`, AVANT que le
@@ -381,15 +524,16 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			if (!entry) { currentHost().ui.notice(t("dashboard.detail.noBlockInNote")); return; }
 			naviguer("detail", { quiz: entry, edit: opts?.edit });
 		},
-		/* shareQuiz, renameQuiz : ABSENTS À DESSEIN, et le menu « ⋯ » de la
-		   fenêtre a donc DEUX entrées (Éditer, Supprimer) là où le greffon en
-		   a quatre. `share.ts` livre par `child_process`/`electron.shell`, hors
-		   du contrat (spec §7 : hors chantier). `renameQuiz` exige de réécrire
+		/* Partager : le modal du greffon, porté le 2026-09-25 — le fichier
+		   est construit dans la fenêtre, écrit et lancé par le principal
+		   (`electron/partage.ts`). */
+		shareQuiz: (cible) => ouvrirPartage(cible),
+		/* renameQuiz : ABSENT À DESSEIN. `renameQuiz` exige de réécrire
 		   les wikilinks ENTRANTS ([[ancien nom]]), ce que seul l'index de liens
 		   d'Obsidian sait faire (`fileManager.renameFile`) ; le poser sur
 		   `HostFs.rename` déplacerait la note et casserait ces liens EN
 		   SILENCE — une entrée absente vaut mieux qu'une entrée qui ment
-		   (`types/dashboard-ctx.ts`). Les deux restent optionnels côté
+		   (`types/dashboard-ctx.ts`). Il reste optionnel côté
 		   `DashboardShellCtx` pour que cette absence soit un état PRÉVU, pas
 		   une erreur de compilation. */
 	};
@@ -450,7 +594,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			const generated = path === ctx.generatedFolder?.();
 			return {
 				path, name,
-				icon: moduleIcon(ov ?? {}, { generated }),
+				icon: moduleIcon({ icon: ov?.icon, name, ue: ov?.ue }, { generated }),
 				color: moduleAccent({ folder: name, color: ov?.color }, { generated }),
 				root: currentHost().paths.rootOf(path)?.name ?? "",
 			};
@@ -600,11 +744,51 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	 *   ne gouverne que l'état du rail. Le routeur le consulte quand même :
 	 *   une SEULE source de vérité entre le rail et lui.
 	 */
+	/* ── Boutons « précédent » / « suivant » de la souris ── */
+	let enRestauration = false;
+	const etatCourant = (): EtatNav => ({
+		vue: vueCourante,
+		// Le dossier n'est un état restaurable que VU depuis « Mes quiz » : hors
+		// de cette vue, `openModuleFolder` peut traîner en résidu.
+		dossier: vueCourante === "quizzes" ? quizzes.getOpenFolder() : null,
+		quiz: vueCourante === "detail" ? quizSelectionne : null,
+	});
+	/** On QUITTE l'état courant : il part sur la pile arrière. Une restauration
+	    n'est pas une navigation, elle n'empile rien. */
+	function enregistrerNav(): void {
+		if (!enRestauration) historiqueNav.enregistrer(etatCourant());
+	}
+	function appliquerNav(etat: EtatNav): void {
+		enRestauration = true;
+		try {
+			naviguer(etat.vue, etat.quiz ? { quiz: etat.quiz } : undefined);
+			// `naviguer` vient de refermer le dossier : rouvrir celui de l'état.
+			if (etat.vue === "quizzes" && etat.dossier !== null) quizzes.openFolder(etat.dossier);
+		} finally {
+			enRestauration = false;
+		}
+	}
+	/* En CAPTURE, sur les deux phases : le bouton est consommé dès l'appui
+	   (Chromium pourrait sinon y voir une navigation), l'action part au
+	   relâchement. Pile vide : le clic ne fait rien. */
+	const surBoutonSouris = (e: MouseEvent): void => {
+		if (e.button !== 3 && e.button !== 4) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.type !== "mouseup") return;
+		const cible = e.button === 3 ? historiqueNav.reculer(etatCourant()) : historiqueNav.avancer(etatCourant());
+		if (cible) appliquerNav(cible);
+	};
+
 	function naviguer(vue: DashboardViewName, data?: NavigateData): void {
 		/* « Créer avec l'IA » depuis un dossier : le préréglage est posé sur
 		   la page AVANT qu'elle se peigne — c'est son premier `render` qui
 		   joint les sources, et il a besoin de la destination déjà connue. */
 		if (vue === "ai" && data?.aiPreset) ai.preset(data.aiPreset);
+		/* L'état QUITTÉ va dans l'historique — sauf si la navigation est
+		   refusée, ou immobile (re-clic du rail sur la page courante). */
+		if (vue === "detail" ? !data?.quiz : !ctx.canOpen(vue)) return;
+		if (!memeEtatNav(etatCourant(), { vue, dossier: null, quiz: vue === "detail" ? data?.quiz ?? null : null })) enregistrerNav();
 		if (vue === "detail") {
 			if (!data?.quiz) return;
 			quizSelectionne = data.quiz;
@@ -616,6 +800,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 			// Aucun bouton du rail ne porte "detail" : `setActive` éteint donc
 			// la carte active, comme sous Obsidian.
 			nav.setActive("detail");
+			// La page d'un quiz est HORS dossier : la bande bleue revient.
+			poserLueur(null);
 			// Notée SANS la question : `onQuestionChange` la précisera au premier
 			// changement. Ouvrir un quiz montre sa fiche ; sa question courante
 			// reste celle sur laquelle l'éditeur s'ouvre.
@@ -628,6 +814,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		// dans un module puis revenir par le rail doit rouvrir la GRILLE, pas
 		// le module laissé ouvert.
 		if (vue === "quizzes") quizzes.resetDrilldown();
+		/* Hors d'un dossier, la bande bleue ; « Mes quiz » rejoue le passage de
+		   la couleur s'il rouvre un dossier (`ambiance`). */
+		poserLueur(null);
 		vueCourante = vue;
 		nav.setActive(vue);
 		noterVue({ vue });
@@ -635,6 +824,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	}
 
 	nav.render(navEl);
+	/* Le logo de l'app en tête du rail, au-dessus d'Accueil (2026-09-26,
+	   référence StudySmarter) : une décoration, masquée aux lecteurs d'écran
+	   et sans aucun état interactif (`shell.css`, `.nq-rail-logo`). Posé par
+	   la coquille et non par `nav.ts` : c'est l'identité de l'APPLICATION. */
+	const logo = document.createElement("div");
+	logo.className = "nq-rail-logo";
+	logo.setAttribute("aria-hidden", "true");
+	navEl.prepend(logo);
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement
 	// au pont pour toute la fenêtre (`mise-a-jour.ts`).
@@ -643,6 +840,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	// quiz », par exemple) : `createNavHandlers` démarre chaque fois avec son
 	// propre `activeNav` interne à "home".
 	nav.setActive(vueCourante);
+	/* Au remontage (retour d'un quiz lancé depuis un dossier), la lueur est
+	   restée celle du dossier, éteinte : hors « Mes quiz », la bande bleue
+	   revient. Dans « Mes quiz », son rendu décide (`ambiance`). */
+	if (vueCourante !== "quizzes") poserLueur(null);
 	peindre();
 
 	// Redessine la page courante à chaque changement du catalogue — `entering:
@@ -680,10 +881,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		void annulerDerniereSuppression(ctx).then(restaure => { if (restaure) peindre(); });
 	};
 	document.addEventListener("keydown", surCtrlZ);
+	document.addEventListener("mousedown", surBoutonSouris, true);
+	document.addEventListener("mouseup", surBoutonSouris, true);
 
 	return () => {
 		if (demonte) return demonte;
 		document.removeEventListener("keydown", surCtrlZ);
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
 		desabonner();
 		demonterMaj();
 		/* La page « Générer » aussi : une génération en vol, son écoute Échap

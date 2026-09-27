@@ -5,7 +5,8 @@ import { QUESTION_ROLES } from "../types/quiz";
 import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { modeDuBloc, titreSansMode } from "../quiz-format";
+import { nombreDeQuestions, nombreDeLectures } from "../lecture-etape";
+import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
 
@@ -23,7 +24,7 @@ import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
  * (editor/export.ts ne pose `type` que pour la variante texte, cf.
  * types/quiz.ts) — comportement de scanner.js préservé tel quel, pas « corrigé ».
  */
-export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "matching";
+export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "matching" | "flashcard";
 
 /**
  * Type global d'un quiz — un TAG stable, pas un libellé.
@@ -34,7 +35,7 @@ export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "mat
  * traduction se fait donc au rendu (quiz-card.ts, detail.ts) via la clé
  * « dashboard.quizType.<tag> ».
  */
-export type QuizTypeTag = "mixed" | "single" | "multiple" | "text" | "ordering" | "matching";
+export type QuizTypeTag = "mixed" | "single" | "multiple" | "text" | "ordering" | "matching" | "flashcard";
 
 /** Forme minimale lue sur un item brut du tableau JSON5 par le scanner. */
 interface RawQuizItem extends Pick<ParsedQuizItem, "id"> {
@@ -66,6 +67,10 @@ export interface QuizItemRef {
 /** Métadonnées extraites d'un bloc quiz-blocks (parseQuizMeta). */
 export interface QuizMeta {
 	questions: number;
+	/** Le nombre de LECTURES (`role: "read"`) du bloc, TOUTES comptées,
+	    absorbées ou restées un écran (src/lecture-etape.ts `nombreDeLectures`) ;
+	    0 hors Learn. Affiché à côté de `questions`, jamais inclus dedans. */
+	readings: number;
 	items: QuizItemRef[];
 	types: QuestionTypeTag[];
 	quizType: QuizTypeTag;
@@ -73,6 +78,12 @@ export interface QuizMeta {
 	    Practice sinon. Affiché en badge, à droite du type ; son suffixe
 	    éventuel (« — Learn ») est retiré du titre (`titreSansMode`). */
 	mode: ModeQuiz;
+	/** Le bloc est une Leçon POUR LE MOTEUR (`extractExamOptions(...).quizMode
+	    === "lesson"`, qui accepte aussi `mode: 'lesson'`, contrairement à
+	    `mode`) : ce que la règle des lectures absorbées lit
+	    (src/lecture-etape.ts). Optionnel pour les entrées fabriquées ailleurs
+	    (absent = pas une Leçon). */
+	lecon?: boolean;
 }
 
 /**
@@ -122,9 +133,11 @@ export function createScanner(host: Host): Scanner {
 			// La détection de la configuration reste partagée avec le moteur : deux
 			// filtres locaux finiraient par construire des catalogues différents.
 			const brut = parseQuizSource(source, { logErrors: false });
-			const sansConfig = (
-				extractExamOptions(brut).questions
-			) as unknown as Array<RawQuizItem | null | undefined>;
+			const extrait = extractExamOptions(brut);
+			const sansConfig = extrait.questions as unknown as Array<RawQuizItem | null | undefined>;
+			// Le mode tel que le MOTEUR le lit : c'est lui qui décide si les
+			// lectures d'étape sont absorbées (src/lecture-etape.ts).
+			const lecon = extrait.quizMode === "lesson";
 
 			// Conserver les positions du tableau BRUT est aussi important que la
 			// déduplication : l'éditeur attribue un qN même aux éléments parasites.
@@ -148,7 +161,8 @@ export function createScanner(host: Host): Scanner {
 			// Détecter les types de questions
 			const typeSet = new Set<QuestionTypeTag>();
 			for (const { q } of questions) {
-				if (q.multiSelect) typeSet.add("multiple");
+				if (estCarte(q)) typeSet.add("flashcard");
+				else if (q.multiSelect) typeSet.add("multiple");
 				else if (q.type === "text") typeSet.add("text");
 				else if (q.type === "ordering") typeSet.add("ordering");
 				else if (q.type === "matching") typeSet.add("matching");
@@ -163,13 +177,21 @@ export function createScanner(host: Host): Scanner {
 			else if (typeSet.has("text")) quizType = "text";
 			else if (typeSet.has("ordering")) quizType = "ordering";
 			else if (typeSet.has("matching")) quizType = "matching";
+			else if (typeSet.has("flashcard")) quizType = "flashcard";
 			else quizType = "mixed";
 
 			// Le titre affiché vient du nom de la note (défini au niveau du cache),
 			// pas de la 1re question (qui vaut souvent « Question 1 »).
 			return {
-				questions: questions.length,
+				/* Le NOMBRE de questions affiché (carte, fiche, infos) saute les
+				   lectures d'un Learn, absorbées par leur étape ou restées un
+				   écran (src/lecture-etape.ts) : un cours n'est pas une question.
+				   `items`, lui, les garde toutes — c'est le catalogue de
+				   l'ordonnanceur, rangé par identifiant. */
+				questions: nombreDeQuestions(questions.map(x => x.q), lecon),
+				readings: nombreDeLectures(questions.map(x => x.q), lecon),
 				items,
+				lecon,
 				types: Array.from(typeSet),
 				quizType,
 				mode: modeDuBloc(brut as unknown[])

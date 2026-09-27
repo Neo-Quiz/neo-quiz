@@ -318,9 +318,15 @@ export async function demarrerOllama(env: NodeJS.ProcessEnv = process.env): Prom
 ══════════════════════════════════════════════════════════ */
 
 /** Une chaîne littérale PowerShell entre apostrophes (la seule forme qui
-    n'interpole rien) : l'apostrophe se double. */
-function citerPs(texte: string): string {
-	return "'" + texte.replace(/'/g, "''") + "'";
+    n'interpole rien). PowerShell tient QUATRE autres caractères pour des
+    apostrophes : ‘ ’ ‚ ‛ (U+2018 à U+201B). Chacun ferme la chaîne comme
+    `'`, et se neutralise de même en se doublant. Ne doubler que l'apostrophe
+    ASCII laissait un « ’ » — celui de « l’an » dans une traduction ou un
+    chemin — terminer la chaîne et faire EXÉCUTER la suite (mesuré le
+    2026-09-25 sur powershell.exe 5.1 : `'a’; Write-Output X; $x=’b'` écrit
+    X). Chaque variante a été vérifiée sur le vrai PowerShell. */
+export function citerPs(texte: string): string {
+	return "'" + texte.replace(/['\u2018\u2019\u201A\u201B]/g, c => c + c) + "'";
 }
 
 /** Les trois textes que la fenêtre peut afficher, traduits par `canaux.ts`

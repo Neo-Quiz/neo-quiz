@@ -66,19 +66,6 @@ function json5Key(k: string): string {
 }
 
 /**
- * Ce texte contient-il du markdown de BLOC — celui que le rendu inline du
- * moteur ne sait pas exprimer ?
- *
- * Titre, liste, citation, bloc de code, ou simplement plusieurs lignes. Le
- * gras, l'italique et le code inline n'en font PAS partie : le moteur les rend
- * depuis le texte brut, et les convertir en HTML à l'écriture ne faisait que
- * figer — et parfois corrompre — la source.
- */
-function hasBlockMarkdown(texte: string): boolean {
-	return /\n/.test(texte) || /^\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)/m.test(texte);
-}
-
-/**
  * Le texte porte-t-il une balise inline ATTRIBUÉE dont la fermante est présente
  * — `Use <strong data-x="1">bold</strong>` ?
  *
@@ -132,17 +119,14 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 		   que personne n'a écrit. */
 		if (q.prompt && q._promptSource) L.push(`\t\tprompt: '${e(q.prompt)}',`);
 	} else if (q.prompt) {
-		/* Passage en HTML seulement pour le markdown de BLOC — titre, liste,
-		   citation, bloc de code, ou plusieurs lignes. L'ancien test suffisait à
-		   la présence d'une étoile ou d'un accent grave n'importe où, et
-		   `md2html` ne connaît pas la règle de flanc du rendu : sauvegarder une
-		   question contenant « 3*4*5 » l'écrivait `3<em>4</em>5` DANS LA NOTE.
-		   La donnée était corrompue par une simple correction de faute de frappe
-		   (revue codex 2026-07-31).
-		   Le markdown INLINE n'a plus besoin d'être converti : depuis que le
-		   moteur rend `prompt` lui-même (engine/sanitizer.ts), le laisser en
-		   texte est à la fois fidèle et plus lisible dans la note. */
-		if (hasBlockMarkdown(q.prompt) || contientBaliseAttribuee(q.prompt)) {
+		/* DU MARKDOWN PARTOUT (2026-09-26) : le markdown de BLOC (paragraphes,
+		   listes, code, tableaux) reste lui aussi du texte — le moteur le rend
+		   (engine/grammaire-blocs.ts). Il partait avant vers `md2html`, qui ne
+		   connaît ni la règle de flanc du rendu (« 3*4*5 » écrit
+		   `3<em>4</em>5` DANS LA NOTE, revue codex 2026-07-31) ni les tableaux.
+		   Seule exception : une balise ATTRIBUÉE, que le rendu du texte
+		   couperait en deux (voir `contientBaliseAttribuee`). */
+		if (contientBaliseAttribuee(q.prompt)) {
 			L.push(`\t\tpromptHtml: '${e(md2html(q.prompt))}',`);
 		} else {
 			L.push(`\t\tprompt: '${e(q.prompt)}',`);
@@ -182,6 +166,12 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 		// à écrire, et `type` reste absent (le moteur discrimine sur `cloze`).
 		L.push(`\t\tcloze: '${e(q.cloze || "")}',`);
 		if (q.caseSensitive) L.push("\t\tcaseSensitive: true,");
+	}
+	if (t === "flashcard") {
+		// Le recto est `prompt` (écrit plus haut), le verso `answer` ; `type`
+		// reste absent : le moteur discrimine sur `flashcard`.
+		L.push("\t\tflashcard: true,");
+		L.push(`\t\tanswer: '${e(q.answer || "")}',`);
 	}
 	if (["numeric", "text", "cmd", "powershell", "bash"].includes(t)) {
 		L.push("\t\ttype: 'text',");
@@ -230,8 +220,14 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 	   ensuite (passage, mathInput, numeric…). Une question portant une
 	   explication ET un de ces champs produisait un bloc JSON5 INVALIDE, que le
 	   moteur refusait de parser (« invalid character 'p' »). */
-	if (q.hint) {
-		L.push(`\t\thint: '${e(q.hint)}',`);
+	/* Un indice d'UN niveau s'écrit en chaîne, comme toujours ; plusieurs
+	   niveaux, en tableau du plus léger au plus révélateur (src/quiz-hint.ts).
+	   Un niveau vidé dans l'éditeur n'est pas écrit. */
+	const niveauxIndice = [q.hint, ...(q._hintMore ?? [])].filter(h => typeof h === "string" && h.trim() !== "");
+	if (niveauxIndice.length === 1) {
+		L.push(`\t\thint: '${e(niveauxIndice[0])}',`);
+	} else if (niveauxIndice.length > 1) {
+		L.push(`\t\thint: [\n${niveauxIndice.map(h => `\t\t\t'${e(h)}',`).join("\n")}\n\t\t],`);
 	}
 	// Priorité à explain modifié par l'utilisateur
 	/* Quand les DEUX existent, le moteur affiche `explainHtml` (cards.ts
@@ -243,10 +239,9 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 		L.push(`\t\texplainHtml: '${e(q._explainHtml)}',`);
 		L.push(`\t\texplain: '${e(q.explain)}',`);
 	} else if (q.explain) {
-		// Même règle que l'énoncé : le markdown inline reste du TEXTE, que le
-		// moteur rend (engine/cards.ts explanationHtml).
-		if (hasBlockMarkdown(q.explain)) L.push(`\t\texplainHtml: '${e(md2html(q.explain))}',`);
-		else L.push(`\t\texplain: '${e(q.explain)}',`);
+		// Même règle que l'énoncé : le markdown, inline ou de bloc, reste du
+		// TEXTE, que le moteur rend (engine/cards.ts explanationHtml).
+		L.push(`\t\texplain: '${e(q.explain)}',`);
 	} else if (q._explainHtml) {
 		L.push(`\t\texplainHtml: '${e(q._explainHtml)}',`);
 	}

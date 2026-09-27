@@ -23,6 +23,12 @@ export const EN_EDITOR = {
 	/* ── Texte à trous ── */
 	"editor.type.cloze.label": "Fill in the blanks",
 	"editor.type.cloze.desc": "Complete a text",
+	"editor.type.flashcard.label": "Flashcard",
+	"editor.type.flashcard.desc": "Flip it, then rate yourself",
+	"editor.flashcard.section": "Back of the card",
+	"editor.flashcard.help": "The question above is the front. Write the expected answer here: one sentence, one formula or one line of code.",
+	"editor.flashcard.back": "Answer",
+	"editor.flashcard.backPlaceholder": "<class 'list'>",
 	"editor.cloze.help": "Write the whole text and wrap each blank in double braces. Separate accepted variants with a pipe: {{Paris}}, {{the euro|euro}}.",
 	"editor.cloze.templateLabel": "Text with blanks",
 	"editor.cloze.templatePlaceholder": "The capital of France is {{Paris}}.",
@@ -76,16 +82,22 @@ export const EN_EDITOR = {
 	"editor.form.promptPlaceholder": "Your question...",
 	"editor.hint.label": "Hint",
 	"editor.hint.placeholder": "A hint to help...",
-	"editor.form.explainSection": "Explanation (Markdown)",
+	/* Un indice à plusieurs niveaux (2026-09-26). */
+	"editor.hint.levelsHelp": "A hard question can have several levels, from the lightest clue to the most revealing one.",
+	"editor.hint.level": "Level {n}",
+	"editor.hint.placeholderNext": "A more revealing hint...",
+	"editor.hint.addLevel": "Add a level",
+	"editor.hint.removeLevel": "Remove this level",
+	"editor.form.explainSection": "Explanation",
 	"editor.form.explainPlaceholder": "### Key points\n- **Term** — Definition",
 
-	/* ── Toolbar entités HTML (infobulles) ── */
-	"editor.entity.gt": "Greater than (>)",
-	"editor.entity.lt": "Less than (<)",
-	"editor.entity.amp": "Ampersand (&)",
-	"editor.entity.nbsp": "Non-breaking space",
-	"editor.entity.apos": "Apostrophe",
-	"editor.entity.quot": "Quotation mark",
+	/* ── Barre de mise en forme (infobulles) ── */
+	"editor.format.bold": "Bold",
+	"editor.format.italic": "Italic",
+	"editor.format.code": "Code",
+	"editor.format.formula": "Formula ($…$)",
+
+	/* ── Menu « Caractère spécial » : entités HTML ── */
 	"editor.entity.codeBlock": "Code block",
 
 	/* ── Section Ressource ── */
@@ -100,7 +112,6 @@ export const EN_EDITOR = {
 
 	/* ── Réponses (choix unique / multiple) ── */
 	"editor.answer.correct": "Correct answer",
-	"editor.answer.wrong": "Wrong answer",
 	"editor.answer.placeholder": "Enter the answer",
 	"editor.answer.add": "Add an answer",
 
@@ -134,6 +145,57 @@ export const EN_EDITOR = {
 	"editor.preview.multiHint": "Select one or more answers",
 	"editor.preview.orderingHint": "Put the items in the right order",
 	"editor.preview.matchingHint": "Match each situation with a medium",
+
+	/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ── */
+	"editor.render.clickToEdit": "Click to edit",
+	"editor.render.htmlInMore": "Edited as HTML in More",
+	"editor.render.untitled": "Untitled question",
+	"editor.render.addPrompt": "Add the question text",
+	"editor.render.addExplain": "Add an explanation",
+
+	/* ── Page d'édition : barre du type et panneau « Plus » (detail-edition.ts) ── */
+	"editor.render.type": "Type",
+	"editor.render.role": "Role",
+	"editor.render.roleTest": "Check",
+	"editor.render.more": "More",
+	"editor.render.promptHtml": "Question text (HTML)",
+	"editor.render.explainHtml": "Explanation (HTML)",
+	"editor.render.typeChangeTitle": "Change the question type?",
+	"editor.render.typeChangeMessage": "Its answers don't carry over to this type: they will be replaced by empty ones.",
+	"editor.render.typeChangeConfirm": "Change type",
+
+	/* ── Style de lecture d'un cours (detail-lecture-style.ts) ── */
+	"editor.lecture.section": "Reading style",
+	"editor.lecture.style": "Style",
+	"editor.lecture.stylePage": "Page",
+	"editor.lecture.styleEtapes": "Steps",
+	"editor.lecture.styleTableau": "Table",
+	"editor.lecture.help": "Every reading has its own screen, except short steps and methods, shown above the first question after the \"before the reading\" ones.",
+	"editor.lecture.methode": "Method to apply in the next question",
+	"editor.lecture.methodeHelp": "The steps are shown above that question even when they are long.",
+	"editor.lecture.etapes": "Steps",
+	"editor.lecture.etapePlaceholder": "One idea or one step",
+	"editor.lecture.colonnes": "Column headers",
+	"editor.lecture.colonnesPlaceholder": "Leave the first one empty, e.g. | Python | C",
+	"editor.lecture.lignes": "Rows",
+	"editor.lecture.lignePlaceholder": "Cells separated by |",
+	"editor.lecture.retenir": "Key points",
+	"editor.lecture.retenirAucun": "None",
+	"editor.lecture.retenirCartes": "Flip cards",
+	"editor.lecture.retenirRecap": "Checked recap",
+	"editor.lecture.recto": "Front",
+	"editor.lecture.verso": "Back",
+	"editor.lecture.pointPlaceholder": "A point to keep",
+	"editor.lecture.ajouter": "Add",
+	"editor.lecture.retirer": "Remove",
+
+	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
+	"editor.render.markCorrect": "Mark as correct answer",
+	"editor.render.addOption": "Add an option",
+	"editor.render.removeOption": "Remove this option",
+	"editor.render.pickSlot": "Select this slot",
+	"editor.render.pickChoice": "Select this item",
+	"editor.render.addVariant": "Add a variant",
 
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Add a question",

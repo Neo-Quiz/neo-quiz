@@ -762,6 +762,23 @@
 	min-width: 300px;
 }
 
+/* Intitulé de section d'un createSelect (option `section`) : « Personnalisé »
+   au-dessus du tri par UE. Même allure que les sections du sélecteur de
+   notes, avec un filet qui le sépare des options au-dessus. */
+.qbd-select-section {
+	margin-top: 4px;
+	padding: 8px 10px 3px;
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-faint);
+	cursor: default;
+}
+.qbd-select-section:first-child {
+	margin-top: 0;
+	border-top: none;
+}
+
 .qbd-note-picker-section {
 	padding: 6px 8px 3px;
 	font-size: 10px;

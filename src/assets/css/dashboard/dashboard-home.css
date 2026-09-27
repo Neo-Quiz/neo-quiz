@@ -198,8 +198,8 @@
 /* ═════════════════════════════════════════════════════════
    HERO "REPRENDRE" — dernier quiz en cours (returning user)
    ═════════════════════════════════════════════════════════ */
-/* Surface VERRE, même recette que le panneau « Progrès » du drill
-   (.qbd-progress-panel : tokens --qbd-glass-*, radius 18, filet 1px) — contrat
+/* Surface VERRE, même recette que les tuiles de l'onglet « Progression »
+   d'un dossier (.qbd-folder-progress-tile : tokens --qbd-glass-*, radius 18, filet 1px) — contrat
    visuel « Mes quiz », 2026-07-28. Le dégradé d'accent plein a disparu : la
    teinte d'accent ne survit que sur le label et la barre de progression, et
    le survol reprend le lift des cartes (translateY(-3px) + halo). */

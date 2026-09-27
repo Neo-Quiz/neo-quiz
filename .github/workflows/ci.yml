@@ -39,10 +39,46 @@ jobs:
       - name: Learn and Practice prompts
         run: npm run check:prompt
 
+      # LA CATÉGORIE D'UN QUIZ (Python, C, réseau…) : déduite des pièces
+      # jointes, puis du dossier, puis de la demande ; la lettre C d'une
+      # phrase n'est pas le langage C, une égalité ne tranche rien.
+      - name: Quiz category detection
+        run: npm run check:categorie
+
+      # LE MARKDOWN DE BLOC ET DE LIGNE d'un texte de quiz (paragraphes,
+      # listes, tableaux, blocs de code colorés, images, liens) : gras et
+      # italique interprétés, une formule LaTeX ou un chemin Windows laissés
+      # intacts, jamais une balise HTML tapée à la main qui s'exécute.
+      - name: Quiz markdown rendering
+        run: npm run check:md
+
+      # LA COLORATION SYNTAXIQUE D'UN BLOC DE CODE : aucun effet de bord sur
+      # le `Prism` de l'hôte (Obsidian a le sien), et une durée bornée même
+      # sur des motifs RÉPÉTÉS hostiles (pas seulement aléatoires) — une
+      # re-revue a trouvé un motif qui prenait plus de 400 ms sur du bash
+      # avec le premier plafond.
+      - name: Code block syntax highlighting
+        run: npm run check:code-highlight
+
+      # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
+      # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
+      - name: HTML to markdown conversion
+        run: npm run check:html-markdown
+
       # UNE RÉPONSE NUMÉRIQUE TAPÉE DANS L'ÉDITEUR D'ÉQUATIONS arrive en LaTeX
       # (« 1{,}5 », « \frac{3}{4} ») : ramenée à un nombre, jamais juste à tort.
       - name: Numeric answers typed in LaTeX
         run: npm run check:numeric
+
+      # UNE RÉPONSE COPIÉE D'UN SITE, dans tous ses états : fence, prose,
+      # LaTeX, virgule oubliée, faux titres de section (Gemini, 2026-09-24).
+      # LE COURS AU-DESSUS D'UNE QUESTION : caché avant la lecture et pendant
+      # un rappel, ouvert au-dessus d'une « à expliquer avec tes mots ».
+      - name: Passage above a question
+        run: npm run check:passage
+
+      - name: Web channel responses
+        run: npm run check:web-channel
 
       # LE CLIQUET DE LA FRONTIÈRE D'HÔTE. Le contrat `src/host/types.ts` dit
       # que c'est ce contrôle, et non la discipline, qui tient la frontière :
@@ -97,6 +133,41 @@ jobs:
       # s'y faisait défiler par un focus et laissait une page blanche.
       - name: Quiz viewport is clipped
         run: npm run check:viewport-clip
+
+      # LE PARTAGE : la fenêtre donne au principal un nom et des octets. Un
+      # nom qui serait un chemin, une extension hors liste ou une apostrophe
+      # qui fermerait la chaîne du script PowerShell sont refusés ou cités.
+      - name: Share names and script quoting
+        run: npm run check:partage
+
+      # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
+      # perdre de réponses, même si le quiz a changé entre deux sessions.
+      - name: Quiz session snapshot
+        run: npm run check:session
+
+      # L'HISTORIQUE DES TENTATIVES : meilleur score dérivé, anciens scores
+      # lus sans perte, suppression et annulation symétriques.
+      - name: Stats attempts
+        run: npm run check:stats
+
+      # LES CHANGEMENTS D'ÉCRAN pendant la transition de lancement d'un quiz :
+      # un double clic ne lance rien deux fois, un retour cliqué pendant la
+      # montée part à la fin au lieu d'être avalé, la fin ne se joue qu'une
+      # fois, et une fenêtre masquée pose l'état final sans animer.
+      - name: Screen transition
+        run: npm run check:transition
+
+      # Les gestes d'édition d'une question, partagés par le formulaire et
+      # l'édition dans le rendu : jamais une question sans bonne réponse,
+      # jamais deux emplacements d'un classement sur le même élément.
+      - name: Gestes d'édition d'une question
+        run: npm run check:gestes
+
+      # LA FILE DE GÉNÉRATION : une génération à la fois, dans l'ordre
+      # d'envoi ; la suivante n'attend pas qu'on le lui dise, mais elle attend
+      # que le processus annulé ait rendu le verrou de son CLI.
+      - name: Generation queue
+        run: npm run check:file-generation
 
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à

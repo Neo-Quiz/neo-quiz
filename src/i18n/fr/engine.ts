@@ -18,6 +18,11 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.collapse": "Masquer le document",
 	"engine.passage.expand": "Afficher le document",
 
+	"engine.lecture.keyPoints": "À retenir",
+	"engine.lecture.flipHint": "Cliquez sur une carte, ou appuyez sur Entrée, pour la retourner.",
+	"engine.lecture.flipAria": "{front} : retourner la carte",
+	"engine.lecture.flippedAria": "{front} : {back}",
+
 	/* ── Navigation ── */
 	"engine.nav.results": "Résultats",
 	"engine.nav.prevQuestion": "Question précédente",
@@ -33,7 +38,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.start.learnSub": "Sans chrono, correction après chaque réponse",
 
 	/* ── Mode examen ── */
-	"engine.exam.chooseMode": "Choisir le mode",
+	"engine.exam.timedTitle": "Quiz chronométré",
+	"engine.exam.start": "Commencer",
 	"engine.exam.startExam": "Commencer l'examen",
 	"engine.exam.startLearn": "Commencer à apprendre",
 	"engine.exam.noTimer": "Sans chrono",
@@ -61,6 +67,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Indice ── */
 	"engine.hint.button": "Indice",
+	"engine.hint.next": "Indice suivant",
+	"engine.hint.level": "Indice {n} sur {total}",
 	"engine.hint.title": "Indice",
 	"engine.hint.close": "Fermer",
 
@@ -72,26 +80,34 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.lesson.rolePre": "Avant la lecture",
 	"engine.lesson.roleRead": "Lecture",
 	"engine.lesson.roleRecall": "De mémoire",
-	"engine.lesson.roleTest": "Vérification",
-	"engine.lesson.skipBlocked": "Réponds d'abord — se tromper fait partie de la méthode.",
 	"engine.lesson.dontKnow": "Je ne sais pas",
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Votre réponse...",
+	"engine.terminal.programOutputLabel": "Sortie du programme",
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Votre réponse libre",
 	"engine.textOnly.answerPlaceholder": "Écrivez votre réponse avec vos mots...",
-	"engine.textOnly.check": "Vérifier",
-	"engine.textOnly.selfRating": "Auto-évaluation",
-	"engine.textOnly.optionsLabel": "Options QCM",
 	"engine.textOnly.explanationLabel": "Explication",
 	"engine.textOnly.noExpectedAnswer": "Réponse attendue non renseignée.",
+	"engine.textOnly.noAnswerGiven": "Aucune réponse donnée.",
+	"engine.textOnly.writtenQuestionNumber": "Q{n}",
+	"engine.textOnly.verdict.right": "J'avais juste",
+	"engine.textOnly.verdict.wrong": "J'avais faux",
 
 	/* ── Auto-évaluation ── */
 	"engine.rating.understood": "Compris",
 	"engine.rating.partial": "Partiel",
 	"engine.rating.review": "À revoir",
+
+	/* ── Carte mémoire ── */
+	"engine.flashcard.flip": "Retourner",
+	"engine.flashcard.flipHint": "Espace",
+	"engine.flashcard.back": "Réponse",
+	"engine.flashcard.again": "À revoir",
+	"engine.flashcard.knew": "Je savais",
+	"engine.flashcard.missingAnswer": "Pas de réponse au verso de cette carte.",
 
 	/* ── Slide de soumission ── */
 	"engine.submit.back": "Retour",
@@ -119,6 +135,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.result.correctLabel": "Bonnes réponses :",
 	"engine.result.pending.one": "Non évaluée",
 	"engine.result.pending.other": "Non évaluées",
+	"engine.result.pendingWritten.one": "{count} réponse écrite n'est pas encore auto-évaluée — elle ne compte pas dans le score.",
+	"engine.result.pendingWritten.other": "{count} réponses écrites ne sont pas encore auto-évaluées — elles ne comptent pas dans le score.",
 	"engine.result.retry": "Recommencer",
 	"engine.result.takeExam": "Passer l'examen",
 	"engine.result.retakeExam": "Repasser l'examen",

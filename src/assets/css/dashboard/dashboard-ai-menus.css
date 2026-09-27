@@ -1,0 +1,68 @@
+/* ══════════════════════════════════════════════════════════
+   LE MENU « + » DU COMPOSER DE « GÉNÉRER » — `qbd-menu-claude`
+   (`src/dashboard/composer-plus.ts`)
+
+   La matière et les mesures du menu « + » de claude.ai, relevées le
+   2026-09-26 : 320 px, fond plein, rayon 12 px, filet INTÉRIEUR à 10 % du
+   texte, deux ombres ; lignes de 32 px, padding 6 px 10 px, rayon 8 px,
+   texte 14/20 px, icône 16 px à la couleur du texte, raccourci gris à
+   droite ; filets de 1 px à 10 px des bords. Les autres menus de
+   l'application gardent leur verre.
+══════════════════════════════════════════════════════════ */
+
+.qbd-select-menu.qbd-menu-claude {
+	gap: 0;
+	padding: 4px;
+	border: none;
+	border-radius: 12px;
+	background: var(--background-secondary);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--text-normal) 10%, transparent),
+		0 8px 24px rgba(0, 0, 0, 0.32),
+		0 2px 6px rgba(0, 0, 0, 0.2);
+	max-width: calc(100vw - 16px);
+}
+
+.qbd-menu-claude.qbd-action-menu {
+	min-width: 0;
+	width: 320px;
+}
+
+.qbd-menu-claude .qbd-select-option,
+.qbd-menu-claude.qbd-action-menu .qbd-select-option {
+	min-height: 32px;
+	padding: 6px 10px;
+	gap: 8px;
+	border-radius: 8px;
+	font-size: 14px;
+	line-height: 20px;
+	color: var(--text-normal);
+}
+
+.qbd-menu-claude .qbd-select-option:hover {
+	background: color-mix(in srgb, var(--text-normal) 7.5%, transparent) !important;
+}
+
+.qbd-menu-claude .qbd-model-menu-sep {
+	margin: 4px 10px;
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+
+.qbd-menu-claude .qbd-action-menu-icon,
+.qbd-menu-claude .qbd-select-option:hover .qbd-action-menu-icon {
+	width: 16px;
+	color: var(--text-normal);
+}
+
+.qbd-menu-claude .qbd-action-menu-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.qbd-menu-claude .qbd-action-menu-hint {
+	font-size: 12px;
+	color: var(--text-muted);
+	max-width: none;
+}

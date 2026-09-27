@@ -20,6 +20,20 @@ import type { ModelDef, OllamaCatalogEntry } from "../dashboard/ai-providers";
 import type { AiUsageEntry } from "../dashboard/usage-format";
 import type { ModuleOverride, ModuleGroup, ModuleMap } from "../dashboard/quiz-modules";
 import type { ReviewStore } from "../review/review-store";
+import type { OngletDossier } from "../dashboard/quizzes-render";
+
+/**
+ * Un examen d'un dossier (« plusieurs examens par dossier », 2026-09-26).
+ * Déclaré ici et non dans `apps/windows/src/host/folder.ts` : `src/` ne peut
+ * pas importer `apps/`, alors que le sens inverse est permis — `folder.ts`
+ * réexporte `export type Examen = ExamenDossier` en l'important en
+ * `import type` depuis ce fichier. Date au format `AAAA-MM-JJ`.
+ */
+export interface ExamenDossier {
+	id: string;
+	nom: string;
+	date: string;
+}
 
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */
 export type DashboardViewName = "home" | "quizzes" | "detail" | "ai";
@@ -90,7 +104,7 @@ export interface AiSettings {
 	quizzesExpandedFolders?: string[];
 	/** Axe de regroupement de « Mes quiz » (module/ue/recent/type) — même remarque
 	    que ci-dessus, aucun rapport avec l'IA. Cf. plugin.ts DEFAULT_SETTINGS. */
-	quizzesGrouping?: "module" | "ue" | "recent" | "type";
+	quizzesGrouping?: "module" | "ue" | "recent" | "type" | "folder";
 	/** Note de correspondance UE → module. Cf. plugin.ts DEFAULT_SETTINGS. */
 	quizzesModuleMapNote?: string;
 	/** DOSSIERS archivés (clé `folder` de module) — l'archivage n'existe qu'au
@@ -116,6 +130,9 @@ export interface DashboardPageSettings {
 	quizzesModuleOverrides?: Record<string, ModuleOverride>;
 	quizzesModuleMapNote?: string;
 	quizzesArchivedFolders?: string[];
+	/** Réunir le Learn et le Practice d'un même cours en une carte (défaut :
+	    oui ; seul `false` les sépare). Cf. course-pairs.ts. */
+	quizzesGroupModes?: boolean;
 }
 
 /** Ce qu'une page transmet à la suivante en naviguant. */
@@ -139,6 +156,10 @@ export interface AiPreset {
 	destination: string;
 	/** Chemins du contrat à joindre, dans l'ordre. */
 	attach: string[];
+	/** Texte à mettre dans le composer (écrit dans le champ du Planning). */
+	prompt?: string;
+	/** Lancer la génération dès que les pièces sont jointes. */
+	lancer?: boolean;
 }
 
 /**
@@ -186,6 +207,15 @@ export interface DashboardShellCtx {
 	    Absent = la section ne s'affiche pas. Le greffon le fournit depuis
 	    `plugin._reviewStore` ; l'application depuis `creerJournalApp`. */
 	reviewStore?: ReviewStore;
+	/** La session EN COURS d'un quiz (reprendre là où on s'était arrêté) :
+	    numéro 1-based de la question courante, total, heure d'écriture.
+	    Absent côté hôte sans reprise : pas de « Reprendre ». */
+	sessionOf?(path: string): { question: number; total: number; ecrite: number } | null;
+	/** La couleur d'AMBIANCE de l'hôte (2026-09-26) : « Mes quiz » l'appelle
+	    à chaque rendu avec l'accent du dossier ouvert, `null` hors dossier.
+	    L'application en teinte la lueur autour de son panneau central.
+	    Absente = pas d'ambiance, la page n'en dépend pas. */
+	ambiance?(accent: string | null): void;
 	/** OUVRE le menu « ⋯ » d'une carte de quiz sur `anchor` (le bouton « ⋯ »),
 	    appelée par la page avec SON propre `rerender` — le menu doit pouvoir
 	    repeindre la page qui l'affiche. Absente = pas de bouton « ⋯ », ce que
@@ -198,7 +228,10 @@ export interface DashboardShellCtx {
 	    liée à Obsidian). L'ouverture appartient maintenant à l'hôte : c'est
 	    lui qui importe `ui-select.ts` (le greffon le fait déjà, `dashboard.ts`
 	    reste dans RESTANTS) et compose les items AU CLIC. */
-	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void) => void;
+	/* `map` (tranche 9, tâche « Move to ») : le sous-menu « Déplacer vers »
+	   liste les dossiers connus groupés par UE, tirés de la même table que
+	   `openModuleMenu`. */
+	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —
 	    autant de modals que l'application n'a pas encore. Absente = pas de
@@ -206,9 +239,9 @@ export interface DashboardShellCtx {
 	    opt-in — l'application ne la fournit pas (menus et modals = tranche
 	    2.6, D5). */
 	openModuleMenu?: (group: ModuleGroup, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
-	/* ── LA DATE D'EXAMEN D'UN DOSSIER ──
+	/* ── LES EXAMENS D'UN DOSSIER ──
 
-	   Elle ne passe PAS par `quizzesModuleOverrides`, alors que le modal
+	   Ils ne passent PAS par `quizzesModuleOverrides`, alors que le modal
 	   « Modifier dossier » écrit tout le reste là-bas, et c'est une correction
 	   de bug : les overrides sont indexés par `ModuleGroup.folder`, qui est un
 	   NOM DE SEGMENT (« Generated »), sans l'identifiant de la racine. Deux
@@ -221,9 +254,20 @@ export interface DashboardShellCtx {
 	   l'HÔTE qui fait la conversion : le code partagé ne connaît ni les racines
 	   ni leurs identifiants.
 
-	   Absents = le champ de date n'est pas rendu dans le modal. */
-	examDate?: (group: ModuleGroup) => string | undefined;
-	setExamDate?: (group: ModuleGroup, date: string | undefined) => void;
+	   « Plusieurs examens par dossier » (2026-09-26) : PLUS d'`examDate`/
+	   `setExamDate` (une seule date) — l'onglet Planning (tâche 4) les a
+	   remplacés. Absents = pas de liste d'examens dans l'onglet. */
+	examens?: (group: ModuleGroup) => ExamenDossier[];
+	/** Ajoute ou remplace (même `id`) un examen du dossier. */
+	enregistrerExamen?: (group: ModuleGroup, e: ExamenDossier) => void;
+	/** Retire un examen du dossier par son `id`. */
+	retirerExamen?: (group: ModuleGroup, id: string) => void;
+	/** Ouvre « Mes quiz » sur ce dossier, à l'onglet donné — appelé par
+	    « Modifier dossier » (bouton « Gérer les examens ») qui a fermé son
+	    modal et n'a plus de champ de date à éditer sur place. Absent = le
+	    bouton n'a nulle part où aller (aucun hôte ne le fournit encore sans
+	    onglet Planning). */
+	openFolderTab?: (folder: string, onglet: OngletDossier) => void;
 	/** Sélecteur d'icône d'un module (clic sur la pastille de la carte).
 	    Absent = la pastille n'est pas cliquable — `renderModuleCard` prévoit
 	    déjà `onPickIcon?` en opt-in. `suggestions` (calculées par la PAGE

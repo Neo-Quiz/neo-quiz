@@ -1,64 +1,52 @@
 import { t } from "../i18n";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
-import { reserveFreePath, releaseReservedPath } from "../unique-path";
+import { releaseReservedPath } from "../unique-path";
 import type { EditorCtx } from "../types/editor-ctx";
 import type { DraftQuestion } from "./utils";
+import { basculerBonne, ajouterOption, retirerOption, placerOrdre, associer, ajouterVariante, retirerVariante } from "./gestes";
+import { insererTexte, poserBarreFormat } from "./format-toolbar";
+import { createSelect } from "../dashboard/ui-select";
+import { keymap } from "@codemirror/view";
+import { cheminImageCollee, collageImage as collageImagePartage } from "./collage-image";
+import type { Extension } from "@codemirror/state";
+import { creerChampDirect } from "./champ-direct";
+import type { ChampDirect } from "./champ-direct";
+import { isShellVariant, defaultTerminalPromptPrefix } from "../engine/terminal";
+
+/** ``` + Entrée pose un bloc de code : le raccourci de la zone de texte,
+    gardé tel quel dans le champ direct. */
+const raccourciBlocCode = keymap.of([{
+	key: "Enter",
+	run: (v) => {
+		const pos = v.state.selection.main.head;
+		const ligne = v.state.doc.lineAt(pos);
+		if (v.state.sliceDoc(ligne.from, pos).trim() !== "```") return false;
+		const ouvre = "<pre><code>\n";
+		v.dispatch({
+			changes: { from: ligne.from, to: pos, insert: ouvre + "</code></pre>" },
+			selection: { anchor: ligne.from + ouvre.length },
+			userEvent: "input",
+		});
+		return true;
+	},
+}]);
+
+/** Options des champs d'un type. `rares` : seulement ce que l'édition dans le
+    RENDU corrigé ne sait pas faire (panneau « Plus », dashboard/detail-edition.ts)
+    — l'ajout et le retrait d'éléments d'un classement ou d'un appariement,
+    l'invite, le texte d'aide, la casse, l'unité et les marges. Les textes,
+    la bonne réponse, l'ordre, les paires et les variantes se modifient dans
+    le rendu : les remontrer ici en ferait deux endroits pour la même chose. */
+export interface OptionsChampsType { rares?: boolean }
 
 /** Handlers du formulaire d'édition d'une question (champs, ressource, éditeurs par type, éditeur de tableau). */
 export interface EditorFormHandlers {
 	renderEditor(): void;
-	_field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts?: Record<string, unknown>): HTMLElement;
+	_field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts?: { html?: boolean }): HTMLElement;
 	_resourceSection(parent: HTMLElement, q: DraftQuestion): void;
-	_renderTypeFields(box: HTMLElement, q: DraftQuestion): void;
+	_renderTypeFields(box: HTMLElement, q: DraftQuestion, opts?: OptionsChampsType): void;
 	_arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void;
-}
-
-/**
- * Chemin où écrire une image collée, décidé par L'HÔTE.
- *
- * `paths.attachmentPathFor` (`src/host/types.ts`) résout ce que l'hôte est
- * seul à savoir : sous Obsidian le réglage « dossier des pièces jointes » — y
- * compris ses modes relatifs `./` (le dossier de la note) et `./sous-dossier`
- * —, dans la fenêtre le dossier de la note elle-même. Le calculer à la main
- * donnait `.//Pasted image….png`, et écrivait à la RACINE du vault ce qui
- * devait aller à côté de la note (revue codex 2026-07-31).
- *
- * `sourcePath` est la note à laquelle l'image appartient. Les deux hôtes n'en
- * font PAS la même chose quand elle manque, et le contrat le dit plutôt que de
- * l'uniformiser : Obsidian retombe sur son fichier ACTIF ; la fenêtre REJETTE
- * avec une cause nommée, n'ayant pas de fichier actif et ne pouvant pas
- * choisir une racine sans risquer de poser l'image hors de celle où la note
- * finira. Le `catch` de l'appelant transforme ce rejet en message.
- */
-async function cheminImageCollee(ext: string, sourcePath?: string): Promise<{ fileName: string; filePath: string }> {
-	const now = new Date();
-	const ts = now.getFullYear().toString() +
-		String(now.getMonth() + 1).padStart(2, "0") +
-		String(now.getDate()).padStart(2, "0") +
-		String(now.getHours()).padStart(2, "0") +
-		String(now.getMinutes()).padStart(2, "0") +
-		String(now.getSeconds()).padStart(2, "0");
-	/* L'HÔTE décide du DOSSIER (et déduplique contre ce qui EXISTE déjà), la
-	   réservation décide du NOM quand deux collages se suivent : mesuré, deux
-	   appels rapprochés rendent le MÊME chemin tant que le fichier n'existe pas
-	   encore, et la seconde image écrasait la première.
-	   Elle reste ici et NON dans l'hôte, parce que le contrat le dit
-	   (`HostPaths.attachmentPathFor`) : un hôte qui réserverait à notre place
-	   ferait tomber CETTE réservation sur un nom déjà pris par lui, chaque
-	   collage sortirait en « ….-2.png » et le nom de base resterait brûlé sans
-	   jamais être écrit. */
-	const propose = await currentHost().paths.attachmentPathFor(
-		`Pasted image ${ts}.${ext}`, sourcePath);
-	const point = propose.lastIndexOf(".");
-	const filePath = await reserveFreePath(
-		point > 0 ? propose.slice(0, point) : propose,
-		point > 0 ? propose.slice(point) : "",
-		(c) => currentHost().fs.exists(c));
-	/* Le lien `![[…]]` porte le NOM, pas le chemin : c'est la forme qu'Obsidian
-	   résout lui-même, et celle que le moteur attend (engine/sanitizer.ts
-	   resolveObsidianEmbedFile). */
-	return { fileName: filePath.split("/").pop() || filePath, filePath };
 }
 
 export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
@@ -169,32 +157,26 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 			v => write("passageId", v));
 	}
 
-	// ── Entités pour la toolbar ──
-	// FONCTION et non constante : la liste était évaluée à la création des
-	// handlers (montage de l'éditeur), ce qui aurait figé les infobulles dans la
-	// langue d'alors. Appelée depuis _field, donc au rendu. `label` et `insert`
-	// sont des symboles/entités HTML — jamais traduits.
-	function entities(): { label: string; insert: string; title: string }[] {
-		return [
-			{ label: '>', insert: '&gt;', title: t("editor.entity.gt") },
-			{ label: '<', insert: '&lt;', title: t("editor.entity.lt") },
-			{ label: '&', insert: '&amp;', title: t("editor.entity.amp") },
-			{ label: '␣', insert: '&nbsp;', title: t("editor.entity.nbsp") },
-			{ label: "'", insert: "&#39;", title: t("editor.entity.apos") },
-			{ label: '"', insert: "&quot;", title: t("editor.entity.quot") },
-			{ label: '```', insert: '<pre><code>\n</code></pre>', title: t("editor.entity.codeBlock") },
-		];
-	}
+	// La barre de mise en forme (et ses entités) vit dans format-toolbar.ts.
+	const _insertAt = insererTexte;
 
-	function _insertAt(ta: HTMLTextAreaElement, text: string, cb: (value: string) => void): void {
-		const s = ta.selectionStart ?? 0;
-		const before = ta.value.substring(0, s);
-		const after = ta.value.substring(ta.selectionEnd ?? 0);
-		ta.value = before + text + after;
-		const nl = text.indexOf('\n');
-		ta.selectionStart = ta.selectionEnd = before.length + (nl !== -1 ? nl + 1 : text.length);
-		ta.focus();
-		cb(ta.value);
+	/** Coller une image dans un champ direct (editor/collage-image.ts, partagé
+	    avec l'édition dans le rendu) : `schedulePreview` est le signal qui fait
+	    sauvegarder la page une fois le lien posé. */
+	const collageImage = (onChange: (value: string) => void): Extension =>
+		collageImagePartage(onChange, { sourcePath: view.sourcePath, apres: () => view.schedulePreview() });
+
+	/** Un texte de quiz d'UNE ligne (réponse, élément, variante) dans un champ
+	    direct. `classe` porte le style du contrôle qu'il remplace. */
+	function _champLigne(parent: HTMLElement, classe: string, value: string, placeholder: string, onChange: (value: string) => void): ChampDirect {
+		const place = ajouter(parent, "div", classe + " qb-direct qb-direct--ligne");
+		return creerChampDirect(place, {
+			valeur: value,
+			multiligne: false,
+			placeholder,
+			onChange,
+			extensions: [collageImage(onChange)],
+		});
 	}
 
 	function _autoResize(ta: HTMLTextAreaElement): void {
@@ -204,23 +186,43 @@ export function createEditorFormHandlers(ctx: EditorCtx): EditorFormHandlers {
 		ta.style.height = newHeight + 'px';
 	}
 
-	function _field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts: Record<string, unknown> = {}): HTMLElement {
-		const wrap = ajouter(parent, "div");
+	function _field(parent: HTMLElement, label: string, value: string | undefined, placeholder: string, multiline: boolean, onChange: (value: string) => void, opts: { html?: boolean } = {}): HTMLElement {
+		const wrap = ajouter(parent, "div", "qb-field");
 		ajouter(wrap, "label", "qb-field-label", label);
+		if (multiline && !opts.html) {
+			/* Un TEXTE de quiz (markdown) : le champ à aperçu en direct
+			   (2026-09-26), rendu comme le quiz, la syntaxe n'apparaissant
+			   qu'autour du curseur. Même cadre, même barre, même `onChange`.
+			   Un champ HTML garde sa zone de texte : c'est du balisage qu'on y
+			   édite, pas un texte à rendre. */
+			const cadre = ajouter(wrap, "div", "qb-rich");
+			const place = document.createElement("div");
+			place.className = "qb-direct qb-direct--multi";
+			const champ = creerChampDirect(place, {
+				valeur: value ?? "",
+				multiligne: true,
+				placeholder,
+				etiquette: label || placeholder,
+				onChange,
+				extensions: [raccourciBlocCode, collageImage(onChange)],
+			});
+			poserBarreFormat(cadre, champ.vue, false, onChange, () => { /* hauteur automatique */ });
+			cadre.appendChild(place);
+			return wrap;
+		}
 		if (multiline) {
-			// Toolbar entités
-			const toolbar = ajouter(wrap, "div", "qb-entity-toolbar");
+			/* Un seul CADRE pour la barre et la zone : la barre est collée au
+			   haut du champ, le liseré et le focus sont ceux du cadre. */
+			const cadre = ajouter(wrap, "div", "qb-rich");
 			/* Le texte passe par le CONTENU du `<textarea>`, comme le faisait
 			   `createEl({ text })` : c'est sa valeur initiale, et l'affecter par
 			   `value` la rendrait « sale » avant la moindre frappe. */
-			const ta = ajouter(wrap, "textarea", "qb-field-textarea qb-prompt-editor", value ?? "");
+			const ta = document.createElement("textarea");
+			ta.className = "qb-field-textarea qb-prompt-editor";
+			ta.textContent = value ?? "";
+			poserBarreFormat(cadre, ta, !!opts.html, onChange, () => _autoResize(ta));
+			cadre.appendChild(ta);
 			ta.placeholder = placeholder;
-
-			entities().forEach(ent => {
-				const btn = ajouter(toolbar, "button", "qb-entity-btn", ent.label);
-				btn.title = ent.title;
-				btn.addEventListener("click", (e) => { e.preventDefault(); _insertAt(ta, ent.insert, onChange); _autoResize(ta); });
-			});
 
 			// Input + auto-resize
 			ta.addEventListener("input", () => { onChange(ta.value); _autoResize(ta); });
@@ -325,13 +327,14 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 		ajouter(helpNote, "span", undefined, t("editor.form.resourceHelp"));
 	}
 
-	function _renderTypeFields(box: HTMLElement, q: DraftQuestion): void {
+	function _renderTypeFields(box: HTMLElement, q: DraftQuestion, opts: OptionsChampsType = {}): void {
 		// Renommé `t` → `qType` : le type de question masquait la fonction de
 		// traduction t() importée en tête de module.
 		const qType = q._type;
 		const rerender = () => { onEdit(); };
+		const rares = !!opts.rares;
 
-		if (qType === "single" || qType === "multi") {
+		if ((qType === "single" || qType === "multi") && !rares) {
 			const isMulti = qType === "multi";
 			/* Une question à choix MULTIPLES sans aucune bonne réponse ne peut
 			   être réussie par personne, et rien ne le disait : elle
@@ -344,7 +347,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				alerteMulti.classList.toggle("qb-field-help--warn", aucune);
 				alerteMulti.textContent = aucune ? t("editor.answer.noneCorrect") : "";
 			};
-			const cardsContainer = ajouter(box, "div", "qb-answer-cards");
+			const cardsContainer = ajouter(box, "div", "qb-answers");
 
 			const renderCards = () => {
 				majAlerte();
@@ -352,119 +355,59 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 				q.options!.forEach((o, i) => {
 					const isCorrect = isMulti ? (q.correctIndices || []).includes(i) : i === q.correctIndex;
-					const card = ajouter(cardsContainer, "div", `qb-answer-card ${isCorrect ? "qb-answer-correct" : "qb-answer-wrong"}`);
+					/* Refonte de l'éditeur (2026-09-26) : une LIGNE sobre par
+					   réponse — le champ, l'interrupteur « Bonne réponse » vert,
+					   supprimer. La bonne réponse se lit au liseré vert fin du
+					   champ et à l'interrupteur, plus à une grande boîte pleine
+					   rouge ou verte. */
+					const card = ajouter(cardsContainer, "div", "qb-answer-row" + (isCorrect ? " is-correct" : ""));
 
-					const toggleRow = ajouter(card, "div", "qb-answer-toggle-row");
-					ajouter(toggleRow, "span", "qb-answer-toggle-label", t(isCorrect ? "editor.answer.correct" : "editor.answer.wrong"));
-
-					const toggle = ajouter(toggleRow, "div", "qb-answer-toggle");
-					const track = ajouter(toggle, "div", "qb-answer-toggle-track");
-					const thumb = ajouter(track, "div", "qb-answer-toggle-thumb");
-					_setIcon(thumb, isCorrect ? "check" : "x");
-
-					const triggerFlash = (toCorrect: boolean) => {
-						card.classList.remove("qb-answer-flash-green", "qb-answer-flash-red");
-						void card.offsetWidth;
-						card.classList.add(toCorrect ? "qb-answer-flash-green" : "qb-answer-flash-red");
-						setTimeout(() => {
-							card.classList.remove("qb-answer-flash-green", "qb-answer-flash-red");
-						}, 500);
-					};
-
-					toggle.addEventListener("click", () => {
-						if (isMulti) {
-							const a = q.correctIndices || [];
-							if (a.includes(i)) {
-								if (a.length > 1) {
-									triggerFlash(false);
-									q.correctIndices = a.filter(x => x !== i);
-									view.render(); view.scheduleSave?.();
-								}
-							} else {
-								triggerFlash(true);
-								q.correctIndices = [...a, i].sort((a, b) => a - b);
-								view.render(); view.scheduleSave?.();
-							}
-						} else {
-							if (!isCorrect) {
-								triggerFlash(true);
-								q.correctIndex = i;
-								view.render(); view.scheduleSave?.();
-							}
-						}
-					});
-
-					const input = ajouter(card, "input", "qb-answer-input");
-					input.type = "text";
-					input.value = o || "";
-					input.placeholder = t("editor.answer.placeholder");
-
-					input.addEventListener("input", () => {
-						q.options![i] = input.value;
+					// Champ direct : l'option s'affiche rendue, sa syntaxe
+					// n'apparaît qu'autour du curseur ; le collage d'image suit.
+					_champLigne(card, "qb-answer-input", o || "", t("editor.answer.placeholder"), (v) => {
+						q.options![i] = v;
 						rerender();
 					});
 
-					input.addEventListener("paste", async (e) => {
-						const items = e.clipboardData?.items;
-						if (!items) return;
-
-						for (const item of Array.from(items)) {
-							if (item.type.startsWith("image/")) {
-								e.preventDefault();
-								const file = item.getAsFile();
-								if (!file) continue;
-
-								try {
-									const ext = file.type?.split("/")[1] || "png";
-									const { fileName, filePath: path } = await cheminImageCollee(ext, view.sourcePath);
-
-									const buf = await file.arrayBuffer();
-									try {
-										await currentHost().fs.writeBinary(path, new Uint8Array(buf));
-									} catch (err) { releaseReservedPath(path); throw err; }
-
-									const before = input.value.slice(0, input.selectionStart ?? 0);
-									const after = input.value.slice(input.selectionEnd ?? 0);
-									const wikiLink = `![[${fileName}]]`;
-									input.value = before + wikiLink + after;
-									input.selectionStart = input.selectionEnd = before.length + wikiLink.length;
-
-									q.options![i] = input.value;
-									view.schedulePreview();
-									view.renderCode();
-								} catch (err) {
-									console.error("[quiz-blocks] collage d'image impossible :", err);
-									currentHost().ui.notice(t("editor.paste.imageFailed"));
-								}
-								break;
-							}
-						}
+					/* L'interrupteur « Bonne réponse » : un vrai bouton (clavier,
+					   lecteur d'écran), même règle qu'avant — en choix unique,
+					   cliquer la bonne ne fait rien ; en choix multiple, la
+					   dernière bonne ne se retire pas. */
+					const toggle = ajouter(card, "button", "qb-answer-switch");
+					toggle.type = "button";
+					toggle.setAttribute("role", "switch");
+					toggle.setAttribute("aria-checked", String(isCorrect));
+					ajouter(toggle, "span", "qb-answer-switch-track");
+					ajouter(toggle, "span", "qb-answer-switch-label", t("editor.answer.correct"));
+					toggle.addEventListener("click", () => {
+						if (basculerBonne(q, i)) { view.render(); view.scheduleSave?.(); }
 					});
 
-					if (!isCorrect && q.options!.length > 2) {
-						const delBtn = ajouter(card, "button", "qb-answer-delete");
-						_setIcon(delBtn, "x");
+					/* Supprimer : jamais une bonne réponse, jamais sous deux
+					   réponses (mêmes règles qu'avant). Quand c'est interdit, la
+					   place reste réservée, invisible : les interrupteurs restent
+					   alignés d'une ligne à l'autre. */
+					const delBtn = ajouter(card, "button", "qb-answer-delete");
+					delBtn.type = "button";
+					delBtn.title = t("editor.action.delete");
+					delBtn.setAttribute("aria-label", t("editor.action.delete"));
+					_setIcon(delBtn, "trash-2");
+					if (isCorrect || q.options!.length <= 2) {
+						delBtn.disabled = true;
+						delBtn.classList.add("is-hidden");
+					} else {
 						delBtn.addEventListener("click", () => {
-							q.options!.splice(i, 1);
-							if (isMulti) {
-								q.correctIndices = (q.correctIndices || []).filter(idx => idx !== i).map(idx => idx > i ? idx - 1 : idx);
-							} else {
-								if (q.correctIndex === i) q.correctIndex = 0;
-								else if ((q.correctIndex ?? 0) > i) q.correctIndex = (q.correctIndex ?? 0) - 1;
-							}
-							view.render(); view.scheduleSave?.();
+							if (retirerOption(q, i)) { view.render(); view.scheduleSave?.(); }
 						});
 					}
 				});
 
 				const addBtn = ajouter(box, "button", "qb-answer-add");
+				addBtn.type = "button";
+				_iconSpan(addBtn, "plus", "qb-add-icon");
 				addBtn.appendChild(document.createTextNode(t("editor.answer.add")));
 				addBtn.addEventListener("click", () => {
-					q.options!.push("");
-					if (isMulti && q.options!.length === 1) {
-						q.correctIndices = [0];
-					}
-					view.render(); view.scheduleSave?.();
+					if (ajouterOption(q, q.options!.length - 1)) { view.render(); view.scheduleSave?.(); }
 				});
 			};
 
@@ -481,15 +424,16 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			}, t("editor.ordering.itemPlaceholder"), t("editor.action.add"));
 			_arrayEditor(box, t("editor.ordering.slotLabels"), q.slots!, rerender, t("editor.ordering.slotPlaceholder"), t("editor.action.add"));
 
-			ajouter(box, "label", "qb-field-label", t("editor.ordering.correctOrder"));
-			(q.correctOrder || []).forEach((val, i) => {
+			// L'ordre attendu se change dans le rendu (clic ou flèches).
+			if (!rares) ajouter(box, "label", "qb-field-label", t("editor.ordering.correctOrder"));
+			if (!rares) (q.correctOrder || []).forEach((val, i) => {
 				const row = ajouter(box, "div", "qb-arr-row");
 				ajouter(row, "span", "qb-arr-idx", (q.slots?.[i] || `S${i}`) + " →");
 				const inp = ajouter(row, "input", "qb-field-input qb-field-sm");
 				inp.type = "number";
 				inp.value = String(val);
 				inp.min = "0"; inp.max = String(q.possibilities!.length - 1); inp.style.width = "55px";
-				inp.addEventListener("input", () => { q.correctOrder![i] = parseInt(inp.value) || 0; rerender(); });
+				inp.addEventListener("input", () => { placerOrdre(q, i, parseInt(inp.value) || 0); rerender(); });
 			});
 		}
 
@@ -504,21 +448,22 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 				rerender();
 			}, t("editor.matching.choicePlaceholder"), t("editor.action.add"));
 
-			ajouter(box, "label", "qb-field-label", t("editor.matching.mapping"));
-			(q.rows || []).forEach((row, i) => {
-				const r = ajouter(box, "div", "qb-match-row");
+			/* « situation → choix » en DEUX COLONNES alignées (refonte
+			   2026-09-26) : chaque ligne a la même grille, le menu prend toute
+			   la largeur de sa colonne. `ui-select` et non un `<select>` natif,
+			   dont le menu n'est pas thémable. Les paires se changent dans le
+			   rendu : la grille n'est pas reprise dans « Plus ». */
+			if (!rares) ajouter(box, "label", "qb-field-label", t("editor.matching.mapping"));
+			const grille = rares ? null : ajouter(box, "div", "qb-match-grid");
+			if (grille) (q.rows || []).forEach((row, i) => {
+				const r = ajouter(grille, "div", "qb-match-row");
 				ajouter(r, "span", "qb-match-label", row || t("editor.matching.rowFallback", { n: i }));
 				_iconSpan(r, "arrow-right", "qb-match-arrow");
-				const sel = ajouter(r, "select", "qb-field-select");
-				(q.choices || []).forEach((c, ci) => {
-					/* `value` APRÈS le texte : sans attribut `value`, un `<option>`
-					   vaut son propre texte — l'index doit donc être posé une fois
-					   le contenu en place. */
-					const opt = ajouter(sel, "option", undefined, c || "...");
-					opt.value = String(ci);
-					if ((q.correctMap?.[i] ?? 0) === ci) opt.selected = true;
+				createSelect(r, {
+					value: String(q.correctMap?.[i] ?? 0),
+					options: (q.choices || []).map((c, ci) => ({ value: String(ci), label: c || "..." })),
+					onChange: (v) => { associer(q, i, parseInt(v) || 0); rerender(); },
 				});
-				sel.addEventListener("change", () => { q.correctMap![i] = parseInt(sel.value) || 0; rerender(); });
 			});
 		}
 
@@ -526,7 +471,7 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			// Le gabarit EST la question : un seul champ, multiligne, avec la
 			// syntaxe rappelée au-dessus — personne ne devine les doubles accolades.
 			ajouter(box, "div", "qb-field-help", t("editor.cloze.help"));
-			_field(box, t("editor.cloze.templateLabel"), q.cloze, t("editor.cloze.templatePlaceholder"), true,
+			if (!rares) _field(box, t("editor.cloze.templateLabel"), q.cloze, t("editor.cloze.templatePlaceholder"), true,
 				v => { q.cloze = v; rerender(); });
 
 			// Compte des trous : la seule vérification qui compte, et elle dit
@@ -550,9 +495,18 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 			ajouter(box, "div", "qb-field-help", t("editor.codeEditInNote"));
 		}
 
+		if (qType === "flashcard" && !rares) {
+			// Le recto est l'énoncé du formulaire, déjà affiché plus haut : ici,
+			// seul le verso — un champ, comme pour le gabarit d'un texte à trous.
+			ajouter(box, "label", "qb-field-label", t("editor.flashcard.section"));
+			ajouter(box, "div", "qb-field-help", t("editor.flashcard.help"));
+			_field(box, t("editor.flashcard.back"), q.answer, t("editor.flashcard.backPlaceholder"), true,
+				v => { q.answer = v; rerender(); });
+		}
+
 		if (qType === "numeric") {
 			ajouter(box, "div", "qb-field-help", t("editor.numeric.help"));
-			_arrayEditor(box, t("editor.numeric.answers"), q.acceptedAnswers!, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
+			if (!rares) _variantEditor(box, t("editor.numeric.answers"), q, rerender, t("editor.numeric.answerPlaceholder"), t("editor.action.add"));
 			_field(box, t("editor.numeric.unit"), q.unit, t("editor.numeric.unitPlaceholder"), false,
 				v => { q.unit = v; rerender(); });
 			/* Les deux marges s'EXCLUENT : renseigner l'une efface l'autre.
@@ -576,18 +530,23 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 		}
 
 		if (["text", "cmd", "powershell", "bash"].includes(qType)) {
-			/* "C:\>" / "PS>" / "user@hostname:~$ " : invites de commandes réelles,
-			   pas de l'UI. BASH aussi : le moteur lit son invite
-			   (engine/terminal.ts getTerminalPromptPrefix) et l'export l'écrit,
-			   mais le formulaire ne la proposait pas — une question bash avait
-			   donc une invite qu'on ne pouvait plus changer. */
-			if (qType === "cmd" || qType === "powershell" || qType === "bash") {
-				const invite = qType === "cmd" ? "C:\\>" : qType === "powershell" ? "PS>" : "user@hostname:~$ ";
-				_field(box, t("editor.text.commandPrefix"), q.commandPrefix, invite, false,
+			/* "C:\>" / "PS>" / "$" : invites de commandes réelles, pas de l'UI —
+			   MÊME défaut que le moteur (engine/terminal.ts
+			   defaultTerminalPromptPrefix), jamais une copie figée. BASH aussi :
+			   le moteur lit son invite (getTerminalPromptPrefix) et l'export
+			   l'écrit, mais le formulaire ne la proposait pas — une question bash
+			   avait donc une invite qu'on ne pouvait plus changer.
+			   Le bucket "bash" range AUSSI les variantes de PROGRAMME (python,
+			   java… — editor/convert.ts, faute de type dédié) : `_terminalVariant`
+			   porte la forme réelle, et une sortie de programme n'a pas d'invite
+			   à proposer ici. */
+			const variant = q._terminalVariant ?? qType;
+			if (isShellVariant(variant)) {
+				_field(box, t("editor.text.commandPrefix"), q.commandPrefix, defaultTerminalPromptPrefix(variant), false,
 					v => { q.commandPrefix = v; rerender(); });
 			}
 			_field(box, t("editor.text.placeholderLabel"), q.placeholder, t("editor.text.placeholderHint"), false, v => { q.placeholder = v; rerender(); });
-			_arrayEditor(box, t("editor.text.acceptedAnswers"), q.acceptedAnswers!, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
+			if (!rares) _variantEditor(box, t("editor.text.acceptedAnswers"), q, rerender, t("editor.text.answerPlaceholder"), t("editor.action.add"));
 			const toggleWrap = ajouter(box, "div", "qb-toggle-wrap");
 			const track = ajouter(toggleWrap, "div", `qb-toggle-track ${q.caseSensitive ? "on" : ""}`);
 			ajouter(track, "div", "qb-toggle-thumb");
@@ -598,23 +557,55 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 
 	function _arrayEditor(parent: HTMLElement, label: string, items: string[], onChange: () => void, placeholder: string, addLabel: string): void {
 		ajouter(parent, "label", "qb-field-label", label);
-		const container = ajouter(parent, "div");
+		const container = ajouter(parent, "div", "qb-arr-list");
 		const renderItems = () => {
 			container.replaceChildren();
 			items.forEach((item, i) => {
 				const row = ajouter(container, "div", "qb-arr-row");
-				const inp = ajouter(row, "input", "qb-field-input");
-				inp.placeholder = `${placeholder} ${i + 1}`;
-				inp.value = item ?? "";
-				inp.addEventListener("input", () => { items[i] = inp.value; onChange(); });
-				const del = ajouter(row, "button", "qb-btn-icon qb-btn-sm qb-btn-danger"); _setIcon(del, "x");
+				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
+				const del = ajouter(row, "button", "qb-arr-del");
+				del.type = "button";
+				del.title = t("editor.action.delete");
+				del.setAttribute("aria-label", t("editor.action.delete"));
+				_setIcon(del, "trash-2");
 				if (items.length <= 1) del.disabled = true;
 				del.addEventListener("click", () => { if (items.length <= 1) return; items.splice(i, 1); onChange(); renderItems(); });
 			});
 			const addBtn = ajouter(container, "button", "qb-arr-add");
-			_iconSpan(addBtn, "plus", "qb-arr-add-icon");
+			addBtn.type = "button";
+			_iconSpan(addBtn, "plus", "qb-add-icon");
 			addBtn.appendChild(document.createTextNode(addLabel));
 			addBtn.addEventListener("click", () => { items.push(""); onChange(); renderItems(); });
+		};
+		renderItems();
+	}
+
+	/* Même rendu que `_arrayEditor`, mais pour `q.acceptedAnswers` : ajouter et
+	   retirer passent par les GESTES partagés (`ajouterVariante` /
+	   `retirerVariante`), qui refusent de retirer la dernière variante — plutôt
+	   que de recopier ici la règle que `_arrayEditor` applique en générique. */
+	function _variantEditor(parent: HTMLElement, label: string, q: DraftQuestion, onChange: () => void, placeholder: string, addLabel: string): void {
+		ajouter(parent, "label", "qb-field-label", label);
+		const container = ajouter(parent, "div", "qb-arr-list");
+		const renderItems = () => {
+			const items = q.acceptedAnswers || [];
+			container.replaceChildren();
+			items.forEach((item, i) => {
+				const row = ajouter(container, "div", "qb-arr-row");
+				_champLigne(row, "qb-field-input", item ?? "", `${placeholder} ${i + 1}`, (v) => { items[i] = v; onChange(); });
+				const del = ajouter(row, "button", "qb-arr-del");
+				del.type = "button";
+				del.title = t("editor.action.delete");
+				del.setAttribute("aria-label", t("editor.action.delete"));
+				_setIcon(del, "trash-2");
+				if (items.length <= 1) del.disabled = true;
+				del.addEventListener("click", () => { if (retirerVariante(q, i)) { onChange(); renderItems(); } });
+			});
+			const addBtn = ajouter(container, "button", "qb-arr-add");
+			addBtn.type = "button";
+			_iconSpan(addBtn, "plus", "qb-add-icon");
+			addBtn.appendChild(document.createTextNode(addLabel));
+			addBtn.addEventListener("click", () => { if (ajouterVariante(q)) { onChange(); renderItems(); } });
 		};
 		renderItems();
 	}

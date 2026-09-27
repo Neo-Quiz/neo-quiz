@@ -6,11 +6,10 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleMap } from "./quiz-modules";
 import { openNewFolderModal, commonModuleParent } from "./module-edit";
-import { parseZip } from "./zip";
+import { nomNoteImportee, parseZip } from "./zip";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
-import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
 /* ══════════════════════════════════════════════════════════
    CREATE FOLDER — modal « Créer un dossier » calqué sur StudySmarter
@@ -80,43 +79,6 @@ export function openCreateFolderModal(
 	});
 }
 
-/** « Nouveau quiz » (drill-down d'un dossier) — MÊME modal à trois options que
-    « Créer un dossier » (demande d'homogénéité Ahmed, capture 2026-07-19),
-    décliné au niveau quiz : IA / quiz vierge dans CE dossier / import d'un
-    quiz reçu dans CE dossier. */
-export function openCreateQuizModal(
-	ctx: DashboardShellCtx,
-	folder: string,
-	onDone: () => void
-): void {
-	requireHost("modals").open({
-		className: "qbd-create-modal",
-		title: t("dashboard.quizzes.createQuizTitle"),
-		onOpen: (m) => {
-			const c = m.contentEl;
-			// Même garde, même raison qu'`openCreateFolderModal` ci-dessus.
-			if (ctx.canOpen("ai")) {
-				/* DEPUIS UN DOSSIER (2026-09-17) : la page « Générer » arrive avec
-				   ce dossier en destination et ses documents et notes déjà joints
-				   (`NavigateData.aiPreset`). Le contenu se lit d'abord — `listDir`
-				   est asynchrone —, la navigation suit. Un dossier illisible rend
-				   trois listes vides, et on navigue quand même : la destination,
-				   elle, reste juste. */
-				createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.quizzes.createAiTitle"), t("dashboard.quizzes.createAiDescFolder"),
-					() => {
-						void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
-							ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu) } });
-						});
-					});
-			}
-			createOptionCard(m, c, "file-plus", "#4573ff", t("dashboard.quizzes.createQuizEmptyTitle"), t("dashboard.quizzes.createQuizEmptyDesc"),
-				() => void createQuizInFolder(ctx, folder));
-			createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createQuizImportTitle"), t("dashboard.quizzes.createQuizImportDesc"),
-				() => void importQuizIntoFolder(ctx, folder, onDone));
-		},
-	});
-}
-
 /* ── Import d'un dossier partagé (.zip) : sélection cross-platform via un
    <input type=file> (desktop ET mobile, pas de dépendance Node), parseZip
    (store), puis recréation du dossier + de ses notes dans le vault. ── */
@@ -143,7 +105,8 @@ export async function importSharedFolder(
 ): Promise<void> {
 	const picked = await pickFile(".zip,application/zip");
 	if (!picked) return;
-	const entries = parseZip(picked.bytes);
+	// Seules les notes `.md` au nom sûr entrent (voir `nomNoteImportee`).
+	const entries = parseZip(picked.bytes).filter(e => nomNoteImportee(e.name) !== null);
 	if (entries.length === 0) {
 		currentHost().ui.notice(t("dashboard.quizzes.importEmpty"));
 		return;
@@ -163,20 +126,18 @@ export async function importSharedFolder(
 	try {
 		await currentHost().fs.mkdirs(folderPath);
 		for (const e of entries) {
-			// Aplatir : on n'écrit que le nom de note (pas de sous-chemins d'archive).
-			const noteName = (e.name.split("/").pop() || e.name).replace(/[\\/:*?"<>|]/g, "-");
+			/* Aplatir : on n'écrit que le nom de note, jamais un sous-chemin
+			   d'archive, et SEULEMENT une note `.md` (`nomNoteImportee`,
+			   2026-09-25) : l'archive vient d'un tiers, et un `.exe`, un `.lnk`
+			   ou un fichier caché n'ont rien à faire dans un dossier de cours. */
+			const noteName = nomNoteImportee(e.name);
 			if (!noteName) continue;
 			/* Le MÊME dédoublonnage que les autres imports, et pour une raison
 			   neuve : deux entrées venues de sous-dossiers différents s'aplatissent
 			   parfois sur le même nom, et `fs.write` REMPLACE là où `vault.create`
 			   rejetait — la première note disparaissait sans un mot, là où
-			   l'utilisateur voyait autrefois une erreur d'import. L'extension est
-			   séparée puis rendue telle quelle : ce zip n'est pas forcément fait
-			   que de `.md`. */
-			const point = noteName.lastIndexOf(".");
-			const stem = point > 0 ? noteName.slice(0, point) : noteName;
-			const ext = point > 0 ? noteName.slice(point) : "";
-			await currentHost().fs.write(await freeNotePath(folderPath, stem, ext), e.content);
+			   l'utilisateur voyait autrefois une erreur d'import. */
+			await currentHost().fs.write(await freeNotePath(folderPath, noteName), e.content);
 		}
 	} catch {
 		currentHost().ui.notice(t("dashboard.quizzes.importError"));
@@ -199,8 +160,8 @@ export async function importSharedFolder(
 
 /** Chemin libre dans `folder` : « nom.md », sinon « nom (2).md »…
     `folder` vide = racine du vault (module « racine », légitime). `ext` n'est
-    `.md` que par défaut — l'import d'un dossier partagé recrée aussi ce qui,
-    dans le zip, n'est pas une note.
+    `.md` que par défaut : l'ajout de fichiers d'un dossier garde celle du
+    fichier choisi.
 
     `fs.exists` (le DISQUE) et non `fs.getFile` (l'index des `.md`), alors même
     qu'il s'agit d'une NOTE : `fs.write` écrit d'abord sur le disque, et l'index
@@ -248,17 +209,17 @@ export async function importQuizIntoFolder(ctx: DashboardShellCtx, folder: strin
 	try {
 		await ensureFolder(folder);
 		if (/\.zip$/i.test(picked.name)) {
-			const entries = parseZip(picked.bytes).filter(e => QUIZ_BLOCK_RE.test(e.content));
+			const entries = parseZip(picked.bytes).filter(e => nomNoteImportee(e.name) !== null && QUIZ_BLOCK_RE.test(e.content));
 			if (entries.length === 0) { currentHost().ui.notice(t("dashboard.quizzes.importEmpty")); return; }
 			for (const e of entries) {
-				const noteName = (e.name.split("/").pop() || e.name).replace(/\.md$/i, "");
-				await currentHost().fs.write(await freeNotePath(folder, noteName), e.content);
+				await currentHost().fs.write(await freeNotePath(folder, nomNoteImportee(e.name) as string), e.content);
 			}
 			currentHost().ui.notice(t("dashboard.quizzes.importDone", { name: folder.split("/").pop() || folder, count: entries.length }));
 		} else {
 			const content = new TextDecoder().decode(picked.bytes);
 			if (!QUIZ_BLOCK_RE.test(content)) { currentHost().ui.notice(t("dashboard.quizzes.importNoQuiz")); return; }
-			const name = picked.name.replace(/\.md$/i, "");
+			// Le nom venu du sélecteur, assaini comme une entrée d'archive.
+			const name = nomNoteImportee(picked.name) ?? "Quiz";
 			await currentHost().fs.write(await freeNotePath(folder, name), content);
 			currentHost().ui.notice(t("dashboard.quizzes.importQuizDone", { name }));
 		}

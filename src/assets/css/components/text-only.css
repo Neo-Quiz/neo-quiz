@@ -278,27 +278,16 @@
   font-weight: 800;
 }
 
-.quiz-textonly-answer .quiz-textarea{
-  min-height: 180px;
-}
+/* Plus de plancher fixe (précision du 27/09) : la hauteur de DÉPART vient de
+   l'attribut `rows` posé au rendu (questionCardBodyHtml, text-only.ts),
+   calé sur la réponse attendue — jamais un champ de 10 lignes pour une
+   réponse d'une ligne. */
 
-.quiz-textonly-check-actions{
-  width: 100%;
-  margin-top: 12px;
-  padding-bottom: 4px;
-}
-
-.quiz-textonly-review{
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.quiz-textonly-expected,
-.quiz-textonly-explain-block,
-.quiz-textonly-comparison,
-.quiz-textonly-self{
+/* Explication et cours en état "plain" (écran de correction, 2026-09-26) :
+   ni cadre ni titre, du texte simple juste sous la bonne réponse. Le cadre
+   `.quiz-textonly-explain-block` / `-content` ci-dessous reste utilisé par
+   le verso de la carte mémoire (flashcardBodyHtml), hors périmètre. */
+.quiz-textonly-explain-block{
   box-sizing: border-box;
   padding: 14px 16px;
   border-radius: 10px;
@@ -306,44 +295,14 @@
   background: color-mix(in srgb, var(--background-secondary) 76%, transparent);
 }
 
-.quiz-textonly-self{
-  padding: 12px 14px;
-  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary)) 0%,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 100%
-    );
-}
-
-.quiz-textonly-expected{
-  border-color: color-mix(in srgb, var(--quiz-success) 38%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-success) 8%, var(--background-secondary));
-}
-
-.quiz-textonly-expected-list{
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.quiz-textonly-expected-item{
-  color: var(--text-normal);
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.quiz-textonly-expected-pair{
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  line-height: 1.4;
-}
-
+/* Même police et même taille que le texte des questions (retour #13,
+   2026-09-26 soir) : ce cadre hérite sinon la petite taille de l'écran des
+   résultats, où l'explication d'une question terminal après correction
+   était trop petite et peu lisible. */
 .quiz-textonly-explain-content{
   color: var(--text-normal);
-  line-height: 1.55;
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
 .quiz-textonly-explain-content p:first-child{
@@ -354,25 +313,76 @@
   margin-bottom: 0;
 }
 
-.quiz-textonly-comparison .quiz-options-wrap{
-  margin-top: 4px;
+.quiz-textonly-explain-plain{
+  color: var(--text-normal);
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
-.quiz-textonly-option{
-  cursor: default;
+.quiz-textonly-explain-plain p:first-child{
+  margin-top: 0;
 }
 
-.quiz-textonly-option:not(.correct):hover,
-.quiz-textonly-option:not(.correct):focus-visible,
-.quiz-textonly-option.correct:hover,
-.quiz-textonly-option.correct:focus-visible{
-  transform: none;
+.quiz-textonly-explain-plain p:last-child{
+  margin-bottom: 0;
 }
 
-.quiz-textonly-rating-row{
+/* Le gras bleu d'une explication (retour #12, posé sur `.quiz-explain strong`
+   par explanations.css) s'applique ICI AUSSI : cet écran (résultats, question
+   par question) affiche la même explication par un chemin CSS différent
+   (`.quiz-textonly-explain-*`, jamais nichée sous `.quiz-explain`). */
+.quiz-textonly-explain-content strong,
+.quiz-textonly-explain-plain strong{
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* La bonne réponse, seule : une ligne par réponse, coche verte + texte —
+   remplace l'ancienne liste encadrée de toutes les options (quiz-textonly-
+   comparison) et la carte "expected" encadrée. Classes distinctes de
+   `.quiz-textonly-expected-*` : ces dernières restent utilisées par l'aperçu
+   de l'éditeur (question-preview-corrige.ts), hors périmètre de cette tâche. */
+.quiz-textonly-correct{
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quiz-textonly-correct-line{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-normal);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.quiz-textonly-correct-icon{
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15em;
+  color: var(--quiz-success);
+}
+
+.quiz-textonly-correct-icon svg{
+  width: 100%;
+  height: 100%;
+}
+
+.quiz-textonly-correct-text{
+  min-width: 0;
+}
+
+.quiz-textonly-correct-sep{
+  margin: 0 6px;
+  color: var(--text-muted);
+}
+
+.quiz-textonly-correct-empty{
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .quiz-textonly-rating-btn.understood{
@@ -403,6 +413,110 @@
   color: var(--quiz-accent-text);
   background: var(--quiz-danger);
   border-color: var(--quiz-danger);
+}
+
+/* Une carte par réponse écrite, sur l'écran des résultats (retours #11/#17,
+   2026-09-26bis) : réponse donnée, bonne réponse, explication, puis un
+   verdict binaire à icône seule — jamais un champ seul, coloré, sans rien. */
+.quiz-textonly-written-review{
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0 6px;
+  text-align: left;
+}
+
+.quiz-textonly-written-card{
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: color-mix(in srgb, var(--background-secondary) 80%, transparent);
+}
+
+.quiz-textonly-written-head{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.quiz-textonly-written-num{
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-weight: 800;
+}
+
+.quiz-textonly-written-answer{
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+.quiz-textonly-written-answer-empty{
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Deux boutons carrés, icône seule, jamais de cadre autour de la paire
+   (précision Ahmed du 2026-09-27) : ~32px, coins de 8px, fond teinté à 12%
+   au repos, plein + icône blanche une fois choisi, l'autre à 0,5 d'opacité. */
+.quiz-textonly-verdict-icon-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quiz-textonly-verdict-icon-btn{
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.quiz-textonly-verdict-icon-btn svg{
+  width: 18px;
+  height: 18px;
+}
+
+.quiz-textonly-verdict-icon-btn.right{
+  color: var(--quiz-success);
+  background: color-mix(in srgb, var(--quiz-success) 12%, transparent);
+}
+
+.quiz-textonly-verdict-icon-btn.wrong{
+  color: var(--quiz-danger);
+  background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
+}
+
+.quiz-textonly-verdict-icon-btn.right:hover{ background: color-mix(in srgb, var(--quiz-success) 22%, transparent); }
+.quiz-textonly-verdict-icon-btn.wrong:hover{ background: color-mix(in srgb, var(--quiz-danger) 22%, transparent); }
+
+.quiz-textonly-verdict-icon-btn.right.selected{ color: var(--quiz-accent-text); background: var(--quiz-success); }
+.quiz-textonly-verdict-icon-btn.wrong.selected{ color: var(--quiz-accent-text); background: var(--quiz-danger); }
+
+.quiz-textonly-verdict-icon-row:has(.selected) .quiz-textonly-verdict-icon-btn:not(.selected){
+  opacity: 0.5;
+}
+
+.quiz-textonly-verdict-icon-btn:focus-visible{
+  outline: 2px solid var(--quiz-primary);
+  outline-offset: 2px;
 }
 
 .quiz-textonly-result-grid{
@@ -457,23 +571,27 @@
 }
 
 .quiz-tab.checked{
-  border-color: color-mix(in srgb, var(--quiz-hint) 48%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-hint) 10%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-hint) 10%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-hint) 48%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-hint) 45%, #000);
 }
 
 .quiz-tab.understood{
-  border-color: color-mix(in srgb, var(--quiz-success) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-success) 16%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-success) 16%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-success) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-success) 45%, #000);
 }
 
 .quiz-tab.partial{
-  border-color: color-mix(in srgb, var(--quiz-hint) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-hint) 14%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-hint) 14%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-hint) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-hint) 45%, #000);
 }
 
 .quiz-tab.review{
-  border-color: color-mix(in srgb, var(--quiz-danger) 55%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-danger) 12%, var(--background-primary));
+  --tab-face: color-mix(in srgb, var(--quiz-danger) 12%, var(--background-primary));
+  --tab-border: color-mix(in srgb, var(--quiz-danger) 55%, transparent);
+  --tab-edge: color-mix(in srgb, var(--quiz-danger) 45%, #000);
 }
 
 @media (max-width: 640px){

@@ -18,12 +18,13 @@
 ══════════════════════════════════════════════════════════ */
 
 import { pont } from "../host/pont";
-import { CLE_REGLAGES_FOND } from "../../electron/pont";
+import { CLE_REGLAGES_FOND, CLE_REGLAGES_FOND_EFFETS } from "../../electron/pont";
 import { urlDeRessource } from "../../electron/ressources";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
-import { estImageDeFond, suivante } from "./fond-pur";
+import { BORNES_EFFETS_FOND, estImageDeFond, normaliserEffetsFond, suivante } from "./fond-pur";
+import type { EffetsFond } from "./fond-pur";
 import { FONDS_EMBARQUES, fondEmbarque, fondsParCategorie, urlFondEmbarque, urlVignetteEmbarquee } from "./fonds-catalogue";
 
 /**
@@ -72,7 +73,7 @@ async function listerImages(dossier: string): Promise<string[]> {
 }
 
 /** Pose l'image dans la variable CSS, ou l'efface (le CSS reprend alors
-    `wallpaper.jpg`, son repli). */
+    `fonds/island-sunset.jpg`, son repli). */
 function poserVariable(reglage: ReglageFond | null): void {
 	if (reglage) {
 		document.documentElement.style.setProperty("--nq-fond-image", `url("${urlDuFond(reglage)}")`);
@@ -126,6 +127,24 @@ export async function appliquerFond(): Promise<void> {
 		return;
 	}
 	poserVariable(reglage);
+}
+
+/** Pose la luminosité et le flou dans les variables que `shell.css` applique
+    à la couche de l'IMAGE (`body::before`) — jamais à la lueur ni au
+    panneau. Sur la racine, comme `--nq-fond-image`. */
+function poserEffets(effets: EffetsFond): void {
+	const racine = document.documentElement.style;
+	racine.setProperty("--nq-fond-luminosite", String(effets.luminosite));
+	racine.setProperty("--nq-fond-flou", `${effets.flou}px`);
+}
+
+/** Lit le réglage (absent ou trafiqué : les défauts) et le pose — au
+    démarrage, avant le premier rendu. */
+export async function appliquerEffetsFond(): Promise<void> {
+	let brut: unknown;
+	// Une lecture qui échoue ne doit pas bloquer le démarrage : les défauts.
+	try { brut = await pont().reglages.lire(CLE_REGLAGES_FOND_EFFETS); } catch { brut = undefined; }
+	poserEffets(normaliserEffetsFond(brut));
 }
 
 /** Passe à l'image suivante du dossier courant — barre, menu, `Ctrl+Shift+B`.
@@ -361,6 +380,51 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 	});
 
 	void redessiner();
+
+	/* ── LUMINOSITÉ ET FLOU (2026-09-26) ──
+	   Deux curseurs sous la rangée, comme dans Neo Calendar. `input` applique
+	   EN DIRECT pendant qu'on glisse (variables CSS seulement, rien d'écrit) ;
+	   `change`, au lâcher, écrit le réglage une fois. Un `<input type=range>`
+	   natif : l'application n'a pas de composant curseur réutilisable (celui
+	   de l'effort est un canevas propre au menu des modèles). */
+	let effets: EffetsFond = normaliserEffetsFond(undefined);
+	const ecrireEffets = (): void => {
+		void pont().reglages.ecrire(CLE_REGLAGES_FOND_EFFETS, effets).catch(() => {
+			currentHost().ui.notice(t("app.fond.effetsNonEcrits"));
+		});
+	};
+	const curseur = (
+		cle: keyof EffetsFond, libelle: string, pas: number, afficher: (v: number) => string,
+	): (v: number) => void => {
+		const ligne = ajouter(section, "label", "nq-fond-curseur");
+		ajouter(ligne, "span", "nq-fond-curseur-libelle", libelle);
+		const entree = ajouter(ligne, "input", "nq-fond-curseur-entree");
+		entree.type = "range";
+		entree.min = String(BORNES_EFFETS_FOND[cle].min);
+		entree.max = String(BORNES_EFFETS_FOND[cle].max);
+		entree.step = String(pas);
+		const valeur = ajouter(ligne, "span", "nq-fond-curseur-valeur");
+		const montrer = (v: number): void => {
+			entree.value = String(v);
+			valeur.textContent = afficher(v);
+		};
+		entree.addEventListener("input", () => {
+			effets = normaliserEffetsFond({ ...effets, [cle]: Number(entree.value) });
+			montrer(effets[cle]);
+			poserEffets(effets);
+		});
+		entree.addEventListener("change", ecrireEffets);
+		return montrer;
+	};
+	const montrerLuminosite = curseur("luminosite", t("app.fond.luminosite"), 0.01, v => t("app.fond.pourcent", { n: String(Math.round(v * 100)) }));
+	const montrerFlou = curseur("flou", t("app.fond.flou"), 1, v => t("app.fond.pixels", { n: String(Math.round(v)) }));
+	const afficherEffets = (): void => { montrerLuminosite(effets.luminosite); montrerFlou(effets.flou); };
+	afficherEffets();
+	void pont().reglages.lire(CLE_REGLAGES_FOND_EFFETS).then(brut => {
+		if (detruit) return;
+		effets = normaliserEffetsFond(brut);
+		afficherEffets();
+	});
 
 	return () => { detruit = true; };
 }

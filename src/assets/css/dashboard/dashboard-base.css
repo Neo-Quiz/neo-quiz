@@ -72,24 +72,30 @@
 	to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Scrollbar styling ── */
-.qbd-content::-webkit-scrollbar,
+/* ── Scrollbar styling ──
+   La page elle-même défile SANS barre visible (2026-09-25) : la barre grise
+   longeait tout le bord droit de la fenêtre. La molette, le pavé et le
+   clavier défilent toujours. */
+.qbd-content {
+	scrollbar-width: none;
+}
+.qbd-content::-webkit-scrollbar {
+	display: none;
+}
+
 .qbd-ai-result-list::-webkit-scrollbar {
 	width: 6px;
 }
 
-.qbd-content::-webkit-scrollbar-track,
 .qbd-ai-result-list::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-.qbd-content::-webkit-scrollbar-thumb,
 .qbd-ai-result-list::-webkit-scrollbar-thumb {
 	background: var(--background-modifier-border);
 	border-radius: 3px;
 }
 
-.qbd-content::-webkit-scrollbar-thumb:hover,
 .qbd-ai-result-list::-webkit-scrollbar-thumb:hover {
 	background: var(--background-modifier-border-hover);
 }
@@ -254,15 +260,6 @@
 .is-mobile .qbd-home-grid,
 .is-mobile .qbd-module-grid {
 	grid-template-columns: 1fr;
-}
-
-/* Panneau « Progrès » du drill-down : sous la grille plutôt qu'à côté. */
-.is-mobile .qbd-quizzes-drill-layout {
-	flex-direction: column;
-}
-.is-mobile .qbd-progress-panel {
-	width: 100%;
-	flex: 1 1 auto;
 }
 
 /* Page d'un quiz : liste des questions AU-DESSUS de la question courante. */

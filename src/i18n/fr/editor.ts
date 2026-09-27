@@ -22,6 +22,12 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	/* ── Texte à trous ── */
 	"editor.type.cloze.label": "Texte à trous",
 	"editor.type.cloze.desc": "Compléter un texte",
+	"editor.type.flashcard.label": "Flashcard",
+	"editor.type.flashcard.desc": "On la retourne, puis on se note",
+	"editor.flashcard.section": "Verso de la carte",
+	"editor.flashcard.help": "L'énoncé ci-dessus est le recto. Écris ici la réponse attendue : une phrase, une formule ou une ligne de code.",
+	"editor.flashcard.back": "Réponse",
+	"editor.flashcard.backPlaceholder": "<class 'list'>",
 	"editor.cloze.help": "Écrivez le texte entier et encadrez chaque trou de doubles accolades. Séparez les variantes acceptées par une barre verticale : {{Paris}}, {{l'euro|euro}}.",
 	"editor.cloze.templateLabel": "Texte à trous",
 	"editor.cloze.templatePlaceholder": "La capitale de la France est {{Paris}}.",
@@ -75,16 +81,21 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.form.promptPlaceholder": "Votre question...",
 	"editor.hint.label": "Indice",
 	"editor.hint.placeholder": "Un indice pour aider...",
-	"editor.form.explainSection": "Explication (Markdown)",
+	"editor.hint.levelsHelp": "Une question difficile peut avoir plusieurs niveaux, du plus léger au plus révélateur.",
+	"editor.hint.level": "Niveau {n}",
+	"editor.hint.placeholderNext": "Un indice plus révélateur...",
+	"editor.hint.addLevel": "Ajouter un niveau",
+	"editor.hint.removeLevel": "Retirer ce niveau",
+	"editor.form.explainSection": "Explication",
 	"editor.form.explainPlaceholder": "### Rappels\n- **Terme** — Définition",
 
-	/* ── Toolbar entités HTML (infobulles) ── */
-	"editor.entity.gt": "Supérieur (>)",
-	"editor.entity.lt": "Inférieur (<)",
-	"editor.entity.amp": "Esperluette (&)",
-	"editor.entity.nbsp": "Espace insécable",
-	"editor.entity.apos": "Apostrophe",
-	"editor.entity.quot": "Guillemet",
+	/* ── Barre de mise en forme (infobulles) ── */
+	"editor.format.bold": "Gras",
+	"editor.format.italic": "Italique",
+	"editor.format.code": "Code",
+	"editor.format.formula": "Formule ($…$)",
+
+	/* ── Menu « Caractère spécial » : entités HTML ── */
 	"editor.entity.codeBlock": "Bloc de code",
 
 	/* ── Section Ressource ── */
@@ -99,7 +110,6 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Réponses (choix unique / multiple) ── */
 	"editor.answer.correct": "Bonne réponse",
-	"editor.answer.wrong": "Mauvaise réponse",
 	"editor.answer.placeholder": "Saisir la réponse",
 	"editor.answer.add": "Ajouter une réponse",
 
@@ -133,6 +143,56 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.preview.multiHint": "Sélectionnez une ou plusieurs réponses",
 	"editor.preview.orderingHint": "Classez les éléments dans le bon ordre",
 	"editor.preview.matchingHint": "Associez chaque situation à un support",
+
+	/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ── */
+	"editor.render.clickToEdit": "Cliquez pour modifier",
+	"editor.render.htmlInMore": "Modifié en HTML dans Plus",
+	"editor.render.untitled": "Question sans titre",
+	"editor.render.addPrompt": "Ajouter l'énoncé",
+	"editor.render.addExplain": "Ajouter une explication",
+
+	/* ── Page d'édition : barre du type et panneau « Plus » (detail-edition.ts) ── */
+	"editor.render.type": "Type",
+	"editor.render.role": "Rôle",
+	"editor.render.roleTest": "Vérification",
+	"editor.render.more": "Plus",
+	"editor.render.promptHtml": "Énoncé (HTML)",
+	"editor.render.explainHtml": "Explication (HTML)",
+	"editor.render.typeChangeTitle": "Changer le type de la question ?",
+	"editor.render.typeChangeMessage": "Ses réponses ne passent pas à ce type : elles seront remplacées par des réponses vides.",
+	"editor.render.typeChangeConfirm": "Changer de type",
+
+	"editor.lecture.section": "Style de lecture",
+	"editor.lecture.style": "Style",
+	"editor.lecture.stylePage": "Page",
+	"editor.lecture.styleEtapes": "Étapes",
+	"editor.lecture.styleTableau": "Tableau",
+	"editor.lecture.help": "Chaque lecture a son écran, sauf des étapes courtes ou une méthode, affichées au-dessus de la première question après les « Avant la lecture ».",
+	"editor.lecture.methode": "Méthode à appliquer dans la question suivante",
+	"editor.lecture.methodeHelp": "Les étapes s'affichent au-dessus de cette question, même longues.",
+	"editor.lecture.etapes": "Étapes",
+	"editor.lecture.etapePlaceholder": "Une idée ou une étape",
+	"editor.lecture.colonnes": "En-têtes de colonnes",
+	"editor.lecture.colonnesPlaceholder": "Laisser la première vide, par exemple | Python | C",
+	"editor.lecture.lignes": "Lignes",
+	"editor.lecture.lignePlaceholder": "Cases séparées par |",
+	"editor.lecture.retenir": "À retenir",
+	"editor.lecture.retenirAucun": "Aucun",
+	"editor.lecture.retenirCartes": "Cartes à retourner",
+	"editor.lecture.retenirRecap": "Récapitulatif coché",
+	"editor.lecture.recto": "Recto",
+	"editor.lecture.verso": "Verso",
+	"editor.lecture.pointPlaceholder": "Un point à retenir",
+	"editor.lecture.ajouter": "Ajouter",
+	"editor.lecture.retirer": "Retirer",
+
+	/* ── Gestes de réponse dans le rendu corrigé (edition-rendu-gestes.ts) ── */
+	"editor.render.markCorrect": "Marquer comme bonne réponse",
+	"editor.render.addOption": "Ajouter une option",
+	"editor.render.removeOption": "Retirer cette option",
+	"editor.render.pickSlot": "Choisir cet emplacement",
+	"editor.render.pickChoice": "Choisir cet élément",
+	"editor.render.addVariant": "Ajouter une variante",
 
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Ajouter une question",

@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, appliquerExamDate, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines }) => {
+await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, idUnique, segmentValide, MAX_DOSSIERS, saveFolders, savedFolders, addFolder, removeFolder, ouvrirVaultsDetectes, lienAvecRacines, lireExamens, enregistrerExamenDans, retirerExamenDe, examenProchain, aujourdhuiIso }) => {
 	const r = makeReporter("Dossiers — réglage et identifiants");
 
 	r.check("aucun réglage : aucune racine", lireDossiers({}), []);
@@ -88,23 +88,6 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 	   qui ouvrirait la racine du disque. */
 	r.check("une entrée sans chemin est ignorée",
 		lireDossiers({ folders: [{ name: "vide" }, { path: "C:/ok", name: "ok" }] }).map(d => d.path), ["C:/ok"]);
-
-	/* LES DATES D'EXAMEN (tâche 10, mineur reporté de la tâche 8). Régler une
-	   date ajoute la clé, l'effacer la RETIRE — elle n'est pas gardée vide.
-	   Sans cette règle, le réglage accumulerait des entrées mortes qu'on
-	   n'oserait plus nettoyer (`setExamDate` impure n'a que ce filet-ci,
-	   `appliquerExamDate` étant la partie pure qu'il appelle). */
-	r.check("régler une date ajoute la clé",
-		appliquerExamDate({}, "Efrei/Reseaux", "2027-06-01"),
-		{ "Efrei/Reseaux": "2027-06-01" });
-	r.check("effacer une date RETIRE la clé, elle n'est pas gardée vide",
-		appliquerExamDate({ "Efrei/Reseaux": "2027-06-01" }, "Efrei/Reseaux", ""),
-		{});
-	r.check("effacer la date d'un module laisse les autres matières intactes",
-		appliquerExamDate(
-			{ "Efrei/Reseaux": "2027-06-01", "Efrei/BDD": "2027-05-01" },
-			"Efrei/Reseaux", ""),
-		{ "Efrei/BDD": "2027-05-01" });
 
 	/* ── `saveFolders` : DISPARU n'est pas INACCESSIBLE (tâche 4, ronde 1) ──
 
@@ -349,6 +332,28 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 			if (precedent === undefined) delete globalThis.window;
 			else globalThis.window = precedent;
 		}
+	}
+
+	{
+		const m = "Efrei/Reseaux";
+		const migre = lireExamens(undefined, { [m]: "2027-06-01" });
+		r.check("migration : l'ancienne date devient un examen", migre[m], [{ id: "migre-" + m, nom: "", date: "2027-06-01" }]);
+		r.check("migration : la clé null vaut jamais écrite", lireExamens(null, { [m]: "2027-06-01" })[m]?.map(e => e.id), ["migre-" + m]);
+		r.check("migration : ne joue plus une fois la clé écrite", lireExamens({ [m]: [{ id: "x", nom: "Partiel", date: "2027-01-10" }] }, { [m]: "2027-06-01" })[m].map(e => e.id), ["x"]);
+		r.check("examen migré puis supprimé : ne revient pas", lireExamens({}, { [m]: "2027-06-01" }), {});
+		r.check("réglage corrompu (tableau) : vide", lireExamens([], undefined), {});
+		r.check("réglage corrompu (chaîne) : vide", lireExamens("x", undefined), {});
+		r.check("entrée sans date ignorée", lireExamens({ [m]: [{ id: "a", nom: "", date: "" }, { id: "b", nom: "", date: "2027-02-02" }] }, undefined)[m].map(e => e.id), ["b"]);
+		const t1 = enregistrerExamenDans({}, m, { id: "a", nom: "Final", date: "2027-06-01" });
+		const t2 = enregistrerExamenDans(t1, m, { id: "b", nom: "Partiel", date: "2027-03-01" });
+		r.check("deux examens, triés par date", t2[m].map(e => e.id), ["b", "a"]);
+		r.check("modifier = même id remplacé", enregistrerExamenDans(t2, m, { id: "a", nom: "Final", date: "2027-02-01" })[m].map(e => e.date), ["2027-02-01", "2027-03-01"]);
+		r.check("retirer", retirerExamenDe(t2, m, "b")[m].map(e => e.id), ["a"]);
+		r.check("module vidé : clé retirée", Object.keys(retirerExamenDe(t1, m, "a")), []);
+		r.check("prochain : aujourd'hui compris", examenProchain(t2[m], "2027-03-01")?.id, "b");
+		r.check("prochain : le passé exclu, le suivant pris", examenProchain(t2[m], "2027-03-02")?.id, "a");
+		r.check("prochain : tout passé", examenProchain(t2[m], "2027-07-01"), null);
+		r.check("date locale ISO", aujourdhuiIso(new Date(2027, 0, 5, 23, 30).getTime()), "2027-01-05");
 	}
 
 	r.done();

@@ -26,6 +26,9 @@ export const EN_AI = {
 	"ai.composer.stop": "Stop",
 	"ai.composer.open": "Open",
 	"ai.add.filesTip": "Add files or images ({hotkey})",
+	/* ── Menu « + » du composer (référence claude.ai) ── */
+	"ai.add.files": "Add files or images",
+	"ai.add.mention": "Mention a note or document",
 	/* Picker « @ » : aucune entrée pour le token tapé. */
 	"ai.mention.noMatch": "No matching file",
 	/* Pied du menu : une garde anti-explosion a coupé l'indexation d'une ou
@@ -79,6 +82,21 @@ export const EN_AI = {
 	"ai.mode.group": "Goal",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
+	/* La catégorie d'un quiz (categorie-quiz.ts) : son nom, et l'avis
+	   « détecté » près du bouton des options. */
+	"ai.categorie.auto": "Automatic",
+	"ai.categorie.python": "Python",
+	"ai.categorie.c": "C",
+	"ai.categorie.bash": "Bash / Linux",
+	"ai.categorie.sql": "SQL",
+	"ai.categorie.web": "Web",
+	"ai.categorie.maths": "Maths",
+	"ai.categorie.reseau": "Networking",
+	"ai.categorie.general": "General",
+	"ai.categorie.detected": "{name} detected",
+	/* « Maths détectées » en français : l'accord suit un nom pluriel féminin. */
+	"ai.categorie.detectedPlural": "{name} detected",
+	"ai.categorie.tip": "The quiz is written for this subject. Change it in the quiz options.",
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Select a provider",
@@ -243,6 +261,40 @@ export const EN_AI = {
 
 	/* ── Scène : chargement, erreur, résultat ── */
 	"ai.loading.title": "Creating your quiz…",
+	/* Un quiz par fichier joint, sur un site : le suivant s'ouvre. */
+	"ai.batch.webNext": "“{file}” is saved. Next file: {next}.",
+	/* La file de génération (spec 2026-09-26) : une ligne par envoi, sous le
+	   composer. « Creating your quiz… » (ai.loading.title) dit la ligne en
+	   cours, « Try again » (ai.error.retry) et « Stop » (ai.composer.stop)
+	   sont repris tels quels. */
+	"ai.queue.label": "Generation queue",
+	"ai.queue.waiting": "Waiting",
+	"ai.queue.open": "Open",
+	"ai.queue.cancel": "Remove from the queue",
+	"ai.queue.close": "Close",
+	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
+	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
+	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
+	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
+	"ai.queue.saving": "Saving…",
+	"ai.queue.retrySave": "Try saving again",
+	"ai.queue.openUnsaved": "Open without saving",
+	"ai.queue.busy": "Finish or cancel the request in progress first.",
+	/* La page en CONVERSATION (référence claude.ai, 2026-09-26) : chaque envoi
+	   est un message, la réponse dit l'étape en cours. */
+	"ai.queue.stepPreparing": "Preparing…",
+	"ai.queue.stepReading": "Reading the document…",
+	"ai.queue.stepWriting": "Writing the questions…",
+	"ai.queue.newRequest": "New request",
+	"ai.queue.newRequestBusy": "Available once nothing is generating",
+	"ai.queue.newRequestUnsaved": "Save or close the unsaved quiz first",
+	/* Une pièce jointe encore en lecture : l'envoi attend. */
+	"ai.attach.remove": "Remove {name}",
+	"ai.attach.reading": "Reading the document…",
+	"ai.attach.readFailed": "Could not read this file",
+	"ai.attach.noText": "No text in this PDF",
+	"ai.attach.removeToSend": "Remove it to send.",
+	"ai.attach.blocked": "Remove the document that could not be read to send",
 	"ai.error.title": "Generation failed",
 	"ai.error.retry": "Try again",
 	"ai.error.checkSettings": "Check your AI settings in the plugin settings.",
@@ -389,6 +441,8 @@ export const EN_AI = {
 	"ai.format.incompleteSlice": "Slice {slice} is missing: {roles}.",
 	"ai.format.noObjectives": "The Learn note has no learning objectives.",
 	"ai.format.preNoHint": "{count} question(s) asked before the reading have no hint: {names}.",
+	"ai.format.noHint": "{count} question(s) of the learning path have no hint: {names}.",
+	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
 	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Practice bank.",
 
 } as const;

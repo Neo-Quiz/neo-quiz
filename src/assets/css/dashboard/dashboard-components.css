@@ -216,7 +216,6 @@
 	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
 }
-
 /* Bouton ⋯ des cartes (quiz ET module) — coin bas droit de la ligne meta,
    façon StudySmarter : trois points NUS, aucun chrome au repos, halo rond
    discret au survol. Les !important battent `.theme-dark button` (0,1,1),
@@ -283,6 +282,38 @@
 .qbd-btn--create .qbd-btn-icon svg {
 	width: 15px;
 	height: 15px;
+}
+
+/* Le REFLET qui défile sur une action principale (« Commencer le quiz »,
+   « Nouveau quiz ») : il passe dès l'arrivée, puis toutes les 6,5 s. Un
+   élément à part (`.qbd-btn-shine`), pas un ::after, pour qu'on puisse
+   relancer son cycle. Infini, donc ignoré par `markViewEnter` (qui attend la
+   fin de l'entrée), et hors de toute classe `-enter` (`check:view-enter`). */
+.qbd-btn--shine {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+}
+/* Le contenu passe DEVANT le reflet. */
+.qbd-btn--shine > :not(.qbd-btn-shine) {
+	position: relative;
+	z-index: 1;
+}
+.qbd-btn-shine {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.8) 50%, transparent 68%);
+	transform: translateX(-110%);
+	animation: qbd-btn-shine 6.5s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes qbd-btn-shine {
+	0%, 5% { transform: translateX(-110%); }
+	22%, 100% { transform: translateX(110%); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-btn-shine { display: none; }
 }
 
 /* ── Modal « Modifier dossier » (référence StudySmarter, sans toggle public).
@@ -595,56 +626,6 @@
 	color: color-mix(in oklab, var(--accent) 75%, #ffffff);
 }
 
-/* ── En-tête de carte : pastille d'état + chevron d'ouverture ── */
-.qbd-quiz-card-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	margin-bottom: 10px;
-}
-
-.qbd-quiz-card-status {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	font-size: 10px;
-	font-weight: 600;
-	padding: 3px 9px 3px 7px;
-	border-radius: 999px;
-	white-space: nowrap;
-	line-height: 1.2;
-}
-
-.qbd-quiz-card-status-icon {
-	display: inline-flex;
-	align-items: center;
-}
-
-.qbd-quiz-card-status-icon svg {
-	width: 12px;
-	height: 12px;
-}
-
-.qbd-quiz-card-status--mastered {
-	color: var(--color-green, #4ade80);
-	background: color-mix(in srgb, var(--color-green, #4ade80) 14%, transparent);
-}
-
-.qbd-quiz-card-status--progress {
-	color: var(--interactive-accent);
-	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
-}
-
-.qbd-quiz-card-status--review {
-	color: var(--color-yellow, #facc15);
-	background: color-mix(in srgb, var(--color-yellow, #facc15) 16%, transparent);
-}
-
-.qbd-quiz-card-status--fresh {
-	color: var(--text-muted);
-	background: var(--background-modifier-hover, rgba(255,255,255,0.05));
-}
 
 /* Bouton lecture rond — présent dès que l'appelant fournit `opts.onPlay`
    (accueil ET « Mes quiz »). `.qbd-root` préfixe pour passer devant le chrome
@@ -698,13 +679,13 @@
 	min-width: 0;
 	max-width: 100%;
 	padding: 15px 17px 11px;
-	/* Système verre commun (tokens.css — harmonisation 2026-07-21) ;
-	   contours teintés à l'accent du dossier conservés (formule des cartes
-	   de module). */
+	/* Système verre commun (tokens.css — harmonisation 2026-07-21).
+	   Contour NEUTRE depuis le 2026-09-25 : l'orange du dossier répété sur
+	   chaque carte saturait la page ; la couleur y dit l'ÉTAT (l'anneau). */
 	--card-bg: var(--qbd-glass-bg);
-	--border-c: color-mix(in oklab, var(--accent) 55%, #232939);
-	--border-soft: color-mix(in oklab, var(--accent) 25%, #262d3f);
-	--glow: color-mix(in oklab, var(--accent) 45%, transparent);
+	--border-c: color-mix(in srgb, var(--text-normal) 22%, transparent);
+	--border-soft: color-mix(in srgb, var(--text-normal) 9%, transparent);
+	--glow: color-mix(in srgb, var(--text-normal) 10%, transparent);
 	background: var(--card-bg);
 	backdrop-filter: var(--qbd-glass-blur);
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
@@ -739,33 +720,20 @@
 	gap: 8px;
 }
 
-.qbd-quiz-card--folder .qbd-quiz-card-head {
-	margin-bottom: 0;
-}
 
 /* Teintes THEME-AWARE (2026-07-28) : cette variante peint désormais AUSSI
    l'accueil, donc toutes ses surfaces. Les hex clairs du handoff 7a étaient
    les couleurs de rôle du thème sombre (texte normal, texte atténué, filet) —
    passer par les variables natives donne le même rendu en sombre et rend la
    carte lisible en thème clair, où le titre #f8fafd disparaissait. */
-.qbd-quiz-card--folder .qbd-quiz-card-status {
-	gap: 6px;
-	padding: 3px 10px;
-	border-radius: 20px;
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
-	font-size: 11.5px;
-}
 
-.qbd-quiz-card--folder .qbd-quiz-card-status--mastered {
-	color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
 
 .qbd-quiz-card--folder .qbd-quiz-card-title {
 	margin: 0;
-	/* 14.5px : 17.5px lisait trop gros sur une grille 3 colonnes (retour
-	   Ahmed 2026-07-20), les titres longs mangeaient la carte. */
-	font-size: 14.5px;
+	/* 13.5px : 17.5px puis 14.5px lisaient trop gros sur une grille 3
+	   colonnes (retours 2026-07-20 et 2026-09-25), à côté de l'anneau les
+	   titres longs passaient sur trois lignes. */
+	font-size: 13.5px;
 	font-weight: 650;
 	line-height: 1.28;
 	letter-spacing: -0.01em;
@@ -845,6 +813,13 @@
 	opacity: 1;
 	transform: translateY(0);
 }
+/* Elle DISPARAÎT d'un coup et n'apparaît qu'en fondu (2026-09-25) : son
+   fondu de sortie laissait, une fraction de seconde après que la souris a
+   quitté la pastille, un « N questions » à moitié transparent flotter sur la
+   carte — un fantôme sur une capture d'écran. */
+.qbd-quiz-card .qbd-quiz-card-type:not(:hover) .qbd-quiz-card-type-tip {
+	transition: none;
+}
 .qbd-quiz-card--folder .qbd-quiz-card-meta-item .qbd-quiz-card-type-icon svg {
 	width: 14px;
 	height: 14px;
@@ -902,4 +877,392 @@
 	flex-direction: column;
 	align-items: center;
 	gap: 6px;
+}
+
+
+/* ══ Carte de quiz, anatomie du 2026-09-25 ══
+   En haut : titre + total de questions à gauche, anneau à droite. En bas :
+   une pastille par mode, puis le « ⋯ ». La couleur dit l'ÉTAT (bleu en
+   cours, vert maîtrisé) ; teintes d'Apple en mode sombre, les plus éprouvées
+   sur fond noir. */
+.qbd-root {
+	--qbd-state-progress: #0a84ff;
+	--qbd-state-done: #30d158;
+	--qbd-ring-track: color-mix(in srgb, var(--text-normal) 13%, transparent);
+}
+
+.qbd-quiz-card-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	min-width: 0;
+}
+
+.qbd-quiz-card-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+
+.qbd-quiz-card-count {
+	margin: 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+/* Séparateur entre « N questions » et « N lectures » : EXACTEMENT celui de la
+   ligne d'origine de la fiche (dashboard-fiche.css
+   `.qbd-fiche-meta .qbd-fiche-origin-date::before`) — même « · » posé en
+   `::before`, mêmes couleur et espacement, réutilisé ici par sa propre classe
+   plutôt que réécrit dans la règle de l'origine. */
+.qbd-count-sep::before {
+	content: "·";
+	margin: 0 7px;
+	color: var(--text-faint);
+}
+
+/* L'anneau : piste, arc de la couleur de l'état, pourcentage au centre. */
+.qbd-ring {
+	position: relative;
+	flex-shrink: 0;
+	display: grid;
+	place-items: center;
+}
+
+.qbd-ring-svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	transform: rotate(-90deg);
+}
+
+.qbd-ring-track { stroke: var(--qbd-ring-track); }
+.qbd-ring--progress .qbd-ring-arc { stroke: var(--qbd-state-progress); }
+.qbd-ring--done .qbd-ring-arc { stroke: var(--qbd-state-done); }
+
+.qbd-ring-pct {
+	position: relative;
+	font-size: 15px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-ring-sign {
+	font-size: 0.62em;
+	font-weight: 700;
+	color: var(--text-muted);
+	margin-left: 1px;
+}
+
+/* Les pastilles de mode : même teinte neutre pour tous, pourcentage toujours
+   affiché. Pas de tuile dans la tuile : une pastille, pas un bouton encadré. */
+.qbd-quiz-card-modes {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+	min-width: 0;
+}
+
+.qbd-quiz-card-mode {
+	display: inline-flex;
+	min-width: 0;
+}
+
+.qbd-root .qbd-quiz-card-mode-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	height: auto;
+	margin: 0;
+	padding: 3px 6px;
+	border: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	box-shadow: none;
+	font: inherit;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text-normal);
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background-color 140ms ease;
+}
+
+.qbd-root .qbd-quiz-card-mode-btn:hover {
+	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+.qbd-root .qbd-quiz-card-mode-btn:focus-visible {
+	outline: 2px solid var(--qbd-state-progress);
+	outline-offset: 2px;
+}
+
+.qbd-quiz-card-mode-icon {
+	display: inline-flex;
+}
+
+.qbd-quiz-card-mode-icon svg {
+	width: 11px;
+	height: 11px;
+}
+
+.qbd-quiz-card-modes .qbd-card-more {
+	flex-shrink: 0;
+}
+
+/* ── Modal « Ajouter du contenu » d'un dossier (folder-add.ts, d'après
+   StudySmarter) : les sources en haut, dans une zone de dépose en
+   pointillés ; ce qu'on crée en tuiles, sous « ou ». ── */
+.qbd-add-modal { width: 600px; }
+.qbd-add-drop {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 22px 20px 20px;
+	border-radius: 14px;
+	border: 1px dashed color-mix(in srgb, var(--text-normal) 24%, transparent);
+	text-align: center;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.qbd-add-drop.is-dragover {
+	border-color: var(--interactive-accent);
+	background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+.qbd-add-drop-title { font-size: 15px; font-weight: 600; color: var(--text-normal); }
+.qbd-add-drop-hint { max-width: 440px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.qbd-add-drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
+.qbd-add-or {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 16px 0;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-faint, var(--text-muted));
+}
+.qbd-add-or::before,
+.qbd-add-or::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--background-modifier-border);
+}
+.qbd-add-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+	gap: 10px;
+}
+.qbd-root .qbd-add-tile,
+.qbd-add-tile {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 18px;
+	min-height: 118px;
+	height: auto;
+	margin: 0;
+	padding: 14px !important;
+	border-radius: 12px;
+	border: 1px solid var(--background-modifier-border);
+	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+	box-shadow: none;
+	text-align: left;
+	white-space: normal;
+	font: inherit;
+	cursor: pointer;
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+/* LA LUEUR de Brilliant (2026-09-26, la carte « Continue course ») : un halo
+   de la couleur de la tuile monte du bas, discret au repos, plein au survol.
+   Portée par un pseudo-élément dont seule l'OPACITÉ bouge : un dégradé ne
+   s'anime pas, une opacité passe par le compositeur. */
+.qbd-create-option,
+.qbd-root .qbd-create-option { position: relative; isolation: isolate; overflow: hidden; }
+.qbd-create-option::before,
+.qbd-add-tile::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: radial-gradient(130% 90% at 50% 125%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 72%);
+	opacity: 0.45;
+	transition: opacity 0.25s ease;
+	pointer-events: none;
+}
+.qbd-add-tile:hover {
+	border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+	background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.qbd-add-tile:hover::before,
+.qbd-add-tile:focus-visible::before,
+.qbd-create-option:hover::before,
+.qbd-create-option:focus-visible::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-add-tile::before,
+	.qbd-create-option::before { transition: none; }
+}
+.qbd-add-tile:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+/* « Créer un dossier » (2026-09-26) : l'icône EN LIBERTÉ en haut à gauche,
+   sans carré de couleur autour, alignée sur le titre ; la lueur ne monte plus
+   du bas, elle RAYONNE DE L'ICÔNE. Le chevron reste centré. */
+.qbd-create-option { align-items: flex-start; }
+.qbd-create-option .qbd-create-option-chevron { align-self: center; }
+.qbd-create-option .qbd-create-option-icon {
+	width: 24px;
+	height: 24px;
+	margin-top: 1px;
+	background: none;
+	border: none;
+	border-radius: 0;
+}
+.qbd-create-option .qbd-create-option-icon svg { width: 22px; height: 22px; }
+.qbd-create-option::before {
+	background: radial-gradient(180px 130px at 28px 28px, color-mix(in oklab, var(--accent) 50%, transparent), transparent 72%);
+}
+
+.qbd-add-tile .qbd-create-option-icon { width: 36px; height: 36px; }
+.qbd-add-tile .qbd-create-option-icon svg { width: 18px; height: 18px; }
+.qbd-add-tile-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--text-normal); }
+
+/* ── LE BOUTON 3D de Brilliant (« Continue course »), dans le bleu des
+   flèches ← → du quiz (2026-09-25, cta3d.ts). Le bouton est transparent et
+   pâlit au survol ; la FACE est surélevée de --qbd-cta3d-depth au-dessus de
+   sa tranche pleine et s'enfonce au clic (100 ms ease-out, valeurs de
+   Brilliant) ; le REFLET balaie la face au premier quart d'un cycle de
+   6,4 s, sur la courbe d'origine — déplacé en `transform` (même trajet que
+   leur `left`, mesuré identique) pour rester fluide sur le compositeur. ── */
+.qbd-root .qbd-cta3d {
+	--qbd-cta3d-face: var(--quiz-primary);
+	--qbd-cta3d-edge: var(--quiz-primary-edge);
+	--qbd-cta3d-depth: 4px;
+	appearance: none;
+	position: relative;
+	display: inline-flex;
+	height: auto;
+	margin: var(--qbd-cta3d-depth) 0 0;
+	padding: 0;
+	border: 0;
+	border-radius: 60px;
+	background: none;
+	box-shadow: none;
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+	transition: opacity 100ms ease-out;
+}
+/* Variante NEUTRE (`poserBouton3dNeutre`) : un gris SOMBRE (plus foncé que
+   le « Jump ahead » de Brilliant, 2026-09-26), en couleurs PLEINES — dérivée de `--background-primary`, la
+   face devenait transparente sur un fond d'écran photo (2026-09-26). */
+.qbd-root .qbd-cta3d--neutre {
+	--qbd-cta3d-face: #2b2a33;
+	--qbd-cta3d-edge: #141319;
+	color: #fff;
+}
+.qbd-cta3d--neutre .qbd-cta3d-face {
+	text-shadow: none;
+	/* Un liseré clair en haut : sombre sur fond sombre, la face disparaîtrait. */
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 var(--qbd-cta3d-depth) 0 0 var(--qbd-cta3d-edge);
+}
+/* Survol : la face s'éclaircit au lieu de pâlir (une face sombre qui
+   devient translucide laisserait voir le fond au travers). */
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { opacity: 1; }
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { --qbd-cta3d-face: #36353f; }
+.qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
+.qbd-root .qbd-cta3d:hover:not(:disabled) {
+	background: none;
+	opacity: 0.85;
+}
+.qbd-cta3d-face {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 14px 24px;
+	border-radius: 60px;
+	background: var(--qbd-cta3d-face);
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 20px;
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+	box-shadow: 0 var(--qbd-cta3d-depth) 0 0 var(--qbd-cta3d-edge);
+	transform: translateY(calc(-1 * var(--qbd-cta3d-depth)));
+	transition: transform 100ms ease-out, box-shadow 100ms ease-out;
+}
+/* `.is-pressing` : l'enfoncement déclenché au clavier (Entrée), identique au clic. */
+.qbd-cta3d.is-pressing .qbd-cta3d-face,
+.qbd-cta3d:active:not(:disabled) .qbd-cta3d-face {
+	transform: none;
+	box-shadow: none;
+}
+.qbd-root .qbd-cta3d:focus-visible {
+	outline: none;
+}
+.qbd-cta3d:focus-visible .qbd-cta3d-face {
+	outline: 2px solid #fff;
+	outline-offset: 3px;
+}
+.qbd-cta3d-face .qbd-btn-icon { display: flex; align-items: center; }
+.qbd-cta3d-face .qbd-btn-icon svg { width: 16px; height: 16px; fill: currentColor; }
+.qbd-cta3d-clip {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: inherit;
+	overflow: clip;
+	pointer-events: none;
+	container-type: inline-size;
+}
+.qbd-cta3d-clip svg {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 100;
+	display: block;
+	overflow: hidden;
+	width: 150px;
+	height: 56px;
+	opacity: 0;
+	will-change: transform, opacity;
+	animation: qbd-cta3d-reflet 6400ms cubic-bezier(0.16, 1, 0.7, 1) infinite;
+}
+@keyframes qbd-cta3d-reflet {
+	0% { opacity: 1; transform: translateX(-100cqw); }
+	25% { opacity: 1; transform: translateX(100cqw); }
+	26% { opacity: 0; }
+	100% { opacity: 0; transform: translateX(100cqw); }
+}
+.qbd-root .qbd-cta3d:disabled { cursor: not-allowed; }
+.qbd-cta3d:disabled .qbd-cta3d-face {
+	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+	color: color-mix(in srgb, var(--text-normal) 40%, transparent);
+	text-shadow: none;
+	box-shadow: none;
+	transform: none;
+}
+.qbd-cta3d:disabled .qbd-cta3d-clip { display: none; }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-root .qbd-cta3d,
+	.qbd-cta3d-face { transition: none; }
+	.qbd-cta3d-clip { display: none; }
 }

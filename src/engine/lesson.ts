@@ -14,6 +14,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import type { QuizQuestion, QuestionRole } from "../types/quiz";
 import { QUESTION_ROLES } from "../types/quiz";
+import { trancheValide } from "../lecture-etape";
 
 /** Une tranche : sa position 1-based dans `lessonSlices()` et les index de ses questions, dans l'ordre du tableau source. */
 export interface LessonSlice {
@@ -28,10 +29,11 @@ export interface LessonModel {
 	roleOf(qi: number): QuestionRole;
 }
 
-/** Entier ≥ 1, et rien d'autre : « 2 » (chaîne) ou 0 ne font pas une tranche. */
-function normalizeSlice(value: unknown): number | null {
-	return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : null;
-}
+/** Entier ≥ 1, et rien d'autre : « 2 » (chaîne) ou 0 ne font pas une
+    tranche. La même règle que celle des lectures absorbées
+    (src/lecture-etape.ts) : deux lectures d'une étape ne doivent pas
+    diverger. */
+const normalizeSlice = trancheValide;
 
 /**
  * Construit le modèle de tranches à partir des QUESTIONS seules (pas de

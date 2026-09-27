@@ -1,9 +1,14 @@
 import JSON5 from "json5";
-import type { EditorExamOptions } from "../types/editor-ctx";
+import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
-import { debutDeDemande, nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
+import { completerConfigLearn, modeDuBloc } from "../quiz-format";
+import { debutDeDemande } from "./ai-sources";
+import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
+import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
+import { fileDeGeneration, figerReglages } from "./file-generation-app";
+import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
+import { creerVueFile } from "./file-generation-vue";
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
 import { ajouter, CLASSE_MODALE_HAUT } from "../dom";
@@ -21,30 +26,28 @@ import { aiSettingsDefaults } from "./ai-settings-host";
 import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
-import { createAiClient } from "./ai-client";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
+import { ouvrirMenuPlus } from "./composer-plus";
+import { categorieChoisie, detecterCategorie } from "./categorie-quiz";
+import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
+import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
+import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
+import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { mathifyElement } from "../engine/mathjax";
 import type { ProviderBrandOption, ProviderMenuHandle } from "./ui-select";
 import { formatHotkey, eventToHotkey } from "../hotkey-format";
-import { findQuizModeConfigIndex } from "../quiz-utils";
 import { attachMentionPicker } from "./mention-picker";
 import type { MentionPickerHandle } from "./mention-picker";
-import type { AiClient, ImagePayload, LoginRequiredError, UpgradeRequiredError } from "./ai-client";
 import { formatTokens, formatCost, formatDuration, totalTokens, tightestRow, usageRowLabel, providerPublishesPlan } from "./usage-format";
 import type { AiUsage, AiUsageEntry, PlanUsage } from "./usage-format";
 import { scanPromptPaths, MAX_PROMPT_PATHS } from "./prompt-paths";
 import { createQuizPage } from "./detail";
 import type { QuizPageHandlers } from "./detail";
 import type { QuizDraft } from "./detail-io";
-import { convertParsedToInternal, readModeConfig } from "../editor/convert";
-import { exportAll, exportAllWithFence } from "../editor/export";
-import { ecrireFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { ensureFolder, freeNotePath } from "./folder-create";
-import type { DraftQuestion } from "../editor/utils";
-import type { ParsedQuizItem } from "../editor/modals";
+import { exportAll } from "../editor/export";
 import { currentLang, t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { openInstallModal } from "./ai-install-modal";
@@ -64,8 +67,11 @@ import { liensNonLus } from "../video/youtube";
    sonde voie le compte arriver. Un état à part et non un drapeau sur
    `error` : le composer, la bulle de la demande et le bouton d'envoi s'y
    comportent comme pendant une génération (rien à renvoyer tant que ça
-   tourne), et c'est la phase qui le dit partout d'un seul mot. */
-type Phase = "idle" | "loading" | "result" | "error" | "connexion" | "web";
+   tourne), et c'est la phase qui le dit partout d'un seul mot.
+   Plus de phase « loading » depuis la file de génération (2026-09-26) : une
+   génération par CLI ne bloque plus la page, elle devient une ligne de la
+   file (`file-generation-app.ts`). */
+type Phase = "idle" | "result" | "error" | "connexion" | "web";
 
 /** Les trois outils qui ont un compte à connecter (pas les modèles locaux
     Ollama, qui n'en ont pas besoin). */
@@ -79,46 +85,9 @@ const OUTIL_DE_ID: Record<string, OutilCompte> = { "claude-code": "claude", code
     immédiate, assez long pour ne pas lancer un CLI en boucle serrée. */
 const SONDE_CONNEXION_MS = 3000;
 
-/** Origine d'une pièce jointe texte : note/fichier du VAULT (chemin relatif
-    connu), fichier hors vault résolu via le picker « @ » (chemin absolu
-    connu), fichier choisi/déposé SANS origine connue (menu « + »,
-    glisser-déposer — on ne sait dire que son nom), ou TRANSCRIPTION D'UNE
-    VIDÉO YOUTUBE (la tuile du composer — `path` y est un identifiant
-    `youtube:<id>`, jamais un fichier). Sert de dédoublonnage
-    (cf. attachmentKey) : deux fichiers de même NOM mais d'origine ou de
-    chemin différents (« AGENTS.md » du vault vs déposé, deux
-    « Styling Coiffure.pdf » de deux dossiers) restent deux pièces jointes
-    distinctes. */
-export type AttachmentSource = "vault" | "external" | "file" | "video";
-
-/** Clé d'identité d'une pièce jointe : origine + chemin quand il existe, nom
-    sinon. Calculée en UN SEUL endroit et réutilisée à tous les points
-    d'ajout (addComposerFiles, attachNoteVaultFile, attachExternalPath) —
-    la régression corrigée ici venait précisément d'un dédoublonnage recopié
-    à la main à chaque appelant, divergent entre `path` et `name`. */
-function attachmentKey(a: { source: AttachmentSource; path?: string; name: string }): string {
-	return a.source + ":" + (a.path || a.name);
-}
-
-/** Source texte attachée (note du vault, fichier .md/.txt/PDF, ou
-    transcription d'une vidéo YouTube — la tuile, cf. video-tile.ts). */
-export interface NoteAttachment {
-	name: string;
-	content: string;
-	/** Vault → chemin relatif au vault. Externe → chemin ABSOLU (résolu par
-	    le picker « @ » juste avant l'attachement). Absent seulement pour un
-	    fichier choisi/déposé sans origine connue. */
-	path?: string;
-	source: AttachmentSource;
-	/** Les OCTETS d'un PDF, gardés pour l'aperçu (les pages dessinées à la
-	    demande, `host.pdf.renderPages`) ; `content` n'en est que le texte.
-	    Absent pour une note. */
-	bytes?: Uint8Array;
-	/** La première page en image (`data:` URL), pour la carte — comme sur
-	    claude.ai, une carte de PDF montre sa page, pas son nom. Absent quand
-	    l'hôte ne dessine pas, ou pour une note. */
-	thumb?: string;
-}
+/* Les pièces jointes et la demande vivent dans `generation-demande.ts`,
+   partagé avec la file de génération ; ré-exportées pour leurs lecteurs. */
+export type { AttachmentSource, NoteAttachment } from "./generation-demande";
 
 /** Une tuile de la modale d'attente du canal web : ce qui s'affiche, et le
     fichier que l'hôte fera partir au glisser (`HostDepot.glisser`). */
@@ -135,16 +104,12 @@ interface ComposerImage {
 	url: string;
 }
 
-/** Message PARTI — ce que le composer contenait au moment de l'envoi. Le
-    composer, lui, GARDE la demande pendant tout l'envoi (Ahmed, 2026-09-19 :
-    derrière la modale d'étape, un champ vidé laissait croire la demande
-    effacée) ; cette copie est ce que la génération lit, indépendamment de
-    ce que le composer deviendrait. */
-interface SentMessage {
-	text: string;
-	notes: NoteAttachment[];
-	images: ComposerImage[];
-}
+/** Message PARTI vers un SITE (canal web) — ce que le composer contenait
+    au moment de l'envoi. Le composer, lui, GARDE la demande pendant
+    l'attente (Ahmed, 2026-09-19 : derrière la modale d'étape, un champ vidé
+    laissait croire la demande effacée). Un envoi par CLI, lui, part dans la
+    file (`DemandeFile`) et vide le composer. */
+type SentMessage = DemandeTexte<ComposerImage>;
 
 /** Le contrôle fournisseur : son bouton (un logo seul dans le pied du
     composer) et de quoi redessiner le menu ouvert quand un statut de CLI
@@ -304,22 +269,101 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   page et n'est pas persistée — rouvrir « Générer » repart du défaut,
 	   c'est-à-dire du comportement d'avant le 2026-09-17. */
 	let destination = "";
+	/* La destination vient d'un PRÉRÉGLAGE (« Créer avec l'IA » depuis un
+	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
+	   reste du composer (spec de la file, 2026-09-26). */
+	let destinationDuPreset = false;
+	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
+	   déduite à l'envoi des pièces jointes, du dossier et de la demande
+	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
+	   nombre et le type, elle vaut pour la session de la page. */
+	let categorieChoix: CategorieQuiz | null = null;
+	/** L'avis « Python détecté » près du bouton des options. */
+	let avisCategorieEl: HTMLElement | null = null;
+	/* La file de génération de l'APPLICATION, partagée par toutes les pages :
+	   la page s'y abonne pour peindre ses lignes, elle ne la possède pas. */
+	const fileGen: FileGenerationApp = fileDeGeneration({
+		settings: deps.settings,
+		scanner: deps.scanner,
+		recordUsage: deps.usage ? (entry) => deps.usage!.record(entry) : undefined,
+	});
+	const vueFile = creerVueFile({
+		file: fileGen,
+		ouvrir: (chemin) => {
+			const quiz = deps.scanner.getQuiz(chemin);
+			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
+			else host.ui.notice(t("ai.queue.missing"));
+		},
+		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
+	});
+
+	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
+	   file, passe en conversation au premier envoi et en sort quand la liste
+	   se vide ; entre-temps, seuls le bouton d'envoi (■ pendant une
+	   génération) et « Nouvelle demande » bougent. ── */
+	let modeConversation = false;
+	let majNouvelle: () => void = () => {};
+	const desabonnerPage = fileGen.abonner(() => {
+		if (!stageRef || !stageRef.isConnected) return;
+		if ((phase === "idle" || phase === "error") && enConversation(fileGen) !== modeConversation) { void render(containerRef); return; }
+		updateGenerateBtn(boutonEnvoi);
+		majNouvelle();
+	}, () => !!stageRef?.isConnected);
+
+	/** « Ouvrir sans enregistrer » : le quiz d'une ligne dont seule la note a
+	    échoué s'affiche dans la page résultat (la même que pour un site), avec
+	    son bouton Enregistrer et « Insérer dans une note ». La ligne reste dans
+	    la file tant que la note n'est pas écrite : quitter la page ne perd rien. */
+	function ouvrirSansEnregistrer(l: LigneGeneration): void {
+		const p = l.demande.produit;
+		if (!p) return;
+		// Une attente de site ou de connexion tient la page : ne pas l'écraser.
+		if (phase === "web" || phase === "connexion") { host.ui.notice(t("ai.queue.busy")); return; }
+		dropSentMessage();
+		sentMessage = { text: l.demande.text, notes: l.demande.notes, images: [] };
+		generatedQuestions = p.questions;
+		generatedTitre = p.titre;
+		lastUsage = p.usage;
+		planTranchesEnvoye = p.planTranches;
+		noteLearnLiee = p.noteLearn;
+		resultatFige = { mode: l.demande.mode, destination: l.demande.destination, reglages: l.demande.reglages, ligne: l.id };
+		generationId++;
+		generatedDraft = null;
+		phase = "result";
+		void render(containerRef);
+	}
 	/* Les sources qu'un préréglage demande de joindre, consommées par le
 	   PREMIER `render` qui suit : joindre exige un composer rendu (les chips
 	   et la vignette d'une image y vivent), et `preset` est appelé avant. */
 	let aJoindre: string[] = [];
+	/* Lancer la génération dès que les sources du préréglage sont jointes
+	   (composer du Planning, tâche 5) : posé par `preset`, consommé et remis
+	   à `false` par le même `render` qui joint `aJoindre`. */
+	let lancerApresJointes = false;
 
 	function preset(p: AiPreset): void {
 		/* Un résultat affiché ou une erreur sont balayés par un clic sur
 		   « Créer avec l'IA » depuis un dossier : on repart d'un composer vide,
 		   comme le fait `resetGeneration` quand un quiz généré est enregistré.
-		   Une génération EN COURS, elle, est arrêtée d'abord (`abort`, le même
-		   geste que le bouton Stop) : on ne joint pas des sources à un composer
-		   dont le CLI tourne encore. */
-		if (phase === "loading") activeClient?.abort();
+		   Les générations de la FILE, elles, continuent : elles ne tiennent
+		   plus le composer. */
+		epochPreset++;
 		if (phase !== "idle") resetGeneration();
+		/* Les pièces du dossier REMPLACENT celles du composer : arriver depuis
+		   XTI302 avec les fichiers d'XTI301 encore joints (préréglage
+		   précédent, jamais envoyé) mêlait deux cours dans une génération
+		   écrite dans un seul dossier (vu le 2026-09-24). Le texte tapé, lui,
+		   reste : c'est une consigne, pas une source. */
+		for (const img of images) URL.revokeObjectURL(img.url);
+		images = [];
+		noteAttachments = [];
 		destination = p.destination;
+		destinationDuPreset = true;
 		aJoindre = [...p.attach];
+		// Un texte du préréglage REMPLACE celui du composer : c'est la demande
+		// tapée dans le dossier, pas une consigne à empiler sur un reste.
+		if (p.prompt && p.prompt.trim()) composerText = p.prompt;
+		lancerApresJointes = !!p.lancer;
 	}
 	let images: ComposerImage[] = [];
 	/* ── Les vidéos YouTube (spec « Vidéos YouTube » § 3.4 et § 5) ──
@@ -349,6 +393,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   classe : `render` recrée le composer. */
 	let composerActif = false;
 	let veilleComposerActif: { retirer(): void } | null = null;
+	/* Depuis quand la zone des pièces jointes est-elle ouverte ? Son contenu
+	   ne descend en fondu (claude.ai : `translateY(-8px)`, 0,2 s) qu'à
+	   l'OUVERTURE — rejoué seulement par un rendu qui tombe PENDANT ces
+	   0,2 s (cf. `effetEnCours`, composer-attachments.ts). */
+	let zonePieces: object | null = null;
+	const debutsZonePieces = new WeakMap<object, number>();
 	// Listener « focus fenêtre » du re-check des statuts CLI (remplacé à
 	// chaque render, retiré quand la zone de hint disparaît).
 	let __focusRecheck: (() => void) | null = null;
@@ -468,30 +518,38 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    de page : le repli automatique d'un modèle courant devenu payant (voir
 	    `sonderPlansOllama`) ne doit jamais défaire un choix que l'utilisateur
 	    vient de faire lui-même. */
-	/** La vue a été fermée : plus rien ne doit repeindre ni démarrer. Un
-	    `abort()` posé pendant l'encodage des images n'a encore aucun processus
-	    à tuer — c'est ce drapeau qui arrête la génération à l'étape suivante. */
+	/** La vue a été fermée : plus rien ne doit repeindre ni démarrer. */
 	let disposed = false;
 	// ResizeObserver de la carte composer (mesure du text-indent des chips) :
 	// déconnecté et recréé à chaque render (composer recréé) — cf. layoutChipsRow.
 	let composerResizeObserver: ResizeObserver | null = null;
-	let phase: Phase = "idle"; // idle | loading | result | error
-	/* Le SIGNAL de génération en cours, pour le rail (demande d'Ahmed du
-	   2026-09-13 : l'icône « Générer » s'anime tant que le modèle travaille,
-	   même depuis une autre page). Une classe sur la racine du document,
-	   posée et retirée ICI, au seul endroit qui connaît la phase ; le rail
-	   ne fait qu'y réagir en CSS (`dashboard-nav.css`, `qbd-generating`).
-	   Retirée aussi au démontage : une génération annulée par la fermeture
-	   de la vue ne doit pas laisser l'étincelle tourner. */
-	function signalerGeneration(enCours: boolean): void {
-		document.documentElement.classList.toggle("qbd-generating", enCours);
-	}
-	/* Demande PARTIE. Non nulle dès l'envoi, remise à null quand la demande
-	   est rendue au composer (annulation) ou qu'on recommence à zéro. */
+	/* Le bouton d'envoi du DERNIER rendu : une lecture de PDF qui finit, ou la
+	   file qui change, le remet à jour sans redessiner la page. */
+	let boutonEnvoi: HTMLButtonElement | null = null;
+	let phase: Phase = "idle";
+	/* Demande PARTIE vers un site. Non nulle dès l'envoi, remise à null quand
+	   la demande est rendue au composer (annulation) ou qu'on recommence. Le
+	   signal du rail (`qbd-generating`) est posé par la file, pas ici. */
 	let sentMessage: SentMessage | null = null;
-	// Client IA de la génération en cours — permet au bouton stop (et à
-	// la touche Esc) d'annuler réellement (kill du CLI / abort du fetch).
-	let activeClient: AiClient | null = null;
+	/* UN QUIZ PAR FICHIER JOINT (2026-09-23), sur le canal web : `lot` dit où
+	   en est l'envoi (« 2 sur 3 ») ; null hors lot. Sur un CLI, chaque
+	   fichier devient une ligne de la file. */
+	let lot: { index: number; total: number; nom: string } | null = null;
+	/* Canal web : les fichiers qui attendent leur tour. Le site s'ouvre pour
+	   le suivant dès que la réponse du précédent est enregistrée ; la page
+	   du PREMIER quiz s'ouvre à la fin. */
+	let lotWebRestant: SentMessage[] = [];
+	let lotWebPremier: (() => void) | null = null;
+	/** La demande partie sur le site en ce moment (un fichier du lot, ou
+	    l'envoi entier) : c'est elle qui nomme la note reçue. */
+	let demandeWeb: SentMessage | null = null;
+	/** Oublie le lot web : plus de fichier en attente, plus de progression. */
+	function oublierLotWeb(): void {
+		lotWebRestant = [];
+		lotWebPremier = null;
+		demandeWeb = null;
+		lot = null;
+	}
 	/* Page « quiz » de la zone résultat — la MÊME que celle d'un quiz du
 	   vault. Créée à la première génération, réutilisée ensuite : elle garde
 	   son état (question courante, mode) tant que la clé ne change pas.
@@ -510,6 +568,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/* Le nom de la note Learn dont ce plan vient : le lien `learn: "[[…]]"`
 	   du Practice enregistré. */
 	let noteLearnLiee: string | undefined;
+	/* Le quiz affiché en page résultat vient d'une ligne de la FILE dont
+	   l'enregistrement a échoué (« Ouvrir sans enregistrer ») : son mode, sa
+	   destination et ses réglages figés à l'envoi, et la ligne à fermer une
+	   fois la note écrite. `null` pour le canal web. */
+	let resultatFige: { mode: ModeQuiz; destination: string; reglages: ReglagesFiges; ligne: number } | null = null;
 	/* La réponse copiée VIENT D'ARRIVER : la modale d'attente le dit sur
 	   place (coche, « Réponse reçue », le nom du quiz) pendant que le quiz
 	   s'enregistre, avant de se fermer sur sa page. Sans cet état, la page
@@ -517,8 +580,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let reponseRecue: { titre?: string } | null = null;
 	let errorMessage = "";
 	let containerRef: HTMLElement | null = null;
-	/* Ce que la DERNIÈRE génération a consommé — null quand le fournisseur ne
-	   publie aucun compteur, auquel cas l'écran le dit. */
+	/* La SCÈNE posée par le dernier `render` dans `containerRef`. Le conteneur,
+	   lui, est celui de la coquille : il reste dans le document quand elle y
+	   peint une AUTRE vue, et `containerRef.isConnected` ne dit donc jamais si
+	   « Générer » est à l'écran. La scène, si : la coquille la détache en
+	   peignant ailleurs. `null` = la prochaine peinture est une vraie entrée. */
+	let stageRef: HTMLElement | null = null;
+	/* Incrémentée à chaque préréglage : la jonction en arrière-plan d'un
+	   préréglage s'arrête dès qu'un autre est posé, pour que deux dossiers ne
+	   mêlent pas leurs pièces dans un même composer. */
+	let epochPreset = 0;
+	/* Ce que la DERNIÈRE génération affichée a consommé — null quand le
+	   fournisseur ne publie aucun compteur (et toujours sur un site). */
 	let lastUsage: AiUsage | null = null;
 	/* Dernier état de forfait CONNU — sert au seul survol du bouton d'usage :
 	   passer la souris ne déclenche jamais de lecture réseau, c'est le modal
@@ -545,10 +618,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	};
 
 	function canGenerate(): boolean {
-		/* Une demande EN VOL (génération, attente du site, attente de
-		   connexion) ne repart pas : le composer la montre encore, et le clic
-		   comme Entrée passent par ici. */
-		if (phase === "loading" || phase === "web" || phase === "connexion") return false;
+		/* Une demande EN VOL sur un site, ou une attente de connexion, ne
+		   repart pas : le composer la montre encore, et le clic comme Entrée
+		   passent par ici. Une génération de la FILE ne bloque rien : le
+		   composer est libre dès l'envoi. */
+		if (phase === "web" || phase === "connexion") return false;
 		const providerId = settings().aiProvider || "";
 		if (!providerId) return false;
 		// Un fournisseur desktop-only (Claude Code CLI) est inutilisable sur
@@ -558,58 +632,31 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// uniquement » explique déjà pourquoi.
 		const provider = aiProviders.getProvider(providerId);
 		if (provider && provider.desktopOnly && host.platform.isMobile) return false;
+		/* Un document encore EN LECTURE (ou dont la lecture a échoué) : son
+		   texte n'est pas là, rien ne part sans lui. */
+		if (noteAttachments.some(n => n.lecture)) return false;
 		return !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
 	}
 
-	/** Le contenu d'une carte de pièce jointe : la première page en image pour
-	    un PDF dessiné, sinon le nom sur deux lignes ; le badge d'extension
-	    dans les deux cas ; le tooltip natif porte le chemin entier. */
-	function poserCarte(chip: HTMLElement, note: NoteAttachment): void {
-		chip.title = note.path || note.name;
-		if (note.thumb) {
-			/* La page SEULE, posée dans la carte : ni badge ni nom par-dessus
-			   (retour Ahmed 2026-09-17, référence claude.ai). Sa forme — paysage
-			   ou portrait — est ce qu'on lit d'un coup d'œil, et le nom vit dans
-			   l'infobulle et dans l'aperçu. */
-			chip.classList.add("qbd-ai-note-chip--thumb");
-			const img = ajouter(chip, "img", "qbd-ai-note-chip-thumb");
-			img.src = note.thumb;
-			img.alt = note.name;
-			img.draggable = false;
-			return;
-		}
-		{
-			/* LA FIN DU NOM RESTE VISIBLE, quelle que soit sa longueur (retour
-			   Ahmed 2026-09-17, référence claude.ai : « TP2 - Entrées… » sur la
-			   première ligne, « xceptions.md » sur la seconde). Un nom court
-			   s'affiche tel quel ; un nom long est coupé AU MILIEU : la tête sur
-			   une ligne avec ses points de suspension, la queue — les douze
-			   derniers caractères, l'extension comprise — sur la ligne du
-			   dessous, jamais tronquée. Une troncature en fin de nom perdait
-			   l'extension, la seule chose qu'on cherche des yeux. */
-			const nom = ajouter(chip, "span", "qbd-ai-note-chip-name");
-			const QUEUE = 12;
-			if (note.name.length <= QUEUE + 4) {
-				nom.textContent = note.name;
-			} else {
-				nom.classList.add("qbd-ai-note-chip-name--split");
-				ajouter(nom, "span", "qbd-ai-note-chip-name-head", note.name.slice(0, -QUEUE));
-				ajouter(nom, "span", "qbd-ai-note-chip-name-tail", note.name.slice(-QUEUE));
-			}
-		}
-		ajouter(chip, "span", "qbd-ai-note-chip-badge", badgeDeFichier(note.name));
-	}
+	/* Les cartes de pièces jointes et la lecture immédiate d'un PDF
+	   (`composer-attachments.ts`). */
+	const pieces = creerPiecesJointes({
+		notes: () => noteAttachments,
+		rendre: () => { void render(containerRef); },
+		majEnvoi: () => updateGenerateBtn(boutonEnvoi),
+	});
+	const joindrePdf = pieces.joindrePdf;
 
 	/** Le contenu d'une carte d'IMAGE : la photo remplit la carte, recadrée
 	    (référence claude.ai : une image jointe est un carré plein, sa forme
 	    n'est pas une information comme l'est celle d'une page). */
 	function poserCarteImage(chip: HTMLElement, image: ComposerImage): void {
-		chip.classList.add("qbd-ai-note-chip--thumb", "qbd-ai-note-chip--image");
+		/* Déjà prête (le fichier est local) : la vignette finale d'emblée,
+		   avec la montée et le fondu flou → net de claude.ai, une fois. */
+		chip.classList.add("qbd-ai-note-chip--prete", "qbd-ai-note-chip--thumb", "qbd-ai-note-chip--image");
 		chip.title = image.file.name;
-		const img = ajouter(chip, "img", "qbd-ai-note-chip-thumb");
-		img.src = image.url;
-		img.alt = image.file.name;
-		img.draggable = false;
+		entrerVignette(chip, image);
+		poserImage(chip, image, image.url, image.file.name);
 		/* Le clic OUVRE L'APERÇU, comme la carte d'un document ; la croix de
 		   retrait garde son rôle. */
 		chip.classList.add("qbd-ai-note-chip--toggle");
@@ -775,8 +822,19 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 	}
 
+	/* L'entrée de la COQUILLE (et de tout hôte) : une vraie navigation vers
+	   « Générer » doit peindre, même si la scène précédente a été détachée. */
+	function entrer(container: HTMLElement): Promise<void> {
+		stageRef = null;
+		return render(container);
+	}
+
 	async function render(container: HTMLElement | null): Promise<void> {
 		if (!container) return;
+		/* Repeint INTERNE (une pièce jointe lue en arrière-plan, une réponse,
+		   un statut) alors que la coquille a peint une autre vue : ne pas
+		   écraser cette vue. Seule `entrer` rouvre la page. */
+		if (stageRef && !stageRef.isConnected) return;
 		containerRef = container;
 		closeAllSelects();
 		// Tooltips portalés au <body> (stop, effort) : un re-render détruit
@@ -794,17 +852,29 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// « Aperçu » vide) ; result → l'ÉDITEUR embarqué pleine page et
 		// le composer EN BAS (variante B « chat »). `formCol` reste le
 		// nom du parent du composer pour ne pas réécrire tout le bloc.
-		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase);
+		/* EN CONVERSATION dès qu'une demande est partie dans la file (référence
+		   claude.ai, 2026-09-26 : /new devient une conversation à l'envoi) : le
+		   titre s'efface, les tours s'empilent dans un fil qui défile, et le
+		   composer se range en bas. On en sort par « Nouvelle demande », ou
+		   quand la liste se vide. */
+		const conversation = (phase === "idle" || phase === "error") && enConversation(fileGen);
+		modeConversation = conversation;
+		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
+		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
+		if (conversation) {
+			majNouvelle = poserNouvelleDemande(ajouter(stage, "div", "qbd-ai-fil-tete"), fileGen);
+			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
+		}
 
 		// ── Page header ──
 		// Absent en résultat (la page du quiz porte son propre titre) et dès
 		// qu'une demande est partie : sur claude.ai le hero d'accueil cède la
 		// place à la conversation à la seconde où l'on envoie. Le garder
 		// au-dessus de la bulle donnerait l'impression de n'être jamais parti.
-		if (phase !== "result" && !sentMessage) {
+		if (phase !== "result" && !sentMessage && !conversation) {
 			const titleRow = ajouter(formCol, "div", "qbd-ai-title-row");
 			const titleIcon = ajouter(titleRow, "span", "qbd-ai-title-icon");
 			// Glyphe de marque NU à côté du titre serif, comme l'astérisque de
@@ -1354,8 +1424,19 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// normal) si elle est trop large pour laisser de la place au texte.
 		const textZone = ajouter(composer, "div", "qbd-ai-composer-textzone");
 		let chipsRow: HTMLElement | null = null;
-		if (images.length > 0 || noteAttachments.length > 0) {
-			chipsRow = ajouter(textZone, "div", "qbd-ai-composer-chips");
+		const avecPieces = images.length > 0 || noteAttachments.length > 0;
+		if (avecPieces) {
+			/* LA ZONE qui s'ouvre au-dessus du texte (claude.ai) : une grille
+			   `overflow: hidden` qui déborde de 8 px en haut et sur les côtés —
+			   la place de la croix, posée à 8 px HORS de la vignette — et dont
+			   le contenu descend en fondu à l'ouverture seulement. */
+			const zone = ajouter(textZone, "div", "qbd-ai-composer-pieces");
+			const contenuZone = ajouter(zone, "div", "qbd-ai-composer-pieces-contenu");
+			zonePieces ??= {};
+			if (effetEnCours(debutsZonePieces, zonePieces, 200)) contenuZone.classList.add("qbd-ai-composer-pieces-contenu--entree");
+			// En flux normal DÈS la création : `layoutChipsRow` attend une image,
+			// qu'une fenêtre masquée ne dessine jamais.
+			chipsRow = ajouter(contenuZone, "div", "qbd-ai-composer-chips qbd-ai-composer-chips--stacked");
 			/* Les images sont des cartes de la MÊME rangée que les documents
 			   (retour Ahmed 2026-09-19, référence claude.ai : un JPG et un PDF
 			   côte à côte, même gabarit). Elles avaient leur propre rangée de
@@ -1363,41 +1444,31 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			for (let i = 0; i < images.length; i++) {
 				const chip = ajouter(chipsRow, "div", "qbd-ai-note-chip");
 				poserCarteImage(chip, images[i]);
-				const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
-				host.ui.setIcon(chipRemove, "x");
-				const idx = i;
-				chipRemove.addEventListener("click", () => {
-					URL.revokeObjectURL(images[idx].url);
+				const image = images[i];
+				poserCroix(chip, image.file.name, () => {
+					const idx = images.indexOf(image);
+					if (idx < 0) return;
+					URL.revokeObjectURL(image.url);
 					images.splice(idx, 1);
 					render(containerRef);
 				});
 			}
-			for (let i = 0; i < noteAttachments.length; i++) {
-				const note = noteAttachments[i];
+			for (const note of noteAttachments) {
 				/* Une CARTE, pas une pastille (retour Ahmed 2026-09-17, référence
 				   claude.ai) : le nom sur deux lignes, et l'EXTENSION en badge en
 				   bas — pas d'icône, le badge dit le type. */
 				const chip = ajouter(chipsRow, "div", "qbd-ai-note-chip");
-				poserCarte(chip, note);
-				/* Le clic OUVRE L'APERÇU (Ahmed, 2026-09-17, référence claude.ai) :
-				   le texte d'une note, les pages d'un PDF. L'ancienne bascule
-				   nom ⇄ chemin complet est partie avec : le chemin est dans la
-				   modale, et le tooltip natif le porte encore. */
-				chip.classList.add("qbd-ai-note-chip--toggle");
+				pieces.peindreCarte(chip, note);
+				/* Le clic OUVRE L'APERÇU : le texte d'une note, les pages d'un
+				   PDF — une fois lu. Le chemin est dans la modale, et le tooltip
+				   natif le porte encore. */
 				chip.addEventListener("click", (e) => {
 					if ((e.target as HTMLElement).closest(".qbd-ai-note-chip-remove")) return;
-					ouvrirApercu(note);
-				});
-				const chipRemove = ajouter(chip, "button", "qbd-ai-note-chip-remove");
-				host.ui.setIcon(chipRemove, "x");
-				const idx = i;
-				chipRemove.addEventListener("click", (e) => {
-					e.stopPropagation(); // ne déclenche pas le basculement du chip
-					noteAttachments.splice(idx, 1);
-					render(containerRef);
+					if (!note.lecture) ouvrirApercu(note);
 				});
 			}
 		}
+		if (!avecPieces) zonePieces = null;
 
 		/* LES TUILES VIDÉO (spec « Vidéos YouTube » § 3.4) : leur rangée est
 		   TOUJOURS là, dans la même bande que les chips, pour qu'une tuile
@@ -1493,6 +1564,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		composerInput.addEventListener("input", (e) => {
 			const ta = e.target as HTMLTextAreaElement;
+			/* Le texte d'invite qui RÉAPPARAÎT (le champ vient de se vider)
+			   entre en fondu, 0,5 s linéaire — `cds-fade-in` de claude.ai.
+			   Retirer la classe et relire une mesure relance l'animation. */
+			if (!ta.value && composerText) {
+				ta.classList.remove("qbd-ai-composer-input--invite");
+				void ta.offsetWidth;
+				ta.classList.add("qbd-ai-composer-input--invite");
+			}
 			composerText = ta.value;
 			composerCaret = ta.selectionStart;
 			autoGrow();
@@ -1537,7 +1616,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			}
 			if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
 			e.preventDefault();
-			if (phase !== "loading" && canGenerate()) startGeneration(containerRef);
+			if (canGenerate()) void startGeneration(containerRef);
 		});
 		requestAnimationFrame(() => { autoGrow(); layoutChipsRow(); });
 
@@ -1575,10 +1654,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const seg = ajouter(composerBottom, "div", "qbd-ai-seg");
 		seg.setAttribute("role", "radiogroup");
 		seg.setAttribute("aria-label", t("ai.mode.group"));
-		/* Le bloc qui glisse (relevé sur claude.ai le 2026-09-23) : un seul
-		   indicateur positionné sous les options, déplacé en FLIP au
-		   changement — 200 ms, cubic-bezier(.32, .72, 0, 1), depuis
-		   l'ancienne position avec un scaleX qui rattrape l'ancienne largeur. */
+		/* Le bloc qui glisse (relevé sur claude.ai le 2026-09-23), partagé
+		   avec la fiche d'un cours : `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
 		const segBtns = (["learn", "practice"] as const).map(v => {
 			const b = ajouter(seg, "button", "qbd-ai-seg-btn", v === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
@@ -1612,20 +1689,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				b.classList.toggle("is-active", v === modeGeneration);
 				b.setAttribute("aria-checked", String(v === modeGeneration));
 			});
-			const ancienX = indic.dataset.x === undefined ? null : parseFloat(indic.dataset.x);
-			const ancienneL = parseFloat(indic.dataset.w || "0");
-			const x = actif.offsetLeft, w = actif.offsetWidth;
-			indic.dataset.x = String(x);
-			indic.dataset.w = String(w);
-			indic.style.width = `${w}px`;
-			indic.style.transform = `translateX(${x}px)`;
-			const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-			if (anime && !reduit && ancienX !== null && ancienneL > 0) {
-				indic.animate(
-					{ transform: [`translateX(${ancienX}px) scaleX(${ancienneL / w})`, `translateX(${x}px) scaleX(1)`] },
-					{ duration: 200, easing: "cubic-bezier(.32, .72, 0, 1)" },
-				);
-			}
+			placerIndicateur(indic, actif, anime);
 		};
 		// Mesure après insertion dans le document (largeurs réelles des options).
 		requestAnimationFrame(() => majSeg(false));
@@ -1647,7 +1711,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				folder: destination,
 				onCount: (n) => { questionCount = n; },
 				onType: (label) => { questionType = typeValue(label); },
-				onFolder: (value) => { destination = value; },
+				onFolder: (value) => { destination = value; destinationDuPreset = false; majAvisCategorie(); },
+				/* La catégorie : Automatique dit ce qu'elle détecte, sinon le
+				   choix force celle du prompt (retour #7). */
+				categories: choixCategories(),
+				categorie: categorieChoix,
+				categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
+				onCategorie: (value) => {
+					categorieChoix = choixCategories().find(c => c.value === value)?.value ?? null;
+					majAvisCategorie();
+				},
 				// Barème et durée : avec le Mock exam, sous-projet à part.
 			});
 		});
@@ -1695,23 +1768,30 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (buildModelControl) buildModelControl(composerTools);
 		// L'icône Options est à droite du modèle (2026-09-23).
 		composerTools.appendChild(optsBtn);
+		/* L'avis de CATÉGORIE, juste avant l'icône Options (retour #7) :
+		   « Python détecté », texte et icône, sans pastille ; caché pour
+		   `general`. Repeint à chaque changement du composer
+		   (`updateGenerateBtn`). */
+		// Sans fournisseur, les options sont cachées (plus bas) : l'avis aussi.
+		avisCategorieEl = null;
+		if (provider) {
+			const avis = document.createElement("span");
+			avis.className = "qbd-ai-categorie";
+			avis.hidden = true;
+			composerTools.insertBefore(avis, optsBtn);
+			attachHoverTip(avis, (tip) => { ajouter(tip, "div", "qbd-hover-tip-body", t("ai.categorie.tip")); });
+			avisCategorieEl = avis;
+			majAvisCategorie();
+		}
 
 		// Bouton générer dans le composer (façon bouton d'envoi claude.ai) :
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.
-		// Pendant la génération il devient le bouton STOP (carré + tooltip
-		// « Arrêter Esc ») qui annule réellement la génération.
+		// Il reste un bouton d'ENVOI pendant une génération : l'arrêt vit sur
+		// la ligne de la file (■).
 		const sendBtn = ajouter(composerTools, "button", "qbd-ai-composer-send");
 		sendBtn.type = "button";
 		const sendIcon = ajouter(sendBtn, "span", "qbd-ai-composer-send-icon");
-		if (phase === "loading") {
-			sendBtn.classList.add("is-stop");
-			// Pas d'aria-label ici : Obsidian en fait un tooltip natif,
-			// redondant avec le tooltip custom « Arrêter Esc ».
-			// Carré dessiné en CSS (l'icône Lucide est trop fine/petite).
-			ajouter(sendIcon, "div", "qbd-ai-stop-square");
-			attachStopTip(sendBtn);
-			sendBtn.addEventListener("click", () => { if (activeClient) activeClient.abort(); });
-		} else if (aiProviders.estCanalWeb(provider)) {
+		if (aiProviders.estCanalWeb(provider)) {
 			/* Sur un canal web, le bouton n'ENVOIE pas : il OUVRE le site, avec
 			   la question déjà écrite. Deux gestes différents méritent deux
 			   boutons différents — d'où le libellé, là où la flèche seule
@@ -1722,16 +1802,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.setIcon(sendIcon, "external-link");
 			ajouter(sendBtn, "span", "qbd-ai-composer-send-label", t("ai.composer.open"));
 			sendBtn.addEventListener("click", () => {
-				if (canGenerate()) startGeneration(containerRef);
+				if (canGenerate()) void startGeneration(containerRef);
 			});
 		} else {
 			sendBtn.setAttribute("aria-label", t("ai.composer.generate"));
 			host.ui.setIcon(sendIcon, "arrow-up");
 			sendBtn.addEventListener("click", () => {
-				if (canGenerate()) startGeneration(containerRef);
+				/* Le ■ de claude.ai : composer vide pendant une génération, le
+				   bouton ARRÊTE celle qui tourne (`updateGenerateBtn`). */
+				if (sendBtn.classList.contains("qbd-ai-composer-send--stop")) {
+					const enCours = fileGen.lignes().find(l => l.etat === "cours");
+					if (enCours) fileGen.annuler(enCours.id);
+					return;
+				}
+				if (canGenerate()) void startGeneration(containerRef);
 			});
 		}
 		generateBtnRef = sendBtn;
+		boutonEnvoi = sendBtn;
 		updateGenerateBtn(generateBtnRef);
 
 		// PAS d'attribut accept : le dialogue Windows affiche alors « Tous
@@ -1749,12 +1837,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 		fileInputRef = fileInput;
 
-		// Le « + » ouvre DIRECTEMENT le sélecteur de fichiers : « Add notes »
-		// a disparu (le picker « @ » fait la même chose, mieux), et un menu à
-		// une seule entrée serait un détour. L'infobulle porte le raccourci.
-		addBtn.title = t("ai.add.filesTip", { hotkey: formatHotkey(settings().hotkeyAddFiles) });
-		addBtn.setAttribute("aria-label", addBtn.title);
-		addBtn.addEventListener("click", () => openAddFiles());
+		/* Le « + » ouvre son MENU, réplique de celui de claude.ai (2026-09-26) :
+		   « Ajouter des fichiers ou des images » avec le raccourci, une note
+		   du vault, la mention « @ ». */
+		addBtn.title = t("ai.composer.addContent");
+		addBtn.addEventListener("click", () => ouvrirMenuPlus(addBtn, {
+			raccourci: formatHotkey(settings().hotkeyAddFiles),
+			ajouterFichiers: openAddFiles,
+			champ: composerInput
+		}));
 
 		// Toute la carte est cliquable pour écrire (demande 2026-07-10) :
 		// un clic hors des contrôles focus le champ, caret en fin de texte.
@@ -1846,6 +1937,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// :empty → masqué ; rempli par refreshProviderStatuses/renderHint.
 		if (provider) hintZone = ajouter(formCol, "div", "qbd-ai-model-hint");
 
+		/* Hors conversation (un site ou une connexion tient la page), les tours
+		   de la file restent sous le composer ; la page d'un quiz ouvert
+		   (`result`) ne les montre pas — rien ne s'y perd, on les retrouve en
+		   revenant. */
+		if (!conversation && phase !== "result") vueFile.rendre(formCol);
+
 		// Détections async (statut fournisseur + modèles réels) : APRÈS la
 		// création de hintZone — l'appel fige ses arguments, et un hintZone
 		// encore null rendait renderHint muet : « ChatGPT sélectionné, CLI
@@ -1904,9 +2001,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (aJoindre.length > 0) {
 			const sources = aJoindre;
 			aJoindre = [];
+			const doitLancer = lancerApresJointes;
+			lancerApresJointes = false;
+			const epoque = epochPreset;
 			void (async () => {
-				for (const path of sources) await attachVaultPath(path);
+				for (const path of sources) {
+					// Un autre préréglage est arrivé : ses pièces remplacent
+					// celles-ci, on n'en joint pas une de plus.
+					if (epoque !== epochPreset) return;
+					await attachVaultPath(path);
+				}
+				if (epoque !== epochPreset) return;
+				/* Pas de génération hors de l'écran : si l'on a quitté
+				   « Générer » pendant la jonction, les pièces restent dans le
+				   composer et l'envoi attend un geste. */
+				if (doitLancer && stageRef?.isConnected && canGenerate()) void startGeneration(containerRef);
 			})();
+		} else if (lancerApresJointes) {
+			// Dossier sans document à joindre (préréglage sans pièce) : lancer
+			// directement, une seule fois.
+			lancerApresJointes = false;
+			if (stageRef?.isConnected && canGenerate()) void startGeneration(containerRef);
 		}
 	}
 
@@ -2514,43 +2629,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	): Promise<void> {
 		const imgs: File[] = [];
 		const rejected: string[] = [];
+		const lectures: Promise<void>[] = [];
 		const source: AttachmentSource = origin?.source ?? "file";
 		for (const file of files) {
 			if (file.type.startsWith("image/")) {
 				imgs.push(file);
 			} else if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
-				/* Le texte d'un PDF vient de l'HÔTE (`host.pdf`, membre OPTIONNEL) :
-				   l'application n'en a pas, et le dit plutôt que de joindre un
-				   PDF vide en silence — voir `HostPdf` dans le contrat. */
-				if (!host.pdf) { host.ui.notice(t("ai.error.pdfUnsupportedInApp")); continue; }
-				try {
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					const content = await host.pdf.extractText(bytes);
-					if (!content.trim()) {
-						host.ui.notice(t("ai.notice.pdfNoText", { name: file.name }));
-					} else {
-						const key = attachmentKey({ source, path: origin?.path, name: file.name });
-						if (noteAttachments.some(n => attachmentKey(n) === key)) {
-							host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: file.name }));
-						} else {
-							/* La vignette : la première page, à la largeur de la carte
-							   (2×, le CSS ramène). Un échec de dessin n'empêche pas de
-							   joindre : la carte montre alors son nom, comme une note. */
-							let thumb: string | undefined;
-							try {
-								thumb = (await host.pdf.renderPages?.(bytes, { width: 124, max: 1 }))?.pages[0];
-							} catch (e) {
-								// NOMMÉ dans la console : une vignette absente sans trace a
-								// déjà coûté une matinée (paramètre `canvas` de pdf.js 5).
-								console.warn(LOG_PREFIX, "vignette PDF impossible:", file.name, e);
-								thumb = undefined;
-							}
-							noteAttachments.push({ name: file.name, content, path: origin?.path, source, bytes, thumb });
-						}
-					}
-				} catch (e) {
-					rejected.push(file.name);
-				}
+				// La carte paraît tout de suite, la lecture suit (`joindrePdf`).
+				lectures.push(joindrePdf(file.name, async () => new Uint8Array(await file.arrayBuffer()), source, origin?.path));
 			} else if (/\.(md|txt)$/i.test(file.name) || file.type.startsWith("text/")) {
 				try {
 					const content = await file.text();
@@ -2575,6 +2661,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (rejected.length) {
 			host.ui.notice(t("ai.notice.unsupportedFormat", { files: rejected.join(", ") }));
 		}
+		await Promise.all(lectures);
 	}
 
 	/* Attache une note du vault comme source du quiz (menu « Ajouter des
@@ -2626,6 +2713,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (!f) return;
 		const ext = f.extension.toLowerCase();
 		if (ext === "md" || ext === "txt") { await attachNoteVaultFile(f); return; }
+		// Un PDF : sa carte AVANT la lecture disque.
+		if (ext === "pdf") { await joindrePdf(f.name, () => host.fs.readBinary(f.path), "vault", f.path); return; }
 		try {
 			const octets = await host.fs.readBinary(f.path);
 			// `slice()` : un `Uint8Array` sur un tampon partagé n'est pas un `BlobPart`.
@@ -2653,6 +2742,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.notice(t("ai.notice.noteAlreadyAttached", { name }));
 			return;
 		}
+		// Un PDF : sa carte AVANT la lecture disque.
+		if (/\.pdf$/i.test(name)) { await joindrePdf(name, () => host.fs.externe.readBinary(path), "external", path); return; }
 		try {
 			/* Par le contrat (`externe.readBinary`, chemin ABSOLU) : dans
 			   l'application, c'est un canal BORNÉ au périmètre, pas un `fs`. */
@@ -2676,9 +2767,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   `<input type="file">` du navigateur, dont le File n'a aucun chemin. */
 		const natif = host.fs.externe.pickFiles;
 		if (natif) {
-			void natif("documents").then(async (chemins) => {
-				for (const abs of chemins) await attachExternalPath(abs);
-			});
+			/* Toutes les cartes D'UN COUP (référence claude.ai) : les lectures
+			   de PDF, elles, se suivent d'elles-mêmes (`lecturesPdf`). */
+			void natif("documents").then(chemins => Promise.all(chemins.map(attachExternalPath)));
 			return;
 		}
 		if (fileInputRef && fileInputRef.isConnected) fileInputRef.click();
@@ -2729,22 +2820,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const affichees = new Set(images.map(img => img.url));
 		for (const img of sentMessage.images) if (!affichees.has(img.url)) URL.revokeObjectURL(img.url);
 		sentMessage = null;
-	}
-
-	/* Loader de génération — l'ANIMATION VALIDÉE (balayage qbd-glide,
-	   icône sparkles, dots pulsants) est reprise à l'identique : mêmes
-	   classes, mêmes keyframes. Seul le conteneur change (carte centrée
-	   sous le composer, plus de colonne d'aperçu). */
-	function renderLoading(parent: HTMLElement): void {
-		const loader = ajouter(parent, "div", "qbd-ai-preview-loading");
-		const iconWrap = ajouter(loader, "div", "qbd-ai-loading-icon");
-		host.ui.setIcon(iconWrap, "sparkles");
-		ajouter(loader, "p", "qbd-ai-loading-title", t("ai.loading.title"));
-
-		const dots = ajouter(loader, "div", "qbd-ai-loading-dots");
-		for (let i = 0; i < 3; i++) {
-			ajouter(dots, "div", "qbd-ai-loading-dot");
-		}
 	}
 
 	function renderError(parent: HTMLElement): void {
@@ -2965,8 +3040,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   la section « Comptes » des réglages — même apparence pour toutes les
 	   attentes de la page (voir son en-tête). */
 
-	/* Les trois modales de phase de la page : connexion (fermer = annuler
-	   l'attente), génération (fermer = Stop, la demande revient au composer),
+	/* Les deux modales de phase de la page (la génération n'en a plus : elle
+	   passe par la file) : connexion (fermer = annuler l'attente),
 	   erreur (fermer = reprendre la demande dans le composer). */
 	/* Vrai quand un terminal est déjà posé sous la place remontée : la modale
 	   d'attente s'ouvre alors DÉJÀ remontée (classe posée à l'ouverture, sans
@@ -2985,13 +3060,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			m.panelEl.style.transition = "";
 		},
 	});
-	const syncLoadingModal = creerModalePhase({
-		phase: "loading", className: "qbd-web-wait-modal qbd-loading-modal",
-		rendre: renderLoading,
-		/* Le même geste que le bouton Stop : `abort` rend la demande au
-		   composer et remet la page en `idle` (chemin `e.aborted`). */
-		annuler: () => { activeClient?.abort(); },
-	});
 	const syncErrorModal = creerModalePhase({
 		phase: "error", className: "qbd-web-wait-modal qbd-error-modal",
 		rendre: renderError,
@@ -3009,7 +3077,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function synchroniserModales(): void {
 		syncWebModal();
 		syncLoginModal();
-		syncLoadingModal();
 		syncErrorModal();
 	}
 
@@ -3280,9 +3347,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// Ligne discrète du header : ce que la génération a coûté, là où
 			// un quiz du vault affiche son chemin.
 			subtitle: usageLine(),
-			// Compté sur le BROUILLON, pas sur la réponse brute : celle-ci
-			// contient aussi l'objet de mode, qui n'est pas une question.
-			questionCount: loadGeneratedDraft().questions.length,
 			load: () => Promise.resolve(loadGeneratedDraft()),
 			// Cette page ne reste visible que si l'enregistrement automatique a
 			// échoué. Le brouillon édité permet alors de réessayer sans perte.
@@ -3308,8 +3372,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    C:\Neo Quiz, quelle que soit la note jointe par « @ ». */
 	/** Le dossier par défaut, en chemin du contrat : `<racine par défaut>/<aiOutputFolder>`. */
 	function defaultDestination(): string {
-		const local = settings().aiOutputFolder || aiSettingsDefaults().aiOutputFolder;
-		return host.paths.contractPath(host.paths.defaultRoot().id, local);
+		return dossierParDefaut(settings().aiOutputFolder);
 	}
 
 	/** Les destinations proposées dans le popover des options : le défaut
@@ -3339,94 +3402,49 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    rend la navigation à faire au lieu de la faire : l'appelant choisit
 	    quand la page du quiz remplace ce qui est à l'écran. `false` si rien
 	    n'a pu être enregistré (notice déjà affichée). */
-	async function saveGeneratedQuiz(options: { differerNavigation?: boolean } = {}): Promise<false | (() => void)> {
-		const root = host.paths.defaultRoot();
-
-		try {
-			const draft = loadGeneratedDraft();
-			if (!draft.questions.length) return false;
-			/* La destination CHOISIE dans le popover des options, sinon le
-			   dossier par défaut. `destination` est déjà un chemin du contrat :
-			   il ne repasse pas par `contractPath`, qui le préfixerait une
-			   seconde fois de la racine par défaut. */
-			const folder = destination || host.paths.contractPath(root.id, settings().aiOutputFolder || aiSettingsDefaults().aiOutputFolder);
-			await ensureFolder(folder);
-			/* Le NOM : `<base> — Learn` / `<base> — Practice`, la base étant la
-			   pièce jointe (le CM), sinon le titre du modèle, sinon la demande.
-			   L'application retire ce suffixe du titre affiché et montre le mode
-			   en badge (Ahmed, 2026-09-23). La SOURCE part dans le frontmatter :
-			   c'est par elle, et non par le nom, qu'un Practice retrouve son
-			   Learn — calculable dès le lancement, avant le titre du modèle. */
-			const defaut = t("dashboard.quizzes.newQuizDefaultName");
-			const pieces = sentMessage?.notes ?? [];
-			const source = nomDeSource(pieces, sentMessage?.text ?? "", defaut);
-			const mode = modeDuBloc(generatedQuestions);
-			const base = pieces.length ? source : nomDeSource([], generatedTitre || sentMessage?.text || "", defaut);
-			const name = nomDeNote(base, mode);
-			const path = await freeNotePath(folder, name);
-			const provider = settings().aiProvider || "";
-			// Le modèle RÉELLEMENT utilisé si le client l'a publié (repli du
-			// fournisseur quand aiModel est vide) ; sinon le réglage tel quel.
-			/* Sur un SITE, le modèle et l'effort sont les siens, inconnus d'ici :
-			   `model` porte le site, pas de ligne `effort`. */
-			const canalWeb = aiProviders.estCanalWeb(provider);
-			/* Antigravity ne publie pas d'usage, et un `aiModel` jamais choisi est
-			   vide : le frontmatter disait `model:` sans rien (vu le 2026-09-20 sur
-			   le premier quiz généré). On écrit la famille RÉSOLUE, celle qui est
-			   partie — le même repli que la génération. */
-			const model = canalWeb ? provider
-				: provider === "antigravity-cli" ? aiProviders.resolveAntigravityModel(settings().aiModel)
-				: (lastUsage?.model || settings().aiModel || "");
-			// Antigravity : le niveau de la FAMILLE (réglage par famille), pas
-			// `aiEffort` qui appartient à Claude et Codex.
-			const effort = canalWeb || provider === "ollama" ? undefined
-				: provider === "antigravity-cli" ? (aiProviders.niveauAntigravity(settings().aiAntigravityLevels, aiProviders.resolveAntigravityModel(model)) || undefined)
-				: settings().aiEffort;
-			const frontmatter = ecrireFrontmatterNeoQuiz({
-				provider,
-				model,
-				effort,
-				generatedAt: new Date().toISOString(),
-				learn: mode === "practice" ? noteLearnLiee : undefined,
-				source,
-			});
-			await host.fs.write(path, frontmatter + exportAllWithFence(draft.questions, draft.examOptions) + "\n");
-
-			/* Contrôle à l'arrivée (spec §2) : un manque est SIGNALÉ, jamais un
-			   échec — la note est déjà écrite. Le mode de la note vient du BLOC
-			   produit, pas de l'interrupteur : un modèle qui n'a pas écrit
-			   `{ mode: "learn" }` produit un Practice, et la notice « objectifs »
-			   ne s'affiche pas à tort.
-			   Try/catch SÉPARÉ de l'écriture : le `catch` de la fonction affiche
-			   « échec de l'enregistrement » et rend `false` — une exception ICI
-			   ne doit jamais faire croire à un échec alors que la note est déjà
-			   sur le disque, ni empêcher le scan et la navigation qui suivent. */
-			try {
-				for (const m of messagesDesManques(verifierFormat(mode, generatedQuestions, planTranchesEnvoye?.map(p => p.slice)))) host.ui.notice(m);
-				if (modeGeneration === "learn" && mode === "practice") host.ui.notice(t("ai.format.notLearn"));
-			} catch (e) {
-				console.warn(LOG_PREFIX, "contrôle à l'arrivée en échec (note déjà enregistrée) :", e);
+	async function saveGeneratedQuiz(options: { differerNavigation?: boolean; demande?: SentMessage } = {}): Promise<false | (() => void)> {
+		/* La demande qui a produit CE quiz : dans un lot (un quiz par fichier
+		   joint), c'est le sous-message du fichier, pas l'envoi entier — sinon
+		   chaque note prendrait le nom du premier fichier. */
+		const demande = options.demande ?? sentMessage;
+		/* Un quiz de la FILE ouvert sans note garde le mode, la destination et
+		   les réglages de SON envoi, pas ceux du composer d'aujourd'hui. */
+		const fige = resultatFige;
+		const mode = fige ? fige.mode : modeGeneration;
+		/* Un Learn DEMANDÉ dont le modèle a oublié `mode: "learn"` reste un
+		   Learn (`completerConfigLearn`) : AVANT le brouillon, qui lit
+		   `generatedQuestions`. */
+		if (mode === "learn") {
+			const complete = completerConfigLearn(generatedQuestions);
+			if (complete.length !== generatedQuestions.length || modeDuBloc(complete) !== modeDuBloc(generatedQuestions)) {
+				generatedQuestions = complete;
+				generatedDraft = null;
 			}
-
-			const file = host.fs.getFile(path);
-			if (file) await deps.scanner.scanFile(file);
-			const entry = deps.scanner.getQuiz(path);
-			if (entry) {
-				/* La page du quiz ENTRE avec une animation quand elle vient d'une
-				   génération (`entree: "generation"`), pas quand on l'ouvre
-				   depuis « Mes quiz » (Ahmed, 2026-09-19). */
-				const naviguer = (): void => {
-					resetGeneration();
-					deps.navigate("detail", { quiz: entry, entree: "generation" });
-				};
-				if (!options.differerNavigation) naviguer();
-				return naviguer;
-			}
-		} catch (err) {
-			// La cause reste interne ; la Notice traduite évite l'échec silencieux.
 		}
-		host.ui.notice(t("ai.notice.saveFailed"));
-		return false;
+		/* L'écriture, le nommage et le rangement sont ceux de la file
+		   (`enregistrerQuiz`) : une seule façon de faire une note générée. */
+		const draft = loadGeneratedDraft();
+		if (!draft.questions.length) return false;
+		const entry = await enregistrerQuiz({
+			draft, questions: generatedQuestions, modeDemande: mode, titreModele: generatedTitre, demande,
+			destination: fige ? fige.destination : destination, reglages: { ...settings(), ...fige?.reglages }, usage: lastUsage,
+			planTranches: planTranchesEnvoye, noteLearn: noteLearnLiee, scanner: deps.scanner,
+		});
+		if (!entry) {
+			host.ui.notice(t("ai.notice.saveFailed"));
+			return false;
+		}
+		// Enregistré depuis la page résultat : la ligne en échec n'a plus d'objet.
+		if (fige) fileGen.fermer(fige.ligne);
+		/* La page du quiz ENTRE avec une animation quand elle vient d'une
+		   génération (`entree: "generation"`), pas quand on l'ouvre depuis
+		   « Mes quiz » (Ahmed, 2026-09-19). */
+		const naviguer = (): void => {
+			resetGeneration();
+			deps.navigate("detail", { quiz: entry, entree: "generation" });
+		};
+		if (!options.differerNavigation) naviguer();
+		return naviguer;
 	}
 
 	/** Titre de la page d'un quiz fraîchement généré : la DEMANDE, abrégée.
@@ -3440,21 +3458,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return coupee ? texte + "…" : texte;
 	}
 
-	/** Practice : la note Learn de la même SOURCE dans le dossier de
-	    destination (clé `source:` de son frontmatter), et son plan des
-	    tranches, qui part avec la demande pour que chaque question pointe sa
-	    tranche (spec §2). Partagé par le canal CLI et le canal web. Rien
-	    trouvé, ou illisible : la génération part sans plan. */
+	/** Practice sur un site : le Learn de la même source et son plan des
+	    tranches (`lienLearn`, le même que la file), retenus pour
+	    l'enregistrement de la réponse. */
 	async function preparerLienLearn(msg: SentMessage): Promise<void> {
-		planTranchesEnvoye = undefined;
-		noteLearnLiee = undefined;
-		if (modeGeneration !== "practice") return;
-		const dossier = destination || defaultDestination();
-		const source = nomDeSource(msg.notes, msg.text, t("dashboard.quizzes.newQuizDefaultName"));
-		const learn = trouverLearn(deps.scanner.getQuizzes(), dossier, source);
-		if (!learn) return;
-		planTranchesEnvoye = (await lirePlanLearn(learn.path)) ?? undefined;
-		if (planTranchesEnvoye) noteLearnLiee = learn.basename;
+		const learn = await lienLearn(deps.scanner, modeGeneration, destination || defaultDestination(), msg);
+		planTranchesEnvoye = learn.plan;
+		noteLearnLiee = learn.note;
 	}
 
 	/** « 6 questions · 54k tokens · $0.73 · 2 min 33 s » — la ligne du header,
@@ -3476,19 +3486,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    généré et un quiz relu d'un .md doivent être le même objet. */
 	function loadGeneratedDraft(): QuizDraft {
 		if (generatedDraft && generatedDraft.genId === generationId) return generatedDraft.draft;
-		const questions: DraftQuestion[] = [];
-		let examOptions: EditorExamOptions | null = null;
-		// Par son INDEX : le critère dépend de la POSITION dans le bloc
-		// (quiz-utils.ts), un test élément par élément ne peut pas le savoir.
-		const configIdx = findQuizModeConfigIndex(generatedQuestions as ParsedQuizItem[]);
-		(generatedQuestions as ParsedQuizItem[]).forEach((raw, i) => {
-			if (i === configIdx) { examOptions = readModeConfig(raw); return; }
-			questions.push(convertParsedToInternal(raw));
-		});
-		// `file: null` : ce quiz n'a pas de note. C'est ce qui distingue un
-		// brouillon généré d'un brouillon lu — et pourquoi la page n'a pas
-		// de `save`.
-		const draft: QuizDraft = { file: null, questions, examOptions };
+		// `file: null` : ce quiz n'a pas de note — d'où l'absence de `save`.
+		const draft = brouillonDe(generatedQuestions);
 		generatedDraft = { genId: generationId, draft };
 		return draft;
 	}
@@ -3514,25 +3513,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function resetGeneration(): void {
 		couperSondeConnexion();
 		arreterAttenteWeb();
+		oublierLotWeb();
 		errorAction = null;
 		attenteWebSite = "";
 		phase = "idle";
-		signalerGeneration(false);
 		errorLogin = null;
 		generatedQuestions = [];
 		generatedTitre = undefined;
 		generatedDraft = null;
+		resultatFige = null;
 		dropSentMessage();
-		/* Les tuiles vidéo suivent le composer : le texte est vidé, leurs
-		   transcriptions en vol sont abandonnées (l'arbre yt-dlp est tué). */
-		tuilesVideo.vider();
-		composerText = "";
-		noteAttachments = [];
-		// Les vignettes préparées dans le composer pendant la génération
-		// disparaissent avec lui : leurs URL d'objet se libèrent ici, sinon
-		// elles resteraient allouées jusqu'à la fermeture d'Obsidian.
-		for (const img of images) URL.revokeObjectURL(img.url);
-		images = [];
+		viderComposer();
 		/* Les modales de phase suivent `phase`, mais ne se synchronisaient qu'à
 		   la fin de `render` — et le succès d'une génération NAVIGUE vers le
 		   quiz enregistré sans re-rendre la page : la modale d'attente restait
@@ -3540,21 +3531,69 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		synchroniserModales();
 	}
 
+	/** Vide le composer : texte, pièces jointes, images et tuiles vidéo (dont
+	    les transcriptions en vol sont abandonnées, l'arbre yt-dlp tué). Les
+	    URL d'objet des vignettes se libèrent ici, sinon elles resteraient
+	    allouées jusqu'à la fermeture de la fenêtre. */
+	function viderComposer(): void {
+		tuilesVideo.vider();
+		composerText = "";
+		composerCaret = null;
+		noteAttachments = [];
+		for (const img of images) URL.revokeObjectURL(img.url);
+		images = [];
+	}
+
+	/** Ce que la détection de catégorie lit d'une demande : les noms des
+	    pièces jointes, le dossier de destination, le texte. */
+	function indicesCategorie(notes: readonly { name: string }[], texte: string): IndicesCategorie {
+		return {
+			pieces: notes.map(n => n.name),
+			dossier: destination || dossierParDefaut(settings().aiOutputFolder),
+			demande: texte,
+		};
+	}
+
+	/** La catégorie qui partirait maintenant avec le composer. */
+	function categorieCourante(): CategorieQuiz {
+		return categorieChoisie(categorieChoix ?? "auto", indicesCategorie(noteAttachments, composerText));
+	}
+
+	/** Repeint l'avis près du bouton des options (texte, pièces, dossier
+	    ou choix changé). Rien pour `general`. */
+	function majAvisCategorie(): void {
+		if (!avisCategorieEl) return;
+		peindreAvisCategorie(avisCategorieEl, categorieCourante(), categorieChoix === null);
+	}
+
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
+		majAvisCategorie();
 		if (!btn) return;
 		// Le bouton d'envoi n'apparaît qu'avec du contenu (texte/image/note),
 		// et reste désactivé tant que la génération n'est pas possible
-		// (aucun fournisseur configuré). Pendant la génération il devient le
-		// bouton stop → toujours visible et cliquable.
-		const loading = phase === "loading";
+		// (aucun fournisseur configuré). En vol sur un site ou en attente de
+		// connexion, `canGenerate` est faux : le bouton reste visible (le
+		// composer garde la demande) mais grisé.
 		const hasContent = !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
-		/* En vol sur un site ou en attente de connexion, `canGenerate` est
-		   faux : le bouton reste visible (le composer garde la demande) mais
-		   grisé. */
-		const canGen = canGenerate();
-		btn.classList.toggle("is-visible", hasContent || loading);
-		btn.disabled = loading ? false : !canGen;
-		btn.classList.toggle("qbd-ai-composer-send--disabled", !loading && !canGen);
+		/* Composer VIDE pendant qu'une génération tourne : le bouton devient le
+		   ■ de claude.ai, qui l'arrête. Avec du contenu, la flèche envoie dans
+		   la file, derrière elle. Pas sur le bouton « Ouvrir » d'un site. */
+		const arret = !hasContent && !btn.classList.contains("qbd-ai-composer-send--wide")
+			&& fileGen.lignes().some(l => l.etat === "cours");
+		if (btn.classList.contains("qbd-ai-composer-send--stop") !== arret) {
+			btn.classList.toggle("qbd-ai-composer-send--stop", arret);
+			const icone = btn.querySelector<HTMLElement>(".qbd-ai-composer-send-icon");
+			if (icone) host.ui.setIcon(icone, arret ? "square" : "arrow-up");
+			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t("ai.composer.generate"));
+		}
+		const canGen = arret || canGenerate();
+		btn.classList.toggle("is-visible", hasContent || arret);
+		btn.disabled = !canGen;
+		btn.classList.toggle("qbd-ai-composer-send--disabled", !canGen);
+		// La flèche grisée dit POURQUOI quand c'est une lecture qui la retient.
+		btn.title = arret ? t("ai.composer.stop")
+			: noteAttachments.some(n => n.lecture === "cours") ? t("ai.attach.reading")
+			: noteAttachments.some(n => n.lecture === "erreur") ? t("ai.attach.blocked") : "";
 	}
 
 	/* Nomme un bouton-icône SANS déclencher de seconde bulle. `aria-label` (et
@@ -3565,15 +3604,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   souris. À appeler APRÈS setIcon, qui réécrit le contenu du bouton. */
 	function labelIconButton(btn: HTMLElement, label: string): void {
 		ajouter(btn, "span", "qbd-sr-only", label);
-	}
-
-	/* Tooltip du bouton stop (référence Claude Code : « Arrêter  Esc »). */
-	function attachStopTip(btn: HTMLElement): void {
-		attachHoverTip(btn, (tip) => {
-			const row = ajouter(tip, "div", "qbd-hover-tip-row");
-			ajouter(row, "span", "qbd-hover-tip-title", t("ai.composer.stop"));
-			ajouter(row, "span", "qbd-hover-tip-esc", "Esc");
-		});
 	}
 
 	/* Les chemins écrits dans le prompt sont attachés AVANT l'envoi : le
@@ -3626,29 +3656,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Une génération est-elle DÉJÀ partie ? Posé avant le moindre `await`. */
 	let demarrage = false;
 
-	/* Source et prompt déduits du contenu du composer, partagés par le
-	   chemin CLI (startGeneration) et le chemin web (ouvrirSite) : même
-	   demande, deux façons de la porter à un modèle. */
-	function composerDemande(msg: SentMessage): { source: "image" | "text" | "topic"; prompt: string } {
-		// Source déduite du contenu du composer :
-		// images → vision ; notes/fichiers attachés → texte source ;
-		// sinon sujet. Chaque source texte est délimitée par son nom
-		// (l'IA distingue les documents d'un envoi multi-notes).
-		const source = msg.images.length > 0 ? "image" : msg.notes.length > 0 ? "text" : "topic";
-		const notesBlock = msg.notes
-			.map(n => (msg.notes.length > 1 ? "--- " + n.name + " ---\n" : "") + n.content)
-			.join("\n\n");
-		// Repli quand des images sont envoyées SANS consigne : instruction au
-		// modèle (pas de l'UI) → anglais, et surtout « dans leur langue »,
-		// sinon des images françaises donneraient un quiz anglais.
-		const prompt = source === "image"
-			? (msg.text.trim() || "Analyze the provided images and build the quiz in their language")
-			: source === "text"
-			? (msg.text.trim() ? msg.text.trim() + "\n\n" : "") + notesBlock
-			: msg.text.trim();
-		return { source, prompt };
-	}
-
 	/** La demande pour un site quand les fichiers sont DÉPOSÉS à côté : la
 	    consigne de l'utilisateur et les noms des documents, dont le contenu
 	    arrivera par le glisser-déposer — pas inliné. Adressé au modèle, donc en
@@ -3690,13 +3697,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	}
 
 	async function startGeneration(container: HTMLElement | null): Promise<void> {
-		/* VERROU d'abord, et de façon synchrone : `phase = "loading"` n'était
-		   posé qu'après l'attente ci-dessous, et Entrée ou un second clic
-		   pendant ce temps lançait une DEUXIÈME génération — qui capturait un
-		   composer déjà vidé et écrasait `activeClient`, donc la première ne
-		   pouvait même plus être annulée (revue codex 2026-07-31). C'est le
-		   contraire de « le message est parti ». */
-		if (demarrage || phase === "loading") return;
+		/* VERROU d'abord, et de façon synchrone : sans lui, Entrée ou un
+		   second clic pendant l'attente ci-dessous envoyait la MÊME demande
+		   une seconde fois (revue codex 2026-07-31). */
+		if (demarrage) return;
 		demarrage = true;
 		/* Les documents des vidéos YouTube prêtes partent avec la demande
 		   (spec « Vidéos YouTube » § 5.2). L'attente vit DANS le verrou :
@@ -3707,9 +3711,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		try {
 			/* Les chemins écrits dans le prompt deviennent des pièces jointes
 			   AVANT la capture : elles doivent partir avec la demande, et
-			   apparaître dans la bulle « envoyé » — c'est là que l'utilisateur
-			   voit désormais ce qui est parti, le composer étant vidé juste
-			   après. */
+			   apparaître dans la ligne « envoyé » de la file. */
 			await attachPromptPaths();
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
@@ -3717,16 +3719,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			}
 			jointesVideo = attente.jointes;
 		} finally {
-			/* Rendu dès que la phase prend le relais : le verrou ne couvre que
-			   la fenêtre entre le clic et `phase = "loading"`. */
+			// Le verrou ne couvre que la fenêtre entre le clic et l'envoi.
 			demarrage = false;
 		}
 
-		// Le composer se vide MAINTENANT, avant le premier rendu de la phase
-		// « loading » : la demande passe en bulle et le champ redevient neuf.
-		// Tout ce qui suit lit `msg`, jamais l'état du composer — qui n'est
-		// plus la demande en vol dès cette ligne.
-		const msg = takeComposerMessage(jointesVideo);
 		/* Une génération qui part reprend la main sur l'attente de connexion.
 		   Sans ça, l'utilisateur qui se lasse et renvoie une demande pendant que
 		   la sonde tourne voyait, à la détection, son composer RÉÉCRIT par la
@@ -3740,127 +3736,41 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   génération CLI qui vient de partir. */
 		arreterAttenteWeb();
 		if (aiProviders.estCanalWeb(settings().aiProvider || "")) {
-			await ouvrirSite(msg, container);
+			/* Le composer GARDE la demande pendant l'attente du site ; tout ce
+			   qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit
+			   qu'une demande à la fois : le premier fichier part, les autres
+			   attendent la réponse du précédent (`recevoirReponse`). */
+			const parFichier = decouperParFichier(takeComposerMessage(jointesVideo));
+			lotWebRestant = parFichier.slice(1);
+			lotWebPremier = null;
+			lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
+			await ouvrirSite(parFichier[0], container);
 			return;
 		}
-		phase = "loading";
-		signalerGeneration(true);
-		errorMessage = "";
-		errorLogin = null;
+		envoyerDansLaFile(jointesVideo);
 		render(container);
-
-		/* Le client lit les réglages par le MÊME hôte que la page : celui qui
-		   possède les réglages (le greffon, ou le cache de l'application). */
-		const client = createAiClient(deps.settings);
-		activeClient = client;
-		// Esc annule la génération (référence : tooltip « Arrêter  Esc »)
-		const onEsc = (e: KeyboardEvent) => {
-			if (e.key === "Escape") { e.preventDefault(); client.abort(); }
-		};
-		document.addEventListener("keydown", onEsc);
-
-		try {
-
-			const { source, prompt } = composerDemande(msg);
-
-			// Convert image files to base64 for vision API
-			let imageData: ImagePayload[] = [];
-			if (msg.images.length > 0) {
-				imageData = await Promise.all(msg.images.map(async (img) => {
-					const buffer = await img.file.arrayBuffer();
-					const bytes = new Uint8Array(buffer);
-					let binary = "";
-					for (let i = 0; i < bytes.length; i++) {
-						binary += String.fromCharCode(bytes[i]);
-					}
-					const base64 = btoa(binary);
-					return { base64, mediaType: img.file.type || "image/png" };
-				}));
-			}
-
-			// La vue a-t-elle été fermée pendant l'encodage des images ? Lancer le
-			// CLI maintenant ferait tourner un processus que plus personne
-			// n'écoute, et sa réponse repeindrait un conteneur détaché.
-			if (disposed) {
-				document.removeEventListener("keydown", onEsc);
-				activeClient = null;
-				return;
-			}
-
-			await preparerLienLearn(msg);
-			const planTranches = planTranchesEnvoye;
-
-			const reponse = await client.generate(prompt, {
-				count: questionCount,
-				type: questionType,
-				mode: modeGeneration,
-				source,
-				planTranches,
-				images: imageData
-			});
-			generatedQuestions = reponse.questions;
-			generatedTitre = reponse.titre;
-
-			/* Coût de CE qui vient d'être produit. Le journal et la lecture des
-			   quotas sont accessoires : ils ne doivent jamais faire échouer une
-			   génération qui, elle, a réussi. */
-			lastUsage = client.lastUsage;
-			lastPlan = null;
-			if (lastUsage && deps.usage) {
-				try {
-					await deps.usage.record({
-						...lastUsage,
-						at: Date.now(),
-						questionCount: generatedQuestions.length
-					});
-					// La génération vient de consommer du forfait : relire tout de
-					// suite garde le survol du bouton d'usage juste, sans attendre
-					// que l'écran soit ouvert.
-					lastPlan = await deps.usage.fetchPlan(lastUsage);
-				} catch (e) {
-					console.warn(LOG_PREFIX, "usage non enregistré:", e);
-				}
-			}
-		} catch (err) {
-			const e = err as Error & { aborted?: boolean };
-			if (e && e.aborted) {
-				// Annulation volontaire (bouton stop / Esc) → retour à l'état
-				// initial, sans écran d'erreur. La demande RETOURNE dans le
-				// composer : annuler, c'est défaire l'envoi — sinon le texte
-				// (et les pièces jointes) seraient perdus.
-				document.removeEventListener("keydown", onEsc);
-				activeClient = null;
-				generatedQuestions = [];
-				restoreComposerMessage();
-				phase = "idle";
-				signalerGeneration(false);
-				render(container);
-				return;
-			}
-			errorMessage = e.message || t("ai.error.checkSettings");
-			errorLogin = (e as LoginRequiredError).besoinConnexion || null;
-			errorAction = (e as UpgradeRequiredError).besoinPlan ? "upgrade" : null;
-			generatedQuestions = [];
-		}
-
-		document.removeEventListener("keydown", onEsc);
-		activeClient = null;
-		signalerGeneration(false);
-		let navigated = false;
-		if (generatedQuestions.length > 0) {
-			// Nouvelle génération → l'éditeur embarqué repart des questions
-			// fraîches (renderResult le monte pleine page).
-			generationId++;
-			generatedDraft = null;
-			phase = "result";
-			// Le succès visible est directement la page de la note enregistrée :
-			// elle affiche déjà « Lancer », sans clic intermédiaire sur Enregistrer.
-			navigated = !!(await saveGeneratedQuiz());
-		} else {
-			phase = "error";
-		}
-		if (!navigated) render(container);
 	}
+
+	/** Un envoi par CLI part dans la FILE de l'application (spec 2026-09-26) :
+	    une ligne par fichier joint (un quiz par fichier), chacune avec le
+	    mode, les options, la destination et les réglages du moment — changer
+	    un réglage ensuite ne touche que les envois suivants. Le composer se
+	    vide aussitôt et reste libre : on peut préparer la demande suivante
+	    pendant que celle-ci tourne. */
+	function envoyerDansLaFile(jointesVideo: NoteAttachment[]): void {
+		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
+		const reglages = figerReglages(settings());
+		for (const d of decouperParFichier(envoi)) {
+			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
+			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
+			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
+			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: questionType, destination, reglages, categorie });
+		}
+		viderComposer();
+		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
+		if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
+	}
+
 
 	/**
 	 * Le canal web : le site s'ouvre avec la question, l'application attend la
@@ -3868,6 +3778,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	 * Copier), et rien à confirmer ici : c'est la contrainte de la spec.
 	 */
 	async function ouvrirSite(msg: SentMessage, container: HTMLElement | null): Promise<void> {
+		demandeWeb = msg;
 		const canalId = settings().aiProvider || "";
 		const canal = aiProviders.getCanal(canalId);
 		const site = canal ? canal.label : canalId;
@@ -3920,7 +3831,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const jeton = nouveauJeton();
 		await preparerLienLearn(msg);
 		const planTranches = planTranchesEnvoye;
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches }), jeton);
+		const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(msg.notes, msg.text));
+		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;
@@ -4019,6 +3931,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Annuler = défaire l'ouverture : la demande revient dans le composer. */
 	function annulerAttenteWeb(): void {
 		arreterAttenteWeb();
+		/* Au milieu d'un lot, les quiz déjà reçus sont enregistrés : annuler
+		   les suivants ouvre le premier, plutôt que de rendre au composer des
+		   fichiers déjà traités. */
+		const premier = lotWebPremier;
+		oublierLotWeb();
+		if (premier) { resetGeneration(); premier(); return; }
 		restoreComposerMessage();
 		phase = "idle";
 		render(containerRef);
@@ -4037,12 +3955,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   sans que la page « Générer » soit à l'écran) : `render(containerRef)`
 		   plus bas repeindrait alors la vue courante par-dessus. On revient
 		   d'abord sur « Générer » — le chemin de succès d'une génération CLI le
-		   fait déjà pour la page détail, ceci est son équivalent en entrée. */
-		if (!containerRef?.isConnected) deps.navigate("ai");
+		   fait déjà pour la page détail, ceci est son équivalent en entrée.
+		   La SCÈNE et non le conteneur : celui de la coquille reste dans le
+		   document quelle que soit la vue peinte. */
+		if (!stageRef?.isConnected) deps.navigate("ai");
 		try {
 			const reponse = parseReponseQuiz(texte);
 			generatedQuestions = reponse.questions;
 			generatedTitre = reponse.titre;
+			resultatFige = null;
 			if (generatedQuestions.length === 0) throw new Error(t("ai.err.notAnArray"));
 		} catch (err) {
 			errorMessage = (err as Error).message || t("ai.error.checkSettings");
@@ -4066,12 +3987,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		void host.ui.premierPlan?.().catch(() => { /* la page reste juste derrière */ });
 		render(containerRef);
 		const [navigated] = await Promise.all([
-			saveGeneratedQuiz({ differerNavigation: true }),
+			saveGeneratedQuiz({ differerNavigation: true, demande: demandeWeb ?? undefined }),
 			new Promise<void>(resolve => window.setTimeout(resolve, 1000)),
 		]);
 		reponseRecue = null;
 		if (disposed) return;
-		if (navigated) { navigated(); return; }
+		/* UN QUIZ PAR FICHIER JOINT : un autre fichier attend son tour → le site
+		   se rouvre pour lui, avec la même consigne. La page du PREMIER quiz
+		   enregistré s'ouvre quand le dernier est reçu. */
+		if (lotWebRestant.length > 0) {
+			if (navigated && !lotWebPremier) lotWebPremier = navigated;
+			const suivant = lotWebRestant.shift() as SentMessage;
+			const fait = lot?.nom ?? "";
+			const total = lot?.total ?? lotWebRestant.length + 2;
+			lot = { index: (lot?.index ?? 1) + 1, total, nom: suivant.notes[0]?.name ?? "" };
+			host.ui.notice(t("ai.batch.webNext", { file: fait, next: lot.nom }));
+			await ouvrirSite(suivant, containerRef);
+			return;
+		}
+		const premier = lotWebPremier ?? navigated;
+		oublierLotWeb();
+		if (premier) { premier(); return; }
 		phase = "result";
 		render(containerRef);
 	}
@@ -4135,12 +4071,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	}
 
 	function dispose(): void {
-		// Une génération en vol survivrait à la vue : son CLI continuerait de
-		// tourner, son écoute Escape resterait posée sur le document, et sa
-		// complétion irait repeindre un conteneur détaché.
+		/* Les générations de la FILE survivent à la vue (spec 2026-09-26) :
+		   elle ne fait que s'en désabonner. Leurs lignes réapparaissent au
+		   prochain montage de la page. */
 		disposed = true;
-		activeClient?.abort();
-		activeClient = null;
+		vueFile.liberer();
+		desabonnerPage();
 		if (ollamaPoll) { window.clearInterval(ollamaPoll); ollamaPoll = null; }
 		couperSondeConnexion();
 		arreterAttenteWeb();
@@ -4153,7 +4089,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		veilleComposerActif = null;
 		// `void` : après un échec d'écriture, ce brouillon n'a toujours pas de
 		// note à autosauvegarder ; la promesse rendue est déjà résolue.
-		signalerGeneration(false);
 		void resultPage?.dispose();
 		resultPage = null;
 		generatedDraft = null;
@@ -4166,7 +4101,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		zoneVideo = null;
 		zoneNoticeVideo = null;
 		containerRef = null;
+		stageRef = null;
 	}
 
-	return { render, openAddFiles, dispose, preset };
+	return { render: entrer, openAddFiles, dispose, preset };
 }

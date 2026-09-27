@@ -70,6 +70,7 @@ await withSrcModule(
 			textOnly,
 			isTextQuestion: () => false,
 			isClozeQuestion: () => false,
+			isFlashcardQuestion: (q) => !!q && q.flashcard === true,
 			isOrderingQuestion: () => false,
 			isMatchingQuestion: () => false,
 			isLessonMode: () => isLessonMode,
@@ -77,6 +78,14 @@ await withSrcModule(
 			roleOfQuestion: (i) => roles[i],
 			closeHintModal: () => {},
 			clampSlideIndex: (i) => i,
+			// Carte mémoire (Case D) : renderLessonHtml (sanitizer.ts) lit ces deux
+			// méthodes, flashcardBodyHtml (text-only.ts) lit renderInlineText —
+			// identité suffisante, ce test ne vérifie pas l'assainissement.
+			sanitize: {
+				renderInlineText: (s) => s,
+				renderTextWithEmbeds: (s) => s,
+				replaceObsidianEmbedsInHtml: (s) => s,
+			},
 		};
 		// N questions + slide "submit" + slide "results" (engine.ts buildSlideMap).
 		ctx.SLIDE_RESULTS_INDEX = quiz.length + 1;
@@ -112,6 +121,8 @@ await withSrcModule(
 			// l'appel à `ctx.recordReview` qui le précède nous intéresse ici.
 			commitQuestionInteraction: () => {},
 			invalidateSavedResults: () => {},
+			saveSession: () => {},
+			clearSession: () => {},
 		});
 		return { ctx, appels };
 	}
@@ -128,8 +139,9 @@ await withSrcModule(
 	}
 	function fakeTrackItem(ratingButtons) {
 		return {
-			querySelector: () => null, // textarea, check-btn : hors périmètre de ce test.
+			querySelector: () => null, // textarea, check-btn, .quiz-flashcard : hors périmètre de ce test.
 			querySelectorAll: (sel) => (sel.includes("quiz-textonly-rating-btn") ? ratingButtons : []),
+			addEventListener: () => {},
 		};
 	}
 
@@ -348,6 +360,36 @@ await withSrcModule(
 	}
 
 	{
+		/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : la lecture
+		   d'une étape qui a d'autres questions n'a plus d'écran. En Leçon elle
+		   reste journalisée `seen` (aucun signal de mémoire) et ne compte ni
+		   au score ni aux questions faites ; basculée en Examen, elle n'a été
+		   ni montrée ni répondue : rien n'est journalisé, et elle ne manque pas. */
+		const r = makeReporter("goToResults — lecture absorbée par son étape");
+		const quiz = [
+			{ id: "pre1", title: "Avant", options: ["a", "b"], correctIndex: 0 },
+			{ id: "read1", title: "Cours" },
+			{ id: "q1", title: "Test", options: ["a", "b"], correctIndex: 0 },
+		];
+		const roles = ["pre", "read", "test"];
+		const lecon = makeCtx({ quiz, selections: [0, null, 0], isLessonMode: true, roles });
+		lecon.ctx.lecturesAbsorbees = new Set([1]);
+		lecon.ctx.goToResults();
+		r.check("Leçon : la lecture absorbée est journalisée seen",
+			lecon.appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "seen", role: "read" });
+		r.check("Leçon : le score ignore la lecture absorbée", lecon.ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
+
+		const examen = makeCtx({ quiz, selections: [0, null, 1], isLessonMode: false, originalQuizMode: "lesson", roles });
+		examen.ctx.lecturesAbsorbees = new Set([1]);
+		r.check("Examen après bascule : la lecture absorbée ne manque pas", examen.ctx.isComplete(1), true);
+		examen.ctx.goToResults();
+		r.check("Examen après bascule : rien n'est journalisé pour la lecture absorbée",
+			examen.appels.some(a => a.q.endsWith("::read1")), false);
+		r.check("Examen après bascule : le score ignore la lecture absorbée", examen.ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
+		r.done();
+	}
+
+	{
 		const r = makeReporter("goToResults — hors mode Leçon, verdict QCM ordinaire, pas de rôle");
 		const quiz = [
 			{ id: "q1", title: "Q1", options: ["a", "b"], correctIndex: 0 },
@@ -458,6 +500,176 @@ await withSrcModule(
 		r.check("le clic a bien appelé recordReview (une ligne journalisée)", appels, [
 			{ q: "Cours/ch1.md::recall1", grade: "understood", role: "recall" },
 		]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case D — la CARTE MÉMOIRE emprunte l'auto-évaluation, même hors Leçon.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("carte mémoire — retournée, notée, journalisée une fois");
+		const quiz = [{ id: "carte1", title: "Carte", prompt: "Que renvoie `type([])` ?", flashcard: true, answer: "list" }];
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], isLessonMode: false, roles: [undefined], textOnly: null });
+		ctx.quizState.textOnlyAnswers = [""];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("une carte est auto-évaluée même hors Leçon", ctx.textOnly.isTextOnlyFor(0), true);
+		r.check("non notée : incomplète", ctx.isComplete(0), false);
+		const html = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
+		r.check("recto : un bouton Retourner, aucune zone de saisie",
+			[html.includes("quiz-flashcard-flip-btn"), html.includes("<textarea")], [true, false]);
+
+		ctx.quizState.textOnlyChecked[0] = true;
+		const verso = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
+		r.check("verso : deux notes seulement, review puis understood",
+			[...verso.matchAll(/data-textonly-rating="(\w+)"/g)].map(m => m[1]), ["review", "understood"]);
+
+		const bouton = fakeRatingButton("review");
+		ctx.textOnly.bindTextOnlyQuestion(fakeTrackItem([bouton]), 0);
+		bouton.click();
+		bouton.click();
+		r.check("« À revoir » : faux, complet, UNE ligne au journal",
+			[ctx.isCorrect(0), ctx.isComplete(0), appels],
+			[false, true, [{ q: "Cours/ch1.md::carte1", grade: "review" }]]);
+
+		const sansVerso = { id: "carte2", title: "Vide", prompt: "P", flashcard: true };
+		r.check("carte sans verso : « Réponse manquante », jamais une exception",
+			ctx.textOnly.questionCardBodyHtml(sansVerso, 0).includes("quiz-flashcard-missing"), true);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case E — un "recall" ne force la réponse libre QUE pour un type à
+	   CHOIX (single/multiple). Un "recall" d'association (matching) garde sa
+	   VRAIE interaction : forcer la réponse libre dessus masquerait la
+	   correction réelle (paires attendues) derrière une auto-évaluation.
+	   Rougit sans le correctif (isTextOnlyFor testait alors uniquement le
+	   rôle, jamais le type de la question).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("text-only.ts — un recall matching garde sa vraie interaction, un recall single reste en réponse libre");
+		const single = { id: "q1", title: "Choix", role: "recall", options: ["a", "b"], correctIndex: 0 };
+		const matching = { id: "q2", title: "Association", role: "recall", matching: true, rows: ["x"], choices: ["y"], correctMap: [0] };
+		const quiz = [single, matching];
+		const { ctx } = makeCtx({ quiz, selections: [null, null], isLessonMode: true, roles: ["recall", "recall"] });
+		// makeCtx câble un stub `isMatchingQuestion` toujours faux (aucun test
+		// antérieur n'en avait besoin) : ici la variante DOIT être reconnue,
+		// donc on la remplace par le vrai prédicat (même forme qu'engine.ts).
+		ctx.isMatchingQuestion = (q) => !!q && (q.matching === true || typeof q.matching === "object");
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("recall à choix (single) : réponse libre", ctx.textOnly.isTextOnlyFor(0), true);
+		r.check("recall matching : vraie interaction, jamais de réponse libre", ctx.textOnly.isTextOnlyFor(1), false);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case F — retour #14 (2026-09-27) : « 2 answers are missing » affiché
+	   pour des questions à réponse écrite pourtant remplies. Plus de bouton
+	   Vérifier : une réponse écrite non vide doit compter comme répondue
+	   (isComplete), sans attendre une note qui n'arrive plus qu'à l'écran des
+	   résultats. Rougit sans le correctif (isComplete exigeait isRated pour
+	   TOUTE question textOnly, carte mémoire ou non).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("retour #14 — une réponse écrite non notée compte comme répondue (isComplete)");
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const { ctx } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
+		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("une réponse écrite non vide, jamais notée : complète quand même", ctx.isComplete(0), true);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case G — retour #17 (2026-09-27) : le score exclut une réponse écrite
+	   pas encore auto-évaluée (ni juste ni fausse) plutôt que de la compter
+	   fausse, et la compte dès qu'elle est notée à l'écran des résultats.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("retour #17 — le score exclut une réponse écrite pas encore évaluée, puis la compte une fois notée");
+		const quiz = [
+			{ id: "q1", title: "QCM", options: ["a", "b"], correctIndex: 0 },
+			{ id: "q2", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+		];
+		const { ctx } = makeCtx({ quiz, selections: [0, null], isLessonMode: true, roles: [undefined, "recall"] });
+		ctx.quizState.textOnlyAnswers = ["", "une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false, false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		r.check("pas encore évaluée : exclue du score (total = 1, pas 2), signalée en pendingWritten",
+			ctx.computeScorePercent(), { pct: 100, correct: 1, total: 1, pendingWritten: 1 });
+
+		ctx.quizState.textOnlyRatings[1] = "understood";
+		r.check("évaluée « juste » : entre dans le score",
+			ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
+
+		ctx.quizState.textOnlyRatings[1] = "review";
+		r.check("évaluée « faux » : entre dans le score, mais fausse",
+			ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case H — revue lot A1, C1 (2026-09-27) : goToResults journalisait
+	   "wrong" pour une réponse écrite pas encore jugée, AVANT le clic de
+	   l'utilisateur sur juste/faux — et `recorded[i]` posé par cette écriture
+	   prématurée faisait ensuite REJETER le vrai verdict (recordReview refuse
+	   tout déjà-journalisé). Rougit sans le correctif (la boucle de
+	   goToResults journalisait "wrong" ici).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("goToResults — retour C1 : une réponse écrite pas encore jugée n'est pas journalisée à sa place du vrai verdict");
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
+		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		ctx.goToResults();
+		r.check("l'arrivée sur les résultats n'écrit rien pour elle (pas encore jugée)", appels, []);
+		r.check("recorded reste faux : le futur clic pourra journaliser le vrai verdict", ctx.quizState.recorded[0], false);
+
+		// Simule le clic « J'avais juste » (text-only.ts bindWrittenReviewControls).
+		ctx.quizState.textOnlyRatings[0] = "understood";
+		ctx.recordReview(0, "understood");
+		r.check("le clic journalise le VRAI verdict, une seule fois",
+			appels, [{ q: "Cours/ch1.md::q1", grade: "understood", role: "recall" }]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case I — revue lot A1, I1 (2026-09-27) : la progression du tableau de
+	   bord comptait une réponse écrite pas encore jugée comme faite
+	   (`questionsDone`), et pouvait retomber sur `ctx.quiz.length` pour
+	   `totalQuestions` — un quiz entièrement écrit et jamais auto-évalué
+	   affichait 100 % de progression. Rougit sans le correctif.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("goToResults — retour I1 : la progression exclut une réponse écrite pas encore jugée");
+		const quiz = [
+			{ id: "read1", title: "Support", role: "read" },
+			{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+		];
+		const updates = [];
+		const statsStore = { updateRecord(_path, rec) { updates.push(rec); } };
+		const { ctx } = makeCtx({ quiz, selections: [null, null], isLessonMode: true, roles: ["read", "recall"], statsStore });
+		ctx.quizState.textOnlyAnswers = ["", "une réponse écrite"];
+		ctx.quizState.textOnlyChecked = [false, false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+
+		ctx.goToResults();
+		r.check("progression : 0 question faite sur 1 (la lecture ne compte pas, l'écrite non jugée non plus)",
+			[updates[0].questionsDone, updates[0].totalQuestions], [0, 1]);
+
+		ctx.quizState.textOnlyRatings[1] = "understood";
+		ctx.quizState.resultsCounted = false; // simule un nouveau passage par les résultats
+		ctx.goToResults();
+		r.check("une fois jugée : 1 question faite sur 1",
+			[updates[1].questionsDone, updates[1].totalQuestions], [1, 1]);
 		r.done();
 	}
 });

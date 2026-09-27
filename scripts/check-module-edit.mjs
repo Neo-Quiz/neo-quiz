@@ -128,6 +128,70 @@ await withSrcModule("src/dashboard/module-icons.ts", async ({ moduleIcon }) => {
 	/* Une chaîne vide vient d'un champ effacé, pas d'un choix : elle doit
 	   retomber sur le défaut comme une absence, sinon la pastille se vide. */
 	r.check("une icône vide vaut une absence", moduleIcon({ icon: "" }, { generated: true }), "sparkles");
+	/* Sans icône choisie, le NOM décide (2026-09-24) : un livre partout ne
+	   disait rien de la matière. Noms réels des modules d'Ahmed. */
+	r.check("le nom choisit l'icône d'un module sans choix", [
+		moduleIcon({ name: "XTI305 - Ethical Hacking 1 - Initiation" }),
+		moduleIcon({ name: "XTI303 - Conception & Architecture logicielle" }),
+		moduleIcon({ name: "XTI302 - Administration système avancées & Scripting" }),
+		moduleIcon({ name: "XCS319 - Outils de Veille en Cybersécurité" }),
+		moduleIcon({ name: "XTI403 - CCNA 2" }),
+	], ["hat-glasses", "blocks", "square-terminal", "radar", "router"]);
+	/* En début de mot seulement : « écosystème » ne vaut pas « système », ni
+	   « outils » le mot-clé « ui ». */
+	r.check("un mot-clé au milieu d'un mot ne compte pas",
+		[moduleIcon({ name: "Écosystème" }), moduleIcon({ name: "Outils" })], ["book", "book"]);
+	r.check("un nom sans mot-clé garde le livre ; un choix l'emporte sur le nom",
+		[moduleIcon({ name: "Divers" }), moduleIcon({ name: "XTI403 - CCNA 2", icon: "star" })], ["book", "star"]);
+	r.done();
+});
+
+/* Chaque icône de la grille et des suggestions EXISTE dans le catalogue que
+   l'application dessine (`lucide`) : un nom inconnu donne une pastille vide,
+   sans la moindre erreur. */
+await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-suggest.ts"], async (mi, is) => {
+	const r = makeReporter("Module — les icônes existent");
+	const { icons } = await import("../apps/windows/node_modules/lucide/dist/esm/lucide.mjs");
+	const pascal = n => n.split("-").map(p => p[0].toUpperCase() + p.slice(1)).join("");
+	const tous = [...new Set([...mi.MODULE_ICONS, ...is.iconesDesRegles()])];
+	r.check("aucune icône inconnue de lucide", tous.filter(n => !icons[pascal(n)]), []);
+	r.check("chaque suggestion est aussi dans la grille", is.iconesDesRegles().filter(n => !mi.MODULE_ICONS.includes(n)), []);
+	r.done();
+});
+
+/* UN COURS, UNE CARTE (2026-09-24) : le Learn et le Practice d'un même
+   cours — même dossier, même titre, modes différents — sont réunis. */
+await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours, quizFrere }) => {
+	const r = makeReporter("Cours — Learn et Practice réunis");
+	const q = (path, title, mode) => ({ path, title, mode, questions: 20 });
+	const D = "Efrei/B2/XTI301";
+	const liste = [
+		q(`${D}/CM1 — Practice.md`, "CM1", "practice"), q(`${D}/CM1 — Learn.md`, "CM1", "learn"),
+		q(`${D}/CM2 — Learn.md`, "CM2", "learn"), q(`${D}/TP1 — Learn.md`, "TP1", "learn"),
+		q(`Autre/CM2 — Practice.md`, "CM2", "practice"),
+	];
+	const cartes = regrouperParCours(liste, true);
+	r.check("un cours = une carte, le Learn en tête, à la place de son premier quiz",
+		cartes.map(c => [c.quiz.path.split("/").pop(), c.frere?.path.split("/").pop() ?? null]),
+		[["CM1 — Learn.md", "CM1 — Practice.md"], ["CM2 — Learn.md", null], ["TP1 — Learn.md", null], ["CM2 — Practice.md", null]]);
+	r.check("un homonyme d'un AUTRE dossier n'est pas réuni", quizFrere(liste[2], liste), null);
+	r.check("deux quiz du même mode ne forment pas un cours",
+		quizFrere(q(`${D}/X.md`, "X", "learn"), [q(`${D}/X.md`, "X", "learn"), q(`${D}/X 2.md`, "X", "learn")]), null);
+	r.check("réglage désactivé : une carte par quiz", regrouperParCours(liste, false).length, 5);
+	r.done();
+});
+
+await withSrcModule("src/dashboard/quiz-modules.ts", async ({ buildFolderGroups }) => {
+	const r = makeReporter("Module — l'axe Dossier");
+	const m = (name, path) => ({ folder: name, name, ue: null, path, quizzes: [], total: 0, mastered: 0 });
+	const B2 = "Efrei/Bachelor/B2 (2026-2027)";
+	const g = buildFolderGroups([
+		m("XTI305", B2 + "/XTI305"), m("Generated", "Neo Quiz/Generated"), m("XTI301", B2 + "/XTI301"),
+		m("Templates", "Personal/Templates"), m("Orphelin", undefined),
+	]);
+	r.check("un en-tête par dossier parent, alphabétique, le groupe sans chemin en dernier",
+		g.map(x => [x.label, x.modules.map(y => y.name)]),
+		[["B2 (2026-2027)", ["XTI301", "XTI305"]], ["Neo Quiz", ["Generated"]], ["Personal", ["Templates"]], ["", ["Orphelin"]]]);
 	r.done();
 });
 

@@ -36,7 +36,7 @@ await withSrcModule(
 		const d = client.composerPrompts("x", {});
 		r.check("sans options : mode Practice par défaut, Auto, mixte, sujet", [
 			d.systemPrompt.includes("MODE: PRACTICE"),
-			d.systemPrompt.includes("between 10 and 25 questions"),
+			d.systemPrompt.includes("between 10 and 20 questions"),
 			d.systemPrompt.includes("the mix of question types that best fits a written exam"),
 			d.userPrompt.startsWith("Generate the quiz about the following topic"),
 		], [true, true, true, true]);
@@ -61,6 +61,16 @@ await withSrcModule(
 		r.check("nettoyerTitre : guillemets, caractères interdits, point final",
 			client.nettoyerTitre(' "Réseaux : couche 2/3 ?" '), "Réseaux - couche 2 3");
 		r.check("nettoyerTitre : rien ne reste → undefined", client.nettoyerTitre(" ... "), undefined);
+		/* Réponse RÉELLE de Gemini 3.5 Flash-Lite (2026-09-24), réduite : une
+		   virgule oubliée entre `explain` et `hint`, et des faux titres de
+		   section `{ "// title": … }` entre les questions. */
+		const gemini = '// neo-quiz p8ye6kl20t\n// title: OSINT et Reconnaissance\n[\n  {\n    "// title": "OSINT et cadre légal"\n  },\n  {\n    "slice": 1,\n    "role": "pre",\n    "prompt": "Quel type de source ?",\n    "options": [\n      "Publique"\n      "Volée"\n    ],\n    "correctIndex": 0,\n    "explain": "Sources ouvertes."\n    "hint": "Open Source."\n  }\n  {\n    "slice": 1,\n    "role": "read",\n    "title": "Définition",\n    "prompt": "Passage."\n  }\n]';
+		const g = (() => { try { const x = client.parseReponseQuiz(gemini); return [x.questions.length, x.questions[0].hint, x.questions[0].options.length, x.titre]; } catch (e) { return String(e.message); } })();
+		r.check("virgules oubliées réparées, faux titres retirés", g, [2, "Open Source.", 2, "OSINT et Reconnaissance"]);
+		r.check("reparerVirgulesManquantes ne touche pas une réponse valide",
+			client.reparerVirgulesManquantes('[\n  {\n    a: 1,\n    b: "x"\n  },\n  // commentaire\n  { c: [1, 2] }\n]'), '[\n  {\n    a: 1,\n    b: "x"\n  },\n  // commentaire\n  { c: [1, 2] }\n]');
+		r.check("une erreur qui n'est pas une virgule reste l'erreur d'origine",
+			(() => { try { client.parseReponseQuiz('[{ prompt: "a" options: ["x"] }]'); return "lu"; } catch (e) { return /JSON5/.test(String(e.message)); } })(), true);
 		/* Copié depuis le bouton du bloc de code de claude.ai : PAS de fence
 		   autour, mais un bloc ```python DANS l'énoncé d'une question (vécu le
 		   2026-09-19 : « pas un quiz »). */
@@ -185,7 +195,7 @@ const { readFileSync } = await import("node:fs");
 const { runInNewContext } = await import("node:vm");
 const { transform } = await import("esbuild");
 const sourcePage = readFileSync("src/dashboard/ai.ts", "utf8");
-const noms = ["startGeneration", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
+const noms = ["startGeneration", "decouperParFichier", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
 const fonctions = noms.map(nom => {
 	const debut = sourcePage.search(new RegExp(`\\t(?:async )?function ${nom}\\(`));
 	const fin = sourcePage.indexOf("\n\t}", debut);
