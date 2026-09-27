@@ -92,6 +92,7 @@ release notes.
 - Every written-answer field now starts at the height of the expected answer (one to a few lines) instead of always opening ten lines tall, and grows as you type.
 - A single-line code block (```` ```python … ``` ````) inside an ordering item or an option is shown as inline code, syntax-highlighted when the language is recognized, instead of showing its raw backticks.
 - The explanation shown after correcting a question now uses the same font and size as the question text, instead of a smaller, harder to read one.
+- `\neq`, `\ne`, `\notin` and `\not=` now show their diagonal stroke instead of an empty box.
 
 ## [1.19.0] - 2026-09-23
 

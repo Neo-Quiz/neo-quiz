@@ -26,3 +26,17 @@
 .math .ML__cmr {
 	font-family: inherit;
 }
+
+/* EXCEPTION au réglage ci-dessus (retour #15, 2026-09-26 soir) : `\neq`,
+   `\notin`, `\not=`… ne sont pas un caractère unique — MathLive les compose
+   d'un caractère de base et d'un TRAIT diagonal superposé (`\not`, atome
+   "overlap", `.ML__rlap`/`.ML__llap`), ce trait étant un glyphe de la zone
+   d'usage privé (U+E020) qui n'existe QUE dans la fonte KaTeX_Main. Hérite
+   du texte, il tombe sur un fallback système qui ne le connaît pas → un
+   carré vide. `\leq`, `\geq` restent des caractères Unicode ordinaires
+   (`≤`, `≥`), déjà présents dans n'importe quelle fonte : ils ne sont pas
+   concernés et gardent la police du texte comme le reste de `.ML__cmr`. */
+.math .ML__rlap .ML__cmr,
+.math .ML__llap .ML__cmr {
+	font-family: KaTeX_Main;
+}
