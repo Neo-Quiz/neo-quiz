@@ -21,6 +21,7 @@ import { createResultsSaver } from "./engine/results-save";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
+import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
@@ -85,7 +86,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		return;
 	}
 
-	const { questions: quiz, quizMode, examOptions, lessonExamOptions } = extractExamOptions(rawQuiz);
+	const { questions: quiz, quizMode, examOptions, lessonExamOptions, glossary } = extractExamOptions(rawQuiz);
 
 	if (!Array.isArray(quiz) || quiz.length === 0) {
 		renderParagraph(container, t("engine.error.noQuestions"));
@@ -173,6 +174,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		   recevoir un repli `qN` comme au scan, jamais lever (fix round 1,
 		   2026-09-02 — `q.id` sans `?.` plantait tout le rendu du bloc). */
 		questionIds: idsForRawItems(quiz),
+		// Glossaire du quiz (engine/termes.ts l'indexe, engine/termes-bulle.ts
+		// y relit term/definition) — voir types/engine-ctx.ts.
+		glossaire: glossary,
 		/* `reviewSink` était un accessor parce qu'il lisait `plugin._reviewStore`,
 		   assigné après le chargement du greffon. Il arrive maintenant par le
 		   contexte d'appel, donc déjà résolu : un accessor n'aurait plus rien à
@@ -233,6 +237,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const passage = createPassageHandlers(ctx);
 	const cloze = createClozeHandlers(ctx);
 	const lesson = createLessonHandlers(ctx);
+	// Lu APRÈS `lesson` : aucune dépendance entre les deux, ordre alphabétique
+	// de queue comme les autres modules sans référence croisée à l'assemblage.
+	const termes = createTermesHandlers(ctx);
 
 	// Fonctions utilitaires seront définies après les constantes SLIDE_* pour éviter TDZ
 
@@ -261,6 +268,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		passage,
 		cloze,
 		lesson,
+		termes,
 		// depuis lesson : accessors (pas des flags __quiz*), voir engine/lesson.ts.
 		isLessonMode: lesson.isLessonMode,
 		lessonSlices: lesson.lessonSlices,
@@ -844,6 +852,12 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		if (!newItem) return null;
 
 		oldItem.replaceWith(newItem);
+		// Termes du glossaire AVANT mathifyElement : la passe remplace des
+		// nœuds texte (span.qb-terme), et mathifyElement capture les siens de
+		// façon synchrone avant d'attendre MathJax — inverser l'ordre
+		// détacherait une formule dont le texte contient aussi un terme
+		// (engine/termes.ts, tête de fichier).
+		ctx.termes.poserTermes(newItem);
 		// LaTeX $...$ / $$...$$ : rendu MathJax natif Obsidian (fire-and-forget
 		// — les ResizeObservers recalent la hauteur quand la formule arrive).
 		mathifyElement(newItem);
@@ -945,6 +959,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	    // (réponse libre + auto-évaluation) est ABSORBÉE par le rôle "recall" en
 	    // mode Leçon, décidé question par question (ctx.textOnly.isTextOnlyFor).
 	    container.innerHTML = `${examChromeHtml}${ctx.cards.navHtml()}<div class="quiz-track-viewport" data-quiz-height-ready="0"><div class="quiz-track">${slidesHtml}</div></div>`;
+	    // Termes du glossaire AVANT mathifyElement — même ordre, même raison
+	    // qu'en repeint d'une carte (voir refreshQuestionSlide plus haut).
+	    ctx.termes.poserTermes(container);
 	    // LaTeX $...$ / $$...$$ de toutes les slides (prompts, options,
 	    // explications, résultats) : rendu MathJax natif Obsidian.
 	    mathifyElement(container);

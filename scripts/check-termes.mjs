@@ -6,6 +6,13 @@
  * chevauchent sans que la plus spécifique l'emporte. Vérifie aussi la
  * reconnaissance d'un objet de configuration qui ne porte qu'un glossaire
  * (`src/quiz-utils.ts`).
+ *
+ * PARTIE DEUX (plus bas) : la passe DOM (`poserTermesDans`,
+ * `src/engine/termes.ts`), sur `linkedom` — ce que le noyau pur ne peut pas
+ * prouver : qu'un énoncé/une option n'est jamais entré (liste blanche de
+ * zones), qu'un lien/du code/une formule non encore rendue sont épargnés à
+ * l'intérieur d'une zone, qu'un second appel ne change plus rien
+ * (idempotence), et qu'une définition hostile ne crée aucun élément vivant.
  *     npm run check:termes
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -81,3 +88,100 @@ await withSrcModule(
 		r.done();
 	},
 );
+
+/* ══════════════════════════════════════════════════════════
+   PARTIE DEUX — la passe DOM, sur `linkedom` (hors navigateur).
+
+   `linkedom` implémente `whatToShow` d'un `TreeWalker` mais IGNORE en
+   silence son callback `acceptNode` : `poserTermesDans` (src/engine/
+   termes.ts) ne s'appuie donc pas dessus pour exclure `<code>`/`<a>`/
+   `.qb-terme`, mais sur un `closest()` posé APRÈS coup — cette différence
+   est documentée en tête de `noeudsTexteDeLaZone`. Un filtre qui aurait
+   dépendu du callback laisserait passer TOUS les nœuds texte ici, y compris
+   ceux d'un `<code>` : ce script serait vert sur un moteur qui ne l'est pas.
+   ═════════════════════════════════════════════════════════ */
+
+/** Même patron que `scripts/check-code-highlight.mjs` `installerDom()`. */
+async function installerDom() {
+	const { parseHTML, NodeFilter } = await import("linkedom");
+	const { document, window, Node } = parseHTML("<html><body></body></html>");
+	globalThis.document = document;
+	globalThis.Node = Node;
+	globalThis.NodeFilter = NodeFilter;
+	globalThis.window = globalThis.window || window;
+}
+
+async function verifierPasseDom() {
+	await installerDom();
+	await withSrcModule(
+		["src/glossaire.ts", "src/engine/termes.ts", "src/engine/sanitizer.ts"],
+		({ lireGlossaire, indexerGlossaire }, { poserTermesDans }, { renderInlineText }) => {
+			const r = makeReporter("Glossaire d'un quiz — passe DOM (poserTermesDans)");
+
+			const index = indexerGlossaire(lireGlossaire([{ term: "pile", definition: "Structure LIFO." }]));
+
+			// --- fragment réaliste : énoncé, option, explication (spec Task 2) ---
+			// DEUX « pile » hors code/lien/formule dans l'explication, dans le
+			// MÊME nœud texte que la formule $pile$ (le cas le plus dur pour
+			// l'exclusion — trouverTermes doit la voir sans couper le match qui
+			// la suit) : la première est enveloppée, la SECONDE reste en texte
+			// (une seule occurrence par entrée) — c'est elle qui distingue une
+			// idempotence correcte (§ »second appel« plus bas) d'une qui ne
+			// ressème pas `dejaVus` depuis le DOM déjà posé.
+			const racine = document.createElement("div");
+			racine.innerHTML =
+				'<div class="quiz-question">Qu’est-ce qu’une pile ?</div>' +
+				'<div class="quiz-option">Une pile</div>' +
+				'<div class="quiz-explain">Une <code>pile</code> et <a href="x">pile</a> et $pile$ et enfin pile, la vraie, et pile encore.</div>';
+			document.body.appendChild(racine);
+
+			poserTermesDans(racine, index);
+
+			const question = racine.querySelector(".quiz-question");
+			const option = racine.querySelector(".quiz-option");
+			const explain = racine.querySelector(".quiz-explain");
+			const termesExplain = explain.querySelectorAll(".qb-terme");
+
+			r.check("l'énoncé n'est jamais entré (hors liste blanche de zones)", question.querySelectorAll(".qb-terme").length, 0);
+			r.check("une option n'est jamais entrée (hors liste blanche de zones)", option.querySelectorAll(".qb-terme").length, 0);
+			r.check("l'explication : une seule occurrence enveloppée (une par entrée, malgré 2 candidates)", termesExplain.length, 1);
+			r.check("le texte enveloppé est exactement le terme trouvé", termesExplain[0]?.textContent, "pile");
+			r.check("l'occurrence dans <code> n'est pas enveloppée", explain.querySelector("code .qb-terme"), null);
+			r.check("l'occurrence dans <a> n'est pas enveloppée", explain.querySelector("a .qb-terme"), null);
+			r.check("la formule $pile$ n'est pas coupée", explain.textContent.includes("$pile$"), true);
+			// L'attribut, pas la propriété IDL `tabIndex` : `linkedom` pose bien
+			// l'attribut mais ne reflète pas son getter (toujours -1) — la seule
+			// chose qui compte pour un vrai navigateur est l'attribut écrit.
+			r.check("le span porte tabindex=0 et data-terme (index d'entrée)",
+				[termesExplain[0]?.getAttribute("tabindex"), termesExplain[0]?.dataset.terme], ["0", "0"]);
+
+			const avant = racine.innerHTML;
+			poserTermesDans(racine, index);
+			r.check("un second appel laisse le DOM identique (idempotent)", racine.innerHTML, avant);
+
+			// --- une zone SANS glossaire (index vide) : sortie immédiate ---
+			const videIndex = indexerGlossaire([]);
+			const racineVide = document.createElement("div");
+			racineVide.innerHTML = '<div class="quiz-explain">Une pile.</div>';
+			poserTermesDans(racineVide, videIndex);
+			r.check("sans glossaire, rien n'est enveloppé", racineVide.querySelectorAll(".qb-terme").length, 0);
+
+			// --- une définition hostile (bulle, engine/termes-bulle.ts) passe par
+			// LA MÊME porte n°1 que tout texte d'un quiz : renderInlineText échappe
+			// avant de rendre le markdown, donc n'exécute ni ne construit jamais de
+			// balise venue de la donnée. ---
+			const boite = document.createElement("div");
+			boite.innerHTML = renderInlineText('<img src=x onerror="window.__quizTermeHostile = true">');
+			r.check("une définition <img onerror> ne crée AUCUN élément dans la zone", boite.querySelectorAll("*").length, 0);
+			// Échappé (« &lt;img … »), jamais une vraie balise (« <img ») : c'est
+			// l'échappement, pas l'absence du mot « onerror », qui protège —
+			// « onerror= » reste légitimement dans le texte AFFICHÉ tel quel.
+			r.check("… le chevron ouvrant est échappé (aucune vraie balise <img)", boite.innerHTML.includes("<img"), false);
+			r.check("… et retrouve « &lt;img » en clair (texte, pas balise)", boite.innerHTML.includes("&lt;img"), true);
+
+			r.done();
+		},
+	);
+}
+
+await verifierPasseDom();

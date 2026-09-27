@@ -273,6 +273,9 @@ async function verifierBudgetSurLesVraisAppelants() {
 					// L'indice pose le bouton « Exécuter » de ses blocs Python
 					// (engine/code-run.ts) : hors sujet ici, un stub suffit.
 					codeRun: { bindCodeRunButtons: () => {} },
+					// Idem pour les termes du glossaire (engine/termes.ts) : ce
+					// script éprouve la coloration, pas le soulignement.
+					termes: { poserTermes: () => {} },
 				};
 				ctx.sanitize = sanitizer.createSanitizer({ host: hote.currentHost(), sourcePath: "" });
 				indice.createHintHandlers(ctx).openHintModal("Indice\n\n" + BLOC_HOSTILE);

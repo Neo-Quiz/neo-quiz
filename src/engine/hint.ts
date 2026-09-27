@@ -192,6 +192,9 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 			// et s'affichait sans couleurs (revue du 2026-09-26, tour 4).
 			reinitialiserBudgetRendu();
 			body.innerHTML = ctx.sanitize.renderHintWithCodeAndEmbeds(text);
+			// Termes du glossaire AVANT mathifyElement — même ordre, même
+			// raison que le repeint d'une carte (engine.ts, engine/termes.ts).
+			ctx.termes.poserTermes(body);
 			// LaTeX $...$ des indices : même rendu MathJax que les slides.
 			void mathifyElement(body);
 			// Bouton « Exécuter » d'un bloc Python de l'indice (engine/code-run.ts).

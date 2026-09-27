@@ -58,6 +58,7 @@ import type {
 	StatsRecord,
 } from "./quiz";
 import type { ReviewGrade } from "../scheduler";
+import type { EntreeGlossaire } from "../glossaire";
 import type { SanitizerHandlers } from "../engine/sanitizer";
 import type { QuestionHandlers } from "../engine/questions";
 import type { ResourceHandlers } from "../engine/resources";
@@ -79,6 +80,7 @@ import type { ResultsSaverHandlers } from "../engine/results-save";
 import type { PassageHandlers } from "../engine/passage";
 import type { ClozeHandlers } from "../engine/cloze";
 import type { LessonHandlers } from "../engine/lesson";
+import type { TermesHandlers } from "../engine/termes";
 
 /**
  * Mode du quiz (engine.js ctx.quizMode / originalQuizMode). Miroir du type
@@ -122,6 +124,15 @@ export interface EngineCtx {
 	 * brut, qui n'a ni slug de repli ni dédoublonnage.
 	 */
 	questionIds: string[];
+	/**
+	 * Le glossaire du quiz (`glossary` de l'objet de configuration du bloc),
+	 * lu une fois par `extractExamOptions` (quiz-utils.ts) — entrées déjà
+	 * validées (`term`/`definition` non vides, `src/glossaire.ts`). Vide hors
+	 * configuration. `engine/termes.ts` l'indexe une fois (`indexerGlossaire`)
+	 * pour souligner ses occurrences ; `engine/termes-bulle.ts` y relit
+	 * `term`/`definition` par l'index posé sur `.qb-terme[data-terme]`.
+	 */
+	glossaire: EntreeGlossaire[];
 	/**
 	 * Puits du journal de révision. Le moteur ne connaît que cette FORME,
 	 * jamais l'implémentation — exactement comme `StatsStoreLike`. C'est ce
@@ -253,6 +264,8 @@ export interface EngineCtx {
 	passage: PassageHandlers;
 	cloze: ClozeHandlers;
 	lesson: LessonHandlers;
+	/** Souligne les termes du glossaire + bulle de définition — engine/termes.ts. */
+	termes: TermesHandlers;
 
 	/* ════════════════════════════════════════════════
 	   Méthodes APLATIES issues des sous-modules (1er Object.assign, :156-219).

@@ -452,6 +452,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			const newNode = tmp.firstElementChild as HTMLElement | null;
 			if (!newNode) return;
 			oldNode.replaceWith(newNode);
+			// Termes du glossaire AVANT mathifyElement — même ordre qu'en
+			// repeint de carte (engine.ts), pour la même raison : la passe
+			// remplace des nœuds texte, mathifyElement en capture d'autres de
+			// façon synchrone avant d'attendre MathJax (engine/termes.ts).
+			ctx.termes.poserTermes(newNode);
 			// LaTeX des slides submit/results (récap des réponses).
 			mathifyElement(newNode);
 			// Bouton « Exécuter » des blocs Python (recap du mode texte

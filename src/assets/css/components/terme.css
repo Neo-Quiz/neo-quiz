@@ -1,0 +1,83 @@
+/* =========================================================
+   TERMES DU GLOSSAIRE — soulignement + bulle de définition
+   (engine/termes.ts, engine/termes-bulle.ts)
+   -----------------------------------------------------------
+   Le terme (span.qb-terme) : souligné en pointillé, couleur d'accent, à sa
+   PREMIÈRE occurrence par zone (règle des liens de Wikipédia — engine/
+   termes.ts s'en charge, ce fichier n'habille que le résultat).
+
+   La bulle (div.qb-terme-bulle) est UNIQUE PAR INSTANCE, portalée au
+   `<body>` en `position: fixed` : le track d'un quiz est transformé et
+   coupé (transition de slide), une bulle posée DANS la carte serait rognée
+   ou embarquée dans le glissement.
+   ========================================================= */
+
+.qb-terme{
+  cursor: help;
+  border-bottom: 1px dotted color-mix(in srgb, var(--quiz-primary) 60%, transparent);
+  text-decoration: none;
+  border-radius: 2px;
+}
+
+.qb-terme:hover,
+.qb-terme:focus-visible{
+  color: var(--quiz-primary);
+  border-bottom-color: var(--quiz-primary);
+}
+
+.qb-terme:focus-visible{
+  outline: 2px solid var(--quiz-primary);
+  outline-offset: 2px;
+}
+
+.qb-terme-bulle{
+  position: fixed;
+  z-index: 80;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border-radius: var(--quiz-card-radius);
+  border: 1px solid var(--qbd-glass-edge);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: left;
+  box-shadow: var(--qbd-glass-shadow);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity var(--quiz-dur-fast) var(--quiz-ease-smooth),
+    transform var(--quiz-dur-fast) var(--quiz-ease-smooth);
+}
+
+.qb-terme-bulle.is-open{
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Ancrée en dessous du terme (place manquante au-dessus) : la légère
+   translation d'entrée vient d'en haut plutôt que du bas. */
+.qb-terme-bulle--bas{
+  transform: translateY(-4px);
+}
+.qb-terme-bulle--bas.is-open{
+  transform: translateY(0);
+}
+
+.qb-terme-bulle-terme{
+  display: block;
+  margin-bottom: 4px;
+  color: var(--quiz-primary);
+  font-weight: 800;
+}
+
+.qb-terme-bulle-def > :first-child{ margin-top: 0; }
+.qb-terme-bulle-def > :last-child{ margin-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce){
+  .qb-terme-bulle{ transition: none; }
+}
