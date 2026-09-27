@@ -110,3 +110,25 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
 
 	r.done();
 });
+
+/* LA RÉCEPTION D'UNE GÉNÉRATION (lot D, 2026-09-27) : `brouillonDe`
+   (`src/dashboard/generation-demande.ts`) est le premier point du chemin de
+   retour qui relit le tableau brut rendu par le modèle — file comme canal
+   web (`ai.ts`) l'appellent tel quel. Le glossaire écrit dans l'objet de
+   configuration final doit y survivre, PAS finir dans une question fantôme
+   ni disparaître avec le reste de la configuration. */
+await withSrcModule("src/dashboard/generation-demande.ts", ({ brouillonDe }) => {
+	const r = makeReporter("Réception d'une génération — glossaire");
+	const genere = [
+		{ title: "Q", prompt: "Qu'est-ce qu'une pile ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." },
+		{ mode: "quiz", glossary: [{ term: "pile", definition: "Structure **LIFO**.", aliases: ["LIFO"] }] },
+	];
+	const draft = brouillonDe(genere);
+	r.check("le glossaire généré traverse brouillonDe jusqu'au brouillon",
+		draft.examOptions?.glossary, [{ term: "pile", definition: "Structure **LIFO**.", aliases: ["LIFO"] }]);
+	r.check("l'objet de configuration ne devient pas une question",
+		draft.questions.length, 1);
+	r.check("sans glossaire dans la réponse : un brouillon sans glossaire, pas une erreur",
+		brouillonDe([genere[0]]).examOptions, null);
+	r.done();
+});

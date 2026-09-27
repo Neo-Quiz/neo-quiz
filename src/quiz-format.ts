@@ -26,8 +26,13 @@ export type ModeQuiz = "learn" | "practice";
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"',
 		// Styles de lecture (2026-09-26, spec des styles §4) : les clés et leurs valeurs.
-		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"'],
-	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"'],
+		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
+		// Glossaire (lot D, 2026-09-27, spec §6) : la génération l'écrit dans la
+		// configuration finale, aux côtés de `objectives`.
+		'"glossary"', '"term"', '"definition"'],
+	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"',
+		// Glossaire (lot D, 2026-09-27) : remplace « No configuration object ».
+		'"glossary"', '"term"', '"definition"'],
 };
 
 /** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés,

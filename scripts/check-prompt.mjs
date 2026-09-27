@@ -76,6 +76,17 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		learnP.includes("A slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE flashcard among its recalls."), true);
 	r.check("Practice : les consignes propres au Learn restent absentes",
 		["EVERY question of the path has \"hint\"", "AT LEAST ONE flashcard"].filter(s => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(s)), []);
+	/* Glossaire (lot D, 2026-09-27) : la consigne GLOSSARY est commune aux deux
+	   modes, et chacun porte l'objet de configuration qui la déclenche. */
+	for (const mode of ["learn", "practice"]) {
+		const p = composerPrompts("x", { mode }).systemPrompt;
+		r.check(`${mode} : la consigne du glossaire est donnée`,
+			['"glossary"', "GLOSSARY:", "5 to 15 KEY TERMS", "Write \"term\" EXACTLY as it appears in the readings and explanations"].filter(s => !p.includes(s)), []);
+	}
+	r.check("Practice : l'objet de configuration porte mode: \"quiz\"",
+		composerPrompts("x", { mode: "practice" }).systemPrompt.includes('{ mode: "quiz", "glossary"'), true);
+	r.check("Practice : plus de « No configuration object »",
+		composerPrompts("x", { mode: "practice" }).systemPrompt.includes("No configuration object"), false);
 	r.done();
 });
 

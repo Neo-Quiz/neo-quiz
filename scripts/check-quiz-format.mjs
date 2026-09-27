@@ -29,6 +29,14 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.check("modes hérités exam, lesson, examMode, learnMode = Practice",
 		[{ mode: "exam" }, { mode: "lesson" }, { examMode: true }, { learnMode: true }].map(c => modeDuBloc([q(), c])),
 		["practice", "practice", "practice", "practice"]);
+	/* Glossaire (lot D, 2026-09-27) : un Practice terminé par la configuration
+	   que la génération écrit désormais (`{ mode: "quiz", glossary }`) reste un
+	   Practice, sans manque — ni devenir un Learn, ni signaler d'objectifs
+	   absents (ce qui n'est exigé que du Learn). */
+	const configGlossaire = { mode: "quiz", glossary: [{ term: "pile", definition: "Une structure LIFO." }] };
+	r.check("objet { mode: \"quiz\", glossary } = Practice, pas Learn", modeDuBloc([q(), configGlossaire]), "practice");
+	r.check("Practice terminé par sa configuration de glossaire : aucun manque",
+		verifierFormat("practice", [q(), q({ title: "R" }), configGlossaire]), []);
 
 	r.check("Practice complet : aucun manque", verifierFormat("practice", [q(), q({ title: "R" })]), []);
 	r.check("Practice : les questions sans explication sont nommées",
