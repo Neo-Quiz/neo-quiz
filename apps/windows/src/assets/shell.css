@@ -1155,10 +1155,10 @@ body::after {
    l'animation inverse sur ce même nœud (repeint, jamais reconstruit).
 
    Le TRANSFORM est celui du recul (`RECUL`, `transition-quiz.ts`) : la
-   coquille remonte de 16 px et rétrécit de 3 % en largeur, ce qui suffit à
-   faire dépasser son bord haut au-dessus du panneau du quiz (les deux
-   panneaux partagent la même case de grille et la même hauteur — voir
-   `nq-empile` plus haut) et à laisser voir ses coins arrondis sur les côtés.
+   coquille rétrécit de 3 % en largeur, et reste entière derrière le quiz
+   (les deux panneaux partagent la même case de grille et la même hauteur —
+   voir `nq-empile` plus haut). Elle ne remonte plus : ses 16 px qui
+   dépassaient au-dessus du quiz se voyaient pendant tout le quiz.
    L'ASSOMBRISSEMENT est un voile (`::after`) posé sur le PANNEAU seul, et
    non une opacité sur toute la coquille : le verre (`backdrop-filter`) reste
    lisible au lieu de laisser voir le fond d'écran à travers. L'ancienne
@@ -1166,12 +1166,15 @@ body::after {
    le temps de ses 500 ms : elle coupait le flou du panneau de la première
    à la dernière image (voir `RECUL`, `transition-quiz.ts`). */
 #neo-quiz-root > .qbd-layout.nq-pile-fond {
-	transform: translateY(-16px) scaleX(0.97);
-	/* RIEN SOUS LA VITRE DU QUIZ : la page n'est plus peinte que dans le
-	   bandeau de 16 px qui dépasse au-dessus du quiz — la coupe où finit la
-	   montée (`coupe`, `transition-quiz.ts`). Sans elle, le verre du quiz
-	   floutait la page dessous au lieu du seul fond d'écran. */
-	clip-path: inset(0 0 calc(100% - 16px) 0);
+	transform: scaleX(0.97);
+}
+/* RIEN SOUS LA VITRE DU QUIZ : la page est coupée entière — la coupe où
+   finit la montée (`coupe`, `transition-quiz.ts`). Sans elle, le verre du
+   quiz floutait la page dessous au lieu du seul fond d'écran. Sur les
+   ENFANTS, comme l'animation qui y mène : sur la coquille, le même
+   `clip-path` animé coupait le flou de son panneau. */
+#neo-quiz-root > .qbd-layout.nq-pile-fond > * {
+	clip-path: inset(0 0 100% 0);
 }
 /* Le voile EXISTE dès que la racine empile (`nq-empile`), à opacité 0 : la
    transition l'anime (`VOILE`, `transition-quiz.ts`) et `nq-pile-fond` le

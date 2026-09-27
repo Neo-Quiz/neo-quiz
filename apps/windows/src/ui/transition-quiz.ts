@@ -54,12 +54,13 @@ const COURBE = "cubic-bezier(0.36, 0.66, 0, 1)";
    (voile de `nq-pile-fond`, opacité 1) : un saut de plus, au début du retour
    comme à la fin de la montée. L'assombrissement est donc celui du VOILE
    (`VOILE`, ci-dessous), le même nœud que l'état figé.
-   `RECUL_Y` : la page remonte d'autant ; `nq-pile-fond` (`shell.css`) fige
-   la même valeur, et c'est la hauteur du bandeau qui dépasse du quiz. */
-const RECUL_Y = 16;
+   Plus de `translateY(-16px)` non plus (2026-09-27) : remontée, la page
+   dépassait du quiz d'un bandeau de 16 px, logo du rail compris, pendant
+   tout le quiz. Elle ne fait plus que se resserrer, et reste entière
+   derrière lui ; `nq-pile-fond` (`shell.css`) fige le même `scaleX`. */
 const RECUL: Keyframe[] = [
-	{ transform: "translateY(0) scaleX(1)" },
-	{ transform: `translateY(-${RECUL_Y}px) scaleX(0.97)` },
+	{ transform: "scaleX(1)" },
+	{ transform: "scaleX(0.97)" },
 ];
 const RETOUR: Keyframe[] = [...RECUL].reverse();
 
@@ -87,25 +88,34 @@ function distanceHorsFenetre(panneau: HTMLElement): number {
    quiz, et la coupe suit ce bord pendant tout le mouvement. Le panneau du
    quiz est du verre : sans elle, il floutait la page encore peinte dessous
    (le bouton bleu « Commencer le quiz » en tache floue) au lieu du seul fond
-   d'écran. Il ne reste de la page que le bandeau de `RECUL_Y` qui dépasse
-   au-dessus du quiz ; `nq-pile-fond` fige ensuite la même coupe.
+   d'écran. Une fois le quiz en place, la page est coupée ENTIÈRE ;
+   `nq-pile-fond` fige ensuite la même coupe.
 
    Les deux panneaux partagent la même case de grille, donc le même bord
-   haut au repos. Dans le repère de la page, le bord haut du quiz est à
-   `distance · (1 − p) + RECUL_Y · p` à la progression `p` de la montée :
-   LINÉAIRE en `p`, parce que la montée du quiz et le recul de la page
-   suivent la même courbe sur la même durée. Des images clés interpolées sur
-   cette courbe tombent donc juste à chaque image. La coupe reste nulle tant
-   que le quiz est plus bas que la page (`croise`). Un `clip-path` sur la
-   coquille ne coupe PAS le flou de son panneau (vérifié à l'image), à la
-   différence de l'`opacity`. */
+   haut au repos, et la page ne bouge pas verticalement. Dans son repère, le
+   bord haut du quiz est à `distance · (1 − p)` à la progression `p` de la
+   montée : LINÉAIRE en `p`, parce que les images clés s'interpolent sur la
+   même courbe et la même durée que la montée du quiz. Elles tombent donc
+   juste à chaque image. La coupe reste nulle tant que le quiz est plus bas
+   que la page (`croise`).
+
+   POSÉE SUR LES ENFANTS de la coquille (le rail, le panneau), JAMAIS sur la
+   coquille : ANIMÉ, un `clip-path` part au compositeur, qui le traite comme
+   un masque, et un masque sur un ANCÊTRE du panneau de verre coupe son flou
+   comme le faisait l'opacité (mesuré en lecture réelle, ralentie : netteté
+   0,81 sur la coquille, 0,29 sur ses enfants comme au repos). Sur le panneau
+   lui-même, le masque découpe son propre flou sans le lui retirer. */
 function coupe(hauteurPage: number, distance: number, sens: SensTransition): Keyframe[] {
 	const ouverte = "inset(0px 0px 0px 0px)";
-	const fermee = `inset(0px 0px ${Math.max(0, hauteurPage - RECUL_Y)}px 0px)`;
-	const croise = distance > RECUL_Y ? Math.min(1, Math.max(0, (distance - hauteurPage) / (distance - RECUL_Y))) : 0;
+	const fermee = `inset(0px 0px ${hauteurPage}px 0px)`;
+	const croise = distance > 0 ? Math.min(1, Math.max(0, (distance - hauteurPage) / distance)) : 0;
 	return sens === "entree"
 		? [{ offset: 0, clipPath: ouverte }, { offset: croise, clipPath: ouverte }, { offset: 1, clipPath: fermee }]
 		: [{ offset: 0, clipPath: fermee }, { offset: 1 - croise, clipPath: ouverte }, { offset: 1, clipPath: ouverte }];
+}
+
+function enfantsDe(el: HTMLElement): HTMLElement[] {
+	return Array.from(el.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
 }
 
 /* La « barre d'outils » de la page qui recule : chez Neo Quiz, les en-têtes
@@ -206,7 +216,7 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 		const distance = distanceHorsFenetre(entrant);
 		for (const s of [...aRetirer, ...garder]) {
 			animations.push(s.animate(RECUL, { ...base, fill: "forwards" }));
-			animations.push(s.animate(coupe(s.offsetHeight, distance, "entree"), { ...base, fill: "forwards" }));
+			for (const enfant of enfantsDe(s)) animations.push(enfant.animate(coupe(enfant.offsetHeight, distance, "entree"), { ...base, fill: "forwards" }));
 			for (const p of s.querySelectorAll<HTMLElement>(PANNEAU)) {
 				animations.push(p.animate(VOILE, { ...base, pseudoElement: "::after", fill: "forwards" }));
 			}
@@ -227,7 +237,10 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 		}
 	} else {
 		const quiz = aRetirer[0];
-		if (quiz) animations.push(entrant.animate(coupe(entrant.offsetHeight, distanceHorsFenetre(quiz), "sortie"), { ...base, fill: "backwards" }));
+		if (quiz) {
+			const distance = distanceHorsFenetre(quiz);
+			for (const enfant of enfantsDe(entrant)) animations.push(enfant.animate(coupe(enfant.offsetHeight, distance, "sortie"), { ...base, fill: "backwards" }));
+		}
 		for (const s of aRetirer) {
 			/* Le quiz qui redescend passe DEVANT la page qui revient, montée
 			   après lui. Ce `z-index` part avec le nœud (`retirer`) ; il est
