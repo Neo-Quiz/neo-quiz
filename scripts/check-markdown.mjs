@@ -48,6 +48,25 @@ const CAS = [
 
 	// Formes limites.
 	["code à double accent grave", "tape ``a ` b`` ici", "tape <code>a ` b</code> ici"],
+	/* Retour #4 du 2026-09-26 soir : un bloc de code collé sur une seule ligne
+	   (dans un élément de classement ou d'option, où grammaire-blocs.ts ne
+	   voit qu'un paragraphe) reste reconnu, et rendu en code EN LIGNE — plus
+	   la clôture brute affichée telle quelle. Langage inconnu : pas de span
+	   coloré, mais toujours du code. */
+	["bloc de code sur une seule ligne, langage reconnu",
+		"élément ```python def somme(n): return n``` ici",
+		"élément <code class=\"quiz-md-code-inline language-python\">"
+		+ "<span class=\"token keyword\">def</span> "
+		+ "<span class=\"token function\">somme</span>"
+		+ "<span class=\"token punctuation\">(</span>n<span class=\"token punctuation\">)</span>"
+		+ "<span class=\"token punctuation\">:</span> "
+		+ "<span class=\"token keyword\">return</span> n</code> ici"],
+	["bloc de code sur une seule ligne, langage inconnu : code nu, sans span",
+		"```mystere x < y``` ici",
+		"<code class=\"quiz-md-code-inline language-mystere\">x &lt; y</code> ici"],
+	["bloc de code sur une seule ligne, sans langage",
+		"```(n + 1) * 2``` ici",
+		"<code class=\"quiz-md-code-inline\">(n + 1) * 2</code> ici"],
 	["deux gras dans la phrase", "**A** puis **B**", "<strong>A</strong> puis <strong>B</strong>"],
 	["gras en début de chaîne", "**Attention** ici", "<strong>Attention</strong> ici"],
 	["italique après parenthèse", "(*ainsi*)", "(<em>ainsi</em>)"],
@@ -150,7 +169,11 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"
 	r.check("positions après un embed", vu("![[x.png]] `c`"), "code:`c`");
 	r.check("quatre étoiles : rien", vu("voir ****ceci**** ici"), "");
 
-	const compter = (html, balise) => (html.match(new RegExp("<" + balise + ">", "g")) || []).length;
+	// `<code\b` et non `<code>` : un bloc de code sur une seule ligne (retour
+	// #4 du 2026-09-26 soir) rend `<code class="quiz-md-code-inline…">`, avec
+	// des attributs — toujours un SEUL `<code>` par segment "code", juste
+	// habillé, comme `<strong>`/`<em>`/`<del>` ne le sont jamais.
+	const compter = (html, balise) => (html.match(new RegExp("<" + balise + "\\b", "g")) || []).length;
 	const genres = (texte, ...g) => decouperInline(texte).filter(s => g.includes(s.genre)).length;
 	let divergences = 0;
 	for (const [nom, entree] of CAS) {

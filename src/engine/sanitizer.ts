@@ -3,7 +3,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 import type { QuestionBase } from "../types/quiz";
 import { pickLessonFields } from "../quiz-utils";
 import {
-	MD_MARK, EMPHASES, motifFormule, motifCodeDouble, motifCodeSimple,
+	MD_MARK, EMPHASES, motifFormule, motifCodeTriple, motifCodeDouble, motifCodeSimple,
 	motifEtoilesMultiples, motifFlanc, decouperMorceaux,
 } from "./grammaire-inline";
 import type { GenreEmphase } from "./grammaire-inline";
@@ -107,6 +107,30 @@ function inlineMarkdown(escaped: string): string {
 
 	let out = escaped.split(MD_MARK).join(HORS_JETON)
 		.replace(/<code>[\s\S]*?<\/code>/g, m => keep(m))
+		/* Un bloc de code collé sur une seule ligne (```lang code```), dans un
+		   élément qui ne peut pas ouvrir de bloc — un classement, une option
+		   (retour #4 du 2026-09-26 soir) : rendu en code EN LIGNE, coloré si le
+		   langage est reconnu, même budget cumulé que les blocs de plusieurs
+		   lignes (code-highlight.ts, réinitialisé une fois par carte). AVANT le
+		   double et le simple accent grave, qui matcheraient sinon deux des
+		   trois marqueurs et laisseraient le troisième littéral.
+		   `code` est ici déjà échappé (par `escaped`, l'entrée de cette
+		   fonction) : on le déséchappe avant `colorerCode`, qui réclame le texte
+		   BRUT et réapplique lui-même l'échappement à chaque jeton — exactement
+		   ce que fait `rendreBlocs` pour un bloc de plusieurs lignes. */
+		.replace(motifCodeTriple(), (_m, langue: string | undefined, code: string) => {
+			const brut = unescapeHtmlText(code.trim());
+			const disponible = budgetRestant();
+			const colore = langue ? colorerCode(brut, langue, escapeHtmlText, disponible) : null;
+			// La classe `language-x` est posée dès qu'un langage est NOMMÉ, coloré
+			// ou non — même règle que le bloc de plusieurs lignes (grammaire-
+			// blocs.ts) : un langage inconnu reste une donnée utile (surlignage
+			// éventuel d'un autre outil), le texte, lui, reste nu sans span.
+			const classe = langue ? ` class="quiz-md-code-inline language-${escapeHtmlAttr(langue.trim().toLowerCase())}"` : ` class="quiz-md-code-inline"`;
+			if (colore) consommerBudget(colore.colore);
+			const html = colore ? colore.html : escapeHtmlText(brut);
+			return keep(`<code${classe}>${html}</code>`);
+		})
 		// Double accent grave AVANT le simple : c'est la forme markdown
 		// d'un code qui CONTIENT un accent grave (``a ` b``).
 		.replace(motifCodeDouble(), (_m, code: string) => keep(`<code>${code}</code>`))

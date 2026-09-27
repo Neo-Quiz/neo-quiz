@@ -90,6 +90,7 @@ release notes.
 - In Learn quizzes, a "from memory" matching, ordering or fill-in question keeps its real interaction instead of turning into a free-text answer.
 - A terminal question whose language is a real program (Python, Java…) is now an editable code block labelled "Program output", instead of a command prompt ("C:\>") that suggested typing a command; real shell prompts (cmd, PowerShell, bash) keep an adapted prompt (`C:\>`, `PS>`, `$`).
 - Every written-answer field now starts at the height of the expected answer (one to a few lines) instead of always opening ten lines tall, and grows as you type.
+- A single-line code block (```` ```python … ``` ````) inside an ordering item or an option is shown as inline code, syntax-highlighted when the language is recognized, instead of showing its raw backticks.
 
 ## [1.19.0] - 2026-09-23
 

@@ -253,6 +253,55 @@
 .quiz-md-code code :is(.token.variable, .token.parameter, .token.property, .token.property-access, .token.entity, .token.url){
   color: var(--qmc-fg);
 }
+
+/* Code EN LIGNE d'un bloc collé sur une seule ligne (grammaire-inline.ts
+   `motifCodeTriple`, retour #4 du 2026-09-26 soir) : la pastille habituelle
+   du code inline, mais Tokyo Night — un fond clair ne porterait pas la
+   coloration syntaxique. Un `<code>` seul, hors `<pre>`, redéclare ici les
+   variables `--qmc-*` que `.quiz-md-code.quiz-md-code` pose pour un bloc. */
+code.quiz-md-code-inline{
+  --qmc-bg: #1a1b26;
+  --qmc-fg: #c0caf5;
+  --qmc-comment: #565f89;
+  --qmc-keyword: #7aa2f7;
+  --qmc-operator: #89ddff;
+  --qmc-function: #7dcfff;
+  --qmc-string: #9ece6a;
+  --qmc-number: #ff9e64;
+  --qmc-class: #2ac3de;
+  --qmc-punctuation: #c0caf5;
+  --qmc-tag: #f7768e;
+  --qmc-attr: #e0af68;
+
+  background: var(--qmc-bg);
+  color: var(--qmc-fg);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+}
+code.quiz-md-code-inline .token{
+  color: var(--qmc-fg);
+  font-style: normal;
+  font-weight: inherit;
+  background: none;
+  text-shadow: none;
+  opacity: 1;
+}
+code.quiz-md-code-inline :is(.token.comment, .token.prolog, .token.doctype, .token.cdata){ color: var(--qmc-comment); font-style: italic; }
+code.quiz-md-code-inline :is(.token.keyword, .token.control, .token.directive, .token.important, .token.atrule){ color: var(--qmc-keyword); }
+code.quiz-md-code-inline .token.operator{ color: var(--qmc-operator); }
+code.quiz-md-code-inline :is(.token.function, .token.method){ color: var(--qmc-function); }
+code.quiz-md-code-inline :is(.token.string, .token.char, .token.regex, .token.attr-value){ color: var(--qmc-string); }
+code.quiz-md-code-inline :is(.token.number, .token.boolean, .token.constant, .token.symbol, .token.inserted){ color: var(--qmc-number); }
+code.quiz-md-code-inline :is(.token.class-name, .token.builtin, .token.type){ color: var(--qmc-class); }
+code.quiz-md-code-inline :is(.token.punctuation, .token.deleted){ color: var(--qmc-punctuation); }
+code.quiz-md-code-inline :is(.token.tag, .token.selector, .token.namespace){ color: var(--qmc-tag); }
+code.quiz-md-code-inline .token.attr-name{ color: var(--qmc-attr); }
+code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property, .token.property-access, .token.entity, .token.url){
+  color: var(--qmc-fg);
+}
+
 .quiz-md-citation{
   border-left: 3px solid var(--background-modifier-border);
   padding-left: 12px;

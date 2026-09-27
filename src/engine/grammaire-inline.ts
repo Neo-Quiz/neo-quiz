@@ -45,6 +45,18 @@ export function motifCodeSimple(): RegExp {
 	return /`([^`\n]+)`/g;
 }
 
+/** Un bloc de code écrit sur UNE SEULE ligne (` ```python def f(): ``` `) :
+    la forme que prend une clôture de bloc (grammaire-blocs.ts) quand un
+    auteur — ou un modèle — l'a collée dans un élément qui ne peut pas ouvrir
+    de bloc (un élément de classement ou une option, retour #4 du
+    2026-09-26 soir). Testé AVANT le double et le simple accent grave : les
+    trois s'ouvrent de la même façon, et le double laisserait un accent
+    grave surnuméraire de chaque côté. Groupe 1 : le langage (vide si
+    absent), groupe 2 : le code. */
+export function motifCodeTriple(): RegExp {
+	return /```(?:([\w+#.-]+)[ \t]+)?([^`\n]+?)```/g;
+}
+
 /** Une suite de QUATRE étoiles ou plus n'est pas de l'emphase : aucune
     combinaison de gras et d'italique ne s'écrit ainsi. */
 export function motifEtoilesMultiples(): RegExp {
@@ -108,7 +120,7 @@ const URL_DE_LIEN = /^(https?:\/\/|mailto:)/i;
 function zonesDeCode(texte: string): Array<[number, number]> {
 	const zones: Array<[number, number]> = [];
 	let masque = texte;
-	for (const motif of [motifCodeDouble(), motifCodeSimple()]) {
+	for (const motif of [motifCodeTriple(), motifCodeDouble(), motifCodeSimple()]) {
 		for (const m of [...masque.matchAll(motif)]) {
 			const d = m.index ?? 0;
 			zones.push([d, d + m[0].length]);
@@ -210,8 +222,15 @@ function decouperMorceau(source: string, base: number, sortie: SegmentInline[]):
 		couvrir(d, d + m[0].length);
 	}
 
-	// 2. Le code, double accent grave avant le simple — AVANT la formule,
-	//    comme au rendu : `` `a $x$ b` `` est un code, sans formule.
+	// 2. Le code, triple accent grave (un bloc collé sur une seule ligne)
+	//    avant le double avant le simple — AVANT la formule, comme au rendu.
+	for (const m of [...masque.matchAll(motifCodeTriple())]) {
+		const d = m.index ?? 0;
+		const f = d + m[0].length;
+		const ouvre = 3 + (m[1] ? m[1].length + 1 : 0);
+		segs.push({ genre: "code", debut: d, fin: f, ouvre, ferme: 3 });
+		couvrir(d, f);
+	}
 	for (const [motif, l] of [[motifCodeDouble, 2], [motifCodeSimple, 1]] as const) {
 		for (const m of [...masque.matchAll(motif())]) {
 			const d = m.index ?? 0;
