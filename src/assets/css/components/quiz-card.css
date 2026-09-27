@@ -312,6 +312,21 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   position: relative;
   margin: 0.6em 0;
 }
+/* Un bloc EXÉCUTABLE forme un seul conteneur avec sa sortie, comme le
+   panneau de sortie d'un éditeur de code (demande du 2026-09-27) : la
+   bordure et les coins arrondis passent du `<pre>` à cette enveloppe,
+   `overflow: hidden` les partage entre le code et la sortie. `.quiz-md-code`
+   hors de cette classe (partout ailleurs : un bloc non-python, l'aperçu…)
+   garde sa propre bordure, inchangée. */
+.quiz-code-block-executable{
+  border: 1px solid var(--qmc-border, var(--background-modifier-border));
+  border-radius: 12px;
+  overflow: hidden;
+}
+.quiz-code-block-executable .quiz-md-code.quiz-md-code{
+  border: none;
+  border-radius: 0;
+}
 .quiz-code-toolbar{
   position: absolute;
   top: 8px;
@@ -345,23 +360,40 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
 
 /* La sortie : du texte de programme, jamais du HTML (posé en `textContent`
    par code-run.ts). Pas d'ascenseur interne (règle « lecture, jamais de
-   scroll ») : elle prend la hauteur qu'il faut, sous le bloc de code. */
+   scroll ») : elle prend la hauteur qu'il faut, sous le bloc de code — DANS
+   le même conteneur que lui (`.quiz-code-block-executable`), séparée par un
+   simple filet, jamais un second encadré (pas de tuile dans une tuile,
+   demande du 2026-09-27 — comme le panneau de sortie d'un éditeur de code) :
+   même bordure, mêmes coins arrondis que le bloc, portés par l'enveloppe.
+   Son fond, un cran plus clair que celui du code (`--qmc-bg`), est ce qui la
+   distingue — pas un encadré. */
 .quiz-code-output{
-  margin-top: 6px;
+  margin: 0;
   padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-normal);
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--qmc-border, var(--background-modifier-border)) 70%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--qmc-bg, var(--background-secondary)), white 6%);
+  color: color-mix(in srgb, var(--qmc-fg, var(--text-normal)) 85%, transparent);
   font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.85em;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Une exception du programme (traceback) : reste en rouge, dans ce MÊME
+   panneau — jamais un encadré à part. */
 .quiz-code-output.quiz-code-output-error{
   color: var(--text-error, #f7768e);
-  border-color: color-mix(in srgb, var(--text-error, #f7768e) 40%, var(--background-modifier-border));
+}
+/* Une PANNE du bac à sable (indisponible, délai, file pleine) n'est pas une
+   sortie du programme : message discret, police d'INTERFACE (pas de code),
+   atténué — jamais présenté comme un résultat rouge (demande du 2026-09-27). */
+.quiz-code-output.quiz-code-output-panne{
+  font-family: var(--font-interface, inherit);
+  font-style: italic;
+  color: color-mix(in srgb, var(--qmc-fg, var(--text-muted)) 60%, transparent);
+  white-space: normal;
 }
 
 .quiz-md-citation{

@@ -53,25 +53,30 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		return sortie;
 	}
 
-	/** Le texte à afficher pour un résultat, jamais posé qu'en `textContent`. */
-	function texteResultat(resultat: PythonRun): { texte: string; erreur: boolean } {
+	/** Le texte à afficher pour un résultat, jamais posé qu'en `textContent`.
+	    `erreur` : le PROGRAMME a levé une exception (traceback en rouge, même
+	    police de code que la sortie normale). `panne` : le bac à sable lui-même
+	    a failli (indisponible, délai, file pleine) — ce n'est pas une sortie du
+	    programme, donc un message DISCRET, en police d'interface, jamais
+	    présenté comme un résultat du code (demande du 2026-09-27). */
+	function texteResultat(resultat: PythonRun): { texte: string; erreur: boolean; panne: boolean } {
 		switch (resultat.status) {
 			case "ok": {
 				const sortie = resultat.stdout ?? "";
-				return { texte: sortie.length > 0 ? sortie : t("engine.code.empty"), erreur: false };
+				return { texte: sortie.length > 0 ? sortie : t("engine.code.empty"), erreur: false, panne: false };
 			}
 			case "error": {
 				const brute = nettoyerTraceback(resultat.error ?? "");
 				const sortie = resultat.stdout ?? "";
-				return { texte: sortie.length > 0 ? `${sortie}\n${brute}` : brute, erreur: true };
+				return { texte: sortie.length > 0 ? `${sortie}\n${brute}` : brute, erreur: true, panne: false };
 			}
 			case "timeout":
-				return { texte: t("engine.code.timeout"), erreur: true };
+				return { texte: t("engine.code.timeout"), erreur: false, panne: true };
 			case "too-long":
-				return { texte: t("engine.code.tooLong"), erreur: true };
+				return { texte: t("engine.code.tooLong"), erreur: false, panne: true };
 			case "unavailable":
 			default:
-				return { texte: t("engine.code.unavailable"), erreur: true };
+				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
 	}
 
@@ -85,17 +90,18 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		btn.disabled = true;
 		btn.classList.add("quiz-code-run-running");
 		sortie.hidden = false;
-		sortie.classList.remove("quiz-code-output-error");
+		sortie.classList.remove("quiz-code-output-error", "quiz-code-output-panne");
 		sortie.textContent = t("engine.code.running");
 
 		try {
 			const resultat = await python.run({ code, stdin: "", timeoutMs: TIMEOUT_MS });
-			const { texte, erreur } = texteResultat(resultat);
+			const { texte, erreur, panne } = texteResultat(resultat);
 			sortie.textContent = texte;
 			sortie.classList.toggle("quiz-code-output-error", erreur);
+			sortie.classList.toggle("quiz-code-output-panne", panne);
 		} catch {
 			sortie.textContent = t("engine.code.unavailable");
-			sortie.classList.add("quiz-code-output-error");
+			sortie.classList.add("quiz-code-output-panne");
 		} finally {
 			btn.disabled = false;
 			btn.classList.remove("quiz-code-run-running");
