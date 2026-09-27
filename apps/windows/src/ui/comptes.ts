@@ -137,6 +137,35 @@ async function lireEtats(): Promise<{ etats: EtatCompte[]; ollamaSigninUrl: stri
    session (cache null) : squelette, comme avant. */
 let cacheEtats: { etats: EtatCompte[]; ollamaSigninUrl: string | null } | null = null;
 
+/** Remplit `cacheEtats`, sans jamais jeter — MÊME RÔLE que `refreshCliCaches`
+    (`ai-providers.ts`) pour les modèles : un instantané de module qu'un
+    lecteur affiche tout de suite, rafraîchi par un appel explicite plutôt que
+    relu à chaque montage. Partagée par `redessiner()` (au montage de la
+    section) et `amorcerCacheComptes()` (au lancement de l'application, avant
+    qu'aucun réglage ne soit ouvert) : UN SEUL endroit qui écrit le cache. */
+async function rafraichirCache(): Promise<{ etats: EtatCompte[]; ollamaSigninUrl: string | null } | null> {
+	try {
+		const resultat = await lireEtats();
+		cacheEtats = resultat;
+		return resultat;
+	} catch (e) {
+		console.warn(LOG_PREFIX, "lecture des comptes IA impossible:", e);
+		return null;
+	}
+}
+
+/** Amorce le cache EN ARRIÈRE-PLAN, peu après le lancement de l'application —
+    avant que l'utilisateur n'ait ouvert les réglages une seule fois. Sans
+    cet appel, la première ouverture de la session repartait toujours du
+    squelette pendant que les trois sondes tournaient (jusqu'à ~1 s, la
+    plus lente étant `agy models`, un aller-retour réseau) : Ahmed,
+    2026-09-27, « je vois que la section n'est pas chargée ». Appelée par
+    `apps/windows/src/main.ts`, SANS attendre : un CLI absent ou une sonde
+    lente ne doit jamais retarder l'affichage de la fenêtre. */
+export function amorcerCacheComptes(): void {
+	void rafraichirCache();
+}
+
 /** L'action que le bouton d'une ligne déclenche : c'est `installe` qui
     tranche la première branche, jamais `connecte` seul — un outil absent de
     la machine et un outil présent mais déconnecté ne peuvent pas partager le
@@ -549,11 +578,11 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 	    un appel IPC ; un pont qui refuse REJETTE, ce n'est pas une hypothèse
 	    d'école. */
 	async function redessiner(): Promise<void> {
-		let resultat: { etats: EtatCompte[]; ollamaSigninUrl: string | null };
-		try {
-			resultat = await lireEtats();
-		} catch (e) {
-			console.warn(LOG_PREFIX, "lecture des comptes IA impossible:", e);
+		// `rafraichirCache` écrit `cacheEtats` elle-même (partagée avec
+		// `amorcerCacheComptes`) et ne jette jamais — `null` est son seul signal
+		// d'échec, déjà journalisé par elle.
+		const resultat = await rafraichirCache();
+		if (!resultat) {
 			if (detruit) return;
 			fermerPopoversUsage();
 			/* Le message d'erreur ne remplace que le SQUELETTE (premier montage
@@ -566,10 +595,6 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 		}
 		if (detruit) return;
 		ollamaSigninUrl = resultat.ollamaSigninUrl;
-		/* Toute lecture réussie RÉFRAÎCHIT le cache — jamais un échec : le
-		   dessin d'avant (ci-dessous ou posé depuis le cache au montage) reste
-		   ce que la prochaine ouverture montrera. */
-		cacheEtats = { etats: resultat.etats, ollamaSigninUrl: resultat.ollamaSigninUrl };
 		fermerPopoversUsage();
 		liste.replaceChildren();
 		for (const etat of resultat.etats) poserLigne(etat);

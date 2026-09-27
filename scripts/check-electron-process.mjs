@@ -1673,3 +1673,118 @@ await withSrcModule("apps/windows/electron/surveillant-cli.ts", async ({ surveil
 	}
 	r.done();
 });
+
+/* ── AUCUNE CONSOLE VISIBLE, JAMAIS (tâche du 2026-09-27) ──
+   CE QU'IL EMPÊCHE. Un `spawn`/`spawnSync` du principal qui perd son
+   `windowsHide: true` (ajouté à la main, oublié à un nouveau site) rouvre
+   exactement le défaut vécu par Ahmed : une console qui flashe à l'écran,
+   ici à l'ouverture des réglages pendant la lecture des comptes CLI. Deux
+   assertions, sur le SOURCE RÉEL du fichier (texte, pas le module chargé —
+   c'est la présence littérale de l'option qui compte) :
+
+   1. CHAQUE site d'appel `spawn(`/`spawnSync(` de `process.ts` porte
+      `windowsHide` — sauf la liste blanche ci-dessous, qui ne peut que
+      RÉTRÉCIR (même cliquet que `RESTANTS` de `check-host.mjs`) : chacune de
+      ses entrées est un site qui ouvre une fenêtre EXPRÈS (le terminal
+      visible d'installation/connexion), documenté sur place.
+   2. `lancer` (le lanceur commun à `run` et aux sondes de comptes) appelle
+      bien `cacherFenetresDe` juste après avoir obtenu un PID — la fenêtre
+      qu'un CLI s'ouvre LUI-MÊME (voir l'en-tête de `scriptCacherFenetresProcessus`)
+      n'est pas couverte par `windowsHide`, qui ne joue que sur la console
+      que WINDOWS attacherait par défaut.
+
+   DISCRIMINANCE ÉPROUVÉE À LA MAIN (2026-09-27) : retirer `windowsHide: true`
+   d'un des sites déjà couverts, ou retirer l'appel à `cacherFenetresDe` dans
+   `lancer`, fait rougir ce groupe ; les restaurer le fait reverdir. */
+{
+	const r = makeReporter("Électron — aucun process lancé sans windowsHide, jamais de fenêtre propre à un CLI");
+	const brut = readFileSync("apps/windows/electron/process.ts", "utf-8");
+	// Les COMMENTAIRES retirés avant de chercher un site d'appel : ce fichier
+	// documente en prose d'anciens appels fautifs (une phrase qui nomme
+	// « ollama » et « spawn » côte à côte) — les compter comme des sites
+	// réels ferait échouer le contrôle sur une PHRASE, jamais sur du code.
+	// Retrait naïf d'un commentaire de bloc à l'autre : suffisant ici, aucune
+	// chaîne du fichier ne referme un commentaire par erreur.
+	const source = brut.replace(/\/\*[\s\S]*?\*\//g, m => " ".repeat(m.length));
+
+	/* Liste blanche des sites SANS `windowsHide`, un cliquet qui ne peut que
+	   rétrécir : chaque entrée est le texte EXACT du site d'appel, tel qu'il
+	   apparaît dans le fichier (espaces compris), pour qu'un site qui change
+	   de forme retombe sous l'assertion générale plutôt que de rester couvert
+	   par erreur. */
+	const SITES_SANS_WINDOWSHIDE = [
+		'spawn("powershell.exe", argumentsTerminal(titre, script), { stdio: "ignore" })',
+	];
+
+	/** Extrait, à partir de l'indice où commence `spawn(`/`spawnSync(`
+	    (l'indice du premier caractère après le nom), le texte de l'appel
+	    ENTIER jusqu'à sa parenthèse fermante — en comptant les parenthèses
+	    imbriquées (un tableau d'arguments, un `Object.assign(...)`, un appel
+	    `encoderCommande(...)` à l'intérieur). */
+	function extraireAppel(source, indiceOuvrante) {
+		let profondeur = 0;
+		for (let i = indiceOuvrante; i < source.length; i++) {
+			if (source[i] === "(") profondeur++;
+			else if (source[i] === ")") {
+				profondeur--;
+				if (profondeur === 0) return source.slice(indiceOuvrante, i + 1);
+			}
+		}
+		return null;
+	}
+
+	const sites = [];
+	const motif = /\bspawn(Sync)?\(/g;
+	for (let m; (m = motif.exec(source)); ) {
+		const appel = extraireAppel(source, m.index + (m[0].length - 1));
+		if (appel) sites.push("spawn" + (m[1] || "") + appel);
+	}
+	r.check("au moins un site de lancement trouvé (le motif de recherche n'a pas divergé du code)",
+		sites.length > 0, true);
+
+	/* `options` (identifiant, pas le mot `windowsHide` en toutes lettres) est
+	   accepté ICI parce que TROIS sites de `lancer`/`demarrerOllama`
+	   construisent leur `spawn` avec l'objet `options` partagé — l'assertion
+	   suivante vérifie que CET objet porte bien `windowsHide: true`, ce qui
+	   ferme le trou qu'accepter l'identifiant ouvrirait sinon. */
+	const manquants = sites.filter(s => !s.includes("windowsHide") && !/\boptions\b/.test(s) && !SITES_SANS_WINDOWSHIDE.includes(s));
+	r.check("chaque site de lancement porte `windowsHide` (en toutes lettres, ou via l'objet `options` vérifié plus bas), sauf la liste blanche documentée",
+		manquants, []);
+
+	const orphelins = SITES_SANS_WINDOWSHIDE.filter(s => !sites.includes(s));
+	r.check("la liste blanche ne contient que des sites qui existent VRAIMENT dans le fichier (un cliquet qui ne couvre rien de réel serait un mensonge)",
+		orphelins, []);
+
+	/* Les sites ci-dessus passent l'assertion précédente parce que `options`
+	   est un IDENTIFIANT, pas `windowsHide` en toutes lettres — cette seconde
+	   assertion ferme ce trou en vérifiant que CHAQUE objet `const options = {…}`
+	   du fichier (il y en a deux : `demarrerOllama` et `lancer`) porte bien
+	   `windowsHide: true`. Un troisième qui l'oublierait resterait invisible à
+	   l'assertion précédente ; celle-ci le voit. */
+	const definitionsOptions = source.match(/const options = \{[^}]*\}/g) || [];
+	r.check("au moins deux définitions de `options` trouvées (`demarrerOllama` et `lancer`)",
+		definitionsOptions.length >= 2, true);
+	r.check("CHAQUE objet `options` que ce fichier construit pour un `spawn` porte `windowsHide: true`",
+		definitionsOptions.filter(d => !/windowsHide:\s*true/.test(d)), []);
+
+	/* La fenêtre qu'un CLI s'ouvre lui-même (voir l'en-tête de
+	   `scriptCacherFenetresProcessus`) : `windowsHide` ne la couvre pas, seul
+	   un masquage après coup, par PID, le peut. */
+	r.check("`lancer` appelle `cacherFenetresDe` juste après avoir obtenu un PID, pour CHAQUE process qu'il lance",
+		/cacherFenetresDe\(enfant\.pid\)/.test(source), true);
+
+	r.done();
+}
+
+await withSrcModule("apps/windows/electron/process.ts", async ({ scriptCacherFenetresProcessus }) => {
+	const r = makeReporter("Électron — le script qui masque la fenêtre qu'un CLI s'ouvre lui-même");
+	const script = scriptCacherFenetresProcessus(4242);
+	r.check("le PID cible est celui donné, en toutes lettres", script.includes("$pidCible = 4242"), true);
+	r.check("chaque fenêtre visible du PID cible est cachée par ShowWindow(0) (SW_HIDE), jamais fermée ni tuée",
+		/ShowWindow\(\$h,\s*0\)/.test(script) && !/TerminateProcess|taskkill/.test(script), true);
+	r.check("le PID est jugé par IsWindowVisible ET GetWindowThreadProcessId, jamais par un titre ou une classe",
+		/IsWindowVisible/.test(script) && /GetWindowThreadProcessId/.test(script), true);
+	r.check("la boucle s'arrête d'elle-même quand le process cible n'existe plus, sans attendre le filet des 20 s",
+		/Get-Process -Id \$pidCible -ErrorAction SilentlyContinue/.test(script), true);
+	r.done();
+});

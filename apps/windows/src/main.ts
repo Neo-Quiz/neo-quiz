@@ -35,6 +35,7 @@ import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, vuesARetirer } from "./ui/transition-etat";
 import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings } from "./ui/settings";
+import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
 
@@ -513,5 +514,11 @@ void demarrer().finally(() => {
 			   le message d'erreur de démarrage. */
 			void miroirCourant?.demarrerSurveillance()
 				.catch(e => console.warn(LOG_PREFIX, "surveillance différée: échec au démarrage:", e));
+			/* Le cache des comptes CLI (« claude », « codex », « agy »), amorcé
+			   ICI plutôt qu'à la première ouverture des réglages — voir
+			   `amorcerCacheComptes`. Même place que la surveillance ci-dessus :
+			   après le signal `prete()`, jamais avant, et sans jamais retarder
+			   l'affichage de la fenêtre sur une sonde lente (~1 s, Antigravity). */
+			amorcerCacheComptes();
 		});
 });
