@@ -9,6 +9,8 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.error.startup": "Neo Quiz n'a pas pu démarrer : {error}",
 
 	"app.quiz.readError": "Impossible de lire {path} : {error}",
+	"app.quiz.close": "Fermer le quiz",
+	"app.quiz.titleWithMode": "{mode} : {title}",
 
 	"app.aiSettings.refused": "Impossible d'enregistrer les réglages IA : {error}",
 	"app.aiHost.title": "Autoriser ce serveur Ollama ?",

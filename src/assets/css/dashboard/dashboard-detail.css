@@ -21,38 +21,52 @@
 }
 
 /* ── Header ──
-   Rangée unique, comme la référence StudySmarter : flèche · titre · badge,
-   puis les actions à droite. La flèche s'aligne sur la LIGNE DU TITRE (le
-   chemin vit en dessous), d'où `align-items: flex-start` + le calage. */
+   Copié de StudySmarter (2026-09-27), mesuré sur sa capture : une CROIX de
+   16 px à trait de 2 px, gris neutre, son bord gauche à 41 px du bord du
+   panneau et son centre à 36 px de son haut ; le titre « Mode : titre » en
+   gras, 28 px après elle, centré sur elle, sur UNE ligne — ni compteur ni
+   chemin sous le titre. L'en-tête prend toute la largeur du panneau, pas la
+   colonne centrée de 1 182 px du contenu (`dashboard-base.css`). */
 .qbd-qz-header {
 	display: flex;
-	align-items: flex-start;
-	/* Resserré à 12px (retour Ahmed 2026-07-21) : la flèche appartient au
-	   titre, un écart plus large la faisait flotter toute seule. */
-	gap: 12px;
+	align-items: center;
+	/* 32 px de bouton autour d'une croix de 16 : 20 px d'écart font les 28
+	   de la référence entre le trait et le titre. */
+	gap: 20px;
 	flex-shrink: 0;
+	max-width: none;
+	/* Le panneau a 28 px de marge haute : remonté de 8, le centre de la croix
+	   tombe à 36 px du haut, comme la référence. */
+	margin-top: -8px;
 }
 
+/* La croix : l'icône Lucide `x` (6 → 18 sur 24) posée sur les 32 px du
+   bouton fait un trait de 16 px ; `stroke-width` 1,5 le ramène à 2 px. Le
+   bouton garde le survol des retours du tableau de bord (fond, texte
+   normal) : la référence ne montre pas le sien. */
 .qbd-root .qbd-qz-back {
 	flex-shrink: 0;
-	/* Cale l'axe de la flèche sur celui des capitales du titre (19px/1.2). */
-	margin-top: -3px;
-	margin-left: -6px;
+}
+.qbd-root .qbd-qz-back svg {
+	width: 32px;
+	height: 32px;
+	stroke-width: 1.5;
 }
 
+/* Le titre ne dépasse jamais sa ligne ; `position: relative` sert de repère
+   au chemin qui apparaît au-dessus de lui. */
 .qbd-qz-headline {
+	position: relative;
 	flex: 1;
 	min-width: 0;
-}
-
-.qbd-qz-title-row {
 	display: flex;
-	align-items: center;
-	gap: 10px;
-	min-width: 0;
 }
 
+/* `inline` par sa largeur (le survol ne vise que le TEXTE du titre, pas la
+   ligne vide à sa droite), tronqué quand il ne tient pas. */
 .qbd-qz-title {
+	min-width: 0;
+	max-width: 100%;
 	font-size: 19px;
 	font-weight: 700;
 	color: var(--text-normal);
@@ -63,32 +77,41 @@
 	white-space: nowrap;
 }
 
-/* Compteur de questions collé au titre (le « 96 » de la référence) :
-   pastille discrète, jamais un badge coloré. Rectangle à coins ARRONDIS et
-   non pilule (demande Ahmed 2026-07-21) — le radius suit celui des petites
-   surfaces du dashboard. */
-.qbd-qz-count {
-	flex-shrink: 0;
-	min-width: 24px;
-	padding: 3px 7px;
-	border-radius: var(--radius-s, 6px);
-	background: var(--background-modifier-border);
-	color: var(--text-muted);
-	font-size: 11px;
-	font-weight: 600;
-	text-align: center;
-	line-height: 1.5;
-}
-
-/* Le chemin de la note, sous le titre : dans la police de l'interface. Une
-   police de code à 10 px disait « donnée technique » là où il n'y a qu'un
-   emplacement à lire (2026-09-24). L'extension reste visible. */
+/* Le chemin de la note, JUSTE AU-DESSUS du titre et au survol du titre
+   seulement (`quiz-page.ts`). Hors du flux : son apparition ne décale rien.
+   Collé au titre, sans espace entre les deux (la marge est un `padding`) :
+   la souris passe de l'un à l'autre sans que le chemin disparaisse, et on
+   peut le sélectionner. Coupé au milieu : la tête se tronque, la queue
+   (trois caractères et l'extension) jamais — le type du fichier reste
+   visible. */
 .qbd-qz-path {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 100%;
+	display: flex;
+	min-width: 0;
+	margin: 0;
+	padding-bottom: 3px;
 	font-size: 11.5px;
 	color: var(--text-faint);
-	margin: 3px 0 0;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 120ms ease;
+}
+.qbd-qz-title:hover + .qbd-qz-path,
+.qbd-qz-path:hover {
+	opacity: 1;
+	pointer-events: auto;
+}
+.qbd-qz-path-tete {
+	min-width: 0;
 	overflow: hidden;
+	white-space: nowrap;
 	text-overflow: ellipsis;
+}
+.qbd-qz-path-queue {
+	flex-shrink: 0;
 	white-space: nowrap;
 }
 

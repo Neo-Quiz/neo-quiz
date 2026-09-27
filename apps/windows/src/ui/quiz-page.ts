@@ -27,6 +27,8 @@ import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { ajouter } from "../../../../src/dom";
+import { couperNomAuMilieu } from "../../../../src/dashboard/file-icons";
+import { quizModeLabel } from "../../../../src/dashboard/quiz-card";
 // Types en `import type` seulement : ils viennent du noyau et de `types/quiz`,
 // et ce fichier ne doit tirer aucune implémentation de plus.
 import type { ReviewGrade } from "../../../../src/scheduler";
@@ -68,19 +70,16 @@ export async function openQuizPage(
 ): Promise<() => void> {
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
-	// ── En-tête : retour · titre · chemin ──
+	// ── En-tête : croix · « Mode : titre », le chemin au survol du titre ──
 	// `t()` est appelé ICI, au rendu, jamais dans une constante de module : une
 	// chaîne traduite au chargement serait figée à la langue du démarrage.
 	const entete = ajouter(contenu, "div", "qbd-qz-header");
 	const retour = ajouter(entete, "button", "qbd-quizzes-crumb-back qbd-qz-back");
 	retour.type = "button";
-	/* Clé du domaine `dashboard`, empruntée volontairement : « dashboard.quiz.back »
-	   est le libellé du MÊME bouton retour côté greffon (et la feuille de style dit
-	   « un seul bouton retour »). En créer un second dans `app` donnerait deux
-	   traductions du même mot, qui divergeraient à la première retouche. */
-	retour.setAttribute("aria-label", t("dashboard.quiz.back"));
-	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
-	ajouter(retour, "span", "qbd-quizzes-crumb-icon");
+	/* Une CROIX et non la flèche du tableau de bord (2026-09-27, référence
+	   StudySmarter) : on FERME le quiz, on ne remonte pas d'une page. */
+	retour.setAttribute("aria-label", t("app.quiz.close"));
+	currentHost().ui.setIcon(retour, "x");
 	retour.addEventListener("click", () => onBack());
 	/* Le bouton « précédent » de la souris fait la même chose que la flèche
 	   (2026-09-25). Consommé dès l'appui, en capture ; l'action part au
@@ -96,12 +95,17 @@ export async function openQuizPage(
 	document.addEventListener("mouseup", surBoutonSouris, true);
 
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");
-	const ligneTitre = ajouter(titrage, "div", "qbd-qz-title-row");
 	// `title` et non `basename` : c'est le champ que `QuizIndexEntry` prévoit
 	// pour l'affichage (les deux sont égaux aujourd'hui, pas forcément demain).
-	ajouter(ligneTitre, "h2", "qbd-qz-title", entry.title);
-	ajouter(ligneTitre, "span", "qbd-qz-count", String(entry.questions));
-	ajouter(titrage, "p", "qbd-qz-path", entry.path);
+	ajouter(titrage, "h2", "qbd-qz-title", t("app.quiz.titleWithMode", { mode: quizModeLabel(entry.mode), title: entry.title }));
+	/* Le CHEMIN de la note, affiché juste au-dessus du titre, au SURVOL du
+	   titre seulement (la référence n'a qu'une ligne) ; APRÈS lui dans le DOM
+	   pour que le survol le désigne (`+`, dashboard-detail.css). Coupé au
+	   milieu : l'extension reste visible (`couperNomAuMilieu`). */
+	const chemin = ajouter(titrage, "p", "qbd-qz-path");
+	const { tete, queue } = couperNomAuMilieu(entry.path);
+	ajouter(chemin, "span", "qbd-qz-path-tete", tete);
+	if (queue) ajouter(chemin, "span", "qbd-qz-path-queue", queue);
 
 	/* Le conteneur donné au moteur, et LUI SEUL : c'est sur lui que le moteur
 	   posera `__quizDestroy`, et c'est lui que le démontage doit viser. Le

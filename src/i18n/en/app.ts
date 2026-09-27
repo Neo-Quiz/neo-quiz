@@ -22,6 +22,8 @@ export const EN_APP = {
 	   ouvert par le coffre, ici il vient du disque et la cause doit être nommée —
 	   un message qui avale la cause rend la panne indiagnosticable. */
 	"app.quiz.readError": "Could not read {path}: {error}",
+	"app.quiz.close": "Close the quiz",
+	"app.quiz.titleWithMode": "{mode}: {title}",
 
 	/* ── La confirmation NATIVE d'un hôte Ollama hors liste ──
 	   Affichée par le PROCESSUS PRINCIPAL (`electron/canaux.ts`, garde de la
