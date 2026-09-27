@@ -1136,6 +1136,49 @@ body::after {
 	visibility: hidden;
 }
 
+/* LA PILE DE FEUILLES (2026-09-27, référence StudySmarter) : lancer un quiz
+   depuis le tableau de bord ne le démonte plus (`main.ts`, `vueGardee`) — il
+   reste monté, `inert`, `aria-hidden`, et FIGÉ dans son état reculé par cette
+   classe STATIQUE (jamais une animation `fill: forwards` qui resterait
+   posée indéfiniment, cf. `check:view-enter`). `ui/transition-quiz.ts` la
+   pose à la fin de l'entrée et la retire au retour, juste avant de rejouer
+   l'animation inverse sur ce même nœud (repeint, jamais reconstruit).
+
+   Le TRANSFORM est celui du recul (`RECUL`, `transition-quiz.ts`) : la
+   coquille remonte de 16 px et rétrécit de 3 % en largeur, ce qui suffit à
+   faire dépasser son bord haut au-dessus du panneau du quiz (les deux
+   panneaux partagent la même case de grille et la même hauteur — voir
+   `nq-empile` plus haut) et à laisser voir ses coins arrondis sur les côtés.
+   L'ASSOMBRISSEMENT est un voile (`::after`) posé sur le PANNEAU seul, et
+   non une opacité sur toute la coquille : le verre (`backdrop-filter`) reste
+   lisible au lieu de laisser voir le fond d'écran à travers, contrairement à
+   l'ancienne image clé `opacity: 0.5` de la transition (acceptable le temps
+   d'une animation de 500 ms, pas pour toute la durée d'un quiz). */
+#neo-quiz-root > .qbd-layout.nq-pile-fond {
+	transform: translateY(-16px) scaleX(0.97);
+}
+#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content {
+	position: relative;
+}
+#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: rgba(0, 0, 0, 0.35);
+	pointer-events: none;
+}
+/* Même repli que l'ancienne animation (en-tête effacé, rail estompé), posé
+   ici en statique pour que rien ne reste en `fill: forwards`. */
+#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-fiche-head,
+#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-quizzes-header,
+#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-home-header {
+	opacity: 0;
+}
+#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-sidebar {
+	opacity: 0.6;
+}
+
 /* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
    DÉCORATION, pas un bouton — ni curseur, ni survol, ni cible au clavier.
    Il avait été retiré du rail le 2026-09-23 parce qu'il « ne menait nulle

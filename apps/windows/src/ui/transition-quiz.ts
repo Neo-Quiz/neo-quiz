@@ -115,27 +115,42 @@ function absorberEntree(entrant: HTMLElement, sens: SensTransition): void {
  * `entree` : l'entrant est l'écran d'un quiz, il monte par-dessus la page
  * qui recule. `sortie` : le sortant est l'écran du quiz, il redescend et
  * découvre la page qui revient.
+ *
+ * `garder` (2026-09-27, « pile de feuilles ») : des vues parmi `sortants` qui
+ * ne sont PAS démontées ni retirées — la coquille du tableau de bord, gardée
+ * derrière le quiz (`main.ts`, `vueGardee`). Elles reçoivent la MÊME
+ * animation de recul que les vraies sortantes, mais à la fin, au lieu d'être
+ * retirées, elles reçoivent la classe statique `nq-pile-fond` (`shell.css`) —
+ * jamais une animation `fill: "forwards"` qui resterait posée indéfiniment
+ * (le piège de `npm run check:view-enter`). `nq-empile` reste alors sur la
+ * racine : les deux vues continuent de se superposer tant que la vue gardée
+ * n'est pas revenue au premier plan.
  */
-export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entrant: HTMLElement, sens: SensTransition): Promise<void> {
-	/* L'entrant n'est JAMAIS retiré, même s'il figurait parmi les sortants
-	   (`vuesARetirer`) : c'est l'écran qu'on vient de monter. */
-	const aRetirer = vuesARetirer(sortants, [entrant]);
+export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entrant: HTMLElement, sens: SensTransition, garder: HTMLElement[] = []): Promise<void> {
+	/* Ni l'entrant ni une vue GARDÉE ne sont jamais retirés, même listés
+	   parmi les sortants (`vuesARetirer`). */
+	const aRetirer = vuesARetirer(sortants, [entrant, ...garder]);
 	const retirer = (): void => {
 		for (const s of aRetirer) s.remove();
-		root.classList.remove("nq-empile");
+		for (const g of garder) {
+			g.classList.add("nq-pile-fond");
+			g.setAttribute("aria-hidden", "true");
+		}
+		// Encore une vue gardée dessous : la grille reste, le quiz reste dessus.
+		if (garder.length === 0) root.classList.remove("nq-empile");
 	};
-	if (aRetirer.length === 0 || choisirMode(mouvementReduit(), document.visibilityState === "hidden") === "immediat") {
+	if ((aRetirer.length === 0 && garder.length === 0) || choisirMode(mouvementReduit(), document.visibilityState === "hidden") === "immediat") {
 		retirer();
 		return Promise.resolve();
 	}
-	for (const s of aRetirer) s.inert = true;
+	for (const s of [...aRetirer, ...garder]) s.inert = true;
 	root.classList.add("nq-empile");
 	absorberEntree(entrant, sens);
 
 	const base: KeyframeAnimationOptions = { duration: DUREE_MS, easing: COURBE };
 	const animations: Animation[] = [];
 	if (sens === "entree") {
-		for (const s of aRetirer) {
+		for (const s of [...aRetirer, ...garder]) {
 			animations.push(s.animate(RECUL, { ...base, fill: "forwards" }));
 			for (const el of s.querySelectorAll<HTMLElement>(EN_TETES)) {
 				animations.push(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: COURBE, fill: "forwards" }));

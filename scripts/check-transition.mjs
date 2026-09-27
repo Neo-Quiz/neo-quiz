@@ -77,5 +77,13 @@ await withSrcModule("apps/windows/src/ui/transition-etat.ts", ({ etatInitial, de
 	r.check("une vue listée deux fois n'est retirée qu'une fois", vuesARetirer(["coquille", "coquille"], ["quiz"]), ["coquille"]);
 	r.check("la vue utile n'est jamais retirée, même listée parmi les sortants", vuesARetirer(["coquille", "quiz"], ["quiz"]), ["coquille"]);
 
+	/* LA PILE DE FEUILLES (2026-09-27) : lancer un quiz depuis la coquille ne
+	   la démonte plus, elle est GARDÉE (`main.ts`, `vueGardee`) — `ui/transition-
+	   quiz.ts` l'ajoute à la liste des vues « utiles » de `vuesARetirer`, au même
+	   titre que l'entrant, pour qu'elle ne soit jamais retirée du DOM. */
+	r.check("une vue GARDÉE n'est jamais retirée, même seule sortante", vuesARetirer(["coquille"], ["quiz", "coquille"]), []);
+	r.check("… la vue gardée protège aussi une AUTRE sortante", vuesARetirer(["coquille", "reglages"], ["quiz", "coquille"]), ["reglages"]);
+	r.check("retour vers une vue gardée : elle redevient l'entrante, seul le quiz est retiré", vuesARetirer(["coquille", "quiz"], ["coquille"]), ["quiz"]);
+
 	r.done();
 });

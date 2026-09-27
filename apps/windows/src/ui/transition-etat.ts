@@ -72,6 +72,11 @@ export function choisirMode(mouvementReduit: boolean, fenetreMasquee: boolean): 
  * Les vues à retirer à la fin d'une transition : les sortantes, SAUF une
  * vue encore utile (l'écran qu'on vient de monter), et chacune UNE fois
  * même si elle était listée deux fois.
+ *
+ * Sert aussi à la « pile de feuilles » (2026-09-27, `main.ts`, `vueGardee`) :
+ * la coquille du tableau de bord GARDÉE derrière un quiz est une « utile »
+ * de plus, jamais retirée ni démontée — `utiles` accepte n'importe quel
+ * nombre de vues protégées, l'entrant et les gardées comprises.
  */
 export function vuesARetirer<V>(sortants: readonly V[], utiles: readonly V[]): V[] {
 	return [...new Set(sortants)].filter(v => !utiles.includes(v));

@@ -31,6 +31,7 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
+import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, vuesARetirer } from "./ui/transition-etat";
 import type { SensEcran } from "./ui/transition-etat";
@@ -65,7 +66,16 @@ import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
  * l'attend pas (`demonter()`, `void`) ; la fermeture de la fenêtre, si
  * (`onCloseRequested`, plus bas).
  */
-let demonterCourant: (() => void | Promise<void>) | null = null;
+/** Ce que `mount`/`ouvrirQuiz` posent pour l'écran affiché : de quoi le
+    démonter, et — pour la coquille du tableau de bord seulement — de quoi la
+    REPEINDRE (`DashboardHandle.repaint`), utilisé par la pile de feuilles
+    ci-dessous. `repaint` est absent pour l'écran d'un quiz : il n'a rien à
+    repeindre depuis l'extérieur. */
+interface EcranActif {
+	demonter: () => void | Promise<void>;
+	repaint?: () => void;
+}
+let demonterCourant: EcranActif | null = null;
 
 /* La carte des racines du démarrage, retenue pour la SEULE chose que le
    contrat d'hôte ne peut pas rendre : traduire un chemin ABSOLU du disque en
@@ -130,14 +140,38 @@ const reglagesIa: AiSettingsHost = {
 	},
 };
 
-/** Démonte l'écran courant et rend ce qu'il reste à attendre (l'écriture en
-    attente de la page d'un quiz), ou rien. `demonterCourant` est remis à
-    `null` AVANT de rendre : un second appel pendant l'attente ne démonte pas
-    deux fois. */
+/**
+ * LA VUE GARDÉE (2026-09-27, « pile de feuilles », référence StudySmarter).
+ *
+ * Lancer un quiz depuis le tableau de bord ne DÉMONTE plus sa coquille :
+ * elle reste montée derrière, `inert`, figée en pile par la classe statique
+ * `nq-pile-fond` (`shell.css`, posée par `ui/transition-quiz.ts`). Au
+ * retour, elle est REPEINTE (`DashboardHandle.repaint`) puis ramenée au
+ * premier plan par l'animation inverse — jamais reconstruite : défilement,
+ * onglet et dossiers dépliés survivent.
+ *
+ * UNE SEULE vue gardée à la fois : `ouvrirQuiz` ne peut en poser une nouvelle
+ * que depuis la coquille (la seule à exposer `repaint`), qui n'ouvre jamais
+ * un second quiz par-dessus le premier — il n'y a donc jamais de pile de
+ * deux. `null` hors quiz, et aussi quand l'écran affiché au lancement n'était
+ * pas la coquille seule (`.qbd-layout`) : dans ce cas, l'ancien
+ * comportement s'applique, sans guarde.
+ */
+let vueGardee: { layout: HTMLElement; ecran: EcranActif } | null = null;
+
+/** Démonte l'écran courant ET la vue gardée s'il y en a une, et rend ce qu'il
+    reste à attendre (l'écriture en attente de la page d'un quiz), ou rien.
+    `demonterCourant`/`vueGardee` sont remis à `null` AVANT de rendre : un
+    second appel pendant l'attente ne démonte pas deux fois. Les DEUX sont
+    démontés ici (fermeture de l'app pendant un quiz : la coquille gardée
+    dessous doit, elle aussi, couper ses écouteurs et vider ses tampons). */
 function demonter(): Promise<void> | void {
+	const g = vueGardee;
+	vueGardee = null;
 	const d = demonterCourant;
 	demonterCourant = null;
-	return d?.();
+	const attentes = [g?.ecran.demonter(), d?.demonter()].filter((p): p is Promise<void> => p instanceof Promise);
+	if (attentes.length > 0) return Promise.all(attentes).then(() => undefined);
 }
 
 /**
@@ -181,10 +215,36 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 	const sortants = ecransDe(root);
 	// Au démarrage (racine vide), pas de transition, donc rien à soumettre.
 	if (sortants.length > 0 && !soumettre("retour", () => mount(root, scanner, store, stats, sessions))) return;
+
+	/* RETOUR VERS UNE VUE GARDÉE : elle n'est ni détruite ni reconstruite,
+	   seulement repeinte puis ramenée au premier plan. Une vue gardée dont le
+	   nœud n'est plus parmi les écrans affichés serait un résidu (ne devrait
+	   pas arriver) : démontée par précaution plutôt que fuir. */
+	if (vueGardee && !sortants.includes(vueGardee.layout)) {
+		void vueGardee.ecran.demonter();
+		vueGardee = null;
+	}
+	if (vueGardee) {
+		const gardee = vueGardee;
+		vueGardee = null;
+		demonterCourant = gardee.ecran;
+		gardee.layout.classList.remove("nq-pile-fond");
+		gardee.layout.removeAttribute("aria-hidden");
+		gardee.layout.inert = false;
+		/* Repeinte AVANT l'animation inverse : le score, l'avancement et les
+		   stats ont pu changer pendant le quiz — voir `DashboardHandle.repaint`.
+		   `entering` y vaut faux (vue inchangée depuis la dernière peinture) :
+		   pas de rejeu de l'entrée CSS par-dessus le retour animé (constat n°1
+		   de `transition-review.md`). */
+		gardee.ecran.repaint?.();
+		void jouerTransition(root, sortants, gardee.layout, "sortie").finally(transitionFinie);
+		return;
+	}
+
 	void demonter();
 	// Empilés AVANT le montage : la coquille se met en page à sa vraie place.
 	if (sortants.length > 0) root.classList.add("nq-empile");
-	demonterCourant = monterDashboard(root, {
+	const coquille: DashboardHandle = monterDashboard(root, {
 		scanner,
 		statsStore: stats,
 		reviewStore: store,
@@ -195,6 +255,7 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		onOpenSettings: () => ouvrirReglages(),
 		sessions,
 	});
+	demonterCourant = coquille;
 	const entrant = root.lastElementChild;
 	if (sortants.length === 0) return;
 	if (!(entrant instanceof HTMLElement)) {
@@ -271,16 +332,34 @@ function ouvrirReglages(): void {
  * démonterait rien deux fois. `soumettre` l'ignore même tout à fait,
  * jusqu'à la fin de la transition.
  *
- * LA TRANSITION (2026-09-27, `ui/transition-quiz.ts`) : la coquille démontée
- * RESTE affichée, inerte, pendant la lecture de la note et les 500 ms où
- * l'écran du quiz monte par-dessus elle ; il est invisible tant qu'il charge
+ * LA TRANSITION (2026-09-27, `ui/transition-quiz.ts`) : la coquille RESTE
+ * affichée, inerte, pendant la lecture de la note et les 500 ms où l'écran
+ * du quiz monte par-dessus elle ; il est invisible tant qu'il charge
  * (`nq-chargement`, `shell.css`).
+ *
+ * LA PILE DE FEUILLES (même date) : quand l'écran affiché est la coquille
+ * SEULE (`.qbd-layout`, celle qui expose `repaint`), elle n'est PAS démontée
+ * ici — elle est GARDÉE (`vueGardee`), figée en pile derrière le quiz plutôt
+ * que détruite puis reconstruite au retour. Depuis un AUTRE écran (aucun
+ * aujourd'hui, mais un futur écran non-coquille), l'ancien comportement
+ * s'applique : démontage complet, pas de pile.
  */
 async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
 	if (!soumettre("ouvrir", () => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); })) return;
 	const sortants = ecransDe(root);
 	for (const s of sortants) s.inert = true;
-	void demonter();
+
+	/* Une seule coquille GARDABLE : l'écran affiché est ELLE SEULE, et son
+	   `EcranActif` expose `repaint` (c'est ce qui la distingue de l'écran d'un
+	   quiz, qui n'en a pas). Sinon, comportement d'avant : démontage complet. */
+	const garder: HTMLElement[] = [];
+	if (sortants.length === 1 && sortants[0].classList.contains("qbd-layout") && demonterCourant?.repaint) {
+		vueGardee = { layout: sortants[0], ecran: demonterCourant };
+		demonterCourant = null;
+		garder.push(sortants[0]);
+	} else {
+		void demonter();
+	}
 	root.classList.add("nq-empile", "nq-chargement");
 	/* Le démontage rendu par `openQuizPage` appelle `__quizDestroy` : sans lui,
 	   chaque aller-retour laisserait vivre une instance de moteur complète
@@ -290,23 +369,28 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	   `StatsStore` portent déjà exactement la FORME que `openQuizPage`
 	   attend — les envelopper dans un objet littéral n'ajouterait rien. */
 	try {
-		demonterCourant = await openQuizPage(root, entry, () => {
+		const demonterQuiz = await openQuizPage(root, entry, () => {
 			mount(root, scanner, store, stats, sessions);
 		}, store, stats, sessions);
+		demonterCourant = { demonter: demonterQuiz };
 		root.classList.remove("nq-chargement");
 		const entrant = root.lastElementChild;
 		if (entrant instanceof HTMLElement && !sortants.includes(entrant)) {
-			await jouerTransition(root, sortants, entrant, "entree");
+			await jouerTransition(root, sortants, entrant, "entree", garder);
 		}
 	} finally {
 		/* Sur TOUTES les issues, un rejet imprévu compris : aucune coquille
-		   fantôme ne reste sous le quiz, l'écran du quiz (la vue UTILE) n'est
-		   jamais retiré, et le verrou se rouvre — puis un retour demandé
-		   pendant la montée part. Après une transition jouée, ces lignes ne
-		   trouvent plus rien à retirer. */
+		   fantôme ne reste sous le quiz (sauf la vue GARDÉE, volontairement
+		   laissée), l'écran du quiz (la vue UTILE) n'est jamais retiré, et le
+		   verrou se rouvre — puis un retour demandé pendant la montée part.
+		   Après une transition jouée, ces lignes ne trouvent plus rien à
+		   retirer. */
 		const courant = root.lastElementChild;
-		for (const s of vuesARetirer(sortants, courant && !sortants.includes(courant as HTMLElement) ? [courant] : [])) s.remove();
-		root.classList.remove("nq-empile", "nq-chargement");
+		const proteges = [courant, vueGardee?.layout].filter((v): v is HTMLElement => v instanceof HTMLElement);
+		for (const s of vuesARetirer(sortants, proteges)) s.remove();
+		root.classList.remove("nq-chargement");
+		// La grille reste tant qu'une vue est gardée dessous.
+		if (!vueGardee) root.classList.remove("nq-empile");
 		transitionFinie();
 	}
 }

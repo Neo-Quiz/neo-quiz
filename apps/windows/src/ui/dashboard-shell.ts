@@ -301,7 +301,23 @@ export interface MonterDashboardDeps {
 }
 
 /**
- * Monte le rail + la page courante dans `root`, et rend le démontage.
+ * Ce que rend `monterDashboard` : de quoi démonter la coquille, et de quoi la
+ * REPEINDRE sans la reconstruire — le second sert à la « pile de feuilles »
+ * (2026-09-27, `main.ts`, `vueGardee`) : lancer un quiz depuis la coquille ne
+ * la démonte plus, elle reste montée derrière, inerte ; `repaint` est ce
+ * qu'appelle `main.ts` juste avant l'animation de retour, pour que la vue
+ * gardée affiche les données à jour (score, avancement) sans perdre son
+ * défilement, son onglet ni ses dossiers dépliés — ce qu'un remontage complet
+ * perdrait.
+ */
+export interface DashboardHandle {
+	demonter: () => Promise<void>;
+	repaint: () => void;
+}
+
+/**
+ * Monte le rail + la page courante dans `root`, et rend la poignée
+ * (`DashboardHandle`) qui permet de la démonter ou de la repeindre.
  *
  * `root` DOIT être vide à l'appel (comme pour `renderSettings`/`openQuizPage`) :
  * c'est `main.ts` qui vide le conteneur avant chaque changement d'écran, au
@@ -313,7 +329,7 @@ export interface MonterDashboardDeps {
  * d'écran n'a pas à l'attendre ; la fermeture de la fenêtre, si — c'est
  * `main.ts` qui décide lequel des deux il est.
  */
-export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): () => Promise<void> {
+export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): DashboardHandle {
 	const layout = ajouter(root, "div", "qbd-layout");
 	// `qbd-sidebar` et non `qbd-nav` : c'est la classe que `src/assets/css/
 	// dashboard/dashboard-base.css` habille (largeur, fond transparent) — le
@@ -868,7 +884,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	   — l'oublier fuyait une instance par ouverture. Le démontage est fait
 	   avant le premier `await` ; seule l'écriture est attendue. Idempotent :
 	   un second appel rend une promesse déjà résolue. */
-	let demonte: Promise<void> | null = null;
+	let demontage: Promise<void> | null = null;
 	/* Ctrl+Z hors d'un champ : annule la dernière suppression de quiz (Ahmed,
 	   2026-09-19). Dans un champ, c'est l'annulation de frappe du navigateur,
 	   qu'on ne touche pas. Un menu ou une modale ne l'interceptent pas non
@@ -884,8 +900,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 	document.addEventListener("mousedown", surBoutonSouris, true);
 	document.addEventListener("mouseup", surBoutonSouris, true);
 
-	return () => {
-		if (demonte) return demonte;
+	const demonter = (): Promise<void> => {
+		if (demontage) return demontage;
 		document.removeEventListener("keydown", surCtrlZ);
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);
@@ -896,7 +912,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): (
 		   survivraient sinon à la coquille (même geste que l'`onClose` du
 		   greffon). */
 		ai.dispose();
-		demonte = detail.dispose();
-		return demonte;
+		demontage = detail.dispose();
+		return demontage;
 	};
+	return { demonter, repaint: peindre };
 }
