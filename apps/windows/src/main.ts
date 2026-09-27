@@ -32,6 +32,8 @@ import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
 import { jouerTransition } from "./ui/transition-quiz";
+import { demander, etatInitial, finir, vuesARetirer } from "./ui/transition-etat";
+import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings } from "./ui/settings";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
@@ -138,14 +140,31 @@ function demonter(): Promise<void> | void {
 }
 
 /**
- * VRAI de l'instant où l'on demande un changement d'écran (lancer un quiz,
- * en revenir) jusqu'à la fin de sa transition (`ui/transition-quiz.ts`).
- * Pendant ce temps, toute autre demande est IGNORÉE : un double clic sur
- * « Commencer le quiz » ne lance pas deux moteurs, un double clic sur la
- * flèche retour ne remonte pas deux coquilles. Posé AVANT la lecture de la
- * note, qui est asynchrone : c'est là que le second clic arrivait.
+ * L'état des changements d'écran (lancer un quiz, en revenir), de la
+ * demande jusqu'à la fin de sa transition (`ui/transition-quiz.ts`). Les
+ * règles vivent dans le noyau pur `ui/transition-etat.ts` (`npm run
+ * check:transition`) : pendant une transition, une demande du même sens est
+ * un double clic, IGNORÉ ; une demande du sens contraire (retour cliqué
+ * pendant que le quiz monte) est MISE EN FILE et part à la fin. La demande
+ * porte de quoi se rejouer : l'appel lui-même.
+ * Posé AVANT la lecture de la note, qui est asynchrone : c'est là que le
+ * second clic arrivait.
  */
-let transitionEnCours = false;
+let etatEcran = etatInitial<() => void>();
+
+/** Soumet une demande de changement d'écran ; vrai si elle part MAINTENANT. */
+function soumettre(sens: SensEcran, rejouer: () => void): boolean {
+	const r = demander(etatEcran, { sens, donnee: rejouer });
+	etatEcran = r.etat;
+	return r.action === "lancer";
+}
+
+/** Fin d'une transition : repos, puis la demande en file, s'il y en a une. */
+function transitionFinie(): void {
+	const r = finir(etatEcran);
+	etatEcran = r.etat;
+	r.suivante?.donnee();
+}
 
 /** Les écrans affichés dans la racine, qui vont céder la place au suivant. */
 function ecransDe(root: HTMLElement): HTMLElement[] {
@@ -158,8 +177,9 @@ function ecransDe(root: HTMLElement): HTMLElement[] {
    l'écran du quiz (déjà démonté) reste affiché et redescend pendant que la
    coquille revient derrière lui ; `jouerTransition` le retire à la fin. */
 export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp): void {
-	if (transitionEnCours) return;
 	const sortants = ecransDe(root);
+	// Au démarrage (racine vide), pas de transition, donc rien à soumettre.
+	if (sortants.length > 0 && !soumettre("retour", () => mount(root, scanner, store, stats, sessions))) return;
 	void demonter();
 	// Empilés AVANT le montage : la coquille se met en page à sa vraie place.
 	if (sortants.length > 0) root.classList.add("nq-empile");
@@ -179,10 +199,10 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 	if (!(entrant instanceof HTMLElement)) {
 		for (const s of sortants) s.remove();
 		root.classList.remove("nq-empile");
+		transitionFinie();
 		return;
 	}
-	transitionEnCours = true;
-	void jouerTransition(root, sortants, entrant, "sortie").finally(() => { transitionEnCours = false; });
+	void jouerTransition(root, sortants, entrant, "sortie").finally(transitionFinie);
 }
 
 /** La modale des réglages, quand elle est ouverte. Une SEULE à la fois : le
@@ -247,8 +267,8 @@ function ouvrirReglages(): void {
  * L'affectation de `demonterCourant` se fait APRÈS l'`await` — `openQuizPage`
  * lit le fichier avant de rendre — mais le démontage de la liste, lui, a lieu
  * AVANT : entre les deux, `demonterCourant` vaut `null`, et un second clic ne
- * démonterait rien deux fois. Le verrou `transitionEnCours` l'ignore même
- * tout à fait, jusqu'à la fin de la transition.
+ * démonterait rien deux fois. `soumettre` l'ignore même tout à fait,
+ * jusqu'à la fin de la transition.
  *
  * LA TRANSITION (2026-09-27, `ui/transition-quiz.ts`) : la coquille démontée
  * RESTE affichée, inerte, pendant la lecture de la note et les 500 ms où
@@ -256,8 +276,7 @@ function ouvrirReglages(): void {
  * (`nq-chargement`, `shell.css`).
  */
 async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
-	if (transitionEnCours) return;
-	transitionEnCours = true;
+	if (!soumettre("ouvrir", () => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); })) return;
 	const sortants = ecransDe(root);
 	for (const s of sortants) s.inert = true;
 	void demonter();
@@ -280,11 +299,14 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 		}
 	} finally {
 		/* Sur TOUTES les issues, un rejet imprévu compris : aucune coquille
-		   fantôme ne reste sous le quiz, et le verrou se rouvre. Après une
-		   transition jouée, ces lignes ne trouvent plus rien à faire. */
-		for (const s of sortants) s.remove();
+		   fantôme ne reste sous le quiz, l'écran du quiz (la vue UTILE) n'est
+		   jamais retiré, et le verrou se rouvre — puis un retour demandé
+		   pendant la montée part. Après une transition jouée, ces lignes ne
+		   trouvent plus rien à retirer. */
+		const courant = root.lastElementChild;
+		for (const s of vuesARetirer(sortants, courant && !sortants.includes(courant as HTMLElement) ? [courant] : [])) s.remove();
 		root.classList.remove("nq-empile", "nq-chargement");
-		transitionEnCours = false;
+		transitionFinie();
 	}
 }
 

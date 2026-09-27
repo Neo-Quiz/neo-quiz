@@ -27,7 +27,7 @@
    - l'ancienne vue reste 500 ms dans le DOM. Elle est DÉJÀ démontée
      (`demonterCourant`, écouteurs et abonnements retirés) et `inert` : ni
      clic ni focus. Elle est retirée à la fin, sur TOUTES les issues
-     (animation finie, annulée, ou garde de temps ci-dessous) ;
+     (événement `finish`, fenêtre masquée, minuteur de secours ci-dessous) ;
    - pendant la transition, la racine passe en grille à une seule case
      (`nq-empile`, `shell.css`) : les deux vues occupent la même place. La
      classe tombe avec les vues sortantes ;
@@ -37,6 +37,8 @@
      leur dernière image. Seules les SORTANTES tiennent leur dernière image
      (`forwards`), le temps d'être retirées.
 ══════════════════════════════════════════════════════════ */
+
+import { choisirMode, uneFois, vuesARetirer } from "./transition-etat";
 
 const DUREE_MS = 500;
 const COURBE = "cubic-bezier(0.36, 0.66, 0, 1)";
@@ -61,11 +63,14 @@ const RETOUR: Keyframe[] = [
 const EN_TETES = ".qbd-fiche-head, .qbd-quizzes-header, .qbd-home-header";
 const RAIL = ".qbd-sidebar";
 
-/* Au-delà, la transition est FORCÉE à sa fin : une animation qui ne se
-   terminerait jamais (fenêtre masquée au mauvais moment, nœud retiré par
-   ailleurs) laisserait la vue fantôme dans le DOM et le verrou de `main.ts`
-   fermé pour toujours. */
-const GARDE_MS = DUREE_MS + 500;
+/* Le minuteur de SECOURS, jamais le chemin normal : la fin normale est
+   l'événement `finish` des animations, et une fenêtre masquée ne les joue
+   même pas (`choisirMode`). Il ne reste que l'imprévu — un nœud retiré par
+   ailleurs, une animation annulée par un tiers — qui laisserait sans lui la
+   vue fantôme dans le DOM et le verrou de `main.ts` fermé pour toujours.
+   Large : il ne doit JAMAIS couper une transition qui tourne encore à
+   l'écran, même saccadée. */
+const SECOURS_MS = DUREE_MS * 4;
 
 export type SensTransition = "entree" | "sortie";
 
@@ -73,6 +78,32 @@ export type SensTransition = "entree" | "sortie";
     tout, le changement d'écran est immédiat. */
 export function mouvementReduit(): boolean {
 	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * L'ENTRÉE PROPRE de la vue entrante est absorbée : c'est la transition qui
+ * fait l'entrée. Sans ça, au retour d'un quiz, le `qbd-fade-in` de
+ * `.qbd-content` (et toute entrée `.qbd-*-enter` posée par `markViewEnter`)
+ * glissait et fondait DANS la page qui, elle, revenait de son recul : deux
+ * mouvements imbriqués. Même chose, à l'entrée, pour le panneau du quiz.
+ *
+ * `finish()` et non `cancel()` ni `animation: none` : l'animation saute à sa
+ * fin, son `animationend` part, et `markViewEnter` retire sa classe
+ * d'entrée comme d'habitude — rien ne reste posé qui priverait la PROCHAINE
+ * navigation de son entrée. Les animations INFINIES (le chemin qui défile
+ * dans une carte de dossier) ne sont pas des entrées : laissées tranquilles
+ * (et `finish()` jetterait sur elles).
+ *
+ * Côté quiz, seul le PANNEAU (`subtree: false`) : le moteur a ses propres
+ * animations, dont il attend peut-être la fin — les précipiter n'est pas
+ * notre affaire.
+ */
+function absorberEntree(entrant: HTMLElement, sens: SensTransition): void {
+	for (const a of entrant.getAnimations({ subtree: sens === "sortie" })) {
+		if (!(a instanceof CSSAnimation) || !a.animationName.startsWith("qbd-")) continue;
+		if (a.effect?.getTiming().iterations === Infinity) continue;
+		a.finish();
+	}
 }
 
 /**
@@ -86,21 +117,25 @@ export function mouvementReduit(): boolean {
  * découvre la page qui revient.
  */
 export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entrant: HTMLElement, sens: SensTransition): Promise<void> {
+	/* L'entrant n'est JAMAIS retiré, même s'il figurait parmi les sortants
+	   (`vuesARetirer`) : c'est l'écran qu'on vient de monter. */
+	const aRetirer = vuesARetirer(sortants, [entrant]);
 	const retirer = (): void => {
-		for (const s of sortants) s.remove();
+		for (const s of aRetirer) s.remove();
 		root.classList.remove("nq-empile");
 	};
-	if (sortants.length === 0 || mouvementReduit()) {
+	if (aRetirer.length === 0 || choisirMode(mouvementReduit(), document.visibilityState === "hidden") === "immediat") {
 		retirer();
 		return Promise.resolve();
 	}
-	for (const s of sortants) s.inert = true;
+	for (const s of aRetirer) s.inert = true;
 	root.classList.add("nq-empile");
+	absorberEntree(entrant, sens);
 
 	const base: KeyframeAnimationOptions = { duration: DUREE_MS, easing: COURBE };
 	const animations: Animation[] = [];
 	if (sens === "entree") {
-		for (const s of sortants) {
+		for (const s of aRetirer) {
 			animations.push(s.animate(RECUL, { ...base, fill: "forwards" }));
 			for (const el of s.querySelectorAll<HTMLElement>(EN_TETES)) {
 				animations.push(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: COURBE, fill: "forwards" }));
@@ -118,8 +153,11 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 			));
 		}
 	} else {
-		for (const s of sortants) {
-			// Le quiz qui redescend passe DEVANT la page qui revient, montée après lui.
+		for (const s of aRetirer) {
+			/* Le quiz qui redescend passe DEVANT la page qui revient, montée
+			   après lui. Ce `z-index` part avec le nœud (`retirer`) ; il est
+			   tout de même effacé à la fin, pour qu'un nœud un jour réutilisé
+			   ne le garde pas collé. */
 			s.style.zIndex = "1";
 			animations.push(s.animate([{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], { ...base, fill: "forwards" }));
 		}
@@ -133,21 +171,36 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 	}
 
 	return new Promise<void>(resoudre => {
-		let fini = false;
-		const terminer = (): void => {
-			if (fini) return;
-			fini = true;
-			clearTimeout(garde);
-			/* `cancel` et non `finish` : les sortantes partent avec leur nœud,
-			   et les entrantes (`backwards`) n'ont déjà plus d'effet ; rien
-			   ne doit rester dans `document.getAnimations()`. */
-			for (const a of animations) a.cancel();
+		let restantes = animations.length;
+		const surFin = (): void => { if (--restantes <= 0) terminer(); };
+		/* La fenêtre passe MASQUÉE en cours de route (réduite pendant la
+		   montée) : ses animations cessent d'avancer. On pose l'état final
+		   tout de suite plutôt que d'attendre des images qui ne viendront pas. */
+		const surVisibilite = (): void => { if (document.visibilityState === "hidden") terminer(); };
+		/* `uneFois` : trois chemins mènent ici (le dernier `finish`, la
+		   fenêtre masquée, le secours), un seul retire les vues. */
+		const terminer = uneFois(() => {
+			clearTimeout(secours);
+			document.removeEventListener("visibilitychange", surVisibilite);
+			for (const a of animations) {
+				a.removeEventListener("finish", surFin);
+				a.removeEventListener("cancel", surFin);
+				/* `cancel` et non `finish` : les sortantes partent avec leur
+				   nœud, les entrantes (`backwards`) n'ont déjà plus d'effet ;
+				   rien ne doit rester dans `document.getAnimations()`. */
+				a.cancel();
+			}
+			for (const s of aRetirer) s.style.zIndex = "";
 			retirer();
 			resoudre();
-		};
-		const garde = window.setTimeout(terminer, GARDE_MS);
-		/* `finished` REJETTE sur une annulation : l'`allSettled` couvre les
-		   deux issues, et `terminer` est idempotent. */
-		void Promise.allSettled(animations.map(a => a.finished)).then(terminer);
+		});
+		const secours = window.setTimeout(terminer, SECOURS_MS);
+		document.addEventListener("visibilitychange", surVisibilite);
+		/* L'événement `finish` de CHAQUE animation (et `cancel`, si un tiers
+		   en annulait une : elle ne finirait jamais). */
+		for (const a of animations) {
+			a.addEventListener("finish", surFin);
+			a.addEventListener("cancel", surFin);
+		}
 	});
 }

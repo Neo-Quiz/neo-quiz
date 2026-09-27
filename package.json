@@ -30,6 +30,7 @@
     "check:web-channel": "node scripts/check-web-channel.mjs",
     "check:dashboard-dom": "node scripts/check-dashboard-dom.mjs",
     "check:view-enter": "node scripts/check-view-enter.mjs",
+    "check:transition": "node scripts/check-transition.mjs",
     "check:viewport-clip": "node scripts/check-viewport-clip.mjs",
     "check:folders": "node scripts/check-folders.mjs",
     "check:windows-host": "node scripts/check-windows-host.mjs",

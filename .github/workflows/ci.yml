@@ -147,6 +147,13 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # LES CHANGEMENTS D'ÉCRAN pendant la transition de lancement d'un quiz :
+      # un double clic ne lance rien deux fois, un retour cliqué pendant la
+      # montée part à la fin au lieu d'être avalé, la fin ne se joue qu'une
+      # fois, et une fenêtre masquée pose l'état final sans animer.
+      - name: Screen transition
+        run: npm run check:transition
+
       # Les gestes d'édition d'une question, partagés par le formulaire et
       # l'édition dans le rendu : jamais une question sans bonne réponse,
       # jamais deux emplacements d'un classement sur le même élément.
