@@ -169,6 +169,14 @@ jobs:
       - name: Gestes d'édition d'une question
         run: npm run check:gestes
 
+      # LE GLOSSAIRE D'UN QUIZ : un terme jamais apparié dans un mot plus long
+      # qui le contient ni au travers d'un accent, jamais coupé dans une
+      # formule, jamais deux fois pour la même entrée — la plus longue gagne
+      # sur un chevauchement. Reconnaît aussi qu'un objet sans énoncé porteur
+      # d'un `glossary` est la configuration du bloc, comme `source`.
+      - name: Quiz glossary terms
+        run: npm run check:termes
+
       # LA FILE DE GÉNÉRATION : une génération à la fois, dans l'ordre
       # d'envoi ; la suivante n'attend pas qu'on le lui dise, mais elle attend
       # que le processus annulé ait rendu le verrou de son CLI.

@@ -496,6 +496,12 @@ export interface ParsedQuizItem {
 	examDurationMinutes?: number;
 	examAutoSubmit?: boolean;
 	examShowTimer?: boolean;
+	/** Glossaire du bloc, sur l'objet de CONFIGURATION seulement (lot D,
+	    2026-09-27) — brut, lu par `lireGlossaire` (src/glossaire.ts), qui
+	    filtre les entrées invalides ; sa seule présence (même un tableau
+	    vide) suffit à distinguer une configuration sans `mode`
+	    (quiz-utils.ts isQuizModeConfig). */
+	glossary?: unknown;
 	ordering?: unknown;
 	matching?: unknown;
 	multiSelect?: boolean;

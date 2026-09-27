@@ -187,6 +187,14 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   indices décalés à l'ajout et au retrait, et un changement de TYPE qui ne
   garde que ce qui se transpose (choix ⇄ choix, saisie ⇄ saisie) sans jamais
   toucher aux champs communs. Dans la CI.
+- `npm run check:termes` — le noyau pur de l'appariement d'un terme du
+  glossaire dans un texte (`src/glossaire.ts`) : jamais un terme apparié dans
+  un mot plus long qui le contient (« empiler » n'est pas « pile »), jamais
+  au travers d'un accent (« pilé » ≠ « pile »), jamais au travers d'une
+  formule LaTeX, jamais deux fois pour la même entrée — et la plus longue
+  gagne sur un chevauchement (« pile d'appel » avant « pile »). Reconnaît
+  aussi qu'un objet sans énoncé porteur d'un `glossary` est la configuration
+  du bloc, comme `source` (`isQuizModeConfig`, `extractExamOptions`). Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

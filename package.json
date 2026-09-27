@@ -72,6 +72,7 @@
     "check:langue": "node scripts/check-langue.mjs",
     "check:stats": "node scripts/check-stats.mjs",
     "check:gestes": "node scripts/check-gestes.mjs",
+    "check:termes": "node scripts/check-termes.mjs",
     "check:file-generation": "node scripts/check-file-generation.mjs",
     "check:format-heure": "node scripts/check-format-heure.mjs",
     "check:fond": "node scripts/check-fond.mjs",

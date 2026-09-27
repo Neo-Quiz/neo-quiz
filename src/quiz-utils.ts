@@ -1,6 +1,7 @@
 import { LOG_PREFIX } from "./branding";
 import JSON5 from "json5";
 import type { QuizQuestion, ExamOptions } from "./types/quiz";
+import { lireGlossaire, type EntreeGlossaire } from "./glossaire";
 
 /** Mode d'un quiz, lu dans l'objet de configuration optionnel en fin de tableau.
     "learn" a été renommé "lesson" (task 0 du lot mode leçon, 2026-08-31) : ce
@@ -26,6 +27,12 @@ interface QuizModeConfig {
 	/** Référence libre vers la note source de la leçon (ex. un lien `[[...]]`) —
 	    jamais lue comme un marqueur de question par `isStrictQuizModeConfig`. */
 	source?: string;
+	/** Glossaire du quiz (lot D, 2026-09-27) : un objet SANS énoncé qui en
+	    porte un est la configuration, même sans `mode` ni `source` — un bloc
+	    écrit à la main peut ne vouloir déclarer QUE des termes. Brut, jamais
+	    validé ici : `extractExamOptions` le passe à `lireGlossaire`
+	    (src/glossaire.ts), qui filtre les entrées invalides. */
+	glossary?: unknown;
 }
 
 interface ParseQuizSourceOptions {
@@ -99,6 +106,12 @@ function isQuizModeConfig(item: unknown): boolean {
 	   casée échoue ici DU BON CÔTÉ : l'objet reste une question ordinaire au lieu
 	   d'être pris pour une configuration. */
 	if (typeof q.source === "string" && q.source.trim() !== "") return true;
+	/* Même règle que `source` juste au-dessus : un objet sans énoncé qui porte
+	   un `glossary` (tableau, même vide) EST la configuration — `glossary`
+	   n'est le nom d'aucun champ de question (types/quiz.ts). Ajouté pour le
+	   lot D (bulles de vocabulaire, 2026-09-27) : un quiz écrit à la main doit
+	   pouvoir déclarer un glossaire sans déclarer de mode. */
+	if (Array.isArray(q.glossary)) return true;
 	/* Les TROIS modes du plugin, pas « une chaîne quelconque ». Une question
 	   légitime nommée `{ title: 'Quel mode choisir ?', mode: 'transport' }`
 	   passait pour la configuration du bloc et DISPARAISSAIT à la réécriture —
@@ -225,8 +238,12 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 	quizMode: QuizMode;
 	examOptions: ExamOptions | null;
 	lessonExamOptions: ExamOptions | null;
+	/** Glossaire du quiz, déjà filtré aux entrées valides (`lireGlossaire`) —
+	    tableau vide sans objet de configuration, ou si celui-ci ne porte pas
+	    de `glossary`. */
+	glossary: EntreeGlossaire[];
 } {
-	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null };
+	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null, glossary: [] };
 
 	/* N'IMPORTE OÙ dans le tableau, pas seulement en dernier. L'export écrit
 	   toujours la configuration à la fin, mais un quiz écrit à la main — ou
@@ -276,11 +293,12 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 			questions: quizArray.filter((_, i) => i !== configIdx),
 			quizMode,
 			examOptions,
-			lessonExamOptions
+			lessonExamOptions,
+			glossary: lireGlossaire(lastItem.glossary)
 		};
 	}
 
-	return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null };
+	return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null, glossary: [] };
 }
 
 /** Forme structurelle minimale acceptée par `pickLessonFields` : les six
