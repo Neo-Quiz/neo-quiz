@@ -346,6 +346,36 @@ Vérification d'un changement = `npm run check`, plus `check:md` / `check:export
   loader esbuild → pas de CDN.
 - **main.js** : format `cjs`, `target es2020`, `external: ["obsidian", "electron"]`.
 
+## Dépôt GitHub et site (depuis le 2026-09-27)
+
+- **Le dépôt appartient à l'organisation `Neo-Quiz`** :
+  `github.com/Neo-Quiz/neo-quiz` (remote `git@github.com:Neo-Quiz/neo-quiz.git`).
+  Il a été TRANSFÉRÉ depuis `ahmed-mili/neo-quiz` : GitHub redirige l'ancien
+  chemin (releases, `latest.yml`, API), donc les applis déjà installées se
+  mettent toujours à jour — mais tout lien NEUF s'écrit `Neo-Quiz/neo-quiz`,
+  et `publish.owner` d'electron-builder vaut `Neo-Quiz` (`check:package`).
+- **Le site est à la racine de `https://neo-quiz.github.io`**, servi par un
+  SECOND dépôt, `Neo-Quiz/neo-quiz.github.io` (seul nom que Pages sert sans
+  `/<dépôt>/` dans l'URL — montage de neovim/neovim.github.io). On ne l'édite
+  JAMAIS directement : la source reste `docs/` ICI, et `.github/workflows/
+  site.yml` l'y recopie à chaque push qui touche `docs/` (sans
+  `docs/superpowers` ni `docs/archive`), par la clé de déploiement du secret
+  `SITE_DEPLOY_KEY`. `release.yml` le relance après avoir poussé
+  `latest.json` (un push fait avec le `GITHUB_TOKEN` ne déclenche aucun
+  workflow). Ce dépôt-ci n'a plus de Pages ni de « Deployments ».
+- **Le site est en ANGLAIS SEUL** : plus de `docs/fr/`, plus de sélecteur ni
+  de devinette de langue. Les liens légaux de l'installeur
+  (`urlLegale(page)`, `installer/noyau.ts`) ouvrent la page anglaise quelle
+  que soit sa langue. `docs/404.html` renvoie les anciennes adresses
+  `/neo-quiz/…` et `/fr/…` vers la même page à la racine ; `check-installer`
+  le fige. L'application, elle, reste bilingue (voir « Langue »).
+- **Tout ce qui est public sur GitHub s'écrit en anglais** : messages de
+  commit (voir « Conventions »), noms de workflows et d'étapes, messages
+  `::error::`, descriptions. Le français reste la langue des commentaires du
+  code, de ce fichier et de la note du vault.
+- Les sondes locales `.tmp-*` à la racine sont ignorées (`.gitignore`) : ne
+  jamais les commiter.
+
 ## Boucle de dev (appliquer une modif dans Obsidian)
 
 `build` **déploie** `main.js` (« Reload without saving » ne suffit pas toujours) :
