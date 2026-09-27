@@ -6,6 +6,7 @@ import { createWarmingHandlers } from "./engine/warming";
 import { createSanitizer } from "./engine/sanitizer";
 import { reinitialiserBudgetRendu } from "./engine/code-highlight";
 import { createResourceHandlers } from "./engine/resources";
+import { createCodeRunHandlers } from "./engine/code-run";
 import { createExamHandlers } from "./engine/exam";
 import { createCardRenderers } from "./engine/cards";
 import { createViewportHandlers } from "./engine/viewport";
@@ -213,6 +214,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// Instancier tous les modules avec ctx injecté
 	const sanitizer = createSanitizer(ctx);
 	const resources = createResourceHandlers(ctx);
+	const codeRun = createCodeRunHandlers(ctx);
 	const exam = createExamHandlers(ctx);
 	const textOnly = createTextOnlyHandlers(ctx);
 	const cards = createCardRenderers(ctx);
@@ -238,6 +240,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	Object.assign(ctx, {
 		sanitize: sanitizer,
 		resources,
+		codeRun,
 		exam,
 		textOnly,
 		cards,
@@ -846,6 +849,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		mathifyElement(newItem);
 		ctx.viewport.applyTrackGeometry({ refreshWidth: false });
 		ctx.resources.bindQuizResourceButtons(newItem);
+		ctx.codeRun.bindCodeRunButtons(newItem);
 		ctx.warming.bindTrackItemImages(newItem, qi);
 		ctx.interactions.bindQuestionTrackItem(newItem);
 		ctx.viewport.observeTrackItemInAllSlidesResizeObserver(newItem);
@@ -973,6 +977,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	    ctx.viewport.bindAllSlidesResizeObserver();
 	    ctx.warming.bindAllTrackImages();
 	    ctx.resources.bindQuizResourceButtons(container);
+	    ctx.codeRun.bindCodeRunButtons(container);
 	    container.querySelectorAll<HTMLElement>('.quiz-track-item[data-slide-kind="question"]').forEach(ctx.interactions.bindQuestionTrackItem);
 	    ctx.interactions.bindStaticControls();
 

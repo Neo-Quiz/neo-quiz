@@ -305,6 +305,18 @@ export function aDesBlocs(blocs: readonly Bloc[]): boolean {
 
 /* ── Le rendu HTML ─────────────────────────────────────────── */
 
+/** Seul Python s'exécute (même règle que `code-exercise/champs.ts
+    estExecutable`, pour la question de type "code" — celle-ci est un bloc de
+    code ordinaire d'un texte quelconque, l'autre une question dédiée : deux
+    lecteurs, une seule idée). `py` est l'alias que la grammaire de coloration
+    (`code-highlight.ts`) reconnaît déjà pour Python. */
+const ESTIME_PYTHON = /^(python|py)$/;
+
+/* Icône Lucide inline (play), au même titre que `ICON_BOOK`/`ICON_CHEVRON`
+   dans `engine/passage.ts` : ce module est PUR (ni DOM, ni hôte), `setIcon()`
+   d'Obsidian ne s'applique qu'à un nœud déjà monté. */
+const ICON_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
+
 export interface OutilsRendu {
 	/** Un morceau de texte, en HTML inline (échappé d'abord). Les sauts de
 	    ligne y deviennent `<br>`. */
@@ -377,7 +389,21 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				// Coloré si un langage est nommé ET reconnu ; sinon le texte
 				// échappé nu, exactement comme avant l'ajout de la coloration.
 				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
-				return `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
+				const pre = `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
+				/* Bouton « Exécuter » (bac à sable Python, engine/code-run.ts) : markup
+				   TOUJOURS émis pour un bloc Python, mais `hidden` — ce module est PUR
+				   (ni DOM, ni hôte) et ne sait pas si l'hôte fournit `HostPython`.
+				   `bindCodeRunButtons` (DOM, avec ctx) le démasque quand l'hôte l'offre,
+				   et le RETIRE sinon (aucun bouton sous le greffon Obsidian, qui
+				   n'exécute pas de Python). La sortie s'affiche dans
+				   `.quiz-code-output`, posée en `textContent` uniquement : c'est du
+				   texte de programme potentiellement hostile, jamais une porte HTML. */
+				// Un bloc non-Python reste EXACTEMENT comme avant l'ajout du bouton
+				// (aucun `<div>` supplémentaire) : la preuve d'équivalence de
+				// `check:md` porte sur cette sortie, octet pour octet.
+				if (!ESTIME_PYTHON.test(b.langue.trim().toLowerCase())) return pre;
+				const barre = `<div class="quiz-code-toolbar"><button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>${ICON_PLAY}</button></div>`;
+				return `<div class="quiz-code-block quiz-code-block-executable">${barre}${pre}<div class="quiz-code-output" hidden></div></div>`;
 			}
 			case "tableau": {
 				/* Autant de colonnes que la rangée la plus longue : les cases

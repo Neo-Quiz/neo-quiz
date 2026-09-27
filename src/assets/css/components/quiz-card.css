@@ -302,6 +302,63 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   color: var(--qmc-fg);
 }
 
+/* Bouton « Exécuter » d'un bloc de code Python (engine/grammaire-blocs.ts,
+   engine/code-run.ts). `.quiz-code-block` enveloppe `.quiz-md-code` pour
+   loger la barre d'outils SANS toucher au bloc de code lui-même (dont la
+   spécificité `.quiz-md-code.quiz-md-code` est réservée à la coloration,
+   voir plus haut). Pas de tuile dans une tuile : la barre est plate,
+   discrète, dans le coin haut droit — un bouton icône seul, pas un panneau. */
+.quiz-code-block{
+  position: relative;
+  margin: 0.6em 0;
+}
+.quiz-code-toolbar{
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+.quiz-code-run-btn{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qmc-fg, var(--text-muted));
+  opacity: 0.6;
+  cursor: pointer;
+}
+.quiz-code-run-btn svg{ width: 15px; height: 15px; }
+.quiz-code-run-btn:hover{ opacity: 1; background: color-mix(in srgb, var(--qmc-fg, currentColor) 12%, transparent); }
+.quiz-code-run-btn:disabled{ cursor: default; opacity: 0.5; }
+.quiz-code-run-btn.quiz-code-run-running svg{ animation: quiz-code-run-spin 0.8s linear infinite; }
+@keyframes quiz-code-run-spin{ to { transform: rotate(360deg); } }
+
+/* La sortie : du texte de programme, jamais du HTML (posé en `textContent`
+   par code-run.ts). Pas d'ascenseur interne (règle « lecture, jamais de
+   scroll ») : elle prend la hauteur qu'il faut, sous le bloc de code. */
+.quiz-code-output{
+  margin-top: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.quiz-code-output.quiz-code-output-error{
+  color: var(--text-error, #f7768e);
+  border-color: color-mix(in srgb, var(--text-error, #f7768e) 40%, var(--background-modifier-border));
+}
+
 .quiz-md-citation{
   border-left: 3px solid var(--background-modifier-border);
   padding-left: 12px;

@@ -182,6 +182,15 @@ export const EN_ENGINE = {
 	"engine.resource.openFailed": "Could not reveal or open the file: {name}",
 	"engine.resource.openError": "Something went wrong while opening the file.",
 
+	/* ── Run button on a Python code block ── */
+	"engine.code.run": "Run",
+	"engine.code.running": "Running…",
+	"engine.code.output": "Output",
+	"engine.code.empty": "(no output)",
+	"engine.code.timeout": "The code took too long to run.",
+	"engine.code.tooLong": "The output is too long and was cut off.",
+	"engine.code.unavailable": "Python sandbox unavailable.",
+
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Close the keyboard",
 	"engine.math.matrixTab": "Matrices and structures",

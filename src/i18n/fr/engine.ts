@@ -160,6 +160,15 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.resource.openFailed": "Impossible de révéler ou d'ouvrir le fichier : {name}",
 	"engine.resource.openError": "Erreur pendant l'ouverture du fichier.",
 
+	/* ── Bouton Exécuter d'un bloc de code Python ── */
+	"engine.code.run": "Exécuter",
+	"engine.code.running": "Exécution…",
+	"engine.code.output": "Sortie",
+	"engine.code.empty": "(aucune sortie)",
+	"engine.code.timeout": "Le code a mis trop de temps à s'exécuter.",
+	"engine.code.tooLong": "La sortie est trop longue et a été tronquée.",
+	"engine.code.unavailable": "Bac à sable Python indisponible.",
+
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Fermer le clavier",
 	"engine.math.matrixTab": "Matrices et structures",

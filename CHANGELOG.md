@@ -31,6 +31,7 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 - Learn quizzes show how many readings they hold next to the number of questions.
 - A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right, and moves both files of a course shown as one card (Learn and Practice).
+- A Run button on every Python code block shown in a quiz (readings, questions, explanations, hints): runs the code in the Python sandbox and shows its output, or its error, right below the block.
 
 ### Changed
 - Question and folder cards react like StudySmarter: a slightly lighter background and soft shadow on hover, a smooth press on click; folders no longer lift, and a folder's page fades in. The question list of the editor reacts the same way, its blue outline only marking the current question.

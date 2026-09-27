@@ -228,12 +228,21 @@ await withSrcModule(
 	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
 		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
 	reinitialiserBudgetRendu();
+	/* Un bloc Python est enveloppé (`.quiz-code-block-executable`) pour loger
+	   le bouton « Exécuter » (engine/code-run.ts, hors DOM ici : hidden par
+	   défaut, démasqué seulement quand l'hôte fournit `HostPython`). Un autre
+	   langage reste rendu à l'identique (voir plus bas). */
 	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
-		`<pre class="quiz-md-code"><code class="language-python">`
+		`<div class="quiz-code-block quiz-code-block-executable"><div class="quiz-code-toolbar">`
+		+ `<button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>`
+		+ `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>`
+		+ `</button></div>`
+		+ `<pre class="quiz-md-code"><code class="language-python">`
 		+ `<span class="token keyword">print</span><span class="token punctuation">(</span>`
 		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
-		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`);
+		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`
+		+ `<div class="quiz-code-output" hidden></div></div>`);
 	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
 		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
 	r.check("langage inconnu : texte échappé, aucun span",
@@ -252,7 +261,10 @@ await withSrcModule(
 			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
 			// Seules nos propres balises (pre/code/span) peuvent apparaître : tout
 			// le reste du contenu du bloc doit être échappé, jeton par jeton.
-			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span"].includes(m[1].toLowerCase()));
+			// Un bloc Python ajoute ses propres balises de confiance (bouton
+			// « Exécuter », `div`/`button`/`svg`/`polygon` — jamais le contenu
+			// injecté, qui reste dans `pre`/`code`/`span`).
+			return [...html.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["pre", "code", "span", "div", "button", "svg", "polygon"].includes(m[1].toLowerCase()));
 		}), LANGUES_INJECTION.map(() => true));
 	r.check("alias `c++` : reconnu comme cpp",
 		rendre("```c++" + NL + "int x = 1;" + NL + "```").includes('<span class="token keyword">int</span>'), true);

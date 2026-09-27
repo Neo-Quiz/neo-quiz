@@ -1,0 +1,141 @@
+import type { EngineCtx } from "../types/engine-ctx";
+import { t } from "../i18n";
+import { nettoyerTraceback } from "../code-exercise/traceback";
+import type { PythonRun } from "../host/types";
+
+/* ══════════════════════════════════════════════════════════
+   BOUTON « EXÉCUTER » d'un bloc de code Python affiché dans un quiz
+   (Learn, énoncés, explications, indices… tout texte qui passe par
+   `engine/sanitizer.ts` → `grammaire-blocs.ts`, LE point de rendu unique
+   des blocs de code).
+
+   `grammaire-blocs.ts` (pur) émet le markup à l'avance, masqué
+   (`hidden`) : c'est ce module, avec `ctx` (donc l'hôte), qui décide de le
+   montrer — `HostPython` est un membre OPTIONNEL du contrat, absent sous le
+   greffon Obsidian, qui n'exécute pas de code. Sans lui, le bouton et la
+   toolbar sont RETIRÉS du DOM, jamais laissés inertes.
+
+   Sécurité (constat M4 de la revue du bac à sable, 2026-09-27) : `stdout` et
+   une erreur sont du texte dont l'AUTEUR DU QUIZ est maître — un quiz partagé
+   est hostile. Toujours posés en `textContent`, jamais par une des quatre
+   portes HTML du sanitizer (qui interpréterait du markdown ou du HTML dans
+   une sortie de programme). Le code exécuté est relu depuis `<code>` par
+   `textContent` (jamais un attribut recopié à la main, jamais désynchronisé
+   du bloc affiché — `textContent` restitue le texte source, entités HTML
+   comprises, exactement comme `colorerCode`/`echapper` l'ont écrit).
+══════════════════════════════════════════════════════════ */
+
+/** Le délai le plus long qu'un clic manuel mérite d'attendre : le contrat
+    (`canaux.ts`) borne `timeoutMs` à 10 s au maximum, on prend ce plafond. */
+const TIMEOUT_MS = 10_000;
+
+export interface CodeRunHandlers {
+	/** Démasque (et branche) tout bouton « Exécuter » sous `rootEl` si l'hôte
+	    fournit `HostPython`, ou le retire sinon. À appeler juste après
+	    `mathifyElement`, comme `bindQuizResourceButtons`. */
+	bindCodeRunButtons(rootEl?: Element | null): void;
+}
+
+export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
+	/** Le worker Pyodide est préchauffé une seule fois pour toute la session
+	    du moteur, à la première apparition d'un bloc exécutable — `warm()` est
+	    sans effet si Python est déjà chargé (contrat `HostPython`). */
+	let prechauffe = false;
+
+	function sortieDe(bloc: HTMLElement): HTMLElement {
+		let sortie = bloc.querySelector<HTMLElement>(":scope > .quiz-code-output");
+		if (!sortie) {
+			sortie = document.createElement("div");
+			sortie.className = "quiz-code-output";
+			sortie.hidden = true;
+			bloc.appendChild(sortie);
+		}
+		return sortie;
+	}
+
+	/** Le texte à afficher pour un résultat, jamais posé qu'en `textContent`. */
+	function texteResultat(resultat: PythonRun): { texte: string; erreur: boolean } {
+		switch (resultat.status) {
+			case "ok": {
+				const sortie = resultat.stdout ?? "";
+				return { texte: sortie.length > 0 ? sortie : t("engine.code.empty"), erreur: false };
+			}
+			case "error": {
+				const brute = nettoyerTraceback(resultat.error ?? "");
+				const sortie = resultat.stdout ?? "";
+				return { texte: sortie.length > 0 ? `${sortie}\n${brute}` : brute, erreur: true };
+			}
+			case "timeout":
+				return { texte: t("engine.code.timeout"), erreur: true };
+			case "too-long":
+				return { texte: t("engine.code.tooLong"), erreur: true };
+			case "unavailable":
+			default:
+				return { texte: t("engine.code.unavailable"), erreur: true };
+		}
+	}
+
+	async function executer(btn: HTMLButtonElement, code: string): Promise<void> {
+		const python = ctx.host.python;
+		if (!python) return; // ne peut pas arriver (bouton retiré sans HostPython), garde honnête
+		const bloc = btn.closest<HTMLElement>(".quiz-code-block");
+		if (!bloc) return;
+		const sortie = sortieDe(bloc);
+
+		btn.disabled = true;
+		btn.classList.add("quiz-code-run-running");
+		sortie.hidden = false;
+		sortie.classList.remove("quiz-code-output-error");
+		sortie.textContent = t("engine.code.running");
+
+		try {
+			const resultat = await python.run({ code, stdin: "", timeoutMs: TIMEOUT_MS });
+			const { texte, erreur } = texteResultat(resultat);
+			sortie.textContent = texte;
+			sortie.classList.toggle("quiz-code-output-error", erreur);
+		} catch {
+			sortie.textContent = t("engine.code.unavailable");
+			sortie.classList.add("quiz-code-output-error");
+		} finally {
+			btn.disabled = false;
+			btn.classList.remove("quiz-code-run-running");
+		}
+	}
+
+	function bindCodeRunButtons(rootEl: Element | null = ctx.container): void {
+		if (!rootEl) return;
+		const python = ctx.host.python;
+
+		rootEl.querySelectorAll<HTMLElement>(".quiz-code-block-executable").forEach(bloc => {
+			const btn = bloc.querySelector<HTMLButtonElement>(".quiz-code-run-btn[data-quiz-code-run]");
+			if (!btn) return;
+
+			if (!python) {
+				// Greffon Obsidian (ou tout hôte sans bac à sable) : aucun bouton.
+				bloc.querySelector(".quiz-code-toolbar")?.remove();
+				bloc.classList.remove("quiz-code-block-executable");
+				return;
+			}
+
+			btn.hidden = false;
+			btn.setAttribute("aria-label", t("engine.code.run"));
+			btn.title = t("engine.code.run");
+
+			if (!prechauffe) {
+				prechauffe = true;
+				try { python.warm(); } catch (_) { /* meilleur effort */ }
+			}
+
+			if (btn.dataset.quizCodeBound === "1") return;
+			btn.dataset.quizCodeBound = "1";
+			btn.addEventListener("click", e => {
+				e.preventDefault();
+				if (btn.disabled) return;
+				const codeEl = bloc.querySelector("code");
+				void executer(btn, codeEl?.textContent ?? "");
+			});
+		});
+	}
+
+	return { bindCodeRunButtons };
+}

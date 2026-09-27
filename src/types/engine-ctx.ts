@@ -61,6 +61,7 @@ import type { ReviewGrade } from "../scheduler";
 import type { SanitizerHandlers } from "../engine/sanitizer";
 import type { QuestionHandlers } from "../engine/questions";
 import type { ResourceHandlers } from "../engine/resources";
+import type { CodeRunHandlers } from "../engine/code-run";
 import type { FocusHandlers } from "../engine/focus";
 import type { HintHandlers } from "../engine/hint";
 import type { LifecycleHandlers, PendingAsyncWaiter } from "../engine/lifecycle";
@@ -233,6 +234,7 @@ export interface EngineCtx {
 	   ════════════════════════════════════════════════ */
 	sanitize: SanitizerHandlers;
 	resources: ResourceHandlers;
+	codeRun: CodeRunHandlers;
 	exam: ExamHandlers;
 	textOnly: TextOnlyHandlers;
 	cards: CardHandlers;
