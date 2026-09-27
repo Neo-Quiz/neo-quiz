@@ -187,14 +187,39 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   indices décalés à l'ajout et au retrait, et un changement de TYPE qui ne
   garde que ce qui se transpose (choix ⇄ choix, saisie ⇄ saisie) sans jamais
   toucher aux champs communs. Dans la CI.
-- `npm run check:termes` — le noyau pur de l'appariement d'un terme du
-  glossaire dans un texte (`src/glossaire.ts`) : jamais un terme apparié dans
-  un mot plus long qui le contient (« empiler » n'est pas « pile »), jamais
-  au travers d'un accent (« pilé » ≠ « pile »), jamais au travers d'une
-  formule LaTeX, jamais deux fois pour la même entrée — et la plus longue
-  gagne sur un chevauchement (« pile d'appel » avant « pile »). Reconnaît
-  aussi qu'un objet sans énoncé porteur d'un `glossary` est la configuration
-  du bloc, comme `source` (`isQuizModeConfig`, `extractExamOptions`). Dans la CI.
+- `npm run check:termes` — TROIS parties, sur le glossaire d'un quiz. Le
+  NOYAU PUR de l'appariement d'un terme dans un texte (`src/glossaire.ts`) :
+  jamais un terme apparié dans un mot plus long qui le contient (« empiler »
+  n'est pas « pile »), jamais au travers d'un accent (« pilé » ≠ « pile ») ni
+  d'une marque combinante (texte NFD), jamais au travers d'une formule LaTeX,
+  jamais deux fois pour la même entrée — et la plus longue gagne sur un
+  chevauchement (« pile d'appel » avant « pile »). Pluriel français/anglais
+  toléré, RÉGULIER et IRRÉGULIER (« signal » → « signaux », « query » →
+  « queries ») ; une espace d'un terme à plusieurs mots apparie aussi une
+  espace insécable ou un saut de ligne ; une forme d'un ou deux caractères
+  n'apparie jamais l'apostrophe d'une élision (« C'est »). Un `term`/alias
+  entouré de backticks (écriture d'un modèle) perd ses backticks à la
+  lecture. Reconnaît aussi qu'un objet sans énoncé porteur d'un `glossary`
+  est la configuration du bloc, comme `source` (`isQuizModeConfig`,
+  `extractExamOptions`). La passe DOM (`poserTermesDans`, `src/engine/
+  termes.ts`) : les zones sont une liste BLANCHE, jamais l'énoncé/les
+  options/un classement ou appariement/le recto d'une carte mémoire ; une
+  exclusion (lien, code, titre, texte d'interface) est BORNÉE à sa zone, un
+  ancêtre du quiz LUI-MÊME (dans la note) ne doit jamais en faire sauter une
+  entière ; un `<code>` INLINE dont le texte est EXACTEMENT une forme
+  s'enveloppe en entier, le code intact dedans (sinon un identifiant comme
+  `yield`, toujours généré entre backticks, ne serait jamais soulignable) ;
+  idempotente ; et, tant qu'une carte n'est pas CORRIGÉE (verrou global du
+  quiz, ou carte mémoire retournée), ses zones à risque (indice, support,
+  lecture courte, cours) ne soulignent jamais un terme qui apparaît dans le
+  contenu protégé de la MÊME carte — ce serait donner la réponse avant
+  l'heure. La BULLE de définition (`src/engine/termes-bulle.ts`) : un clic ou
+  un tap l'OUVRE (pas la logique inverse qu'un `focus` provoqué par le
+  pointeur produirait naïvement), un second clic explicite la referme, un
+  clic sur une bulle ouverte par survol/focus la laisse ouverte ; Échap la
+  ferme, y compris ouverte au survol ; le défilement la REPOSITIONNE tant que
+  l'ancre reste visible, ne ferme que si elle en sort ; `destroy()` retire
+  bien l'élément du DOM. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

@@ -277,6 +277,25 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 	r.check("l'entrée propre survit", nettoye.glossary[0].term, "propre");
 	r.check("aliases entièrement vides omis", "aliases" in nettoye.glossary[0], false);
 
+	/* Défaut #12 (revue du 2026-09-27) : les clés INCONNUES d'une entrée
+	   valide (`example`, `category`…), gardées par `lireGlossaire` dans
+	   `_extra` (src/glossaire.ts — c'est la FORME qu'`EditorExamOptions.glossary`
+	   porte réellement, `dashboard/detail-io.ts` non touché par cette tâche),
+	   sont réécrites APRÈS term/definition/aliases — jamais perdues par une
+	   sauvegarde qui ne les touche pas. */
+	{
+		const avecExtra = [{
+			term: "pile", definition: "LIFO", aliases: ["stack"],
+			_extra: { example: "un annuaire téléphonique", category: "structures" },
+		}];
+		const ecrit = JSON5.parse(exportAll([question({})],
+			{ mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: avecExtra })).at(-1);
+		r.check("clé inconnue « example » conservée", ecrit.glossary[0].example, "un annuaire téléphonique");
+		r.check("clé inconnue « category » conservée", ecrit.glossary[0].category, "structures");
+		r.check("ordre : term/definition/aliases avant les clés inconnues",
+			Object.keys(ecrit.glossary[0]), ["term", "definition", "aliases", "example", "category"]);
+	}
+
 	/* Practice SANS objet de configuration existant : c'est ce que produira
 	   la modale « Vocabulaire » (tâche 4) sur un quiz qui n'en avait pas —
 	   `mode` reste absent de l'`EditorExamOptions` construit à la main. Sans

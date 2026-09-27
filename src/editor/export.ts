@@ -341,6 +341,11 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
  * (src/glossaire.ts), réappliquée ICI plutôt que supposée acquise : la modale
  * « Vocabulaire » (tâche 4 du lot) modifie `examOptions.glossary` en mémoire,
  * sans repasser par cette validation avant chaque sauvegarde différée.
+ *
+ * Défaut #12 de la revue du 2026-09-27 : les clés INCONNUES d'une entrée
+ * (`example`, `category`…), gardées par `lireGlossaire` dans `_extra`, sont
+ * réécrites APRÈS `term`/`definition`/`aliases` — sinon la première
+ * sauvegarde de l'éditeur, qui ne les touche pas, les perdait en silence.
  */
 function glossaryEntries(glossary: EntreeGlossaire[] | undefined): EntreeGlossaire[] {
 	if (!glossary) return [];
@@ -352,6 +357,7 @@ function glossaryEntries(glossary: EntreeGlossaire[] | undefined): EntreeGlossai
 		const entree: EntreeGlossaire = { term, definition };
 		const aliases = (brut.aliases ?? []).map(a => a.trim()).filter(a => a !== "");
 		if (aliases.length > 0) entree.aliases = aliases;
+		if (brut._extra) Object.assign(entree, brut._extra);
 		sortie.push(entree);
 	}
 	return sortie;
