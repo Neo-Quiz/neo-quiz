@@ -12,6 +12,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
 import { freeNotePath } from "./folder-create";
+import { quizFrere } from "./course-pairs";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
@@ -498,7 +499,18 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 						hint: ue.ue ?? t("dashboard.quizzes.noUe"),
 						sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
 						onClick: () => {
-							void moveQuizTo(ctx, quiz, g.path as string, g.name).then(to => {
+							/* Un COURS réuni (Learn + Practice sur une seule carte,
+							   `course-pairs.ts`) part en entier : déplacer un seul de
+							   ses deux fichiers casserait la paire sans rien dire
+							   (Ahmed, 2026-09-27). Le frère ne part que si le premier
+							   est parti ; s'il échoue, `moveQuizTo` le dit lui-même. */
+							const frere = ctx.settings.quizzesGroupModes === false ? null
+								: quizFrere(quiz, ctx.scanner.getQuizzes());
+							void (async () => {
+								const to = await moveQuizTo(ctx, quiz, g.path as string, g.name);
+								if (to && frere) await moveQuizTo(ctx, frere, g.path as string, g.name);
+								return to;
+							})().then(to => {
 								if (to) {
 									currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
 									rerender();
