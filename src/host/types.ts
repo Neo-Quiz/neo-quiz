@@ -867,12 +867,6 @@ export interface HostVideo {
 	annuler(id: string): void;
 }
 
-/**
- * L'attente d'une réponse COPIÉE, pendant une génération par un site (spec
- * 2026-09-18, §4). Le principal sonde le presse-papier et ne livre que le
- * texte qui porte le jeton ; le rendu ne lit rien lui-même. Membre OPTIONNEL :
- * absent sous le greffon, la page attend alors un collage manuel.
- */
 /** Un essai Python à exécuter dans le bac à sable — voir `HostPython`. */
 export interface PythonJob {
 	code: string;
@@ -900,6 +894,12 @@ export interface HostPython {
 	warm(): void;
 }
 
+/**
+ * L'attente d'une réponse COPIÉE, pendant une génération par un site (spec
+ * 2026-09-18, §4). Le principal sonde le presse-papier et ne livre que le
+ * texte qui porte le jeton ; le rendu ne lit rien lui-même. Membre OPTIONNEL :
+ * absent sous le greffon, la page attend alors un collage manuel.
+ */
 export interface HostCollage {
 	/** Démarre l'attente ; la fonction rendue l'arrête. Une nouvelle attente
 	    remplace la précédente. `surTexte` est appelé AU PLUS une fois. */

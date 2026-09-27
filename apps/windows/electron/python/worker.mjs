@@ -24,8 +24,17 @@ const PRELUDE = [
 	"del input",
 ].join("\n");
 
+/* Ce worker est CONSOMMÉ par un seul essai (spec 2026-09-27, correctif I1-I3
+   de la revue de sécurité) : la page le tue dès le résultat rendu, jamais de
+   second `executer` ici. `pret` ne sert donc qu'à distinguer « chargement en
+   cours » de « pas encore lancé » pendant la préchauffe. */
 let pret = null;
 const charger = () => (pret ??= loadPyodide({ indexURL: "./pyodide/", jsglobals: {} }));
+
+/* Tronqué ICI, avant l'IPC : une exception de 100 Mo (`raise
+   Exception("x" * 10**8)`) ne doit pas traverser worker → page → principal
+   en entier (revue, M2). */
+const borner = (s) => (s.length > PLAFOND ? s.slice(0, PLAFOND) : s);
 
 self.onmessage = async (e) => {
 	const m = e.data;
@@ -33,7 +42,10 @@ self.onmessage = async (e) => {
 	if (m.type !== "executer") return;
 	let py;
 	try { py = await charger(); }
-	catch (err) { pret = null; self.postMessage({ id: m.id, res: { status: "unavailable", stdout: "", error: String(err) } }); return; }
+	catch (err) { pret = null; self.postMessage({ id: m.id, res: { status: "unavailable", stdout: "", error: borner(String(err)) } }); return; }
+	/* Chargement terminé : la page démarre ICI le délai de l'essai (M7),
+	   jamais avant — sinon un délai court expirerait pendant `loadPyodide`. */
+	self.postMessage({ id: m.id, type: "pret" });
 
 	let sortie = "", tropLong = false;
 	const ecrire = (s) => {
@@ -51,7 +63,7 @@ self.onmessage = async (e) => {
 		if (m.after) await py.runPythonAsync(m.after, { globals: ns, filename: "checks.py" });
 		self.postMessage({ id: m.id, res: { status: tropLong ? "too-long" : "ok", stdout: sortie } });
 	} catch (err) {
-		self.postMessage({ id: m.id, res: { status: tropLong ? "too-long" : "error", stdout: sortie, error: String(err && err.message || err) } });
+		self.postMessage({ id: m.id, res: { status: tropLong ? "too-long" : "error", stdout: sortie, error: borner(String(err && err.message || err)) } });
 	} finally {
 		ns.destroy();
 	}

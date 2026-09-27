@@ -1445,7 +1445,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   bornés en taille (64 Ko), délai ramené entre 100 ms et 10 s. Le bac à
 	   sable fait le reste (python.ts). */
 	const PLAFOND_PYTHON = 64 * 1024;
-	ipcMain.handle(CANAUX.pythonRun, (_e, job: unknown): Promise<PythonRun> => {
+	/* Défense en profondeur (revue de sécurité 2026-09-27, M1) : la fenêtre
+	   cachée du bac à sable n'a pas le pont `neo` (pas de préchargement
+	   `neo`, Python tourne dans un worker) et ne peut donc pas l'atteindre —
+	   mais ne vérifier l'expéditeur que sur le canal RETOUR (`python.ts`)
+	   laissait ce canal-ci sans garde symétrique. */
+	const depuisFenetrePrincipale = (e: Electron.IpcMainInvokeEvent) => e.sender === deps.fenetreCourante()?.webContents;
+	ipcMain.handle(CANAUX.pythonRun, (e, job: unknown): Promise<PythonRun> => {
+		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ status: "unavailable", stdout: "", error: "travail refusé" });
 		const o = (job ?? {}) as Record<string, unknown>;
 		const texte = (v: unknown) => typeof v === "string" && v.length <= PLAFOND_PYTHON;
 		if (!texte(o.code) || !texte(o.stdin ?? "") || (o.after !== undefined && !texte(o.after))) {
@@ -1454,7 +1461,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const delai = Math.min(10000, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
 		return deps.python.run({ code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
 	});
-	ipcMain.handle(CANAUX.pythonWarm, () => { deps.python.warm(); });
+	ipcMain.handle(CANAUX.pythonWarm, (e) => { if (depuisFenetrePrincipale(e)) deps.python.warm(); });
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {

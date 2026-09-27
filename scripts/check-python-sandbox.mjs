@@ -33,8 +33,16 @@ try {
 		env: { ...process.env, NEO_PYTHON_RACINE: racine, NEO_PYTHON_PRELOAD: join(tmp, "preload.cjs") },
 		encoding: "utf8", timeout: 180000,
 	});
+	/* I4 (d) : un DEUXIÈME processus Electron, avec un seul bac SANS CSP —
+	   deux `creerBacASable` dans le même processus font échouer le second
+	   `protocol.handle` du schéma privilégié (mesuré : `ERR_FAILED`, un
+	   détail d'Electron), donc jamais dans le même `p`. */
+	const pSansCsp = spawnSync(electron, [tmp], {
+		env: { ...process.env, NEO_PYTHON_RACINE: racine, NEO_PYTHON_PRELOAD: join(tmp, "preload.cjs"), NEO_PYTHON_SANS_CSP: "1" },
+		encoding: "utf8", timeout: 30000,
+	});
 	const cas = {};
-	for (const l of `${p.stdout}\n${p.stderr}`.split("\n")) {
+	for (const l of `${p.stdout}\n${p.stderr}\n${pSansCsp.stdout}\n${pSansCsp.stderr}`.split("\n")) {
 		const m = /^CAS (\S+) (.*)$/.exec(l.trim());
 		if (m) cas[m[1]] = JSON.parse(m[2]);
 	}
@@ -55,9 +63,43 @@ try {
 	r.check("évasion reseau : requête jamais émise (aucun LU)", /LU/.test(cas.reseau?.stdout ?? "LU manquant"), false);
 	r.check("évasion fichier : ni contenu (200) ni lecture opaque (0)", /LU (200|0)\b/.test(cas.fichier?.stdout ?? "LU manquant"), false);
 	r.check("évasion traversee : rien de lu (200)", /LU 200\b/.test(cas.traversee?.stdout ?? "LU manquant"), false);
+
+	/* I4 (a) : évasion réseau SANS eval, par un chemin réel de Pyodide
+	   (`loadPackage`, qui ne lève PAS pour un paquet en échec — il logue et
+	   continue, d'où la présence de « CHARGE » quoi qu'il arrive). La preuve
+	   que la requête n'a jamais abouti est « Failed to fetch » : c'est
+	   `webRequest.onBeforeRequest` qui annule la requête, jamais une réponse
+	   du serveur distant. */
+	r.check("évasion loadPackage(http) : requête jamais aboutie", /Failed to fetch/.test(cas["loadpackage-http"]?.stdout ?? ""), true);
+	r.check("évasion loadPackage(file) : jamais chargé", /CHARGE/.test(cas["loadpackage-file"]?.stdout ?? "CHARGE manquant"), false);
+	/* I4 (c) : la CSP seule, sur du code qui ne touche ni réseau ni disque —
+	   Pyodide enveloppe le refus JS en `JsException`, jamais un `EvalError`
+	   Python. */
+	r.check("CSP : Function refusé (JsException)", /^REFUSE JsException$/.test((cas.csp?.stdout ?? "").trim()), true);
+	/* I4 (d) : un bac SANS CSP — `webRequest` doit bloquer SEUL, sur un
+	   `mode: "no-cors"` que Chromium laisserait normalement PARTIR (voir le
+	   commentaire du harnais). Aucun « LU » : la requête n'est jamais émise. */
+	r.check("sans CSP : webRequest bloque seul le réseau (aucun LU)", /LU/.test(cas["sanscsp-reseau"]?.stdout ?? "LU manquant"), false);
+
+	/* I1 : un interpréteur neuf par essai — aucune fuite d'un essai à
+	   l'autre, même via un patch de `pyodide.code.eval_code_async`. */
+	r.check("I1 : essai 1 patche sans effet sur l'essai suivant", (cas["fuite-essai2"]?.stdout ?? "").trim(), "False");
+	r.check("I1 : l'`after` de l'essai 2 échoue bien (interpréteur neuf)", cas["fuite-essai2"]?.status, "error");
+
+	/* I3 : un Pyodide qui s'arrête pour de bon (`os._exit(0)`) n'immobilise
+	   pas la session — l'essai suivant doit marcher normalement. */
+	r.check("I3 : l'essai suivant marche après os._exit(0)", [cas["apres-exit"]?.status, cas["apres-exit"]?.stdout], ["ok", "encore-vivant\n"]);
+
 	r.check("boucle infinie arrêtée au délai", [cas.boucle?.status, cas.boucle?.ms < 5000], ["timeout", true]);
 	r.check("l'essai suivant marche", [cas["apres-boucle"]?.status, cas["apres-boucle"]?.stdout], ["ok", "encore\n"]);
 	r.check("flot de print : trop long ou délai, jamais bloqué", ["too-long", "timeout"].includes(cas.flot?.status), true);
+
+	/* I4 (b) : `resoudreFichierPython` en pur, hors Electron/Python. */
+	r.check("resoudreFichierPython : chemin valide accepté", cas["resoudre-valide"]?.refuse, false);
+	for (const nom of ["backslash-encode", "chemin-absolu", "autre-hote"]) {
+		r.check(`resoudreFichierPython : ${nom} refusé`, cas[`resoudre-${nom}`]?.refuse, true);
+	}
+
 	r.done();
 } finally {
 	rmSync(tmp, { recursive: true, force: true });

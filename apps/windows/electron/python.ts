@@ -28,6 +28,9 @@ const PARTITION = "neo-python"; // sans `persist:` : en mémoire, rien sur disqu
 const CSP = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'";
 const SECOURS_MS = 3000;
 const INACTIVITE_MS = 10 * 60 * 1000;
+/* File d'attente BORNÉE (M3) : le rendu est de confiance, mais un travail
+   sans limite pourrait s'accumuler indéfiniment. */
+const PLAFOND_FILE = 8;
 
 /* Enregistré par `main.ts` dans son UNIQUE appel à
    `registerSchemesAsPrivileged` (Electron n'en retient qu'un). */
@@ -55,12 +58,25 @@ export interface BacASable {
 	fermer(): void;
 }
 
-export function creerBacASable(racine: string, preload: string): BacASable {
+/* `options.csp` n'existe que pour le harnais de `check:python-sandbox`
+   (revue I4, cas `NEO_PYTHON_SANS_CSP`, un PROCESSUS Electron à part) :
+   désactiver la CSP prouve que `webRequest.onBeforeRequest` bloque SEUL le
+   réseau, sans dépendre du refus de `Function` par la CSP. Tout appelant réel
+   (python.ts n'a qu'un seul appelant, `main.ts`) omet `options` et garde
+   donc les deux couches. */
+export function creerBacASable(racine: string, preload: string, options?: { csp?: boolean }): BacASable {
+	const cspActive = options?.csp !== false;
 	let fenetre: BrowserWindow | null = null;
 	let pret: Promise<BrowserWindow> | null = null;
 	let sessionPrete = false;
 	let prochainId = 1;
 	let file: Promise<unknown> = Promise.resolve();
+	let enFile = 0;
+	/* Le travail en cours pendant un RECHARGEMENT de secours (M3) : la page
+	   perd son worker en vol, et lui envoyer le travail suivant avant la fin
+	   du rechargement le perdrait (il attendrait `timeoutMs + SECOURS_MS`
+	   pour rien). */
+	let pretApresRecharge: Promise<void> | null = null;
 	let minuterieInactivite: ReturnType<typeof setTimeout> | null = null;
 	const attentes = new Map<number, (r: PythonRun) => void>();
 
@@ -74,7 +90,7 @@ export function creerBacASable(racine: string, preload: string): BacASable {
 			try {
 				const r = await net.fetch(pathToFileURL(abs).href);
 				const h = new Headers(r.headers);
-				h.set("Content-Security-Policy", CSP);
+				if (cspActive) h.set("Content-Security-Policy", CSP);
 				return new Response(r.body, { status: r.status, headers: h });
 			} catch {
 				return new Response(null, { status: 404 });
@@ -121,17 +137,23 @@ export function creerBacASable(racine: string, preload: string): BacASable {
 	}
 
 	function executer(job: PythonJob): Promise<PythonRun> {
-		return ouvrir().then(f => new Promise<PythonRun>((resolve) => {
-			const id = prochainId++;
-			const secours = setTimeout(() => {
-				/* La page n'a pas répondu : on la recharge (le worker meurt avec). */
-				if (!attentes.delete(id)) return;
-				f.webContents.reload();
-				resolve({ status: "timeout", stdout: "" });
-			}, job.timeoutMs + SECOURS_MS);
-			attentes.set(id, (r) => { clearTimeout(secours); resolve(r); });
-			f.webContents.send(CANAUX_BAC.travail, { ...job, id });
-		}), (): PythonRun => ({ status: "unavailable", stdout: "" }));
+		return ouvrir().then(async f => {
+			/* Un rechargement de secours est en cours : attendre qu'il finisse
+			   avant d'envoyer ce travail, sinon il part dans le vide (M3). */
+			if (pretApresRecharge) { await pretApresRecharge; pretApresRecharge = null; }
+			return new Promise<PythonRun>((resolve) => {
+				const id = prochainId++;
+				const secours = setTimeout(() => {
+					/* La page n'a pas répondu : on la recharge (le worker meurt avec). */
+					if (!attentes.delete(id)) return;
+					pretApresRecharge = new Promise<void>((r) => f.webContents.once("did-finish-load", () => r()));
+					f.webContents.reload();
+					resolve({ status: "timeout", stdout: "" });
+				}, job.timeoutMs + SECOURS_MS);
+				attentes.set(id, (r) => { clearTimeout(secours); resolve(r); });
+				f.webContents.send(CANAUX_BAC.travail, { ...job, id });
+			});
+		}, (): PythonRun => ({ status: "unavailable", stdout: "" }));
 	}
 
 	function fermer(): void {
@@ -141,8 +163,12 @@ export function creerBacASable(racine: string, preload: string): BacASable {
 
 	return {
 		run(job) {
+			if (enFile >= PLAFOND_FILE) {
+				return Promise.resolve({ status: "unavailable", stdout: "", error: "file d'attente pleine" });
+			}
 			rearmerInactivite();
-			const suite = file.then(() => executer(job));
+			enFile++;
+			const suite = file.then(() => executer(job)).finally(() => { enFile--; });
 			file = suite.catch(() => undefined);
 			return suite;
 		},
