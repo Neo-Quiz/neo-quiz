@@ -78,7 +78,7 @@ await withSrcModule("src/dashboard/view-enter.ts", ({ markViewEnter }) => {
 		/* LE CAS DE L'INCIDENT : le rail du chemin tourne pour toujours. */
 		const c = new FauxConteneur([
 			new CSSAnimation("qbd-folder-card-in", "running"),
-			new CSSAnimation("qbd-path-defile", "running", Infinity),
+			new CSSAnimation("animation-infinie-de-test", "running", Infinity),
 		]);
 		markViewEnter(c, true, "qbd-quizzes-enter");
 		c.finir("qbd-folder-card-in");
@@ -89,7 +89,7 @@ await withSrcModule("src/dashboard/view-enter.ts", ({ markViewEnter }) => {
 		const c = new FauxConteneur([
 			new CSSAnimation("qbd-folder-card-in", "running"),
 			new CSSAnimation("qbd-folder-card-in", "running"),
-			new CSSAnimation("qbd-path-defile", "running", Infinity),
+			new CSSAnimation("animation-infinie-de-test", "running", Infinity),
 		]);
 		markViewEnter(c, true, "qbd-quizzes-enter");
 		c.animations[0].playState = "finished";
