@@ -2,6 +2,10 @@
    10) EXPLICATION
    ========================================================= */
 
+/* Même police et même taille que le texte des questions (retour #13,
+   2026-09-26 soir) : `.quiz-question` (quiz-card.css) est à 1.0625em, ~17px
+   sur une base de 16 — l'explication était deux fois plus petite (0.8125em,
+   13px) et peu lisible. */
 .quiz-explain{
   margin-top: 14px;
   padding: 16px;
@@ -9,8 +13,8 @@
   border: 1px solid var(--background-modifier-border);
   background: color-mix(in srgb, var(--background-primary) 80%, transparent);
   color: var(--text-normal);
-  font-size: 0.8125em;
-  line-height: 1.55;
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
 .quiz-explain.good,

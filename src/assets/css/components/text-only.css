@@ -295,9 +295,14 @@
   background: color-mix(in srgb, var(--background-secondary) 76%, transparent);
 }
 
+/* Même police et même taille que le texte des questions (retour #13,
+   2026-09-26 soir) : ce cadre hérite sinon la petite taille de l'écran des
+   résultats, où l'explication d'une question terminal après correction
+   était trop petite et peu lisible. */
 .quiz-textonly-explain-content{
   color: var(--text-normal);
-  line-height: 1.55;
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
 .quiz-textonly-explain-content p:first-child{
@@ -310,7 +315,8 @@
 
 .quiz-textonly-explain-plain{
   color: var(--text-normal);
-  line-height: 1.55;
+  font-size: 1.0625em;
+  line-height: 1.6;
 }
 
 .quiz-textonly-explain-plain p:first-child{
@@ -319,6 +325,16 @@
 
 .quiz-textonly-explain-plain p:last-child{
   margin-bottom: 0;
+}
+
+/* Le gras bleu d'une explication (retour #12, posé sur `.quiz-explain strong`
+   par explanations.css) s'applique ICI AUSSI : cet écran (résultats, question
+   par question) affiche la même explication par un chemin CSS différent
+   (`.quiz-textonly-explain-*`, jamais nichée sous `.quiz-explain`). */
+.quiz-textonly-explain-content strong,
+.quiz-textonly-explain-plain strong{
+  color: var(--interactive-accent);
+  font-weight: 600;
 }
 
 /* La bonne réponse, seule : une ligne par réponse, coche verte + texte —
