@@ -31,6 +31,7 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
+import { jouerTransition } from "./ui/transition-quiz";
 import { renderSettings } from "./ui/settings";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
@@ -136,11 +137,32 @@ function demonter(): Promise<void> | void {
 	return d?.();
 }
 
+/**
+ * VRAI de l'instant où l'on demande un changement d'écran (lancer un quiz,
+ * en revenir) jusqu'à la fin de sa transition (`ui/transition-quiz.ts`).
+ * Pendant ce temps, toute autre demande est IGNORÉE : un double clic sur
+ * « Commencer le quiz » ne lance pas deux moteurs, un double clic sur la
+ * flèche retour ne remonte pas deux coquilles. Posé AVANT la lecture de la
+ * note, qui est asynchrone : c'est là que le second clic arrivait.
+ */
+let transitionEnCours = false;
+
+/** Les écrans affichés dans la racine, qui vont céder la place au suivant. */
+function ecransDe(root: HTMLElement): HTMLElement[] {
+	return Array.from(root.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
+}
+
 /* `document.createElement`, jamais les extensions DOM d'Obsidian (`createEl`,
-   `createDiv`, `empty`) : elles n'existent pas dans la fenêtre de l'app. */
+   `createDiv`, `empty`) : elles n'existent pas dans la fenêtre de l'app.
+   Au démarrage, la racine est vide : pas de transition. Au RETOUR d'un quiz,
+   l'écran du quiz (déjà démonté) reste affiché et redescend pendant que la
+   coquille revient derrière lui ; `jouerTransition` le retire à la fin. */
 export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp): void {
+	if (transitionEnCours) return;
+	const sortants = ecransDe(root);
 	void demonter();
-	root.textContent = "";
+	// Empilés AVANT le montage : la coquille se met en page à sa vraie place.
+	if (sortants.length > 0) root.classList.add("nq-empile");
 	demonterCourant = monterDashboard(root, {
 		scanner,
 		statsStore: stats,
@@ -152,6 +174,15 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		onOpenSettings: () => ouvrirReglages(),
 		sessions,
 	});
+	const entrant = root.lastElementChild;
+	if (sortants.length === 0) return;
+	if (!(entrant instanceof HTMLElement)) {
+		for (const s of sortants) s.remove();
+		root.classList.remove("nq-empile");
+		return;
+	}
+	transitionEnCours = true;
+	void jouerTransition(root, sortants, entrant, "sortie").finally(() => { transitionEnCours = false; });
 }
 
 /** La modale des réglages, quand elle est ouverte. Une SEULE à la fois : le
@@ -216,12 +247,21 @@ function ouvrirReglages(): void {
  * L'affectation de `demonterCourant` se fait APRÈS l'`await` — `openQuizPage`
  * lit le fichier avant de rendre — mais le démontage de la liste, lui, a lieu
  * AVANT : entre les deux, `demonterCourant` vaut `null`, et un second clic ne
- * démonterait rien deux fois. C'est aussi pourquoi la page fait elle-même son
- * `root.replaceChildren()` en entrée.
+ * démonterait rien deux fois. Le verrou `transitionEnCours` l'ignore même
+ * tout à fait, jusqu'à la fin de la transition.
+ *
+ * LA TRANSITION (2026-09-27, `ui/transition-quiz.ts`) : la coquille démontée
+ * RESTE affichée, inerte, pendant la lecture de la note et les 500 ms où
+ * l'écran du quiz monte par-dessus elle ; il est invisible tant qu'il charge
+ * (`nq-chargement`, `shell.css`).
  */
 async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
+	if (transitionEnCours) return;
+	transitionEnCours = true;
+	const sortants = ecransDe(root);
+	for (const s of sortants) s.inert = true;
 	void demonter();
-	root.textContent = "";
+	root.classList.add("nq-empile", "nq-chargement");
 	/* Le démontage rendu par `openQuizPage` appelle `__quizDestroy` : sans lui,
 	   chaque aller-retour laisserait vivre une instance de moteur complète
 	   (écouteurs document/window, ResizeObserver, timers). C'est le pendant
@@ -229,9 +269,23 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	   `store` ET `stats` PASSÉS TELS QUELS comme puits : `ReviewStore` et
 	   `StatsStore` portent déjà exactement la FORME que `openQuizPage`
 	   attend — les envelopper dans un objet littéral n'ajouterait rien. */
-	demonterCourant = await openQuizPage(root, entry, () => {
-		mount(root, scanner, store, stats, sessions);
-	}, store, stats, sessions);
+	try {
+		demonterCourant = await openQuizPage(root, entry, () => {
+			mount(root, scanner, store, stats, sessions);
+		}, store, stats, sessions);
+		root.classList.remove("nq-chargement");
+		const entrant = root.lastElementChild;
+		if (entrant instanceof HTMLElement && !sortants.includes(entrant)) {
+			await jouerTransition(root, sortants, entrant, "entree");
+		}
+	} finally {
+		/* Sur TOUTES les issues, un rejet imprévu compris : aucune coquille
+		   fantôme ne reste sous le quiz, et le verrou se rouvre. Après une
+		   transition jouée, ces lignes ne trouvent plus rien à faire. */
+		for (const s of sortants) s.remove();
+		root.classList.remove("nq-empile", "nq-chargement");
+		transitionEnCours = false;
+	}
 }
 
 async function demarrer(): Promise<void> {

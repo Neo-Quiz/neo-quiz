@@ -39,6 +39,11 @@ import type { SessionsApp } from "../review/sessions";
  *
  * Le retour DOIT être appelé avant tout autre montage : il détruit l'instance
  * du moteur. Voir le commentaire de `__quizDestroy` plus bas.
+ *
+ * Il NE RETIRE PAS l'écran du DOM, pas plus que ne vide `root` à l'entrée
+ * (2026-09-27) : c'est `main.ts` qui ajoute et retire les écrans, parce que
+ * la transition de lancement (`transition-quiz.ts`) garde l'ancien affiché
+ * 500 ms sous le nouveau — même contrat que la coquille du tableau de bord.
  */
 export async function openQuizPage(
 	root: HTMLElement,
@@ -61,7 +66,6 @@ export async function openQuizPage(
 	   mêmes raisons. */
 	sessions?: SessionsApp,
 ): Promise<() => void> {
-	root.replaceChildren();
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
 	// ── En-tête : retour · titre · chemin ──
@@ -107,8 +111,12 @@ export async function openQuizPage(
 	const hote = ajouter(contenu, "div", "quiz-blocks-host");
 
 	/** Démontage d'un écran qui n'a PAS atteint le moteur (erreur de lecture,
-	    note sans bloc) : il n'y a pas d'instance à détruire. */
-	const demonterSansMoteur = (): void => { root.replaceChildren(); };
+	    note sans bloc) : il n'y a pas d'instance à détruire, seulement les
+	    écouteurs du bouton de la souris. */
+	const demonterSansMoteur = (): void => {
+		document.removeEventListener("mousedown", surBoutonSouris, true);
+		document.removeEventListener("mouseup", surBoutonSouris, true);
+	};
 
 	let source: string;
 	try {
@@ -198,6 +206,5 @@ export async function openQuizPage(
 		// le puits (sauvegarde de sortie) ; `vider()` écrit immédiatement au lieu
 		// d'attendre le délai de garde de 400 ms.
 		void sessions?.vider();
-		root.replaceChildren();
 	};
 }

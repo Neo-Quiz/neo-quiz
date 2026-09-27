@@ -1113,6 +1113,29 @@ body::after {
 	overflow-y: auto;
 }
 
+/* LA TRANSITION DE LANCEMENT D'UN QUIZ (2026-09-27, `ui/transition-quiz.ts`) :
+   pendant 500 ms, l'ancienne vue et la nouvelle sont DEUX enfants de la
+   racine. En colonne flex, la seconde se poserait sous la première ; la
+   grille à une seule case les empile au même endroit, chacune gardant sa
+   largeur, sa hauteur et ses marges ci-dessus. L'ordre du DOM décide de qui
+   est devant (le quiz qui monte est ajouté après la page) ; au retour, le
+   quiz sortant est remis devant par un `z-index` posé par le module. */
+#neo-quiz-root.nq-empile {
+	display: grid;
+	grid-template: minmax(0, 100%) / minmax(0, 1fr);
+}
+#neo-quiz-root.nq-empile > * {
+	grid-area: 1 / 1;
+}
+/* Pendant la LECTURE de la note (avant que la transition ne démarre), l'écran
+   du quiz est déjà monté à sa place finale : invisible, mais mis en page,
+   pour que le moteur mesure ses slides dans le vrai panneau. Sans ça, il
+   apparaîtrait d'un coup par-dessus la page, puis repartirait en bas pour
+   monter. */
+#neo-quiz-root.nq-chargement > .qbd-qz {
+	visibility: hidden;
+}
+
 /* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
    DÉCORATION, pas un bouton — ni curseur, ni survol, ni cible au clavier.
    Il avait été retiré du rail le 2026-09-23 parce qu'il « ne menait nulle
