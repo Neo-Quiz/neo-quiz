@@ -270,6 +270,9 @@ async function verifierBudgetSurLesVraisAppelants() {
 					__quizGlobalCleanups: [],
 					currentAsyncEpoch: () => 0,
 					isQuizInstanceAlive: () => false,
+					// L'indice pose le bouton « Exécuter » de ses blocs Python
+					// (engine/code-run.ts) : hors sujet ici, un stub suffit.
+					codeRun: { bindCodeRunButtons: () => {} },
 				};
 				ctx.sanitize = sanitizer.createSanitizer({ host: hote.currentHost(), sourcePath: "" });
 				indice.createHintHandlers(ctx).openHintModal("Indice\n\n" + BLOC_HOSTILE);
