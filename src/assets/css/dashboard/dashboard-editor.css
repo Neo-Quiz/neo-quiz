@@ -350,28 +350,29 @@
 /* ── Le champ à aperçu en direct (editor/champ-direct.ts) ──
    Un CodeMirror sans thème à lui : il hérite de la police, de la taille et
    de la couleur du contrôle qu'il remplace (`.qb-answer-input`,
-   `.qbd-qz-input`, le cadre `.qb-rich`). Préfixe `.qbd-root` : le thème de
+   `.qbd-qz-input`, le cadre `.qb-rich`). Préfixe `.qbd-root` (ou la modale
+   Vocabulaire, portalée hors de lui) : le thème de
    base de CodeMirror est injecté APRÈS nos feuilles, à spécificité égale il
    gagnerait (police à chasse fixe, marges des lignes, contour pointillé). */
-.qbd-root .qb-direct { cursor: text; }
-.qbd-root .qb-direct .cm-editor {
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct { cursor: text; }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-editor {
 	background: none;
 	color: inherit;
 	font: inherit;
 }
-.qbd-root .qb-direct .cm-editor.cm-focused { outline: none; }
-.qbd-root .qb-direct .cm-scroller {
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-editor.cm-focused { outline: none; }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-scroller {
 	font-family: inherit;
 	line-height: inherit;
 	overflow: visible;
 }
-.qbd-root .qb-direct .cm-content {
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-content {
 	padding: 0;
 	font-family: inherit;
 	caret-color: var(--text-normal);
 }
-.qbd-root .qb-direct .cm-line { padding: 0; }
-.qbd-root .qb-direct .cm-placeholder { color: var(--text-faint); }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-line { padding: 0; }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .cm-placeholder { color: var(--text-faint); }
 /* Multiligne : la zone sous la barre, au rythme de l'ancienne zone de texte. */
 .qbd-root .qbd-qz-form .qb-rich .qb-direct--multi {
 	padding: 9px 12px 10px;
@@ -386,13 +387,13 @@
 }
 /* Les marqueurs (`**`, `` ` ``, `$`) quand le curseur est dans le segment :
    présents mais en retrait, comme dans Obsidian. */
-.qbd-root .qb-direct .qb-direct-marqueur { color: var(--text-faint); }
-.qbd-root .qb-direct .qb-direct-formule-source {
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .qb-direct-marqueur { color: var(--text-faint); }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .qb-direct-formule-source {
 	font-family: var(--font-monospace);
 	font-size: 0.92em;
 	color: var(--text-muted);
 }
-.qbd-root .qb-direct .qb-direct-formule { cursor: pointer; }
+:is(.qbd-root, .qbd-gloss-modal) .qb-direct .qb-direct-formule { cursor: pointer; }
 /* Les BLOCS du markdown (editor/champ-direct-deco.ts), comme dans le quiz :
    un bloc ```…``` en police de code sur son fond, ses clôtures en retrait ;
    une liste avec sa puce ; un tableau aligné ; une citation avec sa barre. */
@@ -1228,33 +1229,7 @@
 	border-top: 1px solid var(--background-modifier-border);
 }
 
-/* ── Le champ à aperçu en direct, HORS `.qbd-root` (voir l'en-tête) ──
-   Repris de `.qbd-root .qb-direct` (plus haut dans ce fichier), sans le
-   préfixe : cette modale ne descend pas de `.qbd-root`. */
-.qbd-gloss-modal .qb-direct { cursor: text; }
-.qbd-gloss-modal .qb-direct .cm-editor {
-	background: none;
-	color: inherit;
-	font: inherit;
-}
-.qbd-gloss-modal .qb-direct .cm-editor.cm-focused { outline: none; }
-.qbd-gloss-modal .qb-direct .cm-scroller {
-	font-family: inherit;
-	line-height: inherit;
-	overflow: visible;
-}
-.qbd-gloss-modal .qb-direct .cm-content {
-	padding: 0;
-	font-family: inherit;
-	color: var(--text-normal);
-	caret-color: var(--text-normal);
-}
-.qbd-gloss-modal .qb-direct .cm-line { padding: 0; }
-.qbd-gloss-modal .qb-direct .cm-placeholder { color: var(--text-faint); }
-.qbd-gloss-modal .qb-direct .qb-direct-marqueur { color: var(--text-faint); }
-.qbd-gloss-modal .qb-direct .qb-direct-formule-source {
-	font-family: var(--font-monospace);
-	font-size: 0.92em;
-	color: var(--text-muted);
-}
-.qbd-gloss-modal .qb-direct .qb-direct-formule { cursor: pointer; }
+/* Le champ à aperçu en direct de la modale : les règles communes sont en
+   haut du fichier (`:is(.qbd-root, .qbd-gloss-modal) .qb-direct`) ; seule la
+   couleur du texte est propre à ce fond. */
+.qbd-gloss-modal .qb-direct .cm-content { color: var(--text-normal); }
