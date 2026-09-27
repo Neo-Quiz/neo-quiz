@@ -9,9 +9,30 @@ JSON5) en quiz interactifs : rendu avec transitions, mode examen, LaTeX,
 journal de révision partagé avec l'application Neo Quiz. Créer et éditer un
 quiz, générer par IA, vivent dans l'application (`apps/windows/`) depuis le
 chantier « greffon lecteur » (2026-09-13) — voir « Structure du dépôt » et
-« Architecture » plus bas. 100 % TypeScript strict (ESM). **Commentaires en
-français** ; **UI traduite** (anglais par défaut, cf. « Langue » ci-dessous) —
-le plugin vise la liste communautaire d'Obsidian.
+« Architecture » plus bas. 100 % TypeScript strict (ESM). **Commentaires de
+code en ANGLAIS** (voir « Langue du code » ci-dessous) ; **UI traduite**
+(anglais par défaut, cf. « Langue » ci-dessous) — le plugin vise la liste
+communautaire d'Obsidian.
+
+## Langue du code (depuis le 2026-09-27)
+
+Le dépôt est public et doit pouvoir accueillir d'autres contributeurs : un
+code commenté en français n'est lisible que par des francophones.
+
+- **Tout commentaire NEUF s'écrit en anglais** — ligne, bloc, JSDoc, dans
+  `src/`, `apps/`, `scripts/`, les workflows et les pages de `docs/`.
+- **Les commentaires français existants passent en anglais au fil de l'eau** :
+  un fichier qu'on modifie voit ses commentaires traduits dans le même commit
+  (au moins ceux de la zone touchée ; le fichier entier s'il est petit). Une
+  traduction garde le SENS entier — le pourquoi, le bug évité, la date —,
+  jamais un résumé qui perd l'information. Pas de citation d'Ahmed ni de son
+  prénom dans la version anglaise (le dépôt est public).
+- **Ce fichier (`CLAUDE.md`), la note du vault et les échanges avec Ahmed
+  restent en français.**
+- Les IDENTIFIANTS français déjà en place (`urlLegale`, `perimetre`,
+  `ajouter`…) ne se renomment PAS en passant : un renommage touche chaque
+  appelant et chaque contrôle qui cherche le nom en texte. Un identifiant
+  NEUF s'écrit en anglais.
 
 ## La mémoire du projet est la note du vault, pas un fichier de mémoire
 
@@ -371,8 +392,8 @@ Vérification d'un changement = `npm run check`, plus `check:md` / `check:export
   le fige. L'application, elle, reste bilingue (voir « Langue »).
 - **Tout ce qui est public sur GitHub s'écrit en anglais** : messages de
   commit (voir « Conventions »), noms de workflows et d'étapes, messages
-  `::error::`, descriptions. Le français reste la langue des commentaires du
-  code, de ce fichier et de la note du vault.
+  `::error::`, descriptions — et les commentaires de code (voir « Langue du
+  code »). Le français reste la langue de ce fichier et de la note du vault.
 - Les sondes locales `.tmp-*` à la racine sont ignorées (`.gitignore`) : ne
   jamais les commiter.
 
