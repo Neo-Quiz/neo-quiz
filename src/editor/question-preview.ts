@@ -16,6 +16,7 @@ import { reinitialiserBudgetRendu } from "../engine/code-highlight";
    (bundle CommonJS) ne s'en apercevait pas. Aucun cycle : `math-input`
    n'importe rien de l'éditeur. */
 import { usesMathField, createMathField } from "../engine/math-input";
+import { isShellVariant, defaultTerminalPromptPrefix } from "../engine/terminal";
 import {
 	correctOptionIndices,
 	acceptedAnswersCorrige,
@@ -398,26 +399,49 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 		}
 	}
 
+	/* `type` (le bucket "cmd"/"powershell"/"bash" de l'éditeur) ne distingue
+	   pas une vraie invite d'une variante de PROGRAMME (python, java…) : le
+	   bucket "bash" range les deux (editor/convert.ts). `_terminalVariant`
+	   porte la forme réelle ; à défaut (question neuve, jamais passée par
+	   convertParsedToInternal), le bucket lui-même EST la variante — même
+	   logique que le moteur (engine/terminal.ts isCommandTextQuestion /
+	   isProgramOutputQuestion), sans dupliquer sa table `SHELL_VARIANTS`. */
 	if (type === "cmd" || type === "powershell" || type === "bash") {
-		const shellWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-text-wrap-command");
-		const shell = ajouter(shellWrap, "div", "quiz-command-shell quiz-terminal-variant-" + type + (opts.corrige ? " correct" : ""));
-		if (type === "bash") {
-			const prefixSpan = ajouter(shell, "span", "quiz-command-prefix quiz-command-prefix-bash");
-			prefixSpan.innerHTML = '<span class="quiz-bash-prefix-userhost">user@hostname</span><span class="quiz-bash-prefix-colon">:</span><span class="quiz-bash-prefix-path">~</span><span class="quiz-bash-prefix-dollar">$ </span>';
+		const variant = q._terminalVariant ?? type;
+		if (isShellVariant(variant)) {
+			const shellWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-text-wrap-command");
+			const shell = ajouter(shellWrap, "div", "quiz-command-shell quiz-terminal-variant-" + variant + (opts.corrige ? " correct" : ""));
+			ajouter(shell, "span", "quiz-command-prefix", q.commandPrefix || defaultTerminalPromptPrefix(variant));
+			const inputWrap = ajouter(shell, "div", "quiz-command-input-wrap");
+			const cmdTa = ajouter(inputWrap, "textarea", "quiz-textarea quiz-textarea-command");
+			cmdTa.readOnly = true;
+			cmdTa.rows = 1;
+			cmdTa.wrap = "off";
+			if (opts.corrige) {
+				const { primary, variantsHtml } = acceptedAnswersCorrige(q);
+				cmdTa.value = primary;
+				cmdTa.setAttribute("data-edit", "accepted");
+				cmdTa.setAttribute("data-index", "0");
+				if (variantsHtml) shellWrap.insertAdjacentHTML("afterend", variantsHtml);
+			}
 		} else {
-			ajouter(shell, "span", "quiz-command-prefix", q.commandPrefix || (type === "cmd" ? "C:\\>" : "PS>"));
-		}
-		const inputWrap = ajouter(shell, "div", "quiz-command-input-wrap");
-		const cmdTa = ajouter(inputWrap, "textarea", "quiz-textarea quiz-textarea-command");
-		cmdTa.readOnly = true;
-		cmdTa.rows = 1;
-		cmdTa.wrap = "off";
-		if (opts.corrige) {
-			const { primary, variantsHtml } = acceptedAnswersCorrige(q);
-			cmdTa.value = primary;
-			cmdTa.setAttribute("data-edit", "accepted");
-			cmdTa.setAttribute("data-index", "0");
-			if (variantsHtml) shellWrap.insertAdjacentHTML("afterend", variantsHtml);
+			// Sortie d'un programme (retour #2, 2026-09-26 soir) : même style que
+			// le quiz réel (.quiz-md-code), un libellé au lieu d'une invite.
+			const programWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-text-wrap-program");
+			const programBox = ajouter(programWrap, "div", "quiz-md-code quiz-program-output" + (opts.corrige ? " correct" : ""));
+			ajouter(programBox, "div", "quiz-program-output-label", t("engine.terminal.programOutputLabel"));
+			const progTa = ajouter(programBox, "textarea", "quiz-textarea quiz-textarea-program");
+			progTa.readOnly = true;
+			progTa.setAttribute("aria-readonly", "true");
+			if (opts.corrige) {
+				const { primary, variantsHtml } = acceptedAnswersCorrige(q);
+				progTa.value = primary;
+				progTa.setAttribute("data-edit", "accepted");
+				progTa.setAttribute("data-index", "0");
+				if (variantsHtml) programWrap.insertAdjacentHTML("afterend", variantsHtml);
+			} else {
+				progTa.value = "";
+			}
 		}
 	}
 

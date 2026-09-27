@@ -129,6 +129,17 @@ export interface DraftQuestion {
 	    ajouter une seconde ferait cohabiter deux déclarations pour la même
 	    chose. */
 	_variantNested?: boolean;
+	/**
+	 * La variante NORMALISÉE (`cmd`, `bash`, `python`…, `engine/terminal.ts
+	 * normalizeTerminalVariantName`) — jamais réémise, jamais lue par
+	 * l'export. Sert uniquement à l'aperçu (question-preview.ts) et au
+	 * formulaire (editor-form.ts) : le bucket `_type` ne distingue que trois
+	 * variantes (`cmd`/`powershell`/`bash`) et range toute autre variante
+	 * réelle dans `bash` faute de type dédié — sans ce champ, l'aperçu d'une
+	 * question `python` ne pourrait pas savoir qu'elle n'est pas une vraie
+	 * invite bash (revue du lot A2, 2026-09-27).
+	 */
+	_terminalVariant?: string | null;
 	/** Clés inconnues préservées au round-trip import→export (editor/modals.js convertToInternalFormat). */
 	_extraFields?: Record<string, unknown>;
 	/** Gabarit guidé de l'éditeur math (miroir de TextQuestion.answerTemplate). */

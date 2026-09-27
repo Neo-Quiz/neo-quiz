@@ -40,3 +40,12 @@
 .math .ML__llap .ML__cmr {
 	font-family: KaTeX_Main;
 }
+
+/* Vérifié à l'écran (revue du lot A2, tour 1) : `\neq`, `\ne`, `\notin` et
+   `\not=` affichent bien leur trait, `\leq`/`\geq` restent inchangés (aucun
+   `.ML__rlap`/`.ML__llap` sur ces deux-là), et une construction `.ML__rlap`
+   qui n'est PAS une négation (`\cancel{5}`, le trait barré d'AMSMATH) rend
+   toujours son chiffre ET son trait — l'exception ci-dessus vise TOUT
+   `.ML__cmr` composé par un overlap, jamais seulement `\not`, et c'est
+   voulu : n'importe quel overlap peut avoir besoin d'un glyphe absent des
+   fontes système. */

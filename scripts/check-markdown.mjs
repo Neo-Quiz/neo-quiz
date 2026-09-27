@@ -67,6 +67,15 @@ const CAS = [
 	["bloc de code sur une seule ligne, sans langage",
 		"```(n + 1) * 2``` ici",
 		"<code class=\"quiz-md-code-inline\">(n + 1) * 2</code> ici"],
+	/* Mineur #5 de la revue du lot A2 : le nom de langage n'entre dans
+	   l'attribut `class` qu'après l'échappement HTML (premier passage
+	   d'`inlineMarkdown`) — un guillemet ou un chevron y arrive déjà en
+	   entité, jamais littéral, et ne peut donc jamais refermer l'attribut ni
+	   ouvrir une balise. Figé ici plutôt que de reposer sur la seule revue
+	   manuelle ponctuelle qui l'a déjà vérifié. */
+	["bloc de code : un guillemet et un chevron dans le nom de langage n'échappent jamais l'attribut",
+		"```python\" onclick=\"alert(1) x < y``` ici",
+		"<code class=\"quiz-md-code-inline\">python&quot; onclick=&quot;alert(1) x &lt; y</code> ici"],
 	["deux gras dans la phrase", "**A** puis **B**", "<strong>A</strong> puis <strong>B</strong>"],
 	["gras en début de chaîne", "**Attention** ici", "<strong>Attention</strong> ici"],
 	["italique après parenthèse", "(*ainsi*)", "(<em>ainsi</em>)"],

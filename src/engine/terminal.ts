@@ -86,6 +86,37 @@ export function normalizeTerminalVariantName(value: unknown): string | null {
     `isProgramOutputQuestion`. */
 const SHELL_VARIANTS = new Set(["cmd", "powershell", "bash", "sh", "zsh"]);
 
+/** Une variante normalisée est-elle une vraie invite de commande ? Exportée
+    au niveau du MODULE — pure, sans `ctx` — pour que l'éditeur (aperçu en
+    direct, formulaire) décide de la même façon que le moteur si une question
+    terminal montre une invite ou un bloc « sortie de programme », sans
+    dupliquer la liste `SHELL_VARIANTS`. */
+export const isShellVariant = (variant: string | null | undefined): boolean =>
+	!!variant && SHELL_VARIANTS.has(variant);
+
+/** L'invite PAR DÉFAUT d'une variante — avant l'override explicite d'une
+    question (`q.commandPrefix`…), que `getTerminalPromptPrefix` ajoute
+    par-dessus pour le moteur. Exportée au niveau du module pour que
+    l'éditeur (`editor/convert.ts`, `editor/editor-form.ts`) propose et
+    enregistre la MÊME valeur que le moteur, jamais une copie figée. */
+export function defaultTerminalPromptPrefix(variant: string | null | undefined): string {
+	switch (variant) {
+		case "cmd":
+			return "C:\\>";
+
+		case "powershell":
+			return "PS>";
+
+		/* Bash/zsh/sh : une invite ADAPTÉE (retour #2, 2026-09-26 soir), pas le
+		   `user@hostname:~$ ` complet d'avant — seule cmd garde `C:\>`. */
+		case "bash":
+		case "zsh":
+		case "sh":
+			return "$";
+	}
+	return "C:\\>";
+}
+
 /** Nombre de lignes que compte une réponse attendue — la hauteur DE DÉPART
     d'un champ de réponse écrite est celle-ci, jamais une valeur fixe (retour
     #2 et sa précision générale du 27/09) : jamais un champ de 10 lignes pour
@@ -130,7 +161,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 	// Une vraie invite (cmd/powershell/bash/sh/zsh) : le fake-terminal une
 	// ligne. Toute autre variante terminal (python…) est une sortie de
 	// programme (isProgramOutputQuestion), jamais une commande.
-	const isCommandTextQuestion = (q: QuizQuestion): boolean => SHELL_VARIANTS.has(getTerminalTextVariant(q) ?? "");
+	const isCommandTextQuestion = (q: QuizQuestion): boolean => isShellVariant(getTerminalTextVariant(q));
 
 	const isProgramOutputQuestion = (q: QuizQuestion): boolean => isTerminalTextQuestion(q) && !isCommandTextQuestion(q);
 
@@ -144,23 +175,9 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 		if (explicitPrefix) return explicitPrefix;
 
-		const variant = getTerminalTextVariant(q);
-
-		switch (variant) {
-			case "cmd":
-				return "C:\\>";
-
-			case "powershell":
-				return "PS>";
-
-			/* Bash/zsh/sh : une invite ADAPTÉE (retour #2, 2026-09-26 soir), pas le
-			   `user@hostname:~$ ` complet d'avant — seule cmd garde `C:\>`. */
-			case "bash":
-			case "zsh":
-			case "sh":
-				return "$";
-		}
-		return "C:\\>";
+		// Le DÉFAUT par variante est la même table que l'éditeur — voir
+		// `defaultTerminalPromptPrefix`, exportée au niveau du module.
+		return defaultTerminalPromptPrefix(getTerminalTextVariant(q));
 	}
 
 	function renderTerminalPromptPrefixHtml(q: TextQuestion): string {
@@ -335,7 +352,11 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			// libellé discret au-dessus. Hauteur DE DÉPART = le nombre de lignes
 			// de la réponse attendue (précision du 27/09), au moins une ; elle
 			// grandit ensuite avec la saisie (bindTextQuestion, branche non-shell).
-			const rows = countAnswerLines(getTextAcceptedAnswers(q)[0]);
+			// Plafonnée à 20 (revue du lot A2, mineur #4) : une sortie d'auteur,
+			// jamais d'utilisateur, mais un futur générateur pourrait produire une
+			// boucle de plusieurs dizaines de lignes — sans plafond, la CARTE
+			// s'ouvrirait déjà plus haute que l'écran avant la moindre saisie.
+			const rows = countAnswerLines(getTextAcceptedAnswers(q)[0], 20);
 			return `
 				<div class="qcm-options quiz-text-wrap quiz-text-wrap-program">
 					<div class="quiz-md-code quiz-program-output ${statusClass}">

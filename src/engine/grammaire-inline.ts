@@ -52,9 +52,22 @@ export function motifCodeSimple(): RegExp {
     2026-09-26 soir). Testé AVANT le double et le simple accent grave : les
     trois s'ouvrent de la même façon, et le double laisserait un accent
     grave surnuméraire de chaque côté. Groupe 1 : le langage (vide si
-    absent), groupe 2 : le code. */
+    absent), groupe 2 : le code.
+    Le contenu REFUSE lui-même de COMMENCER par une séquence de trois accents
+    graves (`(?!` ``` `)` à chaque position) : un bloc triple IMBRIQUÉ collé
+    directement après l'ouverture (` ```py```reste``` `) ne matche plus la
+    clôture la plus proche à l'intérieur.
+    LIMITE CONNUE, non résolue (revue du lot A2, mineur #3) : un bloc triple
+    imbriqué plus LOIN dans le contenu (` ```py autre ```py code``` ``` `,
+    espace avant le second ```) retrouve toujours une paire ouverture/
+    fermeture valide ailleurs dans la chaîne et produit un rendu visuellement
+    incorrect (du code orphelin) — sans risque de sécurité, tout reste
+    échappé. Une regex ne peut pas trancher entre les lectures possibles
+    d'un ``` imbriqué sur une seule ligne ; le corriger pleinement demanderait
+    un analyseur, pas une expression régulière — hors du périmètre de cette
+    tâche pour un cas qu'un auteur ou un modèle colle rarement de lui-même. */
 export function motifCodeTriple(): RegExp {
-	return /```(?:([\w+#.-]+)[ \t]+)?([^`\n]+?)```/g;
+	return /```(?:([\w+#.-]+)[ \t]+)?((?:(?!```)[^\n])+?)```/g;
 }
 
 /** Une suite de QUATRE étoiles ou plus n'est pas de l'emphase : aucune

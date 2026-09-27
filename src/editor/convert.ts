@@ -4,7 +4,7 @@ import { _htmlToText } from "./modals";
 import type { ParsedQuizItem } from "./modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
-import { normalizeTerminalVariantName } from "../engine/terminal";
+import { normalizeTerminalVariantName, defaultTerminalPromptPrefix } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
 import { htmlVersMarkdown, texteBaliseVersMarkdown } from "./html-vers-markdown";
 import { niveauxIndice } from "../quiz-hint";
@@ -342,12 +342,24 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		question.acceptedAnswers = accepted;
 		question.caseSensitive = q.caseSensitive || false;
 		question.placeholder = q.placeholder || "";
-		/* L'invite vaut pour TOUTES les variantes de terminal, bash compris
-		   (engine/terminal.ts getTerminalPromptPrefix) — la restreindre à
-		   cmd/powershell faisait disparaître « Town-Hall# » et consorts. */
+		/* La forme NORMALISÉE de la variante (`cmd`, `bash`, `python`…) — même
+		   fonction que le moteur (engine/terminal.ts normalizeTerminalVariantName),
+		   mémorisée pour l'aperçu ET le formulaire : le bucket `type` de
+		   l'éditeur, lui, ne distingue que trois variantes (`cmd`/`powershell`/
+		   `bash`), et range toute autre variante réelle (`python`, `sh`, `zsh`…)
+		   dans `bash` faute de type dédié — sans ce champ, l'aperçu d'une
+		   question `python` ne pourrait plus savoir qu'elle n'est PAS une vraie
+		   invite bash (retour de revue du lot A2). */
 		if (type === "cmd" || type === "powershell" || type === "bash") {
-			const parDefaut = type === "cmd" ? "C:\\>" : type === "powershell" ? "PS>" : "user@hostname:~$ ";
-			question.commandPrefix = q.commandPrefix || parDefaut;
+			const varianteReelle = normalizeTerminalVariantName(variantSource(q).valeur);
+			question._terminalVariant = varianteReelle;
+			/* L'invite vaut pour TOUTES les variantes de terminal, bash compris
+			   (engine/terminal.ts getTerminalPromptPrefix) — la restreindre à
+			   cmd/powershell faisait disparaître « Town-Hall# » et consorts.
+			   MÊME défaut que le moteur (defaultTerminalPromptPrefix), jamais une
+			   copie : sans elle, une question bash chargée dans l'éditeur
+			   enregistrait encore l'ancienne invite complète à la sauvegarde. */
+			question.commandPrefix = q.commandPrefix || defaultTerminalPromptPrefix(varianteReelle);
 		}
 		/* La forme EXACTE de la variante, avec la clé qui la portait : c'est
 		   elle qu'on réémettra, pas sa forme canonique. Réécrire

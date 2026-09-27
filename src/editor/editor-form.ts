@@ -12,6 +12,7 @@ import { cheminImageCollee, collageImage as collageImagePartage } from "./collag
 import type { Extension } from "@codemirror/state";
 import { creerChampDirect } from "./champ-direct";
 import type { ChampDirect } from "./champ-direct";
+import { isShellVariant, defaultTerminalPromptPrefix } from "../engine/terminal";
 
 /** ``` + Entrée pose un bloc de code : le raccourci de la zone de texte,
     gardé tel quel dans le champ direct. */
@@ -522,14 +523,19 @@ _field(group, t("editor.form.resourceFileName"), rb0.fileName, t("editor.form.re
 		}
 
 		if (["text", "cmd", "powershell", "bash"].includes(qType)) {
-			/* "C:\>" / "PS>" / "user@hostname:~$ " : invites de commandes réelles,
-			   pas de l'UI. BASH aussi : le moteur lit son invite
-			   (engine/terminal.ts getTerminalPromptPrefix) et l'export l'écrit,
-			   mais le formulaire ne la proposait pas — une question bash avait
-			   donc une invite qu'on ne pouvait plus changer. */
-			if (qType === "cmd" || qType === "powershell" || qType === "bash") {
-				const invite = qType === "cmd" ? "C:\\>" : qType === "powershell" ? "PS>" : "user@hostname:~$ ";
-				_field(box, t("editor.text.commandPrefix"), q.commandPrefix, invite, false,
+			/* "C:\>" / "PS>" / "$" : invites de commandes réelles, pas de l'UI —
+			   MÊME défaut que le moteur (engine/terminal.ts
+			   defaultTerminalPromptPrefix), jamais une copie figée. BASH aussi :
+			   le moteur lit son invite (getTerminalPromptPrefix) et l'export
+			   l'écrit, mais le formulaire ne la proposait pas — une question bash
+			   avait donc une invite qu'on ne pouvait plus changer.
+			   Le bucket "bash" range AUSSI les variantes de PROGRAMME (python,
+			   java… — editor/convert.ts, faute de type dédié) : `_terminalVariant`
+			   porte la forme réelle, et une sortie de programme n'a pas d'invite
+			   à proposer ici. */
+			const variant = q._terminalVariant ?? qType;
+			if (isShellVariant(variant)) {
+				_field(box, t("editor.text.commandPrefix"), q.commandPrefix, defaultTerminalPromptPrefix(variant), false,
 					v => { q.commandPrefix = v; rerender(); });
 			}
 			_field(box, t("editor.text.placeholderLabel"), q.placeholder, t("editor.text.placeholderHint"), false, v => { q.placeholder = v; rerender(); });
