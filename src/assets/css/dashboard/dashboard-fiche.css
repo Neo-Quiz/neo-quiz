@@ -684,11 +684,26 @@
 /* « 23 questions » reste du texte (ce n'est pas un bouton), sans point
    séparateur devant (2026-09-26). */
 .qbd-fiche-meta .qbd-fiche-count::before { content: none !important; }
-/* Une carte qui ouvre l'éditeur : curseur de lien, liseré bleu au survol
-   et au focus clavier. Pas de levée : la carte défile, elle ne bouge pas. */
-.qbd-fiche-card.is-editable { cursor: pointer; transition: border-color 0.15s ease; }
-.qbd-fiche-card.is-editable:hover { border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent); }
+/* Une carte qui ouvre l'éditeur : curseur de lien, fond plus clair et ombre
+   douce au survol et au focus clavier (StudySmarter, 2026-09-27) — jamais de
+   levée : la carte défile, elle ne bouge pas. Au clic, un léger enfoncement
+   (`scale`), retiré si l'utilisateur préfère moins de mouvement. */
+.qbd-fiche-card.is-editable {
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+.qbd-fiche-card.is-editable:hover,
+.qbd-fiche-card.is-editable:focus-visible {
+	border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 5%, var(--qbd-glass-bg));
+	box-shadow: var(--qbd-glass-sheen), 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+.qbd-fiche-card.is-editable:active { transform: scale(0.99); transition-duration: 60ms; }
 .qbd-fiche-card.is-editable:focus-visible { outline: 2px solid var(--quiz-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-fiche-card.is-editable { transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+	.qbd-fiche-card.is-editable:active { transform: none; }
+}
 
 /* La ligne d'infos de la fiche, reprise sous le titre de l'éditeur (2026-09-26). */
 .qbd-qz-infos { margin-top: 10px; }

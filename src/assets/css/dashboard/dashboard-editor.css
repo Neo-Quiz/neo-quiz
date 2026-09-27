@@ -67,15 +67,26 @@
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	color: var(--text-normal);
 	cursor: pointer;
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
+/* Fond plus clair et ombre douce au survol (StudySmarter, 2026-09-27), sans
+   levée. Au clic, léger enfoncement. */
 .qbd-qz-card:hover {
 	border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 5%, var(--qbd-glass-bg));
+	box-shadow: var(--qbd-glass-sheen), 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
 }
-/* La question courante : un liseré bleu, et un trait plein à gauche. */
+.qbd-qz-card:active { transform: scale(0.99); transition-duration: 60ms; }
+/* La question courante : un contour bleu (comme `.is-selected` chez
+   StudySmarter), remplace l'ancien liseré + trait plein à gauche, qui en
+   faisait doublon (2026-09-27). */
 .qbd-qz-card.is-active {
-	border-color: var(--quiz-primary);
-	box-shadow: var(--qbd-glass-sheen), inset 3px 0 0 var(--quiz-primary);
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-qz-card { transition: border-color 0.15s ease, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+	.qbd-qz-card:active { transform: none; }
 }
 
 /* La ligne du numéro : le nom du type et le rôle s'abrègent, le numéro et les

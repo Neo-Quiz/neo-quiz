@@ -33,6 +33,8 @@ release notes.
 - A quiz can be moved to another folder from its card menu (Move to), keeping its review history.
 
 ### Changed
+- Question and folder cards react like StudySmarter: a lighter background and soft shadow on hover, a slight press on click; folders no longer lift, and a folder's page fades in.
+- Starting a quiz slides it up over the page, which steps back behind it, like StudySmarter; leaving reverses it.
 - A Learn reading no longer shows "About N minutes of reading".
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
 - The app now sits in a centered panel, with your wallpaper fully visible around it; cards inside are plain surfaces instead of glass tiles. A soft blue glow lights the top of the window; entering a folder briefly flashes the folder's color, then the glow fades away inside the folder and comes back when you leave.

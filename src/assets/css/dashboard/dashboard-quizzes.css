@@ -362,26 +362,33 @@
 	-webkit-backdrop-filter: var(--qbd-glass-blur);
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
 	cursor: pointer;
-	transition: border-color .2s cubic-bezier(0.2, 0.7, 0.3, 1),
-		box-shadow .2s cubic-bezier(0.2, 0.7, 0.3, 1),
-		transform .2s cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: border-color .2s ease-in-out,
+		background .2s ease-in-out,
+		box-shadow .2s ease-in-out,
+		transform .2s ease-in-out;
 }
 /* LE HALO D'ANGLE NE DISPARAÎT JAMAIS, SURVOL COMPRIS (Ahmed, 2026-09-17 :
    « la lumière qui vient d'en haut à gauche ne doit jamais disparaître »).
-   Pas de `background` ici : la propriété raccourcie remplace les DEUX
-   couches du fond, et un `background: var(--card-bg)` posé « pour survoler
-   comme la carte d'un quiz » effaçait le halo au moment même où la carte
-   s'élève — elle s'éteignait au lieu de s'allumer. Le survol n'ajoute que ce
-   qui s'ajoute : l'élévation, la bordure vive et la lueur. */
+   PLUS DE LEVÉE au survol (StudySmarter, 2026-09-27, « elles ne se déplacent
+   plus vers le haut ») : la lueur s'INTENSIFIE (12 % → 20 %) et le fond
+   s'éclaircit d'un cran, avec l'ombre douce de StudySmarter, au lieu de
+   l'élévation d'avant. Le halo lui-même n'est donc jamais éteint : il
+   grandit, il ne bouge pas. */
 .qbd-module-card:hover {
-	transform: translateY(-3px);
 	border-color: var(--border-c);
-	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft);
+	background:
+		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) 20%, transparent) 0%, transparent 68%),
+		color-mix(in srgb, var(--text-normal) 5%, var(--card-bg));
+	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft),
+		0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
 }
-/* Press : retombée quasi immédiate, cohérente avec les quiz cards. */
+/* Press : un léger enfoncement, comme StudySmarter, sans levée à retomber. */
 .qbd-module-card:active {
-	transform: translateY(-1px) scale(0.985);
+	transform: scale(0.99);
 	transition-duration: 60ms;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-module-card:active { transform: none; }
 }
 
 /* LA CARTE NE S'ENFONCE PAS SOUS UN CLIC QUI NE LUI EST PAS ADRESSÉ (Ahmed,
@@ -395,8 +402,12 @@
    pendant le clic serait un second faux mouvement. Le survol, lui, reste :
    la carte EST survolée, et le curseur peut encore ressortir de l'icône pour
    l'ouvrir. */
+/* La carte ne s'enfonce plus sous un clic sur son icône (2026-09-27 : plus de
+   levée à annuler, donc plus de transform à rétablir ici — il suffit qu'elle
+   n'hérite pas du `scale(0.99)` de son propre `:active`, qu'un clic sur
+   l'icône déclenche aussi par bouillonnement de l'état). */
 .qbd-module-card:has(.qbd-module-card__icon--editable:active) {
-	transform: translateY(-3px);
+	transform: none;
 	transition-duration: 0.12s;
 }
 
@@ -660,16 +671,38 @@
 	to { opacity: 1; }
 }
 
+/* La page d'un dossier entre comme chez StudySmarter (2026-09-27) : le
+   contenu (le hero entier) en fondu, le TITRE en plus avec sa propre montée
+   de 10 px — deux animations sur deux éléments, jamais la même sur les
+   deux (le titre irait deux fois plus vite que le reste sinon). PAS de
+   transform dans `to` : la règle du haut de ce fichier vaut ici aussi. */
+@keyframes qbd-content-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes qbd-title-rise-in {
+	from { opacity: 0; transform: translateY(10px); }
+	to { opacity: 1; }
+}
+
 /* ── Transition d'ENTRÉE — classe posée par quizzes.ts sur le contenant
    quand on ARRIVE (navigation, drill in/out, bascule d'axe), jamais sur un
    re-render interne : hors de cette classe, aucun de ces éléments n'a
    d'animation — renommer/archiver ne fait pas clignoter la page.
    `>` : le header et le sélecteur RACINE seulement — en drill le header vit
    dans le hero déjà animé, l'animer aussi doublerait fondu et translation. */
-.qbd-quizzes-enter .qbd-quizzes-folder-hero,
 .qbd-quizzes-enter > .qbd-quizzes-header,
 .qbd-quizzes-enter > .qbd-quizzes-group {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
+}
+/* Entrée dans un dossier précisément : contenu en fondu 250ms, titre qui
+   monte de 10px en 200ms linéaire (StudySmarter, 2026-09-27) — remplace
+   l'animation générique ci-dessus pour ce cas précis. */
+.qbd-quizzes-enter .qbd-quizzes-folder-hero {
+	animation: qbd-content-fade-in 0.25s ease-in-out backwards;
+}
+.qbd-quizzes-enter .qbd-quizzes-folder-hero .qbd-quizzes-title {
+	animation: qbd-title-rise-in 0.2s linear backwards;
 }
 
 /* L'empty state entre avec le header (règle séparée : le contrat regex
@@ -1314,6 +1347,7 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-quizzes-enter .qbd-quizzes-folder-hero,
+	.qbd-quizzes-enter .qbd-quizzes-folder-hero .qbd-quizzes-title,
 	.qbd-quizzes-enter > .qbd-quizzes-header,
 	.qbd-quizzes-enter > .qbd-quizzes-group,
 	.qbd-quizzes-enter .qbd-quizzes-node-head,
