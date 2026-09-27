@@ -365,8 +365,10 @@ function glossaryEntries(glossary: EntreeGlossaire[] | undefined): EntreeGlossai
  * via `esc5` : une apostrophe, une barre oblique inverse ou un `$\frac{a}{b}$`
  * dans une définition se relisent à l'identique.
  */
-function glossaryLine(glossary: EntreeGlossaire[] | undefined): string {
-	const entrees = glossaryEntries(glossary);
+function glossaryLine(glossary: EntreeGlossaire[] | undefined, reste: unknown[] = []): string {
+	// Les entrées lues, puis celles que la lecture avait écartées, BRUTES
+	// (`_glossaryRest`) : jamais perdues par une sauvegarde qui n'y touche pas.
+	const entrees: unknown[] = [...glossaryEntries(glossary), ...reste];
 	if (entrees.length === 0) return "";
 	// Une entrée par ligne : la note reste lisible (et un diff aussi) avec
 	// quinze définitions, là où une seule ligne en faisait un mur.
@@ -402,7 +404,7 @@ function exportAll(questions: DraftQuestion[], examOptions: EditorExamOptions | 
 	// Glossaire (lot D, 2026-09-27) : chaîne vide sans entrée exploitable — voir
 	// `glossaryLine`. Ajouté APRÈS `extra` dans chaque branche, comme dans
 	// l'exemple de la spec (`{ mode: 'learn', objectives: [...], glossary: [...] }`).
-	const glossaire = glossaryLine(examOptions?.glossary);
+	const glossaire = glossaryLine(examOptions?.glossary, examOptions?._glossaryRest);
 	if (mode === "lesson") {
 		/* Learn (2026-09-23) : le nom interne canonique reste "lesson" tant que
 		   le moteur de leçon joue ces blocs (plan 2 le remplace), mais la note

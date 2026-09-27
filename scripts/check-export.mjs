@@ -417,6 +417,35 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 		convert.readModeConfig(parsedPractice[idxPractice]).glossary,
 		[{ term: "x", definition: "y" }]);
 
+	/* REVUE DU 2026-09-27 : une entrée ÉCARTÉE par la lecture (terme vide,
+	   écrit à la main et pas fini) est rendue telle quelle, jamais perdue par
+	   une sauvegarde qui n'y touche pas ; un `glossary` qui n'est pas un
+	   tableau reste une clé inconnue. */
+	{
+		const brouillon = { term: "", definition: "brouillon, terme pas encore choisi" };
+		const cfg = { mode: "quiz", glossary: [{ term: "pile", definition: "LIFO" }, brouillon, "note libre"] };
+		const luR = convert.readModeConfig(cfg);
+		const reecrit = JSON5.parse(exp.exportAll([questionConvertie], luR)).at(-1);
+		r.check("entrée écartée par la lecture : réécrite telle quelle, après les lues",
+			reecrit.glossary, [{ term: "pile", definition: "LIFO" }, brouillon, "note libre"]);
+		r.check("… et le glossaire lu, lui, n'en contient pas", luR.glossary, [{ term: "pile", definition: "LIFO" }]);
+		const nonTableau = convert.readModeConfig({ mode: "quiz", glossary: "à écrire" });
+		r.check("un `glossary` qui n'est pas un tableau reste dans `_extra`", nonTableau._extra?.glossary, "à écrire");
+		r.check("… et ressort tel quel",
+			JSON5.parse(exp.exportAll([questionConvertie], nonTableau)).at(-1).glossary, "à écrire");
+	}
+
+	/* Les branches EXAMEN et LEARN CHRONOMÉTRÉ portent aussi le glossaire. */
+	{
+		const g = [{ term: "pile", definition: "LIFO" }];
+		const examen = JSON5.parse(exp.exportAll([questionConvertie],
+			{ enabled: true, mode: "exam", durationMinutes: 20, autoSubmit: true, showTimer: true, glossary: g })).at(-1);
+		r.check("examen : glossaire et durée écrits", [examen.examMode, examen.examDurationMinutes, examen.glossary], [true, 20, g]);
+		const learnChrono = JSON5.parse(exp.exportAll([questionConvertie],
+			{ enabled: true, mode: "lesson", durationMinutes: 15, autoSubmit: true, showTimer: true, glossary: g })).at(-1);
+		r.check("Learn chronométré : glossaire et durée écrits", [learnChrono.mode, learnChrono.examDurationMinutes, learnChrono.glossary], ["learn", 15, g]);
+	}
+
 	r.done();
 });
 

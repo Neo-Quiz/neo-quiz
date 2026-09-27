@@ -72,6 +72,14 @@ export interface EditorExamOptions extends ExamOptions {
 	 * (tâche 4 du lot) modifie ce champ directement.
 	 */
 	glossary?: EntreeGlossaire[];
+	/**
+	 * Les éléments du tableau `glossary` de la note que `lireGlossaire` a
+	 * écartés (terme ou définition vides, forme inattendue), gardés BRUTS pour
+	 * être réécrits tels quels : ce qu'on ne comprend pas, on le rend. Sans
+	 * eux, une entrée en cours d'écriture à la main disparaissait à la première
+	 * sauvegarde d'une autre question (revue du 2026-09-27).
+	 */
+	_glossaryRest?: unknown[];
 }
 
 /**

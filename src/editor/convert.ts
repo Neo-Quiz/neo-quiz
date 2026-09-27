@@ -57,6 +57,10 @@ export function readModeConfig(q: ParsedQuizItem): EditorExamOptions {
 		// qui filtre déjà les entrées incomplètes — un tableau vide quand le bloc
 		// n'en porte pas.
 		glossary: lireGlossaire(q.glossary),
+		// Ce que la lecture écarte est gardé brut, pour être rendu tel quel.
+		_glossaryRest: Array.isArray(q.glossary)
+			? q.glossary.filter(e => lireGlossaire([e]).length === 0)
+			: undefined,
 		_extra: extraModeFields(q),
 	};
 }
@@ -68,7 +72,10 @@ export function readModeConfig(q: ParsedQuizItem): EditorExamOptions {
     à l'export (une fois par le champ dédié, une fois via `_extra`). */
 function extraModeFields(q: ParsedQuizItem): Record<string, unknown> | undefined {
 	const connues = new Set(["mode", "examMode", "learnMode",
-		"examDurationMinutes", "examAutoSubmit", "examShowTimer", "glossary"]);
+		"examDurationMinutes", "examAutoSubmit", "examShowTimer"]);
+	// Un `glossary` qui n'est pas un tableau n'est pas lu : il reste une clé
+	// inconnue, rendue telle quelle.
+	if (Array.isArray(q.glossary)) connues.add("glossary");
 	// `Object.create(null)`, comme `_extraFields` : un objet ordinaire absorbe
 	// une clé nommée `__proto__` au lieu de la stocker.
 	const extra: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
