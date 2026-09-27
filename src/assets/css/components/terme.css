@@ -32,7 +32,9 @@
 
 .qb-terme-bulle{
   position: fixed;
-  z-index: 80;
+  /* Au-dessus de la modale d'indice (hint-modal.css, 99999), qui porte
+     elle aussi des termes : sous elle, la bulle s'ouvrirait invisible. */
+  z-index: 100000;
   width: max-content;
   max-width: min(320px, calc(100vw - 16px));
   padding: 10px 12px;

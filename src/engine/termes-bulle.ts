@@ -29,6 +29,10 @@ const DELAI_GRACE_MS = 150;
 const MARGE_FENETRE_PX = 8;
 
 export interface BulleGlossaireHandlers {
+	/** Ferme la bulle ouverte, s'il y en a une. Appelé au changement de
+	    question : la piste GLISSE sans rien détacher, l'ancre reste connectée
+	    et la veille ne la verrait pas partir. */
+	fermer(): void;
 	/** Retire tous les écouteurs globaux et l'élément de la bulle. */
 	destroy(): void;
 }
@@ -205,8 +209,12 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		if (bulle && !bulle.hidden && ancreOuverte === cible) { fermer(); return; }
 		ouvrir(cible);
 	}
+	/* En CAPTURE et arrêté : Échap ferme d'abord la bulle, et elle seule — la
+	   modale d'indice qui la contient (son propre `keydown` sur `document`)
+	   reste ouverte ; un second Échap la fermera. Un niveau par touche. */
 	function surEchap(e: KeyboardEvent): void {
 		if (e.key !== "Escape" || !bulle || bulle.hidden) return;
+		e.stopPropagation();
 		const aRefocuser = ancreOuverte;
 		fermer();
 		try { aRefocuser?.focus(); } catch (_) { /* meilleur effort */ }
@@ -223,11 +231,14 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 	document.addEventListener("focusin", surFocusIn);
 	document.addEventListener("focusout", surFocusOut);
 	document.addEventListener("click", surClic);
-	document.addEventListener("keydown", surEchap);
+	document.addEventListener("keydown", surEchap, true);
 	window.addEventListener("scroll", surDefilement, { capture: true, passive: true });
 	window.addEventListener("resize", surDefilement, { passive: true });
 
 	function destroy(): void {
+		// D'abord fermer : l'ancre ouverte perd son `aria-describedby`, qui
+		// désignerait sinon une bulle retirée.
+		fermer();
 		annulerOuverture();
 		annulerFermeture();
 		if (veilleRaf) { cancelAnimationFrame(veilleRaf); veilleRaf = 0; }
@@ -236,7 +247,7 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		document.removeEventListener("focusin", surFocusIn);
 		document.removeEventListener("focusout", surFocusOut);
 		document.removeEventListener("click", surClic);
-		document.removeEventListener("keydown", surEchap);
+		document.removeEventListener("keydown", surEchap, true);
 		window.removeEventListener("scroll", surDefilement, { capture: true });
 		window.removeEventListener("resize", surDefilement);
 		bulle?.remove();
@@ -246,5 +257,8 @@ export function creerBulleGlossaire(ctx: EngineCtx): BulleGlossaireHandlers {
 		ancreOuverte = null;
 	}
 
-	return { destroy };
+	return {
+		fermer(): void { annulerOuverture(); annulerFermeture(); fermer(); },
+		destroy,
+	};
 }

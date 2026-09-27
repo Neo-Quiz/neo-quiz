@@ -342,6 +342,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 	async function goToSlide(index: number, { forceRender = false }: { forceRender?: boolean } = {}): Promise<void> {
 		ctx.closeHintModal();
+		// Une bulle de définition ouverte au survol décrirait un terme de la
+		// question quittée : la piste glisse sans détacher son ancre.
+		ctx.termes.fermerBulle();
 		const next = ctx.clampSlideIndex(index);
 		marquerPreNonTentees(next);
 		if (next === ctx.quizState.current && !ctx.quizState.isSliding) return;

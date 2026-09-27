@@ -73,6 +73,10 @@ await withSrcModule(
 			isFlashcardQuestion: (q) => !!q && q.flashcard === true,
 			isOrderingQuestion: () => false,
 			isMatchingQuestion: () => false,
+			// Exercice de code (engine/state.ts isCorrect) et bulle de
+			// définition (goToSlide) : hors sujet ici, des stubs suffisent.
+			isCodeQuestion: () => false,
+			termes: { poserTermes: () => {}, fermerBulle: () => {} },
 			isLessonMode: () => isLessonMode,
 			originalQuizMode,
 			roleOfQuestion: (i) => roles[i],

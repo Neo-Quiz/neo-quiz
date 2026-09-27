@@ -57,6 +57,8 @@ export interface TermesHandlers {
 	    contient, `root` lui-même compris s'il en est une). Sans glossaire,
 	    sortie immédiate — aucun DOM touché. */
 	poserTermes(root: Element | null): void;
+	/** Ferme la bulle de définition ouverte (changement de question). */
+	fermerBulle(): void;
 }
 
 /** Les zones de lecture SOUS `root`, `root` lui-même inclus s'il correspond. */
@@ -158,7 +160,7 @@ export function createTermesHandlers(ctx: EngineCtx): TermesHandlers {
 	const entrees = ctx.glossaire;
 	if (!entrees || entrees.length === 0) {
 		// Quiz sans glossaire : aucune bulle à poser, aucun écouteur à brancher.
-		return { poserTermes() {} };
+		return { poserTermes() {}, fermerBulle() {} };
 	}
 	// Index construit UNE fois pour tout le quiz — l'ordre de tri ne dépend
 	// que du glossaire, jamais du texte où on le cherche (glossaire.ts).
@@ -170,5 +172,5 @@ export function createTermesHandlers(ctx: EngineCtx): TermesHandlers {
 		poserTermesDans(root, index);
 	}
 
-	return { poserTermes };
+	return { poserTermes, fermerBulle: () => bulle.fermer() };
 }
