@@ -30,7 +30,7 @@ release notes.
 - A Review plan tab in every folder: related tasks (review the questions due today), upcoming exams (several per folder, each with a name and a date, added, edited and deleted there), the folder's ring, the next step button and the study modes. Questions only become due once the folder has an upcoming exam; the nearest one sets the review pace. To review today and the exam date left the Progress tab, and Edit folder links to the exams.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 - Learn quizzes show how many readings they hold next to the number of questions.
-- A quiz can be moved to another folder from its card menu (Move to), keeping its review history.
+- A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right.
 
 ### Changed
 - Question and folder cards react like StudySmarter: a slightly lighter background and soft shadow on hover, a smooth press on click; folders no longer lift, and a folder's page fades in. The question list of the editor reacts the same way, its blue outline only marking the current question.

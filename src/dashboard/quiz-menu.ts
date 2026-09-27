@@ -6,7 +6,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
 import { buildModuleGroups, buildUeGroups, moduleForQuiz } from "./quiz-modules";
 import { openModuleEditModal } from "./module-edit";
-import { openActionMenu, type ActionMenuItem } from "./ui-select";
+import type { ActionMenuItem } from "./ui-select";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
@@ -484,35 +484,35 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			const dossierActuel = moduleForQuiz(quiz.path, map).path;
 			const groupes = buildModuleGroups(ctx.scanner.getQuizzes(), {}, map)
 				.filter(g => g.path && g.path !== dossierActuel);
-			if (groupes.length > 0) items.push({
+			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
+			   au lieu d'un second menu qui remplaçait le premier au clic. */
+			const sousItems: ActionMenuItem[] = [];
+			let derniereUe: string | undefined;
+			for (const ue of buildUeGroups(groupes, map)) {
+				for (const g of ue.modules) {
+					sousItems.push({
+						icon: "folder",
+						label: g.name,
+						// L'UE en accessoire à droite : montre le regroupement
+						// sans ajouter d'en-tête au composant partagé.
+						hint: ue.ue ?? t("dashboard.quizzes.noUe"),
+						sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
+						onClick: () => {
+							void moveQuizTo(ctx, quiz, g.path as string, g.name).then(to => {
+								if (to) {
+									currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
+									rerender();
+								}
+							});
+						},
+					});
+					derniereUe = ue.key;
+				}
+			}
+			if (sousItems.length > 0) items.push({
 				icon: "folder-input",
 				label: t("dashboard.quizzes.menuMoveQuiz"),
-				onClick: () => {
-					const sousItems: ActionMenuItem[] = [];
-					let derniereUe: string | undefined;
-					for (const ue of buildUeGroups(groupes, map)) {
-						for (const g of ue.modules) {
-							sousItems.push({
-								icon: "folder",
-								label: g.name,
-								// L'UE en accessoire à droite : montre le regroupement
-								// sans ajouter d'en-tête au composant partagé.
-								hint: ue.ue ?? t("dashboard.quizzes.noUe"),
-								sepBefore: derniereUe !== undefined && derniereUe !== ue.key,
-								onClick: () => {
-									void moveQuizTo(ctx, quiz, g.path as string, g.name).then(to => {
-										if (to) {
-											currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
-											rerender();
-										}
-									});
-								},
-							});
-							derniereUe = ue.key;
-						}
-					}
-					openActionMenu(anchorEl, sousItems);
-				},
+				submenu: sousItems,
 			});
 		}
 		// Même règle que Partager : sans `renameQuiz`, pas d'entrée. Rendre
@@ -651,30 +651,29 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		// même chose, plutôt que d'ouvrir un sous-menu sans rien à y ancrer.
 		const roots = host.paths.roots();
 		if (anchorEl && roots.length > 1) {
-			items.push({
+			// Sous-menu au survol, comme « Move to » d'un quiz (2026-09-27).
+			const rootDeG = host.paths.rootOf(g.folder);
+			const cibles = roots.filter(root => root.id !== rootDeG?.id);
+			if (cibles.length > 0) items.push({
 				icon: "folder-input",
 				label: t("dashboard.quizzes.menuMove"),
-				onClick: () => {
-					const rootDeG = host.paths.rootOf(g.folder);
-					const cibles = roots.filter(root => root.id !== rootDeG?.id);
-					openActionMenu(anchorEl, cibles.map(root => ({
-						label: root.name,
-						onClick: () => {
-							openConfirm({
-								title: t("dashboard.quizzes.moveConfirmTitle"),
-								body: t("dashboard.quizzes.moveConfirmBody", { name: g.name, target: root.name }),
-								cta: t("dashboard.quizzes.moveConfirmCta"),
-							}, () => {
-								void moveModuleTo(ctx, g, root.id).then(ok => {
-									if (ok) {
-										host.ui.notice(t("dashboard.quizzes.moved", { target: root.name }));
-										rerender();
-									}
-								});
+				submenu: cibles.map(root => ({
+					label: root.name,
+					onClick: () => {
+						openConfirm({
+							title: t("dashboard.quizzes.moveConfirmTitle"),
+							body: t("dashboard.quizzes.moveConfirmBody", { name: g.name, target: root.name }),
+							cta: t("dashboard.quizzes.moveConfirmCta"),
+						}, () => {
+							void moveModuleTo(ctx, g, root.id).then(ok => {
+								if (ok) {
+									host.ui.notice(t("dashboard.quizzes.moved", { target: root.name }));
+									rerender();
+								}
 							});
-						},
-					})));
-				},
+						});
+					},
+				})),
 			});
 		}
 		items.push({

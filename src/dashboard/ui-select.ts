@@ -265,6 +265,10 @@ export interface ActionMenuItem {
 	/** Un filet AVANT la ligne : sépare les groupes (menu « + » de claude.ai). */
 	sepBefore?: boolean;
 	onClick?: () => void;
+	/** Un SOUS-MENU : la ligne porte un chevron à droite et ouvre ces items
+	    dans un flyout latéral AU SURVOL, sans clic (« Move to », 2026-09-27).
+	    Un clic ou → l'ouvre aussi (tactile, clavier) ; `onClick` est ignoré. */
+	submenu?: ActionMenuItem[];
 }
 
 /** Réglages de SURFACE d'un menu d'actions, tous facultatifs. */
@@ -286,30 +290,111 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	const menuEl = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu" + (options.className ? " " + options.className : ""));
 	menuEl.setAttribute("role", "menu");
 
-	for (const item of items) {
-		if (item.sepBefore) ajouter(menuEl, "div", "qbd-model-menu-sep");
-		const btn = ajouter(menuEl, "button", "qbd-select-option"
-			+ (item.disabled ? " qbd-select-option--disabled" : "")
-			+ (item.danger ? " qbd-select-option--danger" : ""));
-		btn.type = "button";
-		btn.setAttribute("role", "menuitem");
-		if (item.disabled) btn.disabled = true;
-		const iconEl = ajouter(btn, "span", "qbd-select-check qbd-action-menu-icon");
-		if (item.icon) currentHost().ui.setIcon(iconEl, item.icon);
-		// Ligne simple façon claude.ai (icône + label + accessoire à droite).
-		// `sub` reste supporté (2 lignes) pour compat, mais n'est plus utilisé ici.
-		if (item.sub) {
-			const body = ajouter(btn, "div", "qbd-action-menu-body");
-			ajouter(body, "span", "qbd-select-option-label", item.label);
-			ajouter(body, "span", "qbd-action-menu-sub", item.sub);
-		} else {
-			ajouter(btn, "span", "qbd-select-option-label", item.label);
+	let flyout: HTMLDivElement | null = null;
+	let flyoutRow: HTMLElement | null = null;
+	let flyoutCloseTimer = 0;
+
+	/* Les lignes d'un menu ou de son flyout : une seule écriture. Un clic
+	   sur une ligne FEUILLE ferme tout le menu, flyout compris. */
+	function remplir(parent: HTMLElement, liste: ActionMenuItem[], racine: boolean): void {
+		for (const item of liste) {
+			if (item.sepBefore) ajouter(parent, "div", "qbd-model-menu-sep");
+			const sous = racine && item.submenu && item.submenu.length > 0 ? item.submenu : null;
+			const btn = ajouter(parent, "button", "qbd-select-option"
+				+ (item.disabled ? " qbd-select-option--disabled" : "")
+				+ (item.danger ? " qbd-select-option--danger" : "")
+				+ (sous ? " qbd-action-submenu-row" : ""));
+			btn.type = "button";
+			btn.setAttribute("role", "menuitem");
+			if (item.disabled) btn.disabled = true;
+			const iconEl = ajouter(btn, "span", "qbd-select-check qbd-action-menu-icon");
+			if (item.icon) currentHost().ui.setIcon(iconEl, item.icon);
+			// Ligne simple façon claude.ai (icône + label + accessoire à droite).
+			// `sub` reste supporté (2 lignes) pour compat, mais n'est plus utilisé ici.
+			if (item.sub) {
+				const body = ajouter(btn, "div", "qbd-action-menu-body");
+				ajouter(body, "span", "qbd-select-option-label", item.label);
+				ajouter(body, "span", "qbd-action-menu-sub", item.sub);
+			} else {
+				ajouter(btn, "span", "qbd-select-option-label", item.label);
+			}
+			if (item.hint) ajouter(btn, "span", "qbd-action-menu-hint", item.hint);
+			if (sous) {
+				btn.setAttribute("aria-haspopup", "menu");
+				btn.setAttribute("aria-expanded", "false");
+				currentHost().ui.setIcon(ajouter(btn, "span", "qbd-model-menu-row-chevron"), "chevron-right");
+				btn.addEventListener("mouseenter", () => { annulerFermeture(); ouvrirFlyout(btn, sous); });
+				btn.addEventListener("mouseleave", planifierFermeture);
+				btn.addEventListener("click", () => { annulerFermeture(); ouvrirFlyout(btn, sous, true); });
+				continue;
+			}
+			if (racine) {
+				// Survoler une autre ligne du menu referme le flyout (même délai
+				// que la sortie : le temps de traverser l'espace entre les deux).
+				btn.addEventListener("mouseenter", () => { if (flyout) planifierFermeture(); });
+			}
+			btn.addEventListener("click", () => {
+				closeMenu();
+				if (!item.disabled && item.onClick) item.onClick();
+			});
 		}
-		if (item.hint) ajouter(btn, "span", "qbd-action-menu-hint", item.hint);
-		btn.addEventListener("click", () => {
-			closeMenu();
-			if (!item.disabled && item.onClick) item.onClick();
-		});
+	}
+	remplir(menuEl, items, true);
+
+	/* ── Flyout d'un sous-menu (même patron que ceux d'`openModelMenu`) :
+	   portalé au <body> (le menu a overflow, un enfant absolu serait rogné),
+	   délai de fermeture court = hover-intent, annulé dès qu'on y entre. */
+	function annulerFermeture(): void {
+		if (flyoutCloseTimer) { clearTimeout(flyoutCloseTimer); flyoutCloseTimer = 0; }
+	}
+	function planifierFermeture(): void {
+		annulerFermeture();
+		flyoutCloseTimer = window.setTimeout(fermerFlyout, 140);
+	}
+	function fermerFlyout(): void {
+		annulerFermeture();
+		if (flyout) { flyout.remove(); flyout = null; }
+		if (flyoutRow) {
+			flyoutRow.classList.remove("is-open");
+			flyoutRow.setAttribute("aria-expanded", "false");
+			flyoutRow = null;
+		}
+	}
+	function premierItem(): HTMLElement | null {
+		return flyout ? flyout.querySelector<HTMLElement>("button:not(:disabled)") : null;
+	}
+	function ouvrirFlyout(row: HTMLElement, sous: ActionMenuItem[], focus = false): void {
+		if (flyout && flyoutRow === row) {
+			if (focus) premierItem()?.focus();
+			return;
+		}
+		fermerFlyout();
+		flyoutRow = row;
+		row.classList.add("is-open");
+		row.setAttribute("aria-expanded", "true");
+		const fly = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu qbd-action-flyout" + (options.className ? " " + options.className : ""));
+		flyout = fly;
+		fly.setAttribute("role", "menu");
+		remplir(fly, sous, false);
+
+		// À droite du menu (à gauche s'il n'y a pas la place), le haut aligné
+		// sur la ligne : la liste descend depuis elle, bornée à la fenêtre.
+		const rowR = row.getBoundingClientRect();
+		const menuR = menuEl.getBoundingClientRect();
+		fly.style.visibility = "hidden";
+		fly.style.top = "0px";
+		fly.style.left = "0px";
+		fly.style.maxHeight = (window.innerHeight - 16) + "px";
+		const fr = fly.getBoundingClientRect();
+		let left = menuR.right + 4;
+		if (left + fr.width > window.innerWidth - 8) left = menuR.left - 4 - fr.width;
+		fly.style.left = Math.max(8, left) + "px";
+		fly.style.top = Math.min(Math.max(8, rowR.top - 4), window.innerHeight - fr.height - 8) + "px";
+		fly.style.visibility = "";
+
+		fly.addEventListener("mouseenter", annulerFermeture);
+		fly.addEventListener("mouseleave", planifierFermeture);
+		if (focus) premierItem()?.focus();
 	}
 
 	// Position : au-dessus ou en dessous de l'ancre selon la place
@@ -326,6 +411,7 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	menuEl.style.visibility = "";
 
 	function closeMenu(): void {
+		fermerFlyout();
 		menuEl.remove();
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
@@ -336,17 +422,36 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 
 	function onDocDown(e: MouseEvent): void {
 		const t = e.target as Node | null;
-		if ((t && anchorEl.contains(t)) || (t && menuEl.contains(t))) return;
+		if (t && (anchorEl.contains(t) || menuEl.contains(t) || (flyout && flyout.contains(t)))) return;
 		closeMenu();
 	}
 
+	/* Échap referme d'abord le flyout ouvert, puis le menu ; ← dans le
+	   flyout le referme aussi. Le focus revient à la ligne du sous-menu.
+	   → sur une ligne à sous-menu l'ouvre, focus sur son premier item. */
 	function onKeyDown(e: KeyboardEvent): void {
+		const actif = document.activeElement;
+		const dansFlyout = !!(flyout && actif && flyout.contains(actif));
+		if (flyout && (e.key === "Escape" || (e.key === "ArrowLeft" && dansFlyout))) {
+			const row = flyoutRow;
+			fermerFlyout();
+			row?.focus();
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
+		if (e.key === "ArrowRight" && actif instanceof HTMLElement
+			&& actif.classList.contains("qbd-action-submenu-row") && menuEl.contains(actif)) {
+			actif.click();
+			e.preventDefault();
+			return;
+		}
 		if (e.key === "Escape") closeMenu();
 	}
 
 	function onScroll(e: Event): void {
 		const t = e.target as Node | null;
-		if (t && menuEl.contains(t)) return;
+		if (t && (menuEl.contains(t) || (flyout && flyout.contains(t)))) return;
 		closeMenu();
 	}
 

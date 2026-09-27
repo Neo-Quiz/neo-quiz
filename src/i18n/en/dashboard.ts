@@ -223,7 +223,7 @@ export const EN_DASHBOARD = {
 	/* « Déplacer vers… » (tranche 9, tâche 3) : n'apparaît que quand plusieurs
 	   racines sont ouvertes (l'application). L'historique de révision suit le
 	   dossier, jamais les wikilinks entrants — d'où l'avertissement. */
-	"dashboard.quizzes.menuMove": "Move to…",
+	"dashboard.quizzes.menuMove": "Move to",
 	"dashboard.quizzes.moveConfirmTitle": "Move module",
 	"dashboard.quizzes.moveConfirmBody": "Move “{name}” to {target}? Obsidian links to these notes are not rewritten.",
 	"dashboard.quizzes.moveConfirmCta": "Move",

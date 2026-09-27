@@ -191,7 +191,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.deleteConfirmCta": "Supprimer",
 	"dashboard.quizzes.menuDeleteModule": "Supprimer les quiz du module",
 	"dashboard.quizzes.deleteModuleConfirmBody": "Supprimer les {count} quiz de « {name} » et leurs stats ?",
-	"dashboard.quizzes.menuMove": "Déplacer vers…",
+	"dashboard.quizzes.menuMove": "Déplacer vers",
 	"dashboard.quizzes.moveConfirmTitle": "Déplacer le module",
 	"dashboard.quizzes.moveConfirmBody": "Déplacer « {name} » vers {target} ? Les liens Obsidian vers ces notes ne sont pas réécrits.",
 	"dashboard.quizzes.moveConfirmCta": "Déplacer",

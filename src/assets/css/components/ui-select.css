@@ -235,6 +235,16 @@
 	color: var(--text-muted);
 }
 
+/* Ligne à sous-menu (« Move to ») : le chevron calé à droite, comme les
+   lignes « Effort » du menu des modèles. */
+.qbd-action-submenu-row .qbd-model-menu-row-chevron {
+	margin-left: auto;
+}
+.qbd-action-submenu-row .qbd-model-menu-row-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
 /* Accessoire droite (format, nom de note) — position du raccourci claude.ai */
 .qbd-action-menu-hint {
 	margin-left: auto;
@@ -551,6 +561,7 @@
 }
 
 /* Lignes « Effort » / « Plus de modèles » / famille à niveaux surlignées quand leur flyout est ouvert */
+.qbd-action-submenu-row.is-open,
 .qbd-effort-row.is-open,
 .qbd-more-row.is-open,
 .qbd-level-row.is-open,
