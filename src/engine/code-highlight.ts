@@ -117,6 +117,10 @@ import hcl from "refractor/hcl";
 import graphql from "refractor/graphql";
 import { codeLanguageOf } from "../code-catalogue";
 
+// Known limit (review of 2026-09-28): the `markdown` grammar's own hook
+// reads `Prism.languages[tag]` for a fence NESTED in a markdown block, so a
+// nested ```constructor fence makes the tokenizer throw. The throw is caught
+// below and the block shows uncoloured, still escaped — degraded, not unsafe.
 // `refractor.register` ignores a grammar already registered (compared on its
 // `displayName`), and a grammar registers its own dependencies (`php` →
 // `markup-templating`, `tsx` → `jsx`, `vbnet` → `basic`…): order does not

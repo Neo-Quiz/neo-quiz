@@ -401,8 +401,11 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				   (`title`) and for assistive technology (`alt`). Under the
 				   same condition as the « Run » button below — only a render
 				   DISPLAYED to the learner (`executable`), never the canonical
-				   render nor the editor's preview (whose sanitizer would drop
-				   the `data:` source). INSIDE the `<pre>`, before `<code>`:
+				   render nor the editor's question preview (whose sanitizer
+				   would drop the `data:` source). The corrected preview's
+				   explanation (question-preview-corrige.ts) does show it: it
+				   goes through the engine's `renderTextWithEmbeds`, as the
+				   learner sees it. INSIDE the `<pre>`, before `<code>`:
 				   the badge survives `bindCodeRunButtons` removing the toolbar
 				   of a block the host cannot run, and the wrapper
 				   `sortie-programme.ts` puts around a bare `<pre>`; the code
