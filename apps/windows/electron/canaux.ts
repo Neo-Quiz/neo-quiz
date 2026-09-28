@@ -1360,7 +1360,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		deps.fenetre.commande(nom);
 	});
 	ipcMain.handle(CANAUX.affichageZoom, async (_e, facteur: unknown) => {
-		const f = typeof facteur === "number" && Number.isFinite(facteur) ? Math.min(5, Math.max(0.25, facteur)) : 1;
+		const f = typeof facteur === "number" && Number.isFinite(facteur) ? Math.min(1.5, Math.max(0.25, facteur)) : 1;
 		deps.fenetre.zoom(f);
 		await deps.reglagesOuErreur().ecrire(CLE_REGLAGES_ZOOM, f);
 	});
