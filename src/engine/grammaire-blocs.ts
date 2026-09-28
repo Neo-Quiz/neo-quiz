@@ -323,15 +323,15 @@ export interface OutilsRendu {
 	    texte échappé nu, comme avant. La fonction elle-même retombe sur
 	    `null` pour un langage inconnu ou toute erreur de tokenisation. */
 	colorerCode?(code: string, langue: string): string | null;
-	/** Faux par défaut : un bloc d'un langage exécutable (la table pure
-	    `langageDeBloc`, code-languages.ts) reste alors un `<pre>` nu, sans
-	    bouton « Exécuter » ni panneau de sortie. Vrai UNIQUEMENT pour les
-	    rendus AFFICHÉS à l'apprenant (`renderTextWithEmbeds` du moteur) —
-	    jamais pour le rendu canonique de `html-vers-markdown.ts`
-	    (`rendreCanon`) ni l'aperçu de l'éditeur, qui comparent ou affichent
-	    du markdown sans exécution possible : l'enveloppe `<div>/<button>/
-	    <svg>` y ferait échouer la relecture stricte de `formeNormale`
-	    (constat A-IMPORTANT 1 de la revue du 2026-09-26). */
+	/** False by default: a block of a runnable language (the pure table
+	    `langageDeBloc`, code-languages.ts) then stays a bare `<pre>`, with no
+	    « Run » button nor output panel. True ONLY for renders DISPLAYED to the
+	    learner (`renderTextWithEmbeds` of the engine) — never for the
+	    canonical render of `html-vers-markdown.ts` (`rendreCanon`) nor the
+	    editor's preview, which compare or display markdown with no possible
+	    execution: the `<div>/<button>/<svg>` wrapper would make the strict
+	    re-read of `formeNormale` fail there (finding A-IMPORTANT 1 of the
+	    2026-09-26 review). */
 	executable?: boolean;
 }
 
@@ -415,10 +415,10 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				const langue = langageDeBloc(b.langue);
 				if (!o.executable || !langue) return pre;
 				const barre = `<div class="quiz-code-toolbar"><button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>${ICON_PLAY}</button></div>`;
-				// `data-lang` : la langue CANONIQUE (python/c/cpp), jamais l'alias
-				// écrit par l'auteur (`py`, `c++`, `hpp`…) — c'est elle que lit
-				// `bindCodeRunButtons` (code-run.ts) pour choisir le bac à sable et
-				// comparer à `HostCode.languages()`.
+				// `data-lang`: the CANONICAL language (python/c/cpp), never the
+				// alias the author wrote (`py`, `c++`, `hpp`…) — this is what
+				// `bindCodeRunButtons` (code-run.ts) reads to pick the sandbox
+				// and compare against `HostCode.languages()`.
 				// `aria-label` sur le panneau de sortie (clé engine.code.output,
 				// jusque-là posée dans le dictionnaire mais jamais lue).
 				return `<div class="quiz-code-block quiz-code-block-executable" data-lang="${langue}">${barre}${pre}<div class="quiz-code-output" hidden aria-label="${o.echapper(t("engine.code.output"))}"></div></div>`;

@@ -11,6 +11,13 @@ await withSrcModule("src/code-languages.ts", (m) => {
 	const r = makeReporter("Code languages");
 	r.check("aliases", ["python", "Py", "c", "C++", "cpp", "cc", "cxx", "h", "hpp", "bash", "java", ""].map(m.langageDeBloc),
 		["python", "python", "c", "cpp", "cpp", "cpp", "cpp", "c", "cpp", null, null, null]);
+	// `ALIASES` is a plain object literal used as a lookup table: an inherited
+	// property of `Object.prototype` (its `constructor` function, its own
+	// prototype via `__proto__`, `toString`, `hasOwnProperty`) must never leak
+	// through as a truthy "language" for a block tagged with that word.
+	r.check("inherited Object.prototype keys never leak as a language",
+		["constructor", "__proto__", "toString", "hasOwnProperty"].map(m.langageDeBloc),
+		[null, null, null, null]);
 
 	const txt = (o) => ({ type: "text", prompt: "Q", ...o });
 	r.check("program output: python variant", m.isProgramOutputQuestion(txt({ terminalVariant: "python" })), true);

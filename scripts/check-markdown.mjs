@@ -278,14 +278,13 @@ await withSrcModule(
 	r.check("injection dans un bloc de code coloré : jamais de balise brute, dans plusieurs langages",
 		LANGUES_INJECTION.map(langue => {
 			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
-			// Seules nos propres balises (pre/code/span) peuvent apparaître à
-			// l'intérieur de `pre…/pre` : tout le reste du contenu du bloc doit
-			// être échappé, jeton par jeton. `div`/`button`/`svg`/`polygon`
-			// (le bouton « Exécuter ») ne sont admis QUE pour les langages
-			// exécutables de la table, et seulement HORS du `<pre>` (revue du
-			// 2026-09-26, mineur 2) — les admettre pour tout langage aurait
-			// laissé passer une injection future de ces mêmes balises dans un
-			// langage sans enveloppe.
+			// Only our own tags (pre/code/span) may appear inside `pre…/pre`:
+			// the rest of the block's content must be escaped, token by token.
+			// `div`/`button`/`svg`/`polygon` (the « Run » button) are allowed
+			// ONLY for the table's executable languages, and only OUTSIDE the
+			// `<pre>` (review of 2026-09-26, minor 2) — allowing them for every
+			// language would have let through a future injection of these same
+			// tags in a language with no wrapper.
 			const dansPre = html.replace(/^.*?<pre[^>]*>/s, "").replace(/<\/pre>.*$/s, "");
 			const horsPre = html.replace(/<pre[^>]*>.*?<\/pre>/s, "");
 			const balisesPre = [...dansPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["code", "span"].includes(m[1].toLowerCase()));

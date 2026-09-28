@@ -64,8 +64,8 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 		const { bindCodeRunButtons } = createCodeRunHandlers(ctx);
 		bindCodeRunButtons();
 		const bloc = container.querySelector(".quiz-code-block");
-		r.check("langage de la table non offert par l'hôte : barre retirée", bloc.querySelector(".quiz-code-toolbar"), null);
-		r.check("langage de la table non offert par l'hôte : classe exécutable retirée", bloc.classList.contains("quiz-code-block-executable"), false);
+		r.check("table language not offered by the host: toolbar removed", bloc.querySelector(".quiz-code-toolbar"), null);
+		r.check("table language not offered by the host: executable class removed", bloc.classList.contains("quiz-code-block-executable"), false);
 	}
 
 	r.done();
