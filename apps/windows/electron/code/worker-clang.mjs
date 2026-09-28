@@ -12,22 +12,24 @@
    `__cxa_throw`, because this build's WASI sysroot does not ship the C++
    exception-handling runtime. Every C++ block therefore runs with
    exceptions disabled. */
-const PLAFOND = 20000;
+/* The message types (`chauffer`, `executer`, `pret`) are the page's
+   protocol, shared with worker-python.mjs and page.js: kept as they are. */
+const LIMIT = 20000;
 const BASE = "neo-code://app/languages/c/";
-let outils = null;
-const charger = () => (outils ??= Promise.all([
+let tools = null;
+const load = () => (tools ??= Promise.all([
 	import(BASE + "clang/bundle.js"),
 	import(BASE + "wasi-shim/index.js"),
 ]).then(([clang, shim]) => ({ runClang: clang.runClang, shim })));
-const borner = (s) => (s.length > PLAFOND ? s.slice(0, PLAFOND) : s);
+const bound = (s) => (s.length > LIMIT ? s.slice(0, LIMIT) : s);
 
 self.onmessage = async (e) => {
 	const m = e.data;
-	if (m.type === "chauffer") { charger().catch(() => { outils = null; }); return; }
+	if (m.type === "chauffer") { load().catch(() => { tools = null; }); return; }
 	if (m.type !== "executer") return;
 	let o;
-	try { o = await charger(); }
-	catch (err) { self.postMessage({ id: m.id, res: { status: "not-installed", stdout: "", error: borner(String(err)) } }); return; }
+	try { o = await load(); }
+	catch (err) { self.postMessage({ id: m.id, res: { status: "not-installed", stdout: "", error: bound(String(err)) } }); return; }
 	self.postMessage({ id: m.id, type: "pret" });
 
 	const cpp = m.language === "cpp";
@@ -42,34 +44,40 @@ self.onmessage = async (e) => {
 	   actual message (what the learner needs to see, e.g. "expected ';'
 	   after return statement") only reaches us through the `stderr`
 	   callback of `RunOptions`. */
+	/* Bounded WHILE it grows, like stdout below: a template-instantiation
+	   error cascade can write megabytes of diagnostics within the timeout. */
 	let diagnostics = "";
-	const captureStderr = (bytes) => { if (bytes) diagnostics += new TextDecoder().decode(bytes); };
+	const captureStderr = (bytes) => {
+		if (!bytes || diagnostics.length > LIMIT) return;
+		diagnostics += new TextDecoder().decode(bytes);
+		if (diagnostics.length > LIMIT) diagnostics = diagnostics.slice(0, LIMIT);
+	};
 	try {
 		const files = await o.runClang(flags, { [source]: m.code }, { stderr: captureStderr });
 		wasm = files["a.wasm"];
 		if (!wasm) throw new Error(diagnostics || "compilation produced no output");
 	} catch (err) {
-		self.postMessage({ id: m.id, res: { status: "compile-error", stdout: "", error: borner(diagnostics || String(err?.message ?? err)) } });
+		self.postMessage({ id: m.id, res: { status: "compile-error", stdout: "", error: bound(diagnostics || String(err?.message ?? err)) } });
 		return;
 	}
-	let sortie = "", tropLong = false;
-	const ecrire = (octets) => {
-		if (tropLong) return;
-		sortie += new TextDecoder().decode(octets);
-		if (sortie.length > PLAFOND) { sortie = sortie.slice(0, PLAFOND); tropLong = true; }
+	let output = "", tooLong = false;
+	const write = (bytes) => {
+		if (tooLong) return;
+		output += new TextDecoder().decode(bytes);
+		if (output.length > LIMIT) { output = output.slice(0, LIMIT); tooLong = true; }
 	};
 	const { WASI, File, OpenFile, ConsoleStdout } = o.shim;
 	const fds = [
 		new OpenFile(new File(new TextEncoder().encode(m.stdin ?? ""))),
-		new ConsoleStdout(ecrire),
-		new ConsoleStdout(ecrire),
+		new ConsoleStdout(write),
+		new ConsoleStdout(write),
 	];
 	const wasi = new WASI([source.replace(/\..*$/, "")], [], fds);
 	try {
 		const inst = await WebAssembly.instantiate(await WebAssembly.compile(wasm), { wasi_snapshot_preview1: wasi.wasiImport });
 		const code = wasi.start(inst);
-		self.postMessage({ id: m.id, res: { status: tropLong ? "too-long" : "ok", stdout: sortie, ...(code ? { error: `exit ${code}` } : {}) } });
+		self.postMessage({ id: m.id, res: { status: tooLong ? "too-long" : "ok", stdout: output, ...(code ? { error: `exit ${code}` } : {}) } });
 	} catch (err) {
-		self.postMessage({ id: m.id, res: { status: tropLong ? "too-long" : "error", stdout: sortie, error: borner(String(err?.message ?? err)) } });
+		self.postMessage({ id: m.id, res: { status: tooLong ? "too-long" : "error", stdout: output, error: bound(String(err?.message ?? err)) } });
 	}
 };

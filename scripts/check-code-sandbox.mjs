@@ -30,8 +30,8 @@ import { copierBacASable } from "../apps/windows/electron/code/copier.mjs";
    (its `index.js` imports its siblings the same way; `.tsbuildinfo` is not
    a runtime file). Task 9's real installer writes the same shape from a
    downloaded pack. */
-function construirePackTest(langages) {
-	const dir = join(langages, "c");
+function buildTestPack(languagesDir) {
+	const dir = join(languagesDir, "c");
 	const clangGen = "apps/windows/node_modules/@yowasp/clang/gen";
 	const shimDist = "apps/windows/node_modules/@bjorn3/browser_wasi_shim/dist";
 	mkdirSync(join(dir, "clang"), { recursive: true });
@@ -45,7 +45,7 @@ const tmp = mkdtempSync(join(tmpdir(), "neo-code-"));
 try {
 	const racine = join(tmp, "code");
 	const langages = join(tmp, "languages");
-	construirePackTest(langages);
+	buildTestPack(langages);
 	await copierBacASable(racine);
 	await build({
 		entryPoints: { harnais: "scripts/fixtures/code-sandbox/harnais.ts", preload: "apps/windows/electron/code-preload.ts" },
