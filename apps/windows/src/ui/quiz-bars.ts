@@ -1,20 +1,24 @@
 /* THE PLAYED QUIZ'S TWO BARS (2026-09-28) — `quiz-bars.css`.
 
-   The CSS keeps the top of the quiz (header, beads) in place while a question
-   scrolls. This module does the two things CSS cannot:
+   The panel does not scroll: the top of the quiz and the bar of arrows stay
+   still, and only the current question scrolls between them. This module
+   does the three things CSS cannot:
 
-   - the BOTTOM BAR of arrows. It belongs to the panel, not to the slide
-     track (where a glass can neither blur nor span the panel, see the CSS).
+   - the BOTTOM BAR of arrows, a child of the panel under the questions.
      Its two buttons MIRROR the current slide's own arrows — disabled state,
      label, icon — and FORWARD their clicks to them: which slide comes next,
      what the last arrow does (results, finishing an exam) stays the
      engine's decision, in one place (engine/interactions.ts);
-   - the slides' minimum height, `--qz-slide-min`: the panel's height minus
-     what stands above the questions and the bar, so that the bar rests at
-     the bottom of the panel even after a short question.
+   - the slides' height, `--qz-slide-h`: the room between the beads and
+     the bar, so that the bar rests at the bottom of the panel and a long
+     question scrolls inside its slide;
+   - the WHEEL anywhere in the panel (its margins, the beads, the bar)
+     scrolls the current question: in a wide window, the question's column
+     is only the middle of the panel.
 
-   Both are refreshed when the engine re-renders or changes slide (a
-   MutationObserver on its host) and when the panel or the host is resized. */
+   The first two are refreshed when the engine re-renders or changes slide
+   (a MutationObserver on its host) and when the panel or the host is
+   resized. */
 
 /** The current slide: the engine marks it, and only it, `aria-hidden="false"`
  *  (engine/viewport.ts), during a slide transition as well. */
@@ -60,9 +64,11 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		frame = 0;
 		const found = host.closest<HTMLElement>(".qbd-qz");
 		if (found && found !== panel) {
+			panel?.removeEventListener("wheel", onWheel);
 			panel = found;
 			panel.append(bar);
 			resize.observe(panel);
+			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
 		if (!panel) return;
 
@@ -75,20 +81,39 @@ export function attachQuizBars(host: HTMLElement): () => void {
 
 		const viewport = host.querySelector<HTMLElement>(".quiz-track-viewport");
 		if (!viewport) return;
-		/* Where the questions start in the panel's content, at rest: the
-		   viewport is not sticky, so its offset plus the scroll is the same
-		   wherever the panel is scrolled. The bar reaches the panel's edge,
-		   through its bottom padding (quiz-bars.css), so the padding is not
-		   subtracted: the bar's height is. */
-		const top = viewport.getBoundingClientRect().top - panel.getBoundingClientRect().top
-			- panel.clientTop + panel.scrollTop;
-		const value = `${Math.max(0, Math.floor(panel.clientHeight - top - bar.offsetHeight))}px`;
-		/* Skipping an unchanged value keeps the loop (min-height → host
-		   resized → refresh) visibly finite. */
-		if (panel.style.getPropertyValue("--qz-slide-min") !== value) {
-			panel.style.setProperty("--qz-slide-min", value);
+		/* From the top of the questions to the bottom of the panel's content
+		   box, minus what follows the viewport in the host and the bar (whose
+		   -16 px margin cancels the panel's gap). Divided by the panel's
+		   scale: the launch transition animates its transform
+		   (ui/transition-quiz.ts), and a measure taken mid-way would stay. */
+		const panelRect = panel.getBoundingClientRect();
+		const scale = panel.offsetHeight > 0 ? panelRect.height / panel.offsetHeight : 1;
+		if (!(scale > 0)) return;
+		const viewportRect = viewport.getBoundingClientRect();
+		const contentBottom = panelRect.top + (panel.clientTop + panel.clientHeight
+			- parseFloat(getComputedStyle(panel).paddingBottom || "0")) * scale;
+		const trailing = host.getBoundingClientRect().bottom - viewportRect.bottom;
+		const room = (contentBottom - viewportRect.top - trailing) / scale - bar.offsetHeight;
+		const value = `${Math.max(0, Math.floor(room))}px`;
+		/* Skipping an unchanged value keeps the loop (height → host resized →
+		   refresh) visibly finite. */
+		if (panel.style.getPropertyValue("--qz-slide-h") !== value) {
+			panel.style.setProperty("--qz-slide-h", value);
 		}
 	};
+	/* A wheel outside the current slide scrolls it anyway. Inside it, the
+	   browser already does, and nested scrollers (a long code block, a
+	   terminal) keep theirs. Ctrl + wheel is the zoom (ui/barre-titre.ts),
+	   Shift + wheel and a mostly sideways gesture scroll sideways. */
+	function onWheel(event: WheelEvent): void {
+		if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+		const slide = currentSlide(host);
+		if (!slide || (event.target instanceof Node && slide.contains(event.target))) return;
+		const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+			: event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? slide.clientHeight : 1;
+		slide.scrollBy({ top: event.deltaY * unit });
+	}
+
 	const schedule = (): void => {
 		if (!frame) frame = requestAnimationFrame(refresh);
 	};
@@ -109,7 +134,8 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		resize.disconnect();
 		mutations.disconnect();
 		bar.remove();
-		panel?.style.removeProperty("--qz-slide-min");
+		panel?.removeEventListener("wheel", onWheel);
+		panel?.style.removeProperty("--qz-slide-h");
 		panel = null;
 	};
 }
