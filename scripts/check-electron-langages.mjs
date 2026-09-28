@@ -24,7 +24,7 @@
  *     npm run check:electron-langages
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -111,6 +111,15 @@ try {
 			r.check("a host outside the list is never followed",
 				[await codeDuRejet(installerLangage(dir4, () => {}, t4, pin)), t4.demandees, resteSurDisque(dir4)], ["reseau", [URL_TEST], []]);
 
+			// ── A body longer than the pin, a redirect to plain http ──
+			const dirLong = nouveauDossier("long");
+			r.check("a body larger than the pin cut and refused, nothing left",
+				[await codeDuRejet(installerLangage(dirLong, () => {}, transportServant(Buffer.concat([pack, Buffer.alloc(10)])), pin)), resteSurDisque(dirLong)], ["empreinte", []]);
+			const dirHttp = nouveauDossier("http");
+			const tHttp = transportServant(pack, { redirigeVers: "http://github.com/Neo-Quiz/neo-quiz/x" });
+			r.check("a redirect to plain http never followed",
+				[await codeDuRejet(installerLangage(dirHttp, () => {}, tHttp, pin)), tHttp.demandees], ["reseau", [URL_TEST]]);
+
 			// ── An archive entry that would escape, in a pack whose hash MATCHES ──
 			for (const nom of ["../evil.txt", "clang/../../evil.txt", "C:evil.txt", "/evil.txt", "a\\..\\..\\evil.txt"]) {
 				const piege = Buffer.from(gzipSync(buildZip([...entrees, { name: nom, content: "pwned" }])));
@@ -125,8 +134,14 @@ try {
 				["clang/bundle.js", "manifest.json", "LICENSES/NOTICE.txt"]);
 
 			// ── A previous install is replaced, a delete removes it ──
+			mkdirSync(join(dir, "c.old", "clang"), { recursive: true });
 			await installerLangage(dir, () => {}, transportServant(pack), pin);
-			r.check("reinstall over an installed pack", (await etatLangage(dir)).installe, true);
+			r.check("reinstall over an installed pack, leftovers of an aborted one removed",
+				[(await etatLangage(dir)).installe, resteSurDisque(dir)], [true, ["c"]]);
+			const dirSansVersion = nouveauDossier("sans-version");
+			mkdirSync(join(dirSansVersion, "c"), { recursive: true });
+			writeFileSync(join(dirSansVersion, "c", "manifest.json"), "{}");
+			r.check("a manifest without a version is not an installed pack", (await etatLangage(dirSansVersion)).installe, false);
 			await supprimerLangage(dir);
 			r.check("delete removes the directory", [(await etatLangage(dir)).installe, existsSync(join(dir, "c"))], [false, false]);
 			r.check("state of a never-installed pack", await etatLangage(nouveauDossier("jamais")), { installe: false, version: null, octets: 0 });

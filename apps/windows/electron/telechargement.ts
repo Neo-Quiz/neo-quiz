@@ -58,18 +58,43 @@ export async function* paquetsDe(corps: { getReader(): { read(): Promise<{ done:
     foreign host would not be). `octets` reads the stream chunk by chunk:
     it is what carries progress. */
 export const transportDefaut: TransportInstallation = async (url, init) => {
-	const reponse = await globalThis.fetch(url, { method: init.method, redirect: "manual" });
+	/* AN INACTIVITY DEADLINE (security review 2026-09-28): a connection that
+	   stalls without closing would otherwise hold an install forever — and
+	   with it the one-install-at-a-time lock of the language pack channel.
+	   Re-armed on every chunk, so a slow but moving download is never cut. */
+	const abandon = new AbortController();
+	let minuteur = setTimeout(() => abandon.abort(), INACTIVITE_MS);
+	const rearmer = (): void => { clearTimeout(minuteur); minuteur = setTimeout(() => abandon.abort(), INACTIVITE_MS); };
+	let reponse: Response;
+	try {
+		reponse = await globalThis.fetch(url, { method: init.method, redirect: "manual", signal: abandon.signal });
+	} catch (e) {
+		clearTimeout(minuteur);
+		throw e;
+	}
+	rearmer();
 	/* undici's ReadableStream is iterable at runtime, but its typed shape
 	   varies by library (DOM, undici-types) — the explicit reader is the one
 	   stable bridge. */
 	const corps = reponse.body as unknown as { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }> } } | null;
+	if (!corps) clearTimeout(minuteur);
 	return {
 		status: reponse.status,
 		entete: (nom) => reponse.headers.get(nom),
-		texte: () => reponse.text(),
-		octets: corps ? () => paquetsDe(corps) : undefined,
+		texte: () => reponse.text().finally(() => clearTimeout(minuteur)),
+		octets: corps ? async function* () {
+			try {
+				for await (const paquet of paquetsDe(corps)) { rearmer(); yield paquet; }
+			} finally {
+				clearTimeout(minuteur);
+			}
+		} : undefined,
 	};
 };
+
+/** How long a download may go without receiving a byte before it is
+    abandoned. */
+const INACTIVITE_MS = 30_000;
 
 /** The codes an installer's caller judges: `reseau` (the release is
     unreachable, outside the host list, unreadable) and `empreinte` (a
@@ -110,6 +135,10 @@ export function estErreurInstallation(e: unknown): e is ErreurInstallation {
 export async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation, maxSauts = 3): Promise<ReponseInstallation> {
 	let courant = url;
 	for (let saut = 0; saut < maxSauts; saut++) {
+		/* HTTPS ONLY (security review 2026-09-28): the host list also admits
+		   `http:`, `localhost` and the local Ollama host for other channels;
+		   a download, or a hop of its redirects, never does. */
+		if (!courant.startsWith("https://")) throw erreurInstallation("reseau", "not an https URL: " + courant);
 		if (!hoteAutorise(courant)) throw erreurInstallation("reseau", "host outside the list: " + courant);
 		const reponse = await transport(courant, { method });
 		if (reponse.status < 300 || reponse.status >= 400) return reponse;

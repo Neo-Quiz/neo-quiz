@@ -180,8 +180,9 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   réseau. Un pack qui ne colle pas à son empreinte (un pack VALIDE mais autre
   — gzip rejette déjà seul un octet changé ou un corps tronqué, seul le pin
   arrête celui-là —, un octet changé, un téléchargement coupé) n'est jamais
-  installé et ne laisse RIEN sur le disque ; une redirection hors de la liste
-  d'hôtes n'est jamais suivie ; une entrée d'archive `../x`, `C:x`, `/x`,
+  installé et ne laisse RIEN sur le disque ; un corps plus long que le pin est
+  coupé ; une redirection hors de la liste d'hôtes, ou en `http:`, n'est jamais
+  suivie ; une entrée d'archive `../x`, `C:x`, `/x`,
   `a\..\x` est refusée même dans un pack à la bonne empreinte. Si
   `dist-pack/` contient le pack construit (`npm run build:language-pack`), sa
   taille et son SHA-256 doivent être EXACTEMENT ceux de `PACK_C`, écrits à la

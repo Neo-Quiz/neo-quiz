@@ -90,7 +90,7 @@ import type { CodeLanguage } from "../../../src/code-languages";
 import type { BacASable } from "./code-sandbox";
 /* THE LANGUAGE PACKS (task 9): download, verify, install, delete — the pack
    is pinned in `langages.ts`; the renderer only names the language. */
-import { etatLangage, installerLangage, supprimerLangage } from "./langages";
+import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langages";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -1497,7 +1497,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.langagesInstaller, (e, nom: unknown): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return Promise.resolve({ ok: false, code: "reseau", detail: "pack refused" });
 		if (installationPack) return installationPack;
-		const enCours = installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))
+		/* Already installed at the pinned version: nothing to download — a
+		   compromised renderer cannot make the app re-fetch 28 MB in a loop. */
+		const enCours = etatLangage(deps.dossierLangages).then(st => (st.installe && st.version === PACK_C.version ? undefined : installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
 			.then((): EnveloppeVideo<null, CodeInstallation> => ({ ok: true, valeur: null }), (err: unknown): EnveloppeVideo<null, CodeInstallation> => {
 				if (estErreurInstallation(err)) return { ok: false, code: err.code, detail: err.detail };
 				console.warn(LOG_PREFIX, "language pack install threw:", err);

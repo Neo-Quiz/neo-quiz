@@ -39,9 +39,10 @@
    entries are named — this is that second, independent defence. */
 
 import { createHash } from "node:crypto";
-import { closeSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { LOG_PREFIX } from "../../../src/branding";
 import { parseZip } from "../../../src/dashboard/zip";
 import type { ZipEntry } from "../../../src/dashboard/zip";
 import { demander, erreurInstallation, estErreurInstallation, transportDefaut } from "./telechargement";
@@ -96,7 +97,8 @@ export async function etatLangage(dossier: string): Promise<{ installe: boolean;
 	const cible = dossierLangue(dossier);
 	try {
 		const manifeste = JSON.parse(readFileSync(join(cible, "manifest.json"), "utf8")) as { version?: unknown };
-		return { installe: true, version: typeof manifeste.version === "string" ? manifeste.version : null, octets: tailleDossier(cible) };
+		if (typeof manifeste.version !== "string") return { installe: false, version: null, octets: 0 };
+		return { installe: true, version: manifeste.version, octets: tailleDossier(cible) };
 	} catch {
 		return { installe: false, version: null, octets: 0 };
 	}
@@ -170,72 +172,78 @@ export async function installerLangage(
 	pack: { url: string; sha256: string; taille: number } = PACK_C,
 ): Promise<void> {
 	const cible = dossierLangue(dossier);
-	const partielArchive = cible + ".part.zip.gz";
 	const partielDossier = cible + ".part";
+	const ancien = cible + ".old";
 	mkdirSync(dossier, { recursive: true });
 	try {
-		/* A `.part` left by a previous aborted install must never be reused:
-		   a hash that happened to match by chance would validate bytes that
-		   are not this download's. */
-		rmSync(partielArchive, { force: true });
+		/* A `.part` or `.old` left by an aborted install is never reused. */
 		rmSync(partielDossier, { recursive: true, force: true });
+		rmSync(ancien, { recursive: true, force: true });
 
 		const reponse = await demander(pack.url, "GET", transport);
 		if (reponse.status !== 200) throw erreurInstallation("reseau", "status " + reponse.status + " for the language pack");
 
+		/* The body is kept IN MEMORY (28 MB), hashed as it arrives, and the
+		   very same buffer is decompressed (security review 2026-09-28): a
+		   file re-read from disk after hashing would let unpinned bytes
+		   reach `gunzipSync`. A body longer than the pinned size is cut at
+		   once instead of being taken in whole before the hash refuses it. */
 		const hache = createHash("sha256");
+		const paquets: Uint8Array[] = [];
 		let recus = 0;
-		const descripteur = openSync(partielArchive, "w");
-		try {
-			const ecrire = (paquet: Uint8Array): void => {
-				writeSync(descripteur, paquet);
-				hache.update(paquet);
-				recus += paquet.length;
-				progression(recus, pack.taille);
-			};
-			if (reponse.octets) {
-				for await (const paquet of reponse.octets()) ecrire(paquet);
-			} else {
-				/* A transport that does not stream: the whole body as latin1,
-				   the same fallback `video-installation.ts` uses. */
-				ecrire(Buffer.from(await reponse.texte(), "latin1"));
-			}
-		} finally {
-			closeSync(descripteur);
+		const recevoir = (paquet: Uint8Array): void => {
+			recus += paquet.length;
+			if (recus > pack.taille) throw erreurInstallation("empreinte", "the language pack is larger than its pin");
+			hache.update(paquet);
+			paquets.push(paquet);
+			progression(recus, pack.taille);
+		};
+		if (reponse.octets) {
+			for await (const paquet of reponse.octets()) recevoir(paquet);
+		} else {
+			/* A transport that does not stream: the whole body as latin1,
+			   the same fallback `video-installation.ts` uses. */
+			recevoir(Buffer.from(await reponse.texte(), "latin1"));
 		}
-
 		if (hache.digest("hex") !== pack.sha256) {
 			throw erreurInstallation("empreinte", "SHA-256 of the downloaded pack does not match its pin");
 		}
 
 		let entries: ZipEntry[];
 		try {
-			entries = parseZip(gunzipSync(readFileSync(partielArchive)));
+			entries = parseZip(gunzipSync(Buffer.concat(paquets)));
 		} catch {
 			throw erreurInstallation("empreinte", "the downloaded pack's archive could not be read");
 		}
 		ecrireEntrees(partielDossier, entries);
 
-		/* THE FINAL DIRECTORY APPEARS BY THIS ONE RENAME, same volume same
-		   folder: atomic. A stale `cible` (a previous install) is removed
-		   first so the rename lands cleanly; nothing under `cible` before
-		   this line. */
-		rmSync(cible, { recursive: true, force: true });
+		/* THE FINAL DIRECTORY APPEARS BY A RENAME, same volume same folder.
+		   A previous install is first RENAMED aside, never deleted in place:
+		   a recursive delete that fails halfway (EBUSY, an antivirus, a file
+		   the sandbox is serving) could leave a `manifest.json` without its
+		   `clang/`, a broken pack reporting itself installed. */
+		if (existsSync(cible)) renameSync(cible, ancien);
 		renameSync(partielDossier, cible);
 	} catch (e) {
 		if (estErreurInstallation(e)) throw e;
-		throw erreurInstallation("reseau", String((e as Error)?.message ?? e).slice(-300));
+		/* The raw message may carry local paths (the user's name) or a
+		   signed redirect URL: logged here, never sent to the renderer. */
+		console.warn(LOG_PREFIX, "language pack install failed:", e);
+		throw erreurInstallation("reseau", "unexpected error during the install");
 	} finally {
-		/* FAILURE OR SUCCESS: a `.part` never survives this call. On success
-		   both were already consumed (the archive is no longer needed once
-		   verified, the directory was renamed away) — this is then a no-op. */
-		rmSync(partielArchive, { force: true });
+		/* FAILURE OR SUCCESS: a `.part` never survives this call; nor does
+		   the previous install once the new one is in place. */
 		rmSync(partielDossier, { recursive: true, force: true });
+		rmSync(ancien, { recursive: true, force: true });
 	}
 }
 
 /** Deletes the installed pack. Re-downloadable, so nothing more is asked
     than the button that calls this (Settings › Languages, task 10). */
 export async function supprimerLangage(dossier: string): Promise<void> {
+	/* `manifest.json` first: if the recursive delete then fails halfway, the
+	   pack reads as NOT installed (and re-downloads), never as a broken one
+	   that `code-sandbox.ts` would still try to serve. */
+	rmSync(join(dossierLangue(dossier), "manifest.json"), { force: true });
 	rmSync(dossierLangue(dossier), { recursive: true, force: true });
 }
