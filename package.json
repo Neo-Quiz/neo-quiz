@@ -59,6 +59,8 @@
     "check:electron-reseau": "node scripts/check-electron-reseau.mjs",
     "check:electron-process": "node scripts/check-electron-process.mjs",
     "check:electron-video": "node scripts/check-electron-video.mjs",
+    "check:electron-langages": "node scripts/check-electron-langages.mjs",
+    "build:language-pack": "node scripts/build-language-pack.mjs",
     "check:electron-comptes": "node scripts/check-electron-comptes.mjs",
     "check:electron-collage": "node scripts/check-electron-collage.mjs",
     "check:package": "node scripts/check-package.mjs",

@@ -240,6 +240,22 @@ const pont: Pont = {
 		run: job => ipcRenderer.invoke(CANAUX.codeRun, job),
 		warm: language => ipcRenderer.invoke(CANAUX.codeWarm, language),
 	},
+
+	/* THE LANGUAGE PACKS (task 9): same subscribe-before, unsubscribe-in-
+	   `finally` discipline as `video.installer`. */
+	langages: {
+		etat: nom => ipcRenderer.invoke(CANAUX.langagesEtat, nom),
+		async installer(nom, surProgression) {
+			const ecouteur = (_e: unknown, p: { recus: number; total: number }): void => surProgression(p.recus, p.total);
+			ipcRenderer.on(CANAUX.langagesProgression, ecouteur);
+			try {
+				return await ipcRenderer.invoke(CANAUX.langagesInstaller, nom);
+			} finally {
+				ipcRenderer.off(CANAUX.langagesProgression, ecouteur);
+			}
+		},
+		supprimer: nom => ipcRenderer.invoke(CANAUX.langagesSupprimer, nom),
+	},
 };
 
 contextBridge.exposeInMainWorld("neo", pont);
