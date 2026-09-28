@@ -1,6 +1,9 @@
 /* Harness for `check:code-sandbox`: the REAL `code-sandbox.ts` module, in a
    real Electron. Each case prints a `CAS <name> <json>` line. */
 import { app, protocol } from "electron";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PRIVILEGES_CODE, creerBacASable, resoudreFichierCode } from "../../../apps/windows/electron/code-sandbox";
 
 protocol.registerSchemesAsPrivileged([PRIVILEGES_CODE]);
@@ -9,24 +12,52 @@ const langages = process.env.NEO_CODE_LANGAGES!;
 const preload = process.env.NEO_CODE_PRELOAD!;
 
 /* I4 (b): `resoudreFichierCode` proved in PURE form, without Electron or
-   Python. A literal `..` is NOT a useful case here: the `URL` constructor
-   (Node as much as Chromium) already normalises `.`/`..` segments of a
-   hierarchical path WHILE parsing — `app/../../../Windows/win.ini` becomes
+   Python — on its OWN pair of temp directories, distinct from `racine`/
+   `langages` above (which back the real hidden window further down), so
+   these cases never depend on what the sandbox copy happens to contain.
+   A literal `..` is NOT a useful case here: the `URL` constructor (Node as
+   much as Chromium) already normalises `.`/`..` segments of a hierarchical
+   path WHILE parsing — `app/../../../Windows/win.ini` becomes
    `app/Windows/win.ini` before `resoudreFichierCode` ever runs (verified:
    `new URL(...)` then reading `.pathname`). What remains are the cases where
    that normalisation plays NO role: a re-injected absolute path, another
-   host, and a `..` revealed only by OUR OWN `decodeURIComponent` (the
-   `%5C` — the backslash that Windows accepts as a separator, never
-   normalised by `URL`). */
+   host, and a `..` revealed only by OUR OWN `decodeURIComponent` — the
+   `%5C` (the backslash that Windows accepts as a separator, never a path
+   separator to a non-special scheme's URL parser).
+   MEASURED, and NOT `%2e%2e`: the WHATWG URL spec explicitly treats
+   `%2e%2e` (case-insensitively) as a "double-dot path segment", exactly
+   like a literal `..` — `new URL("neo-code://app/languages/%2e%2e/index.html").pathname`
+   is already `/index.html` (the `languages` segment consumed entirely)
+   before `resoudreFichierCode` ever runs, same as the plain-`..` case
+   above. Confirmed live: fed through this function, it resolves to a path
+   INSIDE `racinePure` (`index.html`), accepted rather than refused — an
+   escape from the `languages` branch into the sandbox's own files that
+   `resoudreFichierCode` cannot see coming, because the URL parser already
+   erased the evidence. `%5C..` survives parsing (a backslash is not a
+   segment separator to this parser, so the pattern it looks for — a raw
+   `..` segment — never matches), and is only turned into a real `..` by
+   our own `decodeURIComponent`, at which point `resoudreFichierCode` is the
+   one that must refuse it — which is exactly what these cases prove. */
 {
+	const racinePure = mkdtempSync(join(tmpdir(), "neo-code-pure-racine-"));
+	const langagesPure = mkdtempSync(join(tmpdir(), "neo-code-pure-langages-"));
+	console.log(`CAS langages-pure-dir ${JSON.stringify(langagesPure)}`);
 	const cas = (nom: string, url: string, doitPasser: boolean) => {
-		const r = resoudreFichierCode(racine, langages, url);
-		console.log(`CAS resoudre-${nom} ${JSON.stringify({ refuse: r === null, attendu: !doitPasser })}`);
+		const r = resoudreFichierCode(racinePure, langagesPure, url);
+		console.log(`CAS resoudre-${nom} ${JSON.stringify({ refuse: r === null, attendu: !doitPasser, chemin: r })}`);
 	};
 	cas("valide", "neo-code://app/index.html", true);
 	cas("backslash-encode", "neo-code://app/%5Cwin.ini", false);
 	cas("chemin-absolu", "neo-code://app//C:/Windows/win.ini", false);
 	cas("autre-hote", "neo-code://autre/index.html", false);
+	/* The `languages/` pack boundary (task 9 will download real packs
+	   there): a valid pack file resolves under `langagesPure`, and neither
+	   escape below can ever land outside it — not even back in
+	   `racinePure`, the sandbox's own files. */
+	cas("pack-valide", "neo-code://app/languages/c/clang/bundle.js", true);
+	cas("pack-double-point", "neo-code://app/languages/%5C..%5C..%5Csecret.txt", false);
+	cas("pack-point", "neo-code://app/languages/%5C..%5Cindex.html", false);
+	cas("pack-vide", "neo-code://app/languages/", false);
 }
 
 /* Two forms of escape, depending on the target origin:
@@ -261,19 +292,16 @@ void app.whenReady().then(async () => {
 	await cas("flot", { code: "while True:\n    print('x' * 100)", timeoutMs: 3000 });
 
 	/* Task 3 of the C/C++ execution plan (generalising the sandbox): an
-	   unknown language is refused by `page.js` before any worker exists, and
-	   `neo-code://app/languages/..` can never climb back out of the packs
-	   directory (`resoudreFichierCode`) into the sandbox's own files. */
+	   unknown language is refused by `page.js` before any worker exists. The
+	   `languages/` path boundary itself (`resoudreFichierCode`) is NOT proved
+	   this way — an earlier version of this case tried a Python-side
+	   `js.fetch('neo-code://app/languages/../index.html')` via
+	   `pyodide.ffi.run_sync`, but that call throws before any fetch is even
+	   attempted (most likely missing cross-origin-isolation headers for
+	   `SharedArrayBuffer`), so it stayed green even with the traversal guard
+	   removed — it discriminated nothing. The real proof lives in the pure
+	   `resoudre-pack-*` cases above, which call `resoudreFichierCode` directly. */
 	console.log(`CAS langue-inconnue ${JSON.stringify(await bac.run({ language: "cobol" as never, code: "x", stdin: "", timeoutMs: 2000 }))}`);
-	console.log(`CAS schema-langues-traversee ${JSON.stringify(await bac.run({ language: "python", timeoutMs: 5000, stdin: "", code: [
-		"import js",
-		"from pyodide.ffi import run_sync",
-		"try:",
-		"    r = run_sync(js.fetch('neo-code://app/languages/../index.html'))",
-		"    print('LU', r.status)",
-		"except Exception as e:",
-		"    print('REFUSE')",
-	].join("\n") }))}`);
 
 	bac.fermer();
 	app.quit();

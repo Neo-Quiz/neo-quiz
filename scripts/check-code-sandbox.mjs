@@ -22,7 +22,7 @@ import { copierBacASable } from "../apps/windows/electron/code/copier.mjs";
 const tmp = mkdtempSync(join(tmpdir(), "neo-code-"));
 try {
 	const racine = join(tmp, "code");
-	const langages = join(tmp, "languages"); // no pack installed yet (task 9); an empty dir is enough to prove the traversal case
+	const langages = join(tmp, "languages"); // no pack installed yet (task 9); the sandbox window never needs to read a real one for these cases
 	await copierBacASable(racine);
 	await build({
 		entryPoints: { harnais: "scripts/fixtures/code-sandbox/harnais.ts", preload: "apps/windows/electron/code-preload.ts" },
@@ -113,8 +113,24 @@ try {
 		r.check(`resoudreFichierCode: ${nom} refused`, cas[`resoudre-${nom}`]?.refuse, true);
 	}
 
+	/* The `languages/` pack boundary (task 9), in the SAME pure form — no
+	   Electron/Python needed either. `langagesPure` is printed by the
+	   harness (its own mkdtemp'd dir, distinct from the sandbox's real
+	   `racine`/`langages`) so this script can compute the exact expected
+	   path for the valid case without hardcoding it twice. Replaces a former
+	   `schema-langues-traversee` case that ran actual Python code through
+	   `pyodide.ffi.run_sync`: that call threw before any fetch was ever
+	   attempted (most likely missing cross-origin-isolation headers for
+	   `SharedArrayBuffer` in the worker), so the case stayed green even with
+	   `resoudreFichierCode`'s traversal guard removed — it discriminated
+	   nothing. These pure cases call the real function directly instead. */
+	const langagesPure = cas["langages-pure-dir"];
+	r.check("resoudreFichierCode: a pack file resolves under languages/", cas["resoudre-pack-valide"]?.chemin, join(langagesPure ?? "", "c", "clang", "bundle.js"));
+	for (const nom of ["pack-double-point", "pack-point", "pack-vide"]) {
+		r.check(`resoudreFichierCode: ${nom} refused`, cas[`resoudre-${nom}`]?.refuse, true);
+	}
+
 	r.check("unknown language refused", cas["langue-inconnue"]?.status, "unavailable");
-	r.check("no traversal out of the packs directory", /REFUSE|LU 403/.test(cas["schema-langues-traversee"]?.stdout ?? ""), true);
 
 	r.done();
 } finally {
