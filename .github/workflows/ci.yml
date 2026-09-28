@@ -76,6 +76,12 @@ jobs:
       - name: Numeric answers typed in LaTeX
         run: npm run check:numeric
 
+      # THE RULES OF CODE EXECUTION: which block languages run, which question
+      # is a program-output question, when `runInLastHint` is valid, and when ▶
+      # shows on a block. Pure rules, shared by engine, format check and editor.
+      - name: Code execution rules
+        run: npm run check:code-languages
+
       # UNE RÉPONSE COPIÉE D'UN SITE, dans tous ses états : fence, prose,
       # LaTeX, virgule oubliée, faux titres de section (Gemini, 2026-09-24).
       # LE COURS AU-DESSUS D'UNE QUESTION : caché avant la lecture et pendant

@@ -41,6 +41,7 @@
     "check:obsidian-host": "node scripts/check-obsidian-host.mjs",
     "check:math-render": "node scripts/check-math-render.mjs",
     "check:numeric": "node scripts/check-numeric.mjs",
+    "check:code-languages": "node scripts/check-code-languages.mjs",
     "check:passage": "node scripts/check-passage.mjs",
     "check:review-store": "node scripts/check-review-store.mjs",
     "check:review-log": "node scripts/check-review-log.mjs",

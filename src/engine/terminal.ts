@@ -5,6 +5,8 @@ import { isNumericQuestion, matchesNumericAnswer, isPurelyNumeric, parseNumericV
 import type { NumericQuestion } from "./numeric";
 import { t } from "../i18n";
 import { placerReponseDansLeCode } from "./sortie-programme";
+import { normalizeTerminalVariantName, isShellVariant, isProgramOutputQuestion as isProgramOutputQuestionPure } from "../code-languages";
+export { normalizeTerminalVariantName, isShellVariant } from "../code-languages";
 
 /* Lucide `square-terminal`, inline like the engine's other icons (cards.ts):
    the title bar of a terminal question. */
@@ -36,74 +38,11 @@ export interface TerminalHandlers {
 	bindTextQuestion(trackItem: HTMLElement, qi: number): void;
 }
 
-/**
- * Nom de variante de terminal, ramené à sa forme canonique.
- *
- * Vit au niveau du MODULE, et EXPORTÉ, parce que l'éditeur en a besoin autant
- * que le moteur : `editor/convert.ts` ne reconnaissait que `terminalVariant:
- * 'cmd'`, `textVariant: 'powershell'` et `textVariant: 'bash'` — trois formes
- * exactes. Les 22 questions Cisco d'Ahmed écrivent `textVariant: 'command'`,
- * que le moteur affiche bien en terminal `cmd` mais que l'éditeur prenait pour
- * du texte ordinaire : la première sauvegarde effaçait la variante ET son
- * invite (`Town-Hall#`, `Router>`…). Une seule table d'alias, deux lecteurs.
- */
-export function normalizeTerminalVariantName(value: unknown): string | null {
-	const raw = String(value ?? "").trim().toLowerCase();
-	if (!raw) return null;
-
-	if ([
-		"command",
-		"cmd",
-		"windows-cmd",
-		"windows cmd",
-		"invite-de-commandes",
-		"invite de commandes"
-	].includes(raw)) return "cmd";
-
-	if ([
-		"powershell",
-		"ps",
-		"pwsh",
-		"windows-powershell",
-		"windows powershell",
-		"power-shell",
-		"power shell"
-	].includes(raw)) return "powershell";
-
-	if ([
-		"bash",
-		"shell",
-		"sh",
-		"zsh",
-		"terminal",
-		"linux"
-	].includes(raw)) {
-		return (raw === "terminal" || raw === "linux") ? "bash" : raw;
-	}
-
-	return raw.replace(/\s+/g, "-");
-}
-
-/** Les vraies invites de commande (retour #2, 2026-09-26 soir) : elles seules
-    gardent le fake-terminal (invite + caret simulé, une seule ligne). Toute
-    autre variante normalisée (`python`, `java`…) est un LANGAGE de
-    programme : sa réponse est une SORTIE, pas une commande à taper — voir
-    `isProgramOutputQuestion`. */
-const SHELL_VARIANTS = new Set(["cmd", "powershell", "bash", "sh", "zsh"]);
-
-/** Une variante normalisée est-elle une vraie invite de commande ? Exportée
-    au niveau du MODULE — pure, sans `ctx` — pour que l'éditeur (aperçu en
-    direct, formulaire) décide de la même façon que le moteur si une question
-    terminal montre une invite ou un bloc « sortie de programme », sans
-    dupliquer la liste `SHELL_VARIANTS`. */
-export const isShellVariant = (variant: string | null | undefined): boolean =>
-	!!variant && SHELL_VARIANTS.has(variant);
-
-/** L'invite PAR DÉFAUT d'une variante — avant l'override explicite d'une
-    question (`q.commandPrefix`…), que `getTerminalPromptPrefix` ajoute
-    par-dessus pour le moteur. Exportée au niveau du module pour que
-    l'éditeur (`editor/convert.ts`, `editor/editor-form.ts`) propose et
-    enregistre la MÊME valeur que le moteur, jamais une copie figée. */
+/** The DEFAULT prompt for a variant — before the explicit override of a
+    question (`q.commandPrefix`…), which `getTerminalPromptPrefix` adds
+    on top for the engine. Exported at the module level so the editor
+    (`editor/convert.ts`, `editor/editor-form.ts`) proposes and
+    registers the SAME value as the engine, never a frozen copy. */
 export function defaultTerminalPromptPrefix(variant: string | null | undefined): string {
 	switch (variant) {
 		case "cmd":
@@ -163,12 +102,12 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 	const isTerminalTextQuestion = (q: QuizQuestion): boolean => !!getTerminalTextVariant(q);
 
-	// Une vraie invite (cmd/powershell/bash/sh/zsh) : le fake-terminal une
-	// ligne. Toute autre variante terminal (python…) est une sortie de
-	// programme (isProgramOutputQuestion), jamais une commande.
+	// A true prompt (cmd/powershell/bash/sh/zsh): the fake-terminal one
+	// line. Any other terminal variant (python…) is a program output
+	// (isProgramOutputQuestion), never a command.
 	const isCommandTextQuestion = (q: QuizQuestion): boolean => isShellVariant(getTerminalTextVariant(q));
 
-	const isProgramOutputQuestion = (q: QuizQuestion): boolean => isTerminalTextQuestion(q) && !isCommandTextQuestion(q);
+	const isProgramOutputQuestion = (q: QuizQuestion): boolean => isProgramOutputQuestionPure(q);
 
 	function getTerminalPromptPrefix(q: TextQuestion): string {
 		const explicitPrefix = [
