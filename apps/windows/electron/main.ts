@@ -290,7 +290,7 @@ function creerFenetre(): void {
 			} catch {
 				return;
 			}
-			if (typeof z === "number" && Number.isFinite(z) && z >= 0.8 && z <= 1.5) {
+			if (typeof z === "number" && Number.isFinite(z) && z >= 0.25 && z <= 5) {
 				fenetre?.webContents.setZoomFactor(z);
 			}
 		})();
