@@ -20,12 +20,13 @@
    ONE WORKER FILE PER LANGUAGE (`worker-<language>.mjs`, picked by
    `page.js`): this file itself stays language-agnostic — it only opens the
    hidden window, resolves the URLs it serves, and relays jobs to the page.
-   Python is the only language wired end to end by this task; a Clang/WASM
-   worker (task 8) and a downloaded language pack served under
-   `neo-code://app/languages/…` (task 9) reuse the same window untouched. */
+   `c`/`cpp` run through the Clang/WASM worker (task 8) once the pack is
+   installed under `neo-code://app/languages/c/` (task 9 downloads it); until
+   then `run` below answers `not-installed` without ever reaching the page. */
 
 import { BrowserWindow, ipcMain, net, session } from "electron";
 import type { CustomScheme } from "electron";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CANAUX_BAC } from "./code-canaux";
@@ -50,9 +51,10 @@ const PLAFOND_FILE = 8;
 
 /* `CodeLanguage`, `CodeJob` and `CodeRun` moved to `src/host/types.ts` at
    task 4: the render side (`HostCode`) and the main process share the exact
-   same shapes, validated at the IPC boundary (`canaux.ts`). Python is still
-   the only language wired end to end; `run` below answers `not-installed`
-   for `c`/`cpp` until task 8 adds the Clang/WASM worker. */
+   same shapes, validated at the IPC boundary (`canaux.ts`). `run` below
+   answers `not-installed` for `c`/`cpp` until the pack's `manifest.json`
+   exists under `langages` (task 9 downloads it; the check harness fakes it,
+   task 8). */
 
 /* Registered by `main.ts` in its ONE call to `registerSchemesAsPrivileged`
    (Electron only keeps the last one). */
@@ -260,12 +262,15 @@ export function creerBacASable(racine: string, langages: string, preload: string
 
 	return {
 		run(job) {
-			/* Task 8 adds the Clang/WASM worker; until then, `c`/`cpp` never
-			   reach the page (which would otherwise try to load a
-			   `worker-clang.mjs` that does not exist yet). Any OTHER language
-			   still falls through to the page, which answers `unavailable`
-			   for a name it does not recognise at all. */
-			if (job.language === "c" || job.language === "cpp") {
+			/* `c` and `cpp` share ONE pack (`languages/c/`, task 9): a single
+			   shared LLVM `Application` compiles either, there is no smaller
+			   C-only subset (measured, spec §6). Refused before ever reaching
+			   the page while the pack is absent — `worker-clang.mjs` would
+			   otherwise fail its own dynamic `import()` of files that are not
+			   there yet and report the same status, one round-trip later. Any
+			   OTHER unknown language still falls through to the page, which
+			   answers `unavailable` for a name it does not recognise at all. */
+			if ((job.language === "c" || job.language === "cpp") && !existsSync(path.join(langages, "c", "manifest.json"))) {
 				return Promise.resolve({ status: "not-installed", stdout: "" });
 			}
 			if (enFile >= PLAFOND_FILE) {

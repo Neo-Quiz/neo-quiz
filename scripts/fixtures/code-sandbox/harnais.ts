@@ -303,6 +303,32 @@ void app.whenReady().then(async () => {
 	   `resoudre-pack-*` cases above, which call `resoudreFichierCode` directly. */
 	console.log(`CAS langue-inconnue ${JSON.stringify(await bac.run({ language: "cobol" as never, code: "x", stdin: "", timeoutMs: 2000 }))}`);
 
+	/* Task 8: the Clang/WASM worker. `cas` above hardcodes `language:
+	   "python"`, so these go through `bac.run` directly — a fake pack
+	   (`languages/c/`, built by `check-code-sandbox.mjs` itself, Task 9's
+	   real installer layout) is already on disk when this process starts.
+	   RULING (plan defect): the plan's own draft names two of these cases
+	   "boucle" and "apres-boucle" — identical to the pre-existing Python
+	   cases of the same name a few lines above. `check-code-sandbox.mjs`
+	   parses every `CAS <name> <json>` line of the combined stdout into one
+	   flat map keyed by name; a collision means the LAST line printed wins,
+	   silently overwriting the Python result the earlier checks read.
+	   Verified live: with the plan's names, "infinite loop stopped at the
+	   deadline" and "the next trial works" (the PYTHON checks) both failed,
+	   reading the C case's own `status`/`stdout` instead of Python's. Every
+	   C case below is prefixed `c-` instead; cost if this ruling is wrong:
+	   a one-line rename back, nothing else depends on the exact name. */
+	const record = (nom: string, r: unknown) => console.log(`CAS ${nom} ${JSON.stringify(r)}`);
+	record("c-simple", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ printf("c %d\\n", 6*7); return 0; }' }));
+	record("cpp-simple", await bac.run({ language: "cpp", timeoutMs: 10000, stdin: "", code: '#include <iostream>\nint main(){ std::cout << "cpp " << 6*7 << std::endl; }' }));
+	record("c-scanf", await bac.run({ language: "c", timeoutMs: 10000, stdin: "5 7\n", code: '#include <stdio.h>\nint main(void){ int a,b; scanf("%d %d",&a,&b); printf("%d\\n",a+b); }' }));
+	record("c-scanf-eof", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ int a=0; int n=scanf("%d",&a); printf("n=%d\\n",n); }' }));
+	record("c-compile-error", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: "int main(void){ return 0 }" }));
+	record("c-boucle", await bac.run({ language: "c", timeoutMs: 2000, stdin: "", code: "int main(void){ for(;;){} }" }));
+	record("c-apres-boucle", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ puts("ok"); }' }));
+	record("c-sortie-bornee", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ for(int i=0;i<200000;i++) puts("xxxxxxxxxx"); }' }));
+	record("c-fichier", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ FILE*f=fopen("C:/Windows/win.ini","r"); puts(f?"LU":"REFUSE"); }' }));
+
 	bac.fermer();
 	app.quit();
 });

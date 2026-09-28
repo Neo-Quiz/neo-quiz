@@ -1,28 +1,51 @@
 /**
  * THE CODE SANDBOX, in a REAL Electron (spec 2026-09-23-exercice-python-
- * design.md §3; generalised from Python-only to a code sandbox at task 3 of
- * docs/superpowers/sdd/2026-09-28-c-cpp-execution — no behaviour change for
- * Python). What it prevents: a trapped SHARED quiz reading a file off disk
- * or reaching the network from the code it runs; an infinite loop blocking
- * the next exercise; `input()` not behaving like a terminal. Mandatory
- * before each release (docs/superpowers/notes/controles.md); in CI on the
- * Windows job.
+ * design.md §3; generalised from Python-only to a code sandbox at task 3,
+ * C/C++ wired at task 8, of docs/superpowers/plans/2026-09-28-c-cpp-
+ * execution.md — no behaviour change for Python). What it prevents: a
+ * trapped SHARED quiz reading a file off disk or reaching the network from
+ * the code it runs; an infinite loop (or, for C, a program stuck at
+ * `scanf` on empty stdin) blocking the next exercise; `input()` not
+ * behaving like a terminal; a C compile error shown as noise instead of the
+ * compiler's own message. Mandatory before each release
+ * (docs/superpowers/notes/controles.md); in CI on the Windows job.
  *
  *     npm run check:code-sandbox
  */
 import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { makeReporter } from "./lib/load-src.mjs";
 import { copierBacASable } from "../apps/windows/electron/code/copier.mjs";
 
+/* Task 8's own pack, until Task 9's real builder/installer exist: the exact
+   layout `worker-clang.mjs` expects under `languages/c/` (its `BASE`,
+   matching the Interfaces block of the plan) — `clang/` holds
+   `@yowasp/clang`'s `gen/*` verbatim (bundle.js fetches its `.wasm`/`.tar`
+   siblings by a URL relative to its OWN location, so they must sit flat
+   next to it), `wasi-shim/` holds `@bjorn3/browser_wasi_shim`'s `dist/*.js`
+   (its `index.js` imports its siblings the same way; `.tsbuildinfo` is not
+   a runtime file). Task 9's real installer writes the same shape from a
+   downloaded pack. */
+function construirePackTest(langages) {
+	const dir = join(langages, "c");
+	const clangGen = "apps/windows/node_modules/@yowasp/clang/gen";
+	const shimDist = "apps/windows/node_modules/@bjorn3/browser_wasi_shim/dist";
+	mkdirSync(join(dir, "clang"), { recursive: true });
+	mkdirSync(join(dir, "wasi-shim"), { recursive: true });
+	for (const f of readdirSync(clangGen)) cpSync(join(clangGen, f), join(dir, "clang", f));
+	for (const f of readdirSync(shimDist)) if (f.endsWith(".js")) cpSync(join(shimDist, f), join(dir, "wasi-shim", f));
+	writeFileSync(join(dir, "manifest.json"), JSON.stringify({ version: "test" }));
+}
+
 const tmp = mkdtempSync(join(tmpdir(), "neo-code-"));
 try {
 	const racine = join(tmp, "code");
-	const langages = join(tmp, "languages"); // no pack installed yet (task 9); the sandbox window never needs to read a real one for these cases
+	const langages = join(tmp, "languages");
+	construirePackTest(langages);
 	await copierBacASable(racine);
 	await build({
 		entryPoints: { harnais: "scripts/fixtures/code-sandbox/harnais.ts", preload: "apps/windows/electron/code-preload.ts" },
@@ -131,6 +154,20 @@ try {
 	}
 
 	r.check("unknown language refused", cas["langue-inconnue"]?.status, "unavailable");
+
+	/* Task 8: the Clang/WASM worker, once the (fake) pack is present. Case
+	   names prefixed `c-` throughout (see the ruling in harnais.ts): the
+	   Python cases above already own "boucle"/"apres-boucle"/"scanf"-less
+	   names in this same flat `cas` map. */
+	r.check("C prints", [cas["c-simple"]?.status, cas["c-simple"]?.stdout], ["ok", "c 42\n"]);
+	r.check("C++ prints", [cas["cpp-simple"]?.status, cas["cpp-simple"]?.stdout], ["ok", "cpp 42\n"]);
+	r.check("scanf reads stdin", cas["c-scanf"]?.stdout, "12\n");
+	r.check("scanf at EOF ends", [cas["c-scanf-eof"]?.status, cas["c-scanf-eof"]?.stdout], ["ok", "n=-1\n"]);
+	r.check("compile error is readable", [cas["c-compile-error"]?.status, /expected ';'/.test(cas["c-compile-error"]?.error ?? "")], ["compile-error", true]);
+	r.check("infinite loop cut", cas["c-boucle"]?.status, "timeout");
+	r.check("the next run works", cas["c-apres-boucle"]?.stdout, "ok\n");
+	r.check("output bounded", [cas["c-sortie-bornee"]?.status, (cas["c-sortie-bornee"]?.stdout ?? "").length <= 20000], ["too-long", true]);
+	r.check("no host file from C", cas["c-fichier"]?.stdout, "REFUSE\n");
 
 	r.done();
 } finally {

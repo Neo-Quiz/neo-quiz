@@ -14,7 +14,7 @@ export async function copierBacASable(dest) {
 	const source = dirname(require.resolve("pyodide/package.json"));
 	await mkdir(join(dest, "pyodide"), { recursive: true });
 	await Promise.all([
-		...["index.html", "page.js", "worker-python.mjs"].map(f => copyFile(join(ici, f), join(dest, f))),
+		...["index.html", "page.js", "worker-python.mjs", "worker-clang.mjs"].map(f => copyFile(join(ici, f), join(dest, f))),
 		...FICHIERS_PYODIDE.map(f => copyFile(join(source, f), join(dest, "pyodide", f))),
 	]);
 }
