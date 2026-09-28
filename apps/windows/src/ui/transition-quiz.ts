@@ -10,7 +10,10 @@
      ici ni remontée ni assombrissement — voir `RECUL`) ;
    - la barre d'outils de l'ancienne page s'efface (300 ms vers 0, 200 ms
      vers 0,6) ;
-   - le contenu de la nouvelle entre en fondu, `translateY(20%) → 0`.
+   - the new page's content fades in, `translateY(20%) → 0` — NOT kept
+     here (2026-09-28): moving on its own inside a panel that is itself
+     rising, the quiz's content was one motion too many; it now rides with
+     the panel, fixed to it, as it already did on the way back.
    500 ms, `cubic-bezier(0.36, 0.66, 0, 1)` pour les deux pages. Au retour,
    la même chose à l'envers, avec la MÊME courbe (des images clés inversées,
    pas `direction: "reverse"`, qui inverserait aussi la courbe : le
@@ -228,14 +231,8 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 				animations.push(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: COURBE, fill: "forwards" }));
 			}
 		}
+		// The quiz's content rises with its panel, never on its own (header).
 		animations.push(entrant.animate([{ transform: `translateY(${distance}px)` }, { transform: "translateY(0)" }], { ...base, fill: "backwards" }));
-		// Le contenu du quiz (en-tête, moteur) entre en fondu, à part du panneau.
-		for (const enfant of Array.from(entrant.children)) {
-			animations.push(enfant.animate(
-				[{ opacity: 0, transform: "translateY(20%)" }, { opacity: 1, transform: "translateY(0)" }],
-				{ duration: DUREE_MS, easing: "ease-in-out", fill: "backwards" },
-			));
-		}
 	} else {
 		const quiz = aRetirer[0];
 		/* Without a quiz to follow (should not happen), the page only
