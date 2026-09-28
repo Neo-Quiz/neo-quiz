@@ -124,9 +124,10 @@ export interface QuestionBase {
 	/** Famille de notions CONFUSABLES (Learn et Practice) : les questions qui
 	    la partagent s'entremêlent en révision (`ScheduledItem.topic`). */
 	topic?: string;
-	/** Compte à rebours en SECONDES, posé par l'IA sur les seuls automatismes.
-	    À l'échéance : réponse + explication, et la question revient comme une
-	    erreur (plan 2). */
+	/** DROPPED (2026-09-28): a per-question countdown in seconds, once written
+	    by the generator on automatisms. The engine never implemented it and it
+	    was judged useless. Kept in the type because notes written before still
+	    carry it: it is read, preserved on save (`_extraFields`), and ignored. */
 	timeLimit?: number;
 }
 

@@ -291,7 +291,6 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	HINTS IN LEARN: EVERY question of the path has "hint" — pre, explain and recall alike; only the read cards and the flashcards have none.
 	A "read" passage NEVER contains the exact sentence that a later question of the same slice asks for: recall must be retrieval, not copying. Do not ask to "justify your answer" everywhere.
 	"topic": optional short label of a family of notions that are easily confused, shared by the questions that test it.
-	"timeLimit": a number of seconds, ONLY on a question that tests an automatism the learner must answer instantly (a keyword, a syntax); omit it everywhere else.
 	The LAST element of the array is the configuration object, with no prompt field: { mode: "learn", "objectives": ["...", "..."], "glossary": [{ "term": "...", "definition": "..." }, ...] } — 3 to 6 learning objectives of the source, each starting with a verb, and the glossary described under GLOSSARY below.`
 	: `MODE: PRACTICE. You are writing an exam-preparation bank on the source, in the FORMAT OF A UNIVERSITY EXAM on it.
 	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
@@ -299,7 +298,6 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	EVERY question has "hint" (see HINTS below).
 	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
 	"slice": when a SLICE PLAN of the learning path is given in the request, the number of the slice that teaches what the question tests; otherwise omit it.
-	"timeLimit": a number of seconds, ONLY on a question that tests an automatism; omit it everywhere else.
 	The LAST element of the array is a configuration object, with no prompt field: { mode: "quiz", "glossary": [{ "term": "...", "definition": "..." }, ...] } — the glossary described under GLOSSARY below.`;
 
 	/* Le complément de la CATÉGORIE (retour #7) : une section de plus, entre

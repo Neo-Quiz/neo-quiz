@@ -24,13 +24,13 @@ export type ModeQuiz = "learn" | "practice";
     le contrôle à l'arrivée exige mais que le prompt tait n'est jamais produit
     (test du 2026-09-23 : `explain` absent du prompt, aucune explication). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
-	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"timeLimit"', '"flashcard"',
+	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"flashcard"',
 		// Styles de lecture (2026-09-26, spec des styles §4) : les clés et leurs valeurs.
 		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
 		// Glossaire (lot D, 2026-09-27, spec §6) : la génération l'écrit dans la
 		// configuration finale, aux côtés de `objectives`.
 		'"glossary"', '"term"', '"definition"'],
-	practice: ['"explain"', '"hint"', '"topic"', '"slice"', '"timeLimit"',
+	practice: ['"explain"', '"hint"', '"topic"', '"slice"',
 		// Glossaire (lot D, 2026-09-27) : remplace « No configuration object ».
 		'"glossary"', '"term"', '"definition"'],
 };
@@ -42,6 +42,10 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 export const MOTS_INTERDITS: readonly RegExp[] = [
 	/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/,
 	/\bpromptHtml\b/, /\bexplainHtml\b/, /\blessonHtml\b/, /\bpassageHtml\b/, /\boptionHtml\b/,
+	// The per-question countdown was dropped (2026-09-28): never implemented
+	// in the engine, then judged useless. A prompt that still named it would
+	// have the model write a field that nothing reads.
+	/\btimeLimit\b/,
 ];
 
 /** Les passages que le prompt de CHAQUE mode doit contenir mot pour mot : la
