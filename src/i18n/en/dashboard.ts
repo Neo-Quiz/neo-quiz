@@ -315,6 +315,8 @@ export const EN_DASHBOARD = {
 	"dashboard.fiche.part": "Part {n}",
 	"dashboard.fiche.editQuestion": "Edit question {n}",
 	"dashboard.fiche.search": "Search",
+	"dashboard.fiche.type.equation": "Equation",
+	"dashboard.fiche.type.programOutput": "Program output",
 	"dashboard.fiche.searchEmpty": "No question matches this search.",
 	"dashboard.quiz.editTitle": "Title",
 	"dashboard.quiz.editTitlePlaceholder": "Name this question…",

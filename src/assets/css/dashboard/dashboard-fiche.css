@@ -129,11 +129,6 @@
 	font-weight: 500;
 	line-height: 1.3;
 }
-.qbd-fiche-chip.is-accent {
-	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
-	color: var(--interactive-accent);
-	font-weight: 600;
-}
 .qbd-fiche-chip .qbd-quiz-card-type-icon svg,
 .qbd-fiche-mode-icon svg {
 	width: 14px;
@@ -156,9 +151,11 @@
 }
 .qbd-fiche-mode-icon { display: inline-flex; }
 
-/* Un cours aux deux modes : Learn | Practice en deux segments, le mode de la
-   fiche en accent, l'autre cliquable (il ouvre sa fiche). Même hauteur et
-   même rayon que les étiquettes voisines. */
+/* A course with both modes: Learn | Practice as two segments, the sheet's
+   mode marked, the other clickable (it opens its sheet). Same height and
+   radius as the neighbouring chips. Never in blue (2026-09-28): the mode is
+   a piece of information like its neighbours, not a call to action — the
+   blue belongs to the buttons. */
 .qbd-fiche-modes {
 	position: relative;
 	display: inline-flex;
@@ -192,9 +189,9 @@
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	color: var(--text-normal);
 }
-/* Le fond du segment actif est le BLOC QUI GLISSE (`seg-indic.ts`), posé
-   sous les segments : le segment lui-même reste transparent, il ne porte que
-   la couleur du texte. */
+/* The active segment's background is the SLIDING BLOCK (`seg-indic.ts`),
+   laid under the segments: the segment itself stays transparent and only
+   carries the text colour. */
 .qbd-root .qbd-fiche-mode-seg {
 	position: relative;
 	z-index: 1;
@@ -202,7 +199,7 @@
 }
 .qbd-root .qbd-fiche-mode-seg.is-active {
 	background: none;
-	color: var(--interactive-accent);
+	color: var(--text-normal);
 	font-weight: 600;
 	cursor: default;
 }
@@ -212,7 +209,7 @@
 	bottom: 2px;
 	left: 0;
 	border-radius: 6px;
-	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
 	transform-origin: left center;
 	pointer-events: none;
 }
@@ -593,10 +590,6 @@
 	margin: 0 1px 0 4px;
 	color: var(--text-faint);
 }
-.qbd-fiche-meta .qbd-fiche-chip.is-accent {
-	color: var(--interactive-accent);
-	font-weight: 600;
-}
 .qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
 .qbd-fiche-meta .qbd-fiche-modes,
 .qbd-fiche-search {
@@ -716,3 +709,17 @@
 
 /* La ligne d'infos de la fiche, reprise sous le titre de l'éditeur (2026-09-26). */
 .qbd-qz-infos { margin-top: 10px; }
+
+/* Image options on a question card (detail-fiche.ts): small thumbnails,
+   never the raw `![[…]]` text. */
+.qbd-fiche-opts.is-images .qbd-fiche-opt-text img{
+	display: block;
+	height: 44px;
+	width: auto;
+	max-width: 84px;
+	object-fit: cover;
+	border-radius: 6px;
+}
+.qbd-fiche-opts.is-images .qbd-fiche-opt-text :is(p, div){
+	margin: 0;
+}

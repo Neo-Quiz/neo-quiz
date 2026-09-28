@@ -5,6 +5,8 @@ import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 import { t } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
 import { Q_TYPES } from "../editor/utils";
+import { usesMathField } from "../engine/math-input";
+import { isShellVariant } from "../engine/terminal";
 import type { DraftQuestion } from "../editor/utils";
 import type { ModeQuiz } from "../quiz-format";
 import type { QuizIndexEntry } from "./scanner";
@@ -278,7 +280,7 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 			});
 		}
 	} else {
-		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip is-accent qbd-fiche-mode", "span");
+		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip qbd-fiche-mode", "span");
 	}
 	const count = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-count");
 	renderQuizTypeIcon(count, deps.quiz.quizType);
@@ -337,6 +339,16 @@ export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): 
 		// Une explication est toujours libre : son type n'apprendrait rien non plus.
 		icone(top, "pen-line", "qbd-fiche-q-icon");
 		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleExplain"));
+	} else if (q._type === "text" && usesMathField(q)) {
+		/* The editor files an equation under "text" and a program's output
+		   under "bash" (it has no type of their own), and the card said
+		   "Free text" / "Bash terminal" (2026-09-27). The LABEL tells what the
+		   learner will see; the editor's types are unchanged. */
+		icone(top, "sigma", "qbd-fiche-q-icon");
+		ajouter(top, "span", "qbd-fiche-q-type", t("dashboard.fiche.type.equation"));
+	} else if (q._type === "bash" && q._terminalVariant && !isShellVariant(q._terminalVariant)) {
+		icone(top, "square-code", "qbd-fiche-q-icon");
+		ajouter(top, "span", "qbd-fiche-q-type", t("dashboard.fiche.type.programOutput"));
 	} else {
 		const def = Q_TYPES.find(d => d.key === q._type);
 		if (def) icone(top, def.lucide, "qbd-fiche-q-icon");
@@ -349,8 +361,12 @@ export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): 
     coche ici. Toutes courtes : des bulles côte à côte ; sinon une colonne. */
 function renderOptions(card: HTMLElement, q: DraftQuestion): void {
 	if ((q._type !== "single" && q._type !== "multi") || q.role === "read" || !q.options?.length) return;
-	const courtes = q.options.every(o => o.length <= OPTION_COURTE);
-	const opts = ajouter(card, "span", courtes ? "qbd-fiche-opts is-pills" : "qbd-fiche-opts");
+	/* Options that are IMAGES (`![[capture.png]]`) were written out as raw
+	   text on the card (2026-09-27): they go through the same rendering as
+	   the prompt (`texteQuizHtml`, images resolved) and show as thumbnails. */
+	const images = q.options.every(o => /^\s*!\[\[[^\]]+\]\]\s*$/.test(o));
+	const courtes = images || q.options.every(o => o.length <= OPTION_COURTE);
+	const opts = ajouter(card, "span", images ? "qbd-fiche-opts is-pills is-images" : courtes ? "qbd-fiche-opts is-pills" : "qbd-fiche-opts");
 	q.options.forEach((o, j) => {
 		const line = ajouter(opts, "span", "qbd-fiche-opt");
 		ajouter(line, "span", "qbd-fiche-opt-letter", String.fromCharCode(65 + j));
@@ -358,7 +374,7 @@ function renderOptions(card: HTMLElement, q: DraftQuestion): void {
 		   (`renderInlineText`), sans quoi `[10, 20, 30]` s'affichait
 		   avec ses accents graves (2026-09-26). */
 		const txt = ajouter(line, "span", "qbd-fiche-opt-text");
-		txt.innerHTML = renderInlineText(o);
+		txt.innerHTML = o.includes("![[") ? texteQuizHtml(o) : renderInlineText(o);
 		if (o.includes("$")) void mathifyElement(txt);
 	});
 }

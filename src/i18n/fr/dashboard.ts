@@ -279,6 +279,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.fiche.part": "Partie {n}",
 	"dashboard.fiche.editQuestion": "Modifier la question {n}",
 	"dashboard.fiche.search": "Rechercher",
+	"dashboard.fiche.type.equation": "Équation",
+	"dashboard.fiche.type.programOutput": "Sortie de programme",
 	"dashboard.fiche.searchEmpty": "Aucune question ne correspond à cette recherche.",
 	"dashboard.quiz.editTitle": "Titre",
 	"dashboard.quiz.editTitlePlaceholder": "Nommez cette question…",
