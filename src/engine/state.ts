@@ -410,6 +410,8 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			const active = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
 			resultsTab.className = buildNavTabClass(`quiz-tab is-result ${active}`.trim(), resultsTab);
 		}
+		// La longueur du fil rempli de la frise de perles (application).
+		ctx.container.querySelector<HTMLElement>(".quiz-nav")?.style.setProperty("--quiz-nav-pos", String(ctx.cards.navPosition()));
 	}
 
 	function setPracticeMode(mode: PracticeMode): void {

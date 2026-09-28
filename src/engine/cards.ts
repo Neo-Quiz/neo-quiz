@@ -22,11 +22,19 @@ const ICON_ARROW_LEFT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24
 const ICON_LIVRE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
 const ICON_BULB ='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
 const ICON_HELP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
+/* Lucide flag : l'onglet « Résultats » quand la navigation est une frise de
+   perles (l'application, `perles.css`) ; masqué ailleurs (nav-tabs.css). */
+const ICON_DRAPEAU = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>';
+/* Lucide triangle-alert / circle-check: the end screen, depending on whether
+   questions remain. */
+const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 export interface CardHandlers {
 	tabClass(i: number): string;
 	navHtml(): string;
+	navPosition(): number;
 	startModeSelectorHtml(): string;
 	optionClass(qi: number, oi: number): string;
 	optionContentHtml(q: QcmQuestion | MultiSelectQuestion, oi: number): string;
@@ -60,7 +68,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	    Learn sans numéro (un livre) — ici et non dans le gabarit, parce que
 	    `updateNavHighlight` (state.ts) réécrit la classe à chaque déplacement. */
 	function tabClass(i: number): string {
-		return `${numero(i) === 0 ? "is-lecture " : ""}${tabEtat(i)}`.trim();
+		const n = numero(i);
+		/* `is-repere` : une question sur cinq (Q5, Q10…), qui garde son numéro
+		   quand la frise de perles de l'application passe en points
+		   (`perles.css`). Sans effet sur les onglets du greffon. */
+		return `${n === 0 ? "is-lecture " : n % 5 === 0 ? "is-repere " : ""}${tabEtat(i)}`.trim();
 	}
 
 	function tabEtat(i: number): string {
@@ -85,21 +97,46 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return `${active} ${ctx.isCorrect(i) ? "correct" : "wrong"}`.trim();
 	}
 
+	/** Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
+	    numéros la sautent (la question qui la suit devient Q2, pas Q3). */
+	function ongletsNav(): number[] {
+		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
+	}
+
+	/** Où en est-on dans la rangée d'onglets, de 0 (le premier) à 1
+	    (« Résultats ») : la longueur du fil rempli quand la navigation est une
+	    frise de perles (`--quiz-nav-pos`, `perles.css` de l'application). Même
+	    règle d'onglet courant que `tabEtat`. */
+	function navPosition(): number {
+		const cur = ctx.quizState.current;
+		if (ctx.isSubmitSlideIndex(cur) || ctx.isResultsSlideIndex(cur)) return 1;
+		const onglets = ongletsNav();
+		const entry = ctx.slideMap[cur] as { questionIndex?: number } | undefined;
+		const k = ctx.isQuestionSlideIndex(cur) && entry?.questionIndex !== undefined ? onglets.indexOf(entry.questionIndex) : -1;
+		return k > 0 ? k / onglets.length : 0;
+	}
+
 	function navHtml(): string {
 		const resultsActive = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
-		// Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
-		// numéros la sautent (la question qui la suit devient Q2, pas Q3).
-		const onglets = ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
+		const onglets = ongletsNav();
 		/* Une lecture de Learn restée un écran (style `page`) n'a pas de
 		   numéro de question (src/lecture-etape.ts) : son onglet est un livre,
-		   nommé par son titre au survol et pour un lecteur d'écran. */
+		   nommé par son titre pour un lecteur d'écran. Plus de `title` : son
+		   infobulle au survol a été retirée comme les autres (2026-09-27).
+		   Le « Q » et le libellé « Résultats » sont dans leur propre `span` :
+		   la frise de perles de l'application n'en garde que le numéro et un
+		   drapeau, les onglets du greffon les affichent tels quels. */
 		const onglet = (i: number): string => {
 			const n = numero(i);
-			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}">Q${n}</a>`;
+			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}"><span class="quiz-tab-q">Q</span>${n}</a>`;
 			const nom = ctx.escapeHtmlAttr(stripInlineMarkdown(ctx.quiz[i]?.title || t("engine.lesson.roleRead")));
-			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" title="${nom}">${ICON_LIVRE}</a>`;
+			/* `data-titre`: the reading's title, shown ABOVE the bead on hover by
+			   the application's bead row (perles.css, CSS `attr()` — plain text,
+			   never HTML). A book alone did not say which reading it opens. */
+			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" data-titre="${nom}">${ICON_LIVRE}</a>`;
 		};
-		return `<div class="quiz-nav">${onglets.map(onglet).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1">${t("engine.nav.results")}</a></div>`;
+		// `--quiz-nav-n` : le nombre de perles, « Résultats » compris.
+		return `<div class="quiz-nav" style="--quiz-nav-n:${onglets.length + 1};--quiz-nav-pos:${navPosition()}">${onglets.map(onglet).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1"><span class="quiz-tab-drapeau">${ICON_DRAPEAU}</span><span class="quiz-tab-libelle">${t("engine.nav.results")}</span></a></div>`;
 	}
 
 	/* Précédente / suivante sous chaque question (2026-09-23) : des ICÔNES
@@ -350,30 +387,60 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i) && !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
 	}
 
+	/* THE END SCREEN, before the score (redesigned 2026-09-27: it dated from
+	   the first versions). One layout for its three variants — answers,
+	   self-assessments, written exam answers: an icon, a title saying what is
+	   left, a progress bar, then the questions concerned as numbered BEADS
+	   (the application's navigation row) and the two actions. What is missing
+	   is amber, not red: a question left empty is not a mistake. */
 	function submitSlideHtml(): string {
-		const missing = ctx.getMissingIndices();
-		const mc = missing.length;
-		if (ctx.textOnly?.isTextOnlyMode?.()) {
-			if (ctx.textOnly.isExamAnswerPhase?.()) {
-				// Même garde "read" que reviewableIndices : hasAnyAnswer d'une
-				// carte "read" est toujours faux (elle n'écrit jamais dans
-				// textOnlyAnswers), donc sans l'exclusion explicite elle
-				// retomberait en "manquante" ici alors qu'il n'y a rien à répondre.
-				const missingAnswers = reviewableIndices()
-					.filter(i => !ctx.textOnly.hasAnyAnswer(i));
-				const mac = missingAnswers.length;
-				const intro = mac > 0
-					? `<div class="quiz-warn">${plural(mac, "engine.submit.missingFreeAnswers.one", "engine.submit.missingFreeAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>`
-					: `<div class="quiz-submit-sub">${t("engine.submit.allFreeAnswered")}</div>`;
-				return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mac > 0 ? missingAnswers : reviewableIndices()).map(i => `<button class="quiz-chip ${mac > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.exam.finish")}</button></div></div></div></div>`;
-			}
-
-			const intro = mc > 0
-				? `<div class="quiz-warn">${plural(mc, "engine.submit.missingRatings.one", "engine.submit.missingRatings.other")}</div><div class="quiz-submit-sub">${t("engine.submit.toRateList")}</div>`
-				: `<div class="quiz-submit-sub">${t("engine.submit.allRated")}</div>`;
-			return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${intro}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showResults")}</button></div></div></div></div>`;
+		const reviewable = reviewableIndices();
+		let missing = ctx.getMissingIndices();
+		let titre: string;
+		let progres: TransKey = "engine.submit.progress";
+		let finir: TransKey = "engine.submit.showScore";
+		let liste: TransKey = "engine.submit.missingList";
+		let complet: TransKey = "engine.submit.allAnswered";
+		if (ctx.textOnly?.isTextOnlyMode?.() && ctx.textOnly.isExamAnswerPhase?.()) {
+			// Same "read" guard as reviewableIndices: hasAnyAnswer of a "read"
+			// card is always false (it never writes into textOnlyAnswers), so
+			// without the explicit exclusion it would fall back to "missing"
+			// here although there is nothing to answer.
+			missing = reviewable.filter(i => !ctx.textOnly.hasAnyAnswer(i));
+			titre = plural(missing.length, "engine.submit.missingFreeAnswers.one", "engine.submit.missingFreeAnswers.other");
+			finir = "engine.exam.finish";
+			complet = "engine.submit.allFreeAnswered";
+		} else if (ctx.textOnly?.isTextOnlyMode?.()) {
+			titre = plural(missing.length, "engine.submit.missingRatings.one", "engine.submit.missingRatings.other");
+			progres = "engine.submit.progressRated";
+			finir = "engine.submit.showResults";
+			liste = "engine.submit.toRateList";
+			complet = "engine.submit.allRated";
+		} else {
+			titre = plural(missing.length, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other");
 		}
-		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap"><div class="quiz-submit-card">${mc > 0 ? `<div class="quiz-warn">${plural(mc, "engine.submit.missingAnswers.one", "engine.submit.missingAnswers.other")}</div><div class="quiz-submit-sub">${t("engine.submit.missingList")}</div>` : `<div class="quiz-submit-sub">${t("engine.submit.reviewList")}</div>`}<div class="quiz-chip-row">${(mc > 0 ? missing : reviewableIndices()).map(i => `<button class="quiz-chip ${mc > 0 ? "missing" : ""}" type="button" data-jump="${i}">Q${numero(i)}</button>`).join("")}</div><div class="quiz-actions"><button class="quiz-action-btn quiz-back-btn" type="button">${t("engine.submit.back")}</button><button class="quiz-action-btn success quiz-show-score-btn" type="button">${t("engine.submit.showScore")}</button></div></div></div></div>`;
+
+		const manque = missing.length > 0;
+		const total = reviewable.length;
+		const faits = Math.max(0, total - missing.length);
+		const pct = total > 0 ? Math.round((faits / total) * 100) : 100;
+		const perles = (manque ? missing : reviewable).map(i =>
+			`<button class="quiz-submit-perle" type="button" data-jump="${i}" aria-label="${ctx.escapeHtmlAttr(t("engine.submit.goTo", { n: numero(i) }))}">${numero(i)}</button>`
+		).join("");
+
+		return `<div class="quiz-track-item" data-slide-kind="submit"><div class="quiz-submit-wrap">`
+			+ `<div class="quiz-submit-card ${manque ? "is-incomplete" : "is-complete"}">`
+			+ `<div class="quiz-submit-icon">${manque ? ICON_TRIANGLE_ALERTE : ICON_CERCLE_OK}</div>`
+			+ `<div class="quiz-submit-title">${manque ? titre : t(complet)}</div>`
+			+ `<div class="quiz-submit-sub">${t(manque ? "engine.submit.missingSub" : "engine.submit.completeSub")}</div>`
+			+ `<div class="quiz-submit-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${faits}">`
+			+ `<div class="quiz-submit-bar"><span style="width:${pct}%"></span></div>`
+			+ `<div class="quiz-submit-count">${t(progres, { done: faits, total })}</div></div>`
+			+ `<div class="quiz-submit-label">${t(manque ? liste : "engine.submit.reviewList")}</div>`
+			+ `<div class="quiz-submit-perles">${perles}</div>`
+			+ `<div class="quiz-actions"><button class="quiz-submit-back quiz-back-btn" type="button">${ICON_ARROW_LEFT}<span>${t("engine.submit.back")}</span></button>`
+			+ `<button class="quiz-action-btn success quiz-show-score-btn" type="button">${t(finir)}</button></div>`
+			+ `</div></div></div>`;
 	}
 
 	function saveResultsButtonHtml(): string {
@@ -648,10 +715,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				${passageSection}
 				${courteHtml}
 				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
-				${ctx.sanitize.resourceButtonHtml(q)}
-				<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>
+				${ctx.isFlashcardQuestion(q) ? "" : `<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>`}
 				${body}
 				${learnSection}
+				${ctx.sanitize.resourceButtonHtml(q) /* after the content, never above it (2026-09-27): at the top of a reading page it came before the text */}
 				${indiceHtml}
 				${hintBtn}
 				${dontKnowBtn}
@@ -664,6 +731,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	return {
 		tabClass,
 		navHtml,
+		navPosition,
 		startModeSelectorHtml,
 		optionClass,
 		optionContentHtml,

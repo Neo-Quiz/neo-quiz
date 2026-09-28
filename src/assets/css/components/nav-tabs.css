@@ -18,13 +18,18 @@
   text-decoration: none !important;
 }
 
-/* Les onglets Q1, Q2… et « Résultats », façon BRILLIANT (2026-09-25),
-   comme les flèches et les boutons verts : des touches « à presser ». Une
-   tranche pleine plus sombre dessous (`0 3px 0 0`, sans flou), qui
-   disparaît au clic pendant que l'onglet descend d'autant. Chaque état ne
-   pose que TROIS variables — la face, le liseré, la tranche — et la
-   mécanique reste la même pour tous. Remplace l'ancienne couche d'effets
-   (lueurs, levées, `!important` de button-press.css). */
+/* The flag of "Results" is only for the app's row of beads
+   (apps/windows/src/assets/perles.css): the tabs keep their label. */
+.quiz-tab-drapeau{
+  display: none;
+}
+
+/* The Q1, Q2… and "Results" tabs, BRILLIANT style (2026-09-25), like the
+   arrows and the green buttons: keys to press. A darker solid edge below
+   (`0 3px 0 0`, no blur), which disappears on click while the tab sinks by
+   as much. Each state only sets THREE variables — the face, the rim, the
+   edge — and the mechanics stay the same for all. Replaces the old layer of
+   effects (glows, lifts, `!important` of button-press.css). */
 .quiz-tab{
   --tab-face: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
   --tab-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
@@ -63,12 +68,12 @@
   outline-offset: 2px;
 }
 
-/* COLORIMÉTRIE (2026-09-25, revue à l'écran) : l'onglet courant ne se
-   voyait qu'à un liseré bleu pâle, « répondu » et « courant » étaient deux
-   bleus voisins, et la tranche noire disparaissait sur le fond sombre.
-   Désormais UNE seule règle : l'état donne la COULEUR (bleu = répondu,
-   émeraude = juste, rouge = faux), la question courante est la seule en
-   aplat PLEIN de sa couleur, texte blanc — le même bleu que les flèches. */
+/* COLOURS (2026-09-25, reviewed on screen): the current tab only showed as
+   a pale blue rim, "answered" and "current" were two neighbouring blues,
+   and the black edge vanished on the dark background. Now ONE rule: the
+   state gives the COLOUR (blue = answered, emerald = right, red = wrong),
+   and the current question is the only one in a SOLID fill of its colour,
+   white text — the same blue as the arrows. */
 .quiz-tab.answered{
   --tab-face: color-mix(in srgb, var(--quiz-primary) 26%, var(--background-primary));
   --tab-border: color-mix(in srgb, var(--quiz-primary) 50%, transparent);
@@ -90,7 +95,7 @@
   --tab-text: #fff;
 }
 
-/* La question courante : aplat plein de sa couleur. */
+/* The current question: a solid fill of its colour. */
 .quiz-tab.active{
   --tab-face: var(--quiz-primary);
   --tab-border: transparent;
@@ -99,10 +104,19 @@
 }
 .quiz-tab.correct.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
 .quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
+/* The self-rated states too (2026-09-28): without these, a current bead
+   already rated fell on the pale tints of text-only.css (a flashcard rated
+   "I knew it" became an almost black green as soon as you stood on it).
+   Turned but not yet rated keeps the current blue; amber is amber-700, which
+   keeps white text readable (the #f59e0b of --quiz-hint is 2:1). */
+.quiz-tab.checked.active{ --tab-face: var(--quiz-primary); --tab-edge: var(--quiz-primary-edge); }
+.quiz-tab.understood.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
+.quiz-tab.partial.active,
+.quiz-tab.review.active{ --tab-face: #b45309; --tab-edge: #7c3a06; }
 
-/* « Résultats » : la fin du quiz, donc VERT — un émeraude profond (var(--quiz-success),
-   5:1 de contraste au texte blanc) et plus le vert néon #29CC57 (2,1:1),
-   qui criait dans la rangée d'onglets sombres (2026-09-25). */
+/* "Results": the end of the quiz, hence GREEN — a deep emerald (var(--quiz-success),
+   5:1 contrast with white text) and no longer the neon green #29CC57 (2.1:1),
+   which screamed in the row of dark tabs (2026-09-25). */
 .quiz-tab.is-result{
   --tab-face: var(--quiz-success);
   --tab-border: transparent;
@@ -117,8 +131,8 @@
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
 
-/* La touche s'enfonce. `.is-pressing` : la classe que pose le moteur pendant
-   l'animation d'appui qui précède la navigation (clavier compris). */
+/* The key sinks. `.is-pressing`: the class the engine sets during the
+   press animation that precedes navigation (keyboard included). */
 .quiz-tab:active,
 .quiz-tab.is-pressing{
   transform: translateY(var(--tab-depth));

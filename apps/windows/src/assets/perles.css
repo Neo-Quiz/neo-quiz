@@ -1,0 +1,388 @@
+/* ══════════════════════════════════════════════════════════
+   LA NAVIGATION DU QUIZ EN FRISE DE PERLES (2026-09-27)
+
+   Proposition C de la maquette « Navigation des questions », retenue par
+   Ahmed : chaque question est une perle numérotée, visible et cliquable, sur
+   un fil qui se remplit jusqu'à la question courante ; la perle courante
+   grossit. Une lecture est une perle violette à livre, « Résultats » une
+   perle à drapeau au bout.
+
+   LA COLORIMÉTRIE est celle des onglets d'avant les perles (« reprends la
+   même que l'ancien design d'avant ») : les perles LISENT les variables
+   que le moteur pose déjà par état (`--tab-face`, `--tab-border`,
+   `--tab-text`, nav-tabs.css et text-only.css) — une seule source, la
+   perle d'une question juste a le vert de l'onglet d'une question juste,
+   dans tous les états, y compris l'auto-évaluation. Seules exceptions : la
+   lecture reste violette (validée sur la maquette), et la part parcourue du
+   fil prend le bleu de la perle courante. Écartés le même jour : les
+   couleurs de la maquette (« la colorimétrie par défaut est moche »), le
+   fil vert (« pourquoi c'est vert derrière ? » : c'était le vert d'une
+   réponse juste, et le fil ne dit rien des réponses), l'habillage bleu du
+   parcours numéroté d'autrefois (« coloré en bleu de partout ») et les
+   losanges pour les lectures et la fin (« une mauvaise idée »).
+
+   TOUJOURS SUR UNE LIGNE (« deux lignes c'est ultra moche ») :
+   - tant qu'elles tiennent, les perles font 32 px (« augmente un peu la
+     taille de tout »), la courante 36 (40 était « trop gros ») ;
+   - au-delà, la rangée passe en MODE COMPACT (`is-compacte`, posée par
+     `ui/perles.ts`, qui porte aussi la loupe) : de petits points, une perle
+     numérotée tous les 5 (`is-repere`, posée par le moteur), les lectures et
+     la fin en taille moyenne, la courante en taille pleine ; au survol, la
+     perle sous la souris et ses voisines grossissent comme le Dock de macOS
+     (`--zoom`) et montrent leur numéro ;
+   - en dernier recours, les perles rétrécissent ensemble (`flex-shrink`,
+     `aspect-ratio`) plutôt que de passer à la ligne ou de déborder.
+
+   L'APPLICATION SEULE : le greffon garde ses onglets « Q1 ». Le moteur ne
+   fait que poser des crochets neutres pour lui (`quiz-tab-q`, le drapeau,
+   `is-repere`, `--quiz-nav-n`, `--quiz-nav-pos`, cards.ts). La rangée visée
+   est celle du quiz JOUÉ (`#neo-quiz-root > .qbd-qz`).
+   ══════════════════════════════════════════════════════════ */
+
+#neo-quiz-root > .qbd-qz .quiz-nav {
+	--perle: min(32px, calc((100cqw - 4px - (var(--quiz-nav-n, 1) - 1) * 4px) / var(--quiz-nav-n, 1)));
+	--perle-courante: calc(var(--perle) + 4px);
+	--point: 10px;
+	--fil: color-mix(in srgb, var(--text-normal) 14%, transparent);
+	/* La part parcourue : le même fil, ÉCLAIRCI (« la ligne s'éclaircit au
+	   lieu de devenir bleue »), mais d'un cran seulement (« une couleur pas
+	   trop claire » : 42 % tranchait trop). */
+	--fil-parcouru: color-mix(in srgb, var(--text-normal) 26%, transparent);
+	--lecture-fond: #3a3380;
+	--lecture: #8b7cf6;
+	container-type: inline-size;
+	position: relative;
+	flex-wrap: nowrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 4px;
+	min-height: 52px;
+	padding: 0 6px;
+	border-bottom: none;
+}
+
+/* Le fil, d'un centre de perle à l'autre, et sa part parcourue jusqu'à la
+   perle courante (`--quiz-nav-pos`, de 0 à 1, cards.ts / state.ts). En
+   compact, les perles n'ont plus la même taille : `ui/perles.ts` mesure les
+   centres et pose le fil en pixels. */
+#neo-quiz-root > .qbd-qz .quiz-nav::before,
+#neo-quiz-root > .qbd-qz .quiz-nav::after {
+	content: "";
+	position: absolute;
+	z-index: 0;
+	top: 50%;
+	left: calc(6px + var(--perle) / 2);
+	height: 3px;
+	margin-top: -1.5px;
+	border-radius: 3px;
+	pointer-events: none;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav::before {
+	right: calc(6px + var(--perle) / 2);
+	background: var(--fil);
+}
+#neo-quiz-root > .qbd-qz .quiz-nav::after {
+	width: calc((100cqw - var(--perle)) * var(--quiz-nav-pos, 0));
+	background: var(--fil-parcouru);
+	transition: width 0.35s ease;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte::before {
+	left: var(--fil-debut, 0px);
+	right: auto;
+	width: var(--fil-long, 0px);
+}
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte::after {
+	left: var(--fil-debut, 0px);
+	width: var(--fil-rempli, 0px);
+}
+
+/* La perle : le BOUTON 3D des actions de la page d'un quiz (`.qbd-cta3d`,
+   dashboard-components.css), en rond (« mets-leur exactement cet effet » :
+   « Modifier » par défaut, « Commencer le quiz » quand elle est bleue, sans
+   le reflet qui défile). Une face surélevée au-dessus d'une tranche pleine
+   de 4 px, un liseré clair en haut pour que la face sombre se détache, un
+   enfoncement de 100 ms au clic.
+
+   Les VALEURS PAR DÉFAUT (perle à faire) sont celles de la variante
+   neutre, posées sous `:where()` : de la spécificité d'un simple
+   `.quiz-tab`, elles cèdent aux variables que le moteur pose par ÉTAT
+   (`.quiz-tab.correct`, `.active`… nav-tabs.css et text-only.css) — une
+   perle juste garde le vert de son onglet, la courante le bleu de
+   « Commencer le quiz » (`--quiz-primary`, `--quiz-primary-edge`). */
+:where(#neo-quiz-root > .qbd-qz .quiz-nav) .quiz-tab {
+	--tab-face: #2b2a33;
+	--tab-edge: #141319;
+	--tab-text: #fff;
+	--tab-depth: 4px;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab {
+	--taille: var(--perle);
+	flex: 0 1 auto;
+	min-width: 0;
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	width: var(--taille);
+	height: auto;
+	aspect-ratio: 1;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: var(--tab-face);
+	color: var(--tab-text);
+	font-size: calc(var(--taille) * 0.375 * var(--texte, 1));
+	font-weight: 600;
+	line-height: 1;
+	text-shadow: none;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 var(--tab-depth) 0 0 var(--tab-edge);
+	transform: none;
+	transition:
+		background-color 0.12s ease,
+		color 0.12s ease,
+		opacity 100ms ease-out,
+		transform 100ms ease-out,
+		box-shadow 100ms ease-out,
+		width 0.18s ease,
+		font-size 0.18s ease;
+}
+/* Survol : la face s'éclaircit, comme « Modifier » (#2b2a33 → #36353f) ;
+   une perle d'une autre couleur s'éclaircit d'autant. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:hover,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:focus-visible {
+	background: color-mix(in srgb, #fff 5%, var(--tab-face));
+}
+/* La courante, bleue : le texte ombré et le survol de « Commencer le
+   quiz » (elle pâlit au lieu de s'éclaircir). */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active {
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+	background: var(--tab-face);
+	opacity: 0.85;
+}
+/* La touche s'enfonce : la face descend sur sa tranche, qui disparaît. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:active,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-pressing {
+	transform: translateY(var(--tab-depth));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 0 0 0 var(--tab-edge);
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 3px;
+}
+
+/* Le numéro seul : « Q » et le libellé « Résultats » sont pour les onglets
+   du greffon. Le libellé reste lu par un lecteur d'écran (masqué à l'œil,
+   pas retiré) ; le « Q » n'ajoute rien à « 7 ». */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab-q {
+	display: none;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab-libelle {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* Une lecture : pleine de violet, le livre dedans (les variables de
+   l'onglet, redéfinies ici, gardent le survol et la courante). « Résultats »
+   garde la face verte de son onglet, le drapeau dedans. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture {
+	--tab-face: var(--lecture-fond);
+	--tab-edge: color-mix(in srgb, #000 45%, var(--lecture-fond));
+	--tab-text: var(--lecture);
+}
+/* La lecture courante : le traitement de la perle courante bleue
+   (« Commencer le quiz »), en violet — même saturation et même luminosité
+   que `--quiz-primary` (#3b62f6) et sa tranche (#2442b8), la teinte
+   décalée de 227° à 252°. Le violet pastel de la maquette (#8b7cf6) y
+   paraissait délavé à côté du bleu. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture.active {
+	--tab-face: #613cf6;
+	--tab-edge: #4224b7;
+	--tab-text: #fff;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab-drapeau {
+	display: grid;
+	place-items: center;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture > svg,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab-drapeau svg {
+	width: calc(var(--taille) * 0.46);
+	height: calc(var(--taille) * 0.46);
+}
+
+/* La perle courante : plus grande, sans halo — « Commencer le quiz » n'en
+   a pas. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active {
+	--taille: var(--perle-courante);
+}
+
+/* ── MODE COMPACT : des points, et la loupe ──
+   `--z`, de 0 (point) à 1 (perle pleine), vaut le plus grand de `--zoom`
+   (la loupe, posée par `ui/perles.ts`) et de `--zoom-min` (ce qu'une perle
+   garde au repos). Le numéro n'apparaît qu'à partir de 0,4 : sur un point
+   de 10 px, il ne serait qu'une tache. */
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab {
+	--z: max(var(--zoom, 0), var(--zoom-min, 0));
+	--taille: calc(var(--point) + (32px - var(--point)) * var(--z));
+	--texte: clamp(0, (var(--z) - 0.3) * 10, 1);
+	/* La tranche suit la taille : 4 px sous un point de 10 l'écraseraient. */
+	--tab-depth: calc(1px + 3px * var(--z));
+}
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-repere,
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-lecture,
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-result {
+	--zoom-min: 0.6;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.active,
+#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab:focus-visible {
+	--zoom-min: 1;
+}
+
+/* THE HELP BUTTON ("Hint", "I don't know", hint-modal.css) takes the beads'
+   grey (2026-09-27): its face, drawn from the theme, was a lighter, colder
+   grey — a button from another family next to the row. Same face, same
+   edge, same rim, same hover. App only: the plugin keeps the face that
+   follows Obsidian's theme, light included. */
+#neo-quiz-root > .qbd-qz .quiz-help-btn {
+	--help-face: #2b2a33;
+	--help-face-hover: color-mix(in srgb, #fff 5%, #2b2a33);
+	--help-edge: #141319;
+	border-color: transparent;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 var(--help-depth) 0 0 var(--help-edge);
+}
+/* The END SCREEN's beads (results.css): the face and edge of the navigation
+   row's, so that both rows read as one object. */
+#neo-quiz-root > .qbd-qz .quiz-submit-perle {
+	--perle-face: #2b2a33;
+	--perle-face-hover: color-mix(in srgb, #fff 5%, #2b2a33);
+	--perle-edge: #141319;
+	--perle-depth: 4px;
+	color: #fff;
+}
+/* And its "Back", with the same face. */
+#neo-quiz-root > .qbd-qz .quiz-submit-back {
+	--back-face: #2b2a33;
+	--back-face-hover: color-mix(in srgb, #fff 5%, #2b2a33);
+	--back-edge: #141319;
+	color: #fff;
+}
+#neo-quiz-root > .qbd-qz .quiz-help-btn:active {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.09),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+		0 0 0 0 var(--help-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#neo-quiz-root > .qbd-qz .quiz-nav::after,
+	#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab {
+		transition: none;
+	}
+}
+
+/* AN ANSWERED QUESTION (2026-09-27): a clear medium blue with its own edge,
+   instead of a navy mixed into the page's darkest background that barely
+   stood out from an unanswered bead. Still far from the CURRENT bead —
+   full blue, larger, with its moving shine below. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active) {
+	--tab-face: color-mix(in srgb, var(--quiz-primary) 58%, #2b2a33);
+	--tab-edge: color-mix(in srgb, #000 45%, var(--quiz-primary));
+	--tab-text: #fff;
+}
+
+/* THE CURRENT BEAD's moving shine (2026-09-27): the same light sweep as
+   "Start the quiz" (`.qbd-btn-shine`, dashboard-components.css), as a
+   background layer — no pseudo-element, so nothing needs clipping and the
+   reading tooltip below keeps its `::after`. Listed with `:hover` because
+   the hover rule of the current bead resets the `background` shorthand. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+	background-image: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.55) 50%, transparent 60%);
+	background-repeat: no-repeat;
+	background-size: 300% 100%;
+	animation: nq-perle-reflet 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes nq-perle-reflet {
+	0%, 8% { background-position: 110% 0; }
+	30%, 100% { background-position: -10% 0; }
+}
+
+/* THE READING'S TITLE above its bead, on hover or keyboard focus
+   (2026-09-27): a book alone did not say which reading it opens. A small
+   dark label with a tail, faded in after a short delay so that sweeping
+   the row with the mouse does not flash every title. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]::after {
+	content: attr(data-titre);
+	position: absolute;
+	left: 50%;
+	bottom: calc(100% + 10px);
+	z-index: 5;
+	width: max-content;
+	max-width: 260px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	background: #16151c;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.35);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.35;
+	text-align: center;
+	white-space: normal;
+	pointer-events: none;
+	opacity: 0;
+	transform: translate(-50%, 4px);
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:hover::after,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:focus-visible::after {
+	opacity: 1;
+	transform: translate(-50%, 0);
+	transition-delay: 0.25s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active { animation: none; background-image: none; }
+	#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]::after { transition: none; }
+}
+
+/* SELF-RATED and CORRECTED beads, in the same register as "answered": the
+   verdict's colour at a clear medium strength with its own edge, instead of
+   a colour mixed into the darkest background (a flashcard rated "I knew it"
+   was an almost black green). Green = knew it / right, amber = partly or to
+   review, red = wrong; turned but not yet rated keeps the answered blue. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active) {
+	--tab-face: color-mix(in srgb, var(--quiz-primary) 58%, #2b2a33);
+	--tab-edge: color-mix(in srgb, #000 45%, var(--quiz-primary));
+	--tab-text: #fff;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.understood:not(.active),
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.correct:not(.active) {
+	--tab-face: color-mix(in srgb, var(--quiz-success) 80%, #2b2a33);
+	--tab-edge: var(--quiz-success-edge);
+	--tab-text: #fff;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.partial:not(.active),
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.review:not(.active) {
+	--tab-face: color-mix(in srgb, var(--quiz-hint) 70%, #2b2a33);
+	--tab-edge: color-mix(in srgb, #000 45%, var(--quiz-hint));
+	--tab-text: #fff;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.wrong:not(.active) {
+	--tab-face: color-mix(in srgb, var(--quiz-danger) 70%, #2b2a33);
+	--tab-edge: #6f1111;
+	--tab-text: #fff;
+}

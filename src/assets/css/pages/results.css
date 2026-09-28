@@ -1,5 +1,5 @@
 /* =========================================================
-   12) Écrans Submit / Résultats
+   12) Submit / Results screens
    ========================================================= */
 
 .quiz-submit-wrap{
@@ -10,98 +10,244 @@
   padding: 10px 0 4px;
 }
 
+/* THE END SCREEN (redesigned 2026-09-27, engine/cards.ts `submitSlideHtml`).
+   No more large blue-bordered frame or red alert: the content sits on the
+   page like a question, centred. An icon, a title, a sentence, the
+   progress, then the questions as numbered beads — the family of the
+   "press me" buttons (navigation beads, help button). What is left to do
+   is AMBER: an unanswered question is not a mistake. */
 .quiz-submit-card{
-  width: min(860px, calc(100% - 24px));
+  --submit-accent: var(--quiz-hint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(760px, calc(100% - 24px));
   box-sizing: border-box;
-  padding: 34px 24px 28px;
+  padding: 18px 12px 12px;
   text-align: center;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, var(--quiz-primary) 18%);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--background-primary) 90%, #0b1220 10%) 0%,
-      color-mix(in srgb, var(--background-primary) 96%, #0b1220 4%) 100%
-    );
-  box-shadow:
-    0 16px 38px rgba(0,0,0,0.12),
-    0 0 0 1px color-mix(in srgb, var(--quiz-primary) 5%, transparent) inset;
 }
 
-.quiz-submit-sub{
-  margin: 0 0 14px;
-  color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1.4;
+.quiz-submit-card.is-complete{
+  --submit-accent: var(--quiz-success-light);
 }
 
-.quiz-warn{
-  margin: 0 0 14px;
-  font-size: 1.1rem;
-  line-height: 1.3;
+/* The icon alone, without a disc: on the wallpaper, an amber-tinted disc
+   turned brown. An orange warning triangle while questions remain, a green
+   check otherwise; a soft halo of its colour lifts it off the background. */
+.quiz-submit-icon{
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: var(--submit-accent);
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--submit-accent) 40%, transparent));
+}
+
+.quiz-submit-icon svg{
+  width: 44px;
+  height: 44px;
+}
+
+.quiz-submit-title{
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 1.35rem;
   font-weight: 800;
-  color: #ef4444;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
-.quiz-chip-row{
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 10px 0 22px;
+.quiz-submit-sub{
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  text-wrap: balance;
 }
 
-.quiz-chip{
+/* The progress: a thin bar, the count beside it. */
+.quiz-submit-progress{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(360px, 100%);
+  margin-top: 20px;
+}
+
+.quiz-submit-bar{
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+}
+
+.quiz-submit-bar > span{
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--quiz-primary);
+}
+
+.quiz-submit-count{
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiz-submit-label{
+  margin: 26px 0 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+/* The beads: round, numbered, a face raised on its edge that sinks when
+   clicked — the button of the navigation row. The colours follow the
+   host's theme; the application aligns them with its beads
+   (apps/windows/src/assets/perles.css). */
+.quiz-submit-perles{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 8px;
+  max-width: 100%;
+  margin-bottom: 28px;
+}
+
+.quiz-submit-perle{
+  --perle-face: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
+  --perle-face-hover: color-mix(in srgb, var(--text-normal) 16%, var(--background-primary));
+  --perle-edge: color-mix(in srgb, #000 50%, var(--perle-face));
+  --perle-depth: 3px;
   appearance: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--perle-face);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
   user-select: none;
-  min-width: 44px;
-  padding: 8px 12px;
-  border-radius: var(--quiz-btn-radius-sm);
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
-  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
-  color: var(--text-normal);
-  font-size: 0.9rem;
-  font-weight: 800;
-  line-height: 1;
   box-shadow:
-    0 2px 8px rgba(0,0,0,0.08),
-    0 0 0 1px color-mix(in srgb, #ffffff 5%, transparent) inset;
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 var(--perle-depth) 0 0 var(--perle-edge);
   transition:
-    transform var(--quiz-dur-fast) var(--quiz-ease-smooth),
-    box-shadow var(--quiz-dur-mid) var(--quiz-ease-smooth),
-    border-color var(--quiz-dur-fast) ease,
-    background var(--quiz-dur-fast) ease,
-    color var(--quiz-dur-fast) ease;
+    background-color 0.12s ease,
+    transform 100ms ease-out,
+    box-shadow 100ms ease-out;
 }
 
-.quiz-chip:hover,
-.quiz-chip:focus-visible{
-  outline: none;
-  transform: translate3d(0,-2px,0);
-  border-color: color-mix(in srgb, var(--quiz-primary) 44%, var(--background-modifier-border));
+.quiz-submit-perle:hover{
+  background: var(--perle-face-hover);
+}
+
+.quiz-submit-perle:active{
+  transform: translateY(var(--perle-depth));
   box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 16%, transparent),
-    0 0 16px color-mix(in srgb, var(--quiz-primary) 12%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 0 0 var(--perle-edge);
 }
 
-.quiz-chip.missing{
-  border-color: color-mix(in srgb, var(--quiz-danger) 45%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-danger) 10%, var(--background-secondary));
-  color: color-mix(in srgb, #fff 90%, var(--text-normal));
+.quiz-submit-perle:focus-visible{
+  outline: 2px solid var(--quiz-primary-light);
+  outline-offset: 3px;
 }
 
-.quiz-chip.missing:hover,
-.quiz-chip.missing:focus-visible{
-  border-color: var(--quiz-danger);
+.theme-light .quiz-submit-perle{
   box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-danger) 18%, transparent),
-    0 0 16px color-mix(in srgb, var(--quiz-danger) 14%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, #000 8%, transparent),
+    0 var(--perle-depth) 0 0 var(--perle-edge);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-submit-perle{ transition: none; }
 }
 
 .quiz-submit-card .quiz-actions{
-  margin-top: 8px;
+  margin-top: 0;
   gap: 16px;
+}
+
+/* "Back": the same "press me" button as "See the score" — same size, same
+   edge, same press —, in NEUTRAL (the beads' face), with its arrow. A class
+   of its own and not `.quiz-action-btn`: that class's generic effects
+   (button-press.css, with !important) would lift and shrink it on hover,
+   unlike its neighbour. */
+.quiz-submit-back{
+  --back-face: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
+  --back-face-hover: color-mix(in srgb, var(--text-normal) 16%, var(--background-primary));
+  --back-edge: color-mix(in srgb, #000 50%, var(--back-face));
+  --back-depth: 4px;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 128px;
+  box-sizing: border-box;
+  padding: 0.78em 1.4em;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--back-face);
+  color: var(--text-normal);
+  /* No `font: inherit`: the font of its neighbour "See the score". */
+  font-size: 0.875em;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 var(--back-depth) 0 0 var(--back-edge);
+  transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.quiz-submit-back svg{
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+}
+
+.quiz-submit-back:hover{
+  background: var(--back-face-hover);
+}
+
+.quiz-submit-back:active{
+  transform: translateY(var(--back-depth));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 0 0 var(--back-edge);
+}
+
+.quiz-submit-back:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.theme-light .quiz-submit-back{
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #000 8%, transparent),
+    0 var(--back-depth) 0 0 var(--back-edge);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-submit-back{ transition: none; }
 }
 
 .quiz-submit-card .quiz-action-btn{
