@@ -5,26 +5,25 @@ import type { CodeRun } from "../host/types";
 import type { CodeLanguage } from "../code-languages";
 
 /* ══════════════════════════════════════════════════════════
-   BOUTON « EXÉCUTER » d'un bloc de code affiché dans un quiz (Learn,
-   énoncés, explications, indices… tout texte qui passe par
-   `engine/sanitizer.ts` → `grammaire-blocs.ts`, LE point de rendu unique
-   des blocs de code). Jusqu'à la tâche 5, seul Python s'exécute — voir
-   `code-languages.ts`.
+   THE « RUN » BUTTON of a code block shown in a quiz (Learn, statements,
+   explanations, hints… any text that goes through `engine/sanitizer.ts` →
+   `grammaire-blocs.ts`, THE single rendering point for code blocks). Until
+   task 5, only Python runs — see `code-languages.ts`.
 
-   `grammaire-blocs.ts` (pur) émet le markup à l'avance, masqué
-   (`hidden`) : c'est ce module, avec `ctx` (donc l'hôte), qui décide de le
-   montrer — `HostCode` est un membre OPTIONNEL du contrat, absent sous le
-   greffon Obsidian, qui n'exécute pas de code. Sans lui, le bouton et la
-   toolbar sont RETIRÉS du DOM, jamais laissés inertes.
+   `grammaire-blocs.ts` (pure) emits the markup ahead of time, hidden
+   (`hidden`): it is this module, with `ctx` (hence the host), that decides
+   whether to show it — `HostCode` is an OPTIONAL contract member, absent
+   under the Obsidian plugin, which runs no code. Without it, the button and
+   the toolbar are REMOVED from the DOM, never left inert.
 
-   Sécurité (constat M4 de la revue du bac à sable, 2026-09-27) : `stdout` et
-   une erreur sont du texte dont l'AUTEUR DU QUIZ est maître — un quiz partagé
-   est hostile. Toujours posés en `textContent`, jamais par une des quatre
-   portes HTML du sanitizer (qui interpréterait du markdown ou du HTML dans
-   une sortie de programme). Le code exécuté est relu depuis `<code>` par
-   `textContent` (jamais un attribut recopié à la main, jamais désynchronisé
-   du bloc affiché — `textContent` restitue le texte source, entités HTML
-   comprises, exactement comme `colorerCode`/`echapper` l'ont écrit).
+   Security (finding M4 of the sandbox review, 2026-09-27): `stdout` and an
+   error are text whose AUTHOR IS THE QUIZ'S — a shared quiz is hostile.
+   Always set through `textContent`, never through one of the sanitizer's
+   four HTML gates (which would interpret markdown or HTML in a program's
+   output). The executed code is read back from `<code>` through
+   `textContent` (never an attribute copied by hand, never desynchronised
+   from the displayed block — `textContent` restores the source text, HTML
+   entities included, exactly as `colorerCode`/`echapper` wrote it).
 ══════════════════════════════════════════════════════════ */
 
 /** Le délai le plus long qu'un clic manuel mérite d'attendre : le contrat
@@ -32,16 +31,16 @@ import type { CodeLanguage } from "../code-languages";
 const TIMEOUT_MS = 10_000;
 
 export interface CodeRunHandlers {
-	/** Démasque (et branche) tout bouton « Exécuter » sous `rootEl` si l'hôte
-	    fournit `HostCode`, ou le retire sinon. À appeler juste après
-	    `mathifyElement`, comme `bindQuizResourceButtons`. */
+	/** Unmasks (and wires up) every « Run » button under `rootEl` if the host
+	    provides `HostCode`, or removes it otherwise. Call right after
+	    `mathifyElement`, like `bindQuizResourceButtons`. */
 	bindCodeRunButtons(rootEl?: Element | null): void;
 }
 
 export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
-	/** Le moteur d'un langage est préchauffé une seule fois pour toute la
-	    session du moteur, à la première apparition d'un bloc exécutable —
-	    `warm()` est sans effet s'il est déjà chargé (contrat `HostCode`). */
+	/** A language's engine is pre-warmed once for the whole engine session,
+	    at the first appearance of a runnable block — `warm()` has no effect
+	    if it is already loaded (contract `HostCode`). */
 	let prechauffe = false;
 
 	function sortieDe(bloc: HTMLElement): HTMLElement {
@@ -90,7 +89,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 
 	async function executer(btn: HTMLButtonElement, source: string, language: CodeLanguage): Promise<void> {
 		const code = ctx.host.code;
-		if (!code) return; // ne peut pas arriver (bouton retiré sans HostCode), garde honnête
+		if (!code) return; // cannot happen (button removed without HostCode), honest guard
 		const bloc = btn.closest<HTMLElement>(".quiz-code-block");
 		if (!bloc) return;
 		const sortie = sortieDe(bloc);
@@ -147,8 +146,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			// rendu de la carte, une fois le quiz corrigé.
 			if (enonceNonCorrige(bloc)) return;
 
-			// Tant que grammaire-blocs.ts n'écrit pas `data-lang` (tâche 5), un
-			// bloc exécutable est nécessairement Python.
+			// Until grammaire-blocs.ts writes `data-lang` (task 5), a runnable
+			// block is necessarily Python.
 			const language = (bloc.dataset.lang ?? "python") as CodeLanguage;
 
 			btn.hidden = false;

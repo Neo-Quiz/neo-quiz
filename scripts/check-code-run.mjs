@@ -1,11 +1,11 @@
 /**
- * Le bouton « Exécuter » d'un bloc de code (src/engine/code-run.ts) — cas de
- * contrôle M4 de la revue du 2026-09-27 : la sortie d'un programme (stdout
- * ou erreur) est du texte dont l'auteur du quiz n'est pas forcément maître
- * (un quiz PARTAGÉ est hostile). Ce script charge le VRAI module avec un
- * `HostCode` factice dont `run()` renvoie une charge HTML, et vérifie que
- * rien de tel n'apparaît jamais comme ÉLÉMENT sous `.quiz-code-output` —
- * seulement comme texte, posé par `textContent`.
+ * The « Run » button of a code block (src/engine/code-run.ts) — finding M4
+ * of the 2026-09-27 review: a program's output (stdout or error) is text
+ * whose author is not necessarily the quiz's own (a SHARED quiz is
+ * hostile). This script loads the REAL module with a fake `HostCode` whose
+ * `run()` returns an HTML payload, and checks that nothing of the sort ever
+ * appears as an ELEMENT under `.quiz-code-output` — only as text, set
+ * through `textContent`.
  *
  *     npm run check:code-run
  */

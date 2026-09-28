@@ -231,10 +231,10 @@ await withSrcModule(
 	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
 		`<ul class="quiz-md-liste"><li>a<ul class="quiz-md-liste"><li>b</li></ul></li><li>c</li></ul>`);
 	reinitialiserBudgetRendu();
-	/* Un bloc Python est enveloppé (`.quiz-code-block-executable`) pour loger
-	   le bouton « Exécuter » (engine/code-run.ts, hors DOM ici : hidden par
-	   défaut, démasqué seulement quand l'hôte fournit `HostCode`). Un autre
-	   langage reste rendu à l'identique (voir plus bas). */
+	/* A Python block is wrapped (`.quiz-code-block-executable`) to house the
+	   « Run » button (engine/code-run.ts, outside the DOM here: hidden by
+	   default, unmasked only when the host provides `HostCode`). Another
+	   language stays rendered identically (see below). */
 	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
 		`<div class="quiz-code-block quiz-code-block-executable"><div class="quiz-code-toolbar">`

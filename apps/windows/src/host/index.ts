@@ -166,9 +166,9 @@ export function createWindowsHost(carte: CarteRacines, index: MiroirDisque): Hos
 		   membre OPTIONNEL du contrat, absent sous le greffon. Un
 		   passe-plat vers le pont, comme `process` et `net`. */
 		video: createWindowsVideo(pont),
-		/* L'exécution de code (spec 2026-09-23-exercice-python, généralisée
-		   tâche 4 de 2026-09-28-c-cpp-execution) : membre OPTIONNEL, absent
-		   sous le greffon. Un passe-plat vers le pont. */
+		/* Code execution (spec 2026-09-23-exercice-python, generalised at
+		   task 4 of 2026-09-28-c-cpp-execution): OPTIONAL member, absent
+		   under the plugin. A pass-through to the bridge. */
 		code: createWindowsCode(pont),
 		/* Disposer les fenêtres, glisser un fichier (la même résolution de
 		   chemin qu'`openExternal` : un `HostFile` du contrat → absolu par

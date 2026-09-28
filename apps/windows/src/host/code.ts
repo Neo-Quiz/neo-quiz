@@ -1,12 +1,13 @@
 /* ══════════════════════════════════════════════════════════
-   L'HÔTE WINDOWS — L'EXÉCUTION DE CODE, UN PASSE-PLAT VERS LE PRINCIPAL
+   THE WINDOWS HOST — CODE EXECUTION, A PASS-THROUGH TO THE MAIN PROCESS
 
-   `HostCode` (src/host/types.ts) côté RENDU. Ce module n'exécute rien :
-   le code part au bac à sable du principal (electron/code-sandbox.ts), fenêtre
-   cachée sans disque ni réseau (spec 2026-09-23-exercice-python-design.md
-   §3). Un pont qui rejette (fenêtre fermée pendant l'appel) devient
-   `unavailable`, jamais une exception dans la carte. Seul Python est câblé
-   jusqu'au bout pour l'instant (tâche 8 pour le duo C/C++).
+   `HostCode` (src/host/types.ts) on the RENDERER side. This module runs
+   nothing itself: the code goes to the main process's sandbox
+   (electron/code-sandbox.ts), a hidden window with no disk or network
+   access (spec 2026-09-23-exercice-python-design.md §3). A bridge call that
+   rejects (window closed mid-call) becomes `unavailable`, never an
+   exception on the card. Only Python is wired end to end for now (task 8
+   for the C/C++ pair).
 ══════════════════════════════════════════════════════════ */
 
 import type { HostCode, CodeRun } from "../../../../src/host/types";

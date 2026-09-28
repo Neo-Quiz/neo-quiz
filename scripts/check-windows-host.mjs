@@ -865,17 +865,17 @@ function installerPont(fichiers = {}, perimetre = null) {
 	r.done();
 }
 
-/* LE MEMBRE `code` DE L'HÔTE, statiquement — même raison que le bloc
-   `video` ci-dessus (tâche 4 de 2026-09-28-c-cpp-execution, généralisant
-   l'exercice Python, spec 2026-09-23-exercice-python-design.md §3) : le
-   contrat gagne un membre OPTIONNEL, et l'hôte Windows l'implore du pont
-   (`./code.ts`), jamais d'un objet posé à la main dans `index.ts`. */
+/* THE HOST's `code` MEMBER, statically — same reason as the `video` block
+   above (task 4 of 2026-09-28-c-cpp-execution, generalising the Python
+   exercise, spec 2026-09-23-exercice-python-design.md §3): the contract
+   gains an OPTIONAL member, and the Windows host begs it off the bridge
+   (`./code.ts`), never an object placed by hand in `index.ts`. */
 {
-	const r = makeReporter("Hôte Windows — l'exécution de code (statique)");
+	const r = makeReporter("Windows host — code execution (static)");
 	const source = readFileSync("apps/windows/src/host/index.ts", "utf-8");
 	const nu = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-	r.check("l'hôte assemblé déclare le membre code par createWindowsCode(pont)", /\bcode\s*:\s*createWindowsCode\(pont\)/.test(nu), true);
-	r.check("… importé de ./code", /import \{ createWindowsCode \} from "\.\/code"/.test(nu), true);
+	r.check("the assembled host declares the code member via createWindowsCode(pont)", /\bcode\s*:\s*createWindowsCode\(pont\)/.test(nu), true);
+	r.check("… imported from ./code", /import \{ createWindowsCode \} from "\.\/code"/.test(nu), true);
 	r.done();
 }
 

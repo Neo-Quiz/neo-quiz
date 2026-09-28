@@ -400,14 +400,14 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				// échappé nu, exactement comme avant l'ajout de la coloration.
 				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
 				const pre = `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
-				/* Bouton « Exécuter » (bac à sable de code, engine/code-run.ts) : markup
-				   TOUJOURS émis pour un bloc Python, mais `hidden` — ce module est PUR
-				   (ni DOM, ni hôte) et ne sait pas si l'hôte fournit `HostCode`.
-				   `bindCodeRunButtons` (DOM, avec ctx) le démasque quand l'hôte l'offre,
-				   et le RETIRE sinon (aucun bouton sous le greffon Obsidian, qui
-				   n'exécute pas de Python). La sortie s'affiche dans
-				   `.quiz-code-output`, posée en `textContent` uniquement : c'est du
-				   texte de programme potentiellement hostile, jamais une porte HTML. */
+				/* « Run » button (code sandbox, engine/code-run.ts): markup ALWAYS
+				   emitted for a Python block, but `hidden` — this module is PURE
+				   (no DOM, no host) and does not know whether the host provides
+				   `HostCode`. `bindCodeRunButtons` (DOM, with ctx) unmasks it when
+				   the host offers it, and REMOVES it otherwise (no button under the
+				   Obsidian plugin, which runs no Python). The output is shown in
+				   `.quiz-code-output`, set through `textContent` only: it is
+				   potentially hostile program text, never an HTML gate. */
 				// Un bloc non-Python reste EXACTEMENT comme avant l'ajout du bouton
 				// (aucun `<div>` supplémentaire) : la preuve d'équivalence de
 				// `check:md` porte sur cette sortie, octet pour octet.

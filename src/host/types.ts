@@ -998,7 +998,7 @@ export interface Host {
 	pdf?: HostPdf;
 	/** Absent sous le greffon — voir `HostVideo`. */
 	video?: HostVideo;
-	/** Absent sous le greffon — voir `HostCode`. */
+	/** Absent under the plugin — see `HostCode`. */
 	code?: HostCode;
 	/** Absent sous le greffon — voir `HostCollage`. */
 	collage?: HostCollage;

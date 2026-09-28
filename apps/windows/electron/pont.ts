@@ -697,9 +697,9 @@ export interface Pont {
 	};
 
 	/**
-	 * L'EXÉCUTION D'UN PROGRAMME : `HostCode` vu du rendu. Le code part au
-	 * bac à sable du principal (`code-sandbox.ts`), fenêtre cachée sans
-	 * disque ni réseau ; le rendu n'exécute rien lui-même.
+	 * RUNNING A PROGRAM: `HostCode` as seen from the renderer. The code runs
+	 * in the main process's sandbox (`code-sandbox.ts`), a hidden window with
+	 * no disk or network access; the renderer never executes anything itself.
 	 */
 	code: {
 		run(job: CodeJob): Promise<CodeRun>;
