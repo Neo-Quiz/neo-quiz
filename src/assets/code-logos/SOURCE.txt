@@ -1,0 +1,15 @@
+Language logos of the code-block badge, embedded in src/code-logos.ts.
+
+- Devicon 2.17.0 (https://devicon.dev, npm "devicon"), MIT licence:
+  LICENSE-devicon.txt. Files icons/<name>/<name>-original.svg, and
+  icons/objectivec/objectivec-plain.svg.
+- Simple Icons 16.33.0 (https://simpleicons.org, npm "simple-icons"),
+  CC0-1.0: LICENSE-simple-icons.md. Files icons/toml.svg, icons/less.svg,
+  icons/graphql.svg, filled with their Simple Icons brand colour.
+
+Optimized with svgo 4 (--multipass --precision=1). Monochrome dark logos
+recoloured light for the dark code background: the list is in the header of
+src/code-logos.ts.
+
+The logos themselves remain trademarks of their respective owners; they are
+shown only to name the language of a code block.

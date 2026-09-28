@@ -35,10 +35,12 @@
    - le nom d'une classe de jeton n'entre en HTML qu'après un filtre
      `^[a-z0-9-]+$` : un jeton EXOTIQUE ne doit jamais pouvoir écrire autre
      chose qu'une classe CSS.
-   - la recherche d'un langage passe par `refractor.registered()` (jamais un
-     accès direct `refractor.languages[langue]`, qui lirait une propriété
-     HÉRITÉE pour une clé comme `constructor` ou `toString`) et par un accès
-     `Object.hasOwn` sur notre propre table d'alias (M1 de la revue).
+   - a language is looked up through `refractor.registered()` (never a direct
+     `refractor.languages[langue]`, which would read an INHERITED property
+     for a key such as `constructor` or `toString`) and through the language
+     catalogue (code-catalogue.ts `codeLanguageOf`, guarded by
+     `hasOwnProperty.call` — M1 of the review), which replaced this module's
+     own alias table on 2026-09-28.
    - un langage inconnu, ou toute erreur de tokenisation, retombe sur `null` :
      l'appelant (grammaire-blocs.ts) affiche alors le texte échappé nu, sans
      couleurs — jamais une exception qui casserait le rendu du quiz.
@@ -70,37 +72,65 @@ import go from "refractor/go";
 import rust from "refractor/rust";
 import php from "refractor/php"; // enregistre lui-même sa dépendance markup-templating
 import csharp from "refractor/csharp";
+// The grammars of the language catalogue (code-catalogue.ts, 2026-09-28):
+// every `grammar` it names is one of these, `check:code-catalogue` proves it.
+import scss from "refractor/scss";
+import sass from "refractor/sass";
+import less from "refractor/less";
+import jsx from "refractor/jsx";
+import tsx from "refractor/tsx";
+import r from "refractor/r";
+import julia from "refractor/julia";
+import matlab from "refractor/matlab";
+import objectivec from "refractor/objectivec";
+import zig from "refractor/zig";
+import kotlin from "refractor/kotlin";
+import scala from "refractor/scala";
+import groovy from "refractor/groovy";
+import swift from "refractor/swift";
+import dart from "refractor/dart";
+import ruby from "refractor/ruby";
+import elixir from "refractor/elixir";
+import erlang from "refractor/erlang";
+import perl from "refractor/perl";
+import batch from "refractor/batch";
+import arduino from "refractor/arduino";
+import haskell from "refractor/haskell";
+import ocaml from "refractor/ocaml";
+import fsharp from "refractor/fsharp";
+import lisp from "refractor/lisp";
+import scheme from "refractor/scheme";
+import clojure from "refractor/clojure";
+import lua from "refractor/lua";
+import vbnet from "refractor/vbnet";
+import visualBasic from "refractor/visual-basic";
+import pascal from "refractor/pascal";
+import fortran from "refractor/fortran";
+import toml from "refractor/toml";
+import ini from "refractor/ini";
+import markdown from "refractor/markdown";
+import latex from "refractor/latex";
+import docker from "refractor/docker";
+import makefile from "refractor/makefile";
+import cmake from "refractor/cmake";
+import hcl from "refractor/hcl";
+import graphql from "refractor/graphql";
+import { codeLanguageOf } from "../code-catalogue";
 
-// `refractor.register` ignore une grammaire déjà enregistrée (comparaison sur
-// son `displayName`) : l'ordre importe peu, `php` peut enregistrer
-// `markup-templating` avant que la boucle ci-dessous n'atteigne `markup`.
-for (const langage of [clike, markup, css, javascript, typescript, python, c, cpp, java, bash, powershell, sql, json, yaml, go, rust, php, csharp]) {
+// Known limit (review of 2026-09-28): the `markdown` grammar's own hook
+// reads `Prism.languages[tag]` for a fence NESTED in a markdown block, so a
+// nested ```constructor fence makes the tokenizer throw. The throw is caught
+// below and the block shows uncoloured, still escaped — degraded, not unsafe.
+// `refractor.register` ignores a grammar already registered (compared on its
+// `displayName`), and a grammar registers its own dependencies (`php` →
+// `markup-templating`, `tsx` → `jsx`, `vbnet` → `basic`…): order does not
+// matter.
+for (const langage of [clike, markup, css, javascript, typescript, python, c, cpp, java, bash, powershell, sql, json, yaml, go, rust, php, csharp,
+	scss, sass, less, jsx, tsx, r, julia, matlab, objectivec, zig, kotlin, scala, groovy, swift, dart, ruby, elixir, erlang, perl, batch,
+	arduino, haskell, ocaml, fsharp, lisp, scheme, clojure, lua, vbnet, visualBasic, pascal, fortran, toml, ini, markdown, latex, docker,
+	makefile, cmake, hcl, graphql]) {
 	refractor.register(langage);
 }
-
-/** Alias qui ne sont PAS déjà posés par les grammaires elles-mêmes (`js`,
-    `ts`, `sh`, `shell`, `py`, `cs`/`dotnet`, `html`/`xml`/`svg`/`mathml`/…
-    le sont déjà, chaque grammaire se recopiant sous son propre nom court).
-    Accès protégé par `Object.hasOwn` (M1 de la revue du 2026-09-26) : une
-    clé comme `constructor` ne doit jamais lire la propriété héritée du
-    même nom sur `Object.prototype`. */
-const ALIAS_SUPPLEMENTAIRES: Readonly<Record<string, string>> = {
-	"c++": "cpp",
-	"c#": "csharp",
-	"ps1": "powershell",
-	"pwsh": "powershell",
-	"rs": "rust",
-	"golang": "go",
-	// Approximations documentées (pas de grammaire dédiée chargée) : un script
-	// zsh ou une session de terminal générique se lisent très majoritairement
-	// comme du bash — mieux coloré ainsi qu'en texte nu.
-	"zsh": "bash",
-	"console": "bash",
-	// Pas de grammaire JSX/TSX chargée : la base JS/TS colore déjà la plus
-	// grande partie du code, seules les balises JSX resteraient en texte uni.
-	"jsx": "javascript",
-	"tsx": "typescript",
-};
 
 /** Un plafond de caractères réellement colorés PAR BLOC : au-delà, le reste
     du code s'affiche échappé, sans couleurs. Choisi après mesure sur des
@@ -237,10 +267,11 @@ export interface ResultatColoration { html: string; colore: number }
 export function colorerCode(code: string, langueBrute: string, echapper: (texte: string) => string, capMax: number): ResultatColoration | null {
 	if (capMax <= 0) return null;
 	const cle = langueBrute.trim().toLowerCase();
-	// `Object.hasOwn` (ES2022) n'est pas dans la cible TS du dépôt (ES2020) :
-	// même garde par `hasOwnProperty.call`, pour ne pas lire une propriété
-	// héritée d'`Object.prototype` (`constructor`, `toString`…) — M1 de la revue.
-	const langue = Object.prototype.hasOwnProperty.call(ALIAS_SUPPLEMENTAIRES, cle) ? ALIAS_SUPPLEMENTAIRES[cle] : cle;
+	// The catalogue's grammar for a recognized tag (its lookup is guarded
+	// against inherited `Object.prototype` keys, M1 of the review); any other
+	// tag is tried as a refractor name or alias as it is (`svg`, `diff`…).
+	// `registered()` itself reads only own entries.
+	const langue = codeLanguageOf(cle)?.grammar ?? cle;
 	if (!refractor.registered(langue)) return null;
 	try {
 		const cap = Math.min(capMax, PLAFOND_CARACTERES_PAR_BLOC);

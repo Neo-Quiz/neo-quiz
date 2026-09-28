@@ -339,6 +339,22 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   border: none;
   border-radius: 0;
 }
+/* Language badge of a recognized block (engine/grammaire-blocs.ts), top
+   left, on its own row above the code: the first code line never runs
+   under it, nor under ▶, which sits on the same row at the right (its
+   28 px button, 8 px from the top, is centred 22 px down; so is this 16 px
+   logo, 14 px down past the `<pre>` padding). `sticky` keeps it in view
+   when a long line scrolls the block sideways. Its name is the `title`:
+   no visible label. */
+.quiz-md-code > .quiz-code-lang{
+  position: sticky;
+  left: 0;
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: -2px 0 10px;
+  user-select: none;
+}
 .quiz-code-toolbar{
   position: absolute;
   top: 8px;

@@ -37,6 +37,7 @@ release notes.
 - The quiz editor has a "Running the code is the last hint" switch under Hint, available once the question holds a Python, C or C++ block and has two hint levels; generated quizzes set it on hard questions where running the program helps.
 - Zoom goes from 25 % to 150 %, on the same steps as a browser. Zooming (Ctrl + wheel or Display > Interface scale) shows the new percentage at the top of the window, with − and + buttons and Reset to go back to 100 %; it goes away on its own after a few seconds.
 - C and C++ code blocks run in a quiz like Python ones: the compiler (Clang, in WebAssembly, isolated from your files and the network) is downloaded the first time you run C or C++, and can be removed in Settings › Languages.
+- Code blocks shown in a quiz carry the logo of their language at the top left (about sixty languages recognized, from Python and C to SQL, YAML or Dockerfile), with its full name on hover, and are coloured for each of them.
 
 ### Changed
 - The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
