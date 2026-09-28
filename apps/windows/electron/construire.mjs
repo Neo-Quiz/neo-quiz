@@ -40,7 +40,7 @@ const ici = fileURLToPath(new URL(".", import.meta.url));
    lui-même, le bundler ne doit pas tenter de le résoudre. Les modules `node:*`
    le sont déjà par `platform: "node"`. */
 await build({
-	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`, `${ici}python-preload.ts`],
+	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`, `${ici}code-preload.ts`],
 	outdir: `${ici}../dist-electron`,
 	outExtension: { ".js": ".cjs" },
 	bundle: true,
@@ -63,7 +63,8 @@ await Promise.all([
 	copyFile(join(ici, "..", "installer", "fond.png"), join(sortieMaj, "fond.png")),
 ]);
 
-/* LE BAC À SABLE PYTHON : page, worker et fichiers de Pyodide, copiés tels
-   quels (spec 2026-09-23-exercice-python-design.md §3.4). */
-const { copierBacASable } = await import("./python/copier.mjs");
-await copierBacASable(join(ici, "..", "dist-electron", "python"));
+/* THE CODE SANDBOX: page, worker(s) and Pyodide files, copied as-is (spec
+   2026-09-23-exercice-python-design.md §3.4; generalised from Python-only
+   to a code sandbox at task 3 of the C/C++ execution plan). */
+const { copierBacASable } = await import("./code/copier.mjs");
+await copierBacASable(join(ici, "..", "dist-electron", "code"));

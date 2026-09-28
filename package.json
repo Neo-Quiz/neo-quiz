@@ -17,7 +17,7 @@
     "check:export": "node scripts/check-export.mjs",
     "check:quiz-format": "node scripts/check-quiz-format.mjs",
     "check:code-exercise": "node scripts/check-code-exercise.mjs",
-    "check:python-sandbox": "node scripts/check-python-sandbox.mjs",
+    "check:code-sandbox": "node scripts/check-code-sandbox.mjs",
     "check:code-run": "node scripts/check-code-run.mjs",
     "check:quiz-io": "node scripts/check-quiz-io.mjs",
     "check:markers": "node scripts/check-render-markers.mjs \"C:/obsidian-vaults/Personal\" \"C:/obsidian-vaults/Efrei\"",

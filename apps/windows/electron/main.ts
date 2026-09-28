@@ -56,11 +56,13 @@ import { creerReglages } from "./reglages";
 import type { Reglages } from "./reglages";
 import { autoriserHote } from "./reseau";
 import { SCHEMA_RESSOURCES, resoudreRessource } from "./ressources";
-/* L'EXÉCUTION PYTHON (tâche 4) : `PRIVILEGES_PYTHON` s'ajoute à l'UNIQUE
-   appel `registerSchemesAsPrivileged` (Electron n'en retient qu'un), et
-   `creerBacASable` construit la fenêtre cachée passée aux canaux. */
-import { creerBacASable, PRIVILEGES_PYTHON } from "./python";
-import type { BacASable } from "./python";
+/* THE CODE SANDBOX (task 4, then generalised from Python-only to any
+   language at task 3 of the C/C++ execution plan): `PRIVILEGES_CODE` is
+   added to the ONE call to `registerSchemesAsPrivileged` (Electron only
+   keeps the last one), and `creerBacASable` builds the hidden window passed
+   to the channels. */
+import { creerBacASable, PRIVILEGES_CODE } from "./code-sandbox";
+import type { BacASable } from "./code-sandbox";
 
 /** Le serveur de développement de Vite. Le port vient de `vite.config.ts`
     (`strictPort: true`) : s'il change là-bas, il change ici. */
@@ -132,8 +134,12 @@ let gardeFermeture: NodeJS.Timeout | null = null;
 /** Arrête l'attente d'une réponse copiée (voir `canaux.ts`) ; posée par
     `enregistrerCanaux`, appelée à la fermeture de la fenêtre. */
 let arreterAttente: (() => void) | null = null;
-/** Le bac à sable Python (tâche 4, `./python.ts`) : créé une fois, fermé à la
-    fermeture de la fenêtre, comme `arreterAttente`. */
+/** The code sandbox (task 4, `./code-sandbox.ts`; generalised from Python to
+    any language at task 3 of the C/C++ execution plan): created once,
+    closed when the window closes, like `arreterAttente`. Only Python is
+    wired through it for now — this field keeps the name `python` because
+    `canaux.ts`'s `DependancesCanaux.python` (the IPC channel it feeds,
+    `neo:python/run`) is untouched by this task; task 4 renames both. */
 let python: BacASable | null = null;
 
 /** Les réglages, ou une erreur NOMMÉE — voir `DependancesCanaux`. */
@@ -550,7 +556,7 @@ function servirRessources(perimetre: Perimetre): void {
    et une surface qu'aucun appelant ne demande est une surface de trop. */
 protocol.registerSchemesAsPrivileged([
 	{ scheme: SCHEMA_RESSOURCES, privileges: { standard: true, secure: true, stream: true } },
-	PRIVILEGES_PYTHON,
+	PRIVILEGES_CODE,
 ]);
 
 /* ─────────── le démarrage ─────────── */
@@ -702,13 +708,15 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);
 			},
 		});
-		/* Le bac à sable Python (tâche 3, `./python.ts`) : une fenêtre cachée,
-		   créée ici et fermée avec la fenêtre principale (voir `fenetre.on
-		   ("closed", …)` plus haut). `dist-electron/python` porte les fichiers
-		   servis par `neo-python://`, `python-preload.cjs` le préchargement
-		   sandboxé de cette fenêtre-là — deux artefacts distincts de ceux de
-		   la fenêtre de l'app. */
-		python = creerBacASable(path.join(__dirname, "python"), path.join(__dirname, "python-preload.cjs"));
+		/* The code sandbox (task 3, `./code-sandbox.ts`): a hidden window,
+		   created here and closed with the main window (see `fenetre.on
+		   ("closed", …)` above). `dist-electron/code` carries the files
+		   served by `neo-code://app/<file>`, `code-preload.cjs` that
+		   window's own sandboxed preload — two artefacts distinct from the
+		   app window's. `userData/languages` is where a downloaded language
+		   pack (task 9) lands, served under `neo-code://app/languages/…`;
+		   nothing is written there yet, only Python runs today. */
+		python = creerBacASable(path.join(__dirname, "code"), path.join(app.getPath("userData"), "languages"), path.join(__dirname, "code-preload.cjs"));
 		const canaux = enregistrerCanaux({
 			perimetre,
 			reglagesOuErreur,
