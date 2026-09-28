@@ -2,6 +2,8 @@ import "../../../src/assets/css/index.css";
 import "./theme/host-vars.css";
 import "./assets/toast.css";
 import "./assets/shell.css";
+import "./assets/perles.css";
+import "./assets/quiz-bars.css";
 import "./assets/modal.css";
 import "./assets/math.css";
 import { setLanguage, setHourCycle, t } from "../../../src/i18n";

@@ -149,7 +149,11 @@ export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 			ctx.viewport.getSlideStableHeight(targetIndex, { refresh: true }) || 0,
 			ctx.viewport.getElementStableHeight(ctx.viewport.getTrackItem(targetIndex)) || 0
 		);
-		const finalHeight = Math.max(1, Math.ceil(refreshedTargetHeight + 4));
+		/* The exact height, never a few pixels more: the settle two frames
+		   later lands on the exact height anyway, and those extra 4 px made the
+		   panel scrollable for one frame at the end of EVERY move (2026-09-28)
+		   — a scrollbar and the bottom bar's glass flashed each time. */
+		const finalHeight = Math.max(1, Math.ceil(refreshedTargetHeight));
 
 		if (track) {
 			track.style.transition = "none";
@@ -227,7 +231,15 @@ export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 			ctx.viewport.getElementStableHeight(ctx.viewport.getTrackItem(targetIndex)) || 0,
 			startHeight
 		);
-		const lockedHeight = Math.max(1, Math.ceil(startHeight), Math.ceil(targetHeight), Math.ceil(ctx.getMaxRenderedSlideHeight({ refresh: true, padding: 24 })));
+		/* Locked to the taller of the two slides that matter, the one left and
+		   the one reached — never to the tallest slide of the whole quiz
+		   (2026-09-28). That lock made every move, even to a short question,
+		   as tall as the quiz's longest reading for the length of the slide:
+		   the page became scrollable for a second, then shrank back. A taller
+		   slide passing in between may be cut at the bottom while it crosses;
+		   in the app every slide fills the panel, so that cut falls below the
+		   visible edge. */
+		const lockedHeight = Math.max(1, Math.ceil(startHeight), Math.ceil(targetHeight));
 		const deltaPx = Math.abs(targetX - startX);
 		const viewportWidth = Math.max(1, viewport.clientWidth || Math.ceil(viewport.getBoundingClientRect().width) || 1);
 		const dist = Math.max(1, deltaPx / viewportWidth);

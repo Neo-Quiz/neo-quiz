@@ -29,6 +29,8 @@ import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { ajouter } from "../../../../src/dom";
 import { couperNomAuMilieu } from "../../../../src/dashboard/file-icons";
 import { quizModeLabel } from "../../../../src/dashboard/quiz-card";
+import { brancherPerles } from "./perles";
+import { attachQuizBars } from "./quiz-bars";
 // Types en `import type` seulement : ils viennent du noyau et de `types/quiz`,
 // et ce fichier ne doit tirer aucune implémentation de plus.
 import type { ReviewGrade } from "../../../../src/scheduler";
@@ -190,10 +192,17 @@ export async function openQuizPage(
 
 	   Idempotent (`fait`) et tolérant : un démontage appelé deux fois, ou après
 	   une destruction déjà faite par le moteur, ne doit pas casser la navigation. */
+	/* La frise de perles (mode compact et loupe, `ui/perles.ts`) : débranchée
+	   avant la destruction du moteur, qui vide le conteneur qu'elle observe. */
+	const debrancherPerles = brancherPerles(hote);
+	/* The two bars that stay in place while a question scrolls (`ui/quiz-bars.ts`). */
+	const detachBars = attachQuizBars(hote);
 	let fait = false;
 	return () => {
 		if (fait) return;
 		fait = true;
+		debrancherPerles();
+		detachBars();
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);
 		try {

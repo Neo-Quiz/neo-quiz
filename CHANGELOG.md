@@ -32,14 +32,33 @@ release notes.
 - A composer at the bottom of the Review plan: type what you want and it opens Generate with the folder as destination, its documents attached and your request, and starts the quiz generation.
 - Learn quizzes show how many readings they hold next to the number of questions.
 - A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right: every folder of My quizzes is offered, empty ones included, with its own icon and color and grouped under its course unit; a folder moved to another vault shows the Obsidian logo next to each vault. It moves both files of a course shown as one card (Learn and Practice).
-- A Run button on every Python code block shown in a quiz (readings, questions, explanations, hints): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
+- A Run button on every Python code block shown in a quiz (readings, explanations, hints, and a question's own code once the quiz is corrected, never before, since running it would give the answer away): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
 
 ### Changed
+- On a quiz page, the Learn or Practice mode is no longer shown in blue, nor the active side of the Learn | Practice switch: blue is kept for buttons.
+- In a quiz being played, the close cross, the title and the row of question beads stay at the top while a long question scrolls under them, and the previous and next arrows always sit at the same place at the bottom of the window, on a frosted bar, whatever the length of the question.
+- The document above a comprehension question shows in full, the page scrolling instead of a scrollbar inside the document.
+- The labels of flashcards, ordering, matching and the screen before the score are no longer in capitals.
+- The current question bead keeps the full colour of its rating (green, amber) instead of turning almost black.
+- The button that opens a file from a quiz (a Packet Tracer activity, a PDF) is a raised purple button with a paperclip icon, placed after the content of its card instead of above it, and shows the file name on hover.
+- Question beads: the current bead has a moving shine, an answered bead is a clear blue (green, amber or red once rated or corrected), and hovering a reading bead shows the reading title above it.
+- Numeric answers show their unit at the right of the field, and the equation field matches the other answer fields.
+- Ordering and matching: empty slots are hollow with a numbered pill, the items are raised pieces with a grip that sink when pressed and turn blue when picked up, a placed item sits raised in its slot, and the instructions are shorter.
+- Terminal questions open in a terminal window with a title bar (Command Prompt, Windows PowerShell, bash).
+- Text answer fields are flat like the answer choices, without a blue border or glow, and start at the height of the expected answer instead of ten lines; an explanation in your own words starts at four lines.
+- Image answers are laid out in a grid of equal columns, and the "Select one or more answers" line is a small note instead of a banner.
+- Flashcards are a real card that turns over in 3D: the question on the front (click it or press Space), the answer on the back, then two raised buttons to rate yourself, coloured once chosen.
+- Answer choices are raised buttons like the arrows, sinking when pressed and springing back when released; hovering lightens the face and tints the circle blue without sliding or glowing; a chosen answer turns blue, with a white radio dot (a white box with a check for multiple choice) instead of a flat blue block with a folded corner.
+- The screen before the score is redesigned: an icon, what is left to do in a sentence, a progress bar ("1 / 16 answered") and the questions to go back to as numbered beads like the navigation above, instead of a red warning and a row of "Q1" tags in a bordered box.
+- The Hint button has the same grey as the question beads.
+- The program output field reads "Program output…" in italics and clears when you click it; the text cursor is blue.
 - The path at the bottom of a folder card is cut in the middle, like a file name: its start and the folder's own name stay visible, instead of the whole path scrolling in a loop.
 - Question and folder cards react like StudySmarter: a slightly lighter background and soft shadow on hover, a smooth press on click; folders no longer lift, and a folder's page fades in. The question list of the editor reacts the same way, its blue outline only marking the current question.
-- Starting a quiz slides it up over the page, which steps back behind it, like StudySmarter; leaving reverses it. The page now stays in place behind the quiz for as long as you play, as a stacked sheet hidden behind it, and comes back to front — with its score and progress refreshed — instead of being rebuilt. Only the wallpaper shows through the quiz's glass, never the page behind it, during the slide as while you play.
+- Starting a quiz slides it up over the page, which steps back behind it, like StudySmarter, without darkening it; leaving reverses it. The page now stays in place behind the quiz for as long as you play, as a stacked sheet hidden behind it, and comes back to front — with its score and progress refreshed — instead of being rebuilt. Only the wallpaper shows through the quiz's glass, never the page behind it, during the slide as while you play.
+- A question asking what a program prints is answered right in the output area of its code block, on one line with "Program output" as placeholder, instead of in a separate, oversized field.
 - Hovering a question card, a button or an icon no longer shows a plain browser tooltip repeating its label; the tooltips left carry what the screen does not show (a full file name or path, why a button is disabled, the exact model of a generated quiz).
 - A quiz being played has a one-line header like StudySmarter: a close cross and "Learn: title" (or Practice); the question count is gone and the note's path only shows, just above the title, when you hover the title.
+- The questions of a quiz being played are a row of numbered beads on a thread that fills up to the current question, which is larger: green or red once corrected, a violet bead with a book for a reading, a bead with a flag for the results. Every question stays visible and clickable on a single line: when there are too many for full-size beads, they become small dots with a number every five, and the beads under the pointer grow like the macOS Dock.
 - A Learn reading no longer shows "About N minutes of reading".
 - In a folder, the Documents, Links and Notes lists scroll within their frame beyond eight rows, instead of making the page endless.
 - The app now sits in a centered panel, with your wallpaper fully visible around it; cards inside are plain surfaces instead of glass tiles. A soft blue glow lights the top of the window; entering a folder briefly flashes the folder's color, then the glow fades away inside the folder and comes back when you leave.
@@ -69,7 +88,7 @@ release notes.
 - The button that opens a quiz in the editor now reads "Edit".
 - Easier reading in a quiz: the question text is larger than before and its title smaller, and the note's location under the quiz title uses the interface font instead of a code font.
 - Code blocks in quizzes use a Tokyo Night theme with an embedded JetBrains Mono font and syntax highlighting, and generated quizzes always name the code language.
-- Math in quiz text blends in with the sentence: numbers, signs and brackets use the interface font and formulas are slightly larger, while variables stay in math italics.
+- Math in quiz text is set in the typeface of mathematics, Computer Modern, as in LaTeX, exam papers and Obsidian: digits, signs and variables alike, slightly larger than the sentence around it.
 - A generated Learn note now stays short: at most 20 questions unless the course truly needs more, and a Practice bank holds 10 to 20. Every question asked before the reading comes with a hint, and a note that lacks one says so.
 - The quiz no longer shows "Slice N of M" above a Learn question: only its role remains, and "In your own words" is now named as such instead of "Check".
 - A numeric question written with math now opens the equation editor and its math keyboard. The answer can be typed as a number, a fraction, a power or a product (3 × 255, 3/4 as a fraction, 2 to the power 10) and is still compared by value, within the question's tolerance.
@@ -86,6 +105,15 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- Moving to another question no longer makes the quiz as tall as its longest reading for the length of the slide, and no longer flashes a scrollbar at the end of each move.
+- Fill in the blanks with a blank inside a formula ($du = ▢ dx$) shows the formula around the blank instead of raw LaTeX, and a blank whose answer is itself written in LaTeX (a fraction) is a blank again.
+- An answer typed in the equation editor is no longer marked wrong for how the editor writes it: a derivative prime (f'(3) = 6), a decimal comma (1,5 for 1.5) and a fraction typed with a slash (15/7) now match the expected answer.
+- A numeric answer given in percent counts as a percent: 62,5 % is accepted for a probability of 0.625, and 0,625 % no longer is; a question whose unit is % still reads 25 % as 25. A number starting with its decimal point (.49) is read too.
+- A revealed hint no longer fades in again each time you pick another answer: only a newly revealed level appears with its animation.
+- A quiz page shows image answers as thumbnails instead of their raw text, and labels an equation as Equation and a program output question as Program output instead of Free text and Bash terminal.
+- Opening or closing a quiz no longer lets a band of wallpaper open between the page and the quiz sliding over it.
+- "What does this program print?" on C, C++ or any language other than Python: the answer field sits right under the code, as for Python, instead of a tall separate box.
+- Fill in the blanks on code is shown as one code block that keeps its indentation, instead of one spaced-out line per paragraph with the loop body at the level of its `for`. The "Fill in the N blanks" banner above the text is gone.
 - Move to no longer reports a failure when the quiz did move, if its old file had already disappeared at the last moment; and a failed move can no longer remove another file created under the same name in the meantime.
 - Moving a folder to another vault (Move to in its menu) failed with "already exists" whenever the folder was not at the root of its vault; the current vault is no longer offered as a destination.
 - Inline code containing a dollar sign, such as `$HOME` and `$PATH` in the same sentence, is shown in full instead of losing part of the text.
