@@ -28,6 +28,8 @@
     "pyodide": "314.0.7"
   },
   "devDependencies": {
+    "@bjorn3/browser_wasi_shim": "0.4.2",
+    "@yowasp/clang": "22.0.0-git20542-10",
     "concurrently": "^10.0.5",
     "electron": "^44.3.0",
     "electron-builder": "^26.0.19",
