@@ -53,17 +53,42 @@
 	stroke-width: 1.5;
 }
 
-/* Le titre ne dépasse jamais sa ligne ; `position: relative` sert de repère
-   au chemin qui apparaît au-dessus de lui. */
+/* The mode pill, then the title, on one line; the title never overflows
+   it (apps/windows/src/ui/quiz-page.ts). */
 .qbd-qz-headline {
-	position: relative;
 	flex: 1;
 	min-width: 0;
 	display: flex;
+	align-items: center;
+	gap: 10px;
 }
 
-/* `inline` par sa largeur (le survol ne vise que le TEXTE du titre, pas la
-   ligne vide à sa droite), tronqué quand il ne tient pas. */
+/* The mode, the same pill as on the quiz cards (`.qbd-quiz-card-mode-btn`,
+   dashboard-components.css), not a button here: it only says which mode
+   is being played (2026-09-28). */
+.qbd-qz-mode {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 7%, transparent);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text-normal);
+	white-space: nowrap;
+}
+.qbd-qz-mode-icon {
+	display: inline-flex;
+}
+.qbd-qz-mode-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* Truncated when it does not fit. */
 .qbd-qz-title {
 	min-width: 0;
 	max-width: 100%;
@@ -74,44 +99,6 @@
 	letter-spacing: -0.015em;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* Le chemin de la note, JUSTE AU-DESSUS du titre et au survol du titre
-   seulement (`quiz-page.ts`). Hors du flux : son apparition ne décale rien.
-   Collé au titre, sans espace entre les deux (la marge est un `padding`) :
-   la souris passe de l'un à l'autre sans que le chemin disparaisse, et on
-   peut le sélectionner. Coupé au milieu : la tête se tronque, la queue
-   (trois caractères et l'extension) jamais — le type du fichier reste
-   visible. */
-.qbd-qz-path {
-	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: 100%;
-	display: flex;
-	min-width: 0;
-	margin: 0;
-	padding-bottom: 3px;
-	font-size: 11.5px;
-	color: var(--text-faint);
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 120ms ease;
-}
-.qbd-qz-title:hover + .qbd-qz-path,
-.qbd-qz-path:hover {
-	opacity: 1;
-	pointer-events: auto;
-}
-.qbd-qz-path-tete {
-	min-width: 0;
-	overflow: hidden;
-	white-space: nowrap;
-	text-overflow: ellipsis;
-}
-.qbd-qz-path-queue {
-	flex-shrink: 0;
 	white-space: nowrap;
 }
 

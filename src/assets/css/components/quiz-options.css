@@ -118,10 +118,12 @@
   }
 }
 
-/* HOVER (2026-09-27): the face lightens one step and the circle turns blue
-   — an invitation, not yet a choice. No blue border: the raised edge
-   already says "press me". No more blue glow or 4 px slide either: on
-   hover, the option used to look already selected. */
+/* HOVER (2026-09-27): the face lightens one step — an invitation, not yet
+   a choice. No blue border: the raised edge already says "press me". No
+   more blue glow or 4 px slide either: on hover, the option used to look
+   already selected. The circle no longer turns blue on hover either
+   (2026-09-28): a blue ring read as a half-made choice. It still does on
+   KEYBOARD focus, where it is the only sign of which option has focus. */
 .quiz-option:not(.selected):not(.correct):not(.wrong):hover,
 .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
   outline: none;
@@ -129,7 +131,6 @@
   color: var(--text-normal);
 }
 
-.quiz-option:not(.selected):not(.correct):not(.wrong):hover::before,
 .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible::before{
   border-color: var(--quiz-primary);
 }

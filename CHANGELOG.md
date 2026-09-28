@@ -37,6 +37,8 @@ release notes.
 - The quiz editor has a "Running the code is the last hint" switch under Hint, available once the question holds a Python, C or C++ block and has two hint levels; generated quizzes set it on hard questions where running the program helps.
 
 ### Changed
+- The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
+- Hovering an answer no longer turns its circle blue; the blue ring stays for keyboard focus only.
 - On a quiz page, the Learn or Practice mode is no longer shown in blue, nor the active side of the Learn | Practice switch: blue is kept for buttons.
 - In a quiz being played, the close cross, the title and the row of question beads stay at the top while a long question scrolls under them, and the previous and next arrows always sit at the same place at the bottom of the window, on a frosted bar, whatever the length of the question.
 - The document above a comprehension question shows in full, the page scrolling instead of a scrollbar inside the document.

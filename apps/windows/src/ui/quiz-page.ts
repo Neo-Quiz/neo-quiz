@@ -27,7 +27,6 @@ import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { ajouter } from "../../../../src/dom";
-import { couperNomAuMilieu } from "../../../../src/dashboard/file-icons";
 import { quizModeLabel } from "../../../../src/dashboard/quiz-card";
 import { brancherPerles } from "./perles";
 import { attachQuizBars } from "./quiz-bars";
@@ -72,9 +71,9 @@ export async function openQuizPage(
 ): Promise<() => void> {
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
-	// ── En-tête : croix · « Mode : titre », le chemin au survol du titre ──
-	// `t()` est appelé ICI, au rendu, jamais dans une constante de module : une
-	// chaîne traduite au chargement serait figée à la langue du démarrage.
+	// ── Header: cross · mode pill · title ──
+	// `t()` is called HERE, at render time, never in a module constant: a
+	// string translated at load time would stay in the startup language.
 	const entete = ajouter(contenu, "div", "qbd-qz-header");
 	const retour = ajouter(entete, "button", "qbd-quizzes-crumb-back qbd-qz-back");
 	retour.type = "button";
@@ -99,15 +98,14 @@ export async function openQuizPage(
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");
 	// `title` et non `basename` : c'est le champ que `QuizIndexEntry` prévoit
 	// pour l'affichage (les deux sont égaux aujourd'hui, pas forcément demain).
-	ajouter(titrage, "h2", "qbd-qz-title", t("app.quiz.titleWithMode", { mode: quizModeLabel(entry.mode), title: entry.title }));
-	/* Le CHEMIN de la note, affiché juste au-dessus du titre, au SURVOL du
-	   titre seulement (la référence n'a qu'une ligne) ; APRÈS lui dans le DOM
-	   pour que le survol le désigne (`+`, dashboard-detail.css). Coupé au
-	   milieu : l'extension reste visible (`couperNomAuMilieu`). */
-	const chemin = ajouter(titrage, "p", "qbd-qz-path");
-	const { tete, queue } = couperNomAuMilieu(entry.path);
-	ajouter(chemin, "span", "qbd-qz-path-tete", tete);
-	if (queue) ajouter(chemin, "span", "qbd-qz-path-queue", queue);
+	/* The MODE as a pill before the title (2026-09-28), the same pill as on
+	   the quiz cards (quiz-card.ts): it replaced a "Learn: " prefix. The
+	   note's path shown on hover above the title is gone too: it said
+	   nothing a player needs. */
+	const mode = ajouter(titrage, "span", "qbd-qz-mode");
+	currentHost().ui.setIcon(ajouter(mode, "span", "qbd-qz-mode-icon"), entry.mode === "learn" ? "book-open" : "dumbbell");
+	ajouter(mode, "span", undefined, quizModeLabel(entry.mode));
+	ajouter(titrage, "h2", "qbd-qz-title", entry.title);
 
 	/* Le conteneur donné au moteur, et LUI SEUL : c'est sur lui que le moteur
 	   posera `__quizDestroy`, et c'est lui que le démontage doit viser. Le
