@@ -86,7 +86,11 @@ export const transportDefaut: TransportInstallation = async (url, init) => {
 			try {
 				for await (const paquet of paquetsDe(corps)) { rearmer(); yield paquet; }
 			} finally {
+				/* `abort()` too: a reader that stops early (a body larger than
+				   its pin) must close the connection, not leave it open and
+				   unread. After a complete body, it changes nothing. */
 				clearTimeout(minuteur);
+				abandon.abort();
 			}
 		} : undefined,
 	};

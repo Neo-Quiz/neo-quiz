@@ -39,6 +39,7 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, screen, shell } from "electron";
 import * as path from "node:path";
+import { existsSync } from "node:fs";
 // Le dossier par défaut CHOISI est créé ici s'il manque — voir son canal.
 import * as fsp from "node:fs/promises";
 import { LOG_PREFIX, PRODUCT_NAME } from "../../../src/branding";
@@ -1498,8 +1499,12 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return Promise.resolve({ ok: false, code: "reseau", detail: "pack refused" });
 		if (installationPack) return installationPack;
 		/* Already installed at the pinned version: nothing to download — a
-		   compromised renderer cannot make the app re-fetch 28 MB in a loop. */
-		const enCours = etatLangage(deps.dossierLangages).then(st => (st.installe && st.version === PACK_C.version ? undefined : installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
+		   compromised renderer cannot make the app re-fetch 28 MB in a loop.
+		   Unless the compiler itself is gone (an antivirus quarantine): then
+		   Install repairs it. */
+		const enPlace = (st: { installe: boolean; version: string | null }): boolean =>
+			st.installe && st.version === PACK_C.version && existsSync(path.join(deps.dossierLangages, "c", "clang", "llvm.core.wasm"));
+		const enCours = etatLangage(deps.dossierLangages).then(st => (enPlace(st) ? undefined : installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
 			.then((): EnveloppeVideo<null, CodeInstallation> => ({ ok: true, valeur: null }), (err: unknown): EnveloppeVideo<null, CodeInstallation> => {
 				if (estErreurInstallation(err)) return { ok: false, code: err.code, detail: err.detail };
 				console.warn(LOG_PREFIX, "language pack install threw:", err);

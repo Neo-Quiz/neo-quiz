@@ -223,7 +223,15 @@ export async function installerLangage(
 		   the sandbox is serving) could leave a `manifest.json` without its
 		   `clang/`, a broken pack reporting itself installed. */
 		if (existsSync(cible)) renameSync(cible, ancien);
-		renameSync(partielDossier, cible);
+		try {
+			renameSync(partielDossier, cible);
+		} catch (e) {
+			/* The new pack could not take its place (an antivirus scanning
+			   `.part`): the previous one goes back, rather than being
+			   deleted by the `finally` below with nothing to replace it. */
+			if (existsSync(ancien) && !existsSync(cible)) renameSync(ancien, cible);
+			throw e;
+		}
 	} catch (e) {
 		if (estErreurInstallation(e)) throw e;
 		/* The raw message may carry local paths (the user's name) or a
@@ -233,8 +241,11 @@ export async function installerLangage(
 	} finally {
 		/* FAILURE OR SUCCESS: a `.part` never survives this call; nor does
 		   the previous install once the new one is in place. */
-		rmSync(partielDossier, { recursive: true, force: true });
-		rmSync(ancien, { recursive: true, force: true });
+		/* A cleanup that fails (EBUSY) is logged, never turned into a failed
+		   install: the pack in place is already the right one. */
+		for (const reste of [partielDossier, ancien]) {
+			try { rmSync(reste, { recursive: true, force: true }); } catch (e) { console.warn(LOG_PREFIX, "language pack leftover not removed:", reste, e); }
+		}
 	}
 }
 
