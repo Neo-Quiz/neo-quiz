@@ -22,6 +22,9 @@ export interface HintHandlers {
 	indiceCarte(qi: number, icone: string): IndiceCarte;
 	/** Câble le bouton d'indice de la carte rendue (interactions.ts). */
 	brancherIndice(trackItem: Element, qi: number): void;
+	/** Have ALL the hint levels of question `qi` been revealed?
+	    (`runInLastHint`, engine/code-run.ts) */
+	tousNiveauxVus(qi: number): boolean;
 }
 
 export function createHintHandlers(ctx: EngineCtx): HintHandlers {
@@ -50,6 +53,13 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 	function nombreVus(qi: number, total: number): number {
 		if (!ctx.quizState.hintSeen?.[qi]) return 0;
 		return Math.min(total, Math.max(1, niveauxVus.get(qi) ?? 1));
+	}
+
+	/** Have ALL the hint levels of question `qi` been revealed? (`runInLastHint`,
+	    engine/code-run.ts) */
+	function tousNiveauxVus(qi: number): boolean {
+		const total = niveauxIndice(ctx.quiz[qi]?.hint).length;
+		return total > 0 && nombreVus(qi, total) >= total;
 	}
 
 	function indiceCarte(qi: number, icone: string): IndiceCarte {
@@ -306,6 +316,7 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 		openHintModal,
 		closeHintModal,
 		indiceCarte,
-		brancherIndice
+		brancherIndice,
+		tousNiveauxVus
 	};
 }

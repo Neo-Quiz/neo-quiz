@@ -71,6 +71,14 @@ export interface QuestionBase {
 	    léger au plus révélateur. Lu par `niveauxIndice` (src/quiz-hint.ts),
 	    qui ignore une valeur invalide. */
 	hint?: string | string[];
+	/** Lets the ▶ button of a runnable block in this question's STATEMENT
+	    (a fenced ```python/```c/```cpp in `prompt`) show once every hint
+	    level has been revealed, instead of waiting for correction — for a
+	    hard "find the bug" question whose own program is not the answer.
+	    Ignored when `runInLastHintProbleme` (src/code-languages.ts) rejects
+	    it: no runnable block, fewer than two hint levels, or a question
+	    asking what the program prints (task 6, 2026-09-28). */
+	runInLastHint?: boolean;
 	/** Explication texte brut affichée après verrouillage (engine/cards.js explanationHtml). */
 	explain?: string;
 	/** Explication HTML pré-rendue, prioritaire sur `explain`. */
@@ -512,6 +520,9 @@ export interface ParsedQuizItem {
 	id?: string;
 	title?: string;
 	hint?: string | string[];
+	/** See `QuestionBase.runInLastHint` (src/types/quiz.ts) — same field, raw
+	    JSON5 shape. */
+	runInLastHint?: boolean;
 	prompt?: string;
 	promptHtml?: string;
 	explain?: string;

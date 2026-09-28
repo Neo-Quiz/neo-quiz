@@ -2,7 +2,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
 import type { CodeRun } from "../host/types";
-import type { CodeLanguage } from "../code-languages";
+import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../code-languages";
 
 /* ══════════════════════════════════════════════════════════
    THE « RUN » BUTTON of a code block shown in a quiz (Learn, statements,
@@ -119,16 +119,27 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		}
 	}
 
-	/** Un bloc de code de l'ÉNONCÉ d'une question pas encore corrigée : son
-	    bouton reste masqué (2026-09-27). Exécuter le programme d'un « que va
-	    afficher ce programme ? » donnait la réponse. Le signe de correction est
-	    celui du glossaire (engine/termes.ts) : le verrou global du quiz,
-	    `.quiz-is-locked`. Une LECTURE (`data-lecture`), un indice, une
-	    explication gardent le leur : ils enseignent, ils ne demandent rien. */
-	function enonceNonCorrige(bloc: HTMLElement): boolean {
-		return !!bloc.closest(".quiz-question")
-			&& !bloc.closest(".quiz-card[data-lecture]")
-			&& !bloc.closest(".quiz-is-locked");
+	/** Does ▶ show on this block (src/code-languages.ts `executionVisible`)? A
+	    block in the STATEMENT of a question not yet corrected stays masked
+	    (2026-09-27): running the program of a "what does this print?" question
+	    would give the answer away. The sign of correction is the same as the
+	    glossary's (engine/termes.ts): the quiz's global lock, `.quiz-is-locked`.
+	    A READING (`data-lecture`), a hint or an explanation keep theirs: they
+	    teach, they ask nothing. `runInLastHint` (task 6, 2026-09-28) lifts the
+	    mask early once every hint level of THIS question has been revealed —
+	    the field is ignored when `runInLastHintProbleme` rejects it, so a
+	    hand-written bad quiz never unlocks ▶ this way. */
+	function executionVisibleSur(bloc: HTMLElement): boolean {
+		const slide = bloc.closest<HTMLElement>('.quiz-track-item[data-slide-kind="question"]');
+		const qi = Number(slide?.dataset.qi);
+		const q = Number.isInteger(qi) ? ctx.quiz[qi] : undefined;
+		return executionVisible({
+			inStatement: !!bloc.closest(".quiz-question"),
+			reading: !!bloc.closest(".quiz-card[data-lecture]"),
+			corrected: !!bloc.closest(".quiz-is-locked"),
+			runInLastHint: q?.runInLastHint === true && runInLastHintProbleme(q) === null,
+			allHintLevelsSeen: Number.isInteger(qi) && ctx.hint.tousNiveauxVus(qi),
+		});
 	}
 
 	function bindCodeRunButtons(rootEl: Element | null = ctx.container): void {
@@ -151,9 +162,10 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				return;
 			}
 
-			// Masqué tel qu'émis (grammaire-blocs.ts) ; réévalué au prochain
-			// rendu de la carte, une fois le quiz corrigé.
-			if (enonceNonCorrige(bloc)) return;
+			// Masked as emitted (grammaire-blocs.ts); re-evaluated on the card's
+			// next render, once the quiz is corrected (or, for a `runInLastHint`
+			// question, once its last hint level is revealed).
+			if (!executionVisibleSur(bloc)) return;
 
 			btn.hidden = false;
 			btn.setAttribute("aria-label", t("engine.code.run"));

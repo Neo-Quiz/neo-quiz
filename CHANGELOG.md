@@ -33,6 +33,7 @@ release notes.
 - Learn quizzes show how many readings they hold next to the number of questions.
 - A quiz can be moved to another folder from its card menu (Move to), keeping its review history. Move to opens its list of folders as a submenu on hover, with an arrow on the right: every folder of My quizzes is offered, empty ones included, with its own icon and color and grouped under its course unit; a folder moved to another vault shows the Obsidian logo next to each vault. It moves both files of a course shown as one card (Learn and Practice).
 - A Run button on every Python code block shown in a quiz (readings, explanations, hints, and a question's own code once the quiz is corrected, never before, since running it would give the answer away): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
+- A hard question may let you run its own program once its last hint is revealed, when the quiz was generated that way; never on a question asking what a program prints.
 
 ### Changed
 - On a quiz page, the Learn or Practice mode is no longer shown in blue, nor the active side of the Learn | Practice switch: blue is kept for buttons.
