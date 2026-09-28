@@ -197,6 +197,11 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 			if ((cle === "correctIndex" || cle === "correctIndices")
 				&& !apres.options && !apres.optionHtml) return true;
 			if (FONDUS.includes(cle)) {
+				/* Written back under its own name, it survived: a flashcard keeps
+				   `answer` as the back of the card, never merged into
+				   `acceptedAnswers` (flashcards arrived on 2026-09-25, and the
+				   audit reported every generated flashcard as lost). */
+				if (apres[cle] !== undefined) return true;
 				const attendus = [].concat(avant[cle]).map(String);
 				const obtenus = (apres.acceptedAnswers || []).map(String);
 				return attendus.every(a => obtenus.includes(a));
