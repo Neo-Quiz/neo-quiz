@@ -60,12 +60,16 @@ function walk(dir, out) {
 	return out;
 }
 
-/* Ce qui, dans le HTML rendu, est littéral par CONTRAT et n'a donc pas à être
-   traduit : le contenu d'un <code> (``a ` b`` garde son accent grave) et une
-   formule LaTeX (MathJax lit la source telle quelle, `*` compris). */
+/* What, in the rendered HTML, is literal by CONTRACT and so has nothing to
+   translate: the content of a <code> (``a ` b`` keeps its backtick) and a
+   LaTeX formula (MathJax reads the source as it is, `*` included).
+   `<code` WITH attributes: since the colouring (2026-09-26), inline code is
+   `<code class="quiz-md-code-inline language-x">` and a block's code
+   `<code class="language-x">` — matching only a bare `<code>` let every
+   coloured snippet's backticks and stars count as unrendered markdown. */
 function retirerLitteraux(html) {
 	return html
-		.replace(/<code>[\s\S]*?<\/code>/g, "")
+		.replace(/<code\b[^>]*>[\s\S]*?<\/code>/g, "")
 		.replace(/\$\$[\s\S]*?\$\$/g, "")
 		.replace(/\$[^$\n]+\$/g, "");
 }
@@ -115,7 +119,20 @@ console.log(fichiers.length + " notes examinées dans " + racines.length + " vau
    stricte que l'originale et sauterait en silence des blocs que le plugin, lui,
    charge — l'audit resterait vert sans les avoir vus. */
 await withSrcModule(["src/engine/sanitizer.ts", "src/quiz-utils.ts"], (sanitizer, { QUIZ_BLOCK_RE }) => {
-	const rendre = sanitizer.renderInlineText;
+	/* Each field through the SAME function the engine renders it with. The
+	   fields below go through `renderTextWithEmbeds` in the engine (cards.ts,
+	   passage.ts, hint.ts, cloze.ts), i.e. the full grammar with fenced
+	   blocks (`rendreTexteQuiz`); every other field through
+	   `renderInlineText`. Rendering them all inline (as before 2026-09-29)
+	   flagged every fenced ```python block of a prompt as unrendered, while
+	   the learner sees it rendered; rendering them all with blocks would hide
+	   a fence in an ordering item, which the learner DOES see raw. Images are
+	   stubbed: only the markdown left over matters here. */
+	const PLEIN = new Set(["prompt", "passage", "explain", "hint", "learn", "cloze", "options"]);
+	const IMAGES = { embed: () => "", image: () => "" };
+	const rendre = (nom, valeur) => PLEIN.has(nom.replace(/\[\d+\]$/, ""))
+		? sanitizer.rendreTexteQuiz(valeur, IMAGES, false)
+		: sanitizer.renderInlineText(valeur);
 	let quiz = 0, champs = 0;
 	const parMotif = new Map();
 	const exemples = [];
@@ -124,7 +141,7 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/quiz-utils.ts"], (sanitizer
 	const verifier = (fichier, qi, nom, valeur) => {
 		if (typeof valeur !== "string" || !valeur.trim()) return;
 		champs++;
-		const reste = retirerLitteraux(rendre(valeur));
+		const reste = retirerLitteraux(rendre(nom, valeur));
 		for (const [libelle, motif] of MOTIFS) {
 			if (!motif.test(reste)) continue;
 			parMotif.set(libelle, (parMotif.get(libelle) || 0) + 1);
