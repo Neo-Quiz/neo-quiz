@@ -400,9 +400,9 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				// échappé nu, exactement comme avant l'ajout de la coloration.
 				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
 				const pre = `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
-				/* Bouton « Exécuter » (bac à sable Python, engine/code-run.ts) : markup
+				/* Bouton « Exécuter » (bac à sable de code, engine/code-run.ts) : markup
 				   TOUJOURS émis pour un bloc Python, mais `hidden` — ce module est PUR
-				   (ni DOM, ni hôte) et ne sait pas si l'hôte fournit `HostPython`.
+				   (ni DOM, ni hôte) et ne sait pas si l'hôte fournit `HostCode`.
 				   `bindCodeRunButtons` (DOM, avec ctx) le démasque quand l'hôte l'offre,
 				   et le RETIRE sinon (aucun bouton sous le greffon Obsidian, qui
 				   n'exécute pas de Python). La sortie s'affiche dans

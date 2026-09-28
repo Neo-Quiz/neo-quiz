@@ -1,9 +1,9 @@
 /**
- * Le bouton « Exécuter » d'un bloc Python (src/engine/code-run.ts) — cas de
+ * Le bouton « Exécuter » d'un bloc de code (src/engine/code-run.ts) — cas de
  * contrôle M4 de la revue du 2026-09-27 : la sortie d'un programme (stdout
  * ou erreur) est du texte dont l'auteur du quiz n'est pas forcément maître
  * (un quiz PARTAGÉ est hostile). Ce script charge le VRAI module avec un
- * `HostPython` factice dont `run()` renvoie une charge HTML, et vérifie que
+ * `HostCode` factice dont `run()` renvoie une charge HTML, et vérifie que
  * rien de tel n'apparaît jamais comme ÉLÉMENT sous `.quiz-code-output` —
  * seulement comme texte, posé par `textContent`.
  *
@@ -32,7 +32,7 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 
 	async function executerEtLireSortie(resultat) {
 		const container = fabriquerBloc();
-		const ctx = { container, host: { python: { run: async () => resultat, warm: () => {} } } };
+		const ctx = { container, host: { code: { languages: () => ["python"], run: async () => resultat, warm: () => {} } } };
 		const { bindCodeRunButtons } = createCodeRunHandlers(ctx);
 		bindCodeRunButtons();
 		const btn = container.querySelector(".quiz-code-run-btn");

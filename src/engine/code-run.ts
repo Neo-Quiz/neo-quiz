@@ -1,17 +1,19 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
-import type { PythonRun } from "../host/types";
+import type { CodeRun } from "../host/types";
+import type { CodeLanguage } from "../code-languages";
 
 /* ══════════════════════════════════════════════════════════
-   BOUTON « EXÉCUTER » d'un bloc de code Python affiché dans un quiz
-   (Learn, énoncés, explications, indices… tout texte qui passe par
+   BOUTON « EXÉCUTER » d'un bloc de code affiché dans un quiz (Learn,
+   énoncés, explications, indices… tout texte qui passe par
    `engine/sanitizer.ts` → `grammaire-blocs.ts`, LE point de rendu unique
-   des blocs de code).
+   des blocs de code). Jusqu'à la tâche 5, seul Python s'exécute — voir
+   `code-languages.ts`.
 
    `grammaire-blocs.ts` (pur) émet le markup à l'avance, masqué
    (`hidden`) : c'est ce module, avec `ctx` (donc l'hôte), qui décide de le
-   montrer — `HostPython` est un membre OPTIONNEL du contrat, absent sous le
+   montrer — `HostCode` est un membre OPTIONNEL du contrat, absent sous le
    greffon Obsidian, qui n'exécute pas de code. Sans lui, le bouton et la
    toolbar sont RETIRÉS du DOM, jamais laissés inertes.
 
@@ -31,15 +33,15 @@ const TIMEOUT_MS = 10_000;
 
 export interface CodeRunHandlers {
 	/** Démasque (et branche) tout bouton « Exécuter » sous `rootEl` si l'hôte
-	    fournit `HostPython`, ou le retire sinon. À appeler juste après
+	    fournit `HostCode`, ou le retire sinon. À appeler juste après
 	    `mathifyElement`, comme `bindQuizResourceButtons`. */
 	bindCodeRunButtons(rootEl?: Element | null): void;
 }
 
 export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
-	/** Le worker Pyodide est préchauffé une seule fois pour toute la session
-	    du moteur, à la première apparition d'un bloc exécutable — `warm()` est
-	    sans effet si Python est déjà chargé (contrat `HostPython`). */
+	/** Le moteur d'un langage est préchauffé une seule fois pour toute la
+	    session du moteur, à la première apparition d'un bloc exécutable —
+	    `warm()` est sans effet s'il est déjà chargé (contrat `HostCode`). */
 	let prechauffe = false;
 
 	function sortieDe(bloc: HTMLElement): HTMLElement {
@@ -61,7 +63,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 	    a failli (indisponible, délai, file pleine) — ce n'est pas une sortie du
 	    programme, donc un message DISCRET, en police d'interface, jamais
 	    présenté comme un résultat du code (demande du 2026-09-27). */
-	function texteResultat(resultat: PythonRun): { texte: string; erreur: boolean; panne: boolean } {
+	function texteResultat(resultat: CodeRun): { texte: string; erreur: boolean; panne: boolean } {
 		switch (resultat.status) {
 			case "ok": {
 				const sortie = resultat.stdout ?? "";
@@ -72,19 +74,23 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				const sortie = resultat.stdout ?? "";
 				return { texte: sortie.length > 0 ? `${sortie}\n${brute}` : brute, erreur: true, panne: false };
 			}
+			case "compile-error":
+				return { texte: resultat.error ?? "", erreur: true, panne: false };
 			case "timeout":
 				return { texte: t("engine.code.timeout"), erreur: false, panne: true };
 			case "too-long":
 				return { texte: t("engine.code.tooLong"), erreur: false, panne: true };
+			case "not-installed":
+				return { texte: t("engine.code.notInstalled"), erreur: false, panne: true };
 			case "unavailable":
 			default:
 				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
 	}
 
-	async function executer(btn: HTMLButtonElement, code: string): Promise<void> {
-		const python = ctx.host.python;
-		if (!python) return; // ne peut pas arriver (bouton retiré sans HostPython), garde honnête
+	async function executer(btn: HTMLButtonElement, source: string, language: CodeLanguage): Promise<void> {
+		const code = ctx.host.code;
+		if (!code) return; // ne peut pas arriver (bouton retiré sans HostCode), garde honnête
 		const bloc = btn.closest<HTMLElement>(".quiz-code-block");
 		if (!bloc) return;
 		const sortie = sortieDe(bloc);
@@ -96,7 +102,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		sortie.textContent = t("engine.code.running");
 
 		try {
-			const resultat = await python.run({ code, stdin: "", timeoutMs: TIMEOUT_MS });
+			const resultat = await code.run({ language, code: source, stdin: "", timeoutMs: TIMEOUT_MS });
 			const { texte, erreur, panne } = texteResultat(resultat);
 			sortie.textContent = texte;
 			sortie.classList.toggle("quiz-code-output-error", erreur);
@@ -124,13 +130,13 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 
 	function bindCodeRunButtons(rootEl: Element | null = ctx.container): void {
 		if (!rootEl) return;
-		const python = ctx.host.python;
+		const code = ctx.host.code;
 
 		rootEl.querySelectorAll<HTMLElement>(".quiz-code-block-executable").forEach(bloc => {
 			const btn = bloc.querySelector<HTMLButtonElement>(".quiz-code-run-btn[data-quiz-code-run]");
 			if (!btn) return;
 
-			if (!python) {
+			if (!code) {
 				// Greffon Obsidian (ou tout hôte sans bac à sable) : aucun bouton.
 				bloc.querySelector(".quiz-code-toolbar")?.remove();
 				bloc.classList.remove("quiz-code-block-executable");
@@ -141,12 +147,16 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			// rendu de la carte, une fois le quiz corrigé.
 			if (enonceNonCorrige(bloc)) return;
 
+			// Tant que grammaire-blocs.ts n'écrit pas `data-lang` (tâche 5), un
+			// bloc exécutable est nécessairement Python.
+			const language = (bloc.dataset.lang ?? "python") as CodeLanguage;
+
 			btn.hidden = false;
 			btn.setAttribute("aria-label", t("engine.code.run"));
 
 			if (!prechauffe) {
 				prechauffe = true;
-				try { python.warm(); } catch (_) { /* meilleur effort */ }
+				try { code.warm(language); } catch (_) { /* meilleur effort */ }
 			}
 
 			if (btn.dataset.quizCodeBound === "1") return;
@@ -155,7 +165,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				e.preventDefault();
 				if (btn.disabled) return;
 				const codeEl = bloc.querySelector("code");
-				void executer(btn, codeEl?.textContent ?? "");
+				void executer(btn, codeEl?.textContent ?? "", language);
 			});
 		});
 	}

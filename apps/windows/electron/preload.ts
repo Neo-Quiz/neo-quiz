@@ -236,9 +236,9 @@ const pont: Pont = {
 		annuler: id => ipcRenderer.invoke(CANAUX.videoAnnuler, id),
 	},
 
-	python: {
-		run: job => ipcRenderer.invoke(CANAUX.pythonRun, job),
-		warm: () => ipcRenderer.invoke(CANAUX.pythonWarm),
+	code: {
+		run: job => ipcRenderer.invoke(CANAUX.codeRun, job),
+		warm: language => ipcRenderer.invoke(CANAUX.codeWarm, language),
 	},
 };
 

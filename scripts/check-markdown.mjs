@@ -233,7 +233,7 @@ await withSrcModule(
 	reinitialiserBudgetRendu();
 	/* Un bloc Python est enveloppé (`.quiz-code-block-executable`) pour loger
 	   le bouton « Exécuter » (engine/code-run.ts, hors DOM ici : hidden par
-	   défaut, démasqué seulement quand l'hôte fournit `HostPython`). Un autre
+	   défaut, démasqué seulement quand l'hôte fournit `HostCode`). Un autre
 	   langage reste rendu à l'identique (voir plus bas). */
 	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),

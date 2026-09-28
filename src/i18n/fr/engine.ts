@@ -180,6 +180,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.code.timeout": "Le code a mis trop de temps à s'exécuter.",
 	"engine.code.tooLong": "La sortie est trop longue et a été tronquée.",
 	"engine.code.unavailable": "Bac à sable Python indisponible.",
+	"engine.code.notInstalled": "Ce langage n'est pas encore installé.",
 
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Fermer le clavier",

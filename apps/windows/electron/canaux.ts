@@ -82,9 +82,11 @@ import { estErreurInstallation } from "./video-installation";
    from Python-only, no behaviour change), which holds the hidden window and
    its isolation. VALUE import forbidden here: this module instantiates
    nothing, only `main.ts` creates the sandbox and passes it via
-   `deps.python` (kept as-is: only Python is wired through the
-   `neo:python/run` channel today; task 4 generalises it). */
-import type { PythonRun } from "../../../src/host/types";
+   `deps.code`. `CodeRun`/`CodeLanguage` are the shared contract
+   (`src/host/types.ts`, `src/code-languages.ts`) that `HostCode` on the
+   render side also uses. */
+import type { CodeRun } from "../../../src/host/types";
+import type { CodeLanguage } from "../../../src/code-languages";
 import type { BacASable } from "./code-sandbox";
 
 /** Ce que les canaux demandent à `main.ts`. */
@@ -136,9 +138,8 @@ export interface DependancesCanaux {
 	};
 	/** The code sandbox (task 3, `./code-sandbox.ts`), created and closed by
 	    `main.ts` — this file only relays calls to it. Only Python reaches it
-	    today, hence the field's name (kept as the IPC channel's own name,
-	    `neo:python/run` — task 4 generalises both together). */
-	python: BacASable;
+	    today; `c`/`cpp` answer `not-installed` until task 8. */
+	code: BacASable;
 }
 
 /** L'état du disque tenu par ce processus — voir `enregistrerCanaux`. */
@@ -1446,29 +1447,30 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (typeof id === "string") annulerVideo(id);
 	});
 
-	/* PYTHON EXECUTION. The arguments come from the renderer: revalidated
-	   here, bounded in size (64 KB), deadline clamped to [100 ms, 10 s]. The
-	   sandbox does the rest (code-sandbox.ts). Only Python is wired through
-	   this channel today, hence the hardcoded `language: "python"` below —
-	   task 4 lets the renderer pick the language and validates it here. */
-	const PLAFOND_PYTHON = 64 * 1024;
+	/* CODE EXECUTION. The arguments come from the renderer: revalidated
+	   here, bounded in size (64 KB), deadline clamped to [100 ms, 10 s],
+	   `language` checked against the known set — the sandbox does the rest
+	   (code-sandbox.ts), and answers `not-installed` for `c`/`cpp` until
+	   task 8 adds the Clang/WASM worker. */
+	const PLAFOND_CODE = 64 * 1024;
+	const LANGUES_CODE = ["python", "c", "cpp"] as const;
 	/* Defence in depth (security review 2026-09-27, M1): the sandbox's
 	   hidden window has no `neo` bridge (no `neo` preload, the code runs in
 	   a worker) and therefore cannot reach this channel — but checking the
 	   sender only on the RETURN channel (`code-sandbox.ts`) left this one
 	   without a symmetrical guard. */
 	const depuisFenetrePrincipale = (e: Electron.IpcMainInvokeEvent) => e.sender === deps.fenetreCourante()?.webContents;
-	ipcMain.handle(CANAUX.pythonRun, (e, job: unknown): Promise<PythonRun> => {
+	ipcMain.handle(CANAUX.codeRun, (e, job: unknown): Promise<CodeRun> => {
 		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ status: "unavailable", stdout: "", error: "job refused" });
 		const o = (job ?? {}) as Record<string, unknown>;
-		const texte = (v: unknown) => typeof v === "string" && v.length <= PLAFOND_PYTHON;
-		if (!texte(o.code) || !texte(o.stdin ?? "") || (o.after !== undefined && !texte(o.after))) {
+		const texte = (v: unknown) => typeof v === "string" && v.length <= PLAFOND_CODE;
+		if (!LANGUES_CODE.includes(o.language as never) || !texte(o.code) || !texte(o.stdin ?? "") || (o.after !== undefined && !texte(o.after))) {
 			return Promise.resolve({ status: "unavailable", stdout: "", error: "job refused" });
 		}
 		const delai = Math.min(10000, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
-		return deps.python.run({ language: "python", code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
+		return deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
 	});
-	ipcMain.handle(CANAUX.pythonWarm, (e) => { if (depuisFenetrePrincipale(e)) deps.python.warm("python"); });
+	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never)) deps.code.warm(language as CodeLanguage); });
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {

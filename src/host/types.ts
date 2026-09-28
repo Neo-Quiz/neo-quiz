@@ -17,6 +17,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { UsageRead } from "../dashboard/usage-format";
+import type { CodeLanguage } from "../code-languages";
 
 /** Un fichier vu par l'hôte. Volontairement plat et sérialisable. */
 export interface HostFile {
@@ -867,31 +868,29 @@ export interface HostVideo {
 	annuler(id: string): void;
 }
 
-/** Un essai Python à exécuter dans le bac à sable — voir `HostPython`. */
-export interface PythonJob {
+/** A program to run in the sandbox — see `HostCode`. */
+export interface CodeJob {
+	language: CodeLanguage;
 	code: string;
 	stdin: string;
 	after?: string;
 	timeoutMs: number;
 }
-
-/** Ce que rend le bac à sable, jamais plus que ces champs. */
-export interface PythonRun {
-	status: "ok" | "error" | "timeout" | "too-long" | "unavailable";
+/** What the sandbox returns, never more than these fields. `compile-error`:
+    the compiler refused the program; `error` carries its message. */
+export interface CodeRun {
+	status: "ok" | "error" | "compile-error" | "timeout" | "too-long" | "unavailable" | "not-installed";
 	stdout: string;
-	/** Traceback BRUTE ; le nettoyage est pur et partagé (src/code-exercise). */
 	error?: string;
 }
-
-/**
- * LE BAC À SABLE PYTHON — un membre OPTIONNEL, l'application seule (voir
- * `apps/windows/electron/python.ts` pour la spec de sécurité : deux couches,
- * chacune mesurée). Le greffon n'exécute pas de code Python.
- */
-export interface HostPython {
-	run(job: PythonJob): Promise<PythonRun>;
-	/** Charge Python en tâche de fond ; sans effet s'il est déjà chargé. */
-	warm(): void;
+/** THE CODE SANDBOX — an OPTIONAL member, the app only
+    (apps/windows/electron/code-sandbox.ts). The plugin runs nothing. */
+export interface HostCode {
+	/** Languages ▶ may offer now: installed, or downloadable (Task 9). */
+	languages(): readonly CodeLanguage[];
+	run(job: CodeJob): Promise<CodeRun>;
+	/** Loads the engine in the background; no effect if already loaded. */
+	warm(language: CodeLanguage): void;
 }
 
 /**
@@ -999,8 +998,8 @@ export interface Host {
 	pdf?: HostPdf;
 	/** Absent sous le greffon — voir `HostVideo`. */
 	video?: HostVideo;
-	/** Absent sous le greffon — voir `HostPython`. */
-	python?: HostPython;
+	/** Absent sous le greffon — voir `HostCode`. */
+	code?: HostCode;
 	/** Absent sous le greffon — voir `HostCollage`. */
 	collage?: HostCollage;
 	/** Absent sous le greffon — voir `HostDepot`. */

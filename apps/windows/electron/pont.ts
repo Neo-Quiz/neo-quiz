@@ -46,7 +46,8 @@
    et la clé `folders` des réglages est gardée à l'écriture.
 ══════════════════════════════════════════════════════════ */
 
-import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, PythonJob, PythonRun } from "../../../src/host/types";
+import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun } from "../../../src/host/types";
+import type { CodeLanguage } from "../../../src/code-languages";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 export type { EtatMiseAJour, PhaseMiseAJour } from "./mise-a-jour-etat";
 import type { EtatMiseAJour } from "./mise-a-jour-etat";
@@ -696,13 +697,13 @@ export interface Pont {
 	};
 
 	/**
-	 * L'EXÉCUTION D'UN PROGRAMME PYTHON : `HostPython` vu du rendu. Le code
-	 * part au bac à sable du principal (`python.ts`), fenêtre cachée sans
+	 * L'EXÉCUTION D'UN PROGRAMME : `HostCode` vu du rendu. Le code part au
+	 * bac à sable du principal (`code-sandbox.ts`), fenêtre cachée sans
 	 * disque ni réseau ; le rendu n'exécute rien lui-même.
 	 */
-	python: {
-		run(job: PythonJob): Promise<PythonRun>;
-		warm(): Promise<void>;
+	code: {
+		run(job: CodeJob): Promise<CodeRun>;
+		warm(language: CodeLanguage): Promise<void>;
 	};
 }
 
@@ -826,8 +827,8 @@ export const CANAUX = {
 	videoProgression: "neo:video/progression",
 	videoTranscrire: "neo:video/transcrire",
 	videoAnnuler: "neo:video/annuler",
-	pythonRun: "neo:python/run",
-	pythonWarm: "neo:python/warm",
+	codeRun: "neo:code/run",
+	codeWarm: "neo:code/warm",
 } as const;
 
 /** La clé des RÉGLAGES IA de l'application (`neo.reglages`) : les MÊMES

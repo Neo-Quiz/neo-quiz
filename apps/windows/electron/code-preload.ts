@@ -3,7 +3,8 @@
    a job, receive a warm-up request, render a result. The code itself runs
    in a worker, which this world never reaches. */
 import { contextBridge, ipcRenderer } from "electron";
-import type { CodeJob, CodeLanguage, CodeRun } from "./code-sandbox";
+import type { CodeJob, CodeRun } from "../../../src/host/types";
+import type { CodeLanguage } from "../../../src/code-languages";
 import { CANAUX_BAC } from "./code-canaux";
 
 contextBridge.exposeInMainWorld("neoCode", {

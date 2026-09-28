@@ -29,6 +29,8 @@ import type { CustomScheme } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CANAUX_BAC } from "./code-canaux";
+import type { CodeJob, CodeRun } from "../../../src/host/types";
+import type { CodeLanguage } from "../../../src/code-languages";
 
 export const SCHEMA_CODE = "neo-code";
 const PARTITION = "neo-code"; // no `persist:`: in memory, nothing on disk
@@ -46,31 +48,11 @@ const INACTIVITE_MS = 10 * 60 * 1000;
    jobs could still pile up without limit. */
 const PLAFOND_FILE = 8;
 
-/** The only language wired up by this task; task 8 adds `"c"` and `"cpp"`
-    (both served by `worker-clang.mjs`), task 4 moves this type — and
-    `CodeJob`/`CodeRun` below — to `src/host/types.ts` and validates it at
-    the IPC boundary. */
-export type CodeLanguage = "python";
-
-/** A code job to run in the sandbox — see `HostPython` in
-    `src/host/types.ts` for the render-side contract this feeds (task 3
-    still only threads Python through; task 4 generalises the contract
-    itself). */
-export interface CodeJob {
-	language: CodeLanguage;
-	code: string;
-	stdin: string;
-	after?: string;
-	timeoutMs: number;
-}
-
-/** What the sandbox returns, never more than these fields. */
-export interface CodeRun {
-	status: "ok" | "error" | "timeout" | "too-long" | "unavailable";
-	stdout: string;
-	/** RAW traceback; cleanup is pure and shared (src/code-exercise). */
-	error?: string;
-}
+/* `CodeLanguage`, `CodeJob` and `CodeRun` moved to `src/host/types.ts` at
+   task 4: the render side (`HostCode`) and the main process share the exact
+   same shapes, validated at the IPC boundary (`canaux.ts`). Python is still
+   the only language wired end to end; `run` below answers `not-installed`
+   for `c`/`cpp` until task 8 adds the Clang/WASM worker. */
 
 /* Registered by `main.ts` in its ONE call to `registerSchemesAsPrivileged`
    (Electron only keeps the last one). */
@@ -278,6 +260,14 @@ export function creerBacASable(racine: string, langages: string, preload: string
 
 	return {
 		run(job) {
+			/* Task 8 adds the Clang/WASM worker; until then, `c`/`cpp` never
+			   reach the page (which would otherwise try to load a
+			   `worker-clang.mjs` that does not exist yet). Any OTHER language
+			   still falls through to the page, which answers `unavailable`
+			   for a name it does not recognise at all. */
+			if (job.language === "c" || job.language === "cpp") {
+				return Promise.resolve({ status: "not-installed", stdout: "" });
+			}
 			if (enFile >= PLAFOND_FILE) {
 				return Promise.resolve({ status: "unavailable", stdout: "", error: "queue full" });
 			}
@@ -302,7 +292,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
    contract's fields are kept, typed. */
 function normaliserResultat(res: unknown): CodeRun {
 	const o = (res ?? {}) as Record<string, unknown>;
-	const statuts = ["ok", "error", "timeout", "too-long", "unavailable"] as const;
+	const statuts = ["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed"] as const;
 	const status = statuts.includes(o.status as typeof statuts[number]) ? o.status as CodeRun["status"] : "error";
 	const stdout = typeof o.stdout === "string" ? o.stdout.slice(0, 20000) : "";
 	return typeof o.error === "string" ? { status, stdout, error: o.error.slice(0, 20000) } : { status, stdout };

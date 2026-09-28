@@ -202,6 +202,7 @@ export const EN_ENGINE = {
 	"engine.code.timeout": "The code took too long to run.",
 	"engine.code.tooLong": "The output is too long and was cut off.",
 	"engine.code.unavailable": "Python sandbox unavailable.",
+	"engine.code.notInstalled": "This language is not installed yet.",
 
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Close the keyboard",

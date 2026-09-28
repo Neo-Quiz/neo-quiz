@@ -134,13 +134,11 @@ let gardeFermeture: NodeJS.Timeout | null = null;
 /** Arrête l'attente d'une réponse copiée (voir `canaux.ts`) ; posée par
     `enregistrerCanaux`, appelée à la fermeture de la fenêtre. */
 let arreterAttente: (() => void) | null = null;
-/** The code sandbox (task 4, `./code-sandbox.ts`; generalised from Python to
-    any language at task 3 of the C/C++ execution plan): created once,
-    closed when the window closes, like `arreterAttente`. Only Python is
-    wired through it for now — this field keeps the name `python` because
-    `canaux.ts`'s `DependancesCanaux.python` (the IPC channel it feeds,
-    `neo:python/run`) is untouched by this task; task 4 renames both. */
-let python: BacASable | null = null;
+/** The code sandbox (task 3, `./code-sandbox.ts`, generalised from
+    Python-only to any language): created once, closed when the window
+    closes, like `arreterAttente`. Only Python is wired through it for now —
+    `c`/`cpp` answer `not-installed` until task 8. */
+let code: BacASable | null = null;
 
 /** Les réglages, ou une erreur NOMMÉE — voir `DependancesCanaux`. */
 function reglagesOuErreur(): Reglages {
@@ -473,7 +471,7 @@ function creerFenetre(): void {
 	fenetre.on("closed", () => {
 		fenetre = null;
 		arreterAttente?.();
-		python?.fermer();
+		code?.fermer();
 	});
 
 	void charger(fenetre).catch(e => console.error(LOG_PREFIX, "chargement du rendu impossible:", e));
@@ -716,11 +714,11 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   app window's. `userData/languages` is where a downloaded language
 		   pack (task 9) lands, served under `neo-code://app/languages/…`;
 		   nothing is written there yet, only Python runs today. */
-		python = creerBacASable(path.join(__dirname, "code"), path.join(app.getPath("userData"), "languages"), path.join(__dirname, "code-preload.cjs"));
+		code = creerBacASable(path.join(__dirname, "code"), path.join(app.getPath("userData"), "languages"), path.join(__dirname, "code-preload.cjs"));
 		const canaux = enregistrerCanaux({
 			perimetre,
 			reglagesOuErreur,
-			python,
+			code,
 			/* LU À CHAQUE APPEL, jamais capturé : l'utilisateur peut changer ce
 			   dossier en cours de session, et les canaux doivent servir le
 			   nouveau dès l'instant où il est écrit. */

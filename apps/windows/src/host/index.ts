@@ -36,7 +36,7 @@ import { createWindowsProcess } from "./process";
 import { createWindowsUi } from "./ui";
 import { createWindowsCollage } from "./collage";
 import { createWindowsVideo } from "./video";
-import { createWindowsPython } from "./python";
+import { createWindowsCode } from "./code";
 
 export { createWindowsIndex } from "./fs";
 export type { MiroirDisque, WindowsIndex } from "./fs";
@@ -166,9 +166,10 @@ export function createWindowsHost(carte: CarteRacines, index: MiroirDisque): Hos
 		   membre OPTIONNEL du contrat, absent sous le greffon. Un
 		   passe-plat vers le pont, comme `process` et `net`. */
 		video: createWindowsVideo(pont),
-		/* L'exécution Python (spec 2026-09-23-exercice-python) : membre
-		   OPTIONNEL, absent sous le greffon. Un passe-plat vers le pont. */
-		python: createWindowsPython(pont),
+		/* L'exécution de code (spec 2026-09-23-exercice-python, généralisée
+		   tâche 4 de 2026-09-28-c-cpp-execution) : membre OPTIONNEL, absent
+		   sous le greffon. Un passe-plat vers le pont. */
+		code: createWindowsCode(pont),
 		/* Disposer les fenêtres, glisser un fichier (la même résolution de
 		   chemin qu'`openExternal` : un `HostFile` du contrat → absolu par
 		   l'index ; une chaîne = un absolu déjà admis), et finir. */
