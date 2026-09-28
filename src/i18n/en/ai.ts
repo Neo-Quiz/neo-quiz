@@ -443,6 +443,7 @@ export const EN_AI = {
 	"ai.format.preNoHint": "{count} question(s) asked before the reading have no hint: {names}.",
 	"ai.format.noHint": "{count} question(s) of the learning path have no hint: {names}.",
 	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
+	"ai.format.runInLastHintInvalid": "{count} question(s) unlock running their code in a way that cannot apply (a runnable block in the statement, 2 hint levels at least, never a program output question): {names}.",
 	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Practice bank.",
 
 } as const;

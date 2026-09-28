@@ -86,6 +86,10 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.hint.placeholderNext": "Un indice plus révélateur...",
 	"editor.hint.addLevel": "Ajouter un niveau",
 	"editor.hint.removeLevel": "Retirer ce niveau",
+	"editor.hint.runInLastHint": "L'exécution du code est le dernier indice",
+	"editor.hint.runInLastHint.noRunnableBlock": "Il faut un bloc Python, C ou C++ dans la question.",
+	"editor.hint.runInLastHint.notEnoughHintLevels": "Il faut au moins deux niveaux d'indice.",
+	"editor.hint.runInLastHint.programOutput": "Pas sur une question qui demande ce qu'affiche un programme.",
 	"editor.form.explainSection": "Explication",
 	"editor.form.explainPlaceholder": "### Rappels\n- **Terme** — Définition",
 

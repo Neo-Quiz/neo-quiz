@@ -1,6 +1,7 @@
 import type { QuestionRole } from "./types/quiz";
 import { findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
 import { aIndice } from "./quiz-hint";
+import { runInLastHintProbleme } from "./code-languages";
 
 /**
  * LE FORMAT LEARN / PRACTICE — module PUR : ni hôte, ni DOM, ni horloge.
@@ -29,10 +30,15 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
 		// Glossaire (lot D, 2026-09-27, spec §6) : la génération l'écrit dans la
 		// configuration finale, aux côtés de `objectives`.
-		'"glossary"', '"term"', '"definition"'],
+		'"glossary"', '"term"', '"definition"',
+		// Code execution (2026-09-28, task 7 of the C/C++ plan): the field that
+		// unlocks ▶ on the question's program once its last hint level is
+		// revealed.
+		"runInLastHint"],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"',
 		// Glossaire (lot D, 2026-09-27) : remplace « No configuration object ».
-		'"glossary"', '"term"', '"definition"'],
+		'"glossary"', '"term"', '"definition"',
+		"runInLastHint"],
 };
 
 /** Ce qu'aucun prompt ne doit plus mentionner : les modes et le champ retirés,
@@ -75,12 +81,17 @@ export type Manque =
 	    lecture et carte mémoire, qui n'ont rien à deviner. */
 	| { kind: "sansIndice"; questions: string[] }
 	/** Une carte sans verso : retournée, elle ne montrerait rien à comparer. */
-	| { kind: "carteSansReponse"; questions: string[] };
+	| { kind: "carteSansReponse"; questions: string[] }
+	/** `runInLastHint: true` on a question `runInLastHintProbleme`
+	    (src/code-languages.ts) rejects: no runnable block in the statement,
+	    fewer than two hint levels, or a program output question (task 7 of
+	    the C/C++ execution plan, 2026-09-28). */
+	| { kind: "runInLastHintInvalide"; questions: string[] };
 
 interface Element {
 	title?: unknown; prompt?: unknown; explain?: unknown; explainHtml?: unknown; hint?: unknown;
 	slice?: unknown; role?: unknown; mode?: unknown; objectives?: unknown;
-	flashcard?: unknown; answer?: unknown;
+	flashcard?: unknown; answer?: unknown; runInLastHint?: unknown;
 }
 
 const texte = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
@@ -143,6 +154,11 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 	const { questions, config } = separer(items);
 	const manques: Manque[] = [];
 	const cartesSansVerso = questions.filter(({ q }) => estCarte(q) && !texte(q.answer)).map(({ q, i }) => nom(q, i));
+	/* `runInLastHint` (task 7 of the C/C++ execution plan, 2026-09-28): shared
+	   by both modes, computed before the branch so it ends up in both returns
+	   instead of being duplicated. */
+	const runInvalides = questions.filter(({ q }) => q.runInLastHint === true && runInLastHintProbleme(q) !== null).map(({ q, i }) => nom(q, i));
+	if (runInvalides.length) manques.push({ kind: "runInLastHintInvalide", questions: runInvalides });
 	if (mode === "practice") {
 		const sans = questions.filter(({ q }) => !texte(q.explain) && !texte(q.explainHtml)).map(({ q, i }) => nom(q, i));
 		if (sans.length) manques.push({ kind: "sansExplication", questions: sans });

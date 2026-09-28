@@ -88,6 +88,11 @@ export const EN_EDITOR = {
 	"editor.hint.placeholderNext": "A more revealing hint...",
 	"editor.hint.addLevel": "Add a level",
 	"editor.hint.removeLevel": "Remove this level",
+	/* Running the question's program as its last hint (runInLastHint, 2026-09-28). */
+	"editor.hint.runInLastHint": "Running the code is the last hint",
+	"editor.hint.runInLastHint.noRunnableBlock": "Needs a Python, C or C++ block in the question.",
+	"editor.hint.runInLastHint.notEnoughHintLevels": "Needs at least two hint levels.",
+	"editor.hint.runInLastHint.programOutput": "Not on a question asking what a program prints.",
 	"editor.form.explainSection": "Explanation",
 	"editor.form.explainPlaceholder": "### Key points\n- **Term** — Definition",
 

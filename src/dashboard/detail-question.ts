@@ -6,6 +6,7 @@ import { renderQuizPreviewCard } from "../editor/question-preview";
 import { isRichHtml } from "../editor/utils";
 import { _htmlToText } from "../editor/modals";
 import type { FormBridge } from "./detail-form-bridge";
+import { runInLastHintProbleme } from "../code-languages";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL QUESTION — panneau principal de la page « quiz »
@@ -163,6 +164,42 @@ function renderHintSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 		cb.onChange();
 		cb.onStructureChange();
 	});
+	renderRunInLastHint(hint, q, cb);
+}
+
+/** `runInLastHint` (2026-09-28): running the statement's program becomes the
+    last hint. A switch, the same native box as `methode`
+    (detail-lecture-style.ts). Disabled while `runInLastHintProbleme` rejects
+    the question — unless already on, so a bad value can still be turned off.
+    Judged at render: adding or removing a level re-renders the panel. */
+function renderRunInLastHint(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): void {
+	const probleme = runInLastHintProbleme(questionPourExecution(q));
+	const ligne = ajouter(parent, "label", "qbd-lecture-style-ligne qbd-lecture-style-methode");
+	const box = ajouter(ligne, "input");
+	box.type = "checkbox";
+	box.setAttribute("role", "switch");
+	box.checked = q.runInLastHint === true;
+	box.disabled = probleme !== null && !box.checked;
+	ajouter(ligne, "span", undefined, t("editor.hint.runInLastHint"));
+	if (probleme) ajouter(parent, "div", "qbd-qz-section-help", t(`editor.hint.runInLastHint.${probleme}`));
+	box.addEventListener("change", () => {
+		if (box.checked) q.runInLastHint = true; else delete q.runInLastHint;
+		cb.onChange();
+		cb.onStructureChange();
+	});
+}
+
+/** The fields `runInLastHintProbleme` reads, in the shape the block will
+    have once written (editor/export.ts): the markdown statement, every hint
+    level, and the terminal variant of a text question. */
+function questionPourExecution(q: DraftQuestion): Record<string, unknown> {
+	const terminal = q._type === "cmd" || q._type === "powershell" || q._type === "bash";
+	return {
+		prompt: q.prompt,
+		hint: [q.hint, ...(q._hintMore ?? [])],
+		type: terminal ? "text" : undefined,
+		terminalVariant: terminal ? (q._terminalVariant ?? q._type) : undefined,
+	};
 }
 
 /** Un bouton à icône, du même habillage que les listes d'une lecture

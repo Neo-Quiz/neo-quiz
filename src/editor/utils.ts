@@ -71,6 +71,10 @@ export interface DraftQuestion {
 	/** Les niveaux SUIVANTS d'un indice à plusieurs niveaux, du moins au plus
 	    révélateur (src/quiz-hint.ts). Absent pour un indice d'un niveau. */
 	_hintMore?: string[];
+	/** Unlocks ▶ on the question's program once its last hint level is
+	    revealed (src/code-languages.ts runInLastHintProbleme). Absent or
+	    `false` is never missing data: only an explicit `true` counts. */
+	runInLastHint?: boolean;
 	explain: string;
 	resourceButton: ResourceButton | null;
 	_useHtmlPrompt: boolean;

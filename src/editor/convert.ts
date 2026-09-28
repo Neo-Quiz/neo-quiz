@@ -169,6 +169,11 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 	const niveaux = niveauxIndice(q.hint).map(h => texteBaliseVersMarkdown(h) ?? h);
 	question.hint = niveaux[0] ?? "";
 	if (niveaux.length > 1) question._hintMore = niveaux.slice(1);
+	/* Code execution (task 7 of the C/C++ plan, 2026-09-28): unlocks ▶ on the
+	   question's program once its last hint level is revealed
+	   (src/code-languages.ts runInLastHintProbleme). Never invented: only an
+	   explicit `true` is read. */
+	if (q.runInLastHint === true) question.runInLastHint = true;
 
 	/* DU MARKDOWN PARTOUT (2026-09-26) : un texte stocké en HTML est converti
 	   en markdown à l'ouverture, quand la conversion est PROUVÉE sans perte
@@ -411,7 +416,11 @@ export function convertParsedToInternal(q: ParsedQuizItem): DraftQuestion {
 		// ci-dessus (`question.slice`/`.role`) — une valeur hors contrat doit
 		// être TUE à l'écriture, pas réapparaître recopiée telle quelle via
 		// `_extraFields` sous prétexte que sa forme de base n'a pas été retenue.
-		'slice','role']);
+		'slice','role',
+		// Code execution (task 7 of the C/C++ plan, 2026-09-28): read explicitly
+		// above (`question.runInLastHint`) — an out-of-contract value (anything
+		// but `true`) must disappear, not be copied back as is.
+		'runInLastHint']);
 	/* Les STYLES DE LECTURE (`lecture`, `etapes`, `tableau`, `retenir`,
 	   2026-09-26) ne sont PAS dans cette liste, exprès : ils voyagent par
 	   `_extraFields`, relus et réécrits tels quels (export.ts), valeurs

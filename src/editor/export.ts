@@ -230,6 +230,9 @@ function exportQuestion(q: DraftQuestion, idx: number, id: string): string {
 	} else if (niveauxIndice.length > 1) {
 		L.push(`\t\thint: [\n${niveauxIndice.map(h => `\t\t\t'${e(h)}',`).join("\n")}\n\t\t],`);
 	}
+	/* Code execution (task 7 of the C/C++ plan, 2026-09-28): written back as
+	   is, never invented — only an explicit `true` is written. */
+	if (q.runInLastHint === true) L.push("\t\trunInLastHint: true,");
 	// Priorité à explain modifié par l'utilisateur
 	/* Quand les DEUX existent, le moteur affiche `explainHtml` (cards.ts
 	   explanationHtml) : l'export doit donc l'écrire, et `explain` en plus. Le

@@ -533,6 +533,16 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 	r.check("brouillon : premier niveau dans hint, les suivants à part", [brouillon.hint, brouillon._hintMore], ["un", ["deux", "trois"]]);
 	brouillon._hintMore = ["", "trois"];
 	r.check("un niveau vidé n'est pas écrit", JSON5.parse(exp.exportAll([brouillon], null))[0].hint, ["un", "trois"]);
+
+	/* `runInLastHint` (task 7 of the C/C++ execution plan, 2026-09-28): read →
+	   write → re-read round trip, never invented on a question without it. */
+	const avecRunInLastHint = convert.convertParsedToInternal({ ...base, runInLastHint: true });
+	r.check("runInLastHint read from the block", avecRunInLastHint.runInLastHint, true);
+	const sourceRunInLastHint = exp.exportAll([avecRunInLastHint], null);
+	r.check("runInLastHint written as is", sourceRunInLastHint.includes("runInLastHint: true,"), true);
+	r.check("runInLastHint re-read after writing", JSON5.parse(sourceRunInLastHint)[0].runInLastHint, true);
+	r.check("without runInLastHint: never invented", tour({ ...base }).runInLastHint, undefined);
+	r.check("runInLastHint other than true: dropped, not copied back", tour({ ...base, runInLastHint: "yes" }).runInLastHint, undefined);
 	r.done();
 });
 

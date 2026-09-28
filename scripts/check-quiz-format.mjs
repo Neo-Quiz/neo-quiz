@@ -47,6 +47,16 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		[{ kind: "trancheInconnue", questions: ["B"] }]);
 	r.check("Practice sans Learn connu : slice non vérifié", verifierFormat("practice", [q({ slice: 9 })]), []);
 
+	/* `runInLastHint` (task 7 of the C/C++ execution plan, 2026-09-28): a
+	   manque when the field is `true` but `runInLastHintProbleme`
+	   (src/code-languages.ts) rejects it — never when absent or `false`. */
+	const bug = (o) => q({ prompt: "Bug ?\n\n```c\nint x\n```", hint: ["a", "b"], runInLastHint: true, ...o });
+	r.check("runInLastHint valid: no manque", verifierFormat("practice", [bug()]).some(m => m.kind === "runInLastHintInvalide"), false);
+	r.check("runInLastHint with one hint level", verifierFormat("practice", [bug({ hint: "a" })]).find(m => m.kind === "runInLastHintInvalide")?.questions.length, 1);
+	r.check("runInLastHint on a program output question",
+		verifierFormat("practice", [bug({ options: undefined, correctIndex: undefined, type: "text", terminalVariant: "c", acceptedAnswers: ["3"] })]).some(m => m.kind === "runInLastHintInvalide"), true);
+	r.check("runInLastHint: false is never a manque", verifierFormat("practice", [bug({ runInLastHint: false, hint: "a" })]).some(m => m.kind === "runInLastHintInvalide"), false);
+
 	const tranche = (s) => [
 		q({ title: `pre${s}`, slice: s, role: "pre", hint: "Pense à la définition." }),
 		{ title: `Lecture ${s}`, prompt: "Passage.", slice: s, role: "read" },
