@@ -30,6 +30,7 @@ import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host"
 import type { AiSettings } from "../../../../src/types/dashboard-ctx";
 import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
+import { mountLanguagePackSettings } from "./language-packs";
 import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
 
 export function renderSettings(
@@ -311,9 +312,15 @@ export function renderSettings(
 	ajouter(fond, "h3", "nq-reglages-titre", t("app.settings.wallpaper"));
 	const demonterFond = monterReglagesFond(fond);
 
+	/* ── Languages (task 10 of the C/C++ plan): the downloadable packs ── */
+	const langages = ajouter(contenu, "section", "nq-reglages-section");
+	ajouter(langages, "h3", "nq-reglages-titre", t("settings.languages.title"));
+	ajouter(langages, "p", "nq-reglages-aide", t("settings.languages.hint"));
+	const demonterLangages = mountLanguagePackSettings(langages);
+
 	/* Le démontage ne désabonne plus la mise à jour : sa section est partie
 	   (2026-09-17) et le seul abonnement restant est celui du rail, qui vit
 	   aussi longtemps que la coquille. Il est rendu quand même parce que TOUT
 	   écran en rend un. */
-	return () => { demonterComptes(); demonterFond(); root.replaceChildren(); };
+	return () => { demonterComptes(); demonterFond(); demonterLangages(); root.replaceChildren(); };
 }

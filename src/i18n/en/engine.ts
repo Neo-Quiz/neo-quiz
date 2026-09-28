@@ -201,8 +201,11 @@ export const EN_ENGINE = {
 	"engine.code.empty": "(no output)",
 	"engine.code.timeout": "The code took too long to run.",
 	"engine.code.tooLong": "The output is too long and was cut off.",
-	"engine.code.unavailable": "Python sandbox unavailable.",
+	"engine.code.unavailable": "Code sandbox unavailable.",
 	"engine.code.notInstalled": "This language is not installed yet.",
+	"engine.code.installing": "Downloading the C/C++ compiler… {percent} %",
+	"engine.code.installOffline": "The C/C++ compiler could not be downloaded (no connection).",
+	"engine.code.installRefused": "The downloaded compiler failed its integrity check and was not installed.",
 
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Close the keyboard",

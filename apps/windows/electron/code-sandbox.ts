@@ -202,6 +202,18 @@ export function creerBacASable(racine: string, langages: string, preload: string
 	   has any pre-warmed worker. `langue` re-warms the worker for the
 	   language whose job triggered this reload, since the page tracks one
 	   pre-warmed worker per language. */
+	/* Is this language's engine on disk? Python is built in; `c` and `cpp`
+	   share ONE pack (`languages/c/`, task 9). The ONE predicate `run`,
+	   `warm` and the re-warm after a reload all read (task 10): a worker
+	   warmed while the pack was still absent keeps its failed `import()` of
+	   the pack cached in its module map for good, and the first run after
+	   the download would then answer `not-installed` again — measured in
+	   the app on 2026-09-28, the run right after the install failed and
+	   only the one after it worked. */
+	function moteurPresent(langue: CodeLanguage): boolean {
+		return (langue !== "c" && langue !== "cpp") || existsSync(path.join(langages, "c", "manifest.json"));
+	}
+
 	function declencherRechargement(f: BrowserWindow, langue: CodeLanguage): void {
 		pretApresRecharge = new Promise<void>((resolve) => {
 			resoudrePretApresRecharge = resolve;
@@ -210,7 +222,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
 				f.webContents.removeListener("did-finish-load", surFini);
 				f.webContents.removeListener("did-fail-load", surEchec);
 				resoudrePretApresRecharge = null;
-				if (charge) f.webContents.send(CANAUX_BAC.chauffe, langue);
+				if (charge && moteurPresent(langue)) f.webContents.send(CANAUX_BAC.chauffe, langue);
 				resolve();
 			};
 			const surFini = () => fini(true);
@@ -270,7 +282,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
 			   there yet and report the same status, one round-trip later. Any
 			   OTHER unknown language still falls through to the page, which
 			   answers `unavailable` for a name it does not recognise at all. */
-			if ((job.language === "c" || job.language === "cpp") && !existsSync(path.join(langages, "c", "manifest.json"))) {
+			if (!moteurPresent(job.language)) {
 				return Promise.resolve({ status: "not-installed", stdout: "" });
 			}
 			if (enFile >= PLAFOND_FILE) {
@@ -286,6 +298,8 @@ export function creerBacASable(racine: string, langages: string, preload: string
 			return suite;
 		},
 		warm(language) {
+			// Never warm an engine that is not there yet (see `moteurPresent`).
+			if (!moteurPresent(language)) return;
 			rearmerInactivite();
 			void ouvrir().then(f => f.webContents.send(CANAUX_BAC.chauffe, language), () => undefined);
 		},

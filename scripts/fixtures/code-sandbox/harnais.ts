@@ -1,7 +1,7 @@
 /* Harness for `check:code-sandbox`: the REAL `code-sandbox.ts` module, in a
    real Electron. Each case prints a `CAS <name> <json>` line. */
 import { app, protocol } from "electron";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PRIVILEGES_CODE, creerBacASable, resoudreFichierCode } from "../../../apps/windows/electron/code-sandbox";
@@ -328,6 +328,27 @@ void app.whenReady().then(async () => {
 	record("c-apres-boucle", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ puts("ok"); }' }));
 	record("c-sortie-bornee", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ for(int i=0;i<200000;i++) puts("xxxxxxxxxx"); }' }));
 	record("c-fichier", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ FILE*f=fopen("C:/Windows/win.ini","r"); puts(f?"LU":"REFUSE"); }' }));
+
+	/* Task 10: the pack ARRIVES while the app runs. ▶ shows on a C block
+	   before the pack is there, and the engine warms the language as soon as
+	   the block appears; the first run answers `not-installed`, the pack is
+	   downloaded, and the run right after must WORK. A worker warmed while
+	   the pack was absent kept its failed import cached, and that run failed
+	   (measured in the app, 2026-09-28). The cases above left a HEALTHY C
+	   worker warmed (the pack was there): the sandbox window is closed
+	   first, so the next call opens a fresh page without any warmed worker
+	   — exactly the app starting without the pack. */
+	const pack = join(langages, "c");
+	renameSync(pack, pack + ".hidden");
+	/* The sandbox window is this harness's ONLY window: closing it would
+	   quit Electron by default, which the app's main window prevents. */
+	app.on("window-all-closed", () => { /* keep running, like the app */ });
+	bac.fermer();
+	bac.warm("c");
+	await new Promise(r => setTimeout(r, 3000));
+	record("pack-absent", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: "int main(void){}" }));
+	renameSync(pack + ".hidden", pack);
+	record("pack-arrive", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ puts("arrive"); }' }));
 
 	bac.fermer();
 	app.quit();
