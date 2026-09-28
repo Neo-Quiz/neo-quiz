@@ -18,9 +18,20 @@ const ALIASES: Readonly<Record<string, CodeLanguage>> = {
 	cpp: "cpp", "c++": "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp",
 };
 
-/** The language a fenced block's tag names, or `null` if it does not run. */
+/** The language a fenced block's tag names, or `null` if it does not run.
+    Same class of bug as `code-highlight.ts`'s M1 (review of 2026-09-26):
+    `ALIASES` is a plain object literal, so a tag of `constructor` or
+    `__proto__` would otherwise read the INHERITED property of that name on
+    `Object.prototype` (a function, an object — always truthy) instead of
+    falling through to `null`. Surfaced here by task 5 of the C/C++
+    execution plan (2026-09-28): once every table entry gets a runnable
+    wrapper, that inherited truthy value wrongly wrapped a plain
+    "```constructor" block as if it were executable. `hasOwnProperty.call`,
+    not `Object.hasOwn` (ES2022): outside this repo's ES2020 TS target,
+    same as `code-highlight.ts`. */
 export function langageDeBloc(tag: string): CodeLanguage | null {
-	return ALIASES[String(tag ?? "").trim().toLowerCase()] ?? null;
+	const cle = String(tag ?? "").trim().toLowerCase();
+	return Object.prototype.hasOwnProperty.call(ALIASES, cle) ? ALIASES[cle] : null;
 }
 
 /* ── Program-output questions (moved from engine/terminal.ts) ── */

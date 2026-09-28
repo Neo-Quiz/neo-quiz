@@ -27,6 +27,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { motifCodeDouble, motifCodeSimple } from "./grammaire-inline";
+import { langageDeBloc } from "../code-languages";
 import { t } from "../i18n";
 
 /** Un intervalle `[debut, fin[` du texte source. */
@@ -306,13 +307,6 @@ export function aDesBlocs(blocs: readonly Bloc[]): boolean {
 
 /* ── Le rendu HTML ─────────────────────────────────────────── */
 
-/** Seul Python s'exécute (même règle que `code-exercise/champs.ts
-    estExecutable`, pour la question de type "code" — celle-ci est un bloc de
-    code ordinaire d'un texte quelconque, l'autre une question dédiée : deux
-    lecteurs, une seule idée). `py` est l'alias que la grammaire de coloration
-    (`code-highlight.ts`) reconnaît déjà pour Python. */
-const ESTIME_PYTHON = /^(python|py)$/;
-
 /* Icône Lucide inline (play), au même titre que `ICON_BOOK`/`ICON_CHEVRON`
    dans `engine/passage.ts` : ce module est PUR (ni DOM, ni hôte), `setIcon()`
    d'Obsidian ne s'applique qu'à un nœud déjà monté. */
@@ -329,7 +323,8 @@ export interface OutilsRendu {
 	    texte échappé nu, comme avant. La fonction elle-même retombe sur
 	    `null` pour un langage inconnu ou toute erreur de tokenisation. */
 	colorerCode?(code: string, langue: string): string | null;
-	/** Faux par défaut : un bloc Python reste alors un `<pre>` nu, sans
+	/** Faux par défaut : un bloc d'un langage exécutable (la table pure
+	    `langageDeBloc`, code-languages.ts) reste alors un `<pre>` nu, sans
 	    bouton « Exécuter » ni panneau de sortie. Vrai UNIQUEMENT pour les
 	    rendus AFFICHÉS à l'apprenant (`renderTextWithEmbeds` du moteur) —
 	    jamais pour le rendu canonique de `html-vers-markdown.ts`
@@ -401,21 +396,32 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
 				const pre = `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
 				/* « Run » button (code sandbox, engine/code-run.ts): markup ALWAYS
-				   emitted for a Python block, but `hidden` — this module is PURE
-				   (no DOM, no host) and does not know whether the host provides
-				   `HostCode`. `bindCodeRunButtons` (DOM, with ctx) unmasks it when
-				   the host offers it, and REMOVES it otherwise (no button under the
-				   Obsidian plugin, which runs no Python). The output is shown in
-				   `.quiz-code-output`, set through `textContent` only: it is
-				   potentially hostile program text, never an HTML gate. */
-				// Un bloc non-Python reste EXACTEMENT comme avant l'ajout du bouton
-				// (aucun `<div>` supplémentaire) : la preuve d'équivalence de
-				// `check:md` porte sur cette sortie, octet pour octet.
-				if (!o.executable || !ESTIME_PYTHON.test(b.langue.trim().toLowerCase())) return pre;
+				   emitted for a block whose language runs (the pure table
+				   `langageDeBloc`, code-languages.ts — task 5 of the C/C++
+				   execution plan: Python was the only entry until then), but
+				   `hidden` — this module is PURE (no DOM, no host) and does not
+				   know whether the host provides `HostCode`, nor which of the
+				   table's languages it actually offers. `bindCodeRunButtons`
+				   (DOM, with ctx) unmasks it when the host offers THIS block's
+				   language, and REMOVES it otherwise (no button under the
+				   Obsidian plugin, which runs no code at all; none either for a
+				   block whose language the host does not implement yet). The
+				   output is shown in `.quiz-code-output`, set through
+				   `textContent` only: it is potentially hostile program text,
+				   never an HTML gate. */
+				// A block outside the table stays EXACTLY as before this button
+				// existed (no extra `<div>`): `check:md`'s equivalence proof
+				// covers this output, byte for byte.
+				const langue = langageDeBloc(b.langue);
+				if (!o.executable || !langue) return pre;
 				const barre = `<div class="quiz-code-toolbar"><button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>${ICON_PLAY}</button></div>`;
+				// `data-lang` : la langue CANONIQUE (python/c/cpp), jamais l'alias
+				// écrit par l'auteur (`py`, `c++`, `hpp`…) — c'est elle que lit
+				// `bindCodeRunButtons` (code-run.ts) pour choisir le bac à sable et
+				// comparer à `HostCode.languages()`.
 				// `aria-label` sur le panneau de sortie (clé engine.code.output,
 				// jusque-là posée dans le dictionnaire mais jamais lue).
-				return `<div class="quiz-code-block quiz-code-block-executable">${barre}${pre}<div class="quiz-code-output" hidden aria-label="${o.echapper(t("engine.code.output"))}"></div></div>`;
+				return `<div class="quiz-code-block quiz-code-block-executable" data-lang="${langue}">${barre}${pre}<div class="quiz-code-output" hidden aria-label="${o.echapper(t("engine.code.output"))}"></div></div>`;
 			}
 			case "tableau": {
 				/* Autant de colonnes que la rangée la plus longue : les cases

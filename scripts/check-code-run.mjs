@@ -20,10 +20,13 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 
 	const CHARGE = '<img src=x onerror=alert(1)>';
 
-	function fabriquerBloc() {
+	// `data-lang` (grammaire-blocs.ts, task 5) names the block's language:
+	// a fixture built by hand must carry it, or `bindCodeRunButtons` would
+	// read an empty string and treat the block as unsupported by the host.
+	function fabriquerBloc(langue = "python") {
 		const container = document.createElement("div");
 		container.innerHTML =
-			`<div class="quiz-code-block quiz-code-block-executable">` +
+			`<div class="quiz-code-block quiz-code-block-executable" data-lang="${langue}">` +
 			`<div class="quiz-code-toolbar"><button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden></button></div>` +
 			`<pre class="quiz-md-code"><code>print("x")</code></pre>` +
 			`<div class="quiz-code-output" hidden></div></div>`;
@@ -50,6 +53,20 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 	const sortieErr = await executerEtLireSortie({ status: "error", error: CHARGE, stdout: "" });
 	r.check("erreur hostile : aucun <img> comme élément", sortieErr.querySelector("img"), null);
 	r.check("erreur hostile : postée en textContent, jamais en HTML", sortieErr.innerHTML.includes("<img"), false);
+
+	// Task 5 (C/C++ execution plan): a block of a language the TABLE names
+	// (src/code-languages.ts) but the current host does not implement yet
+	// loses its bar, same treatment as no `HostCode` at all — never an inert
+	// button a click on which silently does nothing.
+	{
+		const container = fabriquerBloc("c");
+		const ctx = { container, host: { code: { languages: () => ["python"], run: async () => ({ status: "ok", stdout: "" }), warm: () => {} } } };
+		const { bindCodeRunButtons } = createCodeRunHandlers(ctx);
+		bindCodeRunButtons();
+		const bloc = container.querySelector(".quiz-code-block");
+		r.check("langage de la table non offert par l'hôte : barre retirée", bloc.querySelector(".quiz-code-toolbar"), null);
+		r.check("langage de la table non offert par l'hôte : classe exécutable retirée", bloc.classList.contains("quiz-code-block-executable"), false);
+	}
 
 	r.done();
 });

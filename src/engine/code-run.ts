@@ -7,8 +7,12 @@ import type { CodeLanguage } from "../code-languages";
 /* ══════════════════════════════════════════════════════════
    THE « RUN » BUTTON of a code block shown in a quiz (Learn, statements,
    explanations, hints… any text that goes through `engine/sanitizer.ts` →
-   `grammaire-blocs.ts`, THE single rendering point for code blocks). Until
-   task 5, only Python runs — see `code-languages.ts`.
+   `grammaire-blocs.ts`, THE single rendering point for code blocks). Which
+   block languages run is the pure table `langageDeBloc` (`code-languages.ts`):
+   the block's `data-lang` (python/c/cpp) is compared here against what the
+   host's `HostCode.languages()` actually offers — a language of the table
+   the current host does not implement yet stays a bare block, same as one
+   outside the table entirely.
 
    `grammaire-blocs.ts` (pure) emits the markup ahead of time, hidden
    (`hidden`): it is this module, with `ctx` (hence the host), that decides
@@ -135,8 +139,13 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			const btn = bloc.querySelector<HTMLButtonElement>(".quiz-code-run-btn[data-quiz-code-run]");
 			if (!btn) return;
 
-			if (!code) {
-				// Greffon Obsidian (ou tout hôte sans bac à sable) : aucun bouton.
+			// `data-lang` (grammaire-blocs.ts) names the block's language
+			// (python/c/cpp) — no button when the host has none (Obsidian
+			// plugin) or when it does not implement THIS block's language yet
+			// (a language of the table the current host has not wired up, same
+			// treatment as a language outside the table entirely).
+			const language = (bloc.dataset.lang ?? "") as CodeLanguage;
+			if (!code || !code.languages().includes(language)) {
 				bloc.querySelector(".quiz-code-toolbar")?.remove();
 				bloc.classList.remove("quiz-code-block-executable");
 				return;
@@ -145,10 +154,6 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			// Masqué tel qu'émis (grammaire-blocs.ts) ; réévalué au prochain
 			// rendu de la carte, une fois le quiz corrigé.
 			if (enonceNonCorrige(bloc)) return;
-
-			// Until grammaire-blocs.ts writes `data-lang` (task 5), a runnable
-			// block is necessarily Python.
-			const language = (bloc.dataset.lang ?? "python") as CodeLanguage;
 
 			btn.hidden = false;
 			btn.setAttribute("aria-label", t("engine.code.run"));

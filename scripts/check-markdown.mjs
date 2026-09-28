@@ -237,7 +237,7 @@ await withSrcModule(
 	   language stays rendered identically (see below). */
 	r.check("bloc de code : coloré et échappé (python reconnu)",
 		rendre("```python" + NL + "print(\"<script>\")" + NL + "**x** $y$" + NL + "```"),
-		`<div class="quiz-code-block quiz-code-block-executable"><div class="quiz-code-toolbar">`
+		`<div class="quiz-code-block quiz-code-block-executable" data-lang="python"><div class="quiz-code-toolbar">`
 		+ `<button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>`
 		+ `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>`
 		+ `</button></div>`
@@ -246,6 +246,16 @@ await withSrcModule(
 		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
 		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`
 		+ `<div class="quiz-code-output" hidden aria-label="Output"></div></div>`);
+	// Every language of the pure table (src/code-languages.ts langageDeBloc),
+	// not Python alone: task 5 of the C/C++ execution plan.
+	r.check("c block is runnable",
+		/class="quiz-code-block quiz-code-block-executable" data-lang="c"/.test(rendre("```c" + NL + "int x;" + NL + "```")), true);
+	r.check("c++ alias is runnable",
+		/data-lang="cpp"/.test(rendre("```c++" + NL + "int x;" + NL + "```")), true);
+	r.check("python keeps its wrapper, with its language",
+		/data-lang="python"/.test(rendre("```python" + NL + "x=1" + NL + "```")), true);
+	r.check("java stays a bare block (outside the runnable table)",
+		rendre("```java" + NL + "class A{}" + NL + "```").includes("quiz-code-block"), false);
 	r.check("bloc de code jamais refermé : jusqu'à la fin", rendre("a" + NL + "```" + NL + "x"),
 		P("a") + `<pre class="quiz-md-code"><code>x</code></pre>`);
 	r.check("langage inconnu : texte échappé, aucun span",
@@ -258,21 +268,28 @@ await withSrcModule(
 		rendre("```PYTHON" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
 	r.check("alias `py` : reconnu comme python",
 		rendre("```py" + NL + "import os" + NL + "```").includes('<span class="token keyword">import</span>'), true);
-	const LANGUES_INJECTION = ["python", "bash", "javascript", "sql", "markup", "mystere"];
+	const LANGUES_INJECTION = ["python", "c", "cpp", "bash", "javascript", "sql", "markup", "mystere"];
+	// The table's languages (src/code-languages.ts langageDeBloc: python, c,
+	// cpp — task 5 of the C/C++ execution plan), the only ones a runnable
+	// wrapper wraps. Any language outside it must keep ZERO tags outside
+	// `<pre>`: the guarantee below is exactly as strict for a language the
+	// table does not name.
+	const LANGUES_EXECUTABLES = new Set(["python", "c", "cpp"]);
 	r.check("injection dans un bloc de code coloré : jamais de balise brute, dans plusieurs langages",
 		LANGUES_INJECTION.map(langue => {
 			const html = rendre("```" + langue + NL + "<img src=x onerror=alert(1)>" + NL + "</code></pre><script>" + NL + "```");
 			// Seules nos propres balises (pre/code/span) peuvent apparaître à
 			// l'intérieur de `pre…/pre` : tout le reste du contenu du bloc doit
 			// être échappé, jeton par jeton. `div`/`button`/`svg`/`polygon`
-			// (le bouton « Exécuter ») ne sont admis QUE pour python, et
-			// seulement HORS du `<pre>` (revue du 2026-09-26, mineur 2) — les
-			// admettre pour tout langage aurait laissé passer une injection
-			// future de ces mêmes balises dans un langage sans enveloppe.
+			// (le bouton « Exécuter ») ne sont admis QUE pour les langages
+			// exécutables de la table, et seulement HORS du `<pre>` (revue du
+			// 2026-09-26, mineur 2) — les admettre pour tout langage aurait
+			// laissé passer une injection future de ces mêmes balises dans un
+			// langage sans enveloppe.
 			const dansPre = html.replace(/^.*?<pre[^>]*>/s, "").replace(/<\/pre>.*$/s, "");
 			const horsPre = html.replace(/<pre[^>]*>.*?<\/pre>/s, "");
 			const balisesPre = [...dansPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["code", "span"].includes(m[1].toLowerCase()));
-			const balisesHorsPre = langue === "python"
+			const balisesHorsPre = LANGUES_EXECUTABLES.has(langue)
 				? [...horsPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["div", "button", "svg", "polygon"].includes(m[1].toLowerCase()))
 				: [...horsPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].length === 0;
 			return balisesPre && balisesHorsPre;
