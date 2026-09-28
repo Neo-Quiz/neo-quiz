@@ -13,15 +13,17 @@
  *   engine/code-highlight.ts, through the catalogue);
  * - the displayed render carries the badge, first child of the `<pre>`;
  *   the canonical render, an unknown tag and a bare block carry none; a
- *   runnable block keeps its toolbar and `data-lang` untouched.
+ *   runnable block keeps its toolbar and `data-lang` untouched;
+ * - every tag of a runnable language's entry (python, c, cpp) also runs
+ *   (src/code-languages.ts): the logo without ▶ would look broken.
  *
  *     npm run check:code-catalogue
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(
-	["src/code-catalogue.ts", "src/code-logos.ts", "src/engine/code-highlight.ts", "src/engine/sanitizer.ts"],
-	(cat, { CODE_LOGOS }, { colorerCode, reinitialiserBudgetRendu }, { rendreTexteQuiz }) => {
+	["src/code-catalogue.ts", "src/code-logos.ts", "src/engine/code-highlight.ts", "src/engine/sanitizer.ts", "src/code-languages.ts"],
+	(cat, { CODE_LOGOS }, { colorerCode, reinitialiserBudgetRendu }, { rendreTexteQuiz }, { langageDeBloc }) => {
 	const r = makeReporter("Code catalogue");
 	const { CODE_CATALOGUE, codeLanguageOf, codeLanguageBadgeSrc } = cat;
 
@@ -38,6 +40,9 @@ await withSrcModule(
 	r.check("every tag is lower case and trimmed", tags.filter(t => t !== t.trim().toLowerCase() || !t), []);
 	r.check("every tag fits the fence pattern ([\\w+#.-])", tags.filter(t => !/^[\w+#.-]+$/.test(t)), []);
 	r.check("every tag resolves to its entry", tags.filter(t => codeLanguageOf(t)?.id !== seen.get(t)), []);
+	const RUNNABLE = ["python", "c", "cpp"];
+	r.check("every tag of a runnable language runs it",
+		CODE_CATALOGUE.filter(e => RUNNABLE.includes(e.id)).flatMap(e => [e.id, ...e.aliases].filter(t => langageDeBloc(t) !== e.id)), []);
 	r.check("case and spaces do not matter", ["JS", " Py ", "C++", "YML"].map(t => codeLanguageOf(t)?.id), ["javascript", "python", "cpp", "yaml"]);
 	r.check("an unknown, empty or absent tag is null", ["mystere", "", "   ", undefined, null].map(t => codeLanguageOf(t)), [null, null, null, null, null]);
 	r.check("keys inherited from Object.prototype never read as a language",

@@ -12,10 +12,13 @@ import { niveauxIndice } from "./quiz-hint";
 
 export type CodeLanguage = "python" | "c" | "cpp";
 
+/** Every tag the language catalogue (code-catalogue.ts) gives to one of
+    these languages runs too: a block showing the Python logo without ▶
+    would look broken. `check:code-catalogue` holds the two tables together. */
 const ALIASES: Readonly<Record<string, CodeLanguage>> = {
-	python: "python", py: "python",
+	python: "python", py: "python", python3: "python", py3: "python",
 	c: "c", h: "c",
-	cpp: "cpp", "c++": "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp",
+	cpp: "cpp", "c++": "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp", hh: "cpp", hxx: "cpp",
 };
 
 /** The language a fenced block's tag names, or `null` if it does not run.
