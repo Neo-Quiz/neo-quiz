@@ -82,7 +82,7 @@ function json5Key(k: string): string {
  * vaults contient une balise attribuée, ce garde-fou ne protège donc que
  * l'avenir — raison de plus pour qu'il ne se déclenche pas à tort.
  */
-function contientBaliseAttribuee(texte: string): boolean {
+export function contientBaliseAttribuee(texte: string): boolean {
 	for (const m of texte.matchAll(/<([a-z][a-z0-9]*)\s[^>]*>/gi)) {
 		if (new RegExp("</" + m[1] + "\\s*>", "i").test(texte)) return true;
 	}

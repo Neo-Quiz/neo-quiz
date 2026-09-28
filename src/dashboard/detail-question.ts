@@ -7,6 +7,7 @@ import { isRichHtml } from "../editor/utils";
 import { _htmlToText } from "../editor/modals";
 import type { FormBridge } from "./detail-form-bridge";
 import { runInLastHintProbleme } from "../code-languages";
+import { contientBaliseAttribuee } from "../editor/export";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL QUESTION — panneau principal de la page « quiz »
@@ -141,9 +142,14 @@ function renderHintSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 	const suite = q._hintMore ?? [];
 	const hint = section(parent, "lightbulb", t("editor.hint.label"), !!q.hint || suite.length > 0);
 	ajouter(hint, "div", "qbd-qz-section-help", t("editor.hint.levelsHelp"));
+	/* Declared before the fields, posted after them: typing in a level can
+	   bring the question to (or below) two non-empty levels without any
+	   structural repaint. */
+	let rafraichirExecution = (): void => {};
 	bridge.field(hint, suite.length ? t("editor.hint.level", { n: 1 }) : "", (q.hint || "").replace(/<br\s*\/?>/gi, "\n"), t("editor.hint.placeholder"), true, v => {
 		q.hint = v;
 		cb.onChange();
+		rafraichirExecution();
 	});
 	suite.forEach((valeur, i) => {
 		const ligne = ajouter(hint, "div", "qbd-lecture-style-item");
@@ -151,6 +157,7 @@ function renderHintSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 			suite[i] = v;
 			q._hintMore = suite;
 			cb.onChange();
+			rafraichirExecution();
 		});
 		boutonIndice(ligne, "x", t("editor.hint.removeLevel")).addEventListener("click", () => {
 			suite.splice(i, 1);
@@ -164,38 +171,50 @@ function renderHintSection(parent: HTMLElement, q: DraftQuestion, cb: EditCallba
 		cb.onChange();
 		cb.onStructureChange();
 	});
-	renderRunInLastHint(hint, q, cb);
+	rafraichirExecution = renderRunInLastHint(hint, q, cb);
 }
 
 /** `runInLastHint` (2026-09-28): running the statement's program becomes the
     last hint. A switch, the same native box as `methode`
     (detail-lecture-style.ts). Disabled while `runInLastHintProbleme` rejects
     the question — unless already on, so a bad value can still be turned off.
-    Judged at render: adding or removing a level re-renders the panel. */
-function renderRunInLastHint(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): void {
-	const probleme = runInLastHintProbleme(questionPourExecution(q));
+    Returns the function that re-judges it: called on every hint keystroke,
+    and when the pointer or focus reaches the switch, since the statement is
+    edited in the corrected render, which never repaints this panel. */
+function renderRunInLastHint(parent: HTMLElement, q: DraftQuestion, cb: EditCallbacks): () => void {
 	const ligne = ajouter(parent, "label", "qbd-lecture-style-ligne qbd-lecture-style-methode");
 	const box = ajouter(ligne, "input");
 	box.type = "checkbox";
 	box.setAttribute("role", "switch");
-	box.checked = q.runInLastHint === true;
-	box.disabled = probleme !== null && !box.checked;
 	ajouter(ligne, "span", undefined, t("editor.hint.runInLastHint"));
-	if (probleme) ajouter(parent, "div", "qbd-qz-section-help", t(`editor.hint.runInLastHint.${probleme}`));
+	const aide = ajouter(parent, "div", "qbd-qz-section-help");
+	const rafraichir = (): void => {
+		const probleme = runInLastHintProbleme(questionPourExecution(q));
+		box.checked = q.runInLastHint === true;
+		box.disabled = probleme !== null && !box.checked;
+		aide.hidden = probleme === null;
+		aide.textContent = probleme ? t(`editor.hint.runInLastHint.${probleme}`) : "";
+	};
+	rafraichir();
+	ligne.addEventListener("pointerenter", rafraichir);
+	ligne.addEventListener("focusin", rafraichir);
 	box.addEventListener("change", () => {
 		if (box.checked) q.runInLastHint = true; else delete q.runInLastHint;
 		cb.onChange();
-		cb.onStructureChange();
+		rafraichir();
 	});
+	return rafraichir;
 }
 
 /** The fields `runInLastHintProbleme` reads, in the shape the block will
     have once written (editor/export.ts): the markdown statement, every hint
-    level, and the terminal variant of a text question. */
+    level, and the terminal variant of a text question. A statement holding
+    an attributed tag is written as `promptHtml`, whose code blocks never get
+    ▶ (only `prompt` is read by the engine), so it counts as no statement. */
 function questionPourExecution(q: DraftQuestion): Record<string, unknown> {
 	const terminal = q._type === "cmd" || q._type === "powershell" || q._type === "bash";
 	return {
-		prompt: q.prompt,
+		prompt: q.prompt && !contientBaliseAttribuee(q.prompt) ? q.prompt : undefined,
 		hint: [q.hint, ...(q._hintMore ?? [])],
 		type: terminal ? "text" : undefined,
 		terminalVariant: terminal ? (q._terminalVariant ?? q._type) : undefined,
