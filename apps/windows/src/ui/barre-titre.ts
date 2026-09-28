@@ -17,6 +17,7 @@ import { poserIcone } from "../host/ui";
 import { poserGlyphe } from "./glyphes-fenetre";
 import { ouvrirMenuApp } from "./menu-app";
 import { palierZoomVoisin } from "./menu-app-arbre";
+import { createZoomBubble } from "./zoom-bubble";
 import { CLE_REGLAGES_ZOOM } from "../../electron/pont";
 import type { EtatFenetre } from "../../electron/pont";
 import application from "../../package.json";
@@ -117,54 +118,70 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 		if (!pousse) appliquerEtat(e);
 	});
 
-	/* ─── LE ZOOM COURANT : lu une fois au montage, pour que la coche du
-	   sous-menu Affichage > Échelle soit juste dès la première ouverture.
-	   Le principal l'applique déjà à `did-finish-load` (voir `pont.ts`) ;
-	   cette lecture ne sert qu'à la COCHE, pas à appliquer le zoom. ─── */
-	let zoomCourant = 1;
+	/* ─── THE CURRENT ZOOM: read once at mount, so that the check mark of
+	   Display > Interface scale is right from the first opening. The main
+	   process already applies it on `did-finish-load` (see `pont.ts`); this
+	   read only serves the CHECK MARK and the zoom bubble, it applies
+	   nothing. Its `.then` runs after `zoomBubble` below is created. ─── */
+	let currentZoom = 1;
 	void pont().reglages.lire(CLE_REGLAGES_ZOOM).then(v => {
-		if (typeof v === "number") zoomCourant = v;
+		if (typeof v !== "number") return;
+		currentZoom = v;
+		zoomBubble.setApplied(v);
 	});
 
-	/* ─── CTRL + MOLETTE — le zoom d'un navigateur, sur les MÊMES paliers que
-	   le sous-menu Échelle (Ahmed, 2026-09-17). Une fenêtre Electron ne le
-	   fait pas d'elle-même : sans cet écouteur, Ctrl + molette DÉFILE la page.
+	/* ─── EVERY ZOOM CHANGE GOES THROUGH HERE — wheel, menu and the bubble's
+	   own buttons — so the bubble shows up whatever triggered the change,
+	   and only one place talks to the main process. ─── */
+	function setZoom(f: number): void {
+		currentZoom = f;
+		void pont().affichage.zoom(f);
+		zoomBubble.show(f);
+	}
+	function stepZoom(direction: 1 | -1): void {
+		const next = palierZoomVoisin(currentZoom, direction);
+		// Already at the end of the list: nothing to ask the main process,
+		// and the menu's check mark must not move either.
+		if (Math.abs(next - currentZoom) < 0.001) return;
+		setZoom(next);
+	}
+	const zoomBubble = createZoomBubble({ step: stepZoom, reset: () => setZoom(1) });
 
-	   `passive: false` EST la condition du `preventDefault` : Chromium rend
-	   les écouteurs `wheel` passifs par défaut, et un `preventDefault` y est
-	   ignoré avec, pour seul signe, un avertissement dans la console.
+	/* ─── CTRL + WHEEL — a browser's zoom, on the SAME steps as the Interface
+	   scale submenu (asked for on 2026-09-17). An Electron window does not do
+	   it by itself: without this listener, Ctrl + wheel SCROLLS the page.
 
-	   LE DELTA S'ACCUMULE, et un palier ne tombe qu'au seuil. Un cran de
-	   molette vaut une centaine de pixels, donc un palier — ce qu'on attend ;
-	   un pincement de pavé tactile, lui, envoie des dizaines de petits deltas
-	   et traverserait les huit paliers d'un seul geste. Le delta est d'abord
-	   ramené en pixels : la même molette peut le compter en lignes ou en
-	   pages (`deltaMode`), et trois lignes n'auraient jamais atteint le seuil. */
-	const PIXELS_PAR_UNITE = [1, 16, 400]; // pixel, ligne, page
-	const SEUIL_CRAN = 50;
-	let cumulMolette = 0;
-	function surMolette(e: WheelEvent): void {
+	   `passive: false` IS what makes `preventDefault` work: Chromium makes
+	   `wheel` listeners passive by default, and a `preventDefault` there is
+	   ignored with a console warning as the only sign.
+
+	   THE DELTA ACCUMULATES, and a step only falls at the threshold. One wheel
+	   notch is about a hundred pixels, so one step — as expected; a touchpad
+	   pinch sends dozens of small deltas and would cross all eight steps in a
+	   single gesture. The delta is first converted to pixels: the same wheel
+	   may count in lines or pages (`deltaMode`), and three lines would never
+	   have reached the threshold. */
+	const PIXELS_PER_UNIT = [1, 16, 400]; // pixel, line, page
+	const NOTCH_THRESHOLD = 50;
+	let wheelTotal = 0;
+	function onWheel(e: WheelEvent): void {
 		if (!e.ctrlKey) return;
 		e.preventDefault();
-		cumulMolette += e.deltaY * (PIXELS_PAR_UNITE[e.deltaMode] ?? 1);
-		if (Math.abs(cumulMolette) < SEUIL_CRAN) return;
-		// Vers le HAUT (delta négatif), on agrandit : le sens du navigateur.
-		const voisin = palierZoomVoisin(zoomCourant, cumulMolette < 0 ? 1 : -1);
-		cumulMolette = 0;
-		// Déjà au bout de la liste : rien à demander au principal, et la coche
-		// du menu ne doit pas bouger non plus.
-		if (Math.abs(voisin - zoomCourant) < 0.001) return;
-		zoomCourant = voisin;
-		void pont().affichage.zoom(voisin);
+		wheelTotal += e.deltaY * (PIXELS_PER_UNIT[e.deltaMode] ?? 1);
+		if (Math.abs(wheelTotal) < NOTCH_THRESHOLD) return;
+		// UP (negative delta) zooms in: the browser's direction.
+		const direction = wheelTotal < 0 ? 1 : -1;
+		wheelTotal = 0;
+		stepZoom(direction);
 	}
-	window.addEventListener("wheel", surMolette, { passive: false });
+	window.addEventListener("wheel", onWheel, { passive: false });
 
 	let fermerMenu: (() => void) | null = null;
 	boutonMenu.addEventListener("click", () => {
 		if (fermerMenu) { fermerMenu(); fermerMenu = null; return; }
 		fermerMenu = ouvrirMenuApp(boutonMenu, {
 			version: application.version,
-			zoom: () => zoomCourant,
+			zoom: () => currentZoom,
 			executer(id, value) {
 				if (id === "check-updates") {
 					void pont().miseAJour.verifier();
@@ -183,8 +200,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 				} else if (id in COMMANDES_EDITION) {
 					void pont().edition.commande(COMMANDES_EDITION[id]);
 				} else if (id.startsWith("scale-") && typeof value === "number") {
-					void pont().affichage.zoom(value);
-					zoomCourant = value;
+					setZoom(value);
 				} else if (id === "next-wallpaper") {
 					deps.fondSuivant();
 				} else if (id === "reload") {
@@ -246,7 +262,8 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 		desabonnerFenetre();
 		observateurMenu.disconnect();
 		document.removeEventListener("keydown", surClavier, true);
-		window.removeEventListener("wheel", surMolette);
+		window.removeEventListener("wheel", onWheel);
+		zoomBubble.destroy();
 		fermerMenu?.();
 		barre.remove();
 	};

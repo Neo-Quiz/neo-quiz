@@ -1,6 +1,7 @@
 import "../../../src/assets/css/index.css";
 import "./theme/host-vars.css";
 import "./assets/toast.css";
+import "./assets/zoom.css";
 import "./assets/shell.css";
 import "./assets/perles.css";
 import "./assets/quiz-bars.css";

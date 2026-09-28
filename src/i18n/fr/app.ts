@@ -48,6 +48,9 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.menu.fullscreen": "Plein écran",
 	"app.menu.devtools": "Outils de développement",
 	"app.menu.nextWallpaper": "Fond suivant",
+	"app.zoom.in": "Zoom avant",
+	"app.zoom.out": "Zoom arrière",
+	"app.zoom.reset": "Réinitialiser",
 
 	/* ── Réglages « Général » (application seulement) ── */
 	"app.settings.defaultFolder": "Dossier de quiz",

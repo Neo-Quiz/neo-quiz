@@ -35,6 +35,7 @@ release notes.
 - A Run button on every Python code block shown in a quiz (readings, explanations, hints, and a question's own code once the quiz is corrected, never before, since running it would give the answer away): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
 - A hard question may let you run its own program once its last hint is revealed, when the quiz was generated that way; never on a question asking what a program prints.
 - The quiz editor has a "Running the code is the last hint" switch under Hint, available once the question holds a Python, C or C++ block and has two hint levels; generated quizzes set it on hard questions where running the program helps.
+- Zoom goes from 25 % to 150 %, on the same steps as a browser. Zooming (Ctrl + wheel or Display > Interface scale) shows the new percentage at the top of the window, with − and + buttons and Reset to go back to 100 %; it goes away on its own after a few seconds.
 
 ### Changed
 - The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
