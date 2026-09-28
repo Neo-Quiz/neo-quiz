@@ -1159,12 +1159,18 @@ body::after {
    (les deux panneaux partagent la même case de grille et la même hauteur —
    voir `nq-empile` plus haut). Elle ne remonte plus : ses 16 px qui
    dépassaient au-dessus du quiz se voyaient pendant tout le quiz.
-   L'ASSOMBRISSEMENT est un voile (`::after`) posé sur le PANNEAU seul, et
-   non une opacité sur toute la coquille : le verre (`backdrop-filter`) reste
-   lisible au lieu de laisser voir le fond d'écran à travers. L'ancienne
-   image clé `opacity: 0.5` de la transition n'était pas acceptable non plus
-   le temps de ses 500 ms : elle coupait le flou du panneau de la première
-   à la dernière image (voir `RECUL`, `transition-quiz.ts`). */
+   PLUS AUCUN ASSOMBRISSEMENT (2026-09-27, « ça gâche la transition ») : ni
+   l'opacité 0,5 du relevé, qui coupait en plus le flou du panneau, ni le
+   voile noir qui l'avait remplacée, ni le rail estompé à 60 %. */
+/* THE SLIDING WINDOW of the transition (`fenetreGlissante`,
+   `ui/transition-quiz.ts`): the page clips its children at its own box,
+   which slides so that its bottom follows the quiz's top edge. Vertical
+   only — the sides keep their shadows. An overflow clip, unlike a
+   `clip-path` or a mask, is not a backdrop root: the panel keeps its blur. */
+#neo-quiz-root > .qbd-layout.nq-fenetre {
+	overflow-x: visible;
+	overflow-y: clip;
+}
 #neo-quiz-root > .qbd-layout.nq-pile-fond {
 	transform: scaleX(0.97);
 }
@@ -1176,34 +1182,12 @@ body::after {
 #neo-quiz-root > .qbd-layout.nq-pile-fond > * {
 	clip-path: inset(0 0 100% 0);
 }
-/* Le voile EXISTE dès que la racine empile (`nq-empile`), à opacité 0 : la
-   transition l'anime (`VOILE`, `transition-quiz.ts`) et `nq-pile-fond` le
-   fige à 1 ensuite — le même nœud d'un bout à l'autre, donc pas de saut au
-   passage de l'animation à l'état figé, dans un sens comme dans l'autre. */
-#neo-quiz-root.nq-empile > .qbd-layout > .qbd-content {
-	position: relative;
-}
-#neo-quiz-root.nq-empile > .qbd-layout > .qbd-content::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	background: rgba(0, 0, 0, 0.35);
-	opacity: 0;
-	pointer-events: none;
-}
-#neo-quiz-root > .qbd-layout.nq-pile-fond > .qbd-content::after {
-	opacity: 1;
-}
-/* Même repli que l'ancienne animation (en-tête effacé, rail estompé), posé
-   ici en statique pour que rien ne reste en `fill: forwards`. */
+/* L'en-tête effacé, comme à la fin de l'animation, posé ici en statique
+   pour que rien ne reste en `fill: forwards`. */
 #neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-fiche-head,
 #neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-quizzes-header,
 #neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-home-header {
 	opacity: 0;
-}
-#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-sidebar {
-	opacity: 0.6;
 }
 
 /* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
