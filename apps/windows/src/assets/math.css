@@ -1,51 +1,25 @@
 /* ══════════════════════════════════════════════════════════
-   LES MATHS DANS LE TEXTE (rendu MathLive de l'application, host/math.ts)
+   MATH IN THE TEXT (the app's MathLive rendering, host/math.ts)
 
-   MathLive compose avec les fontes KaTeX : un Computer Modern à l'œil plus
-   petit que Segoe UI, posé à la MÊME taille que la phrase. Les formules
-   paraissaient maigres et étrangères au texte qui les porte (Ahmed,
-   2026-09-23 : « même la police d'écriture utilisée pour les maths »).
+   Formulas are set in the fonts MathLive ships, KaTeX's Computer Modern:
+   THE typeface of mathematics — LaTeX, exam papers, the French
+   baccalauréat, Obsidian's MathJax. Every part of a formula keeps it,
+   digits and signs included (2026-09-28). From 2026-09-23 the roman parts
+   (digits, signs, brackets, function names: `.ML__cmr`) took the interface
+   font instead, so that the « 11 » of « u₅ = 11 » matched a sentence's;
+   formulas then read as neither text nor mathematics, and the exception
+   that `\neq` needed (its slash only exists in KaTeX_Main) showed how
+   foreign the interface font was to them.
 
-   Deux réglages, comparés à l'écran sur une question de suites :
-   - la formule grandit de 12 % : son œil rejoint celui du texte ;
-   - le romain des formules (chiffres, signes, parenthèses, noms de
-     fonctions : `.ML__cmr`) prend la police du texte, pour que le « 11 » de
-     « u₅ = 11 » soit le même que celui d'une phrase. Les VARIABLES restent
-     en italique mathématique (`.ML__mathit`) : c'est ce qui les distingue
-     d'un mot.
+   The formula is 12 % larger than the sentence: Computer Modern has a
+   smaller eye than Segoe UI, and at the same size formulas looked thin
+   next to the text that carries them.
 
-   Seulement le rendu dans le contenu (`.math`) : le champ de saisie
-   <math-field> vit dans un shadow DOM que ces règles n'atteignent pas, et
-   sous Obsidian les formules passent par MathJax, pas par MathLive.
+   Only the rendering in the content (`.math`): the <math-field> input lives
+   in a shadow DOM these rules do not reach, and under Obsidian formulas go
+   through MathJax, not MathLive.
    ══════════════════════════════════════════════════════════ */
 
 .math .ML__latex {
 	font-size: 1.12em;
 }
-
-.math .ML__cmr {
-	font-family: inherit;
-}
-
-/* EXCEPTION au réglage ci-dessus (retour #15, 2026-09-26 soir) : `\neq`,
-   `\notin`, `\not=`… ne sont pas un caractère unique — MathLive les compose
-   d'un caractère de base et d'un TRAIT diagonal superposé (`\not`, atome
-   "overlap", `.ML__rlap`/`.ML__llap`), ce trait étant un glyphe de la zone
-   d'usage privé (U+E020) qui n'existe QUE dans la fonte KaTeX_Main. Hérite
-   du texte, il tombe sur un fallback système qui ne le connaît pas → un
-   carré vide. `\leq`, `\geq` restent des caractères Unicode ordinaires
-   (`≤`, `≥`), déjà présents dans n'importe quelle fonte : ils ne sont pas
-   concernés et gardent la police du texte comme le reste de `.ML__cmr`. */
-.math .ML__rlap .ML__cmr,
-.math .ML__llap .ML__cmr {
-	font-family: KaTeX_Main;
-}
-
-/* Vérifié à l'écran (revue du lot A2, tour 1) : `\neq`, `\ne`, `\notin` et
-   `\not=` affichent bien leur trait, `\leq`/`\geq` restent inchangés (aucun
-   `.ML__rlap`/`.ML__llap` sur ces deux-là), et une construction `.ML__rlap`
-   qui n'est PAS une négation (`\cancel{5}`, le trait barré d'AMSMATH) rend
-   toujours son chiffre ET son trait — l'exception ci-dessus vise TOUT
-   `.ML__cmr` composé par un overlap, jamais seulement `\not`, et c'est
-   voulu : n'importe quel overlap peut avoir besoin d'un glyphe absent des
-   fontes système. */

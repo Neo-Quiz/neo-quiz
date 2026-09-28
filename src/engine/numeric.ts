@@ -55,10 +55,10 @@ export function isNumericQuestion(q: TextQuestion | null | undefined): boolean {
 const GROUPING = /[\s  ']/g;
 
 /**
- * Lit un nombre en tête de chaîne, quelle que soit sa convention d'écriture :
- * virgule ou point décimal, séparateurs de milliers, notation scientifique,
- * fraction simple (« 1/2 »), signe. Ce qui suit est rendu comme unité.
- * `null` si rien de numérique ne commence la chaîne.
+ * Reads a number at the start of a string, whatever its writing convention:
+ * decimal comma or point (a leading one too, « .49 »), thousands separators,
+ * scientific notation, simple fraction (« 1/2 »), sign. What follows is
+ * returned as the unit. `null` if nothing numeric starts the string.
  */
 export function parseNumericValue(raw: unknown): ParsedNumeric | null {
 	let s = String(raw ?? "").trim();
@@ -80,7 +80,7 @@ export function parseNumericValue(raw: unknown): ParsedNumeric | null {
 		return null;
 	}
 
-	const m = s.match(/^(-?\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?)(.*)$/);
+	const m = s.match(/^(-?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][-+]?\d+)?)(.*)$/);
 	if (!m) return null;
 	const value = Number(m[1].replace(",", "."));
 	if (!Number.isFinite(value)) return null;
@@ -119,21 +119,31 @@ function normalizeUnit(raw: unknown): string {
 }
 
 /**
- * La saisie répond-elle à la question, numériquement ?
- * L'unité n'est vérifiée que si l'élève en a écrit une : l'exiger
- * transformerait une question de calcul en question de notation.
+ * Does the input answer the question, numerically?
+ * The unit is only checked if the learner wrote one: requiring it would turn
+ * a calculation question into a notation question.
+ *
+ * « % » is a SCALE, not a unit (2026-09-28): « 62,5 % » is 0.625. Read as a
+ * unit and then ignored (no unit expected), it made « 62,5 % » wrong for a
+ * probability of 0.625, and « 0,625 % » right for it. Unless the question
+ * itself counts in percent (`unit: "%"`): there « 25 % » and « 25 » both
+ * mean 25.
  */
 export function matchesNumericAnswer(q: NumericQuestion, accepted: string[], value: unknown): boolean {
-	const student = parseNumericValue(value);
+	const expectedUnit = normalizeUnit(q.unit);
+	const inPercent = expectedUnit === "%";
+	const scaled = (p: ParsedNumeric | null): ParsedNumeric | null =>
+		p && !inPercent && p.unit === "%" ? { value: p.value / 100, unit: "" } : p;
+
+	const student = scaled(parseNumericValue(value));
 	if (!student) return false;
 
-	const expectedUnit = normalizeUnit(q.unit);
 	if (student.unit && expectedUnit && normalizeUnit(student.unit) !== expectedUnit) return false;
 	// Unité écrite alors qu'aucune n'est attendue : on ne la retient pas contre
 	// l'élève tant que le nombre, lui, est bon.
 
 	return accepted.some(raw => {
-		const target = parseNumericValue(raw);
+		const target = scaled(parseNumericValue(raw));
 		if (!target) return false;
 		const margin = toleranceFor(q, target.value);
 		// Le zéro machine (0.1 + 0.2 ≠ 0.3) rendrait faux un « 0,3 » exact :
@@ -161,6 +171,9 @@ function latexEnExpression(latex: string): { expr: string; unit: string } {
 	let s = latex.trim().replace(/^\$\$?|\$\$?$/g, "");
 	let unit = "";
 	s = s.replace(/\\(?:text|mathrm|operatorname)\{([^{}]*)\}/g, (_m, u: string) => { unit += u; return ""; });
+	// The math keyboard's « % » is `\%`: a unit like any other here, scaled by
+	// matchesNumericAnswer.
+	s = s.replace(/\\%/g, () => { unit += "%"; return ""; });
 	s = s.replace(/\{,\}/g, ".");
 	s = s.replace(/\\left|\\right/g, "");
 	s = s.replace(/\\[,;:! ]|~|\\quad|\\qquad/g, "");

@@ -115,6 +115,16 @@ function normalizeMathAnswer(latex: unknown, { caseSensitive = false }: { caseSe
 	s = s.replace(/\\[,;!:]/g, "");
 	s = s.replace(/\\(d|t)frac/g, "\\frac");
 	s = s.replace(/\\operatorname\{([a-zA-Z]+)\}/g, "\\$1");
+	/* MathLive REWRITES what the learner types (measured 2026-09-28, typing
+	   into the real field): a prime becomes `^{\prime}` — « f'(3)=6 » comes
+	   out as `f^{\prime}(3)=6` —, a decimal comma stays a comma or becomes
+	   `{,}`, and « 15/7 » stays a slash. The answers a model writes use
+	   `f'`, `1.5` and `\frac{15}{7}`: every correct answer to a derivative
+	   was marked wrong. Same writing, same form, on both sides. */
+	s = s.replace(/\^\{((?:\\prime)+)\}|\^((?:\\prime)+)|\\prime/g, (m, braced?: string, bare?: string) =>
+		"'".repeat(((braced ?? bare ?? m).match(/\\prime/g) ?? []).length));
+	s = s.replace(/\{,\}/g, ",").replace(/(\d),(?=\d)/g, "$1.");
+	s = s.replace(/\\frac\{(\d+(?:\.\d+)?)\}\{(\d+(?:\.\d+)?)\}/g, "$1/$2");
 	// Accolades singleton : x^{2} → x^2 (répété pour les imbrications).
 	for (let i = 0; i < 3; i++) s = s.replace(/\{([a-zA-Z0-9])\}/g, "$1");
 	if (!caseSensitive) s = s.toLowerCase();
