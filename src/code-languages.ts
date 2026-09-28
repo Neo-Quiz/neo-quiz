@@ -28,8 +28,8 @@ export function langageDeBloc(tag: string): CodeLanguage | null {
 /** Variant name of a terminal, brought to its canonical form.
     Lives at the MODULE level and is EXPORTED, because the editor needs it as much
     as the engine: `editor/convert.ts` recognized only `terminalVariant: 'cmd'`,
-    `textVariant: 'powershell'` and `textVariant: 'bash'` — three exact forms. Ahmed's
-    22 Cisco questions write `textVariant: 'command'`, which the engine displays well
+    `textVariant: 'powershell'` and `textVariant: 'bash'` — three exact forms. 22 real
+    Cisco questions write `textVariant: 'command'`, which the engine displays well
     in terminal `cmd` but which the editor took for plain text: the first save erased
     the variant AND its prompt (`Town-Hall#`, `Router>`…). A single table of aliases,
     two readers. */
@@ -80,7 +80,9 @@ export const isShellVariant = (variant: string | null | undefined): boolean =>
 	!!variant && SHELL_VARIANTS.has(variant);
 
 function isTextQuestion(q: unknown): q is Record<string, unknown> {
-	return !!q && typeof q === "object" && (q as { type?: unknown }).type === "text";
+	if (!q || typeof q !== "object") return false;
+	const o = q as { type?: unknown; text?: unknown };
+	return o.type === "text" || o.text === true;
 }
 
 /** The terminal variant a text question names, the engine's own reading. */

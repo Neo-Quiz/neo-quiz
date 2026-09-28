@@ -19,6 +19,7 @@ await withSrcModule("src/code-languages.ts", (m) => {
 	r.check("command: true is cmd", m.isProgramOutputQuestion(txt({ command: true })), false);
 	r.check("plain text question", m.isProgramOutputQuestion(txt({})), false);
 	r.check("not a text question", m.isProgramOutputQuestion({ prompt: "Q", options: ["a"], terminalVariant: "python" }), false);
+	r.check("legacy text marker with python variant", m.isProgramOutputQuestion({ text: true, prompt: "Q", terminalVariant: "python" }), true);
 
 	r.check("blocks of a statement", m.blocsExecutablesDe("Voici :\n\n```c\nint x;\n```\n\n```bash\nls\n```\n\n```python\nx=1\n```"), ["c", "python"]);
 	r.check("no fenced block", m.blocsExecutablesDe("`x = 1` inline only"), []);
