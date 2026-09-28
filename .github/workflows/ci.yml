@@ -172,6 +172,11 @@ jobs:
       - name: Quiz session snapshot
         run: npm run check:session
 
+      # THE LEARN RETRY LOOP: a missed question comes back after two other
+      # checks or at the end of its step, never at once, three retries at most.
+      - name: Learn retry loop
+        run: npm run check:learn-loop
+
       # L'HISTORIQUE DES TENTATIVES : meilleur score dérivé, anciens scores
       # lus sans perte, suppression et annulation symétriques.
       - name: Stats attempts
