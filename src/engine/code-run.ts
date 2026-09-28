@@ -110,6 +110,18 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		}
 	}
 
+	/** Un bloc de code de l'ÉNONCÉ d'une question pas encore corrigée : son
+	    bouton reste masqué (2026-09-27). Exécuter le programme d'un « que va
+	    afficher ce programme ? » donnait la réponse. Le signe de correction est
+	    celui du glossaire (engine/termes.ts) : le verrou global du quiz,
+	    `.quiz-is-locked`. Une LECTURE (`data-lecture`), un indice, une
+	    explication gardent le leur : ils enseignent, ils ne demandent rien. */
+	function enonceNonCorrige(bloc: HTMLElement): boolean {
+		return !!bloc.closest(".quiz-question")
+			&& !bloc.closest(".quiz-card[data-lecture]")
+			&& !bloc.closest(".quiz-is-locked");
+	}
+
 	function bindCodeRunButtons(rootEl: Element | null = ctx.container): void {
 		if (!rootEl) return;
 		const python = ctx.host.python;
@@ -124,6 +136,10 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				bloc.classList.remove("quiz-code-block-executable");
 				return;
 			}
+
+			// Masqué tel qu'émis (grammaire-blocs.ts) ; réévalué au prochain
+			// rendu de la carte, une fois le quiz corrigé.
+			if (enonceNonCorrige(bloc)) return;
 
 			btn.hidden = false;
 			btn.setAttribute("aria-label", t("engine.code.run"));

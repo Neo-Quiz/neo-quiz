@@ -64,18 +64,61 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		if (suivante !== null) ctx.goToQuestion(suivante);
 	}
 
+	/* The press SPRING of an option (2026-09-27). A click re-renders the whole
+	   card (refreshQuestionSlide): the pressed option is REPLACED by a new
+	   element already at rest, so it used to jump back up in one frame. The
+	   new element of the clicked option replays the release instead
+	   (`is-released`, quiz-options.css); an option that gains the choice
+	   fades into its blue (`is-now-selected`), one that loses it fades out
+	   (`is-deselected`). Each class is removed at the end of ITS animation,
+	   so a later re-render never inherits it. */
+	const RELEASE_ANIMATIONS: Record<string, string> = {
+		"is-released": "quiz-option-release",
+		"is-now-selected": "quiz-option-select",
+		"is-deselected": "quiz-option-deselect",
+	};
+
+	function playOptionRelease(qi: number, pressed: number, gained: number[], lost: number[]): void {
+		const item = ctx.container.querySelector<HTMLElement>(`.quiz-track-item[data-slide-kind="question"][data-qi="${qi}"]`);
+		if (!item) return;
+		const mark = (oi: number, cls: string): void => {
+			const el = item.querySelector<HTMLElement>(`.quiz-option[data-orig="${oi}"]`);
+			if (!el) return;
+			el.classList.add(cls);
+			const end = (e: AnimationEvent): void => {
+				if (e.animationName !== RELEASE_ANIMATIONS[cls]) return;
+				el.classList.remove(cls);
+				el.removeEventListener("animationend", end);
+			};
+			el.addEventListener("animationend", end);
+		};
+		mark(pressed, "is-released");
+		for (const oi of gained) mark(oi, "is-now-selected");
+		for (const oi of lost) mark(oi, "is-deselected");
+	}
+
 	function bindBinaryQuestion(trackItem: HTMLElement, qi: number, isMulti: boolean): void {
 		trackItem.querySelectorAll<HTMLElement>(".quiz-option").forEach(el => {
 			const oi = Number(el.dataset.orig);
 			const trySelect = () => {
 				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				const gained: number[] = [];
+				const lost: number[] = [];
 				if (isMulti) {
 					const s = ctx.quizState.selections[qi];
 					if (!(s instanceof Set)) return;
-					if (s.has(oi)) s.delete(oi);
-					else s.add(oi);
-				} else ctx.quizState.selections[qi] = oi;
+					if (s.has(oi)) { s.delete(oi); lost.push(oi); }
+					else { s.add(oi); gained.push(oi); }
+				} else {
+					const previous = ctx.quizState.selections[qi];
+					if (previous !== oi) {
+						gained.push(oi);
+						if (typeof previous === "number") lost.push(previous);
+					}
+					ctx.quizState.selections[qi] = oi;
+				}
 				commitQuestionInteraction(qi, { syncHeight: true });
+				playOptionRelease(qi, oi, gained, lost);
 			};
 			el.addEventListener("click", trySelect);
 			el.addEventListener("keydown", e => {

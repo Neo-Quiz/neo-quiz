@@ -1,31 +1,32 @@
 /* =========================================================
-   25) SORTIE D'UN PROGRAMME
-   Retour #2 (2026-09-26 soir) + sa précision du 27/09 : une variante
-   terminal qui n'est PAS une vraie invite de commande (python, java…)
-   n'affiche plus « C:\> » — l'élève écrirait une sortie de programme,
-   pas une commande. Même look que .quiz-md-code (Tokyo Night, Neo Quiz
-   Mono, cf. quiz-card.css) : un libellé discret au lieu d'une invite,
-   une hauteur DE DÉPART posée par l'attribut `rows` (countAnswerLines,
-   engine/terminal.ts) qui grandit avec la saisie — jamais d'ascenseur.
+   25) A PROGRAM'S OUTPUT
+   Feedback #2 (2026-09-26 evening) and its follow-up of 2026-09-27: a
+   terminal variant that is NOT a real command prompt (python, java…) no
+   longer shows "C:\>" — the learner writes a program's output, not a
+   command. Same look as .quiz-md-code (Tokyo Night, Neo Quiz Mono, see
+   quiz-card.css): a quiet placeholder instead of a prompt, a STARTING
+   height set by the `rows` attribute (countAnswerLines, engine/terminal.ts)
+   that grows with typing — never a scrollbar.
    ========================================================= */
 
 .quiz-text-wrap-program{
   margin: 10px var(--quiz-option-side-gap) 0;
 }
 
-/* `.quiz-md-code` (quiz-card.css) porte déjà le fond, la bordure, le
-   rayon et la police Tokyo Night — cette classe n'ajoute que la mise en
-   colonne du libellé et le champ. */
+/* `.quiz-md-code` (quiz-card.css) already carries the background, border,
+   radius and Tokyo Night font. No label above the field any more
+   (2026-09-27): "Program output…" is its placeholder. */
 .quiz-program-output{
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: block;
+  padding: 10px 16px 12px;
 }
 
-.quiz-program-output-label{
-  color: var(--qmc-comment);
-  font-size: 0.78em;
-  font-weight: 700;
+/* `.quiz-md-code` is `white-space: pre` (a code block): the template's line
+   breaks and tabs around the `<textarea>` (terminal.ts) showed as empty
+   lines — a one-line field in a six-line frame. The field keeps its own
+   `pre-wrap`. Three classes: it must beat `.quiz-md-code.quiz-md-code`. */
+.quiz-md-code.quiz-md-code.quiz-program-output{
+  white-space: normal;
 }
 
 .quiz-program-output.correct{
@@ -38,10 +39,19 @@
 
 .quiz-textarea.quiz-textarea-program{
   display: block;
-  width: 100%;
+  /* The height comes from `rows` (the expected answer), never from a
+     floor: a 220 px floor once opened a ten-line field for a one-line
+     answer. */
+  min-height: 0;
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+  /* Two pixels of inner padding, offset by a negative margin: the text stays
+     aligned with the code's lines. Without them, the caret of an EMPTY
+     field was drawn on the field's left edge, which cut it down to a small
+     grey tick — it only became normal at the first character (reproduced
+     in Electron, 2026-09-27). */
+  width: calc(100% + 2px);
+  margin: -2px 0 -2px -2px;
+  padding: 2px 0 2px 2px;
   border: 0;
   resize: none;
   background: transparent;
@@ -49,9 +59,8 @@
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
-  /* Un mot trop long pour tenir sur une ligne se coupe plutôt que de
-     pousser un ascenseur horizontal (contrairement à .quiz-md-code, un
-     bloc affiché, jamais saisi). */
+  /* A word too long for a line wraps rather than pushing a horizontal
+     scrollbar (unlike .quiz-md-code, a block that is shown, never typed). */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: hidden;
@@ -59,6 +68,76 @@
   outline: none;
 }
 
+/* The theme's comment grey-blue, pulled towards the app's blue: it reads as
+   an invitation, not as a comment of the program. */
 .quiz-textarea.quiz-textarea-program::placeholder{
-  color: var(--qmc-comment);
+  color: color-mix(in srgb, var(--quiz-primary-light) 45%, var(--qmc-comment));
+  font-style: italic;
+}
+
+/* THE CARET (2026-09-27): a normal bar, in the app's blue — its light
+   shade, the full blue being lost on the block's dark background. A block
+   "terminal" caret read as a display glitch. */
+.quiz-textarea.quiz-textarea-program{
+  caret-color: var(--quiz-primary-light);
+}
+
+/* The placeholder ("Program output…") says WHERE to write while the field
+   waits; on click it clears, leaving only the caret. Left visible, the
+   caret of an empty field was drawn at the left edge, over the "P" — or,
+   when shifted, in front of text that was not an entry. */
+.quiz-textarea.quiz-textarea-program:focus::placeholder{
+  color: transparent;
+}
+
+/* THE SELECTION: the system's solid navy read as a highlight laid on the
+   answer. The app's accent blue, softened, and the text keeps its colour.
+   (`::selection` accepts no `border-radius`: the corners stay square,
+   whatever the style.) */
+.quiz-textarea.quiz-textarea-program::selection{
+  background: color-mix(in srgb, var(--quiz-primary) 45%, transparent);
+  color: var(--qmc-fg);
+}
+
+/* IN THE PROMPT'S CODE BLOCK (2026-09-27, engine/sortie-programme.ts): when
+   the prompt ends with the program whose output is asked, the field TAKES
+   THE PLACE of that block's output panel (`.quiz-code-output`,
+   quiz-card.css), where "Run" usually shows it — same rule, same background
+   one step darker than the code, never a second frame. The frame and its
+   corners are the block's. */
+.quiz-code-reponse{
+  margin: 0;
+  padding: 10px 16px 12px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--qmc-fg, var(--text-normal)) 7%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--qmc-bg, var(--background-secondary)), black 22%);
+  font-family: "Neo Quiz Mono", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+/* A NON-executable block (a non-Python language, the plugin, or a host
+   without a sandbox) carries its frame on the `<pre>` and not on its
+   wrapper: the frame is extended around the field. */
+.quiz-code-block:not(.quiz-code-block-executable):has(> .quiz-code-reponse) > .quiz-md-code.quiz-md-code{
+  /* No longer the last child: its paragraph bottom margin (quiz-card.css)
+     opened an empty band between the code and the field. */
+  margin: 0;
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.quiz-code-block:not(.quiz-code-block-executable) > .quiz-code-reponse{
+  border: 1px solid var(--qmc-border, var(--background-modifier-border));
+  border-top-color: color-mix(in srgb, var(--qmc-fg, var(--text-normal)) 7%, transparent);
+  border-radius: 0 0 12px 12px;
+}
+/* The verdict colours the block's FRAME, as it coloured the field's. */
+.quiz-code-block-executable:has(> .quiz-code-reponse.correct),
+.quiz-code-block:not(.quiz-code-block-executable) > .quiz-code-reponse.correct{
+  border-color: var(--quiz-success);
+}
+.quiz-code-block-executable:has(> .quiz-code-reponse.wrong),
+.quiz-code-block:not(.quiz-code-block-executable) > .quiz-code-reponse.wrong{
+  border-color: var(--quiz-danger);
 }

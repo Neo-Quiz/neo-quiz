@@ -6,7 +6,7 @@
   .quiz-tab,
   .quiz-option,
   .quiz-action-btn,
-  .quiz-chip,
+  .quiz-submit-perle,
   .quiz-hint-btn,
   .quiz-hint-modal-close,
   .quiz-slot,
@@ -22,21 +22,8 @@
   /* Les onglets n'ont plus de variante tactile : leur appui « à presser »
      (nav-tabs.css) est le même partout (2026-09-25). */
 
-  .quiz-option:not(.selected):not(.correct):not(.wrong):hover,
-  .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
-    transform: translate3d(2px,0,0);
-    box-shadow:
-      0 0 0 1.5px var(--quiz-primary-ring-16),
-      0 0 10px var(--quiz-primary-ring-20);
-  }
-
-  .quiz-option.selected:hover,
-  .quiz-option.selected:focus-visible{
-    transform: translate3d(1px,0,0);
-    box-shadow:
-      0 0 0 1.5px var(--quiz-primary-ring-20),
-      0 0 10px var(--quiz-primary-ring-22);
-  }
+  /* Hovering and selecting an option: the same style as on desktop
+     (quiz-options.css, 2026-09-27), without glow or slide. */
 
   .quiz-option.correct:hover,
   .quiz-option.correct:focus-visible{
@@ -56,8 +43,6 @@
 
   .quiz-action-btn:hover,
   .quiz-action-btn:focus-visible,
-  .quiz-chip:hover,
-  .quiz-chip:focus-visible,
   .quiz-hint-modal-close:hover,
   .quiz-hint-modal-close:focus-visible{
     transform: translate3d(0,-1px,0);
@@ -117,37 +102,13 @@
     min-width: 154px;
   }
 
-  .quiz-slot{
-    min-height: 52px;
-    padding: 12px 14px;
-  }
-
-  .quiz-slot.dragover{
-    transform: translate3d(0, -1px, 0);
-    box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 10%, transparent),
-      0 0 10px color-mix(in srgb, var(--quiz-primary) 8%, transparent);
-  }
-
-  .quiz-slot.dragover.swap-target{
-    box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 12%, transparent),
-      0 0 12px color-mix(in srgb, var(--quiz-primary) 10%, transparent);
-  }
-
-  .quiz-possibility.dragging,
-  .quiz-slot.dragging{
-    transform: translate3d(0, -1px, 0);
-    box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 10%, transparent),
-      0 0 8px color-mix(in srgb, var(--quiz-primary) 6%, transparent);
-  }
+  /* Slots and pieces: the same look as on desktop (ordering.css,
+     2026-09-27) — no glow or lift while dragging. */
 
   .quiz-tab,
   .quiz-option,
   .quiz-hint-btn,
   .quiz-action-btn,
-  .quiz-chip,
   .quiz-hint-modal,
   .quiz-hint-modal-close{
     will-change: auto;

@@ -409,7 +409,7 @@ await withSrcModule(
 /* Texte à trous : une paire markdown qui ENJAMBE un trou doit rester une
    paire. Rendre chaque segment séparément laissait « `git ` » et « ` -b` »
    avec un accent grave chacun, tous deux affichés bruts. */
-await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots }) => {
+await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots, codeClozeHtml }) => {
 	const r = makeReporter("Trous");
 
 	const rendu = (gabarit) => {
@@ -442,6 +442,36 @@ await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots }) => {
 		marked.includes(String.fromCharCode(0)), false);
 	r.check("jeton sans lettres lisibles",
 		/CLOZE/.test(marked), false);
+
+	/* A blank in CODE, one pair of backticks per line: a single block, the
+	   indentation kept. Rendered as markdown, the lines became spaced-out
+	   paragraphs, a loop body at the level of its `for`. */
+	const code = (template) => {
+		const html = codeClozeHtml(markSlots(template).marked);
+		return html === null ? null : fillSlots(html, (i) => "[" + i + "]");
+	};
+	r.check("code: one block, indentation kept",
+		code("`for i in x:`\n`    L.{{append}}(i)`"),
+		"<pre class=\"quiz-cloze-code\"><code>for i in x:\n    L.[0](i)</code></pre>");
+	r.check("code: escaped", code("`a < {{b}} & c`"),
+		"<pre class=\"quiz-cloze-code\"><code>a &lt; [0] &amp; c</code></pre>");
+	r.check("code: inner empty line kept", code("`a`\n\n`{{b}}`"),
+		"<pre class=\"quiz-cloze-code\"><code>a\n\n[0]</code></pre>");
+	r.check("sentence with code: not a block", code("tape `git {{checkout}} -b` ici"), null);
+
+	/* A blank INSIDE a formula (2026-09-28): the formula is closed before the
+	   blank and reopened after, never carried into the TeX. */
+	r.check("blank inside a formula", rendu("donne $du = {{3}}dx$, ok").rempli, "donne $du =$ [0]$dx$, ok");
+	r.check("blank at the end of a formula", rendu("$u = {{7}}$").rempli, "$u =$ [0]");
+	r.check("two blanks in one formula", rendu("$a {{1}} b {{2}} c$").rempli, "$a$ [0] $b$ [1] $c$");
+	r.check("formula without a blank untouched", rendu("$x^2$ et {{y}}").rempli, "$x^2$ et [0]");
+	r.check("dollar in code untouched", rendu("`echo $HOME {{x}} $PATH`").rempli, "`echo $HOME [0] $PATH`");
+	r.check("escaped dollar untouched", rendu("5 \\$ et {{x}} \\$").rempli, "5 \\$ et [0] \\$");
+	/* A blank's answers may hold LaTeX braces. */
+	r.check("braces in a blank's answer", rendu("$dx = {{\\frac{1}{3}|1/3}}du$").n, 1);
+	r.check("braces in a blank's answer: rendered", rendu("$dx = {{\\frac{1}{3}|1/3}}du$").rempli, "$dx =$ [0]$du$");
+	r.check("two levels of braces", rendu("{{\\frac{\\sqrt{2}}{2}}}").n, 1);
+	r.check("a line of text among the code: not a block", code("`a`\nfin {{b}}"), null);
 
 	r.done();
 });

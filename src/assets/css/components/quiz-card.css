@@ -171,8 +171,11 @@
    après. */
 .quiz-md-code.quiz-md-code,
 /* L'enveloppe d'un bloc exécutable porte la MÊME palette : son fond et sa
-   sortie la lisent, et sans elle ils retombaient sur les couleurs de repli. */
-.quiz-code-block-executable{
+   sortie la lisent, et sans elle ils retombaient sur les couleurs de repli.
+   De même le champ d'une sortie de programme posé dans un bloc
+   (terminal-program.css, `.quiz-code-reponse`). */
+.quiz-code-block-executable,
+.quiz-code-reponse{
   --qmc-bg: #1a1b26;
   --qmc-border: #24283b;
   --qmc-fg: #c0caf5;
@@ -443,14 +446,15 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   font-weight: 600;
 }
 
+/* The instruction line of a question ("Select one or more answers", how
+   to order, how to match) — restyled 2026-09-27. No framed banner any more:
+   a full-width tinted box between the prompt and the answers read as a
+   second prompt. A small muted line, in the margin of the answers. */
 .quiz-multi-indicator{
-  margin: 0 0 12px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.75em;
+  margin: 0 var(--quiz-option-side-gap) 4px;
+  color: var(--text-faint);
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--quiz-primary) 8%, var(--background-secondary));
-  border: 1px solid color-mix(in srgb, var(--quiz-primary) 20%, var(--background-modifier-border));
+  letter-spacing: 0.01em;
 }
 

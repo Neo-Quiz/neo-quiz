@@ -2,26 +2,12 @@
    17) THEME CLAIR — corrections
    ========================================================= */
 
-/* Ni les onglets ni les boutons verts : leur tranche est leur ombre
-   (boutons « à presser », 2026-09-25). */
-.theme-light .quiz-option:not(:hover):not(:focus-visible),
+/* Neither the tabs, the green buttons nor the answer options: their edge
+   IS their shadow ("press me" buttons, 2026-09-25 and 2026-09-27). */
 .theme-light .quiz-action-btn:not(.success):not(:hover):not(:focus-visible),
-.theme-light .quiz-chip:not(:hover):not(:focus-visible),
-.theme-light .quiz-submit-card,
 .theme-light .quiz-result,
 .theme-light .quiz-hint-modal{
   box-shadow: none !important;
-}
-
-.theme-light .quiz-chip{
-  color: var(--text-normal) !important;
-}
-
-.theme-light .quiz-option:not(.selected):not(.correct):not(.wrong):hover,
-.theme-light .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-22),
-    0 0 16px var(--quiz-primary-ring-16) !important;
 }
 
 .theme-light .quiz-action-btn:hover,
@@ -31,10 +17,4 @@
     0 0 16px var(--quiz-primary-ring-12) !important;
 }
 
-.theme-light .quiz-chip:hover,
-.theme-light .quiz-chip:focus-visible{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-16),
-    0 0 16px var(--quiz-primary-ring-12) !important;
-}
 

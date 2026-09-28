@@ -17,6 +17,7 @@ import { reinitialiserBudgetRendu } from "../engine/code-highlight";
    n'importe rien de l'éditeur. */
 import { usesMathField, createMathField } from "../engine/math-input";
 import { isShellVariant, defaultTerminalPromptPrefix } from "../engine/terminal";
+import { placerReponseDansLeCode } from "../engine/sortie-programme";
 import {
 	correctOptionIndices,
 	acceptedAnswersCorrige,
@@ -262,15 +263,6 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 	inlineInto(titleEl, q.title || fallbackTitle, opts.sourcePath);
 	if (opts.corrige) titleEl.setAttribute("data-edit", "title");
 
-	if (q.resourceButton) {
-		const rbtn = ajouter(card, "button", "quiz-resource-btn");
-		const icon = ajouter(rbtn, "span", "quiz-resource-btn-icon");
-		_setIcon(icon, "paperclip");
-		// Même raison : le moteur rend ce libellé (sanitizer.ts resourceButtonHtml).
-		inlineInto(ajouter(rbtn, "span", "quiz-resource-btn-label"),
-			q.resourceButton.label || t("editor.preview.resourceFallback"), opts.sourcePath);
-	}
-
 	if (q.role === "read" && (q._promptHtml || q.prompt)) {
 		/* Une LECTURE affichée comme écran : son texte dans son STYLE, par le
 		   même rendu que le moteur (engine/cards.ts) ; le titre reste le
@@ -425,12 +417,14 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 				if (variantsHtml) shellWrap.insertAdjacentHTML("afterend", variantsHtml);
 			}
 		} else {
-			// Sortie d'un programme (retour #2, 2026-09-26 soir) : même style que
-			// le quiz réel (.quiz-md-code), un libellé au lieu d'une invite.
+			// Sortie d'un programme : même rendu que le quiz réel (.quiz-md-code),
+			// « Program output » en placeholder et collé sous le bloc de code de
+			// l'énoncé (terminal-program.css), plus de libellé au-dessus.
 			const programWrap = ajouter(card, "div", "qcm-options quiz-text-wrap quiz-text-wrap-program");
 			const programBox = ajouter(programWrap, "div", "quiz-md-code quiz-program-output" + (opts.corrige ? " correct" : ""));
-			ajouter(programBox, "div", "quiz-program-output-label", t("engine.terminal.programOutputLabel"));
 			const progTa = ajouter(programBox, "textarea", "quiz-textarea quiz-textarea-program");
+			progTa.rows = 1;
+			progTa.placeholder = t("engine.terminal.programOutputLabel");
 			progTa.readOnly = true;
 			progTa.setAttribute("aria-readonly", "true");
 			if (opts.corrige) {
@@ -442,7 +436,22 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 			} else {
 				progTa.value = "";
 			}
+			// Comme dans le quiz : dans le bloc de code de l'énoncé, à la place
+			// de son panneau de sortie (engine/sortie-programme.ts).
+			placerReponseDansLeCode(card);
 		}
+	}
+
+	/* The resource button AFTER the content, like the quiz (engine/cards.ts,
+	   2026-09-27): never above a reading's text. Its label renders its
+	   markdown for the same reason as the engine (sanitizer.ts
+	   resourceButtonHtml). */
+	if (q.resourceButton) {
+		const rbtn = ajouter(card, "button", "quiz-resource-btn");
+		const icon = ajouter(rbtn, "span", "quiz-resource-btn-icon");
+		_setIcon(icon, "paperclip");
+		inlineInto(ajouter(rbtn, "span", "quiz-resource-btn-label"),
+			q.resourceButton.label || t("editor.preview.resourceFallback"), opts.sourcePath);
 	}
 
 	if (opts.onHint && q.hint && q.hint.trim()) {

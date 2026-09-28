@@ -517,12 +517,18 @@ await withSrcModule(
 		ctx.quizState.textOnlyAnswers = [""];
 		ctx.quizState.textOnlyChecked = [false];
 		ctx.textOnly = createTextOnlyHandlers(ctx);
+		// Since the 2026-09-27 redesign the prompt is rendered ON the card's
+		// front by the flashcard itself (cards.ts no longer draws it above).
+		ctx.cards = { ...(ctx.cards ?? {}), renderQuizPromptHtml: q => String(q.prompt ?? "") };
+		ctx.escapeHtmlAttr ??= v => String(v);
 
 		r.check("une carte est auto-évaluée même hors Leçon", ctx.textOnly.isTextOnlyFor(0), true);
 		r.check("non notée : incomplète", ctx.isComplete(0), false);
 		const html = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
 		r.check("recto : un bouton Retourner, aucune zone de saisie",
 			[html.includes("quiz-flashcard-flip-btn"), html.includes("<textarea")], [true, false]);
+		r.check("front: the prompt is on the card, the answer is not in the DOM yet",
+			[html.includes("Que renvoie"), html.includes("quiz-flashcard-back"), html.includes(">list<")], [true, false, false]);
 
 		ctx.quizState.textOnlyChecked[0] = true;
 		const verso = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);

@@ -135,6 +135,42 @@
   white-space: nowrap;
 }
 
+/* ── Fill-in-the-blanks on CODE (codeClozeHtml) ──
+   A tight block that keeps the indentation. The line height stays wide
+   enough for the boxes, which take the code's font: a box in a proportional
+   font in the middle of a line of code read as a hole in the layout, not in
+   the program. */
+.quiz-cloze .quiz-cloze-code{
+  margin: 4px 0;
+  padding: 10px 16px;
+  overflow-x: auto;
+  background: var(--code-background);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  line-height: 2.1;
+  white-space: pre;
+}
+
+.quiz-cloze .quiz-cloze-code code{
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: inherit;
+  color: var(--text-normal);
+}
+
+.quiz-cloze .quiz-cloze-code .quiz-cloze-input{
+  width: 10ch;
+  padding: 1px 6px;
+  font-family: var(--font-monospace);
+  font-size: 1em;
+  line-height: 1.4;
+}
+
 .quiz-cloze-embed-wrap{
   display: block;
   margin: 10px 0;

@@ -61,14 +61,20 @@
   outline-offset: 2px;
 }
 
-/* L'indice RÉVÉLÉ : il reste sous la question, dans une boîte teintée
-   d'ambre, et se relit sans rouvrir de fenêtre. */
+/* The REVEALED hint: it stays under the question, in an amber-tinted box,
+   and can be read again without reopening a window. */
 .quiz-hint-inline{
   margin-top: 14px;
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--quiz-hint) 30%, transparent);
   background: color-mix(in srgb, var(--quiz-hint) 9%, transparent);
+}
+
+/* Only the level just revealed fades in (engine/hint.ts, `niveauRevele`):
+   the card is rebuilt on every answer change, and an animation on every
+   .quiz-hint-inline replayed each time. */
+.quiz-hint-inline.is-revealed{
   animation: quiz-hint-inline-in 220ms ease-out backwards;
 }
 
@@ -124,7 +130,7 @@
 
 @media (prefers-reduced-motion: reduce){
   .quiz-help-btn{ transition: none; }
-  .quiz-hint-inline{ animation: none; }
+  .quiz-hint-inline.is-revealed{ animation: none; }
 }
 
 

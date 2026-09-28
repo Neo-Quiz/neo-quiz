@@ -442,3 +442,65 @@
   box-shadow: none !important;
   background: transparent !important;
 }
+/* ---------------------------------------------------------
+   THE TERMINAL WINDOW (2026-09-27, engine/terminal.ts): a title bar naming
+   the shell above the prompt, so the question reads as a terminal and not
+   as a coloured bar. The bar takes the shell's colour, one step lighter;
+   the shell below loses its top corners and is otherwise untouched.
+   --------------------------------------------------------- */
+.quiz-term-window{
+  --term-bar-bg: #1f1f1f;
+  --term-bar-fg: #bdbdbd;
+  --term-bar-edge: #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.quiz-term-window[data-terminal-variant="powershell"]{
+  --term-bar-bg: #0d2c63;
+  --term-bar-fg: #dbe4ff;
+  --term-bar-edge: #0d2c63;
+}
+
+.quiz-term-window[data-terminal-variant="bash"],
+.quiz-term-window[data-terminal-variant="sh"],
+.quiz-term-window[data-terminal-variant="zsh"]{
+  --term-bar-bg: rgb(34, 30, 48);
+  --term-bar-fg: #c9c3dc;
+  --term-bar-edge: rgb(40, 36, 56);
+}
+
+.quiz-term-titlebar{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--term-bar-edge);
+  border-bottom: none;
+  border-radius: 0.533em 0.533em 0 0;
+  background: var(--term-bar-bg);
+  color: var(--term-bar-fg);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
+.quiz-term-titlebar svg{
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Three classes: the variant sheets set the shell's radius with two. */
+.quiz-term-window > .quiz-command-shell.quiz-command-shell{
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  min-height: calc(var(--cmd-shell-pad-top) + var(--cmd-shell-pad-bottom) + 3em);
+  align-items: flex-start;
+}

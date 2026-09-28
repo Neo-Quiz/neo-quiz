@@ -1,11 +1,11 @@
 /* =========================================================
-   SUPPORT DE COMPRÉHENSION — document lu avant de répondre
-   (engine/passage.ts). Encastré en tête de carte, repliable.
+   COMPREHENSION DOCUMENT — a document read before answering
+   (engine/passage.ts). Inset at the top of the card, collapsible.
 
-   Registre visuel volontairement DISTINCT de .quiz-learn-section :
-   la leçon enseigne (teinte primaire, elle appartient au quiz), le
-   document est une pièce du sujet — surface neutre encastrée, comme
-   une feuille agrafée à l'énoncé.
+   Visual register deliberately DISTINCT from .quiz-learn-section:
+   the lesson teaches (primary tint, it belongs to the quiz), the
+   document is a piece of the exam paper — a neutral inset surface,
+   like a sheet stapled to the question.
    ========================================================= */
 
 .quiz-passage{
@@ -16,7 +16,7 @@
   overflow: hidden;
 }
 
-/* ── En-tête ── */
+/* ── Header ── */
 
 .quiz-passage-head{
   display: flex;
@@ -54,8 +54,8 @@
   white-space: nowrap;
 }
 
-/* Portée du document (« questions 2 à 4 ») : l'information qui manque le plus
-   sur un sujet à support partagé — combien de questions en dépendent. */
+/* The document's scope ("questions 2 to 4"): what is missing most on a paper
+   with a shared document — how many questions depend on it. */
 .quiz-passage-scope{
   flex: 0 0 auto;
   padding: 2px 8px;
@@ -103,32 +103,33 @@
   transform: rotate(-90deg);
 }
 
-/* ── Corps ──
-   Repli en display:none, JAMAIS une animation de hauteur : la piste du quiz
-   est une surface translatée (translateX), et un collapse animé y laisse des
-   pixels fantômes du compositeur. Le moteur resynchronise la hauteur de slide
-   après le clic (passage.ts). */
+/* ── Body ──
+   Collapsed with display:none, NEVER a height animation: the quiz track is a
+   translated surface (translateX), and an animated collapse leaves compositor
+   ghost pixels on it. The engine resyncs the slide height after the click
+   (passage.ts). */
 .quiz-passage.is-collapsed .quiz-passage-body{
   display: none;
 }
 
 .quiz-passage-content{
-  /* Un document long ne doit pas étirer la carte à l'infini : il défile chez
-     lui. Le plafond suit la fenêtre pour rester lisible sur grand écran. */
-  max-height: min(46vh, 420px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Never a height cap with its own scrollbar, above a question as much as on
+     a reading card: a reading shows in full and the page scrolls instead.
+     Rule set on 2026-09-02 for reading cards ("it breaks concentration"),
+     extended on 2026-09-26 to the document above a question, which had kept a
+     min(46vh, 420px) cap and cut the reading in two. It is up to the CONTENT
+     to fit the screen: a document that overflows is a slice too large. */
   padding: 14px 16px;
   font-size: 0.94em;
   line-height: 1.72;
   color: var(--text-normal);
-  /* Registre « texte à lire » : la lecture prime sur la densité. */
+  /* "Text to read" register: reading comes before density. */
   text-align: left;
   overflow-wrap: anywhere;
-  /* Les sauts de ligne du support sont déjà des <br> ; ce qui se perdait, ce
-     sont les ESPACES CONSÉCUTIFS — donc toute l'indentation d'un extrait de
-     code collé en document. `break-spaces` les conserve tout en laissant les
-     lignes se replier (contrairement à `pre`, qui déborderait). */
+  /* The document's line breaks are already <br>; what got lost were the
+     CONSECUTIVE SPACES, hence the whole indentation of a code excerpt pasted
+     as a document. `break-spaces` keeps them while letting lines wrap
+     (unlike `pre`, which would overflow). */
   white-space: break-spaces;
   tab-size: 2;
 }
@@ -141,8 +142,8 @@
   font-size: 0.9em;
 }
 
-/* Le code garde ses lignes longues et défile chez lui — jamais de scroll
-   horizontal sur la carte. */
+/* Code keeps its long lines and scrolls sideways inside its own block —
+   never a horizontal scroll on the card. */
 .quiz-passage-content pre{
   background: var(--code-background);
   border: 1px solid var(--background-modifier-border);
@@ -174,38 +175,13 @@
   border-radius: 8px;
 }
 
-/* ── Mobile : le document mange l'écran, on lui donne moins de hauteur ── */
+/* ── Mobile: tighter padding and type ── */
 
 .is-mobile .quiz-passage-content{
-  max-height: min(38vh, 300px);
   padding: 12px 13px;
   font-size: 0.9em;
 }
 
 .is-mobile .quiz-passage-scope{
   display: none;
-}
-
-/* =========================================================
-   CARTE DE LECTURE — jamais de défilement interne
-   -----------------------------------------------------------
-   Règle posée par Ahmed le 2026-09-02, en jouant la démo :
-   « ici on ne doit jamais avoir à scroller, ça déconcentre ».
-
-   Le plafond de hauteur du support (min(46vh, 420px), plus haut
-   dans ce fichier) a un sens partout AILLEURS : le support y est
-   une RÉFÉRENCE posée à côté d'une question, qui doit garder de
-   la place. Sur une carte de rôle "read", le support EST le
-   contenu de la carte — rien ne lui dispute l'espace, et le faire
-   défiler dans une boîte coupe la lecture en deux.
-
-   La contrepartie est assumée et elle est structurante : c'est au
-   CONTENU de tenir dans l'écran. Un support qui déborde signale
-   une tranche trop grosse, pas un défaut d'affichage — l'unité de
-   découpage est l'écran, pas la page. Budget retenu pour la
-   démo : 900 caractères par carte de lecture.
-   ========================================================= */
-.quiz-role-read .quiz-passage-content{
-  max-height: none;
-  overflow-y: visible;
 }

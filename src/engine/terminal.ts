@@ -4,6 +4,11 @@ import { isMathQuestion, usesMathField, matchesMathAnswer, createMathField } fro
 import { isNumericQuestion, matchesNumericAnswer, isPurelyNumeric, parseNumericValue, latexEnNombre } from "./numeric";
 import type { NumericQuestion } from "./numeric";
 import { t } from "../i18n";
+import { placerReponseDansLeCode } from "./sortie-programme";
+
+/* Lucide `square-terminal`, inline like the engine's other icons (cards.ts):
+   the title bar of a terminal question. */
+const ICON_TERMINAL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>';
 
 export interface TerminalVisualTokens {
 	leading: string;
@@ -356,17 +361,22 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			// jamais d'utilisateur, mais un futur générateur pourrait produire une
 			// boucle de plusieurs dizaines de lignes — sans plafond, la CARTE
 			// s'ouvrirait déjà plus haute que l'écran avant la moindre saisie.
+			/* Plus de libellé au-dessus du champ (2026-09-27) : « Program output »
+			   devient son PLACEHOLDER, et le champ se colle sous le bloc de code
+			   de l'énoncé comme le panneau de sortie d'« Exécuter »
+			   (terminal-program.css) — « un seul truc suffit si on écrit juste en
+			   dessous du bloc de code ». */
 			const rows = countAnswerLines(getTextAcceptedAnswers(q)[0], 20);
+			const placeholderSortie = ctx.escapeHtmlAttr(ctx.sanitize.stripInlineMarkdown(q?.placeholder || t("engine.terminal.programOutputLabel")));
 			return `
 				<div class="qcm-options quiz-text-wrap quiz-text-wrap-program">
 					<div class="quiz-md-code quiz-program-output ${statusClass}">
-						<div class="quiz-program-output-label">${ctx.escapeHtmlText(t("engine.terminal.programOutputLabel"))}</div>
 						<textarea
 							class="quiz-textarea quiz-textarea-program"
 							data-text-answer="1"
 							data-terminal-answer="1"
 							name="${textareaName}"
-							placeholder="${placeholder}"
+							placeholder="${placeholderSortie}"
 							spellcheck="false"
 							autocapitalize="off"
 							autocomplete="off"
@@ -388,8 +398,16 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 				? `<span class="quiz-command-render" aria-hidden="true"><span class="quiz-command-render-leading"></span><span class="quiz-command-render-command"></span><span class="quiz-command-render-rest"></span></span>`
 				: "";
 
+			/* A WINDOW around the prompt (2026-09-27): a title bar naming the
+			   shell, like the terminal it imitates — without it, the prompt
+			   was a bare coloured bar that did not read as a terminal. The
+			   shell below is untouched: its caret and metrics are tuned to
+			   the pixel (terminal-cmd.css). */
+			const titreFenetre = t(isPowerShell ? "engine.terminal.window.powershell" : terminalVariant === "cmd" ? "engine.terminal.window.cmd" : "engine.terminal.window.bash");
 			return `
 				<div class="qcm-options quiz-text-wrap quiz-text-wrap-command">
+					<div class="quiz-term-window ${variantClass}" data-terminal-variant="${variantAttr}">
+					<div class="quiz-term-titlebar" aria-hidden="true">${ICON_TERMINAL}<span>${ctx.escapeHtmlText(titreFenetre)}</span></div>
 					<div class="quiz-command-shell ${variantClass} ${statusClass}" data-terminal-variant="${variantAttr}">
 						${promptPrefixHtml}
 						<div class="quiz-command-input-wrap">
@@ -417,6 +435,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 							<span class="quiz-command-caret" aria-hidden="true"></span>
 						</div>
 					</div>
+					</div>
 				</div>`;
 		}
 
@@ -428,13 +447,24 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 				<div class="qcm-options quiz-text-wrap quiz-math-wrap ${statusClass}" data-math-input="1"></div>`;
 		}
 
-		// Hauteur DE DÉPART = le nombre de lignes de la réponse attendue, entre 1
-		// et 6 (précision du 27/09) : jamais un champ de 10 lignes pour une
-		// réponse d'une ligne. Elle grandit ensuite avec la saisie (sync(),
-		// branche non-command de bindTextQuestion).
-		const rows = countAnswerLines(getTextAcceptedAnswers(q)[0], 6);
+		// STARTING height = the line count of the expected answer, between 1
+		// and 6 (2026-09-27): never a ten-line field for a one-line answer. It
+		// then grows with typing (sync(), non-command branch of
+		// bindTextQuestion). An "explain in your own words" question is the
+		// exception: its model answer holds on one line in the note, but the
+		// learner writes a few sentences — it starts at four lines.
+		const explique = ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "explain";
+		const rows = Math.max(explique ? 4 : 1, countAnswerLines(getTextAcceptedAnswers(q)[0], 6));
+		/* The UNIT of a numeric answer (2026-09-27), shown at the right of the
+		   field like on a calculator: the quiz declared it, but the learner
+		   never saw it and could not know what to type. Accepted with or
+		   without it (engine/numeric.ts). Plain text, escaped. */
+		const unite = isNumericQuestion(q) && typeof q.unit === "string" && q.unit.trim()
+			? `<span class="quiz-field-unit" aria-hidden="true">${ctx.escapeHtmlText(q.unit.trim())}</span>`
+			: "";
 		return `
-			<div class="qcm-options quiz-text-wrap">
+			<div class="qcm-options quiz-text-wrap${unite ? " has-unit" : ""}">
+				${unite}
 				<textarea
 					class="quiz-textarea ${statusClass}"
 					data-text-answer="1"
@@ -509,6 +539,10 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			try { trackItem.__quizTextQuestionCleanup(); } catch (_) { /* cleanup best-effort */ }
 			trackItem.__quizTextQuestionCleanup = null;
 		}
+
+		// Une sortie de programme : le champ va dans le bloc de code de
+		// l'énoncé, à la place du panneau de sortie (sortie-programme.ts).
+		placerReponseDansLeCode(trackItem);
 
 		const mathHost = trackItem.querySelector<HTMLElement>("[data-math-input]");
 		if (mathHost) {

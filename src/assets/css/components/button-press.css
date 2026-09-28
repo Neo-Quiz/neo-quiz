@@ -3,7 +3,6 @@
    ========================================================= */
 
 .quiz-action-btn,
-.quiz-chip,
 .quiz-hint-modal-close{
   transform-origin: center;
 }
@@ -13,8 +12,6 @@
    propre enfoncement (action-buttons.css) — ces `!important` l'écrasaient. */
 .quiz-action-btn:not(.success):hover:not(:disabled),
 .quiz-action-btn:not(.success):focus-visible:not(:disabled),
-.quiz-chip:hover,
-.quiz-chip:focus-visible,
 .quiz-hint-modal-close:hover,
 .quiz-hint-modal-close:focus-visible{
   transform: translate3d(0,-1px,0) scale(1.015) !important;
@@ -22,7 +19,6 @@
 
 /* Press / active unifié (sauf `.success`, voir plus haut) */
 .quiz-action-btn:not(.success):active:not(:disabled),
-.quiz-chip:active,
 .quiz-hint-modal-close:active{
   transform: translate3d(0,3px,0) scale(0.955) !important;
   box-shadow:

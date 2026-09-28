@@ -379,18 +379,31 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		});
 	}
 
-	/* CARTE MÉMOIRE (spec cartes §3). Le recto est l'énoncé, déjà rendu par
-	   cards.ts au-dessus de ce corps ; ici : « Retourner », puis le verso.
-	   Le bouton Retourner porte AUSSI `quiz-textonly-check-btn` : le même
-	   gestionnaire que « Vérifier » pose textOnlyChecked[qi]. Les deux notes
-	   portent `quiz-textonly-rating-btn` : le même gestionnaire journalise. */
+	/* FLASHCARD (flashcard spec §3, redesigned 2026-09-27). A real card,
+	   centred, that turns over in 3D: the question on the front, the answer
+	   on the back. The whole front IS the "flip" button (`quiz-flashcard-flip-btn`,
+	   also `quiz-textonly-check-btn`: the same handler as "Check" sets
+	   textOnlyChecked[qi]). The prompt is rendered HERE, on the front, and
+	   no longer above the card by cards.ts — it keeps its `.quiz-question`
+	   class, which the glossary pass never underlines (engine/termes.ts);
+	   the back keeps `.quiz-flashcard-back`, the after-answer zone where it
+	   does. The back is only in the DOM once the card is turned: before
+	   that, nothing of the answer can leak (screen reader, glossary).
+	   The flip plays once, right after the click (`justFlipped`): the card
+	   is re-rendered by the click, so the new card starts face up and turns.
+	   The two ratings are "press me" buttons like the answer options, both
+	   neutral until one is chosen. */
 	function flashcardBodyHtml(q: FlashcardQuestion, qi: number): string {
+		const front = `<span class="quiz-fc-face is-front">
+				<span class="quiz-fc-label">${t("engine.flashcard.front")}</span>
+				<div class="quiz-question quiz-fc-text">${ctx.cards.renderQuizPromptHtml(q)}</div>
+				<span class="quiz-fc-tip">${t("engine.flashcard.flipTip")} <kbd class="quiz-flashcard-kbd">${t("engine.flashcard.flipHint")}</kbd></span>
+			</span>`;
 		if (!isChecked(qi)) {
-			return `<div class="quiz-flashcard" data-flashcard="1">
-				<div class="quiz-actions quiz-flashcard-actions">
-					<button class="quiz-action-btn success quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space">${t("engine.flashcard.flip")}</button>
-					<span class="quiz-flashcard-kbd">${t("engine.flashcard.flipHint")}</span>
-				</div>
+			return `<div class="quiz-flashcard quiz-fc" data-flashcard="1">
+				<button class="quiz-fc-card quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space" aria-label="${ctx.escapeHtmlAttr(t("engine.flashcard.flip"))}">
+					<span class="quiz-fc-inner">${front}</span>
+				</button>
 			</div>`;
 		}
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
@@ -399,20 +412,36 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
 		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
 			const on = current === value;
-			return `<button class="quiz-action-btn quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}">${t(key)} <span class="quiz-flashcard-kbd">${touche}</span></button>`;
+			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
 		};
-		return `<div class="quiz-flashcard is-flipped" data-flashcard="1">
-			<div class="quiz-flashcard-back" aria-live="polite">
-				<div class="quiz-textonly-label">${t("engine.flashcard.back")}</div>
-				<div class="quiz-flashcard-answer">${verso}</div>
-				${learningHtml(q)}
-				<div class="quiz-flashcard-rating">
-					${note("review", "engine.flashcard.again", "1")}
-					${note("understood", "engine.flashcard.knew", "2")}
-				</div>
+		const animate = justFlipped === qi;
+		if (animate) justFlipped = null;
+		/* Turned, the card stays clickable: a click (or Space) turns it back to
+		   read the question again, and again to the answer — a pure view
+		   toggle (`is-front`), the rating is untouched and nothing re-renders.
+		   A focusable <div role="button"> and not a <button>: the button's
+		   press effect (`:active`) would replace its rotation. */
+		return `<div class="quiz-flashcard quiz-fc is-flipped${animate ? " is-flipping" : ""}" data-flashcard="1">
+			<div class="quiz-fc-card quiz-flashcard-flip-btn" role="button" tabindex="0" aria-pressed="false" aria-label="${ctx.escapeHtmlAttr(t("engine.flashcard.showQuestion"))}">
+				<span class="quiz-fc-inner">
+					${front}
+					<span class="quiz-fc-face is-back quiz-flashcard-back" aria-live="polite">
+						<span class="quiz-fc-label">${t("engine.flashcard.back")}</span>
+						<span class="quiz-flashcard-answer quiz-fc-text">${verso}</span>
+					</span>
+				</span>
+			</div>
+			${learningHtml(q)}
+			<div class="quiz-flashcard-rating quiz-fc-ratings">
+				${note("review", "engine.flashcard.again", "1")}
+				${note("understood", "engine.flashcard.knew", "2")}
 			</div>
 		</div>`;
 	}
+
+	/* The flashcard turned by the LAST click, whose re-render must play the
+	   flip — see flashcardBodyHtml. */
+	let justFlipped: number | null = null;
 
 	/* Plus de bouton Vérifier ni de correction affichée sur la carte
 	   elle-même (2026-09-26bis) : on écrit sa réponse, elle est conservée
@@ -507,6 +536,19 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			syncLayout();
 		}
 
+		const turned = trackItem.querySelector<HTMLElement>(".quiz-fc.is-flipped .quiz-fc-card");
+		if (turned) {
+			const fc = turned.closest<HTMLElement>(".quiz-fc");
+			turned.addEventListener("click", e => {
+				e.preventDefault();
+				if (!fc) return;
+				fc.classList.remove("is-flipping");
+				const front = fc.classList.toggle("is-front");
+				turned.setAttribute("aria-pressed", String(front));
+				turned.setAttribute("aria-label", t(front ? "engine.flashcard.showAnswer" : "engine.flashcard.showQuestion"));
+			});
+		}
+
 		const checkBtn = trackItem.querySelector<HTMLButtonElement>(".quiz-textonly-check-btn");
 		if (checkBtn) {
 			checkBtn.addEventListener("click", e => {
@@ -516,6 +558,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				ctx.invalidateSavedResults?.();
 				ctx.quizState.textOnlyAnswers[qi] = String(liveTextarea?.value ?? ctx.quizState.textOnlyAnswers[qi] ?? "");
 				ctx.quizState.textOnlyChecked[qi] = true;
+				if (ctx.isFlashcardQuestion(ctx.quiz[qi])) justFlipped = qi;
 				ctx.commitQuestionInteraction(qi, { syncHeight: true });
 			});
 		}

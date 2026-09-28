@@ -2,11 +2,21 @@
    6) OPTIONS (single / multi)
    ========================================================= */
 
+/* EVERY option is a "press me" button like the question arrows
+   (2026-09-27): its usual face on a darker 4 px edge, sinking onto it when
+   pressed. Each state only changes `--quiz-option-edge` and its face.
+   No `contain: paint` any more: it clips painting to the border box and cut
+   the edge off.
+   The outline is the Hint button's (hint-modal.css, perles.css): no 1 px
+   border, but a light top line and a faint inner ring drawn as inset
+   shadows — `--quiz-option-rim`, repeated in every box-shadow below. */
 .quiz-option{
+  --quiz-option-depth: 4px;
+  --quiz-option-edge: color-mix(in srgb, #000 45%, var(--background-secondary));
+  --quiz-option-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   position: relative;
   z-index: 0;
   overflow: visible;
-  contain: paint;
   box-sizing: border-box;
   cursor: pointer;
   user-select: none;
@@ -14,12 +24,15 @@
   margin: 10px var(--quiz-option-side-gap);
   padding: 14px 16px 14px 54px;
   border-radius: var(--quiz-card-radius);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid transparent;
   background: var(--background-secondary);
   color: var(--text-normal);
+  box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
+  /* The press takes 110 ms: a large surface that snaps down in 80 ms
+     flickered rather than sank. The release is an animation, below. */
   transition:
-    transform var(--quiz-dur-mid) var(--quiz-ease-smooth),
-    box-shadow var(--quiz-dur-mid) var(--quiz-ease-smooth),
+    transform 110ms cubic-bezier(0.3, 0, 0.5, 1),
+    box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1),
     border-color var(--quiz-dur-fast) ease,
     background var(--quiz-dur-fast) ease,
     color var(--quiz-dur-fast) ease;
@@ -29,21 +42,100 @@
   z-index: 3;
 }
 
+/* Pressed: the face sinks onto its edge, which disappears — no more
+   sideways slide, which made the row jump under the finger. */
 .quiz-option:active{
-  transform: translate3d(2px,0,0) scale(0.998);
-  transition-duration: 90ms;
+  transform: translateY(var(--quiz-option-depth));
+  box-shadow: var(--quiz-option-rim), 0 0 0 0 var(--quiz-option-edge);
 }
 
+/* THE RELEASE (2026-09-27). A click re-renders the card, so the pressed
+   option comes back as a NEW element at rest: without this, it jumped back
+   up in a single frame. The new element starts pressed and springs back.
+   The spring is a `linear()` easing sampled from a damped oscillator
+   (damping ratio 0.45): back at rest after ~25 % of the time, a ~0.8 px
+   overshoot, then it settles — no keyframe segments, whose per-segment
+   easing made it snap up then drop. 440 ms in all, the visible motion
+   taking the first ~200: long enough to read as a spring on a full-width
+   button, short enough never to lag behind the next click. Classes set by
+   interactions.ts (playOptionRelease), removed at the end of their
+   animation. */
+@keyframes quiz-option-release{
+  from{
+    transform: translateY(var(--quiz-option-depth));
+    box-shadow: var(--quiz-option-rim), 0 0 0 0 var(--quiz-option-edge);
+  }
+  to{
+    transform: none;
+    box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
+  }
+}
+
+.quiz-option{
+  --quiz-option-spring: linear(0, 0.069, 0.238, 0.456, 0.679, 0.877, 1.032, 1.136, 1.191, 1.205, 1.188, 1.152, 1.106, 1.061, 1.021, 0.99, 0.97, 0.96, 0.958, 0.962, 0.97, 0.979, 0.988, 0.996, 1);
+}
+
+/* The colour follows the release instead of switching in one frame. */
+@keyframes quiz-option-select{
+  from{ background: var(--background-secondary); color: var(--text-normal); }
+}
+
+@keyframes quiz-option-deselect{
+  from{ background: var(--quiz-primary); color: #fff; }
+}
+
+.quiz-option.is-released{
+  animation: quiz-option-release 440ms var(--quiz-option-spring);
+}
+
+.quiz-option.is-now-selected{
+  animation: quiz-option-select 200ms ease-out;
+}
+
+.quiz-option.is-released.is-now-selected{
+  animation:
+    quiz-option-release 440ms var(--quiz-option-spring),
+    quiz-option-select 200ms ease-out;
+}
+
+.quiz-option.is-deselected{
+  animation: quiz-option-deselect 200ms ease-out;
+}
+
+.quiz-option.is-released.is-deselected{
+  animation:
+    quiz-option-release 440ms var(--quiz-option-spring),
+    quiz-option-deselect 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-option,
+  .quiz-option.is-released,
+  .quiz-option.is-now-selected,
+  .quiz-option.is-deselected{
+    animation: none;
+    transition: none;
+  }
+}
+
+/* HOVER (2026-09-27): the face lightens one step and the circle turns blue
+   — an invitation, not yet a choice. No blue border: the raised edge
+   already says "press me". No more blue glow or 4 px slide either: on
+   hover, the option used to look already selected. */
 .quiz-option:not(.selected):not(.correct):not(.wrong):hover,
 .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
   outline: none;
-  transform: translate3d(4px,0,0);
-  border-color: var(--quiz-primary);
-  background: var(--background-secondary);
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--background-secondary));
   color: var(--text-normal);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-22),
-    0 0 20px var(--quiz-primary-glow-35);
+}
+
+.quiz-option:not(.selected):not(.correct):not(.wrong):hover::before,
+.quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible::before{
+  border-color: var(--quiz-primary);
+}
+
+.quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
+  box-shadow: var(--quiz-option-rim), 0 0 0 2px var(--quiz-primary-ring-22), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
 }
 
 .quiz-option::before{
@@ -57,13 +149,14 @@
   border: 2px solid var(--background-modifier-border);
   border-radius: 999px;
   background: var(--background-primary);
+  box-sizing: border-box;
+  transition: border-color var(--quiz-dur-fast) ease, background var(--quiz-dur-fast) ease;
 }
 
 .quiz-option.multi::before{
   border-radius: 4px;
 }
 
-.quiz-option.selected::after,
 .quiz-option.correct::after,
 .quiz-option.wrong::after{
   content: "";
@@ -77,18 +170,31 @@
   border-top-right-radius: var(--quiz-card-radius);
 }
 
+/* SELECTED (2026-09-27): the "press me" button of the question arrows
+   (action-buttons.css, .quiz-nav-btn) — a solid blue face on a darker 4 px
+   edge, lighter on hover, sinking onto its edge when pressed. It replaces a
+   flat blue block with a folded corner and a dark ringed circle on top.
+   The circle becomes a white radio ring with a white dot; the square of a
+   multiple choice, a white box with a blue check. */
 .quiz-option.selected{
+  --quiz-option-edge: var(--quiz-primary-edge);
   background: var(--quiz-primary);
-  color: var(--quiz-accent-text);
-  border-color: var(--quiz-primary);
+  color: #fff;
+  border-color: transparent;
 }
 
 .quiz-option.selected::before{
-  border-color: var(--background-primary);
-  box-shadow: inset 0 0 0 4px var(--quiz-primary);
+  border-color: #fff;
+  background: radial-gradient(circle, #fff 0 3.5px, transparent 4px);
 }
 
+.quiz-option.multi.selected::before{
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b62f6' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+
+
 .quiz-option.correct{
+  --quiz-option-edge: var(--quiz-success-edge);
   background: var(--quiz-success);
   color: var(--quiz-accent-text);
   border-color: var(--quiz-success);
@@ -100,6 +206,7 @@
 }
 
 .quiz-option.wrong{
+  --quiz-option-edge: color-mix(in srgb, #000 40%, var(--quiz-danger));
   background: var(--quiz-danger);
   color: var(--quiz-accent-text);
   border-color: var(--quiz-danger);
@@ -135,7 +242,7 @@
   border-top-right-radius: var(--quiz-card-radius);
 }
 
-/* Options neutres (non correctes, non sélectionnées) quand quiz verrouillé */
+/* Neutral options (neither correct nor selected) once the quiz is locked. */
 .quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected){
   opacity: 0.5;
   cursor: default;
@@ -145,9 +252,21 @@
 .quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible{
   outline: none;
   transform: none;
-  box-shadow: none;
-  border-color: var(--background-modifier-border);
+  box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
+  border-color: transparent;
   background: var(--background-secondary);
+}
+
+/* A locked option is no longer a button: it does not sink when clicked. */
+.quiz-is-locked .quiz-option:active{
+  transform: none;
+  box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
+}
+
+/* Light theme: a white rim would vanish on a light face — a faint dark
+   ring instead, like the light-theme beads (results.css). */
+.theme-light .quiz-option{
+  --quiz-option-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .quiz-is-locked .quiz-option.wrong:hover,
@@ -167,10 +286,12 @@
 .quiz-option.selected:hover,
 .quiz-option.selected:focus-visible{
   outline: none;
-  transform: translate3d(2px,0,0);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-25),
-    0 0 22px var(--quiz-primary-glow-40);
+  background: var(--quiz-primary-light);
+}
+
+.quiz-option.selected:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 .quiz-option.correct:hover,
@@ -192,19 +313,19 @@
   flex-direction: column;
 }
 
+/* A GRID, not a wrapping row (2026-09-27): four images made a row of three
+   and a lone one centred below. Equal columns, as many as fit at 170 px
+   (four across a normal panel, two on a narrow one). */
 .quiz-options-image-grid{
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  justify-content: center !important;
-  gap: 12px;
-  padding: 4px var(--quiz-option-side-gap);
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  padding: 4px var(--quiz-option-side-gap) 8px;
 }
 
 .quiz-options-image-grid > .quiz-option{
-  flex: 0 1 auto !important;
-  width: clamp(140px, 28%, 220px) !important;
-  max-width: 220px !important;
+  width: auto !important;
+  max-width: none !important;
   margin: 0 !important;
   padding: 10px 10px 36px 10px !important;
   display: flex !important;
@@ -237,8 +358,8 @@
 }
 
 @media (max-width: 600px){
-  .quiz-options-image-grid > .quiz-option{
-    width: clamp(120px, 45%, 180px) !important;
+  .quiz-options-image-grid{
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   }
 }
 

@@ -5,7 +5,7 @@ import type { DraftQuestion } from "./utils";
 import { currentHost } from "../host/current";
 import { createSanitizer, renderInlineText } from "../engine/sanitizer";
 import type { EngineCtx } from "../types/engine-ctx";
-import { markSlots, fillSlots } from "../engine/cloze";
+import { markSlots, fillSlots, codeClozeHtml } from "../engine/cloze";
 import { inlineInto, resolveImagesInHtml } from "./question-preview";
 import type { QuizPreviewOptions } from "./question-preview";
 
@@ -164,11 +164,10 @@ export function renderMatchingBlock(card: HTMLElement, q: DraftQuestion, opts: Q
     individuels ne sont pas des champs à part. */
 export function renderClozeBlock(card: HTMLElement, q: DraftQuestion, opts: QuizPreviewOptions): void {
 	const { marked, blanks } = markSlots(q.cloze);
-	ajouter(card, "div", "quiz-multi-indicator", t("engine.cloze.instructions", { count: blanks.length }));
 	const body = ajouter(card, "div", "quiz-cloze");
 	if (opts.corrige) body.setAttribute("data-edit", "cloze");
 	body.innerHTML = fillSlots(
-		resolveImagesInHtml(md2html(marked).replace(/^<p>|<\/p>$/g, ""), opts.sourcePath),
+		codeClozeHtml(marked) ?? resolveImagesInHtml(md2html(marked).replace(/^<p>|<\/p>$/g, ""), opts.sourcePath),
 		(index) => {
 			const label = t("engine.cloze.blankAria", { n: index + 1 }).replace(/"/g, "&quot;");
 			if (opts.corrige) {

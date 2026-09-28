@@ -8,7 +8,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.error.noQuestions": "⚠️ Aucune question fournie au moteur de quiz.",
 
 	/* ── Texte à trous ── */
-	"engine.cloze.instructions": "Complétez les {count} trous",
 	"engine.cloze.blankAria": "Trou {n}",
 
 	/* ── Support de compréhension (document lu avant de répondre) ── */
@@ -55,14 +54,14 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.qcm.multiHint": "Sélectionnez une ou plusieurs réponses",
 
 	/* ── Questions « ordering » ── */
-	"engine.ordering.instructions": "Classez les éléments dans le bon ordre (glisser-déposer). Déposez un élément sur un emplacement déjà rempli pour échanger automatiquement les positions.",
+	"engine.ordering.instructions": "Glissez chaque élément à sa place, ou cliquez sur un élément puis sur un emplacement. Déposé sur un emplacement rempli, il échange les deux.",
 	"engine.ordering.dropHere": "Glissez un élément ici",
 	"engine.ordering.itemsLabel": "Éléments à placer",
 
 	/* ── Questions « matching » ── */
-	"engine.matching.instructions": "Associez chaque situation à un support (glisser-déposer). Un même support peut être utilisé plusieurs fois.",
+	"engine.matching.instructions": "Glissez une réponse sur chaque élément, ou cliquez sur une réponse puis sur un élément. Une réponse peut servir plusieurs fois.",
 	"engine.matching.dropHere": "Déposez un support ici",
-	"engine.matching.choicesLabel": "Supports disponibles",
+	"engine.matching.choicesLabel": "Réponses disponibles",
 	"engine.matching.unknownChoice": "Support inconnu",
 
 	/* ── Indice ── */
@@ -84,7 +83,10 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Votre réponse...",
-	"engine.terminal.programOutputLabel": "Sortie du programme",
+	"engine.terminal.programOutputLabel": "Sortie du programme…",
+	"engine.terminal.window.cmd": "Invite de commandes",
+	"engine.terminal.window.powershell": "Windows PowerShell",
+	"engine.terminal.window.bash": "bash",
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Votre réponse libre",
@@ -104,6 +106,10 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	/* ── Carte mémoire ── */
 	"engine.flashcard.flip": "Retourner",
 	"engine.flashcard.flipHint": "Espace",
+	"engine.flashcard.front": "Question",
+	"engine.flashcard.flipTip": "Cliquez sur la carte ou appuyez sur",
+	"engine.flashcard.showQuestion": "Retourner la carte pour voir la question",
+	"engine.flashcard.showAnswer": "Retourner la carte pour voir la réponse",
 	"engine.flashcard.back": "Réponse",
 	"engine.flashcard.again": "À revoir",
 	"engine.flashcard.knew": "Je savais",
@@ -113,17 +119,23 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.submit.back": "Retour",
 	"engine.submit.showScore": "Voir le score",
 	"engine.submit.showResults": "Voir les résultats",
-	"engine.submit.reviewList": "Revenir sur une question :",
-	"engine.submit.missingList": "Questions sans réponse :",
-	"engine.submit.missingAnswers.one": "Il manque {count} réponse.",
-	"engine.submit.missingAnswers.other": "Il manque {count} réponses.",
-	"engine.submit.missingFreeAnswers.one": "Il manque {count} réponse libre.",
-	"engine.submit.missingFreeAnswers.other": "Il manque {count} réponses libres.",
-	"engine.submit.allFreeAnswered": "Toutes les questions ont une réponse libre.",
-	"engine.submit.missingRatings.one": "Il manque {count} auto-évaluation.",
-	"engine.submit.missingRatings.other": "Il manque {count} auto-évaluations.",
-	"engine.submit.toRateList": "Questions à auto-évaluer :",
-	"engine.submit.allRated": "Toutes les questions sont auto-évaluées.",
+	"engine.submit.reviewList": "Revenir sur une question",
+	"engine.submit.missingList": "Sans réponse",
+	"engine.submit.missingAnswers.one": "{count} question sans réponse",
+	"engine.submit.missingAnswers.other": "{count} questions sans réponse",
+	"engine.submit.missingFreeAnswers.one": "{count} question sans réponse libre",
+	"engine.submit.missingFreeAnswers.other": "{count} questions sans réponse libre",
+	"engine.submit.allFreeAnswered": "Toutes les questions ont une réponse",
+	"engine.submit.missingRatings.one": "{count} question à auto-évaluer",
+	"engine.submit.missingRatings.other": "{count} questions à auto-évaluer",
+	"engine.submit.toRateList": "À auto-évaluer",
+	"engine.submit.allRated": "Toutes les questions sont auto-évaluées",
+	"engine.submit.allAnswered": "Toutes les questions ont une réponse",
+	"engine.submit.missingSub": "Vous pouvez encore y revenir avant de terminer.",
+	"engine.submit.completeSub": "Vous pouvez revoir une question avant de terminer.",
+	"engine.submit.progress": "{done} / {total} répondues",
+	"engine.submit.progressRated": "{done} / {total} auto-évaluées",
+	"engine.submit.goTo": "Aller à la question {n}",
 
 	/* ── Slide de résultats ── */
 	"engine.result.title": "Résultats",

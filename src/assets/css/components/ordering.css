@@ -1,264 +1,253 @@
 /* =========================================================
-   7) ORDERING / MATCH (layout + DnD)
+   7) ORDERING / MATCHING (layout + drag and drop) — redesigned 2026-09-27.
+   Two kinds of things, which must never be confused:
+   - the SLOTS (where things go): hollow, a dashed outline and no edge —
+     a place, not a button; the slot's name in a pill at its left;
+   - the PIECES (what you move): "press me" buttons like the answer options
+     (quiz-options.css) — the same flat face, light rim and darker edge
+     underneath, sinking when pressed, blue when picked up.
+   A slot that holds a piece shows the piece itself, raised, in its place.
+   No more solid blue slot with a folded corner, no glow, no sideways slide.
    ========================================================= */
 
 .quiz-ordering{
+  --quiz-piece-face: var(--background-secondary);
+  --quiz-piece-edge: color-mix(in srgb, #000 45%, var(--background-secondary));
+  --quiz-piece-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --quiz-piece-depth: 4px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin: 14px 0;
+  gap: 16px;
+  margin: 10px var(--quiz-option-side-gap) 6px;
+}
+
+.theme-light .quiz-ordering{
+  --quiz-piece-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .quiz-ordering-slots{
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
+/* ── The slots ─────────────────────────────────────────── */
+
 .quiz-slot{
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 48px;
-  padding: 12px 16px;
+  min-height: 54px;
+  padding: 8px 12px;
+  box-sizing: border-box;
   border-radius: var(--quiz-card-radius);
-  border: 2px dashed var(--background-modifier-border);
-  background: var(--background-secondary);
+  border: 1.5px dashed color-mix(in srgb, var(--text-normal) 18%, transparent);
+  background: transparent;
   cursor: pointer;
-  transform-origin: center;
+  transition:
+    border-color var(--quiz-dur-fast) ease,
+    background-color var(--quiz-dur-fast) ease,
+    box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1),
+    transform 110ms cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.quiz-slot:hover{
+  border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
+}
+
+/* A piece is picked up: every slot says where it can go. */
+.quiz-slot.can-place{
+  border-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--quiz-primary) 6%, transparent);
 }
 
 .quiz-slot:focus-visible,
 .quiz-possibility:focus-visible{
-  outline: none;
-  border-color: color-mix(in srgb, var(--quiz-primary) 36%, var(--background-modifier-border));
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 12%, transparent),
-    0 0 10px color-mix(in srgb, var(--quiz-primary) 8%, transparent);
+  outline: 2px solid var(--quiz-primary-light);
+  outline-offset: 3px;
 }
 
-.quiz-slot:hover{
-  border-color: color-mix(in srgb, var(--quiz-primary) 45%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-primary) 6%, var(--background-secondary));
-}
-
-.quiz-slot.can-place{
-  box-shadow: 0 0 0 2px var(--quiz-primary-ring-12);
-}
-
-.quiz-slot.filled:not(.correct):not(.wrong){
-  border-style: solid !important;
-  border-color: var(--quiz-primary) !important;
-  background: var(--quiz-primary) !important;
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-12),
-    0 0 14px color-mix(in srgb, var(--quiz-primary) 12%, transparent) !important;
-}
-
-.quiz-slot.filled:not(.correct):not(.wrong)::after{
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-top: 38px solid rgba(255,255,255,0.18);
-  border-left: 38px solid transparent;
-  border-top-right-radius: var(--quiz-card-radius);
-  pointer-events: none;
-}
-
-.quiz-slot.correct{
-  border-color: var(--quiz-success) !important;
-  background: color-mix(in srgb, var(--quiz-success) 10%, var(--background-secondary)) !important;
-  box-shadow: none !important;
-}
-
-.quiz-slot.wrong{
-  border-color: var(--quiz-danger) !important;
-  background: color-mix(in srgb, var(--quiz-danger) 8%, var(--background-secondary)) !important;
-  box-shadow: none !important;
-}
-
+/* The slot's name: a number for ordering, the row's term for matching. */
 .quiz-slot-label{
-  min-width: 60px;
-  font-size: 0.8125em;
-  font-weight: 800;
+  flex: none;
+  min-width: 30px;
+  padding: 5px 10px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-normal) 9%, transparent);
   color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
   pointer-events: none;
 }
 
 .quiz-slot-value{
   flex: 1;
-  font-size: 0.8125em;
-  font-weight: 600;
-  color: var(--text-muted);
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: 0.875rem;
+  font-weight: 500;
   pointer-events: none;
 }
 
-.quiz-slot.filled:not(.correct):not(.wrong) .quiz-slot-label,
-.quiz-slot.filled:not(.correct):not(.wrong) .quiz-slot-value{
-  color: var(--quiz-accent-text) !important;
+/* A slot that holds a piece: the piece, raised, in its place. */
+.quiz-slot.filled{
+  border-style: solid;
+  border-color: transparent;
+  background: var(--quiz-piece-face);
+  box-shadow: var(--quiz-piece-rim), 0 var(--quiz-piece-depth) 0 0 var(--quiz-piece-edge);
+  cursor: grab;
 }
 
-.quiz-slot.correct .quiz-slot-label,
-.quiz-slot.wrong .quiz-slot-label{
-  color: var(--text-muted);
+.quiz-slot.filled .quiz-slot-value{
+  color: var(--text-normal);
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
+
+.quiz-slot.filled:not(.correct):not(.wrong):hover{
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-piece-face));
+}
+
+.quiz-slot.filled:not(.correct):not(.wrong):active{
+  transform: translateY(var(--quiz-piece-depth));
+  box-shadow: var(--quiz-piece-rim), 0 0 0 0 var(--quiz-piece-edge);
+}
+
+/* After correction: the piece takes the verdict's colour, edge included. */
+.quiz-slot.correct{
+  --quiz-piece-face: color-mix(in srgb, var(--quiz-success) 22%, var(--background-secondary));
+  --quiz-piece-edge: var(--quiz-success-edge);
+  cursor: default;
+}
+
+.quiz-slot.wrong{
+  --quiz-piece-face: color-mix(in srgb, var(--quiz-danger) 20%, var(--background-secondary));
+  --quiz-piece-edge: color-mix(in srgb, #000 40%, var(--quiz-danger));
+  cursor: default;
+}
+
+.quiz-slot.correct .quiz-slot-label{
+  background: color-mix(in srgb, var(--quiz-success) 30%, transparent);
+  color: var(--text-normal);
+}
+
+.quiz-slot.wrong .quiz-slot-label{
+  background: color-mix(in srgb, var(--quiz-danger) 30%, transparent);
+  color: var(--text-normal);
+}
+
+/* ── Drag and drop ─────────────────────────────────────── */
+
+.quiz-slot.drag-ready{
+  border-color: color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+}
+
+.quiz-slot.dragover{
+  border-style: solid;
+  border-color: var(--quiz-primary);
+  background: color-mix(in srgb, var(--quiz-primary) 12%, transparent);
+}
+
+.quiz-slot.filled.dragover{
+  background: color-mix(in srgb, var(--quiz-primary) 18%, var(--quiz-piece-face));
+}
+
+.quiz-slot.dragover .quiz-slot-value{
+  color: var(--text-normal);
+}
+
+.quiz-possibility.dragging,
+.quiz-slot.dragging{
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* ── The pieces ────────────────────────────────────────── */
 
 .quiz-ordering-label{
-  margin-top: 6px;
-  font-size: 0.75em;
-  font-weight: 600;
-  color: var(--text-muted);
+  margin: 4px 0 -4px;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .quiz-ordering-possibilities{
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.quiz-possibility{
-  padding: 10px 16px;
-  border-radius: var(--quiz-card-radius);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
-  color: var(--text-normal);
-  font-size: 0.8125em;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-  transform-origin: center;
-}
-
-.quiz-possibility:not(.used):not(.selected-pick):hover,
-.quiz-possibility:not(.used):not(.selected-pick):focus-visible{
-  outline: none;
-  transform: translate3d(4px,0,0);
-  border-color: var(--quiz-primary);
-  background: var(--background-secondary);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-20),
-    0 0 14px var(--quiz-primary-glow-35) !important;
-}
-
-.quiz-possibility.used{
-  opacity: 0.35;
-  pointer-events: none;
-  cursor: default;
-  text-decoration: line-through;
-}
-
-.quiz-possibility.selected-pick{
-  border-color: var(--quiz-primary) !important;
-  background: var(--quiz-primary) !important;
-  color: var(--quiz-accent-text) !important;
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-16),
-    0 0 14px color-mix(in srgb, var(--quiz-primary) 12%, transparent) !important;
-}
-
-.quiz-possibility.selected-pick::after{
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-top: 34px solid rgba(255,255,255,0.18);
-  border-left: 34px solid transparent;
-  border-top-right-radius: var(--quiz-card-radius);
-  pointer-events: none;
-}
-
-.quiz-possibility:not(.used),
-.quiz-slot.filled:not(.correct):not(.wrong){
-  cursor: grab;
-}
-
-.quiz-possibility.dragging,
-.quiz-slot.dragging{
-  cursor: grabbing !important;
-}
-
-.quiz-possibility.dragging{
-  opacity: 0.58;
-  border-color: color-mix(in srgb, var(--quiz-primary) 36%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-primary) 8%, var(--background-secondary));
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 12%, transparent),
-    0 0 12px color-mix(in srgb, var(--quiz-primary) 10%, transparent);
-  transform: translate3d(0, -1px, 0);
-}
-
-.quiz-slot.dragging{
-  opacity: 0.68;
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--quiz-primary) 40%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-primary) 8%, var(--background-secondary));
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 12%, transparent),
-    0 0 12px color-mix(in srgb, var(--quiz-primary) 10%, transparent);
-  transform: translate3d(0, -1px, 0);
-}
-
-.quiz-slot.drag-ready{
-  border-color: color-mix(in srgb, var(--quiz-primary) 24%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--quiz-primary) 3%, var(--background-secondary));
-}
-
-.quiz-slot.dragover{
-  border-color: color-mix(in srgb, var(--quiz-primary) 42%, var(--background-modifier-border)) !important;
-  border-style: solid !important;
-  background: color-mix(in srgb, var(--quiz-primary) 10%, var(--background-secondary)) !important;
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 14%, transparent),
-    0 0 18px color-mix(in srgb, var(--quiz-primary) 12%, transparent);
-  transform: translate3d(0, -2px, 0);
-}
-
-.quiz-slot.dragover.swap-target{
-  border-color: var(--quiz-primary) !important;
-  background: color-mix(in srgb, var(--quiz-primary) 12%, var(--background-secondary)) !important;
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 18%, transparent),
-    0 0 20px color-mix(in srgb, var(--quiz-primary) 16%, transparent);
-}
-
-.quiz-slot.dragover .quiz-slot-label,
-.quiz-slot.dragover .quiz-slot-value{
-  color: var(--text-normal);
-}
-
-.quiz-slot,
 .quiz-possibility{
   position: relative;
-  overflow: hidden;
-  transform-origin: center;
+  padding: 12px 16px 12px 38px;
+  border-radius: var(--quiz-card-radius);
+  border: 1px solid transparent;
+  background: var(--quiz-piece-face);
+  color: var(--text-normal);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  box-shadow: var(--quiz-piece-rim), 0 var(--quiz-piece-depth) 0 0 var(--quiz-piece-edge);
   transition:
-    transform 110ms var(--quiz-ease-smooth),
-    box-shadow 180ms var(--quiz-ease-smooth),
-    filter 110ms ease !important;
+    background-color var(--quiz-dur-fast) ease,
+    opacity var(--quiz-dur-fast) ease,
+    box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1),
+    transform 110ms cubic-bezier(0.3, 0, 0.5, 1);
 }
 
-.quiz-slot:active{
-  transform: translate3d(0,1px,0) scale(0.965) !important;
-  filter: brightness(0.96) saturate(1.04);
+/* The grip: six dots at the left, the sign of a piece you can drag. */
+.quiz-possibility::before{
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 10px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--text-normal) 38%, transparent) 1.4px, transparent 1.6px) 0 0 / 5px 5.5px;
+  pointer-events: none;
 }
 
-.quiz-slot.filled:not(.correct):not(.wrong):active{
-  transform: translate3d(0,1px,0) scale(0.955) !important;
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-20),
-    inset 0 0 0 999px rgba(0,0,0,0.10) !important;
+.quiz-possibility:not(.used):not(.selected-pick):hover{
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-piece-face));
 }
 
 .quiz-possibility:not(.used):active{
-  transform: translate3d(2px,0,0) scale(0.965) !important;
-  filter: brightness(0.96) saturate(1.04);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-16),
-    inset 0 0 0 999px rgba(0,0,0,0.08) !important;
+  transform: translateY(var(--quiz-piece-depth));
+  box-shadow: var(--quiz-piece-rim), 0 0 0 0 var(--quiz-piece-edge);
 }
 
+/* Picked up (click, then click a slot): blue, like a chosen option. */
+.quiz-possibility.selected-pick{
+  --quiz-piece-face: var(--quiz-primary);
+  --quiz-piece-edge: var(--quiz-primary-edge);
+  color: #fff;
+}
+
+.quiz-possibility.selected-pick::before{
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.75) 1.4px, transparent 1.6px);
+}
+
+/* Already placed: a ghost of itself, flat, out of the way. */
+.quiz-possibility.used{
+  opacity: 0.32;
+  box-shadow: var(--quiz-piece-rim);
+  transform: translateY(var(--quiz-piece-depth));
+  pointer-events: none;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-slot,
+  .quiz-possibility{ transition: none; }
+}
+
+/* Matching: the rows' terms have different lengths — a common width keeps
+   the dropped options aligned in one column. */
+.quiz-slot[data-match-slot] .quiz-slot-label{
+  min-width: 96px;
+}

@@ -15,7 +15,6 @@ export const EN_ENGINE = {
 	"engine.error.noQuestions": "⚠️ No questions were given to the quiz engine.",
 
 	/* ── Texte à trous ── */
-	"engine.cloze.instructions": "Fill in the {count} blanks",
 	"engine.cloze.blankAria": "Blank {n}",
 
 	/* ── Support de compréhension (document lu avant de répondre) ── */
@@ -71,12 +70,12 @@ export const EN_ENGINE = {
 	"engine.qcm.multiHint": "Select one or more answers",
 
 	/* ── Questions « ordering » ── */
-	"engine.ordering.instructions": "Put the items in the right order (drag and drop). Drop an item on a filled slot to swap the two positions automatically.",
+	"engine.ordering.instructions": "Drag each item into its place, or click an item then a slot. Dropping on a filled slot swaps the two.",
 	"engine.ordering.dropHere": "Drag an item here",
 	"engine.ordering.itemsLabel": "Items to place",
 
 	/* ── Questions « matching » ── */
-	"engine.matching.instructions": "Match each item with an option (drag and drop). The same option can be used more than once.",
+	"engine.matching.instructions": "Drag an option onto each item, or click an option then an item. An option can be used more than once.",
 	"engine.matching.dropHere": "Drop an option here",
 	"engine.matching.choicesLabel": "Available options",
 	"engine.matching.unknownChoice": "Unknown option",
@@ -106,7 +105,10 @@ export const EN_ENGINE = {
 	/* Variante terminal qui n'est PAS une vraie invite de commande (retour #2,
 	   2026-09-26 soir) : le champ devient un bloc de code éditable, avec ce
 	   libellé au-dessus au lieu d'une invite « C:\> ». */
-	"engine.terminal.programOutputLabel": "Program output",
+	"engine.terminal.programOutputLabel": "Program output…",
+	"engine.terminal.window.cmd": "Command Prompt",
+	"engine.terminal.window.powershell": "Windows PowerShell",
+	"engine.terminal.window.bash": "bash",
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Your own answer",
@@ -126,6 +128,10 @@ export const EN_ENGINE = {
 	/* ── Carte mémoire ── */
 	"engine.flashcard.flip": "Flip",
 	"engine.flashcard.flipHint": "Space",
+	"engine.flashcard.front": "Question",
+	"engine.flashcard.flipTip": "Click the card or press",
+	"engine.flashcard.showQuestion": "Turn the card over to see the question",
+	"engine.flashcard.showAnswer": "Turn the card over to see the answer",
 	"engine.flashcard.back": "Answer",
 	"engine.flashcard.again": "Review again",
 	"engine.flashcard.knew": "I knew it",
@@ -135,17 +141,23 @@ export const EN_ENGINE = {
 	"engine.submit.back": "Back",
 	"engine.submit.showScore": "See the score",
 	"engine.submit.showResults": "See the results",
-	"engine.submit.reviewList": "Go back to a question:",
-	"engine.submit.missingList": "Unanswered questions:",
-	"engine.submit.missingAnswers.one": "{count} answer is missing.",
-	"engine.submit.missingAnswers.other": "{count} answers are missing.",
-	"engine.submit.missingFreeAnswers.one": "{count} free-text answer is missing.",
-	"engine.submit.missingFreeAnswers.other": "{count} free-text answers are missing.",
-	"engine.submit.allFreeAnswered": "Every question has a free-text answer.",
-	"engine.submit.missingRatings.one": "{count} self-assessment is missing.",
-	"engine.submit.missingRatings.other": "{count} self-assessments are missing.",
-	"engine.submit.toRateList": "Questions to assess:",
-	"engine.submit.allRated": "Every question has been assessed.",
+	"engine.submit.reviewList": "Go back to a question",
+	"engine.submit.missingList": "Unanswered",
+	"engine.submit.missingAnswers.one": "{count} question left unanswered",
+	"engine.submit.missingAnswers.other": "{count} questions left unanswered",
+	"engine.submit.missingFreeAnswers.one": "{count} question left without an answer",
+	"engine.submit.missingFreeAnswers.other": "{count} questions left without an answer",
+	"engine.submit.allFreeAnswered": "Every question has an answer",
+	"engine.submit.missingRatings.one": "{count} question left to assess",
+	"engine.submit.missingRatings.other": "{count} questions left to assess",
+	"engine.submit.toRateList": "To assess",
+	"engine.submit.allRated": "Every question has been assessed",
+	"engine.submit.allAnswered": "Every question has an answer",
+	"engine.submit.missingSub": "You can still go back to them before finishing.",
+	"engine.submit.completeSub": "You can go over a question again before finishing.",
+	"engine.submit.progress": "{done} / {total} answered",
+	"engine.submit.progressRated": "{done} / {total} assessed",
+	"engine.submit.goTo": "Go to question {n}",
 
 	/* ── Slide de résultats ── */
 	"engine.result.title": "Results",

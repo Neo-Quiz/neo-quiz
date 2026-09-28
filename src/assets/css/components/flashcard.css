@@ -1,38 +1,280 @@
-/* Carte mémoire (engine/text-only.ts flashcardBodyHtml). Le verso se déplie
-   comme une carte qu'on retourne ; sans animation si l'utilisateur le demande. */
-.quiz-flashcard-actions { display: flex; align-items: center; gap: 10px; }
-.quiz-flashcard-kbd {
-	display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
-	border-radius: 5px; border: 1px solid var(--background-modifier-border);
-	font-size: 11px; color: var(--text-muted);
+/* =========================================================
+   FLASHCARD (engine/text-only.ts, flashcardBodyHtml) — redesigned 2026-09-27.
+   A real card that turns over in 3D: the question on the front, the answer
+   on the back. It belongs to the "press me" family of the answer options
+   (quiz-options.css): the same face, the same light rim, the same darker
+   edge underneath — only larger, and centred.
+   ========================================================= */
+
+.quiz-fc{
+  --quiz-fc-face: var(--background-secondary);
+  --quiz-fc-edge: color-mix(in srgb, #000 45%, var(--background-secondary));
+  --quiz-fc-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --quiz-fc-depth: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin: 18px var(--quiz-option-side-gap) 6px;
 }
-.quiz-flashcard-back {
-	margin-top: 4px; padding: 16px; border-radius: 12px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	transform-origin: top center;
-	animation: quiz-flashcard-flip 300ms cubic-bezier(.16, 1, .3, 1);
+
+.theme-light .quiz-fc{
+  --quiz-fc-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
-.quiz-flashcard-answer { font-size: 1.1em; font-weight: 600; margin: 4px 0 12px; }
-/* Jamais une tuile dans une tuile (règle d'interface) : l'explication au verso
-   d'une carte perd le cadre de `.quiz-textonly-explain-block` (bordure, fond,
-   padding latéral) — juste un trait fin au-dessus, comme une section de la
-   même carte plutôt qu'une carte imbriquée. */
-.quiz-flashcard-back .quiz-textonly-explain-block {
-	padding: 14px 0 0;
-	margin-top: 14px;
-	border: none;
-	border-top: 1px solid var(--background-modifier-border);
-	border-radius: 0;
-	background: none;
+
+/* The card. A <button> before the flip (the whole front flips it), a plain
+   block after. `perspective` lives here so that the inner turn is 3D. */
+.quiz-fc-card{
+  appearance: none;
+  display: block;
+  width: min(560px, 100%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  perspective: 1400px;
 }
-.quiz-flashcard-missing { color: var(--text-muted); font-style: italic; font-weight: 400; }
-.quiz-flashcard-rating { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-.quiz-flashcard-rating .quiz-textonly-rating-btn { display: inline-flex; align-items: center; gap: 8px; }
-@keyframes quiz-flashcard-flip {
-	from { opacity: 0; transform: perspective(900px) rotateX(-80deg); }
+
+button.quiz-fc-card{
+  cursor: pointer;
 }
-@media (prefers-reduced-motion: reduce) {
-	.quiz-flashcard-back { animation: quiz-flashcard-fade 150ms ease-out; transform: none; }
+
+/* Both faces share ONE grid cell: the card is as tall as its taller face,
+   and the back never needs an absolute position or a fixed height. */
+.quiz-fc-inner{
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 110ms cubic-bezier(0.3, 0, 0.5, 1);
 }
-@keyframes quiz-flashcard-fade { from { opacity: 0; } }
+
+.quiz-fc.is-flipped .quiz-fc-inner{
+  transform: rotateY(180deg);
+  /* Turning back and forth by hand: the same springy turn as the first
+     flip, as a transition this time (pure class toggle, no re-render). */
+  transition: transform 620ms cubic-bezier(0.34, 1.25, 0.5, 1);
+}
+
+.quiz-fc.is-flipped.is-front .quiz-fc-inner{
+  transform: rotateY(0deg);
+}
+
+.quiz-fc.is-flipped .quiz-fc-card{
+  cursor: pointer;
+  outline: none;
+}
+
+.quiz-fc.is-flipped .quiz-fc-card:hover .quiz-fc-face{
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-fc-face));
+}
+
+.quiz-fc.is-flipped .quiz-fc-card:focus-visible .quiz-fc-face{
+  box-shadow: var(--quiz-fc-rim), 0 0 0 2px var(--quiz-primary-ring-22), 0 var(--quiz-fc-depth) 0 0 var(--quiz-fc-edge);
+}
+
+/* On a turned card, the front no longer says "click to flip": it still
+   flips, but the tip would read as if the card had not been answered. */
+.quiz-fc.is-flipped .quiz-fc-tip{
+  visibility: hidden;
+}
+
+/* The turn, played once right after the click (the click re-renders the
+   card, which starts face up). 620 ms on a slightly springy curve: a card
+   this size turning in less reads as a flicker, in more as a wait. */
+.quiz-fc.is-flipping .quiz-fc-inner{
+  animation: quiz-fc-flip 620ms cubic-bezier(0.34, 1.25, 0.5, 1);
+}
+
+@keyframes quiz-fc-flip{
+  from{ transform: rotateY(0deg); }
+  to{ transform: rotateY(180deg); }
+}
+
+.quiz-fc-face{
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  box-sizing: border-box;
+  padding: 26px 28px 22px;
+  border-radius: 18px;
+  background: var(--quiz-fc-face);
+  box-shadow: var(--quiz-fc-rim), 0 var(--quiz-fc-depth) 0 0 var(--quiz-fc-edge);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: background-color var(--quiz-dur-fast) ease;
+}
+
+.quiz-fc-face.is-back{
+  transform: rotateY(180deg);
+}
+
+/* The front invites a click: lighter face on hover, sinks when pressed —
+   like an option. */
+button.quiz-fc-card:hover .quiz-fc-face.is-front{
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-fc-face));
+}
+
+button.quiz-fc-card:active .quiz-fc-inner{
+  transform: translateY(var(--quiz-fc-depth));
+}
+
+button.quiz-fc-card:active .quiz-fc-face.is-front{
+  box-shadow: var(--quiz-fc-rim), 0 0 0 0 var(--quiz-fc-edge);
+}
+
+button.quiz-fc-card:focus-visible{
+  outline: none;
+}
+
+button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
+  box-shadow: var(--quiz-fc-rim), 0 0 0 2px var(--quiz-primary-ring-22), 0 var(--quiz-fc-depth) 0 0 var(--quiz-fc-edge);
+}
+
+.quiz-fc-label{
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.quiz-fc-face.is-back .quiz-fc-label{
+  color: var(--quiz-success-light);
+}
+
+.quiz-fc-text{
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 1.25rem;
+  /* 600, so that the **bold** of a prompt still stands out. */
+  font-weight: 600;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.quiz-fc-text > :first-child{ margin-top: 0; }
+.quiz-fc-text > :last-child{ margin-bottom: 0; }
+
+.quiz-fc-tip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
+.quiz-flashcard-kbd{
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text-normal) 16%, transparent);
+  background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.quiz-flashcard-missing{
+  color: var(--text-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* What the card teaches, under it once turned — never a tile in a tile:
+   a thin rule above, no frame. */
+.quiz-fc .quiz-textonly-explain-block{
+  width: min(560px, 100%);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 14px 4px 0;
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
+}
+
+/* The two ratings: "press me" buttons, neutral until chosen; the chosen one
+   takes its colour (amber for "review again", green for "I knew it"). */
+.quiz-fc-ratings{
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.quiz-fc-rate{
+  --quiz-fc-rate-face: var(--quiz-fc-face);
+  --quiz-fc-rate-edge: var(--quiz-fc-edge);
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 170px;
+  justify-content: center;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--quiz-fc-rate-face);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--quiz-fc-rim), 0 4px 0 0 var(--quiz-fc-rate-edge);
+  transition: background-color 0.12s ease, transform 110ms cubic-bezier(0.3, 0, 0.5, 1), box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.quiz-fc-rate:hover{
+  background: color-mix(in srgb, var(--text-normal) 5%, var(--quiz-fc-rate-face));
+}
+
+.quiz-fc-rate:active{
+  transform: translateY(4px);
+  box-shadow: var(--quiz-fc-rim), 0 0 0 0 var(--quiz-fc-rate-edge);
+}
+
+.quiz-fc-rate:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* One class more than text-only.css's `.quiz-textonly-rating-btn.review.selected`
+   (the written-answer ratings), which would paint these red. */
+.quiz-fc .quiz-fc-rate.selected[data-textonly-rating="review"]{
+  --quiz-fc-rate-face: var(--quiz-hint);
+  --quiz-fc-rate-edge: color-mix(in srgb, #000 35%, var(--quiz-hint));
+  background: var(--quiz-fc-rate-face);
+  color: #1b1405;
+}
+
+.quiz-fc .quiz-fc-rate.selected[data-textonly-rating="understood"]{
+  --quiz-fc-rate-face: var(--quiz-success);
+  --quiz-fc-rate-edge: var(--quiz-success-edge);
+  background: var(--quiz-fc-rate-face);
+  color: #fff;
+}
+
+.quiz-fc-rate.selected .quiz-flashcard-kbd{
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-fc.is-flipping .quiz-fc-inner{ animation: quiz-fc-fade 150ms ease-out; }
+  .quiz-fc-inner,
+  .quiz-fc.is-flipped .quiz-fc-inner,
+  .quiz-fc-rate{ transition: none; }
+}
+
+@keyframes quiz-fc-fade{ from{ opacity: 0; } }

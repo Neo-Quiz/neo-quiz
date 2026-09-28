@@ -6,76 +6,68 @@
   margin: 10px var(--quiz-option-side-gap) 0;
 }
 
+/* THE ANSWER FIELD (restyled 2026-09-27) in the family of the answer
+   options (quiz-options.css): the same flat face, the same light rim instead
+   of a border — no blue border, glow, gradient or glass any more. It sits
+   still (a field is not a button: no edge underneath); focus draws a blue
+   ring. Its height is no longer a 220 px floor: a one-word answer opened a
+   ten-line box. The starting height comes from `rows` (the expected answer's
+   line count, engine/terminal.ts) and grows with typing; a written
+   explanation (`.quiz-textonly-textarea`) keeps room for a few sentences. */
 .quiz-textarea{
+  --quiz-field-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   display: block;
   width: 100%;
-  min-height: 220px;
+  min-height: 0;
   box-sizing: border-box;
-  resize: vertical;
-  padding: 18px 20px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--quiz-primary) 34%, var(--background-modifier-border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 68%, transparent) 100%
-    );
+  resize: none;
+  /* The field grows with its text (engine/terminal.ts, text-only.ts): a
+     scrollbar would only ever flash in during the frame before it grows. */
+  overflow-y: hidden;
+  padding: 14px 18px;
+  border-radius: var(--quiz-card-radius);
+  border: 1px solid transparent;
+  background: var(--background-secondary);
   color: var(--text-normal);
+  caret-color: var(--quiz-primary-light);
   font: inherit;
   line-height: 1.55;
   outline: none;
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.04),
-    0 0 0 1px color-mix(in srgb, var(--quiz-primary) 8%, transparent),
-    0 10px 26px color-mix(in srgb, #000 16%, transparent);
+  box-shadow: var(--quiz-field-rim);
   transition:
     border-color var(--quiz-dur-fast) ease,
-    box-shadow var(--quiz-dur-mid) var(--quiz-ease-smooth),
-    background var(--quiz-dur-fast) ease,
-    transform var(--quiz-dur-fast) var(--quiz-ease-smooth);
+    box-shadow var(--quiz-dur-fast) ease,
+    background var(--quiz-dur-fast) ease;
+}
+
+.quiz-textarea.quiz-textonly-textarea{
+  min-height: 140px;
 }
 
 .quiz-textarea::placeholder{
-  color: var(--text-muted);
-  opacity: 0.95;
+  color: var(--text-faint);
 }
 
-.quiz-textarea:hover,
-.quiz-textarea:focus{
-  border-color: var(--quiz-primary);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-22),
-    0 0 22px var(--quiz-primary-glow-35);
+/* Hover and focus leave the terminal fields alone (terminal-cmd.css,
+   terminal-program.css): they draw their own look. */
+.quiz-textarea:not(.quiz-textarea-command):not(.quiz-textarea-program):hover:not(:focus):not([readonly]){
+  background: color-mix(in srgb, var(--text-normal) 3%, var(--background-secondary));
 }
 
-.quiz-textarea:focus{
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-secondary) 84%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 74%, transparent) 100%
-    );
-}
-
-.quiz-textarea.filled:not(.correct):not(.wrong){
-  border-color: color-mix(in srgb, var(--quiz-primary) 54%, var(--background-modifier-border));
+.quiz-textarea:not(.quiz-textarea-command):not(.quiz-textarea-program):focus{
+  box-shadow: var(--quiz-field-rim), 0 0 0 2px var(--quiz-primary-ring-22);
 }
 
 .quiz-textarea.correct{
   border-color: var(--quiz-success);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-success-ring-20),
-    0 0 22px var(--quiz-success-glow-38);
+  background: color-mix(in srgb, var(--quiz-success) 10%, var(--background-secondary));
+  box-shadow: var(--quiz-field-rim);
 }
 
 .quiz-textarea.wrong{
   border-color: var(--quiz-danger);
-  box-shadow:
-    0 0 0 1.5px var(--quiz-danger-ring-20),
-    0 0 22px var(--quiz-danger-glow-38);
+  background: color-mix(in srgb, var(--quiz-danger) 10%, var(--background-secondary));
+  box-shadow: var(--quiz-field-rim);
 }
 
 .quiz-textarea[readonly]{
@@ -95,34 +87,31 @@
   background: transparent;
 }
 
-/* Thème clair */
+/* Light theme: the white rim would vanish on a light face — a faint dark
+   ring instead, like the answer options. */
 .theme-light .quiz-textarea{
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, #ffffff 82%, var(--background-primary) 18%) 0%,
-      color-mix(in srgb, var(--background-secondary) 88%, #ffffff 12%) 100%
-    );
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--quiz-primary) 10%, transparent),
-    0 8px 20px rgba(0,0,0,0.04);
+  --quiz-field-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
-.theme-light .quiz-textarea:hover,
-.theme-light .quiz-textarea:focus{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-primary-ring-20),
-    0 0 16px var(--quiz-primary-ring-16);
+/* The unit of a numeric answer, inside the field at its right
+   (engine/terminal.ts). The text stops before it. */
+.quiz-text-wrap.has-unit{
+  position: relative;
 }
 
-.theme-light .quiz-textarea.correct{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-success-ring-20),
-    0 0 16px var(--quiz-success-ring-14);
+.quiz-text-wrap.has-unit .quiz-textarea{
+  padding-right: calc(30px + 8ch);
 }
 
-.theme-light .quiz-textarea.wrong{
-  box-shadow:
-    0 0 0 1.5px var(--quiz-danger-ring-20),
-    0 0 16px var(--quiz-danger-ring-14);
+.quiz-field-unit{
+  position: absolute;
+  top: 0;
+  right: 18px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  color: var(--text-muted);
+  font-weight: 600;
+  pointer-events: none;
 }

@@ -10,46 +10,51 @@
 	gap: 8px;
 }
 
+/* The equation field in the family of the answer fields (inputs.css,
+   2026-09-27): the same flat face and light rim instead of a border, a blue
+   ring on focus, the verdict as a coloured border. */
 math-field.quiz-mathfield {
+	--quiz-field-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 	width: 100%;
-	min-height: 64px;
-	padding: 12px 14px;
+	min-height: 60px;
+	box-sizing: border-box;
+	padding: 12px 16px;
 	font-size: 1.25em;
-	border: 1.5px solid var(--background-modifier-border);
-	border-radius: 10px;
-	background: color-mix(in srgb, var(--background-primary) 72%, transparent);
+	border: 1px solid transparent;
+	border-radius: var(--quiz-card-radius);
+	background: var(--background-secondary);
 	color: var(--text-normal);
-	/* Variables de thème MathLive (noms vérifiés dans le bundle 0.110 —
-	   attention : « contains-highlight-background-color » AVEC le g,
-	   une typo ici = défaut blanc sur la sélection, capture Ahmed
-	   132245). */
-	--caret-color: var(--interactive-accent);
-	--selection-background-color: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+	box-shadow: var(--quiz-field-rim);
+	/* MathLive theme variables (names checked in the 0.110 bundle — note
+	   "contains-highlight-background-color" WITH the g: a typo here gives a
+	   white default on the selection). */
+	--caret-color: var(--quiz-primary-light);
+	--selection-background-color: color-mix(in srgb, var(--quiz-primary) 35%, transparent);
 	--selection-color: var(--text-normal);
-	--contains-highlight-background-color: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+	--contains-highlight-background-color: color-mix(in srgb, var(--quiz-primary) 12%, transparent);
 	--contains-highlight-color: var(--text-normal);
 	--highlight-text: var(--text-normal);
 	--placeholder-color: var(--text-faint);
 	--placeholder-opacity: 0.7;
 }
 
-math-field.quiz-mathfield:focus-within {
-	border-color: var(--interactive-accent);
-	outline: none;
-	box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+.theme-light math-field.quiz-mathfield {
+	--quiz-field-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
-/* Statuts alignés sur la textarea du quiz. */
-.quiz-math-wrap.filled math-field.quiz-mathfield {
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+math-field.quiz-mathfield:focus-within {
+	outline: none;
+	box-shadow: var(--quiz-field-rim), 0 0 0 2px var(--quiz-primary-ring-22);
 }
 
 .quiz-math-wrap.correct math-field.quiz-mathfield {
-	border-color: var(--color-green, #4ade80);
+	border-color: var(--quiz-success);
+	background: color-mix(in srgb, var(--quiz-success) 10%, var(--background-secondary));
 }
 
 .quiz-math-wrap.wrong math-field.quiz-mathfield {
-	border-color: var(--color-red, #f87171);
+	border-color: var(--quiz-danger);
+	background: color-mix(in srgb, var(--quiz-danger) 10%, var(--background-secondary));
 }
 
 /* Champ SANS aucun bouton (demande Ahmed) :

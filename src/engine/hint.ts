@@ -40,6 +40,13 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 	   remise à zéro de l'état suffit donc à tout effacer. */
 	const niveauxVus = new Map<number, number>();
 
+	/* The level JUST revealed by a click, per question, until the card that
+	   shows it has been rendered once. The hint's entrance animation belongs
+	   to that REVEAL, not to the creation of its node: the engine rebuilds
+	   the whole card on every interaction (choosing another answer included),
+	   and an animation carried by the node replayed each time (2026-09-28). */
+	const niveauRevele = new Map<number, number>();
+
 	function nombreVus(qi: number, total: number): number {
 		if (!ctx.quizState.hintSeen?.[qi]) return 0;
 		return Math.min(total, Math.max(1, niveauxVus.get(qi) ?? 1));
@@ -54,12 +61,15 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 			? `<button class="quiz-help-btn quiz-hint-btn" type="button">${icone}<span>${libelle}</span></button>`
 			: "";
 		const plusieurs = niveaux.length > 1;
+		const nouveau = niveauRevele.get(qi);
+		niveauRevele.delete(qi);
 		const revele = niveaux.slice(0, vus).map((texte, i) => {
 			const titre = plusieurs ? t("engine.hint.level", { n: i + 1, total: niveaux.length }) : t("engine.hint.button");
 			/* Le DERNIER niveau révélé peut recevoir le focus (tabindex -1) :
 			   c'est là qu'il passe quand le bouton disparaît (engine/focus.ts). */
 			const dernier = i === vus - 1 ? ` data-hint-dernier tabindex="-1"` : "";
-			return `<div class="quiz-hint-inline"${plusieurs ? ` data-niveau="${i + 1}"` : ""}${dernier}><div class="quiz-hint-inline-label">${icone}<span>${titre}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(texte)}</div></div>`;
+			const classe = i + 1 === nouveau ? "quiz-hint-inline is-revealed" : "quiz-hint-inline";
+			return `<div class="${classe}"${plusieurs ? ` data-niveau="${i + 1}"` : ""}${dernier}><div class="quiz-hint-inline-label">${icone}<span>${titre}</span></div><div class="quiz-hint-inline-body">${ctx.sanitize.renderHintWithCodeAndEmbeds(texte)}</div></div>`;
 		}).join("");
 		return { bouton, revele };
 	}
@@ -74,7 +84,9 @@ export function createHintHandlers(ctx: EngineCtx): HintHandlers {
 			/* L'indice se RÉVÈLE sur place (plus de fenêtre) : un niveau de
 			   plus à chaque clic, et le re-rendu l'affiche sous la question. */
 			const total = niveauxIndice(ctx.quiz[qi]?.hint).length;
-			niveauxVus.set(qi, Math.min(total, nombreVus(qi, total) + 1));
+			const vus = Math.min(total, nombreVus(qi, total) + 1);
+			niveauxVus.set(qi, vus);
+			niveauRevele.set(qi, vus);
 			ctx.quizState.hintSeen[qi] = true;
 			ctx.commitQuestionInteraction(qi, { syncHeight: true });
 		});

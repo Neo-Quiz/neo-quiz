@@ -51,7 +51,10 @@ export interface ClozeHandlers {
    d'un téléphone en demande une plus petite. Le moteur dit qu'il y a un trou,
    la feuille de style dit quelle place il prend. */
 
-const BLANK_RE = /\{\{([^{}]*)\}\}/g;
+/* A blank's answers may hold braces, two levels deep: a model writes
+   `{{\frac{1}{3}|1/3}}`. Without them (2026-09-28), that blank was not a blank
+   at all and showed as raw text in the middle of its formula. */
+const BLANK_RE = /\{\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}\}/g;
 
 /* Découpe du gabarit — hors de la factory : l'APERÇU d'une question (page
    d'un quiz, éditeur) doit montrer les trous, et il n'a pas de moteur sous
@@ -119,7 +122,88 @@ export function markSlots(template: unknown): { marked: string; blanks: ClozeBla
 		blanks.push({ answers });
 		return SLOT_OPEN + (blanks.length - 1) + SLOT_CLOSE;
 	});
-	return { marked, blanks };
+	return { marked: splitMathAroundSlots(marked), blanks };
+}
+
+const SLOT_SPLIT_RE = new RegExp(SLOT_OPEN + "(\\d+)" + SLOT_CLOSE);
+
+/**
+ * A blank INSIDE a formula (`$du = {{3}}dx$`) closes the formula before it and
+ * reopens it after (`$du =$ ▢ $dx$`). Rendered whole, the formula carried the
+ * blank's input into its TeX, and both halves showed as raw LaTeX
+ * (2026-09-28, a generated quiz on integrals). Code spans are copied as they
+ * are: a `$` in a command (`$HOME`) is not math.
+ */
+export function splitMathAroundSlots(marked: string): string {
+	let out = "";
+	let i = 0;
+	while (i < marked.length) {
+		const ch = marked[i];
+		if (ch === "`") {
+			const end = marked.indexOf("`", i + 1);
+			if (end < 0) return out + marked.slice(i);
+			out += marked.slice(i, end + 1);
+			i = end + 1;
+			continue;
+		}
+		if (ch === "\\" && marked[i + 1] === "$") {
+			out += "\\$";
+			i += 2;
+			continue;
+		}
+		if (ch !== "$") {
+			out += ch;
+			i++;
+			continue;
+		}
+		const delim = marked[i + 1] === "$" ? "$$" : "$";
+		let end = i + delim.length;
+		while (end < marked.length && !(marked.startsWith(delim, end) && marked[end - 1] !== "\\")) end++;
+		if (end >= marked.length) return out + marked.slice(i);
+		const body = marked.slice(i + delim.length, end);
+		if (!SLOT_SPLIT_RE.test(body)) {
+			out += marked.slice(i, end + delim.length);
+		} else {
+			// Captured indices sit at odd positions; each piece of formula
+			// becomes its own inline formula, a blank piece stays as it is.
+			out += body.split(SLOT_SPLIT_RE).map((part, k) => k % 2 === 1
+				? SLOT_OPEN + part + SLOT_CLOSE
+				: part.replace(/^(\s*)([\s\S]*?)(\s*)$/, (_m, lead: string, tex: string, trail: string) =>
+					tex ? `${lead}$${tex}$${trail}` : lead + trail)).join("");
+		}
+		i = end + delim.length;
+	}
+	return out;
+}
+
+/* A whole line of code between backticks — what the generator writes for a
+   fill-in-the-blanks on code (one pair per line). */
+const CODE_LINE_RE = /^\s*`([^`]*)`\s*$/;
+
+/**
+ * The marked template, rendered as a CODE BLOCK when every non-empty line is
+ * a whole line of code between backticks; `null` otherwise.
+ *
+ * Through the markdown rendering, those lines became as many paragraphs
+ * separated by a margin, each an inline `<code>` that collapses leading
+ * spaces: the indentation vanished, and a Python loop body read at the level
+ * of its `for` (2026-09-27). A `<pre>` keeps the lines tight and the
+ * indentation, as in the editor. The blank tokens survive the escaping:
+ * `fillSlots` then replaces them as everywhere else.
+ */
+export function codeClozeHtml(marked: string): string | null {
+	const lines = marked.replace(/\r\n?/g, "\n").split("\n");
+	while (lines.length > 0 && !lines[0].trim()) lines.shift();
+	while (lines.length > 0 && !lines[lines.length - 1].trim()) lines.pop();
+	if (lines.length === 0) return null;
+	const code: string[] = [];
+	for (const line of lines) {
+		if (!line.trim()) { code.push(""); continue; }
+		const m = CODE_LINE_RE.exec(line);
+		if (!m) return null;
+		code.push(m[1].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+	}
+	return `<pre class="quiz-cloze-code"><code>${code.join("\n")}</code></pre>`;
 }
 
 /** Remplace les jetons du HTML rendu par ce que `slot` produit pour chacun. */
@@ -160,7 +244,7 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 
 		// Le gabarit ENTIER passe par le rendu (markdown + images), trous
 		// marqués : une paire `…` ou **…** qui enjambe un trou reste une paire.
-		const rendered = ctx.sanitize.renderTextWithEmbeds(marked, {
+		const rendered = codeClozeHtml(marked) ?? ctx.sanitize.renderTextWithEmbeds(marked, {
 			wrapClass: "quiz-cloze-embed-wrap",
 			imgClass: "quiz-cloze-embed"
 		});
@@ -190,8 +274,9 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 				+ `${locked ? " disabled" : ""}>${expected}</span>`;
 		});
 
-		return `<div class="quiz-multi-indicator">${t("engine.cloze.instructions", { count: blanks.length })}</div>
-		<div class="quiz-cloze">${body}</div>`;
+		// No "Fill in the N blanks" banner above (2026-09-27): the dashed
+		// boxes already say that they are to be filled, and how many.
+		return `<div class="quiz-cloze">${body}</div>`;
 	}
 
 	/** Bascule l'état « rempli » d'un trou, et n'anime QUE la transition

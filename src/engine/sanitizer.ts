@@ -8,6 +8,11 @@ import {
 } from "./grammaire-inline";
 import type { GenreEmphase } from "./grammaire-inline";
 import { rendreBlocs } from "./grammaire-blocs";
+
+/* Lucide `paperclip`, inline like the engine's other icons (cards.ts): the
+   resource button's icon. It used to come from `ctx.lucideIcons`, which is
+   never filled, and fell back on a "⬇" character (2026-09-27). */
+const ICON_PAPERCLIP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>';
 import { colorerCode, budgetRestant, consommerBudget } from "./code-highlight";
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
@@ -534,7 +539,7 @@ export function createSanitizer(ctx: EngineCtx): SanitizerHandlers {
 	function resourceButtonHtml(q: QuestionBase | null | undefined): string {
 		const rb = q?.resourceButton;
 		if (!rb || !rb.label || !rb.fileName) return "";
-		return `<button class="quiz-resource-btn" type="button" data-resource-file="${escapeHtmlAttr(rb.fileName)}"><span class="quiz-resource-btn-icon" aria-hidden="true">${ctx.lucideIcons?.paperclip || "⬇" }</span><span class="quiz-resource-btn-label">${renderInlineText(rb.label)}</span></button>`;
+		return `<button class="quiz-resource-btn" type="button" data-resource-file="${escapeHtmlAttr(rb.fileName)}"><span class="quiz-resource-btn-icon" aria-hidden="true">${ICON_PAPERCLIP}</span><span class="quiz-resource-btn-label">${renderInlineText(rb.label)}</span></button>`;
 	}
 
 	/**

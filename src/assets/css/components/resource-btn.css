@@ -1,174 +1,120 @@
 /* =========================================================
-   13) BOUTON RESSOURCE (Activité PT) + Tooltip — VERSION STABLE 7.0
+   13) THE RESOURCE BUTTON (opens a file of the vault: a Packet Tracer
+   activity, a PDF…) — redesigned 2026-09-27.
+   A PURPLE "press me" button, the family of the arrows and the answer
+   options: a solid face on a darker 4 px edge, lighter on hover, sinking
+   onto its edge when pressed. The purple is the readings' (the current
+   reading bead, perles.css): a resource is something to open and read, not
+   an answer. Same size as before (full width, 56 px high). Its place is
+   AFTER the content of the card (engine/cards.ts), never above it — at the
+   top of a reading page it came before the text.
+   The file name shows in a small label above it on hover.
    ========================================================= */
 
 .quiz-resource-btn{
+  --quiz-resource-face: #613cf6;
+  --quiz-resource-face-hover: #7253f8;
+  --quiz-resource-edge: #4224b7;
+  --quiz-resource-depth: 4px;
   appearance: none;
-  width: 100%;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-
-  margin: 10px 0 6px;
-  padding: 9px 18px 9px 14px;
+  width: 100%;
   min-height: 56px;
-
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  margin: 14px 0 calc(6px + var(--quiz-resource-depth));
+  padding: 9px 18px 9px 14px;
+  box-sizing: border-box;
+  border: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.08) 100%);
-  color: var(--text-normal, #e2e8f0);
-
+  background: var(--quiz-resource-face);
+  color: #fff;
+  font: inherit;
   font-size: 0.92em;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  outline: none;
-
-  position: relative;
-  transform-origin: center;
-  will-change: transform, box-shadow;
-
+  box-shadow: 0 var(--quiz-resource-depth) 0 0 var(--quiz-resource-edge);
   transition:
-    background 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    padding-top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    padding-bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.22s ease !important;
+    background-color 0.12s ease,
+    transform 110ms cubic-bezier(0.3, 0, 0.5, 1),
+    box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1);
 }
 
-.quiz-resource-btn:hover,
-.quiz-resource-btn:focus-visible{
-  outline: none;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18) 0%, rgba(139, 92, 246, 0.14) 100%);
-  border-color: rgba(99, 102, 241, 0.55);
-
-  transform: translate3d(0,-2px,0) !important;
-  min-height: 58px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-
-  box-shadow:
-    0 0 0 1.5px rgba(99,102,241,0.22),
-    0 0 26px rgba(99,102,241,0.16) !important;
-
-  filter: saturate(1.06);
+.quiz-resource-btn:hover{
+  background: var(--quiz-resource-face-hover);
 }
 
 .quiz-resource-btn:active{
-  transform: translate3d(0,1px,0) !important;
-  min-height: 57px;
-  padding-top: 9px;
-  padding-bottom: 9px;
+  transform: translateY(var(--quiz-resource-depth));
+  box-shadow: 0 0 0 0 var(--quiz-resource-edge);
+}
 
-  box-shadow:
-    0 0 0 1.5px rgba(99,102,241,0.16),
-    0 0 12px rgba(99,102,241,0.10) !important;
-
-  filter: brightness(0.99) saturate(1.03) !important;
+.quiz-resource-btn:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 .quiz-resource-btn-icon{
-  font-size: 1.05em;
-  opacity: 0.85;
+  display: inline-grid;
+  place-items: center;
+}
+
+.quiz-resource-btn-icon svg{
+  width: 18px;
+  height: 18px;
 }
 
 .quiz-resource-btn-label{
   letter-spacing: 0.01em;
 }
 
+/* The file name, above the button on hover or keyboard focus — the same
+   dark label as the reading beads' titles (perles.css). */
 .quiz-resource-btn::after{
   content: attr(data-resource-file);
   position: absolute;
   bottom: calc(100% + 10px);
   left: 50%;
-  transform: translateX(-50%) translateY(6px);
-
+  z-index: 100;
   width: max-content;
   max-width: min(90vw, 560px);
   box-sizing: border-box;
-
-  padding: 8px 14px;
+  padding: 6px 10px;
   border-radius: 8px;
-  background: var(--background-secondary, #1e293b);
-  border: 1px solid var(--background-modifier-border, rgba(148, 163, 184, 0.18));
-  color: var(--text-normal, #e2e8f0);
-
-  font-size: 0.82em;
-  font-weight: 500;
-  line-height: 1.4;
+  background: #16151c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
   white-space: normal;
   word-break: break-word;
-  text-align: center;
-
   pointer-events: none;
   opacity: 0;
-  z-index: 100;
-
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.quiz-resource-btn::before{
-  content: "";
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%) translateY(6px);
-
-  border: 6px solid transparent;
-  border-top-color: var(--background-secondary, #1e293b);
-
-  pointer-events: none;
-  opacity: 0;
-  z-index: 101;
-
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .quiz-resource-btn:hover::after,
-.quiz-resource-btn:hover::before,
-.quiz-resource-btn:focus-visible::after,
-.quiz-resource-btn:focus-visible::before{
+.quiz-resource-btn:focus-visible::after{
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.theme-light .quiz-resource-btn{
-  box-shadow: none;
-}
-
-.theme-light .quiz-resource-btn:hover,
-.theme-light .quiz-resource-btn:focus-visible{
-  box-shadow:
-    0 0 0 1.5px rgba(99,102,241,0.18),
-    0 0 16px rgba(99,102,241,0.10) !important;
+  transform: translate(-50%, 0);
+  transition-delay: 0.25s;
 }
 
 @media (hover: none), (pointer: coarse), (max-width: 900px){
   .quiz-resource-btn{
     min-height: 52px;
-    padding: 14px 14px;
-    gap: 8px;
-  }
-
-  .quiz-resource-btn:hover,
-  .quiz-resource-btn:focus-visible{
-    transform: translate3d(0,-1px,0) !important;
-    min-height: 52px;
-    padding-top: 14px;
-    padding-bottom: 14px;
-  }
-
-  .quiz-resource-btn:active{
-    transform: translate3d(0,1px,0) !important;
-    min-height: 52px;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    padding: 14px;
   }
 }
 
+@media (prefers-reduced-motion: reduce){
+  .quiz-resource-btn,
+  .quiz-resource-btn::after{ transition: none; }
+}
