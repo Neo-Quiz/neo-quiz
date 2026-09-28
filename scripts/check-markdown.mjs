@@ -206,9 +206,22 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/engine/grammaire-inline.ts"
    comme dans Discord et Obsidian (2026-09-26) — et toujours l'échappement
    AVANT le markdown : un quiz peut venir de quelqu'un d'autre. */
 await withSrcModule(
-	["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts", "src/engine/code-highlight.ts"],
-	({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }, { reinitialiserBudgetRendu }) => {
+	["src/engine/sanitizer.ts", "src/engine/grammaire-blocs.ts", "src/engine/code-highlight.ts", "src/code-catalogue.ts"],
+	({ rendreTexteQuiz, renderInlineText, createSanitizer }, { decouperBlocs, aDesBlocs }, { reinitialiserBudgetRendu }, { codeLanguageOf, codeLanguageBadgeSrc }) => {
 	const r = makeReporter("Blocs, images et liens");
+	/* The language badge a recognized block carries in the displayed render
+	   (code-catalogue.ts, 2026-09-28), first child of its `<pre>`. Its exact
+	   form is `check:code-catalogue`'s business; here it is only the markup
+	   the expected strings include. */
+	const BADGE = (tag) => {
+		const e = codeLanguageOf(tag);
+		return `<img class="quiz-code-lang" src="${codeLanguageBadgeSrc(e)}" alt="${e.name}" title="${e.name}" width="16" height="16" draggable="false">`;
+	};
+	/* The ONLY `<img>` allowed inside a `<pre>`: our own badge, at its very
+	   start, with a `data:` source that holds no `"`, `<`, `>` or `&`. Any
+	   other image (an injected `<img onerror=…>`) must still come out
+	   escaped. */
+	const BADGE_EN_TETE = /^<img class="quiz-code-lang" src="data:image\/svg\+xml,[^"<>&]*" alt="[^"<>&]*" title="[^"<>&]*" width="16" height="16" draggable="false">/;
 	const IMG = { embed: s => `[embed:${s}]`, image: (a, s) => `[image:${a}|${s}]` };
 	/* `rendreTexteQuiz` partage désormais un budget de coloration de MODULE
 	   (code-highlight.ts), remis à zéro par ses appelants réels une fois par
@@ -241,7 +254,7 @@ await withSrcModule(
 		+ `<button type="button" class="quiz-code-run-btn" data-quiz-code-run hidden>`
 		+ `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>`
 		+ `</button></div>`
-		+ `<pre class="quiz-md-code"><code class="language-python">`
+		+ `<pre class="quiz-md-code">${BADGE("python")}<code class="language-python">`
 		+ `<span class="token keyword">print</span><span class="token punctuation">(</span>`
 		+ `<span class="token string">&quot;&lt;script&gt;&quot;</span><span class="token punctuation">)</span>`
 		+ NL + `<span class="token operator">**</span>x<span class="token operator">**</span> $y$</code></pre>`
@@ -285,7 +298,7 @@ await withSrcModule(
 			// `<pre>` (review of 2026-09-26, minor 2) — allowing them for every
 			// language would have let through a future injection of these same
 			// tags in a language with no wrapper.
-			const dansPre = html.replace(/^.*?<pre[^>]*>/s, "").replace(/<\/pre>.*$/s, "");
+			const dansPre = html.replace(/^.*?<pre[^>]*>/s, "").replace(/<\/pre>.*$/s, "").replace(BADGE_EN_TETE, "");
 			const horsPre = html.replace(/<pre[^>]*>.*?<\/pre>/s, "");
 			const balisesPre = [...dansPre.matchAll(/<\/?([a-z]+)[^>]*>/gi)].every(m => ["code", "span"].includes(m[1].toLowerCase()));
 			const balisesHorsPre = LANGUES_EXECUTABLES.has(langue)

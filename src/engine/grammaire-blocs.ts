@@ -28,6 +28,7 @@
 
 import { motifCodeDouble, motifCodeSimple } from "./grammaire-inline";
 import { langageDeBloc } from "../code-languages";
+import { codeLanguageOf, codeLanguageBadgeSrc } from "../code-catalogue";
 import { t } from "../i18n";
 
 /** Un intervalle `[debut, fin[` du texte source. */
@@ -331,7 +332,8 @@ export interface OutilsRendu {
 	    editor's preview, which compare or display markdown with no possible
 	    execution: the `<div>/<button>/<svg>` wrapper would make the strict
 	    re-read of `formeNormale` fail there (finding A-IMPORTANT 1 of the
-	    2026-09-26 review). */
+	    2026-09-26 review). The same flag governs the language badge of a
+	    recognized block (code-catalogue.ts), for the same reason. */
 	executable?: boolean;
 }
 
@@ -376,25 +378,41 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 			case "liste":
 				return rendreListe(texte, b.items, o);
 			case "code": {
-				/* La langue n'entre que sous sa forme sûre (lettres, chiffres,
-				   `+#.-`), dans une classe : c'est ce que le motif de clôture
-				   accepte, rien d'autre ne peut y arriver.
-				   M3 (revue du 2026-09-26) : cette classe `language-xxx` est
-				   aussi celle que le post-processeur d'Obsidian cherche
-				   (`code[class*="language-"]:not(.is-loaded)`) pour lancer SON
-				   PROPRE surligneur — elle existait déjà avant la coloration
-				   (ce commit n'en change pas le risque). La faire remplacer par
-				   `data-langue` toucherait le contrat de `html-vers-markdown.ts`
-				   (attributsCanon) et ne se vérifie que dans le VRAI greffon,
-				   ce que cette tâche ne peut pas faire (pas de build, pas
-				   d'Obsidian) : laissé tel quel, à reprendre avec un test dans
-				   le greffon réel plutôt qu'ici. */
+				/* The language enters only in its safe form (letters, digits,
+				   `+#.-`), inside a class: that is all the fence pattern
+				   accepts, nothing else can get there.
+				   M3 (review of 2026-09-26): this `language-xxx` class is also
+				   the one Obsidian's post-processor looks for
+				   (`code[class*="language-"]:not(.is-loaded)`) to run ITS OWN
+				   highlighter — it existed before the colouring (that commit
+				   did not change the risk). Replacing it with `data-langue`
+				   would touch the contract of `html-vers-markdown.ts`
+				   (attributsCanon) and can only be verified in the REAL plugin,
+				   which that task could not do (no build, no Obsidian): left
+				   as it is, to take up with a test in the real plugin rather
+				   than here. */
 				const classe = b.langue ? ` class="language-${o.echapper(b.langue)}"` : "";
 				const contenu = b.contenu ? tranche(b.contenu) : "";
-				// Coloré si un langage est nommé ET reconnu ; sinon le texte
-				// échappé nu, exactement comme avant l'ajout de la coloration.
+				// Coloured when a language is named AND recognized; otherwise the
+				// bare escaped text, exactly as before the colouring existed.
 				const html = (b.langue && o.colorerCode ? o.colorerCode(contenu, b.langue) : null) ?? o.echapper(contenu);
-				const pre = `<pre class="quiz-md-code"><code${classe}>${html}</code></pre>`;
+				/* Language badge (2026-09-28): the logo of a language of the
+				   catalogue (code-catalogue.ts), top left, its name on hover
+				   (`title`) and for assistive technology (`alt`). Under the
+				   same condition as the « Run » button below — only a render
+				   DISPLAYED to the learner (`executable`), never the canonical
+				   render nor the editor's preview (whose sanitizer would drop
+				   the `data:` source). INSIDE the `<pre>`, before `<code>`:
+				   the badge survives `bindCodeRunButtons` removing the toolbar
+				   of a block the host cannot run, and the wrapper
+				   `sortie-programme.ts` puts around a bare `<pre>`; the code
+				   text (`code.textContent`, what ▶ runs) is untouched. A block
+				   with no tag or an unknown one stays exactly as before. */
+				const entree = o.executable ? codeLanguageOf(b.langue) : null;
+				const badge = entree
+					? `<img class="quiz-code-lang" src="${codeLanguageBadgeSrc(entree)}" alt="${o.echapper(entree.name)}" title="${o.echapper(entree.name)}" width="16" height="16" draggable="false">`
+					: "";
+				const pre = `<pre class="quiz-md-code">${badge}<code${classe}>${html}</code></pre>`;
 				/* « Run » button (code sandbox, engine/code-run.ts): markup ALWAYS
 				   emitted for a block whose language runs (the pure table
 				   `langageDeBloc`, code-languages.ts — task 5 of the C/C++

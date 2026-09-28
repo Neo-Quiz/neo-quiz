@@ -109,8 +109,12 @@ async function verifierDureeBornee() {
 	// une machine modeste ou un motif encore pire qu'on n'aurait pas essayé.
 	const SEUIL_MS = 300;
 
-	await withSrcModule("src/engine/code-highlight.ts", ({ colorerCode, PLAFOND_CARACTERES_PAR_BLOC }) => {
-		for (const langue of TOUS_LES_LANGAGES) {
+	await withSrcModule(["src/engine/code-highlight.ts", "src/code-catalogue.ts"], ({ colorerCode, PLAFOND_CARACTERES_PAR_BLOC }, { CODE_CATALOGUE }) => {
+		// Plus every grammar the language catalogue colours with (2026-09-28),
+		// read from the catalogue itself: a grammar added there is measured
+		// here without anyone having to remember this list.
+		const langues = [...new Set([...TOUS_LES_LANGAGES, ...CODE_CATALOGUE.map(e => e.grammar).filter(Boolean)])];
+		for (const langue of langues) {
 			for (const [nomMotif, motif] of Object.entries(MOTIFS_HOSTILES)) {
 				// Bien au-delà du plafond, pour que la coupe soit ce qui est
 				// mesuré (pas la taille d'entrée).

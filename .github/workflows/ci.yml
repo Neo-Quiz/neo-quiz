@@ -82,6 +82,12 @@ jobs:
       - name: Code execution rules
         run: npm run check:code-languages
 
+      # The language catalogue of code blocks: one entry per tag, no inherited
+      # key read as a language, a logo or icon for each, inert SVG logos,
+      # every tag coloured, and the badge only in the displayed render.
+      - name: Code language catalogue
+        run: npm run check:code-catalogue
+
       # UNE RÉPONSE COPIÉE D'UN SITE, dans tous ses états : fence, prose,
       # LaTeX, virgule oubliée, faux titres de section (Gemini, 2026-09-24).
       # LE COURS AU-DESSUS D'UNE QUESTION : caché avant la lecture et pendant
