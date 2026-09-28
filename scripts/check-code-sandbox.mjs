@@ -74,6 +74,9 @@ try {
 		if (m) cas[m[1]] = JSON.parse(m[2]);
 	}
 	const r = makeReporter("Code sandbox — real Electron");
+	/* The harness must not have thrown anything uncaught (Electron would open a
+	   blocking native dialog), and both Electron processes must exit cleanly. */
+	r.check("harness: no uncaught exception, both processes exit 0", [cas["harness-exception"]?.message, p.status, pSansCsp.status], [undefined, 0, 0]);
 	r.check("simple", [cas.simple?.status, cas.simple?.stdout], ["ok", "bonjour 42\n"]);
 	r.check("input() echoed, like a terminal", cas.echo?.stdout, "Saisir un entier a : 24\nSaisir un entier b : 18\nLe maximum est a = 24\n");
 	r.check("one input() too many: readable EOFError", [cas.eof?.status, /EOFError/.test(cas.eof?.error ?? "")], ["error", true]);
@@ -149,9 +152,12 @@ try {
 	   nothing. These pure cases call the real function directly instead. */
 	const langagesPure = cas["langages-pure-dir"];
 	r.check("resoudreFichierCode: a pack file resolves under languages/", cas["resoudre-pack-valide"]?.chemin, join(langagesPure ?? "", "c", "clang", "bundle.js"));
-	for (const nom of ["pack-double-point", "pack-point", "pack-vide"]) {
+	for (const nom of ["pack-double-point", "pack-point", "pack-vide", "malformed", "pack-ads", "ads-root", "trailing-dot", "trailing-space", "dos-device"]) {
 		r.check(`resoudreFichierCode: ${nom} refused`, cas[`resoudre-${nom}`]?.refuse, true);
 	}
+
+	/* A real pack file whose name has inner dots must keep resolving. */
+	r.check("resoudreFichierCode: a dotted pack file name still resolves", cas["resoudre-pack-dotted-name"]?.refuse, false);
 
 	r.check("unknown language refused", cas["langue-inconnue"]?.status, "unavailable");
 
@@ -167,6 +173,11 @@ try {
 	r.check("infinite loop cut", cas["c-boucle"]?.status, "timeout");
 	r.check("the next run works", cas["c-apres-boucle"]?.stdout, "ok\n");
 	r.check("output bounded", [cas["c-sortie-bornee"]?.status, (cas["c-sortie-bornee"]?.stdout ?? "").length <= 20000], ["too-long", true]);
+	/* Security review 2026-09-28. The total is printed in MiB; before the
+	   `--max-memory` cap the same loop printed ~4080. */
+	const memoryMiB = Number(cas["c-memory"]?.stdout);
+	r.check("C memory capped at 256 MiB", [cas["c-memory"]?.status, memoryMiB > 0 && memoryMiB <= 256 ? "capped" : `${memoryMiB} MiB`], ["ok", "capped"]);
+	r.check("C stdin is read-only (fallocate/write/ftruncate/pwrite refused), read still works", [cas["c-stdin-readonly"]?.status, cas["c-stdin-readonly"]?.stdout], ["ok", "1 1 1 1 abc\n"]);
 	r.check("no host file from C", cas["c-fichier"]?.stdout, "REFUSE\n");
 	r.check("C before its pack: not installed", cas["pack-absent"]?.status, "not-installed");
 	r.check("the first run once the pack arrives works", [cas["pack-arrive"]?.status, cas["pack-arrive"]?.stdout], ["ok", "arrive\n"]);

@@ -26,16 +26,21 @@ const LANGUES = { python: "worker-python.mjs", c: "worker-clang.mjs", cpp: "work
 const prets = new Map(); // language -> the worker warmed for its NEXT job
 const nouveauWorker = (langue) => new Worker(LANGUES[langue], { type: "module" });
 const preparer = (langue) => { let w = prets.get(langue); if (!w) { w = nouveauWorker(langue); prets.set(langue, w); } return w; };
-const chauffer = (langue) => { if (LANGUES[langue]) preparer(langue).postMessage({ type: "chauffer" }); };
+const chauffer = (langue) => { if (Object.hasOwn(LANGUES, langue)) preparer(langue).postMessage({ type: "chauffer" }); };
 
-/* Defence in depth (M2): re-truncate here too, even though the worker
-   already did — the page must never forward an error without a cap. */
-const borner = (res) => {
-	if (res && typeof res.error === "string" && res.error.length > PLAFOND) {
-		return { ...res, error: res.error.slice(0, PLAFOND) };
-	}
-	return res;
-};
+/* Defence in depth (M2, then security review 2026-09-28): the page never
+   forwards what a worker posted as it came. The result is REBUILT from an
+   allowlist — the three fields the main process reads
+   (`normaliserResultat`), each typed and capped — so a worker (which runs
+   the quiz's code) cannot smuggle an extra field, a huge `stdout` or a
+   non-string across the IPC boundary. */
+const borner = (res) => ({
+	/* Never `String(res.status)`: an object whose `toString` is not a
+	   function makes it throw, and the result would never be sent. */
+	status: typeof res?.status === "string" ? res.status.slice(0, 32) : "error",
+	stdout: typeof res?.stdout === "string" ? res.stdout.slice(0, PLAFOND) : "",
+	...(typeof res?.error === "string" ? { error: res.error.slice(0, PLAFOND) } : {}),
+});
 
 window.neoCode.surChauffe(chauffer);
 

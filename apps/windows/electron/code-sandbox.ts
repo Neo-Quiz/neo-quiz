@@ -63,15 +63,34 @@ export const PRIVILEGES_CODE: CustomScheme = {
 	privileges: { standard: true, secure: true, supportFetchAPI: true },
 };
 
+/* What a path segment of the sandbox may look like (security review
+   2026-09-28): letters, digits, `_`, `-` and inner dots. `pyodide.asm.wasm`,
+   `worker-clang.mjs`, `llvm-resources.tar` and every other file of the
+   sandbox and of the pack are of that shape. Everything that Windows reads
+   differently from a URL is out: `:` (`manifest.json::$DATA` serves an NTFS
+   alternate data stream, and `C:` is a drive), a leading dot (`..`), a
+   trailing dot or space (Windows strips them, so `x.` opens `x`),
+   backslashes, empty segments. */
+const SAFE_SEGMENT = /^[A-Za-z0-9_-](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?$/;
+/* DOS device names open a device, not a file, whatever their extension
+   (`nul.txt`, `COM1`, `aux`). */
+const DOS_DEVICE = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?$/i;
+
 /** The sandbox file this URL designates: under `racine` (the sandbox
     itself), or under `langages` for `/languages/...` (the installed packs,
-    task 9); `null` if it leaves them (`..`, absolute path, another host). */
+    task 9); `null` if it leaves them (`..`, absolute path, another host) or
+    if any of its segments is not a plain file name (see `SAFE_SEGMENT`). */
 export function resoudreFichierCode(racine: string, langages: string, url: string): string | null {
 	let u: URL;
 	try { u = new URL(url); } catch { return null; }
 	if (u.protocol !== `${SCHEMA_CODE}:` || u.hostname !== "app") return null;
-	const rel = decodeURIComponent(u.pathname).replace(/^\/+/, "");
+	/* A malformed escape (`%E0%A4`) makes `decodeURIComponent` throw: refuse
+	   it instead of letting the protocol handler blow up. */
+	let decode: string;
+	try { decode = decodeURIComponent(u.pathname); } catch { return null; }
+	const rel = decode.replace(/^\/+/, "");
 	if (!rel) return null;
+	if (!rel.split("/").every((seg) => SAFE_SEGMENT.test(seg) && !DOS_DEVICE.test(seg))) return null;
 	const [premier, ...reste] = rel.split("/");
 	const base = path.resolve(premier === "languages" ? langages : racine);
 	const cible = premier === "languages" ? reste.join("/") : rel;
@@ -160,8 +179,18 @@ export function creerBacASable(racine: string, langages: string, preload: string
 	   `neo-code://app` origin (mounted by a quiz that uses
 	   `pyodide_js.FS.filesystems.IDBFS`) lives in the partition, not in the
 	   worker, and a later trial would otherwise read it back. */
-	function nettoyerPartition(): void {
-		void session.fromPartition(PARTITION).clearStorageData().catch(() => undefined);
+	/* Never throws and never hangs: the job queue waits on it (see `run`),
+	   and a clearing that threw or never settled would block every later
+	   run until the app restarts. Five seconds at most. */
+	async function nettoyerPartition(): Promise<void> {
+		try {
+			await Promise.race([
+				session.fromPartition(PARTITION).clearStorageData(),
+				new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+			]);
+		} catch {
+			/* A failed clearing is not the next run's problem. */
+		}
 	}
 
 	function ouvrir(): Promise<BrowserWindow> {
@@ -292,9 +321,14 @@ export function creerBacASable(racine: string, langages: string, preload: string
 			enFile++;
 			const suite = file
 				.then(() => executer(job))
-				.then((r) => { nettoyerPartition(); return r; })
 				.finally(() => { enFile--; });
-			file = suite.catch(() => undefined);
+			/* The storage clearing (N2) is AWAITED by the queue, not by the
+			   caller: the result goes back to the student right away, but the
+			   next job only starts once the partition is clean. Fired without
+			   waiting, the clearing could still be running when the next
+			   trial's worker opened IndexedDB, and race with it (erasing what
+			   that trial just wrote, or missing what the previous one left). */
+			file = suite.then(nettoyerPartition, nettoyerPartition);
 			return suite;
 		},
 		warm(language) {

@@ -6,6 +6,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PRIVILEGES_CODE, creerBacASable, resoudreFichierCode } from "../../../apps/windows/electron/code-sandbox";
 
+/* Backstop: an exception nobody caught would open Electron's BLOCKING native
+   "A JavaScript error occurred in the main process" dialog on the screen of
+   whoever runs the check (and stall it until someone clicks). Any escape is
+   recorded as a failing case instead, and the process quits with a non-zero
+   code. `app.exit`, not `app.quit`: nothing else is left worth running. */
+const onFailure = (e: unknown) => {
+	console.log(`CAS harness-exception ${JSON.stringify({ message: String((e as Error)?.stack ?? e).slice(0, 500) })}`);
+	app.exit(1);
+};
+process.on("uncaughtException", onFailure);
+process.on("unhandledRejection", onFailure);
+
 protocol.registerSchemesAsPrivileged([PRIVILEGES_CODE]);
 const racine = process.env.NEO_CODE_RACINE!;
 const langages = process.env.NEO_CODE_LANGAGES!;
@@ -43,8 +55,15 @@ const preload = process.env.NEO_CODE_PRELOAD!;
 	const langagesPure = mkdtempSync(join(tmpdir(), "neo-code-pure-langages-"));
 	console.log(`CAS langages-pure-dir ${JSON.stringify(langagesPure)}`);
 	const cas = (nom: string, url: string, doitPasser: boolean) => {
-		const r = resoudreFichierCode(racinePure, langagesPure, url);
-		console.log(`CAS resoudre-${nom} ${JSON.stringify({ refuse: r === null, attendu: !doitPasser, chemin: r })}`);
+		/* An exception inside `resoudreFichierCode` is a FAILURE of the case
+		   (`refuse: null`, matching neither `true` nor `false`), never an
+		   uncaught error of the main process. */
+		try {
+			const r = resoudreFichierCode(racinePure, langagesPure, url);
+			console.log(`CAS resoudre-${nom} ${JSON.stringify({ refuse: r === null, attendu: !doitPasser, chemin: r })}`);
+		} catch (e) {
+			console.log(`CAS resoudre-${nom} ${JSON.stringify({ refuse: null, attendu: !doitPasser, leve: String((e as Error)?.name ?? e) })}`);
+		}
 	};
 	cas("valide", "neo-code://app/index.html", true);
 	cas("backslash-encode", "neo-code://app/%5Cwin.ini", false);
@@ -58,6 +77,19 @@ const preload = process.env.NEO_CODE_PRELOAD!;
 	cas("pack-double-point", "neo-code://app/languages/%5C..%5C..%5Csecret.txt", false);
 	cas("pack-point", "neo-code://app/languages/%5C..%5Cindex.html", false);
 	cas("pack-vide", "neo-code://app/languages/", false);
+	/* Security review 2026-09-28: a malformed escape used to make
+	   `decodeURIComponent` throw OUTSIDE any `try`; an NTFS alternate data
+	   stream (`::$DATA`) and a trailing dot or space (Windows strips both,
+	   so `x.` opens `x`) were served as the file itself; a DOS device
+	   name opens a device rather than a file. A file name with dots inside
+	   (`llvm.core.wasm`) must keep passing. */
+	cas("malformed", "neo-code://app/%E0%A4", false);
+	cas("pack-ads", "neo-code://app/languages/c/manifest.json::$DATA", false);
+	cas("ads-root", "neo-code://app/index.html::$DATA", false);
+	cas("trailing-dot", "neo-code://app/languages/c/manifest.json.", false);
+	cas("trailing-space", "neo-code://app/languages/c/manifest.json%20", false);
+	cas("dos-device", "neo-code://app/languages/c/nul.txt", false);
+	cas("pack-dotted-name", "neo-code://app/languages/c/clang/llvm.core2.wasm", true);
 }
 
 /* Two forms of escape, depending on the target origin:
@@ -327,6 +359,32 @@ void app.whenReady().then(async () => {
 	record("c-boucle", await bac.run({ language: "c", timeoutMs: 2000, stdin: "", code: "int main(void){ for(;;){} }" }));
 	record("c-apres-boucle", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ puts("ok"); }' }));
 	record("c-sortie-bornee", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ for(int i=0;i<200000;i++) puts("xxxxxxxxxx"); }' }));
+	/* Security review 2026-09-28. `c-memory`: a loop of `malloc` (16 MiB a
+	   piece, one byte touched per page so that -O1 cannot delete the
+	   allocation, `volatile` for the same reason) used to reach ~4080 MiB;
+	   the link-time `--max-memory` (256 MiB) makes `malloc` answer NULL.
+	   `c-stdin-readonly`: `posix_fallocate`, `write`, `pwrite` and `ftruncate` on
+	   fd 0 grew a JS buffer outside the wasm memory (1.9 GB measured): each
+	   must fail, while `read` still returns the input from offset 0. */
+	record("c-memory", await bac.run({ language: "c", timeoutMs: 30000, stdin: "", code: [
+		"#include <stdio.h>", "#include <stdlib.h>",
+		"int main(void){ int total = 0;",
+		"  for (int i = 0; i < 300; i++) {",
+		"    volatile char *p = malloc(16 << 20); if (!p) break;",
+		"    for (int j = 0; j < (16 << 20); j += 4096) p[j] = 1;",
+		"    total += 16; }",
+		'  printf("%d\\n", total); }',
+	].join("\n") }));
+	record("c-stdin-readonly", await bac.run({ language: "c", timeoutMs: 20000, stdin: "abc", code: [
+		"#define _POSIX_C_SOURCE 200809L", "#include <stdio.h>", "#include <fcntl.h>", "#include <unistd.h>",
+		"int main(void){ char b[4] = {0};",
+		"  int r = posix_fallocate(0, 0, 1 << 30);",
+		'  long w = write(0, "x", 1);',
+		"  int f = ftruncate(0, 1 << 30);",
+		'  long pw = pwrite(0, "x", 1, 0);',
+		"  long n = read(0, b, 3); (void)n;",
+		'  printf("%d %d %d %d %s\\n", r != 0, w < 0, f < 0, pw < 0, b); }',
+	].join("\n") }));
 	record("c-fichier", await bac.run({ language: "c", timeoutMs: 10000, stdin: "", code: '#include <stdio.h>\nint main(void){ FILE*f=fopen("C:/Windows/win.ini","r"); puts(f?"LU":"REFUSE"); }' }));
 
 	/* Task 10: the pack ARRIVES while the app runs. ▶ shows on a C block
