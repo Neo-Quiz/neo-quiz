@@ -290,7 +290,7 @@ function creerFenetre(): void {
 			} catch {
 				return;
 			}
-			if (typeof z === "number" && Number.isFinite(z) && z >= 0.8 && z <= 1.5) {
+			if (typeof z === "number" && Number.isFinite(z) && z >= 0.25 && z <= 1.5) {
 				fenetre?.webContents.setZoomFactor(z);
 			}
 		})();
@@ -712,13 +712,16 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   served by `neo-code://app/<file>`, `code-preload.cjs` that
 		   window's own sandboxed preload — two artefacts distinct from the
 		   app window's. `userData/languages` is where a downloaded language
-		   pack (task 9) lands, served under `neo-code://app/languages/…`;
-		   nothing is written there yet, only Python runs today. */
-		code = creerBacASable(path.join(__dirname, "code"), path.join(app.getPath("userData"), "languages"), path.join(__dirname, "code-preload.cjs"));
+		   pack (task 9, `langages.ts`) lands, served under
+		   `neo-code://app/languages/…` — ONE path, given to both the sandbox
+		   and the install channels, so they can never look in two places. */
+		const dossierLangages = path.join(app.getPath("userData"), "languages");
+		code = creerBacASable(path.join(__dirname, "code"), dossierLangages, path.join(__dirname, "code-preload.cjs"));
 		const canaux = enregistrerCanaux({
 			perimetre,
 			reglagesOuErreur,
 			code,
+			dossierLangages,
 			/* LU À CHAQUE APPEL, jamais capturé : l'utilisateur peut changer ce
 			   dossier en cours de session, et les canaux doivent servir le
 			   nouveau dès l'instant où il est écrit. */

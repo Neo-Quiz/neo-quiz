@@ -35,12 +35,15 @@ release notes.
 - A Run button on every Python code block shown in a quiz (readings, explanations, hints, and a question's own code once the quiz is corrected, never before, since running it would give the answer away): runs the code in the Python sandbox and shows its output, or its error, in a panel built into the same block, right below the code, like an editor's output panel — a sandbox issue (unavailable, timed out) is shown as a discreet notice instead.
 - A hard question may let you run its own program once its last hint is revealed, when the quiz was generated that way; never on a question asking what a program prints.
 - The quiz editor has a "Running the code is the last hint" switch under Hint, available once the question holds a Python, C or C++ block and has two hint levels; generated quizzes set it on hard questions where running the program helps.
+- Zoom goes from 25 % to 150 %, on the same steps as a browser. Zooming (Ctrl + wheel or Display > Interface scale) shows the new percentage at the top of the window, with − and + buttons and Reset to go back to 100 %; it goes away on its own after a few seconds.
+- C and C++ code blocks run in a quiz like Python ones: the compiler (Clang, in WebAssembly, isolated from your files and the network) is downloaded the first time you run C or C++, and can be removed in Settings › Languages.
 
 ### Changed
 - The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
 - Hovering an answer no longer turns its circle blue; the blue ring stays for keyboard focus only.
 - On a quiz page, the Learn or Practice mode is no longer shown in blue, nor the active side of the Learn | Practice switch: blue is kept for buttons.
-- In a quiz being played, the close cross, the title and the row of question beads stay at the top while a long question scrolls under them, and the previous and next arrows always sit at the same place at the bottom of the window, on a frosted bar, whatever the length of the question.
+- In a quiz being played, the close cross, the title and the row of question beads stay at the top and the previous and next arrows at the bottom, at the same place whatever the length of the question: only the question scrolls between them, and the mouse wheel scrolls it anywhere in the panel.
+- Launching a quiz: its content stays still while the panel rises.
 - The document above a comprehension question shows in full, the page scrolling instead of a scrollbar inside the document.
 - The labels of flashcards, ordering, matching and the screen before the score are no longer in capitals.
 - The current question bead keeps the full colour of its rating (green, amber) instead of turning almost black.

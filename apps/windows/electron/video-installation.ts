@@ -70,6 +70,17 @@ import { PRODUCT_NAME, LOG_PREFIX } from "../../../src/branding";
 import { hoteAutorise } from "./reseau";
 import { executableYtDlp } from "./video";
 import { environnementEnfant, lancer } from "./process";
+/* The download transport (manual redirects, each hop re-judged), the
+   shared error shape and the byte-stream reader moved to `telechargement.ts`
+   (task 9 of docs/superpowers/plans/2026-09-28-c-cpp-execution.md): this
+   module's own installer (yt-dlp) and `langages.ts`'s (the C/C++ pack) both
+   need them, and a copy would eventually drift. No behaviour change here —
+   `ErreurInstallation`/`CodeInstallation`/`estErreurInstallation` are the
+   exact symbols this file exported before, re-imported instead of defined. */
+import type { TransportInstallation } from "./telechargement";
+import { demander, erreurInstallation, estErreurInstallation, transportDefaut } from "./telechargement";
+export type { CodeInstallation, ErreurInstallation } from "./telechargement";
+export { estErreurInstallation } from "./telechargement";
 
 /* ══════════════════════════════════════════════════════════
    LES NOMS FIXES DE LA RELEASE OFFICIELLE
@@ -103,70 +114,6 @@ const VINGT_QUATRE_HEURES_MS = 24 * 60 * 60 * 1000;
 /** Le délai max d'UN `yt-dlp -U` (les 60 s de la spec ; -U remplace
     l'exécutable, rarement au-delà de quelques secondes). */
 const DELAI_MAJ_MS = 60_000;
-
-/** Les redirections suivies à la main, chacune re-jugée par la
-    liste d'hôtes : github.com renvoie l'asset vers
-    release-assets.githubusercontent.com, deux sauts — le
-    troisième serait suspect. */
-const MAX_SAUTS = 3;
-
-/* ══════════════════════════════════════════════════════════
-   LE TRANSPORT — LA COUTURE QUE LE CONTRÔLE INJECTE
-═══════════════════════════════════════════════════════════ */
-
-/** La réponse d'un transport de téléchargement. `entete` lit un
-    en-tête par son nom (la LONGUEUR d'un HEAD, la DESTINATION
-    d'une redirection) ; `texte` rend le corps entier
-    (SHA2-256SUMS) ; `octets` streame le corps par paquets
-    (l'exécutable, pour la progression) — présent seulement quand
-    le corps en est un flux. */
-export interface ReponseInstallation {
-	status: number;
-	entete(nom: string): string | null;
-	texte(): Promise<string>;
-	octets?(): AsyncIterable<Uint8Array>;
-}
-
-/** Le transport : la couture que le contrôle injecte (une fausse
-    release servie depuis un dossier temporaire, JAMAIS le réseau),
-    et que la production pose sur le `fetch` global du processus
-    principal. Chaque appel est jugé par la liste d'hôtes
-    AVANT le transport — le transport n'est pas la règle, il
-    l'obéit. */
-export type TransportInstallation = (url: string, init: { method: "GET" | "HEAD" }) => Promise<ReponseInstallation>;
-
-/** Les paquets d'un corps de `fetch`, lus par un lecteur : le
-    ReadableStream d'undici est itérable en runtime, mais sa forme
-    typée varie selon la librairie — le lecteur explicite est le
-    seul pont stable. */
-async function* paquetsDe(corps: { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }> } }): AsyncGenerator<Uint8Array> {
-	const lecteur = corps.getReader();
-	while (true) {
-		const suite = await lecteur.read();
-		if (suite.done) return;
-		if (suite.value) yield suite.value;
-	}
-}
-
-/** LE TRANSPORT PAR DÉFAUT : le `fetch` global du processus
-    principal, en redirection MANUELLE — chaque saut est re-jugé
-    par la liste d'hôtes (github.com renvoie l'asset vers
-    release-assets…, tous deux de la liste ; un hôte étranger ne
-    le serait pas). `octets` lit le flux par un lecteur, paquet
-    par paquet : c'est lui qui porte la progression. */
-const transportDefaut: TransportInstallation = async (url, init) => {
-	const reponse = await globalThis.fetch(url, { method: init.method, redirect: "manual" });
-	/* Le ReadableStream d'undici est itérable en runtime, mais sa
-	   forme typée varie selon la librairie (DOM, undici-types) — le
-	   lecteur explicite est le seul pont stable. */
-	const corps = reponse.body as unknown as { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }> } } | null;
-	return {
-		status: reponse.status,
-		entete: (nom) => reponse.headers.get(nom),
-		texte: () => reponse.text(),
-		octets: corps ? () => paquetsDe(corps) : undefined,
-	};
-};
 
 /* ══════════════════════════════════════════════════════════
    LES COUTURES DU CONTRÔLE — CE QU'UN CAS INJECTE
@@ -204,36 +151,6 @@ export interface InfosInstallation {
 	taille: number | null;
 	/** La page de la release officielle, cliquable même hors ligne. */
 	url: string;
-}
-
-/** Les codes que la modale juge : `reseau` (la release est
-    injoignable, hors de la liste d'hôtes, illisible) et
-    `empreinte` (SHA2-256SUMS qui ne nomme pas l'asset, ou ses
-    octets qui ne collent pas). Le message d'interface est la
-    décision de la tâche 5 — ici il n'y a que le CODE. */
-export type CodeInstallation = "reseau" | "empreinte";
-
-/** L'erreur d'`installer` : le `code` porte la décision, le
-    `detail` les 300 derniers caractères pour le journal. */
-export interface ErreurInstallation extends Error {
-	code: CodeInstallation;
-	detail?: string;
-}
-
-function erreurInstallation(code: CodeInstallation, detail?: string): ErreurInstallation {
-	const e = new Error("installation yt-dlp : " + code + (detail ? " — " + detail : "")) as ErreurInstallation;
-	e.name = code;
-	e.code = code;
-	if (detail) e.detail = detail;
-	return e;
-}
-
-/** Exporté pour le canal du pont (`canaux.ts`, tâche 4) : un rejet qui
-    n'est pas de l'installation (un bug, une panne d'ailleurs) est réduit
-    à `reseau` côté fenêtre, jamais à un message non traduit. */
-export function estErreurInstallation(e: unknown): e is ErreurInstallation {
-	const o = e as { code?: string };
-	return !!o && (o.code === "reseau" || o.code === "empreinte");
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -275,24 +192,6 @@ async function lireEtiquette(transport: TransportInstallation): Promise<string |
 	if (!lieu) return null;
 	const dernier = new URL(lieu, URL_LATEST).pathname.split("/").filter(Boolean).pop() ?? "";
 	return ETIQUETTE.test(dernier) ? dernier : null;
-}
-
-/** Demande une URL en suivant les redirections À LA MAIN : chaque
-    destination est re-jugée par la liste d'hôtes AVANT son saut —
-    un `redirect: "follow"` du fetch ferait confiance à n'importe
-    où github.com renvoie. Trop de sauts (ou un hôte hors liste)
-    rejette `reseau` : la liste du pont n'est pas négociable. */
-async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation): Promise<ReponseInstallation> {
-	let courant = url;
-	for (let saut = 0; saut < MAX_SAUTS; saut++) {
-		if (!hoteAutorise(courant)) throw erreurInstallation("reseau", "hôte hors liste : " + courant);
-		const reponse = await transport(courant, { method });
-		if (reponse.status < 300 || reponse.status >= 400) return reponse;
-		const lieu = reponse.entete("location");
-		if (!lieu) throw erreurInstallation("reseau", "redirection sans destination : " + courant);
-		courant = new URL(lieu, courant).toString();
-	}
-	throw erreurInstallation("reseau", "trop de redirections : " + url);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -447,16 +346,20 @@ export async function installer(
 		   exécutable à moitié posé sous son nom final. */
 		renameSync(partiel, cible);
 	} catch (e) {
-		/* ÉCHEC → RIEN sur le disque : le .part est effacé, TOUJOURS
-		   (un échec d'effacement est un disque qui refusera aussi le
-		   rename au prochain essai — nommé, pas silencieux). */
+		/* FAILURE → NOTHING on disk: the .part is ALWAYS deleted (a failed
+		   deletion is a disk that will also refuse the rename on the next
+		   try — named, not silent). */
 		try {
 			rmSync(partiel, { force: true });
 		} catch (e2) {
-			console.warn(LOG_PREFIX, "yt-dlp.exe.part non effacé :", partiel, e2);
+			console.warn(LOG_PREFIX, "yt-dlp.exe.part not deleted:", partiel, e2);
 		}
 		if (estErreurInstallation(e)) throw e;
-		throw erreurInstallation("reseau", String((e as Error)?.message ?? e).slice(-300));
+		/* The raw message may carry local paths (the user's name) or a
+		   signed redirect URL: logged here, never sent to the renderer —
+		   the same rule as `langages.ts`. */
+		console.warn(LOG_PREFIX, "yt-dlp install failed:", e);
+		throw erreurInstallation("reseau", "unexpected error during the install");
 	}
 }
 

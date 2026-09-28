@@ -70,3 +70,7 @@ temp/
 
 # Sondes locales de diagnostic (jamais publiées)
 .tmp-*
+
+# The C/C++ language pack built by `npm run build:language-pack`: a release
+# asset (28 MB), never committed.
+dist-pack/

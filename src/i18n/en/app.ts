@@ -72,6 +72,9 @@ export const EN_APP = {
 	"app.menu.fullscreen": "Toggle full screen",
 	"app.menu.devtools": "Show developer tools",
 	"app.menu.nextWallpaper": "Next wallpaper",
+	"app.zoom.in": "Zoom in",
+	"app.zoom.out": "Zoom out",
+	"app.zoom.reset": "Reset",
 
 	/* ── Le dossier de quiz par défaut, et les emplacements supplémentaires
 	   (tranche 9) — Réglages, application seulement : le greffon n'a rien à

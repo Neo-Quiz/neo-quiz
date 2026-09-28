@@ -39,6 +39,7 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, screen, shell } from "electron";
 import * as path from "node:path";
+import { existsSync } from "node:fs";
 // Le dossier par défaut CHOISI est créé ici s'il manque — voir son canal.
 import * as fsp from "node:fs/promises";
 import { LOG_PREFIX, PRODUCT_NAME } from "../../../src/branding";
@@ -75,8 +76,8 @@ import type { LibellesDocument } from "../../../src/video";
 import { annulerVideo, codeErreurVideo, transcrire } from "./video";
 import type { CodeErreurVideo, ResultatVideo } from "./video";
 import { etat as etatInstallation, infosInstallation, installer as installerYtDlp, mettreAJourSiDu } from "./video-installation";
-import type { CodeInstallation } from "./video-installation";
-import { estErreurInstallation } from "./video-installation";
+import type { CodeInstallation } from "./telechargement";
+import { estErreurInstallation } from "./telechargement";
 /* CODE EXECUTION (task 4): `BacASable` comes from the main process's core
    (`./code-sandbox.ts`, task 3 of the C/C++ execution plan — generalised
    from Python-only, no behaviour change), which holds the hidden window and
@@ -88,6 +89,9 @@ import { estErreurInstallation } from "./video-installation";
 import type { CodeRun } from "../../../src/host/types";
 import type { CodeLanguage } from "../../../src/code-languages";
 import type { BacASable } from "./code-sandbox";
+/* THE LANGUAGE PACKS (task 9): download, verify, install, delete — the pack
+   is pinned in `langages.ts`; the renderer only names the language. */
+import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langages";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -140,6 +144,10 @@ export interface DependancesCanaux {
 	    `main.ts` — this file only relays calls to it. Only Python reaches it
 	    today; `c`/`cpp` answer `not-installed` until task 8. */
 	code: BacASable;
+	/** Where the language packs live (`userData/languages`, the same
+	    directory `main.ts` gives the sandbox), fixed by `main.ts`: never a
+	    path from the renderer. */
+	dossierLangages: string;
 }
 
 /** L'état du disque tenu par ce processus — voir `enregistrerCanaux`. */
@@ -1352,7 +1360,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		deps.fenetre.commande(nom);
 	});
 	ipcMain.handle(CANAUX.affichageZoom, async (_e, facteur: unknown) => {
-		const f = typeof facteur === "number" && Number.isFinite(facteur) ? Math.min(1.5, Math.max(0.8, facteur)) : 1;
+		const f = typeof facteur === "number" && Number.isFinite(facteur) ? Math.min(1.5, Math.max(0.25, facteur)) : 1;
 		deps.fenetre.zoom(f);
 		await deps.reglagesOuErreur().ecrire(CLE_REGLAGES_ZOOM, f);
 	});
@@ -1471,6 +1479,46 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		return deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
 	});
 	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never)) deps.code.warm(language as CodeLanguage); });
+
+	/* THE LANGUAGE PACKS (task 9). The renderer passes ONE argument, the
+	   pack's name, and only `"c"` exists (it serves C and C++): anything
+	   else is refused before a byte moves. The URL, the hash and the
+	   directory are the main process's own (`langages.ts`, `main.ts`).
+	   ONE install at a time: a second call while one runs gets the SAME
+	   promise instead of racing it on the same `.part` files, and a delete
+	   waits for it rather than removing a directory being renamed into
+	   place. Progress is PUSHED (`langagesProgression`), like yt-dlp's. */
+	const PACKS = ["c"] as const;
+	const packConnu = (nom: unknown): boolean => PACKS.includes(nom as never);
+	let installationPack: Promise<EnveloppeVideo<null, CodeInstallation>> | null = null;
+	ipcMain.handle(CANAUX.langagesEtat, async (e, nom: unknown) => {
+		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return { installe: false, version: null, octets: 0 };
+		return etatLangage(deps.dossierLangages);
+	});
+	ipcMain.handle(CANAUX.langagesInstaller, (e, nom: unknown): Promise<EnveloppeVideo<null, CodeInstallation>> => {
+		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return Promise.resolve({ ok: false, code: "reseau", detail: "pack refused" });
+		if (installationPack) return installationPack;
+		/* Already installed at the pinned version: nothing to download — a
+		   compromised renderer cannot make the app re-fetch 28 MB in a loop.
+		   Unless the compiler itself is gone (an antivirus quarantine): then
+		   Install repairs it. */
+		const enPlace = (st: { installe: boolean; version: string | null }): boolean =>
+			st.installe && st.version === PACK_C.version && existsSync(path.join(deps.dossierLangages, "c", "clang", "llvm.core.wasm"));
+		const enCours = etatLangage(deps.dossierLangages).then(st => (enPlace(st) ? undefined : installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
+			.then((): EnveloppeVideo<null, CodeInstallation> => ({ ok: true, valeur: null }), (err: unknown): EnveloppeVideo<null, CodeInstallation> => {
+				if (estErreurInstallation(err)) return { ok: false, code: err.code, detail: err.detail };
+				console.warn(LOG_PREFIX, "language pack install threw:", err);
+				return { ok: false, code: "reseau" };
+			})
+			.finally(() => { installationPack = null; });
+		installationPack = enCours;
+		return enCours;
+	});
+	ipcMain.handle(CANAUX.langagesSupprimer, async (e, nom: unknown) => {
+		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return;
+		await installationPack;
+		await supprimerLangage(deps.dossierLangages);
+	});
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {

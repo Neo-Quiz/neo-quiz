@@ -15,22 +15,23 @@ export type EntreeMenu =
 	| { kind: "separator"; id: string }
 	| { kind: "submenu"; id: string; label: string; items: EntreeMenu[] };
 
-/** 80 % à 150 % par pas de 10 : les bornes du principal (`canaux.ts`). */
-export const PALIERS_ZOOM = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
+/** A browser's zoom steps from 25 %, capped at 150 % (both asked on
+    2026-09-28). The bounds of the main process (`canaux.ts`, `main.ts`) are
+    the first and last. */
+export const PALIERS_ZOOM = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.33, 1.4, 1.5];
 
-/** Le palier VOISIN d'une valeur, vers le haut (`1`) ou vers le bas (`-1`) :
-    ce que Ctrl + molette demande (`ui/barre-titre.ts`), et la seule façon de
-    le demander sans redire la liste ailleurs.
+/** The NEIGHBOUR step of a value, up (`1`) or down (`-1`): what Ctrl +
+    wheel and the zoom bubble ask for (`ui/barre-titre.ts`), and the only way
+    to ask for it without repeating the list elsewhere.
 
-    Il travaille à la TOLÉRANCE de la coche (un millième) : le facteur rendu
-    par `webContents.getZoomFactor` n'est pas toujours le nombre écrit
-    (1,0999999 pour 1,1), et une comparaison stricte ferait rendre deux fois
-    le même palier, donc un cran de molette sans effet.
+    It works at the check mark's TOLERANCE (a thousandth): the factor returned
+    by `webContents.getZoomFactor` is not always the number written
+    (1.0999999 for 1.1), and a strict comparison would return the same step
+    twice, hence a wheel notch with no effect.
 
-    Une valeur HORS des bornes revient dans la liste : depuis 2, un cran vers
-    le haut ne trouve aucun palier plus grand et rend le dernier (1,5). C'est
-    la même borne que le principal applique de son côté (`canaux.ts`), pas une
-    seconde règle. */
+    A value OUTSIDE the bounds comes back into the list: from 2, a notch up
+    finds no larger step and returns the last one (1.5). It is the same bound
+    the main process applies on its side (`canaux.ts`), not a second rule. */
 export function palierZoomVoisin(courant: number, sens: 1 | -1): number {
 	const base = Number.isFinite(courant) ? courant : 1;
 	if (sens === 1) return PALIERS_ZOOM.find(p => p > base + 0.001) ?? PALIERS_ZOOM[PALIERS_ZOOM.length - 1];

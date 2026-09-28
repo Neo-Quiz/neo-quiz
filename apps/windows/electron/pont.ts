@@ -59,7 +59,8 @@ import type { Outil } from "./process";
    `import type` seulement, comme `Outil` : un champ ajouté là-bas doit
    faire rougir la compilation ici. */
 import type { CodeErreurVideo, ResultatVideo } from "./video";
-import type { CodeInstallation, InfosInstallation } from "./video-installation";
+import type { InfosInstallation } from "./video-installation";
+import type { CodeInstallation } from "./telechargement";
 
 /** Une requête réseau telle qu'elle TRAVERSE le pont : `HostNetRequest` sans
     son `signal`. Un `AbortSignal` ne se clone pas (l'IPC sérialise par clonage
@@ -610,7 +611,7 @@ export interface Pont {
 	/** Le zoom et les deux commandes qu'un menu natif exposait
 	    (`Ctrl+R`, `Ctrl+Alt+I`), retirées avec lui. */
 	affichage: {
-		/** Borné 0.8..1.5 par le principal, et PERSISTÉ sous la clé
+		/** Borné 0.25..1.5 par le principal, et PERSISTÉ sous la clé
 		    `CLE_REGLAGES_ZOOM` : la barre dessinée par le rendu (tâche 2) n'a
 		    donc pas à relire ce réglage elle-même au démarrage suivant, le
 		    principal l'applique déjà (`main.ts`, `did-finish-load`). */
@@ -704,6 +705,19 @@ export interface Pont {
 	code: {
 		run(job: CodeJob): Promise<CodeRun>;
 		warm(language: CodeLanguage): Promise<void>;
+	};
+
+	/**
+	 * THE LANGUAGE PACKS (task 9, `langages.ts`): the C/C++ compiler, a
+	 * pinned download. The renderer only NAMES the pack (`"c"`, which serves
+	 * C and C++); URL, hash and directory stay in the main process. As for
+	 * `video.installer`, the progress callback does not cross the IPC: the
+	 * bytes come back on a PUSHED channel (`langagesProgression`).
+	 */
+	langages: {
+		etat(nom: "c"): Promise<{ installe: boolean; version: string | null; octets: number }>;
+		installer(nom: "c", surProgression: (recus: number, total: number) => void): Promise<EnveloppeVideo<null, CodeInstallation>>;
+		supprimer(nom: "c"): Promise<void>;
 	};
 }
 
@@ -829,6 +843,12 @@ export const CANAUX = {
 	videoAnnuler: "neo:video/annuler",
 	codeRun: "neo:code/run",
 	codeWarm: "neo:code/warm",
+	langagesEtat: "neo:langages/etat",
+	langagesInstaller: "neo:langages/installer",
+	langagesSupprimer: "neo:langages/supprimer",
+	/** PUSHED by the main process, like `videoProgression`: bytes received
+	    and the pack's pinned size. */
+	langagesProgression: "neo:langages/progression",
 } as const;
 
 /** La clé des RÉGLAGES IA de l'application (`neo.reglages`) : les MÊMES
@@ -849,7 +869,7 @@ export const CLE_REGLAGES_IA = "ai";
 
 /** La clé du ZOOM persisté (`neo.reglages`), lue par le principal au chargement
     de la page et écrite par lui seul (`affichage.zoom` borne puis persiste) :
-    le rendu ne l'écrit jamais directement, pour que la borne 0.8..1.5
+    le rendu ne l'écrit jamais directement, pour que la borne 0.25..1.5
     s'applique aussi à une valeur que la tâche 2 tenterait d'écrire à la main. */
 export const CLE_REGLAGES_ZOOM = "zoom";
 

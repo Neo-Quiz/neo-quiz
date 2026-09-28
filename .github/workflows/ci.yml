@@ -122,6 +122,15 @@ jobs:
       - name: yt-dlp main process
         run: npm run check:electron-video
 
+      # THE C/C++ LANGUAGE PACK installer: a download that does not match
+      # its pin (a valid but different pack, a flipped byte, a truncated
+      # body) never installed and leaves nothing on disk; a redirect off
+      # the host list never followed; an archive entry that would escape
+      # the pack directory refused. On an injected transport, never the
+      # network.
+      - name: Language pack installer
+        run: npm run check:electron-langages
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar

@@ -891,6 +891,12 @@ export interface HostCode {
 	run(job: CodeJob): Promise<CodeRun>;
 	/** Loads the engine in the background; no effect if already loaded. */
 	warm(language: CodeLanguage): void;
+	/** Downloads the engine of a language that answered `not-installed`
+	    (the C/C++ pack, apps/windows/electron/langages.ts), reporting whole
+	    percents. `offline`: it could not be downloaded; `refused`: it was,
+	    but failed its integrity check and was not installed. OPTIONAL: a
+	    host whose languages are all built in has nothing to download. */
+	installer?(language: CodeLanguage, onProgress: (percent: number) => void): Promise<"ok" | "offline" | "refused">;
 }
 
 /**

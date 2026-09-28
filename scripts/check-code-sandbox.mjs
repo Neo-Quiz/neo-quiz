@@ -168,6 +168,8 @@ try {
 	r.check("the next run works", cas["c-apres-boucle"]?.stdout, "ok\n");
 	r.check("output bounded", [cas["c-sortie-bornee"]?.status, (cas["c-sortie-bornee"]?.stdout ?? "").length <= 20000], ["too-long", true]);
 	r.check("no host file from C", cas["c-fichier"]?.stdout, "REFUSE\n");
+	r.check("C before its pack: not installed", cas["pack-absent"]?.status, "not-installed");
+	r.check("the first run once the pack arrives works", [cas["pack-arrive"]?.status, cas["pack-arrive"]?.stdout], ["ok", "arrive\n"]);
 
 	r.done();
 } finally {

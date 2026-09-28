@@ -116,6 +116,16 @@ export function createViewportHandlers(ctx: EngineCtx): ViewportHandlers {
 	function getElementStableHeight(el: HTMLElement | null): number {
 		if (!el) return 0;
 		const rootRect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+		/* A slide that scrolls on its own is as tall as its BOX, never its
+		   content: the app's played quiz sizes each slide to the room between
+		   its two bars and lets the question scroll inside
+		   (apps/windows/src/assets/quiz-bars.css). Measured by its content,
+		   the viewport would grow back to the whole question and push the
+		   bar of arrows out of the panel. The plugin's slides never scroll. */
+		const overflowY = getComputedStyle(el).overflowY;
+		if (overflowY === "auto" || overflowY === "scroll") {
+			return Math.max(1, Math.ceil(Math.max(rootRect ? rootRect.height : 0, el.offsetHeight || 0)));
+		}
 		const rootTop = rootRect ? rootRect.top : 0;
 		let maxBottom = 0;
 		const ownHeight = Math.max(

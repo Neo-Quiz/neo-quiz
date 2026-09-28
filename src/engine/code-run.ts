@@ -105,7 +105,24 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		sortie.textContent = t("engine.code.running");
 
 		try {
-			const resultat = await code.run({ language, code: source, stdin: "", timeoutMs: TIMEOUT_MS });
+			const job = { language, code: source, stdin: "", timeoutMs: TIMEOUT_MS };
+			let resultat = await code.run(job);
+			/* THE LANGUAGE IS DOWNLOADED ON FIRST USE (task 10): C and C++
+			   answer `not-installed` until their pack is there. With a host
+			   that can install it, the progress replaces "Running…", then
+			   the program runs ONCE more — never in a loop. */
+			if (resultat.status === "not-installed" && code.installer) {
+				sortie.classList.add("quiz-code-output-panne");
+				sortie.textContent = t("engine.code.installing", { percent: 0 });
+				const installe = await code.installer(language, percent => { sortie.textContent = t("engine.code.installing", { percent }); });
+				if (installe !== "ok") {
+					sortie.textContent = t(installe === "refused" ? "engine.code.installRefused" : "engine.code.installOffline");
+					return;
+				}
+				sortie.classList.remove("quiz-code-output-panne");
+				sortie.textContent = t("engine.code.running");
+				resultat = await code.run(job);
+			}
 			const { texte, erreur, panne } = texteResultat(resultat);
 			sortie.textContent = texte;
 			sortie.classList.toggle("quiz-code-output-error", erreur);

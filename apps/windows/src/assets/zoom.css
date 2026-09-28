@@ -1,0 +1,88 @@
+/* =========================================================
+   THE ZOOM BUBBLE (`ui/zoom-bubble.ts`)
+
+   Appended to `<body>`, so OUTSIDE `.qbd-root`: like the toasts, it uses
+   only variables defined on `:root` by `theme/host-vars.css` — a dashboard
+   token would resolve to nothing here.
+
+   It wears the application menu's surface (`.nq-menu-panneau`, shell.css)
+   and its buttons are menu rows, not framed buttons. It appears and
+   disappears WITHOUT any effect: the only motion is the percentage
+   cross-fading to its new value (the module), as asked on 2026-09-28.
+   ========================================================= */
+
+.nq-zoom-bubble {
+	position: fixed;
+	/* Just below the title bar. The bar's height follows the page zoom, the
+	   bubble's own lengths do not (`zoom` cancels it, see the module), hence
+	   the factor. */
+	top: calc(var(--nq-barre-hauteur) * var(--nq-zoom-factor, 1) + 8px);
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 6px 6px 6px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: 0 18px 36px -8px rgba(0,0,0,.45), 0 3px 8px -2px rgba(0,0,0,.24);
+	font-family: var(--font-interface);
+	font-size: 13px;
+}
+.nq-zoom-bubble[data-visible="false"] { display: none; }
+
+/* The percentage: the old and new values overlap here while they
+   cross-fade. The fixed width fits "150 %", so the buttons never move
+   while it changes. */
+.nq-zoom-bubble-value {
+	position: relative;
+	width: 44px;
+	height: 18px;
+	margin-right: 10px;
+	font-variant-numeric: tabular-nums;
+}
+.nq-zoom-bubble-value > span {
+	position: absolute;
+	inset: 0;
+	line-height: 18px;
+}
+
+.nq-zoom-bubble-step,
+.nq-zoom-bubble-reset {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 28px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+.nq-zoom-bubble-step { width: 28px; padding: 0; color: var(--text-muted); }
+.nq-zoom-bubble-step svg { width: 16px; height: 16px; }
+.nq-zoom-bubble-reset {
+	margin-left: 4px;
+	padding: 0 10px;
+	white-space: nowrap;
+}
+
+/* The menu rows' hover, the same token (`.nq-menu-ligne:hover`). */
+.nq-zoom-bubble-step:hover:not(:disabled),
+.nq-zoom-bubble-reset:hover:not(:disabled),
+.nq-zoom-bubble-step:focus-visible,
+.nq-zoom-bubble-reset:focus-visible {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	outline: none;
+}
+.nq-zoom-bubble-step:disabled,
+.nq-zoom-bubble-reset:disabled {
+	color: var(--text-faint);
+	cursor: default;
+}

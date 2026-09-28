@@ -1,207 +1,79 @@
 /* ══════════════════════════════════════════════════════════
    THE PLAYED QUIZ'S TWO BARS (2026-09-28) — `ui/quiz-bars.ts`.
 
-   When a question is taller than the panel, the top of the quiz (the
-   close cross, the title, the row of beads) stays on top while the
-   question scrolls under it, and the previous / next arrows always sit
-   at the same place, at the bottom of the panel — short question or
-   long one, so the hand never has to look for them.
+   The panel of a played quiz no longer scrolls. It is a fixed column of
+   three floors:
+   - at the top, still: the close cross, the title, the row of beads;
+   - in the middle, the ONLY part that scrolls: the current question;
+   - at the bottom, still: the previous / next arrows, always at the same
+     place, short question or long one, so the hand never has to look for
+     them.
 
-   Nothing moves by a single pixel when scrolling starts: each sticky
-   element sticks exactly where it rests at the top of the page. Chromium
-   measures sticky offsets from the panel's CONTENT box, inside its
-   padding: `top: 0` sticks 28 px below the panel's edge (a first version
-   counted from the edge and pushed the whole top down by 28 px). The
-   offsets below are the resting geometry, derived:
-   - the panel's padding is 28 px top and bottom (`.qbd-content`);
-   - the header is pulled up by 8 px (`.qbd-qz-header`, dashboard-
-     detail.css) and is 32 px high (its close button);
-   - the panel is a flex column with a 16 px gap;
-   - the row of beads is 52 px high with a 14 px margin below
-     (perles.css, nav-tabs.css).
-   If one of these changes, change the matching line here.
+   Nothing ever passes BEHIND a bar. A first version kept the panel
+   scrolling under sticky bars of frosted glass: whatever glass, tint or
+   fade they wore, the question stayed visible behind them, and a blur of
+   the panel's own blur made it two-toned. Here the question is clipped
+   where its zone ends, and the panel keeps its own glass
+   (`#neo-quiz-root > .qbd-qz`, shell.css), untouched.
 
-   ONE frosted glass per bar, never one per element: two stacked
-   `backdrop-filter`s would show a seam where they meet. The top one is
-   drawn by the header and covers the whole top area, the beads painted
-   above it; the bottom one is drawn by the app's bar of arrows. Both only show
-   once content is under them — a scroll-driven fade, pure CSS: at rest
-   the panel looks exactly as before, and on a question that does not
-   scroll the timeline is inactive and they stay invisible.
+   EACH SLIDE SCROLLS ON ITS OWN, never the viewport or the track:
+   - a question keeps its scroll position when coming back to it, and
+     during a slide transition both questions stay where they were;
+   - a short question never becomes scrollable because its neighbour is
+     long (the track would be as tall as its tallest slide);
+   - the viewport stays `overflow: clip`, never scrollable
+     (`check:viewport-clip`).
+   Every slide is exactly as tall as the room between the beads and the
+   bar, `--qz-slide-h`, measured by ui/quiz-bars.ts; the engine measures a
+   scrolling slide by its box (engine/viewport.ts), so its viewport takes
+   that same height and the bar rests at the bottom of the panel.
 
    App only: the plugin keeps the note's own scrolling.
    ══════════════════════════════════════════════════════════ */
 
+/* `clip`, not `hidden`: an `overflow: hidden` box can still be scrolled
+   by a `focus()` or a `scrollIntoView`, which would lift the whole quiz
+   out of place (the same trap as the viewport, layout.css). */
 #neo-quiz-root > .qbd-qz {
-	--qz-pad-top: 28px;
-	--qz-pad-bottom: 28px;
-	--qz-pad-x: 32px;
-	/* From the content box: the header's own -8 px margin. */
-	--qz-head-top: -8px;
-	--qz-nav-top: calc(var(--qz-head-top) + 32px + 16px);
-	/* From the panel's EDGE to where the questions start. */
-	--qz-top-bar: calc(var(--qz-pad-top) + var(--qz-nav-top) + 52px + 14px);
-	/* A bar's tint. Lighter than the panel's: it lies ON the panel's glass,
-	   already tinted, and the panel's own 60 % on top of it made two dark
-	   bands across the panel. */
-	--qz-bar-bg: color-mix(in srgb, var(--background-secondary) 30%, transparent);
-	/* How much scrolling fades a bar in or out. */
-	--qz-bar-fade: 24px;
+	overflow: clip;
 }
 
-/* ── The panel's own glass ──
-   Moved from the panel to a pseudo-element. An element with a
-   `backdrop-filter` is a BACKDROP ROOT: nothing inside it can blur what is
-   behind (Chromium draws the inner glass as a plain tint — the question
-   under the bars stayed sharp, only dimmed; without the panel's blur, the
-   same bar blurred it away). The pseudo-element keeps the panel's look
-   without making the panel a backdrop root. Nothing else on the panel
-   makes it one: the launch transition only animates its `transform`
-   (ui/transition-quiz.ts). `isolation` gives it the stacking context
-   that keeps the glass behind its content, and is not a backdrop root.
-
-   Only the BLUR moves: the panel keeps its tint, which the blur then
-   takes in with the wallpaper — the same look as before.
-
-   The blur covers the panel's padding box whatever the scroll: sticky at
-   the panel's top edge (offsets count from the content box, hence the
-   negative padding), as tall as the panel, and taking no room: its bottom
-   margin gives back its height and the flex gap. That height is written in
-   CONTAINER units (the panel is a size container: its width and height are
-   set, never taken from its content): a margin in percent counts from the
-   panel's WIDTH, and a first version that wrote `100%` there pulled the
-   whole quiz 450 px above the panel. */
-#neo-quiz-root > .qbd-qz.qbd-content {
-	container-type: size;
-	isolation: isolate;
-	backdrop-filter: none;
-	-webkit-backdrop-filter: none;
-}
-#neo-quiz-root > .qbd-qz.qbd-content::before {
-	/* The panel's padding box: its content box (100cqh) plus its padding. */
-	--qz-glass-h: calc(100cqh + var(--qz-pad-top) + var(--qz-pad-bottom));
-	content: "";
-	display: block;
-	flex: none;
-	position: sticky;
-	top: calc(-1 * var(--qz-pad-top));
-	z-index: -1;
-	height: var(--qz-glass-h);
-	margin: calc(-1 * var(--qz-pad-top)) calc(-1 * var(--qz-pad-x)) calc(var(--qz-pad-top) - 16px - var(--qz-glass-h));
-	/* Inside the panel's 1 px border. */
-	border-radius: calc(var(--nq-panel-radius) - 1px);
-	backdrop-filter: var(--nq-panel-blur);
-	-webkit-backdrop-filter: var(--nq-panel-blur);
-	pointer-events: none;
-}
-
-/* ── The top ── */
-
-#neo-quiz-root > .qbd-qz > .qbd-qz-header {
-	position: sticky;
-	top: var(--qz-head-top);
-	z-index: 3;
-}
-#neo-quiz-root > .qbd-qz > .quiz-blocks-host > .quiz-nav {
-	position: sticky;
-	top: var(--qz-nav-top);
-	/* Above the header, whose glass it sits on. */
-	z-index: 4;
-}
-
-/* The glass of the whole top area, from the panel's top edge to where the
-   questions start. 100vw wide and centred: the panel clips it to its own
-   width and rounded corners. */
-#neo-quiz-root > .qbd-qz > .qbd-qz-header::before {
-	content: "";
-	position: absolute;
-	z-index: -1;
-	top: calc(-1 * (var(--qz-pad-top) + var(--qz-head-top)));
-	left: 50%;
-	width: 100vw;
-	height: var(--qz-top-bar);
-	transform: translateX(-50%);
-	background: var(--qz-bar-bg);
-	backdrop-filter: var(--nq-panel-blur);
-	-webkit-backdrop-filter: var(--nq-panel-blur);
-	box-shadow: inset 0 -1px 0 var(--nq-panel-edge);
-	pointer-events: none;
-	opacity: 0;
-	animation: qz-bar-in linear both;
-	animation-timeline: scroll(nearest block);
-	animation-range: 0 var(--qz-bar-fade);
-}
-@keyframes qz-bar-in {
-	to { opacity: 1; }
+#neo-quiz-root > .qbd-qz .quiz-track-item {
+	height: var(--qz-slide-h, auto);
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
+	/* The same text width on a question that scrolls and on one that does
+	   not: the scrollbar's room is kept on every slide. */
+	scrollbar-gutter: stable;
+	/* Reaching the end of a question does not scroll anything else. */
+	overscroll-behavior: contain;
+	/* The engine's 40 px under each slide: the bar's own padding now
+	   separates the question from the arrows. */
+	padding-bottom: 0;
 }
 
 /* ── The bottom ── */
 
-/* The arrows are the APP'S own bar, a child of the panel like the header,
-   not the rows the engine draws under each question (hidden here). A first
-   version made those rows sticky inside the slide track: the track is a
-   transformed, clipped layer, and there the glass neither blurred what
-   passed under it (the text stayed sharp, only dimmed) nor could reach
-   wider than the column of the questions. The bar's buttons forward their
-   clicks to the current slide's own buttons (ui/quiz-bars.ts): the
-   engine keeps every rule of its navigation. */
+/* The arrows are the APP'S own bar, a child of the panel under the
+   questions, not the rows the engine draws inside each slide (hidden
+   here): those would scroll away with a long question. The bar's buttons
+   forward their clicks to the current slide's own buttons
+   (ui/quiz-bars.ts): the engine keeps every rule of its navigation. */
 #neo-quiz-root > .qbd-qz .quiz-card > .quiz-question-nav {
 	display: none;
 }
 
-/* Every slide at least fills the panel under the top area and above the
-   bar (`--qz-slide-min`, measured by ui/quiz-bars.ts): the bar, which
-   follows the slides, then rests at the bottom of the panel even after a
-   short question, where it also sticks while a long one scrolls. The
-   engine's 40 px under each slide would have left it floating that high. */
-#neo-quiz-root > .qbd-qz .quiz-track-item {
-	min-height: var(--qz-slide-min, 0px);
-	padding-bottom: 0;
-}
-
-/* The bar spans the panel from edge to edge (its side padding cancelled)
-   and runs down to its bottom edge (its bottom padding cancelled; offsets
-   count from the content box, 28 px inside the edge). Its buttons sit
-   where the engine's did: 18 px under the question, 20 px above the
-   panel's padding. `.quiz-question-nav` gives it the engine's arrow
-   styles (action-buttons.css). */
+/* Its buttons sit 18 px under the question and 20 px above the panel's
+   padding. `.quiz-question-nav` gives it the engine's arrow styles
+   (action-buttons.css). The -16 px cancels the panel's flex gap, so the
+   bar starts right under the slide. */
 #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
-	position: sticky;
-	bottom: calc(-1 * var(--qz-pad-bottom));
-	z-index: 3;
 	flex: none;
-	/* Edge to edge: not the 1182 px column every child of the panel gets
-	   (`.qbd-content > *`, dashboard-base.css). */
-	width: auto;
-	max-width: none;
-	/* -16 px: the panel's flex gap, so the bar starts right under the slide. */
-	margin: -16px calc(-1 * var(--qz-pad-x)) calc(-1 * var(--qz-pad-bottom));
-	padding: 18px var(--qz-pad-x) calc(20px + var(--qz-pad-bottom));
+	margin-top: -16px;
+	padding: 18px 0 20px;
 }
 /* On a slide without arrows (the screen before the score, the results):
    the bar keeps its room, so nothing above it moves, but shows nothing. */
 #neo-quiz-root > .qbd-qz > .qz-bottom-bar.is-empty {
 	visibility: hidden;
-}
-
-/* Its glass, visible while there is content below, fading out over the
-   last pixels of scroll. */
-#neo-quiz-root > .qbd-qz > .qz-bottom-bar::before {
-	content: "";
-	position: absolute;
-	z-index: -1;
-	inset: 0;
-	background: var(--qz-bar-bg);
-	backdrop-filter: var(--nq-panel-blur);
-	-webkit-backdrop-filter: var(--nq-panel-blur);
-	box-shadow: inset 0 1px 0 var(--nq-panel-edge);
-	pointer-events: none;
-	opacity: 0;
-	animation: qz-bar-out linear both;
-	animation-timeline: scroll(nearest block);
-	animation-range: calc(100% - var(--qz-bar-fade)) 100%;
-}
-@keyframes qz-bar-out {
-	from { opacity: 1; }
-	to { opacity: 0; }
 }
