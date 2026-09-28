@@ -644,6 +644,11 @@ await withSrcModule("apps/windows/electron/video-installation.ts", async ({ info
 			r.check("le rejet est typé « reseau » et rien n'est resté",
 				{ code: rejet && rejet.code, fichiers: existsSync(join(app, "outils")) ? readdirSync(join(app, "outils")).length : 0 },
 				{ code: "reseau", fichiers: 0 });
+			// The raw message (a local path, a signed URL) stays in the main
+			// process log: only a fixed detail may reach the renderer.
+			r.check("the raw transport message does not reach the rejection's detail",
+				{ fuite: !!(rejet && rejet.detail && rejet.detail.includes("transport en panne")) },
+				{ fuite: false });
 		});
 
 		await cas(r, "installer : une redirection hors de la liste d'hôtes est refusée, rien sur le disque", async () => {

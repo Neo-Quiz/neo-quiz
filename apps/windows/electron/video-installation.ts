@@ -346,16 +346,20 @@ export async function installer(
 		   exécutable à moitié posé sous son nom final. */
 		renameSync(partiel, cible);
 	} catch (e) {
-		/* ÉCHEC → RIEN sur le disque : le .part est effacé, TOUJOURS
-		   (un échec d'effacement est un disque qui refusera aussi le
-		   rename au prochain essai — nommé, pas silencieux). */
+		/* FAILURE → NOTHING on disk: the .part is ALWAYS deleted (a failed
+		   deletion is a disk that will also refuse the rename on the next
+		   try — named, not silent). */
 		try {
 			rmSync(partiel, { force: true });
 		} catch (e2) {
-			console.warn(LOG_PREFIX, "yt-dlp.exe.part non effacé :", partiel, e2);
+			console.warn(LOG_PREFIX, "yt-dlp.exe.part not deleted:", partiel, e2);
 		}
 		if (estErreurInstallation(e)) throw e;
-		throw erreurInstallation("reseau", String((e as Error)?.message ?? e).slice(-300));
+		/* The raw message may carry local paths (the user's name) or a
+		   signed redirect URL: logged here, never sent to the renderer —
+		   the same rule as `langages.ts`. */
+		console.warn(LOG_PREFIX, "yt-dlp install failed:", e);
+		throw erreurInstallation("reseau", "unexpected error during the install");
 	}
 }
 
