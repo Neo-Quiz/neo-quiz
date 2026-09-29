@@ -63,7 +63,7 @@ import { createSheetStack } from "./sheet-stack";
 import { basculerMenuApp } from "./barre-titre";
 
 /** The rail's mark (2026-09-29): a stack of cards with a mortarboard on the
-    front one, drawn as a PNG (`assets/logo-rail.png`) used as a CSS MASK
+    front one, an SVG (`assets/logo-rail.svg`) used as a CSS MASK
     over `currentColor` (shell.css `.nq-rail-logo-mark`) — it takes the
     rail's colour like its other icons, whatever the theme. */
 function marqueRail(): HTMLElement {

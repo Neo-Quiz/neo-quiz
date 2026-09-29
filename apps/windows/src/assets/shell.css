@@ -1314,15 +1314,16 @@ body::after {
 	cursor: pointer;
 	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
-/* The mark itself: a PNG used as a mask, painted in the rail's text colour
-   (dashboard-shell.ts `marqueRail`). */
+/* The mark itself: an SVG used as a mask, painted in the rail's text colour
+   (dashboard-shell.ts `marqueRail`) — sharp at any zoom and pixel density,
+   which the 192 px PNG it replaces was not beyond about 5×. */
 .nq-rail-logo-mark {
 	display: block;
 	width: 38px;
 	height: 38px;
 	background: currentColor;
-	-webkit-mask: url("./logo-rail.png") center / contain no-repeat;
-	mask: url("./logo-rail.png") center / contain no-repeat;
+	-webkit-mask: url("./logo-rail.svg") center / contain no-repeat;
+	mask: url("./logo-rail.svg") center / contain no-repeat;
 }
 .nq-rail-logo:hover, .nq-rail-logo:focus-visible { opacity: 1; transform: scale(1.04); }
 .nq-rail-logo[data-open] { opacity: 1; }
