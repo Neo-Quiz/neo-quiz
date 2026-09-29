@@ -197,6 +197,7 @@ release notes.
 - Coming back from a quiz's page to its folder, the Documents, Links and Notes tile no longer blinks out and back in at the end of the motion.
 - Folder and quiz page transitions: nothing lights up under a still pointer while pages slide; slowed down or paused (DevTools), the motion is no longer cut short and jumps to its end; going back, the page slides out as whole glass instead of fading into a half-frosted double image; a folder's back arrow fades in with its page; and the shine of a Resume button no longer jumps at the last frame.
 - A paid assistant hidden from the generation menu shows as off when Settings open again, instead of always on; and the wallpaper row no longer shows a remove cross when no wallpaper is chosen.
+- The search field of a quiz page gets one clean blue edge with a soft glow when focused, instead of two blue outlines one inside the other; and in a narrow window its counts ("16 questions · 4 readings") drop under the Learn | Exam selector instead of sliding under the search field.
 
 
 ## [1.19.0] - 2026-09-23

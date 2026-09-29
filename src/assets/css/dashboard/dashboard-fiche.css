@@ -645,11 +645,19 @@
 	transition: background-color 120ms ease, border-color 120ms ease, box-shadow 160ms ease;
 }
 .qbd-fiche-search-icon { color: var(--text-muted); transition: color 120ms ease; }
+/* Focus (redrawn 2026-09-29): a solid blue edge and a soft glow that grows
+   out of it. The 3 px ring at 22 % sat outside a 75 % edge, with the dark
+   field showing between them: at the end of the transition it read as two
+   blue outlines, one inside the other. All three properties now move on the
+   same 160 ms, so nothing settles after the rest. */
+.qbd-fiche-search {
+	transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
 .qbd-fiche-search:focus-within {
 	outline: none;
-	border-color: color-mix(in srgb, var(--quiz-primary) 75%, transparent);
-	background: var(--qbd-nc-bouton-survol);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--quiz-primary) 22%, transparent);
+	border-color: var(--quiz-primary);
+	background: color-mix(in srgb, var(--quiz-primary) 8%, var(--qbd-nc-bouton-survol));
+	box-shadow: 0 0 14px -2px color-mix(in srgb, var(--quiz-primary) 45%, transparent);
 }
 .qbd-fiche-search:focus-within .qbd-fiche-search-icon { color: var(--quiz-primary); }
 .qbd-root .qbd-fiche-search-input { font-size: 14px; }
@@ -754,3 +762,10 @@
 	border-radius: 4px;
 	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
 }
+
+/* A NARROW HEADER (2026-09-29): at 1280 px, in French, "Learn | Exam" and
+   "16 questions · 4 readings" were wider than their column, and
+   "4 readings" slid under the search field. The chips now wrap within
+   their column: the counts drop under the selector instead of overlapping. */
+.qbd-fiche-meta-infos { max-width: 100%; }
+.qbd-fiche-chips { flex-wrap: wrap; row-gap: 6px; }
