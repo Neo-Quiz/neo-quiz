@@ -350,12 +350,13 @@ function ouvrirReglages(): void {
 }
 
 /**
- * JOUER un quiz (le moteur) : démonter la coquille, monter la page du moteur ;
- * au retour, démonter le moteur et remonter la coquille — qui revient sur la
- * vue d'où l'on est parti, la page du quiz comprise (`dashboard-shell.ts`,
- * `vueCourante`/`quizSelectionne`). TOUJOURS par `demonterCourant`, appelé
- * AVANT chaque changement d'écran. La page d'un quiz (consultation, édition),
- * elle, n'est PAS un écran de `main.ts` : c'est une vue de la coquille.
+ * PLAY a quiz (the engine): mount the engine's page over the shell; on return,
+ * tear the engine down and bring the shell forward again, on the view the quiz
+ * was launched from (the open folder, Home, the quiz's page…) — see
+ * `vueGardee`, the shell is kept, not rebuilt. ALWAYS through
+ * `demonterCourant`, called BEFORE each screen change. A quiz's page
+ * (viewing, editing), for its part, is NOT a `main.ts` screen: it is a view of
+ * the shell.
  *
  * L'affectation de `demonterCourant` se fait APRÈS l'`await` — `openQuizPage`
  * lit le fichier avant de rendre — mais le démontage de la liste, lui, a lieu

@@ -144,27 +144,22 @@ async function enregistrerReglagesPages(): Promise<void> {
    ══════════════════════════════════════════════════════════ */
 
 /**
- * Vue actuellement affichée par le tableau de bord. Volontairement au niveau
- * du MODULE, et non locale à `monterDashboard` : ce module est un singleton
- * (une seule fenêtre), et c'est cette persistance qui fait qu'ouvrir un quiz
- * puis revenir remonte la coquille sur la page d'où l'on venait, plutôt que
- * de toujours repartir sur « Accueil » (`main.ts` démonte puis remonte
- * entièrement la coquille à chaque aller-retour vers un quiz ou les
- * réglages — un état local serait perdu à chaque fois). Initialisée à
- * "home" : la toute première fois que l'application démarre.
+ * The view the dashboard is showing. Deliberately at MODULE level, not local
+ * to `monterDashboard`: this module is a singleton (one window), and the
+ * value must outlive a mount — the shell is remounted from scratch when the
+ * app restarts on the last view (`reprendre`) rather than always starting on
+ * Home. Playing a quiz does NOT touch it: the shell stays mounted behind the
+ * quiz (`main.ts`, `vueGardee`) and the return repaints the view the quiz
+ * was launched from. Initialised to "home": the very first start.
  */
 let vueCourante: DashboardViewName = "home";
 
 /**
- * Le quiz de la page « detail », et la vue d'où l'on y est entré — au niveau
- * du MODULE pour la même raison que `vueCourante` : jouer un quiz depuis sa
- * page remplace la coquille par le moteur, et le retour doit ramener SUR
- * CETTE PAGE (comme sous Obsidian, où le tableau de bord reste sur le détail
- * pendant que la note s'ouvre à côté), puis sa flèche retour au bon endroit.
- * C'est le `selectedQuiz`/`previousView` de `QuizDashboardView`.
- * `vuePrecedente` ne vaut jamais "detail" : elle n'est prise qu'en QUITTANT
- * une autre vue (le greffon, lui, la recopie sans garde et peut ainsi
- * renvoyer un détail vers lui-même).
+ * The quiz of the "detail" page, and the view it was entered from — at
+ * MODULE level for the same reason as `vueCourante` (restoring the last view
+ * at startup, `reprendre`). `vuePrecedente` is never "detail": it is only
+ * taken when LEAVING another view (the plugin copies it unguarded and can
+ * thus send a detail page back to itself).
  */
 let quizSelectionne: QuizIndexEntry | null = null;
 let vuePrecedente: DashboardViewName = "home";
@@ -384,25 +379,19 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   juste avant d'entrer dans un dossier ou d'en sortir, qui ne passe pas
 		   par `navigate`. */
 		recordNav: () => enregistrerNav(),
-		/* JOUER DEPUIS N'IMPORTE OÙ RAMÈNE À LA PAGE DU QUIZ (2026-09-26). La
-		   coquille est démontée pendant le jeu puis remontée au retour, sur
-		   `vueCourante` : lancé depuis la pastille Learn d'une carte, le retour
-		   retombait sur « Mes quiz »… à la grille RACINE, le dossier ouvert
-		   étant un état de l'instance détruite. On se place donc sur la fiche
-		   du quiz AVANT de partir ; sa flèche retour rouvre ensuite le dossier
-		   (`openFolderOfQuiz`, voir `onBack` plus bas). Depuis la fiche
-		   elle-même, rien ne change. */
-		openQuiz: (quiz) => {
-			if (vueCourante !== "detail" || quizSelectionne?.path !== quiz.path) {
-				if (!memeEtatNav(etatCourant(), { vue: "detail", dossier: null, quiz })) enregistrerNav();
-				if (vueCourante !== "detail") { vuePrecedente = vueCourante; detailDepth = sheets.depth() + 1; }
-				quizSelectionne = quiz;
-				vueCourante = "detail";
-				ouvertureEnAttente = true;
-				noterVue({ vue: "detail", quiz: quiz.path });
-			}
-			deps.onOpenQuiz(quiz);
-		},
+		/* PLAYING RETURNS TO THE VIEW IT WAS LAUNCHED FROM. Launching a quiz
+		   leaves the shell exactly as it is: it stays mounted behind the quiz
+		   (`vueGardee` in `main.ts`, since 2026-09-27) and is only repainted
+		   on return, so the open folder, its tab and the sheet stack are
+		   still there — a folder's Resume button, a card's pill, a Home task
+		   and the quiz page's Start button all come back to where they were
+		   clicked. This used to switch to the quiz's page BEFORE leaving
+		   (2026-09-26): back then the shell was unmounted while a quiz played
+		   and remounted on `vueCourante`, and the open folder, being state of
+		   the destroyed `quizzes` handlers, was lost — the return fell on the
+		   Folders root grid. That workaround is gone: it made every return
+		   land on the quiz's page, over the folder, even from the folder. */
+		openQuiz: (quiz) => deps.onOpenQuiz(quiz),
 		openSettings: () => deps.onOpenSettings(),
 		/* Toutes les vues, la génération comprise (tranche 5, tâche 6) : la page
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à
