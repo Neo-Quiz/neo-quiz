@@ -733,13 +733,17 @@
 }
 
 /* A fill-in-the-blanks on a question card (detail-fiche.ts `renderTrous`):
-   its text or code, each blank an empty dashed slot — never its answer. */
+   its text or code, each blank an empty slot — never its answer — drawn as
+   the quiz draws a blank (cloze.css): a thin outline, small corners. */
 .qbd-fiche-trous { margin-top: 8px; }
 .qbd-fiche-trou {
 	display: inline-block;
 	width: 3.2em;
-	height: 1.05em;
+	height: 1.2em;
 	margin: 0 2px;
-	vertical-align: -0.2em;
-	border-bottom: 2px dashed color-mix(in srgb, var(--text-normal) 35%, transparent);
+	vertical-align: -0.25em;
+	box-sizing: border-box;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 16%, transparent);
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
 }

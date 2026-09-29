@@ -1,15 +1,22 @@
 /* =========================================================
-   TEXTE À TROUS (engine/cloze.ts)
-   Le texte reste du texte : les cases s'insèrent dans le flux de lecture
-   et se replient avec lui — jamais une grille de champs détachée de la
-   phrase, qui obligerait à faire l'aller-retour entre les deux.
+   FILL IN THE BLANKS (engine/cloze.ts)
+   The text stays text: the blanks sit in the flow of reading and wrap with
+   it — never a grid of fields detached from the sentence, which would force
+   going back and forth between the two.
+
+   THE BLANK (2026-09-29): a sober field — a thin outline all round, small
+   corners, no inner shadow, no pop. It replaced a box rounded at the top
+   with a dashed line under it, whose fill turned blue: too loud next to the
+   text, and a "hole" drawn twice (a box AND a line). The colour only says
+   the STATE: blue while typing, green right, red wrong; empty and filled
+   differ by the outline's strength alone.
    ========================================================= */
 
 .quiz-cloze{
   margin: 6px 0 4px;
   font-size: 1.02em;
-  /* Interligne large : les cases dépassent la hauteur d'une ligne de texte,
-     et des lignes serrées les feraient se chevaucher. */
+  /* A wide line height: the blanks are taller than a line of text, and
+     tight lines would make them overlap. */
   line-height: 2.35;
   color: var(--text-normal);
   text-align: left;
@@ -19,39 +26,34 @@
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  /* Le slot suit le flux du texte et se replie avec lui. */
+  /* The slot follows the flow of the text and wraps with it. */
   vertical-align: baseline;
 }
 
-/* Sélecteur DESCENDANT (.quiz-cloze .quiz-cloze-input) et non la seule classe :
-   Obsidian pose `.is-mobile input[type="text"] { width: 100% }`, de
-   spécificité (0,2,1) — une règle à une classe, même plus tardive, perd, et
-   toutes les cases s'étalaient sur la largeur de la carte sur téléphone.
-   Deux classes ici, trois dans la variante mobile : la cascade est gagnée par
-   la structure, jamais par un !important. */
+/* DESCENDANT selector (.quiz-cloze .quiz-cloze-input), not the class alone:
+   Obsidian sets `.is-mobile input[type="text"] { width: 100% }`, of
+   specificity (0,2,1) — a one-class rule, even a later one, loses, and every
+   blank spread across the card's width on a phone. Two classes here, three
+   in the mobile variant: the cascade is won by structure, never by an
+   !important. */
 .quiz-cloze .quiz-cloze-input{
-  /* Largeur UNIFORME pour TOUTES les cases : une case dimensionnée sur sa
-     réponse donnerait la longueur du mot cherché. */
+  /* The SAME width for every blank: a blank sized on its answer would give
+     away the length of the word. */
   width: 12ch;
-  padding: 3px 10px;
-  /* Soulignement TIRETÉ tant que la case est vide : c'est le trait de la
-     ligne à compléter d'un exercice papier — il dit « à remplir » sans
-     texte d'aide, et son passage au plein signale ensuite que c'est fait. */
-  border: 1px solid transparent;
-  border-bottom: 2px dashed color-mix(in srgb, var(--text-muted) 50%, transparent);
-  border-radius: 7px 7px 3px 3px;
-  background: color-mix(in srgb, var(--background-secondary) 55%, transparent);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 12%, transparent);
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--text-normal) 16%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+  box-shadow: none;
   color: var(--text-normal);
   font-family: inherit;
   font-size: 0.95em;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.5;
   text-align: center;
   transition: border-color var(--quiz-dur-fast) var(--quiz-ease-smooth),
               background var(--quiz-dur-fast) var(--quiz-ease-smooth),
-              color var(--quiz-dur-fast) var(--quiz-ease-smooth),
-              box-shadow var(--quiz-dur-fast) var(--quiz-ease-smooth);
+              color var(--quiz-dur-fast) var(--quiz-ease-smooth);
 }
 
 .quiz-cloze .quiz-cloze-input::placeholder{
@@ -59,64 +61,41 @@
 }
 
 .quiz-cloze .quiz-cloze-input:hover:not(:disabled){
-  border-bottom-color: var(--quiz-primary);
-  background: color-mix(in srgb, var(--background-secondary) 85%, transparent);
+  border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
 }
 
 .quiz-cloze .quiz-cloze-input:focus{
   outline: none;
-  border-bottom-style: solid;
-  border-bottom-color: var(--quiz-primary);
-  background: color-mix(in srgb, var(--quiz-primary) 8%, var(--background-secondary));
-  box-shadow: 0 0 0 2px var(--quiz-primary-ring-16);
+  border-color: var(--quiz-primary);
+  background: color-mix(in srgb, var(--quiz-primary) 7%, transparent);
 }
 
-/* ── Trou REMPLI, avant toute correction ──
-   Distinguer d'un coup d'œil ce qui reste à faire (demande Ahmed
-   2026-07-31) : le tireté devient plein, le fond prend la teinte d'accent
-   et le texte passe en pleine couleur. Aucune indication de justesse ici —
-   la correction, elle, vient plus bas (.correct / .wrong). */
+/* ── A FILLED blank, before any correction ──
+   What is left to do shows at a glance (asked for on 2026-07-31): the
+   outline gets firmer. No hint of rightness here — the correction comes
+   below (.correct / .wrong). */
 .quiz-cloze .quiz-cloze-input.is-filled{
-  border-bottom-style: solid;
-  border-bottom-color: var(--quiz-primary);
-  background: color-mix(in srgb, var(--quiz-primary) 13%, var(--background-secondary));
-  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 10%, transparent),
-              0 1px 0 var(--quiz-primary-ring-12);
+  border-color: color-mix(in srgb, var(--text-normal) 32%, transparent);
+  background: color-mix(in srgb, var(--text-normal) 6%, transparent);
 }
 
-/* Le trou qu'on vient de remplir « prend » : une pulsation courte, jouée
-   sur la seule transition vide → rempli (cf. markFilled dans cloze.ts). */
-@keyframes quiz-cloze-pop{
-  0%   { transform: none; }
-  38%  { transform: translateY(-2px) scale(1.045); }
-  100% { transform: none; }
-}
+/* The blank just filled no longer "pops" (`quiz-cloze-pop`, still set by
+   markFilled in cloze.ts): the firmer outline says it, without a movement
+   in the middle of a line. */
 
-.quiz-cloze .quiz-cloze-input.quiz-cloze-pop{
-  animation: quiz-cloze-pop 260ms var(--quiz-ease-smooth);
-}
-
-@media (prefers-reduced-motion: reduce){
-  .quiz-cloze .quiz-cloze-input.quiz-cloze-pop{ animation: none; }
-}
-
-/* ── Après correction ── */
+/* ── After correction ── */
 
 .quiz-cloze .quiz-cloze-input.correct{
-  /* `solid` explicite : la case vide est TIRETÉE, et un trou raté laissé en
-     pointillés se lirait encore comme « à remplir ». */
-  border-bottom-style: solid;
-  border-bottom-color: var(--quiz-success);
-  background: color-mix(in srgb, var(--quiz-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--quiz-success) 70%, transparent);
+  background: color-mix(in srgb, var(--quiz-success) 10%, transparent);
   color: var(--text-normal);
-  -webkit-text-fill-color: var(--text-normal);   /* Chromium grise les champs désactivés */
+  -webkit-text-fill-color: var(--text-normal);   /* Chromium greys disabled fields */
   opacity: 1;
 }
 
 .quiz-cloze .quiz-cloze-input.wrong{
-  border-bottom-style: solid;
-  border-bottom-color: var(--quiz-danger);
-  background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--quiz-danger) 70%, transparent);
+  background: color-mix(in srgb, var(--quiz-danger) 10%, transparent);
   color: var(--text-normal);
   -webkit-text-fill-color: var(--text-normal);
   opacity: 1;
@@ -124,22 +103,21 @@
   text-decoration-color: color-mix(in srgb, var(--quiz-danger) 70%, transparent);
 }
 
-/* La bonne réponse, à côté du seul trou raté. */
+/* The right answer, next to a missed blank only: green text, no pill. */
 .quiz-cloze-expected{
-  padding: 2px 8px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--quiz-success) 16%, transparent);
   color: var(--quiz-success);
   font-size: 0.9em;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-/* ── Fill-in-the-blanks on CODE (codeClozeHtml) ──
-   A tight block that keeps the indentation. The line height stays wide
-   enough for the boxes, which take the code's font: a box in a proportional
-   font in the middle of a line of code read as a hole in the layout, not in
-   the program. */
+/* ── Fill-in-the-blanks on CODE ──
+   Two forms: a ```lang block (the rule since 2026-09-29, `.quiz-md-code`,
+   with its language's logo and colours) and the older one, a line of code
+   between backticks per line (codeClozeHtml, `.quiz-cloze-code`). In both,
+   the blank takes the CODE's font and size and sits inside the line: a
+   field in a proportional font in the middle of a line of code read as a
+   hole in the layout, not in the program. */
 .quiz-cloze .quiz-cloze-code{
   margin: 4px 0;
   padding: 10px 16px;
@@ -163,12 +141,29 @@
   color: var(--text-normal);
 }
 
-.quiz-cloze .quiz-cloze-code .quiz-cloze-input{
+/* The code's line height is kept loose enough for a blank: a field one
+   line tall, with no room above and below, touched the next line. */
+.quiz-cloze .quiz-md-code{
+  line-height: 1.9;
+}
+
+.quiz-cloze .quiz-cloze-code .quiz-cloze-input,
+.quiz-cloze .quiz-md-code .quiz-cloze-input{
   width: 10ch;
-  padding: 1px 6px;
-  font-family: var(--font-monospace);
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: inherit;
   font-size: 1em;
-  line-height: 1.4;
+  font-weight: 500;
+  line-height: 1.45;
+  vertical-align: baseline;
+}
+
+/* The correct answer next to a missed blank, in the code's font. */
+.quiz-cloze .quiz-md-code .quiz-cloze-expected,
+.quiz-cloze .quiz-cloze-code .quiz-cloze-expected{
+  font-family: inherit;
+  font-size: 1em;
 }
 
 .quiz-cloze-embed-wrap{
@@ -183,7 +178,7 @@
   border-radius: 8px;
 }
 
-/* ── Mobile : le clavier occupe la moitié de l'écran, on resserre ── */
+/* ── Mobile: the keyboard takes half the screen, things tighten ── */
 
 .is-mobile .quiz-cloze{
   font-size: 0.98em;
@@ -191,9 +186,9 @@
 }
 
 .is-mobile .quiz-cloze .quiz-cloze-input{
-  /* 16 px minimum : en dessous, iOS zoome sur le champ au focus et casse
-     la mise en page de la carte. Cases plus courtes en compensation — à
-     12ch et 16px, une case mangeait le tiers d'une ligne de téléphone. */
+  /* 16 px at least: below that, iOS zooms on the field on focus and breaks
+     the card's layout. Shorter blanks in return — at 12ch and 16px, a blank
+     took a third of a phone's line. */
   width: 9ch;
   font-size: 16px;
   padding: 2px 6px;

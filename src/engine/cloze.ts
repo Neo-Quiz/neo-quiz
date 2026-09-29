@@ -301,19 +301,11 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 		return `<div class="quiz-cloze">${body}</div>`;
 	}
 
-	/** Bascule l'état « rempli » d'un trou, et n'anime QUE la transition
-	    vide → rempli : rejouer le pop à chaque frappe ferait sautiller la
-	    case pendant qu'on tape. Le retrait/reflow/ajout relance l'animation
-	    quand un trou est vidé puis re-rempli (une classe déjà posée ne
-	    redéclenche rien). */
+	/** Toggles a blank's "filled" state, which firms up its outline
+	    (cloze.css). No animation since 2026-09-29: a pop in the middle of a
+	    line of code moved the text around it. */
 	function markFilled(input: HTMLInputElement): void {
-		const filled = input.value.trim().length > 0;
-		if (filled === input.classList.contains("is-filled")) return;
-		input.classList.toggle("is-filled", filled);
-		if (!filled) return;
-		input.classList.remove("quiz-cloze-pop");
-		void input.offsetWidth;
-		input.classList.add("quiz-cloze-pop");
+		input.classList.toggle("is-filled", input.value.trim().length > 0);
 	}
 
 	function bindClozeQuestion(trackItem: HTMLElement, qi: number): void {

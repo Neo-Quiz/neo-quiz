@@ -47,6 +47,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The blanks of a fill-in-the-blanks are sober fields: a thin outline all round, no dashed line, no pop; blue while typing, green or red once checked. In code they take the code's font and sit inside the line.
 - Every code block shows its language's logo, runnable or not, on the quiz's page and in the editor too.
 - A fill-in-the-blanks on code shows its program in a real code block, with its language's logo and colours, in the quiz, in the editor and on the quiz's page, where its card now shows the text with empty blanks. Generated quizzes always put code in such a block.
 - The version in the application menu reads "v1.19.0".
