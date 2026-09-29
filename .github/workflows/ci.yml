@@ -172,6 +172,12 @@ jobs:
       - name: Quiz session snapshot
         run: npm run check:session
 
+      # THE TEST SETUP: Exam mode is on exactly when hints are off and a time
+      # limit is set; a duration is always within [1, 300]; a malformed
+      # remembered value falls back to the file's default.
+      - name: Test setup rules
+        run: npm run check:test-setup
+
       # THE LEARN RETRY LOOP: a missed question comes back after two other
       # checks or at the end of its step, never at once, three retries at most.
       - name: Learn retry loop

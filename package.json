@@ -71,6 +71,7 @@
     "check:menu-app": "node scripts/check-menu-app.mjs",
     "check:partage": "node scripts/check-partage.mjs",
     "check:session": "node scripts/check-session.mjs",
+    "check:test-setup": "node scripts/check-test-setup.mjs",
     "check:learn-loop": "node scripts/check-learn-loop.mjs",
     "check:reprise": "node scripts/check-reprise.mjs",
     "check:historique-nav": "node scripts/check-historique-nav.mjs",
