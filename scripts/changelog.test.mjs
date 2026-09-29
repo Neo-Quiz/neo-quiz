@@ -35,11 +35,11 @@ test("lireUnreleased rend null sans section Unreleased", () => {
 	assert.equal(lireUnreleased("# Changelog\n\n## [1.0.0] - 2026-09-13\n"), null);
 });
 
-test("deduireNiveau : Breaking gagne, puis Added/Changed, puis Fixed, sinon null", () => {
+test("deduireNiveau : Breaking gives a major, anything else a patch (a minor is typed), nothing null", () => {
 	const vide = { Breaking: [], Added: [], Changed: [], Fixed: [] };
 	assert.equal(deduireNiveau({ ...vide, Breaking: ["x"], Fixed: ["y"] }), "major");
-	assert.equal(deduireNiveau({ ...vide, Changed: ["x"] }), "minor");
-	assert.equal(deduireNiveau({ ...vide, Added: ["x"], Fixed: ["y"] }), "minor");
+	assert.equal(deduireNiveau({ ...vide, Changed: ["x"] }), "patch");
+	assert.equal(deduireNiveau({ ...vide, Added: ["x"], Fixed: ["y"] }), "patch");
 	assert.equal(deduireNiveau({ ...vide, Fixed: ["y"] }), "patch");
 	assert.equal(deduireNiveau(vide), null);
 });

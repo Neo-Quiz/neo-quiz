@@ -1772,3 +1772,23 @@ label.nq-set-ligne {
 	outline: none;
 	border-color: var(--interactive-accent);
 }
+
+/* A number field in a settings row (the longest explanation). */
+.nq-set-nombre {
+	width: 96px;
+	height: 32px;
+	box-sizing: border-box;
+	padding: 0 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	text-align: right;
+}
+
+.nq-set-nombre:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}

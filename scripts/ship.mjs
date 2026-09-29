@@ -1,8 +1,8 @@
 /*
  * Livre une version d'un seul geste :
  *
- *   git ship "Fix collapse ghost pixels"   le travail, puis le numéro que CHANGELOG.md impose
- *   git ship 1.2.0 "Sortie"                 un numéro explicite, s'il vaut au moins ce niveau
+ *   git ship "Fix collapse ghost pixels"   le travail, puis le correctif suivant (x.y.Z+1)
+ *   git ship 1.2.0 "Sortie"                 un numéro explicite : c'est ainsi qu'une MINEURE sort
  *   git ship                                l'arbre est déjà propre : bump seul
  *   git ship --plugin minor                 le greffon garde le niveau tapé
  *

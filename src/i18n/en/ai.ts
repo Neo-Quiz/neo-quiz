@@ -391,7 +391,7 @@ export const EN_AI = {
 	"ai.explain.button": "Explain",
 	"ai.explain.buttonTip": "Ask Claude Code or Codex to explain this question",
 	"ai.explain.title": "Explanation",
-	"ai.explain.defaultPrompt": "Explain this question from my quiz « {quiz} » as you would to a student revising for an exam: why the right answer is right, why the others are wrong, and the course point to remember, with a simple example.\n\nQuestion:\n{question}\n\nChoices:\n{options}\n\nRight answer: {answer}\nMy answer: {myAnswer}\nThe quiz's explanation: {explanation}",
+	"ai.explain.defaultPrompt": "Explain this question from my quiz « {quiz} » as if I knew nothing about the subject, in the best possible way: why the right answer is right, why the others are wrong, and the course point to remember, with a simple example.\n\nQuestion:\n{question}\n\nChoices:\n{options}\n\nRight answer: {answer}\nMy answer: {myAnswer}\nThe quiz's explanation: {explanation}",
 	"ai.explain.followUp": "Ask a follow-up question…",
 	"ai.explain.send": "Send",
 	"ai.explain.stop": "Stop",

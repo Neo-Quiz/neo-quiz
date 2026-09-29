@@ -47,10 +47,15 @@ export function lireUnreleased(texte) {
 	return { sections };
 }
 
+/* THE DEFAULT IS A PATCH (rule of 2026-09-30). A batch of changes — even
+   with "Added" or "Changed" entries — ships as x.y.Z+1: a minor version
+   jumped out for "two or three things" (1.21.0, the night of 2026-09-29)
+   and had to be deleted, the very thing a published version must never
+   need. A MINOR is chosen, never deduced: `git ship 1.21.0`. "Breaking"
+   still forces a major. */
 export function deduireNiveau(sections) {
 	if (sections.Breaking.length) return "major";
-	if (sections.Added.length || sections.Changed.length) return "minor";
-	if (sections.Fixed.length) return "patch";
+	if (sections.Added.length || sections.Changed.length || sections.Fixed.length) return "patch";
 	return null;
 }
 

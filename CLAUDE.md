@@ -438,11 +438,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   vaults). `npm run app:dev` / `app:build` — l'application Windows.
 - **Release** : deux produits indépendants, deux commandes `git ship` (alias posé
   une fois, cf. `scripts/ship.mjs`) :
-  - `git ship "Message"` — l'application par défaut. **Le niveau ne se tape
-    plus** : il se DÉDUIT de la section `## [Unreleased]` de `CHANGELOG.md`
-    (`### Breaking` → major, `### Added`/`### Changed` → minor, `### Fixed`
-    seul → patch ; vide → refus). Un numéro explicite `X.Y.Z` est admis s'il
-    vaut au moins ce niveau. La section est figée en `## [X.Y.Z] - date` dans
+  - `git ship "Message"` — l'application par défaut. Le niveau se lit dans
+    `## [Unreleased]` de `CHANGELOG.md` : `### Breaking` → major, toute autre
+    entrée → patch (règle du 2026-09-30 ci-dessous) ; vide → refus. Une
+    mineure se tape en numéro explicite `X.Y.0`, sur demande d'Ahmed. La section est figée en `## [X.Y.Z] - date` dans
     le commit « Version X.Y.Z », et `release.yml` la publie comme notes de la
     release. Chaque tâche qui change quelque chose de visible écrit sa ligne
     sous `[Unreleased]` dans son propre commit.
@@ -455,6 +454,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   `release.yml` construit le seul produit désigné par la famille de tag et publie.
   (Pas `npm run release` : il pointe vers un fichier absent.)
 
+- **UNE LIVRAISON EST UN CORRECTIF PAR DÉFAUT** (règle d'Ahmed du 2026-09-30) :
+  `git ship` publie x.y.Z+1 quel que soit le contenu de `[Unreleased]`
+  (« Added » et « Changed » compris) ; une MINEURE ne se déduit plus, elle se
+  TAPE (`git ship 1.21.0`) et seulement sur demande d'Ahmed ; « Breaking »
+  reste une majeure. Cause : la 1.21.0 sortie pour « deux ou trois trucs » la
+  nuit du 2026-09-29, supprimée le lendemain — la DERNIÈRE suppression.
 - **UNE VERSION PUBLIÉE NE SE SUPPRIME PLUS** (règle posée le 2026-09-16, après
   en avoir supprimé dix dans la journée). Chaque suppression coûte : une
   installation existante ne voit JAMAIS un numéro plus petit comme une mise à

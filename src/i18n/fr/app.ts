@@ -113,6 +113,8 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.explainPrompt": "Prompt d'explication",
 	"app.settings.explainPromptHint": "Ce que le bouton Expliquer d'une question envoie à Claude Code ou Codex. {quiz}, {question}, {options}, {answer}, {myAnswer} et {explanation} sont remplacés par ceux de la question ; une ligne dont tous les champs sont vides est retirée.",
 	"app.settings.explainPromptReset": "Réinitialiser",
+	"app.settings.explainMaxChars": "Longueur maximale de l'explication",
+	"app.settings.explainMaxCharsHint": "En caractères. Claude Code ou Codex est prié de rester en dessous.",
 	"app.settings.navFolders": "Dossiers",
 	"app.settings.navAi": "IA",
 	"app.settings.navAppearance": "Apparence",

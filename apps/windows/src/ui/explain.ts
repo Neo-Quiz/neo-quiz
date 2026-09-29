@@ -29,6 +29,9 @@ import { remplirPromptExplication } from "../../../../src/explain-prompt";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+/** The default longest explanation, in characters: about a screen. */
+export const EXPLAIN_MAX_CHARS_DEFAUT = 1500;
+
 /** "0:07" — the time the model has worked. */
 function duree(ms: number): string {
 	const s = Math.max(0, Math.floor(ms / 1000));
@@ -64,7 +67,18 @@ export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, de
 	const bouton = ajouter(entete, "button", "qbd-qz-explain");
 	bouton.type = "button";
 	bouton.title = t("ai.explain.buttonTip");
-	host.ui.setIcon(ajouter(bouton, "span", "qbd-qz-explain-icon"), "sparkles");
+	/* The LOGO of the provider chosen in Settings (Claude Code's or
+	   Codex's), read at each paint: it says who will answer. Sparkles when
+	   the provider cannot explain (the click then says so). */
+	const icone = ajouter(bouton, "span", "qbd-qz-explain-icon");
+	const id = deps.settings.get().aiProvider || "";
+	if (id === "claude-code" || id === "codex") {
+		const p = aiProviders.getProvider(id);
+		icone.classList.add("qbd-provider-logo", "qbd-provider-logo--" + p.logo);
+		aiProviders.setBrandLogo(icone, p.logo);
+	} else {
+		host.ui.setIcon(icone, "sparkles");
+	}
 	ajouter(bouton, "span", undefined, t("ai.explain.button"));
 
 	/* Hidden in an Exam: the engine puts its clock straight into the host. */
@@ -150,6 +164,8 @@ function ouvrirExplication(premier: string, settings: AiSettingsHost): void {
 				};
 				try {
 					const reponse = await client.chat(historique, {
+						style: "explain",
+						maxChars: settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT,
 						onTranscript: (ev) => {
 							if (ev.kind !== "text") return;
 							texteVivant += ev.text;

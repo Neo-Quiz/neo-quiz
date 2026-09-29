@@ -173,6 +173,8 @@ export const EN_APP = {
 	"app.settings.explainPrompt": "Explain prompt",
 	"app.settings.explainPromptHint": "What the Explain button of a quiz question sends to Claude Code or Codex. {quiz}, {question}, {options}, {answer}, {myAnswer} and {explanation} are replaced by the question's own; a line whose placeholders are all empty is left out.",
 	"app.settings.explainPromptReset": "Reset",
+	"app.settings.explainMaxChars": "Longest explanation",
+	"app.settings.explainMaxCharsHint": "In characters. Claude Code or Codex is asked to stay under it.",
 	"app.settings.navFolders": "Folders",
 	"app.settings.navAi": "AI",
 	"app.settings.navAppearance": "Appearance",

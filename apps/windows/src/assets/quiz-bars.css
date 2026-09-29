@@ -195,6 +195,10 @@
 
 .qbd-qz-explain-icon {
 	display: inline-flex;
+}
+
+/* The accent only for the fallback sparkles: a brand logo keeps its colour. */
+.qbd-qz-explain-icon:not(.qbd-provider-logo) {
 	color: var(--interactive-accent);
 }
 
@@ -282,4 +286,12 @@
 .nq-explain-envoi svg {
 	width: 16px;
 	height: 16px;
+}
+
+/* The provider's logo in "Explain", at the size of the former icon. */
+.qbd-qz-explain-icon.qbd-provider-logo,
+.qbd-qz-explain-icon.qbd-provider-logo svg,
+.qbd-qz-explain-icon.qbd-provider-logo img {
+	width: 15px;
+	height: 15px;
 }

@@ -96,6 +96,17 @@ export interface ChatTurn {
 	text: string;
 }
 
+/** Options of `AiClient.chat`. */
+export interface ChatOptions {
+	context?: string;
+	onTranscript?: (event: TranscriptEvent) => void;
+	/** `explain`: the "Explain" button of a question — the model assumes the
+	    learner knows nothing of the subject (2026-09-29). */
+	style?: "explain";
+	/** The longest answer wanted, in characters (the model is asked for it). */
+	maxChars?: number;
+}
+
 /** Client IA — retour de createAiClient(plugin). */
 export interface AiClient {
 	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz>;
@@ -104,7 +115,7 @@ export interface AiClient {
 	    with the same fixed options and no tool as a generation — and the
 	    answer comes back as prose. `context` is attached text (notes read by
 	    the page). Any other provider rejects with a message saying so. */
-	chat(history: ChatTurn[], options?: { context?: string; onTranscript?: (event: TranscriptEvent) => void }): Promise<string>;
+	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -1473,7 +1484,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		"You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.",
 	].join("\n\n");
 
-	async function chat(history: ChatTurn[], options: { context?: string; onTranscript?: (event: TranscriptEvent) => void } = {}): Promise<string> {
+	async function chat(history: ChatTurn[], options: ChatOptions = {}): Promise<string> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
@@ -1490,16 +1501,21 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				earlier ? "CONVERSATION SO FAR:\n" + earlier : "",
 				"LEARNER'S NEW MESSAGE:\n" + last.text.trim(),
 			].filter(Boolean).join("\n\n---\n\n");
+			const systeme = [
+				CHAT_SYSTEM,
+				options.style === "explain" ? "The learner pressed \"Explain\" on a quiz question. Assume they know NOTHING about the subject: define every term the first time you use it, go one step at a time from the basics to the answer, and use a concrete everyday comparison when it makes the idea click. Explain in the best possible way for a complete beginner." : "",
+				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding.` : "",
+			].filter(Boolean).join("\n\n");
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);
-				return (await callClaudeCodeTexte(model, CHAT_SYSTEM, userPrompt)).trim();
+				return (await callClaudeCodeTexte(model, systeme, userPrompt)).trim();
 			}
 			if (provider === "codex") {
 				model = resolveCodexModel(model);
 				const effort = resolveEffort("codex", settings.get().aiEffort, model);
 				const m = getCodexModels().find(x => x.value === model);
 				const fast = !!settings.get().aiCodexFast && !!(m && m.fast);
-				return (await callCodexTexte(model, CHAT_SYSTEM, userPrompt, [], effort, fast)).trim();
+				return (await callCodexTexte(model, systeme, userPrompt, [], effort, fast)).trim();
 			}
 			throw new Error(t("ai.chat.providerUnsupported"));
 		} catch (err) {

@@ -34,6 +34,7 @@ import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
 import { mountLanguagePackSettings } from "./language-packs";
 import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
+import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 
 type Category = "general" | "folders" | "ai" | "appearance" | "languages";
 
@@ -411,6 +412,25 @@ export function renderSettings(
 	zone.addEventListener("change", () => {
 		const v = zone.value.trim();
 		void deps.aiSettings.save({ aiExplainPrompt: v === t("ai.explain.defaultPrompt").trim() ? "" : v });
+	});
+	/* The longest explanation (2026-09-29): the model is asked to stay under
+	   it. Bounded to 300..6000; an empty or invalid field keeps the default. */
+	const longueur = ajouter(card(expliquer), "div", "nq-set-ligne");
+	const texteLong = ajouter(longueur, "div", "nq-set-ligne-texte");
+	ajouter(texteLong, "span", "nq-reglages-nom", t("app.settings.explainMaxChars"));
+	ajouter(texteLong, "span", "nq-set-ligne-aide", t("app.settings.explainMaxCharsHint"));
+	const champLong = ajouter(ajouter(longueur, "div", "nq-set-ligne-controle"), "input", "nq-set-nombre");
+	champLong.type = "number";
+	champLong.min = "300";
+	champLong.max = "6000";
+	champLong.step = "100";
+	champLong.value = String(deps.aiSettings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT);
+	champLong.setAttribute("aria-label", t("app.settings.explainMaxChars"));
+	champLong.addEventListener("change", () => {
+		const n = Math.round(Number(champLong.value));
+		const borne = Number.isFinite(n) && n > 0 ? Math.min(6000, Math.max(300, n)) : EXPLAIN_MAX_CHARS_DEFAUT;
+		champLong.value = String(borne);
+		void deps.aiSettings.save({ aiExplainMaxChars: borne });
 	});
 	const reinit = ajouter(ajouter(expliquer, "div", "nq-reglages-actions"), "button", "nq-reglages-changer", t("app.settings.explainPromptReset"));
 	reinit.type = "button";

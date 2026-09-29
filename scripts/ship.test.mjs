@@ -108,8 +108,9 @@ test("pour le greffon, le niveau tapé reste la règle", () => {
 	});
 });
 
-test("le CHANGELOG déduit minor d'une entrée Added", () => {
-	assert.deepEqual(versionDepuisChangelog(UNRELEASED_ADDED, "1.1.0", null), { version: "1.2.0", niveau: "minor" });
+test("an Added entry ships as a patch by default; a minor is typed", () => {
+	assert.deepEqual(versionDepuisChangelog(UNRELEASED_ADDED, "1.1.0", null), { version: "1.1.1", niveau: "patch" });
+	assert.deepEqual(versionDepuisChangelog(UNRELEASED_ADDED, "1.1.0", "1.2.0"), { version: "1.2.0", niveau: "patch" });
 });
 
 test("le CHANGELOG déduit patch d'une entrée Fixed seule", () => {
@@ -118,7 +119,7 @@ test("le CHANGELOG déduit patch d'une entrée Fixed seule", () => {
 
 test("un numéro explicite est admis s'il vaut au moins le niveau déduit", () => {
 	assert.deepEqual(versionDepuisChangelog(UNRELEASED_FIXED, "1.1.0", "1.2.0"), { version: "1.2.0", niveau: "patch" });
-	assert.throws(() => versionDepuisChangelog(UNRELEASED_ADDED, "1.1.0", "1.1.1"), /Added/);
+	assert.throws(() => versionDepuisChangelog(UNRELEASED_ADDED, "1.1.0", "1.1.0"), /Added/);
 });
 
 test("une section Unreleased vide ne se livre pas", () => {

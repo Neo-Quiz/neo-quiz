@@ -347,7 +347,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.explain.button": "Expliquer",
 	"ai.explain.buttonTip": "Demander à Claude Code ou Codex de t'expliquer cette question",
 	"ai.explain.title": "Explication",
-	"ai.explain.defaultPrompt": "Explique-moi cette question de mon quiz « {quiz} » comme à un étudiant qui révise son contrôle : pourquoi la bonne réponse est la bonne, pourquoi les autres sont fausses, et le point de cours à retenir, avec un exemple simple.\n\nQuestion :\n{question}\n\nChoix :\n{options}\n\nBonne réponse : {answer}\nMa réponse : {myAnswer}\nExplication du quiz : {explanation}",
+	"ai.explain.defaultPrompt": "Explique-moi cette question de mon quiz « {quiz} » comme si je ne connaissais rien au sujet, de la meilleure façon possible : pourquoi la bonne réponse est la bonne, pourquoi les autres sont fausses, et le point de cours à retenir, avec un exemple simple.\n\nQuestion :\n{question}\n\nChoix :\n{options}\n\nBonne réponse : {answer}\nMa réponse : {myAnswer}\nExplication du quiz : {explanation}",
 	"ai.explain.followUp": "Pose une autre question…",
 	"ai.explain.send": "Envoyer",
 	"ai.explain.stop": "Arrêter",
