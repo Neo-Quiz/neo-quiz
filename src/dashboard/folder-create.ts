@@ -20,11 +20,10 @@ import { exportAllWithFence } from "../editor/export";
    violet) posés inline, teinte dérivée en CSS.
 ══════════════════════════════════════════════════════════ */
 
-/** Une carte-option du modal de création (icône teintée + titre + description
-    + chevron) — partagée par les DEUX modals de création : même DOM, mêmes
-    classes, fidélité garantie à la capture StudySmarter (2026-07-19).
-    `modal` nul sur l'accueil vide (`home.ts`), où les mêmes trois cartes se
-    rendent sur la page : rien à fermer. */
+/** An option row of the creation modal (tinted icon + title + description,
+    no chevron since 2026-09-29) — shared by BOTH creation modals: same DOM,
+    same classes. `modal` is null on the empty home (`home.ts`), where the
+    same options render on the page: nothing to close. */
 export function createOptionCard(modal: HostModalHandle | null, parent: HTMLElement, icon: string, accent: string, title: string, desc: string, onPick: () => void): void {
 	const card = ajouter(parent, "button", "qbd-create-option");
 	card.type = "button";
@@ -34,8 +33,6 @@ export function createOptionCard(modal: HostModalHandle | null, parent: HTMLElem
 	const txt = ajouter(card, "div", "qbd-create-option-text");
 	ajouter(txt, "div", "qbd-create-option-title", title);
 	ajouter(txt, "div", "qbd-create-option-desc", desc);
-	const chev = ajouter(card, "div", "qbd-create-option-chevron");
-	currentHost().ui.setIcon(chev, "chevron-right");
 	card.addEventListener("click", () => { modal?.close(); onPick(); });
 }
 
