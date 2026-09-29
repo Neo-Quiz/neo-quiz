@@ -84,5 +84,17 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	const retireeAide = sAide.supprimerTentative("g.md", avecAide.date);
 	sAide.restaurerTentative("g.md", retireeAide);
 	r.check("… through a deletion and its undo", tentativesDe(sAide.getRecord("g.md")).find(x => x.date === avecAide.date)?.withHint, 2);
+
+	/* An attempt played in Exam mode (hints off + a time limit, spec
+	   2026-09-29-test-setup-modal-design.md §3) says so; any other attempt has
+	   no field — through a deletion and its undo too. */
+	const { store: sExamen } = fabriquer();
+	sExamen.updateRecord("h.md", { bestScore: 70, questionsDone: 10, totalQuestions: 10, exam: true });
+	sExamen.updateRecord("h.md", { bestScore: 50, questionsDone: 10, totalQuestions: 10, exam: false });
+	const [normale, examen] = tentativesDe(sExamen.getRecord("h.md"));
+	r.check("an Exam attempt is marked, a plain one is not", [examen.exam, "exam" in normale], [true, false]);
+	const retireeExamen = sExamen.supprimerTentative("h.md", examen.date);
+	sExamen.restaurerTentative("h.md", retireeExamen);
+	r.check("… through a deletion and its undo", tentativesDe(sExamen.getRecord("h.md")).find(x => x.date === examen.date)?.exam, true);
 	r.done();
 });

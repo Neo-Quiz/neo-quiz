@@ -20,6 +20,8 @@ export interface Tentative {
 	/** A Test's right answers that used a hint (spec 2026-09-29 §2.2);
 	    absent when there are none. */
 	withHint?: number;
+	/** Played in Exam mode (hints off and a time limit); absent otherwise. */
+	exam?: true;
 }
 
 /** Au-delà, les plus anciennes tombent — la meilleure est toujours gardée. */
@@ -150,6 +152,7 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 			date: maintenant,
 			pct: update.texteLibre ? null : (update.bestScore || 0),
 			...(update.withHint && update.withHint > 0 ? { withHint: update.withHint } : {}),
+			...(update.exam ? { exam: true as const } : {}),
 		};
 		const base: QuizStatRecord = {
 			...existing,

@@ -513,6 +513,10 @@ export interface StatsRecord {
 	/** A Test's right answers that used a hint (spec 2026-09-29 §2.2), kept
 	    on its attempt; absent when there are none. */
 	withHint?: number;
+	/** The attempt was played in Exam mode (hints off AND a time limit, spec
+	    2026-09-29-test-setup-modal-design.md §3); absent otherwise and for a
+	    host that asks for no setup. */
+	exam?: boolean;
 }
 
 /**

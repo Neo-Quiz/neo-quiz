@@ -23,19 +23,29 @@ export interface ExamHandlers {
 	handleExamTimeUp(): void;
 	stopExamTimer(): void;
 	bindExamStartButton(): void;
+	/** Milliseconds left on the clock RIGHT NOW (never a stale tick): what a
+	    snapshot stores so a paused test resumes from the time it had left. */
+	remainingMs(): number;
 }
 
 /**
- * The EXAM of a Test (spec 2026-09-29-test-practice-exam-design §3): a start
- * screen that states the duration, a visible clock, and a hand-in at zero.
- * Nothing to choose: the Learn | Exam selector of the start screen, the
- * Learn → Exam switch and the `examAutoSubmit` / `examShowTimer` options are
- * gone (§3.5) — an Exam is its own quiz, `mode: "exam"`.
+ * The CLOCK of a Test (specs 2026-09-29-test-practice-exam-design §3 and
+ * 2026-09-29-test-setup-modal-design §3): a visible countdown and a hand-in
+ * at zero. `ctx.isExamMode` means "this test has a clock". Played with a setup
+ * (the app), the time limit was chosen in the launch modal and the clock
+ * starts as soon as the test renders; played without one (the Obsidian
+ * plugin), a start screen states the duration first (`mode: "exam"`). The
+ * countdown starts from `ctx.examTimeRemaining`: the whole duration at a
+ * fresh start, the time left when a paused test is resumed. Nothing to
+ * choose here: the Learn | Exam selector, the Learn → Exam switch and the
+ * `examAutoSubmit` / `examShowTimer` options are gone (§3.5).
  */
 export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 	// Local timer state.
 	let examTimerId: number | null = null;
-	let examStartTime = 0;
+	/* The instant the clock reaches zero. The remaining time is always
+	   recomputed from it, never accumulated tick by tick. */
+	let examDeadline = 0;
 
 	function examTimerHtml(): string {
 		if (!ctx.isExamMode) return "";
@@ -87,8 +97,9 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 		stopExamTimer();
 
-		examStartTime = Date.now();
-		ctx.examTimeRemaining = ctx.examDurationMs;
+		// Counts down from what is left: the whole duration at a fresh start
+		// (set by the launch and by "Try again"), less when a test is resumed.
+		examDeadline = Date.now() + ctx.examTimeRemaining;
 		updateExamTimerDisplay();
 
 		// setInterval (and not requestAnimationFrame): rAF is suspended while the
@@ -102,8 +113,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 			   an abandoned Exam leaves no attempt and no verdict (§3.4). */
 			if (ctx.examEnded || ctx.isDestroyed()) return;
 
-			const elapsed = Date.now() - examStartTime;
-			ctx.examTimeRemaining = Math.max(0, ctx.examDurationMs - elapsed);
+			ctx.examTimeRemaining = Math.max(0, examDeadline - Date.now());
 
 			updateExamTimerDisplay();
 
@@ -204,9 +214,16 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 	function stopExamTimer(): void {
 		if (examTimerId) {
+			// Keep what was left: a snapshot taken after the stop (the engine is
+			// being destroyed) must not read a value one tick stale.
+			ctx.examTimeRemaining = Math.max(0, examDeadline - Date.now());
 			window.clearInterval(examTimerId);
 			examTimerId = null;
 		}
+	}
+
+	function remainingMs(): number {
+		return examTimerId ? Math.max(0, examDeadline - Date.now()) : ctx.examTimeRemaining;
 	}
 
 	function bindExamStartButton(): void {
@@ -221,6 +238,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 		updateExamTimerDisplay,
 		handleExamTimeUp,
 		stopExamTimer,
-		bindExamStartButton
+		bindExamStartButton,
+		remainingMs
 	};
 }

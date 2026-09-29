@@ -801,6 +801,47 @@ await withSrcModule(
 		ctx.goToResults();
 		r.check("after \"Try again\", the next hand-in is a new attempt with its verdicts",
 			[records.length, appels.length], [2, 10]);
+
+		/* THE SETUP OF THE NEW ATTEMPT (spec 2026-09-29-test-setup-modal-design.md
+		   §3): "Try again" applies the setup chosen in the modal, and a test played
+		   with a setup has no start screen — its clock runs from the render. A
+		   legacy Exam (no setup) goes back to its start screen. */
+		const chosen = { hints: true, timeLimitMinutes: 20 };
+		Object.assign(ctx, {
+			testSetup: { hints: false, timeLimitMinutes: 30 }, isExamMode: true, examDurationMs: 1_800_000,
+			examStarted: true, examEnded: true, examTimeRemaining: 0,
+			applyPendingSetup() { ctx.testSetup = chosen; ctx.examDurationMs = 1_200_000; },
+		});
+		reset();
+		r.check("Try again with a setup: the chosen setup applies, the clock is whole again and already running (no start screen)",
+			[ctx.testSetup, ctx.examDurationMs, ctx.examTimeRemaining, ctx.examStarted, ctx.examEnded], [chosen, 1_200_000, 1_200_000, true, false]);
+		Object.assign(ctx, { testSetup: { hints: true, timeLimitMinutes: null }, isExamMode: false, examDurationMs: 0, examStarted: true, applyPendingSetup() {} });
+		reset();
+		r.check("Try again with an untimed setup: no clock, nothing started", [ctx.examTimeRemaining, ctx.examStarted], [0, false]);
+		Object.assign(ctx, { testSetup: null, isExamMode: true, examDurationMs: 900_000, examStarted: true });
+		delete ctx.applyPendingSetup;
+		reset();
+		r.check("Try again on a legacy Exam (no setup): back to its start screen with the whole clock",
+			[ctx.examStarted, ctx.examTimeRemaining], [false, 900_000]);
+		r.done();
+	}
+
+	{
+		/* The attempt records whether Exam mode was on: hints off AND a time
+		   limit (isExamSetup), nothing at all for a host that asks for no setup. */
+		const r = makeReporter("Test — the attempt records whether Exam mode was on");
+		const jouer = (testSetup) => {
+			const records = [];
+			const { ctx } = makeCtx({ quiz: [{ id: "a", title: "A", options: ["x", "y"], correctIndex: 0 }], selections: [0],
+				statsStore: { updateRecord: (path, rec) => records.push(rec) } });
+			if (testSetup !== undefined) ctx.testSetup = testSetup;
+			ctx.goToResults();
+			return "exam" in records[0] ? records[0].exam : "absent";
+		};
+		r.check("hints off + a time limit: an Exam attempt", jouer({ hints: false, timeLimitMinutes: 30 }), true);
+		r.check("timed with hints, untimed without hints, plain: not an Exam attempt",
+			[jouer({ hints: true, timeLimitMinutes: 30 }), jouer({ hints: false, timeLimitMinutes: null }), jouer({ hints: true, timeLimitMinutes: null })], [false, false, false]);
+		r.check("a host without a setup records nothing about it", jouer(undefined), "absent");
 		r.done();
 	}
 
@@ -856,10 +897,10 @@ await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
 			if (i >= 0) cles.splice(i, 1);
 		},
 	};
-	const makeCtx = ({ quizMode = "quiz", missing = [], locked = false, isExamMode = false, textOnly = null } = {}) => {
+	const makeCtx = ({ quizMode = "quiz", missing = [], locked = false, isExamMode = false, hintsOff = isExamMode, textOnly = null } = {}) => {
 		const appels = [];
 		const ctx = {
-			quizMode, isExamMode, textOnly,
+			quizMode, isExamMode, hintsOff, textOnly,
 			quizState: { locked },
 			SLIDE_RESULTS_INDEX: 9,
 			HINT_TITLE_ID: "t",
@@ -888,9 +929,16 @@ await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
 		[makeCtx().ctx.handIn.lastArrowLabel(), makeCtx({ quizMode: "exam" }).ctx.handIn.lastArrowLabel(),
 			makeCtx({ locked: true }).ctx.handIn.lastArrowLabel(), makeCtx({ quizMode: "lesson" }).ctx.handIn.lastArrowLabel()],
 		["engine.handIn.button", "engine.handIn.button", "engine.nav.results", "engine.nav.results"]);
-	r.check("hints show in a Practice and a Learn, never in an Exam",
+	r.check("hints show in a plain test and a Learn, never in a legacy Exam (hints off with its clock)",
 		[makeCtx().ctx.handIn.showsHints(), makeCtx({ quizMode: "lesson" }).ctx.handIn.showsHints(), makeCtx({ quizMode: "exam", isExamMode: true }).ctx.handIn.showsHints()],
 		[true, true, false]);
+	/* With a setup the hints follow the HINTS setting, not the clock: a timed
+	   test that kept its hints shows them, an untimed one set up without hints
+	   does not. */
+	r.check("a setup with hints off hides the Hint button, timed or not; hints on shows it, timed or not",
+		[makeCtx({ isExamMode: false, hintsOff: true }).ctx.handIn.showsHints(), makeCtx({ isExamMode: true, hintsOff: true }).ctx.handIn.showsHints(),
+			makeCtx({ isExamMode: true, hintsOff: false }).ctx.handIn.showsHints(), makeCtx({ isExamMode: false, hintsOff: false }).ctx.handIn.showsHints()],
+		[false, false, true, true]);
 
 	const complet = makeCtx();
 	complet.ctx.handIn.handIn();
@@ -980,5 +1028,124 @@ await withSrcModule("src/engine/exam.ts", ({ formatExamClock, createExamHandlers
 	appels.length = 0;
 	createExamHandlers(ctx).handleExamTimeUp();
 	r.check("already handed in: time up does nothing more", appels, []);
+	r.done();
+});
+
+/* LAUNCHING A TEST WITH A SETUP (engine/test-launch.ts, spec
+   2026-09-29-test-setup-modal-design.md §3). The rules `renderInteractiveQuiz`
+   follows, held here because the engine itself needs a DOM: whether the host
+   is asked, what it proposes, that a cancelled modal starts nothing, that a
+   resumed snapshot skips the modal, and how the chosen setup lands on the
+   engine's context. */
+await withSrcModule("src/engine/test-launch.ts", async ({ usesTestSetup, askTestSetup, planLaunch, applyTestSetup }) => {
+	const r = makeReporter("Launch — a Test's setup");
+	const appels = [];
+	const hote = (reponse) => ({ choose: async (defaults, count, examByDefault) => { appels.push({ defaults, count, examByDefault }); return reponse; } });
+	const fichier = { examByDefault: false, durationMinutes: null, questionCount: 20 };
+
+	r.check("only a Test with a host that offers a setup goes through it (not a Learn, not the plugin)",
+		[usesTestSetup(hote(null), true), usesTestSetup(hote(null), false), usesTestSetup(undefined, true)], [true, false, false]);
+
+	const choisi = { hints: false, timeLimitMinutes: 15 };
+	const jouer = await planLaunch(hote(choisi), fichier, null);
+	r.check("a plain file: the host is asked once, proposing hints on and no time limit, with the question count",
+		[appels.length, appels[0].defaults, appels[0].count, appels[0].examByDefault], [1, { hints: true, timeLimitMinutes: null }, 20, false]);
+	r.check("what the host answers is what is played, from the whole duration", jouer, { kind: "play", setup: choisi, msLeft: null, resumed: false });
+
+	appels.length = 0;
+	await planLaunch(hote(choisi), { examByDefault: true, durationMinutes: 45, questionCount: 20 }, null);
+	r.check("a file with mode exam: proposes hints off and ITS duration, and says it is an exam file",
+		[appels[0].defaults, appels[0].examByDefault], [{ hints: false, timeLimitMinutes: 45 }, true]);
+	appels.length = 0;
+	await planLaunch(hote(choisi), { examByDefault: true, durationMinutes: null, questionCount: 20 }, null);
+	r.check("... without a duration, the fallback rule (1 min 30 per question, rounded to 5)", appels[0].defaults.timeLimitMinutes, 30);
+
+	appels.length = 0;
+	const annule = await planLaunch(hote(null), fichier, null);
+	r.check("choose answering null starts nothing: cancelled, no setup to play, asked once", [annule, appels.length], [{ kind: "cancelled" }, 1]);
+
+	appels.length = 0;
+	const reprise = await planLaunch(hote(choisi), fichier, { setup: { hints: true, timeLimitMinutes: 30 }, msLeft: 600_000 });
+	r.check("a resumed snapshot brings back its setup and time left and SKIPS the modal",
+		[reprise, appels.length], [{ kind: "play", setup: { hints: true, timeLimitMinutes: 30 }, msLeft: 600_000, resumed: true }, 0]);
+
+	/* "Try again" asks again, proposing what was just played (not the file's default). */
+	appels.length = 0;
+	await askTestSetup(hote(choisi), { examByDefault: true, durationMinutes: 45, questionCount: 20 }, { hints: true, timeLimitMinutes: null });
+	r.check("Try again proposes the setup just played", appels[0].defaults, { hints: true, timeLimitMinutes: null });
+	const proposition = { hints: true, timeLimitMinutes: null };
+	await askTestSetup({ choose: async (d) => { d.hints = false; return null; } }, fichier, proposition);
+	r.check("the modal cannot change the played setup by mutating its proposal", proposition, { hints: true, timeLimitMinutes: null });
+
+	/* Landing on the engine's context. */
+	const cible = () => ({ isExamMode: false, hintsOff: false, examDurationMs: 0, examTimeRemaining: 0, examStarted: false, examEnded: true, testSetup: null });
+	const chrono = cible();
+	applyTestSetup(chrono, { hints: false, timeLimitMinutes: 30 }, null);
+	r.check("a time limit is the engine's Exam clock, whole, already started (no start screen), hints off",
+		[chrono.isExamMode, chrono.examDurationMs, chrono.examTimeRemaining, chrono.examStarted, chrono.examEnded, chrono.hintsOff, chrono.testSetup],
+		[true, 1_800_000, 1_800_000, true, false, true, { hints: false, timeLimitMinutes: 30 }]);
+	const reprend = cible();
+	applyTestSetup(reprend, { hints: true, timeLimitMinutes: 30 }, 90_000);
+	r.check("a resumed test restarts from the time LEFT, keeping its hints",
+		[reprend.examTimeRemaining, reprend.examDurationMs, reprend.hintsOff], [90_000, 1_800_000, false]);
+	const trop = cible();
+	applyTestSetup(trop, { hints: true, timeLimitMinutes: 1 }, 999_999);
+	r.check("a time left above the duration is bounded by it", trop.examTimeRemaining, 60_000);
+	const libre = cible();
+	applyTestSetup(libre, { hints: false, timeLimitMinutes: null }, null);
+	r.check("no time limit: no clock, nothing started, hints still follow the setting",
+		[libre.isExamMode, libre.examDurationMs, libre.examStarted, libre.hintsOff], [false, 0, false, true]);
+	r.done();
+});
+
+/* THE CLOCK OF A TIMED TEST (engine/exam.ts): no start screen once started,
+   the countdown starts from the time LEFT (a paused test resumes, never from
+   the full duration), `remainingMs` reads it live for the snapshot, and at
+   zero the test is handed in. A fake interval and a fake `Date.now` drive it. */
+await withSrcModule("src/engine/exam.ts", ({ createExamHandlers }) => {
+	const r = makeReporter("Timed test — clock resumes from the time left");
+	let maintenant = 1_000_000;
+	const vraiDateNow = Date.now;
+	let tick = null;
+	globalThis.window = { setInterval: (f) => { tick = f; return 7; }, clearInterval: () => { tick = null; } };
+	Date.now = () => maintenant;
+	try {
+		const appels = [];
+		const ctx = {
+			isExamMode: true, examStarted: true, examEnded: false, examTimeRemaining: 90_000, examDurationMs: 300_000,
+			quizState: { locked: false },
+			isDestroyed: () => false,
+			container: { querySelector: () => null, classList: { add() {} } },
+			handIn: { closeConfirm: () => false },
+			goToResults: () => appels.push("results"),
+			host: { ui: { notice: () => appels.push("notice") } },
+		};
+		const exam = createExamHandlers(ctx);
+		const html = exam.examTimerHtml();
+		r.check("started with a setup: the clock shows, never the start screen",
+			[html.includes('data-exam-timer="1"'), html.includes("data-exam-start-screen"), html.includes("1:30")], [true, false, true]);
+
+		exam.startExamTimer();
+		r.check("the clock starts from the time left, not from the full duration", [ctx.examTimeRemaining, exam.remainingMs()], [90_000, 90_000]);
+		maintenant += 30_000;
+		tick();
+		r.check("30 s later: 60 s left", ctx.examTimeRemaining, 60_000);
+		maintenant += 15_000;
+		r.check("remainingMs reads the clock live, between two ticks", exam.remainingMs(), 45_000);
+		exam.stopExamTimer();
+		maintenant += 60_000;
+		r.check("stopped (the engine is destroyed): the time left is kept, the clock is paused while away",
+			[ctx.examTimeRemaining, exam.remainingMs()], [45_000, 45_000]);
+
+		exam.startExamTimer();
+		r.check("resumed later: continues from those 45 s, not from zero nor the full duration", ctx.examTimeRemaining, 45_000);
+		maintenant += 45_001;
+		tick();
+		r.check("at zero: handed in with the answers so far, clock stopped",
+			[appels, ctx.examEnded, ctx.quizState.locked, ctx.examTimeRemaining, tick], [["results", "notice"], true, true, 0, null]);
+	} finally {
+		Date.now = vraiDateNow;
+		delete globalThis.window;
+	}
 	r.done();
 });

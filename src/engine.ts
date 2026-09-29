@@ -29,7 +29,9 @@ import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
-import { canSnapshot, photographier, restaurer, type SessionSink } from "./engine/session";
+import { canSnapshot, photographier, restaurer, type Restauration, type SessionSink } from "./engine/session";
+import { applyTestSetup, askTestSetup, planLaunch, usesTestSetup, type TestFile, type TestSetupHost } from "./engine/test-launch";
+import type { TestSetup } from "./test-setup";
 import { t } from "./i18n";
 
 import { currentHost } from "./host/current";
@@ -49,27 +51,35 @@ import type {
 } from "./types/quiz";
 
 /**
- * Contexte d'appel du moteur, construit par l'hôte (le processeur de bloc du
- * greffon, ou la page de quiz de l'app). Ce n'est PAS le
- * MarkdownPostProcessorContext d'Obsidian. Nommé `context` (jamais `ctx`)
- * pour ne pas se confondre avec le god-object assemblé plus bas.
+ * The engine's call context, built by the host (the plugin's block processor,
+ * or the app's quiz page). It is NOT Obsidian's MarkdownPostProcessorContext.
+ * Named `context` (never `ctx`) so it is not confused with the god-object
+ * assembled below.
  *
- * Il ne porte plus `plugin` ni `Notice` : l'hôte est LU (currentHost),
- * pas TRANSMIS. Un hôte passé en paramètre laisserait deux hôtes coexister le
- * jour où un appelant oublierait de le passer. Depuis la tâche 5, `app` n'est
- * plus transmis non plus : fichiers, liens et ressources passent par l'hôte.
+ * It no longer carries `plugin` nor `Notice`: the host is READ
+ * (currentHost), not PASSED. A host passed as a parameter would let two hosts
+ * coexist the day a caller forgot to pass it. Since task 5, `app` is no
+ * longer passed either: files, links and resources go through the host.
  */
 interface RenderQuizContext {
 	container: HTMLElement;
 	quiz: QuizQuestion[];
 	sourcePath: string;
-	/** Absent = jouer ce quiz ne compte simplement pas de statistiques.
-	    Ce n'est pas une erreur : la page « Générer » n'en a pas. */
+	/** Absent = playing this quiz simply counts no statistics.
+	    Not an error: the "Generate" page has none. */
 	statsSink?: EngineCtx["statsSink"];
-	/** Absent = les réponses ne sont pas journalisées. Même raison. */
+	/** Absent = the answers are not logged. Same reason. */
 	reviewSink?: EngineCtx["reviewSink"];
-	/** Absent = pas de reprise : le quiz s'ouvre toujours de zéro. */
+	/** Absent = no resume: the quiz always opens from zero. */
 	sessionSink?: SessionSink;
+	/** The host's "Set up your test" (the app's modal). Present: a Test (not a
+	    Learn) started without a session snapshot asks it for its hints and time
+	    limit before the first question, plays with the answer, and asks again
+	    on "Try again"; a snapshot restores its own setup and skips the modal.
+	    `null` from `choose` = cancelled: nothing is rendered (the host closes
+	    the page). Absent (the Obsidian plugin): today's behaviour, driven by
+	    the file's `mode: "exam"`. */
+	testSetup?: TestSetupHost;
 }
 
 async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> {
@@ -80,7 +90,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		sourcePath,
 		statsSink,
 		reviewSink,
-		sessionSink
+		sessionSink,
+		testSetup: setupHost
 	} = context;
 
 	container.replaceChildren();
@@ -109,12 +120,20 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		}
 	}
 
-	const isExamMode = examOptions !== null;
-	// examOptions!.durationMinutes : isExamMode ⇔ (examOptions !== null), donc le
-	// non-null assertion est sûr dans la branche vraie (jamais atteinte sinon).
-	const examDurationMs = isExamMode ? examOptions!.durationMinutes * 60 * 1000 : 0;
+	/* A Test played with a host setup learns its hints and time limit only when
+	   the launch modal is answered (or a snapshot restored): until then it has
+	   no clock and shows its hints, whatever the file's mode says. Without a
+	   host setup (the plugin, a Learn) the file's `mode: "exam"` decides, as
+	   before: a clock, a start screen, no hints. `isExamMode` means "this test
+	   has a clock"; these four are ACCESSORS on `ctx`, not snapshots. */
+	const usesSetup = usesTestSetup(setupHost, quizMode !== "lesson");
+	let isExamMode = examOptions !== null && !usesSetup;
+	let hintsOff = isExamMode;
+	// examOptions!.durationMinutes: isExamMode implies (examOptions !== null)
+	// here, so the non-null assertion is safe in the true branch.
+	let examDurationMs = isExamMode ? examOptions!.durationMinutes * 60 * 1000 : 0;
+	let testSetup: TestSetup | null = null;
 	let examStartTime = 0;
-	let examTimerId = null;
 	let examTimeRemaining = examDurationMs;
 	let examEnded = false;
 	let examStarted = false;
@@ -187,9 +206,15 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		statsSink,
 		sessionSink,
 		quizMode,
-		isExamMode,
+		get isExamMode() { return isExamMode; },
+		set isExamMode(v: boolean) { isExamMode = v; },
+		get hintsOff() { return hintsOff; },
+		set hintsOff(v: boolean) { hintsOff = v; },
 		examOptions,
-		examDurationMs,
+		get examDurationMs() { return examDurationMs; },
+		set examDurationMs(v: number) { examDurationMs = v; },
+		get testSetup() { return testSetup; },
+		set testSetup(v: TestSetup | null) { testSetup = v; },
 		get examTimeRemaining() { return examTimeRemaining; },
 		set examTimeRemaining(v: number) { examTimeRemaining = v; },
 		get examStarted() { return examStarted; },
@@ -493,21 +518,29 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	/* The session snapshot: taken after each answer (`invalidateSavedResults`
 	   is called by EVERY interaction), at each change of question (state.ts)
 	   and when the engine is destroyed (text typed without leaving the
-	   question). The rule is `canSnapshot` (engine/session.ts): never an
-	   Exam, never once handed in, never off a question. An Exam block reopens
-	   on its start screen, which erases the session — the folder's "Resume"
-	   would have promised a resume the engine destroys. */
+	   question). The rule is `canSnapshot` (engine/session.ts): never once
+	   handed in, never off a question, never a legacy Exam (played from its
+	   start screen, without a host setup), which reopens on that screen and
+	   erases the session — the folder's "Resume" would have promised a resume
+	   the engine destroys. A Test played with a setup is snapshotted WITH that
+	   setup and, when timed, the time LEFT (`exam.remainingMs`): the clock is
+	   paused while away. Nothing is written before the launch is decided (the
+	   modal is open), so closing the page then leaves the sink untouched. */
 	ctx.saveSession = () => {
+		if (!launched) return;
 		const entree = slideMap[quizState.current];
-		if (!sessionSink || !canSnapshot({ exam: isExamMode || ctx.isExamMode, locked: quizState.locked, onQuestion: entree?.type === "question" })) return;
+		if (!sessionSink || !canSnapshot({ exam: isExamMode && !testSetup, locked: quizState.locked, onQuestion: entree?.type === "question" })) return;
 		if (entree?.type !== "question") return;
-		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now());
+		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now(),
+			testSetup ? { setup: testSetup, msLeft: isExamMode ? exam.remainingMs() : null } : undefined);
 		// Un quiz ouvert puis feuilleté sans jamais répondre n'a rien à
 		// reprendre : ne pas lui offrir « Reprendre » (règle du chantier).
 		if (Object.keys(photo.questions).length === 0) sessionSink.effacer();
 		else sessionSink.enregistrer(photo);
 	};
 	ctx.clearSession = () => { sessionSink?.effacer(); };
+	/* False while the launch modal is open: no state to snapshot yet. */
+	let launched = !usesSetup;
 
 	ctx.invalidateSavedResults = () => {
 		quizState.savedResultsPath = null;
@@ -826,19 +859,10 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		__quizResultsSlideSignature = "";
 
 		if (container.__quizDestroy === destroyQuiz) delete container.__quizDestroy;
-		if (container.__quizExamRunning === examRunning) delete container.__quizExamRunning;
 		ctx.interactions.destroyZoomFixHandlers();
 	}
 
-	/* An Exam started and not handed in: what the host's leaving guard asks
-	   about (apps/windows/src/ui/leave-guard.ts, spec 2026-09-29 §3.4) — read
-	   at the moment of leaving, never a snapshot. */
-	function examRunning(): boolean {
-		return !__quizDestroyed && !!ctx.isExamMode && !!ctx.examStarted && !ctx.examEnded;
-	}
-
 	container.__quizDestroy = destroyQuiz;
-	container.__quizExamRunning = examRunning;
 	ctx.destroyQuiz = destroyQuiz;
 
 	function refreshQuestionSlide(qi: number, { syncHeight = true }: { syncHeight?: boolean } = {}): Element | null {
@@ -1035,27 +1059,93 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.stopExamTimer = exam.stopExamTimer;
 	ctx.updateExamTimerDisplay = exam.updateExamTimerDisplay;
 
-	/* REPRISE (2026-09-26) : la photo de la session précédente, restaurée
-	   AVANT le premier rendu — le quiz s'ouvre directement sur la question
-	   où l'on s'était arrêté, réponses comprises. Jamais pour un examen
-	   (décision : un examen se fait d'une traite), dont la session est
-	   effacée. Photo illisible → `null` → ouverture de zéro. */
-	if (sessionSink && ctx.isExamMode) sessionSink.effacer();
-	else if (sessionSink?.initiale) {
-		const reprise = restaurer(sessionSink.initiale, ctx.questionIds, { selections: quizState.selections, shuffleMap: quizState.shuffleMap });
-		if (reprise) {
-			const { courante, ...champs } = reprise;
-			Object.assign(quizState, champs);
-			// `getSlideIndexForQuestion`, pas une recherche directe : une photo
-			// prise quand la lecture était encore un écran peut désigner une
-			// lecture ABSORBÉE depuis — on rouvre sur la question qui la montre.
-			const slide = getSlideIndexForQuestion(courante);
-			if (slide >= 0) {
-				quizState.current = slide;
-				quizState.prevCurrent = slide;
-				quizState.lastQuestionIndex = (slideMap[slide] as { questionIndex: number }).questionIndex;
-			}
+	/* THE SETUP OF A TEST (engine/test-launch.ts, spec
+	   2026-09-29-test-setup-modal-design.md §3). What the file says, as the host
+	   asks the player about it: `mode: "exam"` proposes hints off + its
+	   duration, anything else a plain test. */
+	const testFile: TestFile = {
+		examByDefault: examOptions !== null,
+		durationMinutes: examOptions?.durationMinutes ?? null,
+		questionCount: quiz.length,
+	};
+
+	/* "Try again": the host is asked again, proposing the settings just played.
+	   The answer waits in `pendingSetup` until `resetQuiz` applies it, so the
+	   results on screen do not change under the player during the restart
+	   transition. Cancelled: false, the caller restarts nothing. */
+	let pendingSetup: TestSetup | null = null;
+	let askingRetry = false;
+	ctx.chooseRetrySetup = async () => {
+		if (!usesSetup || !setupHost) return true;
+		if (askingRetry) return false;
+		askingRetry = true;
+		try {
+			const chosen = await askTestSetup(setupHost, testFile, testSetup);
+			if (chosen === null || __quizDestroyed) return false;
+			pendingSetup = chosen;
+			return true;
+		} finally {
+			askingRetry = false;
 		}
+	};
+	ctx.applyPendingSetup = () => {
+		if (!pendingSetup) return;
+		applyTestSetup(ctx, pendingSetup, null);
+		pendingSetup = null;
+	};
+
+	/* RESUME (2026-09-26): the snapshot of the previous session, restored
+	   BEFORE the first render — the quiz opens straight on the question where
+	   the player stopped, answers included. An unreadable snapshot gives
+	   `null` and the quiz opens from zero. */
+	const restoreSnapshot = (): Restauration | null =>
+		sessionSink?.initiale
+			? restaurer(sessionSink.initiale, ctx.questionIds, { selections: quizState.selections, shuffleMap: quizState.shuffleMap })
+			: null;
+	const applySnapshot = (reprise: Restauration): void => {
+		const { courante, test: _test, ...champs } = reprise;
+		Object.assign(quizState, champs);
+		// `getSlideIndexForQuestion`, not a direct lookup: a snapshot taken
+		// when a reading was still a screen may point at a reading ABSORBED
+		// since — the quiz reopens on the question that shows it.
+		const slide = getSlideIndexForQuestion(courante);
+		if (slide >= 0) {
+			quizState.current = slide;
+			quizState.prevCurrent = slide;
+			quizState.lastQuestionIndex = (slideMap[slide] as { questionIndex: number }).questionIndex;
+		}
+	};
+
+	if (!usesSetup) {
+		/* Without a host setup (the plugin, a Learn): today's behaviour. Never a
+		   snapshot for an Exam (decision: an Exam is done in one go), whose
+		   session is erased. */
+		if (sessionSink && ctx.isExamMode) sessionSink.effacer();
+		else {
+			const reprise = restoreSnapshot();
+			if (reprise) applySnapshot(reprise);
+		}
+	} else {
+		/* A snapshot restores its own setup and time left and SKIPS the modal;
+		   otherwise the host is asked. Cancelled (`null`): nothing more is
+		   rendered — the host closes the page. The page may also be closed while
+		   the modal is open: the destroyed engine renders nothing either. */
+		const reprise = restoreSnapshot();
+		let plan;
+		try {
+			plan = await planLaunch(setupHost!, testFile, reprise ? reprise.test : null);
+		} catch (e) {
+			destroyQuiz();
+			throw e;
+		}
+		if (__quizDestroyed) return;
+		if (plan.kind === "cancelled") {
+			destroyQuiz();
+			return;
+		}
+		if (reprise) applySnapshot(reprise);
+		applyTestSetup(ctx, plan.setup, plan.msLeft);
+		launched = true;
 	}
 
 	render();

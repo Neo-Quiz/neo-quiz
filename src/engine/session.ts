@@ -1,20 +1,27 @@
 import type { LearnQueueEntry, LearnResume, LearnVerdict, QuestionSelection, QuestionShuffleEntry, QuizState, TextOnlyRating } from "../types/quiz";
+import { readTestSetup, type TestSetup } from "../test-setup";
 
 /* ══════════════════════════════════════════════════════════
-   LA PHOTO DE SESSION D'UN QUIZ (2026-09-26) — reprendre là où on s'était
-   arrêté (spec docs/superpowers/specs/2026-09-26-reprise-quiz-design.md).
+   A QUIZ'S SESSION SNAPSHOT (2026-09-26) — resume where the player left off
+   (spec docs/superpowers/specs/2026-09-26-reprise-quiz-design.md).
 
-   PUR : ni DOM, ni hôte, ni horloge (l'heure est un paramètre). Le moteur
-   photographie son état après chaque réponse ; l'hôte range la photo et la
-   rend à la prochaine ouverture. Tout est rangé par IDENTIFIANT de question
-   (`ctx.questionIds`, la règle unique de `quiz-ids.ts`), jamais par index :
-   un quiz modifié entre deux sessions garde les réponses de ses questions
-   restantes, une question nouvelle arrive vide.
+   PURE: no DOM, no host, no clock (the time is a parameter). The engine
+   snapshots its state after each answer; the host stores the snapshot and
+   hands it back at the next opening. Everything is keyed by question
+   IDENTIFIER (`ctx.questionIds`, the single rule of `quiz-ids.ts`), never by
+   index: a quiz edited between two sessions keeps the answers of the
+   questions that remain, and a new question arrives empty.
 
-   Les options sont désignées par leur index D'ORIGINE (`data-orig`) : une
-   sélection reste juste quel que soit l'ordre affiché. Le mélange est gardé
-   pour que le quiz se rouvre TEL QU'IL ÉTAIT — et rejeté si le nombre
-   d'options a changé, avec la sélection qu'il accompagnait.
+   Options are designated by their ORIGINAL index (`data-orig`): a selection
+   stays right whatever order is displayed. The shuffle is kept so the quiz
+   reopens EXACTLY AS IT WAS — and rejected, with the selection that went
+   with it, when the number of options has changed.
+
+   A TEST's setup (spec 2026-09-29-test-setup-modal-design.md §3) is part of
+   the snapshot: the hints and time-limit settings it was launched with, and
+   the milliseconds LEFT on its clock (the clock is paused while the player is
+   away). A snapshot restores them and skips the launch modal; one written
+   before this existed has neither and resumes as hints on, no time limit.
 ══════════════════════════════════════════════════════════ */
 
 export const SESSION_VERSION = 1;
@@ -44,11 +51,17 @@ export interface EtatQuestion {
 
 export interface SessionQuiz {
 	v: 1;
-	/** Identifiant de la question courante ; null hors d'une question. */
+	/** Identifier of the current question; null off a question. */
 	courante: string | null;
 	questions: Record<string, EtatQuestion>;
-	/** Horodatage de l'écriture (ms) : la session la plus récente l'emporte. */
+	/** Write timestamp (ms): the most recent session wins. */
 	ecrite: number;
+	/** A Test's setup (hints, time limit), only written by a host that asks
+	    for one. Absent from a snapshot taken before the setup existed. */
+	setup?: TestSetup;
+	/** With a time limit: milliseconds left on the clock when the snapshot
+	    was taken (paused while the player is away). */
+	msLeft?: number;
 	/** Learn: the missed questions waiting for their retry, by id. Absent
 	    from a snapshot taken before the retry loop existed. */
 	file?: Array<{ id: string; depuis: number }>;
@@ -63,9 +76,19 @@ export type EtatPhoto = Pick<QuizState,
 	"selections" | "shuffleMap" | "textOnlyAnswers" | "textOnlyChecked" | "textOnlyRatings" | "lessonPreSkipped" | "hintSeen" | "recorded"
 	| "learnVerdicts" | "learnMisses" | "learnRetrying" | "learnChecked" | "learnPending" | "learnQueue" | "learnResume" | "learnRetryQi">;
 
+/** What a snapshot brings back of the Test's setup. */
+export interface SessionTest {
+	setup: TestSetup;
+	/** Milliseconds left on the clock; `null` without a time limit. */
+	msLeft: number | null;
+}
+
 export interface Restauration extends EtatPhoto {
-	/** INDEX de la question sur laquelle rouvrir. */
+	/** INDEX of the question to reopen on. */
 	courante: number;
+	/** The setup and time left of the snapshot; a snapshot without any gives
+	    hints on, no time limit. */
+	test: SessionTest;
 }
 
 const NOTES: readonly TextOnlyRating[] = ["understood", "partial", "review"];
@@ -84,7 +107,9 @@ function repondue(s: QuestionSelection | undefined): boolean {
 	return true;
 }
 
-export function photographier(etat: EtatPhoto, ids: readonly string[], courante: number | null, maintenant: number): SessionQuiz {
+/** `test`: the setup being played and, when it has a time limit, the
+    milliseconds left on its clock. Omitted by a host without a setup. */
+export function photographier(etat: EtatPhoto, ids: readonly string[], courante: number | null, maintenant: number, test?: { setup: TestSetup; msLeft: number | null }): SessionQuiz {
 	const questions: Record<string, EtatQuestion> = {};
 	ids.forEach((id, i) => {
 		const e: EtatQuestion = {};
@@ -121,7 +146,25 @@ export function photographier(etat: EtatPhoto, ids: readonly string[], courante:
 	else if (typeof r === "number" && ids[r] !== undefined) photo.suite = ids[r];
 	const rq = etat.learnRetryQi;
 	if (typeof rq === "number" && ids[rq] !== undefined) photo.enReprise = ids[rq];
+	if (test) {
+		photo.setup = { hints: test.setup.hints, timeLimitMinutes: test.setup.timeLimitMinutes };
+		if (test.setup.timeLimitMinutes !== null && test.msLeft !== null && Number.isFinite(test.msLeft)) {
+			photo.msLeft = Math.max(0, Math.round(test.msLeft));
+		}
+	}
 	return photo;
+}
+
+/** The setup of a snapshot, read defensively. Missing or malformed gives a
+    plain Test (hints on, no time limit): the answers are worth more than a
+    guess at a setting. With a time limit, a missing or unusable `msLeft`
+    gives the whole duration; a valid one is bounded by it. */
+function lireTest(p: Partial<SessionQuiz>): SessionTest {
+	const setup = readTestSetup(p.setup) ?? { hints: true, timeLimitMinutes: null };
+	if (setup.timeLimitMinutes === null) return { setup, msLeft: null };
+	const full = setup.timeLimitMinutes * 60_000;
+	const left = p.msLeft;
+	return { setup, msLeft: typeof left === "number" && Number.isFinite(left) && left >= 0 ? Math.min(left, full) : full };
 }
 
 const estEntier = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
@@ -187,6 +230,7 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 	const n = ids.length;
 	const r: Restauration = {
 		courante: 0,
+		test: lireTest(p),
 		selections: base.selections.map(copieSelection),
 		shuffleMap: base.shuffleMap.map(m => m === null ? null : Array.isArray(m) ? [...m] : { rows: [...m.rows], choices: [...m.choices] }),
 		textOnlyAnswers: new Array<string>(n).fill(""),
@@ -274,21 +318,23 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 	return r;
 }
 
-/** Le puits de session que l'hôte passe au moteur (`renderInteractiveQuiz`). */
+/** The session sink the host passes to the engine (`renderInteractiveQuiz`). */
 export interface SessionSink {
-	/** La photo à reprendre, lue par l'hôte avant l'ouverture ; null si aucune. */
+	/** The snapshot to resume, read by the host before opening; null if none. */
 	initiale: SessionQuiz | null;
 	enregistrer(s: SessionQuiz): void;
 	effacer(): void;
 }
 
-/** May the current state be snapshotted to be resumed? Never an EXAM — an
-    Exam is done in one go (spec 2026-09-29 §2.5, §3.4): a block that is an
-    Exam at assembly is never photographed, and closing it erases its
-    session, so nothing half-done is written and it reopens on its start
-    screen. Never once handed in (the results are the end of the session),
-    and only on a question. A Practice is snapshotted with its answers and
-    its hint use (`hintSeen`). PURE. */
+/** May the current state be snapshotted to be resumed? `exam` is an Exam
+    played the legacy way, from its start screen (a host without a test
+    setup: the Obsidian plugin): it is done in one go, so a block that is such
+    an Exam at assembly is never photographed and closing it erases its
+    session, it reopens on its start screen. A Test played with a setup IS
+    snapshotted, time limit or not: its clock is paused while away and
+    restarts from the time left (spec 2026-09-29-test-setup-modal-design.md
+    §3). Never once handed in (the results are the end of the session), and
+    only on a question. The hint use is kept (`hintSeen`). PURE. */
 export function canSnapshot(o: { exam: boolean; locked: boolean; onQuestion: boolean }): boolean {
 	return !o.exam && !o.locked && o.onQuestion;
 }

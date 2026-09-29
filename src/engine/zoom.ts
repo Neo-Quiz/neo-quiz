@@ -201,12 +201,19 @@ export function createZoomHandlers(ctx: EngineCtx): ZoomHandlers {
 	}
 
 	async function restartQuizWithZoomBlurTransition(): Promise<void> {
-		// Forcer le reset de isSliding si on est sur la page de résultats
-		// car la transition précédente peut ne pas avoir terminée correctement
+		// Force-reset isSliding when on the results page, because the previous
+		// transition may not have finished properly.
 		if (ctx.quizState.isSliding && ctx.isResultsSlideIndex(ctx.quizState.current)) {
 			ctx.quizState.isSliding = false;
 			ctx.setSlidingClass(false);
 		}
+		if (ctx.quizState.isSliding) return;
+
+		/* A test played with a setup asks for it again before anything moves
+		   (the modal, proposing the settings just played). Cancelled: the
+		   results stay, nothing restarts. */
+		if (!(await ctx.chooseRetrySetup()) || ctx.isDestroyed()) return;
+		// The modal was open for a while: the results may have moved on.
 		if (ctx.quizState.isSliding) return;
 
 		let epoch = ctx.currentAsyncEpoch();

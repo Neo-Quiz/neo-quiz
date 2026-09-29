@@ -661,7 +661,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   (engine/hint.ts indiceCarte). Une réponse libre a son indice aussi
 		   (retour #1 : CHAQUE question d'un Learn en a un) ; seule la carte
 		   mémoire n'en a pas, puisqu'elle se retourne pour se lire. */
-		// An Exam shows no hint at all (engine/hand-in.ts showsHints).
+		// A test set up without hints (an Exam) shows none at all (engine/hand-in.ts showsHints).
 		const indice = !isRead && !ctx.isFlashcardQuestion(q) && ctx.handIn.showsHints() ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
 		/* No Hint button once the card shows its correction (a handed-in Test,
 		   a checked Learn card): the explanation is there, and a hint read

@@ -421,7 +421,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 				enabled: !!ctx.isExamMode,
 				started: !!ctx.examStarted,
 				ended: !!ctx.examEnded,
-				durationMinutes: ctx.examOptions?.durationMinutes ?? null,
+				durationMinutes: ctx.isExamMode ? Math.round(ctx.examDurationMs / 60_000) : null,
 				elapsedSeconds: elapsedMs === null ? null : Math.round(elapsedMs / 1000),
 				remainingSeconds: Number.isFinite(ctx.examTimeRemaining) ? Math.round(ctx.examTimeRemaining / 1000) : null
 			},

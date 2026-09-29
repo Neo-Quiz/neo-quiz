@@ -31,8 +31,9 @@ export interface HandInHandlers {
 	pastLastQuestion(): void;
 	/** The label of the last question's next arrow. */
 	lastArrowLabel(): TransKey;
-	/** Hints show everywhere but in an Exam (spec 2026-09-29 §3.2): no help
-	    while answering, the hints stay in the file. */
+	/** Hints show unless the test was set up without them (spec
+	    2026-09-29-test-setup-modal-design.md §3; an Exam is a test with hints
+	    off): no help while answering, the hints stay in the file. */
 	showsHints(): boolean;
 	isConfirmOpen(): boolean;
 	/** Closes the confirmation if it is open; true when it was. */
@@ -49,7 +50,7 @@ export function createHandInHandlers(ctx: EngineCtx): HandInHandlers {
 	}
 
 	function showsHints(): boolean {
-		return !ctx.isExamMode;
+		return !ctx.hintsOff;
 	}
 
 	/* The whole-quiz text-only branches come first: skipping the submit

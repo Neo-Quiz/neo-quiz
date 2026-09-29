@@ -1,6 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import type { PracticeMode, QuizResult, StatsRecord } from "../types/quiz";
 import type { ReviewGrade } from "../scheduler";
+import { isExamSetup } from "../test-setup";
 import { t } from "../i18n";
 
 /** Sous-ensemble du store de stats (dashboard/stats-store) réellement lu ici. */
@@ -643,7 +644,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 					questionsDone,
 					totalQuestions: (total + pendingWritten) || ctx.quiz.length,
 					texteLibre: modeTexte,
-					...(withHint > 0 ? { withHint } : {})
+					...(withHint > 0 ? { withHint } : {}),
+					// Whether Exam mode was on (spec 2026-09-29-test-setup-modal-design.md §3).
+					...(ctx.testSetup ? { exam: isExamSetup(ctx.testSetup) } : {})
 				});
 			}
 
@@ -729,13 +732,13 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		ctx.quizState.shuffleMap = ctx.buildShuffleMap();
 		ctx.quizState.orderingPick = ctx.initOrderingPicks();
 		ctx.quizState.matchPick = ctx.initMatchPicks();
-		// Recommencer, c'est une NOUVELLE tentative : une pré-question déjà
-		// passée en « Je ne sais pas » redevient bloquante (Task 7).
+		// Starting over is a NEW attempt: a pre-question already passed with
+		// "I don't know" blocks again (Task 7).
 		ctx.quizState.lessonPreSkipped = ctx.quiz.map(() => false);
 		ctx.quizState.hintSeen = ctx.quiz.map(() => false);
-		// Recommencer, c'est une NOUVELLE session pour l'ordonnanceur aussi :
-		// sans cette remise à zéro, une question déjà journalisée à la tentative
-		// précédente ne serait plus jamais recomptée (Task 8).
+		// Starting over is a NEW session for the scheduler too: without this
+		// reset, a question already logged in the previous attempt would never
+		// be counted again (Task 8).
 		ctx.quizState.recorded = ctx.quiz.map(() => false);
 		/* ... and a new attempt for the dashboard: without this, "Try again"
 		   then the score again counted no attempt and logged no verdict — the
@@ -750,17 +753,22 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 		ctx.__quizSlideHeightCache?.clear();
 		ctx.__quizWarmSlidePromises?.clear();
-		// Repli/repli-par-défaut du support de compréhension (Task 4, mode Leçon) :
-		// à côté des autres .clear() de session, pour qu'un futur ajout d'état de
-		// session pense à en faire autant — round 1 de revue, sans ça un
-		// « recommencer » retrouvait un support déjà semé de la session précédente.
+		// Fold state of the comprehension passage (Task 4, Learn mode), next to
+		// the other session .clear() calls so that a future addition of session
+		// state thinks of doing the same — review round 1: without it, a
+		// "start over" found a passage already opened by the previous session.
 		ctx.passage.resetPassageState();
 
-		ctx.examStarted = false;
-		ctx.examEnded = false;
-		ctx.examStartTime = 0;
 		ctx.stopExamTimer();
-
+		// The setup chosen for this new attempt ("Try again" in an app that
+		// asks for one) takes effect now, with the clock back to its full duration.
+		ctx.applyPendingSetup?.();
+		ctx.examStartTime = 0;
+		ctx.examEnded = false;
+		/* A test played with a setup has no start screen: its clock runs as
+		   soon as the render below draws the first question. A legacy Exam goes
+		   back to its start screen. */
+		ctx.examStarted = !!ctx.testSetup && ctx.isExamMode;
 		ctx.examTimeRemaining = ctx.isExamMode ? ctx.examDurationMs : 0;
 
 		ctx.render();

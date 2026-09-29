@@ -59,6 +59,7 @@ import type {
 } from "./quiz";
 import type { ReviewGrade } from "../scheduler";
 import type { EntreeGlossaire } from "../glossaire";
+import type { TestSetup } from "../test-setup";
 import type { SanitizerHandlers } from "../engine/sanitizer";
 import type { QuestionHandlers } from "../engine/questions";
 import type { ResourceHandlers } from "../engine/resources";
@@ -150,9 +151,10 @@ export interface EngineCtx {
 	 */
 	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown };
 	sessionSink?: import("../engine/session").SessionSink;
-	/** Photographie l'état et l'enregistre (sans effet en examen, sans puits, hors question). */
+	/** Snapshots the state and stores it (no effect without a sink, off a
+	    question, once handed in, in a legacy Exam, or before the launch). */
 	saveSession(): void;
-	/** Efface la session de ce quiz (fin, « Recommencer », examen). */
+	/** Clears this quiz's session (end, "Try again", legacy Exam). */
 	clearSession(): void;
 	/**
 	 * Jamais assigné dans le littéral `ctx` ni ailleurs dans engine.js (mort/
@@ -161,12 +163,32 @@ export interface EngineCtx {
 	 */
 	lucideIcons?: { paperclip?: string };
 
-	/* ── Mode & exam (initial literal of engine.ts; never changed while the
-	     quiz is played since the Learn → Exam switch left, 2026-09-29) ── */
+	/* ── Mode & clock. `quizMode` is fixed at assembly (the Learn → Exam switch
+	     left on 2026-09-29). The next four are ACCESSORS over engine.ts
+	     closures, NOT snapshots: a Test played with a setup only learns its
+	     settings once the launch modal is answered (`applyTestSetup`,
+	     engine/test-launch.ts), and "Try again" may change them. Read them at
+	     use, never keep a copy. ── */
 	quizMode: QuizMode;
+	/** This test has a CLOCK (a time limit, or a legacy `mode: "exam"`). */
 	isExamMode: boolean;
+	/** Hints are off (spec 2026-09-29-test-setup-modal-design.md §3): no
+	    Hint button. A legacy Exam has none either. */
+	hintsOff: boolean;
 	examOptions: ExamOptions | null;
 	examDurationMs: number;
+	/** The setup being played (hints, time limit); `null` without a host
+	    setup (Learn, Obsidian plugin) — today's behaviour, from the file. */
+	testSetup: TestSetup | null;
+	/** "Try again": asks the host for the setup again, proposing the one just
+	    played. False = the modal was cancelled, do not restart. The chosen
+	    setup is held until `applyPendingSetup`. Always true without a host
+	    setup. */
+	chooseRetrySetup(): Promise<boolean>;
+	/** Applies the setup chosen by `chooseRetrySetup`, if any — called by
+	    `resetQuiz`, so the results on screen do not change under the player
+	    while the restart transition plays. */
+	applyPendingSetup(): void;
 
 	/* ── État d'examen : getters/setters de closure (engine.js:108-115),
 	     vus comme de simples propriétés par les consommateurs. ── */

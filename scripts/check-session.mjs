@@ -122,14 +122,63 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, SESSIO
 	r.done();
 });
 
-/* WHAT IS SNAPSHOTTED (spec 2026-09-29 §2.5, §3.4): a Practice closed
-   mid-way resumes where it was left, answers and hint use included (the
-   round trip above); an Exam is never snapshotted — abandoned, it leaves
-   nothing and reopens on its start screen; a handed-in test is over. */
+/* A TEST'S SETUP AND ITS CLOCK (spec 2026-09-29-test-setup-modal-design.md
+   §3): a timed test left mid-way keeps its settings and the milliseconds
+   LEFT on its clock (paused while away); a snapshot restores both, and the
+   engine then skips the launch modal. A snapshot from before the setup
+   existed resumes as hints on, no time limit. */
+await withSrcModule("src/engine/session.ts", ({ photographier, restaurer }) => {
+	const r = makeReporter("Session — a Test's setup and time left");
+	const ids = ["a", "b"];
+	const base = { selections: [null, null], shuffleMap: [[1, 0], null] };
+	const etat = {
+		selections: [1, null], shuffleMap: [[1, 0], null],
+		textOnlyAnswers: ["", ""], textOnlyChecked: [false, false], textOnlyRatings: [null, null],
+		lessonPreSkipped: [false, false], hintSeen: [false, false], recorded: [false, false],
+	};
+	const rond = (photo) => restaurer(JSON.parse(JSON.stringify(photo)), ids, base);
+
+	const timed = photographier(etat, ids, 1, 5, { setup: { hints: false, timeLimitMinutes: 30 }, msLeft: 754_321 });
+	r.check("a timed snapshot keeps the setup and the time left",
+		[timed.setup, timed.msLeft], [{ hints: false, timeLimitMinutes: 30 }, 754_321]);
+	r.check("restoring it gives the same setup and time left, not the full duration",
+		rond(timed).test, { setup: { hints: false, timeLimitMinutes: 30 }, msLeft: 754_321 });
+
+	const untimed = photographier(etat, ids, 1, 5, { setup: { hints: false, timeLimitMinutes: null }, msLeft: null });
+	r.check("a test without a time limit keeps its hints setting and has no time left",
+		[rond(untimed).test, "msLeft" in untimed], [{ setup: { hints: false, timeLimitMinutes: null }, msLeft: null }, false]);
+	const plainWithHints = photographier(etat, ids, 1, 5, { setup: { hints: true, timeLimitMinutes: 10 }, msLeft: 1000 });
+	r.check("a timed test that kept its hints resumes with them",
+		rond(plainWithHints).test, { setup: { hints: true, timeLimitMinutes: 10 }, msLeft: 1000 });
+
+	const ancienne = photographier(etat, ids, 1, 5);
+	r.check("a host without a setup writes none", ["setup" in ancienne, "msLeft" in ancienne], [false, false]);
+	r.check("a snapshot written before the setup existed resumes as hints on, no time limit",
+		rond(ancienne).test, { setup: { hints: true, timeLimitMinutes: null }, msLeft: null });
+
+	const abime = (extra) => restaurer({ ...JSON.parse(JSON.stringify(timed)), ...extra }, ids, base).test;
+	r.check("a malformed setup gives a plain test, the answers are kept",
+		[abime({ setup: { hints: "non", timeLimitMinutes: 30 } }), restaurer({ ...timed, setup: 7 }, ids, base).selections[0]],
+		[{ setup: { hints: true, timeLimitMinutes: null }, msLeft: null }, 1]);
+	r.check("a timed setup without a usable time left restarts on the whole duration",
+		[abime({ msLeft: undefined }).msLeft, abime({ msLeft: "vite" }).msLeft, abime({ msLeft: -5 }).msLeft, abime({ msLeft: NaN }).msLeft],
+		[1_800_000, 1_800_000, 1_800_000, 1_800_000]);
+	r.check("a time left above the duration is bounded by it, zero stays zero",
+		[abime({ msLeft: 99_999_999 }).msLeft, abime({ msLeft: 0 }).msLeft], [1_800_000, 0]);
+	r.check("the setup does not leak into the restored answers",
+		Object.keys(rond(timed)).includes("selections") && !("setup" in rond(timed)), true);
+	r.done();
+});
+
+/* WHAT IS SNAPSHOTTED (spec 2026-09-29-test-setup-modal-design.md §3): a
+   test played with a setup closed mid-way resumes where it was left,
+   answers, hint use and — when timed — its clock included (the round trips
+   above); only an Exam played the legacy way, from its start screen (a host
+   without a setup), is never snapshotted; a handed-in test is over. */
 await withSrcModule("src/engine/session.ts", ({ canSnapshot }) => {
 	const r = makeReporter("Session — what is snapshotted");
-	r.check("a Practice on a question, not handed in: snapshotted", canSnapshot({ exam: false, locked: false, onQuestion: true }), true);
-	r.check("an Exam, even mid-way: never", canSnapshot({ exam: true, locked: false, onQuestion: true }), false);
+	r.check("a test on a question, not handed in: snapshotted", canSnapshot({ exam: false, locked: false, onQuestion: true }), true);
+	r.check("a legacy Exam (no host setup), even mid-way: never", canSnapshot({ exam: true, locked: false, onQuestion: true }), false);
 	r.check("handed in, or off a question: never",
 		[canSnapshot({ exam: false, locked: true, onQuestion: true }), canSnapshot({ exam: false, locked: false, onQuestion: false })], [false, false]);
 	r.done();

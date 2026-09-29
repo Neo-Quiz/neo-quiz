@@ -34,7 +34,6 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
-import { requestLeave } from "./ui/leave-guard";
 import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
@@ -333,13 +332,11 @@ function ouvrirReglages(): void {
 				   l'hôte, et l'hôte est installé une seule fois. Un remontage à
 				   chaud laisserait vivre l'index et le surveillant de l'ancienne
 				   liste. */
-				// A running Exam asks first (ui/leave-guard.ts); kept, the change
-				// applies at the next start.
-				onFoldersChanged: () => requestLeave(() => location.reload()),
+				onFoldersChanged: () => location.reload(),
 				/* RECHARGER aussi : toutes les heures déjà écrites (la page sous
 				   la modale, la section des comptes) repassent par `hourOptions`,
 				   et la reprise rouvre la même page. */
-				onTimeFormatChanged: () => requestLeave(() => location.reload()),
+				onTimeFormatChanged: () => location.reload(),
 				/* Le MÊME hôte que la page « Générer » : la section « Canaux
 				   payants » écrit à travers lui, le cache du client suit. */
 				aiSettings: reglagesIa,
@@ -579,6 +576,13 @@ async function demarrer(): Promise<void> {
 		   Les deux `destroy()` sont idempotents (`detruit`, minuterie annulée) :
 		   les appeler des deux côtés ne double aucune écriture. C'est le pendant
 		   du `this._reviewStore?.destroy()` de l'`onunload` du greffon. */
+		/* A reload (Ctrl+R, the View menu, a setting) with a quiz on screen unmounts it
+		   first: leaving a test always saves it (spec 2026-09-29-test-setup-modal-design.md
+		   §3), and the engine's destruction is what writes its snapshot, the time left
+		   on a timed test included. Registered BEFORE the writers below so that the
+		   write it triggers is launched by them. Idempotent: closing the window has
+		   already unmounted through `surFermeture`. */
+		window.addEventListener("beforeunload", () => { void demonter(); });
 		window.addEventListener("beforeunload", () => { store.destroy(); stats.destroy(); });
 		/* Les sessions ne portent pas de délai d'écriture symétrique aux deux
 		   autres (`destroy()`) : `vider()` écrit immédiatement, sans annuler de

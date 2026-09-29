@@ -23,7 +23,6 @@ import type { EtatFenetre } from "../../electron/pont";
 import application from "../../package.json";
 // L'URL du dépôt, pour l'entrée « Source code » du menu d'application.
 import manifeste from "../../../../src/assets/manifest.json";
-import { requestLeave } from "./leave-guard";
 import { verifierMaintenant } from "./mise-a-jour";
 
 /** The toggle of the application menu, set by `monterBarreTitre`: the bar
@@ -209,8 +208,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 				} else if (id === "next-wallpaper") {
 					deps.fondSuivant();
 				} else if (id === "reload") {
-					// A running Exam asks first (ui/leave-guard.ts).
-					requestLeave(() => { void pont().affichage.recharger(); });
+					void pont().affichage.recharger();
 				} else if (id === "fullscreen") {
 					void pont().fenetre.pleinEcran();
 				} else if (id === "devtools") {
@@ -255,7 +253,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 			void pont().fenetre.pleinEcran();
 		} else if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "r") {
 			e.preventDefault();
-			requestLeave(() => { void pont().affichage.recharger(); });
+			void pont().affichage.recharger();
 		} else if (e.ctrlKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === "i") {
 			e.preventDefault();
 			void pont().affichage.outilsDev();
