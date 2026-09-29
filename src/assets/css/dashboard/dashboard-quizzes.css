@@ -963,23 +963,30 @@
    reason to have two shapes.
 
    THE EFFECT is the app's, not StudySmarter's (their card only changes
-   its background on hover): the same family as the folder cards
-   (`.qbd-module-card`) — no lift, a halo that brightens and a veil that
-   lightens on hover, a slight press — with the halo coming down from the
-   folder's colour bar instead of the top-left corner. Only here: the same
-   card variant also paints other pages, where no folder gives it a colour.
-   `--accent` is the folder's colour, set on the drill layout
-   (quizzes-render.ts).
+   its background on hover): the halo of the folder cards
+   (`.qbd-module-card`), which brightens with a lightening veil on hover,
+   here coming down from the folder's colour bar instead of the top-left
+   corner — and the app's 3D buttons ("Start the quiz", "New quiz",
+   2026-09-29): the card stands 4 px above a solid edge IN THE FOLDER'S
+   COLOUR, drawn as a hard shadow so it keeps its size in the grid, and
+   sinks onto it when pressed (100 ms ease-out, the buttons' values). Only
+   here: the same card variant also paints other pages, where no folder
+   gives it a colour. `--accent` is the folder's colour, set on the drill
+   layout (quizzes-render.ts).
 ══════════════════════════════════════════════════════════ */
 .qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder {
 	--glow: color-mix(in oklab, var(--accent) 40%, transparent);
 	--border-c: color-mix(in oklab, var(--accent) 45%, var(--border-soft));
+	/* The edge: the folder's colour, darkened as the buttons' edges are. */
+	--qbd-card3d-edge: color-mix(in oklab, var(--accent) 62%, #05060a);
 	box-sizing: border-box;
 	padding: 16px 12px 8px;
 	background:
 		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
 		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
-	transition: var(--qbd-carte-transition);
+	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen);
+	transition: background-color 0.22s ease, border-color 0.22s ease, --qbd-voile 0.22s ease,
+		--qbd-halo 0.22s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
 }
 .qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:hover {
 	transform: none;
@@ -989,12 +996,20 @@
 		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
 		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
 	border-color: var(--border-c);
-	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), var(--qbd-carte-ombre-survol);
+	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow);
 }
-.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active {
+/* Pressed: the card sinks onto its edge, and rises again on release. A
+   press on a control inside it (a mode pill, "⋯") does not sink the card:
+   the same rule as the folder cards, below. */
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:not(:has(button:active)) {
 	--qbd-voile: var(--qbd-carte-voile-clic);
-	transform: scale(var(--qbd-carte-echelle-clic));
-	transition: var(--qbd-carte-transition-clic);
+	transform: translateY(4px);
+	box-shadow: 0 0 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen);
+}
+/* …nor its older press (`.qbd-quiz-card--folder:active`,
+   dashboard-components.css), which would still apply through the pill. */
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:has(button:active) {
+	transform: none;
 }
 /* The colour bar: 4 px across the top, clipped by the rounded corners,
    with a soft glow of its own colour just under it. */
@@ -1055,7 +1070,7 @@
 	height: 20px;
 }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active { transform: none; }
+	.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:not(:has(button:active)) { transform: none; }
 }
 
 /* ── Sélecteur Contenu | Progression, entre le titre et « Nouveau quiz ». ── */
