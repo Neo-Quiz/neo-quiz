@@ -604,7 +604,9 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		const confirmerUn = (q: QuizIndexEntry): void => {
 			openConfirm({
 				title: t("dashboard.quizzes.deleteConfirmTitle"),
-				body: t("dashboard.quizzes.deleteConfirmBody", { title: q.title }),
+				/* With its type (2026-09-29): the Learn and the Test of a course
+				   share their title, and "Delete « CM1 »?" did not say which. */
+				body: t("dashboard.quizzes.deleteConfirmBody", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
 				cta: t("dashboard.quizzes.deleteConfirmCta"),
 				warning: true,
 			}, () => { void deleteQuiz(ctx, q).then(rerender); });
