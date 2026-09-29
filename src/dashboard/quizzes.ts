@@ -370,7 +370,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			const titleBlock = ajouter(header, "div", "qbd-quizzes-title-block");
 			const titleEl = ajouter(titleBlock, "h2", "qbd-quizzes-title");
 			const titleIcon = ajouter(titleEl, "span", "qbd-quizzes-title-icon");
-			currentHost().ui.setIcon(titleIcon, moduleIcon(openModuleInfo ?? {}, { generated: sas }));
+			/* With the folder's NAME even when the module table has no entry for it,
+			   as its card does (module-card.ts): without it, a folder named after
+			   its subject ("XTI301 - Python") showed its `{ }` on the card and the
+			   default book on its own page (2026-09-29). */
+			currentHost().ui.setIcon(titleIcon, moduleIcon({ ...openModuleInfo, name: openModuleInfo?.name || openModuleFolder }, { generated: sas }));
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
 			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 
