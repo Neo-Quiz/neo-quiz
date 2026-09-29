@@ -56,10 +56,8 @@ export function openCreateFolderModal(
 			   `canOpen`) laisserait l'utilisateur devant un écran inchangé, sans
 			   notice ni page. Même geste et même source de vérité unique que les
 			   CTA « Générer » de l'accueil (`home.ts`, deux fois). */
-			if (ctx.canOpen("ai")) {
-				createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.quizzes.createAiTitle"), t("dashboard.quizzes.createAiDesc"),
-					() => ctx.navigate("ai"));
-			}
+			/* No "Create with AI" here any more (2026-09-29): a folder is created
+			   first, its quizzes are generated from inside it. */
 			createOptionCard(m, c, "folder-plus", "#4573ff", t("dashboard.quizzes.createEmptyTitle"), t("dashboard.quizzes.createEmptyDesc"),
 				() => openNewFolderModal(ctx, map, quizzes, onDone));
 			/* MASQUÉE sous le greffon, comme la carte IA et pour une raison du

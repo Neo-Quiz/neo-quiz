@@ -57,8 +57,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.newFolderCta": "Créer",
 	"dashboard.quizzes.newFolderError": "Impossible de créer le dossier",
 	"dashboard.quizzes.createFolderTitle": "Créer un dossier",
-	"dashboard.quizzes.createAiTitle": "Créer avec l'IA",
-	"dashboard.quizzes.createAiDesc": "Décrivez un sujet ou déposez vos notes, l'IA les transforme en quiz interactifs",
 	"dashboard.quizzes.createEmptyTitle": "Créer un nouveau dossier",
 	"dashboard.quizzes.createEmptyDesc": "Un dossier vide à remplir de vos propres quiz quand vous voulez",
 	"dashboard.quizzes.createOpenTitle": "Ouvrir un dossier existant",

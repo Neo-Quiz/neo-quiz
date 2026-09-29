@@ -73,8 +73,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.newFolderCta": "Create",
 	"dashboard.quizzes.newFolderError": "Could not create the folder",
 	"dashboard.quizzes.createFolderTitle": "Create a folder",
-	"dashboard.quizzes.createAiTitle": "Create with AI",
-	"dashboard.quizzes.createAiDesc": "Describe a topic or drop in your notes — AI turns them into interactive quizzes",
 	"dashboard.quizzes.createEmptyTitle": "Create a new folder",
 	"dashboard.quizzes.createEmptyDesc": "An empty folder to fill with your own quizzes whenever you want",
 	"dashboard.quizzes.createOpenTitle": "Open an existing folder",
