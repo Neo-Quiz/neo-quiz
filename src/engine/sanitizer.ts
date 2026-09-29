@@ -269,7 +269,7 @@ function rendreMorceaux(texte: string, images: RenduImages): string {
  * canonique (`html-vers-markdown.ts`) et l'aperçu de l'éditeur
  * (`question-preview.ts`) le laissent à faux.
  */
-export function rendreTexteQuiz(raw: unknown, images: RenduImages, executable = false): string {
+export function rendreTexteQuiz(raw: unknown, images: RenduImages, executable = false, badge = executable): string {
 	const texte = String(raw ?? "");
 	/* Budget CUMULÉ de caractères colorés, partagé par TOUS les champs d'une
 	   même carte de question (titre, énoncé, options, indice, explication,
@@ -291,6 +291,7 @@ export function rendreTexteQuiz(raw: unknown, images: RenduImages, executable = 
 			return resultat.html;
 		},
 		executable,
+		badge,
 	}) ?? rendreMorceaux(texte, images);
 }
 

@@ -332,9 +332,15 @@ export interface OutilsRendu {
 	    editor's preview, which compare or display markdown with no possible
 	    execution: the `<div>/<button>/<svg>` wrapper would make the strict
 	    re-read of `formeNormale` fail there (finding A-IMPORTANT 1 of the
-	    2026-09-26 review). The same flag governs the language badge of a
-	    recognized block (code-catalogue.ts), for the same reason. */
+	    2026-09-26 review). */
 	executable?: boolean;
+	/** The language badge of a recognized block (code-catalogue.ts). Every
+	    block the learner or the author SEES carries its language's logo,
+	    runnable or not (2026-09-29): the quiz, and the fiche and editor
+	    renders (`texteQuizHtml`). Never the canonical render
+	    (`html-vers-markdown.ts`), whose strict re-read must not meet it.
+	    Absent: follows `executable`. */
+	badge?: boolean;
 }
 
 function rendreListe(texte: string, items: ItemListe[], o: OutilsRendu): string {
@@ -411,7 +417,7 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				   `sortie-programme.ts` puts around a bare `<pre>`; the code
 				   text (`code.textContent`, what ▶ runs) is untouched. A block
 				   with no tag or an unknown one stays exactly as before. */
-				const entree = o.executable ? codeLanguageOf(b.langue) : null;
+				const entree = (o.badge ?? o.executable) ? codeLanguageOf(b.langue) : null;
 				/* The name shows in a small bubble on hover (`data-lang-name`,
 				   quiz-card.css), not in the native `title` tooltip, which
 				   looked out of place (2026-09-29); `alt` keeps it for a screen

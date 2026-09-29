@@ -144,7 +144,9 @@ export function texteQuizHtml(raw: string, sourcePath?: string): string {
 	// l'éditeur) et `dashboard/detail-fiche.ts` (la grille de la page d'un
 	// quiz, qui appelle CETTE fonction directement, une fois par carte,
 	// sans jamais passer par `renderQuizPreviewCard`).
-	return resolveImagesInHtml(rendreTexteQuiz(raw, IMAGES_APERCU), sourcePath);
+	// Not runnable here, but every code block shows its language's logo, as
+	// in the quiz (grammaire-blocs.ts `badge`).
+	return resolveImagesInHtml(rendreTexteQuiz(raw, IMAGES_APERCU, false, true), sourcePath);
 }
 
 /** Écrit un libellé COURT en rendant son markdown inline (gras, code…) —
