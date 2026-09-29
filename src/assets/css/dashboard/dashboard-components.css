@@ -906,6 +906,15 @@
    on click. `filter: drop-shadow` and not `box-shadow`: drop-shadow follows
    the painted shape of the svg (the triangle), whereas box-shadow would
    draw a rectangle under its 18px box. No blur, so the edge stays solid. */
+/* On a card tinted by its folder, the triangle takes the folder's colour, as
+   the type badge does (2026-09-29): lifted toward white so a dark folder
+   colour stays legible on the dark card, with the edge darkened from the same
+   colour. It only rebinds the two tokens the rules below read; an untinted
+   card keeps the "Start the quiz" blue. */
+.qbd-quiz-card--tinted .qbd-quiz-card-play {
+	--quiz-primary: color-mix(in oklab, var(--accent) 75%, #ffffff);
+	--quiz-primary-edge: color-mix(in oklab, var(--accent) 55%, #000000);
+}
 .qbd-quiz-card-play svg {
 	width: 18px;
 	height: 18px;

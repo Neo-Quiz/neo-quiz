@@ -160,6 +160,7 @@ release notes.
 - In Learn quizzes a reading is no longer counted as a question: it has no number, and its tab is a book. Every reading is its own screen, after the "before the reading" questions, shown in full without a scrolling box, and is never repeated above a question. Only short steps, or steps marked as a method to apply, are shown open above the first question that follows.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 - The application menu lights one row at a time, the one under the pointer or reached with the arrows, and its Display submenu no longer has an Interface scale list: Ctrl + wheel still zooms.
+- A course card's play button takes the colour of its folder, lightened so that a dark folder colour stays readable.
 
 ### Fixed
 - "Check for updates…" in the application menu no longer lands on Settings with nothing to say: it checks and tells the outcome in a notice (up to date, a version downloading or ready to install, or why the check failed).
