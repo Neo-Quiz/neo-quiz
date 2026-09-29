@@ -112,6 +112,48 @@
 	border-radius: 10px;
 }
 .qbd-planning-exam-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+/* Edit / Delete at the end of an exam row: ghost round icon buttons, like
+   `.qbd-card-more`. !important beats the `.theme-dark button` chrome (0,1,1),
+   which would otherwise repaint a grey fill and an inset shadow. */
+.qbd-planning-exam-actions {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 2px;
+}
+.qbd-planning-exam-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0 !important;
+	border: none !important;
+	border-radius: 50%;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted) !important;
+	cursor: pointer;
+	transition: background-color 120ms, color 120ms;
+}
+.qbd-planning-exam-action:hover {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
+}
+.qbd-planning-exam-action--danger:hover {
+	color: var(--color-red, #f87171) !important;
+}
+.qbd-planning-exam-action:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-planning-exam-action svg {
+	width: 16px;
+	height: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-planning-exam-action { transition: none; }
+}
 .qbd-planning-exam-text {
 	display: flex;
 	flex-direction: column;

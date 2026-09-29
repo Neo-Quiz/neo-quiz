@@ -12,7 +12,6 @@ import { renderNextStep } from "./folder-next";
 import { duesDuDossier } from "./folder-progress-details";
 import { moyenneDossier } from "./folder-progress";
 import type { DetailsProgression } from "./folder-progress";
-import { openActionMenu } from "./ui-select";
 import { parseExamDate } from "../review/review-store";
 import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
@@ -193,17 +192,20 @@ export function renderFolderPlanning(
 			ajouter(infos, "span", "qbd-planning-exam-date",
 				ms === null ? examen.date : new Intl.DateTimeFormat(currentLang(), { dateStyle: "long" }).format(new Date(ms)));
 			if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
-			const plus = ajouter(ligne, "button", "qbd-folder-more-btn");
-			plus.type = "button";
-			plus.setAttribute("aria-label", t("dashboard.card.more"));
-			currentHost().ui.setIcon(plus, "ellipsis-vertical");
-			plus.addEventListener("click", () => openActionMenu(plus, [
-				{ icon: "pencil", label: t("dashboard.planning.examEdit"), onClick: () => ouvrirModalExamen(ctx, group, examen, rerender) },
-				{
-					icon: "trash-2", label: t("dashboard.planning.examDelete"), danger: true,
-					onClick: () => { ctx.retirerExamen?.(group, examen.id); rerender(); },
-				},
-			]));
+			// Edit and Delete are shown directly as two ghost icon buttons
+			// (no "..." menu: two actions do not need one).
+			const actions = ajouter(ligne, "div", "qbd-planning-exam-actions");
+			const action = (icone: string, cle: "dashboard.planning.examEdit" | "dashboard.planning.examDelete", extra: string, onClick: () => void): void => {
+				const bouton = ajouter(actions, "button", `qbd-planning-exam-action${extra}`);
+				bouton.type = "button";
+				bouton.setAttribute("aria-label", t(cle));
+				bouton.title = t(cle);
+				currentHost().ui.setIcon(bouton, icone);
+				bouton.addEventListener("click", onClick);
+			};
+			action("pencil", "dashboard.planning.examEdit", "", () => ouvrirModalExamen(ctx, group, examen, rerender));
+			action("trash-2", "dashboard.planning.examDelete", " qbd-planning-exam-action--danger",
+				() => { ctx.retirerExamen?.(group, examen.id); rerender(); });
 		}
 	}
 
