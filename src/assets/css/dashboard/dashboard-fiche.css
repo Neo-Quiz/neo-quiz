@@ -1,13 +1,15 @@
 /* ══════════════════════════════════════════════════════════
-   FICHE D'UN QUIZ (src/dashboard/detail-fiche.ts)
-   Organisation de StudySmarter (2026-09-26) : un en-tête sur toute la
-   largeur, une ligne d'infos, une barre (grille | liste, recherche), puis
-   les questions. Elle remplace le corps de la page ET son en-tête : la
-   flèche retour et l'éditeur sont dans celui de la fiche.
+   A QUIZ'S FICHE (src/dashboard/detail-fiche.ts)
+   StudySmarter's layout (2026-09-26): a full-width header, an info line
+   with the search and the actions, then the questions. The header is the
+   page's (detail-head.ts), shared with the editor since 2026-09-29 so that
+   it stays in place when the page switches; the fiche replaces only the
+   body (list + panel).
    ══════════════════════════════════════════════════════════ */
 
-.qbd-qz--fiche .qbd-qz-top {
-	display: none;
+/* The fiche's own spacing between the header and the grid. */
+.qbd-qz--fiche {
+	gap: 14px;
 }
 
 /* La page ne défile pas : l'en-tête et la barre restent en place, et les
@@ -706,9 +708,6 @@
 @media (prefers-reduced-motion: reduce) {
 	.qbd-fiche-card.is-editable:active { transform: none; }
 }
-
-/* La ligne d'infos de la fiche, reprise sous le titre de l'éditeur (2026-09-26). */
-.qbd-qz-infos { margin-top: 10px; }
 
 /* Image options on a question card (detail-fiche.ts): small thumbnails,
    never the raw `![[…]]` text. */

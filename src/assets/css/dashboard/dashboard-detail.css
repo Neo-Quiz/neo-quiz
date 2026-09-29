@@ -521,11 +521,13 @@
 }
 
 
-/* ── Bascule consultation ⇄ édition ──
-   Le corps sort (estompe + léger recul), la page se repeint dans l'autre
-   mode, puis le nouveau corps entre. Deux classes distinctes plutôt qu'une
-   transition : le DOM est RECONSTRUIT entre les deux, rien ne survit qui
-   pourrait être transitionné. */
+/* ── Switching fiche ⇄ editor ──
+   The body leaves (fade + slight recoil), the page is repainted in the
+   other mode, then the new body enters. Two distinct classes rather than a
+   transition: the DOM is REBUILT in between, nothing survives that could
+   be transitioned. The header does not fade (detail-head.ts): only its
+   parts that one mode alone has (`qbd-qz-swap`) go with the body — the
+   title, the search, "Edit"/"Done" and "Start the quiz" stay in place. */
 @keyframes qbd-qz-body-out {
 	from { opacity: 1; transform: none; }
 	to   { opacity: 0; transform: translateY(6px) scale(0.994); }
@@ -536,36 +538,43 @@
 	to   { opacity: 1; transform: none; }
 }
 
-.qbd-qz-body--leaving {
+.qbd-qz--leaving > .qbd-qz-body,
+.qbd-qz--leaving .qbd-qz-swap {
 	animation: qbd-qz-body-out 130ms cubic-bezier(0.4, 0, 1, 1) both;
-	/* La page ne doit plus répondre pendant qu'elle s'efface : un clic sur un
-	   champ qui disparaît poserait un focus dans un DOM condamné. */
+}
+/* The page no longer answers while it fades: a click on a field that
+   disappears would put the focus in a doomed DOM. */
+.qbd-qz--leaving {
 	pointer-events: none;
 }
 
-.qbd-qz-body--entering {
+.qbd-qz--entering > .qbd-qz-body,
+.qbd-qz--entering .qbd-qz-swap {
 	animation: qbd-qz-body-in 220ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
-/* Le bouton « Modifier / Terminé » accuse le coup. L'icône CHANGE avec l'état
-   (crayon ↔ coche) : elle ne peut pas se transitionner d'une forme à
-   l'autre, alors c'est son APPARITION qu'on anime — une courte pulsation.
-   La face, elle, s'enfonce au clic (bouton 3D, cta3d.ts). */
+/* The "Edit / Done" button acknowledges the switch. The icon CHANGES with
+   the state (pen ↔ check): it cannot be transitioned from one shape to the
+   other, so its APPEARANCE is animated — a short pulse, only when the page
+   switches (not on every arrival on the fiche), as long as the body's
+   entry. The face sinks on click (3D button, cta3d.ts). */
 @keyframes qbd-qz-edit-icon-in {
 	from { opacity: 0; transform: scale(0.6) rotate(-25deg); }
 	to   { opacity: 1; transform: none; }
 }
 
-.qbd-qz-edit .qbd-btn-icon {
-	animation: qbd-qz-edit-icon-in 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+.qbd-qz--entering .qbd-qz-edit .qbd-btn-icon {
+	animation: qbd-qz-edit-icon-in 220ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-qz-body--leaving,
-	.qbd-qz-body--entering {
+	.qbd-qz--leaving > .qbd-qz-body,
+	.qbd-qz--leaving .qbd-qz-swap,
+	.qbd-qz--entering > .qbd-qz-body,
+	.qbd-qz--entering .qbd-qz-swap {
 		animation: none;
 	}
-	.qbd-qz-edit .qbd-btn-icon { animation: none; }
+	.qbd-qz--entering .qbd-qz-edit .qbd-btn-icon { animation: none; }
 }
 
 

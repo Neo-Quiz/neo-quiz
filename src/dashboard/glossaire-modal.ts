@@ -7,6 +7,7 @@ import { lireGlossaire } from "../glossaire";
 import type { EntreeGlossaire } from "../glossaire";
 import type { EnteteAction } from "./detail-head";
 import { setActionBadge } from "./detail-head";
+import type { ActionMenuItem } from "./ui-select";
 import type { QuizDraft } from "./detail-io";
 
 /* ══════════════════════════════════════════════════════════
@@ -91,6 +92,22 @@ export function glossaryHeaderAction(getDraft: () => QuizDraft | null, scheduleS
 				onChange: scheduleSave,
 				onClose: (n) => setActionBadge(el, n > 0 ? t(n === 1 ? "editor.glossary.countOne" : "editor.glossary.countOther", { count: n }) : undefined),
 			});
+		},
+	};
+}
+
+/** The same action as a line of the page's "⋮" menu, in editing (the
+    header keeps only Search, Done, Start and "⋮", which do not move when
+    the page switches, 2026-09-29): the term count as its hint. */
+export function glossaryMenuItem(getDraft: () => QuizDraft | null, scheduleSave: () => void): ActionMenuItem {
+	return {
+		icon: "book-a",
+		label: t("editor.glossary.button"),
+		hint: texteBadgeGlossaire(getDraft()),
+		onClick: () => {
+			const draft = getDraft();
+			if (!draft) return;
+			openGlossaireModal({ glossary: garantirGlossaire(draft), onChange: scheduleSave, onClose: () => {} });
 		},
 	};
 }

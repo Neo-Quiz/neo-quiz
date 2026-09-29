@@ -44,24 +44,47 @@ export function modeHeaderAction(
 		onClick: (el) => {
 			const d = getDraft();
 			if (!d) return;
-			const actuel = modeOfOptions(d.examOptions);
-			const items: ActionMenuItem[] = actuel === "learn"
-				? [{ icon: "book-open", label: t("editor.mode.learnLocked"), disabled: true }]
-				: [
-					{ icon: "dumbbell", label: t("editor.mode.practice"), disabled: actuel === "practice", onClick: () => onChangeMode("practice") },
-					{ icon: "timer", label: t("editor.mode.exam"), disabled: actuel === "exam", onClick: () => onChangeMode("exam") },
-				];
-			if (actuel === "exam") {
-				items.push({
-					icon: "clock",
-					label: t("editor.mode.duration", { minutes: d.examOptions?.durationMinutes ?? "?" }),
-					sepBefore: true,
-					onClick: () => openDurationModal(d.examOptions?.durationMinutes, onChangeDuration),
-				});
-			}
-			openActionMenu(el, items);
+			openActionMenu(el, modeItems(d, onChangeMode, onChangeDuration));
 		},
 	};
+}
+
+/** The menu of the action: Practice ⇄ Exam, and an Exam's duration. A Learn
+    shows its mode, locked. */
+function modeItems(
+	d: QuizDraft,
+	onChangeMode: (to: "practice" | "exam") => void,
+	onChangeDuration: (minutes: number) => void,
+): ActionMenuItem[] {
+	const actuel = modeOfOptions(d.examOptions);
+	const items: ActionMenuItem[] = actuel === "learn"
+		? [{ icon: "book-open", label: t("editor.mode.learnLocked"), disabled: true }]
+		: [
+			{ icon: "dumbbell", label: t("editor.mode.practice"), disabled: actuel === "practice", onClick: () => onChangeMode("practice") },
+			{ icon: "timer", label: t("editor.mode.exam"), disabled: actuel === "exam", onClick: () => onChangeMode("exam") },
+		];
+	if (actuel === "exam") {
+		items.push({
+			icon: "clock",
+			label: t("editor.mode.duration", { minutes: d.examOptions?.durationMinutes ?? "?" }),
+			sepBefore: true,
+			onClick: () => openDurationModal(d.examOptions?.durationMinutes, onChangeDuration),
+		});
+	}
+	return items;
+}
+
+/** The same action as a line of the page's "⋮" menu, in editing, its
+    choices in a submenu (2026-09-29, see `glossaryMenuItem`). None on a
+    Learn: its only line would be a greyed-out "cannot change". */
+export function modeMenuItem(
+	getDraft: () => QuizDraft | null,
+	onChangeMode: (to: "practice" | "exam") => void,
+	onChangeDuration: (minutes: number) => void,
+): ActionMenuItem | null {
+	const d = getDraft();
+	if (!d || modeOfOptions(d.examOptions) === "learn") return null;
+	return { icon: "layers", label: t("editor.mode.button"), hint: texteBadgeMode(d), submenu: modeItems(d, onChangeMode, onChangeDuration) };
 }
 
 /** The Duration dialog: minutes within [1, 300], four shortcuts. */

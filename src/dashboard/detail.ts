@@ -9,20 +9,22 @@ import { quizFreres } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
-import { glossaryHeaderAction, texteBadgeGlossaire } from "./glossaire-modal";
-import { modeHeaderAction, texteBadgeMode } from "./quiz-mode-action";
+import type { Entete, EnteteAction } from "./detail-head";
+import { glossaryHeaderAction, glossaryMenuItem, texteBadgeGlossaire } from "./glossaire-modal";
+import { modeHeaderAction, modeMenuItem, texteBadgeMode } from "./quiz-mode-action";
 import { changeMode, modeOfOptions, noteNameForMode } from "./quiz-mode-change";
 import { moveQuizTo } from "./quiz-menu";
 import type { ModeQuiz } from "../quiz-format";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
+import type { ActionMenuItem } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
 import { loadQuizDraft, saveQuizDraft, questionText, draftIsStale } from "./detail-io";
 import type { QuizDraft, QuizLoadError } from "./detail-io";
 import { renderQuestionView } from "./detail-question";
 import { renderQuestionEditRendu } from "./detail-edition";
 import { libererChamps } from "../editor/champ-direct";
-import { oublierFiche, renderFiche, renderInfosQuiz, renderTop, suivreDebord } from "./detail-fiche";
+import { oublierFiche, questionsTrouvees, renderFiche, renderInfosQuiz, renderRecherche, renderTop, suivreDebord } from "./detail-fiche";
 import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
@@ -113,8 +115,9 @@ export interface QuizPageSpec {
 	/** The OTHER modes of the same course (course-pairs.ts): the page then
 	    shows a selector Learn | Practice | Exam that opens them. */
 	autresModes?: Array<{ quiz: QuizIndexEntry; open(): void }>;
-	/** Le menu « ⋮ » de la fiche : celui de la carte du quiz (hôte). */
-	menu?(anchor: HTMLElement): void;
+	/** The page's "⋮" menu: the quiz card's (host), with `extra` lines on
+	    top (the editor's "Vocabulary" and "Mode"). */
+	menu?(anchor: HTMLElement, extra?: ActionMenuItem[]): void;
 	/** After a Test's mode changed in the editor and was SAVED: the host
 	    renames its note (" — Practice" ↔ " — Exam") and reopens it (spec
 	    2026-09-29 §5.1). Absent (a quiz in memory, the Generate page): the
@@ -208,7 +211,9 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				save: (draft) => saveQuizDraft(draft),
 				onBack: host.onBack,
 				start: {
-					label: t("dashboard.detail.play"),
+					// The fiche's label in every mode: the button must not
+					// change width when the page switches to the editor.
+					label: t("dashboard.quiz.welcomeStart"),
 					icon: "play",
 					// `ctx.openQuiz` et non un appel direct : c'est L'HÔTE qui
 					// décide ce que « jouer » veut dire. Sous Obsidian il vaut
@@ -248,11 +253,11 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				/* The card's menu, with a repaint that re-reads the quiz: renamed,
 				   the page picks it up; deleted or moved out of the catalogue, we go
 				   back. */
-				menu: ctx.openCardMenu ? (anchor) => ctx.openCardMenu!(quiz, anchor, () => {
+				menu: ctx.openCardMenu ? (anchor, extra) => ctx.openCardMenu!(quiz, anchor, () => {
 					const frais = ctx.scanner.getQuiz(quiz.path);
 					if (frais) ctx.navigate("detail", { quiz: frais });
 					else host.onBack();
-				}, map) : undefined,
+				}, map, extra) : undefined,
 			});
 		},
 		dispose: () => page.dispose(),
@@ -264,6 +269,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 	   elle-même (bascule du mode édition) sans passer par son hôte — c'est
 	   ce qui rend la transition possible et ce qui la rend réutilisable. */
 	let currentSpec: QuizPageSpec | null = null;
+	/* The header of the LAST render, and what repaints the questions after a
+	   new search: the fiche's grid, or the editor's list. */
+	let entete: Entete | null = null;
+	let surRecherche: (() => void) | null = null;
 	let currentContainer: HTMLElement | null = null;
 	/* État de la page, gardé ENTRE deux rendus du même quiz : le dashboard
 	   re-rend la vue sur des événements externes (changement de réglage), et
@@ -451,7 +460,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 		const page = ajouter(container, "div", "qbd-qz");
 		markViewEnter(page, entering, "qbd-qz-enter");
-		renderHeader(page, spec);
+		entete = renderHeader(page, spec);
 
 		const body = ajouter(page, "div", "qbd-qz-body");
 		const listCol = ajouter(body, "div", "qbd-qz-list");
@@ -463,6 +472,12 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const nav = ajouter(main, "div", "qbd-qz-nav");
 
 		bindArrowKeys(page, listCol, panel, nav, spec);
+
+		/* The search, in the header: it filters the fiche's grid as well as
+		   the editor's list, and stays in place between the two. Only on a
+		   catalogue quiz: the Generate page has no fiche. */
+		surRecherche = null;
+		if (spec.stats) renderRecherche(entete.center, spec.key, () => surRecherche?.());
 
 		if (draft) {
 			paint(listCol, panel, nav, spec);
@@ -502,41 +517,59 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		});
 	}
 
-	/* ── En-tête : celui de la fiche (detail-head.ts) ── */
-	function renderHeader(page: HTMLElement, spec: QuizPageSpec): void {
-		// Chaque action écrit d'abord ce qui est en attente : on quitte la
-		// page, on lance le quiz, on insère le brouillon — la dernière frappe
-		// doit y être.
+	/* ── The header, the same in every mode (detail-head.ts) ── */
+	function renderHeader(page: HTMLElement, spec: QuizPageSpec): Entete {
+		// Each action first writes what is pending: we leave the page, start
+		// the quiz, insert the draft — the last keystroke must be in it.
 		const avant = (fn: (el: HTMLElement) => void) => (el: HTMLElement): void => {
 			void flushSave();
 			fn(el);
 		};
 		const start = spec.start;
 		const actions = (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) }));
-		/* "Vocabulary" (task 4 of batch D) and "Mode": as soon as `editing` is
-		   true, NOT only once `draft` is loaded — otherwise the buttons are
-		   missing when arriving DIRECTLY in editing (the "Edit" menu, creating a
-		   quiz): `renderHeader` runs before `spec.load()`, `draft` is still
-		   `null`, and nothing repaints the header by itself when it arrives.
-		   `getDraft` (a closure over `draft`, never its frozen value) lets the
-		   actions read the draft of the moment, ON CLICK; their badges (set to
-		   `undefined` while nothing is loaded) are refreshed separately once
-		   `draft` is ready, below. */
-		if (editing) {
+		/* The editor's "Vocabulary" (task 4 of batch D) and "Mode" (spec
+		   2026-09-29 §5.1: Practice ⇄ Exam, an Exam's duration). With a "⋮"
+		   menu, they are lines of it (2026-09-29): the header then has the
+		   same buttons in both modes, and nothing moves when the page
+		   switches. Without one (the Generate page), header buttons that
+		   fade in with the editor.
+		   As soon as `editing` is true, NOT only once `draft` is loaded —
+		   otherwise they are missing when arriving DIRECTLY in editing (the
+		   "Edit" menu, creating a quiz): `renderHeader` runs before
+		   `spec.load()`. `() => draft` reads the draft of the moment, on click;
+		   the buttons' badges are refreshed once `draft` is ready (`render`).
+		   "Mode" only on a quiz the page WRITES: an unsaved draft (the
+		   Generate page) is named from the mode it was generated in. */
+		const changerMode = (to: "practice" | "exam"): void => { void changeQuizMode(spec, to); };
+		const menu = spec.menu;
+		const editActions: EnteteAction[] = [];
+		if (editing && !menu) {
 			const gloss = glossaryHeaderAction(() => draft, scheduleSave);
-			actions.push({ ...gloss, onClick: avant(gloss.onClick) });
-			/* "Mode" (spec 2026-09-29 §5.1): Practice ⇄ Exam, an Exam's duration.
-			   Only on a quiz the page WRITES: an unsaved draft (the Generate page)
-			   is named from the mode it was generated in. */
+			editActions.push({ ...gloss, onClick: avant(gloss.onClick) });
 			if (spec.save) {
-				const mode = modeHeaderAction(() => draft, (to) => { void changeQuizMode(spec, to); }, changeExamDuration);
-				actions.push({ ...mode, onClick: avant(mode.onClick) });
+				const mode = modeHeaderAction(() => draft, changerMode, changeExamDuration);
+				editActions.push({ ...mode, onClick: avant(mode.onClick) });
 			}
 		}
-		renderEntete(page, {
+		const lignesEdition = (): ActionMenuItem[] | undefined => {
+			if (!editing) return undefined;
+			const lignes: ActionMenuItem[] = [glossaryMenuItem(() => draft, scheduleSave)];
+			const mode = spec.save ? modeMenuItem(() => draft, changerMode, changeExamDuration) : null;
+			if (mode) lignes.push(mode);
+			return lignes;
+		};
+		const fiche = !!spec.stats && !!start;
+		/* The info line, with the Learn | Practice selector of the course's
+		   other modes: the SAME in the editor (2026-09-29). Without the
+		   selector there, the row lost 8 px of height and everything on it
+		   moved up at each switch; a segment opens the other mode's quiz, the
+		   pending write first. */
+		const autresModes = spec.autresModes?.filter(a => a.quiz.mode !== spec.stats?.mode)
+			.map(a => ({ mode: a.quiz.mode, open: () => { void flushSave(); a.open(); } }));
+		return renderEntete(page, {
 			title: spec.title,
-			// Un quiz du catalogue montre son DOSSIER, pas son chemin ; la page
-			// « Générer » garde sa ligne d'usage.
+			// A catalogue quiz shows its FOLDER, not its path; the Generate
+			// page keeps its usage line.
 			kicker: spec.stats ? dossierDuQuiz(spec.stats.path) : spec.subtitle,
 			editing,
 			/* In editing, the arrow goes back to the quiz's FICHE, like "Done",
@@ -545,13 +578,18 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			   (the Generate page), it leaves the page as before. */
 			onBack: () => {
 				void flushSave();
-				if (editing && spec.stats && spec.start) toggleEditing(page);
+				if (editing && fiche) toggleEditing(page);
 				else spec.onBack();
 			},
 			onToggleEditing: () => toggleEditing(page),
 			actions,
+			editActions,
 			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
-			infos: spec.stats ? (p) => { renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!)); } : undefined,
+			enterStarts: showingWelcome(),
+			menu: menu ? (anchor) => menu(anchor, lignesEdition()) : undefined,
+			infos: spec.stats ? (p) => {
+				renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!), autresModes);
+			} : undefined,
 		});
 	}
 
@@ -576,14 +614,17 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			return;
 		}
 
-		/* L'ENTRÉE d'abord retirée : les deux classes portent chacune un
-		   `animation … both`, et `--entering` est déclarée plus bas dans la
-		   feuille — présente toutes les deux, c'est elle qui gagne, et la
-		   sortie ne joue tout simplement pas. Comme `--entering` reste posée
-		   après son animation, le défaut frappait dès la DEUXIÈME bascule :
-		   Ahmed voyait un clignotement au lieu du fondu qu'il a demandé. */
-		body.classList.remove("qbd-qz-body--entering");
-		body.classList.add("qbd-qz-body--leaving");
+		/* The ENTRY removed first: both classes each carry an
+		   `animation … both`, and `--entering` is declared lower in the sheet —
+		   with both present it wins, and the exit simply does not play. As
+		   `--entering` stayed after its animation, the defect struck from the
+		   SECOND switch on: a flash instead of the requested fade.
+		   On the PAGE, not the body (2026-09-29): what fades is the body AND
+		   the parts of the header only one mode has (`qbd-qz-swap`,
+		   detail-head.ts); the title, the search, "Edit"/"Done" and "Start the
+		   quiz" stay in place. */
+		page.classList.remove("qbd-qz--entering");
+		page.classList.add("qbd-qz--leaving");
 		// La sortie est plus courte que l'entrée : la page repeinte doit
 		// arriver, pas se faire attendre.
 		const target = currentSpec;
@@ -594,8 +635,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (!page.isConnected || currentSpec !== target) return;
 			repaint();
 			const neuf = currentContainer?.querySelector(".qbd-qz-body");
-			if (!neuf) return;
-			neuf.classList.add("qbd-qz-body--entering");
+			const nouvellePage = neuf?.parentElement;
+			if (!neuf || !nouvellePage) return;
+			nouvellePage.classList.add("qbd-qz--entering");
 			/* Et retirée dès la fin : une classe d'état qui survit à son
 			   animation finit toujours par croiser la suivante.
 			   `e.target === neuf` : les événements d'animation BOUILLONNENT, et
@@ -604,7 +646,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			   animation d'un enfant retirait la classe et coupait le fondu. */
 			const fini = (e: Event): void => {
 				if (e.target !== neuf) return;
-				neuf.classList.remove("qbd-qz-body--entering");
+				nouvellePage.classList.remove("qbd-qz--entering");
 				neuf.removeEventListener("animationend", fini);
 			};
 			neuf.addEventListener("animationend", fini);
@@ -682,18 +724,14 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		main.style.display = on ? "none" : "";
 		if (!on || !quiz || !start) return false;
 		nav.replaceChildren();
-		renderFiche(body, {
+		surRecherche = renderFiche(body, {
 			quiz,
 			questions: draft.questions,
 			lecon: estLecon(),
 			stat: statOf(quiz),
 			origine: origineDe(quiz),
-			onStart: (el) => { void flushSave(); start.onClick(el); },
-			onEdit: () => toggleEditing(page),
 			onEditQuestion: (i) => { activeIdx = i; toggleEditing(page); },
-			onBack: () => { void flushSave(); spec.onBack(); },
-			autresModes: spec.autresModes?.map(a => ({ mode: a.quiz.mode, open: () => { void flushSave(); a.open(); } })),
-			menu: spec.menu,
+			attirer: () => entete?.attirer(),
 		});
 		return true;
 	}
@@ -728,6 +766,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// `activeIdx` sur une lecture absorbée : on montre la question qui l'affiche.
 		activeIdx = hote(activeIdx);
 		if (paintFiche(listCol, panel, nav, spec)) return;
+		surRecherche = () => paintList(listCol, panel, nav, spec);
 		paintList(listCol, panel, nav, spec);
 		paintPanel(listCol, panel, nav, spec);
 	}
@@ -775,7 +814,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   au-dessus ou au-dessous (2026-09-26) : une carte n'est plus coupée
 		   net. Même mécanisme que les cartes de la grille. */
 		suivreDebord(items);
+		/* Filtered by the header's search, like the fiche's grid (a Generate
+		   page has none: every question). A card keeps its number in the
+		   quiz, not its rank in the results. */
+		const trouvees = new Set(spec.stats ? questionsTrouvees(draft.questions, estLecon()) : vis);
+		if (!vis.some(i => trouvees.has(i))) ajouter(items, "p", "qbd-fiche-empty", t("dashboard.fiche.searchEmpty"));
 		vis.forEach((i, pos) => {
+			if (!trouvees.has(i)) return;
 			const q = draft!.questions[i];
 			/* La carte de la GRILLE de la fiche (refonte de l'éditeur,
 			   2026-09-26) : numéro en rond, une seule étiquette en texte simple

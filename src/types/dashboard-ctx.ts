@@ -21,6 +21,7 @@ import type { AiUsageEntry } from "../dashboard/usage-format";
 import type { ModuleOverride, ModuleGroup, ModuleMap } from "../dashboard/quiz-modules";
 import type { ReviewStore } from "../review/review-store";
 import type { OngletDossier } from "../dashboard/quizzes-render";
+import type { ActionMenuItem } from "../dashboard/ui-select";
 
 /**
  * Un examen d'un dossier (« plusieurs examens par dossier », 2026-09-26).
@@ -241,8 +242,9 @@ export interface DashboardShellCtx {
 	    reste dans RESTANTS) et compose les items AU CLIC. */
 	/* `map` (tranche 9, tâche « Move to ») : le sous-menu « Déplacer vers »
 	   liste les dossiers connus groupés par UE, tirés de la même table que
-	   `openModuleMenu`. */
-	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
+	   `openModuleMenu`. `extra`: lines put above the card's own, a quiz's
+	   page in editing ("Vocabulary", "Mode", detail.ts). */
+	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[]) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —
 	    autant de modals que l'application n'a pas encore. Absente = pas de

@@ -1,7 +1,6 @@
 import { currentHost } from "../host/current";
 import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
-import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 import { t } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
 import { Q_TYPES } from "../editor/utils";
@@ -67,22 +66,17 @@ export interface FicheDeps {
 	stat: QuizStatRecord;
 	/** Absente pour une note écrite à la main ou un quiz partagé. */
 	origine: FicheOrigine | null;
-	/** Lance le quiz (le bouton de l'hôte, avec l'écriture en attente). */
-	onStart(el: HTMLElement): void;
-	/** Passe la page en édition. */
-	onEdit(): void;
-	/** Ouvre l'éditeur sur CETTE question (clic sur sa carte). Absente : le
-	    clic fait briller « Commencer le quiz », comme avant. */
+	/** Opens the editor on THIS question (click on its card). Absent: the
+	    click makes "Start the quiz" shine, as before. */
 	onEditQuestion?(index: number): void;
-	/** Quitte la page. */
-	onBack(): void;
-	/** The OTHER modes of the same course (course-pairs.ts): the mode pill
-	    becomes a selector Learn | Practice | Exam, whose other segments open
-	    their quiz. */
-	autresModes?: Array<{ mode: ModeQuiz; open(): void }>;
-	/** Le menu « ⋮ » du quiz, le même que celui de sa carte. Absent : pas de bouton. */
-	menu?(anchor: HTMLElement): void;
+	/** Makes "Start the quiz", in the page's header, shine. */
+	attirer(): void;
 }
+
+/** The OTHER modes of the same course (course-pairs.ts): the mode pill
+    becomes a selector Learn | Practice | Exam, whose other segments open
+    their quiz. */
+export type AutresModes = Array<{ mode: ModeQuiz; open(): void }>;
 
 /* L'état de la barre, gardé entre deux repeints du MÊME quiz (la page se
    repeint sur des événements extérieurs) ; remis à zéro sur un autre quiz. */
@@ -113,117 +107,47 @@ export function oublierFiche(): void {
 	etat.recherche = "";
 }
 
-export function renderFiche(parent: HTMLElement, deps: FicheDeps): void {
-	if (etat.chemin !== deps.quiz.path) {
-		etat.chemin = deps.quiz.path;
+/** Paints the fiche's questions into `parent`, and returns what repaints
+    them after a new search. The header (back arrow, title, info line,
+    search, actions) is the page's (detail-head.ts), shared with the editor
+    so that it does not move when the page switches. */
+export function renderFiche(parent: HTMLElement, deps: FicheDeps): () => void {
+	const root = ajouter(parent, "div", "qbd-fiche");
+	return renderBody(root, deps.attirer, deps);
+}
+
+/** The search of a quiz's page, in the header's centre slot: the same field
+    for the fiche's grid and the editor's list, kept between two repaints of
+    the same quiz. `onChange` repaints what it filters. */
+export function renderRecherche(place: HTMLElement, chemin: string, onChange: () => void): void {
+	if (etat.chemin !== chemin) {
+		etat.chemin = chemin;
 		etat.recherche = "";
 	}
-	const root = ajouter(parent, "div", "qbd-fiche");
-	renderHead(root, deps);
-	/* UNE ligne sous le titre : les infos à gauche, la recherche au centre,
-	   les actions à droite (2026-09-26 : chacune à sa hauteur, elles
-	   n'étaient alignées sur rien). */
-	const tools = ajouter(root, "div", "qbd-fiche-tools");
-	renderMeta(tools, deps);
-	const recherche = ajouter(tools, "div", "qbd-fiche-tools-center");
-	const attirer = renderActions(tools, deps);
-	renderBody(root, recherche, attirer, deps);
+	const recherche = ajouter(place, "label", "qbd-fiche-search");
+	icone(recherche, "search", "qbd-fiche-search-icon");
+	const champ = ajouter(recherche, "input", "qbd-fiche-search-input");
+	champ.type = "search";
+	champ.placeholder = t("dashboard.fiche.search");
+	champ.setAttribute("aria-label", t("dashboard.fiche.search"));
+	champ.value = etat.recherche;
+	champ.addEventListener("input", () => { etat.recherche = champ.value; onChange(); });
 }
 
-/** L'en-tête : la flèche retour, le dossier et le titre. */
-function renderHead(root: HTMLElement, deps: FicheDeps): void {
-	/* La flèche retour AU-DESSUS du titre (2026-09-26), comme dans un
-	   dossier : à gauche, dossier, titre, ligne d'infos et barre partent
-	   tous de la même verticale. Même bouton que le retour de l'en-tête :
-	   un seul retour dans tout le dashboard. */
-	const back = ajouter(root, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
-	back.type = "button";
-	back.setAttribute("aria-label", t("dashboard.quiz.back"));
-	// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
-	ajouter(back, "span", "qbd-quizzes-crumb-icon");
-	back.addEventListener("click", () => deps.onBack());
-
-	const head = ajouter(root, "header", "qbd-fiche-head");
-
-	// Le DOSSIER du quiz — le seul segment du chemin qui dise d'où il sort
-	// (même règle que les cartes). Racine du vault : rien.
-	const titres = ajouter(head, "div", "qbd-fiche-titles");
-	const dossier = deps.quiz.path.split("/").slice(0, -1).filter(Boolean).pop();
-	// Le titre D'ABORD, le dossier en sous-titre dessous (2026-09-26).
-	ajouter(titres, "h2", "qbd-fiche-title", deps.quiz.title);
-	if (dossier) ajouter(titres, "div", "qbd-fiche-kicker", dossier);
+/** The indexes of the visible questions that match the current search, in
+    their order (all of them with an empty search). */
+export function questionsTrouvees(questions: DraftQuestion[], lecon: boolean): number[] {
+	return filtrer(questions, lecon, etat.recherche);
 }
 
-/** Les actions, au bout de la ligne d'infos, et la fonction qui attire
-    l'œil sur « Commencer le quiz ». DESCENDUES d'une ligne (2026-09-26) :
-    à la hauteur du titre, elles étaient loin de la barre et des questions ;
-    à celle des pastilles, la main les trouve plus vite. */
-function renderActions(meta: HTMLElement, deps: FicheDeps): () => void {
-	const actions = ajouter(meta, "div", "qbd-fiche-actions");
-	const edit = ajouter(actions, "button", "qbd-fiche-edit");
-	edit.type = "button";
-	icone(edit, "square-pen", "qbd-btn-icon");
-	ajouter(edit, "span", undefined, t("dashboard.quiz.editor"));
-	poserBouton3dNeutre(edit);
-	edit.addEventListener("click", () => deps.onEdit());
-
-	const start = ajouter(actions, "button", "qbd-fiche-start");
-	start.type = "button";
-	icone(start, "play", "qbd-btn-icon");
-	ajouter(start, "span", undefined, t("dashboard.quiz.welcomeStart"));
-	/* Le bouton 3D de Brilliant, dans le bleu des flèches (2026-09-25) : face
-	   surélevée qui s'enfonce au clic, et le REFLET qui balaie — un SVG à
-	   part, pour que `attirer` puisse relancer son cycle (cta3d.ts). */
-	const reflet = poserBouton3d(start);
-	start.addEventListener("click", () => deps.onStart(start));
-	/* ENTRÉE = « Commencer le quiz » quand rien n'a le focus (2026-09-26),
-	   avec l'enfoncement du clic : la face descend, PUIS le quiz part. Pas
-	   quand on écrit (recherche), ni sur un bouton ou une carte focalisés
-	   (Entrée leur appartient), ni sous une modale. L'écouteur se retire
-	   de lui-même dès que la fiche quitte le document. */
-	const surEntree = (e: KeyboardEvent): void => {
-		if (!start.isConnected) { document.removeEventListener("keydown", surEntree); return; }
-		if (e.key !== "Enter" || e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-		const cible = e.target instanceof HTMLElement ? e.target : null;
-		if (cible && cible !== document.body && cible.closest("input, textarea, select, button, a, [contenteditable], [role=button], [tabindex]")) return;
-		if (document.querySelector(".modal-container, [role=dialog], [aria-modal=true]")) return;
-		e.preventDefault();
-		start.classList.add("is-pressing");
-		window.setTimeout(() => {
-			start.classList.remove("is-pressing");
-			if (start.isConnected) deps.onStart(start);
-		}, reduit() ? 0 : 130);
-	};
-	document.addEventListener("keydown", surEntree);
-
-	/* « ⋮ » : le menu de la carte du quiz, comme l'en-tête d'un dossier. */
-	const menu = deps.menu;
-	if (menu) {
-		const plus = ajouter(actions, "button", "qbd-folder-more-btn");
-		plus.type = "button";
-		plus.setAttribute("aria-label", t("dashboard.card.more"));
-		currentHost().ui.setIcon(plus, "ellipsis-vertical");
-		plus.addEventListener("click", () => menu(plus));
-	}
-
-	/* Relance le reflet sur-le-champ (remis au début de son cycle). Rien
-	   sans animations. */
-	return () => {
-		if (reduit()) return;
-		for (const a of reflet.getAnimations()) a.currentTime = 0;
-	};
+/** The info line of the page's header, the same in the fiche and the
+    editor: the mode (or the selector Learn | Practice of the course's other
+    modes), the number of questions, the origin. */
+export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null, autresModes?: AutresModes): HTMLElement {
+	return renderMeta(parent, { quiz, origine, autresModes });
 }
 
-/** La ligne d'infos : le mode (ou le sélecteur Learn | Practice), le nombre
-    de questions, l'origine ; les actions s'y ajoutent au bout. */
-/** La même ligne d'infos pour l'en-tête de l'ÉDITEUR (2026-09-26) : le
-    mode seul (sans bascule Learn | Practice : on édite CE quiz), le nombre
-    de questions, l'origine. */
-export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null): HTMLElement {
-	return renderMeta(parent, { quiz, origine });
-}
-
-function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" | "autresModes">): HTMLElement {
+function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: FicheOrigine | null; autresModes?: AutresModes }): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
 	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous,
 	   à la place qu'occupait la recherche, partie au centre (2026-09-26) ;
@@ -277,7 +201,8 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 				const sansAnim = reduit();
 				if (!sansAnim) {
 					etat.fondu = true;
-					root.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
+					// The questions are in the page's body, not in this header row.
+					(root.closest(".qbd-qz") ?? document).querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
 						[{ opacity: 1 }, { opacity: 0 }],
 						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
 					));
@@ -408,17 +333,8 @@ function filtrer(questions: DraftQuestion[], lecon: boolean, recherche: string):
 	});
 }
 
-/** La recherche, et les questions dessous, en grille. */
-function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, deps: FicheDeps): void {
-	const recherche = ajouter(place, "label", "qbd-fiche-search");
-	icone(recherche, "search", "qbd-fiche-search-icon");
-	const champ = ajouter(recherche, "input", "qbd-fiche-search-input");
-	champ.type = "search";
-	champ.placeholder = t("dashboard.fiche.search");
-	champ.setAttribute("aria-label", t("dashboard.fiche.search"));
-	champ.value = etat.recherche;
-	champ.addEventListener("input", () => { etat.recherche = champ.value; peindre(); });
-
+/** The questions, in a grid, filtered by the search. */
+function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): () => void {
 	const body = ajouter(root, "div", "qbd-fiche-body");
 
 	function peindre(): void {
@@ -437,6 +353,7 @@ function renderBody(root: HTMLElement, place: HTMLElement, attirer: () => void, 
 		}
 	}
 	peindre();
+	return peindre;
 }
 
 /** GRILLE : une carte par question. Pas un bouton : on répond en jouant le

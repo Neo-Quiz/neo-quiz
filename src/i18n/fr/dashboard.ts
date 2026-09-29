@@ -253,7 +253,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 
 	/* ── Détail ── */
 	"dashboard.detail.edit": "Modifier",
-	"dashboard.detail.play": "Lancer",
 	"dashboard.detail.generatedBy": "Généré par {model} ({effort})",
 	"dashboard.detail.generatedBySimple": "Généré par {model}",
 	"dashboard.detail.fileNotFound": "Fichier introuvable",

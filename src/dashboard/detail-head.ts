@@ -4,57 +4,84 @@ import { t } from "../i18n";
 import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 
 /* ══════════════════════════════════════════════════════════
-   EN-TÊTE DE LA PAGE D'UN QUIZ HORS FICHE (éditeur, aperçu, page « Générer »)
+   THE HEADER OF A QUIZ'S PAGE: fiche, editor, preview, Generate page
 
-   Refonte de l'éditeur (2026-09-26) : le MÊME en-tête que la fiche
-   (detail-fiche.ts, `renderHead`), mêmes classes `qbd-fiche-*` — la flèche
-   retour au-dessus, le titre, le dossier en sous-titre dessous ; à droite
-   « Terminé » en bouton 3D neutre et « Lancer » en bouton 3D bleu, aux
-   tailles de « Modifier » et « Commencer le quiz ».
+   ONE header for every mode of the page (2026-09-29): the back arrow above,
+   the title, the folder as a subtitle under it, then a row with the info
+   line on the left, a free slot in the centre (the fiche's search) and the
+   actions on the right — "Edit" as a neutral 3D button, "Start the quiz" as
+   the blue one, then "⋮". It stays OUTSIDE the body that fades when the
+   page switches between the fiche and the editor (`toggleEditing`,
+   detail.ts), so the title, the subtitle and the two buttons never
+   disappear and come back: only "Edit" becomes "Done". Before, the fiche
+   drew its own header inside that body and the editor another one, at
+   another height: the whole top of the page flashed on every switch.
 
-   Plus de chemin complet ni de ligne de méta (score, parties, tentatives) :
-   ils vivent dans l'onglet Progression du dossier. La page « Générer », qui
-   n'a pas de dossier, garde sa ligne d'usage en sous-titre.
+   What only one mode has carries `qbd-qz-swap` and fades with the body:
+   the editor's actions of a page without "⋮" (the Generate page's
+   "Vocabulary" and "Mode"), placed LEFT of "Edit" so that "Done" and
+   "Start" keep their place. A quiz of the catalogue has them in its "⋮"
+   menu instead (detail.ts): its header is then identical in both modes.
 
-   Module à part pour que `detail.ts` ne grossisse pas : il ne sait rien du
-   brouillon ni de l'écriture — l'appelant lui passe des fonctions déjà
-   enveloppées de son `flushSave`.
+   No full path nor meta line (score, games, attempts): they live in the
+   folder's Progress tab. The Generate page, which has no folder, keeps its
+   usage line as a subtitle.
+
+   A module of its own so that `detail.ts` does not grow: it knows nothing
+   of the draft nor of writing — the caller passes functions already
+   wrapped in its `flushSave`.
 ══════════════════════════════════════════════════════════ */
 
 export interface EnteteAction {
 	label: string;
 	icon: string;
 	onClick(el: HTMLElement): void;
-	/** Pastille numérique après le libellé (compteur de termes du glossaire,
-	    tâche 4 du lot D) — absente ou vide : pas de pastille. */
+	/** Numeric badge after the label (term count of the glossary, task 4 of
+	    batch D) — absent or empty: no badge. */
 	badge?: string;
-	/** Identifiant STABLE posé en `data-qbd-key` sur le bouton peint, pour
-	    qu'un appelant retrouve un bouton déjà peint (`setActionBadge`) sans
-	    repeindre tout l'en-tête — l'action « Vocabulaire », dont la pastille
-	    se met à jour une fois le brouillon chargé (`detail.ts`). Absent pour
-	    les autres actions, qui n'ont rien à rafraîchir après coup. */
+	/** STABLE identifier set as `data-qbd-key` on the painted button, so a
+	    caller finds an already painted button (`setActionBadge`) without
+	    repainting the whole header — the "Vocabulary" action, whose badge is
+	    updated once the draft is loaded (`detail.ts`). Absent for the other
+	    actions, which have nothing to refresh afterwards. */
 	key?: string;
 }
 
 export interface EnteteDeps {
 	title: string;
-	/** Sous-titre : le dossier du quiz, ou la ligne d'usage d'une génération. Vide → masqué. */
+	/** Subtitle: the quiz's folder, or the usage line of a generation. Empty → hidden. */
 	kicker: string;
-	/** Vrai en édition : le bouton de bascule dit « Terminé », sinon « Modifier ». */
+	/** True in editing: the toggle button says "Done", otherwise "Edit". */
 	editing: boolean;
 	onBack(): void;
 	onToggleEditing(): void;
-	/** Actions secondaires (page « Générer » : « Insérer »), avant le bouton principal. */
+	/** Actions of every mode (Generate page: "Insert"), before "Edit". */
 	actions: EnteteAction[];
-	/** Bouton principal (« Lancer », « Enregistrer »). Absent → masqué. */
+	/** Actions of the editor only ("Vocabulary", "Mode"): they fade in and
+	    out with the body, left of the others. */
+	editActions?: EnteteAction[];
+	/** Main button ("Start the quiz", "Save"). Absent → hidden. */
 	start?: EnteteAction;
-	/** La ligne d'infos sous le titre (mode, nombre de questions, origine),
-	    celle de la fiche. Absente (page « Générer ») → rien. */
+	/** Enter starts the quiz when nothing has the focus (the fiche). */
+	enterStarts?: boolean;
+	/** The quiz's "⋮" menu, the same as its card's. Absent: no button. */
+	menu?(anchor: HTMLElement): void;
+	/** The info line (mode, number of questions, origin), painted into the
+	    given row. Absent (Generate page) → nothing. */
 	infos?(parent: HTMLElement): void;
 }
 
-/** Le dossier d'un quiz — le seul segment du chemin qui dise d'où il sort,
-    même règle que la fiche et les cartes. Racine du vault : chaîne vide. */
+export interface Entete {
+	top: HTMLElement;
+	/** The free slot in the centre of the actions row (the fiche's search). */
+	center: HTMLElement;
+	/** Restarts the sheen of the main button at once (a click on a question
+	    card of the fiche). Nothing without animations or without a button. */
+	attirer(): void;
+}
+
+/** The folder of a quiz — the only segment of the path that says where it
+    comes from, same rule as the fiche and the cards. Vault root: empty string. */
 export function dossierDuQuiz(path: string): string {
 	return path.split("/").slice(0, -1).filter(Boolean).pop() ?? "";
 }
@@ -69,9 +96,9 @@ function bouton(parent: HTMLElement, cls: string, icon: string, label: string, b
 	return btn;
 }
 
-/** Met à jour (ou retire) la pastille d'un bouton d'action déjà peint, sans
-    repeindre tout l'en-tête — la modale « Vocabulaire » (tâche 4 du lot D)
-    s'en sert à sa fermeture, une fois le compteur de termes connu. */
+/** Updates (or removes) the badge of an already painted action button,
+    without repainting the whole header — the "Vocabulary" modal (task 4 of
+    batch D) uses it when it closes, once the term count is known. */
 export function setActionBadge(btn: HTMLElement, badge?: string): void {
 	let pastille = btn.querySelector<HTMLElement>(".qbd-qz-action-badge");
 	if (!badge) { pastille?.remove(); return; }
@@ -79,14 +106,19 @@ export function setActionBadge(btn: HTMLElement, badge?: string): void {
 	pastille.textContent = badge;
 }
 
-export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
-	// `qbd-qz-top` et non `qbd-qz-header` : cette dernière classe habille aussi
-	// l'en-tête de la page du LECTEUR (apps/windows/src/ui/quiz-page.ts), en
-	// rangée. La changer en colonne ici l'aurait cassé là-bas.
+function reduit(): boolean {
+	return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
+	// `qbd-qz-top` and not `qbd-qz-header`: the latter also dresses the header
+	// of the PLAYER's page (apps/windows/src/ui/quiz-page.ts), as a row.
+	// Turning it into a column here would have broken it there.
 	const top = ajouter(page, "div", "qbd-qz-top");
 
-	/* Même bouton que le retour de la fiche : un seul retour dans tout le
-	   dashboard, la flèche dessinée en CSS (masque). */
+	/* The same button as every back arrow of the dashboard, the arrow drawn
+	   in CSS (mask). ABOVE the title (2026-09-26), as in a folder: on the
+	   left, arrow, title, info line and bar all start from one vertical. */
 	const back = ajouter(top, "button", "qbd-quizzes-crumb-back qbd-fiche-back");
 	back.type = "button";
 	back.setAttribute("aria-label", t("dashboard.quiz.back"));
@@ -95,30 +127,82 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): HTMLElement {
 
 	const head = ajouter(top, "header", "qbd-fiche-head");
 	const titres = ajouter(head, "div", "qbd-fiche-titles");
+	// The title FIRST, the folder as a subtitle under it (2026-09-26).
 	ajouter(titres, "h2", "qbd-fiche-title", deps.title);
 	if (deps.kicker) ajouter(titres, "div", "qbd-fiche-kicker", deps.kicker);
-	if (deps.infos) deps.infos(ajouter(titres, "div", "qbd-qz-infos"));
 
-	const actions = ajouter(head, "div", "qbd-fiche-actions qbd-qz-actions");
+	/* ONE row under the title: the infos on the left, the centre slot, the
+	   actions on the right (2026-09-26: each at its own height, they were
+	   aligned on nothing). The actions came DOWN a row: at the title's
+	   height they were far from the bar and the questions. */
+	const tools = ajouter(top, "div", "qbd-fiche-tools");
+	deps.infos?.(tools);
+	const center = ajouter(tools, "div", "qbd-fiche-tools-center");
+	const actions = ajouter(tools, "div", "qbd-fiche-actions");
 
-	// Modifier ↔ Terminé : la MÊME page bascule. Neutre, comme « Modifier »
-	// dans la fiche : l'action principale reste « Lancer », à côté.
+	const action = (a: EnteteAction, swap: boolean): void => {
+		const btn = bouton(actions, "qbd-qz-action" + (swap ? " qbd-qz-swap" : ""), a.icon, a.label, a.badge, a.key);
+		poserBouton3dNeutre(btn);
+		btn.addEventListener("click", () => a.onClick(btn));
+	};
+	for (const a of deps.editActions ?? []) action(a, true);
+	for (const a of deps.actions) action(a, false);
+
+	// Edit ↔ Done: the SAME page switches. Neutral: the main action stays
+	// "Start the quiz", next to it.
 	const edit = bouton(actions, "qbd-qz-edit", deps.editing ? "check" : "square-pen",
 		t(deps.editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"));
 	poserBouton3dNeutre(edit);
 	edit.addEventListener("click", () => deps.onToggleEditing());
 
-	for (const action of deps.actions) {
-		const btn = bouton(actions, "qbd-qz-action", action.icon, action.label, action.badge, action.key);
-		poserBouton3dNeutre(btn);
-		btn.addEventListener("click", () => action.onClick(btn));
-	}
-
+	let reflet: SVGSVGElement | null = null;
 	const start = deps.start;
 	if (start) {
 		const btn = bouton(actions, "qbd-qz-start", start.icon, start.label);
-		poserBouton3d(btn);
+		/* Brilliant's 3D button, in the blue of the arrows (2026-09-25): a
+		   raised face that sinks on click, and the SHEEN that sweeps — an SVG
+		   of its own, so that `attirer` can restart its cycle (cta3d.ts). */
+		reflet = poserBouton3d(btn);
 		btn.addEventListener("click", () => start.onClick(btn));
+		if (deps.enterStarts) {
+			/* ENTER = "Start the quiz" when nothing has the focus (2026-09-26),
+			   with the click's press: the face sinks, THEN the quiz starts. Not
+			   while typing (search), nor on a focused button or card (Enter
+			   belongs to them), nor under a modal. The listener removes itself
+			   once the button has left the document. */
+			const surEntree = (e: KeyboardEvent): void => {
+				if (!btn.isConnected) { document.removeEventListener("keydown", surEntree); return; }
+				if (e.key !== "Enter" || e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+				const cible = e.target instanceof HTMLElement ? e.target : null;
+				if (cible && cible !== document.body && cible.closest("input, textarea, select, button, a, [contenteditable], [role=button], [tabindex]")) return;
+				if (document.querySelector(".modal-container, [role=dialog], [aria-modal=true]")) return;
+				e.preventDefault();
+				btn.classList.add("is-pressing");
+				window.setTimeout(() => {
+					btn.classList.remove("is-pressing");
+					if (btn.isConnected) start.onClick(btn);
+				}, reduit() ? 0 : 130);
+			};
+			document.addEventListener("keydown", surEntree);
+		}
 	}
-	return top;
+
+	/* "⋮": the quiz card's menu, as in a folder's header. */
+	const menu = deps.menu;
+	if (menu) {
+		const plus = ajouter(actions, "button", "qbd-folder-more-btn");
+		plus.type = "button";
+		plus.setAttribute("aria-label", t("dashboard.card.more"));
+		currentHost().ui.setIcon(plus, "ellipsis-vertical");
+		plus.addEventListener("click", () => menu(plus));
+	}
+
+	return {
+		top,
+		center,
+		attirer: () => {
+			if (!reflet || reduit()) return;
+			for (const a of reflet.getAnimations()) a.currentTime = 0;
+		},
+	};
 }
