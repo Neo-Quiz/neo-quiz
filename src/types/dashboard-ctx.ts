@@ -96,11 +96,6 @@ export interface AiSettings {
 	aiMentionExtraFolders?: string[];
 	/** Chemin relatif persistant du dossier qui reçoit les quiz générés. */
 	aiOutputFolder?: string;
-	/** How the Generate page lays out its requests and their live transcript
-	    (2026-09-29, after MonoCode's "Transcript layout"): `full`, every turn
-	    across the full width; `chat`, requests on the right as in a
-	    messaging app. Persisted values, never translated. */
-	aiTranscriptLayout?: "full" | "chat";
 	/** The message "Explain" sends about a played question (2026-09-29,
 	    `explain-prompt.ts` placeholders). Empty: the translated default. */
 	aiExplainPrompt?: string;

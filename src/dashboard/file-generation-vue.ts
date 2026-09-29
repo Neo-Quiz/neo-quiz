@@ -68,10 +68,6 @@ export function creerVueFile(opts: {
 	ouvrir: (chemin: string) => void;
 	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
-	/** The layout of the turns (setting `aiTranscriptLayout`), read at each
-	    paint: `full` stretches every turn across the column, `chat` keeps
-	    the requests on the right. */
-	disposition?: () => "full" | "chat";
 	/** Copies a chat answer (the host's clipboard). */
 	copier?: (texte: string) => Promise<boolean>;
 }): VueFile {
@@ -390,9 +386,8 @@ export function creerVueFile(opts: {
 		const fil = defileur();
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
 		zone.replaceChildren();
-		const disposition = opts.disposition?.() ?? "full";
-		zone.classList.toggle("qbd-ai-file--full", disposition === "full");
-		zone.classList.toggle("qbd-ai-file--chat", disposition === "chat");
+		// Always full width (2026-09-30): no chat layout any more.
+		zone.classList.add("qbd-ai-file--full");
 		// L'état `arret` ne se montre pas : pour l'utilisateur, la ligne est annulée.
 		const visibles = opts.file.lignes().filter(l => l.etat !== "arret");
 		for (const l of visibles) {

@@ -166,10 +166,6 @@ export const EN_APP = {
 
 	/* ── Réglages « Général » (application seulement) ── */
 	"app.settings.general": "General",
-	"app.settings.transcriptLayout": "Generation layout",
-	"app.settings.transcriptLayoutHint": "How your requests and the live transcript of each generation appear on the Generate page.",
-	"app.settings.transcriptFull": "Full width",
-	"app.settings.transcriptChat": "Chat",
 	"app.settings.explainPrompt": "Explain prompt",
 	"app.settings.explainPromptHint": "What the Explain button of a quiz question sends to Claude Code or Codex. {quiz}, {question}, {options}, {answer}, {myAnswer} and {explanation} are replaced by the question's own; a line whose placeholders are all empty is left out.",
 	"app.settings.explainPromptReset": "Reset",

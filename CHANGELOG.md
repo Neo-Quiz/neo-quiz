@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- The Generate page always shows its conversation across the full width, so everything Claude Code or Codex does stays visible; the Generation layout setting is gone.
+
 ## [1.20.1] - 2026-09-29
 
 ### Added

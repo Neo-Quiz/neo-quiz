@@ -351,7 +351,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			else host.ui.notice(t("ai.queue.missing"));
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
-		disposition: () => (settings().aiTranscriptLayout === "chat" ? "chat" : "full"),
 		copier: deps.copyText,
 	});
 

@@ -44,7 +44,7 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
 	| "aiOllamaModels" | "aiOllamaCatalog" | "aiOllamaPlansAppris" | "aiOllamaPlanCompte"
 	| "aiCanauxPayantsMasques" | "aiWebAvertissementMasque" | "aiUsageLog"
-	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiTranscriptLayout">> & { hotkeyAddFiles: Hotkey } {
+	| "aiMentionExtraFolders" | "aiOutputFolder">> & { hotkeyAddFiles: Hotkey } {
 	return {
 		// Aucun fournisseur par défaut : le choix reste la première étape.
 		aiProvider: "",
@@ -83,7 +83,5 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		aiMentionExtraFolders: [],
 		// Donnée persistée, donc jamais traduite : les deux hôtes écrivent au même endroit.
 		aiOutputFolder: "Generated",
-		// Full width, as MonoCode's default: the transcript needs the room.
-		aiTranscriptLayout: "full",
 	};
 }
