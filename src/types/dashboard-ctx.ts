@@ -343,6 +343,11 @@ export interface DashboardShellCtx {
 	    `clipboard-read` que le processus principal refuse (mesuré le
 	    2026-09-17), et l'appel échoue en `NotAllowedError`. */
 	copyText?: (texte: string) => Promise<boolean>;
+	/** The time limit (minutes) a quiz was last played with, if any: what the
+	    "Keep exam mode" menu item writes as the duration. The remembered setups
+	    live in the application's settings, so only the application has them;
+	    absent = the note's own duration, else the fallback rule. */
+	rememberedTestMinutes?: (path: string) => Promise<number | null>;
 	/** Ouvre une NOTE dans Obsidian (`obsidian://open`), quand la racine de ce
 	    chemin est un vault. `false` = pas un vault, ou Obsidian absent : pas
 	    une erreur, l'appelant enchaîne sur l'ouverture par le système. C'est ce

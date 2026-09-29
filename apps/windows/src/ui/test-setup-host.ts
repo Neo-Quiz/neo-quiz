@@ -1,11 +1,6 @@
-import { saveKeepExam } from "../../../../src/dashboard/detail-io";
-import type { KeepExam } from "../../../../src/dashboard/exam-keep";
 import { openTestSetupModal } from "../../../../src/engine/test-setup-modal";
 import type { TestSetupHost } from "../../../../src/engine/test-launch";
-import { currentHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
-import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
-import { keepExamChange } from "../../../../src/test-setup";
+import { isExamSetup } from "../../../../src/test-setup";
 import type { TestSetupsApp } from "../review/test-setups";
 
 /* ══════════════════════════════════════════════════════════
@@ -15,10 +10,10 @@ import type { TestSetupsApp } from "../review/test-setups";
    - Opens the modal on the settings last used for this quiz (else the
      engine's default, the file's own); the modal asks the player.
    - Remembers what was chosen, per quiz path.
-   - Writes "Keep exam mode" into the note, through `detail-io`'s single
-     write path, only when the test is STARTED and only when it changes what
-     the note says (`keepExamChange`).
-   - Cancelling writes nothing and remembers nothing.
+   - Never writes the note: "Keep exam mode" lives in the quiz's "⋯" menus
+     (`dashboard/exam-keep-menu.ts`). A quiz whose note says `mode: "exam"`
+     still opens with Exam mode on, through the engine's default.
+   - Cancelling remembers nothing.
 
    `choose` is called at launch AND on "Try again", and cannot tell them
    apart: the FIRST call of a page is the launch. Only a cancelled launch
@@ -41,13 +36,6 @@ export interface TestSetupPageOptions {
 	path: string;
 	/** The quiz's title, shown in the modal. */
 	title: string;
-	/** The block's source as read when the page opened: the compare-and-swap witness. */
-	block: string;
-	/** The note says `mode: "exam"`, and its duration in minutes. */
-	kept: boolean;
-	minutes: number | null;
-	/** The note can hold "Keep exam mode" (any Test; a Learn never asks). */
-	canKeep: boolean;
 	remembered: TestSetupsApp;
 }
 
@@ -55,55 +43,31 @@ export function createTestSetupPage(opts: TestSetupPageOptions): TestSetupPage {
 	let first = true;
 	let cancelledLaunch = false;
 	let abort: AbortController | null = null;
-	/* What the note says NOW: updated after each successful write, so a "Try
-	   again" compares with the note as it is, not as it was on opening. */
-	let block = opts.block;
-	let kept = opts.kept;
-	let minutes = opts.minutes;
-
-	/** Writes the change; on success, follows the note (its new block is the
-	    next witness). A refused write is said, once, and the test starts anyway. */
-	async function writeKeep(change: KeepExam): Promise<void> {
-		if (await saveKeepExam(opts.path, block, change)) {
-			kept = change !== null;
-			minutes = change ? change.minutes : null;
-			try {
-				const source = await currentHost().fs.read(opts.path);
-				const match = source.match(QUIZ_BLOCK_RE);
-				if (match) block = match[1];
-			} catch {
-				// The witness stays stale: the next write is refused rather than blind.
-			}
-			return;
-		}
-		currentHost().ui.notice(t("engine.testSetup.keepFailed"));
-	}
 
 	const host: TestSetupHost = {
-		async choose(defaults, questionCount) {
+		async choose(defaults, questionCount, examByDefault) {
 			const launch = first;
 			first = false;
 			const controller = new AbortController();
 			abort = controller;
+			/* A retry proposes the setup just played; a launch, what was last used.
+			   Except that a note which keeps Exam mode always opens on an Exam: a
+			   plain test played since (one-off) must not hide what the menu's
+			   "Keep exam mode" says. An Exam played last still brings back its
+			   duration. */
+			const last = launch ? opts.remembered.read(opts.path) : null;
 			const choice = await openTestSetupModal({
 				title: opts.title,
 				questionCount,
-				// A retry proposes the setup just played; a launch, what was last used.
-				defaults: launch ? (opts.remembered.read(opts.path) ?? defaults) : defaults,
-				examByDefault: kept,
-				canKeep: opts.canKeep,
+				defaults: last && (!examByDefault || isExamSetup(last)) ? last : defaults,
 			}, controller.signal);
 			if (abort === controller) abort = null;
 			if (choice === null) {
 				if (launch) cancelledLaunch = true;
 				return null;
 			}
-			opts.remembered.remember(opts.path, choice.setup);
-			if (opts.canKeep) {
-				const change = keepExamChange(kept, minutes, choice.setup, choice.keep);
-				if (change !== undefined) await writeKeep(change);
-			}
-			return choice.setup;
+			opts.remembered.remember(opts.path, choice);
+			return choice;
 		},
 	};
 

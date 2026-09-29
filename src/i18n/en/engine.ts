@@ -59,7 +59,7 @@ export const EN_ENGINE = {
 	"engine.testSetup.shortcut": "{minutes} min",
 	"engine.testSetup.minutesUnit": "min",
 	"engine.testSetup.start": "Start the test",
-	"engine.testSetup.keepFailed": "The test started, but the note could not be updated: it changed since it was opened.",
+	"engine.testSetup.examLocked": "Set by exam mode",
 
 	/* ── Handing in a Test (engine/hand-in.ts) ── */
 	"engine.handIn.button": "Hand in the test",

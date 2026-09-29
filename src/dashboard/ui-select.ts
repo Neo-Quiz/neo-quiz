@@ -277,6 +277,11 @@ export interface ActionMenuItem {
 	/** Pose une icône qui n'est pas Lucide (logo d'Obsidian d'un vault) à la
 	    place d'`icon`. */
 	renderIcon?: (el: HTMLElement) => void;
+	/** A CHECKABLE row ("Keep exam mode"): defined = the row is a
+	    `menuitemcheckbox`, and a check mark closes it on the right while it is
+	    on (the same trailing mark as the app's other menus). Undefined = a plain
+	    row. */
+	checked?: boolean;
 }
 
 /** Réglages de SURFACE d'un menu d'actions, tous facultatifs. */
@@ -314,7 +319,8 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 				+ (item.danger ? " qbd-select-option--danger" : "")
 				+ (sous ? " qbd-action-submenu-row" : ""));
 			btn.type = "button";
-			btn.setAttribute("role", "menuitem");
+			btn.setAttribute("role", item.checked === undefined ? "menuitem" : "menuitemcheckbox");
+			if (item.checked !== undefined) btn.setAttribute("aria-checked", String(item.checked));
 			if (item.disabled) btn.disabled = true;
 			const iconEl = ajouter(btn, "span", "qbd-select-check qbd-action-menu-icon");
 			if (item.renderIcon) item.renderIcon(iconEl);
@@ -333,6 +339,7 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 				ajouter(btn, "span", "qbd-select-option-label", item.label);
 			}
 			if (item.hint) ajouter(btn, "span", "qbd-action-menu-hint", item.hint);
+			if (item.checked) currentHost().ui.setIcon(ajouter(btn, "span", "qbd-select-check"), "check");
 			if (sous) {
 				btn.setAttribute("aria-haspopup", "menu");
 				btn.setAttribute("aria-expanded", "false");

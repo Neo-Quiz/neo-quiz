@@ -190,6 +190,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.renameTitle": "Renommer le quiz",
 	"dashboard.quizzes.pathCopied": "Chemin copié",
 	"dashboard.quizzes.pathCopyFailed": "Le chemin n'a pas pu être copié",
+	"dashboard.quizzes.keepExamFailed": "La note n'a pas pu être mise à jour : elle a changé depuis son ouverture.",
 	"dashboard.quizzes.renameLabel": "Nom du quiz",
 	"dashboard.quizzes.renameCta": "Renommer",
 	"dashboard.quizzes.deleted": "Quiz supprimé · Ctrl+Z pour annuler",

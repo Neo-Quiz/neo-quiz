@@ -225,6 +225,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.renameTitle": "Rename quiz",
 	"dashboard.quizzes.pathCopied": "Path copied",
 	"dashboard.quizzes.pathCopyFailed": "Could not copy the path",
+	"dashboard.quizzes.keepExamFailed": "The note could not be updated: it changed since it was opened.",
 	"dashboard.quizzes.renameLabel": "Quiz name",
 	"dashboard.quizzes.renameCta": "Rename",
 	"dashboard.quizzes.deleted": "Quiz deleted · Ctrl+Z to undo",

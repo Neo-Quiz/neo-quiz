@@ -95,10 +95,24 @@ export function readTestSetup(raw: unknown): TestSetup | null {
  * says: a one-off practice of an Exam note must not un-keep it (the box is
  * disabled while Exam mode is off, so it can only ever mean "keep" or "stop
  * keeping" for an Exam that is being started).
+ *
+ * No longer called since the box left the modal (2026-09-29: "Keep exam mode"
+ * lives in the quiz menus, `dashboard/exam-keep-menu.ts`); kept, with its
+ * checks, as the reviewed rule for a launch that would write the note again.
  */
 export function keepExamChange(fileKept: boolean, fileMinutes: number | null, setup: TestSetup, keep: boolean): { minutes: number } | null | undefined {
 	if (!isExamSetup(setup)) return undefined;
 	if (!keep) return fileKept ? null : undefined;
 	const minutes = setup.timeLimitMinutes as number;
 	return fileKept && fileMinutes === minutes ? undefined : { minutes };
+}
+
+/**
+ * The duration "Keep exam mode" writes into a note when it is switched on from
+ * a quiz's menu: the duration this quiz was last played with (the app's
+ * remembered setup), else the note's own valid `examDurationMinutes`, else the
+ * fallback rule for its question count.
+ */
+export function examMinutesToKeep(rememberedMinutes: number | null, fileMinutes: number | null, questionCount: number): number {
+	return clampExamDuration(rememberedMinutes) ?? clampExamDuration(fileMinutes) ?? fallbackExamDuration(questionCount);
 }

@@ -74,6 +74,7 @@ function marqueRail(): HTMLElement {
 }
 import type { DerniereVue } from "./reprise";
 import type { SessionsApp } from "../review/sessions";
+import { testSetups } from "../review/test-setups";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES DES PAGES « ACCUEIL » / « MES QUIZ »
@@ -477,6 +478,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   variable d'environnement : c'est la seule chose qui distingue ici un
 		   chemin Windows d'un chemin POSIX, et `pack:linux` existe. */
 		copyText: copierTexte,
+		// "Keep exam mode" writes the duration this quiz was last played with.
+		rememberedTestMinutes: async (path) => (await testSetups()).read(path)?.timeLimitMinutes ?? null,
 		absolutePath: (path) => {
 			const absolu = deps.cheminAbsolu(path);
 			if (!absolu) return null;

@@ -16,16 +16,31 @@ import { isExamSetup, withExamMode, withHints, withTimeLimit, type TestSetup } f
    and Time limit. The rules (turning Exam mode on, the bounds of the
    duration) are those of `src/test-setup.ts`; this file only draws them.
 
-   Two things the pure core does not remember, because it is stateless:
-   - the LAST DURATION: turning Time limit off and on again, or Exam mode off
-     and on, brings back the duration that was there, not the fallback rule;
-   - the "Keep exam mode" box, whose value survives Exam mode being switched
-     off (it is disabled then, and shown unchecked, but comes back).
+   What the pure core does not remember, because it is stateless: the LAST
+   DURATION. Turning Time limit off and on again, or Exam mode off and on,
+   brings back the duration that was there, not the fallback rule.
 
-   Keyboard: Tab follows the page order; Space toggles the focused switch or
-   box (they are real controls: `role="switch"` buttons and an `<input>`);
-   ENTER STARTS from anywhere (except on the close cross); Escape cancels,
-   and so does a click on the backdrop or the cross (the host handles those).
+   EXAM MODE GROUPS ITS SETTINGS (2026-09-29). Switched on, the tinted Exam
+   card grows to CONTAIN Hints and Time limit (and the total duration), shown
+   locked (Hints off, Time limit on, switches `aria-disabled`, dimmed, out of
+   the tab order): they are what Exam mode IS, so they cannot be changed one
+   by one any more. The total duration stays editable there. Switched off,
+   the card shrinks back and the same rows are editable below it. Two copies
+   of those rows exist, one in the card and one below it, and each slides
+   open or shut (`.qbd-setup-slide`, grid rows 0fr <-> 1fr, no height
+   measured) while the other does the opposite, so the panel keeps its
+   height and nothing jumps. The closed copy is `visibility: hidden`: out of
+   the tab order and of the accessibility tree. Both copies paint the same
+   `setup`; neither owns any state.
+
+   "Keep exam mode" is not here: it writes the note, and a modal that opens
+   when a test starts must not. It lives in the quiz's "⋯" menus
+   (`dashboard/exam-keep-menu.ts`).
+
+   Keyboard: Tab follows the page order; Space toggles the focused switch
+   (real controls: `role="switch"` buttons); ENTER STARTS from anywhere
+   (except on the close cross); Escape cancels, and so does a click on the
+   backdrop or the cross (the host handles those).
    The Start button takes the focus, so that a player who wants the same
    settings as last time presses Enter once.
 ══════════════════════════════════════════════════════════ */
@@ -36,18 +51,6 @@ export interface TestSetupModalOptions {
 	questionCount: number;
 	/** What the modal opens on: the settings last used for this quiz, else the file's. */
 	defaults: TestSetup;
-	/** The note says `mode: "exam"`: "Keep exam mode" opens checked. */
-	examByDefault: boolean;
-	/** The host can write the note: without it the box is not shown. */
-	canKeep: boolean;
-}
-
-export interface TestSetupChoice {
-	setup: TestSetup;
-	/** The state of the "Keep exam mode" box. Only meaningful for a setup that
-	    is an exam (`keepExamChange`): a test played without Exam mode never
-	    touches the note. */
-	keep: boolean;
 }
 
 /** The duration shortcuts, in minutes. */
@@ -78,21 +81,20 @@ function drawSheets(parent: HTMLElement): void {
 }
 
 /**
- * Opens the modal. Resolves with the player's choice, or `null` when the
+ * Opens the modal. Resolves with the settings chosen, or `null` when the
  * modal is closed without starting (Escape, cross, backdrop, or `signal`
  * aborted — the host uses that when the page is left while the modal is up).
  */
-export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSignal): Promise<TestSetupChoice | null> {
+export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSignal): Promise<TestSetup | null> {
 	if (signal?.aborted) return Promise.resolve(null);
-	return new Promise<TestSetupChoice | null>((resolve) => {
+	return new Promise<TestSetup | null>((resolve) => {
 		const n = opts.questionCount;
 		let setup: TestSetup = { ...opts.defaults };
-		let keep = opts.examByDefault;
 		let lastMinutes = setup.timeLimitMinutes ?? fallbackExamDuration(n);
 		let answered = false;
 		let handle: { close(): void } | null = null;
 
-		const answer = (choice: TestSetupChoice | null): void => {
+		const answer = (choice: TestSetup | null): void => {
 			if (answered) return;
 			answered = true;
 			signal?.removeEventListener("abort", onAbort);
@@ -133,125 +135,152 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 					if (help) ajouter(text, "span", "qbd-setup-help", help);
 					return { row: r, side: ajouter(r, "div", "qbd-setup-side") };
 				};
-				/** A switch: a real button with `role="switch"`; a click on its row toggles it too. */
-				const makeSwitch = (parent: HTMLElement, rowEl: HTMLElement, key: string, onToggle: (on: boolean) => void): HTMLButtonElement => {
+				/** A switch: a real button with `role="switch"`; a click on its row toggles it too.
+				    `locked`: shown but not operable (`aria-disabled`, out of the tab order, no click). */
+				const makeSwitch = (parent: HTMLElement, rowEl: HTMLElement, key: string, locked: boolean, onToggle: (on: boolean) => void): HTMLButtonElement => {
 					const sw = ajouter(parent, "button", "qbd-setup-switch");
 					sw.type = "button";
 					sw.setAttribute("role", "switch");
 					sw.setAttribute("aria-labelledby", `${id}-${key}`);
 					ajouter(sw, "span", "qbd-setup-switch-thumb");
+					if (locked) {
+						sw.setAttribute("aria-disabled", "true");
+						sw.tabIndex = -1;
+						rowEl.classList.add("is-locked");
+						return sw;
+					}
 					sw.addEventListener("click", () => onToggle(sw.getAttribute("aria-checked") !== "true"));
 					rowEl.addEventListener("click", (e) => { if (!sw.contains(e.target as Node)) sw.click(); });
 					return sw;
 				};
+				/** A block that slides open and shut (grid rows 0fr <-> 1fr, see the CSS). */
+				const slide = (parent: HTMLElement, name: string): { slide: HTMLElement; body: HTMLElement } => {
+					const s = ajouter(parent, "div", `qbd-setup-slide qbd-setup-${name}`);
+					return { slide: s, body: ajouter(ajouter(s, "div", "qbd-setup-slide-clip"), "div", `qbd-setup-${name}-body`) };
+				};
 
-				// ── Exam mode, and under it Keep exam mode: one tinted card ──
+				/** Hints, Time limit and its total duration, drawn once in the Exam card
+				    (`locked`) and once below it. Both paint the same `setup`. */
+				interface SettingsRows {
+					/** Paints `setup` on the controls, in place: the focus never moves. */
+					paint(): void;
+					/** Leaving the field, or starting: an empty or unusable text goes back
+					    to the current duration, a number out of range is brought within it. */
+					commit(): void;
+				}
+				const buildRows = (parent: HTMLElement, locked: boolean): SettingsRows => {
+					const k = locked ? "-in" : "";
+
+					// ── Hints ──
+					const hints = row(parent, "lightbulb", `hints${k}`, t("engine.testSetup.hints"));
+					const hintsSwitch = makeSwitch(hints.side, hints.row, `hints${k}`, locked, (on) => {
+						setup = withHints(setup, on);
+						sync();
+					});
+
+					// ── Time limit, and its total duration ──
+					const limit = row(parent, "timer", `limit${k}`, t("engine.testSetup.timeLimit"));
+					const limitSwitch = makeSwitch(limit.side, limit.row, `limit${k}`, locked, (on) => {
+						setup = withTimeLimit(setup, on ? lastMinutes : null, n);
+						if (setup.timeLimitMinutes !== null) lastMinutes = setup.timeLimitMinutes;
+						sync();
+					});
+
+					// The sub-row slides open under Time limit, and stays editable when locked.
+					const duration = slide(parent, "duration");
+					ajouter(duration.body, "span", "qbd-setup-label", t("engine.testSetup.duration")).id = `${id}-duration${k}`;
+					const controls = ajouter(duration.body, "div", "qbd-setup-controls");
+					const segments = ajouter(controls, "div", "qbd-setup-segments");
+					segments.setAttribute("role", "group");
+					segments.setAttribute("aria-labelledby", `${id}-duration${k}`);
+					const segmentButtons = DURATION_SHORTCUTS.map((minutes) => {
+						const b = ajouter(segments, "button", "qbd-setup-segment", t("engine.testSetup.shortcut", { minutes }));
+						b.type = "button";
+						b.addEventListener("click", () => {
+							setup = withTimeLimit(setup, minutes, n);
+							lastMinutes = minutes;
+							sync();
+						});
+						return { minutes, b };
+					});
+					const fieldBox = ajouter(controls, "div", "qbd-setup-fieldbox");
+					const field = ajouter(fieldBox, "input", "qbd-setup-field");
+					field.type = "number";
+					field.min = "1";
+					field.max = "300";
+					field.step = "1";
+					field.inputMode = "numeric";
+					field.setAttribute("aria-labelledby", `${id}-duration${k}`);
+					ajouter(fieldBox, "span", "qbd-setup-unit", t("engine.testSetup.minutesUnit"));
+
+					const paintSegments = (): void => {
+						for (const { minutes, b } of segmentButtons) b.setAttribute("aria-pressed", String(setup.timeLimitMinutes === minutes));
+					};
+					/** The typed text as it stands: a whole number within [1, 300] is
+					    taken at once (the shortcuts follow); anything else waits for
+					    `commit`, and never reaches the setup. */
+					field.addEventListener("input", () => {
+						const v = field.value.trim() === "" ? NaN : Number(field.value);
+						const valid = Number.isInteger(v) && v >= 1 && v <= 300;
+						field.setAttribute("aria-invalid", valid || field.value.trim() === "" ? "false" : "true");
+						if (!valid) return;
+						setup = withTimeLimit(setup, v, n);
+						lastMinutes = v;
+						paintSegments();
+					});
+					const commit = (): void => {
+						if (setup.timeLimitMinutes === null) return;
+						const raw = field.value.trim();
+						if (raw !== "" && Number.isFinite(Number(raw))) {
+							setup = withTimeLimit(setup, Number(raw), n);
+							lastMinutes = setup.timeLimitMinutes as number;
+						}
+						field.setAttribute("aria-invalid", "false");
+						sync();
+					};
+					field.addEventListener("change", commit);
+
+					return {
+						paint: () => {
+							hintsSwitch.setAttribute("aria-checked", String(setup.hints));
+							limitSwitch.setAttribute("aria-checked", String(setup.timeLimitMinutes !== null));
+							duration.slide.classList.toggle("is-open", setup.timeLimitMinutes !== null);
+							if (setup.timeLimitMinutes !== null && document.activeElement !== field) field.value = String(setup.timeLimitMinutes);
+							paintSegments();
+						},
+						commit,
+					};
+				};
+
+				// ── Exam mode: one tinted card. Switched on, it slides open around
+				//    the locked Hints and Time limit; switched off it shrinks back ──
 				const examCard = ajouter(c, "div", "qbd-setup-exam");
 				const exam = row(examCard, "graduation-cap", "exam", t("engine.testSetup.examMode"), t("engine.testSetup.examModeHelp"));
-				const examSwitch = makeSwitch(exam.side, exam.row, "exam", (on) => {
+				const examSwitch = makeSwitch(exam.side, exam.row, "exam", false, (on) => {
 					// Turning Exam mode on brings back the last duration, not the fallback rule.
 					setup = withExamMode({ ...setup, timeLimitMinutes: setup.timeLimitMinutes ?? lastMinutes }, on, n);
 					sync();
 				});
+				const insideSlide = slide(examCard, "inside");
+				const lockNote = ajouter(insideSlide.body, "p", "qbd-setup-locknote");
+				ui.setIcon(ajouter(lockNote, "span", "qbd-setup-locknote-ico"), "lock");
+				ajouter(lockNote, "span", undefined, t("engine.testSetup.examLocked"));
+				const inside = buildRows(insideSlide.body, true);
 
-				let keepBox: HTMLInputElement | null = null;
-				if (opts.canKeep) {
-					const keepRow = ajouter(examCard, "label", "qbd-setup-keep");
-					keepBox = ajouter(keepRow, "input", "qbd-setup-check");
-					keepBox.type = "checkbox";
-					ui.setIcon(ajouter(keepRow, "span", "qbd-setup-box"), "check");
-					ajouter(keepRow, "span", undefined, t("engine.testSetup.keepExam"));
-					keepBox.addEventListener("change", () => { keep = (keepBox as HTMLInputElement).checked; });
-				}
+				// ── The same settings, below the card, while Exam mode is off ──
+				const outsideSlide = slide(c, "outside");
+				ajouter(outsideSlide.body, "div", "qbd-setup-sep");
+				const outside = buildRows(ajouter(outsideSlide.body, "div", "qbd-setup-rows"), false);
 
-				ajouter(c, "div", "qbd-setup-sep");
-				const rows = ajouter(c, "div", "qbd-setup-rows");
-
-				// ── Hints ──
-				const hints = row(rows, "lightbulb", "hints", t("engine.testSetup.hints"));
-				const hintsSwitch = makeSwitch(hints.side, hints.row, "hints", (on) => {
-					setup = withHints(setup, on);
-					sync();
-				});
-
-				// ── Time limit, and its total duration ──
-				const limit = row(rows, "timer", "limit", t("engine.testSetup.timeLimit"));
-				const limitSwitch = makeSwitch(limit.side, limit.row, "limit", (on) => {
-					setup = withTimeLimit(setup, on ? lastMinutes : null, n);
-					if (setup.timeLimitMinutes !== null) lastMinutes = setup.timeLimitMinutes;
-					sync();
-				});
-
-				// The sub-row slides open under Time limit (grid rows 0fr -> 1fr, see the CSS).
-				const durationRow = ajouter(rows, "div", "qbd-setup-duration");
-				const durationBody = ajouter(ajouter(durationRow, "div", "qbd-setup-duration-clip"), "div", "qbd-setup-duration-body");
-				ajouter(durationBody, "span", "qbd-setup-label", t("engine.testSetup.duration")).id = `${id}-duration`;
-				const controls = ajouter(durationBody, "div", "qbd-setup-controls");
-				const segments = ajouter(controls, "div", "qbd-setup-segments");
-				segments.setAttribute("role", "group");
-				segments.setAttribute("aria-labelledby", `${id}-duration`);
-				const segmentButtons = DURATION_SHORTCUTS.map((minutes) => {
-					const b = ajouter(segments, "button", "qbd-setup-segment", t("engine.testSetup.shortcut", { minutes }));
-					b.type = "button";
-					b.addEventListener("click", () => {
-						setup = withTimeLimit(setup, minutes, n);
-						lastMinutes = minutes;
-						sync();
-					});
-					return { minutes, b };
-				});
-				const fieldBox = ajouter(controls, "div", "qbd-setup-fieldbox");
-				const field = ajouter(fieldBox, "input", "qbd-setup-field");
-				field.type = "number";
-				field.min = "1";
-				field.max = "300";
-				field.step = "1";
-				field.inputMode = "numeric";
-				field.setAttribute("aria-labelledby", `${id}-duration`);
-				ajouter(fieldBox, "span", "qbd-setup-unit", t("engine.testSetup.minutesUnit"));
-
-				/** The typed text as it stands: a whole number within [1, 300] is
-				    taken at once (the shortcuts follow); anything else waits for
-				    `commit`, and never reaches the setup. */
-				field.addEventListener("input", () => {
-					const v = field.value.trim() === "" ? NaN : Number(field.value);
-					const valid = Number.isInteger(v) && v >= 1 && v <= 300;
-					field.setAttribute("aria-invalid", valid || field.value.trim() === "" ? "false" : "true");
-					if (!valid) return;
-					setup = withTimeLimit(setup, v, n);
-					lastMinutes = v;
-					syncSegments();
-				});
-				/** Leaving the field, or starting: an empty or unusable text goes back
-				    to the current duration, a number out of range is brought within it. */
-				const commit = (): void => {
-					if (setup.timeLimitMinutes === null) return;
-					const raw = field.value.trim();
-					if (raw !== "" && Number.isFinite(Number(raw))) {
-						setup = withTimeLimit(setup, Number(raw), n);
-						lastMinutes = setup.timeLimitMinutes as number;
-					}
-					field.setAttribute("aria-invalid", "false");
-					sync();
-				};
-				field.addEventListener("change", commit);
-
-				function syncSegments(): void {
-					for (const { minutes, b } of segmentButtons) b.setAttribute("aria-pressed", String(setup.timeLimitMinutes === minutes));
-				}
-				/** Paints the state on the controls, in place: the focus never moves. */
+				/** The copy of the rows that is on show. */
+				const shown = (): SettingsRows => (isExamSetup(setup) ? inside : outside);
 				function sync(): void {
 					const isExam = isExamSetup(setup);
 					examSwitch.setAttribute("aria-checked", String(isExam));
-					hintsSwitch.setAttribute("aria-checked", String(setup.hints));
-					limitSwitch.setAttribute("aria-checked", String(setup.timeLimitMinutes !== null));
-					if (keepBox) {
-						keepBox.disabled = !isExam;
-						keepBox.checked = isExam && keep;
-					}
-					durationRow.classList.toggle("is-open", setup.timeLimitMinutes !== null);
-					if (setup.timeLimitMinutes !== null && document.activeElement !== field) field.value = String(setup.timeLimitMinutes);
-					syncSegments();
+					insideSlide.slide.classList.toggle("is-open", isExam);
+					outsideSlide.slide.classList.toggle("is-open", !isExam);
+					inside.paint();
+					outside.paint();
 				}
 				sync();
 
@@ -263,8 +292,8 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 				ajouter(start, "span", undefined, t("engine.testSetup.start"));
 				poserBouton3d(start);
 				const begin = (): void => {
-					commit();
-					answer({ setup: { ...setup }, keep });
+					shown().commit();
+					answer({ ...setup });
 				};
 				start.addEventListener("click", begin);
 

@@ -48,7 +48,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.testSetup.shortcut": "{minutes} min",
 	"engine.testSetup.minutesUnit": "min",
 	"engine.testSetup.start": "Lancer le test",
-	"engine.testSetup.keepFailed": "Le test a démarré, mais la note n'a pas pu être mise à jour : elle a changé depuis son ouverture.",
+	"engine.testSetup.examLocked": "Réglé par le mode examen",
 
 	/* ── Rendre un Test (engine/hand-in.ts) ── */
 	"engine.handIn.button": "Rendre le test",

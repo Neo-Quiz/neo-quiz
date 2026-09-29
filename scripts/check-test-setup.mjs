@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup, keepExamChange }) => {
+await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup, keepExamChange, examMinutesToKeep }) => {
 	const r = makeReporter("Test setup (pure core)");
 
 	/* Defaults: a plain Test, or an Exam when the file says so. */
@@ -97,5 +97,15 @@ await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withE
 		keepExamChange(true, 45, timed, true), undefined);
 	r.check("keep: unchecking the box on a kept note takes Exam mode out; on a note that is not kept, nothing",
 		[keepExamChange(true, 45, timed, false), keepExamChange(false, null, timed, false)], [null, undefined]);
+
+	/* The duration the quiz menu's "Keep exam mode" writes: what the quiz was
+	   last played with, else the note's, else the fallback rule; always within
+	   [1, 300]. */
+	r.check("keep from the menu: the remembered duration wins over the note's",
+		examMinutesToKeep(60, 45, 20), 60);
+	r.check("keep from the menu: without one, the note's duration; without either, the fallback rule (20 questions = 30)",
+		[examMinutesToKeep(null, 45, 20), examMinutesToKeep(null, null, 20)], [45, 30]);
+	r.check("keep from the menu: an unusable remembered duration falls through, a huge one is clamped",
+		[examMinutesToKeep(0, 45, 20), examMinutesToKeep(999, null, 20)], [45, 300]);
 	r.done();
 });

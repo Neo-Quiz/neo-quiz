@@ -25,7 +25,7 @@ import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
 import { renderInteractiveQuiz } from "../../../../src/engine";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
-import { extractExamOptions, parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
+import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { ajouter } from "../../../../src/dom";
 import { quizModeIcon, quizModeLabel } from "../../../../src/dashboard/quiz-card";
 import { brancherPerles } from "./perles";
@@ -177,17 +177,11 @@ export async function openQuizPage(
 		/* `parseQuizSource` THROWS on invalid JSON5 — hence the try: a half-written
 		   block must say why, not leave an empty screen. */
 		const quiz = parseQuizSource(bloc[1]);
-		/* The app's side of "Set up your test": the modal, the settings last used
-		   for this quiz, and "Keep exam mode" written into the note. A Learn
-		   never asks (the engine skips it) and cannot hold Keep exam mode. */
-		const { quizMode, examOptions } = extractExamOptions(quiz);
+		/* The app's side of "Set up your test": the modal and the settings last
+		   used for this quiz. A Learn never asks (the engine skips it). */
 		setupPage = createTestSetupPage({
 			path: entry.path,
 			title: entry.title,
-			block: bloc[1],
-			kept: quizMode === "exam",
-			minutes: examOptions?.durationMinutes ?? null,
-			canKeep: quizMode !== "lesson",
 			remembered: await testSetups(),
 		});
 		await renderInteractiveQuiz({

@@ -16,6 +16,7 @@ import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
 import { freeNotePath } from "./folder-create";
 import { quizFreres } from "./course-pairs";
+import { keepExamMenuItem } from "./exam-keep-menu";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
@@ -545,6 +546,9 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				submenu: sousItems,
 			});
 		}
+		// « Keep exam mode » (a Test only): checkable, written into the note.
+		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
+		if (keepExam) items.push(keepExam);
 		// Même règle que Partager : sans `renameQuiz`, pas d'entrée. Rendre
 		// « Renommer » sur `HostFs.rename` casserait les liens entrants en
 		// silence — une entrée qui n'existe pas vaut mieux qu'une qui ment.
