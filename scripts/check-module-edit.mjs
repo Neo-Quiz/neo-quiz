@@ -184,6 +184,16 @@ await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours,
 	r.check("two of one mode among three: no course either",
 		quizFreres(q(`${D}/Y.md`, "Y", "exam"), [q(`${D}/Y.md`, "Y", "exam"), q(`${D}/Y 2.md`, "Y", "exam"), q(`${D}/Y — Learn.md`, "Y", "learn")]), []);
 	r.check("setting off: one card per quiz", regrouperParCours(liste, false).map(c => c.freres.length), [0, 0, 0, 0, 0, 0, 0]);
+	/* A Test named "— Practice" whose block was switched to `mode: "exam"`
+	   ("Keep exam mode" does not rename the note): titled through the real
+	   scanner rule, it still pairs with its Learn. */
+	await withSrcModule("src/quiz-format.ts", ({ titreSansMode }) => {
+		const s = (base, mode) => q(`${D}/${base}.md`, titreSansMode(base, mode), mode);
+		const kept = [s("CM1 — Learn", "learn"), s("CM1 — Practice", "exam"), s("TP1 — Learn", "learn"), s("TP1 — Exam (2)", "practice")];
+		r.check("a Practice-named note in exam mode is titled without suffix and grouped with its Learn",
+			[kept[1].title, kept[3].title, regrouperParCours(kept, true).map(c => [nom(c.quiz), c.freres.map(nom)])],
+			["CM1", "TP1 (2)", [["CM1 — Learn.md", ["CM1 — Practice.md"]], ["TP1 — Learn.md", []], ["TP1 — Exam (2).md", []]]]);
+	});
 	r.done();
 });
 

@@ -168,23 +168,33 @@ export function nomDeNote(base: string, mode: ModeQuiz): string {
 	return base + suffixeDeMode(mode);
 }
 
+/** The suffixes a note of `mode` may carry. A Learn has one; a Test (Practice
+    or Exam) is ONE file whose suffix is "— Practice" (new notes) or "— Exam"
+    (older notes), and "Keep exam mode" flips the block's `mode` WITHOUT
+    renaming the note: the block's mode says nothing reliable about which of
+    the two the name carries, so a Test accepts both. */
+function suffixesAcceptes(mode: ModeQuiz): string[] {
+	return mode === "learn" ? [suffixeDeMode("learn")] : [suffixeDeMode("practice"), suffixeDeMode("exam")];
+}
+
 /** A note name split into its base and the counter `freeNotePath`
     (dashboard/folder-create.ts) adds on a collision — "CM1 — Exam (2)" →
-    { base: "CM1", counter: " (2)" } for an Exam. `null` when the name does
-    not end with the suffix of `mode` (with or without a counter). */
+    { base: "CM1", counter: " (2)" }. `null` when the name does not end with
+    a suffix `mode` accepts (`suffixesAcceptes`), with or without a counter. */
 export function separerNomDeNote(nom: string, mode: ModeQuiz): { base: string; counter: string } | null {
-	const suffixe = suffixeDeMode(mode);
 	const m = nom.match(/ \(\d+\)$/);
 	const counter = m ? m[0] : "";
 	const sans = counter ? nom.slice(0, -counter.length) : nom;
-	if (!sans.endsWith(suffixe) || sans.length <= suffixe.length) return null;
-	return { base: sans.slice(0, -suffixe.length), counter };
+	const suffixe = suffixesAcceptes(mode).find(s => sans.endsWith(s) && sans.length > s.length);
+	return suffixe ? { base: sans.slice(0, -suffixe.length), counter } : null;
 }
 
-/** A note's displayed title: its name WITHOUT the suffix of its mode, which
-    the badge already says — a collision counter stays ("CM1 — Exam (2)" →
-    "CM1 (2)"). Only the suffix of the block's REAL mode is stripped: a
-    Practice named "… — Learn" by hand keeps its whole name. */
+/** A note's displayed title: its name WITHOUT the suffix its mode accepts,
+    which the badge already says — a collision counter stays ("CM1 — Exam (2)"
+    → "CM1 (2)"). A Test strips "— Practice" and "— Exam" whatever its block's
+    mode (see `suffixesAcceptes`), so a Practice-named note switched to exam
+    mode still pairs with its Learn; a Practice named "… — Learn" by hand
+    keeps its whole name. */
 export function titreSansMode(nom: string, mode: ModeQuiz): string {
 	const parts = separerNomDeNote(nom, mode);
 	return parts ? parts.base + parts.counter : nom;

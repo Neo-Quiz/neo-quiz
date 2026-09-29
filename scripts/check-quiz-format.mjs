@@ -27,9 +27,14 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.check("a collision counter after the suffix stays in the title (freeNotePath's \" (2)\")",
 		[titreSansMode("CM1 — Exam (2)", "exam"), titreSansMode("Réseaux — Practice (12)", "practice"), titreSansMode("CM1 (2)", "exam"), titreSansMode("CM1 — Exam(2)", "exam")],
 		["CM1 (2)", "Réseaux (12)", "CM1 (2)", "CM1 — Exam(2)"]);
-	r.check("a suffix that is not the real mode's stays, and so does a name that is ONLY the suffix",
-		[titreSansMode("CM1 — Learn", "practice"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice"), titreSansMode("CM1 — Exam", "practice"), titreSansMode("CM1 — Practice", "exam")],
-		["CM1 — Learn", " — Learn", "Quiz libre", "CM1 — Exam", "CM1 — Practice"]);
+	r.check("a Learn suffix on a Test stays, and so does a name that is ONLY the suffix",
+		[titreSansMode("CM1 — Learn", "practice"), titreSansMode("CM1 — Learn", "exam"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice"), titreSansMode(" — Practice", "exam"), titreSansMode("CM1 — Practice", "learn"), titreSansMode("CM1 — Exam", "learn")],
+		["CM1 — Learn", "CM1 — Learn", " — Learn", "Quiz libre", " — Practice", "CM1 — Practice", "CM1 — Exam"]);
+	/* A Test is ONE file named "— Practice" (new) or "— Exam" (older);
+	   "Keep exam mode" flips the block's mode without renaming the note. */
+	r.check("a Test strips either suffix whatever its block's mode, counter kept",
+		[titreSansMode("CM1 — Practice", "exam"), titreSansMode("CM1 — Exam (2)", "practice"), titreSansMode("CM1 — Exam", "practice"), titreSansMode("CM1 — Practice (3)", "exam")],
+		["CM1", "CM1 (2)", "CM1", "CM1 (3)"]);
 	const q = (o) => ({ title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que.", ...o });
 
 	r.check("bloc sans objet de mode = Practice", modeDuBloc([q()]), "practice");
