@@ -936,7 +936,9 @@
 
 @media (min-width: 1000px) {
 	.qbd-quizzes-drill-grid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		/* StudySmarter's study set cards are 367 px wide (measured
+		   2026-09-29): three columns up to that width, narrower below. */
+		grid-template-columns: repeat(3, minmax(0, 367px));
 	}
 }
 
@@ -948,11 +950,54 @@
 	grid-template-columns: minmax(0, 1fr);
 }
 
-/* THE FOLDER'S COLOUR BAR on each quiz card of an open folder (2026-09-29,
-   after StudySmarter's study set cards: a 4 px bar across the top, clipped
-   by the card's rounded corners). `--accent` is the folder's colour, set on
-   the drill layout (quizzes-render.ts). Only here: the same card variant
-   also paints the home page, where no folder gives it a colour. */
+/* ══════════════════════════════════════════════════════════
+   A QUIZ CARD IN AN OPEN FOLDER (2026-09-29)
+
+   THE DIMENSIONS of StudySmarter's study set card, measured over the
+   DevTools protocol: 367 × 136 px, padding 16 / 12 / 8, a 16 px title on
+   24 px lines in a 36 px band, 14 px counts on 21 px lines, 8 px between
+   the three rows, a footer under a hairline with 8 px above its 28 px row
+   of 12 px pills, and 36 px icon buttons that overflow that row by 4 px
+   rather than grow it. The 15 px corners stay: the folder cards on the
+   Folders page have the same, and two card families on one app have no
+   reason to have two shapes.
+
+   THE EFFECT is the app's, not StudySmarter's (their card only changes
+   its background on hover): the same family as the folder cards
+   (`.qbd-module-card`) — no lift, a halo that brightens and a veil that
+   lightens on hover, a slight press — with the halo coming down from the
+   folder's colour bar instead of the top-left corner. Only here: the same
+   card variant also paints other pages, where no folder gives it a colour.
+   `--accent` is the folder's colour, set on the drill layout
+   (quizzes-render.ts).
+══════════════════════════════════════════════════════════ */
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder {
+	--glow: color-mix(in oklab, var(--accent) 40%, transparent);
+	--border-c: color-mix(in oklab, var(--accent) 45%, var(--border-soft));
+	box-sizing: border-box;
+	padding: 16px 12px 8px;
+	background:
+		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
+		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
+	transition: var(--qbd-carte-transition);
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:hover {
+	transform: none;
+	--qbd-halo: 20%;
+	--qbd-voile: var(--qbd-carte-voile-survol);
+	background:
+		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
+		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
+	border-color: var(--border-c);
+	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), var(--qbd-carte-ombre-survol);
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active {
+	--qbd-voile: var(--qbd-carte-voile-clic);
+	transform: scale(var(--qbd-carte-echelle-clic));
+	transition: var(--qbd-carte-transition-clic);
+}
+/* The colour bar: 4 px across the top, clipped by the rounded corners,
+   with a soft glow of its own colour just under it. */
 .qbd-quizzes-drill-grid .qbd-quiz-card--folder::before {
 	content: "";
 	position: absolute;
@@ -961,7 +1006,56 @@
 	right: 0;
 	height: 4px;
 	background: var(--accent);
+	box-shadow: 0 1px 8px color-mix(in oklab, var(--accent) 60%, transparent);
 	pointer-events: none;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-text {
+	gap: 8px;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-title {
+	min-height: 36px;
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 24px;
+	letter-spacing: -0.01em;
+	/* Two lines at most, as StudySmarter's "two-liner". */
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-count {
+	font-size: 14px;
+	line-height: 21px;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-modes {
+	gap: 8px;
+	margin-top: 0;
+	padding-top: 8px;
+	border-top-color: color-mix(in srgb, var(--text-normal) 6%, transparent);
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn {
+	gap: 4px;
+	padding: 4px 8px 4px 6px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 6%, transparent);
+	font-size: 12px;
+	line-height: 16px;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-icon svg {
+	width: 14px;
+	height: 14px;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-modes .qbd-card-more {
+	width: 36px;
+	height: 36px;
+	margin: -4px -4px -4px auto;
+}
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-card-more svg {
+	width: 20px;
+	height: 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active { transform: none; }
 }
 
 /* ── Sélecteur Contenu | Progression, entre le titre et « Nouveau quiz ». ── */
