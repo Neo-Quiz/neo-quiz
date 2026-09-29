@@ -48,6 +48,7 @@ release notes.
 - C and C++ code blocks run in a quiz like Python ones: the compiler (Clang, in WebAssembly, isolated from your files and the network) is downloaded the first time you run C or C++, and can be removed in Settings › Languages.
 - Code blocks shown in a quiz carry the icon of their language at the top left, the one VS Code shows by default (about sixty languages recognized, from Python and C to SQL, YAML or Dockerfile), with its full name on hover, and are coloured for each of them.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
+- Home opens on a band of light above its first card: a line of light that slowly breathes, with a highlight running along it (still when the system asks for reduced motion).
 
 ### Changed
 - Home starts with its folder cards and calendar: Quick actions now creates or imports folders below the calendar, and Resume moves below the folder cards.

@@ -203,9 +203,84 @@
 .qbd-root .qbd-resume-cta { flex: 0 0 auto; align-self: center; }
 .qbd-resume-cta .qbd-cta3d-face { padding: 10px 20px; font-size: 14px; }
 
-/* The page keeps the breathing space the removed stats band had above it
-   (2026-09-29), so its first card does not stick to the tile's top edge. */
-.qbd-home-page { padding-top: 28px; }
+/* THE HALO BAND (2026-09-29): the empty space above the first card, lit.
+   A line of light across the band, fading out at both ends; under it a
+   wide soft glow that breathes; along it a brighter highlight that runs
+   from left to right and fades out, then again. Everything is drawn INSIDE
+   the band and faded at its edges, so nothing is cut by the tile's edge —
+   what made the previous glow read as a smear. Only `transform` and
+   `opacity` move: compositor work, no repaint of the page. */
+.qbd-home-halo {
+	position: relative;
+	height: 84px;
+	margin-bottom: 4px;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+/* The glow, wider than tall, centred on the line. */
+.qbd-home-halo::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(ellipse 34% 60% at 50% 55%, color-mix(in srgb, var(--interactive-accent) 30%, transparent), transparent 70%),
+		radial-gradient(ellipse 22% 45% at 58% 55%, color-mix(in srgb, var(--color-purple) 22%, transparent), transparent 70%);
+	animation: qbd-home-halo-breathe 7s ease-in-out infinite;
+}
+
+/* The line: an 11 px strip whose middle pixel is the line of light and
+   whose height holds its soft vertical glow. A MASK fades both ends — the
+   line, its glow AND the running highlight — so the highlight dims where
+   the line does instead of staying bright past its faded end. */
+.qbd-home-halo-line {
+	position: absolute;
+	left: 12%;
+	right: 12%;
+	top: calc(55% - 5px);
+	height: 11px;
+	background:
+		linear-gradient(90deg, var(--interactive-accent), var(--color-purple) 55%, var(--interactive-accent)) center / 100% 1px no-repeat,
+		linear-gradient(180deg, transparent, color-mix(in srgb, var(--interactive-accent) 26%, transparent) 50%, transparent);
+	-webkit-mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent);
+	mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent);
+	opacity: 0.85;
+}
+
+/* The highlight running along the line: a short bright streak. */
+.qbd-home-halo-line::after {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 0;
+	width: 22%;
+	height: 5px;
+	border-radius: 999px;
+	background: radial-gradient(ellipse at center, #ffffff 0%, color-mix(in srgb, var(--interactive-accent) 70%, transparent) 40%, transparent 70%);
+	animation: qbd-home-halo-run 5.5s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes qbd-home-halo-breathe {
+	0%, 100% { opacity: 0.55; transform: scaleX(0.92); }
+	50% { opacity: 1; transform: scaleX(1.04); }
+}
+
+@keyframes qbd-home-halo-run {
+	0% { transform: translateX(-30%); opacity: 0; }
+	15% { opacity: 1; }
+	70% { opacity: 1; }
+	85%, 100% { transform: translateX(420%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-home-halo::before,
+	.qbd-home-halo-line::after {
+		animation: none;
+	}
+	.qbd-home-halo-line::after {
+		opacity: 0;
+	}
+}
 
 /* ══ FOLDERS + WEEK ═════════════════════════════════════════ */
 .qbd-home-layout {
