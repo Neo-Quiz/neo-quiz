@@ -56,9 +56,14 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json", "--model", modele]);
 		case "claude":
 			/* `--tools` vaut "" (aucun outil) ou "Read", et Read seulement
-			   quand des images sont jointes : le modèle les lit par leur jeton. */
+			   quand des images sont jointes : le modèle les lit par leur jeton.
+			   The output is a STREAM since 2026-09-29 (live transcript):
+			   `stream-json` requires `--verbose` in print mode, and
+			   `--include-partial-messages` adds the text as it is written.
+			   Three output options, no capability: the plain `json` form is
+			   gone, so there is still exactly one shape. */
 			return correspond(a, [
-				"-p", "--output-format", "json", "--model", modele,
+				"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
 				"--tools", (t: string) => t === "" || t === "Read",
 				"--no-session-persistence", "--setting-sources", "",
 			]);

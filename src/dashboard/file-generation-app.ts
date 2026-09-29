@@ -35,6 +35,8 @@ import type { DemandeTexte } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
+import { appliquer, transcriptVide } from "./transcript";
+import type { Transcript } from "./transcript";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -112,6 +114,13 @@ export interface FileGenerationApp {
 	/** `affichee` dit si l'abonné est à l'écran : sans aucun abonné affiché,
 	    un quiz prêt se signale par un avis. Rend le désabonnement. */
 	abonner(ecouteur: () => void, affichee: () => boolean): () => void;
+	/** The live transcript of a line (2026-09-29), `null` before its run
+	    starts or for a provider that does not stream. */
+	transcript(id: number): Transcript | null;
+	/** Called with a line's id each time its transcript grows — at most
+	    every 80 ms, so a view updates the transcript in place instead of
+	    repainting the whole queue on every chunk. Returns the unsubscribe. */
+	abonnerTranscript(ecouteur: (id: number) => void): () => void;
 }
 
 let instance: FileGenerationApp | null = null;
@@ -132,6 +141,26 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	const abonnes = new Set<{ ecouteur: () => void; affichee: () => boolean }>();
 	let clientCourant: AiClient | null = null;
 	const etapes = new Map<number, EtapeGeneration>();
+	/* The transcripts, by line, and who repaints them. Chunks arrive many
+	   times a second: the listeners hear of it once per 80 ms at most. */
+	const transcripts = new Map<number, Transcript>();
+	const ecouteursTranscript = new Set<(id: number) => void>();
+	const transcriptsChanges = new Set<number>();
+	let minuteurTranscript: ReturnType<typeof setTimeout> | null = null;
+	function transcriptChange(id: number): void {
+		transcriptsChanges.add(id);
+		if (minuteurTranscript !== null) return;
+		minuteurTranscript = setTimeout(() => {
+			minuteurTranscript = null;
+			const ids = [...transcriptsChanges];
+			transcriptsChanges.clear();
+			for (const e of [...ecouteursTranscript]) {
+				for (const id of ids) {
+					try { e(id); } catch (err) { console.warn(LOG_PREFIX, "transcript listener failed:", err); }
+				}
+			}
+		}, 80);
+	}
 	/** Change l'étape affichée d'une ligne et prévient les abonnés. */
 	function etapeDe(id: number, e: EtapeGeneration | null): void {
 		if (e) etapes.set(id, e); else etapes.delete(id);
@@ -184,7 +213,17 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			// Annulée pendant la préparation : aucun processus n'est encore lancé.
 			if (!tourne(ligne.id)) return;
 			etapeDe(ligne.id, "redaction");
-			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie });
+			const transcript = transcriptVide();
+			transcripts.set(ligne.id, transcript);
+			const reponse = await client.generate(prompt, {
+				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie,
+				onTranscript: (ev) => {
+					// A stopped or retried line no longer owns this transcript.
+					if (transcripts.get(ligne.id) !== transcript) return;
+					appliquer(transcript, ev);
+					transcriptChange(ligne.id);
+				},
+			});
 			if (!tourne(ligne.id)) return;
 			/* The final configuration FIRST, merged: a model that answers with two
 			   consecutive objects (the mode in one, the glossary in the other, in
@@ -271,12 +310,19 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			publier();
 		},
 		reessayer(id) {
+			transcripts.delete(id);
 			file = F.reessayer(file, id);
 			pomper();
 		},
 		fermer(id) {
+			transcripts.delete(id);
 			file = F.fermer(file, id);
 			publier();
+		},
+		transcript: (id) => transcripts.get(id) ?? null,
+		abonnerTranscript(ecouteur) {
+			ecouteursTranscript.add(ecouteur);
+			return () => { ecouteursTranscript.delete(ecouteur); };
 		},
 		abonner(ecouteur, affichee) {
 			const a = { ecouteur, affichee };

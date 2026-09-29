@@ -499,7 +499,11 @@ export interface Pont {
 	 * qui constate si le serveur répond, jamais ce booléen.
 	 */
 	processus: {
-		run(spec: RequeteCli, requeteId: number): Promise<ResultatCli>;
+		/** `flux`: stream the CLI's standard output to THIS window as it
+		    arrives (`surFlux`), for the live transcript of a generation. Only
+		    a boolean crosses; what comes back is the text `run` returns anyway
+		    at the end, sent to the window that asked and to no other. */
+		run(spec: RequeteCli, requeteId: number, flux?: boolean): Promise<ResultatCli>;
 		annuler(requeteId: number): Promise<void>;
 		lireCache(tool: "claude" | "codex"): Promise<{ mtimeMs: number; json: unknown; catalogue?: unknown } | null>;
 		ollamaInstalle(): Promise<boolean>;
@@ -531,6 +535,9 @@ export interface Pont {
 		    `surveillerCachesCli`). Seul le NOM de l'outil traverse, jamais un
 		    chemin ni un contenu : le rendu relit ensuite par `lireCache`. */
 		surCachesCli(rappel: (tool: "claude" | "codex") => void): () => void;
+		/** Subscribes to the standard output of the runs started with `flux`:
+		    the run's `requeteId` and a chunk of its text. */
+		surFlux(rappel: (requeteId: number, texte: string) => void): () => void;
 		/** S'abonne au moment où le navigateur de la connexion s'ouvre (les
 		    deux colonnes) : la modale doit alors se remesurer. */
 		surNavigateurOuvert(rappel: () => void): () => void;
@@ -782,6 +789,9 @@ export const CANAUX = {
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
 	processusAnnuler: "neo:process/annuler",
+	/** PUSHED by the main process: a chunk of the standard output of a run
+	    started with `flux` (live transcript, 2026-09-29). */
+	processusFlux: "neo:process/flux",
 	processusLireCache: "neo:process/lire-cache",
 	processusOllamaInstalle: "neo:process/ollama-installe",
 	processusDemarrerOllama: "neo:process/demarrer-ollama",

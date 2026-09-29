@@ -17,6 +17,8 @@ import { t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
+import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
+import type { TranscriptEvent } from "./transcript";
 
 /* ══════════════════════════════════════════════════════════
    AI CLIENT — Claude Code + Codex + Ollama
@@ -73,6 +75,10 @@ export interface GenerateOptions {
 	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi : son
 	    complément s'ajoute au prompt système. Absente ou `general` : rien. */
 	categorie?: CategorieQuiz;
+	/** The live transcript (2026-09-29, `transcript.ts`): each event of the
+	    CLI's work as it happens — Claude Code and Codex only; the other
+	    providers answer in one piece. */
+	onTranscript?: (event: TranscriptEvent) => void;
 }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
@@ -626,6 +632,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	// à l'état initial, pas comme une erreur.
 	let abortCurrent: (() => void) | null = null;
 	let aborted = false;
+	/** Where the running generation's transcript goes (`GenerateOptions`). */
+	let transcriptSink: ((event: TranscriptEvent) => void) | null = null;
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -663,7 +671,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	}): Promise<SortieCli> {
 		const ac = new AbortController();
 		abortCurrent = () => { aborted = true; try { ac.abort(); } catch (e) { /* déjà avorté */ } };
+		/* The live transcript: the output decoded line by line as it arrives,
+		   for the two CLIs that stream a format we read. */
+		const sink = transcriptSink;
+		const decode = sink && (spec.tool === "claude" || spec.tool === "codex") ? createTranscriptDecoder(spec.tool) : null;
 		return requireHost("process").run({
+			onStdout: decode && sink ? (chunk) => { for (const ev of decode(chunk)) sink(ev); } : undefined,
 			tool: spec.tool,
 			args: spec.args,
 			stdin: spec.stdin,
@@ -687,6 +700,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 
 	async function generate(prompt: string, options: GenerateOptions = {}): Promise<ReponseQuiz> {
 		aborted = false;
+		transcriptSink = options.onTranscript ?? null;
 		pendingUsage = null;
 		lastUsage = null;
 		/* L'INSTANTANÉ des fichiers de CLI, relu AVANT l'appel : `resolveCodexModel`
@@ -722,6 +736,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw err;
 		} finally {
 			abortCurrent = null;
+			transcriptSink = null;
 		}
 	}
 
@@ -968,8 +983,11 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			res = await runCli({
 				tool: "claude",
+				/* A STREAM (2026-09-29): the text arrives as it is written, for
+				   the live transcript; the last line, `result`, is the object
+				   `--output-format json` used to print (`claudeResultDuFlux`). */
 				args: [
-					"-p", "--output-format", "json", "--model", model,
+					"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
 					"--tools", tools, "--no-session-persistence", "--setting-sources", "",
 				],
 				marqueur,
@@ -1003,12 +1021,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				cache_creation_input_tokens?: number;
 			};
 		}
-		let data: ClaudeResult;
-		try {
-			data = JSON.parse(stdout);
-		} catch (e) {
-			throw new Error(t("ai.err.claudeUnreadable"));
-		}
+		const data = claudeResultDuFlux(stdout) as ClaudeResult | null;
+		if (!data) throw new Error(t("ai.err.claudeUnreadable"));
 
 		const u = data.usage;
 		if (u) {

@@ -106,6 +106,10 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.comptes.usage.codexSnapshotSansDate": "Photo du dernier lancement de Codex — l'heure exacte n'est pas disponible.",
 
 	"app.settings.general": "Général",
+	"app.settings.transcriptLayout": "Disposition des générations",
+	"app.settings.transcriptLayoutHint": "Comment vos demandes et le transcript en direct de chaque génération s'affichent dans Générer.",
+	"app.settings.transcriptFull": "Pleine largeur",
+	"app.settings.transcriptChat": "Discussion",
 	"app.settings.navFolders": "Dossiers",
 	"app.settings.navAi": "IA",
 	"app.settings.navAppearance": "Apparence",

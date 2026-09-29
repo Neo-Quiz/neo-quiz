@@ -546,6 +546,11 @@ export interface HostProcess {
 		    pas si l'hôte sépare par `/` ou `\`, et le deviner est exactement ce que
 		    ces jetons existent pour éviter. */
 		sortieFichier?: string;
+		/** The CLI's standard output AS IT ARRIVES, in chunks cut anywhere,
+		    for the live transcript of a generation (2026-09-29,
+		    `dashboard/transcript.ts`). The same text still comes back whole
+		    in `stdout` at the end. A host that cannot stream ignores it. */
+		onStdout?: (chunk: string) => void;
 	}): Promise<{ stdout: string; stderr: string; code: number | null; sortie?: string }>;
 	/** Le fichier de cache/config du CLI, à un chemin FIXE tenu par l'hôte
 	    (Codex : `$CODEX_HOME` ou `~/.codex/models_cache.json` ; Claude :

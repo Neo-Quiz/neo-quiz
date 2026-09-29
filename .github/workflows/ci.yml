@@ -45,6 +45,12 @@ jobs:
       - name: Quiz category detection
         run: npm run check:categorie
 
+      # THE LIVE TRANSCRIPT of a generation: a CLI line cut by the pipe is
+      # read once, a non-JSON line never breaks the stream, and the final
+      # result of a Claude stream-json output is always found.
+      - name: Generation transcript decoding
+        run: npm run check:transcript
+
       # LE MARKDOWN DE BLOC ET DE LIGNE d'un texte de quiz (paragraphes,
       # listes, tableaux, blocs de code colorés, images, liens) : gras et
       # italique interprétés, une formule LaTeX ou un chemin Windows laissés

@@ -33,10 +33,14 @@
 import type { HostProcess } from "../../../../src/host/types";
 import { pont } from "./pont";
 
-/** Le prochain identifiant d'appel. Un compteur et non un aléa : deux appels en
-    vol ne peuvent pas se confondre, et un identifiant réutilisé après la fin
-    d'un appel ne désigne plus rien côté principal. */
-let prochainId = 1;
+/** The next call id. A COUNTER, so two calls in flight never share one, and
+    an id reused after a call has ended no longer names anything in the main
+    process. */
+/* But a RANDOM start, not 1 (2026-09-29): the counter restarts with the page,
+   and a CLI of the previous page may still be running after a reload —
+   its streamed chunks (`surFlux`) carry ITS id, and must never land in the
+   transcript of a new run that happens to get the same number. */
+let prochainId = 1 + Math.floor(Math.random() * 1_000_000_000);
 
 /** Une erreur dont le `name` est celui que le contrat nomme — reconstruit
     depuis l'enveloppe du canal. */
@@ -54,7 +58,7 @@ export function createWindowsProcess(): HostProcess {
 			   rejetterait un `AbortSignal`, et `invoke` échouerait avant même que
 			   le principal ne voie l'appel. Le reste est recopié champ par champ —
 			   `RequeteCli` (`pont.ts`) dit exactement ce qui passe. */
-			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier } = spec;
+			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, onStdout } = spec;
 			/* Déjà annulé avant l'envoi : rien à lancer. Le contrat nomme cette
 			   issue `annule`, et le principal n'a pas à voir partir un CLI que
 			   personne n'attend plus. */
@@ -63,15 +67,26 @@ export function createWindowsProcess(): HostProcess {
 				void pont().processus.annuler(id);
 			};
 			signal?.addEventListener("abort", relayer, { once: true });
+			/* The live transcript: subscribed BEFORE the call, filtered on THIS
+			   run's id, dropped in `finally` — a chunk of another run, or of a
+			   run of the previous page, never reaches this listener. */
+			const desabonner = onStdout
+				? pont().processus.surFlux((requete, texte) => {
+					if (requete !== id) return;
+					try { onStdout(texte); } catch { /* the transcript never stops a run */ }
+				})
+				: null;
 			try {
 				const res = await pont().processus.run(
 					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier },
 					id,
+					!!onStdout,
 				);
 				if (!res.ok) throw erreurCli(res.nom, res.message);
 				return { stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
 			} finally {
 				signal?.removeEventListener("abort", relayer);
+				desabonner?.();
 			}
 		},
 		/* Le NOM, et rien d'autre. Un rejet du principal (outil hors liste)

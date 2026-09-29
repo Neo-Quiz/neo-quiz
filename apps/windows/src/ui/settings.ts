@@ -387,6 +387,18 @@ export function renderSettings(
 	   would come back by itself as soon as a channel becomes paid. */
 	if (!unPayant) payants.remove();
 
+	/* The layout of the Generate page's requests and their live transcript
+	   (2026-09-29, MonoCode's "Transcript layout"): full width by default,
+	   or the chat layout it had before. Read at each paint of the queue. */
+	createSelect(row(card(section(aiPage, null)), t("app.settings.transcriptLayout"), t("app.settings.transcriptLayoutHint")), {
+		value: deps.aiSettings.get().aiTranscriptLayout === "chat" ? "chat" : "full",
+		options: [
+			{ value: "full", label: t("app.settings.transcriptFull") },
+			{ value: "chat", label: t("app.settings.transcriptChat") },
+		],
+		onChange: valeur => { void deps.aiSettings.save({ aiTranscriptLayout: valeur === "chat" ? "chat" : "full" }); },
+	});
+
 	/* ═══ APPEARANCE ═══ */
 	const demonterFond = monterReglagesFond(card(section(pages.get("appearance")!, t("app.settings.wallpaper"))));
 

@@ -166,6 +166,10 @@ export const EN_APP = {
 
 	/* ── Réglages « Général » (application seulement) ── */
 	"app.settings.general": "General",
+	"app.settings.transcriptLayout": "Generation layout",
+	"app.settings.transcriptLayoutHint": "How your requests and the live transcript of each generation appear on the Generate page.",
+	"app.settings.transcriptFull": "Full width",
+	"app.settings.transcriptChat": "Chat",
 	"app.settings.navFolders": "Folders",
 	"app.settings.navAi": "AI",
 	"app.settings.navAppearance": "Appearance",

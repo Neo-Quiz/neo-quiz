@@ -381,3 +381,137 @@
 	.qbd-ai-reponse-etape { animation: none; }
 	.qbd-ai-reponse-etape { color: var(--text-muted); background: none; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   THE LIVE TRANSCRIPT and THE FULL-WIDTH LAYOUT (2026-09-29, after
+   MonoCode's full-width transcript)
+
+   `full` (the default, `aiTranscriptLayout`): every turn runs across the
+   column — the request as a full-width card, its attachments and meta on
+   the left — so the transcript under it has the room to be read. `chat`
+   keeps the requests on the right, as before.
+   ══════════════════════════════════════════════════════════ */
+.qbd-ai-file--full .qbd-ai-message {
+	align-self: stretch;
+	max-width: none;
+	align-items: stretch;
+}
+
+.qbd-ai-file--full .qbd-ai-message-pieces,
+.qbd-ai-file--full .qbd-ai-message-meta {
+	justify-content: flex-start;
+}
+
+.qbd-ai-file--full .qbd-ai-bulle {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+}
+
+/* The transcript: the CLI's work under its request. No tile of its own
+   (it belongs to the turn): a thin rule on its left, like a quoted log. */
+.qbd-ai-transcript {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 2px 0 0 8px;
+	padding: 2px 0 2px 16px;
+	border-left: 2px solid var(--background-modifier-border);
+	min-width: 0;
+}
+
+.qbd-ai-transcript-attente {
+	font-size: 13px;
+	color: var(--text-faint);
+}
+
+.qbd-ai-transcript-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.qbd-ai-transcript-titre,
+.qbd-ai-transcript-outil {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.qbd-ai-transcript-outil {
+	font-weight: 500;
+}
+
+.qbd-ai-transcript-titre-icone {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.qbd-ai-transcript-titre-icone svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* The reasoning: muted, as MonoCode shows it — context, not the answer. */
+.qbd-ai-transcript-reflexion {
+	font-size: 13.5px;
+	line-height: 1.55;
+	color: var(--text-muted);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* The answer as it is written: the quiz's source, in the code font. A LOG,
+   so it has a height and follows the writing (the view scrolls it to the
+   end unless the user scrolled up to read). */
+.qbd-ai-transcript-texte {
+	margin: 0;
+	max-height: 320px;
+	overflow: auto;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--code-background);
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+	font-size: 12.5px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb-bg) transparent;
+}
+
+/* "Show the transcript" under a finished request: a text button. */
+.qbd-ai-transcript-bascule {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 4px;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.qbd-ai-transcript-bascule:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-ai-transcript-bascule-icone {
+	display: inline-flex;
+}
+
+.qbd-ai-transcript-bascule-icone svg {
+	width: 14px;
+	height: 14px;
+}

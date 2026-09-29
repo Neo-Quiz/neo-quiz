@@ -2033,6 +2033,9 @@ export function lancer(spec: {
 	   filet). `delaiGardeMs` est `DELAI_GARDE_MS` par défaut. */
 	tuer?: (pid: number | undefined) => Promise<void>;
 	delaiGardeMs?: number;
+	/** The standard output as it arrives (live transcript). A throwing
+	    listener never breaks the run. */
+	surStdout?: (texte: string) => void;
 }, parCmd = false): Promise<{ stdout: string; stderr: string; code: number | null }> {
 	return new Promise((resolve, reject) => {
 		const tuer = spec.tuer || tuerArbre;
@@ -2129,7 +2132,11 @@ export function lancer(spec: {
 		   JSON d'un CLI illisible dès qu'il écrit un avertissement. */
 		let stdout = "";
 		let stderr = "";
-		enfant.stdout?.on("data", (d: unknown) => { stdout += String(d); });
+		enfant.stdout?.on("data", (d: unknown) => {
+			const texte = String(d);
+			stdout += texte;
+			if (spec.surStdout) { try { spec.surStdout(texte); } catch { /* the transcript never stops a run */ } }
+		});
 		enfant.stderr?.on("data", (d: unknown) => { stderr += String(d); });
 		enfant.on("error", (e: NodeJS.ErrnoException) => {
 			if (peutReessayer && (e.code === "ENOENT" || e.code === "EINVAL")) {
@@ -2230,6 +2237,8 @@ export async function run(spec: {
 	/** Combien de temps attendre un verrou pris avant de rendre `occupe`
 	    (un quart de minute par défaut ; les contrôles le raccourcissent). */
 	attenteVerrouMs?: number;
+	/** The standard output as it arrives, passed to `lancer`. */
+	surStdout?: (texte: string) => void;
 } = {}): Promise<{
 	stdout: string; stderr: string; code: number | null; sortie?: string;
 }> {
@@ -2286,6 +2295,7 @@ export async function run(spec: {
 				cwd: dossierPersonnel(env),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
+				surStdout: options.surStdout,
 			});
 		}, env);
 		return Object.assign({}, resultat, { sortie });

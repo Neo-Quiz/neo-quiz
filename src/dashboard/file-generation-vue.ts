@@ -31,6 +31,7 @@ import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file
 import type { TransKey } from "../i18n";
 import { t } from "../i18n";
 import { quizModeLabel } from "./quiz-card";
+import type { Transcript } from "./transcript";
 
 export interface VueFile {
 	/** Pose la zone des tours dans `parent` (à chaque rendu de la page). */
@@ -66,11 +67,18 @@ export function creerVueFile(opts: {
 	ouvrir: (chemin: string) => void;
 	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
+	/** The layout of the turns (setting `aiTranscriptLayout`), read at each
+	    paint: `full` stretches every turn across the column, `chat` keeps
+	    the requests on the right. */
+	disposition?: () => "full" | "chat";
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
 	let desabonner: (() => void) | null = null;
 	let horloge: number | null = null;
+	let desabonnerTranscript: (() => void) | null = null;
+	/** The finished lines whose transcript the user opened. */
+	const transcriptsOuverts = new Set<number>();
 	/** L'identifiant du dernier tour peint ; -1 force le retour en bas. */
 	let dernierPeint = -1;
 
@@ -83,6 +91,8 @@ export function creerVueFile(opts: {
 	function liberer(): void {
 		desabonner?.();
 		desabonner = null;
+		desabonnerTranscript?.();
+		desabonnerTranscript = null;
 		arreterHorloge();
 		zone = null;
 	}
@@ -203,6 +213,85 @@ export function creerVueFile(opts: {
 		}
 	}
 
+	/* ── THE LIVE TRANSCRIPT (2026-09-29, after MonoCode) ──
+	   Under the running request, what the CLI is doing: its reasoning, the
+	   tools it calls, and the answer as it is written. A finished request
+	   keeps it behind "Show the transcript". Updated IN PLACE on each chunk
+	   (`abonnerTranscript`), never by repainting the queue. */
+	const enCours = (l: LigneGeneration): boolean => l.etat === "cours" || l.etat === "enregistrement";
+
+	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean): void {
+		const ancien = bloc.querySelector<HTMLElement>(".qbd-ai-transcript-texte");
+		const hautAncien = ancien ? ancien.scrollTop : 0;
+		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
+		bloc.replaceChildren();
+		if (!tr.thinking && !tr.text && tr.tools.length === 0) {
+			if (vivant) ajouter(bloc, "div", "qbd-ai-transcript-attente", t("ai.transcript.waiting"));
+			return;
+		}
+		if (tr.thinking) {
+			const s = ajouter(bloc, "div", "qbd-ai-transcript-section");
+			const titre = ajouter(s, "div", "qbd-ai-transcript-titre");
+			host.ui.setIcon(ajouter(titre, "span", "qbd-ai-transcript-titre-icone"), "brain");
+			ajouter(titre, "span", undefined, t("ai.transcript.thinking"));
+			// `textContent` (through `ajouter`): the model's text is never HTML here.
+			ajouter(s, "div", "qbd-ai-transcript-reflexion", tr.thinking.trim());
+		}
+		for (const nom of tr.tools) {
+			const o = ajouter(bloc, "div", "qbd-ai-transcript-outil");
+			host.ui.setIcon(ajouter(o, "span", "qbd-ai-transcript-titre-icone"), "wrench");
+			ajouter(o, "span", undefined, t("ai.transcript.tool", { name: nom }));
+		}
+		if (tr.text) {
+			const s = ajouter(bloc, "div", "qbd-ai-transcript-section");
+			const titre = ajouter(s, "div", "qbd-ai-transcript-titre");
+			host.ui.setIcon(ajouter(titre, "span", "qbd-ai-transcript-titre-icone"), "pen-line");
+			ajouter(titre, "span", undefined, t("ai.transcript.writing"));
+			const texte = ajouter(s, "pre", "qbd-ai-transcript-texte", tr.text);
+			// Follows the writing, unless the user scrolled up to read.
+			texte.scrollTop = suivait ? texte.scrollHeight : hautAncien;
+		}
+	}
+
+	function peindreTranscript(parent: HTMLElement, l: LigneGeneration): void {
+		const tr = opts.file.transcript(l.id);
+		// No transcript: a provider that answers in one piece (Ollama, Antigravity).
+		if (!tr) return;
+		const vivant = enCours(l);
+		if (!vivant) {
+			const ouvert = transcriptsOuverts.has(l.id);
+			const b = ajouter(parent, "button", "qbd-ai-transcript-bascule");
+			b.type = "button";
+			b.setAttribute("aria-expanded", String(ouvert));
+			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-bascule-icone"), ouvert ? "chevron-down" : "chevron-right");
+			ajouter(b, "span", undefined, t(ouvert ? "ai.transcript.hide" : "ai.transcript.show"));
+			b.addEventListener("click", () => {
+				if (ouvert) transcriptsOuverts.delete(l.id); else transcriptsOuverts.add(l.id);
+				peindre();
+			});
+			if (!ouvert) return;
+		}
+		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
+		bloc.dataset.ligne = String(l.id);
+		bloc.setAttribute("role", "log");
+		bloc.setAttribute("aria-label", t("ai.transcript.label"));
+		remplirTranscript(bloc, tr, vivant);
+	}
+
+	function surTranscript(id: number): void {
+		if (!zone?.isConnected) return;
+		const l = opts.file.lignes().find(x => x.id === id);
+		const tr = opts.file.transcript(id);
+		if (!l || !tr) return;
+		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
+		// First chunk of a run painted before its transcript existed: one repaint.
+		if (!bloc) { if (enCours(l)) peindre(); return; }
+		const fil = defileur();
+		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
+		remplirTranscript(bloc, tr, enCours(l));
+		if (fil && enBas) fil.scrollTop = fil.scrollHeight;
+	}
+
 	/** Le conteneur qui défile (le fil de la page), s'il y en a un. */
 	const defileur = (): HTMLElement | null => zone?.closest<HTMLElement>(".qbd-ai-fil") ?? null;
 
@@ -214,6 +303,9 @@ export function creerVueFile(opts: {
 		const fil = defileur();
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
 		zone.replaceChildren();
+		const disposition = opts.disposition?.() ?? "full";
+		zone.classList.toggle("qbd-ai-file--full", disposition === "full");
+		zone.classList.toggle("qbd-ai-file--chat", disposition === "chat");
 		// L'état `arret` ne se montre pas : pour l'utilisateur, la ligne est annulée.
 		const visibles = opts.file.lignes().filter(l => l.etat !== "arret");
 		for (const l of visibles) {
@@ -221,6 +313,7 @@ export function creerVueFile(opts: {
 			tour.setAttribute("role", "listitem");
 			peindreMessage(tour, l);
 			peindreReponse(tour, l);
+			peindreTranscript(tour, l);
 		}
 		/* Un tour NOUVEAU se lit à l'identifiant du dernier, pas au nombre de
 		   tours : une réponse fermée pendant qu'une demande part laisse le
@@ -247,6 +340,7 @@ export function creerVueFile(opts: {
 			zone.setAttribute("aria-label", t("ai.queue.label"));
 			zone.setAttribute("aria-live", "polite");
 			if (!desabonner) desabonner = opts.file.abonner(peindre, affichee);
+			if (!desabonnerTranscript) desabonnerTranscript = opts.file.abonnerTranscript(surTranscript);
 			dernierPeint = -1; // un rendu neuf de la page : on se cale en bas
 			peindre();
 		},

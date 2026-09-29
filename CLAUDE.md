@@ -301,6 +301,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   ferme, y compris ouverte au survol ; le défilement la REPOSITIONNE tant que
   l'ancre reste visible, ne ferme que si elle en sort ; `destroy()` retire
   bien l'élément du DOM. Dans la CI.
+- `npm run check:transcript` — le TRANSCRIPT EN DIRECT d'une génération
+  (`src/dashboard/transcript.ts`, 2026-09-29, d'après MonoCode) : une ligne
+  de Claude Code (`stream-json`) ou de Codex (`exec --json`) coupée par le
+  tuyau n'est lue qu'une fois, une ligne non JSON ne casse rien, un flux sans
+  fin est borné, et le `result` final d'un flux Claude est toujours trouvé
+  (sans lui, toute génération Claude échouerait). Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

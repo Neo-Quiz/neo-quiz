@@ -1281,7 +1281,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
 	const cliEnVol = new Map<number, AbortController>();
 
-	ipcMain.handle(CANAUX.processusRun, async (_e, spec: unknown, requeteId: unknown): Promise<ResultatCli> => {
+	ipcMain.handle(CANAUX.processusRun, async (e, spec: unknown, requeteId: unknown, flux: unknown): Promise<ResultatCli> => {
 		const s = (spec && typeof spec === "object" ? spec : {}) as Partial<RequeteCli>;
 		if (!estOutilAutorise(s.tool)) {
 			console.warn(LOG_PREFIX, "CLI refusé, outil hors liste:", s.tool);
@@ -1304,6 +1304,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				.map(f => ({ nom: f.nom, base64: f.base64 }))
 			: undefined;
 		const id = typeof requeteId === "number" ? requeteId : NaN;
+		/* THE LIVE TRANSCRIPT (2026-09-29): the standard output, as it
+		   arrives, to the window that asked — `e.sender`, never another. It
+		   is the text this call returns anyway at the end; nothing new leaves
+		   the main process, and nothing but a boolean came in. */
+		const expediteur = e.sender;
+		const surStdout = flux === true && !Number.isNaN(id)
+			? (texte: string): void => { if (!expediteur.isDestroyed()) expediteur.send(CANAUX.processusFlux, { id, texte }); }
+			: undefined;
 		const controleur = new AbortController();
 		if (!Number.isNaN(id)) cliEnVol.set(id, controleur);
 		try {
@@ -1316,7 +1324,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				fichiers,
 				sortieFichier: typeof s.sortieFichier === "string" ? s.sortieFichier : undefined,
 				signal: controleur.signal,
-			});
+			}, { surStdout });
 			return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
 		} catch (e) {
 			/* Le NOM survit, c'est tout l'objet de l'enveloppe. « erreur » est le

@@ -121,7 +121,7 @@ const pont: Pont = {
 	},
 
 	processus: {
-		run: (spec, requeteId) => ipcRenderer.invoke(CANAUX.processusRun, spec, requeteId),
+		run: (spec, requeteId, flux) => ipcRenderer.invoke(CANAUX.processusRun, spec, requeteId, flux === true),
 		annuler: requeteId => ipcRenderer.invoke(CANAUX.processusAnnuler, requeteId),
 		lireCache: tool => ipcRenderer.invoke(CANAUX.processusLireCache, tool),
 		ollamaInstalle: () => ipcRenderer.invoke(CANAUX.processusOllamaInstalle),
@@ -139,6 +139,15 @@ const pont: Pont = {
 			const ecouteur = (_e: unknown, tool: unknown): void => { if (tool === "claude" || tool === "codex") rappel(tool); };
 			ipcRenderer.on(CANAUX.processusCachesCli, ecouteur);
 			return () => { ipcRenderer.off(CANAUX.processusCachesCli, ecouteur); };
+		},
+		surFlux(rappel) {
+			// Only a number and a string are relayed, whatever the payload holds.
+			const ecouteur = (_e: unknown, p: unknown): void => {
+				const r = p && typeof p === "object" ? p as { id?: unknown; texte?: unknown } : null;
+				if (r && typeof r.id === "number" && typeof r.texte === "string") rappel(r.id, r.texte);
+			};
+			ipcRenderer.on(CANAUX.processusFlux, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.processusFlux, ecouteur); };
 		},
 		comptesEtat: outils => ipcRenderer.invoke(CANAUX.comptesEtat, outils),
 		comptesUsage: tool => ipcRenderer.invoke(CANAUX.comptesUsage, tool),
