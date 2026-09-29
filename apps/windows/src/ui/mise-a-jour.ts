@@ -17,6 +17,9 @@ import { pont } from "../host/pont";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
+import application from "../../package.json";
+
+const versionApp = application.version;
 
 let etat: EtatMiseAJour = { phase: "inactif" };
 const abonnes = new Set<(etat: EtatMiseAJour) => void>();
@@ -47,6 +50,34 @@ function abonner(rappel: (etat: EtatMiseAJour) => void): () => void {
 	abonnes.add(rappel);
 	rappel(etat);
 	return () => { abonnes.delete(rappel); };
+}
+
+/**
+ * "CHECK FOR UPDATES…" of the application menu: checks now and SAYS what
+ * came of it in a notice. The rail only speaks while a version downloads or
+ * waits to be installed, so without this an up-to-date app or a failed check
+ * answered the click with nothing (2026-09-29).
+ *
+ * The state is read AFTER `verifier()` resolves: the main process sends
+ * electron-updater's events to the window before answering the call, so the
+ * state is then the check's own outcome.
+ */
+export async function verifierMaintenant(): Promise<void> {
+	const notice = (message: string): void => currentHost().ui.notice(message, 6000);
+	const annoncer = (e: EtatMiseAJour): void => {
+		const version = e.version ?? "";
+		if (e.phase === "a-jour") notice(t("app.update.upToDate", { version: versionApp }));
+		else if (e.phase === "telechargement") notice(t("app.update.available", { version }));
+		else if (e.phase === "prete") notice(t("app.update.ready", { version }));
+		else if (e.phase === "erreur") notice(t("app.update.failed", { message: e.message ?? "" }));
+	};
+	/* Already downloading or ready: checking again would only restart what
+	   the rail is showing. */
+	const avant = await pont().miseAJour.etat();
+	if (avant.phase === "telechargement" || avant.phase === "prete") { annoncer(avant); return; }
+	notice(t("app.update.checking"));
+	if (!await pont().miseAJour.verifier()) { notice(t("app.update.devBuild")); return; }
+	annoncer(await pont().miseAJour.etat());
 }
 
 /**

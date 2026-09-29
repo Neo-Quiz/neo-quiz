@@ -771,8 +771,6 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				fermer: () => fenetre?.close(),
 				pleinEcran: () => fenetre?.setFullScreen(!fenetre.isFullScreen()),
 				etat: etatFenetre,
-				// Le nom est déjà jugé par `canaux.ts` (union fermée) avant d'arriver ici.
-				commande: nom => fenetre?.webContents[nom as "undo"](),
 				zoom: f => fenetre?.webContents.setZoomFactor(f),
 				recharger: () => fenetre?.webContents.reload(),
 				outilsDev: () => fenetre?.webContents.toggleDevTools(),

@@ -780,9 +780,6 @@ function installerPont(fichiers = {}, perimetre = null) {
 			async etat() { return { agrandie: false, focus: true, pleinEcran: false }; },
 			surEtat: () => () => {},
 		},
-		edition: {
-			async commande() {},
-		},
 		affichage: {
 			async zoom() {},
 			async recharger() {},
@@ -794,7 +791,7 @@ function installerPont(fichiers = {}, perimetre = null) {
 		miseAJour: {
 			etat: async () => ({ phase: "inactif", auto: true }),
 			surEtat: () => () => {},
-			verifier: async () => {},
+			verifier: async () => false,
 			installer: async () => {},
 			reglerAuto: async () => {},
 		},

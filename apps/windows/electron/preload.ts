@@ -174,10 +174,6 @@ const pont: Pont = {
 		},
 	},
 
-	edition: {
-		commande: nom => ipcRenderer.invoke(CANAUX.editionCommande, nom),
-	},
-
 	affichage: {
 		zoom: facteur => ipcRenderer.invoke(CANAUX.affichageZoom, facteur),
 		recharger: () => ipcRenderer.invoke(CANAUX.affichageRecharger),

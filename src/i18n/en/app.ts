@@ -49,6 +49,13 @@ export const EN_APP = {
 	"app.update.downloading": "Downloading update",
 	"app.update.install": "Update",
 	"app.update.installing": "Installing…",
+	/* What "Check for updates…" of the application menu answers. */
+	"app.update.checking": "Checking for updates…",
+	"app.update.upToDate": "Neo Quiz is up to date (v{version}).",
+	"app.update.available": "Version {version} is downloading; an Update button will appear in the sidebar.",
+	"app.update.ready": "Version {version} is ready: click Update in the sidebar to install it.",
+	"app.update.failed": "Could not check for updates: {message}",
+	"app.update.devBuild": "Updates are only checked in the installed app.",
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée
 	   depuis un reflet de l'installation (`electron/fenetre-maj.ts`). */
 	"app.update.window.title": "Updating Neo Quiz",
@@ -63,13 +70,6 @@ export const EN_APP = {
 	"app.titlebar.close": "Close",
 	"app.menu.checkUpdates": "Check for updates…",
 	"app.menu.settings": "Settings…",
-	"app.menu.edit": "Edit",
-	"app.menu.undo": "Undo",
-	"app.menu.redo": "Redo",
-	"app.menu.cut": "Cut",
-	"app.menu.copy": "Copy",
-	"app.menu.paste": "Paste",
-	"app.menu.selectAll": "Select all",
 	"app.menu.view": "Display",
 	"app.menu.scale": "Interface scale",
 	"app.menu.reload": "Reload",

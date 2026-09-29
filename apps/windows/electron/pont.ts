@@ -596,18 +596,6 @@ export interface Pont {
 		surEtat(rappel: (etat: EtatFenetre) => void): () => void;
 	};
 
-	/** Les six commandes d'édition, remplaçant les accélérateurs du menu natif
-	    retiré (`Menu.setApplicationMenu(null)`). Elles passent par
-	    `webContents` du principal parce que `document.execCommand` est
-	    déprécié et que le presse-papiers SANDBOXÉ ne colle pas sans geste
-	    utilisateur : c'est le principal, pas le rendu, qui porte le geste
-	    natif. Le NOM est une union FERMÉE, jugée par le principal
-	    (`canaux.ts`) — un nom hors de la liste est refusé avant d'atteindre
-	    `webContents`. */
-	edition: {
-		commande(nom: "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll"): Promise<void>;
-	};
-
 	/** Le zoom et les deux commandes qu'un menu natif exposait
 	    (`Ctrl+R`, `Ctrl+Alt+I`), retirées avec lui. */
 	affichage: {
@@ -632,7 +620,8 @@ export interface Pont {
 	miseAJour: {
 		etat(): Promise<EtatMiseAJour>;
 		surEtat(rappel: (etat: EtatMiseAJour) => void): () => void;
-		verifier(): Promise<void>;
+		/** False when no check ran (a dev build). */
+		verifier(): Promise<boolean>;
 		installer(): Promise<void>;
 	};
 
@@ -773,7 +762,6 @@ export const CANAUX = {
 	/** POUSSÉ par le principal (`webContents.send`), comme `evenement` et
 	    `miseAJourEtat`. */
 	fenetreEtat: "neo:fenetre/etat",
-	editionCommande: "neo:edition/commande",
 	affichageZoom: "neo:affichage/zoom",
 	affichageRecharger: "neo:affichage/recharger",
 	affichageOutilsDev: "neo:affichage/outils-dev",

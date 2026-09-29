@@ -52,7 +52,7 @@ release notes.
 - Every code block shows its language's logo, runnable or not, on the quiz's page and in the editor too.
 - A fill-in-the-blanks on code shows its program in a real code block, with its language's logo and colours, in the quiz, in the editor and on the quiz's page, where its card now shows the text with empty blanks. Generated quizzes always put code in such a block.
 - The version in the application menu reads "v1.19.0".
-- The application menu is simpler: one top row with the version, "Check for updates" and a GitHub logo, then Edit and Display. The "Neo Quiz" submenu and its Settings line are gone (Ctrl+, and the rail's Settings button remain).
+- The application menu is simpler: one top row with the version, "Check for updates" and a GitHub logo, then Display. The "Neo Quiz" submenu and its Settings line are gone (Ctrl+, and the rail's Settings button remain), and so is the Edit submenu: undo (Ctrl+Z), redo (Ctrl+Y or Ctrl+Shift+Z), cut, copy, paste and select all work from the keyboard in every field.
 - A new Neo Quiz logo at the top of the rail: a stack of cards with a mortarboard.
 - The application menu (Neo Quiz, Edit, Display) opens from the Neo Quiz logo at the top of the rail; the chevron button of the title bar is gone. The logo no longer opens GitHub directly: the menu has that link.
 - An "In your own words" question no longer shows a "Your own answer" label above its field: the field's hint already says it.
@@ -148,6 +148,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- "Check for updates…" in the application menu no longer lands on Settings with nothing to say: it checks and tells the outcome in a notice (up to date, a version downloading or ready to install, or why the check failed).
 - The back arrow of the quiz editor returns to the quiz's page, as "Done" does, instead of closing it and going back to the folder.
 - "Try again" then reaching the score again now counts the new attempt in the Progress tab and in spaced review; it counted only the first one.
 - Moving to another question no longer makes the quiz as tall as its longest reading for the length of the slide, and no longer flashes a scrollbar at the end of each move.

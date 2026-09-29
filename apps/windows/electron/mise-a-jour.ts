@@ -38,7 +38,9 @@ export interface MiseAJour {
 	    vérification. SANS PARAMÈTRE depuis le 2026-09-17 — il n'y a plus de
 	    réglage à lire, la mise à jour automatique est le seul mode. */
 	initialiser(): void;
-	verifier(): Promise<void>;
+	/** False when no check ran (a dev build, `app.isPackaged` false): the
+	    "Check for updates" menu entry then says so instead of staying silent. */
+	verifier(): Promise<boolean>;
 	/** Vrai si une mise à jour prête a été armée pour l'installation : c'est
 	    à l'appelant de fermer la fenêtre, puis d'appeler `installerArmee()`
 	    quand tout est fermé. */
@@ -82,10 +84,10 @@ export function creerMiseAJour(deps: {
 	// penser.
 	autoUpdater.on("error", error => appliquer({ type: "error", message: error.message }));
 
-	async function verifier(): Promise<void> {
+	async function verifier(): Promise<boolean> {
 		if (!app.isPackaged) {
 			console.log(LOG_PREFIX, "mise à jour: ignorée hors d'un paquet (app.isPackaged faux)");
-			return;
+			return false;
 		}
 		derniereVerification = Date.now();
 		try {
@@ -95,6 +97,7 @@ export function creerMiseAJour(deps: {
 			// qu'une promesse rejetée ne remonte pas en « unhandled ».
 			console.warn(LOG_PREFIX, "mise à jour: vérification impossible:", e);
 		}
+		return true;
 	}
 
 	function armerMinuteur(): void {

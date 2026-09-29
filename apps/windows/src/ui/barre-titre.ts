@@ -24,20 +24,7 @@ import application from "../../package.json";
 // L'URL du dépôt, pour l'entrée « Source code » du menu d'application.
 import manifeste from "../../../../src/assets/manifest.json";
 import { requestLeave } from "./leave-guard";
-
-/** Table id de menu → nom de commande d'édition (`pont().edition.commande`) :
-    les six ids de `menu-app-arbre.ts` correspondent un à un aux six noms du
-    contrat, mais la table reste EXPLICITE plutôt qu'un cast — un septième id
-    ajouté un jour sans entrée ici doit rester silencieusement sans effet, pas
-    planter le rendu. */
-const COMMANDES_EDITION: Record<string, "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll"> = {
-	undo: "undo",
-	redo: "redo",
-	cut: "cut",
-	copy: "copy",
-	paste: "paste",
-	"select-all": "selectAll",
-};
+import { verifierMaintenant } from "./mise-a-jour";
 
 /** The toggle of the application menu, set by `monterBarreTitre`: the bar
     holds the menu's actions, the rail's logo opens it. */
@@ -204,8 +191,10 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 			zoom: () => currentZoom,
 			executer(id, value) {
 				if (id === "check-updates") {
-					void pont().miseAJour.verifier();
-					deps.ouvrirReglages();
+					/* It used to open Settings as well, where an update section
+					   showed the result; that section left on 2026-09-17, and the
+					   click only landed on Settings with nothing to say. */
+					void verifierMaintenant();
 				} else if (id === "repo") {
 					/* `window.open` et non une navigation : le principal REFUSE
 					   toute navigation de premier niveau vers une autre origine
@@ -215,8 +204,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					   le `<a target="_blank">` de l'ancienne section
 					   « À propos ». */
 					window.open(manifeste.helpUrl, "_blank", "noopener");
-				} else if (id in COMMANDES_EDITION) {
-					void pont().edition.commande(COMMANDES_EDITION[id]);
 				} else if (id.startsWith("scale-") && typeof value === "number") {
 					setZoom(value);
 				} else if (id === "next-wallpaper") {

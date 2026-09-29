@@ -51,15 +51,10 @@ export function buildMenu(ctx: { version: string; zoom: number }): EntreeMenu[] 
 		   (`manifest.json`, `helpUrl`); it is now the GitHub mark's name. */
 		{ kind: "about", id: "about", version: ctx.version, checkLabel: t("app.menu.checkUpdates"), repoLabel: t("settings.about.repo") },
 		{ kind: "separator", id: "about-sep" },
-		{ kind: "submenu", id: "edit", label: t("app.menu.edit"), items: [
-			{ kind: "action", id: "undo", label: t("app.menu.undo"), shortcut: "Ctrl+Z" },
-			{ kind: "action", id: "redo", label: t("app.menu.redo"), shortcut: "Ctrl+Y" },
-			{ kind: "separator", id: "edit-sep" },
-			{ kind: "action", id: "cut", label: t("app.menu.cut"), shortcut: "Ctrl+X" },
-			{ kind: "action", id: "copy", label: t("app.menu.copy"), shortcut: "Ctrl+C" },
-			{ kind: "action", id: "paste", label: t("app.menu.paste"), shortcut: "Ctrl+V" },
-			{ kind: "action", id: "select-all", label: t("app.menu.selectAll"), shortcut: "Ctrl+A" },
-		] },
+		/* No Edit submenu since 2026-09-29: its six commands only repeated
+		   Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z), Ctrl+X, Ctrl+C, Ctrl+V and Ctrl+A,
+		   which Chromium handles by itself in every field (Blink's
+		   editing_behavior.cc); nobody reached them by the menu. */
 		{ kind: "submenu", id: "view", label: t("app.menu.view"), items: [
 			{ kind: "submenu", id: "scale", label: t("app.menu.scale"), items: PALIERS_ZOOM.map(p => ({
 				kind: "check" as const, id: `scale-${Math.round(p * 100)}`, label: `${Math.round(p * 100)} %`, value: p,

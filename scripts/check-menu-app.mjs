@@ -11,7 +11,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/electron/pont.ts"], ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin }, { ZOOM_MIN, ZOOM_MAX, borneZoom }) => {
 	const r = makeReporter("Application menu — tree");
 	const menu = buildMenu({ version: "2.5.2", zoom: 1 });
-	r.check("the about row, a rule, then the Edit and Display submenus", menu.map(e => e.id), ["about", "about-sep", "edit", "view"]);
+	r.check("the about row, a rule, then the Display submenu (no Edit)", menu.map(e => e.id), ["about", "about-sep", "view"]);
 	const ids = [];
 	const visit = (entries) => { for (const e of entries) { ids.push(e.id); if (e.kind === "submenu") visit(e.items); } };
 	visit(menu);
@@ -30,11 +30,11 @@ await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/elec
 	r.check("above the maximum, the maximum; not a number, 100 %", [borneZoom(3), borneZoom("x"), borneZoom(Number.NaN)], [1.5, 1, 1]);
 	r.check("the scale steps are sorted, each one larger than the last",
 		PALIERS_ZOOM.every((p, i) => i === 0 || p > PALIERS_ZOOM[i - 1]), true);
-	const scale = menu[3].items.find(e => e.id === "scale");
+	const scale = menu[2].items.find(e => e.id === "scale");
 	r.check("the check mark is on the current step, and on it alone",
 		scale.items.filter(e => e.checked).map(e => e.value), [1]);
 	r.check("a zoom between two steps checks nothing",
-		buildMenu({ version: "x", zoom: 1.05 })[3].items.find(e => e.id === "scale").items.filter(e => e.checked).length, 0);
+		buildMenu({ version: "x", zoom: 1.05 })[2].items.find(e => e.id === "scale").items.filter(e => e.checked).length, 0);
 
 	/* ─── THE NEIGHBOUR STEP (Ctrl + wheel) ───
 	   What it prevents: a wheel notch that changes nothing because the

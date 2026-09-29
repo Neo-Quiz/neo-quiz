@@ -124,9 +124,8 @@ export interface DependancesCanaux {
 	    différées vidées) ; `main.ts` lance `quitAndInstall` une fois tout
 	    fermé. */
 	fermerPourInstaller(): void;
-	/** La fenêtre sans cadre : ordres et lecture d'état, implémentés par
-	    `main.ts` sur l'instance `BrowserWindow`. Le NOM de `commande` est déjà
-	    jugé par `enregistrerCanaux` (union fermée) avant d'arriver ici. */
+	/** The frameless window: orders and state reading, implemented by
+	    `main.ts` on the `BrowserWindow` instance. */
 	fenetre: {
 		prete(): void;
 		reduire(): void;
@@ -135,7 +134,6 @@ export interface DependancesCanaux {
 		fermer(): void;
 		pleinEcran(): void;
 		etat(): EtatFenetre;
-		commande(nom: string): void;
 		zoom(f: number): void;
 		recharger(): void;
 		outilsDev(): void;
@@ -1354,11 +1352,6 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.fenetreFermer, () => deps.fenetre.fermer());
 	ipcMain.handle(CANAUX.fenetrePleinEcran, () => deps.fenetre.pleinEcran());
 	ipcMain.handle(CANAUX.fenetreEtatLire, () => deps.fenetre.etat());
-	const COMMANDES = new Set(["undo", "redo", "cut", "copy", "paste", "selectAll"]);
-	ipcMain.handle(CANAUX.editionCommande, (_e, nom: unknown) => {
-		if (typeof nom !== "string" || !COMMANDES.has(nom)) throw new Error(`commande d'édition refusée : ${String(nom)}`);
-		deps.fenetre.commande(nom);
-	});
 	ipcMain.handle(CANAUX.affichageZoom, async (_e, facteur: unknown) => {
 		const f = borneZoom(facteur);
 		deps.fenetre.zoom(f);
