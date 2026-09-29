@@ -902,11 +902,11 @@
 	flex-shrink: 0;
 }
 
-/* PLAY, top right of a course card (2026-09-29), StudySmarter's: a thin
-   circle with a filled triangle, in the accent colour, where the eye ends
-   the title. No tile around it (no tile in a tile): the ring only fills a
-   little on hover. !important against the .theme-dark button chrome, as
-   `.qbd-card-more`. */
+/* PLAY, top right of a course card (2026-09-29), where StudySmarter puts
+   it: a filled triangle, always in the blue of "Start the quiz"
+   (`--quiz-primary`), with no outline and no tile around it (no tile in a
+   tile) — a disc of the same blue only shows on hover. !important against
+   the .theme-dark button chrome, as `.qbd-card-more`. */
 .qbd-quiz-card-play {
 	flex-shrink: 0;
 	display: inline-flex;
@@ -916,29 +916,29 @@
 	height: 34px;
 	margin: -3px -2px 0 auto;
 	padding: 0 !important;
-	border: 2px solid color-mix(in srgb, var(--interactive-accent) 45%, transparent) !important;
+	border: none !important;
 	border-radius: 999px;
 	background: transparent !important;
 	box-shadow: none !important;
-	color: var(--interactive-accent);
+	color: var(--quiz-primary);
 	cursor: pointer;
-	transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+	transition: background-color 150ms ease, transform 150ms ease;
 }
 .qbd-quiz-card-play svg {
-	width: 15px;
-	height: 15px;
+	width: 18px;
+	height: 18px;
 	margin-left: 2px; /* a triangle's optical centre sits right of its box's */
 	fill: currentColor;
 }
 .qbd-quiz-card-play:hover {
-	border-color: var(--interactive-accent) !important;
-	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent) !important;
+	color: var(--quiz-primary) !important;
+	background: color-mix(in srgb, var(--quiz-primary) 16%, transparent) !important;
 }
 .qbd-quiz-card-play:active {
 	transform: scale(0.92);
 }
 .qbd-quiz-card-play:focus-visible {
-	outline: 2px solid var(--interactive-accent);
+	outline: 2px solid var(--quiz-primary);
 	outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
