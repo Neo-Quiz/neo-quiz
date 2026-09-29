@@ -902,33 +902,36 @@
 	flex-shrink: 0;
 }
 
-/* PLAY, top right of a course card (2026-09-29): a ghost icon of the "⋯"
-   family — no tile in a tile —, the accent only on hover. !important
-   against the .theme-dark button chrome, as `.qbd-card-more`. */
+/* PLAY, top right of a course card (2026-09-29), StudySmarter's: a thin
+   circle with a filled triangle, in the accent colour, where the eye ends
+   the title. No tile around it (no tile in a tile): the ring only fills a
+   little on hover. !important against the .theme-dark button chrome, as
+   `.qbd-card-more`. */
 .qbd-quiz-card-play {
 	flex-shrink: 0;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 30px;
-	height: 30px;
-	margin: -4px -6px 0 auto;
+	width: 34px;
+	height: 34px;
+	margin: -3px -2px 0 auto;
 	padding: 0 !important;
-	border: none !important;
+	border: 2px solid color-mix(in srgb, var(--interactive-accent) 45%, transparent) !important;
 	border-radius: 999px;
 	background: transparent !important;
 	box-shadow: none !important;
-	color: var(--text-muted);
+	color: var(--interactive-accent);
 	cursor: pointer;
-	transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+	transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 .qbd-quiz-card-play svg {
-	width: 16px;
-	height: 16px;
+	width: 15px;
+	height: 15px;
+	margin-left: 2px; /* a triangle's optical centre sits right of its box's */
 	fill: currentColor;
 }
 .qbd-quiz-card-play:hover {
-	color: var(--interactive-accent) !important;
+	border-color: var(--interactive-accent) !important;
 	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent) !important;
 }
 .qbd-quiz-card-play:active {

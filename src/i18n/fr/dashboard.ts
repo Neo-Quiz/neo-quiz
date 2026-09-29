@@ -229,6 +229,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.card.more": "Plus d'actions",
 	"dashboard.card.play": "Lancer",
 	"dashboard.card.pickMode": "Quel mode ?",
+	"dashboard.folder.emptyTitle": "Ajouter un premier quiz",
+	"dashboard.folder.emptyDrop": "Ou déposez ici un quiz partagé (.md ou .zip)",
 
 	/* ── Type de quiz ── */
 	"dashboard.quizType.mixed": "Mixte",

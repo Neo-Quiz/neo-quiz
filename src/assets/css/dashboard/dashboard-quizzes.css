@@ -1564,3 +1564,54 @@
 @media (max-width: 900px) {
 	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions { height: auto; }
 }
+
+/* AN EMPTY FOLDER (2026-09-29, folder-add.ts `renderEmptyFolder`): the three
+   options of "New quiz" right on the page, in a dashed zone that also takes
+   a shared quiz dropped on it — the zone lights up in the folder's accent
+   while files are dragged over it. */
+.qbd-folder-empty {
+	max-width: 560px;
+	margin: 6px auto 22px;
+	padding: 18px 16px 14px;
+	border: 1.5px dashed color-mix(in srgb, var(--text-normal) 16%, transparent);
+	border-radius: 16px;
+	background: color-mix(in srgb, var(--background-primary) 45%, transparent);
+	transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.qbd-root .qbd-folder-empty-title {
+	margin: 0 0 10px 14px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+.qbd-root .qbd-folder-empty-drop {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin: 12px 0 0;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 12.5px;
+	color: var(--text-muted);
+	transition: color 150ms ease;
+}
+.qbd-folder-empty-drop-icon {
+	display: inline-flex;
+}
+.qbd-folder-empty-drop-icon svg {
+	width: 15px;
+	height: 15px;
+}
+.qbd-folder-empty.is-dragover {
+	border-color: var(--accent, var(--interactive-accent));
+	background: color-mix(in srgb, var(--accent, var(--interactive-accent)) 10%, transparent);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--interactive-accent)) 14%, transparent);
+}
+.qbd-folder-empty.is-dragover .qbd-folder-empty-drop {
+	color: var(--accent, var(--interactive-accent));
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-folder-empty,
+	.qbd-folder-empty-drop { transition: none; }
+}

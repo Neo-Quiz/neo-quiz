@@ -20,6 +20,7 @@ import { moduleAccent } from "./module-color";
 import { renderCollapsibleSection } from "./collapsible";
 import { suggestIcons } from "./icon-suggest";
 import { renderFolderSections } from "./folder-sections";
+import { renderEmptyFolder } from "./folder-add";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES RENDER — extrait de quizzes.ts (Task 4) pour rester
@@ -227,7 +228,9 @@ export function renderModuleDrill(
 	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout");
 	layout.style.setProperty("--accent", accent);
 	const principal = ajouter(layout, "div", "qbd-quizzes-drill-main");
-	if (inModule.length === 0) {
+	if (inModule.length === 0 && !sas && cheminOuvert !== undefined && ctx.createQuiz) {
+		renderEmptyFolder(principal, ctx, cheminOuvert, rerender);
+	} else if (inModule.length === 0) {
 		const empty = ajouter(principal, "div", "qbd-empty-state");
 		ajouter(empty, "p", undefined, t("dashboard.quizzes.empty"));
 		/* L'indice d'un dossier vide renvoie aux « documents et notes

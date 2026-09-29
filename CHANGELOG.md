@@ -14,7 +14,8 @@ release notes.
 ## [Unreleased]
 
 ### Added
-- A play button at the top right of a course card starts it at once: its only mode, or a choice between Learn, Test and Exam when the card gathers several.
+- An empty folder shows the three ways to add a quiz right on its page (generate, create, import) instead of "No quiz found", and takes a shared quiz (.md or .zip) dropped on them; its New quiz button appears once it holds a quiz.
+- A play button at the top right of a course card, as on StudySmarter, starts it at once: its only mode, or a choice between Learn, Test and Exam when the card gathers several.
 - Timed exams: a test can be an Exam, with a start screen giving its duration and number of questions, a clock at the top that turns orange then red and shows hours from 60 minutes on, no hints, and an automatic hand-in at zero with the answers given so far. An exam is never resumed: closed before it is handed in, it leaves no attempt and no review.
 - Leaving an exam before handing it in asks first, from the quiz's close button or the mouse's back button: "Leave the exam? It will not be saved.", with Leave and Continue the exam; the clock keeps running meanwhile.
 - The quiz editor has a Mode button next to Vocabulary: a test switches between Practice and Exam, an exam's duration is set there (30, 60, 90 or 120 minutes, or any length from 1 to 300), and a note named "— Practice" or "— Exam" is renamed to match, keeping its review history. A Learn shows its mode but stays a Learn.

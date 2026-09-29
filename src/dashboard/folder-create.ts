@@ -203,6 +203,14 @@ export async function createQuizInFolder(ctx: DashboardShellCtx, folder: string)
 export async function importQuizIntoFolder(ctx: DashboardShellCtx, folder: string, onDone: () => void): Promise<void> {
 	const picked = await pickFile(".md,.zip,text/markdown,application/zip");
 	if (!picked) return;
+	await importFileIntoFolder(folder, picked, onDone);
+}
+
+/** Writes a shared quiz (.md) or a shared folder's archive (.zip) into
+    `folder`: the ONE path of the file picker and of a file dropped on an
+    empty folder (2026-09-29) — same name sanitising (`nomNoteImportee`),
+    same quiz block check, whatever brought the file. */
+export async function importFileIntoFolder(folder: string, picked: { name: string; bytes: Uint8Array }, onDone: () => void): Promise<void> {
 	try {
 		await ensureFolder(folder);
 		if (/\.zip$/i.test(picked.name)) {

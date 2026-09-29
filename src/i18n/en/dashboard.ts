@@ -270,6 +270,8 @@ export const EN_DASHBOARD = {
 	"dashboard.card.more": "More actions",
 	"dashboard.card.play": "Start",
 	"dashboard.card.pickMode": "Which mode?",
+	"dashboard.folder.emptyTitle": "Add a first quiz",
+	"dashboard.folder.emptyDrop": "Or drop a shared quiz here (.md or .zip)",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */
 	"dashboard.quizType.mixed": "Mixed",

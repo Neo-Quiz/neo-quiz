@@ -390,8 +390,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   barre « Ajouter du contenu » pleine largeur au-dessus de la grille
 			   est partie. Même pilule que « Nouveau dossier » de « Mes quiz ».
 			   Absent dans le sas, qui ne se remplit que par la génération. */
+			/* Not while the folder is empty (2026-09-29): its options are then
+			   on the page itself (`renderEmptyFolder`, folder-add.ts). */
 			const { createQuiz } = ctx;
-			if (createQuiz && !sas) {
+			if (createQuiz && !sas && inModule.length > 0) {
 				const nouveau = ajouter(headerActions, "button", "qbd-btn--create");
 				nouveau.type = "button";
 				currentHost().ui.setIcon(ajouter(nouveau, "span", "qbd-btn-icon"), "plus");
