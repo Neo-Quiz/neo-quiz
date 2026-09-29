@@ -60,10 +60,7 @@ import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
-
-/** The public repository the rail's mark opens (its page carries the Star
-    button). The organisation's path, never the pre-transfer one. */
-const DEPOT_GITHUB = "https://github.com/Neo-Quiz/neo-quiz";
+import { basculerMenuApp } from "./barre-titre";
 
 /** The rail's mark: two stacked cards with a mortarboard on the front one —
     the app icon's motif, redrawn as a single-colour line glyph (32-unit
@@ -911,17 +908,20 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 
 	nav.render(navEl);
 	/* The app's mark at the top of the rail, above Home (StudySmarter's
-	   layout). Since 2026-09-29 it is a LINK to the GitHub repository, whose
-	   tooltip invites a star, and a line-drawn SVG in the rail's colour
-	   instead of the app's bitmap icon (`shell.css`, `.nq-rail-logo`). Set
-	   by the shell, not by `nav.ts`: it is the APPLICATION's identity. */
+	   layout), a line-drawn SVG in the rail's colour instead of the app's
+	   bitmap icon (`shell.css`, `.nq-rail-logo`). Since 2026-09-29 it opens
+	   the APPLICATION MENU (Neo Quiz, Edit, Display), in place of the title
+	   bar's chevron, which is gone; the GitHub link it used to be is in that
+	   menu. Set by the shell, not by `nav.ts`: it is the APPLICATION's
+	   identity. */
 	const logo = document.createElement("button");
 	logo.type = "button";
 	logo.className = "nq-rail-logo";
-	logo.title = t("app.rail.github");
-	logo.setAttribute("aria-label", t("app.rail.github"));
+	logo.title = t("app.titlebar.menu");
+	logo.setAttribute("aria-label", t("app.titlebar.menu"));
+	logo.setAttribute("aria-haspopup", "menu");
 	logo.append(marqueRail());
-	logo.addEventListener("click", () => { void currentHost().shell.openUrl(DEPOT_GITHUB); });
+	logo.addEventListener("click", () => basculerMenuApp(logo));
 	navEl.prepend(logo);
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement

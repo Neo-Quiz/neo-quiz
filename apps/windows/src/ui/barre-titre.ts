@@ -39,6 +39,21 @@ const COMMANDES_EDITION: Record<string, "undo" | "redo" | "cut" | "copy" | "past
 	"select-all": "selectAll",
 };
 
+/** The toggle of the application menu, set by `monterBarreTitre`: the bar
+    holds the menu's actions, the rail's logo opens it. */
+let basculer: ((ancre: HTMLElement) => void) | null = null;
+
+/**
+ * Opens the application menu under `ancre`, or closes it when it is already
+ * open from that anchor. Since 2026-09-29 the anchor is the app's logo at the
+ * top of the rail (`dashboard-shell.ts`): the bar's chevron button is gone,
+ * the logo it sat next to says "the app" better. Nothing before the bar is
+ * mounted.
+ */
+export function basculerMenuApp(ancre: HTMLElement): void {
+	basculer?.(ancre);
+}
+
 /**
  * Construit la barre, l'ajoute en tout premier enfant de `root` (donc AVANT
  * `#neo-quiz-root`, son frère), et la câble au pont. Rend le démontage —
@@ -54,12 +69,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	root.prepend(barre);
 
 	const gauche = ajouter(barre, "div", "nq-barre-gauche");
-	const boutonMenu = document.createElement("button");
-	boutonMenu.type = "button";
-	boutonMenu.className = "nq-barre-menu";
-	boutonMenu.setAttribute("aria-label", t("app.titlebar.menu"));
-	poserGlyphe(boutonMenu, "chevron-down");
-	gauche.appendChild(boutonMenu);
 
 	const glisse = ajouter(barre, "div", "nq-barre-glisse");
 
@@ -179,9 +188,18 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	window.addEventListener("wheel", onWheel, { passive: false });
 
 	let fermerMenu: (() => void) | null = null;
-	boutonMenu.addEventListener("click", () => {
-		if (fermerMenu) { fermerMenu(); fermerMenu = null; return; }
-		fermerMenu = ouvrirMenuApp(boutonMenu, {
+	let ancreMenu: HTMLElement | null = null;
+	basculer = (ancre) => {
+		if (fermerMenu) {
+			const memeAncre = ancre === ancreMenu;
+			fermerMenu();
+			fermerMenu = null;
+			if (memeAncre) return;
+		}
+		ancreMenu = ancre;
+		observateurMenu.disconnect();
+		observateurMenu.observe(ancre, { attributes: true, attributeFilter: ["data-open"] });
+		fermerMenu = ouvrirMenuApp(ancre, {
 			version: application.version,
 			zoom: () => currentZoom,
 			executer(id, value) {
@@ -215,16 +233,15 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 				}
 			},
 		});
-	});
-	// Le menu se ferme lui-même (clic dehors, Échap, action) sans repasser par
-	// ce bouton : `fermerMenu` resterait alors une fonction déjà consommée.
-	// `ouvrirMenuApp` pose et retire `data-open` sur l'ancre ; on s'en sert
-	// pour savoir si un second clic doit fermer ou rouvrir.
+	};
+	// The menu closes by itself (click outside, Escape, action) without going
+	// back through its anchor: `fermerMenu` would then stay an already used
+	// function. `ouvrirMenuApp` sets and removes `data-open` on the anchor;
+	// it tells whether a second click must close or reopen.
 	function surFermetureMenu(): void {
-		if (!boutonMenu.hasAttribute("data-open")) fermerMenu = null;
+		if (!ancreMenu?.hasAttribute("data-open")) fermerMenu = null;
 	}
 	const observateurMenu = new MutationObserver(surFermetureMenu);
-	observateurMenu.observe(boutonMenu, { attributes: true, attributeFilter: ["data-open"] });
 
 	/* ─── LES RACCOURCIS SANS MENU NATIF ───
 	   `Ctrl+,` et `Ctrl+Shift+B` seulement HORS champ (ce sont des raccourcis
@@ -262,6 +279,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	document.addEventListener("keydown", surClavier, true);
 
 	return () => {
+		basculer = null;
 		desabonnerFenetre();
 		observateurMenu.disconnect();
 		document.removeEventListener("keydown", surClavier, true);

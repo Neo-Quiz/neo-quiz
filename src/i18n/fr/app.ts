@@ -37,7 +37,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.titlebar.maximize": "Agrandir",
 	"app.titlebar.restore": "Restaurer",
 	"app.titlebar.close": "Fermer",
-	"app.rail.github": "Neo Quiz sur GitHub : laissez une étoile",
 	"app.menu.checkUpdates": "Vérifier les mises à jour…",
 	"app.menu.settings": "Réglages…",
 	"app.menu.edit": "Édition",

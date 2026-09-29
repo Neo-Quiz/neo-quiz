@@ -61,7 +61,6 @@ export const EN_APP = {
 	"app.titlebar.maximize": "Maximize",
 	"app.titlebar.restore": "Restore",
 	"app.titlebar.close": "Close",
-	"app.rail.github": "Neo Quiz on GitHub: leave a star",
 	"app.menu.checkUpdates": "Check for updates…",
 	"app.menu.settings": "Settings…",
 	"app.menu.edit": "Edit",
