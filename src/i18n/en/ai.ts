@@ -98,6 +98,10 @@ export const EN_AI = {
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained.",
 	"ai.mode.group": "Goal",
+	/* "N quizzes <-> 1 quiz" toggle, under the attached documents */
+	"ai.oneQuiz.label": "One quiz",
+	"ai.oneQuiz.tipOne": "The {count} documents go into a single quiz. Click for one quiz per document.",
+	"ai.oneQuiz.tipMany": "One quiz per document: {count} quizzes. Click to put all the documents into a single quiz.",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
 	/* A quiz's subject (categorie-quiz.ts): its name, its menu section, and

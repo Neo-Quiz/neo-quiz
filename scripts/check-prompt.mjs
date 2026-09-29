@@ -11,11 +11,11 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts }, { CHAMPS_DECRITS, MOTS_INTERDITS, PASSAGES_REQUIS }) => {
-	const r = makeReporter("Prompts Learn / Practice");
-	for (const mode of ["learn", "practice"]) {
+	const r = makeReporter("Prompts Learn / Practice / Exam");
+	for (const mode of ["learn", "practice", "exam"]) {
 		const { systemPrompt } = composerPrompts("Python", { mode, count: null, type: "Mixte" });
 		r.check(`${mode} : chaque champ exigé est décrit`, CHAMPS_DECRITS[mode].filter(c => !systemPrompt.includes(c)), []);
-		r.check(`${mode} : aucun mode ni champ retiré n'est mentionné`, MOTS_INTERDITS.filter(re => re.test(systemPrompt)).map(String), []);
+		r.check(`${mode} : aucun mode ni champ retiré n'est mentionné`, MOTS_INTERDITS[mode].filter(re => re.test(systemPrompt)).map(String), []);
 		/* Du markdown partout (2026-09-26) : la consigne est là, et aucun champ
 		   `*Html` n'est nommé (MOTS_INTERDITS ci-dessus). */
 		r.check(`${mode} : la consigne markdown est donnée`, PASSAGES_REQUIS.filter(p => !systemPrompt.includes(p)), []);
@@ -26,7 +26,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.check("nombre fixé : exactement N", composerPrompts("x", { mode: "practice", count: 12 }).systemPrompt.includes("exactly 12 questions"), true);
 	r.check("Learn en Auto : 20 questions au plus, sauf nécessité", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("at most 20 questions in total"), true);
 	r.check("le code d'une phrase va entre backticks, dans les deux modes (sinon __init__ s'affiche en gras)",
-		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes("goes between backticks in EVERY text field")), [true, true]);
+		["learn", "practice", "exam"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes("goes between backticks in EVERY text field")), [true, true, true]);
 	r.check("Learn : chaque pré-question a un indice", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("EVERY pre question also has \"hint\""), true);
 	r.check("mode absent = Practice", composerPrompts("x", {}).systemPrompt.includes("MODE: PRACTICE"), true);
 	const plan = [{ slice: 1, titre: "Types" }, { slice: 2, titre: "Listes" }];
@@ -35,7 +35,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.check("Learn : le plan des tranches est ignoré",
 		composerPrompts("x", { mode: "learn", planTranches: plan }).userPrompt.includes("Listes"), false);
 	r.check("la carte mémoire est décrite en Learn, jamais en Practice",
-		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes('"flashcard": true')), [true, false]);
+		["learn", "practice", "exam"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes('"flashcard": true')), [true, false, false]);
 	r.check("Learn : une carte seulement pour une réponse courte",
 		composerPrompts("x", { mode: "learn" }).systemPrompt.includes("ONLY when the answer fits in one sentence, one formula or one line of code"), true);
 	r.check("Learn : le texte complet du flashcard du brief",
@@ -76,9 +76,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		learnP.includes("A slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE flashcard among its recalls."), true);
 	r.check("Practice : les consignes propres au Learn restent absentes",
 		["EVERY question of the path has \"hint\"", "AT LEAST ONE flashcard"].filter(s => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(s)), []);
-	/* Glossaire (lot D, 2026-09-27) : la consigne GLOSSARY est commune aux deux
+	/* Glossaire (lot D, 2026-09-27) : la consigne GLOSSARY est commune aux trois
 	   modes, et chacun porte l'objet de configuration qui la déclenche. */
-	for (const mode of ["learn", "practice"]) {
+	for (const mode of ["learn", "practice", "exam"]) {
 		const p = composerPrompts("x", { mode }).systemPrompt;
 		r.check(`${mode} : la consigne du glossaire est donnée`,
 			['"glossary"', "GLOSSARY:", "5 to 15 KEY TERMS", "Write \"term\" EXACTLY as it appears in the readings and explanations"].filter(s => !p.includes(s)), []);
@@ -92,22 +92,61 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		composerPrompts("x", { mode: "practice" }).systemPrompt.includes('{ mode: "quiz", "glossary"'), true);
 	r.check("Practice : plus de « No configuration object »",
 		composerPrompts("x", { mode: "practice" }).systemPrompt.includes("No configuration object"), false);
+
+	/* ── Spec 2026-09-29 §4.5: Practice hints are optional, the Exam has its own prompt ── */
+	const practiceP = composerPrompts("x", { mode: "practice" }).systemPrompt;
+	r.check("Practice: a hint is optional, added when a question deserves it, no longer expected on every question",
+		[practiceP.includes('"hint": optional — add one when a question deserves it'), practiceP.includes('EVERY question has "hint"')], [true, false]);
+	r.check("Practice: the rest is unchanged (explain required, slice plan, hint levels, runInLastHint)",
+		['EVERY question has "explain"', '"slice": when a SLICE PLAN', "HINTS:", "runInLastHint: true ONLY"].filter(p => !practiceP.includes(p)), []);
+	const examP = composerPrompts("x", { mode: "exam", count: null }).systemPrompt;
+	r.check("Exam: has its own MODE block, never the Practice or Learn one",
+		[examP.includes("MODE: EXAM."), examP.includes("MODE: PRACTICE"), examP.includes("MODE: LEARN")], [true, false, false]);
+	r.check("Exam: the same question shape as Practice, explain on every question, one topic per question",
+		['EVERY question has "explain"', '"topic": a short label', 'give EVERY question a "topic"'].filter(p => !examP.includes(p)), []);
+	r.check("Exam: no hint of any kind (field, HINTS paragraph, runInLastHint, language list), no slice plan",
+		[/hint/i.test(examP), examP.includes("HINTS:"), examP.includes("runInLastHint"), /\bslice\b/i.test(examP)], [false, false, false, false]);
+	r.check("Exam: the final configuration writes mode: \"exam\" and examDurationMinutes",
+		examP.includes('{ mode: "exam", "examDurationMinutes": <whole number of minutes, from 1 to 300>, "glossary"'), true);
+	r.check("Exam, several sources: every document covered in proportion to its content",
+		examP.includes("cover EVERY document, each one in proportion to its content"), true);
+	r.check("Exam, Auto duration: the model chooses it",
+		[examP.includes("DURATION: you choose it."), /exactly \d+ minutes/.test(examP)], [true, false]);
+	const typed = composerPrompts("x", { mode: "exam", count: null, examDurationMinutes: 90 }).systemPrompt;
+	r.check("Exam, typed duration: given to the model to size length and difficulty, and to write",
+		["DURATION: the exam lasts exactly 90 minutes.", "size the number of questions to the 90 minutes of the exam", '"examDurationMinutes": 90,'].filter(p => !typed.includes(p)), []);
+	r.check("Exam, typed duration: a fixed count still wins on the number of questions",
+		composerPrompts("x", { mode: "exam", count: 12, examDurationMinutes: 90 }).systemPrompt.includes("exactly 12 questions"), true);
+	r.check("Exam: the duration is brought within [1, 300]",
+		[composerPrompts("x", { mode: "exam", examDurationMinutes: 999 }).systemPrompt.includes("exactly 300 minutes"),
+			composerPrompts("x", { mode: "exam", examDurationMinutes: 0 }).systemPrompt.includes("DURATION: you choose it.")], [true, true]);
+	r.check("a duration typed outside an Exam is ignored (Learn and Practice never name it)",
+		["learn", "practice"].map(m => composerPrompts("x", { mode: m, examDurationMinutes: 90 }).systemPrompt.includes("90 minutes")), [false, false]);
+	r.check("Exam: the slice plan is ignored, like in Learn",
+		composerPrompts("x", { mode: "exam", planTranches: plan }).userPrompt.includes("Listes"), false);
+	r.check("per-mode forbidden words: mode: \"exam\" is forbidden in Learn and Practice, hints and slices in Exam",
+		[MOTS_INTERDITS.learn.some(re => re.test('mode: "exam"')), MOTS_INTERDITS.practice.some(re => re.test('mode: "exam"')), MOTS_INTERDITS.exam.some(re => re.test('mode: "exam"')),
+			MOTS_INTERDITS.exam.some(re => re.test('"hint"')), MOTS_INTERDITS.exam.some(re => re.test("runInLastHint")), MOTS_INTERDITS.exam.some(re => re.test('"slice"')),
+			MOTS_INTERDITS.practice.some(re => re.test('"hint"'))], [true, true, false, true, true, true, false]);
+	r.check("every mode forbids the retired keys learnMode, examAutoSubmit, examShowTimer",
+		["learn", "practice", "exam"].map(m => ["learnMode", "examAutoSubmit", "examShowTimer"].filter(k => !MOTS_INTERDITS[m].some(re => re.test(k)))), [[], [], []]);
 	r.done();
 });
 
 /* LA CATÉGORIE (retour #7) : chaque complément part dans le prompt système
    des deux modes, une seule fois, et `general` n'ajoute rien. */
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prompt.ts", "src/dashboard/categorie-quiz.ts"], ({ composerPrompts }, { complementCategorie }, { CATEGORIES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prompt.ts", "src/dashboard/categorie-quiz.ts", "src/quiz-format.ts"], ({ composerPrompts }, { complementCategorie }, { CATEGORIES }, { MOTS_INTERDITS: MOTS_INTERDITS_PAR_MODE }) => {
 	const r = makeReporter("Prompts par catégorie");
 	const sans = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	r.check("general : prompt identique à l'absence de catégorie", composerPrompts("x", { mode: "learn", categorie: "general" }).systemPrompt, sans);
 	for (const cat of CATEGORIES.filter(c => c !== "general")) {
 		const complement = complementCategorie(cat);
 		r.check(`${cat} : un complément non vide`, complement.length > 40, true);
-		for (const mode of ["learn", "practice"]) {
+		for (const mode of ["learn", "practice", "exam"]) {
 			const p = composerPrompts("x", { mode, categorie: cat }).systemPrompt;
 			r.check(`${cat} / ${mode} : le complément est ajouté, une fois`, p.split(complement).length - 1, 1);
-			r.check(`${cat} / ${mode} : le reste du prompt est gardé`, p.includes("THE SAME LANGUAGE AS THE USER REQUEST") && p.includes("HINTS:"), true);
+			r.check(`${cat} / ${mode} : le reste du prompt est gardé`, p.includes("THE SAME LANGUAGE AS THE USER REQUEST") && p.includes("EXPLANATIONS:"), true);
+			r.check(`${cat} / ${mode} : the complement introduces no forbidden word of the mode`, MOTS_INTERDITS_PAR_MODE[mode].filter(re => re.test(p)).map(String), []);
 		}
 		r.check(`${cat} : aucun autre complément`, CATEGORIES.filter(c => c !== "general" && c !== cat && composerPrompts("x", { categorie: cat }).systemPrompt.includes(complementCategorie(c))), []);
 	}
@@ -121,8 +160,8 @@ await withSrcModule(["src/dashboard/ai-client.ts"], ({ composerPrompts }) => {
 	const r = makeReporter("Prompts Learn / Practice (styles)");
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	r.check("Learn : le style reste choisi selon le contenu", learnP.includes("CHOOSE for each read card, from its content"), true);
-	r.check("Practice : aucun style de lecture",
-		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
+	r.check("Practice et Exam : aucun style de lecture",
+		["practice", "exam"].map(m => ['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: m }).systemPrompt.includes(p))), [[], []]);
 	r.done();
 });
 
@@ -149,6 +188,12 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ assemblerQuestionsOllama, p
 	r.check("une configuration déjà glissée dans questions (schéma ignoré par le modèle) : pas de doublon",
 		assemblerQuestionsOllama({ questions: [q1, dejaConfig], mode: "quiz", glossary: [{ term: "autre", definition: "x" }] }),
 		[q1, dejaConfig]);
+	r.check("Exam: mode + examDurationMinutes racine : ajoutés à l'objet de configuration final",
+		assemblerQuestionsOllama({ questions: [q1], mode: "exam", examDurationMinutes: 45 }), [q1, { mode: "exam", examDurationMinutes: 45 }]);
+	r.check("Exam: an examDurationMinutes that is not a number is not carried over",
+		assemblerQuestionsOllama({ questions: [q1], mode: "exam", examDurationMinutes: "45" }), [q1, { mode: "exam" }]);
+	r.check("Exam: a configuration already slipped into questions (carrying only the duration) : no duplicate",
+		assemblerQuestionsOllama({ questions: [q1, { examDurationMinutes: 60 }], mode: "exam", examDurationMinutes: 45 }), [q1, { examDurationMinutes: 60 }]);
 	r.check("bout en bout : parseOllamaResponse lit {questions, mode, glossary} et rend le tableau fusionné",
 		parseOllamaResponse(JSON.stringify({ title: "T", questions: [q1], mode: "learn", objectives: ["Définir"], glossary: [{ term: "pile", definition: "LIFO." }] })).questions,
 		[q1, { mode: "learn", objectives: ["Définir"], glossary: [{ term: "pile", definition: "LIFO." }] }]);

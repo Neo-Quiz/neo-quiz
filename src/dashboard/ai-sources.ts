@@ -25,12 +25,14 @@ export function debutDeDemande(texte: string, max = 60): { texte: string; coupee
 	return { texte: (espace > max / 2 ? coupe.slice(0, espace) : coupe).replace(/[\s:,;–—-]+$/, ""), coupee: true };
 }
 
-/** Le nom de la source : la première pièce jointe sans son extension,
-    sinon le début de la demande, sinon `repli` — nettoyé des caractères
-    qu'un nom de fichier ou une valeur YAML ne supporte pas. Calculé à
-    l'identique au lancement (recherche du Learn) et à l'enregistrement. */
-export function nomDeSource(pieces: { name: string }[], demande: string, repli: string): string {
-	const brut = pieces[0]?.name.replace(/\.[^.\\/]+$/, "") || debutDeDemande(demande).texte || repli;
+/** The name of the source: the first attached document without its
+    extension, else the start of the request, else `repli` — cleaned of the
+    characters a file name or a YAML value cannot hold. Computed identically
+    at launch (Learn lookup) and at saving. With SEVERAL documents (one quiz
+    over all of them, spec 2026-09-29 §4.4) no single document names it: it is
+    `folderName`, the destination folder's name (the module), when there is one. */
+export function nomDeSource(pieces: { name: string }[], demande: string, repli: string, folderName = ""): string {
+	const brut = (pieces.length > 1 ? folderName : "") || pieces[0]?.name.replace(/\.[^.\\/]+$/, "") || debutDeDemande(demande).texte || repli;
 	return brut.replace(INTERDITS, "-").replace(/\s+/g, " ").trim() || repli;
 }
 

@@ -145,3 +145,105 @@ await withSrcModule("src/dashboard/generation-demande.ts", ({ brouillonDe, nombr
 		nombreDeQuestions([genere[0], { mode: "quiz" }, { glossary: [{ term: "pile", definition: "LIFO." }] }]), 1);
 	r.done();
 });
+
+/* "N QUIZZES <-> 1 QUIZ" AND THE NAME OF AN EXAM (spec 2026-09-29 §4.3-§4.5),
+   through the real `generation-demande.ts`: the split rule now takes the
+   user's choice, the toggle's default follows the mode, and a request over
+   SEVERAL documents made as ONE quiz is named after the destination folder
+   (the module), with no Learn to follow. `enregistrerQuiz` runs against an
+   in-memory host, so the note's real path and frontmatter are what is
+   checked, not a copy of the naming rule. */
+await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts", "src/quiz-format.ts"], async (gd, hote, format) => {
+	const r = makeReporter("N quizzes <-> 1 quiz, name of an Exam");
+	const doc = (name) => ({ name, content: "texte " + name, source: "file" });
+	const msg = (docs, images = 0) => ({ text: "Fais un quiz", notes: docs.map(doc), images: Array.from({ length: images }, () => ({ file: {} })) });
+	const noms = (msgs) => msgs.map(m => m.notes.map(n => n.name));
+
+	r.check("split: N quizzes (one per document) when not chosen as one quiz",
+		noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md", "CM3.md"]), false)), [["CM1.md"], ["CM2.md"], ["CM3.md"]]);
+	r.check("split: ONE quiz over every document when chosen",
+		noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md", "CM3.md"]), true)), [["CM1.md", "CM2.md", "CM3.md"]]);
+	r.check("split: an image keeps ONE quiz whatever the choice",
+		[false, true].map(c => noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md"], 1), c))), [[["CM1.md", "CM2.md"]], [["CM1.md", "CM2.md"]]]);
+	r.check("split: a single document is never split",
+		[false, true].map(c => noms(gd.decouperParFichier(msg(["CM1.md"]), c))), [[["CM1.md"]], [["CM1.md"]]]);
+	r.check("split: each sub-request keeps the instruction",
+		gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), false).map(m => m.text), ["Fais un quiz", "Fais un quiz"]);
+
+	r.check("the toggle's default follows the mode: N in Learn and Practice, 1 in Exam",
+		["learn", "practice", "exam"].map(gd.oneQuizByDefault), [false, false, true]);
+	r.check("the toggle is offered with at least two documents and no image",
+		[[0, 0], [1, 0], [2, 0], [5, 0], [2, 1], [1, 1], [0, 2]].map(([d, i]) => gd.canChooseQuizCount(d, i)), [false, false, true, true, false, false, false]);
+	r.check("the typed Exam duration is read in Exam only, clamped to [1, 300], null = Auto",
+		[gd.typedExamDuration("exam", { aiExamDurationMinutes: 90 }), gd.typedExamDuration("exam", { aiExamDurationMinutes: 999 }), gd.typedExamDuration("exam", { aiExamDurationMinutes: null }),
+			gd.typedExamDuration("exam", {}), gd.typedExamDuration("practice", { aiExamDurationMinutes: 90 }), gd.typedExamDuration("learn", { aiExamDurationMinutes: 90 })],
+		[90, 300, null, null, null, null]);
+
+	/* An in-memory host: the destination folder, the files already there, and
+	   what was written. Only what `enregistrerQuiz` reaches is provided. */
+	const ecrits = new Map();
+	const existants = new Set();
+	const notices = [];
+	hote.installHost({
+		fs: {
+			mkdirs: async () => {},
+			exists: async (p) => existants.has(p),
+			write: async (p, contenu) => { ecrits.set(p, contenu); existants.add(p); },
+			getFile: () => null,
+		},
+		paths: {
+			contractPath: (root, local) => root + "/" + local,
+			defaultRoot: () => ({ id: "R", name: "Neo Quiz" }),
+			localPath: (p) => (p === "R" ? "" : p.replace(/^R\//, "")),
+			rootOf: () => ({ id: "R", name: "Neo Quiz" }),
+		},
+		ui: { notice: (m) => notices.push(m) },
+	});
+	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p }), getQuizzes: () => [] };
+	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const question = { title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." };
+	const enregistrer = async (mode, docs, { destination = "R/Cours/Réseaux", noteLearn } = {}) => {
+		const questions = mode === "exam" ? format.completeExamConfig([question], 45) : [question];
+		const entry = await gd.enregistrerQuiz({
+			draft: gd.brouillonDe(questions), questions, modeDemande: mode, demande: { text: "Fais un quiz", notes: docs.map(n => ({ name: n })) },
+			destination, reglages, usage: null, noteLearn, planTranches: undefined, scanner,
+		});
+		return { path: entry?.path, contenu: entry ? ecrits.get(entry.path) : undefined };
+	};
+
+	let e = await enregistrer("exam", ["CM1.pdf"]);
+	r.check("Exam, one document: <course> — Exam.md, source = the course",
+		[e.path, /\n\s+source: "CM1"\n/.test(e.contenu)], ["R/Cours/Réseaux/CM1 — Exam.md", true]);
+	e = await enregistrer("exam", ["CM1.pdf", "CM2.pdf", "CM3.pdf"]);
+	r.check("Exam, several documents in ONE quiz: <module> — Exam.md, source = the module",
+		[e.path, /\n\s+source: "Réseaux"\n/.test(e.contenu)], ["R/Cours/Réseaux/Réseaux — Exam.md", true]);
+	e = await enregistrer("exam", ["CM1.pdf", "CM2.pdf"]);
+	r.check("the same module, a second Exam: freeNotePath's counter", e.path, "R/Cours/Réseaux/Réseaux — Exam (2).md");
+	e = await enregistrer("exam", ["CM1.pdf", "CM2.pdf"], { destination: "R" });
+	r.check("a module that is the root itself: the root's name", e.path, "R/Neo Quiz — Exam.md");
+	e = await enregistrer("practice", ["CM1.pdf", "CM2.pdf"]);
+	r.check("Practice as ONE quiz over several documents: named after the module too", e.path, "R/Cours/Réseaux/Réseaux — Practice.md");
+	e = await enregistrer("practice", ["CM1.pdf"], { noteLearn: "CM1 — Learn" });
+	r.check("Practice on ONE document keeps its learn: link",
+		[e.path, /learn: "?\[\[CM1 — Learn\]\]"?/.test(e.contenu)], ["R/Cours/Réseaux/CM1 — Practice.md", true]);
+	e = await enregistrer("exam", ["CM1.pdf"], { noteLearn: "CM1 — Learn" });
+	r.check("an Exam never carries a learn: link", /learn:/.test(e.contenu), false);
+	r.check("a saved Exam reads back as an Exam with its explicit duration",
+		(() => { const items = format.lireBlocQuiz(e.contenu); return [format.modeDuBloc(items), items.at(-1).examDurationMinutes]; })(), ["exam", 45]);
+
+	/* `lienLearn`: never for an Exam, nor for a Practice over several documents. */
+	const learn = { path: "R/Cours/Réseaux/CM1 — Learn.md", basename: "CM1 — Learn", mode: "learn", generated: { source: "CM1", generatedAt: "2026-09-23T10:00:00Z" } };
+	const avecLearn = { getQuizzes: () => [learn] };
+	const lu = async (mode, docs) => Object.keys(await gd.lienLearn(avecLearn, mode, "R/Cours/Réseaux", msg(docs)));
+	hote.uninstallHost();
+	/* The Learn note holds a real slice plan: without one `lienLearn` finds
+	   nothing whatever the rule, and the cases below would prove nothing. */
+	const noteLearn = ["```quiz-blocks", "[{ title: 'Types', prompt: 'x', role: 'read', slice: 1 }]", "```", ""].join("\n");
+	hote.installHost({ fs: { read: async () => noteLearn }, ui: { notice: () => {} } });
+	r.check("lienLearn: a Practice on ONE document follows its Learn (the control the next case relies on)",
+		await lu("practice", ["CM1.md"]), ["plan", "note"]);
+	r.check("lienLearn: nothing for an Exam, nor for a Practice over several documents (no single Learn to follow)",
+		[await lu("exam", ["CM1.md"]), await lu("practice", ["CM1.md", "CM2.md"]), await lu("learn", ["CM1.md"])], [[], [], []]);
+	hote.uninstallHost();
+	r.done();
+});

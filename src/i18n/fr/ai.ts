@@ -79,6 +79,10 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.mode.learnTip": "Apprendre un cours pas à pas : une question avant chaque passage, la correction aussitôt, jusqu'à ce que ça tienne.",
 	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée.",
 	"ai.mode.group": "Objectif",
+	/* Bascule « N quiz <-> 1 quiz », sous les documents joints */
+	"ai.oneQuiz.label": "Un seul quiz",
+	"ai.oneQuiz.tipOne": "Les {count} documents forment un seul quiz. Cliquer pour un quiz par document.",
+	"ai.oneQuiz.tipMany": "Un quiz par document : {count} quiz. Cliquer pour réunir tous les documents dans un seul quiz.",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Choisi par l'IA",
 	"ai.categorie.auto": "Automatique",

@@ -14,7 +14,7 @@
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
+import { clampExamDuration, fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
 import { nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
@@ -96,12 +96,46 @@ export function composerDemande(msg: DemandeTexte): { source: "image" | "text" |
 	return { source, prompt };
 }
 
-/** UN QUIZ PAR FICHIER JOINT (2026-09-23) : un sous-message par fichier,
-    même consigne pour chacun, dès que la demande porte plusieurs documents
-    et aucune image (une image illustre souvent LE document d'à côté). */
-export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>): DemandeTexte<I>[] {
-	if (msg.images.length > 0 || msg.notes.length < 2) return [msg];
+/** ONE QUIZ PER ATTACHED FILE (2026-09-23), unless the user chose "1 quiz"
+    (spec 2026-09-29 §4.3): one sub-message per file, the same instruction for
+    each, as soon as the request carries several documents and no image (an
+    image often illustrates THE document next to it, so an image keeps a
+    single quiz whatever the choice). `oneQuiz` is the state of the composer's
+    "N quizzes ↔ 1 quiz" toggle, whose default follows the mode (N in Learn
+    and Practice, 1 in Exam). */
+export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, oneQuiz: boolean): DemandeTexte<I>[] {
+	if (oneQuiz || msg.images.length > 0 || msg.notes.length < 2) return [msg];
 	return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
+}
+
+/** The name of a folder given as a contract path: its last segment, or the
+    root's own name when the folder IS a root. `""` when neither is known. */
+function folderName(folder: string): string {
+	const host = currentHost();
+	const last = host.paths.localPath(folder).split("/").filter(Boolean).pop();
+	return last ?? host.paths.rootOf(folder)?.name ?? "";
+}
+
+/** The default of the composer's "N quizzes <-> 1 quiz" toggle (spec
+    2026-09-29 §4.3): N quizzes in Learn and Practice (a course is learnt and
+    trained document by document), ONE quiz in Exam (an exam covers the whole
+    module). The composer resets it to this each time the mode changes. */
+export function oneQuizByDefault(mode: ModeQuiz): boolean {
+	return mode === "exam";
+}
+
+/** Whether the toggle is offered: at least two documents and no image (with
+    an image, `decouperParFichier` keeps a single quiz whatever the choice). */
+export function canChooseQuizCount(documents: number, images: number): boolean {
+	return documents >= 2 && images === 0;
+}
+
+/** The Exam duration typed by the user, in minutes within the format's
+    bounds; `null` = Auto (or not an Exam). `figerReglages` freezes
+    `aiExamDurationMinutes` for EVERY mode and unclamped: only an Exam reads
+    it, through here. */
+export function typedExamDuration(mode: ModeQuiz, settings: { aiExamDurationMinutes?: number | null }): number | null {
+	return mode === "exam" ? clampExamDuration(settings.aiExamDurationMinutes) : null;
 }
 
 /** Le dossier par défaut, en chemin du contrat : `<racine par défaut>/<aiOutputFolder>`. */
@@ -110,11 +144,13 @@ export function dossierParDefaut(aiOutputFolder: string | undefined): string {
 	return host.paths.contractPath(host.paths.defaultRoot().id, aiOutputFolder || aiSettingsDefaults().aiOutputFolder);
 }
 
-/** Practice : la note Learn de la même SOURCE dans le dossier de
-    destination (clé `source:` de son frontmatter) et son plan des tranches,
-    qui part avec la demande (spec §2). Rien trouvé ou illisible : `{}`. */
+/** Practice: the Learn note of the same SOURCE in the destination folder
+    (the `source:` key of its frontmatter) and its slice plan, which goes
+    with the request (spec §2). Nothing found or unreadable: `{}`. Never for
+    an Exam, nor for a Practice made as ONE quiz over several documents (spec
+    2026-09-29 §4.5): there is no single Learn to follow. */
 export async function lienLearn(scanner: Scanner, mode: ModeQuiz, dossier: string, msg: DemandeTexte): Promise<{ plan?: { slice: number; titre: string }[]; note?: string }> {
-	if (mode !== "practice") return {};
+	if (mode !== "practice" || msg.notes.length > 1) return {};
 	const source = nomDeSource(msg.notes, msg.text, t("dashboard.quizzes.newQuizDefaultName"));
 	const learn = trouverLearn(scanner.getQuizzes(), dossier, source);
 	if (!learn) return {};
@@ -188,13 +224,16 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		   `contractPath`, qui le préfixerait une seconde fois. */
 		const folder = e.destination || dossierParDefaut(e.reglages.aiOutputFolder);
 		await ensureFolder(folder);
-		/* Le NOM : `<base> — Learn` / `<base> — Practice`, la base étant la
-		   pièce jointe (le CM), sinon le titre du modèle, sinon la demande. La
-		   SOURCE part dans le frontmatter : c'est par elle qu'un Practice
-		   retrouve son Learn. */
+		/* The NAME: `<base> — Learn` / `<base> — Practice` / `<base> — Exam`,
+		   the base being the attached document (the lecture), else the model's
+		   title, else the request. SEVERAL documents in ONE quiz have no single
+		   name to take: the base is then the destination folder's name (the
+		   module, spec 2026-09-29 §4.4). The SOURCE goes in the frontmatter: a
+		   Practice finds its Learn through it, and it takes the same value as
+		   the name's base. */
 		const defaut = t("dashboard.quizzes.newQuizDefaultName");
 		const pieces = e.demande?.notes ?? [];
-		const source = nomDeSource(pieces, e.demande?.text ?? "", defaut);
+		const source = nomDeSource(pieces, e.demande?.text ?? "", defaut, folderName(folder));
 		const mode = modeDuBloc(e.questions);
 		const base = pieces.length ? source : nomDeSource([], e.titreModele || e.demande?.text || "", defaut);
 		const path = await freeNotePath(folder, nomDeNote(base, mode));

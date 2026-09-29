@@ -1,5 +1,5 @@
 import type { QuestionRole } from "./types/quiz";
-import { findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
+import { clampExamDuration, fallbackExamDuration, findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
 import { aIndice } from "./quiz-hint";
 import { runInLastHintProbleme } from "./code-languages";
 
@@ -27,8 +27,12 @@ export type ModeQuiz = "learn" | "practice" | "exam";
 /** What the prompt of EACH mode must name, word for word: a field the
     arrival check requires but the prompt keeps quiet about is never produced
     (test of 2026-09-23: `explain` missing from the prompt, no explanation at
-    all). The Exam joins this list with its own prompt. */
-export const CHAMPS_DECRITS: Readonly<Record<Exclude<ModeQuiz, "exam">, readonly string[]>> = {
+    all). The Exam has its own list (spec 2026-09-29 §4.5): the Practice
+    fields that stay, minus `hint` (never shown in an Exam, so not worth the
+    tokens), `runInLastHint` (it unlocks ▶ once the last HINT level is
+    revealed) and `slice` (an Exam is never linked to a Learn, so it gets no
+    slice plan), plus the two keys of its configuration object. */
+export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"flashcard"',
 		// Reading styles (2026-09-26, reading styles spec §4): the keys and their values.
 		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
@@ -43,20 +47,39 @@ export const CHAMPS_DECRITS: Readonly<Record<Exclude<ModeQuiz, "exam">, readonly
 		// Glossary (batch D, 2026-09-27): replaces "No configuration object".
 		'"glossary"', '"term"', '"definition"',
 		"runInLastHint"],
+	exam: ['"explain"', '"topic"',
+		// The configuration object of an Exam (spec 2026-09-29 §1.1).
+		'mode: "exam"', '"examDurationMinutes"',
+		'"glossary"', '"term"', '"definition"'],
 };
 
-/** What no prompt may mention any more: the retired modes and field, and the
+/** What no prompt may mention any more: the retired modes and fields, and the
     pre-rendered HTML fields — a quiz is written in markdown, as in Discord and
     Obsidian (2026-09-26): naming `promptHtml` to the model invites it to write
     one. */
-export const MOTS_INTERDITS: readonly RegExp[] = [
-	/\blesson\b/i, /\bexamMode\b/, /mode:\s*"exam"/,
+const COMMON_FORBIDDEN_WORDS: readonly RegExp[] = [
+	/\blesson\b/i, /\bexamMode\b/,
+	// Retired on 2026-09-29 (spec §1.1): no longer read nor written. A prompt
+	// that still named them would have the model write keys nothing reads.
+	/\blearnMode\b/, /\bexamAutoSubmit\b/, /\bexamShowTimer\b/,
 	/\bpromptHtml\b/, /\bexplainHtml\b/, /\blessonHtml\b/, /\bpassageHtml\b/, /\boptionHtml\b/,
 	// The per-question countdown was dropped (2026-09-28): never implemented
 	// in the engine, then judged useless. A prompt that still named it would
 	// have the model write a field that nothing reads.
 	/\btimeLimit\b/,
 ];
+
+/** The forbidden words of EACH mode's prompt (spec 2026-09-29 §4.6): the
+    common list, plus what belongs to another mode. `mode: "exam"` and its
+    duration stay out of the Learn and Practice prompts (a model that reads
+    them writes an Exam nobody asked for) and are required in the Exam prompt
+    (`CHAMPS_DECRITS.exam`). The Exam prompt, in turn, never names hints nor
+    slices (see `CHAMPS_DECRITS`): `/hint/i` also catches `runInLastHint`. */
+export const MOTS_INTERDITS: Readonly<Record<ModeQuiz, readonly RegExp[]>> = {
+	learn: [...COMMON_FORBIDDEN_WORDS, /mode:\s*"exam"/, /\bexamDurationMinutes\b/],
+	practice: [...COMMON_FORBIDDEN_WORDS, /mode:\s*"exam"/, /\bexamDurationMinutes\b/],
+	exam: [...COMMON_FORBIDDEN_WORDS, /hint/i, /\bslice\b/i],
+};
 
 /** The passages the prompt of EACH mode must contain word for word: the
     markdown instruction. Without it, a model readily writes its readings in
@@ -287,6 +310,43 @@ export function completerConfigLearn(items: readonly unknown[]): unknown[] {
 	}
 	copie.push({ mode: "learn" });
 	return copie;
+}
+
+/** A REQUESTED Exam, brought to the state a saved Exam must have (spec
+    2026-09-29 §1.2 and §4.6): `mode: "exam"` and an explicit
+    `examDurationMinutes`, whatever the model wrote.
+    - The mode: a model that forgot `mode: "exam"` (or wrote another mode in
+      its configuration object) would have the note saved as a Practice, named
+      "— Practice", and untimed. Same defect and same repair as
+      `completerConfigLearn`; here, with no path role to look for, a
+      configuration object is added when the model wrote none.
+    - The duration: a duration TYPED by the user wins over the model's answer
+      (`typed`, already validated by the caller or not: it goes through
+      `clampExamDuration` here); in Auto (`typed` null), the model's own
+      `examDurationMinutes`, clamped to [1, 300]; failing that, the fallback
+      rule (`fallbackExamDuration`: 1 min 30 per question, rounded to 5).
+    Merges split configurations first (`fusionnerConfigsFinales`). A lone
+    `{ examDurationMinutes }` object is not recognised as a configuration by
+    `findQuizModeConfigIndex` (no mode, no glossary), so it is looked for
+    explicitly, or it would stay as a phantom question next to the new
+    configuration. PURE: returns a new array. */
+export function completeExamConfig(items: readonly unknown[], typed: number | null | undefined): unknown[] {
+	const merged = fusionnerConfigsFinales(items);
+	let idx = findQuizModeConfigIndex(merged);
+	if (idx < 0) {
+		idx = merged.findIndex(it => !!it && typeof it === "object" && !Array.isArray(it)
+			&& !texte((it as Element).prompt) && "examDurationMinutes" in (it as object));
+	}
+	const config = idx >= 0 ? (merged[idx] as Record<string, unknown>) : null;
+	const questionCount = merged.length - (config ? 1 : 0);
+	const minutes = clampExamDuration(typed)
+		?? clampExamDuration(config?.examDurationMinutes)
+		?? fallbackExamDuration(questionCount);
+	const result = [...merged];
+	const completed = { ...config, mode: "exam", examDurationMinutes: minutes };
+	if (idx >= 0) result[idx] = completed;
+	else result.push(completed);
+	return result;
 }
 
 export function planDesTranches(items: readonly unknown[]): { slice: number; titre: string }[] {

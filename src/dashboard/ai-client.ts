@@ -14,7 +14,7 @@ import {
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage } from "./usage-format";
 import { t } from "../i18n";
-import type { ModeQuiz } from "../quiz-format";
+import { clampExamDuration, type ModeQuiz } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
 
@@ -65,10 +65,18 @@ export interface GenerateOptions {
 	type?: string;
 	source?: string;
 	images?: ImagePayload[];
-	/** Absent : Practice, comme un bloc sans objet de mode. */
+	/** Absent: Practice, like a block without a mode object. */
 	mode?: ModeQuiz;
-	/** Practice seulement : les tranches du Learn de la même source, pour
-	    poser `slice` (spec §2). Ignoré en Learn. */
+	/** Exam only: the duration typed by the user, in minutes, given to the
+	    model so it sizes the length and the difficulty of the exam. `null` or
+	    absent = Auto: the model chooses and writes `examDurationMinutes`
+	    itself. Ignored outside an Exam. The saved note gets the typed value
+	    from the arrival check, whatever the model answered
+	    (`completeExamConfig`). */
+	examDurationMinutes?: number | null;
+	/** Practice only: the slices of the Learn of the same source, to set
+	    `slice` (spec §2). Ignored in Learn, and in Exam (an Exam is never
+	    linked to a Learn). */
 	planTranches?: { slice: number; titre: string }[];
 	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi : son
 	    complément s'ajoute au prompt système. Absente ou `general` : rien. */
@@ -243,17 +251,21 @@ function courseAbandon<T>(promesse: Promise<T>, signal: AbortSignal): Promise<T>
 export const PHRASE_FINALE_CLI = "Reply ONLY with the JSON5 array, with no explanation and no formatting.";
 
 /**
- * Les deux prompts d'une génération, PURS : le même texte pour un CLI, pour
- * Ollama et pour un site. Sortis de `generateInner` le 2026-09-18 pour que
- * la page « Générer » les compose elle-même quand le canal est un site.
- * ANGLAIS, et INDÉPENDANTS de la langue de l'UI (voir la règle LANGUAGE dans
- * le prompt) ; `type` est la VALEUR canonique (cf. TYPE_VALUES dans ai.ts).
- * Un prompt PAR MODE, spec Learn/Practice §2.
+ * The two prompts of a generation, PURE: the same text for a CLI, for
+ * Ollama and for a website. Moved out of `generateInner` on 2026-09-18 so
+ * that the Generate page composes them itself when the channel is a site.
+ * In ENGLISH, and INDEPENDENT of the UI language (see the LANGUAGE rule in
+ * the prompt); `type` is the canonical VALUE (see TYPE_VALUES in ai.ts).
+ * One prompt PER MODE: Learn and Practice (Learn/Practice spec §2), and the
+ * Exam (Test/Exam spec 2026-09-29 §4.5).
  */
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
 	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie } = options;
-	// TODO(task 12): "exam" has no prompt of its own yet; it takes the Practice one below.
 	const learn = mode === "learn";
+	const exam = mode === "exam";
+	/* The typed duration of an Exam (null = Auto), brought within the format's
+	   bounds. Only an Exam reads it. */
+	const duration = exam ? clampExamDuration(options.examDurationMinutes) : null;
 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
 	const typeInstruction = type === "Mixte"
@@ -275,6 +287,8 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
 		? "QUANTITY: at most 20 questions in total, every role counted — usually 2 or 3 slices. Cover what can be examined on the source, the most important first; go beyond 20 ONLY if the source truly cannot be learned in fewer, and never pad with trivia. A learner who sees 50 questions gives up before starting."
+		: exam && duration !== null
+		? `QUANTITY: size the number of questions to the ${duration} minutes of the exam, at about one and a half minutes per question on average: ONLY what can be examined, the most important first. Never pad with trivia.`
 		: "QUANTITY: between 10 and 20 questions, chosen by you from the source: ONLY what can be examined, the most important first. Never pad with trivia.";
 
 	const blocMode = learn ? `MODE: LEARN. You are writing a guided LEARNING PATH through the source — not a test, and not a summary to read.
@@ -293,10 +307,19 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	A "read" passage NEVER contains the exact sentence that a later question of the same slice asks for: recall must be retrieval, not copying. Do not ask to "justify your answer" everywhere.
 	"topic": optional short label of a family of notions that are easily confused, shared by the questions that test it.
 	The LAST element of the array is the configuration object, with no prompt field: { mode: "learn", "objectives": ["...", "..."], "glossary": [{ "term": "...", "definition": "..." }, ...] } — 3 to 6 learning objectives of the source, each starting with a verb, and the glossary described under GLOSSARY below.`
+	: exam ? `MODE: EXAM. You are writing a TIMED EXAM on the source, in the FORMAT OF A UNIVERSITY EXAM on it: the learner answers against the clock, and only sees the corrections once the exam is handed in.
+	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
+	EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong. It is shown in the correction, after the hand-in.
+	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
+	SEVERAL SOURCES: when the request holds several documents (each one starts with a "--- <file name> ---" marker), cover EVERY document, each one in proportion to its content, and give EVERY question a "topic" naming the notion it tests.
+	${duration !== null
+		? `DURATION: the exam lasts exactly ${duration} minutes. Size the length and the difficulty of the questions so that a well-prepared student uses about that time: neither too short nor impossible to finish.`
+		: "DURATION: you choose it. Write the number of minutes a well-prepared student needs, at about one and a half minutes per question on average, more for multi-step problems."}
+	The LAST element of the array is a configuration object, with no prompt field: { mode: "exam", "examDurationMinutes": ${duration !== null ? duration : "<whole number of minutes, from 1 to 300>"}, "glossary": [{ "term": "...", "definition": "..." }, ...] } — the glossary described under GLOSSARY below.`
 	: `MODE: PRACTICE. You are writing an exam-preparation bank on the source, in the FORMAT OF A UNIVERSITY EXAM on it.
 	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
 	EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.
-	EVERY question has "hint" (see HINTS below).
+	"hint": optional — add one when a question deserves it (see HINTS below), and leave it out otherwise.
 	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
 	"slice": when a SLICE PLAN of the learning path is given in the request, the number of the slice that teaches what the question tests; otherwise omit it.
 	The LAST element of the array is a configuration object, with no prompt field: { mode: "quiz", "glossary": [{ "term": "...", "definition": "..." }, ...] } — the glossary described under GLOSSARY below.`;
@@ -305,6 +328,19 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	   les consignes du mode et le titre ; rien pour `general`. */
 	const complement = complementCategorie(categorie);
 	const categorieBloc = complement ? `\n\t${complement}\n` : "";
+
+	/* The text fields the code and markdown rules apply to: `hint` is one of
+	   them outside an Exam. */
+	const textFields = exam ? "prompt, options, explain, answer" : "prompt, options, explain, hint, answer";
+	/* Hints exist in Learn and Practice only: an Exam never shows one, so its
+	   prompt does not name the field, the code-execution field that hangs on
+	   it, nor the HINTS paragraph (spec 2026-09-29 §4.5). */
+	const hintFields = exam ? "" : `	- hint: a nudge shown on demand — a string, or for a DIFFICULT question an array of 2 or 3 levels (see HINTS below)
+	- runInLastHint: true ONLY on a DIFFICULT question whose prompt holds a python, c or cpp code block and whose "hint" has 2 or 3 levels, when running that program helps without answering in the learner's place (find the bug, choose the fix, explain a behaviour): once the last hint level is revealed, the learner may run it. NEVER on a question asking what a program prints (its answer IS the output), never on an easy question.
+`;
+	const hintsBlock = exam ? "" : `
+	HINTS: a "hint" helps without giving the answer away. The learner can open it BEFORE any attempt, from a button under the question: never write it as if an answer had already been given ("you got it wrong", "try again"). Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
+`;
 
 	const systemPrompt = `You are a quiz generator. Generate the quiz questions as a JSON5 array. Each question may have:
 	- title: short question title
@@ -316,9 +352,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	- type: "text" for free text, omitted otherwise
 	- answer: expected answer (free text)
 	- explain: the explanation shown after the answer
-	- hint: a nudge shown on demand — a string, or for a DIFFICULT question an array of 2 or 3 levels (see HINTS below)
-	- runInLastHint: true ONLY on a DIFFICULT question whose prompt holds a python, c or cpp code block and whose "hint" has 2 or 3 levels, when running that program helps without answering in the learner's place (find the bug, choose the fix, explain a behaviour): once the last hint level is revealed, the learner may run it. NEVER on a question asking what a program prints (its answer IS the output), never on an easy question.
-	- mathInput: true for a text question whose answer is a mathematical expression (the learner answers in a visual EQUATION EDITOR)
+${hintFields}	- mathInput: true for a text question whose answer is a mathematical expression (the learner answers in a visual EQUATION EDITOR)
 	- answerTemplate: a LaTeX template pre-filled in the answer field of a mathInput question, with \\\\placeholder{} for each blank to fill (e.g. 'x = \\\\placeholder{}' ; two solutions: 'x_1 = \\\\placeholder{},\\\\; x_2 = \\\\placeholder{}'). RULES for mathInput: the question text NEVER gives answer-format instructions (no "as a fraction", "comma-separated", "e.g. 1/2") — the equation editor makes all of that pointless; prefer an answerTemplate that guides instead; acceptedAnswers are the COMPLETE content of the field once the template is filled, in LaTeX (e.g. 'x_1 = \\\\frac{1}{2},\\\\; x_2 = 3'), and add variants where relevant (solutions in reverse order)
 	- terminalVariant: "python", "bash", "powershell" or "cmd" for a text question answered in a terminal (a command, or the output of a program)
 	- cloze: a FILL-IN-THE-BLANK text. Put the whole sentence, paragraph or code in this field and wrap each blank in DOUBLE BRACES, with accepted variants separated by "|": "The capital of France is {{Paris}} and its currency is {{the euro|euro}}." Use double BRACES, never double brackets — double brackets are Obsidian's internal-link syntax and would be rewritten before the quiz is read. Keep "prompt" as the SHORT instruction only ("Complete the text below"), never repeat the text there. 2 to 5 blanks per question, each on a key term, never on a word the sentence already gives away. A blank NEVER sits between the delimiters that frame its answer: chevrons, brackets, parentheses or quotes around it go INSIDE the blank, with the answer — #include {{<stdio.h>}}, never #include <{{stdio.h}}>; printf({{"%d"}}, n), never printf("{{%d}}", n). Left outside, they give away what kind of answer is expected, and the blank becomes too easy
@@ -328,20 +362,18 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	- passage / passageId / passageTitle: a SOURCE DOCUMENT to read before answering (comprehension). "passage" holds the full text, "passageTitle" names it, and "passageId" is a shared key: every question carrying the SAME passageId shows the SAME document, so write the text ONCE on the first question of the group and give the others only their passageId
 
 	${blocMode}
-
-	HINTS: a "hint" helps without giving the answer away. The learner can open it BEFORE any attempt, from a button under the question: never write it as if an answer had already been given ("you got it wrong", "try again"). Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
-
+${hintsBlock}
 	EXPLANATIONS: in every "explain", put the two or three KEY WORDS in **bold** — no more; the reader colors them.
 
 	GLOSSARY: the configuration object at the end of the array (see above) carries a "glossary" of 5 to 15 KEY TERMS of the source — the technical notions a student must know, never everyday words. Each entry is { "term": "...", "definition": "..." }, plus an optional "aliases": ["..."] for another form of the SAME term used in the text (an acronym, an abbreviation, e.g. "LIFO" for "stack"). Write "term" EXACTLY as it appears in the readings and explanations — same spelling, same form; a term written differently is never matched and never underlined. Write "term" in PLAIN TEXT, NEVER between backticks, even for a keyword or a function of the language: the bare name is the term (e.g. "yield", not \`yield\`) — it is still recognized wherever that name appears inside inline \`code\`. "definition" is ONE OR TWO SENTENCES in markdown (**bold**, \`code\`, a $formula$), understandable on its own WITHOUT the course, and NEVER a copy of a question's answer or explanation. No duplicate term, no filler word.
 ${categorieBloc}
 	QUIZ TITLE: the very first line of the array, right after the opening bracket, is a JSON5 line comment giving the quiz a name: '// title: <name>'. The name is what a student would write on the cover: 3 to 8 words naming its subject and scope (e.g. "Python : types, listes et exceptions"), in the language of the content, WITHOUT the word "quiz" and without a trailing period. Exactly one such line, nowhere else.
 
-	LANGUAGE — THIS IS A HARD RULE: write ALL the content you produce (title, prompt, options, answer, explain, hint, objectives, glossary) in THE SAME LANGUAGE AS THE USER REQUEST BELOW. If the request is in French, write the quiz in French; in Arabic, in Arabic; in English, in English. When the request provides source material (a text, a note, images), follow the language of that material. NEVER translate the content into English just because these instructions are in English. The FIELD NAMES (title, prompt, options…) and the JSON5 structure always stay exactly as specified above, in English. Keep the technical terms of the source exactly as the source writes them.
+	LANGUAGE — THIS IS A HARD RULE: write ALL the content you produce (title, prompt, options, answer, explain, ${exam ? "" : "hint, "}objectives, glossary) in THE SAME LANGUAGE AS THE USER REQUEST BELOW. If the request is in French, write the quiz in French; in Arabic, in Arabic; in English, in English. When the request provides source material (a text, a note, images), follow the language of that material. NEVER translate the content into English just because these instructions are in English. The FIELD NAMES (title, prompt, options…) and the JSON5 structure always stay exactly as specified above, in English. Keep the technical terms of the source exactly as the source writes them.
 
-	CODE: every piece of code written inside a sentence — an identifier, a keyword, a command, an option, a file name, a path, an expression — goes between backticks in EVERY text field (prompt, options, explain, hint, answer): \`__init__\`, \`find /var/log -name '*.log'\`, \`i ** 2\`. Without them, \`__init__\` is displayed as a bold "init" and \`**\` as emphasis. CODE OF MORE THAN ONE LINE, in ANY field and ANY question type, is ALWAYS a fenced block naming its language (\`\`\`python … \`\`\`), never one pair of backticks per line: the reader shows the language's logo and colours only on such a block. A "cloze" on code puts the WHOLE program in ONE such block, its blanks inside it: \`\`\`python\nclass Dog:\n    def {{__init__}}(self, name):\n\`\`\`.
+	CODE: every piece of code written inside a sentence — an identifier, a keyword, a command, an option, a file name, a path, an expression — goes between backticks in EVERY text field (${textFields}): \`__init__\`, \`find /var/log -name '*.log'\`, \`i ** 2\`. Without them, \`__init__\` is displayed as a bold "init" and \`**\` as emphasis. CODE OF MORE THAN ONE LINE, in ANY field and ANY question type, is ALWAYS a fenced block naming its language (\`\`\`python … \`\`\`), never one pair of backticks per line: the reader shows the language's logo and colours only on such a block. A "cloze" on code puts the WHOLE program in ONE such block, its blanks inside it: \`\`\`python\nclass Dog:\n    def {{__init__}}(self, name):\n\`\`\`.
 
-	FORMATTING — MARKDOWN ONLY: every text field (prompt, options, explain, hint, answer, passage) is written in MARKDOWN, exactly as in Discord and Obsidian: **bold**, *italic*, \`code\`; a block of code between two lines of three backticks, the language after the opening ones (\`\`\`python); bulleted lists with "- " and numbered lists with "1. ", one item per line; paragraphs separated by an empty line (\\n\\n inside the JSON5 string); a markdown table (| A | B | then |---|---|) when comparing several notions on the same criteria; formulas between dollars as described below. NEVER write an HTML tag (no <p>, <br>, <strong>, <em>, <code>, <pre>, <ul>, <li>, <table>) and never a field whose name ends in "Html": markdown is shorter, and a tag shows up as raw markup when the quiz is edited. A code block ALWAYS names its language right on the opening backticks (\`\`\`python, \`\`\`bash, \`\`\`c…) — NEVER just \`\`\` alone: the reader colors the block from that name, and an unnamed block is shown without color.
+	FORMATTING — MARKDOWN ONLY: every text field (${textFields}, passage) is written in MARKDOWN, exactly as in Discord and Obsidian: **bold**, *italic*, \`code\`; a block of code between two lines of three backticks, the language after the opening ones (\`\`\`python); bulleted lists with "- " and numbered lists with "1. ", one item per line; paragraphs separated by an empty line (\\n\\n inside the JSON5 string); a markdown table (| A | B | then |---|---|) when comparing several notions on the same criteria; formulas between dollars as described below. NEVER write an HTML tag (no <p>, <br>, <strong>, <em>, <code>, <pre>, <ul>, <li>, <table>) and never a field whose name ends in "Html": markdown is shorter, and a tag shows up as raw markup when the quiz is edited. A code block ALWAYS names its language right on the opening backticks (\`\`\`python, \`\`\`bash, \`\`\`c…) — NEVER just \`\`\` alone: the reader colors the block from that name, and an unnamed block is shown without color.
 
 	MATHEMATICS: every mathematical expression (formula, function, equation, integral, fraction, exponent, Greek letter…) MUST be written in LaTeX delimited by dollar signs, as in Obsidian: $f(x) = x^3$ inline, $$\\int_0^2 2x\\,dx$$ for a display formula. Never pseudo-notation such as f(x) = x^3 or ∫ from 0 to 2 outside the dollars. This applies to every text field. IMPORTANT: inside JSON5 strings, DOUBLE every backslash — for LaTeX (write '$\\\\frac{a}{b}$' to get \\frac) as well as Windows paths (write 'C:\\\\Users\\\\dev') — a single backslash would be destroyed by the parser.
 
@@ -351,7 +383,7 @@ ${categorieBloc}
 
 	Generate ${typeInstruction}. ${PHRASE_FINALE_CLI}`;
 
-	const plan = !learn && planTranches && planTranches.length
+	const plan = !learn && !exam && planTranches && planTranches.length
 		? `\n\nSLICE PLAN OF THE LEARNING PATH (use these numbers in "slice"):\n${planTranches.map(p => `${p.slice}. ${p.titre}`).join("\n")}`
 		: "";
 	const userPrompt = (source === "topic"
@@ -426,26 +458,28 @@ function retirerFence(content: string): string {
     une question perdue (l'objet existant reste, dans tous les cas). */
 function estDejaUneConfig(q: unknown): boolean {
 	if (!q || typeof q !== "object" || Array.isArray(q)) return false;
-	const o = q as { prompt?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
-	return !o.prompt && ("mode" in o || "objectives" in o || "glossary" in o);
+	const o = q as { prompt?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown; examDurationMinutes?: unknown };
+	return !o.prompt && ("mode" in o || "objectives" in o || "glossary" in o || "examDurationMinutes" in o);
 }
 
-/** Réassemble le tableau `questions` attendu par le reste du pipeline
- * (`findQuizModeConfigIndex`, `extractExamOptions`…) à partir de la réponse
- * STRUCTURÉE d'Ollama : `mode`, `objectives` et `glossary` y arrivent au
- * NIVEAU RACINE de l'objet (à côté de `questions`, jamais DANS le schéma
- * d'une question — voir le commentaire du schéma `format` ci-dessus), donc
- * jamais dans le tableau lui-même. Un objet de configuration final est
- * ajouté EN QUEUE à partir de ces champs racine ; SAUF si le modèle en a
- * déjà glissé un dans `questions` malgré le schéma (`estDejaUneConfig`) —
- * dans ce cas rien n'est ajouté, l'objet existant suffit et en ajouter un
- * second aurait scindé la configuration (spec lot D §5). PURE : ne mute
- * jamais `obj.questions`.
+/** Rebuilds the `questions` array expected by the rest of the pipeline
+ * (`findQuizModeConfigIndex`, `extractExamOptions`…) from Ollama's
+ * STRUCTURED response: `mode`, `examDurationMinutes`, `objectives` and
+ * `glossary` arrive at the ROOT level of the object (next to `questions`,
+ * never INSIDE the schema of a question — see the comment of the `format`
+ * schema in `callOllama`), so never in the array itself. A final
+ * configuration object is appended from these root fields; EXCEPT when the
+ * model already slipped one into `questions` despite the schema
+ * (`estDejaUneConfig`) — then nothing is added, the existing object is
+ * enough and adding a second one would have split the configuration (batch D
+ * spec §5). PURE: never mutates `obj.questions`.
  */
-export function assemblerQuestionsOllama(obj: { questions: unknown[]; mode?: unknown; objectives?: unknown; glossary?: unknown }): unknown[] {
+export function assemblerQuestionsOllama(obj: { questions: unknown[]; mode?: unknown; examDurationMinutes?: unknown; objectives?: unknown; glossary?: unknown }): unknown[] {
 	if (obj.questions.some(estDejaUneConfig)) return obj.questions;
 	const config: Record<string, unknown> = {};
 	if (typeof obj.mode === "string" && obj.mode.trim()) config.mode = obj.mode;
+	// An Exam's duration (spec 2026-09-29 §1.2): a number, clamped later by the arrival check.
+	if (typeof obj.examDurationMinutes === "number") config.examDurationMinutes = obj.examDurationMinutes;
 	if (Array.isArray(obj.objectives) && obj.objectives.length > 0) config.objectives = obj.objectives;
 	if (Array.isArray(obj.glossary) && obj.glossary.length > 0) config.glossary = obj.glossary;
 	if (Object.keys(config).length === 0) return obj.questions;
@@ -463,7 +497,7 @@ export function parseOllamaResponse(content: string): ReponseQuiz {
 
 		// If it's an object with a "questions" key, extract the array
 		if (parsed && !Array.isArray(parsed) && Array.isArray((parsed as { questions?: unknown }).questions)) {
-			const obj = parsed as { questions: unknown[]; title?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
+			const obj = parsed as { questions: unknown[]; title?: unknown; mode?: unknown; examDurationMinutes?: unknown; objectives?: unknown; glossary?: unknown };
 			return { questions: assemblerQuestionsOllama(obj), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
 		}
 
@@ -1286,15 +1320,16 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 					],
 					stream: false,
 					...(thinkLevel ? { think: thinkLevel } : {}),
-					/* `mode`, `objectives` et `glossary` sont décrits au NIVEAU RACINE,
-					   à CÔTÉ de `questions` — jamais DANS le schéma de chaque question,
-					   qui exige "title" et "prompt" : l'objet de configuration final
-					   n'a ni l'un ni l'autre, et le décrire là en aurait fait une
-					   question fantôme (revue lot D, 2026-09-27). Avant ce correctif, le
-					   schéma ne connaissait ni l'un ni l'autre : Ollama les OMETTAIT du
-					   quiz, ou improvisait un objet qui devenait une question vide.
-					   `assemblerQuestionsOllama` (plus bas) réassemble le tableau final
-					   à partir de ces trois champs. */
+					/* `mode`, `examDurationMinutes`, `objectives` and `glossary` are
+					   described at the ROOT level, NEXT TO `questions` — never INSIDE
+					   the schema of each question, which requires "title" and "prompt":
+					   the final configuration object has neither, and describing it
+					   there would have made it a phantom question (batch D review,
+					   2026-09-27). Before that fix the schema knew none of them: Ollama
+					   OMITTED them from the quiz, or improvised an object that became
+					   an empty question. `examDurationMinutes` joined them with the
+					   Exam mode (2026-09-29). `assemblerQuestionsOllama` (further down)
+					   rebuilds the final array from these root fields. */
 					format: {
 						type: "object",
 						properties: {
@@ -1321,6 +1356,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 								}
 							},
 							mode: { type: "string" },
+							examDurationMinutes: { type: "number" },
 							objectives: { type: "array", items: { type: "string" } },
 							glossary: {
 								type: "array",

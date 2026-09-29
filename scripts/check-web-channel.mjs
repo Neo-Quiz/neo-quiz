@@ -218,7 +218,7 @@ const refus = makeReporter("Canal web : refus pendant une attente");
 for (const avecImage of [false, true]) {
 	const contexte = {
 		phase: "web", demarrage: false, composerText: "Nouvelle demande", composerCaret: null,
-		noteAttachments: [], images: avecImage ? [{ url: "blob:test" }] : [],
+		noteAttachments: [], images: avecImage ? [{ url: "blob:test" }] : [], oneQuiz: false,
 		sentMessage: { text: "Demande précédente", images: [], notes: [] }, sentAnimPending: false,
 		arrets: 0, retraits: 0, rendus: [],
 		attachPromptPaths: async () => {}, couperSondeConnexion: () => {},

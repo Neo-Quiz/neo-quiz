@@ -1297,6 +1297,44 @@
 	scrollbar-color: color-mix(in srgb, var(--text-normal) 22%, transparent) transparent;
 }
 
+/* The "N quizzes <-> 1 quiz" toggle (spec 2026-09-29 §4.3), under the
+   documents it is about. Text with its icon, no frame: a bordered button in
+   the composer's card would be a tile within a tile. Muted when off, accent
+   when on (`aria-pressed`, painted by `paintOneQuiz`). */
+.qbd-ai-onequiz {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.qbd-ai-onequiz:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-ai-onequiz.is-on {
+	color: var(--interactive-accent);
+}
+
+.qbd-ai-onequiz-icon {
+	display: inline-flex;
+}
+
+.qbd-ai-onequiz-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
 .qbd-ai-composer-chips::-webkit-scrollbar { height: 6px; }
 .qbd-ai-composer-chips::-webkit-scrollbar-thumb {
 	background: color-mix(in srgb, var(--text-normal) 22%, transparent);
@@ -1691,6 +1729,7 @@
    sans flou ni fondu. */
 @media (prefers-reduced-motion: reduce) {
 	.qbd-ai-composer-pieces-contenu,
+	.qbd-ai-onequiz,
 	.qbd-ai-note-chip,
 	.qbd-ai-note-chip-thumb,
 	.qbd-ai-note-chip-remove {
