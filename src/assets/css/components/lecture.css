@@ -179,6 +179,19 @@
   color: var(--text-muted);
 }
 
+/* A table comparing THREE things or more (a label column plus three,
+   2026-09-29): held to the 62ch reading column, "Tuple / List / Dictionary"
+   wrapped one word per line while the card had room on both sides. It takes
+   the card's width; its title and intro keep the reading measure. A
+   two-column comparison (the validated mockup) is unchanged. */
+.quiz-lecture--tableau:has(.quiz-lecture-tableau th:nth-child(4)){
+  max-width: 100%;
+}
+
+.quiz-lecture--tableau:has(.quiz-lecture-tableau th:nth-child(4)) > :not(.quiz-lecture-tableau-wrap){
+  max-width: 62ch;
+}
+
 /* ── « À retenir » ── */
 
 .quiz-lecture-cartes-bloc,

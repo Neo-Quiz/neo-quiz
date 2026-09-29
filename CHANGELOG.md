@@ -206,6 +206,7 @@ release notes.
 - An empty equation answer field shows "Your answer..." like the other answer fields, instead of nothing that says you can write in it.
 - Leaving the Generate page during a generation and coming back no longer makes it forget the chosen AI tool ("Choose a provider"): a tool busy generating was taken for a missing one.
 - In a Learn, a recall question whose choices are the question itself ("Which of these statements are true?", or any multiple-choice recall) keeps its choices instead of turning into a free answer whose statements had disappeared; generated single-choice recalls are now written to be answerable without their options.
+- A Learn reading that compares three things or more in a table uses the card's full width, instead of squeezing the table into the reading column one word per line.
 
 
 ## [1.19.0] - 2026-09-23
