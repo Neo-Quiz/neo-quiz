@@ -75,8 +75,7 @@ attendre qu'Ahmed le demande** :
   une idée vus à l'écran pendant le chantier : une ligne de plus dans la liste
   de la version, le jour même.
 - **Toujours par un agent** (jamais la session principale), avec le texte
-  exact des lignes à changer : haiku pour cocher une ligne, sonnet pour une
-  réorganisation. C'est le rôle que la mémoire
+  exact des lignes à changer : Sonnet 5.5 (décision du 2026-09-29). C'est le rôle que la mémoire
   `feedback_note-vault-task-in-progress` ne fait que pointer.
 
 ## Langue (i18n)
@@ -180,9 +179,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   GARDÉE de la même façon (`garde-ia.ts`) : l'hôte d'`aiOllamaUrl` entre dans la
   liste du réseau, et `cheminClaude`/`cheminCodex` désignent un exécutable que le
   principal LANCERA — absolu, existant, extension lançable (un `.js` qui existe
-  pour de bon est refusé : ce serait « écris-le puis lance-le »). Elle garde aussi
-  `aiExamDurationMinutes` : un entier de 1 à 300, ou vide (= Auto), aux bornes du
-  format.
+  pour de bon est refusé : ce serait « écris-le puis lance-le »). L'ancien
+  réglage `aiExamDurationMinutes` (la durée d'un Examen générable, retiré le
+  2026-09-29) n'est plus gardé : une valeur restée dans un fichier de
+  réglages est acceptée et ignorée, et n'affaiblit aucune autre règle de la clé.
 - `npm run check:electron-process` — les fichiers de cache des CLI ET le
   LANCEMENT d'un CLI (`apps/windows/electron/process.ts`), sur de vrais process.
   C'est la capacité la plus dangereuse du pont : la liste blanche de NOMS
@@ -228,14 +228,28 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   seuls variables) ; `--dangerously-skip-permissions`, `--mcp-config` ou un
   bac à sable ouvert sont refusés. **Ajouter une option à un appel de CLI du
   rendu exige de l'ajouter à ce gabarit.** Dans la CI.
+- `npm run check:test-setup` — le noyau PUR des réglages de la fenêtre « Prépare
+  ton test » (`src/test-setup.ts`, spec 2026-09-29-test-setup-modal). Le mode
+  examen se DÉDUIT : actif exactement quand les indices sont coupés ET une
+  limite posée (rallumer les indices, ou retirer la limite, l'éteint ; le
+  rallumer coupe les indices et pose un chrono) ; une durée bornée à [1, 300]
+  ou la règle de secours ; une valeur mémorisée dans les réglages (`readTestSetup`)
+  abîmée retombe sur `null`, jamais devinée ; et QUAND la note est écrite par
+  « Garder le mode examen » (`keepExamChange` : jamais pour un test joué sans
+  mode examen, seulement si le réglage change). Le câblage de l'écriture est
+  tenu par `check:quiz-io` (section 14). Dans la CI.
 - `npm run check:session` — la PHOTO DE SESSION d'un quiz (`src/engine/session.ts`),
   pour reprendre là où on s'était arrêté : aller-retour de chaque type de
   question, quiz modifié entre deux sessions (question supprimée, ajoutée,
   options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
   s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Et CE
   QUI est photographié (`canSnapshot`) : un Entraînement, avec ses réponses et
-  l'usage de ses indices ; JAMAIS un Examen (abandonné, il ne laisse rien et
-  rouvre sur son écran de départ), ni un test rendu. Dans la CI.
+  l'usage de ses indices ; un Test CHRONOMÉTRÉ aussi, avec ses réglages et les
+  millisecondes restantes (une reprise repart du temps qu'il restait, sans
+  rouvrir la fenêtre « Prépare ton test », et une photo antérieure aux
+  réglages ou abîmée redonne un test avec indices et sans limite) ; JAMAIS un
+  test rendu. Seul un Examen ANCIEN, joué sans réglages d'hôte, reste sans
+  photo. Dans la CI.
 - `npm run check:learn-loop` — la BOUCLE DE REPRISE d'un Learn
   (`src/engine/learn-loop.ts`, noyau pur ; câblage `src/engine/learn.ts`) :
   une question ratée ne revient jamais aussitôt (deux autres vérifications,
@@ -322,11 +336,18 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   TEST (Entraînement · Examen, spec 2026-09-29) : rien au journal avant de
   rendre, un verdict par question au moment de rendre (juste avec indice,
   faux ou sans réponse = raté), « 12/15, dont 2 avec indice » compté sans
-  pénalité, « Recommencer » = une nouvelle tentative ; le rendu depuis la
+  pénalité, « Recommencer » = une nouvelle tentative ; le LANCEMENT d'un Test
+  (`engine/test-launch.ts`, noyau sans DOM) : l'hôte n'est interrogé que pour
+  un Test (ni un Learn, ni le greffon), une fenêtre annulée ne lance rien, une
+  photo reprise saute la fenêtre, et les réglages choisis arrivent sur le
+  contexte du moteur (indices, durée, chrono déjà lancé, jamais d'écran de
+  départ) ; « Recommencer » applique les réglages choisis et l'essai porte
+  `exam` quand les indices sont coupés ET une limite posée ; le rendu depuis la
   dernière question (`engine/hand-in.ts` : jamais l'écran de soumission,
   la modale des questions sans réponse), l'ampoule sur la perle d'une
-  question aidée, et le chrono de l'Examen (h:mm:ss dès une heure, rendu à
-  zéro qui referme la modale). `check:module-edit` tient aussi le REGROUPEMENT
+  question aidée, les indices qui suivent le RÉGLAGE et non l'horloge, et le
+  chrono d'un test limité (h:mm:ss dès une heure, rendu à zéro qui referme la
+  modale). `check:module-edit` tient aussi le REGROUPEMENT
   d'un cours (`course-pairs.ts`) : au plus un quiz par mode, Learn,
   Entraînement puis Examen sur une carte. Les deux dans la CI.
 - `npm run check:quiz-io` — **le CÂBLAGE de l'écriture d'un bloc**, le seul
@@ -336,33 +357,41 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   ligne, ni celle des clôtures, ni le remplacement par FONCTION qui protège un
   quiz contenant `$1$`. Les quatre sont des correctifs de bugs réels, et deux
   avaient régressé la nuit même où ils furent écrits. Depuis le 2026-09-29, il
-  tient aussi l'EXAMEN et le CHANGEMENT DE MODE de l'éditeur : un Examen réécrit
-  en `mode: 'exam'` + `examDurationMinutes` (règle de secours s'il n'en a
-  pas), le retour en Entraînement qui retire la durée, jamais une clé retirée
-  (`examMode`, `examAutoSubmit`, `examShowTimer`, `learnMode`) réécrite.
+  tient aussi l'EXAMEN (un Examen relu puis réécrit en `mode: 'exam'` +
+  `examDurationMinutes`, jamais une clé retirée — `examMode`, `examAutoSubmit`,
+  `examShowTimer`, `learnMode` — réécrite) et « GARDER LE MODE EXAMEN » de la
+  fenêtre « Prépare ton test » (`saveKeepExam`, `dashboard/exam-keep.ts`) :
+  une ÉDITION DE TEXTE des deux seules clés, octet pour octet, qui préserve
+  commentaires, clé inconnue, fins de ligne CRLF, clôtures et attributs, ne
+  touche jamais un énoncé piégé (`$1$`), et refuse (sans rien écrire) un bloc
+  changé depuis l'ouverture, un Learn ou un bloc illisible ; décocher rend la
+  note d'origine. L'ancien changement de mode de l'éditeur n'existe plus.
 - `npm run check:review-log` — l'emplacement et la migration du journal de révision.
 - `npm run check:historique-nav` — les boutons précédent/suivant de la souris
-  (`historique-nav.ts`) et la GARDE DE SORTIE d'un Examen (`leave-guard.ts`) :
-  quitter l'écran d'un Examen commencé et pas rendu (croix, bouton précédent,
-  Ctrl+R, Affichage › Recharger, réglage qui recharge) demande d'abord ; rien
-  ne bouge avant la réponse, « Quitter » ne part qu'une fois.
+  (`historique-nav.ts`) : « précédent » ramène à la page quittée, une nouvelle
+  navigation efface le « suivant », pas de doublon, pile bornée. La garde de
+  sortie d'un Examen (`leave-guard.ts`) est supprimée depuis le 2026-09-29 :
+  un test chronométré se quitte librement et se reprend (`check:session`).
 - `npm run check:quiz-format` — le FORMAT Learn / Test (`src/quiz-format.ts`,
   `extractExamOptions`) : les modes `learn`, `exam` et l'Entraînement sans
   mode, le suffixe « — Exam » (et le compteur « (2) » de `freeNotePath`), la
   durée bornée à [1, 300] et sa règle de secours (1 min 30 par question,
-  arrondie à 5), les clés retirées plus lues, `verifierFormat("exam")`, et
-  `completeExamConfig` (l'ARRIVÉE d'un Examen demandé : la durée saisie l'emporte,
-  sinon celle du modèle bornée, sinon la règle de secours sur les seules
-  questions).
-- `npm run check:prompt` — les prompts de génération, dans les TROIS modes, avec
-  leurs mots interdits PAR mode : `mode: "exam"` obligatoire en Examen, interdit
-  ailleurs ; `learnMode`, `examAutoSubmit` et `examShowTimer` interdits partout ;
-  en Examen, ni indice ni tranche. La durée saisie (ou l'Auto) est donnée au
-  modèle, bornée à [1, 300], et ignorée hors Examen.
+  arrondie à 5), les clés retirées plus lues, et le vocabulaire de génération
+  (`CHAMPS_DECRITS` ne connaît que Learn et Test, sans les clés de l'Examen).
+  On ne GÉNÈRE plus d'Examen : un Test le devient à son lancement ou par
+  « Garder le mode examen ».
+- `npm run check:prompt` — les prompts de génération, pour les DEUX types
+  générés (Learn et Test), avec leurs mots interdits PAR type : aucun prompt
+  n'écrit `mode: "exam"` ni `examDurationMinutes`, quelles que soient les
+  options (une durée passée quand même n'arrive jamais au prompt, et celle
+  d'une réponse Ollama n'est pas reportée dans la configuration) ; `learnMode`,
+  `examAutoSubmit` et `examShowTimer` interdits partout ; l'indice est
+  facultatif dans un Test.
 - `npm run check:file-generation` — la demande de génération sur fichiers (vraie
   `generation-demande.ts`) : le choix « N quiz ↔ 1 quiz » (un quiz par document,
   ou un seul sur tous ; une image force un seul quiz), et le nom d'un quiz
-  unique sur plusieurs documents, celui du module (`<module> — Exam`), dans un
+  unique sur plusieurs documents, celui du module (`<module> — Practice`, un Test
+  généré ne porte aucune configuration d'examen), dans un
   hôte en mémoire pour lire le vrai chemin et le vrai frontmatter.
 - `npm run check:folders` — la conversion `folder` → `folders`, et l'unicité des
   identifiants de dossier.
