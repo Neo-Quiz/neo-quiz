@@ -948,6 +948,22 @@
 	grid-template-columns: minmax(0, 1fr);
 }
 
+/* THE FOLDER'S COLOUR BAR on each quiz card of an open folder (2026-09-29,
+   after StudySmarter's study set cards: a 4 px bar across the top, clipped
+   by the card's rounded corners). `--accent` is the folder's colour, set on
+   the drill layout (quizzes-render.ts). Only here: the same card variant
+   also paints the home page, where no folder gives it a colour. */
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: var(--accent);
+	pointer-events: none;
+}
+
 /* ── Sélecteur Contenu | Progression, entre le titre et « Nouveau quiz ». ── */
 .qbd-folder-view-tabs {
 	position: relative;
