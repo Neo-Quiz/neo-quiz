@@ -103,7 +103,8 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				   the arrows go from row to row, and the mark stays a click
 				   away, named for screen readers. */
 				const rangee = ajouter(panneau, "div", "nq-menu-apropos");
-				ajouter(rangee, "span", "nq-menu-apropos-version", entree.version);
+				// "v1.19.0", as a version reads on a release page.
+				ajouter(rangee, "span", "nq-menu-apropos-version", `v${entree.version}`);
 				const verifier = document.createElement("button");
 				verifier.type = "button";
 				verifier.className = "nq-menu-apropos-verifier";
