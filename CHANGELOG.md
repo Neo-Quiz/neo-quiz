@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-09-29
+
 ### Added
 - An empty folder shows the three ways to add a quiz right on its page (generate, create, import) instead of "No quiz found", and takes a shared quiz (.md or .zip) dropped on them; its New quiz button appears once it holds a quiz.
 - A play button at the top right of a course card, as on StudySmarter, starts it at once: its only mode, or a choice between Learn, Test and Exam when the card gathers several.
@@ -212,7 +214,6 @@ release notes.
 - Generate no longer takes an attached .html file for a web development course when the file's name, the destination folder or the request name another subject: a Python revision sheet saved as a web page sent to a Python folder is Python.
 - Deleting one quiz of a course card names it with its type in the confirmation (« CM1 (Learn) »), since the Learn and the Test of a course share their title.
 - Generated quizzes write code in a question's title between backticks too, so a title such as « The `__name__` test » no longer shows "name" in bold.
-
 
 ## [1.19.0] - 2026-09-23
 
