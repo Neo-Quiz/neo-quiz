@@ -104,7 +104,7 @@ export const EN_APP = {
 	   des fournisseurs. Les canaux gratuits n'y figurent jamais — ils n'ont
 	   rien à payer, ils restent. */
 	"app.settings.paidChannels": "Paid assistants",
-	"app.settings.paidChannelsHint": "These assistants need a subscription. Untick one to remove it from the generation menu; tick it again to bring it back.",
+	"app.settings.paidChannelsHint": "These assistants need a subscription. Turn one off to remove it from the generation menu; turn it on again to bring it back.",
 	"app.settings.paidChannelRow": "Show “{name}” in the generation menu",
 	"app.comptes.claude": "Claude Code",
 	"app.comptes.codex": "Codex CLI",
@@ -166,6 +166,10 @@ export const EN_APP = {
 
 	/* ── Réglages « Général » (application seulement) ── */
 	"app.settings.general": "General",
+	"app.settings.navFolders": "Folders",
+	"app.settings.navAi": "AI",
+	"app.settings.navAppearance": "Appearance",
+	"app.settings.nav": "Settings sections",
 	"app.settings.languageAuto": "Automatic (follow Windows)",
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",

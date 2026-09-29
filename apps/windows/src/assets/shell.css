@@ -420,6 +420,294 @@ body::after {
 	margin-top: 6px;
 }
 
+/* ══════════════════════════════════════════════════════════
+   THE SETTINGS, TWO PANES (2026-09-29, `ui/settings.ts`)
+
+   The categories on the left, one category on the right, every setting a
+   ROW of a card (name and help on the left, control on the right) — the
+   layout of Windows 11's Settings, in the app's own materials: the cards
+   are the flat surface of the modal, separated by hairlines, never a tile
+   in a tile. Only variables of `theme/host-vars.css` (see the note above:
+   `check:theme` does not sweep this folder).
+   ══════════════════════════════════════════════════════════ */
+.nq-set {
+	display: grid;
+	grid-template-columns: 208px minmax(0, 1fr);
+	height: 100%;
+}
+
+/* The category list: a slightly deeper surface than the pane, full height,
+   the modal's title in its head (`modal.css`). */
+.nq-set-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 62px 10px 12px;
+	border-right: 1px solid var(--background-modifier-border);
+	background: color-mix(in srgb, var(--background-secondary) 55%, var(--background-primary));
+}
+
+.nq-set-onglet {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 36px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: var(--radius-m);
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	text-align: start;
+	cursor: pointer;
+	transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.nq-set-onglet:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* The current category: lit, and marked by a short accent bar on its left
+   edge, as Windows 11 marks its current page. */
+.nq-set-onglet[aria-selected="true"] {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.nq-set-onglet[aria-selected="true"]::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: 3px;
+	height: 16px;
+	border-radius: 999px;
+	background: var(--interactive-accent);
+	transform: translateY(-50%);
+}
+
+.nq-set-onglet:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.nq-set-onglet-icone {
+	display: grid;
+	place-items: center;
+	flex: none;
+}
+
+.nq-set-onglet-icone svg {
+	width: 16px;
+	height: 16px;
+}
+
+.nq-set-onglet[aria-selected="true"] .nq-set-onglet-icone {
+	color: var(--text-accent);
+}
+
+/* The pane: the only part of the modal that scrolls. Right padding wide
+   enough for the close cross above it. */
+.nq-set-volet {
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: clip;
+	padding: 18px 28px 28px;
+}
+
+.nq-set-page[hidden] {
+	display: none;
+}
+
+.nq-set-page-titre {
+	margin: 0 0 18px;
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--text-normal);
+}
+
+/* A section of a category: no longer centred at 640 px with 24 px above
+   and below, as when the settings were a full screen. */
+.nq-set .nq-reglages-section {
+	max-width: none;
+	margin: 0;
+	padding: 0 0 26px;
+	gap: 8px;
+}
+
+.nq-set .nq-reglages-titre {
+	font-size: 13.5px;
+}
+
+/* THE CARD: one border around rows separated by hairlines. The lists of
+   folders, the accounts and the wallpaper take the same look, so a
+   category reads as one family of cards. */
+.nq-set-carte,
+.nq-set .nq-reglages-liste,
+.nq-set .nq-comptes-liste {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	margin-top: 2px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	background: var(--background-secondary);
+	overflow: hidden;
+}
+
+.nq-set .nq-reglages-liste[hidden] {
+	display: none;
+}
+
+.nq-set-carte > * + *,
+.nq-set .nq-reglages-liste > * + * {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* The rows the other modules build (`.nq-reglages-dossier`: a folder, the
+   wallpaper, the C/C++ pack) were cards of their own: inside a card, they
+   are rows. */
+.nq-set-carte > .nq-reglages-dossier,
+.nq-set .nq-reglages-liste > .nq-reglages-dossier {
+	min-height: 56px;
+	padding: 10px 16px;
+	border-left: 0;
+	border-right: 0;
+	border-bottom: 0;
+	border-radius: 0;
+	background: transparent;
+}
+
+.nq-set-carte > .nq-reglages-dossier:first-child,
+.nq-set .nq-reglages-liste > .nq-reglages-dossier:first-child {
+	border-top: 0;
+}
+
+/* The C/C++ pack stays a card of its own (its action sits under it). */
+.nq-set .nq-reglages-section > .nq-reglages-dossier {
+	min-height: 56px;
+	padding: 10px 16px;
+	border-radius: var(--radius-l);
+}
+
+.nq-set .nq-comptes-ligne {
+	padding: 0 16px;
+}
+
+/* A setting row. A `<label>` row (a switch) is clickable as a whole. */
+.nq-set-ligne {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	min-height: 56px;
+	box-sizing: border-box;
+	padding: 10px 16px;
+	margin: 0;
+}
+
+label.nq-set-ligne {
+	cursor: pointer;
+}
+
+.nq-set-ligne-texte {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	flex: 1;
+	min-width: 0;
+}
+
+.nq-set-ligne-aide {
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.nq-set-ligne-controle {
+	display: flex;
+	align-items: center;
+	flex: none;
+}
+
+.nq-set-ligne-controle .qbd-select {
+	min-width: 220px;
+}
+
+/* THE SWITCH: a native checkbox (keyboard, `change`), drawn as a switch. */
+.nq-set-interrupteur {
+	appearance: none;
+	-webkit-appearance: none;
+	position: relative;
+	flex: none;
+	width: 38px;
+	height: 22px;
+	margin: 0;
+	border: 1px solid var(--background-modifier-border-hover);
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+	cursor: pointer;
+	transition: background-color 160ms ease-out, border-color 160ms ease-out;
+}
+
+.nq-set-interrupteur::before {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	transition: transform 160ms cubic-bezier(0.2, 0, 0, 1), background-color 160ms ease-out;
+}
+
+.nq-set-interrupteur:checked {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+}
+
+.nq-set-interrupteur:checked::before {
+	background: var(--text-on-accent);
+	transform: translateX(16px);
+}
+
+.nq-set-interrupteur:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nq-set-interrupteur,
+	.nq-set-interrupteur::before {
+		transition: none;
+	}
+}
+
+/* `hidden` must win over the `display` these classes set: without it, the
+   wallpaper row kept its remove cross (and an empty preview box) when no
+   wallpaper was chosen, a cross that removed nothing. */
+.nq-reglages-retirer[hidden],
+.nq-fond-apercu[hidden] {
+	display: none;
+}
+
+/* The wallpaper's sliders, rows of its card. */
+.nq-set-carte > .nq-fond-curseur {
+	min-height: 48px;
+	box-sizing: border-box;
+	padding: 8px 16px;
+}
+
+.nq-set .nq-fond-rangee:hover {
+	background: var(--background-modifier-hover);
+}
+
 /* ── Le fond d'écran (Réglages) ──
    L'APERÇU de la rangée : le fond courant, à la place qu'occupe l'icône d'un
    dossier dans les autres rangées de cette page. C'est lui qui dit sur quoi

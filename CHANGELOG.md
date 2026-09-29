@@ -161,6 +161,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 - The application menu lights one row at a time, the one under the pointer or reached with the arrows, and its Display submenu no longer has an Interface scale list: Ctrl + wheel still zooms.
 - A course card's play button takes the colour of its folder, lightened so that a dark folder colour stays readable.
+- Settings are reorganised in two panes: General, Folders, AI, Appearance and Languages on the left, one category at a time on the right, each setting a row with its name and help on the left and its control on the right; on/off settings are switches.
 
 ### Fixed
 - "Check for updates…" in the application menu no longer lands on Settings with nothing to say: it checks and tells the outcome in a notice (up to date, a version downloading or ready to install, or why the check failed).
@@ -195,6 +196,7 @@ release notes.
 - A terminal window no longer flashes on screen when the app checks the Antigravity account (Settings, generation): Antigravity's own background update check, which opened it, is now turned off for the processes the app launches. CLI account status also loads in the background right after launch, so Settings shows it immediately.
 - Coming back from a quiz's page to its folder, the Documents, Links and Notes tile no longer blinks out and back in at the end of the motion.
 - Folder and quiz page transitions: nothing lights up under a still pointer while pages slide; slowed down or paused (DevTools), the motion is no longer cut short and jumps to its end; going back, the page slides out as whole glass instead of fading into a half-frosted double image; a folder's back arrow fades in with its page; and the shine of a Resume button no longer jumps at the last frame.
+- A paid assistant hidden from the generation menu shows as off when Settings open again, instead of always on; and the wallpaper row no longer shows a remove cross when no wallpaper is chosen.
 
 
 ## [1.19.0] - 2026-09-23

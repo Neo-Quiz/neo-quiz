@@ -247,30 +247,36 @@ body:has(.qbd-sidebar) .modal-container {
 	height: 16px;
 }
 
-/* ── LA MODALE DES RÉGLAGES ──
-   672 px, ET C'EST UNE SOUSTRACTION, pas un chiffre rond : les sections de la
-   page (`.nq-reglages-section`, shell.css) sont calées à 640 px depuis qu'elle
-   était un écran plein, et 640 + les 32 px de `padding` du panneau les fait
-   remplir la modale exactement. Plus large, elles flotteraient au milieu de
-   marges vides ; plus étroit, les rangées « libellé à gauche, champ à droite »
-   se replieraient sur deux lignes.
-   La hauteur, elle, est déjà bornée par `:where(.modal)` (85 vh) et c'est
-   `.modal-content` qui défile — rien à ajouter ici.
-
-   `.qbd-content` est la classe de contenu du TABLEAU DE BORD, que
-   `settings.ts` réemploie : son `padding` de 28/32 px et son fondu d'entrée ont
-   un sens dans un écran plein, pas dans un panneau qui apporte déjà ses 16 px
-   et sa propre animation. On les neutralise ICI plutôt que de faire diverger la
-   page de son autre hôte. */
+/* ── THE SETTINGS MODAL (two panes since 2026-09-29, `ui/settings.ts`) ──
+   A FIXED height, not the content's: switching category would otherwise
+   make the modal jump to the height of each page. The panel has no padding
+   of its own: the category list runs from its top to its bottom edge, and
+   the host's title is laid in that list's head, above the categories (it
+   names the whole modal, the page title names the category). The pane on
+   the right is the only thing that scrolls — `.modal-content` no longer
+   does. */
 .nq-reglages-modal {
-	width: 672px;
-}
-
-.nq-reglages-modal .qbd-content {
+	width: 880px;
+	height: min(660px, 85vh);
 	padding: 0;
-	animation: none;
+	overflow: hidden;
 }
 
+.nq-reglages-modal .modal-title {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 208px;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 20px 22px 0;
+	font-size: 15px;
+}
+
+.nq-reglages-modal .modal-content {
+	flex: 1;
+	overflow: hidden;
+}
 
 /* ── LA MODALE DE CHOIX D'UN FOND ──
    Plus étroite que celle des Réglages par-dessus laquelle elle s'ouvre : une
