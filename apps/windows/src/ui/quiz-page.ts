@@ -27,7 +27,7 @@ import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { ajouter } from "../../../../src/dom";
-import { quizModeLabel } from "../../../../src/dashboard/quiz-card";
+import { quizModeIcon, quizModeLabel } from "../../../../src/dashboard/quiz-card";
 import { brancherPerles } from "./perles";
 import { attachQuizBars } from "./quiz-bars";
 import { clearActiveLeaveGuard, createLeaveGuard, setActiveLeaveGuard } from "./leave-guard";
@@ -125,7 +125,7 @@ export async function openQuizPage(
 	   note's path shown on hover above the title is gone too: it said
 	   nothing a player needs. */
 	const mode = ajouter(titrage, "span", "qbd-qz-mode");
-	currentHost().ui.setIcon(ajouter(mode, "span", "qbd-qz-mode-icon"), entry.mode === "learn" ? "book-open" : "dumbbell");
+	currentHost().ui.setIcon(ajouter(mode, "span", "qbd-qz-mode-icon"), quizModeIcon(entry.mode));
 	ajouter(mode, "span", undefined, quizModeLabel(entry.mode));
 	ajouter(titrage, "h2", "qbd-qz-title", entry.title);
 

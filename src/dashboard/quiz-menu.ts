@@ -15,7 +15,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
 import { freeNotePath } from "./folder-create";
-import { quizFrere } from "./course-pairs";
+import { quizFreres } from "./course-pairs";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
@@ -517,16 +517,16 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 						   plusieurs UE : seule, elle ne distingue rien. */
 						section: plusieursUe && derniereUe !== ue.key ? (ue.ue ?? t("dashboard.quizzes.noUe")) : undefined,
 						onClick: () => {
-							/* Un COURS réuni (Learn + Practice sur une seule carte,
-							   `course-pairs.ts`) part en entier : déplacer un seul de
-							   ses deux fichiers casserait la paire sans rien dire
-							   (Ahmed, 2026-09-27). Le frère ne part que si le premier
-							   est parti ; s'il échoue, `moveQuizTo` le dit lui-même. */
-							const frere = ctx.settings.quizzesGroupModes === false ? null
-								: quizFrere(quiz, ctx.scanner.getQuizzes());
+							/* A course brought together (its modes on one card,
+							   `course-pairs.ts`) moves as a whole: moving only one of
+							   its files would split the course without a word
+							   (2026-09-27). The others only move once the first has;
+							   when one fails, `moveQuizTo` says so itself. */
+							const freres = ctx.settings.quizzesGroupModes === false ? []
+								: quizFreres(quiz, ctx.scanner.getQuizzes());
 							void (async () => {
 								const to = await moveQuizTo(ctx, quiz, g.path as string, g.name);
-								if (to && frere) await moveQuizTo(ctx, frere, g.path as string, g.name);
+								if (to) for (const f of freres) await moveQuizTo(ctx, f, g.path as string, g.name);
 								return to;
 							})().then(to => {
 								if (to) {

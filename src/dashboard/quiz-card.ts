@@ -6,6 +6,7 @@ import type { QuizIndexEntry, QuizTypeTag } from "./scanner";
 import type { ModeQuiz } from "../quiz-format";
 import type { QuizStatRecord } from "./stats-store";
 import { computeQuizState } from "./quiz-mastery";
+import { parMode } from "./course-pairs";
 
 /* Tag de type de quiz (calculé au scan) → clé de traduction, résolue au rendu.
    Table explicite plutôt qu'une clé construite par concaténation : `t()` n'accepte
@@ -47,9 +48,16 @@ export function quizTypeLabel(tag: QuizTypeTag): string {
 	return t(QUIZ_TYPE_KEYS[tag]);
 }
 
-/** Libellé de l'objectif d'un quiz (partagé par la carte et la vue Détail). */
+/** The label of a quiz's mode (shared by the card, the page and the app's
+    player): Learn / Practice / Exam, translated (spec 2026-09-29 §1.4). */
 export function quizModeLabel(mode: ModeQuiz): string {
-	return t(mode === "learn" ? "dashboard.quizMode.learn" : "dashboard.quizMode.practice");
+	return t(mode === "learn" ? "dashboard.quizMode.learn" : mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.practice");
+}
+
+/** The Lucide icon of a mode: a book to learn, a dumbbell to practise, a
+    timer for an exam. */
+export function quizModeIcon(mode: ModeQuiz): string {
+	return mode === "learn" ? "book-open" : mode === "exam" ? "timer" : "dumbbell";
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -98,10 +106,11 @@ export function renderQuizCard(
 		onMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement) => void;
 		accent?: string;
 		entryIndex?: number;
-		/** Le quiz de l'AUTRE mode du même cours (`regrouperParCours`) : la
-		    carte devient celle du cours, avec une pastille par mode. */
-		frere?: QuizIndexEntry;
-		statsFrere?: QuizStatRecord | null;
+		/** The quizzes of the OTHER modes of the same course
+		    (`regrouperParCours`): the card becomes the course's, with one pill
+		    per mode; `statsFreres` in the same order. */
+		freres?: QuizIndexEntry[];
+		statsFreres?: Array<QuizStatRecord | null | undefined>;
 	}
 ): HTMLDivElement {
 	/* Anatomie UNIQUE depuis le contrat visuel du 2026-07-28 : l'accueil et
@@ -116,17 +125,16 @@ export function renderQuizCard(
 
 	// ── État du quiz (calcul partagé quiz-mastery.ts) ──
 	// `state` choisit la couleur de l'anneau, `pct` ce qu'il affiche.
-	/* Un cours réuni résume ses deux modes : maîtrisé si les deux le sont, à
-	   revoir si l'un l'est, en cours dès que l'un a commencé (pourcentage
-	   moyen), neuf sinon. */
-	const frere = opts?.frere;
-	const infoQuiz = computeQuizState(quiz, stats);
-	const infoFrere = frere ? computeQuizState(frere, opts?.statsFrere) : null;
-	const { state, pct } = !infoFrere ? infoQuiz
-		: infoQuiz.state === "mastered" && infoFrere.state === "mastered" ? { state: "mastered" as const, pct: 100 }
-		: infoQuiz.state === "review" || infoFrere.state === "review" ? { state: "review" as const, pct: 100 }
-		: infoQuiz.state === "fresh" && infoFrere.state === "fresh" ? { state: "fresh" as const, pct: 0 }
-		: { state: "progress" as const, pct: Math.round((infoQuiz.pct + infoFrere.pct) / 2) };
+	/* A course brought together sums up its modes: mastered when all are, to
+	   review when one is, in progress as soon as one has started (average
+	   percentage), fresh otherwise. */
+	const freres = opts?.freres ?? [];
+	const infos = [computeQuizState(quiz, stats), ...freres.map((f, i) => computeQuizState(f, opts?.statsFreres?.[i]))];
+	const { state, pct } = infos.length === 1 ? infos[0]
+		: infos.every(x => x.state === "mastered") ? { state: "mastered" as const, pct: 100 }
+		: infos.some(x => x.state === "review") ? { state: "review" as const, pct: 100 }
+		: infos.every(x => x.state === "fresh") ? { state: "fresh" as const, pct: 0 }
+		: { state: "progress" as const, pct: Math.round(infos.reduce((n, x) => n + x.pct, 0) / infos.length) };
 	const body = ajouter(card, "div", "qbd-quiz-card-body");
 
 	/* ANATOMIE DU 2026-09-25 (maquette « anneau de progression », variante 2) :
@@ -138,8 +146,8 @@ export function renderQuizCard(
 	const haut = ajouter(body, "div", "qbd-quiz-card-top");
 	const texte = ajouter(haut, "div", "qbd-quiz-card-text");
 	ajouter(texte, "p", "qbd-quiz-card-title", quiz.title);
-	const totalQuestions = quiz.questions + (frere ? frere.questions : 0);
-	const totalReadings = quiz.readings + (frere ? frere.readings : 0);
+	const totalQuestions = quiz.questions + freres.reduce((n, f) => n + f.questions, 0);
+	const totalReadings = quiz.readings + freres.reduce((n, f) => n + f.readings, 0);
 	const compte = ajouter(texte, "p", "qbd-quiz-card-count");
 	ajouter(compte, "span", undefined,
 		t(totalQuestions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: totalQuestions }));
@@ -177,12 +185,12 @@ export function renderQuizCard(
 	   dossier. Un clic lance le mode ; au survol, le nombre de questions du
 	   mode. Le « ⋯ » ferme la ligne, en bas à droite. */
 	const bas = ajouter(body, "div", "qbd-quiz-card-modes");
-	const modes = frere ? [quiz, frere].sort((x, y) => (x.mode === "learn" ? 0 : 1) - (y.mode === "learn" ? 0 : 1)) : [quiz];
+	const modes = [quiz, ...freres].sort(parMode);
 	for (const q of modes) {
 		const wrap = ajouter(bas, "span", "qbd-quiz-card-type qbd-quiz-card-mode");
 		const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
 		btn.type = "button";
-		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), q.mode === "learn" ? "book-open" : "dumbbell");
+		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), quizModeIcon(q.mode));
 		ajouter(btn, "span", undefined, quizModeLabel(q.mode));
 		ajouter(wrap, "span", "qbd-quiz-card-type-tip",
 			t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));

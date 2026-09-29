@@ -1,24 +1,36 @@
 import type { QuizIndexEntry } from "./scanner";
+import type { ModeQuiz } from "../quiz-format";
 
 /* ══════════════════════════════════════════════════════════
-   UN COURS, DEUX MODES — module PUR (ni hôte, ni DOM).
+   ONE COURSE, ITS MODES — a PURE module (no host, no DOM).
 
-   Un cours a un fichier par mode : « CM1 — Learn » et « CM1 — Practice ».
-   Le format ne change pas (un fichier par mode reste la règle définitive,
-   Ahmed 2026-09-24) ; c'est l'AFFICHAGE qui les réunit : six cartes pour
-   trois CM donnaient l'impression d'une montagne de travail.
+   A course has one file per mode: "CM1 — Learn", "CM1 — Practice",
+   "CM1 — Exam". The format does not change (one file per mode stays the
+   definitive rule, 2026-09-24); it is the DISPLAY that brings them together:
+   six cards for three lectures gave the impression of a mountain of work.
 
-   Deux quiz forment un cours quand ils sont dans le MÊME dossier, portent
-   le MÊME titre (le suffixe de mode est déjà retiré par le scanner) et ont
-   des modes DIFFÉRENTS. Au-delà de deux homonymes, rien n'est réuni : on ne
-   devine pas lequel va avec lequel.
+   Quizzes form a course when they are in the SAME folder, carry the SAME
+   title (the mode suffix is already stripped by the scanner) and have
+   DIFFERENT modes — at most one quiz per mode, so two or three of them
+   (spec 2026-09-29-test-practice-exam-design §5.2). Two namesakes of the
+   same mode, or more than three, are not brought together: we do not guess
+   which goes with which. A multi-document Exam ("<module> — Exam") carries
+   the module's name, not a course's, and stays a card of its own.
 ══════════════════════════════════════════════════════════ */
 
-/** Une carte de la grille : un quiz, et son frère de l'autre mode s'il a été
-    réuni avec lui. `quiz` est toujours le Learn quand les deux existent. */
+/** A card of the grid: a quiz, and the other modes of its course when they
+    were brought together. `quiz` is the first by mode — Learn, then
+    Practice, then Exam — and `freres` the others, in the same order. */
 export interface CarteCours {
 	quiz: QuizIndexEntry;
-	frere?: QuizIndexEntry;
+	freres: QuizIndexEntry[];
+}
+
+const ORDRE_MODES: Readonly<Record<ModeQuiz, number>> = { learn: 0, practice: 1, exam: 2 };
+
+/** Learn, then Practice, then Exam: the order of a course everywhere. */
+export function parMode(a: QuizIndexEntry, b: QuizIndexEntry): number {
+	return ORDRE_MODES[a.mode] - ORDRE_MODES[b.mode];
 }
 
 function cle(q: QuizIndexEntry): string {
@@ -26,29 +38,35 @@ function cle(q: QuizIndexEntry): string {
 	return dossier + "\u0000" + q.title.trim().toLocaleLowerCase();
 }
 
-/** Le quiz de l'AUTRE mode du même cours, ou `null`. */
-export function quizFrere(quiz: QuizIndexEntry, tous: readonly QuizIndexEntry[]): QuizIndexEntry | null {
+/** The quizzes of the OTHER modes of the same course, by mode; empty when
+    the quiz is not part of a course. */
+export function quizFreres(quiz: QuizIndexEntry, tous: readonly QuizIndexEntry[]): QuizIndexEntry[] {
 	const k = cle(quiz);
 	const memes = tous.filter(q => cle(q) === k);
-	if (memes.length !== 2) return null;
-	const autre = memes.find(q => q.path !== quiz.path);
-	return autre && autre.mode !== quiz.mode ? autre : null;
+	if (memes.length < 2 || memes.length > 3) return [];
+	if (new Set(memes.map(q => q.mode)).size !== memes.length) return [];
+	return memes.filter(q => q.path !== quiz.path).sort(parMode);
 }
 
-/** Les cartes d'une grille, dans l'ordre reçu : un cours réuni prend la place
-    de son premier quiz, le Learn en tête. `actif` faux : une carte par quiz,
-    comme avant. */
+/** Every quiz of a card, by mode. */
+export function quizDeLaCarte(carte: CarteCours): QuizIndexEntry[] {
+	return [carte.quiz, ...carte.freres];
+}
+
+/** The cards of a grid, in the order received: a course takes the place of
+    its first quiz, its modes by order. `actif` false: one card per quiz, as
+    before. */
 export function regrouperParCours(quizzes: readonly QuizIndexEntry[], actif: boolean): CarteCours[] {
-	if (!actif) return quizzes.map(quiz => ({ quiz }));
+	if (!actif) return quizzes.map(quiz => ({ quiz, freres: [] }));
 	const vus = new Set<string>();
 	const cartes: CarteCours[] = [];
 	for (const q of quizzes) {
 		if (vus.has(q.path)) continue;
-		const frere = quizFrere(q, quizzes);
-		if (!frere) { cartes.push({ quiz: q }); continue; }
-		vus.add(frere.path);
-		const learn = q.mode === "learn" ? q : frere;
-		cartes.push({ quiz: learn, frere: learn === q ? frere : q });
+		const freres = quizFreres(q, quizzes);
+		if (freres.length === 0) { cartes.push({ quiz: q, freres: [] }); continue; }
+		const tous = [q, ...freres].sort(parMode);
+		for (const x of tous) vus.add(x.path);
+		cartes.push({ quiz: tous[0], freres: tous.slice(1) });
 	}
 	return cartes;
 }

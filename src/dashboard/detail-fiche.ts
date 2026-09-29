@@ -15,7 +15,7 @@ import { questionText } from "./detail-io";
 import { texteQuizHtml } from "../editor/question-preview";
 import { renderInlineText } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
-import { quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
+import { quizModeIcon, quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
 import { lectureCourteDe, numerosAffiches, questionsVisibles } from "../lecture-etape";
@@ -76,9 +76,10 @@ export interface FicheDeps {
 	onEditQuestion?(index: number): void;
 	/** Quitte la page. */
 	onBack(): void;
-	/** L'autre mode du même cours : la pastille du mode devient un sélecteur
-	    Learn | Practice, dont l'autre segment ouvre ce quiz. */
-	autreMode?: { mode: ModeQuiz; open(): void };
+	/** The OTHER modes of the same course (course-pairs.ts): the mode pill
+	    becomes a selector Learn | Practice | Exam, whose other segments open
+	    their quiz. */
+	autresModes?: Array<{ mode: ModeQuiz; open(): void }>;
 	/** Le menu « ⋮ » du quiz, le même que celui de sa carte. Absent : pas de bouton. */
 	menu?(anchor: HTMLElement): void;
 }
@@ -222,7 +223,7 @@ export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origi
 	return renderMeta(parent, { quiz, origine });
 }
 
-function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" | "autreMode">): HTMLElement {
+function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" | "autresModes">): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
 	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous,
 	   à la place qu'occupait la recherche, partie au centre (2026-09-26) ;
@@ -233,35 +234,40 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
 	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
 		const el = ajouter(parent, tag, cls);
-		icone(el, m === "learn" ? "book-open" : "dumbbell", "qbd-fiche-mode-icon");
+		icone(el, quizModeIcon(m), "qbd-fiche-mode-icon");
 		ajouter(el, "span", undefined, quizModeLabel(m));
 		attachHoverTip(el, (tip) => {
 			tip.classList.add("qbd-hover-tip--card");
-			ajouter(tip, "div", "qbd-hover-tip-title", m === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
-			ajouter(tip, "div", "qbd-hover-tip-body", m === "learn" ? t("ai.mode.learnTip") : t("ai.mode.practiceTip"));
+			ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(m));
+			ajouter(tip, "div", "qbd-hover-tip-body", m === "learn" ? t("ai.mode.learnTip") : m === "exam" ? t("dashboard.quizMode.examTip") : t("ai.mode.practiceTip"));
 		});
 		return el;
 	};
-	const autre = deps.autreMode;
-	if (autre && autre.mode !== deps.quiz.mode) {
+	const autres = (deps.autresModes ?? []).filter(a => a.mode !== deps.quiz.mode);
+	if (autres.length > 0) {
 		const choix = ajouter(chips, "div", "qbd-fiche-modes");
 		choix.setAttribute("role", "group");
 		/* Le bloc qui glisse, comme dans la page « Générer » (2026-09-25) : au
 		   clic, il glisse vers l'autre mode pendant que les questions
 		   s'effacent, PUIS sa fiche s'ouvre et les siennes apparaissent. */
 		const indic = ajouter(choix, "div", "qbd-fiche-mode-indic");
-		const segs = (["learn", "practice"] as const).map(m => {
+		// The course's modes, in their order (Learn, Practice, Exam).
+		const ordre: readonly ModeQuiz[] = ["learn", "practice", "exam"];
+		const presents = ordre.filter(m => m === deps.quiz.mode || autres.some(a => a.mode === m));
+		const segs = presents.map(m => {
 			const actif = m === deps.quiz.mode;
 			const seg = pastilleMode(choix, m, "qbd-fiche-mode-seg" + (actif ? " is-active" : ""), "button");
 			(seg as HTMLButtonElement).type = "button";
 			seg.setAttribute("aria-pressed", actif ? "true" : "false");
-			return { actif, seg };
+			return { actif, seg, open: autres.find(a => a.mode === m)?.open };
 		});
 		const courant = segs.find(s => s.actif)!.seg;
 		requestAnimationFrame(() => placerIndicateur(indic, courant, false));
-		for (const { actif, seg } of segs) {
-			if (actif) continue;
-			let parti = false;
+		/* ONE flag for every segment: with three modes, clicking a second one
+		   during the slide would open two quizzes. */
+		let parti = false;
+		for (const { actif, seg, open } of segs) {
+			if (actif || !open) continue;
 			seg.addEventListener("click", () => {
 				if (parti) return;
 				parti = true;
@@ -276,7 +282,7 @@ function renderMeta(root: HTMLElement, deps: Pick<FicheDeps, "quiz" | "origine" 
 						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
 					));
 				}
-				window.setTimeout(() => autre.open(), sansAnim ? 0 : DUREE_GLISSEMENT);
+				window.setTimeout(() => open(), sansAnim ? 0 : DUREE_GLISSEMENT);
 			});
 		}
 	} else {

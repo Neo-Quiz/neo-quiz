@@ -272,6 +272,8 @@ export const EN_DASHBOARD = {
 	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
 	"dashboard.quizMode.learn": "Learn",
 	"dashboard.quizMode.practice": "Practice",
+	"dashboard.quizMode.exam": "Exam",
+	"dashboard.quizMode.examTip": "A timed test without help: no hints, corrected once handed in, handed in automatically when time is up.",
 	"dashboard.quizType.single": "Single choice",
 	"dashboard.quizType.multiple": "Multiple choice",
 	"dashboard.quizType.text": "Free text",

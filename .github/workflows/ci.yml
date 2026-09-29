@@ -182,6 +182,11 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # A COURSE'S MODES on one card (Learn, Practice, Exam; at most one quiz
+      # per mode), the dashboard's module editing and folder axis.
+      - name: Course grouping and module editing
+        run: npm run check:module-edit
+
       # THE HOME PAGE: a folder's tasks in order (review, Learn, Test),
       # mastered quizzes left out, folders by nearest exam then latest work,
       # the week from Monday, local midnights across daylight saving.

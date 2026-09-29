@@ -928,6 +928,9 @@
    affiché. Pas de tuile dans la tuile : une pastille, pas un bouton encadré. */
 .qbd-quiz-card-modes {
 	display: flex;
+	/* Three modes since the Exam (2026-09-29): the pills wrap rather than
+	   push the "⋯" out of a narrow card. */
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 3px;
 	margin-top: 10px;

@@ -4,10 +4,10 @@ import { currentHost } from "../host/current";
 import type { DashboardShellCtx, ExamenDossier } from "../types/dashboard-ctx";
 import type { QuizStatRecord } from "./stats-store";
 import type { ModuleGroup } from "./quiz-modules";
-import { quizModeLabel } from "./quiz-card";
+import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { duesDuDossier, questions } from "./folder-progress-details";
 import { moyenneDossier } from "./folder-progress";
-import { regrouperParCours } from "./course-pairs";
+import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import {
 	folderTasks, homeFolders, lastPlayedOf, successOf, upcomingExams, daysUntil,
 	type HomeFolder, type HomeTask, type HomeTaskKind,
@@ -43,7 +43,7 @@ export function collectHomeFolders(
 	return homeFolders(groups.map(group => {
 		// Card order, the Learn before the Test of a course — the order of
 		// the folder's own page (quizzes-render.ts `ordre`).
-		const ordre = regrouperParCours(group.quizzes, groupModes).flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
+		const ordre = regrouperParCours(group.quizzes, groupModes).flatMap(quizDeLaCarte);
 		return {
 			group,
 			name: group.name,
@@ -125,7 +125,8 @@ function renderTask(list: HTMLElement, ctx: DashboardShellCtx, task: HomeTask, l
 	const host = currentHost();
 	const row = ajouter(list, "button", `qbd-homef-task${lead ? " is-lead" : ""}`);
 	row.type = "button";
-	host.ui.setIcon(ajouter(row, "span", `qbd-homef-task-icon qbd-homef-task-icon--${task.kind}`), ICONS[task.kind]);
+	// A Test task shows its own mode's icon: the dumbbell, or the timer of an Exam.
+	host.ui.setIcon(ajouter(row, "span", `qbd-homef-task-icon qbd-homef-task-icon--${task.kind}`), task.kind === "test" ? quizModeIcon(task.quiz.mode) : ICONS[task.kind]);
 	ajouter(row, "span", "qbd-homef-task-label", taskLabel(task));
 	if (lead) {
 		const cta = ajouter(row, "span", "qbd-homef-task-cta");

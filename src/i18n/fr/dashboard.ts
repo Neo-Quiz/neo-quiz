@@ -229,8 +229,10 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	/* ── Type de quiz ── */
 	"dashboard.quizType.mixed": "Mixte",
 	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
-	"dashboard.quizMode.learn": "Learn",
-	"dashboard.quizMode.practice": "Practice",
+	"dashboard.quizMode.learn": "Apprendre",
+	"dashboard.quizMode.practice": "Entraînement",
+	"dashboard.quizMode.exam": "Examen",
+	"dashboard.quizMode.examTip": "Un test chronométré, sans aide : pas d'indice, corrigé une fois rendu, rendu automatiquement à la fin du temps.",
 	"dashboard.quizType.single": "Choix unique",
 	"dashboard.quizType.multiple": "Choix multiple",
 	"dashboard.quizType.text": "Texte libre",

@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import { formatDateHeure } from "./format-date";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
-import { quizFrere } from "./course-pairs";
+import { quizFreres } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
@@ -110,9 +110,9 @@ export interface QuizPageSpec {
 	/** Appelée à chaque changement de question courante, par `goToQuestion`
 	    et nulle part ailleurs — c'est le seul endroit où `activeIdx` bouge. */
 	onQuestionChange?(index: number): void;
-	/** L'AUTRE mode du même cours (course-pairs.ts) : la fiche montre alors un
-	    sélecteur Learn | Practice qui ouvre ce quiz. */
-	autreMode?: { quiz: QuizIndexEntry; open(): void };
+	/** The OTHER modes of the same course (course-pairs.ts): the page then
+	    shows a selector Learn | Practice | Exam that opens them. */
+	autresModes?: Array<{ quiz: QuizIndexEntry; open(): void }>;
 	/** Le menu « ⋮ » de la fiche : celui de la carte du quiz (hôte). */
 	menu?(anchor: HTMLElement): void;
 	/** After a Test's mode changed in the editor and was SAVED: the host
@@ -224,11 +224,8 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
 				ouverture: host.ouverture,
-				autreMode: (() => {
-					if (ctx.settings.quizzesGroupModes === false) return undefined;
-					const frere = quizFrere(quiz, ctx.scanner.getQuizzes());
-					return frere ? { quiz: frere, open: () => ctx.navigate("detail", { quiz: frere }) } : undefined;
-				})(),
+				autresModes: ctx.settings.quizzesGroupModes === false ? undefined
+					: quizFreres(quiz, ctx.scanner.getQuizzes()).map(f => ({ quiz: f, open: () => ctx.navigate("detail", { quiz: f }) })),
 				/* Renaming after a mode change goes through `moveQuizTo`, the path
 				   that keeps review history and stats; a note named by hand keeps
 				   its name (quiz-mode-change.ts noteNameForMode). Reopened in
@@ -687,7 +684,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onEdit: () => toggleEditing(page),
 			onEditQuestion: (i) => { activeIdx = i; toggleEditing(page); },
 			onBack: () => { void flushSave(); spec.onBack(); },
-			autreMode: spec.autreMode ? { mode: spec.autreMode.quiz.mode, open: () => { void flushSave(); spec.autreMode!.open(); } } : undefined,
+			autresModes: spec.autresModes?.map(a => ({ mode: a.quiz.mode, open: () => { void flushSave(); a.open(); } })),
 			menu: spec.menu,
 		});
 		return true;

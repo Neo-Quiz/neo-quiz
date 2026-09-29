@@ -4,29 +4,27 @@ import { currentHost } from "../host/current";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
-import { quizModeLabel } from "./quiz-card";
+import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { computeQuizState } from "./quiz-mastery";
 import { poserBouton3d } from "./cta3d";
 import { duesDuDossier, questions } from "./folder-progress-details";
 
 /* ══════════════════════════════════════════════════════════
-   L'ÉTAPE SUIVANTE d'un dossier (2026-09-25, sans flèche depuis 2026-09-26) :
-   un seul bouton, une seule action : Reprendre le quiz entamé le plus
-   récemment quitté, sinon Réviser (si l'ordonnanceur a des questions dues
-   pour ce dossier), sinon le prochain Learn pas encore maîtrisé, sinon le
-   prochain Practice. Plus rien à faire : pas de bouton.
+   A folder's NEXT STEP (2026-09-25, without an arrow since 2026-09-26): one
+   button, one action: Resume the started quiz left most recently, else
+   Review (when the scheduler has questions due for this folder), else the
+   next Learn not mastered yet, else the next Practice, else the next Exam
+   (2026-09-29). Nothing left to do: no button.
 ══════════════════════════════════════════════════════════ */
 
-const ICONES = { learn: "book-open", practice: "dumbbell" } as const;
-
-/** Un choix du bouton : ce qu'il affiche et ce qu'il lance. */
+/** One choice of the button: what it shows and what it starts. */
 interface Choix { icone: string; mode: string; titre: string; lancer: () => void }
 
-/** `ordre` : les quiz dans l'ordre des cartes, le Learn avant le Practice
-    d'un même cours. Le bouton propose d'abord de REPRENDRE un quiz entamé
-    (2026-09-26), puis la RÉVISION du jour quand l'ordonnanceur en a pour ce
-    dossier (2026-09-25, d'après le « Réviser N flashcards » de StudySmarter),
-    puis le prochain Learn, puis le prochain Practice. */
+/** `ordre`: the quizzes in card order, a course's modes Learn, Practice,
+    Exam. The button first offers to RESUME a started quiz (2026-09-26),
+    then today's REVIEW when the scheduler has some for this folder
+    (2026-09-25, after StudySmarter's "Review N flashcards"), then the next
+    Learn, then the next Practice, then the next Exam. */
 export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordre: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 	const aFaire = ordre.filter(q => computeQuizState(q, stats[q.path]).state !== "mastered");
 	const choix: Choix[] = [];
@@ -54,11 +52,11 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 			lancer: () => ctx.openQuiz(note),
 		});
 	}
-	for (const mode of ["learn", "practice"] as const) {
+	for (const mode of ["learn", "practice", "exam"] as const) {
 		const q = aFaire.find(x => x.mode === mode);
 		if (!q) continue;
 		choix.push({
-			icone: ICONES[mode], mode: quizModeLabel(mode), titre: q.title,
+			icone: quizModeIcon(mode), mode: quizModeLabel(mode), titre: q.title,
 			lancer: () => ctx.openQuiz(q),
 		});
 	}

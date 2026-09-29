@@ -6,7 +6,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
-import { regrouperParCours } from "./course-pairs";
+import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas, modulesAffiches } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
@@ -240,7 +240,7 @@ export function renderModuleDrill(
 	const dossier = cheminOuvert ?? openModuleFolder;
 	// Le Learn avant le Practice d'un même cours : ordre des cartes,
 	// consommé par l'étape suivante (ci-dessous) ET par le Planning.
-	const ordre = cartes.flatMap(({ quiz, frere }) => frere ? [quiz, frere] : [quiz]);
+	const ordre = cartes.flatMap(quizDeLaCarte);
 	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
 	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
 	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
@@ -251,10 +251,10 @@ export function renderModuleDrill(
 		renderNextStep(rangee, ctx, ordre, stats);
 		if (!rangee.firstChild) rangee.remove();
 	}
-	for (const [index, { quiz, frere }] of cartes.entries()) {
+	for (const [index, { quiz, freres }] of cartes.entries()) {
 		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
-			frere,
-			statsFrere: frere ? stats[frere.path] : undefined,
+			freres,
+			statsFreres: freres.map(f => stats[f.path]),
 			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
 			showPath: false,
 			// L'avancement vit dans l'onglet « Progression » du dossier.

@@ -159,25 +159,31 @@ await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-sugges
 	r.done();
 });
 
-/* UN COURS, UNE CARTE (2026-09-24) : le Learn et le Practice d'un même
-   cours — même dossier, même titre, modes différents — sont réunis. */
-await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours, quizFrere }) => {
-	const r = makeReporter("Cours — Learn et Practice réunis");
+/* ONE COURSE, ONE CARD (2026-09-24, three modes since 2026-09-29, spec
+   2026-09-29-test-practice-exam-design §5.2): the Learn, the Practice and the
+   Exam of a course — same folder, same title, at most one quiz per mode —
+   are brought together, Learn first, then Practice, then Exam. */
+await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours, quizFreres }) => {
+	const r = makeReporter("Course — its modes brought together");
 	const q = (path, title, mode) => ({ path, title, mode, questions: 20 });
 	const D = "Efrei/B2/XTI301";
+	const nom = (x) => x.path.split("/").pop();
 	const liste = [
-		q(`${D}/CM1 — Practice.md`, "CM1", "practice"), q(`${D}/CM1 — Learn.md`, "CM1", "learn"),
-		q(`${D}/CM2 — Learn.md`, "CM2", "learn"), q(`${D}/TP1 — Learn.md`, "TP1", "learn"),
+		q(`${D}/CM1 — Exam.md`, "CM1", "exam"), q(`${D}/CM1 — Practice.md`, "CM1", "practice"), q(`${D}/CM1 — Learn.md`, "CM1", "learn"),
+		q(`${D}/CM2 — Learn.md`, "CM2", "learn"), q(`${D}/TP1 — Practice.md`, "TP1", "practice"), q(`${D}/TP1 — Exam.md`, "TP1", "exam"),
 		q(`Autre/CM2 — Practice.md`, "CM2", "practice"),
 	];
 	const cartes = regrouperParCours(liste, true);
-	r.check("un cours = une carte, le Learn en tête, à la place de son premier quiz",
-		cartes.map(c => [c.quiz.path.split("/").pop(), c.frere?.path.split("/").pop() ?? null]),
-		[["CM1 — Learn.md", "CM1 — Practice.md"], ["CM2 — Learn.md", null], ["TP1 — Learn.md", null], ["CM2 — Practice.md", null]]);
-	r.check("un homonyme d'un AUTRE dossier n'est pas réuni", quizFrere(liste[2], liste), null);
-	r.check("deux quiz du même mode ne forment pas un cours",
-		quizFrere(q(`${D}/X.md`, "X", "learn"), [q(`${D}/X.md`, "X", "learn"), q(`${D}/X 2.md`, "X", "learn")]), null);
-	r.check("réglage désactivé : une carte par quiz", regrouperParCours(liste, false).length, 5);
+	r.check("a course = one card with its modes by order, in place of its first quiz",
+		cartes.map(c => [nom(c.quiz), c.freres.map(nom)]),
+		[["CM1 — Learn.md", ["CM1 — Practice.md", "CM1 — Exam.md"]], ["CM2 — Learn.md", []], ["TP1 — Practice.md", ["TP1 — Exam.md"]], ["CM2 — Practice.md", []]]);
+	r.check("the other modes of a quiz, by order", quizFreres(liste[0], liste).map(nom), ["CM1 — Learn.md", "CM1 — Practice.md"]);
+	r.check("a namesake in ANOTHER folder is not brought together", quizFreres(liste[3], liste), []);
+	r.check("two quizzes of the same mode do not form a course",
+		quizFreres(q(`${D}/X.md`, "X", "learn"), [q(`${D}/X.md`, "X", "learn"), q(`${D}/X 2.md`, "X", "learn")]), []);
+	r.check("two of one mode among three: no course either",
+		quizFreres(q(`${D}/Y.md`, "Y", "exam"), [q(`${D}/Y.md`, "Y", "exam"), q(`${D}/Y 2.md`, "Y", "exam"), q(`${D}/Y — Learn.md`, "Y", "learn")]), []);
+	r.check("setting off: one card per quiz", regrouperParCours(liste, false).map(c => c.freres.length), [0, 0, 0, 0, 0, 0, 0]);
 	r.done();
 });
 
