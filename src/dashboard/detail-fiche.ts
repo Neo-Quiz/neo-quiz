@@ -15,7 +15,7 @@ import { texteQuizHtml } from "../editor/question-preview";
 import { codeClozeHtml, fillSlots, markSlots, protectCodeSlots, restoreCodeSlots } from "../engine/cloze";
 import { renderInlineText } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
-import { quizModeIcon, quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
+import { quizModeIcon, quizModeLabel, quizModeTip, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
 import { attachHoverTip } from "./hover-tip";
 import { lectureCourteDe, numerosAffiches, questionsVisibles } from "../lecture-etape";
@@ -164,7 +164,7 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 		attachHoverTip(el, (tip) => {
 			tip.classList.add("qbd-hover-tip--card");
 			ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(m));
-			ajouter(tip, "div", "qbd-hover-tip-body", m === "learn" ? t("ai.mode.learnTip") : m === "exam" ? t("dashboard.quizMode.examTip") : t("ai.mode.practiceTip"));
+			ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(m));
 		});
 		return el;
 	};

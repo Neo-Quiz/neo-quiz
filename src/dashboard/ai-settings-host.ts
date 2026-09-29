@@ -44,7 +44,7 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
 	| "aiOllamaModels" | "aiOllamaCatalog" | "aiOllamaPlansAppris" | "aiOllamaPlanCompte"
 	| "aiCanauxPayantsMasques" | "aiWebAvertissementMasque" | "aiUsageLog"
-	| "aiMentionExtraFolders" | "aiOutputFolder">> & { hotkeyAddFiles: Hotkey } {
+	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiExamDurationMinutes">> & { hotkeyAddFiles: Hotkey } {
 	return {
 		// Aucun fournisseur par défaut : le choix reste la première étape.
 		aiProvider: "",
@@ -83,5 +83,7 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		aiMentionExtraFolders: [],
 		// Donnée persistée, donc jamais traduite : les deux hôtes écrivent au même endroit.
 		aiOutputFolder: "Generated",
+		// Auto: no typed duration, the model sizes the Exam.
+		aiExamDurationMinutes: null,
 	};
 }

@@ -30,6 +30,7 @@ import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
 import { t } from "../i18n";
+import { quizModeLabel } from "./quiz-card";
 
 export interface VueFile {
 	/** Pose la zone des tours dans `parent` (à chaque rendu de la page). */
@@ -135,7 +136,7 @@ export function creerVueFile(opts: {
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
 		const meta = ajouter(message, "div", "qbd-ai-message-meta");
-		ajouter(meta, "span", undefined, d.mode === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
+		ajouter(meta, "span", undefined, quizModeLabel(d.mode));
 		const providerId = d.reglages.aiProvider || "";
 		const p = providerId ? aiProviders.getProvider(providerId) : null;
 		if (p) {

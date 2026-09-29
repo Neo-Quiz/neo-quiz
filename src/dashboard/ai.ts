@@ -2,7 +2,8 @@ import JSON5 from "json5";
 import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
-import { completerConfigLearn, fusionnerConfigsFinales, modeDuBloc } from "../quiz-format";
+import { clampExamDuration, completerConfigLearn, fusionnerConfigsFinales, modeDuBloc } from "../quiz-format";
+import { quizModeIcon, quizModeLabel, quizModeTip } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
@@ -294,10 +295,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let noteAttachments: NoteAttachment[] = []; // [{ name, content, path? }]
 	/** `null` : « Auto », le nombre suit la source (spec §2). */
 	let questionCount: number | null = null;
-	/** L'OBJECTIF de la génération : on génère toujours un quiz, Learn pour
-	    apprendre, Practice pour s'entraîner. Vaut pour la session de la page,
-	    comme le nombre et le type. */
+	/** The GOAL of the generation: a quiz is always generated — Learn to
+	    learn, Practice to train, Exam to be tested under the clock. Holds for
+	    the page session, like the count and the type. */
 	let modeGeneration: ModeQuiz = "learn";
+	/** The Test kind last chosen (Practice | Exam), what the Test button
+	    selects when Learn is active. Same lifetime as `modeGeneration`. */
+	let modeTest: Exclude<ModeQuiz, "learn"> = "practice";
 	let questionType = "Mixte";
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
 	   par défaut. Comme le nombre et le type, elle vaut pour la SESSION de la
@@ -1741,54 +1745,83 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		addBtn.setAttribute("aria-label", t("ai.composer.addContent"));
 		host.ui.setIcon(addBtn, "plus");
 
-		// Bouton Options (questions + type) : JUSTE à droite du « + » (façon
-		// pills gauche de claude.ai, demande 2026-07-16) — popover à la
-		// demande, tooltip d'état.
-		/* Sélecteur segmenté Learn | Practice (chantier « deux modes »,
-		   2026-09-23) — gauche épurée façon « Chat | Cowork » de claude.ai :
-		   « + », le sélecteur Learn | Practice, puis la seule icône Options
-		   (nombre, type, destination). */
+		/* Segmented selector Learn | Test (spec 2026-09-29 §4.1) — a bare left
+		   side in the manner of claude.ai's "Chat | Cowork": "+", the
+		   Learn | Test selector, then the single Options icon (count, type,
+		   destination, and in Exam the duration). The Test button carries a
+		   chevron opening Practice | Exam and always shows the precise mode
+		   ("Test · Exam"); a click on it while Learn is active selects the
+		   Test kind last chosen (Practice at first). */
 		const seg = ajouter(composerBottom, "div", "qbd-ai-seg");
 		seg.setAttribute("role", "radiogroup");
 		seg.setAttribute("aria-label", t("ai.mode.group"));
-		/* Le bloc qui glisse (relevé sur claude.ai le 2026-09-23), partagé
-		   avec la fiche d'un cours : `seg-indic.ts`. */
+		/* The sliding block (measured on claude.ai on 2026-09-23), shared
+		   with a course's sheet: `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const segBtns = (["learn", "practice"] as const).map(v => {
-			const b = ajouter(seg, "button", "qbd-ai-seg-btn", v === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
+		const libelleTest = (): string => `${t("ai.mode.test")} · ${quizModeLabel(modeTest)}`;
+		const choisirMode = (m: ModeQuiz): void => {
+			if (m !== "learn") modeTest = m;
+			if (modeGeneration === m) return;
+			modeGeneration = m;
+			majSeg(true);
+			/* The options are not the same from one mode to the other: the icon
+			   lights up in accent then fades, so that a first-time user sees that
+			   something changed THERE. Removing then re-adding the class restarts
+			   the animation at each switch. */
+			optsBtn.classList.remove("qbd-ai-opts-pulse");
+			void optsBtn.offsetWidth;
+			optsBtn.classList.add("qbd-ai-opts-pulse");
+		};
+		const segBtns = (["learn", "test"] as const).map(kind => {
+			const b = ajouter(seg, "button", "qbd-ai-seg-btn");
 			b.type = "button";
 			b.setAttribute("role", "radio");
-			b.addEventListener("click", () => {
-				if (modeGeneration === v) return;
-				modeGeneration = v;
-				majSeg(true);
-				/* Les options ne sont plus les mêmes d'un mode à l'autre : l'icône
-				   s'allume en accent puis s'éteint, pour qu'un premier utilisateur
-				   voie que quelque chose a changé LÀ. Retirer puis reposer la
-				   classe relance l'animation à chaque bascule. */
-				optsBtn.classList.remove("qbd-ai-opts-pulse");
-				void optsBtn.offsetWidth;
-				optsBtn.classList.add("qbd-ai-opts-pulse");
+			const label = ajouter(b, "span", "qbd-ai-seg-label", kind === "learn" ? quizModeLabel("learn") : libelleTest());
+			if (kind === "test") {
+				b.setAttribute("aria-haspopup", "menu");
+				const chevron = ajouter(b, "span", "qbd-ai-seg-chevron");
+				chevron.setAttribute("aria-hidden", "true");
+				host.ui.setIcon(chevron, "chevron-down");
+			}
+			b.addEventListener("click", (e) => {
+				if (kind === "learn") { choisirMode("learn"); return; }
+				/* Test: the menu on the chevron, or on the button once Test is
+				   the current kind; otherwise the click SELECTS the kind. */
+				const surChevron = (e.target as HTMLElement).closest(".qbd-ai-seg-chevron") !== null;
+				if (surChevron || modeGeneration !== "learn") ouvrirMenuTest(b);
+				else choisirMode(modeTest);
 			});
-			/* L'objectif de chaque mode, au survol, au-dessus (référence : la
-			   bulle de « Chat | Cowork » de Claude). Les noms restent en anglais,
-			   l'explication suit la langue de l'interface. */
+			/* Each mode's goal, on hover, above (reference: the bubble of
+			   claude.ai's "Chat | Cowork"). */
 			attachHoverTip(b, (tip) => {
 				tip.classList.add("qbd-hover-tip--card");
-				ajouter(tip, "div", "qbd-hover-tip-title", v === "learn" ? t("ai.mode.learn") : t("ai.mode.practice"));
-				ajouter(tip, "div", "qbd-hover-tip-body", v === "learn" ? t("ai.mode.learnTip") : t("ai.mode.practiceTip"));
+				ajouter(tip, "div", "qbd-hover-tip-title", kind === "learn" ? quizModeLabel("learn") : libelleTest());
+				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind === "learn" ? "learn" : modeTest));
 			});
-			return { v, b };
+			return { kind, b, label };
 		});
-		const majSeg = (anime: boolean) => {
-			const actif = segBtns.find(({ v }) => v === modeGeneration)!.b;
-			segBtns.forEach(({ v, b }) => {
-				b.classList.toggle("is-active", v === modeGeneration);
-				b.setAttribute("aria-checked", String(v === modeGeneration));
-			});
-			placerIndicateur(indic, actif, anime);
+		/* The Practice | Exam menu of the Test button (`ui-select`, the only
+		   dropdown allowed). The current Test mode is greyed out; while Learn
+		   is active both stay available, and choosing one selects Test. */
+		const ouvrirMenuTest = (ancre: HTMLElement): void => {
+			const testActif = modeGeneration !== "learn";
+			openActionMenu(ancre, (["practice", "exam"] as const).map(m => ({
+				icon: quizModeIcon(m), label: quizModeLabel(m),
+				disabled: testActif && modeGeneration === m,
+				onClick: () => choisirMode(m),
+			})));
 		};
-		// Mesure après insertion dans le document (largeurs réelles des options).
+		const majSeg = (anime: boolean): void => {
+			const testActif = modeGeneration !== "learn";
+			segBtns.forEach(({ kind, b, label }) => {
+				const actif = kind === "test" ? testActif : !testActif;
+				label.textContent = kind === "learn" ? quizModeLabel("learn") : libelleTest();
+				b.classList.toggle("is-active", actif);
+				b.setAttribute("aria-checked", String(actif));
+			});
+			placerIndicateur(indic, segBtns.find(({ kind }) => (kind === "test") === testActif)!.b, anime);
+		};
+		// Measure after insertion in the document (real widths of the options).
 		requestAnimationFrame(() => majSeg(false));
 		const optsBtn = ajouter(composerBottom, "button", "qbd-ai-composer-opts");
 		optsBtn.type = "button";
@@ -1815,7 +1848,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					categorieChoix = estCategorie(value) ? value : null;
 					majAvisCategorie();
 				},
-				// Barème et durée : avec le Mock exam, sous-projet à part.
+				/* The Exam duration, only in Test · Exam; kept in the `ai`
+				   settings like the other options (guarded by garde-ia.ts). */
+				duration: modeGeneration === "exam" ? {
+					minutes: clampExamDuration(settings().aiExamDurationMinutes),
+					onChange: (minutes) => { void saveSettings({ aiExamDurationMinutes: minutes }); },
+				} : undefined,
 			});
 		});
 		// Hover tooltip: the current state ("5 questions · Mixed"), re-read
@@ -1824,7 +1862,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		attachHoverTip(optsBtn, (tip) => {
 			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
 			const ty = questionType === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(questionType);
-			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
+			const duree = clampExamDuration(settings().aiExamDurationMinutes);
+			const reste = modeGeneration === "exam" ? ` · ${duree === null ? t("ai.options.auto") : `${duree} ${t("dashboard.select.durationUnit")}`}` : "";
+			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}${reste}`);
 		});
 
 		/* Consultation du forfait, à sa place de contrôle : dans le composer,

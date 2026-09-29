@@ -90,6 +90,11 @@ export interface AiSettings {
 	aiMentionExtraFolders?: string[];
 	/** Chemin relatif persistant du dossier qui reçoit les quiz générés. */
 	aiOutputFolder?: string;
+	/** The Exam duration typed in the Options menu of the Generate page, in
+	    whole minutes within [1, 300]; `null` (or absent) is Auto, the model
+	    chooses (spec 2026-09-29 §1.2, §4.2). Kept across sessions like the
+	    other Options; only read when the requested mode is Exam. */
+	aiExamDurationMinutes?: number | null;
 	/* PLUS DE CHEMINS D'EXÉCUTABLE DE CLI (2026-09-17). Deux champs des
 	   Réglages désignaient l'exécutable à lancer quand la sonde automatique
 	   échouait. Le processus principal fusionne désormais le `PATH` du REGISTRE

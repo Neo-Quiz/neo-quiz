@@ -54,6 +54,12 @@ export function quizModeLabel(mode: ModeQuiz): string {
 	return t(mode === "learn" ? "dashboard.quizMode.learn" : mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.practice");
 }
 
+/** The one-sentence goal of a mode (hover bubbles of the Generate page's
+    selector and of a course sheet's). */
+export function quizModeTip(mode: ModeQuiz): string {
+	return t(mode === "learn" ? "ai.mode.learnTip" : mode === "exam" ? "dashboard.quizMode.examTip" : "ai.mode.practiceTip");
+}
+
 /** The Lucide icon of a mode: a book to learn, a dumbbell to practise, a
     timer for an exam. */
 export function quizModeIcon(mode: ModeQuiz): string {

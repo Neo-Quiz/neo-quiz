@@ -357,6 +357,8 @@ export const EN_DASHBOARD = {
 	"dashboard.select.usageWarning": "Consumes usage limits faster",
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
+	"dashboard.select.optionsDuration": "Duration",
+	"dashboard.select.durationUnit": "min",
 	"dashboard.select.optionsCustom": "Custom",
 	"dashboard.select.optionsCategory": "Subject",
 	"dashboard.select.noteSearch": "Search a note…",

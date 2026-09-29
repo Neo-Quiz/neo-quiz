@@ -526,7 +526,7 @@ await withSrcModule("apps/windows/electron/pont.ts", async ({ CANAUX }) => {
  * dernière assertion, STATIQUE comme celle des canaux `fichiers.*`, vérifie
  * que `reglagesEcrire` appelle la garde AVANT `.ecrire(`.
  */
-await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, estDossierSortieIaValide, hoteEstPrive, validerReglagesIa }) => {
+await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, estDossierSortieIaValide, estDureeExamenValide, DUREE_EXAMEN_MIN, DUREE_EXAMEN_MAX, hoteEstPrive, validerReglagesIa }) => {
 	const r = makeReporter("Électron — la garde de la clé ai");
 
 	/* ── hoteEstPrive : la boucle locale, la RFC 1918, `.local`, et rien d'autre ── */
@@ -585,6 +585,30 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 				...verdicts.slice(1).map(v => "refus" in v && v.refus.includes("aiOutputFolder")),
 			],
 			[{ ok: true, admettre: null }, true, true, true, true]);
+	});
+	/* The typed Exam duration (Generate page, Test · Exam): a whole number of
+	   minutes in [1, 300], or empty (absent / null) for Auto. It reaches the
+	   prompt and the written quiz, so a fraction, a string or an out-of-range
+	   number is refused and NAMED, never cut to fit. */
+	await cas(r, "aiExamDurationMinutes : un entier de 1 à 300, ou vide, passe", async () => {
+		const verdicts = await Promise.all([1, 30, 120, 300, null, undefined].map(v => valider({ aiExamDurationMinutes: v })));
+		r.check("aiExamDurationMinutes : un entier de 1 à 300, ou vide, passe",
+			verdicts, Array(6).fill({ ok: true, admettre: null }));
+		r.check("aiExamDurationMinutes : absent, rien à refuser",
+			await valider({ aiModel: "x" }), { ok: true, admettre: null });
+	});
+	await cas(r, "aiExamDurationMinutes : hors bornes, non entier ou non numérique est refusé, nommé", async () => {
+		const mauvaises = [0, -5, 301, 1000, 1.5, NaN, Infinity, "60", "", true, [60], {}];
+		const verdicts = await Promise.all(mauvaises.map(v => valider({ aiExamDurationMinutes: v })));
+		r.check("aiExamDurationMinutes : hors bornes, non entier ou non numérique est refusé, nommé",
+			verdicts.map(v => "refus" in v && v.refus.includes("aiExamDurationMinutes")), Array(mauvaises.length).fill(true));
+	});
+	await cas(r, "aiExamDurationMinutes : les bornes de la garde sont celles du format", async () => {
+		await withSrcModule("src/quiz-utils.ts", ({ EXAM_DURATION_MIN, EXAM_DURATION_MAX }) => {
+			r.check("aiExamDurationMinutes : les bornes de la garde sont celles du format",
+				[DUREE_EXAMEN_MIN, DUREE_EXAMEN_MAX, estDureeExamenValide(EXAM_DURATION_MIN), estDureeExamenValide(EXAM_DURATION_MAX), estDureeExamenValide(EXAM_DURATION_MIN - 1), estDureeExamenValide(EXAM_DURATION_MAX + 1)],
+				[EXAM_DURATION_MIN, EXAM_DURATION_MAX, true, true, false, false]);
+		});
 	});
 	await cas(r, "une URL illisible, non-chaîne ou hors http(s) est refusée, nommée", async () => {
 		const [pasChaine, illisible, fichier, ftp] = await Promise.all([

@@ -36,15 +36,18 @@ import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
 
-/** Les réglages qu'une demande FIGE à l'envoi : changer de fournisseur, de
-    modèle ou d'effort ensuite ne touche que les envois suivants. */
-export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiOutputFolder">;
+/** The settings a request FREEZES when it is sent: changing the provider,
+    model or effort afterwards only affects the following requests. The typed
+    Exam duration (`aiExamDurationMinutes`, `null` = Auto) travels with them:
+    it is the field through which the generation of an Exam reads it. */
+export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiOutputFolder" | "aiExamDurationMinutes">;
 
 export function figerReglages(s: AiSettings): ReglagesFiges {
 	return {
 		aiProvider: s.aiProvider, aiModel: s.aiModel, aiEffort: s.aiEffort, aiCodexFast: s.aiCodexFast,
 		aiAntigravityLevels: s.aiAntigravityLevels ? { ...s.aiAntigravityLevels } : s.aiAntigravityLevels,
 		aiOutputFolder: s.aiOutputFolder,
+		aiExamDurationMinutes: s.aiExamDurationMinutes ?? null,
 	};
 }
 

@@ -117,6 +117,23 @@ export function estDossierSortieIaValide(valeur: unknown): valeur is string {
 	return segments.every(segment => !!segment && segment !== "." && !segment.includes(".."));
 }
 
+/**
+ * The bounds of an Exam's typed duration, in minutes. The SAME values as
+ * `EXAM_DURATION_MIN` / `EXAM_DURATION_MAX` (`src/quiz-utils.ts`), repeated
+ * here because that module pulls JSON5 into the main process for two numbers;
+ * `check:electron-reglages` compares the two so they cannot drift apart.
+ */
+export const DUREE_EXAMEN_MIN = 1;
+export const DUREE_EXAMEN_MAX = 300;
+
+/** A typed Exam duration is a whole number of minutes within the bounds. It
+    reaches the prompt and is written into the quiz: a fraction, a string or
+    a huge number would be a corrupted setting, refused rather than cut. */
+export function estDureeExamenValide(valeur: unknown): valeur is number {
+	return typeof valeur === "number" && Number.isInteger(valeur)
+		&& valeur >= DUREE_EXAMEN_MIN && valeur <= DUREE_EXAMEN_MAX;
+}
+
 /** L'extension d'un chemin, en minuscules, ou la chaîne vide s'il n'en a pas.
     Sur le DERNIER point du NOM seul : `C:/a.b/claude` n'a pas d'extension, et
     `claude.pdf.exe` en a une — `.exe`. */
@@ -171,12 +188,17 @@ export async function validerReglagesIa(
 	if (!valeur || typeof valeur !== "object" || Array.isArray(valeur)) {
 		return { refus: "réglages IA refusés : la valeur n'est pas un objet" };
 	}
-	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder } = valeur as {
-		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown;
+	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder, aiExamDurationMinutes } = valeur as {
+		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown; aiExamDurationMinutes?: unknown;
 	};
 
 	if (aiOutputFolder !== undefined && !estDossierSortieIaValide(aiOutputFolder)) {
 		return { refus: "réglages IA refusés : aiOutputFolder doit être un chemin relatif sûr" };
+	}
+
+	// Absent or `null` is Auto; anything else must be a whole number of minutes in range.
+	if (aiExamDurationMinutes !== undefined && aiExamDurationMinutes !== null && !estDureeExamenValide(aiExamDurationMinutes)) {
+		return { refus: `AI settings refused: aiExamDurationMinutes must be a whole number from ${DUREE_EXAMEN_MIN} to ${DUREE_EXAMEN_MAX}, or empty` };
 	}
 
 	if (aiMentionExtraFolders !== undefined) {

@@ -252,6 +252,7 @@ export const PHRASE_FINALE_CLI = "Reply ONLY with the JSON5 array, with no expla
  */
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
 	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie } = options;
+	// TODO(task 12): "exam" has no prompt of its own yet; it takes the Practice one below.
 	const learn = mode === "learn";
 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.

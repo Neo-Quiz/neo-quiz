@@ -94,8 +94,7 @@ export const EN_AI = {
 	"ai.type.comprehension": "Comprehension",
 
 	/* ── Objectif Learn / Practice (composer) ── */
-	"ai.mode.learn": "Learn",
-	"ai.mode.practice": "Practice",
+	"ai.mode.test": "Test",
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained.",
 	"ai.mode.group": "Goal",

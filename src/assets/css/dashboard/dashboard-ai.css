@@ -2844,11 +2844,11 @@
 	height: 18px;
 }
 
-/* Sélecteur Learn | Practice — valeurs relevées sur le « Chat | Cowork » de
-   claude.ai (2026-09-23) : piste 28 px, padding 1 px, rayon 7 px, voile
-   5 % de la couleur du texte ; bloc 26 px, rayon 6 px, voile 10 % + filet
-   intérieur 10 % ; options 0 10 px, 14 px. Les voiles sont en RELATIF au
-   texte (color-mix) pour tenir sur les deux thèmes. */
+/* Learn | Test selector — values measured on claude.ai's "Chat | Cowork"
+   (2026-09-23): 28 px track, 1 px padding, 7 px radius, 5 % veil of the
+   text colour; 26 px block, 6 px radius, 10 % veil + 10 % inner hairline;
+   options 0 10 px, 14 px. The veils are RELATIVE to the text (color-mix) so
+   they hold on both themes. */
 .qbd-ai-seg {
 	position: relative;
 	display: inline-flex;
@@ -2878,6 +2878,9 @@
 .qbd-ai-seg-btn {
 	position: relative;
 	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	height: 26px;
 	padding: 0 10px;
 	border-radius: 5px;
@@ -2899,6 +2902,17 @@
 .qbd-ai-seg-btn:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 1px;
+}
+
+/* The chevron of the Test button, which opens Practice | Exam. */
+.qbd-ai-seg-chevron {
+	display: inline-flex;
+	opacity: 0.7;
+}
+
+.qbd-ai-seg-chevron svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* ── Menu Options en trois lignes + flyouts (2026-09-23) ──

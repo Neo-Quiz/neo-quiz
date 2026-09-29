@@ -1,6 +1,7 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
+import { EXAM_DURATION_MAX, EXAM_DURATION_MIN } from "../quiz-utils";
 import { createEffortTrackFx } from "./effort-canvas";
 import type { EffortTrackFx } from "./effort-canvas";
 
@@ -1816,6 +1817,12 @@ export interface OpenOptionsMenuOptions {
 	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
 	categorieDetectee?: string;
 	onCategorie?: (value: string | null) => void;
+	/**
+	 * The Exam DURATION row (spec 2026-09-29 §4.2), which the caller passes
+	 * only in Test · Exam: absent = no row. `minutes` is the typed duration,
+	 * `null` = Auto (the model sizes the Exam).
+	 */
+	duration?: { minutes: number | null; onChange: (minutes: number | null) => void };
 }
 
 /** One subject of the options menu: its icon is Lucide (`icon`) or drawn
@@ -2189,6 +2196,28 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 			{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: typeAuto, choisir: () => { typeAuto = true; if (opts.onTypeAuto) opts.onTypeAuto(); } },
 			...opts.types.map(x => ({ label: x, actif: !typeAuto && type === x, choisir: () => { type = x; typeAuto = false; if (opts.onType) opts.onType(x); } })),
 		]);
+
+	/* ── Duration (Test · Exam only): Auto, the four shortcuts, or a typed
+	   number of minutes within the Exam bounds — the same shape as the
+	   Questions row, and `champPerso` bounds and rounds the typed value. ── */
+	const duree = opts.duration;
+	if (duree) {
+		const RACCOURCIS = [30, 60, 90, 120];
+		let minutes = duree.minutes;
+		const uniteMin = (): string => t("dashboard.select.durationUnit");
+		const choisirDuree = (n: number | null): void => { minutes = n; duree.onChange(n); };
+		ligne("clock", t("dashboard.select.optionsDuration"),
+			() => minutes === null ? t("ai.options.auto") : `${minutes} ${uniteMin()}`,
+			() => [
+				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: minutes === null, choisir: () => choisirDuree(null) },
+				...RACCOURCIS.map(n => ({ label: `${n} ${uniteMin()}`, actif: minutes === n, choisir: () => choisirDuree(n) })),
+			],
+			(f, maj) => champPerso(f, {
+				unite: uniteMin, min: EXAM_DURATION_MIN, max: EXAM_DURATION_MAX,
+				valeur: minutes ?? EXAM_DURATION_MIN, actif: minutes !== null && !RACCOURCIS.includes(minutes),
+				valider: (n) => choisirDuree(n), maj,
+			}));
+	}
 
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──
 	const rect = anchorEl.getBoundingClientRect();

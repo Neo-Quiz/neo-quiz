@@ -315,6 +315,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.usageWarning": "Consomme vos limites plus rapidement",
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
+	"dashboard.select.optionsDuration": "Durée",
+	"dashboard.select.durationUnit": "min",
 	"dashboard.select.optionsCustom": "Personnalisé",
 	"dashboard.select.optionsCategory": "Sujet",
 	"dashboard.select.noteSearch": "Rechercher une note…",
