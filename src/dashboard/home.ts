@@ -5,80 +5,72 @@ import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
-import { renderQuizCard as renderSharedQuizCard } from "./quiz-card";
-import { regrouperParCours } from "./course-pairs";
 import { isFolderArchived } from "./folder-archive";
-import { moduleForQuiz, applyModuleOverrides } from "./quiz-modules";
+import { moduleForQuiz, applyModuleOverrides, buildModuleGroups } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
-import { renderCollapsibleSection } from "./collapsible";
 import { markViewEnter } from "./view-enter";
 import { createOptionCard, importSharedFolder } from "./folder-create";
 import { openNewFolderModal } from "./module-edit";
+import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
+import { collectHomeFolders, renderHomeFolder } from "./home-folders";
+import { renderHomeSide, type HomeExam } from "./home-week";
 
 /* ══════════════════════════════════════════════════════════
-   HOME VIEW — Dashboard
-   Header + stats grid + sections "À reprendre" / "Complétés"
+   HOME VIEW — what to work on today (redesigned 2026-09-29, after the
+   StudySmarter home): the Resume card, then one card per folder with an open
+   task (home-folders.ts) and the week with the next exam (home-week.ts).
+   The global counters and the grid of quiz cards are gone: they did not say
+   what to do. Spec: docs/superpowers/specs/2026-09-29-home-page-design.md.
 ══════════════════════════════════════════════════════════ */
 
-/** Cartes affichées par section : 2 rangées de 3 sur large, ni plus (l'accueil
-    n'est pas « Mes quiz »), ni moins (une seule rangée ne relance pas assez). */
-const HOME_GRID_MAX = 6;
-
-/** Carte de la grille de stats (statCards ci-dessous). */
-interface StatCard {
-	label: string;
-	value: string;
-	sub: string;
-	icon: string;
-	highlight?: boolean;
-}
-
 export interface HomeHandlers {
-	/** `entering` = on ARRIVE sur la page (la transition d'entrée se joue).
-	    L'hôte le sait : c'est lui qui compare la vue peinte à la vue demandée
-	    (dashboard.ts). Un re-render déclenché par le scanner du vault ou par le
-	    menu ⋯ d'une carte passe `false` — sinon la page clignote à chaque
-	    sauvegarde de note. */
+	/** `entering` = we ARRIVE on the page (the entry transition plays). The
+	    host knows it: it is the one comparing the painted view with the
+	    requested one (dashboard.ts). A re-render triggered by the vault
+	    scanner or by a card's ⋯ menu passes `false` — otherwise the page
+	    would flicker at every note save. */
 	render(container: HTMLElement, entering?: boolean): void;
 }
 
 export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 
-	/* Dernier conteneur peint : le menu ⋯ d'une carte (archivage, reset de
-	   stats) doit pouvoir repeindre l'accueil sans repasser par la navigation. */
+	/* Last container painted: a card's ⋯ menu (archiving, stats reset) must
+	   be able to repaint the home without going through navigation again. */
 	let containerRef: HTMLElement | null = null;
-	/* Valeur d'`entering` du dernier rendu : quand la table des modules arrive
-	   (lecture async) et déclenche un repeint, il doit REJOUER l'entrée si le
-	   rendu interrompu en était une — sinon la cascade se coupe net à peine
-	   commencée (même piège que quizzes.ts). */
+	/* `entering` of the last render: when the module table arrives (async
+	   read) and triggers a repaint, it must REPLAY the entry if the
+	   interrupted render was one — otherwise the cascade stops dead just
+	   after it began (same trap as quizzes.ts). */
 	let lastEntering = true;
+	/* Week shown in the side column, from the current one. Kept across the
+	   re-renders the page causes itself; back to this week on arrival. */
+	let weekOffset = 0;
 
-	/* Table des modules lue dans la note de correspondance, comme « Mes quiz ».
-	   Sans elle, un quiz rangé dans un SOUS-dossier de son module se voyait
-	   attribuer l'accent (et le dossier d'archivage) du sous-dossier ici, celui
-	   du module là-bas : deux couleurs pour un même quiz selon la page. */
+	/* Module table read from the mapping note, as "My quizzes" does. Without
+	   it, a quiz filed in a SUB-folder of its module got the sub-folder's
+	   accent (and archive folder) here and the module's there: two colours
+	   for the same quiz depending on the page. */
 	let moduleMap: ModuleMap | null = null;
 	let moduleMapLoaded = false;
 
 	async function loadModuleMap(): Promise<void> {
 		moduleMapLoaded = true;
-		// Cède TOUJOURS avant de poursuivre : sans ce yield, la branche « note
-		// absente » ne traverse aucun await réel et re-rendrait DEPUIS le render()
-		// en cours, qui peindrait ensuite une seconde copie par-dessus (piège
-		// documenté au long dans quizzes.ts).
+		// ALWAYS yield before going on: without it, the "note missing" branch
+		// crosses no real await and would re-render FROM the render() in
+		// progress, which would then paint a second copy on top (trap
+		// documented at length in quizzes.ts).
 		await Promise.resolve();
-		// Le brief demandait `|| ""` : passer une chaîne vide aurait fait
-		// perdre le repli sur la note « Dashboard » (DEFAULT_SETTINGS,
-		// plugin.ts) que l'ancien bloc appliquait — un comportement différent
-		// si le réglage est vide ou pas encore migré. `"Dashboard"` restaure
-		// exactement l'ancien fallback (bug du plan, corrigé).
+		// Not `|| ""`: an empty string would lose the fallback to the
+		// "Dashboard" note (DEFAULT_SETTINGS, plugin.ts) the old block applied —
+		// a different behaviour when the setting is empty or not yet migrated.
+		// `"Dashboard"` restores exactly the old fallback (a plan bug, fixed).
 		moduleMap = await lireModuleMap(ctx.settings.quizzesModuleMapNote || "Dashboard");
 		if (containerRef) render(containerRef, lastEntering);
 	}
 
-	/** Re-render déclenché par la page elle-même (menu ⋯) : jamais d'entrée. */
+	/** Re-render triggered by the page itself (⋯ menu, week arrows): never an entry. */
 	function rerender(): void {
 		if (containerRef) render(containerRef, false);
 	}
@@ -86,20 +78,21 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 	function render(container: HTMLElement, entering = true): void {
 		containerRef = container;
 		lastEntering = entering;
+		if (entering) weekOffset = 0;
 		markViewEnter(container, entering, "qbd-home-enter");
 		container.replaceChildren();
 
-		// Cascade d'entrée : UN seul compteur pour toute la page (tuiles de
-		// stats, en-têtes de section, cartes) — même formule que « Mes quiz ».
+		// Entry cascade: ONE counter for the whole page (the folder cards) —
+		// the same formula as "My quizzes".
 		let entryIndex = 0;
 		const entryDelay = (): string => `${100 + entryIndex++ * 45}ms`;
 
-		// Les quiz des DOSSIERS ARCHIVÉS (menu ⋯ d'une carte de dossier de
-		// « Mes quiz ») n'existent plus pour l'accueil : ni stats, ni sections.
-		// Ils ne reviennent que sous la section « Archivés » de « Mes quiz ».
-		// Même table effective que « Mes quiz » : la note (chargée en tâche de
-		// fond au premier rendu) recouverte par les overrides du modal
-		// « Modifier dossier », relus à chaque rendu.
+		// The quizzes of ARCHIVED FOLDERS (⋯ menu of a folder card in "My
+		// quizzes") no longer exist for the home: no task, no folder. They
+		// only come back under the "Archived" section of "My quizzes". Same
+		// effective table as "My quizzes": the note (loaded in the background
+		// on the first render) overlaid by the "Edit folder" modal's
+		// overrides, re-read at every render.
 		if (!moduleMapLoaded) { void loadModuleMap(); }
 		const map: ModuleMap = applyModuleOverrides(
 			moduleMap ?? { byFolder: new Map(), ueOrder: [] },
@@ -109,43 +102,35 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const quizzes = allQuizzes.filter(q => !isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
 		const stats: Record<string, QuizStatRecord> = ctx.statsStore ? ctx.statsStore.getAll() : {};
 
-		// ── Premier usage : aucun quiz → onboarding guidé ──
+		// ── First use: no quiz → guided onboarding ──
 		if (allQuizzes.length === 0) {
 			renderOnboarding(container, map, allQuizzes);
 			return;
 		}
 
-		// ── Classement des quiz par état (utilisé par le hero + les sections) ──
+		// The quizzes in progress: the Resume card offers the latest one.
 		const inProgress = quizzes.filter(q => {
 			const s = stats[q.path];
 			return s && s.questionsDone > 0 && s.questionsDone < q.questions;
 		});
-		const notStarted = quizzes.filter(q => {
-			const s = stats[q.path];
-			return !s || s.questionsDone === 0;
-		});
-		const completed = quizzes.filter(q => {
-			const s = stats[q.path];
-			return s && s.questionsDone >= q.questions;
-		});
+
+		/* The page is ONE wrapper: `.qbd-content > *` centres it, and it holds
+		   the glow, which must stay behind every card (`isolation`, dashboard-
+		   home.css). */
+		const page = ajouter(container, "div", "qbd-home-page");
+		ajouter(page, "div", "qbd-home-glow").setAttribute("aria-hidden", "true");
 
 		// ── Header ──
-		const header = ajouter(container, "div", "qbd-home-header");
+		const header = ajouter(page, "div", "qbd-home-header");
 		const headerLeft = ajouter(header, "div", "qbd-home-header-left");
 		ajouter(headerLeft, "h2", "qbd-home-title", PRODUCT_NAME);
+		ajouter(headerLeft, "p", "qbd-home-subtitle", t("dashboard.home.subtitle"));
 
-		// Sous-titre orientant : annonce les deux actions principales. (La note
-		// active reste dans le footer de la sidebar, et la vue Générer la relit.)
-		const subtitle = inProgress.length > 0
-			? t("dashboard.home.subtitleResume")
-			: t("dashboard.home.subtitleStart");
-		ajouter(headerLeft, "p", "qbd-home-subtitle", subtitle);
-
-		// Pilule claire IDENTIQUE à « + New folder » de « Mes quiz » : une seule
-		// grammaire d'action primaire dans le dashboard (contrat 2026-07-28).
-		// MASQUÉ (pas grisé) si l'hôte ne sait pas servir "ai" : un bouton
-		// d'ACTION mort au clic est pire qu'absent, contrairement au rail
-		// (forme fixe et mémorisée) que canOpen se contente de griser.
+		// Light pill IDENTICAL to "+ New folder" of "My quizzes": one grammar
+		// of primary action in the dashboard (contract 2026-07-28). HIDDEN (not
+		// greyed out) when the host cannot serve "ai": an ACTION button dead on
+		// click is worse than none, unlike the rail (fixed, remembered shape)
+		// that canOpen merely greys out.
 		if (ctx.canOpen("ai")) {
 			const genBtn = ajouter(header, "button", "qbd-btn--create");
 			const genIcon = ajouter(genBtn, "span", "qbd-btn-icon");
@@ -154,7 +139,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			genBtn.addEventListener("click", () => ctx.navigate("ai"));
 		}
 
-		// ── Reprendre : dernier quiz en cours (action primaire du returning user) ──
+		// ── Resume: the latest quiz in progress (a returning user's primary action) ──
 		const resumeQuiz = inProgress
 			.slice()
 			.sort((a, b) => {
@@ -163,188 +148,42 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 				return lb - la;
 			})[0];
 		if (resumeQuiz) {
-			renderResumeHero(container, resumeQuiz, stats[resumeQuiz.path], accentOf(resumeQuiz, map));
+			renderResumeHero(page, resumeQuiz, stats[resumeQuiz.path], accentOf(resumeQuiz, map));
 		}
 
-		// ── Stats grid ──
-		const statsGrid = ajouter(container, "div", "qbd-home-stats");
-
-		const totalQuestions = ctx.scanner ? ctx.scanner.getTotalQuestions() : 0;
-		const mastered = quizzes.filter(q => {
-			const s = stats[q.path];
-			return s && s.bestScore >= 80;
-		}).length;
-
-		// Construit DANS render : les libellés sont traduits à chaque rendu (une
-		// constante de module serait figée dans la langue du démarrage).
-		const statCards: StatCard[] = [
-			{ label: t("dashboard.home.statQuizzes"), value: String(quizzes.length), sub: t("dashboard.home.statQuizzesSub"), icon: "layers" },
-			{ label: t("dashboard.home.statQuestions"), value: String(totalQuestions), sub: t("dashboard.home.statQuestionsSub"), icon: "list" },
-			{
-				label: t("dashboard.home.statMastered"), value: `${mastered}/${quizzes.length}`, sub: t("dashboard.home.statMasteredSub"),
-				icon: "award", highlight: true
-			}
-		];
-
-		for (const card of statCards) {
-			const el = ajouter(statsGrid, "div", `qbd-stat-card${card.highlight ? " qbd-stat-card--highlight" : ""}`);
-			el.style.setProperty("--qbd-card-delay", entryDelay());
-			const head = ajouter(el, "div", "qbd-stat-head");
-			const icon = ajouter(head, "span", "qbd-stat-icon");
-			currentHost().ui.setIcon(icon, card.icon);
-			ajouter(head, "p", "qbd-stat-label", card.label);
-			ajouter(el, "p", "qbd-stat-value", card.value);
-			// Aucune barre de progression sur une tuile de stats : même règle que
-			// les cartes de dossier (contrat visuel « Mes quiz »), le chiffre porte
-			// déjà l'information.
-			ajouter(el, "p", "qbd-stat-sub", card.sub);
+		// ── The folders and the week ──
+		const now = Date.now();
+		const todayStart = startOfDay(now);
+		const todayIso = isoLocal(now);
+		const groups = buildModuleGroups(quizzes, stats, map);
+		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
+		if (folders.length === 0) {
+			const done = ajouter(page, "div", "qbd-home-done");
+			currentHost().ui.setIcon(ajouter(done, "span", "qbd-home-done-icon"), "circle-check");
+			ajouter(done, "p", "qbd-home-done-title", t("dashboard.home.allDone"));
+			ajouter(done, "p", "qbd-home-done-hint", t("dashboard.home.allDoneHint"));
+			return;
 		}
+		// Every upcoming exam of every folder — a folder with nothing to do
+		// today can still have its exam this week.
+		const exams: HomeExam[] = groups
+			.flatMap(group => upcomingExams(ctx.examens?.(group) ?? [], todayIso).map(exam => ({ exam, group })))
+			.sort((a, b) => a.exam.date.localeCompare(b.exam.date));
 
-		// ── Sections de quiz ──
-		// Mêmes en-têtes que « Mes quiz » : rangée 52px, chevron animé, libellé
-		// 16px, badge compteur, repli persisté (contrat visuel 2026-07-28). Les
-		// micro-capitales 10px, propres à l'accueil, ont disparu avec eux.
-		const collapse = {
-			isExpanded: (key: string) => new Set(ctx.settings.quizzesExpandedFolders || []).has(key),
-			toggleExpanded: (key: string) => {
-				const set = new Set(ctx.settings.quizzesExpandedFolders || []);
-				if (set.has(key)) set.delete(key); else set.add(key);
-				ctx.settings.quizzesExpandedFolders = [...set];
-				ctx.saveSettings().catch(() => {});
-			},
-		};
-
-		// À faire (en cours + à commencer). La grille est PLAFONNÉE (revue design
-		// 2026-07-28) : 54 cartes faisaient de l'accueil un doublon de « Mes
-		// quiz ». Deux rangées de trois suffisent à reprendre le travail ; le
-		// reste vit derrière « See all », qui affiche le total resté dehors.
-		/* Une section = en-tête repliable + grille plafonnée + « See all » vers
-		   « Mes quiz ». TOUTE section plafonnée porte ce lien : sans lui, les
-		   quiz au-delà du 6e n'auraient aucune sortie depuis l'accueil. */
-		const renderSection = (key: string, label: string, quizzes: QuizIndexEntry[], defaultOpen: boolean): void => {
-			/* Un cours, une carte (course-pairs.ts), comme dans « Mes quiz » : le
-			   compteur et le plafond comptent des COURS, pas des fichiers. */
-			const list = regrouperParCours(quizzes, ctx.settings.quizzesGroupModes !== false);
-			const shown = list.slice(0, HOME_GRID_MAX);
-			const section = ajouter(container, "div", "qbd-home-section");
-			const body = renderCollapsibleSection(collapse, section, key, label, list.length, {
-				rowClass: "qbd-home-node-row",
-				entryDelay,
-				defaultOpen,
-				// « See all » vit à CÔTÉ de l'en-tête, jamais dedans : l'en-tête
-				// est lui-même un <button> (un bouton dans un bouton est invalide).
-				headRow: (row) => {
-					const seeAll = ajouter(row, "button", "qbd-btn qbd-btn--subtle");
-					seeAll.type = "button";
-					ajouter(seeAll, "span", undefined,
-						list.length > shown.length
-							? t("dashboard.home.seeAllCount", { count: list.length })
-							: t("dashboard.home.seeAll")
-					);
-					const chevron = ajouter(seeAll, "span", "qbd-btn-icon qbd-btn-icon--sm");
-					currentHost().ui.setIcon(chevron, "chevron-right");
-					seeAll.addEventListener("click", () => ctx.navigate("quizzes"));
-				},
-			});
-
-			const grid = ajouter(body, "div", "qbd-home-grid");
-			for (const { quiz, frere } of shown) {
-				renderQuizCard(grid, quiz, stats[quiz.path], map, frere, frere ? stats[frere.path] : undefined).style
-					.setProperty("--qbd-card-delay", entryDelay());
-			}
-		};
-
-		/* ── À réviser aujourd'hui ──
-		   L'ordonnanceur rend des CLÉS de question (`chemin::id`) ; l'accueil
-		   les regroupe par note pour rester actionnable — le seul geste
-		   possible aujourd'hui est d'ouvrir un quiz. La session composée de
-		   questions venant de plusieurs notes est le chantier suivant.
-
-		   `reviewStore` peut être absent : la task 7 le fait DÉGRADER plutôt
-		   que bloquer le greffon, donc l'accueil doit vivre sans lui — c'est
-		   pourquoi ce membre de `DashboardShellCtx` est optionnel. */
-		const plan = ctx.reviewStore?.plan(Date.now());
-		if (plan && plan.today.length) {
-			const parNote = new Map<string, number>();
-			for (const cle of plan.today) {
-				const sep = cle.lastIndexOf("::");
-				// Une clé sans séparateur ne vient pas du catalogue : on la
-				// laisse tomber plutôt que de fabriquer un chemin vide.
-				if (sep <= 0) continue;
-				const path = cle.slice(0, sep);
-				parNote.set(path, (parNote.get(path) ?? 0) + 1);
-			}
-
-			// Nombre décroissant, puis chemin : ordre TOTAL, donc stable d'un
-			// rendu à l'autre — l'ordre de `plan.today` sert la SESSION (il
-			// entrelace les familles), pas l'affichage.
-			const lignes = [...parNote.entries()]
-				.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-				.map(([path, n]) => ({ quiz: ctx.scanner?.getQuiz(path), n }))
-				// Note disparue entre le scan et le rendu : rien à ouvrir.
-				.filter((l): l is { quiz: QuizIndexEntry; n: number } => !!l.quiz);
-
-			// Une section vide n'a rien à dire : si toutes les notes dues ont
-			// disparu, on n'affiche pas un en-tête qui ne mène nulle part.
-			if (lignes.length > 0) {
-				const section = ajouter(container, "div", "qbd-home-section");
-				// Même helper que « À faire » et « Complétés » : rangée 52px,
-				// chevron animé, libellé, badge compteur. Un balisage écrit à
-				// la main ici serait une VARIANTE de l'anatomie, ce que le
-				// contrat visuel du 2026-07-28 interdit.
-				const body = renderCollapsibleSection(
-					collapse, section, "home:review", t("dashboard.review.title"), plan.today.length,
-					{ rowClass: "qbd-home-node-row", entryDelay, defaultOpen: true },
-				);
-
-				const liste = ajouter(body, "div", "qbd-review-list");
-				for (const { quiz, n } of lignes) {
-					const row = ajouter(liste, "button", "qbd-review-row");
-					row.type = "button";
-					const icone = ajouter(row, "span", "qbd-review-icon");
-					currentHost().ui.setIcon(icone, "rotate-ccw");
-					ajouter(row, "span", "qbd-review-title", quiz.title);
-					ajouter(row, "span", "qbd-review-count",
-						t(n === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: n }),
-					);
-					row.addEventListener("click", () => ctx.openQuiz(quiz));
-				}
-
-				/* Le report est une INFORMATION, pas un reproche : il dit que le
-				   budget du jour a tenu, pas que l'utilisateur est en retard. */
-				if (plan.deferred.length) {
-					ajouter(liste, "p", "qbd-review-deferred",
-						t(
-							plan.deferred.length === 1 ? "dashboard.review.deferredOne" : "dashboard.review.deferredOther",
-							{ count: plan.deferred.length },
-						),
-					);
-				}
-			}
-		}
-
-		// À faire (en cours + à commencer). La grille est PLAFONNÉE (revue design
-		// 2026-07-28) : 54 cartes faisaient de l'accueil un doublon de « Mes
-		// quiz ». Deux rangées de trois suffisent à reprendre le travail ; le
-		// reste vit derrière « See all », qui affiche le total resté dehors.
-		const todo = [...inProgress, ...notStarted];
-		if (todo.length > 0) {
-			renderSection("home:todo", t("dashboard.home.todo"), todo, true);
-		}
-
-		// Complétés — repliés par défaut : le badge dit combien, la grille ne
-		// repousse plus « À faire » hors de l'écran.
-		if (completed.length > 0) {
-			renderSection("home:completed", t("dashboard.home.completed"), completed, false);
-		}
-
+		const layout = ajouter(page, "div", "qbd-home-layout");
+		const column = ajouter(layout, "div", "qbd-home-folders");
+		for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart, entryDelay());
+		renderHomeSide(layout, {
+			ctx, folders, exams, todayStart, weekOffset,
+			moveWeek: (delta) => { weekOffset += delta; rerender(); },
+		});
 	}
 
-	/* Héros « Reprendre » — teinté par l'accent du DOSSIER du quiz, comme sa
-	   carte (revue design 2026-07-28) : liseré vertical, halo, label, barre et
-	   bouton en dérivent. C'est ce qui règle la concurrence d'accents : la
-	   pilule claire reste l'action de page (« Generate a quiz »), le héros parle
-	   la couleur de son module au lieu du bleu d'interface. */
+	/* "Resume" hero — tinted with the accent of the quiz's FOLDER, like its
+	   card (design review 2026-07-28): the vertical edge, halo, label, bar and
+	   button derive from it. That settles the competition of accents: the
+	   light pill stays the page action ("Generate a quiz"), the hero speaks
+	   its module's colour instead of the interface blue. */
 	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, accent: string): void {
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;
@@ -355,8 +194,8 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const open = () => ctx.navigate("detail", { quiz });
 		hero.addEventListener("click", open);
 
-		// Halo derrière le contenu : boîte propre, entièrement contenue (une
-		// ellipse qui dépasserait se ferait couper net par un ancêtre à scroll).
+		// Halo behind the content: its own box, fully contained (an ellipse
+		// spilling out would be cut sharp by a scrolling ancestor).
 		ajouter(hero, "div", "qbd-resume-halo");
 
 		const info = ajouter(hero, "div", "qbd-resume-info");
@@ -368,8 +207,9 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 
 		ajouter(info, "p", "qbd-resume-title", quiz.title);
 
-		// Dossier parent, même source que la ligne des cartes : le héros dit d'où
-		// vient le quiz, sinon sa couleur d'accent n'a aucun référent à l'écran.
+		// Parent folder, same source as the cards' line: the hero says where
+		// the quiz comes from, otherwise its accent colour refers to nothing
+		// on screen.
 		const segs = quiz.path.split("/").slice(0, -1).filter(Boolean);
 		if (segs.length > 0) {
 			ajouter(info, "p", "qbd-resume-path", segs[segs.length - 1]);
@@ -379,8 +219,8 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const bar = ajouter(progress, "div", "qbd-resume-bar");
 		const fill = ajouter(bar, "div", "qbd-resume-bar-fill");
 		fill.style.width = `${pct}%`;
-		// L'accord se joue sur le TOTAL (« 0/1 question », « 3/10 questions ») :
-		// le compteur formé est ensuite inséré tel quel dans la ligne de progression.
+		// Agreement follows the TOTAL ("0/1 question", "3/10 questions"): the
+		// counter is then inserted as is in the progress line.
 		const questions = t(total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done, total });
 		ajouter(progress, "span", "qbd-resume-progress-text", t("dashboard.home.resumeProgress", { questions, pct }));
 
@@ -400,10 +240,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		ajouter(wrap, "h2", "qbd-onboarding-title", t("dashboard.onboarding.title"));
 		ajouter(wrap, "p", "qbd-onboarding-lead", t("dashboard.onboarding.lead"));
 
-		// Action primaire évidente — MÊME pilule claire que l'accueil peuplé et
-		// que « + New folder » : une seule grammaire d'action primaire.
-		// MASQUÉ (pas grisé) si l'hôte ne sait pas servir "ai" : c'est ici le
-		// cas le plus grave (dossier vide, SEULE action primaire de l'écran).
+		// Obvious primary action — the SAME light pill as the populated home
+		// and "+ New folder": one grammar of primary action. HIDDEN (not greyed
+		// out) when the host cannot serve "ai": here it is the worst case (empty
+		// folder, the ONLY primary action on screen).
 		if (ctx.canOpen("ai")) {
 			const primary = ajouter(wrap, "button", "qbd-btn--create qbd-onboarding-cta");
 			const pIcon = ajouter(primary, "span", "qbd-btn-icon");
@@ -412,14 +252,14 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			primary.addEventListener("click", () => ctx.navigate("ai"));
 		}
 
-		// Séparateur
+		// Separator
 		const divider = ajouter(wrap, "div", "qbd-onboarding-divider");
 		ajouter(divider, "span", undefined, t("dashboard.onboarding.or"));
 
-		/* Les trois cartes du modal « Créer un dossier », rendues sur place
-		   (spec « utilisable par n'importe qui », § 1) : personne ne crée un quiz
-		   à la main dans un bloc de code, et « Générer » au-dessus EST la carte
-		   IA. Même composant, même CSS : aucune apparence de plus à tenir. */
+		/* The three cards of the "Create a folder" modal, rendered in place
+		   (spec "usable by anyone", § 1): nobody writes a quiz by hand in a code
+		   block, and "Generate" above IS the AI card. Same component, same CSS:
+		   no extra look to maintain. */
 		const cartes = ajouter(wrap, "div", "qbd-onboarding-cards");
 		createOptionCard(null, cartes, "folder-plus", "#4573ff", t("dashboard.quizzes.createEmptyTitle"), t("dashboard.quizzes.createEmptyDesc"),
 			() => openNewFolderModal(ctx, map, allQuizzes, rerender));
@@ -431,36 +271,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			() => void importSharedFolder(ctx, map, allQuizzes, rerender));
 	}
 
-	/** Accent du DOSSIER d'un quiz — même source que « Mes quiz ». */
+	/** Accent of a quiz's FOLDER — same source as "My quizzes". */
 	function accentOf(quiz: QuizIndexEntry, map: ModuleMap): string {
 		const folder = moduleForQuiz(quiz.path, map).folder;
 		return moduleAccent(map.byFolder.get(folder) ?? { folder });
-	}
-
-	/* Carte de quiz — MÊME anatomie que « Mes quiz » : verre, teinte du dossier
-	   parent, bouton lecture et menu ⋯. L'accueil et « Mes quiz » ne parlaient
-	   pas la même langue visuelle ; depuis le contrat 2026-07-28, une carte de
-	   quiz a UNE seule apparence. Le cran de cascade est posé par l'appelant :
-	   il continue le compteur de la page (stats et en-têtes l'ont déjà avancé). */
-	function renderQuizCard(
-		container: HTMLElement,
-		quiz: QuizIndexEntry,
-		stats: QuizStatRecord | null | undefined,
-		map: ModuleMap,
-		frere?: QuizIndexEntry,
-		statsFrere?: QuizStatRecord
-	): HTMLDivElement {
-		return renderSharedQuizCard(container, quiz, stats, (q) => ctx.navigate("detail", { quiz: q }), {
-			frere,
-			statsFrere,
-			onPlay: (q) => ctx.openQuiz(q),
-			// Absent côté application (menus et modals = tranche 2.6) : la carte
-			// se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in. L'hôte
-			// OUVRE le menu lui-même (tour de correction 1, tâche 6) — la carte
-			// ne fait plus que signaler le clic et son ancre.
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map) : undefined,
-			accent: accentOf(quiz, map),
-		});
 	}
 
 	return { render };

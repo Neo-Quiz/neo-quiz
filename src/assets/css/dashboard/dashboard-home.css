@@ -32,29 +32,13 @@
 	line-height: 1.5;
 }
 
-/* ── Stats grid ──
-   Gap et marge basse calés sur la référence : 16px entre surfaces d'une même
-   rangée, 24px avant l'en-tête de section suivant (comme la barre « Recent »
-   → première section de « Mes quiz »). */
-/* Bandeau et tuiles gardent la LARGEUR DE COLONNE (comme la barre « Recent /
-   New folder » et les en-têtes de section de la référence) : seule la grille
-   de cartes est plafonnée. `.qbd-content > *` centre déjà la colonne — une
-   max-width ici décalerait ces surfaces de 50px vers la droite par rapport à
-   la grille (mesuré in-app). */
-.qbd-home-stats {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 16px;
-	margin-bottom: 24px;
-}
-
 /* ══════════════════════════════════════════════════════════
-   TRANSITION D'ENTRÉE — même grammaire que « Mes quiz » (keyframes
-   qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css).
-   La classe .qbd-home-enter n'est posée qu'à l'ARRIVÉE sur la page et
-   retirée dès l'animation finie (view-enter.ts) : un re-render interne
-   ne clignote pas, et aucune animation en fill: both ne confisque
-   `transform` au lift des cartes.
+   ENTRY TRANSITION — the same grammar as "My quizzes" (keyframes
+   qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css). The
+   .qbd-home-enter class is set only on ARRIVAL on the page and removed as
+   soon as the animation ends (view-enter.ts): an internal re-render does not
+   flicker, and no animation in fill: both confiscates `transform` from the
+   cards.
    ═════════════════════════════════════════════════════════ */
 .qbd-home-enter .qbd-home-header,
 .qbd-home-enter .qbd-resume-hero,
@@ -62,9 +46,8 @@
 	animation: qbd-folder-hero-in 0.35s ease backwards;
 }
 
-.qbd-home-enter .qbd-stat-card,
-.qbd-home-enter .qbd-quizzes-node-head,
-.qbd-home-enter .qbd-quiz-card {
+.qbd-home-enter .qbd-homef,
+.qbd-home-enter .qbd-homes {
 	animation: qbd-folder-card-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
 	animation-delay: var(--qbd-card-delay, 100ms);
 }
@@ -73,38 +56,10 @@
 	.qbd-home-enter .qbd-home-header,
 	.qbd-home-enter .qbd-resume-hero,
 	.qbd-home-enter .qbd-onboarding,
-	.qbd-home-enter .qbd-stat-card,
-	.qbd-home-enter .qbd-quizzes-node-head,
-	.qbd-home-enter .qbd-quiz-card {
+	.qbd-home-enter .qbd-homef,
+	.qbd-home-enter .qbd-homes {
 		animation: none;
 	}
-}
-
-/* ── Sections ──
-   Les en-têtes sont ceux de « Mes quiz » (.qbd-quizzes-node-*, rangée 52px,
-   chevron animé, badge compteur). Seule la rangée est propre à l'accueil :
-   l'action « See all » se cale à droite, à côté du bouton d'en-tête (elle ne
-   peut pas vivre dedans — bouton imbriqué). */
-/* Rythme inter-sections de la référence : 16px au-dessus de chaque section
-   suivante, rien en bas de la dernière (.qbd-quizzes-node + .qbd-quizzes-node,
-   dashboard-quizzes.css). L'ancien margin-bottom de 24px s'ajoutait en plus
-   sous la dernière section. */
-.qbd-home-section + .qbd-home-section {
-	margin-top: 16px;
-}
-
-.qbd-home-node-row {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-}
-
-/* L'en-tête ne prend plus toute la largeur : il pousse « See all » à droite,
-   mais la zone cliquable s'arrête là où le contenu s'arrête. */
-.qbd-root .qbd-home-node-row .qbd-quizzes-node-head {
-	width: auto;
-	flex: 1 1 auto;
-	min-width: 0;
 }
 
 /* ── Grid ──
@@ -388,75 +343,403 @@
 	justify-content: center;
 }
 
-/* ══ À RÉVISER AUJOURD'HUI ══════════════════════════════════
-   Une LISTE, pas une grille de cartes : le contrat visuel du
-   2026-07-28 n'admet qu'une seule anatomie de carte par page, et
-   c'est la carte de quiz. Ces rangées sont donc volontairement
-   plates — pas de fond propre, pas de barre de progression, le
-   seul relief est le survol. */
-.qbd-review-list {
+/* ══ THE PAGE AND ITS GLOW (2026-09-29) ═════════════════════
+   One wrapper for the whole page (`.qbd-content > *` centres it). It is its
+   own stacking context (`isolation`), so the glow at `z-index: -1` sits above
+   the tile's glass and BELOW every card, without giving each card a
+   position. The glow reaches past the wrapper to the tile's inner edges
+   (the tile's padding, dashboard-base.css), and the tile's rounded,
+   scrolling box clips it. After the StudySmarter home. */
+.qbd-home-page {
+	position: relative;
+	isolation: isolate;
+}
+
+.qbd-home-glow {
+	position: absolute;
+	z-index: -1;
+	top: -28px;
+	left: -32px;
+	right: -32px;
+	height: 420px;
+	pointer-events: none;
+	background: radial-gradient(
+		ellipse 50% 90% at 50% -25%,
+		color-mix(in srgb, var(--qbd-state-progress) 75%, transparent),
+		color-mix(in srgb, var(--qbd-state-progress) 30%, transparent) 45%,
+		color-mix(in srgb, var(--qbd-state-progress) 8%, transparent) 70%,
+		transparent 88%
+	);
+}
+
+/* ══ FOLDERS + WEEK ═════════════════════════════════════════ */
+.qbd-home-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 290px;
+	gap: 18px;
+	align-items: start;
+	margin-top: 18px;
+}
+
+.qbd-home-folders {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 14px;
+	min-width: 0;
 }
 
-.qbd-review-row {
+/* The only tiles of the page (with the Resume card): the content. Inside,
+   rows and text only — never a second box. */
+.qbd-homef,
+.qbd-homes {
+	background: var(--qbd-surface-bg);
+	border: 1px solid var(--qbd-surface-edge);
+	border-radius: 15px;
+}
+
+.qbd-homef {
+	padding: 16px 18px 8px;
+}
+
+.qbd-homef-head {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	width: 100%;
-	/* min-width:0 sur un enfant de flex : sans lui, un titre long
-	   pousserait la rangée au-delà du conteneur au lieu d'être coupé
-	   (le min-width auto d'un item flex vaut son contenu). */
+	justify-content: space-between;
+	gap: 12px;
 	min-width: 0;
-	padding: 8px 10px;
+}
+
+.qbd-root .qbd-homef-name {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	height: auto;
+	padding: 0;
 	border: none;
-	border-radius: 8px;
-	background: transparent;
+	background: none;
 	box-shadow: none;
 	color: var(--text-normal);
-	font-size: 14px;
-	text-align: left;
+	font: inherit;
+	font-size: 15.5px;
+	font-weight: 650;
 	cursor: pointer;
-	transition: background-color 120ms ease;
 }
 
-.qbd-review-row:hover {
-	background: var(--background-modifier-hover);
-}
-
-.qbd-review-icon {
-	display: flex;
-	flex: 0 0 auto;
-	color: var(--text-muted);
-}
-
-.qbd-review-icon svg {
-	width: 15px;
-	height: 15px;
-}
-
-.qbd-review-title {
-	flex: 1 1 auto;
-	min-width: 0;
+.qbd-homef-name > span:first-child {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.qbd-review-count {
+.qbd-homef-name-chev,
+.qbd-homef-exam-icon,
+.qbd-homef-more-chev,
+.qbd-homef-task-chev,
+.qbd-homef-task-cta-chev,
+.qbd-homes-row-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+}
+
+.qbd-homef-name-chev { color: var(--text-muted); }
+.qbd-homef-name-chev svg { width: 15px; height: 15px; }
+
+.qbd-homef-exam {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 	flex: 0 0 auto;
 	color: var(--text-muted);
+	font-size: 12.5px;
+}
+
+.qbd-homef-exam-icon svg { width: 14px; height: 14px; }
+
+.qbd-homef-bar {
+	height: 4px;
+	margin: 12px 0 8px;
+	border-radius: 4px;
+	background: var(--qbd-ring-track);
+	overflow: hidden;
+}
+
+.qbd-homef-bar-fill {
+	height: 100%;
+	border-radius: inherit;
+	background: var(--qbd-state-progress);
+}
+
+.qbd-homef-meta {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	color: var(--text-muted);
+	font-size: 12.5px;
+}
+
+.qbd-homef-tasks {
+	margin-top: 8px;
+}
+
+/* A task: a flat row between 1px lines — the "no tile in a tile" rule. */
+.qbd-root .qbd-homef-task {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-width: 0;
+	height: auto;
+	padding: 10px 2px;
+	border: none;
+	border-top: 1px solid var(--qbd-surface-edge);
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13.5px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.qbd-root .qbd-homef-task:hover .qbd-homef-task-label {
+	color: #ffffff;
+}
+
+.qbd-homef-task-icon {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+}
+
+.qbd-homef-task-icon svg { width: 15px; height: 15px; }
+.qbd-homef-task-icon--review { color: #ff9f0a; background: color-mix(in srgb, #ff9f0a 16%, transparent); }
+.qbd-homef-task-icon--learn { color: #0a84ff; background: color-mix(in srgb, #0a84ff 16%, transparent); }
+.qbd-homef-task-icon--test { color: #bf5af2; background: color-mix(in srgb, #bf5af2 16%, transparent); }
+
+.qbd-homef-task-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	transition: color 120ms ease;
+}
+
+.qbd-homef-task.is-lead .qbd-homef-task-label {
+	font-weight: 650;
+}
+
+/* The lead's action is TEXT in the accent colour, never a framed button. */
+.qbd-homef-task-cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	flex: 0 0 auto;
+	color: color-mix(in srgb, var(--qbd-state-progress) 65%, #ffffff);
+	font-weight: 650;
+}
+
+.qbd-homef-task-cta-chev svg,
+.qbd-homef-task-chev svg { width: 15px; height: 15px; }
+.qbd-homef-task-chev { color: var(--text-muted); }
+
+.qbd-root .qbd-homef-more {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	width: 100%;
+	height: auto;
+	padding: 10px 0 6px;
+	border: none;
+	border-top: 1px solid var(--qbd-surface-edge);
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.qbd-root .qbd-homef-more:hover { color: var(--text-normal); }
+.qbd-homef-more-chev svg { width: 14px; height: 14px; }
+
+/* ── The side column ── */
+.qbd-homes {
+	position: sticky;
+	top: 0;
+	padding: 14px 16px 4px;
+}
+
+.qbd-homes-week-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--text-normal);
+	font-size: 14px;
+	font-weight: 650;
+}
+
+.qbd-root .qbd-homes-arrow {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: none;
+	border-radius: 8px;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.qbd-root .qbd-homes-arrow:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.qbd-homes-arrow svg { width: 16px; height: 16px; }
+
+.qbd-homes-week {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+	margin: 12px 0 10px;
+}
+
+.qbd-homes-day {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 0 4px;
+	border-radius: 10px;
+}
+
+.qbd-homes-day-letter {
+	color: var(--text-muted);
 	font-size: 12px;
+	font-weight: 650;
+}
+
+.qbd-homes-day-num {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	color: var(--text-normal);
+	font-size: 12.5px;
+	font-weight: 600;
 	font-variant-numeric: tabular-nums;
 }
 
-.qbd-review-deferred {
-	margin: 6px 0 0;
-	padding: 0 10px;
-	color: var(--text-muted);
-	font-size: 12px;
+/* A past day's outcome tints its number — no ring, no checkbox look. */
+.qbd-homes-day--done .qbd-homes-day-num {
+	background: color-mix(in srgb, var(--qbd-state-done) 22%, transparent);
+	color: var(--qbd-state-done);
 }
+
+.qbd-homes-day--missed .qbd-homes-day-num {
+	background: color-mix(in srgb, #ff453a 20%, transparent);
+	color: #ff6961;
+}
+
+.qbd-homes-day--none .qbd-homes-day-num {
+	color: var(--text-muted);
+}
+
+.qbd-homes-day.is-today {
+	background: color-mix(in srgb, var(--qbd-state-progress) 16%, transparent);
+}
+
+.qbd-homes-day.is-today .qbd-homes-day-letter,
+.qbd-homes-day.is-today .qbd-homes-day-num {
+	color: color-mix(in srgb, var(--qbd-state-progress) 65%, #ffffff);
+}
+
+.qbd-homes-day-exam {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: #bf5af2;
+}
+
+.qbd-homes-day-exam.is-empty { background: transparent; }
+
+.qbd-homes-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 11px 0;
+	border-top: 1px solid var(--qbd-surface-edge);
+	color: var(--text-normal);
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.qbd-homes-row-icon { color: var(--text-muted); margin-top: 1px; }
+.qbd-homes-row-icon svg { width: 16px; height: 16px; }
+.qbd-homes-row-text { min-width: 0; }
+.qbd-homes-row-text strong { font-weight: 650; }
+
+.qbd-homes-muted {
+	color: var(--text-muted);
+	font-size: 12.5px;
+}
+
+.qbd-root .qbd-homes-link {
+	display: inline;
+	height: auto;
+	margin-top: 2px;
+	padding: 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	color: color-mix(in srgb, var(--qbd-state-progress) 65%, #ffffff);
+	font: inherit;
+	font-size: 12.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+/* ── Nothing to do anywhere ── */
+.qbd-home-done {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 56px 16px;
+	text-align: center;
+}
+
+.qbd-home-done-icon { display: inline-flex; color: var(--qbd-state-done); }
+.qbd-home-done-icon svg { width: 36px; height: 36px; }
+
+.qbd-home-done-title {
+	margin: 6px 0 0;
+	color: var(--text-normal);
+	font-size: 17px;
+	font-weight: 650;
+}
+
+.qbd-home-done-hint {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+/* A narrow page: one column, the week ABOVE the folders. `.is-mobile`:
+   Obsidian's mobile emulation, where the viewport query does not fire
+   (dashboard-base.css stacks the grid itself). */
+@media (max-width: 900px) {
+	.qbd-home-layout { grid-template-columns: 1fr; }
+	.qbd-homes { order: -1; position: static; }
+}
+.is-mobile .qbd-homes { order: -1; position: static; }
 
 @media (max-width: 600px) {
 	.qbd-home-header {

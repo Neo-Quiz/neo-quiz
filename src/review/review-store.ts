@@ -2,8 +2,8 @@ import type { HostFs, HostPaths, HostRoot, HostWatcher } from "../host/types";
 import type { QuizIndexEntry } from "../dashboard/scanner";
 import { applyModuleOverrides, moduleForQuiz, type ModuleOverride } from "../dashboard/quiz-modules";
 import {
-	applyRenames, DEFAULT_PARAMS, planToday,
-	type LogLine, type Plan, type ReviewEvent, type ReviewGrade, type ScheduledItem, type SchedulerParams,
+	applyRenames, DEFAULT_PARAMS, planToday, dayOutcome as dayOutcomeOf,
+	type DayOutcome, type LogLine, type Plan, type ReviewEvent, type ReviewGrade, type ScheduledItem, type SchedulerParams,
 } from "../scheduler";
 import type { QuestionRole } from "../types/quiz";
 import { createLogFile, type LogFile } from "./log-file";
@@ -75,6 +75,9 @@ export interface ReviewStore {
 	    garde les siennes, en ajout seul, comme toujours. */
 	moved(from: string, to: string): Promise<void>;
 	plan(now: number): Plan;
+	/** How the day starting at `dayStart` (local midnight, ms) went: the
+	    home page week (spec 2026-09-29-home-page-design.md §3.2). */
+	dayOutcome(dayStart: number): DayOutcome;
 	keyOf(path: string, id: string): string;
 	destroy(): void;
 }
@@ -263,6 +266,20 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		});
 	}
 
+	function dayOutcome(dayStart: number): DayOutcome {
+		// The end of the day is the NEXT local midnight, never `+ 24 h`: a
+		// daylight saving change makes a day 23 or 25 hours long.
+		const d = new Date(dayStart);
+		const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+		return dayOutcomeOf({
+			dayStart, dayEnd,
+			items: deps.catalogue(),
+			events: toutesLesLignes(),
+			horizons: deps.horizons(),
+			params,
+		});
+	}
+
 	function destroy(): void {
 		if (detruit) return;
 		detruit = true;
@@ -271,7 +288,7 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		for (const { fichier } of journaux.values()) fichier.destroy();
 	}
 
-	return { load, record, renamed, moved, plan, keyOf: keyOfQuestion, destroy };
+	return { load, record, renamed, moved, plan, dayOutcome, keyOf: keyOfQuestion, destroy };
 }
 
 /** Construit les seules données que le noyau comprend. `moduleForQuiz` reste

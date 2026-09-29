@@ -182,6 +182,12 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # THE HOME PAGE: a folder's tasks in order (review, Learn, Test),
+      # mastered quizzes left out, folders by nearest exam then latest work,
+      # the week from Monday, local midnights across daylight saving.
+      - name: Home tasks
+        run: npm run check:home
+
       # LES CHANGEMENTS D'ÉCRAN pendant la transition de lancement d'un quiz :
       # un double clic ne lance rien deux fois, un retour cliqué pendant la
       # montée part à la fin au lieu d'être avalé, la fin ne se joue qu'une

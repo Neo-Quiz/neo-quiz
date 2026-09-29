@@ -181,10 +181,6 @@
 		padding: 16px 12px;
 	}
 
-	.qbd-home-stats {
-		grid-template-columns: 1fr !important;
-	}
-
 	.qbd-home-grid {
 		grid-template-columns: 1fr !important;
 	}
@@ -283,7 +279,7 @@
    Les media queries viewport (600/900/1200px) ne se déclenchent pas
    sous l'émulation Obsidian (viewport large) ; on empile via .is-mobile
    pour un rendu cohérent sur mobile réel ET en émulation. */
-.is-mobile .qbd-home-stats,
+.is-mobile .qbd-home-layout,
 .is-mobile .qbd-home-grid,
 .is-mobile .qbd-module-grid {
 	grid-template-columns: 1fr;

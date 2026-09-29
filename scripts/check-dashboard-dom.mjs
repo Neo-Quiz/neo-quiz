@@ -49,6 +49,10 @@ const LIBERES = [
 	"src/dashboard/module-card.ts",
 	"src/dashboard/nav.ts",
 	"src/dashboard/home.ts",
+	// The home page redesign (2026-09-29).
+	"src/dashboard/home-tasks.ts",
+	"src/dashboard/home-folders.ts",
+	"src/dashboard/home-week.ts",
 	"src/dashboard/quizzes.ts",
 	"src/dashboard/quizzes-render.ts",
 	"src/dashboard/stats-store.ts",

@@ -87,14 +87,6 @@
 		BlinkMacSystemFont, system-ui, "Segoe UI", "Google Sans Flex", Roboto,
 		"Inter Variable", "Inter", "Apple Color Emoji", "Segoe UI Emoji",
 		"Segoe UI Symbol", sans-serif;
-	/* LA TAILLE OPTIQUE DES GRANDS TEXTES. Segoe UI Variable se décline en
-	   trois dessins — Small sous 12 px, Text pour l'interface, Display à
-	   partir d'environ 24 px : Display resserre l'interlettrage et affine les
-	   pleins, ce que Text ne fait pas parce qu'il est dessiné pour rester
-	   lisible petit. Les grands TITRES du produit restent en Constantia (banc
-	   comparatif du 2026-07-16) ; cette variable sert aux grands textes
-	   d'INTERFACE, chiffres compris. */
-	--font-display: "Segoe UI Variable Display", var(--font-interface);
 	--font-monospace: ui-monospace, SFMono-Regular, "Cascadia Mono", "Roboto Mono",
 		"DejaVu Sans Mono", Menlo, Monaco, "Consolas",
 		"Source Code Pro", monospace;

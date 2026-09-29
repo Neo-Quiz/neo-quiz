@@ -23,3 +23,7 @@ export { deriveStates } from "./state";
 // ce fichier est le contrat que l'application PC héritera — elle n'expose
 // que ce qui sert (ruling préflight 1, 2026-09-02).
 export { planToday } from "./plan";
+// How a past day went (the home page week): replays `planToday` at the
+// start of the day.
+export { dayOutcome } from "./day-outcome";
+export type { DayOutcome, DayOutcomeInput } from "./day-outcome";

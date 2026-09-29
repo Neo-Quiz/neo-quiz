@@ -30,21 +30,35 @@ export const EN_DASHBOARD = {
 	"dashboard.nav.soon": "Coming soon",
 
 	/* ── Accueil ── */
-	"dashboard.home.subtitleResume": "Resume a quiz in progress, or generate a new one.",
-	"dashboard.home.subtitleStart": "Pick a quiz to review, or generate a new one.",
+	"dashboard.home.subtitle": "Here is what to focus on today.",
 	"dashboard.home.generate": "Generate a quiz",
-	"dashboard.home.statQuizzes": "Quizzes created",
-	"dashboard.home.statQuizzesSub": "in this vault",
-	"dashboard.home.statQuestions": "Total questions",
-	"dashboard.home.statQuestionsSub": "across all notes",
-	"dashboard.home.statMastered": "Mastered",
-	"dashboard.home.statMasteredSub": "score ≥ 80%",
-	"dashboard.home.todo": "To do",
-	"dashboard.home.seeAll": "See all",
-	// Affiché quand la grille de l'accueil est plafonnée : {count} = TOTAL de la
-	// section, pas le reste caché.
-	"dashboard.home.seeAllCount": "See all {count}",
-	"dashboard.home.completed": "Completed",
+	// A folder card (spec 2026-09-29-home-page-design.md §2).
+	"dashboard.home.openTasksOne": "{count} open task",
+	"dashboard.home.openTasksOther": "{count} open tasks",
+	"dashboard.home.success": "{pct}% success",
+	// {questions} is already counted and agreed ("12 questions").
+	"dashboard.home.taskReview": "Review {questions}",
+	// {mode}: the kind of the quiz ("Learn", "Test"…), {title}: its title.
+	"dashboard.home.taskQuiz": "{mode} · {title}",
+	"dashboard.home.ctaReview": "Review",
+	"dashboard.home.ctaStart": "Start",
+	"dashboard.home.seeTasks": "See the {count} tasks",
+	// {exam}: the exam's name, {when}: "in 5 days", "tomorrow"…
+	"dashboard.home.folderExam": "{exam} · {when}",
+	// The side column (§3).
+	"dashboard.home.weekPrev": "Previous week",
+	"dashboard.home.weekNext": "Next week",
+	"dashboard.home.dayDone": "Done",
+	"dashboard.home.dayMissed": "Missed",
+	"dashboard.home.dayNone": "Nothing due",
+	"dashboard.home.tasksLeftOne": "{count} task left today",
+	"dashboard.home.tasksLeftOther": "{count} tasks left today",
+	"dashboard.home.nextExamWhen": "{when} · {date}",
+	"dashboard.home.noExam": "No upcoming exam",
+	"dashboard.home.addExam": "Add an exam",
+	// Nothing to do in any folder.
+	"dashboard.home.allDone": "All caught up",
+	"dashboard.home.allDoneHint": "Nothing to review or learn today.",
 	"dashboard.home.resumeLabel": "Pick up where you left off",
 	"dashboard.home.resumeProgress": "{questions} · {pct}%",
 	"dashboard.home.resumeBtn": "Resume",
@@ -248,11 +262,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moduleIconAll": "All",
 	"dashboard.quizzes.moduleIconNoResult": "No icon found",
 	"dashboard.quizzes.moduleEditCustomColor": "Custom color",
-
-	/* ── À réviser aujourd'hui (ordonnanceur) ── */
-	"dashboard.review.title": "Due today",
-	"dashboard.review.deferredOne": "{count} more, held back for tomorrow",
-	"dashboard.review.deferredOther": "{count} more, held back for tomorrow",
 
 	/* ── Carte de quiz (état) ── */
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */

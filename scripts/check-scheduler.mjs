@@ -593,3 +593,54 @@ await withSrcModule(["src/scheduler/index.ts"], (S) => {
 
 	r.done();
 });
+
+await withSrcModule(["src/scheduler/index.ts"], (S) => {
+	const r = makeReporter("Scheduler — outcome of a past day");
+	const P = S.DEFAULT_PARAMS;
+	const D0 = 1_700_000_000_000;
+	const D1 = D0 + JOUR;
+	const rep = (q, at, grade = "correct") => ({ t: "answer", q, at, grade });
+	const items = (...qs) => qs.map(q => ({ q, module: "M", source: "s" }));
+	const jour = (over = {}) => ({ dayStart: D0, dayEnd: D1, horizons: {}, params: P, items: [], events: [], ...over });
+
+	r.check("nothing due: none", S.dayOutcome(jour()), "none");
+	r.check("every due question answered that day: done",
+		S.dayOutcome(jour({ items: items("a", "b"), events: [rep("a", D0 + HEURE), rep("b", D0 + 2 * HEURE)] })), "done");
+	r.check("one due question left: missed",
+		S.dayOutcome(jour({ items: items("a", "b"), events: [rep("a", D0 + HEURE)] })), "missed");
+	r.check("a wrong answer still answers the question: done",
+		S.dayOutcome(jour({ items: items("a"), events: [rep("a", D0 + HEURE, "wrong")] })), "done");
+	r.check("an answer after midnight counts for the next day: missed",
+		S.dayOutcome(jour({ items: items("a"), events: [rep("a", D1)] })), "missed");
+	r.check("an answer at the very start of the day counts for it: done",
+		S.dayOutcome(jour({ items: items("a"), events: [rep("a", D0)] })), "done");
+
+	// A question answered the day before, then due again: that answer does
+	// not validate the day.
+	const avant = { items: items("a"), events: [rep("a", D0 - 2 * JOUR, "wrong")] };
+	const dueAgain = S.planToday({ now: D0, dayStart: D0, horizons: {}, params: P, ...avant }).today.includes("a");
+	r.check("an answer the day before does not validate the day",
+		S.dayOutcome(jour(avant)), dueAgain ? "missed" : "none");
+	r.check("(the case above really has the question due again)", dueAgain, true);
+
+	// A note renamed AFTER the day keeps the answers given under its old name.
+	r.check("renamed after the day: the old name's answers count",
+		S.dayOutcome(jour({
+			items: [{ q: "b.md::q1", module: "M", source: "s" }],
+			events: [rep("a.md::q1", D0 + HEURE), { t: "rename", from: "a.md", to: "b.md", at: D1 + JOUR }],
+		})), "done");
+
+	// The day's budget bounds what was due: answering exactly the planned
+	// questions is enough, answering as many OTHER ones is not.
+	const dix = items("q0", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9");
+	const serre = { ...P, budgetJour: 12, partNeuf: 0.25 };
+	const prevus = S.planToday({ now: D0, dayStart: D0, horizons: {}, params: serre, items: dix, events: [] }).today;
+	const autres = dix.map(i => i.q).filter(q => !prevus.includes(q)).slice(0, prevus.length);
+	r.check("the budget bounds the day's plan", prevus.length, 3);
+	r.check("the planned questions answered: done",
+		S.dayOutcome(jour({ items: dix, params: serre, events: prevus.map((q, k) => rep(q, D0 + k * HEURE)) })), "done");
+	r.check("as many other questions answered: missed",
+		S.dayOutcome(jour({ items: dix, params: serre, events: autres.map((q, k) => rep(q, D0 + k * HEURE)) })), "missed");
+
+	r.done();
+});

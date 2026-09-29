@@ -41,6 +41,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The home page now shows what to work on today: one card per folder with its tasks (review the questions due, then the Learns, then the tests), sorted by the nearest exam, and on the right the week with the days done or missed, the tasks left today and the next exam. The global counters and the grid of quizzes are gone.
 - The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
 - Hovering an answer no longer turns its circle blue; the blue ring stays for keyboard focus only.
 - On a quiz page, the Learn or Practice mode is no longer shown in blue, nor the active side of the Learn | Practice switch: blue is kept for buttons.
