@@ -78,9 +78,6 @@ export interface ReviewStore {
 	/** How the day starting at `dayStart` (local midnight, ms) went: the
 	    home page week (spec 2026-09-29-home-page-design.md §3.2). */
 	dayOutcome(dayStart: number): DayOutcome;
-	/** The timestamp (epoch ms) of every answer in every log: the home
-	    page estimates study time from them (`dashboard/study-time.ts`). */
-	answerTimes(): number[];
 	keyOf(path: string, id: string): string;
 	destroy(): void;
 }
@@ -283,14 +280,6 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		});
 	}
 
-	function answerTimes(): number[] {
-		const out: number[] = [];
-		for (const { fichier } of journaux.values()) {
-			for (const l of fichier.lines()) if (l.t === "answer") out.push(l.at);
-		}
-		return out;
-	}
-
 	function destroy(): void {
 		if (detruit) return;
 		detruit = true;
@@ -299,7 +288,7 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		for (const { fichier } of journaux.values()) fichier.destroy();
 	}
 
-	return { load, record, renamed, moved, plan, dayOutcome, answerTimes, keyOf: keyOfQuestion, destroy };
+	return { load, record, renamed, moved, plan, dayOutcome, keyOf: keyOfQuestion, destroy };
 }
 
 /** Construit les seules données que le noyau comprend. `moduleForQuiz` reste

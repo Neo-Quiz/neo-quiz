@@ -1,6 +1,6 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
-import { currentLang, t } from "../i18n";
+import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
@@ -15,7 +15,6 @@ import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
 import { renderHomeSide, type HomeExam } from "./home-week";
-import { formatStudyTime, studyStats } from "./study-time";
 
 /* ══════════════════════════════════════════════════════════
    HOME VIEW — what to work on today (redesigned 2026-09-29, after the
@@ -119,8 +118,6 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		   tile's edge, it read as a smear rather than light. */
 		const page = ajouter(container, "div", "qbd-home-page");
 
-		renderStudyStats(page);
-
 		/* No header (2026-09-29): no title, no "Generate a quiz" — the page
 		   says what to do by itself, and "Create a new folder" closes it
 		   (below the folders). */
@@ -174,28 +171,6 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			ctx, folders, exams, todayStart, weekOffset,
 			moveWeek: (delta) => { weekOffset += delta; rerender(); },
 		});
-	}
-
-	/** The stats band at the top of the page (after StudySmarter's): total
-	    study time, the daily average and the best day, ESTIMATED from the
-	    answers' timestamps (`study-time.ts` says how). Hidden until a first
-	    answer, and under a host without a review log. */
-	function renderStudyStats(parent: HTMLElement): void {
-		const times = ctx.reviewStore?.answerTimes() ?? [];
-		const s = studyStats(times, Date.now());
-		if (!s) return;
-		const lang = currentLang();
-		const band = ajouter(parent, "div", "qbd-home-stats");
-		band.title = t("dashboard.home.statsHint");
-		for (const [ms, key] of [
-			[s.totalMs, "dashboard.home.statsTotal"],
-			[s.perDayMs, "dashboard.home.statsPerDay"],
-			[s.recordMs, "dashboard.home.statsRecord"],
-		] as const) {
-			const cell = ajouter(band, "div", "qbd-home-stat");
-			ajouter(cell, "div", "qbd-home-stat-value", formatStudyTime(ms, lang));
-			ajouter(cell, "div", "qbd-home-stat-label", t(key));
-		}
 	}
 
 	/* "Resume" card (redrawn 2026-09-29): the whole card is the button — no

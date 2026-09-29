@@ -61,10 +61,6 @@ export const EN_DASHBOARD = {
 	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Create a new folder",
 	"dashboard.home.resumeBtn": "Resume",
-	"dashboard.home.statsTotal": "Total",
-	"dashboard.home.statsPerDay": "Per day",
-	"dashboard.home.statsRecord": "Record",
-	"dashboard.home.statsHint": "Study time estimated from your answers: pauses of more than 5 minutes are not counted.",
 
 	/* ── Onboarding (premier usage, aucun quiz) ── */
 	"dashboard.onboarding.title": "Welcome to Neo Quiz",

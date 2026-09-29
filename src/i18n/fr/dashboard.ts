@@ -44,10 +44,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Créer un nouveau dossier",
 	"dashboard.home.resumeBtn": "Reprendre",
-	"dashboard.home.statsTotal": "Total",
-	"dashboard.home.statsPerDay": "Par jour",
-	"dashboard.home.statsRecord": "Record",
-	"dashboard.home.statsHint": "Temps d'étude estimé d'après vos réponses : les pauses de plus de 5 minutes ne comptent pas.",
 
 	/* ── Onboarding ── */
 	"dashboard.onboarding.title": "Bienvenue dans Neo Quiz",
