@@ -62,35 +62,15 @@ import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
 import { basculerMenuApp } from "./barre-titre";
 
-/** The rail's mark: two stacked cards with a mortarboard on the front one —
-    the app icon's motif, redrawn as a single-colour line glyph (32-unit
-    grid, stroked in `currentColor`) so it sits in the rail like its other
-    icons. Built node by node: no markup string reaches the DOM. */
-function marqueRail(): SVGSVGElement {
-	const NS = "http://www.w3.org/2000/svg";
-	const svg = document.createElementNS(NS, "svg");
-	svg.setAttribute("viewBox", "0 0 32 32");
-	svg.setAttribute("fill", "none");
-	svg.setAttribute("stroke", "currentColor");
-	svg.setAttribute("stroke-width", "2");
-	svg.setAttribute("stroke-linecap", "round");
-	svg.setAttribute("stroke-linejoin", "round");
-	svg.setAttribute("aria-hidden", "true");
-	for (const d of [
-		// The back card, peeking out above and to the right of the front one.
-		"M9 9V8a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4h-1",
-		// The front card.
-		"M4 13a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z",
-		// The mortarboard: its top, its band, its tassel.
-		"M13.5 13.5l6 3-6 3-6-3z",
-		"M10.5 18v2.6c0 .9 1.4 1.9 3 1.9s3-1 3-1.9V18",
-		"M19.5 16.5v3.5",
-	]) {
-		const path = document.createElementNS(NS, "path");
-		path.setAttribute("d", d);
-		svg.append(path);
-	}
-	return svg;
+/** The rail's mark (2026-09-29): a stack of cards with a mortarboard on the
+    front one, drawn as a PNG (`assets/logo-rail.png`) used as a CSS MASK
+    over `currentColor` (shell.css `.nq-rail-logo-mark`) — it takes the
+    rail's colour like its other icons, whatever the theme. */
+function marqueRail(): HTMLElement {
+	const mark = document.createElement("span");
+	mark.className = "nq-rail-logo-mark";
+	mark.setAttribute("aria-hidden", "true");
+	return mark;
 }
 import type { DerniereVue } from "./reprise";
 import type { SessionsApp } from "../review/sessions";

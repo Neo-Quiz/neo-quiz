@@ -1291,9 +1291,9 @@ body::after {
 	transform: scaleX(var(--nq-sheet-scale, 0.97));
 }
 
-/* THE MARK at the top of the rail (StudySmarter's layout). A line-drawn SVG
-   in the rail's text colour (dashboard-shell.ts `marqueRail`), no longer the
-   app's bitmap icon, which read as a pasted image. Since 2026-09-29 it OPENS
+/* THE MARK at the top of the rail (StudySmarter's layout). A single-colour
+   mark in the rail's text colour (dashboard-shell.ts `marqueRail`), no longer
+   the app's coloured bitmap icon, which read as a pasted image. Since 2026-09-29 it OPENS
    the application menu (in place of the title bar's chevron), so it behaves
    as a button: it brightens on hover, gives under the press, like the
    rail's entries, and stays bright while its menu is open. */
@@ -1314,7 +1314,16 @@ body::after {
 	cursor: pointer;
 	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
-.nq-rail-logo svg { width: 38px; height: 38px; }
+/* The mark itself: a PNG used as a mask, painted in the rail's text colour
+   (dashboard-shell.ts `marqueRail`). */
+.nq-rail-logo-mark {
+	display: block;
+	width: 38px;
+	height: 38px;
+	background: currentColor;
+	-webkit-mask: url("./logo-rail.png") center / contain no-repeat;
+	mask: url("./logo-rail.png") center / contain no-repeat;
+}
 .nq-rail-logo:hover, .nq-rail-logo:focus-visible { opacity: 1; transform: scale(1.04); }
 .nq-rail-logo[data-open] { opacity: 1; }
 .nq-rail-logo:active { transform: scale(0.96); }
