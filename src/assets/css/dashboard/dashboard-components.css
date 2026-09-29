@@ -939,7 +939,7 @@
    Brilliant) ; le REFLET balaie la face au premier quart d'un cycle de
    6,4 s, sur la courbe d'origine — déplacé en `transform` (même trajet que
    leur `left`, mesuré identique) pour rester fluide sur le compositeur. ── */
-.qbd-root .qbd-cta3d {
+:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d {
 	--qbd-cta3d-face: var(--quiz-primary);
 	--qbd-cta3d-edge: var(--quiz-primary-edge);
 	--qbd-cta3d-depth: 4px;
@@ -979,7 +979,7 @@
 .qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { opacity: 1; }
 .qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { --qbd-cta3d-face: #36353f; }
 .qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
-.qbd-root .qbd-cta3d:hover:not(:disabled) {
+:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d:hover:not(:disabled) {
 	background: none;
 	opacity: 0.85;
 }
@@ -1008,7 +1008,7 @@
 	transform: none;
 	box-shadow: none;
 }
-.qbd-root .qbd-cta3d:focus-visible {
+:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d:focus-visible {
 	outline: none;
 }
 .qbd-cta3d:focus-visible .qbd-cta3d-face {
@@ -1055,7 +1055,7 @@
 }
 .qbd-cta3d:disabled .qbd-cta3d-clip { display: none; }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-root .qbd-cta3d,
+	:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d,
 	.qbd-cta3d-face { transition: none; }
 	.qbd-cta3d-clip { display: none; }
 }

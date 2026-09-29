@@ -1,27 +1,35 @@
 /* =========================================================
    THE "SET UP YOUR TEST" MODAL (engine/test-setup-modal.ts, 2026-09-29)
 
-   Centred like Quizlet's, and sober: the quiz title small and muted, a
-   large heading, rows with the label on the left and a switch on the right,
-   one thin separator, and the primary button at the bottom right. Rows are
-   NOT tiles (no fill, no border): text and controls on the modal's own
-   surface. The panel itself (surface, border, radius, shadow, entry
-   animation) is the app's shared modal (`apps/windows/src/assets/modal.css`).
+   Sober and airy, in the app's language: a header (quiz title, large
+   heading, a pill with the question count, and a small illustration of two
+   stacked sheets), Exam mode as ONE soft tinted card (the rule that drives
+   the two rows below it), a thin separator, then the individual rows, each
+   with a Lucide icon in a tinted square and a switch on the right. The
+   duration slides open under Time limit; the primary button is the app's 3D
+   one (`.qbd-cta3d`, poserBouton3d). The panel itself (surface, border,
+   radius, shadow, entry animation) is the app's shared modal
+   (`apps/windows/src/assets/modal.css`).
 
    The panel is portalled to <body>, outside `.qbd-root`: every selector
-   here is a plain class, and every variable is a root one.
-
-   The switches follow the same drawing as the editor's (`.qb-answer-switch`):
-   a rounded track and a white thumb, in the app's blue when on.
-   Lucide only, no uppercase labels.
+   here is a plain class, every variable is a root one, and the 3D button's
+   `.qbd-root .qbd-cta3d` rules name `.qbd-setup-modal` too
+   (dashboard-components.css). Lucide only, no uppercase labels.
    ========================================================= */
 
 .qbd-setup-modal {
 	width: 460px;
-	padding: 28px 28px 24px;
+	padding: 32px 32px 26px;
 }
 
-.qbd-setup-head { margin-right: 28px; }
+/* ── Header ── */
+.qbd-setup-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+.qbd-setup-headtext { min-width: 0; flex: 1; }
 .qbd-setup-quiz {
 	margin: 0 0 6px;
 	font-size: 13px;
@@ -39,27 +47,78 @@
 	color: var(--text-normal);
 }
 .qbd-setup-count {
-	margin: 6px 0 0;
-	font-size: 13px;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 12px 0 0;
+	padding: 4px 11px 4px 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	font-size: 12.5px;
+	font-weight: 500;
 	color: var(--text-muted);
 }
+.qbd-setup-count-ico { display: inline-flex; }
+.qbd-setup-count-ico svg { width: 14px; height: 14px; }
 
+/* The illustration: kept clear of the modal's close cross (top right). */
+.qbd-setup-art {
+	flex-shrink: 0;
+	width: 64px;
+	height: 64px;
+	margin-right: 8px;
+	filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent));
+}
+.qbd-setup-art-back { fill: color-mix(in srgb, var(--quiz-primary) 38%, transparent); }
+.qbd-setup-art-front {
+	fill: var(--quiz-primary);
+	stroke: rgb(255 255 255 / 0.2);
+	stroke-width: 1;
+}
+.qbd-setup-art-line { fill: #fff; }
+.qbd-setup-art-line.is-soft { fill: rgb(255 255 255 / 0.55); }
+
+/* ── Rows ── */
+.qbd-setup-exam {
+	margin-top: 22px;
+	padding: 10px 16px 12px;
+	border-radius: 16px;
+	background: color-mix(in srgb, var(--quiz-primary) 9%, transparent);
+}
+.qbd-setup-sep {
+	height: 1px;
+	margin: 16px 0 6px;
+	background: var(--background-modifier-border);
+}
 .qbd-setup-rows {
 	display: flex;
 	flex-direction: column;
-	margin-top: 20px;
 }
 .qbd-setup-row {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	min-height: 48px;
+	gap: 12px;
+	min-height: 52px;
 	padding: 8px 0;
 	cursor: pointer;
 }
+.qbd-setup-exam .qbd-setup-row { padding: 4px 0; }
+.qbd-setup-ico {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--quiz-primary) 16%, transparent);
+	color: color-mix(in srgb, var(--quiz-primary) 70%, #fff);
+}
+.qbd-setup-exam .qbd-setup-ico { background: color-mix(in srgb, var(--quiz-primary) 24%, transparent); }
+.qbd-setup-ico svg { width: 18px; height: 18px; }
 .qbd-setup-text {
 	display: flex;
+	flex: 1;
 	flex-direction: column;
 	gap: 2px;
 	min-width: 0;
@@ -76,24 +135,23 @@
 .qbd-setup-side {
 	display: flex;
 	align-items: center;
-	gap: 10px;
 	flex-shrink: 0;
 }
 
-/* ── The switch ── */
+/* ── The switch: 40x22 track, 16px knob with a soft shadow ── */
 .qbd-setup-switch {
 	appearance: none;
 	position: relative;
 	flex-shrink: 0;
-	width: 42px;
-	height: 24px;
+	width: 40px;
+	height: 22px;
 	margin: 0;
 	padding: 0;
 	border: 0;
 	border-radius: 999px;
 	background: color-mix(in srgb, var(--text-normal) 22%, transparent);
 	cursor: pointer;
-	transition: background-color 0.18s ease;
+	transition: background-color 150ms ease;
 }
 .qbd-setup-switch[aria-checked="true"] { background: var(--quiz-primary); }
 .qbd-setup-switch:focus-visible {
@@ -104,65 +162,134 @@
 	position: absolute;
 	top: 3px;
 	left: 3px;
-	width: 18px;
-	height: 18px;
+	width: 16px;
+	height: 16px;
 	border-radius: 50%;
 	background: #fff;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-	transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+	transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .qbd-setup-switch[aria-checked="true"] .qbd-setup-switch-thumb { transform: translateX(18px); }
 
-/* ── Keep exam mode: a native checkbox under the Exam mode row, dimmed and
-   inert while Exam mode is off ── */
+/* ── Keep exam mode: under the Exam mode row, indented to its label. The real
+   checkbox stays in the tab order, invisible, on top of a drawn box; while
+   Exam mode is off it is disabled and the whole line is dimmed ── */
 .qbd-setup-keep {
+	position: relative;
 	display: flex;
 	align-items: center;
 	gap: 10px;
 	width: fit-content;
-	margin: -4px 0 8px;
+	margin: 2px 0 0 48px;
 	font-size: 13.5px;
 	color: var(--text-muted);
 	cursor: pointer;
 }
 .qbd-setup-check {
-	width: 16px;
-	height: 16px;
-	margin: 0;
-	accent-color: var(--quiz-primary);
+	appearance: none;
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: 18px;
+	height: 18px;
+	margin: -9px 0 0;
+	padding: 0;
+	opacity: 0;
 	cursor: inherit;
 }
-.qbd-setup-keep:has(.qbd-setup-check:disabled) {
-	opacity: 0.45;
-	cursor: default;
+.qbd-setup-box {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text-normal) 32%, transparent);
+	color: #fff;
+	transition: background-color 150ms ease, box-shadow 150ms ease;
 }
-.qbd-setup-check:focus-visible {
+.qbd-setup-box svg {
+	width: 12px;
+	height: 12px;
+	stroke-width: 3;
+	opacity: 0;
+	transform: scale(0.6);
+	transition: opacity 150ms ease, transform 150ms ease;
+}
+.qbd-setup-check:checked + .qbd-setup-box {
+	background: var(--quiz-primary);
+	box-shadow: none;
+}
+.qbd-setup-check:checked + .qbd-setup-box svg {
+	opacity: 1;
+	transform: none;
+}
+.qbd-setup-check:focus-visible + .qbd-setup-box {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 2px;
 }
+.qbd-setup-keep:has(.qbd-setup-check:disabled) {
+	opacity: 0.4;
+	cursor: default;
+}
 
-/* ── Total duration: the shortcuts as segments (the app's segmented style),
-   the minutes as a field ── */
-.qbd-setup-duration { cursor: default; }
-.qbd-setup-duration[hidden] { display: none; }
-.qbd-setup-duration .qbd-setup-side { flex-wrap: wrap; justify-content: flex-end; }
+/* ── Total duration: slides open under Time limit (0fr -> 1fr grid row, so no
+   height is measured), label on ONE line, then the segments and the minutes
+   field on one line, wrapping cleanly when the window is narrow. `visibility`
+   keeps the closed controls out of the tab order once the slide is done. ── */
+.qbd-setup-duration {
+	display: grid;
+	grid-template-rows: 0fr;
+	opacity: 0;
+	visibility: hidden;
+	transition: grid-template-rows 180ms ease, opacity 180ms ease, visibility 0s linear 180ms;
+}
+.qbd-setup-duration.is-open {
+	grid-template-rows: 1fr;
+	opacity: 1;
+	visibility: visible;
+	transition: grid-template-rows 180ms ease, opacity 180ms ease, visibility 0s;
+}
+.qbd-setup-duration-clip {
+	min-height: 0;
+	overflow: hidden;
+}
+.qbd-setup-duration-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 2px 3px 12px;
+}
+.qbd-setup-duration .qbd-setup-label {
+	font-size: 13px;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+.qbd-setup-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
 .qbd-setup-segments {
 	display: inline-flex;
 	gap: 2px;
-	padding: 2px;
-	border-radius: 8px;
+	padding: 3px;
+	border-radius: 11px;
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 }
 .qbd-setup-segment {
 	appearance: none;
 	margin: 0;
-	padding: 4px 10px;
+	padding: 6px 11px;
 	border: 0;
-	border-radius: 6px;
+	border-radius: 8px;
 	background: none;
 	color: var(--text-muted);
 	font: inherit;
-	font-size: 12.5px;
+	font-size: 13px;
 	font-weight: 500;
 	line-height: 1.3;
 	white-space: nowrap;
@@ -171,27 +298,33 @@
 }
 .qbd-setup-segment:hover { background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal); }
 .qbd-setup-segment[aria-pressed="true"] {
-	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
-	color: var(--text-normal);
+	background: var(--quiz-primary);
+	color: #fff;
 	font-weight: 600;
 }
 .qbd-setup-segment:focus-visible {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 1px;
 }
+.qbd-setup-fieldbox {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}
 .qbd-setup-field {
-	width: 62px;
-	height: 30px;
+	box-sizing: border-box;
+	width: 92px;
+	height: 38px;
 	margin: 0;
-	padding: 0 8px;
+	padding: 0 40px 0 12px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
+	border-radius: 11px;
 	background: var(--background-modifier-form-field);
 	color: var(--text-normal);
 	font: inherit;
-	font-size: 13.5px;
+	font-size: 14px;
 	font-variant-numeric: tabular-nums;
-	text-align: center;
+	text-align: right;
 	outline: none;
 	transition: border-color 120ms;
 }
@@ -203,48 +336,29 @@
 	margin: 0;
 }
 .qbd-setup-unit {
+	position: absolute;
+	right: 12px;
 	font-size: 13px;
 	color: var(--text-muted);
+	pointer-events: none;
 }
 
-/* ── The footer: a thin separator, the primary button at the right, in the
-   app's blue, standing 4px above its edge like the other 3D buttons ── */
+/* ── The footer: the app's 3D button, at the right. Its rules live in
+   dashboard-components.css; only the spacing is set here. ── */
 .qbd-setup-foot {
 	display: flex;
 	justify-content: flex-end;
-	margin-top: 16px;
-	padding-top: 20px;
-	border-top: 1px solid var(--background-modifier-border);
+	margin-top: 18px;
 }
-.qbd-setup-start {
-	appearance: none;
-	height: 44px;
-	margin: 0 0 4px;
-	padding: 0 26px;
-	border: 0;
-	border-radius: 22px;
-	background: var(--quiz-primary);
-	color: #fff;
-	font: inherit;
-	font-size: 15px;
-	font-weight: 600;
-	box-shadow: 0 4px 0 0 var(--quiz-primary-edge);
-	cursor: pointer;
-	transition: background-color 0.15s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
-}
-.qbd-setup-start:hover { background: color-mix(in srgb, var(--quiz-primary) 90%, #fff); }
-.qbd-setup-start:active {
-	transform: translateY(4px);
-	box-shadow: 0 0 0 0 var(--quiz-primary-edge);
-}
-.qbd-setup-start:focus-visible {
-	outline: 2px solid var(--text-normal);
-	outline-offset: 3px;
-}
+.qbd-setup-modal .qbd-setup-foot .qbd-cta3d-face { padding: 12px 26px; }
+.qbd-setup-foot .qbd-btn-icon svg { width: 15px; height: 15px; }
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-setup-switch,
 	.qbd-setup-switch-thumb,
-	.qbd-setup-segment,
-	.qbd-setup-start { transition: none; }
+	.qbd-setup-box,
+	.qbd-setup-box svg,
+	.qbd-setup-duration,
+	.qbd-setup-duration.is-open,
+	.qbd-setup-segment { transition: none; }
 }

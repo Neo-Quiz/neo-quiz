@@ -1,5 +1,6 @@
 import { ajouter } from "../dom";
-import { requireHost } from "../host/current";
+import { poserBouton3d } from "../dashboard/cta3d";
+import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
 import { fallbackExamDuration } from "../quiz-utils";
 import { isExamSetup, withExamMode, withHints, withTimeLimit, type TestSetup } from "../test-setup";
@@ -54,6 +55,28 @@ export const DURATION_SHORTCUTS = [30, 60, 90, 120] as const;
 
 let counter = 0;
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svgEl(parent: Element, tag: string, attrs: Record<string, string>): SVGElement {
+	const node = document.createElementNS(SVG_NS, tag);
+	for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+	parent.appendChild(node);
+	return node;
+}
+
+/** The header's illustration: two stacked, slightly rotated sheets, the front
+    one carrying three lines of text. Pure decoration (`aria-hidden`), drawn
+    inline so that no asset ships; the colours come from the CSS classes, in the
+    app's blue. */
+function drawSheets(parent: HTMLElement): void {
+	const svg = svgEl(parent, "svg", { viewBox: "0 0 64 64", width: "64", height: "64", class: "qbd-setup-art", "aria-hidden": "true", focusable: "false" });
+	svgEl(svg, "rect", { x: "22", y: "6", width: "34", height: "44", rx: "7", transform: "rotate(10 39 28)", class: "qbd-setup-art-back" });
+	const front = svgEl(svg, "g", { transform: "rotate(-8 27 36)" });
+	svgEl(front, "rect", { x: "10", y: "14", width: "34", height: "44", rx: "7", class: "qbd-setup-art-front" });
+	svgEl(front, "rect", { x: "17", y: "25", width: "20", height: "4", rx: "2", class: "qbd-setup-art-line" });
+	svgEl(front, "rect", { x: "17", y: "35", width: "20", height: "3", rx: "1.5", class: "qbd-setup-art-line is-soft" });
+	svgEl(front, "rect", { x: "17", y: "43", width: "13", height: "3", rx: "1.5", class: "qbd-setup-art-line is-soft" });
+}
+
 /**
  * Opens the modal. Resolves with the player's choice, or `null` when the
  * modal is closed without starting (Escape, cross, backdrop, or `signal`
@@ -86,16 +109,25 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 				m.panelEl.setAttribute("aria-labelledby", `${id}-title`);
 				const c = m.contentEl;
 
+				const ui = currentHost().ui;
+				/** A Lucide icon in a tinted rounded square. */
+				const iconBox = (parent: HTMLElement, name: string): void => {
+					ui.setIcon(ajouter(parent, "span", "qbd-setup-ico"), name);
+				};
+
 				const head = ajouter(c, "div", "qbd-setup-head");
-				ajouter(head, "p", "qbd-setup-quiz", opts.title);
-				ajouter(head, "h2", "qbd-setup-title", t("engine.testSetup.title")).id = `${id}-title`;
-				ajouter(head, "p", "qbd-setup-count", t(n === 1 ? "engine.exam.questionCount.one" : "engine.exam.questionCount.other", { count: n }));
+				const headText = ajouter(head, "div", "qbd-setup-headtext");
+				ajouter(headText, "p", "qbd-setup-quiz", opts.title);
+				ajouter(headText, "h2", "qbd-setup-title", t("engine.testSetup.title")).id = `${id}-title`;
+				const count = ajouter(headText, "p", "qbd-setup-count");
+				ui.setIcon(ajouter(count, "span", "qbd-setup-count-ico"), "list-checks");
+				ajouter(count, "span", undefined, t(n === 1 ? "engine.exam.questionCount.one" : "engine.exam.questionCount.other", { count: n }));
+				drawSheets(head);
 
-				const rows = ajouter(c, "div", "qbd-setup-rows");
-
-				/** A row: the label (and a muted line under it) on the left, the control on the right. */
-				const row = (key: string, label: string, help?: string): { row: HTMLElement; side: HTMLElement } => {
-					const r = ajouter(rows, "div", "qbd-setup-row");
+				/** A row: an icon, the label (and a muted line under it), the control on the right. */
+				const row = (parent: HTMLElement, icon: string, key: string, label: string, help?: string): { row: HTMLElement; side: HTMLElement } => {
+					const r = ajouter(parent, "div", "qbd-setup-row");
+					iconBox(r, icon);
 					const text = ajouter(r, "div", "qbd-setup-text");
 					ajouter(text, "span", "qbd-setup-label", label).id = `${id}-${key}`;
 					if (help) ajouter(text, "span", "qbd-setup-help", help);
@@ -113,8 +145,9 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 					return sw;
 				};
 
-				// ── Exam mode, and under it Keep exam mode ──
-				const exam = row("exam", t("engine.testSetup.examMode"), t("engine.testSetup.examModeHelp"));
+				// ── Exam mode, and under it Keep exam mode: one tinted card ──
+				const examCard = ajouter(c, "div", "qbd-setup-exam");
+				const exam = row(examCard, "graduation-cap", "exam", t("engine.testSetup.examMode"), t("engine.testSetup.examModeHelp"));
 				const examSwitch = makeSwitch(exam.side, exam.row, "exam", (on) => {
 					// Turning Exam mode on brings back the last duration, not the fallback rule.
 					setup = withExamMode({ ...setup, timeLimitMinutes: setup.timeLimitMinutes ?? lastMinutes }, on, n);
@@ -123,32 +156,38 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 
 				let keepBox: HTMLInputElement | null = null;
 				if (opts.canKeep) {
-					const keepRow = ajouter(rows, "label", "qbd-setup-keep");
+					const keepRow = ajouter(examCard, "label", "qbd-setup-keep");
 					keepBox = ajouter(keepRow, "input", "qbd-setup-check");
 					keepBox.type = "checkbox";
+					ui.setIcon(ajouter(keepRow, "span", "qbd-setup-box"), "check");
 					ajouter(keepRow, "span", undefined, t("engine.testSetup.keepExam"));
 					keepBox.addEventListener("change", () => { keep = (keepBox as HTMLInputElement).checked; });
 				}
 
+				ajouter(c, "div", "qbd-setup-sep");
+				const rows = ajouter(c, "div", "qbd-setup-rows");
+
 				// ── Hints ──
-				const hints = row("hints", t("engine.testSetup.hints"));
+				const hints = row(rows, "lightbulb", "hints", t("engine.testSetup.hints"));
 				const hintsSwitch = makeSwitch(hints.side, hints.row, "hints", (on) => {
 					setup = withHints(setup, on);
 					sync();
 				});
 
 				// ── Time limit, and its total duration ──
-				const limit = row("limit", t("engine.testSetup.timeLimit"));
+				const limit = row(rows, "timer", "limit", t("engine.testSetup.timeLimit"));
 				const limitSwitch = makeSwitch(limit.side, limit.row, "limit", (on) => {
 					setup = withTimeLimit(setup, on ? lastMinutes : null, n);
 					if (setup.timeLimitMinutes !== null) lastMinutes = setup.timeLimitMinutes;
 					sync();
 				});
 
-				const durationRow = ajouter(rows, "div", "qbd-setup-row qbd-setup-duration");
-				ajouter(ajouter(durationRow, "div", "qbd-setup-text"), "span", "qbd-setup-label", t("engine.testSetup.duration")).id = `${id}-duration`;
-				const durationSide = ajouter(durationRow, "div", "qbd-setup-side");
-				const segments = ajouter(durationSide, "div", "qbd-setup-segments");
+				// The sub-row slides open under Time limit (grid rows 0fr -> 1fr, see the CSS).
+				const durationRow = ajouter(rows, "div", "qbd-setup-duration");
+				const durationBody = ajouter(ajouter(durationRow, "div", "qbd-setup-duration-clip"), "div", "qbd-setup-duration-body");
+				ajouter(durationBody, "span", "qbd-setup-label", t("engine.testSetup.duration")).id = `${id}-duration`;
+				const controls = ajouter(durationBody, "div", "qbd-setup-controls");
+				const segments = ajouter(controls, "div", "qbd-setup-segments");
 				segments.setAttribute("role", "group");
 				segments.setAttribute("aria-labelledby", `${id}-duration`);
 				const segmentButtons = DURATION_SHORTCUTS.map((minutes) => {
@@ -161,14 +200,15 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 					});
 					return { minutes, b };
 				});
-				const field = ajouter(durationSide, "input", "qbd-setup-field");
+				const fieldBox = ajouter(controls, "div", "qbd-setup-fieldbox");
+				const field = ajouter(fieldBox, "input", "qbd-setup-field");
 				field.type = "number";
 				field.min = "1";
 				field.max = "300";
 				field.step = "1";
 				field.inputMode = "numeric";
 				field.setAttribute("aria-labelledby", `${id}-duration`);
-				ajouter(durationSide, "span", "qbd-setup-unit", t("engine.testSetup.minutesUnit"));
+				ajouter(fieldBox, "span", "qbd-setup-unit", t("engine.testSetup.minutesUnit"));
 
 				/** The typed text as it stands: a whole number within [1, 300] is
 				    taken at once (the shortcuts follow); anything else waits for
@@ -209,16 +249,19 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 						keepBox.disabled = !isExam;
 						keepBox.checked = isExam && keep;
 					}
-					durationRow.hidden = setup.timeLimitMinutes === null;
+					durationRow.classList.toggle("is-open", setup.timeLimitMinutes !== null);
 					if (setup.timeLimitMinutes !== null && document.activeElement !== field) field.value = String(setup.timeLimitMinutes);
 					syncSegments();
 				}
 				sync();
 
-				// ── Footer: a thin separator, the primary button at the right ──
+				// ── Footer: the app's 3D primary button, at the right ──
 				const foot = ajouter(c, "div", "qbd-setup-foot");
-				const start = ajouter(foot, "button", "qbd-setup-start", t("engine.testSetup.start"));
+				const start = ajouter(foot, "button", "qbd-setup-start");
 				start.type = "button";
+				ui.setIcon(ajouter(start, "span", "qbd-btn-icon"), "play");
+				ajouter(start, "span", undefined, t("engine.testSetup.start"));
+				poserBouton3d(start);
 				const begin = (): void => {
 					commit();
 					answer({ setup: { ...setup }, keep });
