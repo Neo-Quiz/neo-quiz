@@ -88,3 +88,75 @@
 	-webkit-backdrop-filter: none;
 	backdrop-filter: none;
 }
+
+/* THE TEST CLOCK, REDRAWN (2026-09-29): no longer a track across the
+   panel above the beads — two horizontal lines stacked, the clock's and
+   the beads', competed for the eye. It is a pill at the top right, on the
+   line of the close cross and the title, as the mirror of the cross: a
+   ring that empties as time passes (`--quiz-exam-pct`, set by
+   engine/exam.ts), then the time in tabular digits. Amber from half the
+   time, red in the last fifth, a gentle pulse in the last minute (the
+   engine's classes). The plugin keeps its track (`pages/exam.css`). */
+.qbd-qz {
+	position: relative;
+}
+
+.qbd-qz .quiz-exam-timer {
+	position: absolute;
+	/* Centred on the cross: its centre sits 36 px below the panel's top
+	   (dashboard-detail.css, `.qbd-qz-header`), the pill is 34 px tall. */
+	top: 19px;
+	right: 36px;
+	z-index: 5;
+	width: auto;
+	margin: 0;
+	padding: 0;
+}
+
+.qbd-qz .quiz-exam-timer-bar {
+	display: none;
+}
+
+.qbd-qz .quiz-exam-timer-pill {
+	gap: 10px;
+	height: 34px;
+	box-sizing: border-box;
+	padding: 0 14px 0 8px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	background: color-mix(in srgb, var(--text-normal) 5%, transparent);
+	color: var(--text-normal);
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+}
+
+/* The ring: a conic fill cut to a 3 px band. */
+.qbd-qz .quiz-exam-timer-icon {
+	--ring: var(--quiz-primary);
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: conic-gradient(var(--ring) calc(var(--quiz-exam-pct, 100) * 1%), color-mix(in srgb, var(--text-normal) 12%, transparent) 0);
+	-webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+	mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+
+.qbd-qz .quiz-exam-timer-icon svg {
+	display: none;
+}
+
+.qbd-qz .quiz-exam-timer-warning .quiz-exam-timer-icon { --ring: var(--quiz-hint); }
+.qbd-qz .quiz-exam-timer-danger .quiz-exam-timer-icon { --ring: var(--quiz-danger); }
+
+.qbd-qz .quiz-exam-timer-warning .quiz-exam-timer-pill {
+	color: var(--quiz-hint);
+	border-color: color-mix(in srgb, var(--quiz-hint) 35%, transparent);
+	background: color-mix(in srgb, var(--quiz-hint) 10%, transparent);
+}
+
+.qbd-qz .quiz-exam-timer-danger .quiz-exam-timer-pill {
+	color: var(--quiz-danger);
+	border-color: color-mix(in srgb, var(--quiz-danger) 40%, transparent);
+	background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
+}

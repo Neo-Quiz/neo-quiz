@@ -85,7 +85,9 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 		const pct = Math.max(0, Math.min(100, (ctx.examTimeRemaining / ctx.examDurationMs) * 100));
 
-		return `<div class="quiz-exam-timer" data-exam-timer="1">
+		/* `--quiz-exam-pct`: the share of time left, for a host that draws the
+		   clock as a ring (the app, quiz-bars.css) rather than a track. */
+		return `<div class="quiz-exam-timer" data-exam-timer="1" style="--quiz-exam-pct: ${pct}">
 			<div class="quiz-exam-timer-bar">
 				<div class="quiz-exam-timer-progress" data-exam-progress="1" style="width: ${pct}%"> </div>
 			</div>
@@ -191,8 +193,9 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 		textEl.textContent = formatExamClock(ctx.examTimeRemaining);
 
-		const timerContainer = ctx.container?.querySelector('[data-exam-timer="1"]');
+		const timerContainer = ctx.container?.querySelector<HTMLElement>('[data-exam-timer="1"]');
 		if (timerContainer) {
+			timerContainer.style.setProperty("--quiz-exam-pct", String(pct));
 			timerContainer.classList.remove("quiz-exam-timer-warning", "quiz-exam-timer-danger", "quiz-exam-timer-critical");
 			if (pct <= 20) timerContainer.classList.add("quiz-exam-timer-danger");
 			else if (pct <= 50) timerContainer.classList.add("quiz-exam-timer-warning");

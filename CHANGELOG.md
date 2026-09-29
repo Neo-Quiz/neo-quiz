@@ -165,6 +165,7 @@ release notes.
 - A course card's play button takes the colour of its folder, lightened so that a dark folder colour stays readable.
 - Settings are reorganised in two panes: General, Folders, AI, Appearance and Languages on the left, one category at a time on the right, each setting a row with its name and help on the left and its control on the right; on/off settings are switches.
 - In a fill-in-the-blanks, what you type starts at the left of the blank instead of its middle, and once corrected a right blank shows only its answer in green, without a box around it; a wrong one keeps its red box and the right answer next to it.
+- A timed test's clock is a pill at the top right, on the line of the close cross and the title: a ring that empties as time passes and the time left, amber from half the time, red in the last fifth, instead of a track across the quiz above the question dots.
 
 ### Fixed
 - "Check for updates…" in the application menu no longer lands on Settings with nothing to say: it checks and tells the outcome in a notice (up to date, a version downloading or ready to install, or why the check failed).
@@ -208,7 +209,6 @@ release notes.
 - In a Learn, a recall question whose choices are the question itself ("Which of these statements are true?", or any multiple-choice recall) keeps its choices instead of turning into a free answer whose statements had disappeared; generated single-choice recalls are now written to be answerable without their options.
 - A Learn reading that compares three things or more in a table uses the card's full width, instead of squeezing the table into the reading column one word per line.
 - Generate no longer takes an attached .html file for a web development course when the file's name, the destination folder or the request name another subject: a Python revision sheet saved as a web page sent to a Python folder is Python.
-- A timed test's clock no longer sits on a dark rectangular band across the quiz: in the app it is just its track and its time.
 
 
 ## [1.19.0] - 2026-09-23
