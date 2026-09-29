@@ -223,6 +223,11 @@ export interface ClozeQuestion extends QuestionBase {
 	cloze: string;
 	/** Comparaison sensible à la casse (défaut : non, comme les réponses libres). */
 	caseSensitive?: boolean;
+	/** The most characters each blank takes, one number per blank in reading
+	    order, chosen by the generator (2026-09-29). Missing, invalid or
+	    shorter than the blank's longest accepted answer: the engine's rule
+	    applies instead (engine/cloze.ts, `blankMaxLength`). */
+	blankMaxLengths?: number[];
 }
 
 /**

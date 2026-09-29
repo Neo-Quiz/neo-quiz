@@ -44,11 +44,13 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeGeneration, readonly string[]>>
 		// Code execution (2026-09-28, task 7 of the C/C++ plan): the field that
 		// unlocks ▶ on the question's program once its last hint level is
 		// revealed.
-		"runInLastHint"],
+		"runInLastHint",
+		// A character limit per blank of a fill-in-the-blanks (2026-09-29).
+		'"blankMaxLengths"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"',
 		// Glossary (batch D, 2026-09-27): replaces "No configuration object".
 		'"glossary"', '"term"', '"definition"',
-		"runInLastHint"],
+		"runInLastHint", '"blankMaxLengths"'],
 };
 
 /** What no prompt may mention any more: the retired modes and fields, and the

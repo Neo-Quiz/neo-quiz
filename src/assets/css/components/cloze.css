@@ -50,7 +50,9 @@
   font-size: 0.95em;
   font-weight: 500;
   line-height: 1.5;
-  text-align: center;
+  /* Typed text starts at the left edge, as in any field (2026-09-29): centred,
+     it began in the middle of the blank and moved at each key. */
+  text-align: start;
   transition: border-color var(--quiz-dur-fast) var(--quiz-ease-smooth),
               background var(--quiz-dur-fast) var(--quiz-ease-smooth),
               color var(--quiz-dur-fast) var(--quiz-ease-smooth);
@@ -192,4 +194,26 @@
   width: 9ch;
   font-size: 16px;
   padding: 2px 6px;
+}
+
+/* ── A RIGHT blank, once corrected (2026-09-29): only its text, in green ──
+   The box around a right answer (green outline, tinted fill) said the same
+   thing twice, and a line of code full of framed answers read as a form,
+   not as a program. The field shrinks to its text (`field-sizing`) and
+   loses its frame; a WRONG blank keeps its red box, struck through, with
+   the right answer next to it. Written after the code rules, which set the
+   blank's width with the same weight. */
+.quiz-cloze .quiz-cloze-input.correct,
+.quiz-cloze .quiz-cloze-code .quiz-cloze-input.correct,
+.quiz-cloze .quiz-md-code .quiz-cloze-input.correct{
+  field-sizing: content;
+  width: auto;
+  min-width: 1ch;
+  padding-left: 0;
+  padding-right: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--quiz-success);
+  -webkit-text-fill-color: var(--quiz-success);
+  font-weight: 600;
 }

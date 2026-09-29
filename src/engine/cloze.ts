@@ -228,6 +228,20 @@ export function restoreCodeSlots(html: string): string {
 	return html.replace(SLOT_IDENT_RE, (_m, n: string) => SLOT_OPEN + n + SLOT_CLOSE);
 }
 
+/**
+ * The character limit of blank `index`: the one the generator chose for it
+ * (`blankMaxLengths`, 2026-09-29), never below its longest accepted answer —
+ * a limit that cut the right answer short would make the blank impossible —
+ * nor above 500; otherwise `fallback`.
+ */
+export function blankMaxLength(q: { blankMaxLengths?: unknown }, index: number, blanks: ClozeBlank[], fallback: number): number {
+	const list = Array.isArray(q.blankMaxLengths) ? q.blankMaxLengths : [];
+	const chosen = Number(list[index]);
+	if (!Number.isInteger(chosen) || chosen < 1) return fallback;
+	const longest = Math.max(0, ...(blanks[index]?.answers ?? []).map(a => a.length));
+	return Math.min(500, Math.max(chosen, longest));
+}
+
 /** Remplace les jetons du HTML rendu par ce que `slot` produit pour chacun. */
 export function fillSlots(html: string, slot: (index: number) => string): string {
 	return html.replace(SLOT_RE, (_m, n: string) => slot(Number(n)));
@@ -264,10 +278,11 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 		const values: unknown[] = Array.isArray(sel) ? sel : [];
 		const locked = ctx.isRevealed(qi);
 		/* A CHARACTER LIMIT (2026-09-29): nothing stopped a blank from taking
-		   a whole paragraph. ONE limit for every blank of the question — the
-		   longest accepted answer plus some room, 24 at least — so that it
-		   never tells the length of a particular answer. */
-		const maxLength = Math.max(24, ...blanks.flatMap(b => b.answers.map(a => a.length + 8)));
+		   a whole paragraph. By default ONE limit for every blank of the
+		   question — the longest accepted answer plus some room, 24 at least
+		   — so that it never tells the length of a particular answer; a limit
+		   the generator chose for a blank wins (`blankMaxLength`). */
+		const defaultMax = Math.max(24, ...blanks.flatMap(b => b.answers.map(a => a.length + 8)));
 
 		// Le gabarit ENTIER passe par le rendu (markdown + images), trous
 		// marqués : une paire `…` ou **…** qui enjambe un trou reste une paire.
@@ -295,7 +310,7 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 			}
 
 			return `<span class="quiz-cloze-slot"><input class="${cls}" type="text" `
-				+ `data-cloze="${index}" value="${ctx.escapeHtmlAttr(value)}" maxlength="${maxLength}" `
+				+ `data-cloze="${index}" value="${ctx.escapeHtmlAttr(value)}" maxlength="${blankMaxLength(q, index, blanks, defaultMax)}" `
 				+ `autocomplete="off" autocapitalize="off" spellcheck="false" `
 				+ `aria-label="${ctx.escapeHtmlAttr(t("engine.cloze.blankAria", { n: index + 1 }))}"`
 				+ `${locked ? " disabled" : ""}>${expected}</span>`;

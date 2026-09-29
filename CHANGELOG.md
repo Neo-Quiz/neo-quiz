@@ -49,6 +49,7 @@ release notes.
 - Code blocks shown in a quiz carry the icon of their language at the top left, the one VS Code shows by default (about sixty languages recognized, from Python and C to SQL, YAML or Dockerfile), with its full name on hover, and are coloured for each of them.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 - Home opens on a band of light above its first card: a line of light that slowly breathes, with a highlight running along it (still when the system asks for reduced motion).
+- Each blank of a fill-in-the-blanks can have its own character limit (`blankMaxLengths`), chosen by the AI when it generates the quiz: a bit more than the answer, never its exact length. Without it, the blanks of a question keep one common limit.
 
 ### Changed
 - Home starts with its folder cards and calendar: Quick actions now creates or imports folders below the calendar, and Resume moves below the folder cards.
@@ -163,6 +164,7 @@ release notes.
 - The application menu lights one row at a time, the one under the pointer or reached with the arrows, and its Display submenu no longer has an Interface scale list: Ctrl + wheel still zooms.
 - A course card's play button takes the colour of its folder, lightened so that a dark folder colour stays readable.
 - Settings are reorganised in two panes: General, Folders, AI, Appearance and Languages on the left, one category at a time on the right, each setting a row with its name and help on the left and its control on the right; on/off settings are switches.
+- In a fill-in-the-blanks, what you type starts at the left of the blank instead of its middle, and once corrected a right blank shows only its answer in green, without a box around it; a wrong one keeps its red box and the right answer next to it.
 
 ### Fixed
 - "Check for updates…" in the application menu no longer lands on Settings with nothing to say: it checks and tells the outcome in a notice (up to date, a version downloading or ready to install, or why the check failed).
