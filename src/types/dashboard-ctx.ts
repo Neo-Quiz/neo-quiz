@@ -216,6 +216,16 @@ export interface DashboardShellCtx {
 	    L'application en teinte la lueur autour de son panneau central.
 	    Absente = pas d'ambiance, la page n'en dépend pas. */
 	ambiance?(accent: string | null): void;
+	/** The FOLDER SHEET (2026-09-29): an open folder rises as a sheet over
+	    the grid, which stays behind it. "Folders" hands the host its
+	    repaints: `open` repaints the page with the folder, `close` paints
+	    the grid into the target it is given. `sync` is called on every
+	    render with whether a folder is open. Absent = plain repaints. */
+	folderSheet?: {
+		open(paint: () => void): void;
+		close(paint: (target: HTMLElement) => void): void;
+		sync(inFolder: boolean): void;
+	};
 	/** OUVRE le menu « ⋯ » d'une carte de quiz sur `anchor` (le bouton « ⋯ »),
 	    appelée par la page avec SON propre `rerender` — le menu doit pouvoir
 	    repeindre la page qui l'affiche. Absente = pas de bouton « ⋯ », ce que

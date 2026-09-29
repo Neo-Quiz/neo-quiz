@@ -59,6 +59,7 @@ import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
+import { createFolderSheet } from "./folder-sheet";
 
 /** The public repository the rail's mark opens (its page carries the Star
     button). The organisation's path, never the pre-transfer one. */
@@ -374,6 +375,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	// nu n'a AUCUNE règle : le rail se serait retrouvé sans largeur ni fond.
 	const navEl = ajouter(layout, "div", "qbd-sidebar");
 	const contentEl = ajouter(layout, "div", "qbd-content");
+	/* An open folder is a sheet over the grid (`folder-sheet.ts`). */
+	const feuille = createFolderSheet(layout, contentEl);
 
 	/* Dernière vue effectivement PEINTE dans CE montage — jamais persistée
 	   au niveau du module, à l'inverse de `vueCourante` : le DOM est neuf à
@@ -442,6 +445,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite };
 		},
 		ambiance: (accent) => poserLueur(accent),
+		folderSheet: feuille,
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
@@ -714,6 +718,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	    d'`entering` est le même : vrai seulement si la vue diffère de la
 	    dernière peinte. */
 	function peindre(): void {
+		// Only an open folder stands on a sheet stack ("Folders" syncs it).
+		if (vueCourante !== "quizzes") feuille.drop();
 		contentEl.replaceChildren();
 		const entering = vueCourante !== dernierePeinte;
 		dernierePeinte = vueCourante;
@@ -951,6 +957,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		document.removeEventListener("mouseup", surBoutonSouris, true);
 		desabonner();
 		demonterMaj();
+		feuille.drop();
 		/* La page « Générer » aussi : une génération en vol, son écoute Échap
 		   sur le document, son sondage Ollama et les URL d'objet de ses images
 		   survivraient sinon à la coquille (même geste que l'`onClose` du

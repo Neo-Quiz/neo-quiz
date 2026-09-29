@@ -180,11 +180,17 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	}
 
 	function openModule(folder: string): void {
-		// Historique boutons souris : l'état quitté (grille ou autre dossier)
-		// doit rester restaurable (spec 2026-07-20-mouse-nav-history).
+		// Mouse button history: the state being left (grid or another
+		// folder) must stay restorable (spec 2026-07-20-mouse-nav-history).
 		ctx.recordNav();
+		const fromGrid = openModuleFolder === null;
 		openModuleFolder = folder;
-		if (containerRef) render(containerRef);
+		const container = containerRef;
+		if (!container) return;
+		/* From the grid, the folder rises as a sheet over it (the host's
+		   `folderSheet`); from another folder, a plain repaint. */
+		if (fromGrid && ctx.folderSheet) ctx.folderSheet.open(() => render(container));
+		else render(container);
 	}
 
 	/** Filtre de la GRILLE : exclut les quiz des DOSSIERS archivés (l'archivage
@@ -275,14 +281,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		containerRef = container;
 		container.replaceChildren();
 
-		// Transition d'entrée (spec 2026-07-20) : classe posée SEULEMENT quand la
-		// vue change — mécanisme partagé avec l'accueil (view-enter.ts).
+		// Entry transition (spec 2026-07-20): the class is set ONLY when the
+		// view changes — mechanism shared with the home page (view-enter.ts).
 		if (openModuleFolder !== ongletPour) { ongletDossier = "contenu"; ongletPour = openModuleFolder; }
 		vuesDossier = null;
 		const viewKey = openModuleFolder ?? "root";
 		const entering = viewKey !== lastPaintedView;
 		lastPaintedView = viewKey;
 		markViewEnter(container, entering, "qbd-quizzes-enter");
+		// A folder stands on its sheet stack, the grid does not.
+		ctx.folderSheet?.sync(openModuleFolder !== null);
 
 		const quizzes: QuizIndexEntry[] = ctx.scanner ? ctx.scanner.getQuizzes() : [];
 		const stats: Record<string, QuizStatRecord> = ctx.statsStore ? ctx.statsStore.getAll() : {};
@@ -341,7 +349,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			back.addEventListener("click", () => {
 				ctx.recordNav();
 				openModuleFolder = null;
-				if (containerRef) render(containerRef);
+				// The folder's sheet slides back down, uncovering the grid.
+				if (ctx.folderSheet) ctx.folderSheet.close(target => render(target));
+				else if (containerRef) render(containerRef);
 			});
 			// Dans un dossier : le header EST le titre du dossier — icône + nom du
 			// module, teinte à l'accent du dossier (comme sa carte). Le nom n'est

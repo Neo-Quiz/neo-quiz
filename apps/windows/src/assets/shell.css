@@ -1227,6 +1227,62 @@ body::after {
 	opacity: 0;
 }
 
+/* THE FOLDER SHEET (2026-09-29, `ui/folder-sheet.ts`): an open folder is a
+   sheet laid over the grid, which stays behind it, narrowed, and shows as
+   a 16 px strip above it (StudySmarter's study set over its Library).
+   The shell becomes the positioning box of the back sheet, and the front
+   panel is positioned too: an absolutely positioned sibling would
+   otherwise paint over it whatever the DOM order. */
+#neo-quiz-root > .qbd-layout.nq-sheet-stack {
+	position: relative;
+}
+#neo-quiz-root > .qbd-layout.nq-sheet-stack > .qbd-content {
+	position: relative;
+}
+#neo-quiz-root > .qbd-layout > .qbd-content.nq-sheet-front {
+	margin-top: 16px;
+}
+/* The wrap: the panel's column (its `left` is set by the module), clipped
+   vertically only, as the quiz launch's sliding window. */
+.nq-sheet-back {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	overflow-x: visible;
+	overflow-y: clip;
+	pointer-events: none;
+}
+.nq-sheet-back-scaler {
+	height: 100%;
+}
+/* The back panel wears the panel's glass (the rule is repeated here: it is
+   not a direct child of the shell). It never scrolls by hand, and does not
+   replay `.qbd-content`'s fade-in when it is created. */
+#neo-quiz-root > .qbd-layout .nq-sheet-back-panel {
+	box-sizing: border-box;
+	height: 100%;
+	border-radius: var(--nq-panel-radius);
+	border: 1px solid var(--nq-panel-edge);
+	background: var(--nq-panel-bg);
+	backdrop-filter: var(--nq-panel-blur);
+	-webkit-backdrop-filter: var(--nq-panel-blur);
+	overflow: hidden;
+	animation: none;
+}
+/* At rest, only the strip is left: the wrap is cut to the offset, the
+   panel inside keeps the height of a whole page so that its bottom edge
+   never shows, and the narrowing is set statically — never an animation
+   left in `fill: forwards` (`npm run check:view-enter`). */
+.nq-sheet-back.nq-sheet-back--rest {
+	bottom: auto;
+	height: 16px;
+}
+.nq-sheet-back--rest > .nq-sheet-back-scaler {
+	height: 100vh;
+	transform: scaleX(0.97);
+}
+
 /* THE MARK at the top of the rail (StudySmarter's layout). A line-drawn SVG
    in the rail's text colour (dashboard-shell.ts `marqueRail`), no longer the
    app's bitmap icon, which read as a pasted image. Since 2026-09-29 it LEADS
