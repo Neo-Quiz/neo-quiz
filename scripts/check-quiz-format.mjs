@@ -288,8 +288,10 @@ await withSrcModule("src/quiz-utils.ts", ({ extractExamOptions, findQuizModeConf
 	/* 14 questions → 20 min, 15 → 25: counting the configuration object as a
 	   question would show. */
 	r.check("an Exam without a duration gets the fallback rule, on its questions only", lu({ mode: "exam" }, 14).examOptions?.durationMinutes, 20);
-	r.check("examAutoSubmit / examShowTimer are no longer read",
-		[lu({ mode: "exam", examDurationMinutes: 10, examAutoSubmit: false, examShowTimer: false }).examOptions].map(o => [o?.autoSubmit, o?.showTimer]), [[true, true]]);
+	r.check("examAutoSubmit / examShowTimer are no longer read: an Exam's options are its duration",
+		lu({ mode: "exam", examDurationMinutes: 10, examAutoSubmit: false, examShowTimer: false }).examOptions, { durationMinutes: 10 });
+	r.check("a duration on a Learn or a Practice is ignored (no Learn → Exam switch any more)",
+		[lu({ mode: "learn", examDurationMinutes: 15 }), lu({ mode: "quiz", examDurationMinutes: 15 })].map(x => [x.examOptions, "lessonExamOptions" in x]), [[null, false], [null, false]]);
 	r.check("mode: \"learn\" is a Learn, mode: \"quiz\" a Practice", [lu({ mode: "learn" }).quizMode, lu({ mode: "quiz" }).quizMode], ["lesson", "quiz"]);
 	/* Retired values (spec 2026-09-29 §1.1): `mode: "lesson"` is not a mode
 	   any more, and the booleans do not make a configuration — no

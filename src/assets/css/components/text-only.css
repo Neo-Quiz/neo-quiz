@@ -169,103 +169,6 @@
   margin: 14px auto 14px;
 }
 
-.quiz-start-mode-selector{
-  box-sizing: border-box;
-  width: min(100%, 420px);
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 14px auto 14px;
-  padding: 5px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted) 22%);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--background-secondary) 70%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 84%, transparent) 100%
-    );
-  box-shadow:
-    0 4px 12px rgba(0,0,0,0.12),
-    0 1px 0 rgba(255,255,255,0.035) inset;
-}
-
-.quiz-start-mode-option{
-  appearance: none;
-  box-sizing: border-box;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 9px 12px 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    color 180ms ease,
-    transform var(--quiz-dur-fast) var(--quiz-ease-smooth),
-    box-shadow 220ms ease;
-}
-
-/* Cause : ce <button> est en flex-direction:column (titre + sous-titre empilés)
-   mais ne déclarait aucune height. La hauteur de champ ambiante d'Obsidian
-   (notamment sur mobile) s'appliquait alors par défaut, rendant le bouton trop
-   court ; le sous-titre débordait sous la boîte et était masqué par la carte
-   suivante. On force le dimensionnement au contenu. Le double sélecteur garantit
-   une spécificité supérieure à toute règle `button` ambiante (sans !important). */
-.quiz-start-mode-selector .quiz-start-mode-option{
-  height: auto;
-  min-height: auto;
-}
-
-.quiz-start-mode-option:hover,
-.quiz-start-mode-option:focus-visible{
-  outline: none;
-  color: var(--text-normal);
-  border-color: color-mix(in srgb, var(--interactive-accent) 36%, transparent);
-  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
-}
-
-.quiz-start-mode-option:active{
-  transform: scale(0.985);
-}
-
-.quiz-start-mode-option.is-active{
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary)) 0%,
-      color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)) 100%
-    );
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 18%, transparent) inset,
-    0 6px 16px rgba(0,0,0,0.14);
-}
-
-.quiz-start-mode-title{
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.quiz-start-mode-sub{
-  max-width: 100%;
-  overflow: hidden;
-  color: currentColor;
-  opacity: 0.72;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .quiz-textonly{
   margin: 10px var(--quiz-option-side-gap) 0;
 }
@@ -605,32 +508,6 @@
   .quiz-mode-toggle-label,
   .quiz-mode-toggle-label{
     font-size: 0.72em;
-  }
-
-  .quiz-start-mode-selector{
-    grid-template-columns: 1fr;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .quiz-start-mode-selector .quiz-start-mode-option{
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    min-height: auto;
-    padding: 10px 12px;
-  }
-
-  .quiz-start-mode-title{
-    font-size: 14px;
-  }
-
-  .quiz-start-mode-sub{
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    font-size: 11px;
-    line-height: 1.25;
   }
 
   .quiz-textonly-expected-pair{

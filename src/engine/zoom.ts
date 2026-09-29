@@ -372,7 +372,7 @@ export function createZoomHandlers(ctx: EngineCtx): ZoomHandlers {
 			cleanup();
 			return;
 		}
-		ctx.resetQuiz({ preserveSliding: false, resetToOriginalMode: true });
+		ctx.resetQuiz({ preserveSliding: false });
 
 		/* IMPORTANT :
 		   render() a relancé restartAsyncLifecycle(),

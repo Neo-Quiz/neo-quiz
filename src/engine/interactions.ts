@@ -14,14 +14,12 @@ export interface InteractionHandlers {
 	bindBinaryQuestion(trackItem: HTMLElement, qi: number, isMulti: boolean): void;
 	bindOrderingQuestion(trackItem: HTMLElement, qi: number, q: OrderingQuestion): void;
 	bindMatchingQuestion(trackItem: HTMLElement, qi: number, q: MatchingQuestion): void;
-	bindStartModeControls(rootEl?: HTMLElement | null): void;
 	bindQuestionTrackItem(trackItem: HTMLElement | null): void;
 	/** Task 7 (mode Lesson) : extrait du binding DOM (round 1 de revue, Finding 5)
 	 * pour rester testable sans document (scripts/check-lesson.mjs). */
 	markLessonPreSkipped(qi: number): void;
 	bindSubmitSlideControls(rootEl: Element | null): void;
 	bindResultsSlideControls(rootEl: Element | null): void;
-	bindExamStartButton(): void;
 	bindStaticControls(): void;
 	bindZoomFixHandlers(): void;
 	destroyZoomFixHandlers(): void;
@@ -526,48 +524,6 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			e.preventDefault();
 			ctx.goToQuestion(0);
 		});
-		const examBtn = rootEl.querySelector(".quiz-exam-btn");
-		if (examBtn) examBtn.addEventListener("click", e => {
-			e.preventDefault();
-			ctx.switchToExamMode();
-		});
-	}
-
-	function bindExamStartButton(): void {
-		const startBtn = ctx.container.querySelector('.quiz-exam-start-btn');
-		if (startBtn) {
-			startBtn.addEventListener('click', () => {
-				if (ctx.quizState?.startMode === "learn") ctx.exam.startLearnMode();
-				else ctx.exam.startExam();
-			});
-		}
-	}
-
-	/* Le bouton "Practice mode" est retire de l’interface (Task 5, 2026-08-31),
-	   sa mecanique absorbee par le role "recall" en mode Lecon. FINDING 3
-	   (round 1 de revue Task 5) : bindModeToggleControls et
-	   applyModeToggleVisualState, qui geraient le clic sur CE bouton, sont
-	   retires avec lui plutot que laisses en place - verifie par grep
-	   qu’aucun code ne produit plus jamais l’attribut data-quiz-mode qu’ils
-	   ecoutaient. Ce n’etait PAS un chemin partage avec bindStartModeControls
-	   ci-dessous (deux fonctions a selecteurs distincts, [data-quiz-mode]
-	   contre [data-quiz-start-mode]), contrairement a ce qu’affirmait a tort
-	   le commentaire d’une revue precedente. */
-	/* Le choix Apprendre / Examen de l'écran de démarrage. Il ne passe PLUS
-	   par `setPracticeMode` (2026-09-17) : « Practice » est retiré, et
-	   `practiceMode` ne sert plus qu'au rôle `recall` d'une leçon. On note le
-	   choix et on repeint l'écran — le libellé du bouton et le résumé
-	   (« Sans chrono » ou la durée) en dépendent. */
-	function bindStartModeControls(rootEl: HTMLElement | null = ctx.container): void {
-		rootEl?.querySelectorAll?.<HTMLElement>("[data-quiz-start-mode]")?.forEach(btn => {
-			btn.addEventListener("click", e => {
-				e.preventDefault();
-				const next = btn.dataset.quizStartMode === "learn" ? "learn" : "exam";
-				if (next === ctx.quizState.startMode) return;
-				ctx.quizState.startMode = next;
-				ctx.render();
-			});
-		});
 	}
 
 	function bindStaticControls(): void {
@@ -748,12 +704,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		bindBinaryQuestion,
 		bindOrderingQuestion,
 		bindMatchingQuestion,
-		bindStartModeControls,
 		bindQuestionTrackItem,
 		markLessonPreSkipped,
 		bindSubmitSlideControls,
 		bindResultsSlideControls,
-		bindExamStartButton,
 		bindStaticControls,
 		bindZoomFixHandlers,
 		destroyZoomFixHandlers,

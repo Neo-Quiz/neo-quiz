@@ -248,13 +248,12 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 	questions: QuizQuestion[];
 	quizMode: QuizMode;
 	examOptions: ExamOptions | null;
-	lessonExamOptions: ExamOptions | null;
 	/** The quiz's glossary, already filtered to its valid entries
 	    (`lireGlossaire`) — empty without a configuration object, or when it
 	    carries no `glossary`. */
 	glossary: EntreeGlossaire[];
 } {
-	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null, glossary: [] };
+	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [] };
 
 	/* ANYWHERE in the array, not only last. The export always writes the
 	   configuration at the end, but a quiz written by hand — or by a model —
@@ -277,31 +276,22 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 		/* An Exam that does not state its duration (written by hand) gets the
 		   fallback rule, as generation and the editor would have written it
 		   (spec 2026-09-29 §1.2). `examAutoSubmit` / `examShowTimer` are no
-		   longer read: an Exam is a visible clock and a hand-in at zero. */
-		const buildExamOpts = (): ExamOptions => ({
-			durationMinutes: clampExamDuration(lastItem.examDurationMinutes) ?? fallbackExamDuration(questions.length),
-			autoSubmit: true,
-			showTimer: true
-		});
-
-		const examOptions: ExamOptions | null = quizMode === "exam" ? buildExamOpts() : null;
-
-		// Exam options of a Learn that carries a duration ("Take the exam").
-		let lessonExamOptions: ExamOptions | null = null;
-		if (quizMode === "lesson" && lastItem.examDurationMinutes != null) {
-			lessonExamOptions = buildExamOpts();
-		}
+		   longer read: an Exam is a visible clock and a hand-in at zero. A
+		   duration on another mode is ignored: the Learn → Exam switch it fed
+		   is gone (§3.5). */
+		const examOptions: ExamOptions | null = quizMode === "exam"
+			? { durationMinutes: clampExamDuration(lastItem.examDurationMinutes) ?? fallbackExamDuration(questions.length) }
+			: null;
 
 		return {
 			questions,
 			quizMode,
 			examOptions,
-			lessonExamOptions,
 			glossary: lireGlossaire(lastItem.glossary)
 		};
 	}
 
-	return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null, glossary: [] };
+	return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [] };
 }
 
 /** Forme structurelle minimale acceptée par `pickLessonFields` : les six

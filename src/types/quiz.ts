@@ -389,15 +389,6 @@ export type QuestionShuffleEntry =
  */
 export interface QuizState {
 	practiceMode: PracticeMode;
-	/**
-	 * Le choix de l'écran de démarrage d'un bloc `mode: "exam"` : APPRENDRE
-	 * (sans chrono ni verrou, correction et explication après chaque réponse)
-	 * ou se TESTER (l'examen). Décision d'Ahmed, 2026-09-17 : « Practice »
-	 * (les réponses en texte libre) est RETIRÉ — un quiz a deux façons de se
-	 * jouer, et cette valeur ne touche PAS `practiceMode`, qui ne sert plus
-	 * qu'au rôle `recall` d'une leçon.
-	 */
-	startMode: "learn" | "exam";
 	selections: QuestionSelection[];
 	/** Réponses libres saisies en mode entraînement texte (engine/text-only.js hasAnyAnswer). */
 	textOnlyAnswers: string[];
@@ -484,17 +475,14 @@ export type SlideMapEntry =
 	| { type: "results" };
 
 /**
- * Options d'examen actives (ctx.examOptions), construites par
- * quiz-utils.js extractExamOptions/buildExamOpts et lues dans engine/exam.js
- * (examTimerHtml, handleExamTimeUp).
+ * Options of an active Exam (ctx.examOptions), built by quiz-utils.ts
+ * extractExamOptions and read by engine/exam.ts (examTimerHtml,
+ * startExamTimer). An Exam is a visible clock and a hand-in at zero: the
+ * `autoSubmit` / `showTimer` options left on 2026-09-29.
  */
 export interface ExamOptions {
-	/** Durée en minutes, bornée [1, 180] au parsing (quiz-utils.js buildExamOpts). */
+	/** Duration in minutes, within [1, 300] (quiz-utils.ts clampExamDuration). */
 	durationMinutes: number;
-	/** Soumission automatique à l'échéance du chrono (par défaut true — engine/exam.js handleExamTimeUp). */
-	autoSubmit: boolean;
-	/** Afficher le chrono à l'écran (engine/exam.js examTimerHtml). */
-	showTimer: boolean;
 }
 
 /**

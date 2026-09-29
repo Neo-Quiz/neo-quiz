@@ -35,7 +35,6 @@ export interface CardHandlers {
 	tabClass(i: number): string;
 	navHtml(): string;
 	navPosition(): number;
-	startModeSelectorHtml(): string;
 	optionClass(qi: number, oi: number): string;
 	optionContentHtml(q: QcmQuestion | MultiSelectQuestion, oi: number): string;
 	explanationHtml(qi: number): string;
@@ -174,26 +173,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return `<div class="quiz-question-nav">
 			<button class="quiz-nav-btn quiz-prev-btn" type="button" aria-label="${prevLabel}"${isFirst ? " disabled" : ""}>${ICON_ARROW_LEFT}</button>
 			<button class="quiz-nav-btn quiz-next-btn" type="button" aria-label="${nextAttr}" data-nav-label="${ctx.escapeHtmlAttr(nextLabel)}">${ICON_ARROW_RIGHT}</button>
-		</div>`;
-	}
-
-	/* DEUX modes, et deux seulement (Ahmed, 2026-09-17) : APPRENDRE et se
-	   TESTER. « Practice » — les réponses en texte libre — est retiré : la
-	   spec du mode Leçon (§6, 2026-08-31) l'avait déjà condamné, et un an plus
-	   tard il était toujours là. Apprendre en premier : c'est ce qu'on fait
-	   avant de se tester. Le choix vit dans `quizState.startMode`, pas dans
-	   `practiceMode` — celui-ci ne sert plus qu'au rôle `recall` d'une leçon. */
-	function startModeSelectorHtml(): string {
-		const learn = ctx.quizState.startMode === "learn";
-		return `<div class="quiz-start-mode-selector" role="group" aria-label="${ctx.escapeHtmlAttr(t("engine.start.selectorAria"))}">
-			<button class="quiz-start-mode-option${learn ? " is-active" : ""}" type="button" data-quiz-start-mode="learn" aria-pressed="${learn ? "true" : "false"}">
-				<span class="quiz-start-mode-title">${t("engine.start.learnTitle")}</span>
-				<span class="quiz-start-mode-sub">${t("engine.start.learnSub")}</span>
-			</button>
-			<button class="quiz-start-mode-option${!learn ? " is-active" : ""}" type="button" data-quiz-start-mode="exam" aria-pressed="${!learn ? "true" : "false"}">
-				<span class="quiz-start-mode-title">${t("engine.start.examTitle")}</span>
-				<span class="quiz-start-mode-sub">${t("engine.start.examSub")}</span>
-			</button>
 		</div>`;
 	}
 
@@ -500,14 +479,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div>${writtenReview}<div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 		}
 		const { pct, correct, total, pendingWritten } = ctx.computeScorePercent();
-		// Mode leçon : bouton "Passer l'examen"
-		const lessonExamBtn = (ctx.quizMode === "lesson" && ctx.lessonExamOptions)
-			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.takeExam")}</button>`
-			: "";
-		// Mode examen issu du mode leçon : bouton "Repasser l'examen"
-		const retakeExamBtn = (ctx.quizMode === "exam" && ctx.originalQuizMode === "lesson" && ctx.originalLessonExamOptions)
-			? `<button class="quiz-action-btn quiz-exam-btn" type="button">${t("engine.result.retakeExam")}</button>`
-			: "";
 		// Le score n'inclut pas les réponses écrites pas encore auto-évaluées
 		// (computeScorePercent les exclut déjà de correct/total) : le dire
 		// clairement plutôt que de les compter fausses.
@@ -525,7 +496,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			learnSummary = `<div class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</div>`;
 		}
 		// Le score (« 12/20 », « 60 % ») reste du code : seule l'étiquette est traduite.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 	}
 
 
@@ -766,7 +737,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		tabClass,
 		navHtml,
 		navPosition,
-		startModeSelectorHtml,
 		optionClass,
 		optionContentHtml,
 		explanationHtml,

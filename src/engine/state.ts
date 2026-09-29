@@ -27,7 +27,7 @@ export interface StateHandlers {
 	goToQuestion(index: number): void;
 	goToSubmit(): void;
 	goToResults(): void;
-	resetQuiz(opts?: { preserveSliding?: boolean; resetToOriginalMode?: boolean }): void;
+	resetQuiz(opts?: { preserveSliding?: boolean }): void;
 	recordReview(i: number, grade: ReviewGrade): void;
 }
 
@@ -68,10 +68,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		return sel !== null;
 	}
 
-	/** Une carte SANS RÉPONSE : une lecture en Leçon (task 6b), ou une
-	    lecture ABSORBÉE par son étape (2026-09-26), qui n'a même plus de
-	    diapositive — quel que soit le mode courant, une bascule Leçon →
-	    Examen comprise : elle n'y redevient pas une question inatteignable. */
+	/** A card WITHOUT an answer: a reading in a Learn (task 6b), or a reading
+	    ABSORBED by its step (2026-09-26), which does not even have a slide —
+	    it never counts as a question that cannot be reached. */
 	function sansReponse(i: number): boolean {
 		return !!ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read");
 	}
@@ -475,42 +474,32 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	}
 
 	/**
-	 * Journalise UNE question pour l'ordonnanceur, une seule fois par
-	 * session. `sourcePath` absent (aperçu de l'éditeur, quiz en mémoire non
-	 * encore enregistré) : rien à journaliser, la question n'a pas de clé
-	 * stable.
+	 * Logs ONE question for the scheduler, only once per session.
+	 * `sourcePath` absent (editor preview, in-memory quiz not saved yet):
+	 * nothing to log, the question has no stable key.
 	 *
-	 * Le rôle est celui DÉCLARÉ par la question, dès que le bloc est
-	 * D'ORIGINE Leçon (`ctx.originalQuizMode`, jamais réassigné après
-	 * l'assemblage) — PAS le mode courant (`ctx.isLessonMode()`). Fix round 1
-	 * (2026-09-02) : `switchToExamMode` bascule une Leçon en Examen
-	 * (`ctx.quizMode = "exam"`) sans jamais toucher `originalQuizMode` ; une
-	 * question `role: "pre"` répondue APRÈS cette bascule perdait son rôle
-	 * (`isLessonMode()` valait alors faux), et `signalOf` (scheduler/state.ts)
-	 * comptait cette réponse comme un succès ou un échec — ce qu'il interdit
-	 * explicitement pour une "pre" (Richland/Kornell/Kao : la tentative est
-	 * le mécanisme, pas la justesse). `roleOfQuestion` lit le champ déclaré
-	 * de la question, indépendamment du mode courant (engine/lesson.ts
-	 * `buildLessonModel.roleOf`) : seul le GATE qui décide de le lire dépend
-	 * ici du mode D'ORIGINE, jamais du mode courant.
+	 * The role is the one DECLARED by the question as soon as the block is a
+	 * Learn (`ctx.quizMode === "lesson"`) — NOT `ctx.isLessonMode()`, which is
+	 * also false for a Learn block WITHOUT a valid slice (`buildLessonModel`,
+	 * engine/lesson.ts). That is deliberate (review of 2026-09-03): the author
+	 * wrote a Learn, and a question declaring `role: "pre"` there stays a
+	 * pre-question that must produce no memory signal, valid slices or not —
+	 * `signalOf` (scheduler/state.ts) forbids counting a "pre" as a success or
+	 * a failure (Richland/Kornell/Kao: the attempt is the mechanism, not being
+	 * right). Other questions get the default role `"test"` (engine/lesson.ts
+	 * `roleOf`), which `signalOf` treats normally.
 	 *
-	 * Élargissement délibéré (round de revue suivant, 2026-09-03) : le gate
-	 * teste `originalQuizMode === "lesson"`, PAS `isLessonMode()` — un bloc
-	 * `mode: 'lesson'` SANS tranche valide (`buildLessonModel.isLesson` faux,
-	 * engine/lesson.ts) obtient donc désormais un rôle dans le journal alors
-	 * qu'avant il n'en recevait aucun. C'est correct : `originalQuizMode ===
-	 * "lesson"` signifie que l'auteur a écrit une Leçon, et une question qui
-	 * y déclare `role: "pre"` reste une pré-question qui ne doit produire
-	 * aucun signal de mémoire, tranches valides ou pas. Les autres questions
-	 * reçoivent le rôle par défaut `"test"` (engine/lesson.ts `roleOf`), que
-	 * `signalOf` traite normalement — rien ne change pour elles.
+	 * The mode of a quiz no longer changes while it is played: the Learn → Exam
+	 * switch that used to make the block's mode and the current mode differ
+	 * was removed on 2026-09-29 (spec 2026-09-29-test-practice-exam-design
+	 * §3.5).
 	 */
 	function recordReview(i: number, grade: ReviewGrade): void {
 		if (!ctx.reviewSink || !ctx.sourcePath) return;
 		if (ctx.quizState.recorded[i]) return;
 		const id = ctx.questionIds[i];
 		if (!id) return;
-		const role = ctx.originalQuizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
+		const role = ctx.quizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
 		try {
 			// Le puits est une FORME destinée à d'autres hôtes (types/engine-ctx.ts) :
 			// un tiers qui lève ne doit jamais casser le rendu — ni cette boucle,
@@ -625,32 +614,21 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				});
 			}
 
-			/* L'ordonnanceur, lui, compte PAR QUESTION. Une carte "read" n'est
-			   ni juste ni fausse (`seen`), une pré-question abandonnée non plus
-			   (`skipped`) : ces deux-là sont journalisées pour que l'historique
-			   soit complet, mais elles ne produisent aucun signal de mémoire
-			   (scheduler/state.ts signalOf).
-			   Le RÔLE journalisé est celui déclaré par la question dès que le
-			   bloc est D'ORIGINE Leçon (`originalQuizMode`), même après une
-			   bascule Leçon → Examen — voir le commentaire de `recordReview`.
-			   Le mode COURANT (`isLessonMode()`), lui, ne sert plus qu'à décider
-			   si "read" doit court-circuiter le verdict : une carte "read"
-			   redevient une question normale une fois basculée en Examen
-			   (`isComplete` la traite alors comme les autres), donc grade
-			   "seen" ne doit s'appliquer QUE tant que le mode Leçon est
-			   réellement actif — sinon une carte "read" activement répondue en
-			   Examen recevrait "seen" au lieu de son verdict réel. */
+			/* The scheduler counts PER QUESTION. A "read" card is neither right
+			   nor wrong (`seen`), nor is an abandoned pre-question (`skipped`):
+			   both are logged so that the history is complete, but they produce
+			   no memory signal (scheduler/state.ts signalOf).
+			   The logged ROLE is the one the question declares as soon as the
+			   block is a Learn — see the comment of `recordReview`.
+			   `isLessonMode()` only decides whether "read" short-circuits the
+			   verdict: in a Learn block without a valid slice, a "read" card is
+			   played as an ordinary question, so it gets its real verdict, not
+			   "seen". A reading WITHOUT a screen (short reading, read above its
+			   host question, src/lecture-etape.ts) only exists in an active
+			   Learn, where it is logged `seen` like the others. */
 			for (let i = 0; i < ctx.quiz.length; i++) {
 				if (ctx.quizState.recorded[i]) continue;
-				const role = ctx.originalQuizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
-				/* Une lecture SANS ÉCRAN (lecture courte, lue au-dessus de sa
-				   question hôte, src/lecture-etape.ts) reste une lecture pour le
-				   journal : `seen` en Leçon, sans signal de mémoire. Après une
-				   bascule Leçon → Examen, elle n'a été ni montrée ni répondue :
-				   rien n'est écrit. Condition bien ATTEIGNABLE : l'ensemble est
-				   figé sur le mode D'ORIGINE (engine.ts), `isLessonMode()` lit le
-				   mode COURANT — `check:engine-review` éprouve ce cas. */
-				if (ctx.lecturesAbsorbees?.has(i) && !ctx.isLessonMode()) continue;
+				const role = ctx.quizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
 				/* CORRECTIF (2026-09-27, revue lot A1, C1) : une réponse écrite
 				   (recall à choix, hors carte mémoire) est « répondue » dès
 				   qu'elle contient du texte (isComplete, retour #14) mais pas
@@ -684,7 +662,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		goToSlide(ctx.SLIDE_RESULTS_INDEX, { forceRender: false });
 	}
 
-	function resetQuiz({ preserveSliding = false, resetToOriginalMode = false }: { preserveSliding?: boolean; resetToOriginalMode?: boolean } = {}): void {
+	function resetQuiz({ preserveSliding = false }: { preserveSliding?: boolean } = {}): void {
 		ctx.closeHintModal();
 		ctx.track.clearTrackTransitionFallback();
 		ctx.viewport.destroyActiveSlideResizeObserver();
@@ -737,18 +715,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		ctx.examStartTime = 0;
 		ctx.stopExamTimer();
 
-		// Réinitialiser au mode d'origine si demandé
-		if (resetToOriginalMode && ctx.originalQuizMode === "lesson") {
-			ctx.trainingSession = false;
-			ctx.quizMode = "lesson";
-			ctx.isExamMode = false;
-			ctx.examOptions = null;
-			ctx.examDurationMs = 0;
-			ctx.lessonExamOptions = ctx.originalLessonExamOptions;
-			ctx.examTimeRemaining = 0;
-		} else {
-			ctx.examTimeRemaining = ctx.isExamMode ? ctx.examDurationMs : 0;
-		}
+		ctx.examTimeRemaining = ctx.isExamMode ? ctx.examDurationMs : 0;
 
 		ctx.render();
 		ctx.clearSession();

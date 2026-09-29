@@ -84,16 +84,13 @@ import type { LearnHandlers } from "../engine/learn";
 import type { TermesHandlers } from "../engine/termes";
 
 /**
- * Mode du quiz (engine.js ctx.quizMode / originalQuizMode). Miroir du type
- * `QuizMode` de src/quiz-utils.ts (extractExamOptions) qui n'est PAS exporté —
- * dupliqué ici plutôt que modifier quiz-utils.ts (iso-fonctionnalité Task 9).
- * `"training"` n'est PAS produit par le parsing (quiz-utils) mais assigné au
- * runtime par engine/exam.ts startLearnMode (`ctx.quizMode = "training"`) —
- * ajouté ici en Task 10c pour coller à la réalité de la mutation.
- * "learn" a été renommé "lesson" (task 0 du lot mode leçon, 2026-08-31) :
- * quiz-utils.ts continue de LIRE l'ancien nom, mais ne le renvoie plus jamais.
+ * The quiz's mode (ctx.quizMode). Mirror of the `QuizMode` type of
+ * src/quiz-utils.ts (extractExamOptions), which is NOT exported. "lesson" is
+ * the internal name of a Learn (`mode: "learn"` in the block). The runtime
+ * `"training"` value (the start screen's Learn choice) went with that choice
+ * on 2026-09-29.
  */
-export type QuizMode = "lesson" | "exam" | "quiz" | "training";
+export type QuizMode = "lesson" | "exam" | "quiz";
 
 /* ════════════════════════════════════════════════════════
    Les 18 sous-modules ont tous leur VRAI handler-type (Task 10 terminée) :
@@ -163,15 +160,12 @@ export interface EngineCtx {
 	 */
 	lucideIcons?: { paperclip?: string };
 
-	/* ── Mode & examen (littéral initial, engine.js:100-107 ; muté par switchToExamMode :808-813) ── */
+	/* ── Mode & exam (initial literal of engine.ts; never changed while the
+	     quiz is played since the Learn → Exam switch left, 2026-09-29) ── */
 	quizMode: QuizMode;
 	isExamMode: boolean;
-	trainingSession: boolean;
 	examOptions: ExamOptions | null;
 	examDurationMs: number;
-	lessonExamOptions: ExamOptions | null;
-	originalQuizMode: QuizMode;
-	originalLessonExamOptions: ExamOptions | null;
 
 	/* ── État d'examen : getters/setters de closure (engine.js:108-115),
 	     vus comme de simples propriétés par les consommateurs. ── */
@@ -359,9 +353,8 @@ export interface EngineCtx {
 	stopExamTimer: ExamHandlers["stopExamTimer"];
 	updateExamTimerDisplay: ExamHandlers["updateExamTimerDisplay"];
 
-	// depuis lesson (1er Object.assign, engine.ts) — accessors, pas des
-	// flags : recalculent le modèle à chaque appel (engine/lesson.ts), car
-	// ctx.quizMode est mutable (switchToExamMode, resetQuiz).
+	// from lesson (1st Object.assign, engine.ts) — accessors, not flags:
+	// they rebuild the model on each call (engine/lesson.ts).
 	isLessonMode: LessonHandlers["isLessonMode"];
 	lessonSlices: LessonHandlers["lessonSlices"];
 	sliceOfQuestion: LessonHandlers["sliceOfQuestion"];
@@ -444,6 +437,4 @@ export interface EngineCtx {
 	commitQuestionInteraction(qi: number, opts?: { syncHeight?: boolean }): void;
 	/** engine.js:714-800 — rendu principal (reconstruit tout le HTML des slides). */
 	render(): void;
-	/** engine.js:803-819 — bascule mode Leçon → Examen (lesson only). */
-	switchToExamMode(): void;
 }

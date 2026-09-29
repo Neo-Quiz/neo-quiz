@@ -30,18 +30,17 @@ await withSrcModule(
 	 * Construit un ctx minimal, avec le câblage croisé réel des méthodes
 	 * aplaties (même pattern qu'engine.ts).
 	 *
-	 * `originalQuizMode` et `isLessonMode` sont deux paramètres INDÉPENDANTS
-	 * (fix 2) : par défaut `originalQuizMode` suit `isLessonMode` (un quiz
-	 * QCM ordinaire n'a jamais été une Leçon), mais un test peut les découpler
-	 * pour simuler une Leçon basculée en Examen (`originalQuizMode: "lesson"`,
-	 * `isLessonMode: false`) — exactement l'état que `switchToExamMode`
-	 * (engine.ts) produit sans jamais toucher `originalQuizMode`.
+	 * `quizMode` and `isLessonMode` are two INDEPENDENT parameters: by
+	 * default `quizMode` follows `isLessonMode`, but a test can split them
+	 * to play a Learn block WITHOUT a valid slice (`quizMode: "lesson"`,
+	 * `isLessonMode: false`, engine/lesson.ts buildLessonModel) — the one
+	 * state where the block's mode and `isLessonMode()` still differ since
+	 * the Learn → Exam switch left (2026-09-29).
 	 */
 	function makeCtx({
 		quiz,
 		selections,
 		isLessonMode = false,
-		originalQuizMode = isLessonMode ? "lesson" : "quiz",
 		roles = [],
 		lessonPreSkipped = [],
 		recordedInit = [],
@@ -86,7 +85,6 @@ await withSrcModule(
 			goToQuestion: () => {},
 			initSelections: () => quiz.map(() => null),
 			buildShuffleMap: () => quiz.map(() => null),
-			originalQuizMode,
 			roleOfQuestion: (i) => roles[i],
 			closeHintModal: () => {},
 			clampSlideIndex: (i) => i,
@@ -213,7 +211,7 @@ await withSrcModule(
 	}
 
 	{
-		const r = makeReporter("recordReview — rôle inclus dès que le bloc est d'origine Leçon (fix 2)");
+		const r = makeReporter("recordReview — role included as soon as the block is a Learn");
 		const quiz = [{ id: "q1", title: "T1" }];
 
 		const { ctx: horsLecon, appels: a1 } = makeCtx({ quiz, selections: [null], isLessonMode: false, roles: ["recall"] });
@@ -224,17 +222,15 @@ await withSrcModule(
 		enLecon.recordReview(0, "understood");
 		r.check("en Leçon (mode courant) : le rôle déclaré est copié", a2[0]?.role, "recall");
 
-		// LE cas du fix 2 : le bloc est D'ORIGINE Leçon mais le mode COURANT a
-		// basculé en Examen (switchToExamMode, engine.ts — jamais originalQuizMode).
-		// `roleOfQuestion` renvoie le rôle déclaré quel que soit le mode courant
-		// (engine/lesson.ts buildLessonModel.roleOf) : le gate doit donc suivre
-		// `originalQuizMode`, pas `isLessonMode()`, sous peine de perdre le rôle
-		// exactement dans ce cas — celui que le brief n'avait pas prévu.
-		const { ctx: apresBascule, appels: a3 } = makeCtx({
-			quiz, selections: [null], isLessonMode: false, originalQuizMode: "lesson", roles: ["recall"],
+		// A Learn block without a valid slice: `isLessonMode()` is false but
+		// the author wrote a Learn. `roleOfQuestion` returns the declared role
+		// whatever the mode (engine/lesson.ts buildLessonModel.roleOf): the gate
+		// follows the BLOCK's mode (`quizMode`), not `isLessonMode()`.
+		const { ctx: sansTranche, appels: a3 } = makeCtx({
+			quiz, selections: [null], isLessonMode: false, quizMode: "lesson", roles: ["recall"],
 		});
-		apresBascule.recordReview(0, "understood");
-		r.check("bloc d'origine Leçon, mode courant Examen : le rôle SURVIT", a3[0]?.role, "recall");
+		sansTranche.recordReview(0, "understood");
+		r.check("Learn block without a valid slice: the role SURVIVES", a3[0]?.role, "recall");
 		r.done();
 	}
 
@@ -343,37 +339,33 @@ await withSrcModule(
 	}
 
 	{
-		/* Fix 2, scénario exact demandé par le ruling : une question "pre"
-		   répondue APRÈS que la Leçon a basculé en Examen (switchToExamMode,
-		   engine.ts) doit toujours porter `role: "pre"` dans le journal — sinon
-		   `signalOf` (scheduler/state.ts) la compterait comme un succès/échec
-		   ordinaire, ce que le noyau interdit explicitement pour "pre".
-		   Une carte "read" dans le MÊME lot vérifie l'autre moitié du ruling :
-		   « le mode gate ne sert plus qu'à la branche read » — en Examen,
-		   `isLessonMode()` vaut faux, donc "read" NE doit PLUS court-circuiter
-		   vers "seen" : la carte est notée sur son verdict réel comme une
-		   question normale (elle est répondue, donc "correct"/"wrong"), avec
-		   son rôle "read" tout de même journalisé (utile à l'historique,
-		   inoffensif ici : `signalOf`, scheduler/state.ts, ne distingue QUE
-		   `role === "pre"` — pour tout autre rôle il dérive le signal du seul
-		   `grade`, donc journaliser "read" à côté d'un grade "correct"/"wrong"
-		   ne change rien à ce que l'ordonnanceur en tire). */
-		const r = makeReporter("goToResults — le rôle survit à une bascule Leçon → Examen (fix 2)");
+		/* A Learn block WITHOUT a valid slice is played as an ordinary quiz
+		   (`isLessonMode()` false), but a "pre" question must still carry
+		   `role: "pre"` in the log — otherwise `signalOf` (scheduler/state.ts)
+		   would count it as an ordinary success/failure, which the core
+		   explicitly forbids for "pre". A "read" card in the SAME batch checks
+		   the other half: with `isLessonMode()` false, "read" must NOT
+		   short-circuit to "seen": the card gets its real verdict like an
+		   ordinary question (it was answered, so "correct"/"wrong"), with its
+		   "read" role still logged (harmless: `signalOf` only singles out
+		   `role === "pre"`; for any other role the signal comes from `grade`
+		   alone). */
+		const r = makeReporter("goToResults — the role survives in a Learn block without a valid slice");
 		const quiz = [
 			{ id: "pre1", title: "Pré-question", options: ["a", "b"], correctIndex: 0 },
-			{ id: "read1", title: "Support répondu en Examen", options: ["a", "b"], correctIndex: 0 },
+			{ id: "read1", title: "Answered reading", options: ["a", "b"], correctIndex: 0 },
 		];
 		const roles = ["pre", "read"];
-		// Les deux cartes sont répondues (Examen : plus de "pre" ni "read" au
-		// sens Leçon, ce sont des questions QCM normales) : pre1 correcte, read1 fausse.
+		// Both cards are answered (no active Learn: ordinary multiple-choice
+		// questions): pre1 right, read1 wrong.
 		const selections = [0, 1];
 		const { ctx, appels } = makeCtx({
-			quiz, selections, isLessonMode: false, originalQuizMode: "lesson", roles,
+			quiz, selections, isLessonMode: false, quizMode: "lesson", roles,
 		});
 		ctx.goToResults();
-		r.check("la 'pre' répondue en Examen garde role:'pre' et son verdict réel (pas 'seen')",
+		r.check("the answered 'pre' keeps role:'pre' and its real verdict (not 'seen')",
 			appels.find(a => a.q.endsWith("::pre1")), { q: "Cours/ch1.md::pre1", grade: "correct", role: "pre" });
-		r.check("la 'read' répondue en Examen garde role:'read' mais N'EST PLUS forcée à 'seen'",
+		r.check("the answered 'read' keeps role:'read' but is NOT forced to 'seen'",
 			appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "wrong", role: "read" });
 		r.done();
 	}
@@ -382,8 +374,7 @@ await withSrcModule(
 		/* LECTURES ABSORBÉES (2026-09-26, src/lecture-etape.ts) : la lecture
 		   d'une étape qui a d'autres questions n'a plus d'écran. En Leçon elle
 		   reste journalisée `seen` (aucun signal de mémoire) et ne compte ni
-		   au score ni aux questions faites ; basculée en Examen, elle n'a été
-		   ni montrée ni répondue : rien n'est journalisé, et elle ne manque pas. */
+		   au score ni aux questions faites. */
 		const r = makeReporter("goToResults — lecture absorbée par son étape");
 		const quiz = [
 			{ id: "pre1", title: "Avant", options: ["a", "b"], correctIndex: 0 },
@@ -398,13 +389,6 @@ await withSrcModule(
 			lecon.appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "seen", role: "read" });
 		r.check("Leçon : le score ignore la lecture absorbée", lecon.ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
 
-		const examen = makeCtx({ quiz, selections: [0, null, 1], isLessonMode: false, originalQuizMode: "lesson", roles });
-		examen.ctx.lecturesAbsorbees = new Set([1]);
-		r.check("Examen après bascule : la lecture absorbée ne manque pas", examen.ctx.isComplete(1), true);
-		examen.ctx.goToResults();
-		r.check("Examen après bascule : rien n'est journalisé pour la lecture absorbée",
-			examen.appels.some(a => a.q.endsWith("::read1")), false);
-		r.check("Examen après bascule : le score ignore la lecture absorbée", examen.ctx.computeScorePercent(), { pct: 50, correct: 1, total: 2, pendingWritten: 0 });
 		r.done();
 	}
 

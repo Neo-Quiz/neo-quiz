@@ -38,7 +38,7 @@ export type LearnAdvance =
 	| { kind: "go"; qi: number | null };
 
 export interface LearnHandlers {
-	/** A `mode: "learn"` quiz, still played as a Learn (not switched to its exam). */
+	/** A `mode: "learn"` quiz, played as a Learn. */
 	isActive(): boolean;
 	/** The card can be checked: a Learn question, not a reading nor a code exercise. */
 	isCheckable(qi: number): boolean;

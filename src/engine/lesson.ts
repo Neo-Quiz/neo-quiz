@@ -82,21 +82,17 @@ export interface LessonHandlers {
 }
 
 /**
- * Enveloppe de `ctx` : reconstruit le modèle à CHAQUE appel plutôt que de le
- * figer une fois pour toutes à l'assemblage.
+ * Wrapper around `ctx`: rebuilds the model on EACH call rather than freezing
+ * it once and for all at assembly.
  *
- * Nécessaire car `ctx.quizMode` EST mutable en cours de vie du bloc, malgré
- * la simplification du brief de cette tâche : `switchToExamMode` (engine.ts)
- * bascule Leçon → Examen (`ctx.quizMode = "exam"`), et `resetQuiz` peut
- * revenir à `"lesson"` (engine/state.ts). Un modèle construit UNE fois au
- * montage figerait `isLesson` à la valeur de l'instant de l'assemblage et
- * deviendrait faux dès le premier changement de mode — exactement l'écueil
- * SNAPSHOT que la règle « accessor, jamais flag » du projet interdit.
- * `ctx.quiz`, lui, ne change jamais après l'assemblage (aucune mutation des
- * champs `slice`/`role` ni du tableau trouvée dans engine.ts/engine/*.ts) :
- * seul `ctx.quizMode` bouge, d'où ce choix de tout recalculer à chaque appel
- * plutôt que d'introduire un cache invalidé à la main. Le coût est
- * négligeable : un seul passage sur `ctx.quiz`, borné à la taille du quiz.
+ * It was needed while `ctx.quizMode` could change during the block's life
+ * (the Learn → Exam switch and `resetQuiz` going back to `"lesson"`, both
+ * removed on 2026-09-29). It stays an accessor, as the project's "accessor,
+ * never a flag" rule asks: a snapshot would silently go wrong the day
+ * something mutates the mode again. `ctx.quiz` never changes after assembly
+ * (no mutation of the `slice`/`role` fields nor of the array in
+ * engine.ts/engine/*.ts). The cost is negligible: one pass over `ctx.quiz`,
+ * bounded by the quiz's size.
  */
 export function createLessonHandlers(ctx: EngineCtx): LessonHandlers {
 	const model = (): LessonModel => buildLessonModel(ctx.quiz, ctx.quizMode);

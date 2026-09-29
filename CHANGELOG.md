@@ -42,6 +42,7 @@ release notes.
 
 ### Changed
 - The quiz format no longer reads `mode: "lesson"`, `examMode`, `learnMode`, `examAutoSubmit` or `examShowTimer`: a Learn writes `mode: "learn"`, and a timed exam `mode: "exam"` with `examDurationMinutes`, now up to 300 minutes (a missing duration gives 1 min 30 per question, rounded to 5 minutes).
+- A Learn no longer ends with a "Take the exam" button, even when it carries a duration: an exam is now a quiz of its own.
 - The home page's Resume card no longer shows a percentage: it simply reopens the quiz on the question where you stopped.
 - The blue glow at the top of the home page and its "Add an exam" link are gone.
 - The side rail has new effects: entries are dimmed at rest, a soft surface appears on hover, they shrink slightly when pressed, and the current page is a frosted-glass card with a filled icon. The logo at the top is now a line icon that opens the GitHub repository, where you can leave a star.

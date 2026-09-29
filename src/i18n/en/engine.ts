@@ -35,35 +35,17 @@ export const EN_ENGINE = {
 	"engine.nav.prevQuestion": "Previous question",
 	"engine.nav.nextQuestion": "Next question",
 
-	/* ── Bascule de mode ──
-	   Le bouton "Practice mode" (et les cles switchOn/switchOff qui lui
-	   servaient d’aria-label) a disparu le 2026-08-31 (Task 5, lot mode lecon) :
-	   sa mecanique est absorbee par le role "recall" en mode Lecon. FINDING 3
-	   (round 1 de revue Task 5) : le code qui lisait ces deux cles
-	   (engine/interactions.ts, bindModeToggleControls/applyModeToggleVisualState)
-	   a ete retire avec le bouton, donc les cles aussi - retirees des DEUX
-	   dictionnaires ensemble (le typage FR sur EN_ENGINE l’impose). */
-
-	/* ── Écran de démarrage (choix du mode) ── */
-	"engine.start.selectorAria": "Choose the quiz mode",
-	"engine.start.examTitle": "Exam",
-	"engine.start.examSub": "Timed multiple choice",
-	"engine.start.learnTitle": "Learn",
-	"engine.start.learnSub": "No timer, corrected after each answer",
-
-	/* ── Mode examen ── */
-	/* L'écran de départ d'un quiz CHRONOMÉTRÉ : il annonce le chrono, sans choix. */
+	/* ── Exam ── */
+	/* The start screen of a TIMED quiz: it announces the clock, nothing to
+	   choose (the Learn | Exam choice left on 2026-09-24, its keys on
+	   2026-09-29). */
 	"engine.exam.timedTitle": "Timed quiz",
 	"engine.exam.start": "Start",
-	"engine.exam.startExam": "Start the exam",
-	"engine.exam.startLearn": "Start learning",
-	"engine.exam.noTimer": "No timer",
 	"engine.exam.duration.one": "Duration: {minutes} minute",
 	"engine.exam.duration.other": "Duration: {minutes} minutes",
 	"engine.exam.questionCount.one": "{count} question",
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Finish the exam",
-	"engine.exam.timeUpManual": "Time's up! Finish and submit your exam.",
 	"engine.exam.timeUpLocked": "Time's up! The quiz has been locked.",
 
 	/* ── Questions à choix ── */
@@ -180,8 +162,6 @@ export const EN_ENGINE = {
 	"engine.result.pendingWritten.one": "{count} written answer is not self-assessed yet — it doesn't count in the score.",
 	"engine.result.pendingWritten.other": "{count} written answers are not self-assessed yet — they don't count in the score.",
 	"engine.result.retry": "Start over",
-	"engine.result.takeExam": "Take the exam",
-	"engine.result.retakeExam": "Retake the exam",
 
 	/* ── Sauvegarde des résultats ── */
 	"engine.result.save": "Save my results",

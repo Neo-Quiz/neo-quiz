@@ -89,7 +89,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		return;
 	}
 
-	const { questions: quiz, quizMode, examOptions, lessonExamOptions, glossary } = extractExamOptions(rawQuiz);
+	const { questions: quiz, quizMode, examOptions, glossary } = extractExamOptions(rawQuiz);
 
 	if (!Array.isArray(quiz) || quiz.length === 0) {
 		renderParagraph(container, t("engine.error.noQuestions"));
@@ -154,10 +154,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const isFlashcardQuestion = (q: QuizQuestion): q is FlashcardQuestion =>
 		!!(q && (q as { flashcard?: unknown }).flashcard === true);
 
-	// Créer le contexte partagé (ctx) pour injection de dépendances
-	const originalQuizMode = quizMode;
-	const originalLessonExamOptions = lessonExamOptions ? { ...lessonExamOptions } : null;
-
+	// Create the shared context (ctx) for dependency injection.
 	// Cast unique documenté (as EngineCtx) : à ce point les 17 slots de
 	// sous-modules (sanitize, cards, …), l'état runtime (quizState) et les
 	// fonctions locales du moteur ne sont pas encore greffés — ils le seront via
@@ -190,12 +187,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		sessionSink,
 		quizMode,
 		isExamMode,
-		trainingSession: false,
 		examOptions,
 		examDurationMs,
-		lessonExamOptions,
-		originalQuizMode,
-		originalLessonExamOptions,
 		get examTimeRemaining() { return examTimeRemaining; },
 		set examTimeRemaining(v: number) { examTimeRemaining = v; },
 		get examStarted() { return examStarted; },
@@ -384,16 +377,16 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const initOrderingPicks = () => quiz.map(() => null);
 	const initMatchPicks = () => quiz.map(() => null);
 
-	/* NUMÉROS (src/lecture-etape.ts) : dans un Learn, chaque lecture a son
-	   écran mais pas de numéro de question (0 ; son onglet est un livre,
-	   engine/cards.ts `navHtml`). FIGÉS à l'assemblage sur le mode
-	   D'ORIGINE, comme `slideMap`. */
-	const estLecon = buildLessonModel(quiz, originalQuizMode).isLesson;
+	/* NUMBERS (src/lecture-etape.ts): in a Learn, each reading has its screen
+	   but no question number (0; its tab is a book, engine/cards.ts
+	   `navHtml`). FIXED at assembly, like `slideMap` — the mode of a quiz no
+	   longer changes while it is played. */
+	const estLecon = buildLessonModel(quiz, quizMode).isLesson;
 	const numeros = numerosAffiches(quiz, estLecon);
 	ctx.numeroAffiche = (qi: number): number => numeros[qi] ?? qi + 1;
-	/* Les LECTURES COURTES (même règle) n'ont pas d'écran : elles se lisent
-	   au-dessus de leur question hôte (engine/cards.ts). Figées elles aussi :
-	   une bascule Leçon → Examen ne leur rend pas une diapositive vide. */
+	/* SHORT READINGS (same rule) have no screen: they are read above their
+	   host question (engine/cards.ts). Fixed at assembly too, since the slide
+	   map is built once: a short reading never gets a slide of its own. */
 	const courtes = lecturesCourtes(quiz, estLecon);
 	ctx.lecturesAbsorbees = new Set(courtes.keys());
 	ctx.lectureCourteDe = (qi: number): number | null => {
@@ -420,7 +413,6 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	const quizState: QuizState = {
 		practiceMode: "qcm",
-		startMode: "exam",
 		selections: initSelections(),
 		textOnlyAnswers: initTextOnlyAnswers(),
 		textOnlyChecked: initTextOnlyChecked(),
@@ -941,9 +933,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	    ctx.track.clearTrackTransitionFallback();
 
 	    if (ctx.isExamMode && !ctx.examStarted) {
-	        // L'examen reste QCM chronométré ; l'entraînement est un mode séparé.
+	        // An Exam's start screen: its duration, a single Start button.
 	        container.innerHTML = ctx.exam.examTimerHtml();
-	        ctx.interactions.bindStartModeControls(container);
 	        ctx.exam.bindExamStartButton();
 	        return;
 	    }
@@ -1023,25 +1014,6 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	// The language name above a code block's logo, on hover (engine/code-lang-bubble.ts).
 	__quizGlobalCleanups.push(installCodeLangBubble(container));
-
-	// ── Mode Leçon → Examen : transition ──
-	function switchToExamMode(): void {
-		if (quizMode !== "lesson" || !lessonExamOptions) return;
-
-		// Changer les flags de mode (le slideMap ne change pas, les sections de
-		// leçon sont intégrées dans les question cards et seront masquées au render)
-		ctx.quizMode = "exam";
-		ctx.isExamMode = true;
-		ctx.trainingSession = false;
-		ctx.examOptions = lessonExamOptions;
-		ctx.examDurationMs = lessonExamOptions.durationMinutes * 60 * 1000;
-		ctx.examTimeRemaining = ctx.examDurationMs;
-
-		// Reset complet du quiz en mode examen
-		ctx.state.resetQuiz();
-	}
-
-	ctx.switchToExamMode = switchToExamMode;
 
 	// Assign remaining local functions to ctx
 	// Navigation functions use ctx.state.*

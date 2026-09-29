@@ -1,5 +1,5 @@
 /* =========================================================
-   Learn Mode — Inline learn section + Passer l'examen button
+   Learn Mode — Inline learn section
    ========================================================= */
 
 .quiz-learn-section{
@@ -62,34 +62,9 @@
   font-size: inherit;
 }
 
-/* ── "Passer l'examen" button on results page ── */
-
-.quiz-exam-btn{
-  background: color-mix(in srgb, var(--quiz-primary) 14%, var(--background-secondary)) !important;
-  color: var(--quiz-primary) !important;
-  border: 1px solid color-mix(in srgb, var(--quiz-primary) 30%, var(--background-modifier-border)) !important;
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.06),
-    0 0 0 1px color-mix(in srgb, var(--quiz-primary) 6%, transparent) inset !important;
-}
-
-.quiz-exam-btn:hover,
-.quiz-exam-btn:focus-visible{
-  background: color-mix(in srgb, var(--quiz-primary) 22%, var(--background-secondary)) !important;
-  border-color: color-mix(in srgb, var(--quiz-primary) 50%, var(--background-modifier-border)) !important;
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 16%, transparent),
-    0 0 16px color-mix(in srgb, var(--quiz-primary) 12%, transparent) !important;
-  transform: translate3d(0,-2px,0);
-}
-
 /* ── Light theme adjustments ── */
 
 .theme-light .quiz-learn-section{
-  box-shadow: none !important;
-}
-
-.theme-light .quiz-exam-btn{
   box-shadow: none !important;
 }
 

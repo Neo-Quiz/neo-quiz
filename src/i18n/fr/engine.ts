@@ -27,27 +27,14 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.nav.prevQuestion": "Question précédente",
 	"engine.nav.nextQuestion": "Question suivante",
 
-	/* ── Bascule de mode ── (retiree, voir en/engine.ts pour le contexte) */
-
-	/* ── Écran de démarrage (choix du mode) ── */
-	"engine.start.selectorAria": "Choisir le mode du quiz",
-	"engine.start.examTitle": "Examen",
-	"engine.start.examSub": "QCM chronométré",
-	"engine.start.learnTitle": "Apprendre",
-	"engine.start.learnSub": "Sans chrono, correction après chaque réponse",
-
-	/* ── Mode examen ── */
+	/* ── Exam ── */
 	"engine.exam.timedTitle": "Quiz chronométré",
 	"engine.exam.start": "Commencer",
-	"engine.exam.startExam": "Commencer l'examen",
-	"engine.exam.startLearn": "Commencer à apprendre",
-	"engine.exam.noTimer": "Sans chrono",
 	"engine.exam.duration.one": "Durée : {minutes} minute",
 	"engine.exam.duration.other": "Durée : {minutes} minutes",
 	"engine.exam.questionCount.one": "{count} question",
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Terminer l'examen",
-	"engine.exam.timeUpManual": "Temps écoulé ! Terminez et validez votre examen.",
 	"engine.exam.timeUpLocked": "Temps écoulé ! Le quiz a été verrouillé.",
 
 	/* ── Questions à choix ── */
@@ -156,8 +143,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.result.pendingWritten.one": "{count} réponse écrite n'est pas encore auto-évaluée — elle ne compte pas dans le score.",
 	"engine.result.pendingWritten.other": "{count} réponses écrites ne sont pas encore auto-évaluées — elles ne comptent pas dans le score.",
 	"engine.result.retry": "Recommencer",
-	"engine.result.takeExam": "Passer l'examen",
-	"engine.result.retakeExam": "Repasser l'examen",
 
 	/* ── Sauvegarde des résultats ── */
 	"engine.result.save": "Sauvegarder mes résultats",
