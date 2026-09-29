@@ -1122,10 +1122,13 @@
 
 /* ── Au-dessus de la grille : l'étape suivante (« Nouveau quiz » est dans
    l'en-tête du dossier depuis le 2026-09-26). ── */
+/* Each button takes only the room it needs (2026-09-29): stretched over
+   the whole width, "Resume" read as a banner rather than a button. A long
+   title is still cut by the button's own ellipsis (max-width). */
 .qbd-quizzes-drill-next {
-	display: grid;
-	grid-auto-flow: column;
-	grid-auto-columns: minmax(0, 1fr);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
 	gap: 14px;
 	margin-bottom: 18px;
 	animation-delay: 60ms;
@@ -1136,6 +1139,8 @@
    transparents, séparés par un filet. (2026-09-26) */
 .qbd-root .qbd-next-step.qbd-cta3d {
 	display: flex;
+	flex: 0 1 auto;
+	max-width: 100%;
 	min-width: 0;
 	cursor: default;
 }
