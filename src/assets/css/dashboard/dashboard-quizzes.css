@@ -1568,53 +1568,86 @@
 	.qbd-quizzes-folder-hero .qbd-quizzes-header-actions { height: auto; }
 }
 
-/* AN EMPTY FOLDER (2026-09-29, folder-add.ts `renderEmptyFolder`): the three
-   options of "New quiz" right on the page, in a dashed zone that also takes
-   a shared quiz dropped on it — the zone lights up in the folder's accent
-   while files are dragged over it. */
-.qbd-folder-empty {
+/* AN EMPTY FOLDER (2026-09-29, folder-add.ts `renderEmptyFolder`): one
+   centred column shared by the title, the two creation rows (no frame) and
+   the import DROP ZONE, the only element that takes dropped files. The zone
+   lights up in the import accent while files are dragged over it. */
+.qbd-empty-folder {
 	max-width: 560px;
 	margin: 6px auto 22px;
-	padding: 18px 16px 14px;
-	border: 1.5px dashed color-mix(in srgb, var(--text-normal) 16%, transparent);
-	border-radius: 16px;
-	background: color-mix(in srgb, var(--background-primary) 45%, transparent);
-	transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
-.qbd-root .qbd-folder-empty-title {
+.qbd-root .qbd-empty-folder-title {
 	margin: 0 0 10px 14px;
 	font-size: 15px;
 	font-weight: 600;
 	color: var(--text-normal);
 }
-.qbd-root .qbd-folder-empty-drop {
+.qbd-root .qbd-drop-zone {
+	/* Import accent (same amber as its row in the modal). The folder's own
+	   `--accent`, inherited, is kept for the drag state. */
+	--drop-accent: #f5a524;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	margin: 12px 0 0;
-	padding-top: 12px;
-	border-top: 1px solid var(--background-modifier-border);
+	gap: 4px;
+	width: 100%;
+	height: auto;
+	margin: 14px 0 0;
+	padding: 22px 16px 20px;
+	border: 1.5px dashed color-mix(in srgb, var(--text-normal) 16%, transparent);
+	border-radius: 16px;
+	background: color-mix(in srgb, var(--background-primary) 45%, transparent);
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	text-align: center;
+	/* The <button> inherits Obsidian's `white-space: nowrap`. */
+	white-space: normal;
+	cursor: pointer;
+	transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.qbd-root .qbd-drop-zone:hover {
+	border-color: color-mix(in srgb, var(--drop-accent) 55%, transparent);
+	background: color-mix(in srgb, var(--drop-accent) 6%, transparent);
+}
+.qbd-root .qbd-drop-zone:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-drop-zone-icon {
+	display: grid;
+	place-items: center;
+	width: 42px;
+	height: 42px;
+	margin-bottom: 6px;
+	border-radius: 12px;
+	color: var(--drop-accent);
+	background: color-mix(in oklab, var(--drop-accent) 17%, transparent);
+	transition: background-color 150ms ease;
+}
+.qbd-drop-zone-icon svg {
+	width: 21px;
+	height: 21px;
+}
+.qbd-drop-zone-title {
+	font-size: 14.5px;
+	font-weight: 650;
+	color: var(--text-normal);
+}
+.qbd-drop-zone-hint {
 	font-size: 12.5px;
+	line-height: 1.4;
 	color: var(--text-muted);
-	transition: color 150ms ease;
 }
-.qbd-folder-empty-drop-icon {
-	display: inline-flex;
-}
-.qbd-folder-empty-drop-icon svg {
-	width: 15px;
-	height: 15px;
-}
-.qbd-folder-empty.is-dragover {
+.qbd-root .qbd-drop-zone.is-dragover {
 	border-color: var(--accent, var(--interactive-accent));
 	background: color-mix(in srgb, var(--accent, var(--interactive-accent)) 10%, transparent);
 	box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--interactive-accent)) 14%, transparent);
 }
-.qbd-folder-empty.is-dragover .qbd-folder-empty-drop {
-	color: var(--accent, var(--interactive-accent));
+.qbd-drop-zone.is-dragover .qbd-drop-zone-icon {
+	background: color-mix(in oklab, var(--drop-accent) 26%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-folder-empty,
-	.qbd-folder-empty-drop { transition: none; }
+	.qbd-drop-zone,
+	.qbd-drop-zone-icon { transition: none; }
 }

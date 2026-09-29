@@ -25,9 +25,11 @@ export function openNewQuizModal(ctx: DashboardShellCtx, folder: string, onDone:
 	});
 }
 
-/** The three options, in the modal or right on the page of an empty folder
-    (`renderEmptyFolder`). `m` is null on the page: nothing to close. */
-function renderNewQuizOptions(c: HTMLElement, m: HostModalHandle | null, ctx: DashboardShellCtx, folder: string, onDone: () => void): void {
+/** The options, in the modal or right on the page of an empty folder
+    (`renderEmptyFolder`). `m` is null on the page: nothing to close. The
+    empty page passes `withImport = false`: its import is a drop zone of its
+    own, below the two rows. */
+function renderNewQuizOptions(c: HTMLElement, m: HostModalHandle | null, ctx: DashboardShellCtx, folder: string, onDone: () => void, withImport = true): void {
 	/* Hidden when the host does not serve "ai": the same guard as the
 	   folder creation modal. From a folder, Generate arrives with this
 	   folder as destination and its documents and notes attached. */
@@ -40,20 +42,29 @@ function renderNewQuizOptions(c: HTMLElement, m: HostModalHandle | null, ctx: Da
 	}
 	createOptionCard(m, c, "file-plus", "#4573ff", t("dashboard.quizzes.createQuizEmptyTitle"), t("dashboard.folder.newQuizEmptyDesc"),
 		() => void createQuizInFolder(ctx, folder));
+	if (!withImport) return;
 	createOptionCard(m, c, "download", "#f5a524", t("dashboard.quizzes.createQuizImportTitle"), t("dashboard.folder.newQuizImportDesc"),
 		() => void importQuizIntoFolder(ctx, folder, onDone));
 }
 
 /** AN EMPTY FOLDER (2026-09-29): instead of "No quiz found" and a "New
-    quiz" button, the three options straight on the page, in a zone that
-    also takes a shared quiz dropped on it. */
+    quiz" button, the two ways to CREATE a quiz straight on the page (same
+    rows as the modal, no frame), then a drop zone for a shared one: the
+    import is the only thing that takes dropped files, and a click on it
+    opens the file picker. */
 export function renderEmptyFolder(parent: HTMLElement, ctx: DashboardShellCtx, folder: string, onDone: () => void): void {
-	const zone = ajouter(parent, "div", "qbd-folder-empty");
-	ajouter(zone, "p", "qbd-folder-empty-title", t("dashboard.folder.emptyTitle"));
-	renderNewQuizOptions(ajouter(zone, "div", "qbd-folder-empty-options"), null, ctx, folder, onDone);
-	const drop = ajouter(zone, "p", "qbd-folder-empty-drop");
-	currentHost().ui.setIcon(ajouter(drop, "span", "qbd-folder-empty-drop-icon"), "upload");
-	ajouter(drop, "span", undefined, t("dashboard.folder.emptyDrop"));
+	const page = ajouter(parent, "div", "qbd-empty-folder");
+	ajouter(page, "p", "qbd-empty-folder-title", t("dashboard.folder.emptyTitle"));
+	renderNewQuizOptions(ajouter(page, "div", "qbd-empty-folder-options"), null, ctx, folder, onDone, false);
+
+	/* A real button: click, Enter and Space open the same picker as the
+	   import row of the modal (`importQuizIntoFolder`). */
+	const zone = ajouter(page, "button", "qbd-drop-zone");
+	zone.type = "button";
+	currentHost().ui.setIcon(ajouter(zone, "span", "qbd-drop-zone-icon"), "download");
+	ajouter(zone, "span", "qbd-drop-zone-title", t("dashboard.folder.emptyDropTitle"));
+	ajouter(zone, "span", "qbd-drop-zone-hint", t("dashboard.folder.emptyDropHint"));
+	zone.addEventListener("click", () => void importQuizIntoFolder(ctx, folder, onDone));
 
 	/* Only a drag carrying FILES lights the zone up (a text selection
 	   dragged over it does not). `depth` counts enter/leave pairs: moving
