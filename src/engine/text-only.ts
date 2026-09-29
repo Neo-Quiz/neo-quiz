@@ -518,10 +518,12 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 
 		return `<div class="quiz-textonly">
 			<div class="quiz-textonly-answer">
-				<label class="quiz-textonly-label" for="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}">${t("engine.textOnly.answerLabel")}</label>
+				<!-- No visible label above the field (2026-09-29): its placeholder
+				     already says what to write. Screen readers keep the name. -->
 				<textarea
 					id="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}"
 					class="quiz-textarea quiz-textonly-textarea"
+					aria-label="${ctx.escapeHtmlAttr(t("engine.textOnly.answerLabel"))}"
 					data-textonly-answer="1"
 					name="${textareaName}"
 					placeholder="${ctx.escapeHtmlAttr(t("engine.textOnly.answerPlaceholder"))}"
