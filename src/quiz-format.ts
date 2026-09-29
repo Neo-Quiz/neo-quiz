@@ -1,5 +1,5 @@
 import type { QuestionRole } from "./types/quiz";
-import { clampExamDuration, fallbackExamDuration, findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
+import { findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "./quiz-utils";
 import { aIndice } from "./quiz-hint";
 import { runInLastHintProbleme } from "./code-languages";
 
@@ -199,7 +199,8 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 	   instead of being duplicated. */
 	const runInvalides = questions.filter(({ q }) => q.runInLastHint === true && runInLastHintProbleme(q) !== null).map(({ q, i }) => nom(q, i));
 	if (runInvalides.length) manques.push({ kind: "runInLastHintInvalide", questions: runInvalides });
-	/* A Test, Practice or Exam (spec 2026-09-29 §4.6): an explanation
+	/* A Test (spec 2026-09-29 §4.6; `mode` is the block's REAL mode, so a model
+	   that wrote `mode: "exam"` anyway is checked like a Test): an explanation
 	   everywhere — it is the whole correction view once the test is handed
 	   in — and no flashcard without a back. */
 	if (mode !== "learn") {
@@ -305,43 +306,6 @@ export function completerConfigLearn(items: readonly unknown[]): unknown[] {
 	}
 	copie.push({ mode: "learn" });
 	return copie;
-}
-
-/** A REQUESTED Exam, brought to the state a saved Exam must have (spec
-    2026-09-29 §1.2 and §4.6): `mode: "exam"` and an explicit
-    `examDurationMinutes`, whatever the model wrote.
-    - The mode: a model that forgot `mode: "exam"` (or wrote another mode in
-      its configuration object) would have the note saved as a Practice, named
-      "— Practice", and untimed. Same defect and same repair as
-      `completerConfigLearn`; here, with no path role to look for, a
-      configuration object is added when the model wrote none.
-    - The duration: a duration TYPED by the user wins over the model's answer
-      (`typed`, already validated by the caller or not: it goes through
-      `clampExamDuration` here); in Auto (`typed` null), the model's own
-      `examDurationMinutes`, clamped to [1, 300]; failing that, the fallback
-      rule (`fallbackExamDuration`: 1 min 30 per question, rounded to 5).
-    Merges split configurations first (`fusionnerConfigsFinales`). A lone
-    `{ examDurationMinutes }` object is not recognised as a configuration by
-    `findQuizModeConfigIndex` (no mode, no glossary), so it is looked for
-    explicitly, or it would stay as a phantom question next to the new
-    configuration. PURE: returns a new array. */
-export function completeExamConfig(items: readonly unknown[], typed: number | null | undefined): unknown[] {
-	const merged = fusionnerConfigsFinales(items);
-	let idx = findQuizModeConfigIndex(merged);
-	if (idx < 0) {
-		idx = merged.findIndex(it => !!it && typeof it === "object" && !Array.isArray(it)
-			&& !texte((it as Element).prompt) && "examDurationMinutes" in (it as object));
-	}
-	const config = idx >= 0 ? (merged[idx] as Record<string, unknown>) : null;
-	const questionCount = merged.length - (config ? 1 : 0);
-	const minutes = clampExamDuration(typed)
-		?? clampExamDuration(config?.examDurationMinutes)
-		?? fallbackExamDuration(questionCount);
-	const result = [...merged];
-	const completed = { ...config, mode: "exam", examDurationMinutes: minutes };
-	if (idx >= 0) result[idx] = completed;
-	else result.push(completed);
-	return result;
 }
 
 export function planDesTranches(items: readonly unknown[]): { slice: number; titre: string }[] {

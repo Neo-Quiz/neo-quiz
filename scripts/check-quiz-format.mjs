@@ -15,7 +15,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, completeExamConfig, fusionnerConfigsFinales, estCarte, fallbackExamDuration, clampExamDuration, CHAMPS_DECRITS }) => {
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, fusionnerConfigsFinales, estCarte, fallbackExamDuration, clampExamDuration, CHAMPS_DECRITS }) => {
 	const r = makeReporter("Format Learn / Test");
 
 	/* The mode stays in the file NAME (readable in Obsidian) but not in the
@@ -48,54 +48,11 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.check("typed duration: whole minutes within [1, 300], null when not a positive number",
 		[clampExamDuration(90), clampExamDuration(301), clampExamDuration(0.4), clampExamDuration("45"), clampExamDuration(0), clampExamDuration("x"), clampExamDuration(undefined), clampExamDuration(-5)],
 		[90, 300, 1, 45, null, null, null, null]);
-	r.check("Exam: every question without an explanation is named, no slice required",
-		verifierFormat("exam", [q({ title: "Pile", explain: "" }), q({ title: "File" }), { mode: "exam", examDurationMinutes: 30 }]),
-		[{ kind: "sansExplication", questions: ["Pile"] }]);
-	r.check("Exam: a flashcard without a back is reported",
-		verifierFormat("exam", [q({ title: "Carte", options: undefined, correctIndex: undefined, flashcard: true })]),
-		[{ kind: "carteSansReponse", questions: ["Carte"] }]);
 	/* Only a Learn and a Test are generated (spec 2026-09-29 test setup §4): the
 	   prompt vocabulary has no Exam list, and neither type describes the Exam's
 	   configuration keys (`check:prompt` holds the forbidden words). */
 	r.check("CHAMPS_DECRITS knows Learn and Practice (the Test) only, and neither names the Exam's keys",
 		[Object.keys(CHAMPS_DECRITS), ["learn", "practice"].map(m => CHAMPS_DECRITS[m].some(c => /exam/i.test(c)))], [["learn", "practice"], [false, false]]);
-
-	/* ARRIVAL of a requested Exam (spec 2026-09-29 §1.2, §4.6): always
-	   `mode: "exam"` and an explicit duration — the typed one wins, then the
-	   model's (clamped), then the fallback rule on the QUESTIONS only. */
-	const dix = Array.from({ length: 10 }, (_, i) => q({ title: "Q" + i }));
-	const fixe = completeExamConfig(dix, null);
-	r.check("Exam arriving without any configuration: one is added, mode exam, fallback duration (10 questions = 15 min)",
-		[fixe.length, fixe.at(-1), modeDuBloc(fixe)], [11, { mode: "exam", examDurationMinutes: 15 }, "exam"]);
-	r.check("Exam arriving with a Practice or Learn configuration: the mode becomes exam, the rest of the configuration is kept",
-		[completeExamConfig([...dix, { mode: "quiz", glossary: [{ term: "t", definition: "d" }] }], null).at(-1),
-			completeExamConfig([...dix, { mode: "learn", objectives: ["x"] }], null).at(-1)],
-		[{ mode: "exam", glossary: [{ term: "t", definition: "d" }], examDurationMinutes: 15 }, { mode: "exam", objectives: ["x"], examDurationMinutes: 15 }]);
-	r.check("Exam: a typed duration is written whatever the model answered",
-		[completeExamConfig([...dix, { mode: "exam", examDurationMinutes: 45 }], 90).at(-1).examDurationMinutes,
-			completeExamConfig([...dix, { mode: "exam" }], 90).at(-1).examDurationMinutes,
-			completeExamConfig(dix, 999).at(-1).examDurationMinutes],
-		[90, 90, 300]);
-	r.check("Exam in Auto: the model's duration is kept, clamped to [1, 300]; an unusable one gets the fallback rule",
-		[45, 999, 0.2, "x", -5, null].map(d => completeExamConfig([...dix, { mode: "exam", examDurationMinutes: d }], null).at(-1).examDurationMinutes),
-		[45, 300, 1, 15, 15, 15]);
-	r.check("Exam: the fallback counts the questions, never the configuration object",
-		[completeExamConfig(dix.slice(0, 8), null).at(-1).examDurationMinutes, completeExamConfig([...dix.slice(0, 8), { mode: "exam" }], null).at(-1).examDurationMinutes], [10, 10]);
-	r.check("Exam: a lone { examDurationMinutes } object is the configuration, not left as a phantom question",
-		(() => { const res = completeExamConfig([...dix, { examDurationMinutes: 60 }], null); return [res.length, res.at(-1)]; })(),
-		[11, { examDurationMinutes: 60, mode: "exam" }]);
-	r.check("Exam: a configuration split in two objects is merged, the glossary kept",
-		completeExamConfig([...dix, { mode: "exam", examDurationMinutes: 40 }, { glossary: [{ term: "t", definition: "d" }] }], null).slice(10),
-		[{ mode: "exam", examDurationMinutes: 40, glossary: [{ term: "t", definition: "d" }] }]);
-	r.check("Exam: pure (the input is left as it was) and idempotent",
-		(() => {
-			const entree = [...dix, { mode: "quiz" }];
-			const avant = JSON.stringify(entree);
-			const un = completeExamConfig(entree, 30);
-			return [JSON.stringify(entree) === avant, JSON.stringify(completeExamConfig(un, 30)) === JSON.stringify(un)];
-		})(), [true, true]);
-	r.check("Exam fixed on arrival passes the arrival check with no gap",
-		verifierFormat("exam", completeExamConfig(dix, 60)), []);
 
 	/* Glossaire (lot D, 2026-09-27) : un Practice terminé par la configuration
 	   que la génération écrit désormais (`{ mode: "quiz", glossary }`) reste un
