@@ -1227,12 +1227,13 @@ body::after {
 	opacity: 0;
 }
 
-/* THE FOLDER SHEET (2026-09-29, `ui/folder-sheet.ts`): an open folder is a
-   sheet laid over the grid, which stays behind it, narrowed, and shows as
-   a 16 px strip above it (StudySmarter's study set over its Library).
-   The shell becomes the positioning box of the back sheet, and the front
-   panel is positioned too: an absolutely positioned sibling would
-   otherwise paint over it whatever the DOM order. */
+/* THE SHEET STACK (2026-09-29, `ui/sheet-stack.ts`): an open folder is a
+   sheet laid over the grid, a quiz's page a sheet over its folder; the
+   pages behind stay, narrowed, and show as 16 px strips above the front
+   one (StudySmarter's study set over its Library). The shell becomes the
+   positioning box of the back sheets, and the front panel is positioned
+   too: an absolutely positioned sibling would otherwise paint over it
+   whatever the DOM order. */
 /* NO ENTRY for the dashboard's panel (2026-09-29): `.qbd-content`'s
    fade-in (dashboard-base.css) played each time the shell was mounted, on
    Home or Folders. StudySmarter shows its pages without one. The quiz
@@ -1247,13 +1248,13 @@ body::after {
 	position: relative;
 }
 #neo-quiz-root > .qbd-layout > .qbd-content.nq-sheet-front {
-	margin-top: 16px;
+	margin-top: calc(16px * var(--nq-sheet-depth, 1));
 }
-/* The wrap: the panel's column (its `left` is set by the module), clipped
-   vertically only, as the quiz launch's sliding window. */
+/* The wrap: the panel's column (its `left` and its level's `top` are set
+   by the module), clipped vertically only, as the quiz launch's sliding
+   window. */
 .nq-sheet-back {
 	position: absolute;
-	top: 0;
 	bottom: 0;
 	right: 0;
 	overflow-x: visible;
@@ -1287,7 +1288,7 @@ body::after {
 }
 .nq-sheet-back--rest > .nq-sheet-back-scaler {
 	height: 100vh;
-	transform: scaleX(0.97);
+	transform: scaleX(var(--nq-sheet-scale, 0.97));
 }
 
 /* THE MARK at the top of the rail (StudySmarter's layout). A line-drawn SVG

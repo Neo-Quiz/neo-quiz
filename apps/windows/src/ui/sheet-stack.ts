@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════
-   THE FOLDER SHEET (2026-09-29)
+   THE SHEET STACK (2026-09-29)
 
    Reference: StudySmarter, clicking a study set in its Library, recorded
    over the DevTools protocol with `document.getAnimations()`. It is the
@@ -8,9 +8,8 @@
    - the new page rises from the bottom, `translateY(100%) → 0`, 500 ms,
      `cubic-bezier(0.36, 0.66, 0, 1)` — but only the PAGE: the rail stays;
    - it settles 16 px BELOW the top of the page it covers, which stays
-     behind it, narrowed (`scaleX(0.97)`): a stack of two sheets whose back
-     one shows as a strip above the front one, for as long as the study set
-     is open;
+     behind it, narrowed (`scaleX(0.97)`): a stack of sheets whose back one
+     shows as a strip above the front one, for as long as the page is open;
    - no content that slides on its own: the title fades in while rising
      10 px (200 ms, linear), the rest of the page fades in (250 ms);
    - the background tint moves to the set's colour (400 ms, same curve) —
@@ -25,32 +24,37 @@
    2026-09-27 ("it spoils the transition"); the two transitions keep the
    same rule.
 
-   THE BACK SHEET is not the grid's real panel: the panel (`.qbd-content`)
-   is the page's scroll container and `quizzes.ts`'s render target, it
-   stays in front and receives the folder. The back sheet is a copy of the
-   panel's MATERIAL, absolutely positioned over the same column:
+   SEVERAL LEVELS: the grid, a folder over it, a quiz's page over the
+   folder. Each page opened from the one in front pushes a sheet; each back
+   arrow pops one. The sheet at level `l` sits `l × 16 px` below the top,
+   narrowed by 3 % per level above it, so the strips read as a pile.
+
+   A BACK SHEET is not a real page: the panel (`.qbd-content`) is the
+   pages' scroll container and render target, it stays in front and
+   receives the new page. A back sheet is a copy of the panel's MATERIAL,
+   absolutely positioned over the same column:
      wrap (clips, slides)  >  scaler (narrows)  >  glass panel (counter-slides)
-   - on OPEN, the grid's live nodes move into the back panel (listeners,
-     scroll position and all), so what recoils is exactly what was on
-     screen;
+   - on OPEN, the page's live nodes move into the new back panel
+     (listeners, scroll position and all), so what recoils is exactly what
+     was on screen;
    - at REST, only the strip is left: the wrap is cut to 16 px and holds no
      animation (a `fill: forwards` would stay set for good — the trap of
      `npm run check:view-enter`); the strip is the empty top of a glass
-     panel, so a folder shown WITHOUT the rise (history, back from a quiz's
-     page, startup) gets the same stack with an empty back panel;
-   - on CLOSE, the grid is painted afresh into the back panel before it
-     comes forward, then once more into the real panel at the end, where
-     the back sheet is removed: the two paintings are identical, so the
-     swap does not show.
+     panel, so a page shown WITHOUT the rise (history, startup) gets the
+     same stack with empty back panels (`sync`);
+   - on CLOSE, the previous page is painted afresh into the top back panel
+     before it comes forward, then once more into the real panel at the
+     end, where that sheet is removed: the two paintings are identical, so
+     the swap does not show.
 
    NOTHING UNDER THE GLASS, as for the quiz launch: the front panel is
-   glass and would blur the grid painted beneath it. The wrap clips its
+   glass and would blur the page painted beneath it. The wrap clips its
    children at its own box and slides so that its bottom follows the front
    panel's top edge, while the panel inside slides the other way so that it
    does not move — all in `transform`, all on the compositor, on the same
    frames as the rising panel (see `slidingWindow`). The narrowing lives on
    the SCALER, not on the wrap: the quiz launch animates the `transform` of
-   every child of the shell, the wrap included, and would otherwise wipe
+   every child of the shell, the wraps included, and would otherwise wipe
    the stack's `scaleX` for its 500 ms.
 ══════════════════════════════════════════════════════════ */
 
@@ -60,53 +64,59 @@ import { uneFois } from "./transition-etat";
 /* Measured on StudySmarter, identical to the quiz launch's values. */
 const DURATION_MS = 500;
 const EASING = "cubic-bezier(0.36, 0.66, 0, 1)";
-/* How far below the back sheet's top the front one settles. */
-const OFFSET_PX = 16;
-const NARROWED = 0.97;
+/* How far below a back sheet's top the sheet in front of it settles. */
+const STEP_PX = 16;
+/* How much narrower a sheet gets per sheet in front of it. */
+const STEP_SCALE = 0.03;
 /* A fallback timer only, never the normal path (the `finish` events are):
    see `SECOURS_MS` in `transition-quiz.ts`. */
 const FALLBACK_MS = DURATION_MS * 4;
 
-/* The title of an open folder, which fades in while rising. */
-const TITLE = ".qbd-quizzes-header";
-/* The panel's first child in a folder, which holds the title. */
+/* The title of the page that rises, which fades in while rising: a
+   folder's, or a quiz page's. */
+const TITLE = ".qbd-quizzes-header, .qbd-fiche-head";
+/* A folder's first child, which holds the title: not faded as a whole. */
 const HERO = ".qbd-quizzes-folder-hero";
 
-export interface FolderSheet {
-	/** Plays the rise of a folder over the grid. `paint` repaints the panel
-	    with the folder (the grid's nodes have already left it). */
+export interface SheetStack {
+	/** Plays the rise of a page over the current one, which becomes a back
+	    sheet. `paint` repaints the panel with the new page (the old page's
+	    nodes have already left it). */
 	open(paint: () => void): void;
-	/** Plays the return to the grid. `paint(target)` paints the GRID into
-	    `target`: first the back sheet, then the real panel at the end.
-	    Without a stack, paints the panel directly. */
+	/** Plays the return to the page behind. `paint(target)` paints that
+	    page into `target`: first the top back sheet, then the real panel at
+	    the end. Without a back sheet, paints the panel directly. */
 	close(paint: (target: HTMLElement) => void): void;
-	/** Puts the page in the state its view calls for, without animation:
-	    a folder is stacked on a back sheet, anything else is not. Ignored
-	    while a transition runs — the transition sets its own end state. */
-	sync(inFolder: boolean): void;
+	/** Puts the stack at `depth` back sheets without animation — the depth
+	    the page being painted calls for. Ignored while a transition runs:
+	    the transition sets its own end state. */
+	sync(depth: number): void;
+	/** The number of back sheets. */
+	depth(): number;
 	/** Removes the stack at once (the shell is unmounted). */
 	drop(): void;
 }
 
-interface Stack {
+interface Sheet {
 	wrap: HTMLElement;
 	scaler: HTMLElement;
 	back: HTMLElement;
+	level: number;
 }
 
 /* The sliding window, as in `transition-quiz.ts` (`fenetreGlissante`),
-   with the front sheet settling OFFSET_PX lower. At progress `p` of the
-   rise, the front panel's top edge sits `OFFSET_PX + d · (1 − p)` below the
+   with the front sheet settling STEP_PX lower. At progress `p` of the
+   rise, the front panel's top edge sits `STEP_PX + d · (1 − p)` below the
    back sheet's top (`d`: the panel's travel), so the wrap, of height `H`,
-   slides by `T = min(0, OFFSET_PX + d · (1 − p) − H)`: zero while the front
+   slides by `T = min(0, STEP_PX + d · (1 − p) − H)`: zero while the front
    panel is below the back one, then linear in `p` — keyframes interpolate
    linearly on the same eased progress as the panel, so they fall exactly on
    its frames. */
 function slidingWindow(height: number, distance: number, rising: boolean): { wrap: Keyframe[]; back: Keyframe[] } {
-	const end = OFFSET_PX - height;
-	const points: Array<[number, number]> = distance > height - OFFSET_PX
-		? [[0, 0], [1 - (height - OFFSET_PX) / distance, 0], [1, end]]
-		: [[0, OFFSET_PX + distance - height], [1, end]];
+	const end = STEP_PX - height;
+	const points: Array<[number, number]> = distance > height - STEP_PX
+		? [[0, 0], [1 - (height - STEP_PX) / distance, 0], [1, end]]
+		: [[0, STEP_PX + distance - height], [1, end]];
 	const ordered = rising ? points : points.map(([o, t]): [number, number] => [1 - o, t]).reverse();
 	return {
 		wrap: ordered.map(([o, t]) => ({ offset: o, transform: `translateY(${t}px)` })),
@@ -119,6 +129,11 @@ function slidingWindow(height: number, distance: number, rising: boolean): { wra
    `transition-quiz.ts`). Measured at rest. */
 function travel(panel: HTMLElement): number {
 	return Math.max(0, window.innerHeight - panel.getBoundingClientRect().top);
+}
+
+/* The narrowing of the sheet at `level` under a stack `depth` deep. */
+function scaleFor(level: number, depth: number): number {
+	return 1 - STEP_SCALE * (depth - level);
 }
 
 /**
@@ -139,17 +154,26 @@ function children(el: HTMLElement): HTMLElement[] {
 	return Array.from(el.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
 }
 
-export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): FolderSheet {
-	let stack: Stack | null = null;
+export function createSheetStack(layout: HTMLElement, panel: HTMLElement): SheetStack {
+	const sheets: Sheet[] = [];
 	/* The end of the running transition, if any: called early when another
 	   request arrives, so that it starts from a settled page. */
 	let settle: (() => void) | null = null;
+	/* True while `open`/`close` call their `paint`: the page's render calls
+	   `sync`, which must not undo the stack being played. */
+	let painting = false;
 
-	function build(): Stack {
+	function paintWith(fn: () => void): void {
+		painting = true;
+		try { fn(); } finally { painting = false; }
+	}
+
+	function build(level: number): Sheet {
 		const wrap = document.createElement("div");
 		wrap.className = "nq-sheet-back";
 		wrap.inert = true;
 		wrap.setAttribute("aria-hidden", "true");
+		wrap.style.top = `${level * STEP_PX}px`;
 		const scaler = document.createElement("div");
 		scaler.className = "nq-sheet-back-scaler";
 		const back = document.createElement("div");
@@ -158,32 +182,32 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 		wrap.append(scaler);
 		/* The wrap covers the panel's column: the rail's width is fixed, so
 		   the panel's left edge holds when the window is resized. Measured
-		   once the shell is the positioning box (`nq-sheet-stack`). */
+		   once the shell is the positioning box (`nq-sheet-stack`). Right
+		   before the panel: the deeper sheets come first and paint beneath. */
 		layout.classList.add("nq-sheet-stack");
 		wrap.style.left = `${panel.offsetLeft}px`;
 		panel.before(wrap);
-		return { wrap, scaler, back };
+		const sheet = { wrap, scaler, back, level };
+		sheets.push(sheet);
+		return sheet;
 	}
 
-	/* True while `open`/`close` call their `paint`: the page's render calls
-	   `sync`, which must not undo the stack being played. */
-	let painting = false;
-	function paintWith(fn: () => void): void {
-		painting = true;
-		try { fn(); } finally { painting = false; }
+	/* The static state of a stack `depth` deep: every sheet cut to its
+	   strip and narrowed, the panel lowered under them. */
+	function atRest(depth: number): void {
+		for (const s of sheets) {
+			s.wrap.classList.add("nq-sheet-back--rest");
+			s.scaler.style.setProperty("--nq-sheet-scale", String(scaleFor(s.level, depth)));
+		}
+		panel.style.setProperty("--nq-sheet-depth", String(depth));
+		panel.classList.toggle("nq-sheet-front", depth > 0);
+		if (depth === 0) layout.classList.remove("nq-sheet-stack");
 	}
 
-	function atRest(s: Stack): void {
-		s.wrap.classList.add("nq-sheet-back--rest");
-		panel.classList.add("nq-sheet-front");
-	}
-
-	function remove(): void {
-		if (!stack) return;
-		stack.wrap.remove();
-		stack = null;
-		layout.classList.remove("nq-sheet-stack");
-		panel.classList.remove("nq-sheet-front");
+	function removeAll(): void {
+		for (const s of sheets) s.wrap.remove();
+		sheets.length = 0;
+		atRest(0);
 	}
 
 	function immediate(): boolean {
@@ -219,6 +243,17 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 		if (animations.length === 0) finishAll();
 	}
 
+	/* The deeper sheets narrow (open) or widen (close) by one step. */
+	function reshape(animations: Animation[], from: number, to: number, base: KeyframeAnimationOptions): void {
+		for (const s of sheets) {
+			if (s.level >= Math.min(from, to)) continue;
+			animations.push(s.scaler.animate(
+				[{ transform: `scaleX(${scaleFor(s.level, from)})` }, { transform: `scaleX(${scaleFor(s.level, to)})` }],
+				{ ...base, fill: "forwards" },
+			));
+		}
+	}
+
 	return {
 		open(paint) {
 			settle?.();
@@ -227,14 +262,14 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 				paint();
 				return;
 			}
-			/* Measured BEFORE anything moves: the grid's height and scroll. */
+			const depth = sheets.length;
+			/* Measured BEFORE anything moves: the page's height and scroll. */
 			const height = panel.offsetHeight;
 			const scroll = panel.scrollTop;
-			remove();
-			const s = build();
-			stack = s;
+			const s = build(depth);
 			s.back.append(...panel.childNodes);
 			s.back.scrollTop = scroll;
+			panel.style.setProperty("--nq-sheet-depth", String(depth + 1));
 			panel.classList.add("nq-sheet-front");
 			panel.scrollTop = 0;
 			paintWith(paint);
@@ -246,9 +281,10 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 			const animations: Animation[] = [
 				s.wrap.animate(win.wrap, { ...base, fill: "forwards" }),
 				s.back.animate(win.back, { ...base, fill: "forwards" }),
-				s.scaler.animate([{ transform: "scaleX(1)" }, { transform: `scaleX(${NARROWED})` }], { ...base, fill: "forwards" }),
+				s.scaler.animate([{ transform: "scaleX(1)" }, { transform: `scaleX(${scaleFor(depth, depth + 1)})` }], { ...base, fill: "forwards" }),
 				panel.animate([{ transform: `translateY(${distance}px)` }, { transform: "translateY(0)" }], { ...base, fill: "backwards" }),
 			];
+			reshape(animations, depth, depth + 1, base);
 			/* The title fades in while rising, the rest of the page fades in. */
 			const title = panel.querySelector<HTMLElement>(TITLE);
 			if (title) {
@@ -259,26 +295,28 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 				animations.push(child.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: "ease-in-out", fill: "backwards" }));
 			}
 			whenDone(animations, () => {
-				if (stack !== s) return;
-				/* The grid's nodes have done their part: the strip only shows
-				   the empty top of the glass. Emptied, they no longer hold
-				   listeners or observers behind the folder. */
+				if (!sheets.includes(s)) return;
+				/* The old page's nodes have done their part: the strip only
+				   shows the empty top of the glass. Emptied, they no longer
+				   hold listeners or observers behind the new page. */
 				s.back.replaceChildren();
-				atRest(s);
+				atRest(sheets.length);
 			});
 		},
 
 		close(paint) {
 			settle?.();
-			const s = stack;
+			const s = sheets[sheets.length - 1];
 			if (!s || immediate()) {
-				remove();
+				/* The page painted next sets the stack it calls for (`sync`). */
 				panel.replaceChildren();
 				paint(panel);
 				return;
 			}
-			/* The back sheet comes forward with the grid painted afresh, at
-			   the scroll position it will have in the real panel (the top). */
+			const depth = sheets.length;
+			/* The back sheet comes forward with the previous page painted
+			   afresh, at the scroll position it will have in the real panel
+			   (the top). */
 			s.wrap.classList.remove("nq-sheet-back--rest");
 			s.back.replaceChildren();
 			paintWith(() => paint(s.back));
@@ -290,31 +328,37 @@ export function createFolderSheet(layout: HTMLElement, panel: HTMLElement): Fold
 			const animations: Animation[] = [
 				s.wrap.animate(win.wrap, { ...base, fill: "both" }),
 				s.back.animate(win.back, { ...base, fill: "both" }),
-				s.scaler.animate([{ transform: `scaleX(${NARROWED})` }, { transform: "scaleX(1)" }], { ...base, fill: "both" }),
-				/* In front of the back sheet (DOM order already), sliding down
+				s.scaler.animate([{ transform: `scaleX(${scaleFor(s.level, depth)})` }, { transform: "scaleX(1)" }], { ...base, fill: "both" }),
+				/* In front of the back sheets (DOM order already), sliding down
 				   while fading out. */
 				panel.animate([{ transform: "translateY(0)", opacity: 1 }, { transform: `translateY(${distance}px)`, opacity: 0 }], { ...base, fill: "forwards" }),
 			];
+			reshape(animations, depth, depth - 1, base);
 			whenDone(animations, () => {
-				if (stack !== s) return;
-				remove();
+				if (!sheets.includes(s)) return;
+				s.wrap.remove();
+				sheets.splice(sheets.indexOf(s), 1);
+				atRest(sheets.length);
 				panel.replaceChildren();
 				panel.scrollTop = 0;
 				paint(panel);
 			});
 		},
 
-		sync(inFolder) {
-			if (settle || painting) return;
-			if (!inFolder) { remove(); return; }
-			if (stack) return;
-			stack = build();
-			atRest(stack);
+		sync(depth) {
+			if (settle || painting || sheets.length === depth) return;
+			removeAll();
+			for (let level = 0; level < depth; level++) build(level);
+			atRest(depth);
+		},
+
+		depth() {
+			return sheets.length;
 		},
 
 		drop() {
 			settle?.();
-			remove();
+			removeAll();
 		},
 	};
 }

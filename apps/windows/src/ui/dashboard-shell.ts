@@ -59,7 +59,7 @@ import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
-import { createFolderSheet } from "./folder-sheet";
+import { createSheetStack } from "./sheet-stack";
 
 /** The public repository the rail's mark opens (its page carries the Star
     button). The organisation's path, never the pre-transfer one. */
@@ -375,8 +375,12 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	// nu n'a AUCUNE règle : le rail se serait retrouvé sans largeur ni fond.
 	const navEl = ajouter(layout, "div", "qbd-sidebar");
 	const contentEl = ajouter(layout, "div", "qbd-content");
-	/* An open folder is a sheet over the grid (`folder-sheet.ts`). */
-	const feuille = createFolderSheet(layout, contentEl);
+	/* An open folder is a sheet over the grid, a quiz's page a sheet over
+	   the page it was opened from (`sheet-stack.ts`). */
+	const sheets = createSheetStack(layout, contentEl);
+	/* The number of back sheets a quiz's page stands on: one more than the
+	   page it was opened from, fixed when it is opened. */
+	let detailDepth = 1;
 
 	/* Dernière vue effectivement PEINTE dans CE montage — jamais persistée
 	   au niveau du module, à l'inverse de `vueCourante` : le DOM est neuf à
@@ -413,7 +417,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		openQuiz: (quiz) => {
 			if (vueCourante !== "detail" || quizSelectionne?.path !== quiz.path) {
 				if (!memeEtatNav(etatCourant(), { vue: "detail", dossier: null, quiz })) enregistrerNav();
-				if (vueCourante !== "detail") vuePrecedente = vueCourante;
+				if (vueCourante !== "detail") { vuePrecedente = vueCourante; detailDepth = sheets.depth() + 1; }
 				quizSelectionne = quiz;
 				vueCourante = "detail";
 				ouvertureEnAttente = true;
@@ -445,7 +449,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite };
 		},
 		ambiance: (accent) => poserLueur(accent),
-		folderSheet: feuille,
+		sheetStack: sheets,
 		pickIcon: (anchor, courante, onPick, suggestions) => {
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
@@ -717,10 +721,11 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	    par le scanner (simple rafraîchissement) — dans les deux cas le calcul
 	    d'`entering` est le même : vrai seulement si la vue diffère de la
 	    dernière peinte. */
-	function peindre(): void {
-		// Only an open folder stands on a sheet stack ("Folders" syncs it).
-		if (vueCourante !== "quizzes") feuille.drop();
-		contentEl.replaceChildren();
+	function peindre(target: HTMLElement = contentEl): void {
+		// The sheets each page stands on ("Folders" sets its own).
+		if (vueCourante === "detail") sheets.sync(detailDepth);
+		else if (vueCourante !== "quizzes") sheets.sync(0);
+		target.replaceChildren();
 		const entering = vueCourante !== dernierePeinte;
 		dernierePeinte = vueCourante;
 		switch (vueCourante) {
@@ -728,7 +733,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				// Pas de paramètre `entering` : `quizzes.ts` gère sa propre
 				// transition d'entrée, calée sur son état de drill-down interne
 				// (voir `createQuizzesHandlers`), pas sur celui de la coquille.
-				quizzes.render(contentEl);
+				quizzes.render(target);
 				break;
 			case "detail": {
 				const quiz = quizSelectionne;
@@ -737,7 +742,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 					// les pose ensemble) : l'accueil plutôt qu'un contenu vide.
 					vueCourante = "home";
 					nav.setActive("home");
-					home.render(contentEl, entering);
+					home.render(target, entering);
 					break;
 				}
 				const edit = editionEnAttente;
@@ -755,16 +760,26 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				ouvertureEnAttente = false;
 				const entreeAnimee = entreeDetail === "generation";
 				entreeDetail = undefined;
-				detail.render(contentEl, quiz, {
+				detail.render(target, quiz, {
 					startEditing: edit,
 					animateEntry: entreeAnimee,
 					onBack: () => {
+						/* Back to Folders or Home: the quiz's page slides down
+						   and the page behind comes forward (`sheet-stack.ts`).
+						   Back to "Folders", the quiz's FOLDER, not the root
+						   grid — `naviguer` has just closed the drill-down
+						   (`resetDrilldown`), hence the reopening, on the
+						   `quizzes` instance still alive. Back to Generate, a
+						   plain repaint: its page holds a composer that must
+						   not be painted twice. */
+						if (cible === "quizzes" || cible === "home") {
+							naviguer(cible, undefined, () => {
+								if (cible === "quizzes") quizzes.selectFolderOfQuiz(quiz.path);
+								sheets.close(t => peindre(t));
+							});
+							return;
+						}
 						naviguer(cible);
-						// Retour vers « Mes quiz » : le DOSSIER du quiz, pas la
-						// grille racine — `naviguer` vient de refermer le drill
-						// (`resetDrilldown`), d'où la réouverture, sur l'instance
-						// de `quizzes` restée vivante (même geste que le greffon).
-						if (cible === "quizzes") quizzes.openFolderOfQuiz(quiz.path);
 					},
 					isStale: () => vueCourante !== "detail",
 					initialQuestion: initial,
@@ -774,11 +789,11 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				break;
 			}
 			case "ai":
-				void ai.render(contentEl);
+				void ai.render(target);
 				break;
 			case "home":
 			default:
-				home.render(contentEl, entering);
+				home.render(target, entering);
 				break;
 		}
 	}
@@ -841,7 +856,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		if (cible) appliquerNav(cible);
 	};
 
-	function naviguer(vue: DashboardViewName, data?: NavigateData): void {
+	function naviguer(vue: DashboardViewName, data?: NavigateData, repaint: () => void = peindre): void {
 		/* « Créer avec l'IA » depuis un dossier : le préréglage est posé sur
 		   la page AVANT qu'elle se peigne — c'est son premier `render` qui
 		   joint les sources, et il a besoin de la destination déjà connue. */
@@ -852,6 +867,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		if (!memeEtatNav(etatCourant(), { vue, dossier: null, quiz: vue === "detail" ? data?.quiz ?? null : null })) enregistrerNav();
 		if (vue === "detail") {
 			if (!data?.quiz) return;
+			const from = vueCourante;
 			quizSelectionne = data.quiz;
 			editionEnAttente = !!data.edit;
 			ouvertureEnAttente = true;
@@ -867,7 +883,13 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			// changement. Ouvrir un quiz montre sa fiche ; sa question courante
 			// reste celle sur laquelle l'éditeur s'ouvre.
 			noterVue({ vue: "detail", quiz: data.quiz.path });
-			peindre();
+			/* A quiz's page opened by a click rises as a sheet over the page
+			   it was opened from; restored from history, or arriving from a
+			   generation (which has its own entry), it is simply painted, on
+			   the same stack. From another quiz's page, the stack stays. */
+			if (from !== "detail") detailDepth = sheets.depth() + 1;
+			if (from !== "detail" && !enRestauration && data.entree !== "generation") sheets.open(() => peindre());
+			else peindre();
 			return;
 		}
 		if (!ctx.canOpen(vue)) return;
@@ -881,7 +903,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		vueCourante = vue;
 		nav.setActive(vue);
 		noterVue({ vue });
-		peindre();
+		repaint();
 	}
 
 	nav.render(navEl);
@@ -957,7 +979,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		document.removeEventListener("mouseup", surBoutonSouris, true);
 		desabonner();
 		demonterMaj();
-		feuille.drop();
+		sheets.drop();
 		/* La page « Générer » aussi : une génération en vol, son écoute Échap
 		   sur le document, son sondage Ollama et les URL d'objet de ses images
 		   survivraient sinon à la coquille (même geste que l'`onClose` du

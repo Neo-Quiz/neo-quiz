@@ -48,6 +48,10 @@ export interface QuizzesHandlers {
 	    2026-07-21) — et la correspondance chemin → dossier de module vit ici,
 	    avec la note de correspondance et les overrides. */
 	openFolderOfQuiz(quizPath: string): void;
+	/** The same folder as `openFolderOfQuiz`, set WITHOUT painting nor
+	    recording history: the host paints it itself, into the back sheet
+	    that comes forward when a quiz's page closes (`sheetStack.close`). */
+	selectFolderOfQuiz(quizPath: string): void;
 	/** Ouvre un dossier à un ONGLET donné (« Gérer les examens » de
 	    module-edit.ts, via `ctx.openFolderTab`) : même geste qu'`openFolder`,
 	    mais fixe aussi l'onglet AVANT le rendu — sans quoi `render()` le
@@ -193,8 +197,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		const container = containerRef;
 		if (!container) return;
 		/* From the grid, the folder rises as a sheet over it (the host's
-		   `folderSheet`); from another folder, a plain repaint. */
-		if (fromGrid && ctx.folderSheet) ctx.folderSheet.open(() => render(container));
+		   `sheetStack`); from another folder, a plain repaint. */
+		if (fromGrid && ctx.sheetStack) ctx.sheetStack.open(() => render(container));
 		else render(container);
 	}
 
@@ -295,8 +299,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		regrouping = false;
 		lastPaintedView = viewKey;
 		markViewEnter(container, entering, "qbd-quizzes-enter");
-		// A folder stands on its sheet stack, the grid does not.
-		ctx.folderSheet?.sync(openModuleFolder !== null);
+		// A folder stands on one back sheet (the grid), the grid on none.
+		ctx.sheetStack?.sync(openModuleFolder !== null ? 1 : 0);
 
 		const quizzes: QuizIndexEntry[] = ctx.scanner ? ctx.scanner.getQuizzes() : [];
 		const stats: Record<string, QuizStatRecord> = ctx.statsStore ? ctx.statsStore.getAll() : {};
@@ -356,7 +360,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				ctx.recordNav();
 				openModuleFolder = null;
 				// The folder's sheet slides back down, uncovering the grid.
-				if (ctx.folderSheet) ctx.folderSheet.close(target => render(target));
+				if (ctx.sheetStack) ctx.sheetStack.close(target => render(target));
 				else if (containerRef) render(containerRef);
 			});
 			// Dans un dossier : le header EST le titre du dossier — icône + nom du
@@ -515,6 +519,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// grille plutôt que d'ouvrir un dossier fantôme.
 			const folder = moduleForQuiz(quizPath, effectiveMap()).folder;
 			if (folder) openModule(folder);
+		},
+		selectFolderOfQuiz(quizPath: string) {
+			if (moduleMap === null) { dossierAttenduPour = quizPath; return; }
+			openModuleFolder = moduleForQuiz(quizPath, effectiveMap()).folder || null;
 		},
 	};
 }

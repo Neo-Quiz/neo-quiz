@@ -48,6 +48,7 @@ release notes.
 
 ### Changed
 - Opening a folder from the Folders page: the folder rises as a sheet over the grid, which stays behind it, slightly narrowed, as a strip above the folder; its title and content fade in. The back arrow slides the folder down and brings the grid forward again.
+- Opening a quiz from a folder or from Home: its page rises the same way over the page it came from, which stays behind as a strip (a folder over the grid, a quiz over its folder, one strip per level); its back arrow slides it down again.
 - The quiz cards of an open folder carry a thin bar in the folder's colour across their top.
 - Home and Folders now appear at once when opened from the side rail, without their entry animation; switching the grouping of the Folders page still plays its cascade.
 - Quiz cards, course pages and the Progress tab know the Exam: a course gathers its Learn, Practice and Exam on one card with a pill each (a timer for the exam), and its page switches between the three. In French, the modes are now called Apprendre, Entraînement and Examen.
