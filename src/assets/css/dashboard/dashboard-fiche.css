@@ -600,7 +600,7 @@
 }
 .qbd-fiche-meta .qbd-fiche-chip:hover { transform: none; }
 .qbd-fiche-meta .qbd-fiche-chip + .qbd-fiche-chip::before,
-.qbd-fiche-meta .qbd-fiche-quizzes + .qbd-fiche-chip::before {
+.qbd-fiche-meta .qbd-fiche-modes + .qbd-fiche-chip::before {
 	content: "·";
 	/* La pastille est en `inline-flex` avec `gap: 6px` : ce `::before` en
 	   devient un élément, et le gap s'ajoutait à la marge (espace en trop
@@ -609,6 +609,7 @@
 	color: var(--text-faint);
 }
 .qbd-fiche-meta .qbd-fiche-origin-date { color: var(--text-muted); }
+.qbd-fiche-meta .qbd-fiche-modes,
 .qbd-fiche-search {
 	/* EXACTEMENT les boutons « Semaine » et « Aujourd'hui » de l'application
 	   Neo Calendar (apps/windows/src/DesktopTitlebar.css, .nc-btn-today) :
@@ -669,6 +670,23 @@
 	cursor: pointer;
 	opacity: 0.8;
 }
+/* Dans le sélecteur, chaque segment occupe TOUTE la hauteur intérieure
+   (24 px), comme le bloc bleu qui glisse : le survol d'un segment a donc
+   exactement les dimensions et le rayon du bloc actif (2026-09-26). Le
+   sélecteur entier ne s'éclaire plus au survol, seul le segment visé. */
+.qbd-fiche-meta .qbd-fiche-modes { align-items: stretch; padding: 2px; }
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg {
+	display: inline-flex;
+	align-items: center;
+	font-weight: 500;
+	padding: 0 10px;
+	border-radius: 4px;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:hover:not(.is-active) {
+	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+}
+.qbd-fiche-meta .qbd-fiche-mode-indic { border-radius: 4px; }
 .qbd-root .qbd-fiche-search-input::placeholder { color: var(--text-muted); }
 .qbd-fiche-meta-infos {
 	display: flex;
