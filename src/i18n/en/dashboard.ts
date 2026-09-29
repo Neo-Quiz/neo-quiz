@@ -92,7 +92,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.newQuiz": "New quiz",
 	"dashboard.quizzes.newQuizDefaultName": "New quiz",
 	"dashboard.quizzes.newQuizError": "Could not create the quiz",
-	"dashboard.quizzes.createQuizEmptyTitle": "Create an empty quiz",
+	"dashboard.quizzes.createQuizEmptyTitle": "Create a quiz manually",
 	"dashboard.quizzes.createQuizImportTitle": "Import a shared quiz",
 	"dashboard.quizzes.importQuizDone": "Imported {name}",
 	"dashboard.quizzes.importNoQuiz": "No quiz block found in this file",
@@ -108,7 +108,7 @@ export const EN_DASHBOARD = {
 	"dashboard.folder.addGenerate": "Generate a quiz with AI",
 	// The rows of a folder's "New quiz" modal (folder-add.ts).
 	"dashboard.folder.newQuizAiDesc": "From this folder's documents and notes, already attached",
-	"dashboard.folder.newQuizEmptyDesc": "An empty quiz to fill in yourself in the editor",
+	"dashboard.folder.newQuizEmptyDesc": "Write the questions yourself in the editor",
 	"dashboard.folder.newQuizImportDesc": "A quiz someone shared with you (.md)",
 	"dashboard.folder.filesAddedOne": "{count} file added",
 	"dashboard.folder.filesAddedOther": "{count} files added",

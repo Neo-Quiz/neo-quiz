@@ -329,21 +329,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
 			}
 
-			/* « Partager » le dossier (2026-09-25, comme StudySmarter) : le même
-			   modal que l'entrée « Partager » du menu ⋯ de sa carte, sur les
-			   mêmes quiz que la grille. Absent si l'hôte ne sait pas partager. */
-			const { shareQuiz } = ctx;
-			if (shareQuiz && inModule.length > 0) {
-				const partager = ajouter(headerActions, "button", "qbd-folder-share-btn");
-				partager.type = "button";
-				currentHost().ui.setIcon(ajouter(partager, "span", "qbd-btn-icon"), "share-2");
-				ajouter(partager, "span", undefined, t("dashboard.quizzes.menuShare"));
-				const nom = openModuleInfo?.name || openModuleFolder;
-				partager.addEventListener("click", () => shareQuiz({ group: {
-					folder: openModuleFolder as string, name: nom, ue: null, path: cheminOuvert,
-					quizzes: inModule, total: inModule.length, mastered: 0,
-				} }));
-			}
+			/* No "Share" button here any more (2026-09-29): the ⋯ menu below
+			   already opens the same share modal, and the button took the room
+			   that a long folder title needs. */
 
 			/* « ⋯ » : le menu du dossier (Modifier, Ouvrir dans l'explorateur,
 			   Archiver…), le MÊME que celui de sa carte dans « Mes quiz »

@@ -21,7 +21,7 @@ release notes.
 - Learn courses come in several reading styles chosen by the AI for the content: a reading page, numbered steps or a comparison table, with key points as flip cards or a checked recap; the style can be changed in the editor.
 - Wallpaper brightness and blur sliders in Settings, under the wallpaper, applied live as you drag.
 - A ⋯ button at the top right of a folder opens the same menu as its card (edit, open the folder, copy its path, archive, move, delete).
-- Share a folder or a quiz: a Share button at the top right of a folder, and a Share entry in the ⋯ menu of every card. Discord puts the file (a .zip for a folder, a .md for a quiz) in the clipboard and brings Discord to the front, ready to paste; Save file asks where to save it and shows it in the explorer.
+- Share a folder or a quiz: a Share entry in the ⋯ menu of a folder and of every card. Discord puts the file (a .zip for a folder, a .md for a quiz) in the clipboard and brings Discord to the front, ready to paste; Save file asks where to save it and shows it in the explorer.
 - The back and forward buttons of a mouse move through the pages you visited, like in a browser: home, Folders, a folder, a quiz page. On a quiz being played, the back button returns to the list.
 - Attaching several documents now makes one quiz per document instead of one long quiz: CM1, CM2 and CM3 give three quizzes, each with its own line in the generation queue, generated one after the other and saved as soon as it is ready. A document that fails shows its error on its line and the others go on; with a website, the site reopens for the next document once the previous answer is received.
 - A Time format setting: times are shown in 24-hour format by default, whatever the interface language, and can be switched to 12-hour (AM/PM) in Settings.
@@ -41,6 +41,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- A folder's header no longer has a Share button, which left the folder name cut off: Share is in its ⋯ menu. In New quiz, "Create an empty quiz" is now "Create a quiz manually".
 - The My quizzes page is now called Folders, with a folders icon in the side rail: it opens on your folders.
 - The home page now shows what to work on today: one card per folder with its tasks (review the questions due, then the Learns, then the tests), sorted by the nearest exam, and on the right the week with the days done or missed, the tasks left today and the next exam. The global counters and the grid of quizzes are gone.
 - The played quiz shows its mode as a Learn or Practice pill before its title, instead of a "Learn:" prefix; the note's path no longer appears on hover.
