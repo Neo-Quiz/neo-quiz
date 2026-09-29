@@ -996,6 +996,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	    // (réponse libre + auto-évaluation) est ABSORBÉE par le rôle "recall" en
 	    // mode Leçon, décidé question par question (ctx.textOnly.isTextOnlyFor).
 	    container.innerHTML = `${examChromeHtml}${ctx.cards.navHtml()}<div class="quiz-track-viewport" data-quiz-height-ready="0"><div class="quiz-track">${slidesHtml}</div></div>`;
+	    ctx.exam.paintExamTimerIcon();
 	    // Termes du glossaire AVANT mathifyElement — même ordre, même raison
 	    // qu'en repeint d'une carte (voir refreshQuestionSlide plus haut).
 	    ctx.termes.poserTermes(container);

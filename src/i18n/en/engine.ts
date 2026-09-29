@@ -55,7 +55,6 @@ export const EN_ENGINE = {
 	"engine.testSetup.keepExam": "Keep exam mode",
 	"engine.testSetup.hints": "Hints",
 	"engine.testSetup.timeLimit": "Time limit",
-	"engine.testSetup.totalHelp": "Total for the whole test",
 	"engine.testSetup.less": "Less time",
 	"engine.testSetup.more": "More time",
 	"engine.testSetup.minutesUnit": "min",

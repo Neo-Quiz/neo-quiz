@@ -187,8 +187,7 @@
 	color: var(--text-muted);
 }
 .qbd-setup-locknote[hidden],
-.qbd-setup-stepper[hidden],
-.qbd-setup-help[hidden] { display: none; }
+.qbd-setup-stepper[hidden] { display: none; }
 .qbd-setup-locknote-ico { display: inline-flex; }
 .qbd-setup-locknote-ico svg { width: 12px; height: 12px; }
 .qbd-setup-row.is-locked { cursor: default; }

@@ -182,7 +182,6 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 
 				// ── Time limit: the stepper, then the switch ──
 				const limit = row(rows, "timer", "limit", t("engine.testSetup.timeLimit"));
-				const limitHelp = ajouter(limit.text, "span", "qbd-setup-help", t("engine.testSetup.totalHelp"));
 				const stepper = ajouter(limit.side, "div", "qbd-setup-stepper");
 				stepper.setAttribute("role", "group");
 				stepper.setAttribute("aria-labelledby", `${id}-limit`);
@@ -277,7 +276,6 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 					hintsSwitch.lock(isExam);
 					limitSwitch.lock(isExam);
 					stepper.hidden = !limited;
-					limitHelp.hidden = !limited;
 					if (limited) {
 						const minutes = setup.timeLimitMinutes as number;
 						if (document.activeElement !== field) field.value = String(minutes);

@@ -1,81 +1,117 @@
 /* =========================================================
-   MODE EXAMEN — TIMER
+   TEST CLOCK
+   A thin track across the width of the beads row below (same width formula
+   as `.quiz-nav`), and the time as a small pill on its right. No box around
+   it: the sticky wrapper only carries a faint glass so the questions do not
+   show through it while scrolling. Shared by the app and the plugin.
    ========================================================= */
 
-/* Timer container */
 .quiz-exam-timer {
 	position: sticky;
 	top: 0;
 	z-index: 100;
-	background: var(--background-primary);
-	border-bottom: 1px solid var(--background-modifier-border);
-	padding: 8px 12px;
-	margin: 0 auto;
 	width: min(var(--quiz-max-width), calc(100% - (var(--quiz-side-gap) * 2)));
+	margin: 0 auto;
+	padding: 8px 0;
 	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	gap: 12px;
+	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
 }
 
-/* Barre de progression */
+/* The track: 4px, fully rounded, faint neutral. */
 .quiz-exam-timer-bar {
 	flex: 1;
-	height: 6px;
-	background: var(--background-modifier-border);
-	border-radius: 3px;
+	height: 4px;
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	border-radius: 999px;
 	overflow: hidden;
 	position: relative;
 }
 
+/* The fill shrinks as time passes. */
 .quiz-exam-timer-progress {
 	height: 100%;
 	width: 100%;
-	background: var(--quiz-success);
-	border-radius: 3px;
+	background: var(--quiz-primary);
+	border-radius: 999px;
 	transition: width 1s linear, background-color 0.3s ease;
 }
 
-/* Texte du timer */
-.quiz-exam-timer-text {
-	font-size: 14px;
-	font-weight: 700;
+/* The time: icon + tabular digits on a faint surface. */
+.quiz-exam-timer-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px 3px 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+	color: var(--text-muted);
+	font-family: var(--font-monospace, ui-monospace, monospace);
+	font-size: 13px;
+	font-weight: 500;
 	font-variant-numeric: tabular-nums;
-	color: var(--text-normal);
-	min-width: 45px;
+	line-height: 1.4;
+	transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+.quiz-exam-timer-icon {
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+}
+
+.quiz-exam-timer-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.quiz-exam-timer-text {
+	min-width: 4ch;
 	text-align: right;
 }
 
-/* États de couleur du timer */
+/* Warning states: amber at half the time, red in the last fifth. */
 .quiz-exam-timer-warning .quiz-exam-timer-progress {
-	background: #f59e0b;
+	background: var(--quiz-hint);
 }
 
-.quiz-exam-timer-warning .quiz-exam-timer-text {
-	color: #f59e0b;
+.quiz-exam-timer-warning .quiz-exam-timer-pill {
+	color: var(--quiz-hint);
+	background: color-mix(in srgb, var(--quiz-hint) 12%, transparent);
 }
 
 .quiz-exam-timer-danger .quiz-exam-timer-progress {
 	background: var(--quiz-danger);
 }
 
-.quiz-exam-timer-danger .quiz-exam-timer-text {
+.quiz-exam-timer-danger .quiz-exam-timer-pill {
 	color: var(--quiz-danger);
+	background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
 }
 
-/* Animation pulse pour danger */
+/* Last minute: the pill pulses gently. */
 @keyframes quiz-timer-pulse {
 	0%, 100% { opacity: 1; }
-	50% { opacity: 0.7; }
+	50% { opacity: 0.65; }
 }
 
-.quiz-exam-timer-danger .quiz-exam-timer-text {
+.quiz-exam-timer-critical .quiz-exam-timer-pill {
 	animation: quiz-timer-pulse 1s ease-in-out infinite;
 }
 
-/* Theme light */
-.theme-light .quiz-exam-timer {
-	background: var(--background-primary);
+@media (prefers-reduced-motion: reduce) {
+	.quiz-exam-timer-progress,
+	.quiz-exam-timer-pill {
+		transition: none;
+	}
+
+	.quiz-exam-timer-critical .quiz-exam-timer-pill {
+		animation: none;
+	}
 }
 
 /* Écran de démarrage de l'examen */

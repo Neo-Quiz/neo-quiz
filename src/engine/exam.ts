@@ -17,6 +17,7 @@ export function formatExamClock(ms: number): string {
 
 export interface ExamHandlers {
 	examTimerHtml(): string;
+	paintExamTimerIcon(): void;
 	startExamTimer(): void;
 	startExam(): void;
 	updateExamTimerDisplay(): void;
@@ -88,8 +89,19 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 			<div class="quiz-exam-timer-bar">
 				<div class="quiz-exam-timer-progress" data-exam-progress="1" style="width: ${pct}%"> </div>
 			</div>
-			<div class="quiz-exam-timer-text" data-exam-text="1">${timerDisplay}</div>
+			<div class="quiz-exam-timer-pill">
+				<span class="quiz-exam-timer-icon" data-exam-icon="1"></span>
+				<span class="quiz-exam-timer-text" data-exam-text="1">${timerDisplay}</span>
+			</div>
 		</div>`;
+	}
+
+	/** Draws the pill's icon through the host (the markup above is a string, so
+	    the icon can only be set once it is in the DOM). Called right after each
+	    render that includes the clock. */
+	function paintExamTimerIcon(): void {
+		const el = ctx.container?.querySelector<HTMLElement>('[data-exam-icon="1"]');
+		if (el && !el.firstChild) ctx.host.ui.setIcon(el, "timer");
 	}
 
 	function startExamTimer(): void {
@@ -181,9 +193,11 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 		const timerContainer = ctx.container?.querySelector('[data-exam-timer="1"]');
 		if (timerContainer) {
-			timerContainer.classList.remove("quiz-exam-timer-warning", "quiz-exam-timer-danger");
+			timerContainer.classList.remove("quiz-exam-timer-warning", "quiz-exam-timer-danger", "quiz-exam-timer-critical");
 			if (pct <= 20) timerContainer.classList.add("quiz-exam-timer-danger");
 			else if (pct <= 50) timerContainer.classList.add("quiz-exam-timer-warning");
+			// Last minute: the pill pulses gently (only while time is still running).
+			if (ctx.examTimeRemaining > 0 && ctx.examTimeRemaining <= 60_000) timerContainer.classList.add("quiz-exam-timer-critical");
 		}
 	}
 
@@ -233,6 +247,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 	return {
 		examTimerHtml,
+		paintExamTimerIcon,
 		startExamTimer,
 		startExam,
 		updateExamTimerDisplay,

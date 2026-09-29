@@ -44,7 +44,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.testSetup.keepExam": "Garder le mode examen",
 	"engine.testSetup.hints": "Indices",
 	"engine.testSetup.timeLimit": "Temps limité",
-	"engine.testSetup.totalHelp": "Total pour tout le test",
 	"engine.testSetup.less": "Moins de temps",
 	"engine.testSetup.more": "Plus de temps",
 	"engine.testSetup.minutesUnit": "min",
