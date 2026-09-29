@@ -826,10 +826,19 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		__quizResultsSlideSignature = "";
 
 		if (container.__quizDestroy === destroyQuiz) delete container.__quizDestroy;
+		if (container.__quizExamRunning === examRunning) delete container.__quizExamRunning;
 		ctx.interactions.destroyZoomFixHandlers();
 	}
 
+	/* An Exam started and not handed in: what the host's leaving guard asks
+	   about (apps/windows/src/ui/leave-guard.ts, spec 2026-09-29 §3.4) — read
+	   at the moment of leaving, never a snapshot. */
+	function examRunning(): boolean {
+		return !__quizDestroyed && !!ctx.isExamMode && !!ctx.examStarted && !ctx.examEnded;
+	}
+
 	container.__quizDestroy = destroyQuiz;
+	container.__quizExamRunning = examRunning;
 	ctx.destroyQuiz = destroyQuiz;
 
 	function refreshQuestionSlide(qi: number, { syncHeight = true }: { syncHeight?: boolean } = {}): Element | null {

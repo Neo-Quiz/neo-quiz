@@ -30,6 +30,8 @@ import { ajouter } from "../../../../src/dom";
 import { quizModeLabel } from "../../../../src/dashboard/quiz-card";
 import { brancherPerles } from "./perles";
 import { attachQuizBars } from "./quiz-bars";
+import { clearActiveLeaveGuard, createLeaveGuard, setActiveLeaveGuard } from "./leave-guard";
+import { openConfirmModal } from "../../../../src/editor/modals";
 // Types en `import type` seulement : ils viennent du noyau et de `types/quiz`,
 // et ce fichier ne doit tirer aucune implémentation de plus.
 import type { ReviewGrade } from "../../../../src/scheduler";
@@ -81,7 +83,27 @@ export async function openQuizPage(
 	   StudySmarter) : on FERME le quiz, on ne remonte pas d'une page. */
 	retour.setAttribute("aria-label", t("app.quiz.close"));
 	currentHost().ui.setIcon(retour, "x");
-	retour.addEventListener("click", () => onBack());
+	/* EVERY way out goes through the leaving guard: an Exam started and not
+	   handed in asks first (ui/leave-guard.ts, spec 2026-09-29 §3.4). The
+	   engine answers through the container it was given (`hote`, below). */
+	const garde = createLeaveGuard({
+		mustAsk: () => !!hote.__quizExamRunning?.(),
+		ask: (answer) => {
+			/* The engine's "Hand in anyway?" confirmation is open
+			   (engine/hand-in.ts): it is answered first — a second dialog on top
+			   of it would split Escape and Tab between the two. Stay. */
+			if (document.querySelector(".quiz-handin-overlay")) {
+				answer(false);
+				return;
+			}
+			openConfirmModal(t("app.quiz.leaveExamTitle"), t("app.quiz.leaveExamMessage"),
+				t("app.quiz.leaveExamLeave"), t("app.quiz.leaveExamContinue"), answer, undefined, "log-out");
+		},
+	});
+	// A reload from outside the screen asks it too (barre-titre.ts, main.ts).
+	setActiveLeaveGuard(garde);
+	const quitter = (): void => garde.request(onBack);
+	retour.addEventListener("click", quitter);
 	/* Le bouton « précédent » de la souris fait la même chose que la flèche
 	   (2026-09-25). Consommé dès l'appui, en capture ; l'action part au
 	   relâchement. Le « suivant » est consommé sans effet : il n'y a rien après
@@ -90,7 +112,7 @@ export async function openQuizPage(
 		if (e.button !== 3 && e.button !== 4) return;
 		e.preventDefault();
 		e.stopPropagation();
-		if (e.type === "mouseup" && e.button === 3) onBack();
+		if (e.type === "mouseup" && e.button === 3) quitter();
 	};
 	document.addEventListener("mousedown", surBoutonSouris, true);
 	document.addEventListener("mouseup", surBoutonSouris, true);
@@ -117,6 +139,7 @@ export async function openQuizPage(
 	    note sans bloc) : il n'y a pas d'instance à détruire, seulement les
 	    écouteurs du bouton de la souris. */
 	const demonterSansMoteur = (): void => {
+		clearActiveLeaveGuard(garde);
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);
 	};
@@ -199,6 +222,7 @@ export async function openQuizPage(
 	return () => {
 		if (fait) return;
 		fait = true;
+		clearActiveLeaveGuard(garde);
 		debrancherPerles();
 		detachBars();
 		document.removeEventListener("mousedown", surBoutonSouris, true);

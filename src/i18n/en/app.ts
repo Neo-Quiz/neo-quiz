@@ -23,6 +23,10 @@ export const EN_APP = {
 	   un message qui avale la cause rend la panne indiagnosticable. */
 	"app.quiz.readError": "Could not read {path}: {error}",
 	"app.quiz.close": "Close the quiz",
+	"app.quiz.leaveExamTitle": "Leave the exam?",
+	"app.quiz.leaveExamMessage": "It will not be saved: no score and no review for this attempt.",
+	"app.quiz.leaveExamLeave": "Leave",
+	"app.quiz.leaveExamContinue": "Continue the exam",
 
 	/* ── La confirmation NATIVE d'un hôte Ollama hors liste ──
 	   Affichée par le PROCESSUS PRINCIPAL (`electron/canaux.ts`, garde de la

@@ -34,6 +34,7 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
+import { requestLeave } from "./ui/leave-guard";
 import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
@@ -332,11 +333,13 @@ function ouvrirReglages(): void {
 				   l'hôte, et l'hôte est installé une seule fois. Un remontage à
 				   chaud laisserait vivre l'index et le surveillant de l'ancienne
 				   liste. */
-				onFoldersChanged: () => location.reload(),
+				// A running Exam asks first (ui/leave-guard.ts); kept, the change
+				// applies at the next start.
+				onFoldersChanged: () => requestLeave(() => location.reload()),
 				/* RECHARGER aussi : toutes les heures déjà écrites (la page sous
 				   la modale, la section des comptes) repassent par `hourOptions`,
 				   et la reprise rouvre la même page. */
-				onTimeFormatChanged: () => location.reload(),
+				onTimeFormatChanged: () => requestLeave(() => location.reload()),
 				/* Le MÊME hôte que la page « Générer » : la section « Canaux
 				   payants » écrit à travers lui, le cache du client suit. */
 				aiSettings: reglagesIa,

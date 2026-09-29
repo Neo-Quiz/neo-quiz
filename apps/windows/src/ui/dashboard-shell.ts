@@ -824,6 +824,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   relâchement. Pile vide : le clic ne fait rien. */
 	const surBoutonSouris = (e: MouseEvent): void => {
 		if (e.button !== 3 && e.button !== 4) return;
+		/* Kept INERT behind a quiz screen (main.ts, the stack of sheets): the
+		   buttons belong to the quiz, which handles them — moving the hidden
+		   shell would land the user elsewhere when the quiz closes. */
+		if (layout.inert) return;
 		e.preventDefault();
 		e.stopPropagation();
 		if (e.type !== "mouseup") return;

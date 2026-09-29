@@ -4,6 +4,9 @@ declare global {
   interface HTMLElement {
     // Cycle de vie
     __quizDestroy?: () => void;
+    // An Exam is started and not handed in (engine.ts): what the app's
+    // leaving guard asks before closing the quiz screen (ui/leave-guard.ts).
+    __quizExamRunning?: () => boolean;
     // Nullable : terminal.ts remet le cleanup à `null` après exécution (bindMathQuestion / bindTextQuestion).
     __quizTextQuestionCleanup?: (() => void) | null;
     // Track / animation (engine/track.ts)
