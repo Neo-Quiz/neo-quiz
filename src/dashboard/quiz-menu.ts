@@ -15,7 +15,8 @@ import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
 import { freeNotePath } from "./folder-create";
-import { quizFreres } from "./course-pairs";
+import { parMode, quizFreres } from "./course-pairs";
+import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
 
 /* ══════════════════════════════════════════════════════════
@@ -318,6 +319,23 @@ async function deleteQuizCore(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Pro
 	return true;
 }
 
+/** Deletes every quiz of a course card (its Learn and its Test): each one
+    through the same core, one after the other; a failure is counted, never
+    thrown, so a course is never half-deleted without a word. */
+async function deleteCourseQuizzes(ctx: DashboardShellCtx, quizzes: readonly QuizIndexEntry[]): Promise<void> {
+	let failures = 0;
+	for (const q of quizzes) {
+		try {
+			if (!await deleteQuizCore(ctx, q)) failures++;
+		} catch {
+			failures++;
+		}
+	}
+	currentHost().ui.notice(failures > 0
+		? t("dashboard.quizzes.deletedPartial", { count: failures })
+		: t("dashboard.quizzes.deleted"));
+}
+
 /** Delete d'un MODULE entier : chaque quiz passe par le même cœur. */
 async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): Promise<void> {
 	/* Une note qui résiste n'arrête pas les autres, et ne fait pas passer la
@@ -576,19 +594,57 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				});
 			},
 		});
-		items.push({
-			icon: "trash-2",
-			label: t("dashboard.quizzes.menuDelete"),
-			danger: true,
-			onClick: () => {
-				openConfirm({
-					title: t("dashboard.quizzes.deleteConfirmTitle"),
-					body: t("dashboard.quizzes.deleteConfirmBody", { title: quiz.title }),
-					cta: t("dashboard.quizzes.deleteConfirmCta"),
-					warning: true,
-				}, () => { void deleteQuiz(ctx, quiz).then(rerender); });
-			},
-		});
+		/* A course brought together (its quizzes on one card, `course-pairs.ts`)
+		   says WHICH quiz goes (2026-09-29): "Delete quiz" on such a card did
+		   not tell whether the Learn, the Test or both would be removed. A
+		   submenu names each quiz by its type, then offers all of them. Every
+		   path still confirms, and goes through `deleteQuizCore`. */
+		const freres = ctx.settings.quizzesGroupModes === false ? []
+			: quizFreres(quiz, ctx.scanner.getQuizzes());
+		const confirmerUn = (q: QuizIndexEntry): void => {
+			openConfirm({
+				title: t("dashboard.quizzes.deleteConfirmTitle"),
+				body: t("dashboard.quizzes.deleteConfirmBody", { title: q.title }),
+				cta: t("dashboard.quizzes.deleteConfirmCta"),
+				warning: true,
+			}, () => { void deleteQuiz(ctx, q).then(rerender); });
+		};
+		if (freres.length === 0) {
+			items.push({
+				icon: "trash-2",
+				label: t("dashboard.quizzes.menuDelete"),
+				danger: true,
+				onClick: () => confirmerUn(quiz),
+			});
+		} else {
+			const cours = [quiz, ...freres].sort(parMode);
+			items.push({
+				icon: "trash-2",
+				label: t("dashboard.quizzes.menuDelete"),
+				danger: true,
+				submenu: [
+					...cours.map((q): ActionMenuItem => ({
+						icon: quizModeIcon(q.mode),
+						label: t("dashboard.quizzes.menuDeleteType", { type: quizModeLabel(q.mode) }),
+						danger: true,
+						onClick: () => confirmerUn(q),
+					})),
+					{
+						icon: "trash-2",
+						label: t(cours.length === 2 ? "dashboard.quizzes.menuDeleteBoth" : "dashboard.quizzes.menuDeleteAll", { count: cours.length }),
+						danger: true,
+						onClick: () => {
+							openConfirm({
+								title: t("dashboard.quizzes.deleteConfirmTitle"),
+								body: t("dashboard.quizzes.deleteCourseConfirmBody", { count: cours.length, title: quiz.title }),
+								cta: t("dashboard.quizzes.deleteConfirmCta"),
+								warning: true,
+							}, () => { void deleteCourseQuizzes(ctx, cours).then(rerender); });
+						},
+					},
+				],
+			});
+		}
 		return items;
 	};
 }
