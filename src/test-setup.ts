@@ -67,6 +67,23 @@ export function withTimeLimit(s: TestSetup, minutes: number | null, questionCoun
 	return { ...s, timeLimitMinutes: clamped ?? fallbackExamDuration(questionCount) };
 }
 
+/** The step of the time limit's `-` / `+` buttons, in minutes. */
+export const TIME_LIMIT_STEP = 5;
+
+/** One press of the time limit's `-` (`direction` -1) or `+` (1): to the next
+    multiple of 5 in that direction, so 30 goes to 35 and 32 goes to 35 (up) or
+    30 (down). Always within [1, 300]: the first step down from 5 lands on 1,
+    and 1 goes up to 5. Anything that is not a finite number steps from the
+    fallback rule for `questionCount`, so an unusable value never reaches the
+    engine. */
+export function stepTimeLimit(minutes: number, direction: 1 | -1, questionCount: number): number {
+	const from = Number.isFinite(minutes) ? minutes : fallbackExamDuration(questionCount);
+	const stepped = direction === 1
+		? (Math.floor(from / TIME_LIMIT_STEP) + 1) * TIME_LIMIT_STEP
+		: (Math.ceil(from / TIME_LIMIT_STEP) - 1) * TIME_LIMIT_STEP;
+	return clampExamDuration(Math.max(stepped, EXAM_DURATION_MIN)) ?? fallbackExamDuration(questionCount);
+}
+
 /** A setting remembered by the app (per quiz), read back from raw settings.
     Anything malformed gives `null`, and the caller then falls back to the
     file's default: a corrupt remembered value must never crash the launch nor

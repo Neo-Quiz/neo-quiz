@@ -6,13 +6,14 @@
  * (it must be on exactly when hints are off AND a time limit is set); turning
  * Exam mode on without a timer; a duration outside [1, 300] or not a number
  * reaching the engine; a remembered value from the settings that is malformed
- * being trusted instead of falling back to the file's default.
+ * being trusted instead of falling back to the file's default; the time
+ * limit's `-` / `+` stepping off the multiples of 5 or out of [1, 300].
  *
  *     npm run check:test-setup
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup, keepExamChange, examMinutesToKeep }) => {
+await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup, keepExamChange, examMinutesToKeep, stepTimeLimit }) => {
 	const r = makeReporter("Test setup (pure core)");
 
 	/* Defaults: a plain Test, or an Exam when the file says so. */
@@ -56,6 +57,21 @@ await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withE
 	r.check("time limit: NaN, Infinity or a non-number -> fallback rule on the question count (20 -> 30, 10 -> 15)",
 		[withTimeLimit(plain, NaN, 20), withTimeLimit(plain, Infinity, 20), withTimeLimit(plain, "45", 20), withTimeLimit(plain, undefined, 10)].map(s => s.timeLimitMinutes),
 		[30, 30, 30, 15]);
+
+	/* The time limit's stepper: 5 minutes at a time, snapping to the next
+	   multiple of 5 in the direction pressed, always within [1, 300]. */
+	r.check("step: a multiple of 5 moves by 5, up and down",
+		[stepTimeLimit(30, 1, 20), stepTimeLimit(30, -1, 20), stepTimeLimit(295, 1, 20), stepTimeLimit(10, -1, 20)], [35, 25, 300, 5]);
+	r.check("step: from a value that is not a multiple of 5, snap to the next multiple in that direction",
+		[stepTimeLimit(32, 1, 20), stepTimeLimit(32, -1, 20), stepTimeLimit(31, 1, 20), stepTimeLimit(34, -1, 20), stepTimeLimit(299, 1, 20), stepTimeLimit(6, -1, 20)],
+		[35, 30, 35, 30, 300, 5]);
+	r.check("step: the bounds hold (5 down -> 1, 1 up -> 5, 1 down stays 1, 300 up stays 300, 3 down -> 1)",
+		[stepTimeLimit(5, -1, 20), stepTimeLimit(1, 1, 20), stepTimeLimit(1, -1, 20), stepTimeLimit(300, 1, 20), stepTimeLimit(3, -1, 20)],
+		[1, 5, 1, 300, 1]);
+	r.check("step: a value above the range comes back inside it (999 up -> 300, 999 down -> 300)",
+		[stepTimeLimit(999, 1, 20), stepTimeLimit(999, -1, 20)], [300, 300]);
+	r.check("step: NaN or Infinity steps from the fallback rule (20 questions = 30)",
+		[stepTimeLimit(NaN, 1, 20), stepTimeLimit(NaN, -1, 20), stepTimeLimit(Infinity, 1, 20)], [35, 25, 35]);
 
 	/* A remembered value: anything malformed is null. Decision: a positive
 	   duration out of range is CLAMPED; zero, negative, NaN, non-number or a

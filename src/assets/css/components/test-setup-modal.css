@@ -3,11 +3,11 @@
 
    Sober and airy, in the app's language: a header (quiz title, large
    heading, a pill with the question count, and a small illustration of two
-   stacked sheets), Exam mode as ONE soft tinted card, which grows to contain
-   the two rows it drives (locked) while it is on; off, those rows sit below
-   it after a thin separator. Each row has a Lucide icon in a tinted square
-   and a switch on the right. The duration slides open under Time limit; the primary button is the app's 3D
-   one (`.qbd-cta3d`, poserBouton3d). The panel itself (surface, border,
+   stacked sheets), Exam mode as ONE soft tinted card, then Hints and Time
+   limit after a thin separator (locked and dimmed while Exam mode is on).
+   Each row has a Lucide icon in a tinted square and a switch on the right;
+   Time limit adds a compact stepper before its switch. The primary button is
+   the app's 3D one (`.qbd-cta3d`, poserBouton3d). The panel itself (surface, border,
    radius, shadow, entry animation) is the app's shared modal
    (`apps/windows/src/assets/modal.css`).
 
@@ -136,6 +136,7 @@
 	display: flex;
 	align-items: center;
 	flex-shrink: 0;
+	gap: 12px;
 }
 
 /* ── The switch: 40x22 track, 16px knob with a soft shadow ── */
@@ -171,11 +172,12 @@
 }
 .qbd-setup-switch[aria-checked="true"] .qbd-setup-switch-thumb { transform: translateX(18px); }
 
-/* ── Exam mode holds its own settings (2026-09-29). Switched on, the card
-   slides open (`.qbd-setup-inside`) around the locked Hints and Time limit
-   while the copy below it (`.qbd-setup-outside`) slides shut, both over the
-   same 200 ms, so the panel keeps its height. The locked rows are dimmed and
-   their switches are not operable; the total duration stays editable. ── */
+/* ── Exam mode locks what it sets (2026-09-29). The note under its row says
+   so; Hints and Time limit stay in place, their icon, label and switch
+   dimmed and not operable (the switch is `aria-disabled` and out of the tab
+   order). The stepper is NOT dimmed: the duration stays editable. `[hidden]`
+   is restated on every element that sets its own `display`, which would
+   otherwise win over the attribute. ── */
 .qbd-setup-locknote {
 	display: flex;
 	align-items: center;
@@ -184,128 +186,89 @@
 	font-size: 12.5px;
 	color: var(--text-muted);
 }
+.qbd-setup-locknote[hidden],
+.qbd-setup-stepper[hidden],
+.qbd-setup-help[hidden] { display: none; }
 .qbd-setup-locknote-ico { display: inline-flex; }
 .qbd-setup-locknote-ico svg { width: 12px; height: 12px; }
-.qbd-setup-row.is-locked {
-	opacity: 0.5;
-	cursor: default;
-}
+.qbd-setup-row.is-locked { cursor: default; }
+.qbd-setup-row.is-locked .qbd-setup-ico,
+.qbd-setup-row.is-locked .qbd-setup-label,
+.qbd-setup-row.is-locked .qbd-setup-switch { opacity: 0.5; }
 .qbd-setup-switch[aria-disabled="true"] { cursor: default; }
 
-/* ── A block that slides open and shut (the Exam card's contents, the rows
-   below it, the total duration under Time limit): a 0fr -> 1fr grid row, so no
-   height is measured. `visibility` keeps a closed block out of the tab order
-   and the accessibility tree once the slide is done; an open block INHERITS it
-   (not `visible`), or a duration nested in a closed block would stay
-   reachable. The clip is widened by 6px on each side so the switches' focus
-   rings are not cut by its `overflow`. ── */
-.qbd-setup-slide {
-	display: grid;
-	grid-template-rows: 0fr;
-	opacity: 0;
-	visibility: hidden;
-	transition: grid-template-rows 200ms ease, opacity 200ms ease, visibility 0s linear 200ms;
-}
-.qbd-setup-slide.is-open {
-	grid-template-rows: 1fr;
-	opacity: 1;
-	visibility: inherit;
-	transition: grid-template-rows 200ms ease, opacity 200ms ease, visibility 0s;
-}
-.qbd-setup-slide-clip {
-	min-height: 0;
-	margin-inline: -6px;
-	padding-inline: 6px;
-	overflow: hidden;
-}
-
-/* ── Total duration: label on ONE line, then the segments and the minutes
-   field on one line, wrapping cleanly when the window is narrow. ── */
-.qbd-setup-duration-body {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	padding: 2px 3px 12px;
-}
-.qbd-setup-duration .qbd-setup-label {
-	font-size: 13px;
-	color: var(--text-muted);
-	white-space: nowrap;
-}
-.qbd-setup-controls {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 10px;
-}
-.qbd-setup-segments {
+/* ── Time limit's stepper: [-] 30 min [+], sitting before the switch. The
+   value is a real text field (typed into, no spinner) whose "min" unit is its
+   label, so a click on the unit focuses it. The steps are ghost buttons: no
+   box until hovered, so the row stays as light as the others. ── */
+.qbd-setup-stepper {
 	display: inline-flex;
+	align-items: center;
 	gap: 2px;
-	padding: 3px;
-	border-radius: 11px;
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 }
-.qbd-setup-segment {
+.qbd-setup-step {
 	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
 	margin: 0;
-	padding: 6px 11px;
+	padding: 0;
 	border: 0;
 	border-radius: 8px;
 	background: none;
 	color: var(--text-muted);
-	font: inherit;
-	font-size: 13px;
-	font-weight: 500;
-	line-height: 1.3;
-	white-space: nowrap;
 	cursor: pointer;
 	transition: background-color 140ms ease, color 140ms ease;
 }
-.qbd-setup-segment:hover { background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal); }
-.qbd-setup-segment[aria-pressed="true"] {
-	background: var(--quiz-primary);
-	color: #fff;
-	font-weight: 600;
-}
-.qbd-setup-segment:focus-visible {
+.qbd-setup-step-ico { display: inline-flex; }
+.qbd-setup-step-ico svg { width: 16px; height: 16px; }
+.qbd-setup-step:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
+.qbd-setup-step:active { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
+.qbd-setup-step[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+.qbd-setup-step[aria-disabled="true"]:hover { background: none; color: var(--text-muted); }
+.qbd-setup-step:focus-visible {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 1px;
 }
-.qbd-setup-fieldbox {
-	position: relative;
+.qbd-setup-value {
 	display: inline-flex;
-	align-items: center;
+	align-items: baseline;
+	justify-content: center;
+	gap: 4px;
+	min-width: 62px;
+	padding: 3px 8px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	cursor: text;
+	transition: border-color 120ms, background-color 120ms;
 }
-.qbd-setup-field {
-	box-sizing: border-box;
-	width: 92px;
-	height: 38px;
-	margin: 0;
-	padding: 0 40px 0 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 11px;
+.qbd-setup-value:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+.qbd-setup-value:focus-within {
+	border-color: var(--quiz-primary);
 	background: var(--background-modifier-form-field);
+}
+.qbd-setup-value:has(.qbd-setup-field[aria-invalid="true"]) { border-color: var(--quiz-danger); }
+.qbd-setup-field {
+	box-sizing: content-box;
+	width: 3ch;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
 	color: var(--text-normal);
 	font: inherit;
-	font-size: 14px;
+	font-size: 15px;
+	font-weight: 500;
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 	outline: none;
-	transition: border-color 120ms;
-}
-.qbd-setup-field:focus { border-color: var(--quiz-primary); }
-.qbd-setup-field[aria-invalid="true"] { border-color: var(--quiz-danger); }
-.qbd-setup-field::-webkit-inner-spin-button,
-.qbd-setup-field::-webkit-outer-spin-button {
-	appearance: none;
-	margin: 0;
 }
 .qbd-setup-unit {
-	position: absolute;
-	right: 12px;
 	font-size: 13px;
 	color: var(--text-muted);
-	pointer-events: none;
 }
 
 /* ── The footer: the app's 3D button, at the right. Its rules live in
@@ -321,7 +284,6 @@
 @media (prefers-reduced-motion: reduce) {
 	.qbd-setup-switch,
 	.qbd-setup-switch-thumb,
-	.qbd-setup-slide,
-	.qbd-setup-slide.is-open,
-	.qbd-setup-segment { transition: none; }
+	.qbd-setup-step,
+	.qbd-setup-value { transition: none; }
 }
