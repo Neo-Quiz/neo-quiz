@@ -148,9 +148,9 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 	});
 }
 
-/** Une tentative : date + heure, pourcentage, mention « avant l'historique »,
-    et le bouton de suppression — ou, en attente d'annulation, « Tentative
-    supprimée » + Annuler. */
+/** One attempt: date and time, percentage, "Exam" when it was played in Exam
+    mode, "before history" for an old score, and the delete button — or, while
+    a deletion waits to be confirmed, "Attempt deleted" + Undo. */
 function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizIndexEntry, tentative: Tentative, enAttente: boolean, registre: EnAttenteAnnulation, redessiner: () => void): void {
 	const cle = `${q.path}::${tentative.date}`;
 	const row = ajouter(parent, "div", "qbd-folder-attempt-row");
@@ -169,6 +169,7 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 	ajouter(row, "span", "qbd-folder-attempt-date", formatDateHeure(new Date(tentative.date)));
 	const infos = ajouter(row, "span", "qbd-folder-attempt-info");
 	ajouter(infos, "span", "qbd-folder-attempt-pct", tentative.pct === null ? t("dashboard.quizzes.attemptFree") : t("dashboard.quizzes.attemptPct", { pct: tentative.pct }));
+	if (tentative.exam) ajouter(infos, "span", "qbd-folder-attempt-exam", t("dashboard.quizzes.attemptExam"));
 	if (tentative.withHint) ajouter(infos, "span", "qbd-folder-attempt-hint", t("dashboard.quizzes.attemptWithHint", { count: tentative.withHint }));
 	if (tentative.ancienne) ajouter(infos, "span", "qbd-folder-attempt-old", t("dashboard.quizzes.attemptOld"));
 	const supprimer = ajouter(row, "button", "qbd-folder-attempt-delete");

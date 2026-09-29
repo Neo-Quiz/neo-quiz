@@ -409,10 +409,33 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	   `StatsStore` portent déjà exactement la FORME que `openQuizPage`
 	   attend — les envelopper dans un objet littéral n'ajouterait rien. */
 	try {
-		const demonterQuiz = await openQuizPage(root, entry, () => {
+		const page = await openQuizPage(root, entry, () => {
 			mount(root, scanner, store, stats, sessions);
 		}, store, stats, sessions);
-		demonterCourant = { demonter: demonterQuiz };
+		/* A LAUNCH CANCELLED in the "Set up your test" modal (2026-09-29): the
+		   page was never shown (its screen is out of `root` and was invisible
+		   while loading), so nothing plays. The kept dashboard, exactly as it
+		   was, becomes the current screen again — the reverse of the stacking
+		   done above — with no transition, instead of a page that rises and
+		   goes straight back down. */
+		if (page.launchCancelled) {
+			const gardee = vueGardee;
+			if (gardee) {
+				const { aDemonter, nouveauCourant } = retourVersGardee<EcranActif>({ demonter: page.teardown }, gardee.ecran);
+				void aDemonter?.demonter();
+				demonterCourant = nouveauCourant;
+				vueGardee = null;
+				for (const s of sortants) { s.inert = false; s.removeAttribute("aria-hidden"); }
+				if (gardee.declencheur?.isConnected) gardee.declencheur.focus({ preventScroll: true });
+			} else {
+				// No dashboard was kept (a screen that is not the shell): the
+				// ordinary way back, queued until this launch is over.
+				page.teardown();
+				mount(root, scanner, store, stats, sessions);
+			}
+			return;
+		}
+		demonterCourant = { demonter: page.teardown };
 		root.classList.remove("nq-chargement");
 		const entrant = root.lastElementChild;
 		if (entrant instanceof HTMLElement && !sortants.includes(entrant)) {

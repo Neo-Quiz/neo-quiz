@@ -8,6 +8,7 @@ import { exportAll } from "../editor/export";
 import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
+import { applyKeepExam, type KeepExam } from "./exam-keep";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL I/O — lecture / écriture du bloc quiz-blocks d'une note
@@ -177,6 +178,49 @@ export async function saveQuizDraft(draft: QuizDraft): Promise<boolean> {
 		   300 ms), donc une Notice « modifié dehors » à chaque sauvegarde. */
 		draft.mtime = currentHost().fs.getFile(file.path)?.mtime ?? draft.mtime;
 		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * "Keep exam mode" (spec 2026-09-29-test-setup-modal-design.md §2): writes
+ * `mode: 'exam'` and `examDurationMinutes` into the note's configuration
+ * object, or removes them (`keep === null`). Nothing else of the note moves.
+ *
+ * It uses the same guarantees as `saveQuizDraft`, and not its rewrite: the
+ * block is NOT re-exported (that would drop its comments and formatting on a
+ * note the user only started), `applyKeepExam` edits the text of the two keys.
+ * - `fs.process`, an indivisible read-modify-write, whose callback may be
+ *   replayed (`written` starts again at false on every call);
+ * - COMPARE-AND-SWAP on the block: `expectedBlock` is the source the caller
+ *   read when it opened the quiz; if the note's block no longer matches,
+ *   someone else edited it, and nothing is written;
+ * - the fences (opening line with its attributes, indented closing line) and
+ *   the line endings are the note's own: only the text between them is
+ *   replaced, and by a FUNCTION, never a string (`$1`, `$&` are special in a
+ *   replacement string, and a maths quiz is full of `$…$`).
+ * Returns false when nothing was written because of a stale block, a Learn,
+ * a block that does not read back as expected, or a host error. A change that
+ * is already in the note (the same mode and duration) is a success.
+ */
+export async function saveKeepExam(path: string, expectedBlock: string, keep: KeepExam): Promise<boolean> {
+	try {
+		let done = false;
+		await currentHost().fs.process(path, (content) => {
+			done = false;
+			const actual = content.match(QUIZ_BLOCK_RE);
+			if (!actual || actual[1] !== expectedBlock) return content;
+			const next = applyKeepExam(actual[1], keep);
+			if (next === null) return content;
+			done = true;
+			if (next === actual[1]) return content;
+			// The source starts right after the opening line's line break.
+			const at = actual[0].indexOf("\n") + 1;
+			const block = actual[0].slice(0, at) + next + actual[0].slice(at + actual[1].length);
+			return content.replace(QUIZ_BLOCK_RE, () => block);
+		});
+		return done;
 	} catch {
 		return false;
 	}

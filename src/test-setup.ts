@@ -84,3 +84,21 @@ export function readTestSetup(raw: unknown): TestSetup | null {
 	const minutes = clampExamDuration(timeLimitMinutes);
 	return minutes === null ? null : { hints, timeLimitMinutes: minutes };
 }
+
+/**
+ * What "Keep exam mode" asks of the note when a test starts (spec §2), given
+ * what the note says now (`fileKept`: it has `mode: "exam"`; `fileMinutes`: its
+ * duration). `undefined` = leave the note alone; `null` = take Exam mode out of
+ * it; `{ minutes }` = write `mode: "exam"` with that duration.
+ *
+ * A test played WITHOUT Exam mode never touches the note, whatever the box
+ * says: a one-off practice of an Exam note must not un-keep it (the box is
+ * disabled while Exam mode is off, so it can only ever mean "keep" or "stop
+ * keeping" for an Exam that is being started).
+ */
+export function keepExamChange(fileKept: boolean, fileMinutes: number | null, setup: TestSetup, keep: boolean): { minutes: number } | null | undefined {
+	if (!isExamSetup(setup)) return undefined;
+	if (!keep) return fileKept ? null : undefined;
+	const minutes = setup.timeLimitMinutes as number;
+	return fileKept && fileMinutes === minutes ? undefined : { minutes };
+}

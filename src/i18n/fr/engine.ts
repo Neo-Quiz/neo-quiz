@@ -36,6 +36,20 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Terminer l'examen",
 
+	/* ── « Prépare ton test » (engine/test-setup-modal.ts). Learn et Test sont
+	   des TYPES de quiz ; « Mode examen » est la façon de passer un Test. ── */
+	"engine.testSetup.title": "Prépare ton test",
+	"engine.testSetup.examMode": "Mode examen",
+	"engine.testSetup.examModeHelp": "Sans indices, avec un temps limité.",
+	"engine.testSetup.keepExam": "Garder le mode examen",
+	"engine.testSetup.hints": "Indices",
+	"engine.testSetup.timeLimit": "Temps limité",
+	"engine.testSetup.duration": "Durée totale",
+	"engine.testSetup.shortcut": "{minutes} min",
+	"engine.testSetup.minutesUnit": "min",
+	"engine.testSetup.start": "Lancer le test",
+	"engine.testSetup.keepFailed": "Le test a démarré, mais la note n'a pas pu être mise à jour : elle a changé depuis son ouverture.",
+
 	/* ── Rendre un Test (engine/hand-in.ts) ── */
 	"engine.handIn.button": "Rendre le test",
 	"engine.handIn.unanswered.one": "{count} question sans réponse",

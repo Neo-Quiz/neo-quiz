@@ -1,17 +1,18 @@
 /**
- * Non-régression du CÂBLAGE de l'écriture d'un bloc quiz-blocks.
+ * Regression check for the WIRING of how a quiz-blocks block is written.
  *
- * `check:export` garde la FORME du bloc produit (`exportAll`) et
- * `audit-vaults.mjs` l'aller-retour sur de vrais vaults. Entre les deux, le
- * câblage de `src/dashboard/detail-io.ts` n'avait RIEN : ni le
- * compare-and-swap sur le bloc, ni la préservation des fins de ligne, ni celle
- * des clôtures, ni le remplacement par FONCTION qui protège les `$…$` d'un
- * quiz de maths. Les quatre sont pourtant des correctifs de bugs réels (revue
- * codex du 2026-07-31), et deux d'entre eux ont régressé la nuit même où ils
- * ont été écrits.
+ * `check:export` guards the SHAPE of the block produced (`exportAll`) and
+ * `audit-vaults.mjs` the round trip on real vaults. Between the two, the
+ * wiring of `src/dashboard/detail-io.ts` had NOTHING: neither the
+ * compare-and-swap on the block, nor the preservation of line endings, nor
+ * that of the fences, nor the replacement by FUNCTION that protects the `$…$`
+ * of a maths quiz. All four are fixes of real bugs (codex review of
+ * 2026-07-31), and two of them regressed the very night they were written.
+ * Since 2026-09-29 it also holds "Keep exam mode" (section 14), the write that
+ * starts from the test setup modal.
  *
- * Ce fichier est le SEUL chemin par lequel la page réécrit une note de
- * l'utilisateur : ce qu'il casse, il le casse dans le travail de quelqu'un.
+ * This file covers the ONLY paths by which the app rewrites a user's note:
+ * what it breaks, it breaks in someone's work.
  *
  *     npm run check:quiz-io
  */
@@ -95,13 +96,14 @@ function premierEcart(obtenu, attendu) {
 		+ ", obtenu " + JSON.stringify(obtenu.slice(i, i + 60));
 }
 
-/* TROIS entrées, et `splitting` fait de `src/host/current.ts` un chunk PARTAGÉ
-   (cf. scripts/lib/load-src.mjs) : l'hôte installé par ce script est donc bien
-   celui que `detail-io.ts` voit. Un build par entrée donnerait à chacune sa
-   copie du singleton, et `currentHost()` jetterait côté module vérifié. */
+/* Several entries, and `splitting` makes `src/host/current.ts` a SHARED chunk
+   (see scripts/lib/load-src.mjs): the host this script installs is therefore
+   the one `detail-io.ts` sees. One build per entry would give each its own
+   copy of the singleton, and `currentHost()` would throw on the module under
+   test. */
 await withSrcModule(
-	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts", "src/dashboard/quiz-mode-change.ts"],
-	async (io, hote, exp, modeChange) => {
+	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts", "src/dashboard/quiz-mode-change.ts", "src/dashboard/exam-keep.ts"],
+	async (io, hote, exp, modeChange, keepMod) => {
 	const r = makeReporter("Écriture d'un bloc");
 
 	/** Un faux HÔTE sur une carte en mémoire : un chemin, un contenu, une date.
@@ -529,6 +531,154 @@ await withSrcModule(
 			["CM1 — Exam", "CM1 — Practice", null, null]);
 		r.check("13. a collision counter is dropped from the new name (freeNotePath adds its own)",
 			[noteNameForMode("CM1 — Exam (2)", "exam", "practice"), noteNameForMode("CM1 — Practice (3)", "practice", "exam")], ["CM1 — Practice", "CM1 — Exam"]);
+	}
+
+	/* ─────────── 14. "KEEP EXAM MODE" (spec 2026-09-29-test-setup-modal §2) ─────────── */
+
+	{
+		/* Started from the "Set up your test" modal, on a note the user did not
+		   ask to edit: it writes `mode: 'exam'` and `examDurationMinutes` and
+		   NOTHING else. Every expectation below is a whole note written out by
+		   hand, compared byte for byte (`premierEcart`), never derived from the
+		   code under test. The comparison against a re-export is deliberate
+		   too: `saveQuizDraft` would drop the comments and re-lay the block. */
+		const RE_BLOC = new RegExp(FENCE + "quiz-blocks[^\\n]*\\n([\\s\\S]*?)\\r?\\n[ \\t]*" + FENCE);
+		const bloc = (contenu) => contenu.match(RE_BLOC)[1];
+		const Q1 = "\t{ id: 'q1', title: 'Unite', prompt: \"Enonce.\", options: ['un', 'deux'], correctIndex: 0 },";
+		const CONFIG_EXAM = (minutes) => ["", "\t// Exam", "\t{", "\t\tmode: 'exam',", "\t\texamDurationMinutes: " + minutes + ",", "\t},"];
+		const keepOn = (v, minutes) => io.saveKeepExam(v.chemin, bloc(v.contenu), { minutes });
+		const keepOff = (v) => io.saveKeepExam(v.chemin, bloc(v.contenu), null);
+
+		// a. no configuration yet: an Exam configuration is appended in the exporter's layout
+		{
+			const v = vault(note({ source: ["[", Q1, "]"].join(LF) }));
+			const avant = v.contenu;
+			r.check("14a. on, no configuration: the write succeeds", await keepOn(v, 45), true);
+			r.check("14a. the configuration is appended, every other byte is the note's",
+				premierEcart(v.contenu, note({ source: ["[", Q1, ...CONFIG_EXAM(45), "]"].join(LF) })), "identiques");
+			// off puts the note back EXACTLY as it was, blank line and comment included
+			r.check("14a. off after on gives the original note back", await keepOff(v), true);
+			r.check("14a. … byte for byte", premierEcart(v.contenu, avant), "identiques");
+		}
+
+		// b. a hand-written inline configuration: its own keys and layout stay
+		{
+			const v = vault(note({ source: ["[", Q1, "\t{ mode: 'quiz', owner: 'alice' },", "]"].join(LF) }));
+			r.check("14b. on: the write succeeds", await keepOn(v, 30), true);
+			r.check("14b. mode changed, duration inserted after it, the custom key untouched",
+				premierEcart(v.contenu, note({ source: ["[", Q1, "\t{ mode: 'exam', examDurationMinutes: 30, owner: 'alice' },", "]"].join(LF) })), "identiques");
+		}
+
+		// c. an Exam with comments and retired keys: only the duration's number moves
+		{
+			const cfg = (m) => ["\t// Exam, kept", "\t{", "\t\tmode: 'exam', // as the teacher wants it", "\t\texamDurationMinutes: " + m + ",", "\t\texamAutoSubmit: false,", "\t\towner: 'alice',", "\t},"];
+			const v = vault(note({ source: ["[", Q1, "", ...cfg(125), "]"].join(LF) }));
+			r.check("14c. a new duration: the write succeeds", await keepOn(v, 60), true);
+			r.check("14c. only the number changed (comments, retired key, custom key intact)",
+				premierEcart(v.contenu, note({ source: ["[", Q1, "", ...cfg(60), "]"].join(LF) })), "identiques");
+			const apres = v.contenu;
+			r.check("14c. the same setting again is a success", await keepOn(v, 60), true);
+			r.check("14c. … and changes nothing", premierEcart(v.contenu, apres), "identiques");
+		}
+
+		// d. off on an Exam whose other keys would not keep it recognised as a configuration
+		{
+			const cfg = (mode, extra) => ["\t{", "\t\tmode: '" + mode + "',", ...extra, "\t\texamAutoSubmit: false,", "\t\towner: 'alice',", "\t},"];
+			const v = vault(note({ source: ["[", Q1, ...cfg("exam", ["\t\texamDurationMinutes: 125,"]), "]"].join(LF) }));
+			r.check("14d. off: the write succeeds", await keepOff(v), true);
+			/* Removing `mode` would leave `{ examAutoSubmit, owner }`, which the
+			   format reads as a QUESTION: the object keeps an explicit Practice. */
+			r.check("14d. the duration goes, the mode becomes an explicit Practice, nothing else moves",
+				premierEcart(v.contenu, note({ source: ["[", Q1, ...cfg("quiz", []), "]"].join(LF) })), "identiques");
+		}
+
+		// e. off on an Exam that a glossary keeps recognised: both keys go, the glossary is untouched
+		{
+			const cfg = (withKeys) => ["\t{", ...(withKeys ? ["\t\tmode: 'exam',", "\t\texamDurationMinutes: 45,"] : []),
+				"\t\tglossary: [{ term: 'pile', definition: 'LIFO, } ] // not a comment' }],", "\t},"];
+			const v = vault(note({ source: ["[", Q1, ...cfg(true), "]"].join(LF) }));
+			r.check("14e. off: the write succeeds", await keepOff(v), true);
+			r.check("14e. both keys removed, the glossary (with brackets and slashes in a string) untouched",
+				premierEcart(v.contenu, note({ source: ["[", Q1, ...cfg(false), "]"].join(LF) })), "identiques");
+		}
+
+		// f. CRLF, an opening line with attributes, an indented closing fence
+		{
+			const ouverture = OUVERTURE + " data-owner=alice";
+			const fermeture = "  " + FENCE;
+			const v = vault(note({ source: ["[", Q1, "]"].join(LF), ouverture, fermeture, eol: CRLF }));
+			r.check("14f. CRLF note: the write succeeds", await keepOn(v, 90), true);
+			r.check("14f. line endings, fences and attributes are the note's own",
+				premierEcart(v.contenu, note({ source: ["[", Q1, ...CONFIG_EXAM(90), "]"].join(LF), ouverture, fermeture, eol: CRLF })), "identiques");
+			r.check("14f. no lone line feed anywhere", /[^\r]\n/.test(v.contenu), false);
+		}
+
+		// g. the replacement is by function: `$1`, `$&`, `$` + backtick survive
+		{
+			const v = vault(note());
+			const lignes = SOURCE.split(LF);
+			lignes.pop();
+			r.check("14g. a maths quiz: the write succeeds", await keepOn(v, 45), true);
+			r.check("14g. the trap statement is intact, the configuration appended",
+				premierEcart(v.contenu, note({ source: [...lignes, ...CONFIG_EXAM(45), "]"].join(LF) })), "identiques");
+		}
+
+		// h. the scanner is not fooled by brackets, commas and comment openers inside a string
+		{
+			const q = "\t{ id: 'q1', prompt: \"x } ] , // not a comment /* nor this\", options: ['a', 'b'], correctIndex: 0 },";
+			const v = vault(note({ source: ["[", q, "]"].join(LF) }));
+			r.check("14h. a tricky statement: the write succeeds", await keepOn(v, 45), true);
+			r.check("14h. … and the statement is untouched",
+				premierEcart(v.contenu, note({ source: ["[", q, ...CONFIG_EXAM(45), "]"].join(LF) })), "identiques");
+		}
+
+		// i. a configuration written first, without a trailing comma
+		{
+			const v = vault(note({ source: ["[", "\t{ mode: 'quiz' },", Q1, "]"].join(LF) }));
+			r.check("14i. first-position configuration: the write succeeds", await keepOn(v, 45), true);
+			r.check("14i. edited in place",
+				premierEcart(v.contenu, note({ source: ["[", "\t{ mode: 'exam', examDurationMinutes: 45 },", Q1, "]"].join(LF) })), "identiques");
+		}
+
+		// j. compare-and-swap: a block that changed since it was read is never written over
+		{
+			const v = vault(note({ source: ["[", Q1, "]"].join(LF) }));
+			const lu = bloc(v.contenu);
+			const dehors = note({ source: ["[", Q1.replace("Unite", "Change dehors"), "]"].join(LF) });
+			v.contenu = dehors;
+			r.check("14j. a stale block: nothing is written, and it says so",
+				await io.saveKeepExam(v.chemin, lu, { minutes: 45 }), false);
+			r.check("14j. the note keeps the other writer's version", v.contenu, dehors);
+		}
+
+		// k. cases that must not write
+		{
+			const learn = note({ source: ["[", Q1, "\t{ mode: 'learn', glossary: [] },", "]"].join(LF) });
+			const v = vault(learn);
+			r.check("14k. a Learn is refused", await keepOn(v, 45), false);
+			r.check("14k. … and left as it was", v.contenu, learn);
+			const cassee = note({ source: ["[", "\t{ id: 'q1', prompt: 'x' " ].join(LF) });
+			const w = vault(cassee);
+			r.check("14k. an unreadable block is refused", await io.saveKeepExam(w.chemin, bloc(w.contenu), { minutes: 45 }), false);
+			r.check("14k. … and left as it was", w.contenu, cassee);
+			const sans = note({ source: ["[", Q1, "]"].join(LF) });
+			const x = vault(sans);
+			r.check("14k. off with no configuration is already done", await keepOff(x), true);
+			r.check("14k. … and changes nothing", x.contenu, sans);
+			r.check("14k. an empty block is refused", [keepMod.applyKeepExam("[]", { minutes: 45 }), keepMod.applyKeepExam("", { minutes: 45 })], [null, null]);
+		}
+
+		// l. an Exam without a duration gets one, right after its mode
+		{
+			const v = vault(note({ source: ["[", Q1, "\t{ mode: 'exam' }", "]"].join(LF) }));
+			r.check("14l. duration added: the write succeeds", await keepOn(v, 40), true);
+			r.check("14l. inserted after the mode, the missing comma added",
+				premierEcart(v.contenu, note({ source: ["[", Q1, "\t{ mode: 'exam', examDurationMinutes: 40 }", "]"].join(LF) })), "identiques");
+		}
+
+		// m. the bounds are the caller's; the module writes what it is given, and re-reads it
+		r.check("14m. the edited block reads back as an Exam",
+			JSON5.parse(keepMod.applyKeepExam(["[", Q1, "]"].join(LF), { minutes: 300 })).at(-1), { mode: "exam", examDurationMinutes: 300 });
 	}
 
 	r.done();

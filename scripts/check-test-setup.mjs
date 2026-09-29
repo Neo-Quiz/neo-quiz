@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup }) => {
+await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withExamMode, withHints, withTimeLimit, readTestSetup, keepExamChange }) => {
 	const r = makeReporter("Test setup (pure core)");
 
 	/* Defaults: a plain Test, or an Exam when the file says so. */
@@ -81,5 +81,21 @@ await withSrcModule("src/test-setup.ts", ({ isExamSetup, defaultTestSetup, withE
 		[{ hints: false, timeLimitMinutes: 999 }, { hints: false, timeLimitMinutes: 0.4 }, { hints: false, timeLimitMinutes: 44.6 }].map(readTestSetup),
 		[{ hints: false, timeLimitMinutes: 300 }, { hints: false, timeLimitMinutes: 1 }, { hints: false, timeLimitMinutes: 45 }]);
 	r.check("remembered: extra keys are dropped", readTestSetup({ hints: true, timeLimitMinutes: null, mode: "exam", x: 1 }), plain);
+
+	/* "Keep exam mode": when the note is written (undefined = never, null =
+	   remove, { minutes } = write). */
+	const timed = { hints: false, timeLimitMinutes: 45 };
+	r.check("keep: a test played without Exam mode never touches the note, kept or not, box checked or not",
+		[keepExamChange(true, 45, plain, true), keepExamChange(true, 45, plain, false), keepExamChange(false, null, plain, true),
+			keepExamChange(true, 45, { hints: true, timeLimitMinutes: 45 }, false), keepExamChange(true, 45, { hints: false, timeLimitMinutes: null }, false)],
+		[undefined, undefined, undefined, undefined, undefined]);
+	r.check("keep: Exam mode with the box checked writes a note that is not kept yet, with the duration played",
+		keepExamChange(false, null, timed, true), { minutes: 45 });
+	r.check("keep: a kept note played with another duration is rewritten with it",
+		keepExamChange(true, 30, timed, true), { minutes: 45 });
+	r.check("keep: a kept note played as it is stays untouched",
+		keepExamChange(true, 45, timed, true), undefined);
+	r.check("keep: unchecking the box on a kept note takes Exam mode out; on a note that is not kept, nothing",
+		[keepExamChange(true, 45, timed, false), keepExamChange(false, null, timed, false)], [null, undefined]);
 	r.done();
 });

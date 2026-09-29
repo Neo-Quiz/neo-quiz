@@ -47,6 +47,20 @@ export const EN_ENGINE = {
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Finish the exam",
 
+	/* ── "Set up your test" (engine/test-setup-modal.ts). Learn and Test are
+	   TYPES of quiz; "Exam mode" is how a Test is taken. ── */
+	"engine.testSetup.title": "Set up your test",
+	"engine.testSetup.examMode": "Exam mode",
+	"engine.testSetup.examModeHelp": "No hints, and a time limit.",
+	"engine.testSetup.keepExam": "Keep exam mode",
+	"engine.testSetup.hints": "Hints",
+	"engine.testSetup.timeLimit": "Time limit",
+	"engine.testSetup.duration": "Total duration",
+	"engine.testSetup.shortcut": "{minutes} min",
+	"engine.testSetup.minutesUnit": "min",
+	"engine.testSetup.start": "Start the test",
+	"engine.testSetup.keepFailed": "The test started, but the note could not be updated: it changed since it was opened.",
+
 	/* ── Handing in a Test (engine/hand-in.ts) ── */
 	"engine.handIn.button": "Hand in the test",
 	"engine.handIn.unanswered.one": "{count} question unanswered",
