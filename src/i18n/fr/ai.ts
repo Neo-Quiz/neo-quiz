@@ -75,6 +75,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.type.comprehension": "Compréhension",
 
 	/* ── Type de quiz : Learn / Test (composer) ── */
+	"ai.type.learnGenerateTip": "Générer un quiz optimisé pour apprendre : de courtes lectures, une question avant chacune et la correction aussitôt, jusqu'à ce que ça tienne.",
+	"ai.type.testGenerateTip": "Générer un quiz optimisé pour se tester : des questions au format de l'examen, chacune expliquée, à passer avec ou sans indices et temps limité.",
 	"ai.mode.learnTip": "Apprendre un cours pas à pas : une question avant chaque passage, la correction aussitôt, jusqu'à ce que ça tienne.",
 	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée. Au lancement, vous pouvez le jouer comme un examen chronométré.",
 	"ai.mode.group": "Type de quiz",

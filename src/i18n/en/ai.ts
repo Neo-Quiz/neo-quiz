@@ -94,6 +94,8 @@ export const EN_AI = {
 	"ai.type.comprehension": "Comprehension",
 
 	/* ── Quiz type: Learn / Test (composer) ── */
+	"ai.type.learnGenerateTip": "Generate a quiz optimised for learning: short readings, a question before each one and instant feedback, until it sticks.",
+	"ai.type.testGenerateTip": "Generate a quiz optimised for testing yourself: exam-style questions, each one explained, to take with or without hints and a time limit.",
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained. When you start it, you can play it as a timed exam.",
 	"ai.mode.group": "Quiz type",

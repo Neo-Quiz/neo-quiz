@@ -3,7 +3,7 @@ import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
-import { quizModeLabel, quizModeTip } from "./quiz-card";
+import { quizModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, canChooseQuizCount } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
@@ -1814,7 +1814,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			attachHoverTip(b, (tip) => {
 				tip.classList.add("qbd-hover-tip--card");
 				ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(kind));
-				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind));
+				/* What GENERATING this type gives — not the course sheet's
+				   description of an existing quiz (`quizModeTip`). */
+				ajouter(tip, "div", "qbd-hover-tip-body", t(kind === "learn" ? "ai.type.learnGenerateTip" : "ai.type.testGenerateTip"));
 			});
 			return { kind, b };
 		});
