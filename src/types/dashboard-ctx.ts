@@ -34,8 +34,12 @@ export interface ExamenDossier {
 	id: string;
 	nom: string;
 	date: string;
-	/** Weight of the exam in the course's grade, a number in (0, 100]. Optional. */
+	/** Weight of the exam in the course's grade, a number in (0, 100]: a
+	    coefficient or a percentage depending on `weightUnit`. Optional. */
 	coefficient?: number;
+	/** What `coefficient` means; absent is "coef", so exams saved before the
+	    percentage existed stay valid. Only ever written as "percent". */
+	weightUnit?: "coef" | "percent";
 }
 
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */

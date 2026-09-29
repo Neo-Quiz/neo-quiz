@@ -346,6 +346,10 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 		r.check("valid coefficient is kept", lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 2.5 }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 2.5 }]);
 		for (const bad of [0, -1, 101, "2", NaN, null])
 			r.check(`invalid coefficient ${String(bad)} drops the coefficient, not the exam`, lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: bad }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02" }]);
+		r.check("a percentage keeps its unit", lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 20, weightUnit: "percent" }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 20, weightUnit: "percent" }]);
+		r.check("an explicit coef unit reads like no unit", lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 2, weightUnit: "coef" }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 2 }]);
+		for (const [c, u] of [[150, "percent"], [20, "pct"], [undefined, "percent"]])
+			r.check(`invalid weight ${JSON.stringify([c, u])} drops the weight, not the exam`, lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: c, weightUnit: u }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02" }]);
 		r.check("entrée sans date ignorée", lireExamens({ [m]: [{ id: "a", nom: "", date: "" }, { id: "b", nom: "", date: "2027-02-02" }] }, undefined)[m].map(e => e.id), ["b"]);
 		const t1 = enregistrerExamenDans({}, m, { id: "a", nom: "Final", date: "2027-06-01" });
 		const t2 = enregistrerExamenDans(t1, m, { id: "b", nom: "Partiel", date: "2027-03-01" });

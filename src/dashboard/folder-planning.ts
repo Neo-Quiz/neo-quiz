@@ -12,7 +12,8 @@ import { renderNextStep } from "./folder-next";
 import { duesDuDossier } from "./folder-progress-details";
 import { moyenneDossier } from "./folder-progress";
 import type { DetailsProgression } from "./folder-progress";
-import { formatExamDate, parseExamDate } from "../review/review-store";
+import { formatExamDate, parseExamDate, parseExamWeight, type ExamWeightUnit } from "../review/review-store";
+import { placerIndicateur } from "./seg-indic";
 import { openDatePicker } from "./date-picker";
 import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
@@ -56,26 +57,18 @@ function joursRestants(ms: number): string {
 		: t("dashboard.quizzes.progressExamIn", { count: jours });
 }
 
-/** A typed coefficient: "" is none (`undefined`), "2,5" and "2.5" are 2.5, and
-    anything else (not a number, zero, above 100) is invalid (`null`). */
-function lireCoefficient(brut: string): number | undefined | null {
-	const texte = brut.trim();
-	if (!texte) return undefined;
-	if (!/^\d*[.,]?\d*$/.test(texte)) return null;
-	const n = Number(texte.replace(",", "."));
-	return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
-}
-
 /** An exam's modal, to add (`examen: null`) or edit one. Name (required), Date
-    (the app's own picker, no earlier than today) and Coefficient (optional);
-    Save stays disabled until the name is not blank, the date is picked and the
-    coefficient, if typed, is valid. A new exam's `id` is
+    (the app's own picker, no earlier than today) and Weight (optional: a number
+    and a Coef. | % toggle, a "%" typed in the field flips the toggle); Save
+    stays disabled until the name is not blank, the date is picked and the
+    weight, if typed, is valid. A new exam's `id` is
     `Date.now().toString(36)` (same pattern as the dashboard's other ids made
     on the fly). */
 function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: ExamenDossier | null, rerender: () => void): void {
 	let nom = examen?.nom ?? "";
 	let date = examen?.date ?? "";
-	let coefficient = examen?.coefficient === undefined ? "" : String(examen.coefficient).replace(".", ",");
+	let weight = examen?.coefficient === undefined ? "" : String(examen.coefficient).replace(".", ",");
+	let unit: ExamWeightUnit = examen?.weightUnit === "percent" ? "percent" : "coef";
 
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
@@ -100,25 +93,63 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			};
 			majDate();
 
-			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examCoefficient"));
-			const coefInput = ajouter(c, "input", "qbd-medit-input");
-			coefInput.type = "text";
-			coefInput.inputMode = "decimal";
-			coefInput.placeholder = t("dashboard.planning.examCoefficientPlaceholder");
-			coefInput.value = coefficient;
+			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examWeight"));
+			const weightRow = ajouter(c, "div", "qbd-planning-weight-row");
+			const weightInput = ajouter(weightRow, "input", "qbd-medit-input");
+			weightInput.type = "text";
+			weightInput.inputMode = "decimal";
+			weightInput.placeholder = t("dashboard.planning.examWeightPlaceholder");
+			weightInput.value = weight;
+			const weightError = ajouter(c, "p", "qbd-medit-hint qbd-planning-weight-error", t("dashboard.planning.examWeightInvalid"));
+			weightError.id = "qbd-planning-weight-error";
+			weightError.hidden = true;
+			weightInput.setAttribute("aria-describedby", weightError.id);
 
-			const save = ajouter(c, "button", "qbd-medit-save", t("dashboard.planning.examSave"));
+			// Coef. | % toggle: the app's segmented selector, with its sliding block.
+			const unitSeg = ajouter(weightRow, "div", "qbd-planning-unit");
+			unitSeg.setAttribute("role", "radiogroup");
+			unitSeg.setAttribute("aria-label", t("dashboard.planning.examWeightUnit"));
+			const unitIndic = ajouter(unitSeg, "div", "qbd-planning-unit-indic");
+			const unitBtns = (["coef", "percent"] as const).map(kind => {
+				const b = ajouter(unitSeg, "button", "qbd-planning-unit-btn",
+					t(kind === "coef" ? "dashboard.planning.examWeightCoef" : "dashboard.planning.examWeightPercent"));
+				b.type = "button";
+				b.setAttribute("role", "radio");
+				b.addEventListener("click", () => { unit = kind; paintUnit(true); majEtat(); });
+				return { kind, b };
+			});
+			const paintUnit = (anime: boolean): void => {
+				for (const { kind, b } of unitBtns) {
+					b.classList.toggle("is-active", kind === unit);
+					b.setAttribute("aria-checked", String(kind === unit));
+				}
+				placerIndicateur(unitIndic, unitBtns.find(({ kind }) => kind === unit)!.b, anime);
+			};
+
+			const save = ajouter(c, "button", "qbd-medit-save qbd-medit-save--primary", t("dashboard.planning.examSave"));
 			save.type = "button";
 			// An exam is planned in the future: a past date cannot be saved (the
 			// picker disables those days, this also covers an old saved value).
 			const majEtat = (): void => {
-				const coefValide = lireCoefficient(coefficient) !== null;
-				coefInput.setAttribute("aria-invalid", String(!coefValide));
-				save.disabled = !nom.trim() || !date || date < aujourdhuiIsoLocal(Date.now()) || !coefValide;
+				const weightValide = parseExamWeight(weight, unit) !== null;
+				weightInput.setAttribute("aria-invalid", String(!weightValide));
+				weightError.hidden = weightValide;
+				save.disabled = !nom.trim() || !date || date < aujourdhuiIsoLocal(Date.now()) || !weightValide;
 			};
+			paintUnit(false);
 			majEtat();
 			nomInput.addEventListener("input", () => { nom = nomInput.value; majEtat(); });
-			coefInput.addEventListener("input", () => { coefficient = coefInput.value; majEtat(); });
+			weightInput.addEventListener("input", () => {
+				// A typed "%" is the unit, not part of the number: it flips the
+				// toggle and leaves the field with the number alone.
+				if (/%\s*$/.test(weightInput.value)) {
+					weightInput.value = weightInput.value.replace(/\s*%\s*$/, "");
+					unit = "percent";
+					paintUnit(true);
+				}
+				weight = weightInput.value;
+				majEtat();
+			});
 			dateBtn.addEventListener("click", () => {
 				openDatePicker(dateBtn, date, { min: aujourdhuiIsoLocal(Date.now()) }, (iso) => {
 					date = iso;
@@ -127,13 +158,14 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				});
 			});
 			save.addEventListener("click", () => {
-				const coef = lireCoefficient(coefficient);
-				if (save.disabled || coef === null) return;
+				const parsed = parseExamWeight(weight, unit);
+				if (save.disabled || parsed === null) return;
 				ctx.enregistrerExamen?.(group, {
 					id: examen?.id ?? Date.now().toString(36),
 					nom: nom.trim(),
 					date,
-					...(coef === undefined ? {} : { coefficient: coef }),
+					// Only a percentage stores its unit; "coef" is the absent default.
+					...(parsed === undefined ? {} : { coefficient: parsed.value, ...(parsed.unit === "percent" ? { weightUnit: "percent" as const } : {}) }),
 				});
 				m.close();
 				rerender();
@@ -211,7 +243,8 @@ export function renderFolderPlanning(
 			ajouter(infos, "span", "qbd-planning-exam-date", formatExamDate(examen.date, currentLang()));
 			if (examen.coefficient !== undefined) {
 				ajouter(infos, "span", "qbd-planning-exam-coef",
-					t("dashboard.planning.examCoef", { n: new Intl.NumberFormat(currentLang()).format(examen.coefficient) }));
+					t(examen.weightUnit === "percent" ? "dashboard.planning.examPercent" : "dashboard.planning.examCoef",
+						{ n: new Intl.NumberFormat(currentLang()).format(examen.coefficient) }));
 			}
 			if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
 			// Edit and Delete are shown directly as two ghost icon buttons

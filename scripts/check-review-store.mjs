@@ -405,7 +405,7 @@ await withSrcModule("src/review/review-store.ts", async ({ buildReviewCatalogue 
 	r.done();
 });
 
-await withSrcModule(["src/review/review-store.ts", "src/dashboard/home-tasks.ts"], async ({ parseExamDate, formatExamDate }, { isoLocal }) => {
+await withSrcModule(["src/review/review-store.ts", "src/dashboard/home-tasks.ts"], async ({ parseExamDate, formatExamDate, parseExamWeight, readExamWeight }, { isoLocal }) => {
 	const r = makeReporter("Adaptateur — parseExamDate (garde NaN)");
 	r.check("une date valide donne un timestamp fini", typeof parseExamDate("2027-06-01"), "number");
 	// 275761 dépasse la plage représentable par `Date`, mais ses trois
@@ -422,6 +422,24 @@ await withSrcModule(["src/review/review-store.ts", "src/dashboard/home-tasks.ts"
 	r.check("English date is written in full, capitalised", formatExamDate("2026-09-30", "en"), "Wednesday, September 30, 2026");
 	r.check("French date is written in full, capitalised", formatExamDate("2026-09-30", "fr"), "Mercredi 30 septembre 2026");
 	r.check("an unreadable date is returned as is", formatExamDate("nope", "en"), "nope");
+	// An exam's weight: a coefficient or a percentage, both in (0, 100].
+	r.check("weight: empty is none", parseExamWeight(""), undefined);
+	r.check("weight: blank is none", parseExamWeight("  "), undefined);
+	r.check("weight: 20% is a percentage", parseExamWeight("20%"), { value: 20, unit: "percent" });
+	r.check("weight: 20 % is a percentage", parseExamWeight("20 %"), { value: 20, unit: "percent" });
+	r.check("weight: a bare number takes the toggle's unit (coef)", parseExamWeight("2"), { value: 2, unit: "coef" });
+	r.check("weight: a bare number takes the toggle's unit (percent)", parseExamWeight("2", "percent"), { value: 2, unit: "percent" });
+	r.check("weight: a typed % wins over the toggle", parseExamWeight("2%", "coef"), { value: 2, unit: "percent" });
+	r.check("weight: decimal comma", parseExamWeight("1,5"), { value: 1.5, unit: "coef" });
+	r.check("weight: decimal point", parseExamWeight("1.5"), { value: 1.5, unit: "coef" });
+	r.check("weight: 100 is the top", parseExamWeight("100%"), { value: 100, unit: "percent" });
+	for (const bad of ["0", "-1", "abc", "150%", "101", "0%", "%", ",", "2%%", "2 3", "1e2"])
+		r.check(`weight: ${JSON.stringify(bad)} is invalid`, parseExamWeight(bad), null);
+	r.check("stored weight: a coefficient without a unit is kept as is", readExamWeight(2.5, undefined), { coefficient: 2.5 });
+	r.check("stored weight: an explicit coef unit is not written back", readExamWeight(2, "coef"), { coefficient: 2 });
+	r.check("stored weight: a percentage keeps its unit", readExamWeight(20, "percent"), { coefficient: 20, weightUnit: "percent" });
+	for (const [n, u] of [[0, undefined], [101, "percent"], ["2", undefined], [null, "percent"], [undefined, "percent"], [2, "pct"], [2, null]])
+		r.check(`stored weight: ${JSON.stringify([n, u])} is dropped`, readExamWeight(n, u), null);
 	r.done();
 });
 

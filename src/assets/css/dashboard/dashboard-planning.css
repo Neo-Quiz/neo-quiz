@@ -273,7 +273,7 @@
 	margin-top: 4px;
 }
 
-/* The coefficient of an exam, after its date: a touch stronger than the
+/* The weight of an exam ("coef. 2" or "20 %"), after its date: a touch stronger than the
    muted line it sits in, without a chip around it. */
 .qbd-planning-exam-coef {
 	font-weight: 600;
@@ -295,12 +295,104 @@
 .qbd-planning-date-text.is-empty { color: var(--text-faint); }
 .qbd-planning-date-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }
 .qbd-planning-date-icon svg { width: 16px; height: 16px; }
+/* Focus REPLACES the border colour (accent), it never stacks a ring on it: an
+   outline around the 1 px border doubled the frame, and around a red border
+   it gave a red-and-blue double ring. The invalid red wins over the focus
+   accent. Applies to every field of the exam modal (name, date, weight). */
 .qbd-medit-select:focus-visible,
 .qbd-medit-input:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: 2px;
+	outline: none;
+	border-color: var(--interactive-accent) !important;
 }
-.qbd-medit-input[aria-invalid="true"] { border-color: var(--color-red, #f87171) !important; }
+.qbd-medit-input[aria-invalid="true"],
+.qbd-medit-input[aria-invalid="true"]:focus,
+.qbd-medit-input[aria-invalid="true"]:focus-visible {
+	border-color: var(--color-red, #f87171) !important;
+}
+
+/* ── The exam modal's weight: a number field, the Coef. | % toggle at its
+   right (the app's segmented selector: a rail, a sliding block), and a short
+   red hint under the row when the weight is invalid. ── */
+.qbd-planning-weight-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.qbd-planning-weight-row .qbd-medit-input {
+	flex: 1;
+	min-width: 0;
+	width: auto;
+}
+.qbd-planning-unit {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+	box-sizing: border-box;
+	height: 38px;
+	padding: 3px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+.qbd-planning-unit-indic {
+	position: absolute;
+	top: 3px;
+	bottom: 3px;
+	left: 0;
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
+	transform-origin: left center;
+	pointer-events: none;
+}
+.qbd-planning-unit-btn {
+	position: relative;
+	z-index: 1;
+	height: 32px;
+	margin: 0;
+	padding: 0 12px;
+	border: none !important;
+	border-radius: 7px;
+	background: transparent !important;
+	box-shadow: none !important;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	white-space: nowrap;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 200ms ease;
+}
+.qbd-planning-unit-btn:hover:not(.is-active) { color: var(--text-normal); }
+.qbd-planning-unit-btn.is-active {
+	color: var(--text-normal);
+	font-weight: 600;
+	cursor: default;
+}
+.qbd-planning-unit-btn:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+.qbd-planning-weight-error {
+	color: var(--color-red, #f87171);
+}
+
+/* The exam modal's Save: the app's primary blue, like "Start the quiz",
+   instead of the inverted pill the other small modals use. */
+.qbd-medit-save.qbd-medit-save--primary {
+	background: var(--quiz-primary) !important;
+	color: #fff !important;
+}
+.qbd-medit-save.qbd-medit-save--primary:hover:not(:disabled) {
+	background: var(--quiz-primary-hover) !important;
+}
+.qbd-medit-save.qbd-medit-save--primary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-planning-unit-btn { transition: none; }
+}
 
 /* ── The calendar popover (`date-picker.ts`). Portalled to <body>, so nothing
    here may rely on `.qbd-root`; the surface (glass, radius, shadow) comes from

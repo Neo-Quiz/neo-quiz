@@ -347,3 +347,39 @@ export function formatExamDate(iso: string, lang: string): string {
 	const text = new Intl.DateTimeFormat(lang, { dateStyle: "full" }).format(new Date(ms));
 	return text.charAt(0).toLocaleUpperCase(lang) + text.slice(1);
 }
+
+/** What an exam's weight number means: a coefficient ("coef. 2") or a share of
+    the grade in percent ("20 %"). An exam with no unit stored is a "coef". */
+export type ExamWeightUnit = "coef" | "percent";
+
+/** A weight is valid in (0, 100], whatever its unit. */
+function validExamWeight(n: number): boolean {
+	return Number.isFinite(n) && n > 0 && n <= 100;
+}
+
+/**
+ * A typed exam weight. "" is none (`undefined`); "2,5" and "2.5" are 2.5; a
+ * trailing "%" ("20%", "20 %") makes it a percentage whatever `defaultUnit`
+ * says, otherwise the number takes `defaultUnit` (the unit toggle's state).
+ * Anything else (not a number, zero, negative, above 100) is invalid (`null`).
+ */
+export function parseExamWeight(raw: string, defaultUnit: ExamWeightUnit = "coef"): { value: number; unit: ExamWeightUnit } | undefined | null {
+	const text = raw.trim();
+	if (!text) return undefined;
+	const match = /^(\d+[.,]?\d*|[.,]\d+)\s*(%?)$/.exec(text);
+	if (!match) return null;
+	const value = Number(match[1].replace(",", "."));
+	return validExamWeight(value) ? { value, unit: match[2] ? "percent" : defaultUnit } : null;
+}
+
+/**
+ * The weight fields of a persisted exam, validated: `null` when the weight is
+ * invalid (a bad number, a unit that is neither "coef" nor "percent", a unit
+ * without a number) so the caller drops the weight and keeps the exam. Only a
+ * percentage stores its unit; a coefficient is written without one, as before.
+ */
+export function readExamWeight(coefficient: unknown, weightUnit: unknown): { coefficient: number; weightUnit?: "percent" } | null {
+	if (typeof coefficient !== "number" || !validExamWeight(coefficient)) return null;
+	if (weightUnit === undefined || weightUnit === "coef") return { coefficient };
+	return weightUnit === "percent" ? { coefficient, weightUnit } : null;
+}

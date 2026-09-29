@@ -26,6 +26,7 @@
 
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { ExamenDossier } from "../../../../src/types/dashboard-ctx";
+import { readExamWeight } from "../../../../src/review/review-store";
 /* `pont()` lit `window.neo` À L'APPEL — voir `./pont.ts` pour le pourquoi.
    `npm run check:folders` charge ce module hors de toute fenêtre : les
    fonctions PURES qu'il éprouve (`lireDossiers`, `idUnique`,
@@ -633,13 +634,11 @@ export function lireExamens(brut: unknown, anciennes: unknown): Record<string, E
 				&& typeof (e as Examen).id === "string" && (e as Examen).id !== ""
 				&& typeof (e as Examen).nom === "string"
 				&& typeof (e as Examen).date === "string" && DATE_ISO.test((e as Examen).date))
-				.map(e => {
-						// An invalid coefficient is dropped, never the exam.
-						const c = e.coefficient;
-						return typeof c === "number" && Number.isFinite(c) && c > 0 && c <= 100
-							? { id: e.id, nom: e.nom, date: e.date, coefficient: c }
-							: { id: e.id, nom: e.nom, date: e.date };
-					});
+				.map(e => ({
+					id: e.id, nom: e.nom, date: e.date,
+					// An invalid weight is dropped, never the exam.
+					...readExamWeight(e.coefficient, e.weightUnit),
+				}));
 			if (valides.length) out[module] = valides.sort((a, b) => a.date.localeCompare(b.date));
 		}
 	}
