@@ -1348,7 +1348,14 @@ body::after {
 .nq-menu-chevron svg { width: 14px; height: 14px; }
 .nq-menu-ligne:hover, .nq-menu-ligne:focus, .nq-menu-ligne[aria-expanded="true"] { background: var(--background-modifier-hover); outline: none; }
 .nq-menu-separateur { height: 1px; margin: 6px 0; background: var(--background-modifier-border); }
-.nq-menu-version { display: flex; align-items: center; height: 28px; padding: 0 10px 0 28px; color: var(--text-faint); font-size: 13px; cursor: default; }
+/* The top row (2026-09-29): the version, "Check for updates" and the GitHub
+   mark, aligned on the labels of the rows below (28 px, the check column). */
+.nq-menu-apropos { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 6px 0 28px; font-size: 13px; }
+.nq-menu-apropos-version { flex: none; padding-right: 4px; color: var(--text-faint); cursor: default; }
+.nq-menu-apropos-verifier { flex: 1 1 auto; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
+.nq-menu-apropos-github { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.nq-menu-apropos-github svg { width: 16px; height: 16px; }
+.nq-menu-apropos-verifier:hover, .nq-menu-apropos-verifier:focus, .nq-menu-apropos-github:hover, .nq-menu-apropos-github:focus-visible { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
 
 /* ══════════════════════════════════════════════════════════
    LES BARRES DE DÉFILEMENT DE LA FENÊTRE

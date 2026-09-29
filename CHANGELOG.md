@@ -47,6 +47,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The application menu is simpler: one top row with the version, "Check for updates" and a GitHub logo, then Edit and Display. The "Neo Quiz" submenu and its Settings line are gone (Ctrl+, and the rail's Settings button remain).
 - A new Neo Quiz logo at the top of the rail: a stack of cards with a mortarboard.
 - The application menu (Neo Quiz, Edit, Display) opens from the Neo Quiz logo at the top of the rail; the chevron button of the title bar is gone. The logo no longer opens GitHub directly: the menu has that link.
 - An "In your own words" question no longer shows a "Your own answer" label above its field: the field's hint already says it.

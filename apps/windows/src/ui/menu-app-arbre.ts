@@ -6,10 +6,13 @@
    l'éprouve tel quel. Le PRODUIT n'est jamais traduit (`PRODUCT_NAME`).
 ══════════════════════════════════════════════════════════ */
 import { t } from "../../../../src/i18n";
-import { PRODUCT_NAME } from "../../../../src/branding";
 
 export type EntreeMenu =
-	| { kind: "version"; id: string; label: string }
+	/* ONE row at the top of the menu (2026-09-29): the version, "Check for
+	   updates" and a GitHub mark. It replaces the "Neo Quiz" submenu, whose
+	   three lines said the same thing in three rows, and whose "Settings…"
+	   is gone (Ctrl+, and the rail's Settings button remain). */
+	| { kind: "about"; id: string; version: string; checkLabel: string; repoLabel: string }
 	| { kind: "action"; id: string; label: string; shortcut?: string; disabled?: boolean }
 	| { kind: "check"; id: string; label: string; value: number; checked: boolean }
 	| { kind: "separator"; id: string }
@@ -42,17 +45,12 @@ export function palierZoomVoisin(courant: number, sens: 1 | -1): number {
 
 export function buildMenu(ctx: { version: string; zoom: number }): EntreeMenu[] {
 	return [
-		{ kind: "submenu", id: "app", label: PRODUCT_NAME, items: [
-			{ kind: "version", id: "version", label: ctx.version },
-			{ kind: "action", id: "check-updates", label: t("app.menu.checkUpdates") },
-			/* Le lien vers le dépôt, arrivé ici le 2026-09-17 avec la
-			   suppression de la section « À propos » des Réglages : il
-			   appartient au même bloc que la version, qui est déjà dans ce
-			   menu. La clé est celle qu'il portait là-bas — inchangée, comme
-			   son URL (`manifest.json`, `helpUrl`). */
-			{ kind: "action", id: "repo", label: t("settings.about.repo") },
-			{ kind: "action", id: "settings", label: t("app.menu.settings"), shortcut: "Ctrl+," },
-		] },
+		/* The repository link came to this menu on 2026-09-17, when the
+		   Settings' "About" section was removed: it belongs with the version.
+		   Its key is the one it had there — unchanged, like its URL
+		   (`manifest.json`, `helpUrl`); it is now the GitHub mark's name. */
+		{ kind: "about", id: "about", version: ctx.version, checkLabel: t("app.menu.checkUpdates"), repoLabel: t("settings.about.repo") },
+		{ kind: "separator", id: "about-sep" },
 		{ kind: "submenu", id: "edit", label: t("app.menu.edit"), items: [
 			{ kind: "action", id: "undo", label: t("app.menu.undo"), shortcut: "Ctrl+Z" },
 			{ kind: "action", id: "redo", label: t("app.menu.redo"), shortcut: "Ctrl+Y" },

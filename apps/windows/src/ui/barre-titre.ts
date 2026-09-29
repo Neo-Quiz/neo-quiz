@@ -206,8 +206,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 				if (id === "check-updates") {
 					void pont().miseAJour.verifier();
 					deps.ouvrirReglages();
-				} else if (id === "settings") {
-					deps.ouvrirReglages();
 				} else if (id === "repo") {
 					/* `window.open` et non une navigation : le principal REFUSE
 					   toute navigation de premier niveau vers une autre origine

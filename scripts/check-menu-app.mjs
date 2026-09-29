@@ -11,14 +11,14 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/electron/pont.ts"], ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin }, { ZOOM_MIN, ZOOM_MAX, borneZoom }) => {
 	const r = makeReporter("Application menu — tree");
 	const menu = buildMenu({ version: "2.5.2", zoom: 1 });
-	r.check("three top-level submenus", menu.map(e => e.id), ["app", "edit", "view"]);
+	r.check("the about row, a rule, then the Edit and Display submenus", menu.map(e => e.id), ["about", "about-sep", "edit", "view"]);
 	const ids = [];
 	const visit = (entries) => { for (const e of entries) { ids.push(e.id); if (e.kind === "submenu") visit(e.items); } };
 	visit(menu);
 	r.check("no empty id", ids.every(id => typeof id === "string" && id.length > 0), true);
 	r.check("no duplicate id", new Set(ids).size, ids.length);
-	r.check("the version is the first row of the Neo Quiz submenu",
-		menu[0].items[0], { kind: "version", id: "version", label: "2.5.2" });
+	r.check("the version is on the menu's first row, and no Settings line is left",
+		[menu[0].kind, menu[0].version, ids.includes("settings")], ["about", "2.5.2", false]);
 	r.check("the scale steps have the main process's bounds (0.75..1.5)",
 		[Math.min(...PALIERS_ZOOM), Math.max(...PALIERS_ZOOM)], [0.75, 1.5]);
 	r.check("the first and last steps ARE the main process's bounds (electron/pont.ts)",
@@ -30,11 +30,11 @@ await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/elec
 	r.check("above the maximum, the maximum; not a number, 100 %", [borneZoom(3), borneZoom("x"), borneZoom(Number.NaN)], [1.5, 1, 1]);
 	r.check("the scale steps are sorted, each one larger than the last",
 		PALIERS_ZOOM.every((p, i) => i === 0 || p > PALIERS_ZOOM[i - 1]), true);
-	const scale = menu[2].items.find(e => e.id === "scale");
+	const scale = menu[3].items.find(e => e.id === "scale");
 	r.check("the check mark is on the current step, and on it alone",
 		scale.items.filter(e => e.checked).map(e => e.value), [1]);
 	r.check("a zoom between two steps checks nothing",
-		buildMenu({ version: "x", zoom: 1.05 })[2].items.find(e => e.id === "scale").items.filter(e => e.checked).length, 0);
+		buildMenu({ version: "x", zoom: 1.05 })[3].items.find(e => e.id === "scale").items.filter(e => e.checked).length, 0);
 
 	/* ─── THE NEIGHBOUR STEP (Ctrl + wheel) ───
 	   What it prevents: a wheel notch that changes nothing because the
