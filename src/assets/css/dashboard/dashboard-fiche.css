@@ -44,10 +44,14 @@
 	gap: 14px;
 	padding-top: 2px;
 }
+/* The same left offset as a folder's back arrow
+   (`.qbd-quizzes-header-back`, dashboard-quizzes.css): both arrows sit at
+   the same place, so two clicks go back from a quiz to the grid without
+   moving the mouse (2026-09-29). */
 .qbd-root .qbd-fiche-back {
 	align-self: flex-start;
 	flex-shrink: 0;
-	margin: 0 0 -8px -6px;
+	margin: 0 0 -8px 7px;
 }
 .qbd-fiche-titles {
 	flex: 1;

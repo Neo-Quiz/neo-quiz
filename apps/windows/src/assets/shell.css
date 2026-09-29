@@ -1247,8 +1247,14 @@ body::after {
 #neo-quiz-root > .qbd-layout.nq-sheet-stack > .qbd-content {
 	position: relative;
 }
+/* Each level moves the front sheet 16 px lower, and its top padding gives
+   the same 16 px back from the second level on (2026-09-29): the header of
+   every sheet — its back arrow first — stays at the same place on screen,
+   so going back from a quiz to its folder, then to the grid, is two clicks
+   without moving the mouse. 28 px is `.qbd-content`'s own top padding. */
 #neo-quiz-root > .qbd-layout > .qbd-content.nq-sheet-front {
 	margin-top: calc(16px * var(--nq-sheet-depth, 1));
+	padding-top: max(8px, calc(28px - 16px * (var(--nq-sheet-depth, 1) - 1)));
 }
 /* The wrap: the panel's column (its `left` and its level's `top` are set
    by the module), clipped vertically only, as the quiz launch's sliding

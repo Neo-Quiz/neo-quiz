@@ -50,6 +50,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The back arrow of a quiz's page sits exactly where a folder's does: going back from a quiz to its folder, then to Folders, is two clicks without moving the mouse.
 - Generated Practice questions get a hint only when one helps, instead of one on every question.
 - Generated fill-in-the-blanks no longer frame a blank with the chevrons, brackets or quotes of its answer (#include <▢>): those go inside the blank, which no longer hints at the answer.
 - The blanks of a fill-in-the-blanks are sober fields: a thin outline all round, no dashed line, no pop; blue while typing, green or red once checked. In code they take the code's font and sit inside the line. A blank now takes a limited number of characters, the same for every blank of the question, so its length never gives the answer away.
