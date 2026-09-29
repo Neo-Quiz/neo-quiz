@@ -53,7 +53,6 @@ export const EN_DASHBOARD = {
 	"dashboard.home.tasksLeftOther": "{count} tasks left today",
 	"dashboard.home.nextExamWhen": "{when} · {date}",
 	"dashboard.home.noExam": "No upcoming exam",
-	"dashboard.home.addExam": "Add an exam",
 	// Nothing to do in any folder.
 	"dashboard.home.allDone": "All caught up",
 	"dashboard.home.allDoneHint": "Nothing to review or learn today.",
@@ -62,6 +61,10 @@ export const EN_DASHBOARD = {
 	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Create a new folder",
 	"dashboard.home.resumeBtn": "Resume",
+	"dashboard.home.statsTotal": "Total",
+	"dashboard.home.statsPerDay": "Per day",
+	"dashboard.home.statsRecord": "Record",
+	"dashboard.home.statsHint": "Study time estimated from your answers: pauses of more than 5 minutes are not counted.",
 
 	/* ── Onboarding (premier usage, aucun quiz) ── */
 	"dashboard.onboarding.title": "Welcome to Neo Quiz",

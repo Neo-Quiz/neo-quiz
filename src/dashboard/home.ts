@@ -1,6 +1,6 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
-import { t } from "../i18n";
+import { currentLang, t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
@@ -16,6 +16,7 @@ import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
 import { renderHomeSide, type HomeExam } from "./home-week";
+import { formatStudyTime, studyStats } from "./study-time";
 
 /* ══════════════════════════════════════════════════════════
    HOME VIEW — what to work on today (redesigned 2026-09-29, after the
@@ -114,11 +115,12 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			return s && s.questionsDone > 0 && s.questionsDone < q.questions;
 		});
 
-		/* The page is ONE wrapper: `.qbd-content > *` centres it, and it holds
-		   the glow, which must stay behind every card (`isolation`, dashboard-
-		   home.css). */
+		/* The page is ONE wrapper: `.qbd-content > *` centres it. No blue
+		   glow behind the top of the page any more (2026-09-29): cut by the
+		   tile's edge, it read as a smear rather than light. */
 		const page = ajouter(container, "div", "qbd-home-page");
-		ajouter(page, "div", "qbd-home-glow").setAttribute("aria-hidden", "true");
+
+		renderStudyStats(page);
 
 		/* No header (2026-09-29): no title, no "Generate a quiz" — the page
 		   says what to do by itself, and "Create a new folder" closes it
@@ -181,6 +183,28 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 	   accent TEXT action. The accent is the quiz FOLDER's, like its card: the
 	   ring stays the progress blue of every ring. It resumes the quiz where it
 	   was left, like the folder's next step. */
+	/** The stats band at the top of the page (after StudySmarter's): total
+	    study time, the daily average and the best day, ESTIMATED from the
+	    answers' timestamps (`study-time.ts` says how). Hidden until a first
+	    answer, and under a host without a review log. */
+	function renderStudyStats(parent: HTMLElement): void {
+		const times = ctx.reviewStore?.answerTimes() ?? [];
+		const s = studyStats(times, Date.now());
+		if (!s) return;
+		const lang = currentLang();
+		const band = ajouter(parent, "div", "qbd-home-stats");
+		band.title = t("dashboard.home.statsHint");
+		for (const [ms, key] of [
+			[s.totalMs, "dashboard.home.statsTotal"],
+			[s.perDayMs, "dashboard.home.statsPerDay"],
+			[s.recordMs, "dashboard.home.statsRecord"],
+		] as const) {
+			const cell = ajouter(band, "div", "qbd-home-stat");
+			ajouter(cell, "div", "qbd-home-stat-value", formatStudyTime(ms, lang));
+			ajouter(cell, "div", "qbd-home-stat-label", t(key));
+		}
+	}
+
 	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, accent: string): void {
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;

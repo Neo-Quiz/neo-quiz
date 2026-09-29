@@ -38,13 +38,16 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.home.tasksLeftOther": "{count} tâches restantes aujourd'hui",
 	"dashboard.home.nextExamWhen": "{when} · {date}",
 	"dashboard.home.noExam": "Pas d'examen à venir",
-	"dashboard.home.addExam": "Ajouter un examen",
 	"dashboard.home.allDone": "Tout est à jour",
 	"dashboard.home.allDoneHint": "Rien à réviser ni à apprendre aujourd'hui.",
 	"dashboard.home.resumeLabel": "Reprendre là où vous en étiez",
 	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Créer un nouveau dossier",
 	"dashboard.home.resumeBtn": "Reprendre",
+	"dashboard.home.statsTotal": "Total",
+	"dashboard.home.statsPerDay": "Par jour",
+	"dashboard.home.statsRecord": "Record",
+	"dashboard.home.statsHint": "Temps d'étude estimé d'après vos réponses : les pauses de plus de 5 minutes ne comptent pas.",
 
 	/* ── Onboarding ── */
 	"dashboard.onboarding.title": "Bienvenue dans Neo Quiz",

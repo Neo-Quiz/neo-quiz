@@ -21,7 +21,7 @@ export interface HomeExam { exam: ExamenDossier; group: ModuleGroup }
 
 export interface HomeSideDeps {
 	ctx: DashboardShellCtx;
-	/** The folders shown (tasks left, the "Add an exam" link). */
+	/** The folders shown (for the tasks left today). */
 	folders: readonly HomeFolderCard[];
 	/** Every upcoming exam, every folder, nearest first. */
 	exams: readonly HomeExam[];
@@ -96,13 +96,8 @@ export function renderHomeSide(parent: HTMLElement, deps: HomeSideDeps): void {
 		const date = new Intl.DateTimeFormat(lang, { weekday: "short", day: "numeric", month: "short" }).format(new Date(y, m - 1, d));
 		ajouter(text, "div", "qbd-homes-muted", t("dashboard.home.nextExamWhen", { when: whenLabel(next.exam.date, todayStart), date }));
 	} else {
+		// No "Add an exam" link here any more (2026-09-29): exams are set
+		// from a folder's Review plan, where they belong to a course.
 		ajouter(text, "div", undefined, t("dashboard.home.noExam"));
-		// Exams live in a folder's Review plan: the first folder shown.
-		const target = folders[0]?.group;
-		if (target && ctx.openFolderTab) {
-			const add = ajouter(text, "button", "qbd-homes-link", t("dashboard.home.addExam"));
-			add.type = "button";
-			add.addEventListener("click", () => ctx.openFolderTab!(target.folder, "planning"));
-		}
 	}
 }

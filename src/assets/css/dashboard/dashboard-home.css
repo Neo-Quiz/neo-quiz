@@ -10,6 +10,7 @@
    flicker, and no animation in fill: both confiscates `transform` from the
    cards.
    ═════════════════════════════════════════════════════════ */
+.qbd-home-enter .qbd-home-stats,
 .qbd-home-enter .qbd-resume-hero,
 .qbd-home-enter .qbd-onboarding {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
@@ -22,6 +23,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+	.qbd-home-enter .qbd-home-stats,
 	.qbd-home-enter .qbd-resume-hero,
 	.qbd-home-enter .qbd-onboarding,
 	.qbd-home-enter .qbd-homef,
@@ -246,33 +248,39 @@
 
 .qbd-home-done .qbd-home-newfolder { margin-top: 18px; }
 
-/* ══ THE PAGE AND ITS GLOW (2026-09-29) ═════════════════════
-   One wrapper for the whole page (`.qbd-content > *` centres it). It is its
-   own stacking context (`isolation`), so the glow at `z-index: -1` sits above
-   the tile's glass and BELOW every card, without giving each card a
-   position. The glow reaches past the wrapper to the tile's inner edges
-   (the tile's padding, dashboard-base.css), and the tile's rounded,
-   scrolling box clips it. After the StudySmarter home. */
-.qbd-home-page {
-	position: relative;
-	isolation: isolate;
+/* ══ THE STATS BAND (2026-09-29) ═══════════════════════════
+   At the top of the page, after the StudySmarter statistics: three equal
+   cells (Total, Per day, Record) in one tile, split by hairlines, a large
+   number over a small muted label. It replaced the blue glow that sat
+   behind the top of the page. */
+.qbd-home-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	padding: 18px 0;
+	margin-bottom: 18px;
+	cursor: default;
 }
-
-.qbd-home-glow {
-	position: absolute;
-	z-index: -1;
-	top: -28px;
-	left: -32px;
-	right: -32px;
-	height: 420px;
-	pointer-events: none;
-	background: radial-gradient(
-		ellipse 50% 90% at 50% -25%,
-		color-mix(in srgb, var(--qbd-state-progress) 75%, transparent),
-		color-mix(in srgb, var(--qbd-state-progress) 30%, transparent) 45%,
-		color-mix(in srgb, var(--qbd-state-progress) 8%, transparent) 70%,
-		transparent 88%
-	);
+.qbd-home-stat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+	padding: 0 12px;
+}
+.qbd-home-stat + .qbd-home-stat { border-left: 1px solid var(--qbd-surface-edge); }
+.qbd-home-stat-value {
+	font-size: 30px;
+	font-weight: 750;
+	line-height: 1.15;
+	letter-spacing: -0.02em;
+	font-variant-numeric: tabular-nums lining-nums;
+	color: var(--text-normal);
+	white-space: nowrap;
+}
+.qbd-home-stat-label {
+	font-size: 12px;
+	color: var(--text-muted);
 }
 
 /* ══ FOLDERS + WEEK ═════════════════════════════════════════ */
@@ -294,7 +302,8 @@
 /* The only tiles of the page (with the Resume card): the content. Inside,
    rows and text only — never a second box. */
 .qbd-homef,
-.qbd-homes {
+.qbd-homes,
+.qbd-home-stats {
 	background: var(--qbd-surface-bg);
 	border: 1px solid var(--qbd-surface-edge);
 	border-radius: 15px;
@@ -592,21 +601,6 @@
 .qbd-homes-muted {
 	color: var(--text-muted);
 	font-size: 12.5px;
-}
-
-.qbd-root .qbd-homes-link {
-	display: inline;
-	height: auto;
-	margin-top: 2px;
-	padding: 0;
-	border: none;
-	background: none;
-	box-shadow: none;
-	color: color-mix(in srgb, var(--qbd-state-progress) 65%, #ffffff);
-	font: inherit;
-	font-size: 12.5px;
-	font-weight: 600;
-	cursor: pointer;
 }
 
 /* ── Nothing to do anywhere ── */
