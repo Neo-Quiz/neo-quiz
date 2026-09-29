@@ -505,6 +505,30 @@ await withSrcModule("src/engine/cloze.ts", ({ markSlots, fillSlots, codeClozeHtm
 	r.done();
 });
 
+/* A blank INSIDE a ```lang block (2026-09-29): the block gets its language's
+   colours, and the highlighter cut the blank tokens — `return {{0}};` put the
+   0 in a number span between the two private-use characters, and 3 blanks
+   out of 4 were lost. Through the REAL highlighter. */
+await withSrcModule(["src/engine/cloze.ts", "src/engine/code-highlight.ts"], ({ markSlots, protectCodeSlots, restoreCodeSlots }, { colorerCode }) => {
+	const r = makeReporter("Blanks in a fenced code block");
+	const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	const gabarit = "```c\n#include <{{stdio.h}}>\nint main(void) {\n    {{int}} age = 20;\n    return {{0}};\n}\n```\n\nIn prose, a {{word}}.";
+	const { marked, blanks } = markSlots(gabarit);
+	const protege = protectCodeSlots(marked);
+	const code = protege.split("```c\n")[1].split("\n```")[0];
+	const colore = colorerCode(code, "c", esc, 100000);
+	const html = restoreCodeSlots(typeof colore === "string" ? colore : colore.html);
+	r.check("four blanks counted", blanks.length, 4);
+	r.check("the code was coloured", /class="token/.test(html), true);
+	r.check("every blank of the code survives the highlighter",
+		(html.match(/\d/g) || []).length, 3);
+	r.check("a blank in prose keeps its token (no __…__, which is bold)",
+		protege.endsWith("In prose, a 3."), true);
+	r.check("without the protection, the highlighter loses blanks",
+		((() => { const brut = colorerCode(marked.split("```c\n")[1].split("\n```")[0], "c", esc, 100000); return (typeof brut === "string" ? brut : brut.html); })().match(/\d/g) || []).length < 3, true);
+	r.done();
+});
+
 /* Les STYLES DE LECTURE (2026-09-26) : étapes, cases de tableau, cartes et
    récapitulatif passent par la MÊME grammaire que le reste du quiz — le
    rendu RÉEL (engine/lecture-rendu.ts) avec les portes RÉELLES. Un champ

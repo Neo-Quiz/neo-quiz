@@ -1,12 +1,11 @@
 import { t } from "../i18n";
 import { ajouter } from "../dom";
-import { md2html } from "./utils";
 import type { DraftQuestion } from "./utils";
 import { currentHost } from "../host/current";
 import { createSanitizer, renderInlineText } from "../engine/sanitizer";
 import type { EngineCtx } from "../types/engine-ctx";
-import { markSlots, fillSlots, codeClozeHtml } from "../engine/cloze";
-import { inlineInto, resolveImagesInHtml } from "./question-preview";
+import { markSlots, fillSlots, codeClozeHtml, protectCodeSlots, restoreCodeSlots } from "../engine/cloze";
+import { inlineInto, texteQuizHtml } from "./question-preview";
 import type { QuizPreviewOptions } from "./question-preview";
 
 /* ══════════════════════════════════════════════════════════
@@ -156,9 +155,9 @@ export function renderMatchingBlock(card: HTMLElement, q: DraftQuestion, opts: Q
 	});
 }
 
-/** Texte à trous : gabarit ENTIER passé par `md2html` d'un seul tenant (une
-    paire markdown qui enjambe un trou reste une paire — même raison que le
-    moteur, engine/cloze.ts). En corrigé, chaque trou affiche sa réponse
+/** Fill in the blanks: the WHOLE template rendered in one piece by the quiz's
+    renderer (a markdown pair spanning a blank stays a pair — same reason as
+    the engine, engine/cloze.ts). En corrigé, chaque trou affiche sa réponse
     (première variante), classes `is-filled correct`. Un SEUL champ éditable
     pour tout le gabarit (`q.cloze`, source avec ses `{{…}}`) : les trous
     individuels ne sont pas des champs à part. */
@@ -167,7 +166,10 @@ export function renderClozeBlock(card: HTMLElement, q: DraftQuestion, opts: Quiz
 	const body = ajouter(card, "div", "quiz-cloze");
 	if (opts.corrige) body.setAttribute("data-edit", "cloze");
 	body.innerHTML = fillSlots(
-		codeClozeHtml(marked) ?? resolveImagesInHtml(md2html(marked).replace(/^<p>|<\/p>$/g, ""), opts.sourcePath),
+		/* The quiz's own renderer (`texteQuizHtml`), not `md2html`: a ```lang
+		   block gets its box and colours as in the quiz, its blanks protected
+		   from the highlighter (engine/cloze.ts `protectCodeSlots`). */
+		codeClozeHtml(marked) ?? restoreCodeSlots(texteQuizHtml(protectCodeSlots(marked), opts.sourcePath)),
 		(index) => {
 			const label = t("engine.cloze.blankAria", { n: index + 1 }).replace(/"/g, "&quot;");
 			if (opts.corrige) {

@@ -175,7 +175,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			// (a language of the table the current host has not wired up, same
 			// treatment as a language outside the table entirely).
 			const language = (bloc.dataset.lang ?? "") as CodeLanguage;
-			if (!code || !code.languages().includes(language)) {
+			// A fill-in-the-blanks' code has holes: it cannot run (cloze.ts).
+			if (!code || !code.languages().includes(language) || bloc.closest(".quiz-cloze")) {
 				bloc.querySelector(".quiz-code-toolbar")?.remove();
 				bloc.classList.remove("quiz-code-block-executable");
 				return;

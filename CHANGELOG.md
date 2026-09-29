@@ -47,6 +47,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- A fill-in-the-blanks on code shows its program in a real code block, with its language's logo and colours, in the quiz, in the editor and on the quiz's page, where its card now shows the text with empty blanks. Generated quizzes always put code in such a block.
 - The version in the application menu reads "v1.19.0".
 - The application menu is simpler: one top row with the version, "Check for updates" and a GitHub logo, then Edit and Display. The "Neo Quiz" submenu and its Settings line are gone (Ctrl+, and the rail's Settings button remain).
 - A new Neo Quiz logo at the top of the rail: a stack of cards with a mortarboard.

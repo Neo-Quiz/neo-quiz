@@ -12,6 +12,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
 import { texteQuizHtml } from "../editor/question-preview";
+import { codeClozeHtml, fillSlots, markSlots, protectCodeSlots, restoreCodeSlots } from "../engine/cloze";
 import { renderInlineText } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 import { quizModeIcon, quizModeLabel, renderQuizTypeIcon } from "./quiz-card";
@@ -294,6 +295,22 @@ export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): 
 	return top;
 }
 
+/** A fill-in-the-blanks' text, its code in its ```lang block, each blank an
+    EMPTY slot: like the options without the right one, the card never gives
+    the answer (2026-09-29 — the card showed only the instruction, "Complete
+    this C program", and never the program). */
+function renderTrous(card: HTMLElement, q: DraftQuestion): void {
+	const gabarit = typeof q.cloze === "string" ? q.cloze : "";
+	if (!gabarit.trim()) return;
+	const { marked } = markSlots(gabarit);
+	const el = ajouter(card, "div", "qbd-fiche-trous");
+	el.innerHTML = fillSlots(
+		codeClozeHtml(marked) ?? restoreCodeSlots(texteQuizHtml(protectCodeSlots(marked))),
+		() => `<span class="qbd-fiche-trou" aria-hidden="true"></span>`,
+	);
+	if (gabarit.includes("$")) void mathifyElement(el);
+}
+
 /** Les options d'un QCM, SANS la bonne, marquées A, B, C… : rien ne se
     coche ici. Toutes courtes : des bulles côte à côte ; sinon une colonne. */
 function renderOptions(card: HTMLElement, q: DraftQuestion): void {
@@ -429,6 +446,7 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 			texte(corps, "span", "qbd-fiche-q-text", t("dashboard.quiz.promptEmpty"));
 		}
 		renderOptions(corps, q);
+		renderTrous(corps, q);
 		suivreDebord(corps);
 		/* CLIC = ÉDITER CETTE QUESTION (2026-09-26) : la carte ouvre l'éditeur
 		   dessus. Toujours aucune réponse ici ; répondre se fait en jouant. */

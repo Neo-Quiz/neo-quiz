@@ -206,6 +206,28 @@ export function codeClozeHtml(marked: string): string | null {
 	return `<pre class="quiz-cloze-code"><code>${code.join("\n")}</code></pre>`;
 }
 
+/* A blank INSIDE a fenced code block (```c … ```): the rule is that any code
+   goes in a block naming its language, so that it gets that language's logo
+   and colours (2026-09-29). The highlighter, though, cuts a blank's token (a
+   private-use character around its number) — `return {{0}};` gave
+   `<span class="token number">0</span>` between the two characters, and the
+   blank was gone. Inside a fence, each token becomes a plain IDENTIFIER the
+   highlighter keeps whole, and comes back after the rendering. Only inside a
+   fence: in prose, `__…__` is bold. */
+const FENCE_RE = /^([ \t]*)(`{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*$/gm;
+const SLOT_IDENT_RE = /__NQ_SLOT_(\d+)__/g;
+
+/** The marked template, its blank tokens inside fenced code blocks turned into
+    identifiers the highlighter does not split (`restoreCodeSlots` undoes it). */
+export function protectCodeSlots(marked: string): string {
+	return marked.replace(FENCE_RE, bloc => bloc.replace(SLOT_RE, (_m, n: string) => `__NQ_SLOT_${n}__`));
+}
+
+/** The rendered HTML, the identifiers of `protectCodeSlots` back to tokens. */
+export function restoreCodeSlots(html: string): string {
+	return html.replace(SLOT_IDENT_RE, (_m, n: string) => SLOT_OPEN + n + SLOT_CLOSE);
+}
+
 /** Remplace les jetons du HTML rendu par ce que `slot` produit pour chacun. */
 export function fillSlots(html: string, slot: (index: number) => string): string {
 	return html.replace(SLOT_RE, (_m, n: string) => slot(Number(n)));
@@ -244,10 +266,10 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 
 		// Le gabarit ENTIER passe par le rendu (markdown + images), trous
 		// marqués : une paire `…` ou **…** qui enjambe un trou reste une paire.
-		const rendered = codeClozeHtml(marked) ?? ctx.sanitize.renderTextWithEmbeds(marked, {
+		const rendered = codeClozeHtml(marked) ?? restoreCodeSlots(ctx.sanitize.renderTextWithEmbeds(protectCodeSlots(marked), {
 			wrapClass: "quiz-cloze-embed-wrap",
 			imgClass: "quiz-cloze-embed"
-		});
+		}));
 
 		const body = fillSlots(rendered, (index) => {
 			const value = String(values[index] ?? "");
