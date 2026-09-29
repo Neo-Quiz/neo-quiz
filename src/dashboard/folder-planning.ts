@@ -247,26 +247,8 @@ export function renderFolderPlanning(
 
 	renderNextStep(droite, ctx, ordre, stats);
 
-	const modes = ajouter(droite, "div", "qbd-planning-modes");
-	const modeAFaire = (mode: "learn" | "practice"): QuizIndexEntry | undefined =>
-		ordre.find(q => q.mode === mode && computeQuizState(q, stats[q.path]).state !== "mastered");
-	const modeLigne = (icone: string, titre: string, aide: string, cible: QuizIndexEntry | undefined): void => {
-		const ligne = ajouter(modes, "button", "qbd-planning-mode-row");
-		ligne.type = "button";
-		currentHost().ui.setIcon(ajouter(ligne, "span", "qbd-planning-mode-icon"), icone);
-		const corps = ajouter(ligne, "div", "qbd-planning-mode-text");
-		ajouter(corps, "span", "qbd-planning-mode-title", titre);
-		ajouter(corps, "span", "qbd-planning-mode-help", aide);
-		if (!cible) {
-			ligne.disabled = true;
-			ligne.setAttribute("aria-disabled", "true");
-		} else {
-			ligne.addEventListener("click", () => ctx.openQuiz(cible));
-		}
-	};
-	modeLigne("book-open", t("dashboard.planning.modeLearn"), t("dashboard.quiz.modeLearnHelp"), modeAFaire("learn"));
-	modeLigne("dumbbell", t("dashboard.planning.modePractice"), t("dashboard.quiz.modePracticeHelp"), modeAFaire("practice"));
-	modeLigne("rotate-ccw", t("dashboard.quizzes.progressDueAction"), t("dashboard.quizzes.nextStepReviewHelp"), dues.lignes[0]?.quiz);
+	/* No study modes panel (Learn / Test / Review) any more (2026-09-29): the
+	   course cards and the next step above already start each quiz. */
 
 	return vue;
 }

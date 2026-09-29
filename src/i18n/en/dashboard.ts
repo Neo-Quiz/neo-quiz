@@ -191,7 +191,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.attemptDelete": "Delete this attempt",
 	"dashboard.quizzes.attemptDeleted": "Attempt deleted",
 	"dashboard.quizzes.attemptUndo": "Undo",
-	"dashboard.quizzes.nextStepReviewHelp": "Questions due today in this folder.",
 	"dashboard.quizzes.nextStepResume": "Resume",
 	/* "Mastered"/"To review" du donut réutilisent dashboard.card.mastered/review
 	   (même mot que la pastille d'état d'une carte) ; "To learn" agrège fresh
@@ -323,8 +322,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.editDone": "Done",
 	"dashboard.quiz.moveUp": "Move up",
 	"dashboard.quiz.moveDown": "Move down",
-	"dashboard.quiz.modeLearnHelp": "To learn the course, step by step.",
-	"dashboard.quiz.modePracticeHelp": "To train for the exam, exercise after exercise.",
 	"dashboard.quiz.welcomeProgress": "{done} of {total} questions done",
 	"dashboard.quiz.welcomeStart": "Start the quiz",
 	"dashboard.quiz.previewBanner": "Preview: your answers here don't count.",
@@ -388,8 +385,6 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.dateNextMonth": "Next month",
 	"dashboard.planning.examsEmptyTitle": "No upcoming exams",
 	"dashboard.planning.examsEmptyHint": "Add an exam date to get review tasks planned for it.",
-	"dashboard.planning.modeLearn": "Learn",
-	"dashboard.planning.modePractice": "Test",
 	"dashboard.planning.manageExams": "Manage exams",
 	/* ── Composer du dossier (folder-planning.ts, task 5, 2026-09-26) ── */
 	"dashboard.planning.composerPlaceholder": "Ask for a quiz on this folder…",
