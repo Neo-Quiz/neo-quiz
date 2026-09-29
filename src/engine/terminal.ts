@@ -445,7 +445,12 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			readOnly: !!ctx.isRevealed(qi),
 			// Même raison qu'au champ texte : MathLive affiche ce placeholder
 			// comme du texte nu, pas comme du HTML.
-			placeholder: ctx.sanitize.stripInlineMarkdown(q?.placeholder || ""),
+			/* Without one, the empty field had no prompt at all and did not read
+			   as a place to write (2026-09-29): the text fields' own "Your
+			   answer...", as TEXT — the placeholder is LaTeX, and bare words
+			   would come out as italic letters run together. */
+			placeholder: ctx.sanitize.stripInlineMarkdown(q?.placeholder || "")
+				|| `\\text{${t("engine.text.placeholder").replace(/[\\{}$&#%_^~]/g, "")}}`,
 			onInput: (latex) => {
 				if (ctx.isRevealed(qi)) return;
 				ctx.invalidateSavedResults?.();
