@@ -41,8 +41,9 @@ import { isExamSetup, stepTimeLimit, withExamMode, withHints, withTimeLimit, typ
    (`dashboard/exam-keep-menu.ts`).
 
    Keyboard: Tab follows the page order; Space toggles the focused switch
-   (real controls: `role="switch"` buttons); ENTER STARTS from anywhere
-   (except on the close cross); Escape cancels, and so does a click on the
+   and Enter presses the focused button (real controls: `role="switch"`
+   buttons, the stepper's `-` / `+`, the Start button, the close cross);
+   ENTER STARTS only from anywhere that is not a button or a field; Escape cancels, and so does a click on the
    backdrop or the cross (the host handles those).
    The Start button takes the focus, so that a player who wants the same
    settings as last time presses Enter once.
@@ -299,9 +300,12 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 				};
 				start.addEventListener("click", begin);
 
-				// Enter starts from anywhere, except on the host's close cross.
+				// Enter starts from anywhere that is not a button or a field. On a button it
+				// is that button's own press (the browser turns Enter into a click): starting
+				// here too would fire twice on Start, and would start instead of stepping or
+				// toggling. The minutes field handles its own Enter (validates, stops it here).
 				m.panelEl.addEventListener("keydown", (e: KeyboardEvent) => {
-					if (e.key !== "Enter" || e.isComposing || (e.target as HTMLElement).closest(".modal-close-button")) return;
+					if (e.key !== "Enter" || e.isComposing || (e.target as HTMLElement).closest("button, input")) return;
 					e.preventDefault();
 					begin();
 				});
