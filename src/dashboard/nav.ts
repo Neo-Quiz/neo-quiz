@@ -17,6 +17,26 @@ interface NavItem {
 	key: Exclude<DashboardViewName, "detail">;
 	labelKey: TransKey;
 	icon: string;
+	/** The active entry shows a FILLED icon (StudySmarter swaps to a "-fill"
+	    glyph; Lucide has none). `shape`: index of the child of the SVG to
+	    fill; `cut`: details that must read as cut-outs of the filled shape
+	    (the house's door). Indices follow Lucide's node order. */
+	fill?: { shape: number; cut?: number[] };
+}
+
+/** Tags the Lucide SVG in `wrap` for the filled active state (CSS
+    `.qbd-nav-fill` / `.qbd-nav-cut`, dashboard-nav.css). The filled shape is
+    moved FIRST so that the cut-outs, painted after it, stay on top. An icon
+    whose shape is not where expected is left as is: outline only. */
+function markFill(wrap: HTMLElement, fill: NavItem["fill"]): void {
+	const svg = wrap.querySelector("svg");
+	if (!svg || !fill) return;
+	const parts = Array.from(svg.children);
+	const shape = parts[fill.shape];
+	if (!shape) return;
+	for (const i of fill.cut ?? []) parts[i]?.classList.add("qbd-nav-cut");
+	shape.classList.add("qbd-nav-fill");
+	svg.prepend(shape);
 }
 
 export interface NavHandlers {
@@ -38,12 +58,12 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 	}
 
 	const NAV_ITEMS: NavItem[] = [
-		{ key: "home", labelKey: "dashboard.nav.home", icon: "home" },
+		{ key: "home", labelKey: "dashboard.nav.home", icon: "home", fill: { shape: 1, cut: [0] } },
 		// Named "Folders" since 2026-09-29 (formerly "My quizzes", "library"
 		// icon): the page opens on a grid of folders, so the rail names what
 		// the user actually sees there.
-		{ key: "quizzes", labelKey: "dashboard.nav.quizzes", icon: "folders" },
-		{ key: "ai", labelKey: "dashboard.nav.generate", icon: "sparkles" }
+		{ key: "quizzes", labelKey: "dashboard.nav.quizzes", icon: "folders", fill: { shape: 0 } },
+		{ key: "ai", labelKey: "dashboard.nav.generate", icon: "sparkles", fill: { shape: 0 } }
 	];
 
 	function render(container: HTMLElement): void {
@@ -77,6 +97,7 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 
 			const iconWrap = ajouter(btn, "span", "qbd-nav-icon");
 			currentHost().ui.setIcon(iconWrap, item.icon);
+			markFill(iconWrap, item.fill);
 
 			ajouter(btn, "span", "qbd-nav-label", t(item.labelKey));
 

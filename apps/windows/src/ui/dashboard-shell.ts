@@ -59,6 +59,41 @@ import { cleModule } from "../review/catalogue";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
+
+/** The public repository the rail's mark opens (its page carries the Star
+    button). The organisation's path, never the pre-transfer one. */
+const DEPOT_GITHUB = "https://github.com/Neo-Quiz/neo-quiz";
+
+/** The rail's mark: two stacked cards with a mortarboard on the front one —
+    the app icon's motif, redrawn as a single-colour line glyph (32-unit
+    grid, stroked in `currentColor`) so it sits in the rail like its other
+    icons. Built node by node: no markup string reaches the DOM. */
+function marqueRail(): SVGSVGElement {
+	const NS = "http://www.w3.org/2000/svg";
+	const svg = document.createElementNS(NS, "svg");
+	svg.setAttribute("viewBox", "0 0 32 32");
+	svg.setAttribute("fill", "none");
+	svg.setAttribute("stroke", "currentColor");
+	svg.setAttribute("stroke-width", "2");
+	svg.setAttribute("stroke-linecap", "round");
+	svg.setAttribute("stroke-linejoin", "round");
+	svg.setAttribute("aria-hidden", "true");
+	for (const d of [
+		// The back card, peeking out above and to the right of the front one.
+		"M9 9V8a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4h-1",
+		// The front card.
+		"M4 13a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z",
+		// The mortarboard: its top, its band, its tassel.
+		"M13.5 13.5l6 3-6 3-6-3z",
+		"M10.5 18v2.6c0 .9 1.4 1.9 3 1.9s3-1 3-1.9V18",
+		"M19.5 16.5v3.5",
+	]) {
+		const path = document.createElementNS(NS, "path");
+		path.setAttribute("d", d);
+		svg.append(path);
+	}
+	return svg;
+}
 import type { DerniereVue } from "./reprise";
 import type { SessionsApp } from "../review/sessions";
 
@@ -840,13 +875,18 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	}
 
 	nav.render(navEl);
-	/* Le logo de l'app en tête du rail, au-dessus d'Accueil (2026-09-26,
-	   référence StudySmarter) : une décoration, masquée aux lecteurs d'écran
-	   et sans aucun état interactif (`shell.css`, `.nq-rail-logo`). Posé par
-	   la coquille et non par `nav.ts` : c'est l'identité de l'APPLICATION. */
-	const logo = document.createElement("div");
+	/* The app's mark at the top of the rail, above Home (StudySmarter's
+	   layout). Since 2026-09-29 it is a LINK to the GitHub repository, whose
+	   tooltip invites a star, and a line-drawn SVG in the rail's colour
+	   instead of the app's bitmap icon (`shell.css`, `.nq-rail-logo`). Set
+	   by the shell, not by `nav.ts`: it is the APPLICATION's identity. */
+	const logo = document.createElement("button");
+	logo.type = "button";
 	logo.className = "nq-rail-logo";
-	logo.setAttribute("aria-hidden", "true");
+	logo.title = t("app.rail.github");
+	logo.setAttribute("aria-label", t("app.rail.github"));
+	logo.append(marqueRail());
+	logo.addEventListener("click", () => { void currentHost().shell.openUrl(DEPOT_GITHUB); });
 	navEl.prepend(logo);
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement

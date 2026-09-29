@@ -843,7 +843,9 @@ body::after {
    Voir `ui/mise-a-jour.ts`. */
 .nq-maj {
 	position: relative;
-	min-height: 60px;
+	/* Grows past the rail's 56px entries when its label opens below. */
+	height: auto;
+	min-height: 56px;
 	color: var(--text-accent) !important;
 	transition: opacity 200ms ease, transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), background 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.22s ease, filter 0.1s ease;
 }
@@ -1033,11 +1035,35 @@ body::after {
 .nq-barre-controle:hover, .nq-barre-controle:focus-visible { color: #fff; }
 .nq-barre-controle:focus-visible { outline: 1px solid color-mix(in srgb, var(--text-normal) 50%, transparent); outline-offset: -1px; }
 .nq-barre-controle svg, .nq-barre-menu svg { transition: opacity 100ms ease; filter: var(--nq-ombre-lisible-filtre); }
-/* Les libellés et icônes du rail, posés eux aussi sur le fond depuis que le
-   rail est sorti du panneau. Pas sur l'entrée active : sa carte claire porte
-   déjà son contraste, une ombre noire y salirait le texte sombre. */
-.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active) { text-shadow: var(--nq-ombre-lisible); }
-.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active) .qbd-nav-icon svg { filter: var(--nq-ombre-lisible-filtre); }
+/* The rail in the APP (2026-09-29): StudySmarter's effects (dashboard-nav.css)
+   in this app's material. The active card and the hover surface are the
+   central panel's frosted glass — same tint, blur and hairline edge, a
+   radius in proportion to the panel's — so the card reads as a small piece
+   of the panel rather than a foreign tile on the wallpaper. At rest the
+   entries are dimmed less than the reference's 0.6: they sit on a photo,
+   not on a flat dark rail. */
+.qbd-sidebar .qbd-nav-item {
+	--qbd-nav-card: var(--nq-panel-bg);
+	--qbd-nav-rest: 0.72;
+	border-radius: 12px;
+}
+.qbd-sidebar .qbd-nav-item.qbd-nav-item--active {
+	border-color: var(--nq-panel-edge) !important;
+	backdrop-filter: var(--nq-panel-blur);
+	-webkit-backdrop-filter: var(--nq-panel-blur);
+}
+/* Hover: a faint tint WITHOUT the blur — the frosted glass is what makes
+   the active card; a hover with it too read as a second selected entry. */
+@media (hover: hover) and (pointer: fine) {
+	.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active):hover {
+		background: color-mix(in srgb, var(--background-secondary) 32%, transparent) !important;
+	}
+}
+/* No dark halo behind the rail's ICONS any more (2026-09-29): on a dimmed
+   entry the two drop-shadows of `--nq-ombre-lisible-filtre` showed as a
+   smudge around each glyph. The label keeps one tight, faint shadow, just
+   enough to lift small text off a bright wallpaper. */
+.qbd-sidebar .qbd-nav-item:not(.qbd-nav-item--active) { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
 .nq-barre-controle { transition: color 100ms ease; }
 /* Les glyphes portent leur taille (attributs `width`/`height`, reprise de
    Neo Calendar : 16, 20, 24) ; seul « restaurer », icône Lucide, est fixé ici
@@ -1201,18 +1227,35 @@ body::after {
 	opacity: 0;
 }
 
-/* LE LOGO en tête du rail (2026-09-26, référence StudySmarter) : une
-   DÉCORATION, pas un bouton — ni curseur, ni survol, ni cible au clavier.
-   Il avait été retiré du rail le 2026-09-23 parce qu'il « ne menait nulle
-   part et ressemblait à un bouton » : sans aucun état interactif, il ne se
-   lit plus comme tel. L'icône de l'application elle-même, sans texte. */
+/* THE MARK at the top of the rail (StudySmarter's layout). A line-drawn SVG
+   in the rail's text colour (dashboard-shell.ts `marqueRail`), no longer the
+   app's bitmap icon, which read as a pasted image. Since 2026-09-29 it LEADS
+   somewhere — the GitHub repository — so it now behaves as a button: it
+   brightens on hover and gives under the press, like the rail's entries. */
 .nq-rail-logo {
 	flex: none;
-	width: 40px;
-	height: 40px;
-	margin: 6px auto 14px;
-	background: url("../../icons/icon.png") center / contain no-repeat;
-	pointer-events: none;
+	display: grid;
+	place-items: center;
+	width: 48px;
+	height: 48px;
+	margin: 4px auto 10px;
+	padding: 0;
+	border: 0;
+	border-radius: 12px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	opacity: 0.9;
+	cursor: pointer;
+	transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+.nq-rail-logo svg { width: 38px; height: 38px; }
+.nq-rail-logo:hover, .nq-rail-logo:focus-visible { opacity: 1; transform: scale(1.04); }
+.nq-rail-logo:active { transform: scale(0.96); }
+.nq-rail-logo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+	.nq-rail-logo { transition: none; }
+	.nq-rail-logo:hover, .nq-rail-logo:active { transform: none; }
 }
 
 /* ── LE MENU D'APPLICATION ── */

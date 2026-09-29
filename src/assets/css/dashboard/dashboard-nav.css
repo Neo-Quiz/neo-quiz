@@ -1,76 +1,105 @@
 /* ═════════════════════════════════════════════════════════
-   DASHBOARD NAVIGATION — rail iconique (référence StudySmarter)
-   Rail étroit : logo nu en haut, items icône AU-DESSUS du label,
-   item actif = carte claire INVERSÉE (fond --text-normal, contenu
-   --background-secondary) — theme-aware dans les deux sens.
+   DASHBOARD NAVIGATION — icon rail, modelled on StudySmarter's
+   (its rules read live from app.studysmarter.de on 2026-09-29).
+   Icon ABOVE the label. At rest an entry is dimmed (opacity 0.6);
+   hovering lays a soft surface under it; pressing shrinks it (0.98);
+   the ACTIVE entry is a raised card — surface, 1px hairline border,
+   shadow fading in — at full opacity, and its icon turns FILLED
+   (nav.ts marks the shape to fill). Theme-aware: every colour comes
+   from the theme variables.
    ═════════════════════════════════════════════════════════ */
 
-/* ── Brand : logo nu centré ── */
 /* ── Nav items ── */
 .qbd-nav-items {
-	/* Le haut du rail, que le logo occupait : Accueil s'aligne sous la
-	   barre de titre. */
+	/* The top of the rail, where the logo used to be: Home lines up under
+	   the title bar. 12px between entries, as in the reference. */
 	padding: 16px 10px 10px;
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: 12px;
 }
 
-/* box-shadow/background !important : neutralise le chrome natif
-   des <button> d'Obsidian (.theme-dark button, spécificité 0,1,1)
-   qui peint un fond pilule + ombre par-dessus nos classes. */
+/* box-shadow/background !important: neutralises Obsidian's native <button>
+   chrome (.theme-dark button, specificity 0,1,1), which paints a pill
+   background and a shadow over our classes. */
 .qbd-nav-item {
+	--qbd-nav-card: var(--background-secondary);
+	/* The colour a cut-out is stroked in: the card's, but OPAQUE — a host
+	   whose card is translucent (the app's glass) would otherwise let the
+	   filled shape show through the door. */
+	--qbd-nav-cut: var(--background-secondary);
+	--qbd-nav-rest: 0.6;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 5px;
-	padding: 10px 4px 8px;
-	border-radius: 14px;
+	gap: 2px;
+	height: 56px;
+	padding: 0 2px;
+	border-radius: 8px;
 	width: 100%;
 	background: transparent !important;
-	border: none;
+	/* ALWAYS a 1px border, transparent at rest: the reference only adds it
+	   on the active entry, which nudges the content by a pixel each time
+	   the active entry changes. */
+	border: 1px solid transparent !important;
 	box-shadow: none !important;
-	height: auto;
-	/* color !important : .theme-dark button (0,1,1) impose sinon
-	   --text-normal — le label actif deviendrait blanc sur carte blanche.
-	   `--text-normal` AU REPOS, et non plus `--text-muted` (2026-09-26) :
-	   le rail est sorti du panneau et se pose directement sur le fond
-	   d'écran et sa lueur colorée. Le gris s'y perdait sur une image claire ;
-	   le texte clair, avec l'ombre serrée que la coquille de l'app lui
-	   ajoute (`shell.css`, `--nq-ombre-lisible`), se détache de n'importe
-	   quelle image. L'icône garde son opacité de repos (0,7) : c'est elle qui
-	   distingue le repos du survol, et l'entrée active reste la carte
-	   inversée. */
+	/* color !important: .theme-dark button (0,1,1) would impose its own. The
+	   rest colour stays --text-normal (2026-09-26): the rail sits on the
+	   wallpaper, where a grey got lost on a light image; the dimming comes
+	   from the entry's opacity, and the app shell adds a tight shadow to
+	   the text (`shell.css`, `--nq-ombre-lisible`). */
 	color: var(--text-normal) !important;
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 600;
+	line-height: 18px;
 	cursor: pointer;
 	text-align: center;
 	font-family: var(--font-interface, inherit);
-	/* Bascule de la carte active : le fond et le texte s'inversent en fondu.
-	   Ne joue que parce que nav.ts bascule la classe sur le bouton EXISTANT —
-	   un rail reconstruit à chaque clic n'aurait pas d'état de départ. */
-	transition: background 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+	/* Only plays because nav.ts toggles the class on the EXISTING button —
+	   a rail rebuilt on every click would have no starting state. */
+	transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 	position: relative;
 }
+/* Dimmed at rest. Not the update entry (shell.css `.nq-maj`): it is an
+   announcement, in the accent colour, and must not fade into the rail. */
+.qbd-nav-item:not(.nq-maj) { opacity: var(--qbd-nav-rest); }
 
-.qbd-nav-item:hover {
-	background: var(--background-modifier-hover, rgba(255,255,255,0.04)) !important;
-	color: var(--text-normal) !important;
+/* The active card's shadow, on a pseudo-element so it can FADE (0.3s)
+   instead of snapping on with the class. */
+.qbd-nav-item::after {
+	content: "";
+	position: absolute;
+	inset: -1px;
+	border-radius: inherit;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(0, 0, 0, 0.22);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.3s ease-in-out;
 }
 
-/* Carte inversée : claire sur thème sombre, sombre sur thème clair. */
-.qbd-nav-item--active,
-.qbd-nav-item--active:hover {
-	background: var(--text-normal) !important;
-	color: var(--background-secondary) !important;
+@media (hover: hover) and (pointer: fine) {
+	.qbd-nav-item:hover {
+		background: color-mix(in srgb, var(--qbd-nav-card) 70%, transparent) !important;
+		opacity: 1;
+	}
 }
+.qbd-nav-item:focus-visible {
+	background: color-mix(in srgb, var(--qbd-nav-card) 70%, transparent) !important;
+	opacity: 1;
+}
+.qbd-nav-item:active:not(:disabled) { transform: scale(0.98); }
 
-/* Entrée que l'hôte ne sait pas encore ouvrir (ex. « Générer » côté
-   application avant la tranche 4) : visible mais inerte — un `<button
-   disabled>` ne reçoit déjà plus de clic, ce bloc neutralise juste le survol
-   hérité de .qbd-nav-item:hover pour qu'il ne suggère pas une action possible. */
+.qbd-nav-item.qbd-nav-item--active {
+	opacity: 1;
+	background: var(--qbd-nav-card) !important;
+	border-color: color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+}
+.qbd-nav-item--active::after { opacity: 1; }
+
+/* An entry the host cannot open yet: visible but inert — a disabled
+   <button> already gets no click, this block only cancels the hover so it
+   does not suggest a possible action. */
 .qbd-nav-item--disabled,
 .qbd-nav-item--disabled:hover {
 	color: var(--text-faint) !important;
@@ -82,46 +111,43 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 22px;
-	height: 22px;
+	width: 24px;
+	height: 24px;
 	flex-shrink: 0;
-	opacity: 0.7;
-	/* `color` : l'icône s'inverse en même temps que le label (elle passe à
-	   --background-secondary en actif) — sans elle, l'icône claquerait
-	   pendant que le fond, lui, fond. */
-	transition: opacity 0.22s ease, color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.qbd-nav-item:hover .qbd-nav-icon {
-	opacity: 1;
-}
-
-.qbd-nav-item--active .qbd-nav-icon {
-	opacity: 1;
-	color: var(--background-secondary);
 }
 
 .qbd-nav-icon svg {
-	width: 20px;
-	height: 20px;
+	width: 22px;
+	height: 22px;
 }
 
-/* PENDANT UNE GÉNÉRATION (demande d'Ahmed, 2026-09-13) : l'étincelle de
-   « Générer » respire et tourne lentement, que l'on soit sur la page ou
-   ailleurs. La classe `qbd-generating` est posée sur la racine du document
-   par la page « Générer » (ai.ts) le temps de la phase « loading » : c'est
-   le seul signal, le rail ne connaît pas la page. `prefers-reduced-motion`
-   ne coupe que la rotation, la respiration reste lisible et douce. */
+/* The FILLED icon of the active entry (the reference swaps to a "-fill"
+   glyph; Lucide has none, so nav.ts tags the icon's main shape). The fill
+   fades in rather than snapping. `qbd-nav-cut` is a detail drawn OVER the
+   filled shape (the house's door), stroked in the card's colour so it reads
+   as a cut-out. */
+.qbd-nav-icon .qbd-nav-fill {
+	fill: currentColor;
+	fill-opacity: 0;
+	transition: fill-opacity 0.2s ease-in-out;
+}
+.qbd-nav-icon .qbd-nav-cut { transition: stroke 0.2s ease-in-out; }
+.qbd-nav-item--active .qbd-nav-fill { fill-opacity: 1; }
+.qbd-nav-item--active .qbd-nav-cut { stroke: var(--qbd-nav-cut); }
+
+/* DURING A GENERATION (2026-09-13): the sparkle of "Generate" breathes and
+   slowly turns, whether on that page or elsewhere. The `qbd-generating`
+   class is set on the document root by the Generate page (ai.ts) for its
+   "loading" phase: it is the only signal, the rail does not know the page.
+   `prefers-reduced-motion` only stops the rotation; the breathing stays,
+   readable and soft. On the active entry too: its card is no longer
+   inverted, so the accent reads on it. */
 .qbd-generating .qbd-nav-item[data-nav="ai"] .qbd-nav-icon {
-	opacity: 1;
 	color: var(--interactive-accent);
 	animation: qbd-generating-pulse 1.4s ease-in-out infinite;
 }
 .qbd-generating .qbd-nav-item[data-nav="ai"] .qbd-nav-icon svg {
 	animation: qbd-generating-spin 6s linear infinite;
-}
-.qbd-generating .qbd-nav-item--active[data-nav="ai"] .qbd-nav-icon {
-	color: var(--background-secondary);
 }
 @keyframes qbd-generating-pulse {
 	0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
@@ -141,19 +167,20 @@
 	text-overflow: ellipsis;
 }
 
-/* ── Pied de rail : bouton Réglages ── */
+/* ── Foot of the rail: the Settings button ── */
 .qbd-nav-footer {
-	margin-top: auto; /* pousse au pied du rail */
+	margin-top: auto; /* pushed to the foot of the rail */
 	padding: 10px 10px 14px;
 	display: flex;
 	flex-direction: column;
 }
 
-/* (Badge compteur retiré — demande Ahmed 2026-07-21.) */
-
 @media (prefers-reduced-motion: reduce) {
 	.qbd-nav-item,
-	.qbd-nav-icon {
+	.qbd-nav-item::after,
+	.qbd-nav-icon .qbd-nav-fill,
+	.qbd-nav-icon .qbd-nav-cut {
 		transition: none;
 	}
+	.qbd-nav-item:active:not(:disabled) { transform: none; }
 }
