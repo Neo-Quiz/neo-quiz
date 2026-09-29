@@ -80,12 +80,10 @@ export function renderHomeFolder(
 	folder: HomeFolderCard,
 	stats: Record<string, QuizStatRecord>,
 	todayStart: number,
-	delay: string,
 ): void {
 	const { group, tasks } = folder;
 	const host = currentHost();
 	const card = ajouter(parent, "section", "qbd-homef");
-	card.style.setProperty("--qbd-card-delay", delay);
 
 	const head = ajouter(card, "div", "qbd-homef-head");
 	const name = ajouter(head, "button", "qbd-homef-name");

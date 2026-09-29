@@ -1233,6 +1233,13 @@ body::after {
    The shell becomes the positioning box of the back sheet, and the front
    panel is positioned too: an absolutely positioned sibling would
    otherwise paint over it whatever the DOM order. */
+/* NO ENTRY for the dashboard's panel (2026-09-29): `.qbd-content`'s
+   fade-in (dashboard-base.css) played each time the shell was mounted, on
+   Home or Folders. StudySmarter shows its pages without one. The quiz
+   screen and Settings keep theirs. */
+#neo-quiz-root > .qbd-layout > .qbd-content {
+	animation: none;
+}
 #neo-quiz-root > .qbd-layout.nq-sheet-stack {
 	position: relative;
 }

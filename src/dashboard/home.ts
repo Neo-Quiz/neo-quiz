@@ -9,7 +9,6 @@ import { moduleForQuiz, applyModuleOverrides, buildModuleGroups } from "./quiz-m
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
-import { markViewEnter } from "./view-enter";
 import { createOptionCard, importSharedFolder, openCreateFolderModal } from "./folder-create";
 import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
@@ -25,11 +24,12 @@ import { renderHomeSide, type HomeExam } from "./home-week";
 ══════════════════════════════════════════════════════════ */
 
 export interface HomeHandlers {
-	/** `entering` = we ARRIVE on the page (the entry transition plays). The
-	    host knows it: it is the one comparing the painted view with the
-	    requested one (dashboard.ts). A re-render triggered by the vault
-	    scanner or by a card's ⋯ menu passes `false` — otherwise the page
-	    would flicker at every note save. */
+	/** `entering` = we ARRIVE on the page (the week strip goes back to the
+	    current week). The host knows it: it is the one comparing the painted
+	    view with the requested one (dashboard.ts). A re-render triggered by
+	    the vault scanner or by a card's ⋯ menu passes `false`.
+	    No entry transition since 2026-09-29: StudySmarter plays none when
+	    its Home is opened from the rail (measured: zero animations). */
 	render(container: HTMLElement, entering?: boolean): void;
 }
 
@@ -39,9 +39,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 	   be able to repaint the home without going through navigation again. */
 	let containerRef: HTMLElement | null = null;
 	/* `entering` of the last render: when the module table arrives (async
-	   read) and triggers a repaint, it must REPLAY the entry if the
-	   interrupted render was one — otherwise the cascade stops dead just
-	   after it began (same trap as quizzes.ts). */
+	   read) and triggers a repaint, that repaint is still the arrival. */
 	let lastEntering = true;
 	/* Week shown in the side column, from the current one. Kept across the
 	   re-renders the page causes itself; back to this week on arrival. */
@@ -78,13 +76,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		containerRef = container;
 		lastEntering = entering;
 		if (entering) weekOffset = 0;
-		markViewEnter(container, entering, "qbd-home-enter");
 		container.replaceChildren();
-
-		// Entry cascade: ONE counter for the whole page (the folder cards) —
-		// the same formula as "My quizzes".
-		let entryIndex = 0;
-		const entryDelay = (): string => `${100 + entryIndex++ * 45}ms`;
 
 		// The quizzes of ARCHIVED FOLDERS (⋯ menu of a folder card in "My
 		// quizzes") no longer exist for the home: no task, no folder. They
@@ -165,7 +157,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 
 		const layout = ajouter(page, "div", "qbd-home-layout");
 		const column = ajouter(layout, "div", "qbd-home-folders");
-		for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart, entryDelay());
+		for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart);
 		newFolder(column);
 		renderHomeSide(layout, {
 			ctx, folders, exams, todayStart, weekOffset,

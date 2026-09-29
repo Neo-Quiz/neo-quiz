@@ -49,6 +49,7 @@ release notes.
 ### Changed
 - Opening a folder from the Folders page: the folder rises as a sheet over the grid, which stays behind it, slightly narrowed, as a strip above the folder; its title and content fade in. The back arrow slides the folder down and brings the grid forward again.
 - The quiz cards of an open folder carry a thin bar in the folder's colour across their top.
+- Home and Folders now appear at once when opened from the side rail, without their entry animation; switching the grouping of the Folders page still plays its cascade.
 - Quiz cards, course pages and the Progress tab know the Exam: a course gathers its Learn, Practice and Exam on one card with a pill each (a timer for the exam), and its page switches between the three. In French, the modes are now called Apprendre, Entraînement and Examen.
 - The quiz format no longer reads `mode: "lesson"`, `examMode`, `learnMode`, `examAutoSubmit` or `examShowTimer`: a Learn writes `mode: "learn"`, and a timed exam `mode: "exam"` with `examDurationMinutes`, now up to 300 minutes (a missing duration gives 1 min 30 per question, rounded to 5 minutes).
 - A Learn no longer ends with a "Take the exam" button, even when it carries a duration: an exam is now a quiz of its own.

@@ -2,33 +2,8 @@
    DASHBOARD HOME VIEW
    ═════════════════════════════════════════════════════════ */
 
-/* ══════════════════════════════════════════════════════════
-   ENTRY TRANSITION — the same grammar as "My quizzes" (keyframes
-   qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css). The
-   .qbd-home-enter class is set only on ARRIVAL on the page and removed as
-   soon as the animation ends (view-enter.ts): an internal re-render does not
-   flicker, and no animation in fill: both confiscates `transform` from the
-   cards.
-   ═════════════════════════════════════════════════════════ */
-.qbd-home-enter .qbd-resume-hero,
-.qbd-home-enter .qbd-onboarding {
-	animation: qbd-folder-hero-in 0.35s ease backwards;
-}
-
-.qbd-home-enter .qbd-homef,
-.qbd-home-enter .qbd-homes {
-	animation: qbd-folder-card-in 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
-	animation-delay: var(--qbd-card-delay, 100ms);
-}
-
-@media (prefers-reduced-motion: reduce) {
-		.qbd-home-enter .qbd-resume-hero,
-	.qbd-home-enter .qbd-onboarding,
-	.qbd-home-enter .qbd-homef,
-	.qbd-home-enter .qbd-homes {
-		animation: none;
-	}
-}
+/* No entry transition (removed 2026-09-29, like StudySmarter's Home,
+   which plays none when opened from the rail). */
 
 /* ── Grid ──
    MÊME géométrie que la grille de cartes de « Mes quiz » (.qbd-module-grid,

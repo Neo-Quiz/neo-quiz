@@ -85,9 +85,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 
 	function setGrouping(g: GroupingKey): void {
 		ctx.settings.quizzesGrouping = g;
-		// La bascule d'axe reconstruit toute la grille : la cascade d'entrée
-		// accompagne le changement (décision Ahmed, spec 2026-07-20).
-		lastPaintedView = null;
+		// Switching the grouping rebuilds the whole grid: the entry cascade
+		// goes with the change (decision of 2026-07-20). The only cascade the
+		// grid still has — see `render`.
+		regrouping = true;
 		ctx.saveSettings().catch(() => {});
 	}
 
@@ -124,12 +125,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	/** A folder's subject, deduced from its path and name (categorie-quiz.ts). */
 	const sujetDe = (m: ModuleGroup): CategorieQuiz => categorieDuDossier(m.path ?? m.folder, m.name);
 
-	/* Dernière vue PEINTE ("root" ou chemin du dossier ouvert) : render() la
-	   compare à la vue courante pour distinguer une ENTRÉE (navigation, drill
-	   in/out, bascule d'axe — la transition d'entrée joue) d'un re-render
-	   interne (renommage, archivage, icône — aucun replay). null = la
-	   prochaine peinture est une entrée. */
+	/* Last view PAINTED ("root" or the open folder's path): render() compares
+	   it with the current view to tell an ENTRY (the entry transition plays)
+	   from an internal re-render (rename, archive, icon — no replay). null =
+	   the next painting is an entry. */
 	let lastPaintedView: string | null = null;
+	/* The grid itself has NO entry transition since 2026-09-29: StudySmarter
+	   plays none when its Library is opened from the rail (measured: only the
+	   rail button's highlight fades). Only a change of grouping replays the
+	   grid's cascade (`setGrouping`); a folder keeps its own entry. */
+	let regrouping = false;
 
 	async function loadModuleMap(): Promise<void> {
 		moduleMapLoaded = true;
@@ -286,7 +291,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		if (openModuleFolder !== ongletPour) { ongletDossier = "contenu"; ongletPour = openModuleFolder; }
 		vuesDossier = null;
 		const viewKey = openModuleFolder ?? "root";
-		const entering = viewKey !== lastPaintedView;
+		const entering = viewKey === "root" ? regrouping : viewKey !== lastPaintedView;
+		regrouping = false;
 		lastPaintedView = viewKey;
 		markViewEnter(container, entering, "qbd-quizzes-enter");
 		// A folder stands on its sheet stack, the grid does not.
