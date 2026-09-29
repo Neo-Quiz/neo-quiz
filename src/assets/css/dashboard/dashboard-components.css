@@ -882,7 +882,7 @@
 /* PLAY, top right of a course card (2026-09-29), where StudySmarter puts
    it: a filled triangle, always in the blue of "Start the quiz"
    (`--quiz-primary`), with no outline and no tile around it (no tile in a
-   tile) — a disc of the same blue only shows on hover. !important against
+   tile), not even a disc on hover: only the triangle lightens. !important against
    the .theme-dark button chrome, as `.qbd-card-more`. */
 .qbd-quiz-card-play {
 	flex-shrink: 0;
@@ -916,7 +916,7 @@
 }
 .qbd-quiz-card-play:hover {
 	color: color-mix(in srgb, var(--quiz-primary) 85%, #fff) !important;
-	background: color-mix(in srgb, var(--quiz-primary) 16%, transparent) !important;
+	background: transparent !important; /* no disc on hover: the triangle alone reacts */
 }
 .qbd-quiz-card-play:active svg {
 	transform: translateY(2px);
