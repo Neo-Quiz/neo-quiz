@@ -51,19 +51,32 @@ servir de mémoire du projet, au moins pour les plans ; à chaque fois je dois
 dire de mettre à jour les tâches, c'est épuisant »). Règles, **sans jamais
 attendre qu'Ahmed le demande** :
 
-- **Au début d'une session** sur un chantier : lire le callout `[!goal]`
-  courant de cette note avant tout — c'est là, pas dans `memory/`, que vit
-  l'état du plan.
+- **La forme de la note** (réorganisée le 2026-09-29, à la demande d'Ahmed) :
+  chaque version est un simple titre `## <span class="num">N.</span> Version
+  suivante `desktop-vX.Y.Z`` — plus de callout `[!goal]`. Sous ce titre,
+  chaque plan est un callout de premier niveau : `> [!plan-active]+` (en
+  cours), `> [!plan-paused]-` (commencé puis mis en pause — ajouté le
+  2026-09-29), `> [!plan]-` (pas commencé), `> [!plan-done]-` (terminé).
+  **Seul le plan EN COURS est ouvert** (`+`, donc ouvert et repliable) ;
+  tous les autres sont repliés (`-`) — règle d'Ahmed du 2026-09-29. Leur
+  style vit dans le snippet `callouts.css` du vault.
+  Les lignes isolées (à faire, bugs, idées, fait hors plan) forment une liste
+  sous le titre, rangée par intertitres en gras.
+- **Au début d'une session** sur un chantier : lire le titre de la version en
+  cours et le callout `[!plan-active]` du chantier avant tout — c'est là, pas
+  dans `memory/`, que vit l'état du plan.
 - **Dès qu'un plan est commité** : ses N tâches y sont écrites en entier, une
   ligne `- [ ] <span class="num">TN.</span> **titre** : une phrase` par tâche,
-  dans une tranche `**Le plan, tâche par tâche**` du callout de la version
-  en cours — la dernière ligne dit combien il y en a.
-- **À chaque dispatch** d'une tâche : sa ligne passe `- [/]`. **À chaque revue
-  close** : `- [x]` + SHA court entre parenthèses. Un bug ou une idée vus à
-  l'écran pendant le chantier : une ligne de plus dans le même callout, le
-  jour même.
-- **Toujours par un agent haiku** (jamais la session principale), avec le
-  texte exact des lignes à changer. C'est le rôle que la mémoire
+  dans une tranche `**Le plan, tâche par tâche** :` de son callout — la
+  dernière ligne dit « Le plan compte N tâches. ».
+- **Plus de `[/]` au dispatch** : le callout `plan-active` dit déjà que le
+  plan est en cours. **À chaque revue close** : `- [x]` + SHA court entre
+  parenthèses. Le plan fini, son callout passe `> [!plan-done]-`. Un bug ou
+  une idée vus à l'écran pendant le chantier : une ligne de plus dans la liste
+  de la version, le jour même.
+- **Toujours par un agent** (jamais la session principale), avec le texte
+  exact des lignes à changer : haiku pour cocher une ligne, sonnet pour une
+  réorganisation. C'est le rôle que la mémoire
   `feedback_note-vault-task-in-progress` ne fait que pointer.
 
 ## Langue (i18n)
@@ -167,7 +180,9 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   GARDÉE de la même façon (`garde-ia.ts`) : l'hôte d'`aiOllamaUrl` entre dans la
   liste du réseau, et `cheminClaude`/`cheminCodex` désignent un exécutable que le
   principal LANCERA — absolu, existant, extension lançable (un `.js` qui existe
-  pour de bon est refusé : ce serait « écris-le puis lance-le »).
+  pour de bon est refusé : ce serait « écris-le puis lance-le »). Elle garde aussi
+  `aiExamDurationMinutes` : un entier de 1 à 300, ou vide (= Auto), aux bornes du
+  format.
 - `npm run check:electron-process` — les fichiers de cache des CLI ET le
   LANCEMENT d'un CLI (`apps/windows/electron/process.ts`), sur de vrais process.
   C'est la capacité la plus dangereuse du pont : la liste blanche de NOMS
@@ -217,7 +232,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   pour reprendre là où on s'était arrêté : aller-retour de chaque type de
   question, quiz modifié entre deux sessions (question supprimée, ajoutée,
   options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
-  s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Dans la CI.
+  s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Et CE
+  QUI est photographié (`canSnapshot`) : un Entraînement, avec ses réponses et
+  l'usage de ses indices ; JAMAIS un Examen (abandonné, il ne laisse rien et
+  rouvre sur son écran de départ), ni un test rendu. Dans la CI.
 - `npm run check:learn-loop` — la BOUCLE DE REPRISE d'un Learn
   (`src/engine/learn-loop.ts`, noyau pur ; câblage `src/engine/learn.ts`) :
   une question ratée ne revient jamais aussitôt (deux autres vérifications,
@@ -300,15 +318,52 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   vérifiée MÉCANIQUEMENT. Le casser, c'est perdre la seule partie du code qu'on ne
   réécrira pas.
 - `npm run check:review-store`, `check:engine-review`, `check:module-edit` — les
-  trois câblages de l'ordonnanceur.
+  trois câblages de l'ordonnanceur. `check:engine-review` tient aussi le
+  TEST (Entraînement · Examen, spec 2026-09-29) : rien au journal avant de
+  rendre, un verdict par question au moment de rendre (juste avec indice,
+  faux ou sans réponse = raté), « 12/15, dont 2 avec indice » compté sans
+  pénalité, « Recommencer » = une nouvelle tentative ; le rendu depuis la
+  dernière question (`engine/hand-in.ts` : jamais l'écran de soumission,
+  la modale des questions sans réponse), l'ampoule sur la perle d'une
+  question aidée, et le chrono de l'Examen (h:mm:ss dès une heure, rendu à
+  zéro qui referme la modale). `check:module-edit` tient aussi le REGROUPEMENT
+  d'un cours (`course-pairs.ts`) : au plus un quiz par mode, Learn,
+  Entraînement puis Examen sur une carte. Les deux dans la CI.
 - `npm run check:quiz-io` — **le CÂBLAGE de l'écriture d'un bloc**, le seul
   chemin par lequel la page réécrit une note. Entre `check:export` (la FORME du
   bloc produit) et `audit-vaults.mjs` (l'aller-retour sur de vrais vaults), il n'y
   avait RIEN : ni le compare-and-swap sur le bloc, ni la préservation des fins de
   ligne, ni celle des clôtures, ni le remplacement par FONCTION qui protège un
   quiz contenant `$1$`. Les quatre sont des correctifs de bugs réels, et deux
-  avaient régressé la nuit même où ils furent écrits.
+  avaient régressé la nuit même où ils furent écrits. Depuis le 2026-09-29, il
+  tient aussi l'EXAMEN et le CHANGEMENT DE MODE de l'éditeur : un Examen réécrit
+  en `mode: 'exam'` + `examDurationMinutes` (règle de secours s'il n'en a
+  pas), le retour en Entraînement qui retire la durée, jamais une clé retirée
+  (`examMode`, `examAutoSubmit`, `examShowTimer`, `learnMode`) réécrite.
 - `npm run check:review-log` — l'emplacement et la migration du journal de révision.
+- `npm run check:historique-nav` — les boutons précédent/suivant de la souris
+  (`historique-nav.ts`) et la GARDE DE SORTIE d'un Examen (`leave-guard.ts`) :
+  quitter l'écran d'un Examen commencé et pas rendu (croix, bouton précédent,
+  Ctrl+R, Affichage › Recharger, réglage qui recharge) demande d'abord ; rien
+  ne bouge avant la réponse, « Quitter » ne part qu'une fois.
+- `npm run check:quiz-format` — le FORMAT Learn / Test (`src/quiz-format.ts`,
+  `extractExamOptions`) : les modes `learn`, `exam` et l'Entraînement sans
+  mode, le suffixe « — Exam » (et le compteur « (2) » de `freeNotePath`), la
+  durée bornée à [1, 300] et sa règle de secours (1 min 30 par question,
+  arrondie à 5), les clés retirées plus lues, `verifierFormat("exam")`, et
+  `completeExamConfig` (l'ARRIVÉE d'un Examen demandé : la durée saisie l'emporte,
+  sinon celle du modèle bornée, sinon la règle de secours sur les seules
+  questions).
+- `npm run check:prompt` — les prompts de génération, dans les TROIS modes, avec
+  leurs mots interdits PAR mode : `mode: "exam"` obligatoire en Examen, interdit
+  ailleurs ; `learnMode`, `examAutoSubmit` et `examShowTimer` interdits partout ;
+  en Examen, ni indice ni tranche. La durée saisie (ou l'Auto) est donnée au
+  modèle, bornée à [1, 300], et ignorée hors Examen.
+- `npm run check:file-generation` — la demande de génération sur fichiers (vraie
+  `generation-demande.ts`) : le choix « N quiz ↔ 1 quiz » (un quiz par document,
+  ou un seul sur tous ; une image force un seul quiz), et le nom d'un quiz
+  unique sur plusieurs documents, celui du module (`<module> — Exam`), dans un
+  hôte en mémoire pour lire le vrai chemin et le vrai frontmatter.
 - `npm run check:folders` — la conversion `folder` → `folders`, et l'unicité des
   identifiants de dossier.
 - `npm run check:rename-match` — l'appariement d'un renommage entre deux hôtes,
