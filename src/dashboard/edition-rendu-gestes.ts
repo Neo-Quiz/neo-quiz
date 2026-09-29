@@ -66,6 +66,9 @@ function decorerOptions(carte: HTMLElement, q: DraftQuestion, deps: DepsGestesRe
 		const bon = isMulti ? (q.correctIndices || []).includes(oi) : q.correctIndex === oi;
 		const marquer = bouton("qb-er-bonne", t("editor.render.markCorrect"));
 		marquer.setAttribute("aria-pressed", String(bon));
+		// A single choice's circle carries the option's letter (the `::before`
+		// it covers does, quiz-options.css).
+		if (opt.dataset.letter) marquer.textContent = opt.dataset.letter;
 		marquer.addEventListener("click", e => {
 			e.stopPropagation();
 			e.preventDefault();

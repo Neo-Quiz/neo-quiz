@@ -158,6 +158,42 @@
   border-radius: 4px;
 }
 
+/* A SINGLE CHOICE's circle carries its option's letter, A, B, C… in the
+   order shown (2026-09-29): the letters of the quiz's fiche, one convention
+   for the fiche, the editor and the quiz. The circle keeps its place and
+   grows to hold a letter; a state colours the letter instead of a dot or a
+   ring. A multiple choice keeps its squares. */
+.quiz-option[data-letter]::before{
+  content: attr(data-letter);
+  left: 14px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.quiz-option.selected[data-letter]::before{
+  border-color: #fff;
+  background: #fff;
+  color: var(--quiz-primary);
+}
+.quiz-option.correct[data-letter]::before,
+.quiz-option.wrong[data-letter]::before{
+  border-color: #fff;
+  background: #fff;
+  box-shadow: none;
+}
+.quiz-option.correct[data-letter]::before{ color: var(--quiz-success); }
+.quiz-option.wrong[data-letter]::before{ color: var(--quiz-danger); }
+.quiz-option.missed[data-letter]::before{
+  box-shadow: none;
+  color: var(--quiz-success);
+}
+
 .quiz-option.correct::after,
 .quiz-option.wrong::after{
   content: "";
@@ -353,6 +389,11 @@
   transform: translateX(-50%) !important;
   width: 16px;
   height: 16px;
+}
+.quiz-options-image-grid > .quiz-option[data-letter]::before{
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .quiz-options-image-grid > .quiz-option .quiz-option-embed-wrap{

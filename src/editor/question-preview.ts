@@ -300,6 +300,8 @@ export function renderQuizPreviewCard(host: HTMLElement, q: DraftQuestion, opts:
 			opt.setAttribute("role", "button");
 			opt.setAttribute("tabindex", "0");
 			opt.innerHTML = texteQuizHtml(o || "...", opts.sourcePath);
+			// A single choice's letter, as in the quiz (engine/cards.ts).
+			if (!isMulti) opt.dataset.letter = String.fromCharCode(65 + oi);
 			if (opts.corrige) {
 				opt.setAttribute("data-edit", "option");
 				opt.setAttribute("data-index", String(oi));

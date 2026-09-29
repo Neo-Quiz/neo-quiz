@@ -635,13 +635,18 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			const smap = (ctx.quizState.shuffleMap[qi] as number[]) || [];
 			const mi = isMulti ? `<div class="quiz-multi-indicator">${t("engine.qcm.multiHint")}</div>` : "";
 			const sel = ctx.quizState.selections[qi];
-			const optionsHtml = smap.map((oi) => {
+			/* A single choice names its options A, B, C… in the order SHOWN
+			   (shuffled or not), the letters of the quiz's fiche (2026-09-29);
+			   `quiz-options.css` writes the letter in the option's circle. A
+			   multiple choice keeps its squares: they say "several answers". */
+			const optionsHtml = smap.map((oi, pos) => {
 				const contentHtml = optionContentHtml(qcm, oi);
 				// aria-pressed reflète l'état sélectionné pour les lecteurs d'écran (recalculé
 				// à chaque refreshQuestionSlide). role=button + aria-pressed plutôt que radio/
 				// checkbox pour ne pas capturer les flèches (réservées à la navigation).
 				const isSelected = isMulti ? (sel instanceof Set && sel.has(oi)) : (sel === oi);
-				return `<div class="quiz-option ${isMulti ? "multi" : ""} ${optionClass(qi, oi)}" role="button" tabindex="0" aria-pressed="${isSelected}" data-orig="${oi}">${contentHtml}</div>`;
+				const lettre = isMulti ? "" : ` data-letter="${String.fromCharCode(65 + pos)}"`;
+				return `<div class="quiz-option ${isMulti ? "multi" : ""} ${optionClass(qi, oi)}" role="button" tabindex="0" aria-pressed="${isSelected}" data-orig="${oi}"${lettre}>${contentHtml}</div>`;
 			}).join("");
 			const hasImg = /<img[\s>]/i.test(optionsHtml);
 			body = mi + `<div class="quiz-options-wrap${hasImg ? " quiz-options-image-grid" : ""}">${optionsHtml}</div>`;

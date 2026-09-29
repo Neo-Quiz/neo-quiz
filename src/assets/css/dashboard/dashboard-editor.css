@@ -932,6 +932,24 @@
 	z-index: 1;
 }
 .qb-er .quiz-option.multi .qb-er-bonne { border-radius: 4px; }
+/* A single choice's button carries the option's letter, at the size of the
+   quiz's lettered circle (quiz-options.css); the right answer turns it to
+   the quiz's "correct" circle: white, the letter in green. */
+.qb-er .quiz-option[data-letter] .qb-er-bonne {
+	left: 14px;
+	width: 24px;
+	height: 24px;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1;
+	color: var(--text-muted);
+}
+.qb-er .quiz-option[data-letter] .qb-er-bonne[aria-pressed="true"] {
+	border-color: #fff;
+	background: #fff;
+	box-shadow: none;
+	color: var(--quiz-success);
+}
 .qb-er .qb-er-bonne[aria-pressed="true"] {
 	border-color: var(--quiz-success);
 	box-shadow: inset 0 0 0 4px var(--quiz-success);
