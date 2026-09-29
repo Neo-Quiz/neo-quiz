@@ -412,8 +412,13 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				   text (`code.textContent`, what ▶ runs) is untouched. A block
 				   with no tag or an unknown one stays exactly as before. */
 				const entree = o.executable ? codeLanguageOf(b.langue) : null;
+				/* The name shows in a small bubble on hover (`data-lang-name`,
+				   quiz-card.css), not in the native `title` tooltip, which
+				   looked out of place (2026-09-29); `alt` keeps it for a screen
+				   reader. */
+				const nom = entree ? o.echapper(entree.name) : "";
 				const badge = entree
-					? `<img class="quiz-code-lang" src="${codeLanguageBadgeSrc(entree)}" alt="${o.echapper(entree.name)}" title="${o.echapper(entree.name)}" width="16" height="16" draggable="false">`
+					? `<span class="quiz-code-lang" data-lang-name="${nom}"><img class="quiz-code-lang-logo" src="${codeLanguageBadgeSrc(entree)}" alt="${nom}" width="16" height="16" draggable="false"></span>`
 					: "";
 				const pre = `<pre class="quiz-md-code">${badge}<code${classe}>${html}</code></pre>`;
 				/* « Run » button (code sandbox, engine/code-run.ts): markup ALWAYS

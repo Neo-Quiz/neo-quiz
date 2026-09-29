@@ -215,13 +215,13 @@ await withSrcModule(
 	   the expected strings include. */
 	const BADGE = (tag) => {
 		const e = codeLanguageOf(tag);
-		return `<img class="quiz-code-lang" src="${codeLanguageBadgeSrc(e)}" alt="${e.name}" title="${e.name}" width="16" height="16" draggable="false">`;
+		return `<span class="quiz-code-lang" data-lang-name="${e.name}"><img class="quiz-code-lang-logo" src="${codeLanguageBadgeSrc(e)}" alt="${e.name}" width="16" height="16" draggable="false"></span>`;
 	};
 	/* The ONLY `<img>` allowed inside a `<pre>`: our own badge, at its very
 	   start, with a `data:` source that holds no `"`, `<`, `>` or `&`. Any
 	   other image (an injected `<img onerror=…>`) must still come out
 	   escaped. */
-	const BADGE_EN_TETE = /^<img class="quiz-code-lang" src="data:image\/svg\+xml,[^"<>&]*" alt="[^"<>&]*" title="[^"<>&]*" width="16" height="16" draggable="false">/;
+	const BADGE_EN_TETE = /^<span class="quiz-code-lang" data-lang-name="[^"<>&]*"><img class="quiz-code-lang-logo" src="data:image\/svg\+xml,[^"<>&]*" alt="[^"<>&]*" width="16" height="16" draggable="false"><\/span>/;
 	const IMG = { embed: s => `[embed:${s}]`, image: (a, s) => `[image:${a}|${s}]` };
 	/* `rendreTexteQuiz` partage désormais un budget de coloration de MODULE
 	   (code-highlight.ts), remis à zéro par ses appelants réels une fois par

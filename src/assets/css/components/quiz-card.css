@@ -344,8 +344,7 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
    under it, nor under ▶, which sits on the same row at the right (its
    28 px button, 8 px from the top, is centred 22 px down; so is this 16 px
    logo, 14 px down past the `<pre>` padding). `sticky` keeps it in view
-   when a long line scrolls the block sideways. Its name is the `title`:
-   no visible label. */
+   when a long line scrolls the block sideways. */
 .quiz-md-code > .quiz-code-lang{
   position: sticky;
   left: 0;
@@ -354,6 +353,41 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   height: 16px;
   margin: -2px 0 10px;
   user-select: none;
+}
+.quiz-code-lang > .quiz-code-lang-logo{
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+/* The language's name in a small bubble JUST ABOVE the logo, on hover
+   (engine/code-lang-bubble.ts, 2026-09-29) — the native `title` tooltip
+   looked out of place. On <body>, so the <pre> that scrolls sideways does
+   not clip it; the same dark label as a reading's title above its bead
+   (perles.css). */
+.quiz-code-lang-bubble{
+  position: fixed;
+  z-index: 10000;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #16151c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: var(--font-interface);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.quiz-code-lang-bubble.is-visible{
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce){
+  .quiz-code-lang-bubble{ transition: none; }
 }
 .quiz-code-toolbar{
   position: absolute;

@@ -83,12 +83,13 @@ await withSrcModule(
 	const canonical = (s) => { reinitialiserBudgetRendu(); return rendreTexteQuiz(s, { embed: () => "", image: () => "" }, false); };
 	const badgeOf = (tag) => {
 		const e = codeLanguageOf(tag);
-		return `<img class="quiz-code-lang" src="${codeLanguageBadgeSrc(e)}" alt="${e.name}" title="${e.name}" width="16" height="16" draggable="false">`;
+		return `<span class="quiz-code-lang" data-lang-name="${e.name}"><img class="quiz-code-lang-logo" src="${codeLanguageBadgeSrc(e)}" alt="${e.name}" width="16" height="16" draggable="false"></span>`;
 	};
 	r.check("displayed: the badge is the first child of the <pre>",
 		shown("```yml" + NL + "a: 1" + NL + "```").startsWith(`<pre class="quiz-md-code">${badgeOf("yaml")}<code class="language-yml">`), true);
-	r.check("displayed: the name is the hover title and the alt text",
-		/alt="C#" title="C#"/.test(shown("```cs" + NL + "int x;" + NL + "```")), true);
+	const cs = shown("```cs" + NL + "int x;" + NL + "```");
+	r.check("displayed: the name is the hover bubble's and the alt text, never a native title",
+		[/data-lang-name="C#"/.test(cs), /alt="C#"/.test(cs), /title=/.test(cs)], [true, true, false]);
 	r.check("canonical render: no badge", canonical("```js" + NL + "x" + NL + "```").includes("quiz-code-lang"), false);
 	r.check("unknown tag: no badge", shown("```mystere" + NL + "x" + NL + "```"), `<pre class="quiz-md-code"><code class="language-mystere">x</code></pre>`);
 	r.check("no tag: no badge", shown("```" + NL + "x" + NL + "```"), `<pre class="quiz-md-code"><code>x</code></pre>`);

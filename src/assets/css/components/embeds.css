@@ -12,11 +12,14 @@
   margin: 0.75rem 0;
 }
 
+/* `:not(.quiz-code-lang-logo)`: the language badge of a code block
+   (engine/grammaire-blocs.ts) is an <img> too, 16 px at the top left of the
+   block — the embed sizing below blew it up to the width of the card. */
 .quiz-question-embed,
 .quiz-option-embed,
 .quiz-hint-embed,
 .quiz-explain-embed,
-.quiz-card .quiz-question img,
+.quiz-card .quiz-question img:not(.quiz-code-lang-logo),
 .quiz-card .quiz-question .internal-embed img,
 .quiz-card .quiz-question .image-embed img{
   display: block !important;
@@ -61,7 +64,7 @@
 }
 
 .quiz-question-embed,
-.quiz-card .quiz-question img,
+.quiz-card .quiz-question img:not(.quiz-code-lang-logo),
 .quiz-card .quiz-question .internal-embed img,
 .quiz-card .quiz-question .image-embed img{
   margin: 0.75rem 0 !important;

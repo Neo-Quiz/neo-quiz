@@ -67,7 +67,8 @@
   background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
 }
 
-.quiz-explain img{
+/* Not the language badge of a code block (embeds.css, same exclusion). */
+.quiz-explain img:not(.quiz-code-lang-logo){
   display: block !important;
   margin: 0.75rem auto !important;
   max-width: min(90%, 680px) !important;

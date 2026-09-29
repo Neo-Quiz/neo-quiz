@@ -22,6 +22,7 @@ import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
 import { createLearnHandlers } from "./engine/learn";
+import { installCodeLangBubble } from "./engine/code-lang-bubble";
 import { emptyLearnState } from "./engine/learn-loop";
 import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
@@ -1019,6 +1020,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	// Assign render function to ctx AFTER it's defined to avoid TDZ
 	ctx.render = render;
+
+	// The language name above a code block's logo, on hover (engine/code-lang-bubble.ts).
+	__quizGlobalCleanups.push(installCodeLangBubble(container));
 
 	// ── Mode Leçon → Examen : transition ──
 	function switchToExamMode(): void {
