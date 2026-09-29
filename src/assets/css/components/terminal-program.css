@@ -68,10 +68,11 @@
   outline: none;
 }
 
-/* The theme's comment grey-blue, pulled towards the app's blue: it reads as
-   an invitation, not as a comment of the program. */
+/* A plain grey at low opacity (2026-09-29): the blue it had, pulled from
+   the app's accent, drew the eye to an empty field like a link. The field
+   waits; it does not call. */
 .quiz-textarea.quiz-textarea-program::placeholder{
-  color: color-mix(in srgb, var(--quiz-primary-light) 45%, var(--qmc-comment));
+  color: color-mix(in srgb, var(--text-muted) 55%, transparent);
   font-style: italic;
 }
 

@@ -47,6 +47,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The "Program output…" hint of a program-output field is a soft grey instead of blue.
 - A reading's card, on the quiz's page and in the editor's list, shows a purple book in place of a number; the editor numbers the questions as the quiz does, without the readings.
 - A single choice names its options A, B, C in the quiz and in the editor, the letters of the quiz's page: a bare letter in JetBrains Mono where the radio button was.
 - A quiz's page keeps the same header in the editor: the title, the course selector, the search, "Start the quiz" and "⋮" stay in place and only "Edit" becomes "Done". The search also filters the editor's question list, and "Vocabulary" and "Mode" moved into the "⋮" menu (Mode is not offered on a Learn quiz, which cannot change mode).
