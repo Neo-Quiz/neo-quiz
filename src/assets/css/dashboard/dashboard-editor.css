@@ -932,23 +932,29 @@
 	z-index: 1;
 }
 .qb-er .quiz-option.multi .qb-er-bonne { border-radius: 4px; }
-/* A single choice's button carries the option's letter, at the size of the
-   quiz's lettered circle (quiz-options.css); the right answer turns it to
-   the quiz's "correct" circle: white, the letter in green. */
+/* A single choice's button is the option's bare letter, as in the quiz
+   (quiz-options.css): no circle, JetBrains Mono. The right answer's option
+   is green, its letter white; hovering another letter turns it blue — it
+   is the button that marks the right answer. */
 .qb-er .quiz-option[data-letter] .qb-er-bonne {
-	left: 14px;
 	width: 24px;
 	height: 24px;
-	font-size: 12px;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	font-family: "Neo Quiz Mono", "JetBrains Mono", var(--font-monospace, monospace);
+	font-size: 17px;
 	font-weight: 700;
 	line-height: 1;
 	color: var(--text-muted);
 }
 .qb-er .quiz-option[data-letter] .qb-er-bonne[aria-pressed="true"] {
-	border-color: #fff;
-	background: #fff;
 	box-shadow: none;
-	color: var(--quiz-success);
+	color: #fff;
+}
+.qb-er .quiz-option[data-letter] .qb-er-bonne:not([aria-pressed="true"]):hover,
+.qb-er .quiz-option[data-letter] .qb-er-bonne:focus-visible {
+	color: var(--quiz-primary);
 }
 .qb-er .qb-er-bonne[aria-pressed="true"] {
 	border-color: var(--quiz-success);

@@ -158,38 +158,41 @@
   border-radius: 4px;
 }
 
-/* A SINGLE CHOICE's circle carries its option's letter, A, B, C… in the
-   order shown (2026-09-29): the letters of the quiz's fiche, one convention
-   for the fiche, the editor and the quiz. The circle keeps its place and
-   grows to hold a letter; a state colours the letter instead of a dot or a
-   ring. A multiple choice keeps its squares. */
+/* A SINGLE CHOICE shows its option's letter, A, B, C… in the order shown
+   (2026-09-29): the letters of the quiz's fiche, one convention for the
+   fiche, the editor and the quiz. The bare letter, without a circle, in the
+   embedded JetBrains Mono ("Neo Quiz Mono", quiz-card.css), a size above
+   the text: it reads as a label, not as a control to tick. A state colours
+   the letter only: white on the blue, green and red faces. A multiple
+   choice keeps its squares. */
 .quiz-option[data-letter]::before{
   content: attr(data-letter);
-  left: 14px;
+  left: 16px;
   width: 24px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  border: none;
+  background: none;
+  font-family: "Neo Quiz Mono", "JetBrains Mono", var(--font-monospace, monospace);
+  font-size: 17px;
   font-weight: 700;
   line-height: 1;
   color: var(--text-muted);
 }
-.quiz-option.selected[data-letter]::before{
-  border-color: #fff;
-  background: #fff;
+.quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible[data-letter]::before{
   color: var(--quiz-primary);
 }
+.quiz-option.selected[data-letter]::before,
 .quiz-option.correct[data-letter]::before,
 .quiz-option.wrong[data-letter]::before{
-  border-color: #fff;
-  background: #fff;
+  background: none;
   box-shadow: none;
+  color: #fff;
 }
-.quiz-option.correct[data-letter]::before{ color: var(--quiz-success); }
-.quiz-option.wrong[data-letter]::before{ color: var(--quiz-danger); }
 .quiz-option.missed[data-letter]::before{
+  background: none;
   box-shadow: none;
   color: var(--quiz-success);
 }
@@ -393,7 +396,7 @@
 .quiz-options-image-grid > .quiz-option[data-letter]::before{
   width: 20px;
   height: 20px;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .quiz-options-image-grid > .quiz-option .quiz-option-embed-wrap{

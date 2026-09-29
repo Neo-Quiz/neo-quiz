@@ -48,7 +48,7 @@ release notes.
 
 ### Changed
 - A reading's card, on the quiz's page and in the editor's list, shows a purple book in place of a number; the editor numbers the questions as the quiz does, without the readings.
-- A single choice names its options A, B, C in the quiz and in the editor, the letters of the quiz's page, in the circle that used to be a radio button.
+- A single choice names its options A, B, C in the quiz and in the editor, the letters of the quiz's page: a bare letter in JetBrains Mono where the radio button was.
 - A quiz's page keeps the same header in the editor: the title, the course selector, the search, "Start the quiz" and "⋮" stay in place and only "Edit" becomes "Done". The search also filters the editor's question list, and "Vocabulary" and "Mode" moved into the "⋮" menu (Mode is not offered on a Learn quiz, which cannot change mode).
 - Opening a folder from the Folders page: the folder rises as a sheet over the grid, which stays behind it, slightly narrowed, as a strip above the folder; its title and content fade in. The back arrow slides the folder down and brings the grid forward again.
 - Opening a quiz from a folder or from Home: its page rises the same way over the page it came from, which stays behind as a strip (a folder over the grid, a quiz over its folder, one strip per level); its back arrow slides it down again.
