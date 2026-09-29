@@ -1,6 +1,20 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 
+/** The clock's text: `m:ss`, and `h:mm:ss` from an hour on — an Exam lasts
+    up to 300 minutes, and "125:00" does not read as a time (spec 2026-09-29
+    §3.2). Whole seconds rounded UP, like any countdown: the full duration
+    shows for its first second, and "0:00" only when the time is really up —
+    the moment of the hand-in. Never negative. PURE. */
+export function formatExamClock(ms: number): string {
+	const total = Math.max(0, Math.ceil((Number.isFinite(ms) ? ms : 0) / 1000));
+	const h = Math.floor(total / 3600);
+	const m = Math.floor((total % 3600) / 60);
+	const s = total % 60;
+	const ss = s.toString().padStart(2, "0");
+	return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
 export interface ExamHandlers {
 	examTimerHtml(): string;
 	startExamTimer(): void;
@@ -30,8 +44,8 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 			   has a CLOCK, and it says so before starting it — duration, number
 			   of questions, a single button. */
 			// examOptions is non-null in exam mode (isExamMode guard above).
-			// The mm:ss format of the clock stays code; only the labels (and
-			// their singular/plural agreement) go through the dictionary.
+			// The clock's format stays code (formatExamClock); only the labels
+			// (and their singular/plural agreement) go through the dictionary.
 			const minutes = ctx.examOptions!.durationMinutes;
 			const summaryLabel = t(minutes > 1 ? "engine.exam.duration.other" : "engine.exam.duration.one", { minutes });
 			const nbQuestions = ctx.quiz.length;
@@ -56,9 +70,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 			</div>`;
 		}
 
-		const minutes = Math.floor(ctx.examTimeRemaining / 60000);
-		const seconds = Math.floor((ctx.examTimeRemaining % 60000) / 1000);
-		const timerDisplay = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+		const timerDisplay = formatExamClock(ctx.examTimeRemaining);
 
 		const pct = Math.max(0, Math.min(100, (ctx.examTimeRemaining / ctx.examDurationMs) * 100));
 
@@ -86,7 +98,9 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 		// recomputed from Date.now(), so handleExamTimeUp fires on time whether
 		// the window is in front or not.
 		const tick = () => {
-			if (ctx.examEnded) return;
+			/* A destroyed engine (the note or the page closed) never hands in:
+			   an abandoned Exam leaves no attempt and no verdict (§3.4). */
+			if (ctx.examEnded || ctx.isDestroyed()) return;
 
 			const elapsed = Date.now() - examStartTime;
 			ctx.examTimeRemaining = Math.max(0, ctx.examDurationMs - elapsed);
@@ -114,6 +128,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 				scale: 0.95,
 				blur: 10,
 				onComplete: () => {
+					if (ctx.isDestroyed()) return;
 					ctx.examStarted = true;
 					// Start the timer before rendering.
 					startExamTimer();
@@ -152,9 +167,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 		const pct = Math.max(0, Math.min(100, (ctx.examTimeRemaining / ctx.examDurationMs) * 100));
 		progressEl.style.width = `${pct}%`;
 
-		const minutes = Math.floor(ctx.examTimeRemaining / 60000);
-		const seconds = Math.floor((ctx.examTimeRemaining % 60000) / 1000);
-		textEl.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+		textEl.textContent = formatExamClock(ctx.examTimeRemaining);
 
 		const timerContainer = ctx.container?.querySelector('[data-exam-timer="1"]');
 		if (timerContainer) {
@@ -174,6 +187,11 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 
 		ctx.examEnded = true;
 
+		/* The "Hand in anyway?" confirmation may be open: time decides for
+		   the user — it closes and the test is handed in with the answers
+		   given so far (spec 2026-09-29 §3.3). */
+		ctx.handIn?.closeConfirm();
+
 		// 2. Lock the quiz.
 		ctx.quizState.locked = true;
 		ctx.container?.classList?.add("quiz-is-locked");
@@ -181,7 +199,7 @@ export function createExamHandlers(ctx: EngineCtx): ExamHandlers {
 		// 3. Go to the results (same action as "see the score").
 		ctx.goToResults();
 
-		ctx.host.ui.notice(t("engine.exam.timeUpLocked"), 5000);
+		ctx.host.ui.notice(t("engine.exam.timeUp"), 5000);
 	}
 
 	function stopExamTimer(): void {

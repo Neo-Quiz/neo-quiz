@@ -39,7 +39,7 @@ export const EN_ENGINE = {
 	/* The start screen of a TIMED quiz: it announces the clock, nothing to
 	   choose (the Learn | Exam choice left on 2026-09-24, its keys on
 	   2026-09-29). */
-	"engine.exam.timedTitle": "Timed quiz",
+	"engine.exam.timedTitle": "Exam",
 	"engine.exam.start": "Start",
 	"engine.exam.duration.one": "Duration: {minutes} minute",
 	"engine.exam.duration.other": "Duration: {minutes} minutes",
@@ -54,7 +54,7 @@ export const EN_ENGINE = {
 	"engine.handIn.confirmSub": "Hand in anyway? An unanswered question counts as wrong.",
 	"engine.handIn.confirm": "Hand in",
 	"engine.handIn.keepAnswering": "Keep answering",
-	"engine.exam.timeUpLocked": "Time's up! The quiz has been locked.",
+	"engine.exam.timeUp": "Time is up: the exam has been handed in.",
 
 	/* ── Questions à choix ── */
 	"engine.qcm.multiHint": "Select one or more answers",

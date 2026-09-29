@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- Timed exams: a test can be an Exam, with a start screen giving its duration and number of questions, a clock at the top that turns orange then red and shows hours from 60 minutes on, no hints, and an automatic hand-in at zero with the answers given so far. An exam is never resumed: closed before it is handed in, it leaves no attempt and no review.
 - A question answered with the help of its hint shows a bulb on its dot instead of the check, circling arrow or cross, in Learn and in a handed-in test; the dot's colour still gives the result. Once a question shows its correction, its Hint button is gone.
 - Course terms: the key terms of a quiz are underlined in its readings, explanations and hints; hover, focus or tap one to read its definition in a bubble. Generated quizzes come with their glossary, and the quiz editor has a Vocabulary window to change it.
 - Generate detects the subject of a quiz (Python, C, Bash / Linux, SQL, Web, Maths, Networking) from the attached files' names, the destination folder and your request, and says so next to the options button ("Python detected"). The prompt is then adapted to the subject: for Python, fenced runnable examples, questions on what `print` displays, and each idiom shown in its compact form, its result and its loop equivalent. The subject can be changed in the quiz options (Automatic by default).

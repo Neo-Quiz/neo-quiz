@@ -281,3 +281,14 @@ export interface SessionSink {
 	enregistrer(s: SessionQuiz): void;
 	effacer(): void;
 }
+
+/** May the current state be snapshotted to be resumed? Never an EXAM — an
+    Exam is done in one go (spec 2026-09-29 §2.5, §3.4): a block that is an
+    Exam at assembly is never photographed, and closing it erases its
+    session, so nothing half-done is written and it reopens on its start
+    screen. Never once handed in (the results are the end of the session),
+    and only on a question. A Practice is snapshotted with its answers and
+    its hint use (`hintSeen`). PURE. */
+export function canSnapshot(o: { exam: boolean; locked: boolean; onQuestion: boolean }): boolean {
+	return !o.exam && !o.locked && o.onQuestion;
+}

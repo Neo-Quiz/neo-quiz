@@ -121,3 +121,16 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, SESSIO
 		[ancienne.learnVerdicts.every(v => v === "none"), ancienne.learnQueue, ancienne.learnResume], [true, [], null]);
 	r.done();
 });
+
+/* WHAT IS SNAPSHOTTED (spec 2026-09-29 §2.5, §3.4): a Practice closed
+   mid-way resumes where it was left, answers and hint use included (the
+   round trip above); an Exam is never snapshotted — abandoned, it leaves
+   nothing and reopens on its start screen; a handed-in test is over. */
+await withSrcModule("src/engine/session.ts", ({ canSnapshot }) => {
+	const r = makeReporter("Session — what is snapshotted");
+	r.check("a Practice on a question, not handed in: snapshotted", canSnapshot({ exam: false, locked: false, onQuestion: true }), true);
+	r.check("an Exam, even mid-way: never", canSnapshot({ exam: true, locked: false, onQuestion: true }), false);
+	r.check("handed in, or off a question: never",
+		[canSnapshot({ exam: false, locked: true, onQuestion: true }), canSnapshot({ exam: false, locked: false, onQuestion: false })], [false, false]);
+	r.done();
+});

@@ -28,7 +28,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.nav.nextQuestion": "Question suivante",
 
 	/* ── Exam ── */
-	"engine.exam.timedTitle": "Quiz chronométré",
+	"engine.exam.timedTitle": "Examen",
 	"engine.exam.start": "Commencer",
 	"engine.exam.duration.one": "Durée : {minutes} minute",
 	"engine.exam.duration.other": "Durée : {minutes} minutes",
@@ -43,7 +43,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.handIn.confirmSub": "Rendre quand même ? Une question sans réponse compte comme fausse.",
 	"engine.handIn.confirm": "Rendre",
 	"engine.handIn.keepAnswering": "Continuer à répondre",
-	"engine.exam.timeUpLocked": "Temps écoulé ! Le quiz a été verrouillé.",
+	"engine.exam.timeUp": "Temps écoulé : l'examen a été rendu.",
 
 	/* ── Questions à choix ── */
 	"engine.qcm.multiHint": "Sélectionnez une ou plusieurs réponses",

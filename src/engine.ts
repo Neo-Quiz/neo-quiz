@@ -29,7 +29,7 @@ import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
 import { idsForRawItems } from "./quiz-ids";
-import { photographier, restaurer, type SessionSink } from "./engine/session";
+import { canSnapshot, photographier, restaurer, type SessionSink } from "./engine/session";
 import { t } from "./i18n";
 
 import { currentHost } from "./host/current";
@@ -490,18 +490,17 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	ctx.getSlidingWindow = getSlidingWindow;
 	ctx.getSlideIndexForQuestion = getSlideIndexForQuestion;
 	ctx.questionSuivante = questionSuivante;
-	/* La photo de session : prise après chaque réponse (`invalidateSavedResults`
-	   est appelé par TOUTE interaction), à chaque changement de question
-	   (state.ts) et à la destruction du moteur (un texte tapé sans quitter la
-	   question). Jamais en examen ; jamais hors d'une question. Un bloc
-	   d'EXAMEN d'origine (`isExamMode` à l'assemblage) n'est jamais
-	   photographié, même joué en « Apprendre » : il rouvre sur son écran de
-	   départ, qui effacerait la session — le « Reprendre » du dossier
-	   aurait promis une reprise que le moteur détruit. */
+	/* The session snapshot: taken after each answer (`invalidateSavedResults`
+	   is called by EVERY interaction), at each change of question (state.ts)
+	   and when the engine is destroyed (text typed without leaving the
+	   question). The rule is `canSnapshot` (engine/session.ts): never an
+	   Exam, never once handed in, never off a question. An Exam block reopens
+	   on its start screen, which erases the session — the folder's "Resume"
+	   would have promised a resume the engine destroys. */
 	ctx.saveSession = () => {
-		if (!sessionSink || isExamMode || ctx.isExamMode || quizState.locked) return;
 		const entree = slideMap[quizState.current];
-		if (!entree || entree.type !== "question") return;
+		if (!sessionSink || !canSnapshot({ exam: isExamMode || ctx.isExamMode, locked: quizState.locked, onQuestion: entree?.type === "question" })) return;
+		if (entree?.type !== "question") return;
 		const photo = photographier(quizState, ctx.questionIds, entree.questionIndex, Date.now());
 		// Un quiz ouvert puis feuilleté sans jamais répondre n'a rien à
 		// reprendre : ne pas lui offrir « Reprendre » (règle du chantier).

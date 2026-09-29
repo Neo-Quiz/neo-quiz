@@ -949,3 +949,36 @@ await withSrcModule("src/engine/cards.ts", ({ withHintBadge, createCardRenderers
 		["answered", "active", "", "understood", "partial"]);
 	r.done();
 });
+
+/* THE EXAM'S CLOCK AND ITS END (spec 2026-09-29 §3.2, §3.3): m:ss, then
+   h:mm:ss from an hour on; at zero the test is handed in with the answers
+   given so far, an open "Hand in anyway?" confirmation closes, and a notice
+   says time is up. */
+await withSrcModule("src/engine/exam.ts", ({ formatExamClock, createExamHandlers }) => {
+	const r = makeReporter("Exam — clock and time up");
+	r.check("m:ss under an hour, rounded up: 0:00 only at zero",
+		[formatExamClock(0), formatExamClock(1), formatExamClock(59_001), formatExamClock(61_000), formatExamClock(59 * 60_000 + 59_000)], ["0:00", "0:01", "1:00", "1:01", "59:59"]);
+	r.check("h:mm:ss from an hour on (up to 300 minutes)",
+		[formatExamClock(3_600_000), formatExamClock(3_599_000), formatExamClock(125 * 60_000), formatExamClock(300 * 60_000)], ["1:00:00", "59:59", "2:05:00", "5:00:00"]);
+	r.check("never negative nor NaN", [formatExamClock(-5), formatExamClock(NaN)], ["0:00", "0:00"]);
+
+	const appels = [];
+	let confirmationOuverte = true;
+	const ctx = {
+		isExamMode: true, examStarted: true, examEnded: false, examTimeRemaining: 1200, examDurationMs: 60_000,
+		quizState: { locked: false },
+		isDestroyed: () => false,
+		container: { querySelector: () => null, classList: { add() {} } },
+		handIn: { closeConfirm: () => { const was = confirmationOuverte; confirmationOuverte = false; appels.push("close"); return was; } },
+		goToResults: () => appels.push("results"),
+		host: { ui: { notice: (m) => appels.push("notice") } },
+	};
+	createExamHandlers(ctx).handleExamTimeUp();
+	r.check("at zero: the confirmation closes, then the test is handed in, then the notice",
+		[appels, confirmationOuverte, ctx.quizState.locked, ctx.examEnded], [["close", "results", "notice"], false, true, true]);
+	// Already handed in (by hand, or by an earlier tick): time up does nothing.
+	appels.length = 0;
+	createExamHandlers(ctx).handleExamTimeUp();
+	r.check("already handed in: time up does nothing more", appels, []);
+	r.done();
+});
