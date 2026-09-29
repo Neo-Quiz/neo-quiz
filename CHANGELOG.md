@@ -52,7 +52,6 @@ release notes.
 
 ### Changed
 - The question editor shows the same number badge as the list (the book for a reading) and no longer prints "Question 14 of 20", which counted readings; the Role menu moved into More for a Learn and is gone for a Test.
-- A course's quizzes show as two separate buttons, each with its type and question count, instead of a Learn | Test toggle that made them look like two modes of one quiz.
 - A folder's upcoming exams show their Edit and Delete buttons directly instead of a ⋮ menu.
 - An exam's date is picked in the app's own calendar instead of the grey system one, and shown written out in full ("Wednesday, September 30, 2026"). An exam now needs a name and takes an optional coefficient, shown as "coef. 2" in its row. The "Related tasks" section of a folder's Review plan is gone.
 - A Practice now reads "Test" on cards, quiz pages and progress, with a written-sheet icon; a Test kept as an Exam reads "Exam".

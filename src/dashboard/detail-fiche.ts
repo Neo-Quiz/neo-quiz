@@ -74,10 +74,10 @@ export interface FicheDeps {
 	attirer(): void;
 }
 
-/** The OTHER quizzes of the same course (course-pairs.ts): each becomes a
-    button beside the current quiz's pill, with its question count, that
-    opens its quiz. */
-export type AutresModes = Array<{ mode: ModeQuiz; questions: number; open(): void }>;
+/** The OTHER modes of the same course (course-pairs.ts): the mode pill
+    becomes a selector Learn | Practice | Exam, whose other segments open
+    their quiz. */
+export type AutresModes = Array<{ mode: ModeQuiz; open(): void }>;
 
 /* L'état de la barre, gardé entre deux repeints du MÊME quiz (la page se
    repeint sur des événements extérieurs) ; remis à zéro sur un autre quiz. */
@@ -142,8 +142,8 @@ export function questionsTrouvees(questions: DraftQuestion[], lecon: boolean): n
 }
 
 /** The info line of the page's header, the same in the fiche and the
-    editor: the mode and the number of questions (or, for a course with
-    several quizzes, one button per quiz with its count), the origin. */
+    editor: the mode (or the selector Learn | Practice of the course's other
+    modes), the number of questions, the origin. */
 export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null, autresModes?: AutresModes): HTMLElement {
 	return renderMeta(parent, { quiz, origine, autresModes });
 }
@@ -155,9 +155,8 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 	   les actions au bout. */
 	const infos = ajouter(meta, "div", "qbd-fiche-meta-infos");
 	const chips = ajouter(infos, "div", "qbd-fiche-chips");
-	/* The MODE (the quiz's type), with its icon, and its explanation on
-	   hover: the bubble of the Generate page's Learn | Test selector, same
-	   texts. */
+	/* The MODE, with its icon, and its explanation on hover: the bubble of
+	   the Generate page's Learn | Test selector, same texts. */
 	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
 		const el = ajouter(parent, tag, cls);
 		icone(el, quizModeIcon(m), "qbd-fiche-mode-icon");
@@ -171,29 +170,35 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 	};
 	const autres = (deps.autresModes ?? []).filter(a => a.mode !== deps.quiz.mode);
 	if (autres.length > 0) {
-		/* TWO SEPARATE BUTTONS, not a toggle (2026-09-29): a course's Learn and
-		   Test are two different quizzes (two files), and a joined track with a
-		   sliding block read as two modes of ONE quiz. The quiz shown is the
-		   current page; each other one is a ghost pill that opens its quiz.
-		   Each pill carries its question count, so no separate "N questions"
-		   chip follows them. */
-		const choix = ajouter(chips, "div", "qbd-fiche-quizzes");
-		// The course's quizzes, in their order (Learn, Test, Exam).
+		const choix = ajouter(chips, "div", "qbd-fiche-modes");
+		choix.setAttribute("role", "group");
+		/* Le bloc qui glisse, comme dans la page « Générer » (2026-09-25) : au
+		   clic, il glisse vers l'autre mode pendant que les questions
+		   s'effacent, PUIS sa fiche s'ouvre et les siennes apparaissent. */
+		const indic = ajouter(choix, "div", "qbd-fiche-mode-indic");
+		// The course's modes, in their order (Learn, Practice, Exam).
 		const ordre: readonly ModeQuiz[] = ["learn", "practice", "exam"];
-		/* ONE flag for every pill: with three quizzes, clicking a second one
-		   during the fade would open two of them. */
+		const presents = ordre.filter(m => m === deps.quiz.mode || autres.some(a => a.mode === m));
+		const segs = presents.map(m => {
+			const actif = m === deps.quiz.mode;
+			const seg = pastilleMode(choix, m, "qbd-fiche-mode-seg" + (actif ? " is-active" : ""), "button");
+			(seg as HTMLButtonElement).type = "button";
+			seg.setAttribute("aria-pressed", actif ? "true" : "false");
+			return { actif, seg, open: autres.find(a => a.mode === m)?.open };
+		});
+		const courant = segs.find(s => s.actif)!.seg;
+		requestAnimationFrame(() => placerIndicateur(indic, courant, false));
+		/* ONE flag for every segment: with three modes, clicking a second one
+		   during the slide would open two quizzes. */
 		let parti = false;
-		for (const m of ordre) {
-			const autre = autres.find(a => a.mode === m);
-			const courant = m === deps.quiz.mode;
-			if (!courant && !autre) continue;
-			const pill = pastilleMode(choix, m, "qbd-fiche-quiz-pill", courant ? "span" : "button");
-			ajouter(pill, "span", "qbd-fiche-quiz-count", String(autre ? autre.questions : deps.quiz.questions));
-			if (!autre) { pill.setAttribute("aria-current", "page"); continue; }
-			(pill as HTMLButtonElement).type = "button";
-			pill.addEventListener("click", () => {
+		for (const { actif, seg, open } of segs) {
+			if (actif || !open) continue;
+			seg.addEventListener("click", () => {
 				if (parti) return;
 				parti = true;
+				courant.classList.remove("is-active");
+				seg.classList.add("is-active");
+				placerIndicateur(indic, seg, true);
 				const sansAnim = reduit();
 				if (!sansAnim) {
 					etat.fondu = true;
@@ -203,15 +208,15 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
 					));
 				}
-				window.setTimeout(() => autre.open(), sansAnim ? 0 : DUREE_GLISSEMENT);
+				window.setTimeout(() => open(), sansAnim ? 0 : DUREE_GLISSEMENT);
 			});
 		}
 	} else {
 		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip qbd-fiche-mode", "span");
-		const count = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-count");
-		renderQuizTypeIcon(count, deps.quiz.quizType);
-		ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 	}
+	const count = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-count");
+	renderQuizTypeIcon(count, deps.quiz.quizType);
+	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
 
 	/* Le nombre de LECTURES, à côté : jamais montré à 0 ni hors Learn
 	   (deps.quiz.readings vaut alors 0, src/lecture-etape.ts). Une pastille de

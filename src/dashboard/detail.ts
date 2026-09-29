@@ -517,12 +517,13 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const lignesEdition = (): ActionMenuItem[] | undefined =>
 			editing ? [glossaryMenuItem(() => draft, scheduleSave)] : undefined;
 		const fiche = !!spec.stats && !!start;
-		/* The info line, with one button per other quiz of the course: the
-		   SAME in the editor (2026-09-29). Without them there, the row lost
-		   height and everything on it moved up at each switch; a button opens
-		   the other quiz, the pending write first. */
+		/* The info line, with the Learn | Practice selector of the course's
+		   other modes: the SAME in the editor (2026-09-29). Without the
+		   selector there, the row lost 8 px of height and everything on it
+		   moved up at each switch; a segment opens the other mode's quiz, the
+		   pending write first. */
 		const autresModes = spec.autresModes?.filter(a => a.quiz.mode !== spec.stats?.mode)
-			.map(a => ({ mode: a.quiz.mode, questions: a.quiz.questions, open: () => { void flushSave(); a.open(); } }));
+			.map(a => ({ mode: a.quiz.mode, open: () => { void flushSave(); a.open(); } }));
 		return renderEntete(page, {
 			title: spec.title,
 			// A catalogue quiz shows its FOLDER, not its path; the Generate
