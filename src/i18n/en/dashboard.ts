@@ -22,7 +22,7 @@ export const EN_DASHBOARD = {
 
 	/* ── Sidebar ── */
 	"dashboard.nav.home": "Home",
-	"dashboard.nav.quizzes": "My quizzes",
+	"dashboard.nav.quizzes": "Folders",
 	"dashboard.nav.generate": "Generate",
 	"dashboard.nav.settings": "Settings",
 	// Entrée du rail que l'hôte ne sait pas encore ouvrir (ex. « Générer »
@@ -69,7 +69,7 @@ export const EN_DASHBOARD = {
 	"dashboard.onboarding.generate": "Generate my first quiz",
 	"dashboard.onboarding.or": "or",
 
-	/* ── Mes quiz ── */
+	/* ── Folders page ── */
 	"dashboard.quizzes.new": "New folder",
 	"dashboard.quizzes.newFolderTitle": "New folder",
 	"dashboard.quizzes.newFolderCta": "Create",

@@ -92,7 +92,7 @@ export const EN_APP = {
 	   moment où l'on vise la croix. */
 	"app.settings.extraFoldersHint": "Your Obsidian vaults open by themselves.",
 	"app.settings.folderAlreadyOpen": "This folder is already open.",
-	"app.settings.folderInsideOpen": "This folder is already inside one of your open folders. Add it from My quizzes → New folder → Open an existing folder.",
+	"app.settings.folderInsideOpen": "This folder is already inside one of your open folders. Add it from Folders → New folder → Open an existing folder.",
 	"app.settings.folderContainsOpen": "This folder contains one of your open folders.",
 
 	/* ── Réglages « Comptes » (application seulement) ──
@@ -171,7 +171,7 @@ export const EN_APP = {
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",
 	"app.settings.groupModes": "Group the Learn and Practice of a course",
-	"app.settings.groupModesHint": "In My quizzes, a course with both modes shows as one card, with a button for each mode.",
+	"app.settings.groupModesHint": "On the Folders page, a course with both modes shows as one card, with a button for each mode.",
 	"app.settings.timeFormat24": "24-hour ({example})",
 	"app.settings.timeFormat12": "12-hour ({example})",
 

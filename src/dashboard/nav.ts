@@ -39,9 +39,10 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 
 	const NAV_ITEMS: NavItem[] = [
 		{ key: "home", labelKey: "dashboard.nav.home", icon: "home" },
-		// Même icône « library » que le titre de la page Mes quiz (quizzes.ts) :
-		// le rail et la page désignent la même chose (demande Ahmed 2026-07-20).
-		{ key: "quizzes", labelKey: "dashboard.nav.quizzes", icon: "library" },
+		// Named "Folders" since 2026-09-29 (formerly "My quizzes", "library"
+		// icon): the page opens on a grid of folders, so the rail names what
+		// the user actually sees there.
+		{ key: "quizzes", labelKey: "dashboard.nav.quizzes", icon: "folders" },
 		{ key: "ai", labelKey: "dashboard.nav.generate", icon: "sparkles" }
 	];
 
