@@ -79,6 +79,10 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			const nomInput = ajouter(c, "input", "qbd-medit-input");
 			nomInput.type = "text";
 			nomInput.value = nom;
+			/* Named by its label for assistive tech (2026-09-29): the labels
+			   are plain paragraphs, and the fields were announced without a
+			   name ("edit text", or the weight's placeholder "2"). */
+			nomInput.setAttribute("aria-label", t("dashboard.planning.examName"));
 
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examDate"));
 			const dateBtn = ajouter(c, "button", "qbd-medit-select qbd-planning-date-field");
@@ -110,6 +114,7 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			};
 			weightInput.type = "text";
 			weightInput.inputMode = "decimal";
+			weightInput.setAttribute("aria-label", t("dashboard.planning.examWeight"));
 			weightInput.placeholder = t("dashboard.planning.examWeightPlaceholder");
 			weightInput.value = weight;
 			fitWeight();

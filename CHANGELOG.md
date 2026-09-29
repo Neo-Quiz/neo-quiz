@@ -202,6 +202,7 @@ release notes.
 - A paid assistant hidden from the generation menu shows as off when Settings open again, instead of always on; and the wallpaper row no longer shows a remove cross when no wallpaper is chosen.
 - The search field of a quiz page gets one clean blue edge with a soft glow when focused, instead of two blue outlines one inside the other; and in a narrow window its counts ("16 questions · 4 readings") drop under the Learn | Exam selector instead of sliding under the search field.
 - An open folder's title shows the same icon as its card: a folder named after its subject ("XTI301 - Python") showed its braces on the card but a book on its own page.
+- Screen readers announce the Name and Weight fields of the exam window by their label, instead of an unnamed field and "2".
 
 
 ## [1.19.0] - 2026-09-23
