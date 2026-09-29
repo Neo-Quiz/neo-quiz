@@ -93,7 +93,7 @@ export const EN_AI = {
 	"ai.type.text": "Free text",
 	"ai.type.comprehension": "Comprehension",
 
-	/* ── Objectif Learn / Practice (composer) ── */
+	/* ── Goal: Learn / Test (composer) ── */
 	"ai.mode.test": "Test",
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained.",

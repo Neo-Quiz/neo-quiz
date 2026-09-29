@@ -301,7 +301,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let modeGeneration: ModeQuiz = "learn";
 	/** The Test kind last chosen (Practice | Exam), what the Test button
 	    selects when Learn is active. Same lifetime as `modeGeneration`. */
-	let modeTest: Exclude<ModeQuiz, "learn"> = "practice";
+	let testKind: Exclude<ModeQuiz, "learn"> = "practice";
 	let questionType = "Mixte";
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
 	   par défaut. Comme le nombre et le type, elle vaut pour la SESSION de la
@@ -881,7 +881,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		containerRef = container;
 		closeAllSelects();
 		// Tooltips portalés au <body> (stop, effort) : un re-render détruit
-		// leur ancre sans mouseleave → purge pour éviter les orphelins.
+		// leur anchor sans mouseleave → purge pour éviter les orphelins.
 		document.querySelectorAll(".qbd-hover-tip").forEach(t => t.remove());
 		// Le composer (et son ResizeObserver) est détruit par container.replaceChildren() :
 		// déconnecter AVANT, sinon l'ancien observer continue de viser un élément
@@ -1758,12 +1758,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* The sliding block (measured on claude.ai on 2026-09-23), shared
 		   with a course's sheet: `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const libelleTest = (): string => `${t("ai.mode.test")} · ${quizModeLabel(modeTest)}`;
-		const choisirMode = (m: ModeQuiz): void => {
-			if (m !== "learn") modeTest = m;
+		const testLabel = (): string => `${t("ai.mode.test")} · ${quizModeLabel(testKind)}`;
+		const selectMode = (m: ModeQuiz): void => {
+			if (m !== "learn") testKind = m;
 			if (modeGeneration === m) return;
 			modeGeneration = m;
-			majSeg(true);
+			paintSeg(true);
 			/* The options are not the same from one mode to the other: the icon
 			   lights up in accent then fades, so that a first-time user sees that
 			   something changed THERE. Removing then re-adding the class restarts
@@ -1776,7 +1776,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const b = ajouter(seg, "button", "qbd-ai-seg-btn");
 			b.type = "button";
 			b.setAttribute("role", "radio");
-			const label = ajouter(b, "span", "qbd-ai-seg-label", kind === "learn" ? quizModeLabel("learn") : libelleTest());
+			const label = ajouter(b, "span", "qbd-ai-seg-label", kind === "learn" ? quizModeLabel("learn") : testLabel());
 			if (kind === "test") {
 				b.setAttribute("aria-haspopup", "menu");
 				const chevron = ajouter(b, "span", "qbd-ai-seg-chevron");
@@ -1784,45 +1784,45 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				host.ui.setIcon(chevron, "chevron-down");
 			}
 			b.addEventListener("click", (e) => {
-				if (kind === "learn") { choisirMode("learn"); return; }
+				if (kind === "learn") { selectMode("learn"); return; }
 				/* Test: the menu on the chevron, or on the button once Test is
 				   the current kind; otherwise the click SELECTS the kind. */
-				const surChevron = (e.target as HTMLElement).closest(".qbd-ai-seg-chevron") !== null;
-				if (surChevron || modeGeneration !== "learn") ouvrirMenuTest(b);
-				else choisirMode(modeTest);
+				const onChevron = (e.target as HTMLElement).closest(".qbd-ai-seg-chevron") !== null;
+				if (onChevron || modeGeneration !== "learn") openTestMenu(b);
+				else selectMode(testKind);
 			});
 			/* Each mode's goal, on hover, above (reference: the bubble of
 			   claude.ai's "Chat | Cowork"). */
 			attachHoverTip(b, (tip) => {
 				tip.classList.add("qbd-hover-tip--card");
-				ajouter(tip, "div", "qbd-hover-tip-title", kind === "learn" ? quizModeLabel("learn") : libelleTest());
-				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind === "learn" ? "learn" : modeTest));
+				ajouter(tip, "div", "qbd-hover-tip-title", kind === "learn" ? quizModeLabel("learn") : testLabel());
+				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind === "learn" ? "learn" : testKind));
 			});
 			return { kind, b, label };
 		});
 		/* The Practice | Exam menu of the Test button (`ui-select`, the only
 		   dropdown allowed). The current Test mode is greyed out; while Learn
 		   is active both stay available, and choosing one selects Test. */
-		const ouvrirMenuTest = (ancre: HTMLElement): void => {
-			const testActif = modeGeneration !== "learn";
-			openActionMenu(ancre, (["practice", "exam"] as const).map(m => ({
+		const openTestMenu = (anchor: HTMLElement): void => {
+			const testActive = modeGeneration !== "learn";
+			openActionMenu(anchor, (["practice", "exam"] as const).map(m => ({
 				icon: quizModeIcon(m), label: quizModeLabel(m),
-				disabled: testActif && modeGeneration === m,
-				onClick: () => choisirMode(m),
+				disabled: testActive && modeGeneration === m,
+				onClick: () => selectMode(m),
 			})));
 		};
-		const majSeg = (anime: boolean): void => {
-			const testActif = modeGeneration !== "learn";
+		const paintSeg = (anime: boolean): void => {
+			const testActive = modeGeneration !== "learn";
 			segBtns.forEach(({ kind, b, label }) => {
-				const actif = kind === "test" ? testActif : !testActif;
-				label.textContent = kind === "learn" ? quizModeLabel("learn") : libelleTest();
-				b.classList.toggle("is-active", actif);
-				b.setAttribute("aria-checked", String(actif));
+				const active = kind === "test" ? testActive : !testActive;
+				label.textContent = kind === "learn" ? quizModeLabel("learn") : testLabel();
+				b.classList.toggle("is-active", active);
+				b.setAttribute("aria-checked", String(active));
 			});
-			placerIndicateur(indic, segBtns.find(({ kind }) => (kind === "test") === testActif)!.b, anime);
+			placerIndicateur(indic, segBtns.find(({ kind }) => (kind === "test") === testActive)!.b, anime);
 		};
 		// Measure after insertion in the document (real widths of the options).
-		requestAnimationFrame(() => majSeg(false));
+		requestAnimationFrame(() => paintSeg(false));
 		const optsBtn = ajouter(composerBottom, "button", "qbd-ai-composer-opts");
 		optsBtn.type = "button";
 		host.ui.setIcon(optsBtn, "settings-2");
@@ -1862,9 +1862,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		attachHoverTip(optsBtn, (tip) => {
 			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
 			const ty = questionType === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(questionType);
-			const duree = clampExamDuration(settings().aiExamDurationMinutes);
-			const reste = modeGeneration === "exam" ? ` · ${duree === null ? t("ai.options.auto") : `${duree} ${t("dashboard.select.durationUnit")}`}` : "";
-			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}${reste}`);
+			const duration = clampExamDuration(settings().aiExamDurationMinutes);
+			const durationSuffix = modeGeneration === "exam" ? ` · ${duration === null ? t("ai.options.auto") : `${duration} ${t("dashboard.select.durationUnit")}`}` : "";
+			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}${durationSuffix}`);
 		});
 
 		/* Consultation du forfait, à sa place de contrôle : dans le composer,

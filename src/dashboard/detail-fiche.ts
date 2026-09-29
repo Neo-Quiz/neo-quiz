@@ -155,8 +155,8 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 	   les actions au bout. */
 	const infos = ajouter(meta, "div", "qbd-fiche-meta-infos");
 	const chips = ajouter(infos, "div", "qbd-fiche-chips");
-	/* Le MODE, avec son icône, et au survol son explication : la bulle du
-	   sélecteur Learn | Practice de la page « Générer », mêmes textes. */
+	/* The MODE, with its icon, and its explanation on hover: the bubble of
+	   the Generate page's Learn | Test selector, same texts. */
 	const pastilleMode = (parent: HTMLElement, m: ModeQuiz, cls: string, tag: "span" | "button"): HTMLElement => {
 		const el = ajouter(parent, tag, cls);
 		icone(el, quizModeIcon(m), "qbd-fiche-mode-icon");

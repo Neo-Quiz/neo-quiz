@@ -123,15 +123,15 @@ export function estDossierSortieIaValide(valeur: unknown): valeur is string {
  * here because that module pulls JSON5 into the main process for two numbers;
  * `check:electron-reglages` compares the two so they cannot drift apart.
  */
-export const DUREE_EXAMEN_MIN = 1;
-export const DUREE_EXAMEN_MAX = 300;
+export const EXAM_DURATION_MIN_MINUTES = 1;
+export const EXAM_DURATION_MAX_MINUTES = 300;
 
 /** A typed Exam duration is a whole number of minutes within the bounds. It
     reaches the prompt and is written into the quiz: a fraction, a string or
     a huge number would be a corrupted setting, refused rather than cut. */
-export function estDureeExamenValide(valeur: unknown): valeur is number {
-	return typeof valeur === "number" && Number.isInteger(valeur)
-		&& valeur >= DUREE_EXAMEN_MIN && valeur <= DUREE_EXAMEN_MAX;
+export function isValidExamDuration(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value)
+		&& value >= EXAM_DURATION_MIN_MINUTES && value <= EXAM_DURATION_MAX_MINUTES;
 }
 
 /** L'extension d'un chemin, en minuscules, ou la chaîne vide s'il n'en a pas.
@@ -186,46 +186,46 @@ export async function validerReglagesIa(
 	fichierExiste: (chemin: string) => Promise<boolean>,
 ): Promise<VerdictReglagesIa> {
 	if (!valeur || typeof valeur !== "object" || Array.isArray(valeur)) {
-		return { refus: "réglages IA refusés : la valeur n'est pas un objet" };
+		return { refus: "AI settings refused: the value is not an object" };
 	}
 	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder, aiExamDurationMinutes } = valeur as {
 		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown; aiExamDurationMinutes?: unknown;
 	};
 
 	if (aiOutputFolder !== undefined && !estDossierSortieIaValide(aiOutputFolder)) {
-		return { refus: "réglages IA refusés : aiOutputFolder doit être un chemin relatif sûr" };
+		return { refus: "AI settings refused: aiOutputFolder must be a safe relative path" };
 	}
 
 	// Absent or `null` is Auto; anything else must be a whole number of minutes in range.
-	if (aiExamDurationMinutes !== undefined && aiExamDurationMinutes !== null && !estDureeExamenValide(aiExamDurationMinutes)) {
-		return { refus: `AI settings refused: aiExamDurationMinutes must be a whole number from ${DUREE_EXAMEN_MIN} to ${DUREE_EXAMEN_MAX}, or empty` };
+	if (aiExamDurationMinutes !== undefined && aiExamDurationMinutes !== null && !isValidExamDuration(aiExamDurationMinutes)) {
+		return { refus: `AI settings refused: aiExamDurationMinutes must be a whole number from ${EXAM_DURATION_MIN_MINUTES} to ${EXAM_DURATION_MAX_MINUTES}, or empty` };
 	}
 
 	if (aiMentionExtraFolders !== undefined) {
 		if (!Array.isArray(aiMentionExtraFolders) || aiMentionExtraFolders.some(d => typeof d !== "string")) {
-			return { refus: "réglages IA refusés : aiMentionExtraFolders doit être un tableau de chaînes" };
+			return { refus: "AI settings refused: aiMentionExtraFolders must be an array of strings" };
 		}
 		for (const dossier of aiMentionExtraFolders as string[]) {
 			if (!(await perimetreContient(dossier))) {
-				return { refus: "dossier hors périmètre, refusé dans les réglages IA : " + dossier };
+				return { refus: "folder outside the perimeter, refused in the AI settings: " + dossier };
 			}
 		}
 	}
 
 	if (aiOllamaUrl === undefined) return { ok: true, admettre: null };
 	if (typeof aiOllamaUrl !== "string") {
-		return { refus: "réglages IA refusés : aiOllamaUrl doit être une chaîne" };
+		return { refus: "AI settings refused: aiOllamaUrl must be a string" };
 	}
 	let url: URL;
 	try {
 		url = new URL(aiOllamaUrl);
 	} catch {
-		return { refus: "réglages IA refusés : aiOllamaUrl illisible : " + aiOllamaUrl };
+		return { refus: "AI settings refused: aiOllamaUrl is unreadable: " + aiOllamaUrl };
 	}
 	/* Le protocole, pas seulement l'hôte — la même moitié que `hoteAutorise`
 	   (`reseau.ts`) : `file://127.0.0.1/C:/x` porte un hôte de la liste. */
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		return { refus: "réglages IA refusés : aiOllamaUrl doit être en http(s) : " + aiOllamaUrl };
+		return { refus: "AI settings refused: aiOllamaUrl must be http(s): " + aiOllamaUrl };
 	}
 	const hote = url.hostname.toLowerCase();
 	if (HOTES_AUTORISES.has(hote) || hoteEstPrive(hote)) return { ok: true, admettre: hote };

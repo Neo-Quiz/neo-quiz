@@ -74,7 +74,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.type.text": "Texte libre",
 	"ai.type.comprehension": "Compréhension",
 
-	/* ── Objectif Learn / Practice (composer) ── */
+	/* ── Goal: Learn / Test (composer) ── */
 	"ai.mode.test": "Test",
 	"ai.mode.learnTip": "Apprendre un cours pas à pas : une question avant chaque passage, la correction aussitôt, jusqu'à ce que ça tienne.",
 	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée.",

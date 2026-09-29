@@ -2099,6 +2099,11 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	const champPerso = (f: HTMLDivElement, c: {
 		unite: (n: number) => string; avant?: string; min: number; max: number;
 		valeur: number; actif: boolean; valider: (n: number) => void; maj: () => void;
+		/** The field's placeholder while no custom value is set (default "—"). */
+		placeholder?: string;
+		/** Called when a custom value is CLEARED and submitted: the row then
+		    means "empty", the Duration row's Auto. Absent: an empty field is ignored. */
+		vider?: () => void;
 	}): void => {
 		const row = ajouter(f, "label", "qbd-select-option qbd-opts-custom" + (c.actif ? " is-active" : ""));
 		ajouter(row, "span", "qbd-opts-custom-label", t("dashboard.select.optionsCustom"));
@@ -2110,7 +2115,7 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		field.max = String(c.max);
 		field.inputMode = "numeric";
 		field.value = c.actif ? String(c.valeur) : "";
-		field.placeholder = c.actif ? "" : "—";
+		field.placeholder = c.actif ? "" : (c.placeholder ?? "—");
 		const unite = ajouter(saisie, "span", "qbd-opts-custom-unit", c.unite(c.actif ? c.valeur : 2));
 		const chk = ajouter(row, "span", "qbd-select-check");
 		if (c.actif) currentHost().ui.setIcon(chk, "check");
@@ -2124,7 +2129,10 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		ajuster();
 		field.addEventListener("input", ajuster);
 		const valider = (): void => {
-			if (!field.value.trim()) return;
+			if (!field.value.trim()) {
+				if (c.actif && c.vider) { c.vider(); c.maj(); }
+				return;
+			}
 			const n = Math.min(c.max, Math.max(c.min, Math.round(Number(field.value))));
 			if (!Number.isFinite(n)) return;
 			c.valider(n);
@@ -2200,22 +2208,23 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	/* ── Duration (Test · Exam only): Auto, the four shortcuts, or a typed
 	   number of minutes within the Exam bounds — the same shape as the
 	   Questions row, and `champPerso` bounds and rounds the typed value. ── */
-	const duree = opts.duration;
-	if (duree) {
-		const RACCOURCIS = [30, 60, 90, 120];
-		let minutes = duree.minutes;
-		const uniteMin = (): string => t("dashboard.select.durationUnit");
-		const choisirDuree = (n: number | null): void => { minutes = n; duree.onChange(n); };
+	const durationOpts = opts.duration;
+	if (durationOpts) {
+		const SHORTCUTS = [30, 60, 90, 120];
+		let minutes = durationOpts.minutes;
+		const unitMin = (): string => t("dashboard.select.durationUnit");
+		const chooseDuration = (n: number | null): void => { minutes = n; durationOpts.onChange(n); };
 		ligne("clock", t("dashboard.select.optionsDuration"),
-			() => minutes === null ? t("ai.options.auto") : `${minutes} ${uniteMin()}`,
+			() => minutes === null ? t("ai.options.auto") : `${minutes} ${unitMin()}`,
 			() => [
-				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: minutes === null, choisir: () => choisirDuree(null) },
-				...RACCOURCIS.map(n => ({ label: `${n} ${uniteMin()}`, actif: minutes === n, choisir: () => choisirDuree(n) })),
+				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: minutes === null, choisir: () => chooseDuration(null) },
+				...SHORTCUTS.map(n => ({ label: `${n} ${unitMin()}`, actif: minutes === n, choisir: () => chooseDuration(n) })),
 			],
 			(f, maj) => champPerso(f, {
-				unite: uniteMin, min: EXAM_DURATION_MIN, max: EXAM_DURATION_MAX,
-				valeur: minutes ?? EXAM_DURATION_MIN, actif: minutes !== null && !RACCOURCIS.includes(minutes),
-				valider: (n) => choisirDuree(n), maj,
+				unite: unitMin, min: EXAM_DURATION_MIN, max: EXAM_DURATION_MAX,
+				valeur: minutes ?? EXAM_DURATION_MIN, actif: minutes !== null && !SHORTCUTS.includes(minutes),
+				valider: (n) => chooseDuration(n), maj,
+				placeholder: t("ai.options.auto"), vider: () => chooseDuration(null),
 			}));
 	}
 
