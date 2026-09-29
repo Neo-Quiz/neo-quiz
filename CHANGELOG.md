@@ -50,6 +50,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The home page's Resume card has the app's raised blue Resume button with a play icon, and its muted line names the folder with its own icon and colour, then the quiz's type (Learn, Test or Exam), then the progress.
 - Deleting from a course card that gathers a Learn and a Test asks which one: a submenu offers each quiz by its type, or both, each with its confirmation.
 - The question editor shows the same number badge as the list (the book for a reading) and no longer prints "Question 14 of 20", which counted readings; the Role menu moved into More for a Learn and is gone for a Test.
 - A folder's upcoming exams show their Edit and Delete buttons directly instead of a ⋮ menu.

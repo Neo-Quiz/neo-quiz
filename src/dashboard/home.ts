@@ -8,6 +8,9 @@ import { isFolderArchived } from "./folder-archive";
 import { moduleForQuiz, applyModuleOverrides, buildModuleGroups } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
+import { moduleIcon } from "./module-icons";
+import { quizModeIcon, quizModeLabel } from "./quiz-card";
+import { poserBouton3d } from "./cta3d";
 import { lireModuleMap } from "./module-map-note";
 import { createOptionCard, importSharedFolder, openCreateFolderModal } from "./folder-create";
 import { openNewFolderModal } from "./module-edit";
@@ -123,7 +126,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 				return lb - la;
 			})[0];
 		if (resumeQuiz) {
-			renderResumeHero(page, resumeQuiz, stats[resumeQuiz.path], accentOf(resumeQuiz, map));
+			renderResumeHero(page, resumeQuiz, stats[resumeQuiz.path], map);
 		}
 
 		// ── The folders and the week ──
@@ -165,36 +168,60 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		});
 	}
 
-	/* "Resume" card (redrawn 2026-09-29): the whole card is the button — no
-	   framed button inside it (no tile in a tile). The title and where it
-	   comes from, and on the right an accent TEXT action; the accent is the
-	   quiz FOLDER's, like its card. No progress ring or percentage (removed
-	   2026-09-29): the card's only job is to reopen the quiz on the question
-	   where it was left, like the folder's next step. */
-	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, accent: string): void {
+	/* "Resume" card (redrawn 2026-09-29, button restyled the same day): a
+	   content tile like the folder cards. Its action is the app's 3D button
+	   (cta3d.ts, the one of "Start the quiz" and of a folder's Resume),
+	   sized to its content and centred on the right. The tile is a DIV, not a
+	   button: a button inside a button is invalid HTML and would fire twice.
+	   The whole tile stays clickable with the mouse; for the keyboard and
+	   assistive tech the 3D button is the one control, and it stops the
+	   click there so the tile's handler never runs a second time.
+	   The muted line reads folder (its own icon and accent, as on its folder
+	   card), then the quiz's type (icon + text, not a framed pill: no tile in
+	   a tile), then the progress. No ring or percentage (removed 2026-09-29):
+	   the card's only job is to reopen the quiz where it was left. */
+	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, map: ModuleMap): void {
+		const host = currentHost();
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;
+		const info = moduleForQuiz(quiz.path, map);
+		// The generated-quizzes folder has its own icon and accent (quizzes.ts).
+		const generated = !!info.path && info.path === ctx.generatedFolder?.();
 
-		const hero = ajouter(container, "button", "qbd-resume-hero");
-		hero.type = "button";
-		hero.style.setProperty("--accent", accent);
+		const hero = ajouter(container, "div", "qbd-resume-hero");
+		hero.style.setProperty("--accent", moduleAccent(info, { generated }));
 		hero.addEventListener("click", () => ctx.openQuiz(quiz));
 
-		const info = ajouter(hero, "span", "qbd-resume-info");
-		const label = ajouter(info, "span", "qbd-resume-label");
-		currentHost().ui.setIcon(ajouter(label, "span", "qbd-resume-label-icon"), "history");
+		const text = ajouter(hero, "span", "qbd-resume-info");
+		const label = ajouter(text, "span", "qbd-resume-label");
+		host.ui.setIcon(ajouter(label, "span", "qbd-resume-label-icon"), "history");
 		ajouter(label, "span", undefined, t("dashboard.home.resumeLabel"));
-		ajouter(info, "span", "qbd-resume-title", quiz.title);
-		// Agreement follows the TOTAL ("0/1 question", "3/10 questions").
-		const questions = t(total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done, total });
-		// Parent folder: says where the quiz comes from, and gives the accent
-		// colour something on screen to refer to.
-		const folder = quiz.path.split("/").slice(0, -1).filter(Boolean).pop();
-		ajouter(info, "span", "qbd-resume-meta", folder ? t("dashboard.home.resumeMeta", { folder, questions }) : questions);
+		ajouter(text, "span", "qbd-resume-title", quiz.title);
 
-		const cta = ajouter(hero, "span", "qbd-resume-cta");
+		// Folder · type · progress. A quiz outside any folder has no folder part.
+		const meta = ajouter(text, "span", "qbd-resume-meta");
+		const folderName = info.name || info.folder;
+		if (folderName) {
+			const folder = ajouter(meta, "span", "qbd-resume-meta-folder");
+			host.ui.setIcon(ajouter(folder, "span", "qbd-resume-meta-icon"), moduleIcon(info, { generated }));
+			ajouter(folder, "span", "qbd-resume-meta-text", folderName);
+			ajouter(meta, "span", "qbd-resume-meta-sep", "·");
+		}
+		const type = ajouter(meta, "span", "qbd-resume-meta-type");
+		host.ui.setIcon(ajouter(type, "span", "qbd-resume-meta-icon"), quizModeIcon(quiz.mode));
+		ajouter(type, "span", undefined, quizModeLabel(quiz.mode));
+		ajouter(meta, "span", "qbd-resume-meta-sep", "·");
+		// Agreement follows the TOTAL ("0/1 question", "3/10 questions").
+		ajouter(meta, "span", "qbd-resume-meta-progress", t(total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done, total }));
+
+		// The 3D button: the same icon + label markup as the folder's Resume.
+		const cta = ajouter(hero, "button", "qbd-resume-cta");
+		cta.type = "button";
+		cta.setAttribute("aria-label", t("dashboard.home.resumeAria", { title: quiz.title }));
+		host.ui.setIcon(ajouter(cta, "span", "qbd-btn-icon"), "play");
 		ajouter(cta, "span", undefined, t("dashboard.home.resumeBtn"));
-		currentHost().ui.setIcon(ajouter(cta, "span", "qbd-resume-cta-chev"), "chevron-right");
+		poserBouton3d(cta);
+		cta.addEventListener("click", (e) => { e.stopPropagation(); ctx.openQuiz(quiz); });
 	}
 
 	function renderOnboarding(container: HTMLElement, map: ModuleMap, allQuizzes: QuizIndexEntry[]): void {
@@ -235,12 +262,6 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		}
 		createOptionCard(null, cartes, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
 			() => void importSharedFolder(ctx, map, allQuizzes, rerender));
-	}
-
-	/** Accent of a quiz's FOLDER — same source as "My quizzes". */
-	function accentOf(quiz: QuizIndexEntry, map: ModuleMap): string {
-		const folder = moduleForQuiz(quiz.path, map).folder;
-		return moduleAccent(map.byFolder.get(folder) ?? { folder });
 	}
 
 	return { render };

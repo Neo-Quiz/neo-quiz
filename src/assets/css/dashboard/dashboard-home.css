@@ -95,11 +95,12 @@
 .qbd-onboarding-cards { width: 100%; max-width: 480px; }
 
 /* ══ "RESUME" CARD (redrawn 2026-09-29) ═════════════════════
-   The whole card is ONE button (home.ts `renderResumeHero`): a content tile
-   like the folder cards, the quiz's progress as a ring with its %, the text,
-   and on the right an accent TEXT action — no framed button inside the card
-   (no tile in a tile), no vertical edge nor halo. `--accent` is the quiz
-   folder's, set inline. */
+   A content tile like the folder cards (home.ts `renderResumeHero`): the
+   text on the left, and on the right the app's 3D button (`.qbd-cta3d`,
+   cta3d.ts) sized to its content and centred vertically. The tile is a DIV
+   that stays clickable with the mouse; the 3D button is its keyboard target.
+   `--accent` is the quiz folder's, set inline: it tints the label, the
+   folder's icon in the meta line and the hover edge. */
 .qbd-root .qbd-resume-hero,
 .qbd-resume-hero {
 	--accent: var(--qbd-state-progress);
@@ -121,16 +122,15 @@
 	cursor: pointer;
 	transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-root .qbd-resume-hero,
+	.qbd-resume-hero { transition: none; }
+}
 
 .qbd-root .qbd-resume-hero:hover,
 .qbd-resume-hero:hover {
 	border-color: color-mix(in srgb, var(--accent) 45%, var(--qbd-surface-edge)) !important;
 	background: color-mix(in srgb, var(--accent) 5%, var(--qbd-surface-bg)) !important;
-}
-
-.qbd-resume-hero:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
 }
 
 .qbd-resume-info {
@@ -163,27 +163,42 @@
 	white-space: nowrap;
 }
 
+/* Muted line: folder (own icon, accent), type (icon + text), progress.
+   Only the folder name shrinks and truncates; the type and the progress
+   keep their full text. */
 .qbd-resume-meta {
-	overflow: hidden;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
 	color: var(--text-muted);
 	font-size: 12.5px;
-	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-/* The action is TEXT in the accent colour, like a folder card's lead task. */
-.qbd-resume-cta {
+.qbd-resume-meta-folder,
+.qbd-resume-meta-type {
 	display: inline-flex;
 	align-items: center;
-	gap: 2px;
-	flex: 0 0 auto;
-	color: var(--accent);
-	font-size: 14px;
-	font-weight: 650;
+	gap: 5px;
 }
+.qbd-resume-meta-folder { min-width: 0; color: var(--accent); }
+.qbd-resume-meta-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.qbd-resume-meta-type,
+.qbd-resume-meta-sep,
+.qbd-resume-meta-progress { flex: 0 0 auto; }
+.qbd-resume-meta-icon { display: inline-flex; flex: 0 0 auto; }
+.qbd-resume-meta-icon svg { width: 13px; height: 13px; }
+.qbd-resume-meta-sep { opacity: 0.6; }
 
-.qbd-resume-cta-chev { display: inline-flex; }
-.qbd-resume-cta-chev svg { width: 16px; height: 16px; }
+/* The 3D button: sized to its content, centred on the right. The button's own
+   top margin (its depth, `.qbd-cta3d`) is left as is: it offsets the raised
+   face so the whole button stays centred. */
+.qbd-root .qbd-resume-cta { flex: 0 0 auto; align-self: center; }
+.qbd-resume-cta .qbd-cta3d-face { padding: 10px 20px; font-size: 14px; }
 
 /* ── "Create a new folder", under the folders (after StudySmarter's "Add a
    new set"): a quiet outlined pill, centred. */
@@ -579,5 +594,5 @@
 
 @media (max-width: 600px) {
 	.qbd-resume-hero { flex-wrap: wrap; }
-	.qbd-resume-cta { width: 100%; justify-content: flex-end; }
+	.qbd-root .qbd-resume-cta { margin-left: auto; }
 }

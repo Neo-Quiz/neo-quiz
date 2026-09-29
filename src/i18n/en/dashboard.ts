@@ -57,9 +57,8 @@ export const EN_DASHBOARD = {
 	"dashboard.home.allDone": "All caught up",
 	"dashboard.home.allDoneHint": "Nothing to review or learn today.",
 	"dashboard.home.resumeLabel": "Pick up where you left off",
-	// {folder}: the quiz's folder, {questions}: "2/16 questions".
-	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Create a new folder",
+	"dashboard.home.resumeAria": "Resume {title}",
 	"dashboard.home.resumeBtn": "Resume",
 
 	/* ── Onboarding (premier usage, aucun quiz) ── */

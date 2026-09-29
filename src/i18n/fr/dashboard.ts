@@ -41,8 +41,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.home.allDone": "Tout est à jour",
 	"dashboard.home.allDoneHint": "Rien à réviser ni à apprendre aujourd'hui.",
 	"dashboard.home.resumeLabel": "Reprendre là où vous en étiez",
-	"dashboard.home.resumeMeta": "{folder} · {questions}",
 	"dashboard.home.newFolder": "Créer un nouveau dossier",
+	"dashboard.home.resumeAria": "Reprendre {title}",
 	"dashboard.home.resumeBtn": "Reprendre",
 
 	/* ── Onboarding ── */
