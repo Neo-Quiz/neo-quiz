@@ -4,6 +4,7 @@ import type { TransKey } from "../i18n";
 import { currentHost } from "../host/current";
 import type { DashboardShellCtx, ExamenDossier } from "../types/dashboard-ctx";
 import type { ModuleGroup } from "./quiz-modules";
+import { formatExamDate } from "../review/review-store";
 import { isoLocal, tasksLeft, weekDays } from "./home-tasks";
 import { whenLabel, type HomeFolderCard } from "./home-folders";
 
@@ -67,7 +68,7 @@ export function renderHomeSide(parent: HTMLElement, deps: HomeSideDeps): void {
 		const cell = ajouter(week, "div", `qbd-homes-day qbd-homes-day--${past ? outcome : "open"}${day === todayStart ? " is-today" : ""}`);
 		const onExam = examDays.get(isoLocal(day)) ?? [];
 		const title = [long.format(day), past ? t(OUTCOME_KEYS[outcome]) : "",
-			...onExam.map(e => `${e.exam.nom || t("dashboard.planning.examUnnamed")} · ${e.group.name}`)].filter(Boolean).join(" — ");
+			...onExam.map(e => `${e.exam.nom} · ${e.group.name}`)].filter(Boolean).join(" — ");
 		cell.setAttribute("title", title);
 		cell.setAttribute("aria-label", title);
 		// No marker of its own (a dashed ring read as a checkbox): a day done
@@ -90,10 +91,9 @@ export function renderHomeSide(parent: HTMLElement, deps: HomeSideDeps): void {
 	const next = exams[0];
 	if (next) {
 		const line = ajouter(text, "div");
-		ajouter(line, "strong", undefined, next.exam.nom || t("dashboard.planning.examUnnamed"));
+		ajouter(line, "strong", undefined, next.exam.nom);
 		ajouter(line, "span", undefined, ` · ${next.group.name}`);
-		const [y, m, d] = next.exam.date.split("-").map(Number);
-		const date = new Intl.DateTimeFormat(lang, { weekday: "short", day: "numeric", month: "short" }).format(new Date(y, m - 1, d));
+		const date = formatExamDate(next.exam.date, lang);
 		ajouter(text, "div", "qbd-homes-muted", t("dashboard.home.nextExamWhen", { when: whenLabel(next.exam.date, todayStart), date }));
 	} else {
 		// No "Add an exam" link here any more (2026-09-29): exams are set

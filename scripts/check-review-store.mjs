@@ -405,7 +405,7 @@ await withSrcModule("src/review/review-store.ts", async ({ buildReviewCatalogue 
 	r.done();
 });
 
-await withSrcModule("src/review/review-store.ts", async ({ parseExamDate }) => {
+await withSrcModule(["src/review/review-store.ts", "src/dashboard/home-tasks.ts"], async ({ parseExamDate, formatExamDate }, { isoLocal }) => {
 	const r = makeReporter("Adaptateur — parseExamDate (garde NaN)");
 	r.check("une date valide donne un timestamp fini", typeof parseExamDate("2027-06-01"), "number");
 	// 275761 dépasse la plage représentable par `Date`, mais ses trois
@@ -414,6 +414,14 @@ await withSrcModule("src/review/review-store.ts", async ({ parseExamDate }) => {
 	// empoisonnerait silencieusement toutes les échéances du module.
 	r.check("une année hors du domaine Date retombe sur null, pas NaN", parseExamDate("275761-01-01"), null);
 	r.check("une entrée non-string rend null", parseExamDate(undefined), null);
+	// The picker stores `isoLocal` of a local date: 00:30 local on the 30th must
+	// stay the 30th in any timezone (`toISOString` gives the 29th east of UTC).
+	r.check("local ISO date keeps the local day just after midnight", isoLocal(new Date(2026, 8, 30, 0, 30).getTime()), "2026-09-30");
+	r.check("local ISO date keeps the local day just before midnight", isoLocal(new Date(2026, 8, 30, 23, 59).getTime()), "2026-09-30");
+	r.check("an exam date round-trips through parse and local ISO", isoLocal(parseExamDate("2026-01-01")), "2026-01-01");
+	r.check("English date is written in full, capitalised", formatExamDate("2026-09-30", "en"), "Wednesday, September 30, 2026");
+	r.check("French date is written in full, capitalised", formatExamDate("2026-09-30", "fr"), "Mercredi 30 septembre 2026");
+	r.check("an unreadable date is returned as is", formatExamDate("nope", "en"), "nope");
 	r.done();
 });
 

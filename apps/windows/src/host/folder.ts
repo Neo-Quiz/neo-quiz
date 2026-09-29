@@ -633,7 +633,13 @@ export function lireExamens(brut: unknown, anciennes: unknown): Record<string, E
 				&& typeof (e as Examen).id === "string" && (e as Examen).id !== ""
 				&& typeof (e as Examen).nom === "string"
 				&& typeof (e as Examen).date === "string" && DATE_ISO.test((e as Examen).date))
-				.map(e => ({ id: e.id, nom: e.nom, date: e.date }));
+				.map(e => {
+						// An invalid coefficient is dropped, never the exam.
+						const c = e.coefficient;
+						return typeof c === "number" && Number.isFinite(c) && c > 0 && c <= 100
+							? { id: e.id, nom: e.nom, date: e.date, coefficient: c }
+							: { id: e.id, nom: e.nom, date: e.date };
+					});
 			if (valides.length) out[module] = valides.sort((a, b) => a.date.localeCompare(b.date));
 		}
 	}

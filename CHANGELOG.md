@@ -53,6 +53,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- An exam's date is picked in the app's own calendar instead of the grey system one, and shown written out in full ("Wednesday, September 30, 2026"). An exam now needs a name and takes an optional coefficient, shown as "coef. 2" in its row. The "Related tasks" section of a folder's Review plan is gone.
 - A Practice now reads "Test" on cards, quiz pages and progress, with a written-sheet icon; "Practice" only names the Test's sub-mode on the Generate page.
 - The back arrow of a quiz's page sits exactly where a folder's does: going back from a quiz to its folder, then to Folders, is two clicks without moving the mouse.
 - Generated Practice questions get a hint only when one helps, instead of one on every question.

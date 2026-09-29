@@ -12,41 +12,41 @@ import { renderNextStep } from "./folder-next";
 import { duesDuDossier } from "./folder-progress-details";
 import { moyenneDossier } from "./folder-progress";
 import type { DetailsProgression } from "./folder-progress";
-import { parseExamDate } from "../review/review-store";
+import { formatExamDate, parseExamDate } from "../review/review-store";
+import { openDatePicker } from "./date-picker";
 import { cheminsAJoindre, lireContenuDossier } from "./folder-contents";
 
 /* ══════════════════════════════════════════════════════════
-   ONGLET « PLANNING DE RÉVISIONS » d'un dossier (tâche 4, 2026-09-26) :
-   les tâches du jour (ce que l'ordonnanceur doit à CE dossier), les examens
-   à venir (plusieurs par dossier, ajoutés/modifiés/supprimés ici même), puis
-   l'anneau du dossier, l'étape suivante et les trois modes — colonne droite,
-   reprise de « Progression » et de l'ancienne étape suivante du drill.
+   A folder's "Review plan" tab (task 4, 2026-09-26): the upcoming exams
+   (several per folder, added, edited and deleted right here), then the
+   folder's ring, the next step and the three modes on the right, taken from
+   "Progress" and from the drill's old next step. The "Related tasks" section
+   was removed on 2026-09-29 (it only repeated the review action).
 
-   « Aucune tâche sans examen à venir » : l'ordonnanceur (côté hôte) ne rend
-   des questions dues pour ce dossier que s'il a un examen `>= aujourd'hui` —
-   cette vue ne fait qu'EXPLIQUER cette règle, jamais la recalculer.
+   "No task without an upcoming exam": the scheduler (host side) only gives a
+   folder due questions when it has an exam `>= today`. This view only
+   EXPLAINS that rule, it never recomputes it.
 ══════════════════════════════════════════════════════════ */
 
-/** `AAAA-MM-JJ` LOCAL du jour — jamais UTC, même règle que son homonyme côté
-    application (`apps/windows/src/host/folder.ts`, `aujourdhuiIso`), dupliquée
-    ici : `src/` ne peut pas importer `apps/`. */
+/** The LOCAL `YYYY-MM-DD` of today, never UTC: same rule as its twin on the
+    app side (`apps/windows/src/host/folder.ts`, `aujourdhuiIso`), duplicated
+    here because `src/` cannot import `apps/`. */
 function aujourdhuiIsoLocal(now: number): string {
 	const d = new Date(now);
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Les examens du dossier dont la date est `>= aujourd'hui` (comparaison de
-    chaînes `AAAA-MM-JJ`, même règle que `examenProchain` côté application),
-    triés par date. */
+/** The folder's exams dated `>= today` (string comparison of `YYYY-MM-DD`,
+    same rule as `examenProchain` on the app side), sorted by date. */
 function examensAVenir(ctx: DashboardShellCtx, group: ModuleGroup): ExamenDossier[] {
 	const tous = ctx.examens?.(group) ?? [];
 	const aujourdhui = aujourdhuiIsoLocal(Date.now());
 	return tous.filter(e => e.date >= aujourdhui).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Jours restants avant un examen déjà connu comme À VENIR (`ms >=` minuit
-    local d'aujourd'hui) : jamais de cas « passé », les trois clés existantes
-    de « Mes quiz » suffisent. */
+/** Days left before an exam already known to be UPCOMING (`ms >=` today's
+    local midnight): never a "past" case, the three existing "My quizzes" keys
+    are enough. */
 function joursRestants(ms: number): string {
 	const aujourdhui = new Date();
 	aujourdhui.setHours(0, 0, 0, 0);
@@ -56,13 +56,26 @@ function joursRestants(ms: number): string {
 		: t("dashboard.quizzes.progressExamIn", { count: jours });
 }
 
-/** Le modal d'un examen — ajout (`examen: null`) ou modification. Champs Nom
-    (facultatif) et Date (natif) ; Enregistrer désactivé tant que la date est
-    vide ; `id` d'un nouvel examen = `Date.now().toString(36)` (même patron
-    que les autres identifiants générés à la volée du dashboard). */
+/** A typed coefficient: "" is none (`undefined`), "2,5" and "2.5" are 2.5, and
+    anything else (not a number, zero, above 100) is invalid (`null`). */
+function lireCoefficient(brut: string): number | undefined | null {
+	const texte = brut.trim();
+	if (!texte) return undefined;
+	if (!/^\d*[.,]?\d*$/.test(texte)) return null;
+	const n = Number(texte.replace(",", "."));
+	return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
+}
+
+/** An exam's modal, to add (`examen: null`) or edit one. Name (required), Date
+    (the app's own picker, no earlier than today) and Coefficient (optional);
+    Save stays disabled until the name is not blank, the date is picked and the
+    coefficient, if typed, is valid. A new exam's `id` is
+    `Date.now().toString(36)` (same pattern as the dashboard's other ids made
+    on the fly). */
 function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: ExamenDossier | null, rerender: () => void): void {
 	let nom = examen?.nom ?? "";
 	let date = examen?.date ?? "";
+	let coefficient = examen?.coefficient === undefined ? "" : String(examen.coefficient).replace(".", ",");
 
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
@@ -73,27 +86,55 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			const nomInput = ajouter(c, "input", "qbd-medit-input");
 			nomInput.type = "text";
 			nomInput.value = nom;
-			nomInput.addEventListener("input", () => { nom = nomInput.value; });
 
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examDate"));
-			const dateInput = ajouter(c, "input", "qbd-medit-input");
-			dateInput.type = "date";
-			// Un examen se planifie dans l'avenir : le calendrier natif grise
-			// les jours passés, et une date passée tapée au clavier (que `min`
-			// n'empêche pas de saisir) laisse Enregistrer désactivé.
-			dateInput.min = aujourdhuiIsoLocal(Date.now());
-			dateInput.value = date;
+			const dateBtn = ajouter(c, "button", "qbd-medit-select qbd-planning-date-field");
+			dateBtn.type = "button";
+			dateBtn.setAttribute("aria-haspopup", "dialog");
+			dateBtn.setAttribute("aria-expanded", "false");
+			const dateText = ajouter(dateBtn, "span", "qbd-planning-date-text");
+			currentHost().ui.setIcon(ajouter(dateBtn, "span", "qbd-planning-date-icon"), "calendar");
+			const majDate = (): void => {
+				dateText.textContent = date ? formatExamDate(date, currentLang()) : t("dashboard.planning.datePick");
+				dateText.classList.toggle("is-empty", !date);
+			};
+			majDate();
+
+			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examCoefficient"));
+			const coefInput = ajouter(c, "input", "qbd-medit-input");
+			coefInput.type = "text";
+			coefInput.inputMode = "decimal";
+			coefInput.placeholder = t("dashboard.planning.examCoefficientPlaceholder");
+			coefInput.value = coefficient;
 
 			const save = ajouter(c, "button", "qbd-medit-save", t("dashboard.planning.examSave"));
 			save.type = "button";
-			const majEtat = (): void => { save.disabled = !dateInput.value || dateInput.validity.rangeUnderflow; };
+			// An exam is planned in the future: a past date cannot be saved (the
+			// picker disables those days, this also covers an old saved value).
+			const majEtat = (): void => {
+				const coefValide = lireCoefficient(coefficient) !== null;
+				coefInput.setAttribute("aria-invalid", String(!coefValide));
+				save.disabled = !nom.trim() || !date || date < aujourdhuiIsoLocal(Date.now()) || !coefValide;
+			};
 			majEtat();
-			dateInput.addEventListener("input", () => { date = dateInput.value; majEtat(); });
+			nomInput.addEventListener("input", () => { nom = nomInput.value; majEtat(); });
+			coefInput.addEventListener("input", () => { coefficient = coefInput.value; majEtat(); });
+			dateBtn.addEventListener("click", () => {
+				openDatePicker(dateBtn, date, { min: aujourdhuiIsoLocal(Date.now()) }, (iso) => {
+					date = iso;
+					majDate();
+					majEtat();
+				});
+			});
 			save.addEventListener("click", () => {
-				if (!dateInput.value || dateInput.validity.rangeUnderflow) return;
-				// Un nom fait uniquement d'espaces vaut une absence — jamais
-				// persisté tel quel (fix round 1, 2026-09-26).
-				ctx.enregistrerExamen?.(group, { id: examen?.id ?? Date.now().toString(36), nom: nom.trim(), date: dateInput.value });
+				const coef = lireCoefficient(coefficient);
+				if (save.disabled || coef === null) return;
+				ctx.enregistrerExamen?.(group, {
+					id: examen?.id ?? Date.now().toString(36),
+					nom: nom.trim(),
+					date,
+					...(coef === undefined ? {} : { coefficient: coef }),
+				});
 				m.close();
 				rerender();
 			});
@@ -130,31 +171,9 @@ export function renderFolderPlanning(
 		},
 	};
 
-	// ── « Tâches associées » ──
 	const aVenir = examensAVenir(ctx, group);
-	const dues = duesDuDossier(ctx, inModule);
-	// Le compteur de l'en-tête est le nombre de LIGNES de tâche affichées (une
-	// seule ligne existe pour l'instant), jamais le nombre de questions
-	// qu'elle porte — fix round 1 (2026-09-26) : « 2 » quand une seule ligne
-	// disait « Réviser 2 questions » n'avait pas de sens pour un compteur de
-	// tâches.
-	const tacheLignes = aVenir.length > 0 && dues.total > 0 && dues.lignes.length > 0 ? 1 : 0;
-	const tacheCorps = renderCollapsibleSection(collapse, gauche, "planning:tasks", t("dashboard.planning.tasks"), tacheLignes);
-	if (aVenir.length === 0) {
-		ajouter(tacheCorps, "p", "qbd-planning-empty-line", t("dashboard.planning.tasksNeedExam"));
-	} else if (dues.total > 0 && dues.lignes.length > 0) {
-		const ligne = ajouter(tacheCorps, "button", "qbd-planning-task-row");
-		ligne.type = "button";
-		currentHost().ui.setIcon(ajouter(ligne, "span", "qbd-planning-task-icon"), "rotate-ccw");
-		ajouter(ligne, "span", "qbd-planning-task-label",
-			t(dues.total === 1 ? "dashboard.planning.taskReviewOne" : "dashboard.planning.taskReview",
-				{ count: dues.total, folder: group.name || group.folder }));
-		ligne.addEventListener("click", () => ctx.openQuiz(dues.lignes[0].quiz));
-	} else {
-		ajouter(tacheCorps, "p", "qbd-planning-empty-line", t("dashboard.planning.tasksNone"));
-	}
 
-	// ── « Examens à venir » ──
+	// ── "Upcoming exams" ──
 	const examensCorps = renderCollapsibleSection(collapse, gauche, "planning:exams", t("dashboard.planning.exams"), aVenir.length, {
 		// « + » à droite de l'en-tête, jamais dans le bouton d'en-tête lui-même
 		// (un bouton dans un bouton est invalide — même geste que « See all »
@@ -186,11 +205,14 @@ export function renderFolderPlanning(
 		for (const examen of aVenir) {
 			const ligne = ajouter(liste, "div", "qbd-planning-exam-row");
 			const texte = ajouter(ligne, "div", "qbd-planning-exam-text");
-			ajouter(texte, "span", "qbd-planning-exam-name", examen.nom.trim() || t("dashboard.planning.examUnnamed"));
+			ajouter(texte, "span", "qbd-planning-exam-name", examen.nom);
 			const ms = parseExamDate(examen.date);
 			const infos = ajouter(texte, "div", "qbd-planning-exam-infos");
-			ajouter(infos, "span", "qbd-planning-exam-date",
-				ms === null ? examen.date : new Intl.DateTimeFormat(currentLang(), { dateStyle: "long" }).format(new Date(ms)));
+			ajouter(infos, "span", "qbd-planning-exam-date", formatExamDate(examen.date, currentLang()));
+			if (examen.coefficient !== undefined) {
+				ajouter(infos, "span", "qbd-planning-exam-coef",
+					t("dashboard.planning.examCoef", { n: new Intl.NumberFormat(currentLang()).format(examen.coefficient) }));
+			}
 			if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
 			// Edit and Delete are shown directly as two ghost icon buttons
 			// (no "..." menu: two actions do not need one).
@@ -216,6 +238,7 @@ export function renderFolderPlanning(
 	}
 
 	// ── Colonne droite : anneau, étape suivante, modes ──
+	const dues = duesDuDossier(ctx, inModule);
 	const moyenne = moyenneDossier(inModule, stats);
 	const masteredN = inModule.filter(q => computeQuizState(q, stats[q.path]).state === "mastered").length;
 	const anneauTuile = ajouter(droite, "div", "qbd-planning-ring-tile");

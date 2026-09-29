@@ -334,3 +334,16 @@ export function parseExamDate(brut: unknown): number | null {
 	const t = new Date(a, m - 1, j).getTime();
 	return Number.isFinite(t) ? t : null;
 }
+
+/**
+ * An exam date (`YYYY-MM-DD`) written out in full for `lang`, first letter
+ * capitalised: "Wednesday, September 30, 2026" / "Mercredi 30 septembre 2026".
+ * The single place an exam date is shown, so the picker field, the exam rows
+ * and the home page cannot drift apart. An unreadable date is returned as is.
+ */
+export function formatExamDate(iso: string, lang: string): string {
+	const ms = parseExamDate(iso);
+	if (ms === null) return iso;
+	const text = new Intl.DateTimeFormat(lang, { dateStyle: "full" }).format(new Date(ms));
+	return text.charAt(0).toLocaleUpperCase(lang) + text.slice(1);
+}

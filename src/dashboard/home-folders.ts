@@ -95,7 +95,7 @@ export function renderHomeFolder(
 		const exam = ajouter(head, "span", "qbd-homef-exam");
 		host.ui.setIcon(ajouter(exam, "span", "qbd-homef-exam-icon"), "calendar");
 		ajouter(exam, "span", undefined, t("dashboard.home.folderExam", {
-			exam: folder.nextExam.nom || t("dashboard.planning.examUnnamed"),
+			exam: folder.nextExam.nom,
 			when: whenLabel(folder.nextExam.date, todayStart),
 		}));
 	}

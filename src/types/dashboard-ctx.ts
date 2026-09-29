@@ -34,6 +34,8 @@ export interface ExamenDossier {
 	id: string;
 	nom: string;
 	date: string;
+	/** Weight of the exam in the course's grade, a number in (0, 100]. Optional. */
+	coefficient?: number;
 }
 
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */

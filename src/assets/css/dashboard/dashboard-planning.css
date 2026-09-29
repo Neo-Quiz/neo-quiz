@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════
    L'ONGLET « PLANNING DE RÉVISIONS » d'un dossier (tâche 4, 2026-09-26) :
-   deux colonnes — à gauche les tâches du jour et les examens à venir
+   deux colonnes — à gauche les examens à venir
    (ajout/modif/suppression sur place), à droite l'anneau du dossier,
    l'étape suivante et les trois modes. Une seule colonne sous 900 px, comme
    toute grille à deux colonnes du dashboard.
@@ -37,39 +37,6 @@
 .qbd-planning-col--left {
 	align-self: stretch;
 }
-
-/* ── Contenu des deux sections repliables (mêmes rangées que « Mes quiz ») ── */
-
-.qbd-planning-empty-line {
-	margin: 0;
-	padding: 4px 0 10px;
-	font-size: 13px;
-	color: var(--text-muted);
-}
-
-.qbd-root .qbd-planning-task-row {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	width: 100%;
-	height: auto;
-	margin: 0;
-	padding: 10px;
-	border: 0;
-	border-radius: 10px;
-	background: none;
-	box-shadow: none;
-	color: var(--text-normal);
-	font: inherit;
-	font-size: 13px;
-	text-align: left;
-	cursor: pointer;
-}
-.qbd-root .qbd-planning-task-row:hover { background: color-mix(in srgb, var(--text-normal) 7%, transparent); }
-.qbd-root .qbd-planning-task-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
-.qbd-planning-task-icon { display: inline-flex; flex-shrink: 0; color: var(--qbd-state-progress); }
-.qbd-planning-task-icon svg { width: 15px; height: 15px; }
-.qbd-planning-task-label { min-width: 0; }
 
 /* Le « + » de l'en-tête « Examens à venir », à droite du bouton d'en-tête —
    jamais DANS lui (deux boutons imbriqués sont invalides). */
@@ -170,8 +137,9 @@
 }
 .qbd-planning-exam-infos {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: baseline;
-	gap: 8px;
+	column-gap: 8px;
 	font-size: 12px;
 	color: var(--text-muted);
 }
@@ -364,4 +332,128 @@
 	justify-content: center;
 	width: 100%;
 	margin-top: 4px;
+}
+
+/* The coefficient of an exam, after its date: a touch stronger than the
+   muted line it sits in, without a chip around it. */
+.qbd-planning-exam-coef {
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+/* ── The exam modal's date field: the app's own field-look button that opens
+   the calendar (`.qbd-medit-select` gives the field surface). ── */
+.qbd-planning-date-field {
+	text-align: left;
+	gap: 8px;
+}
+.qbd-planning-date-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-planning-date-text.is-empty { color: var(--text-faint); }
+.qbd-planning-date-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }
+.qbd-planning-date-icon svg { width: 16px; height: 16px; }
+.qbd-medit-select:focus-visible,
+.qbd-medit-input:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-medit-input[aria-invalid="true"] { border-color: var(--color-red, #f87171) !important; }
+
+/* ── The calendar popover (`date-picker.ts`). Portalled to <body>, so nothing
+   here may rely on `.qbd-root`; the surface (glass, radius, shadow) comes from
+   `.qbd-select-menu`. ── */
+.qbd-select-menu.qbd-datepicker {
+	width: 300px;
+	min-width: 0;
+	padding: 12px;
+	gap: 8px;
+	overflow: visible;
+}
+.qbd-datepicker-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.qbd-datepicker-title {
+	flex: 1;
+	text-align: center;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+.qbd-datepicker-nav {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0 !important;
+	border: none !important;
+	border-radius: 50%;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted) !important;
+	cursor: pointer;
+	transition: background-color 120ms, color 120ms;
+}
+.qbd-datepicker-nav svg { width: 16px; height: 16px; }
+.qbd-datepicker-nav:hover:not(:disabled) {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
+}
+.qbd-datepicker-nav:disabled { opacity: 0.35; cursor: default; }
+.qbd-datepicker-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 2px;
+}
+/* Rows only carry the grid semantics: their cells lay out in the grid itself. */
+.qbd-datepicker-row { display: contents; }
+.qbd-datepicker-weekday {
+	padding: 4px 0;
+	text-align: center;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+.qbd-datepicker-day {
+	height: 34px;
+	padding: 0 !important;
+	border: 1px solid transparent !important;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	font: inherit;
+	font-size: 13px;
+	color: var(--text-normal) !important;
+	cursor: pointer;
+	transition: background-color 120ms;
+}
+.qbd-datepicker-day:hover:not([aria-disabled="true"]):not([aria-selected="true"]) {
+	background: var(--background-modifier-hover) !important;
+}
+.qbd-datepicker-day--other { color: var(--text-faint) !important; }
+.qbd-datepicker-day--today { border-color: var(--text-muted) !important; }
+.qbd-datepicker-day[aria-selected="true"] {
+	background: var(--quiz-primary) !important;
+	border-color: var(--quiz-primary) !important;
+	color: #fff !important;
+	font-weight: 600;
+}
+.qbd-datepicker-day[aria-disabled="true"] {
+	opacity: 0.35;
+	cursor: default;
+}
+.qbd-datepicker-day:focus-visible,
+.qbd-datepicker-nav:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-datepicker-day, .qbd-datepicker-nav { transition: none; }
 }
