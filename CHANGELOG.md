@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.1] - 2026-09-29
+
 ### Added
 - Chat with Claude Code or Codex in Generate: a third choice, Chat, next to Learn and Test, sends a message answered in prose as it is written (lists, code, bold), with the model and how long it worked above it and a Copy button under it; each message remembers the conversation, and New chat starts a fresh one.
 - An Explain button on every question of a Learn or a Test (hidden in exam mode) asks Claude Code or Codex to explain that question — its choices, the right answer, yours and the quiz's explanation go with it — and opens the answer in a window where you can ask follow-up questions. The button shows the logo of the AI tool chosen in Settings; the explanation assumes you know nothing of the subject and stays under a length you set (Settings › AI › Longest explanation, 1,500 characters by default); the message it sends can be changed in Settings › AI › Explain prompt.
