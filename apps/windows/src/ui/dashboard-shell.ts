@@ -42,7 +42,7 @@ import { aiSettingsDefaults } from "../../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { openIconPicker } from "../../../../src/dashboard/icon-picker";
 import { openCreateFolderModal } from "../../../../src/dashboard/folder-create";
-import { openAddContentModal } from "../../../../src/dashboard/folder-add";
+import { openNewQuizModal } from "../../../../src/dashboard/folder-add";
 import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
@@ -514,7 +514,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		},
 		// « Nouveau quiz » : une note vierge, puis sa page en ÉDITION par
 		// `openQuizPath` ci-dessous — l'éditeur existe désormais dans la fenêtre.
-		createQuiz: (folder, done) => openAddContentModal(ctx, folder, done),
+		createQuiz: (folder, done) => openNewQuizModal(ctx, folder, done),
 		/* La page d'un quiz PAR CHEMIN, pour une note que le catalogue n'a pas
 		   forcément encore. Son seul appelant (`createQuizInFolder`,
 		   folder-create.ts) l'appelle juste après `fs.write`, AVANT que le

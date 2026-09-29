@@ -30,7 +30,6 @@ export const EN_DASHBOARD = {
 	"dashboard.nav.soon": "Coming soon",
 
 	/* ── Accueil ── */
-	"dashboard.home.generate": "Generate a quiz",
 	// A folder card (spec 2026-09-29-home-page-design.md §2).
 	"dashboard.home.openTasksOne": "{count} open task",
 	"dashboard.home.openTasksOther": "{count} open tasks",
@@ -59,7 +58,9 @@ export const EN_DASHBOARD = {
 	"dashboard.home.allDone": "All caught up",
 	"dashboard.home.allDoneHint": "Nothing to review or learn today.",
 	"dashboard.home.resumeLabel": "Pick up where you left off",
-	"dashboard.home.resumeProgress": "{questions} · {pct}%",
+	// {folder}: the quiz's folder, {questions}: "2/16 questions".
+	"dashboard.home.resumeMeta": "{folder} · {questions}",
+	"dashboard.home.newFolder": "Create a new folder",
 	"dashboard.home.resumeBtn": "Resume",
 
 	/* ── Onboarding (premier usage, aucun quiz) ── */
@@ -104,11 +105,11 @@ export const EN_DASHBOARD = {
 	"dashboard.folder.documentsEmptyTitle": "No documents yet",
 	"dashboard.folder.documentsEmptyHint": "Add a file (PDF, image) and create quizzes from it.",
 	"dashboard.folder.addFiles": "Upload files",
-	"dashboard.folder.addContent": "Add content",
-	"dashboard.folder.addDropTitle": "Drag files here or upload them",
-	"dashboard.folder.addDropHint": "Course documents: PDF, slides, images. You can also add a website or a YouTube link.",
-	"dashboard.folder.addOr": "or",
 	"dashboard.folder.addGenerate": "Generate a quiz with AI",
+	// The rows of a folder's "New quiz" modal (folder-add.ts).
+	"dashboard.folder.newQuizAiDesc": "From this folder's documents and notes, already attached",
+	"dashboard.folder.newQuizEmptyDesc": "An empty quiz to fill in yourself in the editor",
+	"dashboard.folder.newQuizImportDesc": "A quiz someone shared with you (.md)",
 	"dashboard.folder.filesAddedOne": "{count} file added",
 	"dashboard.folder.filesAddedOther": "{count} files added",
 	"dashboard.folder.fileAddError": "Could not add {name}",

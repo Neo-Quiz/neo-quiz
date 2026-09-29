@@ -10,7 +10,8 @@ import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
-import { createOptionCard, importSharedFolder } from "./folder-create";
+import { createOptionCard, importSharedFolder, openCreateFolderModal } from "./folder-create";
+import { renderProgressRing } from "./quiz-card";
 import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
@@ -119,24 +120,9 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const page = ajouter(container, "div", "qbd-home-page");
 		ajouter(page, "div", "qbd-home-glow").setAttribute("aria-hidden", "true");
 
-		// ── Header ── No title nor subtitle (2026-09-29): the page says what
-		// to do by itself. The left side stays, empty, to keep the Generate
-		// button on the right.
-		const header = ajouter(page, "div", "qbd-home-header");
-		ajouter(header, "div", "qbd-home-header-left");
-
-		// Light pill IDENTICAL to "+ New folder" of "My quizzes": one grammar
-		// of primary action in the dashboard (contract 2026-07-28). HIDDEN (not
-		// greyed out) when the host cannot serve "ai": an ACTION button dead on
-		// click is worse than none, unlike the rail (fixed, remembered shape)
-		// that canOpen merely greys out.
-		if (ctx.canOpen("ai")) {
-			const genBtn = ajouter(header, "button", "qbd-btn--create");
-			const genIcon = ajouter(genBtn, "span", "qbd-btn-icon");
-			currentHost().ui.setIcon(genIcon, "sparkles");
-			ajouter(genBtn, "span", undefined, t("dashboard.home.generate"));
-			genBtn.addEventListener("click", () => ctx.navigate("ai"));
-		}
+		/* No header (2026-09-29): no title, no "Generate a quiz" — the page
+		   says what to do by itself, and "Create a new folder" closes it
+		   (below the folders). */
 
 		// ── Resume: the latest quiz in progress (a returning user's primary action) ──
 		const resumeQuiz = inProgress
@@ -156,11 +142,21 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const todayIso = isoLocal(now);
 		const groups = buildModuleGroups(quizzes, stats, map);
 		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
+		/* "Create a new folder", under the folders (after StudySmarter's "Add
+		   a new set"): a quiet outlined pill, the page's only creation action. */
+		const newFolder = (parent: HTMLElement): void => {
+			const b = ajouter(parent, "button", "qbd-home-newfolder");
+			b.type = "button";
+			currentHost().ui.setIcon(ajouter(b, "span", "qbd-home-newfolder-icon"), "folder-plus");
+			ajouter(b, "span", undefined, t("dashboard.home.newFolder"));
+			b.addEventListener("click", () => openCreateFolderModal(ctx, map, allQuizzes, rerender));
+		};
 		if (folders.length === 0) {
 			const done = ajouter(page, "div", "qbd-home-done");
 			currentHost().ui.setIcon(ajouter(done, "span", "qbd-home-done-icon"), "circle-check");
 			ajouter(done, "p", "qbd-home-done-title", t("dashboard.home.allDone"));
 			ajouter(done, "p", "qbd-home-done-hint", t("dashboard.home.allDoneHint"));
+			newFolder(done);
 			return;
 		}
 		// Every upcoming exam of every folder — a folder with nothing to do
@@ -172,62 +168,46 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const layout = ajouter(page, "div", "qbd-home-layout");
 		const column = ajouter(layout, "div", "qbd-home-folders");
 		for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart, entryDelay());
+		newFolder(column);
 		renderHomeSide(layout, {
 			ctx, folders, exams, todayStart, weekOffset,
 			moveWeek: (delta) => { weekOffset += delta; rerender(); },
 		});
 	}
 
-	/* "Resume" hero — tinted with the accent of the quiz's FOLDER, like its
-	   card (design review 2026-07-28): the vertical edge, halo, label, bar and
-	   button derive from it. That settles the competition of accents: the
-	   light pill stays the page action ("Generate a quiz"), the hero speaks
-	   its module's colour instead of the interface blue. */
+	/* "Resume" card (redrawn 2026-09-29): the whole card is the button — no
+	   framed button inside it (no tile in a tile). The quiz's progress as a
+	   ring with its %, the title and where it comes from, and on the right an
+	   accent TEXT action. The accent is the quiz FOLDER's, like its card: the
+	   ring stays the progress blue of every ring. It resumes the quiz where it
+	   was left, like the folder's next step. */
 	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, accent: string): void {
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;
 		const pct = total > 0 ? Math.round(done / total * 100) : 0;
 
-		const hero = ajouter(container, "div", "qbd-resume-hero");
+		const hero = ajouter(container, "button", "qbd-resume-hero");
+		hero.type = "button";
 		hero.style.setProperty("--accent", accent);
-		const open = () => ctx.navigate("detail", { quiz });
-		hero.addEventListener("click", open);
+		hero.addEventListener("click", () => ctx.openQuiz(quiz));
 
-		// Halo behind the content: its own box, fully contained (an ellipse
-		// spilling out would be cut sharp by a scrolling ancestor).
-		ajouter(hero, "div", "qbd-resume-halo");
+		renderProgressRing(hero, pct, "progress", 54, 5);
 
-		const info = ajouter(hero, "div", "qbd-resume-info");
-
-		const label = ajouter(info, "div", "qbd-resume-label");
-		const labelIcon = ajouter(label, "span", "qbd-resume-label-icon");
-		currentHost().ui.setIcon(labelIcon, "history");
+		const info = ajouter(hero, "span", "qbd-resume-info");
+		const label = ajouter(info, "span", "qbd-resume-label");
+		currentHost().ui.setIcon(ajouter(label, "span", "qbd-resume-label-icon"), "history");
 		ajouter(label, "span", undefined, t("dashboard.home.resumeLabel"));
-
-		ajouter(info, "p", "qbd-resume-title", quiz.title);
-
-		// Parent folder, same source as the cards' line: the hero says where
-		// the quiz comes from, otherwise its accent colour refers to nothing
-		// on screen.
-		const segs = quiz.path.split("/").slice(0, -1).filter(Boolean);
-		if (segs.length > 0) {
-			ajouter(info, "p", "qbd-resume-path", segs[segs.length - 1]);
-		}
-
-		const progress = ajouter(info, "div", "qbd-resume-progress");
-		const bar = ajouter(progress, "div", "qbd-resume-bar");
-		const fill = ajouter(bar, "div", "qbd-resume-bar-fill");
-		fill.style.width = `${pct}%`;
-		// Agreement follows the TOTAL ("0/1 question", "3/10 questions"): the
-		// counter is then inserted as is in the progress line.
+		ajouter(info, "span", "qbd-resume-title", quiz.title);
+		// Agreement follows the TOTAL ("0/1 question", "3/10 questions").
 		const questions = t(total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done, total });
-		ajouter(progress, "span", "qbd-resume-progress-text", t("dashboard.home.resumeProgress", { questions, pct }));
+		// Parent folder: says where the quiz comes from, and gives the accent
+		// colour something on screen to refer to.
+		const folder = quiz.path.split("/").slice(0, -1).filter(Boolean).pop();
+		ajouter(info, "span", "qbd-resume-meta", folder ? t("dashboard.home.resumeMeta", { folder, questions }) : questions);
 
-		const btn = ajouter(hero, "button", "qbd-btn qbd-resume-btn");
-		const btnIcon = ajouter(btn, "span", "qbd-btn-icon");
-		currentHost().ui.setIcon(btnIcon, "play");
-		ajouter(btn, "span", undefined, t("dashboard.home.resumeBtn"));
-		btn.addEventListener("click", (e) => { e.stopPropagation(); open(); });
+		const cta = ajouter(hero, "span", "qbd-resume-cta");
+		ajouter(cta, "span", undefined, t("dashboard.home.resumeBtn"));
+		currentHost().ui.setIcon(ajouter(cta, "span", "qbd-resume-cta-chev"), "chevron-right");
 	}
 
 	function renderOnboarding(container: HTMLElement, map: ModuleMap, allQuizzes: QuizIndexEntry[]): void {

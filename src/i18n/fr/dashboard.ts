@@ -20,7 +20,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.nav.soon": "Bientôt disponible",
 
 	/* ── Accueil ── */
-	"dashboard.home.generate": "Générer un quiz",
 	"dashboard.home.openTasksOne": "{count} tâche ouverte",
 	"dashboard.home.openTasksOther": "{count} tâches ouvertes",
 	"dashboard.home.success": "{pct} % de réussite",
@@ -43,7 +42,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.home.allDone": "Tout est à jour",
 	"dashboard.home.allDoneHint": "Rien à réviser ni à apprendre aujourd'hui.",
 	"dashboard.home.resumeLabel": "Reprendre là où vous en étiez",
-	"dashboard.home.resumeProgress": "{questions} · {pct}%",
+	"dashboard.home.resumeMeta": "{folder} · {questions}",
+	"dashboard.home.newFolder": "Créer un nouveau dossier",
 	"dashboard.home.resumeBtn": "Reprendre",
 
 	/* ── Onboarding ── */
@@ -88,11 +88,10 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.folder.documentsEmptyTitle": "Aucun document pour l'instant",
 	"dashboard.folder.documentsEmptyHint": "Ajoutez un fichier (PDF, image) et créez des quiz à partir de celui-ci.",
 	"dashboard.folder.addFiles": "Upload des fichiers",
-	"dashboard.folder.addContent": "Ajouter du contenu",
-	"dashboard.folder.addDropTitle": "Glissez vos fichiers ici ou uploadez-les",
-	"dashboard.folder.addDropHint": "Documents du cours : PDF, présentations, images. Vous pouvez aussi ajouter un site web ou un lien YouTube.",
-	"dashboard.folder.addOr": "ou",
 	"dashboard.folder.addGenerate": "Générer un quiz avec l'IA",
+	"dashboard.folder.newQuizAiDesc": "À partir des documents et des notes de ce dossier, déjà joints",
+	"dashboard.folder.newQuizEmptyDesc": "Un quiz vide, à remplir vous-même dans l'éditeur",
+	"dashboard.folder.newQuizImportDesc": "Un quiz qu'on vous a partagé (.md)",
 	"dashboard.folder.filesAddedOne": "{count} fichier ajouté",
 	"dashboard.folder.filesAddedOther": "{count} fichiers ajoutés",
 	"dashboard.folder.fileAddError": "Impossible d'ajouter {name}",

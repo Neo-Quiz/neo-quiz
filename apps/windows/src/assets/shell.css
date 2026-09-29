@@ -1193,11 +1193,11 @@ body::after {
 #neo-quiz-root > .qbd-layout.nq-pile-fond > * {
 	clip-path: inset(0 0 100% 0);
 }
-/* L'en-tête effacé, comme à la fin de l'animation, posé ici en statique
-   pour que rien ne reste en `fill: forwards`. */
+/* The header faded out, as at the end of the animation, set here statically
+   so that nothing stays in `fill: forwards`. The home has no header since
+   2026-09-29. */
 #neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-fiche-head,
-#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-quizzes-header,
-#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-home-header {
+#neo-quiz-root > .qbd-layout.nq-pile-fond .qbd-quizzes-header {
 	opacity: 0;
 }
 

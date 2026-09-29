@@ -127,11 +127,11 @@ function enfantsDe(el: HTMLElement): HTMLElement[] {
 	return Array.from(el.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
 }
 
-/* La « barre d'outils » de la page qui recule : chez Neo Quiz, les en-têtes
-   des pages du tableau de bord (fiche d'un quiz, « Mes quiz », accueil)
-   s'effacent comme les titres d'Ionic (vers 0 en 300 ms). Le rail ne
-   s'estompe plus : c'était un assombrissement de plus. */
-const EN_TETES = ".qbd-fiche-head, .qbd-quizzes-header, .qbd-home-header";
+/* The "toolbar" of the page moving back: in Neo Quiz, the headers of the
+   dashboard pages (a quiz's sheet, "My quizzes") fade out like Ionic's
+   titles (to 0 in 300 ms); the home has no header since 2026-09-29. The
+   rail no longer dims: that was one darkening too many. */
+const EN_TETES = ".qbd-fiche-head, .qbd-quizzes-header";
 
 /* Le minuteur de SECOURS, jamais le chemin normal : la fin normale est
    l'événement `finish` des animations, et une fenêtre masquée ne les joue

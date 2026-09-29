@@ -856,7 +856,6 @@
    quiz" (visual contract 2026-07-28): one geometry of primary action in the
    whole dashboard, defined here. */
 .qbd-quizzes-folder-hero .qbd-btn--create,
-.qbd-home-header .qbd-btn--create,
 .qbd-onboarding .qbd-btn--create,
 .qbd-quizzes-group .qbd-btn--create {
 	margin-left: 8px;

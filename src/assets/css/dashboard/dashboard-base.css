@@ -184,12 +184,6 @@
 	.qbd-home-grid {
 		grid-template-columns: 1fr !important;
 	}
-
-	.qbd-home-header {
-		flex-direction: column;
-		gap: 10px;
-		align-items: flex-start;
-	}
 }
 
 /* ═════════════════════════════════════════════════════════

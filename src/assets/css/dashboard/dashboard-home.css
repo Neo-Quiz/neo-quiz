@@ -2,17 +2,6 @@
    DASHBOARD HOME VIEW
    ═════════════════════════════════════════════════════════ */
 
-.qbd-home-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 24px;
-}
-
-.qbd-home-header-left {
-	min-width: 0;
-}
-
 /* ══════════════════════════════════════════════════════════
    ENTRY TRANSITION — the same grammar as "My quizzes" (keyframes
    qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css). The
@@ -21,7 +10,6 @@
    flicker, and no animation in fill: both confiscates `transform` from the
    cards.
    ═════════════════════════════════════════════════════════ */
-.qbd-home-enter .qbd-home-header,
 .qbd-home-enter .qbd-resume-hero,
 .qbd-home-enter .qbd-onboarding {
 	animation: qbd-folder-hero-in 0.35s ease backwards;
@@ -34,7 +22,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-home-enter .qbd-home-header,
 	.qbd-home-enter .qbd-resume-hero,
 	.qbd-home-enter .qbd-onboarding,
 	.qbd-home-enter .qbd-homef,
@@ -132,198 +119,132 @@
 /* Les trois cartes de création, à la largeur qu'avait la carte code. */
 .qbd-onboarding-cards { width: 100%; max-width: 480px; }
 
-/* ═════════════════════════════════════════════════════════
-   HERO "REPRENDRE" — dernier quiz en cours (returning user)
-   ═════════════════════════════════════════════════════════ */
-/* Surface VERRE, même recette que les tuiles de l'onglet « Progression »
-   d'un dossier (.qbd-folder-progress-tile : tokens --qbd-glass-*, radius 18, filet 1px) — contrat
-   visuel « Mes quiz », 2026-07-28. Le dégradé d'accent plein a disparu : la
-   teinte d'accent ne survit que sur le label et la barre de progression, et
-   le survol reprend le lift des cartes (translateY(-3px) + halo). */
+/* ══ "RESUME" CARD (redrawn 2026-09-29) ═════════════════════
+   The whole card is ONE button (home.ts `renderResumeHero`): a content tile
+   like the folder cards, the quiz's progress as a ring with its %, the text,
+   and on the right an accent TEXT action — no framed button inside the card
+   (no tile in a tile), no vertical edge nor halo. `--accent` is the quiz
+   folder's, set inline. */
+.qbd-root .qbd-resume-hero,
 .qbd-resume-hero {
-	/* --accent = couleur du dossier du quiz (posée par home.ts) ; repli sur
-	   l'accent d'interface si le héros est rendu sans dossier parent. */
-	--accent: var(--interactive-accent);
-	position: relative;
-	overflow: hidden;
+	--accent: var(--qbd-state-progress);
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 20px;
-	padding: 18px 22px;
-	margin-bottom: 22px;
-	border-radius: 18px;
+	gap: 16px;
+	width: 100%;
+	height: auto;
+	margin: 0 0 18px;
+	padding: 16px 20px !important;
+	border: 1px solid var(--qbd-surface-edge) !important;
+	border-radius: 15px;
+	background: var(--qbd-surface-bg) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font: inherit;
+	text-align: left;
+	white-space: normal;
 	cursor: pointer;
-	border: 1px solid var(--qbd-glass-edge);
-	background: var(--qbd-glass-bg);
-	backdrop-filter: var(--qbd-glass-blur);
-	-webkit-backdrop-filter: var(--qbd-glass-blur);
-	box-shadow: var(--qbd-glass-sheen), var(--qbd-glass-shadow);
-	transition: border-color 0.15s ease,
-		box-shadow 0.2s cubic-bezier(0.2, 0.7, 0.3, 1),
-		transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
+	transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
+.qbd-root .qbd-resume-hero:hover,
 .qbd-resume-hero:hover {
-	border-color: color-mix(in srgb, var(--accent) 45%, var(--qbd-glass-edge));
-	box-shadow: var(--qbd-glass-sheen),
-		0 14px 30px -12px color-mix(in srgb, var(--accent) 45%, transparent),
-		0 0 0 1px var(--qbd-glass-edge);
-	transform: translateY(-3px);
+	border-color: color-mix(in srgb, var(--accent) 45%, var(--qbd-surface-edge)) !important;
+	background: color-mix(in srgb, var(--accent) 5%, var(--qbd-surface-bg)) !important;
 }
 
-/* Liseré vertical à gauche : la signature « accent du dossier » du héros.
-   Dégradé vers la transparence pour ne pas dessiner un trait dur sur toute la
-   hauteur ; halo doux à côté. */
-.qbd-resume-hero::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 0;
-	bottom: 0;
-	width: 3px;
-	background: linear-gradient(180deg,
-		var(--accent),
-		color-mix(in srgb, var(--accent) 20%, transparent));
-	box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
-	pointer-events: none;
+.qbd-resume-hero:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
 }
 
-/* Halo : l'ellipse tient ENTIÈREMENT dans la boîte (centre ± rayon dans
-   [0,100%]), donc l'alpha atteint zéro avant tout bord — aucune arête de coupe
-   possible (même contrainte que le halo de la bannière de dossier). */
-.qbd-resume-halo {
-	position: absolute;
-	inset: 0;
-	background: radial-gradient(340px 130px at 8% 50%,
-		color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-		transparent 70%);
-	pointer-events: none;
-}
-
-.qbd-resume-hero:active {
-	transform: translateY(0) scale(0.99);
-	transition-duration: 60ms;
-}
+.qbd-resume-hero .qbd-ring { flex: 0 0 auto; }
 
 .qbd-resume-info {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	flex: 1 1 auto;
 	min-width: 0;
-	flex: 1;
-	position: relative;
 }
 
 .qbd-resume-label {
-	display: flex;
-	align-items: center;
-	gap: 5px;
-	font-size: 11px;
-	font-weight: 600;
-	color: var(--accent);
-	margin-bottom: 6px;
-}
-
-.qbd-resume-label-icon {
 	display: inline-flex;
 	align-items: center;
+	gap: 6px;
+	color: var(--accent);
+	font-size: 12px;
+	font-weight: 600;
 }
 
-.qbd-resume-label-icon svg {
-	width: 13px;
-	height: 13px;
-}
+.qbd-resume-label-icon { display: inline-flex; }
+.qbd-resume-label-icon svg { width: 13px; height: 13px; }
 
-/* 20px : le héros doit gagner contre les titres de cartes (14.5px) — à 16px
-   il se lisait comme une carte de plus (revue design 2026-07-28). */
 .qbd-resume-title {
-	font-size: 20px;
-	font-weight: 650;
+	overflow: hidden;
 	color: var(--text-normal);
-	margin: 0 0 4px;
-	white-space: nowrap;
-	overflow: hidden;
+	font-size: 17px;
+	font-weight: 700;
+	line-height: 1.3;
 	text-overflow: ellipsis;
-	letter-spacing: -0.01em;
+	white-space: nowrap;
 }
 
-.qbd-resume-progress {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-}
-
-.qbd-resume-bar {
-	flex: 1;
-	max-width: 260px;
-	height: 6px;
-	border-radius: 3px;
-	background: var(--background-modifier-border);
+.qbd-resume-meta {
 	overflow: hidden;
-}
-
-.qbd-resume-bar-fill {
-	height: 100%;
-	border-radius: 3px;
-	background: var(--accent);
-	transition: width 0.4s ease;
-}
-
-.qbd-resume-progress-text {
-	font-size: 11px;
 	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-}
-
-/* Dossier parent, même vocabulaire que la ligne des cartes (mono, discret),
-   teinté vers l'accent pour relier la couleur du héros à son module. */
-.qbd-resume-path {
-	font-size: 11.5px;
-	font-family: var(--font-monospace, monospace);
-	color: color-mix(in srgb, var(--accent) 55%, var(--text-muted));
-	margin: 0 0 10px;
-	white-space: nowrap;
-	overflow: hidden;
+	font-size: 12.5px;
 	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Action du héros : verre TEINTÉ à l'accent du dossier, pas la pilule claire
-   (réservée à « Generate a quiz », l'action de page) ni le bleu d'interface —
-   deux accents pleins se disputaient l'oeil (revue design 2026-07-28). */
-.qbd-root .qbd-resume-btn {
-	flex-shrink: 0;
-	padding: 10px 18px;
-	border-radius: 11px;
+/* The action is TEXT in the accent colour, like a folder card's lead task. */
+.qbd-resume-cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	flex: 0 0 auto;
+	color: var(--accent);
+	font-size: 14px;
+	font-weight: 650;
+}
+
+.qbd-resume-cta-chev { display: inline-flex; }
+.qbd-resume-cta-chev svg { width: 16px; height: 16px; }
+
+/* ── "Create a new folder", under the folders (after StudySmarter's "Add a
+   new set"): a quiet outlined pill, centred. */
+.qbd-root .qbd-home-newfolder,
+.qbd-home-newfolder {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	gap: 8px;
+	height: auto;
+	margin: 6px auto 0;
+	padding: 10px 20px !important;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 22%, transparent) !important;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--background-secondary) 70%, transparent) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font: inherit;
 	font-size: 13.5px;
 	font-weight: 600;
-	background: color-mix(in srgb, var(--accent) 16%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-	color: var(--accent);
-	backdrop-filter: var(--qbd-glass-blur-dense);
-	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.qbd-root .qbd-resume-btn:hover {
-	background: color-mix(in srgb, var(--accent) 26%, transparent);
-	border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-	box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent);
+.qbd-root .qbd-home-newfolder:hover,
+.qbd-home-newfolder:hover {
+	border-color: color-mix(in srgb, var(--text-normal) 40%, transparent) !important;
+	background: color-mix(in srgb, var(--text-normal) 8%, var(--background-secondary)) !important;
 }
 
-/* Header EMPILÉ (mobile réel .is-mobile, ou fenêtre étroite) : l'action
-   s'étire sous le titre. Centrée, la pilule flottait sans rapport avec la
-   colonne de texte ; pleine largeur, elle offre la même cible tactile que le
-   bouton « Resume » du bandeau. Ces règles vivent ICI parce que le fichier est
-   importé APRÈS dashboard-base.css : à spécificité égale, c'est le dernier qui
-   gagne — d'où l'`align-items: center` du repos qui l'emportait sur la media
-   query de base (mesuré in-app le 2026-07-28). */
-.is-mobile .qbd-home-header {
-	flex-direction: column;
-	align-items: stretch;
-	gap: 10px;
-}
+.qbd-home-newfolder-icon { display: inline-flex; color: var(--text-muted); }
+.qbd-home-newfolder-icon svg { width: 16px; height: 16px; }
 
-.is-mobile .qbd-home-header .qbd-btn--create {
-	justify-content: center;
-}
+.qbd-home-done .qbd-home-newfolder { margin-top: 18px; }
 
 /* ══ THE PAGE AND ITS GLOW (2026-09-29) ═════════════════════
    One wrapper for the whole page (`.qbd-content > *` centres it). It is its
@@ -724,20 +645,6 @@
 .is-mobile .qbd-homes { order: -1; position: static; }
 
 @media (max-width: 600px) {
-	.qbd-home-header {
-		align-items: stretch;
-	}
-
-	.qbd-home-header .qbd-btn--create {
-		justify-content: center;
-	}
-
-	.qbd-resume-hero {
-		flex-direction: column;
-		align-items: stretch;
-		gap: 14px;
-	}
-
-	.qbd-resume-btn { width: 100%; }
-	.qbd-resume-bar { max-width: none; }
+	.qbd-resume-hero { flex-wrap: wrap; }
+	.qbd-resume-cta { width: 100%; justify-content: flex-end; }
 }
