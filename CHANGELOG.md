@@ -194,6 +194,7 @@ release notes.
 - `\neq`, `\ne`, `\notin` and `\not=` now show their diagonal stroke instead of an empty box.
 - A terminal window no longer flashes on screen when the app checks the Antigravity account (Settings, generation): Antigravity's own background update check, which opened it, is now turned off for the processes the app launches. CLI account status also loads in the background right after launch, so Settings shows it immediately.
 - Coming back from a quiz's page to its folder, the Documents, Links and Notes tile no longer blinks out and back in at the end of the motion.
+- Folder and quiz page transitions: nothing lights up under a still pointer while pages slide; slowed down or paused (DevTools), the motion is no longer cut short and jumps to its end; going back, the page slides out as whole glass instead of fading into a half-frosted double image; a folder's back arrow fades in with its page; and the shine of a Resume button no longer jumps at the last frame.
 
 
 ## [1.19.0] - 2026-09-23

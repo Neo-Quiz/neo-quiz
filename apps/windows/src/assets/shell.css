@@ -1174,6 +1174,17 @@ body::after {
 #neo-quiz-root.nq-empile > * {
 	grid-area: 1 / 1;
 }
+/* NO HOVER WHILE A PAGE MOVES (2026-09-29): the pointer stays still while
+   the pages slide under it, so whatever passes below it lit up its hover
+   ("Search" on a quiz's page, lit though the pointer was elsewhere at the
+   end) and went dark again when it moved off, near the end of the motion.
+   Nothing is hit-tested for the 500 ms; the class is set by
+   `ui/transition-quiz.ts` (root) and `ui/sheet-stack.ts` (shell) and dropped
+   with the transition, on every outcome. */
+.nq-en-transition,
+.nq-en-transition * {
+	pointer-events: none !important;
+}
 /* Pendant la LECTURE de la note (avant que la transition ne démarre), l'écran
    du quiz est déjà monté à sa place finale : invisible, mais mis en page,
    pour que le moteur mesure ses slides dans le vrai panneau. Sans ça, il

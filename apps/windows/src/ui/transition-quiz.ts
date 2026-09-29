@@ -214,7 +214,7 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 		return Promise.resolve();
 	}
 	for (const s of [...aRetirer, ...garder]) s.inert = true;
-	root.classList.add("nq-empile");
+	root.classList.add("nq-empile", "nq-en-transition");
 	absorberEntree(entrant, sens);
 
 	const base: KeyframeAnimationOptions = { duration: DUREE_MS, easing: COURBE };
@@ -278,6 +278,7 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 			}
 			for (const v of [entrant, ...aRetirer, ...garder]) v.classList.remove("nq-fenetre");
 			for (const s of aRetirer) s.style.zIndex = "";
+			root.classList.remove("nq-en-transition");
 			retirer();
 			resoudre();
 		});

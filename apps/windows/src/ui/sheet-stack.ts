@@ -150,6 +150,31 @@ function absorbEntry(el: HTMLElement): void {
 	}
 }
 
+/* The page is painted twice on the way back (the back sheet, then the real
+   panel): the second painting restarts its INFINITE animations from zero —
+   the shine sweeping a folder's Resume button jumped back at the last
+   frame. Their progress is carried over, matched by name in tree order;
+   two paintings of the same page have the same list. */
+function loops(el: HTMLElement): CSSAnimation[] {
+	return el.getAnimations({ subtree: true }).filter((a): a is CSSAnimation =>
+		a instanceof CSSAnimation && a.effect?.getTiming().iterations === Infinity);
+}
+
+/* Read BEFORE the old painting leaves the DOM: a CSS animation whose
+   element is removed is cancelled, and its time lost. */
+function loopTimes(el: HTMLElement): Array<{ name: string; time: CSSNumberish | null }> {
+	return loops(el).map(a => ({ name: a.animationName, time: a.currentTime }));
+}
+
+function carryLoops(from: Array<{ name: string; time: CSSNumberish | null }>, to: HTMLElement): void {
+	const next = loops(to);
+	if (next.length !== from.length) return;
+	next.forEach((a, i) => {
+		const old = from[i];
+		if (old && old.name === a.animationName && old.time !== null) a.currentTime = old.time;
+	});
+}
+
 function children(el: HTMLElement): HTMLElement[] {
 	return Array.from(el.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
 }
@@ -217,7 +242,12 @@ export function createSheetStack(layout: HTMLElement, panel: HTMLElement): Sheet
 	/** Waits for every animation, the hidden window or the fallback timer —
 	    whichever comes first — then runs `end` once. */
 	function whenDone(animations: Animation[], end: () => void): void {
+		/* Nothing is hit-tested while the pages move: the pointer stays still
+		   under sliding pages and would light whatever passes below it (see
+		   `nq-en-transition`, shell.css). Dropped on every outcome. */
+		layout.classList.add("nq-en-transition");
 		const finishAll = uneFois(() => {
+			layout.classList.remove("nq-en-transition");
 			clearTimeout(fallback);
 			document.removeEventListener("visibilitychange", onVisibility);
 			for (const a of animations) {
@@ -233,7 +263,18 @@ export function createSheetStack(layout: HTMLElement, panel: HTMLElement): Sheet
 		let left = animations.length;
 		const onFinish = (): void => { if (--left <= 0) finishAll(); };
 		const onVisibility = (): void => { if (document.visibilityState === "hidden") finishAll(); };
-		const fallback = window.setTimeout(finishAll, FALLBACK_MS);
+		/* The fallback counts WALL-CLOCK time, the animations their own: slowed
+		   down or paused (the DevTools Animations panel, 2026-09-29), a
+		   transition still under way was cut at 2 s and jumped to its end. So
+		   it only settles when nothing is moving any more — every animation
+		   done or dropped, the case its `finish` events were lost — and waits
+		   again otherwise. */
+		const stillMoving = (): boolean => animations.some(a => a.playState === "running" || a.playState === "paused");
+		const onFallback = (): void => {
+			if (stillMoving()) fallback = window.setTimeout(onFallback, FALLBACK_MS);
+			else finishAll();
+		};
+		let fallback = window.setTimeout(onFallback, FALLBACK_MS);
 		document.addEventListener("visibilitychange", onVisibility);
 		for (const a of animations) {
 			a.addEventListener("finish", onFinish);
@@ -290,8 +331,13 @@ export function createSheetStack(layout: HTMLElement, panel: HTMLElement): Sheet
 			if (title) {
 				animations.push(title.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 200, easing: "linear", fill: "backwards" }));
 			}
-			for (const child of children(panel)) {
-				if (child.matches(HERO)) continue;
+			/* A folder's hero holds its title AND its back arrow: the arrow
+			   fades in with the rest of the page, instead of standing there at
+			   full opacity from the first frame while everything around it
+			   fades in. */
+			const hero = panel.querySelector<HTMLElement>(`:scope > ${HERO}`);
+			const heroParts = hero ? children(hero.firstElementChild instanceof HTMLElement ? hero.firstElementChild : hero).filter(c => !c.matches(TITLE)) : [];
+			for (const child of [...children(panel).filter(c => c !== hero), ...heroParts]) {
 				animations.push(child.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: "ease-in-out", fill: "backwards" }));
 			}
 			whenDone(animations, () => {
@@ -329,19 +375,26 @@ export function createSheetStack(layout: HTMLElement, panel: HTMLElement): Sheet
 				s.wrap.animate(win.wrap, { ...base, fill: "both" }),
 				s.back.animate(win.back, { ...base, fill: "both" }),
 				s.scaler.animate([{ transform: `scaleX(${scaleFor(s.level, depth)})` }, { transform: "scaleX(1)" }], { ...base, fill: "both" }),
-				/* In front of the back sheets (DOM order already), sliding down
-				   while fading out. */
-				panel.animate([{ transform: "translateY(0)", opacity: 1 }, { transform: `translateY(${distance}px)`, opacity: 0 }], { ...base, fill: "forwards" }),
+				/* In front of the back sheets (DOM order already), sliding down.
+				   Its CONTENT fades out, not the panel: an opacity on the glass
+				   fades its blur with it, and halfway down the sharp wallpaper
+				   showed through a half-frosted sheet — a double image, plain to
+				   see as soon as the motion is slowed. The glass slides out whole,
+				   as the quiz does when it closes (`transition-quiz.ts`). */
+				panel.animate([{ transform: "translateY(0)" }, { transform: `translateY(${distance}px)` }], { ...base, fill: "forwards" }),
+				...children(panel).map(child => child.animate([{ opacity: 1 }, { opacity: 0 }], { ...base, fill: "forwards" })),
 			];
 			reshape(animations, depth, depth - 1, base);
 			whenDone(animations, () => {
 				if (!sheets.includes(s)) return;
+				const running = loopTimes(s.back);
 				s.wrap.remove();
 				sheets.splice(sheets.indexOf(s), 1);
 				atRest(sheets.length);
 				panel.replaceChildren();
 				panel.scrollTop = 0;
 				paint(panel);
+				carryLoops(running, panel);
 			});
 		},
 
