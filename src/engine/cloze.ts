@@ -263,6 +263,11 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 		const sel = ctx.quizState.selections[qi];
 		const values: unknown[] = Array.isArray(sel) ? sel : [];
 		const locked = ctx.isRevealed(qi);
+		/* A CHARACTER LIMIT (2026-09-29): nothing stopped a blank from taking
+		   a whole paragraph. ONE limit for every blank of the question — the
+		   longest accepted answer plus some room, 24 at least — so that it
+		   never tells the length of a particular answer. */
+		const maxLength = Math.max(24, ...blanks.flatMap(b => b.answers.map(a => a.length + 8)));
 
 		// Le gabarit ENTIER passe par le rendu (markdown + images), trous
 		// marqués : une paire `…` ou **…** qui enjambe un trou reste une paire.
@@ -290,7 +295,7 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 			}
 
 			return `<span class="quiz-cloze-slot"><input class="${cls}" type="text" `
-				+ `data-cloze="${index}" value="${ctx.escapeHtmlAttr(value)}" `
+				+ `data-cloze="${index}" value="${ctx.escapeHtmlAttr(value)}" maxlength="${maxLength}" `
 				+ `autocomplete="off" autocapitalize="off" spellcheck="false" `
 				+ `aria-label="${ctx.escapeHtmlAttr(t("engine.cloze.blankAria", { n: index + 1 }))}"`
 				+ `${locked ? " disabled" : ""}>${expected}</span>`;

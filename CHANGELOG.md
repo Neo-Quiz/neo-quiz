@@ -48,7 +48,7 @@ release notes.
 
 ### Changed
 - Generated fill-in-the-blanks no longer frame a blank with the chevrons, brackets or quotes of its answer (#include <▢>): those go inside the blank, which no longer hints at the answer.
-- The blanks of a fill-in-the-blanks are sober fields: a thin outline all round, no dashed line, no pop; blue while typing, green or red once checked. In code they take the code's font and sit inside the line.
+- The blanks of a fill-in-the-blanks are sober fields: a thin outline all round, no dashed line, no pop; blue while typing, green or red once checked. In code they take the code's font and sit inside the line. A blank now takes a limited number of characters, the same for every blank of the question, so its length never gives the answer away.
 - Every code block shows its language's logo, runnable or not, on the quiz's page and in the editor too.
 - A fill-in-the-blanks on code shows its program in a real code block, with its language's logo and colours, in the quiz, in the editor and on the quiz's page, where its card now shows the text with empty blanks. Generated quizzes always put code in such a block.
 - The version in the application menu reads "v1.19.0".
