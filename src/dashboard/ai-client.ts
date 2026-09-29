@@ -313,7 +313,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	const categorieBloc = complement ? `\n\t${complement}\n` : "";
 
 	/* The text fields the code and markdown rules apply to. */
-	const textFields = "prompt, options, explain, hint, answer";
+	const textFields = "title, prompt, options, explain, hint, answer";
 	const hintFields = `	- hint: a nudge shown on demand — a string, or for a DIFFICULT question an array of 2 or 3 levels (see HINTS below)
 	- runInLastHint: true ONLY on a DIFFICULT question whose prompt holds a python, c or cpp code block and whose "hint" has 2 or 3 levels, when running that program helps without answering in the learner's place (find the bug, choose the fix, explain a behaviour): once the last hint level is revealed, the learner may run it. NEVER on a question asking what a program prints (its answer IS the output), never on an easy question.
 `;
