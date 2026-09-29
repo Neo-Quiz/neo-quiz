@@ -19,7 +19,7 @@ import { poserBouton3d, poserBouton3dNeutre } from "./cta3d";
 
    What only one mode has carries `qbd-qz-swap` and fades with the body:
    the editor's actions of a page without "⋮" (the Generate page's
-   "Vocabulary" and "Mode"), placed LEFT of "Edit" so that "Done" and
+   "Vocabulary"), placed LEFT of "Edit" so that "Done" and
    "Start" keep their place. A quiz of the catalogue has them in its "⋮"
    menu instead (detail.ts): its header is then identical in both modes.
 
@@ -57,7 +57,7 @@ export interface EnteteDeps {
 	onToggleEditing(): void;
 	/** Actions of every mode (Generate page: "Insert"), before "Edit". */
 	actions: EnteteAction[];
-	/** Actions of the editor only ("Vocabulary", "Mode"): they fade in and
+	/** Actions of the editor only ("Vocabulary"): they fade in and
 	    out with the body, left of the others. */
 	editActions?: EnteteAction[];
 	/** Main button ("Start the quiz", "Save"). Absent → hidden. */

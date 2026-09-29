@@ -52,16 +52,10 @@ export function quizTypeLabel(tag: QuizTypeTag): string {
 /** The label of a quiz's mode (shared by the card, the page and the app's
     player): Learn / Test / Exam, translated. A Practice reads "Test"
     (2026-09-29, after spec §1.4 which said "Practice"): the product has two
-    kinds, Learn and Test, and "Practice" only names the Test's sub-mode on
-    the Generate page (`testSubModeLabel`). */
+    types of quiz, Learn and Test, and a Test file with `mode: "exam"` (see
+    "Keep exam mode") reads "Exam". */
 export function quizModeLabel(mode: ModeQuiz): string {
 	return t(mode === "learn" ? "dashboard.quizMode.learn" : mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.test");
-}
-
-/** The two sub-modes of a Test, as the Generate page's Test menu names
-    them: Practice / Exam. */
-export function testSubModeLabel(mode: "practice" | "exam"): string {
-	return t(mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.practice");
 }
 
 /** The one-sentence goal of a mode (hover bubbles of the Generate page's

@@ -394,29 +394,6 @@
 	cursor: pointer;
 }
 
-/* An Exam's duration (editor, Mode action, 2026-09-29): four shortcut
-   pills under the minutes field. */
-.qbd-mode-duration-shortcuts {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 12px;
-}
-.qbd-mode-duration-shortcut {
-	height: 30px;
-	padding: 0 14px;
-	border: 1px solid var(--background-modifier-border) !important;
-	border-radius: 15px;
-	background: transparent !important;
-	color: var(--text-normal);
-	font-size: 13px;
-	cursor: pointer;
-	box-shadow: none !important;
-}
-.qbd-mode-duration-shortcut:hover {
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent) !important;
-}
-
 /* "Create a folder" (restyled 2026-09-29): the options are ROWS, not cards
    — cards inside the modal's own box were a tile in a tile. No border, no
    chevron: an icon in a square tinted with the option's accent, the title

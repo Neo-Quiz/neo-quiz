@@ -74,11 +74,10 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.type.text": "Texte libre",
 	"ai.type.comprehension": "Compréhension",
 
-	/* ── Goal: Learn / Test (composer) ── */
-	"ai.mode.test": "Test",
+	/* ── Type de quiz : Learn / Test (composer) ── */
 	"ai.mode.learnTip": "Apprendre un cours pas à pas : une question avant chaque passage, la correction aussitôt, jusqu'à ce que ça tienne.",
-	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée.",
-	"ai.mode.group": "Objectif",
+	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée. Au lancement, vous pouvez le jouer comme un examen chronométré.",
+	"ai.mode.group": "Type de quiz",
 	/* Bascule « N quiz <-> 1 quiz », sous les documents joints */
 	"ai.oneQuiz.label": "Un seul quiz",
 	"ai.oneQuiz.tipOne": "Les {count} documents forment un seul quiz. Cliquer pour un quiz par document.",
@@ -468,6 +467,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.format.noHint": "{count} question(s) du parcours n'ont pas d'indice : {names}.",
 	"ai.format.flashcardNoAnswer": "{count} carte(s) n'ont pas de réponse au verso : {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) débloquent l'exécution de leur code là où c'est impossible (il faut un bloc exécutable dans l'énoncé, au moins 2 niveaux d'indice, jamais une sortie de programme) : {names}.",
-	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme banque Practice.",
+	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme Test.",
 
 };

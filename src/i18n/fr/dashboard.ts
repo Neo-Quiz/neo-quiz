@@ -229,15 +229,15 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	/* ── Carte de quiz ── */
 	"dashboard.card.more": "Plus d'actions",
 	"dashboard.card.play": "Lancer",
-	"dashboard.card.pickMode": "Quel mode ?",
+	"dashboard.card.pickMode": "Quel quiz ?",
 	"dashboard.folder.emptyTitle": "Ajouter un premier quiz",
-	"dashboard.folder.emptyDrop": "Ou déposez ici un quiz partagé (.md ou .zip)",
+	"dashboard.folder.emptyDropTitle": "Glisse un quiz partagé ici",
+	"dashboard.folder.emptyDropHint": "ou clique pour choisir un fichier (.md ou .zip)",
 
 	/* ── Type de quiz ── */
 	"dashboard.quizType.mixed": "Mixte",
 	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
 	"dashboard.quizMode.learn": "Apprendre",
-	"dashboard.quizMode.practice": "Entraînement",
 	"dashboard.quizMode.test": "Test",
 	"dashboard.quizMode.exam": "Examen",
 	"dashboard.quizMode.examTip": "Un test chronométré, sans aide : pas d'indice, corrigé une fois rendu, rendu automatiquement à la fin du temps.",
@@ -321,8 +321,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.usageWarning": "Consomme vos limites plus rapidement",
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
-	"dashboard.select.optionsDuration": "Durée",
-	"dashboard.select.durationUnit": "min",
 	"dashboard.select.optionsCustom": "Personnalisé",
 	"dashboard.select.optionsCategory": "Sujet",
 	"dashboard.select.noteSearch": "Rechercher une note…",
@@ -349,7 +347,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.planning.examsEmptyTitle": "Pas d'examens à venir",
 	"dashboard.planning.examsEmptyHint": "Ajoutez une date d'examen pour recevoir des révisions planifiées.",
 	"dashboard.planning.modeLearn": "Learn",
-	"dashboard.planning.modePractice": "Practice",
+	"dashboard.planning.modePractice": "Test",
 	"dashboard.planning.manageExams": "Gérer les examens",
 	/* ── Composer du dossier (folder-planning.ts, tâche 5, 2026-09-26) ── */
 	"dashboard.planning.composerPlaceholder": "Demandez un quiz sur ce dossier…",

@@ -11,10 +11,6 @@ import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
 import type { Entete, EnteteAction } from "./detail-head";
 import { glossaryHeaderAction, glossaryMenuItem, texteBadgeGlossaire } from "./glossaire-modal";
-import { modeHeaderAction, modeMenuItem, texteBadgeMode } from "./quiz-mode-action";
-import { changeMode, modeOfOptions, noteNameForMode } from "./quiz-mode-change";
-import { moveQuizTo } from "./quiz-menu";
-import type { ModeQuiz } from "../quiz-format";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import type { ActionMenuItem } from "./ui-select";
@@ -116,13 +112,8 @@ export interface QuizPageSpec {
 	    shows a selector Learn | Practice | Exam that opens them. */
 	autresModes?: Array<{ quiz: QuizIndexEntry; open(): void }>;
 	/** The page's "⋮" menu: the quiz card's (host), with `extra` lines on
-	    top (the editor's "Vocabulary" and "Mode"). */
+	    top (the editor's "Vocabulary"). */
 	menu?(anchor: HTMLElement, extra?: ActionMenuItem[]): void;
-	/** After a Test's mode changed in the editor and was SAVED: the host
-	    renames its note (" — Practice" ↔ " — Exam") and reopens it (spec
-	    2026-09-29 §5.1). Absent (a quiz in memory, the Generate page): the
-	    page just repaints. */
-	renameForMode?(from: ModeQuiz, to: ModeQuiz): Promise<void>;
 }
 
 /** Dépendances d'une page « quiz », indépendantes du dashboard — et de
@@ -231,25 +222,6 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				ouverture: host.ouverture,
 				autresModes: ctx.settings.quizzesGroupModes === false ? undefined
 					: quizFreres(quiz, ctx.scanner.getQuizzes()).map(f => ({ quiz: f, open: () => ctx.navigate("detail", { quiz: f }) })),
-				/* Renaming after a mode change goes through `moveQuizTo`, the path
-				   that keeps review history and stats; a note named by hand keeps
-				   its name (quiz-mode-change.ts noteNameForMode). Reopened in
-				   editing, on its new path. */
-				renameForMode: async (from, to) => {
-					const courant = ctx.scanner.getQuiz(quiz.path) ?? quiz;
-					const nom = noteNameForMode(courant.basename, from, to);
-					let chemin = courant.path;
-					if (nom) {
-						const coupe = chemin.lastIndexOf("/");
-						const dossier = coupe >= 0 ? chemin.slice(0, coupe) : "";
-						const nomDossier = dossier.slice(dossier.lastIndexOf("/") + 1);
-						chemin = (await moveQuizTo(ctx, courant, dossier, nomDossier, nom)) ?? chemin;
-					}
-					const fichier = currentHost().fs.getFile(chemin);
-					if (fichier) await ctx.scanner.scanFile(fichier);
-					const frais = ctx.scanner.getQuiz(chemin);
-					if (frais) ctx.navigate("detail", { quiz: frais, edit: true });
-				},
 				/* The card's menu, with a repaint that re-reads the quiz: renamed,
 				   the page picks it up; deleted or moved out of the catalogue, we go
 				   back. */
@@ -509,8 +481,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (editing) {
 				const btn = page.querySelector<HTMLElement>('[data-qbd-key="glossary"]');
 				if (btn) setActionBadge(btn, texteBadgeGlossaire(draft));
-				const modeBtn = page.querySelector<HTMLElement>('[data-qbd-key="mode"]');
-				if (modeBtn) setActionBadge(modeBtn, texteBadgeMode(draft));
 			}
 			activeIdx = Math.min(activeIdx, Math.max(0, draft.questions.length - 1));
 			paint(listCol, panel, nav, spec);
@@ -527,37 +497,25 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		};
 		const start = spec.start;
 		const actions = (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) }));
-		/* The editor's "Vocabulary" (task 4 of batch D) and "Mode" (spec
-		   2026-09-29 §5.1: Practice ⇄ Exam, an Exam's duration). With a "⋮"
-		   menu, they are lines of it (2026-09-29): the header then has the
-		   same buttons in both modes, and nothing moves when the page
-		   switches. Without one (the Generate page), header buttons that
-		   fade in with the editor.
+		/* The editor's "Vocabulary" (task 4 of batch D). With a "⋮" menu, it is a
+		   line of it (2026-09-29): the header then has the same buttons in both
+		   modes, and nothing moves when the page switches. Without one (the
+		   Generate page), a header button that fades in with the editor.
 		   As soon as `editing` is true, NOT only once `draft` is loaded —
-		   otherwise they are missing when arriving DIRECTLY in editing (the
-		   "Edit" menu, creating a quiz): `renderHeader` runs before
-		   `spec.load()`. `() => draft` reads the draft of the moment, on click;
-		   the buttons' badges are refreshed once `draft` is ready (`render`).
-		   "Mode" only on a quiz the page WRITES: an unsaved draft (the
-		   Generate page) is named from the mode it was generated in. */
-		const changerMode = (to: "practice" | "exam"): void => { void changeQuizMode(spec, to); };
+		   otherwise it is missing when arriving DIRECTLY in editing (the "Edit"
+		   menu, creating a quiz): `renderHeader` runs before `spec.load()`.
+		   `() => draft` reads the draft of the moment, on click; the button's
+		   badge is refreshed once `draft` is ready (`render`). The editor has no
+		   Practice / Exam switch any more: "Keep exam mode" in the "Set up your
+		   test" modal writes the exam configuration of a note. */
 		const menu = spec.menu;
 		const editActions: EnteteAction[] = [];
 		if (editing && !menu) {
 			const gloss = glossaryHeaderAction(() => draft, scheduleSave);
 			editActions.push({ ...gloss, onClick: avant(gloss.onClick) });
-			if (spec.save) {
-				const mode = modeHeaderAction(() => draft, changerMode, changeExamDuration);
-				editActions.push({ ...mode, onClick: avant(mode.onClick) });
-			}
 		}
-		const lignesEdition = (): ActionMenuItem[] | undefined => {
-			if (!editing) return undefined;
-			const lignes: ActionMenuItem[] = [glossaryMenuItem(() => draft, scheduleSave)];
-			const mode = spec.save ? modeMenuItem(() => draft, changerMode, changeExamDuration) : null;
-			if (mode) lignes.push(mode);
-			return lignes;
-		};
+		const lignesEdition = (): ActionMenuItem[] | undefined =>
+			editing ? [glossaryMenuItem(() => draft, scheduleSave)] : undefined;
 		const fiche = !!spec.stats && !!start;
 		/* The info line, with the Learn | Practice selector of the course's
 		   other modes: the SAME in the editor (2026-09-29). Without the
@@ -1158,56 +1116,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			const cible = voisine(activeIdx, 1);
 			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
 		});
-	}
-
-	/** A Test changes mode (spec 2026-09-29 §5.1): the configuration is
-	    rewritten (quiz-mode-change.ts) and WRITTEN at once, IN the save chain
-	    — never beside it, where it would race a debounced write on the note's
-	    compare-and-swap. The same draft carries the edits still pending, so a
-	    pending write is folded into this one. A failed write restores the
-	    previous mode and renames nothing; then the host renames the note. */
-	async function changeQuizMode(spec: QuizPageSpec, to: "practice" | "exam"): Promise<void> {
-		const d = draft;
-		const save = currentSpec?.save;
-		if (!d || !save) return;
-		const from = modeOfOptions(d.examOptions);
-		const next = changeMode(d.examOptions, to, d.questions.length);
-		if (!next || from === to) return;
-		const before = d.examOptions;
-		d.examOptions = next;
-		if (saveTimer) {
-			window.clearTimeout(saveTimer);
-			saveTimer = null;
-			pendingSave = null;
-		}
-		let ok = false;
-		saveChain = saveChain.then(() => save(d)).then((r) => { ok = r; }, () => { ok = false; });
-		await saveChain;
-		if (!ok) {
-			d.examOptions = before;
-			currentHost().ui.notice(t("dashboard.quiz.saveError"));
-			repaint();
-			return;
-		}
-		if (!spec.renameForMode) { repaint(); return; }
-		try {
-			await spec.renameForMode(from, to);
-		} catch (e) {
-			// The mode IS saved: only the note's name lags behind. Say so.
-			console.error("[quiz-blocks] renaming after a mode change failed:", e);
-			currentHost().ui.notice(t("editor.mode.renameFailed"));
-			repaint();
-		}
-	}
-
-	/** An Exam's duration, from the Mode action's Duration dialog. */
-	function changeExamDuration(minutes: number): void {
-		const d = draft;
-		if (!d || modeOfOptions(d.examOptions) !== "exam") return;
-		d.examOptions = { ...d.examOptions, durationMinutes: minutes };
-		scheduleSave();
-		const btn = currentContainer?.querySelector<HTMLElement>('[data-qbd-key="mode"]');
-		if (btn) setActionBadge(btn, texteBadgeMode(d));
 	}
 
 	/** Writes what is pending NOW (leaving the page, starting the quiz,

@@ -93,11 +93,10 @@ export const EN_AI = {
 	"ai.type.text": "Free text",
 	"ai.type.comprehension": "Comprehension",
 
-	/* ── Goal: Learn / Test (composer) ── */
-	"ai.mode.test": "Test",
+	/* ── Quiz type: Learn / Test (composer) ── */
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
-	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained.",
-	"ai.mode.group": "Goal",
+	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained. When you start it, you can play it as a timed exam.",
+	"ai.mode.group": "Quiz type",
 	/* "N quizzes <-> 1 quiz" toggle, under the attached documents */
 	"ai.oneQuiz.label": "One quiz",
 	"ai.oneQuiz.tipOne": "The {count} documents go into a single quiz. Click for one quiz per document.",
@@ -533,6 +532,6 @@ export const EN_AI = {
 	"ai.format.noHint": "{count} question(s) of the learning path have no hint: {names}.",
 	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) unlock running their code in a way that cannot apply (a runnable block in the statement, 2 hint levels at least, never a program output question): {names}.",
-	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Practice bank.",
+	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Test.",
 
 } as const;

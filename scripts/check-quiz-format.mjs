@@ -54,12 +54,11 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 	r.check("Exam: a flashcard without a back is reported",
 		verifierFormat("exam", [q({ title: "Carte", options: undefined, correctIndex: undefined, flashcard: true })]),
 		[{ kind: "carteSansReponse", questions: ["Carte"] }]);
-	/* The Exam's own vocabulary (spec 2026-09-29 §4.6): its configuration keys
-	   are named, and what an Exam never shows (hint, slice plan) is not. */
-	r.check("CHAMPS_DECRITS.exam names mode: \"exam\" and examDurationMinutes, and no hint nor slice",
-		[CHAMPS_DECRITS.exam.includes('mode: "exam"'), CHAMPS_DECRITS.exam.includes('"examDurationMinutes"'),
-			CHAMPS_DECRITS.exam.includes('"hint"'), CHAMPS_DECRITS.exam.includes('"slice"'), CHAMPS_DECRITS.exam.includes("runInLastHint")],
-		[true, true, false, false, false]);
+	/* Only a Learn and a Test are generated (spec 2026-09-29 test setup §4): the
+	   prompt vocabulary has no Exam list, and neither type describes the Exam's
+	   configuration keys (`check:prompt` holds the forbidden words). */
+	r.check("CHAMPS_DECRITS knows Learn and Practice (the Test) only, and neither names the Exam's keys",
+		[Object.keys(CHAMPS_DECRITS), ["learn", "practice"].map(m => CHAMPS_DECRITS[m].some(c => /exam/i.test(c)))], [["learn", "practice"], [false, false]]);
 
 	/* ARRIVAL of a requested Exam (spec 2026-09-29 §1.2, §4.6): always
 	   `mode: "exam"` and an explicit duration — the typed one wins, then the

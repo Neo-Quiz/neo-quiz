@@ -1,11 +1,11 @@
 import JSON5 from "json5";
 import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
-import type { ModeQuiz } from "../quiz-format";
-import { clampExamDuration, completeExamConfig, completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
-import { quizModeIcon, quizModeLabel, quizModeTip, testSubModeLabel } from "./quiz-card";
+import type { ModeGeneration } from "../quiz-format";
+import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
+import { quizModeLabel, quizModeTip } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
-import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, oneQuizByDefault, canChooseQuizCount, typedExamDuration } from "./generation-demande";
+import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, canChooseQuizCount } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
 import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
@@ -295,19 +295,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let noteAttachments: NoteAttachment[] = []; // [{ name, content, path? }]
 	/** `null` : « Auto », le nombre suit la source (spec §2). */
 	let questionCount: number | null = null;
-	/** The GOAL of the generation: a quiz is always generated — Learn to
-	    learn, Practice to train, Exam to be tested under the clock. Holds for
-	    the page session, like the count and the type. */
-	let modeGeneration: ModeQuiz = "learn";
-	/** The Test kind last chosen (Practice | Exam), what the Test button
-	    selects when Learn is active. Same lifetime as `modeGeneration`. */
-	let testKind: Exclude<ModeQuiz, "learn"> = "practice";
+	/** The TYPE of quiz to generate: a Learn to learn, or a Test to train
+	    (`"practice"`, the format's name for a Test file). How a Test is taken
+	    (hints, time limit, Exam mode) is chosen when it starts, never here.
+	    Holds for the page session, like the count and the type. */
+	let modeGeneration: ModeGeneration = "learn";
 	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
 	   the attached documents, `false` = one quiz per document. Only offered
 	   with at least two documents and no image (`decouperParFichier` keeps a
-	   single quiz otherwise). The default follows the mode — N in Learn and
-	   Practice, 1 in Exam — and is reset each time the mode changes and each
-	   time the composer is emptied. */
+	   single quiz otherwise). The default is N quizzes, in Learn and in Test
+	   alike, and is reset each time the type changes and each time the
+	   composer is emptied. */
 	let oneQuiz = false;
 	let oneQuizBtn: HTMLElement | null = null;
 	const paintOneQuiz = (): void => {
@@ -626,7 +624,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   l'enregistrement a échoué (« Ouvrir sans enregistrer ») : son mode, sa
 	   destination et ses réglages figés à l'envoi, et la ligne à fermer une
 	   fois la note écrite. `null` pour le canal web. */
-	let resultatFige: { mode: ModeQuiz; destination: string; reglages: ReglagesFiges; ligne: number } | null = null;
+	let resultatFige: { mode: ModeGeneration; destination: string; reglages: ReglagesFiges; ligne: number } | null = null;
 	/* La réponse copiée VIENT D'ARRIVER : la modale d'attente le dit sur
 	   place (coche, « Réponse reçue », le nom du quiz) pendant que le quiz
 	   s'enregistre, avant de se fermer sur sa page. Sans cet état, la page
@@ -1782,25 +1780,20 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* Segmented selector Learn | Test (spec 2026-09-29 §4.1) — a bare left
 		   side in the manner of claude.ai's "Chat | Cowork": "+", the
 		   Learn | Test selector, then the single Options icon (count, type,
-		   destination, and in Exam the duration). The Test button carries a
-		   chevron opening Practice | Exam and always shows the precise mode
-		   ("Test · Exam"); a click on it while Learn is active selects the
-		   Test kind last chosen (Practice at first). */
+		   destination). Two TYPES of quiz, one file each: how a Test is taken
+		   (hints, time limit, Exam mode) is chosen when it starts, so the Test
+		   button has no sub-menu. */
 		const seg = ajouter(composerBottom, "div", "qbd-ai-seg");
 		seg.setAttribute("role", "radiogroup");
 		seg.setAttribute("aria-label", t("ai.mode.group"));
 		/* The sliding block (measured on claude.ai on 2026-09-23), shared
 		   with a course's sheet: `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const testLabel = (): string => `${t("ai.mode.test")} · ${testSubModeLabel(testKind)}`;
-		const selectMode = (m: ModeQuiz): void => {
-			if (m !== "learn") testKind = m;
+		const selectMode = (m: ModeGeneration): void => {
 			if (modeGeneration === m) return;
 			modeGeneration = m;
-			oneQuiz = oneQuizByDefault(m);
-			paintOneQuiz();
 			paintSeg(true);
-			/* The options are not the same from one mode to the other: the icon
+			/* The options are not the same from one type to the other: the icon
 			   lights up in accent then fades, so that a first-time user sees that
 			   something changed THERE. Removing then re-adding the class restarts
 			   the animation at each switch. */
@@ -1808,54 +1801,30 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			void optsBtn.offsetWidth;
 			optsBtn.classList.add("qbd-ai-opts-pulse");
 		};
-		const segBtns = (["learn", "test"] as const).map(kind => {
+		const segBtns = (["learn", "practice"] as const).map(kind => {
 			const b = ajouter(seg, "button", "qbd-ai-seg-btn");
 			b.type = "button";
 			b.setAttribute("role", "radio");
-			const label = ajouter(b, "span", "qbd-ai-seg-label", kind === "learn" ? quizModeLabel("learn") : testLabel());
-			if (kind === "test") {
-				b.setAttribute("aria-haspopup", "menu");
-				const chevron = ajouter(b, "span", "qbd-ai-seg-chevron");
-				chevron.setAttribute("aria-hidden", "true");
-				host.ui.setIcon(chevron, "chevron-down");
-			}
-			b.addEventListener("click", (e) => {
-				if (kind === "learn") { selectMode("learn"); return; }
-				/* Test: the menu on the chevron, or on the button once Test is
-				   the current kind; otherwise the click SELECTS the kind. */
-				const onChevron = (e.target as HTMLElement).closest(".qbd-ai-seg-chevron") !== null;
-				if (onChevron || modeGeneration !== "learn") openTestMenu(b);
-				else selectMode(testKind);
-			});
-			/* Each mode's goal, on hover, above (reference: the bubble of
+			/* A Test is generated as a "practice" file: the label is the type's,
+			   `quizModeLabel` reads "Test" for it. */
+			ajouter(b, "span", "qbd-ai-seg-label", quizModeLabel(kind));
+			b.addEventListener("click", () => selectMode(kind));
+			/* Each type's goal, on hover, above (reference: the bubble of
 			   claude.ai's "Chat | Cowork"). */
 			attachHoverTip(b, (tip) => {
 				tip.classList.add("qbd-hover-tip--card");
-				ajouter(tip, "div", "qbd-hover-tip-title", kind === "learn" ? quizModeLabel("learn") : testLabel());
-				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind === "learn" ? "learn" : testKind));
+				ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(kind));
+				ajouter(tip, "div", "qbd-hover-tip-body", quizModeTip(kind));
 			});
-			return { kind, b, label };
+			return { kind, b };
 		});
-		/* The Practice | Exam menu of the Test button (`ui-select`, the only
-		   dropdown allowed). The current Test mode is greyed out; while Learn
-		   is active both stay available, and choosing one selects Test. */
-		const openTestMenu = (anchor: HTMLElement): void => {
-			const testActive = modeGeneration !== "learn";
-			openActionMenu(anchor, (["practice", "exam"] as const).map(m => ({
-				icon: m === "exam" ? quizModeIcon(m) : "dumbbell", label: testSubModeLabel(m),
-				disabled: testActive && modeGeneration === m,
-				onClick: () => selectMode(m),
-			})));
-		};
 		const paintSeg = (anime: boolean): void => {
-			const testActive = modeGeneration !== "learn";
-			segBtns.forEach(({ kind, b, label }) => {
-				const active = kind === "test" ? testActive : !testActive;
-				label.textContent = kind === "learn" ? quizModeLabel("learn") : testLabel();
+			segBtns.forEach(({ kind, b }) => {
+				const active = kind === modeGeneration;
 				b.classList.toggle("is-active", active);
 				b.setAttribute("aria-checked", String(active));
 			});
-			placerIndicateur(indic, segBtns.find(({ kind }) => (kind === "test") === testActive)!.b, anime);
+			placerIndicateur(indic, segBtns.find(({ kind }) => kind === modeGeneration)!.b, anime);
 		};
 		// Measure after insertion in the document (real widths of the options).
 		requestAnimationFrame(() => paintSeg(false));
@@ -1884,12 +1853,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					categorieChoix = estCategorie(value) ? value : null;
 					majAvisCategorie();
 				},
-				/* The Exam duration, only in Test · Exam; kept in the `ai`
-				   settings like the other options (guarded by garde-ia.ts). */
-				duration: modeGeneration === "exam" ? {
-					minutes: clampExamDuration(settings().aiExamDurationMinutes),
-					onChange: (minutes) => { void saveSettings({ aiExamDurationMinutes: minutes }); },
-				} : undefined,
 			});
 		});
 		// Hover tooltip: the current state ("5 questions · Mixed"), re-read
@@ -1898,9 +1861,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		attachHoverTip(optsBtn, (tip) => {
 			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
 			const ty = questionType === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(questionType);
-			const duration = clampExamDuration(settings().aiExamDurationMinutes);
-			const durationSuffix = modeGeneration === "exam" ? ` · ${duration === null ? t("ai.options.auto") : `${duration} ${t("dashboard.select.durationUnit")}`}` : "";
-			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}${durationSuffix}`);
+			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
 		});
 
 		/* Consultation du forfait, à sa place de contrôle : dans le composer,
@@ -3562,16 +3523,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const mode = fige ? fige.mode : modeGeneration;
 		const reglages = { ...settings(), ...fige?.reglages };
 		/* A REQUESTED Learn whose model forgot `mode: "learn"` stays a Learn
-		   (`completerConfigLearn`), and a requested Exam always ends up with
-		   `mode: "exam"` and an explicit duration, the typed one winning over
-		   the model's (`completeExamConfig`): BEFORE the draft, which reads
-		   `generatedQuestions`. Both are idempotent, so a queue result, already
+		   (`completerConfigLearn`): BEFORE the draft, which reads
+		   `generatedQuestions`. It is idempotent, so a queue result, already
 		   fixed on arrival, is left as it is (and its draft, possibly edited,
 		   kept). */
-		if (mode === "learn" || mode === "exam") {
-			const complete = mode === "learn"
-				? completerConfigLearn(generatedQuestions)
-				: completeExamConfig(generatedQuestions, typedExamDuration(mode, reglages));
+		if (mode === "learn") {
+			const complete = completerConfigLearn(generatedQuestions);
 			if (JSON.stringify(complete) !== JSON.stringify(generatedQuestions)) {
 				generatedQuestions = complete;
 				generatedDraft = null;
@@ -3698,7 +3655,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		noteAttachments = [];
 		for (const img of images) URL.revokeObjectURL(img.url);
 		images = [];
-		oneQuiz = oneQuizByDefault(modeGeneration);
+		oneQuiz = false;
 	}
 
 	/** Ce que la détection de catégorie lit d'une demande : les noms des
@@ -3989,7 +3946,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		await preparerLienLearn(msg);
 		const planTranches = planTranchesEnvoye;
 		const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(msg.notes, msg.text));
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, examDurationMinutes: typedExamDuration(modeGeneration, settings()), source, planTranches, categorie }), jeton);
+		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;

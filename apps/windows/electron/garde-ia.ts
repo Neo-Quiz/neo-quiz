@@ -117,23 +117,6 @@ export function estDossierSortieIaValide(valeur: unknown): valeur is string {
 	return segments.every(segment => !!segment && segment !== "." && !segment.includes(".."));
 }
 
-/**
- * The bounds of an Exam's typed duration, in minutes. The SAME values as
- * `EXAM_DURATION_MIN` / `EXAM_DURATION_MAX` (`src/quiz-utils.ts`), repeated
- * here because that module pulls JSON5 into the main process for two numbers;
- * `check:electron-reglages` compares the two so they cannot drift apart.
- */
-export const EXAM_DURATION_MIN_MINUTES = 1;
-export const EXAM_DURATION_MAX_MINUTES = 300;
-
-/** A typed Exam duration is a whole number of minutes within the bounds. It
-    reaches the prompt and is written into the quiz: a fraction, a string or
-    a huge number would be a corrupted setting, refused rather than cut. */
-export function isValidExamDuration(value: unknown): value is number {
-	return typeof value === "number" && Number.isInteger(value)
-		&& value >= EXAM_DURATION_MIN_MINUTES && value <= EXAM_DURATION_MAX_MINUTES;
-}
-
 /** L'extension d'un chemin, en minuscules, ou la chaîne vide s'il n'en a pas.
     Sur le DERNIER point du NOM seul : `C:/a.b/claude` n'a pas d'extension, et
     `claude.pdf.exe` en a une — `.exe`. */
@@ -166,19 +149,22 @@ function extensionDe(chemin: string): string {
    `settings.json`, ignoré — plus personne ne le lit. */
 
 /**
- * Le verdict sur la valeur que le rendu veut écrire sous la clé `ai`.
+ * The verdict on the value the renderer wants to write under the `ai` key.
  *
- * `aiOllamaUrl`, s'il est présent, doit être une URL `http(s)` lisible : son
- * hôte est admis d'office s'il est dans la liste du réseau ou sur le réseau
- * local, et demandé à l'utilisateur sinon. `aiMentionExtraFolders`, s'il est
- * présent, doit être un tableau de chaînes dont CHACUNE est déjà dans le
- * périmètre (`perimetreContient`) — la même règle que `folders`, et pour la
- * même raison : un dossier hors périmètre inscrit là serait lu par le
- * sélecteur « @ » au prochain lancement. L'application n'a aucune interface
- * pour remplir cette clé aujourd'hui ; la garde existe avant l'interface.
+ * `aiOllamaUrl`, when present, must be a readable `http(s)` URL: its host is
+ * admitted outright if it is in the network list or on the local network, and
+ * asked of the user otherwise. `aiMentionExtraFolders`, when present, must be
+ * an array of strings EACH of which is already inside the perimeter
+ * (`perimetreContient`) — the same rule as `folders`, for the same reason: a
+ * folder outside the perimeter written there would be read by the "@" picker
+ * at the next launch. The application has no interface to fill this key today;
+ * the guard exists before the interface.
  *
- * Les autres champs (modèle, effort, journal d'usage) ne donnent aucun droit
- * au principal : ils passent tels quels.
+ * The other fields (model, effort, usage log) give the main process no right:
+ * they pass as they are. That includes `aiExamDurationMinutes`, a REMOVED
+ * setting (a test's duration is now chosen when the test starts): a value an
+ * earlier version already wrote is ignored, never refused, since a refusal
+ * would fail the write of EVERY `ai` setting.
  */
 export async function validerReglagesIa(
 	valeur: unknown,
@@ -188,17 +174,12 @@ export async function validerReglagesIa(
 	if (!valeur || typeof valeur !== "object" || Array.isArray(valeur)) {
 		return { refus: "AI settings refused: the value is not an object" };
 	}
-	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder, aiExamDurationMinutes } = valeur as {
-		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown; aiExamDurationMinutes?: unknown;
+	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder } = valeur as {
+		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown;
 	};
 
 	if (aiOutputFolder !== undefined && !estDossierSortieIaValide(aiOutputFolder)) {
 		return { refus: "AI settings refused: aiOutputFolder must be a safe relative path" };
-	}
-
-	// Absent or `null` is Auto; anything else must be a whole number of minutes in range.
-	if (aiExamDurationMinutes !== undefined && aiExamDurationMinutes !== null && !isValidExamDuration(aiExamDurationMinutes)) {
-		return { refus: `AI settings refused: aiExamDurationMinutes must be a whole number from ${EXAM_DURATION_MIN_MINUTES} to ${EXAM_DURATION_MAX_MINUTES}, or empty` };
 	}
 
 	if (aiMentionExtraFolders !== undefined) {

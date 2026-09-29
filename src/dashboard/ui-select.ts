@@ -1,7 +1,6 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
-import { EXAM_DURATION_MAX, EXAM_DURATION_MIN } from "../quiz-utils";
 import { createEffortTrackFx } from "./effort-canvas";
 import type { EffortTrackFx } from "./effort-canvas";
 
@@ -1817,12 +1816,6 @@ export interface OpenOptionsMenuOptions {
 	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
 	categorieDetectee?: string;
 	onCategorie?: (value: string | null) => void;
-	/**
-	 * The Exam DURATION row (spec 2026-09-29 §4.2), which the caller passes
-	 * only in Test · Exam: absent = no row. `minutes` is the typed duration,
-	 * `null` = Auto (the model sizes the Exam).
-	 */
-	duration?: { minutes: number | null; onChange: (minutes: number | null) => void };
 }
 
 /** One subject of the options menu: its icon is Lucide (`icon`) or drawn
@@ -2090,20 +2083,15 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		});
 	};
 
-	/* ── Le champ PERSONNALISÉ, commun aux trois flyouts (nombre, barème,
-	   durée) : une LIGNE comme les autres — libellé à gauche, le nombre saisi
-	   DANS la ligne suivi de son unité, la même coche à droite quand il est
-	   la valeur courante. Le cadre du nombre n'apparaît qu'au survol et à la
-	   saisie : au repos, la ligne se lit comme ses voisines. Entrée ou la
-	   perte du focus valident, Échap annule la saisie. ── */
+	/* ── The CUSTOM field of the Questions flyout: a ROW like the others — the
+	   label on the left, the typed number INSIDE the row followed by its unit,
+	   and the same check on the right when it is the current value. The
+	   number's frame only shows on hover and while typing: at rest, the row
+	   reads like its neighbours. Enter or losing focus commits, Escape
+	   cancels the typing. ── */
 	const champPerso = (f: HTMLDivElement, c: {
 		unite: (n: number) => string; avant?: string; min: number; max: number;
 		valeur: number; actif: boolean; valider: (n: number) => void; maj: () => void;
-		/** The field's placeholder while no custom value is set (default "—"). */
-		placeholder?: string;
-		/** Called when a custom value is CLEARED and submitted: the row then
-		    means "empty", the Duration row's Auto. Absent: an empty field is ignored. */
-		vider?: () => void;
 	}): void => {
 		const row = ajouter(f, "label", "qbd-select-option qbd-opts-custom" + (c.actif ? " is-active" : ""));
 		ajouter(row, "span", "qbd-opts-custom-label", t("dashboard.select.optionsCustom"));
@@ -2115,13 +2103,13 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		field.max = String(c.max);
 		field.inputMode = "numeric";
 		field.value = c.actif ? String(c.valeur) : "";
-		field.placeholder = c.actif ? "" : (c.placeholder ?? "—");
+		field.placeholder = c.actif ? "" : "—";
 		const unite = ajouter(saisie, "span", "qbd-opts-custom-unit", c.unite(c.actif ? c.valeur : 2));
 		const chk = ajouter(row, "span", "qbd-select-check");
 		if (c.actif) currentHost().ui.setIcon(chk, "check");
-		// La largeur suit le nombre tapé : « 5 » ne flotte pas dans une boîte de trois chiffres.
+		// The width follows the typed number: "5" does not float in a three-digit box.
 		const ajuster = (): void => {
-			// + padding et bordure : la boîte est en border-box.
+			// + padding and border: the box is border-box.
 			field.style.width = `calc(${Math.max(2, (field.value || field.placeholder).length) + 0.5}ch + 12px)`;
 			const n = Number(field.value);
 			unite.textContent = c.unite(Number.isFinite(n) && n > 0 ? n : 2);
@@ -2129,10 +2117,7 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		ajuster();
 		field.addEventListener("input", ajuster);
 		const valider = (): void => {
-			if (!field.value.trim()) {
-				if (c.actif && c.vider) { c.vider(); c.maj(); }
-				return;
-			}
+			if (!field.value.trim()) return;
 			const n = Math.min(c.max, Math.max(c.min, Math.round(Number(field.value))));
 			if (!Number.isFinite(n)) return;
 			c.valider(n);
@@ -2204,29 +2189,6 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 			{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: typeAuto, choisir: () => { typeAuto = true; if (opts.onTypeAuto) opts.onTypeAuto(); } },
 			...opts.types.map(x => ({ label: x, actif: !typeAuto && type === x, choisir: () => { type = x; typeAuto = false; if (opts.onType) opts.onType(x); } })),
 		]);
-
-	/* ── Duration (Test · Exam only): Auto, the four shortcuts, or a typed
-	   number of minutes within the Exam bounds — the same shape as the
-	   Questions row, and `champPerso` bounds and rounds the typed value. ── */
-	const durationOpts = opts.duration;
-	if (durationOpts) {
-		const SHORTCUTS = [30, 60, 90, 120];
-		let minutes = durationOpts.minutes;
-		const unitMin = (): string => t("dashboard.select.durationUnit");
-		const chooseDuration = (n: number | null): void => { minutes = n; durationOpts.onChange(n); };
-		ligne("clock", t("dashboard.select.optionsDuration"),
-			() => minutes === null ? t("ai.options.auto") : `${minutes} ${unitMin()}`,
-			() => [
-				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: minutes === null, choisir: () => chooseDuration(null) },
-				...SHORTCUTS.map(n => ({ label: `${n} ${unitMin()}`, actif: minutes === n, choisir: () => chooseDuration(n) })),
-			],
-			(f, maj) => champPerso(f, {
-				unite: unitMin, min: EXAM_DURATION_MIN, max: EXAM_DURATION_MAX,
-				valeur: minutes ?? EXAM_DURATION_MIN, actif: minutes !== null && !SHORTCUTS.includes(minutes),
-				valider: (n) => chooseDuration(n), maj,
-				placeholder: t("ai.options.auto"), vider: () => chooseDuration(null),
-			}));
-	}
 
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──
 	const rect = anchorEl.getBoundingClientRect();

@@ -20,8 +20,8 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { AiSettings } from "../types/dashboard-ctx";
-import type { ModeQuiz } from "../quiz-format";
-import { completeExamConfig, completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
+import type { ModeGeneration } from "../quiz-format";
+import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
@@ -30,31 +30,28 @@ import type { AiClient, ImagePayload } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
-import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn, nombreDeQuestions, typedExamDuration } from "./generation-demande";
+import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
 import type { DemandeTexte } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
-    model or effort afterwards only affects the following requests. The typed
-    Exam duration (`aiExamDurationMinutes`, `null` = Auto) travels with them:
-    it is the field through which the generation of an Exam reads it. */
-export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiOutputFolder" | "aiExamDurationMinutes">;
+    model or effort afterwards only affects the following requests. */
+export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiOutputFolder">;
 
 export function figerReglages(s: AiSettings): ReglagesFiges {
 	return {
 		aiProvider: s.aiProvider, aiModel: s.aiModel, aiEffort: s.aiEffort, aiCodexFast: s.aiCodexFast,
 		aiAntigravityLevels: s.aiAntigravityLevels ? { ...s.aiAntigravityLevels } : s.aiAntigravityLevels,
 		aiOutputFolder: s.aiOutputFolder,
-		aiExamDurationMinutes: s.aiExamDurationMinutes ?? null,
 	};
 }
 
 /** Une demande telle qu'elle est partie : le texte, les pièces déjà LUES,
     et chaque option de la génération. */
 export interface DemandeFile extends DemandeTexte {
-	mode: ModeQuiz;
+	mode: ModeGeneration;
 	count: number | null;
 	type: string;
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
@@ -187,23 +184,18 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			// Annulée pendant la préparation : aucun processus n'est encore lancé.
 			if (!tourne(ligne.id)) return;
 			etapeDe(ligne.id, "redaction");
-			const examDuration = typedExamDuration(d.mode, d.reglages);
-			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, examDurationMinutes: examDuration, source, planTranches: learn.plan, images, categorie: d.categorie });
+			const reponse = await client.generate(prompt, { count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie });
 			if (!tourne(ligne.id)) return;
-			/* La configuration finale D'ABORD, fusionnée : un modèle qui répond en
-			   deux objets consécutifs (mode d'un côté, glossaire de l'autre, dans
-			   un ordre quelconque) ne doit perdre ni l'un ni l'autre — AVANT tout
-			   ce qui suit lit la position du DERNIER élément (lot D §5). */
+			/* The final configuration FIRST, merged: a model that answers with two
+			   consecutive objects (the mode in one, the glossary in the other, in
+			   any order) must lose neither — BEFORE anything below reads the
+			   position of the LAST element (batch D §5). */
 			const brut = fusionnerConfigsFinales(reponse.questions);
 			/* A REQUESTED Learn whose model forgot `mode: "learn"` stays a Learn,
-			   as before the queue; a requested Exam always carries `mode: "exam"`
-			   and an explicit duration (`completeExamConfig`: the typed one wins,
-			   Auto falls back to the model's, then to the fallback rule). Done
-			   BEFORE the quiz is kept with the request, so a retried save (which
-			   never calls the model again) writes the same Exam. */
-			const questions = d.mode === "learn" ? completerConfigLearn(brut)
-				: d.mode === "exam" ? completeExamConfig(brut, examDuration)
-				: brut;
+			   as before the queue. Done BEFORE the quiz is kept with the request,
+			   so a retried save (which never calls the model again) writes the
+			   same Learn. */
+			const questions = d.mode === "learn" ? completerConfigLearn(brut) : brut;
 			if (!questions.length) throw new Error(t("ai.error.checkSettings"));
 			const usage = client.lastUsage;
 			if (usage && deps.recordUsage) {

@@ -270,15 +270,15 @@ export const EN_DASHBOARD = {
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */
 	"dashboard.card.more": "More actions",
 	"dashboard.card.play": "Start",
-	"dashboard.card.pickMode": "Which mode?",
+	"dashboard.card.pickMode": "Which quiz?",
 	"dashboard.folder.emptyTitle": "Add a first quiz",
-	"dashboard.folder.emptyDrop": "Or drop a shared quiz here (.md or .zip)",
+	"dashboard.folder.emptyDropTitle": "Drop a shared quiz here",
+	"dashboard.folder.emptyDropHint": "or click to choose a file (.md or .zip)",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */
 	"dashboard.quizType.mixed": "Mixed",
 	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
 	"dashboard.quizMode.learn": "Learn",
-	"dashboard.quizMode.practice": "Practice",
 	"dashboard.quizMode.test": "Test",
 	"dashboard.quizMode.exam": "Exam",
 	"dashboard.quizMode.examTip": "A timed test without help: no hints, corrected once handed in, handed in automatically when time is up.",
@@ -363,8 +363,6 @@ export const EN_DASHBOARD = {
 	"dashboard.select.usageWarning": "Consumes usage limits faster",
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
-	"dashboard.select.optionsDuration": "Duration",
-	"dashboard.select.durationUnit": "min",
 	"dashboard.select.optionsCustom": "Custom",
 	"dashboard.select.optionsCategory": "Subject",
 	"dashboard.select.noteSearch": "Search a note…",
@@ -391,7 +389,7 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.examsEmptyTitle": "No upcoming exams",
 	"dashboard.planning.examsEmptyHint": "Add an exam date to get review tasks planned for it.",
 	"dashboard.planning.modeLearn": "Learn",
-	"dashboard.planning.modePractice": "Practice",
+	"dashboard.planning.modePractice": "Test",
 	"dashboard.planning.manageExams": "Manage exams",
 	/* ── Composer du dossier (folder-planning.ts, task 5, 2026-09-26) ── */
 	"dashboard.planning.composerPlaceholder": "Ask for a quiz on this folder…",

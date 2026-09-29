@@ -92,11 +92,6 @@ export interface AiSettings {
 	aiMentionExtraFolders?: string[];
 	/** Chemin relatif persistant du dossier qui reçoit les quiz générés. */
 	aiOutputFolder?: string;
-	/** The Exam duration typed in the Options menu of the Generate page, in
-	    whole minutes within [1, 300]; `null` (or absent) is Auto, the model
-	    chooses (spec 2026-09-29 §1.2, §4.2). Kept across sessions like the
-	    other Options; only read when the requested mode is Exam. */
-	aiExamDurationMinutes?: number | null;
 	/* PLUS DE CHEMINS D'EXÉCUTABLE DE CLI (2026-09-17). Deux champs des
 	   Réglages désignaient l'exécutable à lancer quand la sonde automatique
 	   échouait. Le processus principal fusionne désormais le `PATH` du REGISTRE
@@ -250,7 +245,7 @@ export interface DashboardShellCtx {
 	/* `map` (tranche 9, tâche « Move to ») : le sous-menu « Déplacer vers »
 	   liste les dossiers connus groupés par UE, tirés de la même table que
 	   `openModuleMenu`. `extra`: lines put above the card's own, a quiz's
-	   page in editing ("Vocabulary", "Mode", detail.ts). */
+	   page in editing ("Vocabulary", detail.ts). */
 	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[]) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —

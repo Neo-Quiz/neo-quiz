@@ -13,8 +13,8 @@
 
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { EditorExamOptions } from "../types/editor-ctx";
-import type { ModeQuiz } from "../quiz-format";
-import { clampExamDuration, fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
+import type { ModeGeneration } from "../quiz-format";
+import { fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
 import { nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
@@ -101,8 +101,7 @@ export function composerDemande(msg: DemandeTexte): { source: "image" | "text" |
     each, as soon as the request carries several documents and no image (an
     image often illustrates THE document next to it, so an image keeps a
     single quiz whatever the choice). `oneQuiz` is the state of the composer's
-    "N quizzes ↔ 1 quiz" toggle, whose default follows the mode (N in Learn
-    and Practice, 1 in Exam). */
+    "N quizzes ↔ 1 quiz" toggle, whose default is N quizzes. */
 export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, oneQuiz: boolean): DemandeTexte<I>[] {
 	if (oneQuiz || msg.images.length > 0 || msg.notes.length < 2) return [msg];
 	return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
@@ -116,26 +115,10 @@ function folderName(folder: string): string {
 	return last ?? host.paths.rootOf(folder)?.name ?? "";
 }
 
-/** The default of the composer's "N quizzes <-> 1 quiz" toggle (spec
-    2026-09-29 §4.3): N quizzes in Learn and Practice (a course is learnt and
-    trained document by document), ONE quiz in Exam (an exam covers the whole
-    module). The composer resets it to this each time the mode changes. */
-export function oneQuizByDefault(mode: ModeQuiz): boolean {
-	return mode === "exam";
-}
-
 /** Whether the toggle is offered: at least two documents and no image (with
     an image, `decouperParFichier` keeps a single quiz whatever the choice). */
 export function canChooseQuizCount(documents: number, images: number): boolean {
 	return documents >= 2 && images === 0;
-}
-
-/** The Exam duration typed by the user, in minutes within the format's
-    bounds; `null` = Auto (or not an Exam). `figerReglages` freezes
-    `aiExamDurationMinutes` for EVERY mode and unclamped: only an Exam reads
-    it, through here. */
-export function typedExamDuration(mode: ModeQuiz, settings: { aiExamDurationMinutes?: number | null }): number | null {
-	return mode === "exam" ? clampExamDuration(settings.aiExamDurationMinutes) : null;
 }
 
 /** Le dossier par défaut, en chemin du contrat : `<racine par défaut>/<aiOutputFolder>`. */
@@ -147,9 +130,9 @@ export function dossierParDefaut(aiOutputFolder: string | undefined): string {
 /** Practice: the Learn note of the same SOURCE in the destination folder
     (the `source:` key of its frontmatter) and its slice plan, which goes
     with the request (spec §2). Nothing found or unreadable: `{}`. Never for
-    an Exam, nor for a Practice made as ONE quiz over several documents (spec
-    2026-09-29 §4.5): there is no single Learn to follow. */
-export async function lienLearn(scanner: Scanner, mode: ModeQuiz, dossier: string, msg: DemandeTexte): Promise<{ plan?: { slice: number; titre: string }[]; note?: string }> {
+    a Practice made as ONE quiz over several documents (spec 2026-09-29
+    §4.5): there is no single Learn to follow. */
+export async function lienLearn(scanner: Scanner, mode: ModeGeneration, dossier: string, msg: DemandeTexte): Promise<{ plan?: { slice: number; titre: string }[]; note?: string }> {
 	if (mode !== "practice" || msg.notes.length > 1) return {};
 	const source = nomDeSource(msg.notes, msg.text, t("dashboard.quizzes.newQuizDefaultName"));
 	const learn = trouverLearn(scanner.getQuizzes(), dossier, source);
@@ -198,10 +181,10 @@ export function brouillonDe(generated: unknown[]): QuizDraft {
 
 export interface Enregistrement {
 	draft: QuizDraft;
-	/** Les questions brutes, dont le mode du bloc et le contrôle se lisent. */
+	/** The raw questions, from which the block's mode and the check are read. */
 	questions: unknown[];
-	/** Le mode DEMANDÉ (l'interrupteur au moment de l'envoi). */
-	modeDemande: ModeQuiz;
+	/** The type REQUESTED (the selector's value when the request was sent). */
+	modeDemande: ModeGeneration;
 	titreModele?: string;
 	demande: { text: string; notes: { name: string }[] } | null;
 	/** Chemin du contrat choisi, ou "" pour le dossier par défaut. */

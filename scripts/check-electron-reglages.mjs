@@ -526,7 +526,7 @@ await withSrcModule("apps/windows/electron/pont.ts", async ({ CANAUX }) => {
  * dernière assertion, STATIQUE comme celle des canaux `fichiers.*`, vérifie
  * que `reglagesEcrire` appelle la garde AVANT `.ecrire(`.
  */
-await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, estDossierSortieIaValide, isValidExamDuration, EXAM_DURATION_MIN_MINUTES, EXAM_DURATION_MAX_MINUTES, hoteEstPrive, validerReglagesIa }) => {
+await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, estDossierSortieIaValide, hoteEstPrive, validerReglagesIa }) => {
 	const r = makeReporter("Électron — la garde de la clé ai");
 
 	/* ── hoteEstPrive : la boucle locale, la RFC 1918, `.local`, et rien d'autre ── */
@@ -586,29 +586,32 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 			],
 			[{ ok: true, admettre: null }, true, true, true, true]);
 	});
-	/* The typed Exam duration (Generate page, Test · Exam): a whole number of
-	   minutes in [1, 300], or empty (absent / null) for Auto. It reaches the
-	   prompt and the written quiz, so a fraction, a string or an out-of-range
-	   number is refused and NAMED, never cut to fit. */
-	await cas(r, "aiExamDurationMinutes: a whole number from 1 to 300, or empty, passes", async () => {
-		const verdicts = await Promise.all([1, 30, 120, 300, null, undefined].map(v => valider({ aiExamDurationMinutes: v })));
-		r.check("aiExamDurationMinutes: a whole number from 1 to 300, or empty, passes",
-			verdicts, Array(6).fill({ ok: true, admettre: null }));
-		r.check("aiExamDurationMinutes: absent, nothing to refuse",
-			await valider({ aiModel: "x" }), { ok: true, admettre: null });
+	/* `aiExamDurationMinutes` (the Generate page's Exam duration) is a RETIRED
+	   setting: a value an earlier version already wrote is ignored, whatever it
+	   is — valid, out of range or nonsense — and never refused, or the write of
+	   EVERY `ai` setting would fail. Ignoring it must not loosen any other
+	   rule: the refusals of its neighbours still hold with it present. */
+	await cas(r, "aiExamDurationMinutes (retired): any value is accepted and ignored", async () => {
+		const anciennes = [1, 30, 300, null, undefined, 0, -5, 301, 1.5, NaN, Infinity, "60", "", true, [60], {}];
+		const verdicts = await Promise.all(anciennes.map(v => valider({ aiExamDurationMinutes: v })));
+		r.check("aiExamDurationMinutes (retired): any value is accepted and ignored, nothing to admit",
+			verdicts, Array(anciennes.length).fill({ ok: true, admettre: null }));
 	});
-	await cas(r, "aiExamDurationMinutes: out of range, non-integer or non-numeric is refused, and named", async () => {
-		const mauvaises = [0, -5, 301, 1000, 1.5, NaN, Infinity, "60", "", true, [60], {}];
-		const verdicts = await Promise.all(mauvaises.map(v => valider({ aiExamDurationMinutes: v })));
-		r.check("aiExamDurationMinutes: out of range, non-integer or non-numeric is refused, and named",
-			verdicts.map(v => "refus" in v && v.refus.includes("aiExamDurationMinutes")), Array(mauvaises.length).fill(true));
-	});
-	await cas(r, "aiExamDurationMinutes: the guard's bounds are the format's", async () => {
-		await withSrcModule("src/quiz-utils.ts", ({ EXAM_DURATION_MIN, EXAM_DURATION_MAX }) => {
-			r.check("aiExamDurationMinutes: the guard's bounds are the format's",
-				[EXAM_DURATION_MIN_MINUTES, EXAM_DURATION_MAX_MINUTES, isValidExamDuration(EXAM_DURATION_MIN), isValidExamDuration(EXAM_DURATION_MAX), isValidExamDuration(EXAM_DURATION_MIN - 1), isValidExamDuration(EXAM_DURATION_MAX + 1)],
-				[EXAM_DURATION_MIN, EXAM_DURATION_MAX, true, true, false, false]);
-		});
+	await cas(r, "aiExamDurationMinutes (retired): the other refusals still hold beside it", async () => {
+		const [dossier, url, perimetre, hote] = await Promise.all([
+			valider({ aiExamDurationMinutes: 90, aiOutputFolder: "../Privé" }),
+			valider({ aiExamDurationMinutes: 999, aiOllamaUrl: "ftp://localhost/x" }),
+			valider({ aiExamDurationMinutes: 90, aiMentionExtraFolders: ["E:/hors-perimetre"] }),
+			valider({ aiExamDurationMinutes: 90, aiOllamaUrl: "https://Attaquant.Example:8443/api" }),
+		]);
+		r.check("aiExamDurationMinutes (retired): the other refusals still hold beside it",
+			[
+				"refus" in dossier && dossier.refus.includes("aiOutputFolder"),
+				"refus" in url && url.refus.includes("aiOllamaUrl"),
+				"refus" in perimetre && perimetre.refus.includes("E:/hors-perimetre"),
+				"confirmer" in hote && hote.confirmer,
+			],
+			[true, true, true, "attaquant.example"]);
 	});
 	await cas(r, "une URL illisible, non-chaîne ou hors http(s) est refusée, nommée", async () => {
 		const [pasChaine, illisible, fichier, ftp] = await Promise.all([

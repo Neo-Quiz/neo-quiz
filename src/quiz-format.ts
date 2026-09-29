@@ -24,15 +24,17 @@ export { EXAM_DURATION_MIN, EXAM_DURATION_MAX, clampExamDuration, fallbackExamDu
 
 export type ModeQuiz = "learn" | "practice" | "exam";
 
-/** What the prompt of EACH mode must name, word for word: a field the
-    arrival check requires but the prompt keeps quiet about is never produced
-    (test of 2026-09-23: `explain` missing from the prompt, no explanation at
-    all). The Exam has its own list (spec 2026-09-29 §4.5): the Practice
-    fields that stay, minus `hint` (never shown in an Exam, so not worth the
-    tokens), `runInLastHint` (it unlocks ▶ once the last HINT level is
-    revealed) and `slice` (an Exam is never linked to a Learn, so it gets no
-    slice plan), plus the two keys of its configuration object. */
-export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
+/** What a GENERATION produces: a Learn or a Test file (`"practice"`). An
+    Exam is never generated (spec 2026-09-29-test-setup-modal §4): a Test
+    becomes one when it is started, or when "Keep exam mode" writes
+    `mode: "exam"` into its configuration (`dashboard/exam-keep.ts`). */
+export type ModeGeneration = Exclude<ModeQuiz, "exam">;
+
+/** What the prompt of EACH generated type must name, word for word: a field
+    the arrival check requires but the prompt keeps quiet about is never
+    produced (test of 2026-09-23: `explain` missing from the prompt, no
+    explanation at all). */
+export const CHAMPS_DECRITS: Readonly<Record<ModeGeneration, readonly string[]>> = {
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"flashcard"',
 		// Reading styles (2026-09-26, reading styles spec §4): the keys and their values.
 		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
@@ -47,10 +49,6 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeQuiz, readonly string[]>> = {
 		// Glossary (batch D, 2026-09-27): replaces "No configuration object".
 		'"glossary"', '"term"', '"definition"',
 		"runInLastHint"],
-	exam: ['"explain"', '"topic"',
-		// The configuration object of an Exam (spec 2026-09-29 §1.1).
-		'mode: "exam"', '"examDurationMinutes"',
-		'"glossary"', '"term"', '"definition"'],
 };
 
 /** What no prompt may mention any more: the retired modes and fields, and the
@@ -69,16 +67,13 @@ const COMMON_FORBIDDEN_WORDS: readonly RegExp[] = [
 	/\btimeLimit\b/,
 ];
 
-/** The forbidden words of EACH mode's prompt (spec 2026-09-29 §4.6): the
-    common list, plus what belongs to another mode. `mode: "exam"` and its
-    duration stay out of the Learn and Practice prompts (a model that reads
-    them writes an Exam nobody asked for) and are required in the Exam prompt
-    (`CHAMPS_DECRITS.exam`). The Exam prompt, in turn, never names hints nor
-    slices (see `CHAMPS_DECRITS`): `/hint/i` also catches `runInLastHint`. */
-export const MOTS_INTERDITS: Readonly<Record<ModeQuiz, readonly RegExp[]>> = {
+/** The forbidden words of EACH generated type's prompt: the common list,
+    plus the Exam's configuration. `mode: "exam"` and its duration stay out of
+    the Learn and Test prompts, both: a model that reads them writes an Exam
+    nobody asked for (a Test is taken as an Exam only when it is started). */
+export const MOTS_INTERDITS: Readonly<Record<ModeGeneration, readonly RegExp[]>> = {
 	learn: [...COMMON_FORBIDDEN_WORDS, /mode:\s*"exam"/, /\bexamDurationMinutes\b/],
 	practice: [...COMMON_FORBIDDEN_WORDS, /mode:\s*"exam"/, /\bexamDurationMinutes\b/],
-	exam: [...COMMON_FORBIDDEN_WORDS, /hint/i, /\bslice\b/i],
 };
 
 /** The passages the prompt of EACH mode must contain word for word: the

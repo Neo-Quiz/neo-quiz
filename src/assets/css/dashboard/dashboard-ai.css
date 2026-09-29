@@ -2883,11 +2883,14 @@
 	height: 18px;
 }
 
-/* Learn | Test selector — values measured on claude.ai's "Chat | Cowork"
-   (2026-09-23): 28 px track, 1 px padding, 7 px radius, 5 % veil of the
-   text colour; 26 px block, 6 px radius, 10 % veil + 10 % inner hairline;
-   options 0 10 px, 14 px. The veils are RELATIVE to the text (color-mix) so
-   they hold on both themes. */
+/* Learn | Test selector — sizes measured on claude.ai's "Chat | Cowork"
+   (2026-09-23): 28 px track, 1 px padding, 7 px radius; 26 px block, 6 px
+   radius; options 0 10 px, 14 px. The COLOURS are the composer's own
+   (2026-09-29): the old veils of `--text-normal` (5 % track, 10 % block)
+   turned into a blue-grey on the app's blue-tinted text colour and clashed
+   with the composer. The track is now nothing at all (the composer's
+   surface shows through) and the sliding block is the same light overlay as
+   the hover of the "+" button beside it. */
 .qbd-ai-seg {
 	position: relative;
 	display: inline-flex;
@@ -2895,7 +2898,7 @@
 	height: 28px;
 	padding: 1px;
 	border-radius: 7px;
-	background: color-mix(in srgb, var(--text-normal) 5%, transparent);
+	background: transparent;
 	flex-shrink: 0;
 }
 
@@ -2905,10 +2908,7 @@
 	left: 0;
 	height: 26px;
 	border-radius: 6px;
-	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
-	box-shadow:
-		inset 0 0 0 1px color-mix(in srgb, var(--text-normal) 10%, transparent),
-		0 1px 2px rgba(0, 0, 0, 0.05);
+	background: var(--background-modifier-hover);
 	transform-origin: 0 50%;
 	will-change: transform;
 	pointer-events: none;
@@ -2941,17 +2941,6 @@
 .qbd-ai-seg-btn:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 1px;
-}
-
-/* The chevron of the Test button, which opens Practice | Exam. */
-.qbd-ai-seg-chevron {
-	display: inline-flex;
-	opacity: 0.7;
-}
-
-.qbd-ai-seg-chevron svg {
-	width: 14px;
-	height: 14px;
 }
 
 /* ── Menu Options en trois lignes + flyouts (2026-09-23) ──

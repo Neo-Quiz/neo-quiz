@@ -170,8 +170,8 @@ export const EN_APP = {
 	"app.settings.languageAuto": "Automatic (follow Windows)",
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",
-	"app.settings.groupModes": "Group the Learn and Practice of a course",
-	"app.settings.groupModesHint": "On the Folders page, a course with both modes shows as one card, with a button for each mode.",
+	"app.settings.groupModes": "Group the Learn and Test of a course",
+	"app.settings.groupModesHint": "On the Folders page, a course with both a Learn and a Test shows as one card, with a button for each.",
 	"app.settings.timeFormat24": "24-hour ({example})",
 	"app.settings.timeFormat12": "12-hour ({example})",
 
