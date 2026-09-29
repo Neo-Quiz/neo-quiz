@@ -964,12 +964,15 @@
 
    THE EFFECT is the app's, not StudySmarter's (their card only changes
    its background on hover): the halo of the folder cards
-   (`.qbd-module-card`), which brightens with a lightening veil on hover,
-   here coming down from the folder's colour bar instead of the top-left
-   corner — and the app's 3D buttons ("Start the quiz", "New quiz",
-   2026-09-29): the card stands 4 px above a solid edge IN THE FOLDER'S
-   COLOUR, drawn as a hard shadow so it keeps its size in the grid, and
-   sinks onto it when pressed (100 ms ease-out, the buttons' values). Only
+   (`.qbd-module-card`), from the same top-left corner, which brightens
+   with a lightening veil on hover — and the app's 3D buttons ("Start the
+   quiz", "New quiz", 2026-09-29): the card stands 4 px above a solid edge
+   IN THE FOLDER'S COLOUR, drawn as a hard shadow so it keeps its size in
+   the grid, and sinks onto it when pressed (100 ms ease-out, the buttons'
+   values). No colour bar across the top any more (removed the same day):
+   with the edge below, the folder's colour framed the card twice, and the
+   bar under a 15 px corner read as a separate strip. The edge alone
+   carries the colour, with a border faintly tinted by it. Only
    here: the same card variant also paints other pages, where no folder
    gives it a colour. `--accent` is the folder's colour, set on the drill
    layout (quizzes-render.ts).
@@ -977,13 +980,15 @@
 .qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder {
 	--glow: color-mix(in oklab, var(--accent) 40%, transparent);
 	--border-c: color-mix(in oklab, var(--accent) 45%, var(--border-soft));
-	/* The edge: the folder's colour, darkened as the buttons' edges are. */
-	--qbd-card3d-edge: color-mix(in oklab, var(--accent) 62%, #05060a);
+	/* The edge: the folder's colour, darkened as the buttons' edges are,
+	   and brighter on hover. */
+	--qbd-card3d-edge: color-mix(in oklab, var(--accent) 58%, #07080d);
 	box-sizing: border-box;
 	padding: 16px 12px 8px;
 	background:
-		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
+		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 68%),
 		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
+	border-color: color-mix(in oklab, var(--accent) 28%, var(--border-soft));
 	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen);
 	transition: background-color 0.22s ease, border-color 0.22s ease, --qbd-voile 0.22s ease,
 		--qbd-halo 0.22s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
@@ -992,8 +997,9 @@
 	transform: none;
 	--qbd-halo: 20%;
 	--qbd-voile: var(--qbd-carte-voile-survol);
+	--qbd-card3d-edge: color-mix(in oklab, var(--accent) 72%, #07080d);
 	background:
-		radial-gradient(120% 90px at 50% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 72%),
+		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 68%),
 		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
 	border-color: var(--border-c);
 	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow);
@@ -1010,19 +1016,6 @@
    dashboard-components.css), which would still apply through the pill. */
 .qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:has(button:active) {
 	transform: none;
-}
-/* The colour bar: 4 px across the top, clipped by the rounded corners,
-   with a soft glow of its own colour just under it. */
-.qbd-quizzes-drill-grid .qbd-quiz-card--folder::before {
-	content: "";
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	height: 4px;
-	background: var(--accent);
-	box-shadow: 0 1px 8px color-mix(in oklab, var(--accent) 60%, transparent);
-	pointer-events: none;
 }
 .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-text {
 	gap: 8px;
