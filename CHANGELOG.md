@@ -205,6 +205,7 @@ release notes.
 - Screen readers announce the Name and Weight fields of the exam window by their label, instead of an unnamed field and "2".
 - An empty equation answer field shows "Your answer..." like the other answer fields, instead of nothing that says you can write in it.
 - Leaving the Generate page during a generation and coming back no longer makes it forget the chosen AI tool ("Choose a provider"): a tool busy generating was taken for a missing one.
+- In a Learn, a recall question whose choices are the question itself ("Which of these statements are true?", or any multiple-choice recall) keeps its choices instead of turning into a free answer whose statements had disappeared; generated single-choice recalls are now written to be answerable without their options.
 
 
 ## [1.19.0] - 2026-09-23
