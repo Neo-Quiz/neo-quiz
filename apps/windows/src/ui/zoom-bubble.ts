@@ -112,8 +112,8 @@ export function createZoomBubble(deps: {
 
 	/* THE BUBBLE MUST NOT MOVE WHILE THE PAGE ZOOMS. It lives INSIDE the
 	   zoomed page, so CSS `zoom` cancels the page factor on it alone, like a
-	   browser's own bubble, which sits outside the page; `--nq-zoom-factor`
-	   keeps it just below the title bar, whose height does follow the zoom.
+	   browser's own bubble, which sits outside the page; the title bar does
+	   the same (shell.css), so the bubble sits a fixed distance below it.
 
 	   The trap: the page zoom changes one IPC round trip AFTER it is asked
 	   for. Compensating for the requested factor right away made the bubble
@@ -134,7 +134,10 @@ export function createZoomBubble(deps: {
 	}
 	function compensate(): void {
 		bubble.style.setProperty("zoom", String(1 / appliedZoom));
-		bubble.style.setProperty("--nq-zoom-factor", String(appliedZoom));
+		/* The same measured zoom, for the title bar (shell.css `--nq-zoom`),
+		   which must not zoom either: set on the root, where the page layout
+		   reads the bar's height too. */
+		document.documentElement.style.setProperty("--nq-zoom", String(appliedZoom));
 	}
 	function onResize(): void {
 		const dpr = window.devicePixelRatio;

@@ -47,6 +47,13 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 
 	const panneaux: Panneau[] = [];
 
+	/* THE MENU DOES NOT ZOOM, like the bar it opens from (shell.css,
+	   2026-09-29): its layer cancels the page zoom, so its panels are placed
+	   in SCREEN pixels. Every page measure (a rect, the window's size) is
+	   brought to screen pixels by the zoom the page actually has. */
+	const zoom = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nq-zoom")) || 1;
+	const ecran = (px: number): number => px * zoom;
+
 	function fermer(): void {
 		document.removeEventListener("keydown", surClavier, true);
 		window.removeEventListener("blur", fermer);
@@ -68,9 +75,10 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		el.style.left = "-9999px";
 		el.style.top = "-9999px";
 		couche.appendChild(el);
-		const { offsetWidth: largeur, offsetHeight: hauteur } = el;
-		const l = Math.max(4, Math.min(left, window.innerWidth - largeur - 4));
-		const h = Math.max(4, Math.min(top, window.innerHeight - hauteur - 4));
+		const taille = el.getBoundingClientRect();
+		const largeur = ecran(taille.width), hauteur = ecran(taille.height);
+		const l = Math.max(4, Math.min(left, ecran(window.innerWidth) - largeur - 4));
+		const h = Math.max(4, Math.min(top, ecran(window.innerHeight) - hauteur - 4));
 		el.style.left = `${l}px`;
 		el.style.top = `${h}px`;
 	}
@@ -144,7 +152,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		panneaux[niveauParent].lignes.forEach(l => l.removeAttribute("aria-expanded"));
 		ligneEl.setAttribute("aria-expanded", "true");
 		const rect = ligneEl.getBoundingClientRect();
-		ouvrirNiveau(niveauParent + 1, entree.items, rect.right - 4, rect.top - 12);
+		ouvrirNiveau(niveauParent + 1, entree.items, ecran(rect.right) - 4, ecran(rect.top) - 12);
 	}
 
 	function activer(entree: EntreeMenu, ligneEl: HTMLElement): void {
@@ -200,7 +208,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	window.addEventListener("blur", fermer);
 
 	const rectAncre = ancre.getBoundingClientRect();
-	ouvrirNiveau(0, arbre, rectAncre.left, rectAncre.bottom + 4);
+	ouvrirNiveau(0, arbre, ecran(rectAncre.left), ecran(rectAncre.bottom) + 4);
 
 	return fermer;
 }

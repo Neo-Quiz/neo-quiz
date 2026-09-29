@@ -13,10 +13,9 @@
 
 .nq-zoom-bubble {
 	position: fixed;
-	/* Just below the title bar. The bar's height follows the page zoom, the
-	   bubble's own lengths do not (`zoom` cancels it, see the module), hence
-	   the factor. */
-	top: calc(var(--nq-barre-hauteur) * var(--nq-zoom-factor, 1) + 8px);
+	/* Just below the title bar, which does not zoom either (shell.css): both
+	   are measured in screen pixels. */
+	top: calc(var(--nq-barre-ecran) + 8px);
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 100;
