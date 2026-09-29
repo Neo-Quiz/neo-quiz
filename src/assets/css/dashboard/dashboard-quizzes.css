@@ -1122,12 +1122,14 @@
 
 /* ── Au-dessus de la grille : l'étape suivante (« Nouveau quiz » est dans
    l'en-tête du dossier depuis le 2026-09-26). ── */
-/* Each button takes only the room it needs (2026-09-29): stretched over
-   the whole width, "Resume" read as a banner rather than a button. A long
+/* Each button takes only the room it needs, centred (2026-09-29):
+   stretched over the whole width, "Resume" read as a banner rather than a
+   button. A long
    title is still cut by the button's own ellipsis (max-width). */
 .qbd-quizzes-drill-next {
 	display: flex;
 	flex-wrap: wrap;
+	justify-content: center;
 	align-items: flex-start;
 	gap: 14px;
 	margin-bottom: 18px;
