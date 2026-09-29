@@ -31,6 +31,16 @@ const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
+/** THE HINT BADGE (spec 2026-09-29-test-practice-exam-design §2.3): a dot
+    whose question used its hint carries the Hint button's bulb instead of
+    its verdict mark (✓, ↻, ✗) — `used-hint`, drawn by nav-tabs.css. Only on
+    a dot that HAS a verdict mark; its colour still follows the result.
+    Test and Learn alike. PURE, so that check:engine-review holds it. */
+export function withHintBadge(etat: string, hintUsed: boolean): string {
+	if (!hintUsed || !/(^|\s)(correct|retried|wrong)(\s|$)/.test(etat)) return etat;
+	return `${etat} used-hint`;
+}
+
 export interface CardHandlers {
 	tabClass(i: number): string;
 	navHtml(): string;
@@ -71,7 +81,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		/* `is-repere` : une question sur cinq (Q5, Q10…), qui garde son numéro
 		   quand la frise de perles de l'application passe en points
 		   (`perles.css`). Sans effet sur les onglets du greffon. */
-		return `${n === 0 ? "is-lecture " : n % 5 === 0 ? "is-repere " : ""}${tabEtat(i)}`.trim();
+		const etat = withHintBadge(tabEtat(i), !!ctx.quizState.hintSeen?.[i]);
+		return `${n === 0 ? "is-lecture " : n % 5 === 0 ? "is-repere " : ""}${etat}`.trim();
 	}
 
 	function tabEtat(i: number): string {
@@ -647,17 +658,21 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   mémoire n'en a pas, puisqu'elle se retourne pour se lire. */
 		// An Exam shows no hint at all (engine/hand-in.ts showsHints).
 		const indice = !isRead && !ctx.isFlashcardQuestion(q) && ctx.handIn.showsHints() ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
-		const hintBtn = indice.bouton;
+		/* No Hint button once the card shows its correction (a handed-in Test,
+		   a checked Learn card): the explanation is there, and a hint read
+		   AFTER the verdict would turn its ✓ into the bulb (withHintBadge)
+		   although it did not help. Levels already seen stay displayed. */
+		const hintBtn = ctx.isRevealed(qi) ? "" : indice.bouton;
 		const indiceHtml = indice.revele;
-		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une
-		// tentative VIDE mais EXPLICITE. Passer à la suite sans répondre donne
-		// désormais le même verdict (engine/state.ts marquerPreNonTentees). Gardée par !ctx.quizState.locked comme hintBtn/
-		// lessonContent : un quiz déjà soumis n'a plus rien à "laisser passer".
-		// Round 1 de revue (Finding 4) : masqué dès que lessonPreSkipped[qi] est
-		// déjà vrai — sur la DERNIÈRE question (aucune navigation suivante
-		// possible), le clic ne produisait sinon aucun effet visible ; sa
-		// disparition EST l'effet visible attendu, en plus du re-rendu qui la
-		// déclenche (interactions.ts markLessonPreSkipped).
+		// Task 7 (Learn): "I don't know" on a pre-question — an EMPTY but
+		// EXPLICIT attempt. Moving on without answering now gives the same
+		// verdict (engine/state.ts marquerPreNonTentees). Guarded by
+		// !isRevealed like hintBtn: a card already corrected has nothing left
+		// to "let pass". Round 1 of review (Finding 4): hidden as soon as
+		// lessonPreSkipped[qi] is true — on the LAST question (no next
+		// navigation), the click otherwise had no visible effect; its
+		// disappearance IS the expected visible effect, on top of the re-render
+		// that triggers it (interactions.ts markLessonPreSkipped).
 		const dontKnowBtn = (!hintBtn && !isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.isRevealed(qi) && !ctx.quizState.lessonPreSkipped[qi])
 			? `<button class="quiz-help-btn quiz-lesson-dontknow-btn" type="button">${ICON_HELP}<span>${t("engine.lesson.dontKnow")}</span></button>`
 			: "";

@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- A question answered with the help of its hint shows a bulb on its dot instead of the check, circling arrow or cross, in Learn and in a handed-in test; the dot's colour still gives the result. Once a question shows its correction, its Hint button is gone.
 - Course terms: the key terms of a quiz are underlined in its readings, explanations and hints; hover, focus or tap one to read its definition in a bubble. Generated quizzes come with their glossary, and the quiz editor has a Vocabulary window to change it.
 - Generate detects the subject of a quiz (Python, C, Bash / Linux, SQL, Web, Maths, Networking) from the attached files' names, the destination folder and your request, and says so next to the options button ("Python detected"). The prompt is then adapted to the subject: for Python, fenced runnable examples, questions on what `print` displays, and each idiom shown in its compact form, its result and its loop equivalent. The subject can be changed in the quiz options (Automatic by default).
 - Generated quizzes give every Learn question a hint, with key words in bold, a concrete example and, for a hard question, two or three levels; explanations put their two or three key words in bold; a reading explains every compact line in full; a step that introduces terms has at least one flashcard; ordering items are single lines of inline code.

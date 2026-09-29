@@ -916,3 +916,36 @@ await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
 	delete globalThis.document;
 	r.done();
 });
+
+/* THE HINT BADGE (spec 2026-09-29 §2.3): a dot whose question used its hint
+   shows the bulb INSTEAD of its verdict mark — only when it has one (right,
+   retried, wrong), in a Test and in a Learn; the verdict class stays, so the
+   colour still follows the result. */
+await withSrcModule("src/engine/cards.ts", ({ withHintBadge, createCardRenderers }) => {
+	const r = makeReporter("Hint badge on the dots");
+	/* Through the REAL tabClass (what updateNavHighlight writes on the dots):
+	   a handed-in Test, Q1 right with its hint, Q2 wrong without. */
+	const ctx = {
+		quiz: [{}, {}], slideMap: [], numeroAffiche: (i) => i + 1,
+		quizState: { current: 9, locked: true, hintSeen: [true, false] },
+		isQuestionSlideIndex: () => false,
+		learn: { verdictOf: () => "none", isCheckable: () => false, isGraded: () => true },
+		textOnly: { isTextOnlyFor: () => false },
+		hasAnyAnswer: () => true, isRevealed: () => true, isCorrect: (i) => i === 0,
+	};
+	const cards = createCardRenderers(ctx);
+	r.check("tabClass: the bulb on the dot answered with a hint, the plain mark on the other",
+		[cards.tabClass(0), cards.tabClass(1)], ["correct used-hint", "wrong"]);
+	// Before the hand-in a Test's dots only say "answered": no verdict, no bulb.
+	ctx.quizState.locked = false;
+	ctx.isRevealed = () => false;
+	r.check("tabClass before the hand-in: answered, no bulb", [cards.tabClass(0), cards.tabClass(1)], ["answered", "answered"]);
+	r.check("a verdict dot whose hint was used gets the bulb, its verdict kept",
+		["correct", "active retried", "wrong"].map(e => withHintBadge(e, true)),
+		["correct used-hint", "active retried used-hint", "wrong used-hint"]);
+	r.check("no hint used: the verdict mark stays", withHintBadge("correct", false), "correct");
+	r.check("no verdict yet (answered, current, self-rated): no badge",
+		["answered", "active", "", "understood", "partial"].map(e => withHintBadge(e, true)),
+		["answered", "active", "", "understood", "partial"]);
+	r.done();
+});
