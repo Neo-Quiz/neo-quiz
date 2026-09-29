@@ -204,6 +204,7 @@ release notes.
 - An open folder's title shows the same icon as its card: a folder named after its subject ("XTI301 - Python") showed its braces on the card but a book on its own page.
 - Screen readers announce the Name and Weight fields of the exam window by their label, instead of an unnamed field and "2".
 - An empty equation answer field shows "Your answer..." like the other answer fields, instead of nothing that says you can write in it.
+- Leaving the Generate page during a generation and coming back no longer makes it forget the chosen AI tool ("Choose a provider"): a tool busy generating was taken for a missing one.
 
 
 ## [1.19.0] - 2026-09-23

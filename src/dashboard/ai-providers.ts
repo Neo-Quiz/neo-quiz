@@ -1680,6 +1680,18 @@ const CLAUDE_CODE_TTL = 60000;
 /* Claude Code CLI installé ? → { ok, version?, reason? }
    `force` ignore le TTL (relance le CLI) — sert à re-vérifier la version
    à l'ouverture du menu fournisseur, après un éventuel update. */
+/* A probe refused because a `run` of the SAME tool is under way — a
+   generation: the host launches one at a time and answers `occupe` (after
+   waiting up to 15 s). The tool is plainly installed, it is running. Counted
+   as "not installed" like any other rejection (until 2026-09-29), it made
+   the Generate page forget the chosen provider — `setStatus` clears a
+   provider in error, and writes it — as soon as the page was painted again
+   during a generation (leaving Generate and coming back was enough). A busy
+   probe keeps the last known answer and is not cached. */
+function estOccupe(e: unknown): boolean {
+	return e instanceof Error && e.name === "occupe";
+}
+
 export async function checkClaudeCode(force?: boolean): Promise<ClaudeCodeStatus> {
 	if (!currentHost().platform.isDesktopApp) {
 		return { ok: false, reason: "mobile" };
@@ -1692,13 +1704,18 @@ export async function checkClaudeCode(force?: boolean): Promise<ClaudeCodeStatus
 	   en 10 s (`timeout`), ou l'hôte ne sait pas encore lancer de CLI
 	   (`indisponible`, l'application jusqu'à la tâche 7). Un code de sortie
 	   non nul aussi — l'ancien `exec` le rendait dans `err`. */
+	let occupe = false;
 	const result = await requireHost("process")
 		.run({ tool: "claude", args: ["--version"], stdin: "", timeoutMs: 10000 })
 		.then((res): ClaudeCodeStatus => res.code === 0
 			? { ok: true, version: (res.stdout || "").trim().split(/\s+/)[0] || "" }
 			: { ok: false, reason: "not-installed" })
-		.catch((): ClaudeCodeStatus => ({ ok: false, reason: "not-installed" }));
-	claudeCodeCache = { at: Date.now(), result };
+		.catch((e: unknown): ClaudeCodeStatus => {
+			if (!estOccupe(e)) return { ok: false, reason: "not-installed" };
+			occupe = true;
+			return claudeCodeCache?.result.ok ? claudeCodeCache.result : { ok: true, version: "" };
+		});
+	if (!occupe) claudeCodeCache = { at: Date.now(), result };
 	return result;
 }
 
@@ -1715,6 +1732,7 @@ export async function checkCodex(force?: boolean): Promise<CodexStatus> {
 		return codexCache.result;
 	}
 	// Même règle que `checkClaudeCode` : tout rejet vaut « pas installé ».
+	let occupe = false;
 	const result = await requireHost("process")
 		.run({ tool: "codex", args: ["--version"], stdin: "", timeoutMs: 10000 })
 		.then((res): CodexStatus => {
@@ -1722,8 +1740,13 @@ export async function checkCodex(force?: boolean): Promise<CodexStatus> {
 			const parts = (res.stdout || "").trim().split(/\s+/);
 			return { ok: true, version: parts[parts.length - 1] || "" };
 		})
-		.catch((): CodexStatus => ({ ok: false, reason: "not-installed" }));
-	codexCache = { at: Date.now(), result };
+		// A busy tool is an installed one (see `estOccupe`).
+		.catch((e: unknown): CodexStatus => {
+			if (!estOccupe(e)) return { ok: false, reason: "not-installed" };
+			occupe = true;
+			return codexCache?.result.ok ? codexCache.result : { ok: true, version: "" };
+		});
+	if (!occupe) codexCache = { at: Date.now(), result };
 	return result;
 }
 
@@ -1740,6 +1763,7 @@ export async function checkAntigravity(force?: boolean): Promise<CodexStatus> {
 	if (!force && antigravityCache && Date.now() - antigravityCache.at < CLAUDE_CODE_TTL) {
 		return antigravityCache.result;
 	}
+	let occupe = false;
 	const result = await requireHost("process")
 		.run({ tool: "agy", args: ["--version"], stdin: "", timeoutMs: 10000 })
 		.then((res): CodexStatus => {
@@ -1747,8 +1771,13 @@ export async function checkAntigravity(force?: boolean): Promise<CodexStatus> {
 			const parts = (res.stdout || "").trim().split(/\s+/);
 			return { ok: true, version: parts[parts.length - 1] || "" };
 		})
-		.catch((): CodexStatus => ({ ok: false, reason: "not-installed" }));
-	antigravityCache = { at: Date.now(), result };
+		// A busy tool is an installed one (see `estOccupe`).
+		.catch((e: unknown): CodexStatus => {
+			if (!estOccupe(e)) return { ok: false, reason: "not-installed" };
+			occupe = true;
+			return antigravityCache?.result.ok ? antigravityCache.result : { ok: true, version: "" };
+		});
+	if (!occupe) antigravityCache = { at: Date.now(), result };
 	return result;
 }
 
