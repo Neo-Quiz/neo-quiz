@@ -1079,9 +1079,10 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 
 	/** Navigation ‹ › — les flèches bleues 3D du quiz (`.quiz-question-nav
 	    .quiz-nav-btn`, action-buttons.css : face bleue, tranche, enfoncement
-	    au clic, grise et à plat quand désactivée), et la position entre les
-	    deux (refonte de l'éditeur, 2026-09-26 : les deux ronds fantômes gris
-	    d'avant ne se lisaient pas comme des flèches). Repeinte seule à chaque
+	    au clic, grise et à plat quand désactivée), sans texte de position :
+	    « Question 14 sur 20 » comptait les lectures, la liste dit 11
+	    (2026-09-29). Refonte de l'éditeur, 2026-09-26 : les deux ronds
+	    fantômes gris d'avant ne se lisaient pas comme des flèches. Repeinte seule à chaque
 	    glissement, pour que l'état désactivé suive sans reconstruire la
 	    question. */
 	function paintNav(listCol: HTMLElement, panel: HTMLElement, nav: HTMLElement, spec: QuizPageSpec): void {
@@ -1102,9 +1103,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			const cible = voisine(activeIdx, -1);
 			if (cible >= 0) goToQuestion(cible, listCol, panel, nav, spec);
 		});
-
-		ajouter(nav, "span", "qbd-qz-nav-pos",
-			t("dashboard.quiz.position", { n: pos + 1, total: vis.length }));
 
 		const next = ajouter(nav, "button", "quiz-nav-btn");
 		next.type = "button";

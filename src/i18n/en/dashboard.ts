@@ -316,7 +316,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.deleteQuestion": "Delete this question",
 	"dashboard.quiz.prev": "Previous question",
 	"dashboard.quiz.next": "Next question",
-	"dashboard.quiz.position": "Question {n} of {total}",
 	"dashboard.quiz.editAnswers": "Answers",
 	"dashboard.quiz.promptEmpty": "Empty question",
 	"dashboard.quiz.back": "Back",

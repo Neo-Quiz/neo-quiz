@@ -253,21 +253,32 @@ const OPTION_COURTE = 32;
     barre « Rôle » de l'éditeur (detail-edition.ts). Partagé avec les cartes
     de la liste de l'éditeur (detail.ts), qui y ajoutent leurs commandes :
     rendu, pour qu'elles s'y greffent. */
-export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
-	const top = ajouter(card, "span", "qbd-fiche-q-top");
+/** The circle a question wears in the list, the grid and the editor: the
+    displayed number on blue, or the book on purple for a reading. Nothing
+    for a numberless non-reading (`numero` 0). Shared, never redrawn, so the
+    editor cannot drift from the list. */
+export function renderNumero(parent: HTMLElement, q: DraftQuestion, numero: number): HTMLElement | null {
 	if (q.role === "read") {
 		/* A reading has no question number (src/lecture-etape.ts): its circle
 		   carries the book, in the readings' purple (the reading bead, the
 		   resource button), in place of a number and of the small icon before
-		   its label (2026-09-29). Its type would teach nothing: it expects
-		   no answer. */
-		const rond = ajouter(top, "span", "qbd-fiche-num qbd-fiche-num--read");
+		   its label (2026-09-29). */
+		const rond = ajouter(parent, "span", "qbd-fiche-num qbd-fiche-num--read");
 		icone(rond, "book-open", "qbd-fiche-num-icon");
+		return rond;
+	}
+	// 0: a card without a question number — its type's icon says what it is.
+	return numero > 0 ? ajouter(parent, "span", "qbd-fiche-num", String(numero)) : null;
+}
+
+export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
+	const top = ajouter(card, "span", "qbd-fiche-q-top");
+	renderNumero(top, q, numero);
+	if (q.role === "read") {
+		// Its type would teach nothing: a reading expects no answer.
 		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleRead"));
 		return top;
 	}
-	// 0: a card without a question number — its type's icon says what it is.
-	if (numero > 0) ajouter(top, "span", "qbd-fiche-num", String(numero));
 	if (q.role === "explain") {
 		// Une explication est toujours libre : son type n'apprendrait rien non plus.
 		icone(top, "pen-line", "qbd-fiche-q-icon");

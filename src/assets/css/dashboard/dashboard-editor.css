@@ -752,22 +752,14 @@
 	.qbd-qz-form .qb-match-arrow { display: none; }
 }
 
-/* ── Navigation du bas : les flèches bleues du quiz, et la position ── */
+/* ── Navigation du bas : les flèches bleues du quiz, centrées en paire ── */
 .qbd-qz-nav.quiz-question-nav {
 	align-items: center;
+	justify-content: center;
 	gap: 16px;
 	margin: 6px 0 auto;
 	/* La tranche des flèches (4 px) ne doit pas toucher le bas. */
 	padding: 0 0 4px;
-}
-.qbd-qz-nav-pos {
-	min-width: 0;
-	font-size: 13px;
-	font-weight: 500;
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-	color: var(--text-normal);
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 /* ── La page d'édition : barre, rendu corrigé, « Plus »

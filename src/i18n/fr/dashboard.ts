@@ -274,7 +274,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.deleteQuestion": "Supprimer cette question",
 	"dashboard.quiz.prev": "Question précédente",
 	"dashboard.quiz.next": "Question suivante",
-	"dashboard.quiz.position": "Question {n} sur {total}",
 	"dashboard.quiz.editAnswers": "Réponses",
 	"dashboard.quiz.promptEmpty": "Question vide",
 	"dashboard.quiz.back": "Retour",

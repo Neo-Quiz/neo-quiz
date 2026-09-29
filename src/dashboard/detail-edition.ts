@@ -14,6 +14,7 @@ import { monterEditionRendu } from "./edition-rendu";
 import { createFormBridge } from "./detail-form-bridge";
 import { renderStyleLecture } from "./detail-lecture-style";
 import type { FormBridge } from "./detail-form-bridge";
+import { renderNumero } from "./detail-fiche";
 import { bloc, renderExtras, section } from "./detail-question";
 import type { EditCallbacks } from "./detail-question";
 
@@ -22,12 +23,13 @@ import type { EditCallbacks } from "./detail-question";
    (chantier « éditer dans le rendu », 2026-09-26, tâche 5)
 
    De haut en bas :
-   - une BARRE fine — le type de la question et, dans un Learn, son rôle :
-     deux menus `ui-select` précédés de leur nom, du texte et des contrôles,
-     pas une carte ;
+   - une BARRE fine — le numéro de la question (le même rond que la liste)
+     et son type : un menu `ui-select` précédé de son nom, du texte et des
+     contrôles, pas une carte ;
    - le RENDU corrigé de la question (edition-rendu.ts) : on clique un texte
      pour le modifier, la lettre d'une réponse pour la marquer juste… ;
-   - « Plus », repliable, fermé par défaut : le formulaire de l'éditeur
+   - « Plus », repliable, fermé par défaut : le rôle (Learn seulement) et le
+     formulaire de l'éditeur
      LIMITÉ à ce que le rendu ne sait pas faire (champs du type rares,
      énoncé ou explication restés en HTML, document, leçon, ressource,
      indice). Son état ouvert/fermé est tenu par la page, pour survivre aux
@@ -49,7 +51,7 @@ export interface EditionCallbacks {
 	/** « Plus » est-il ouvert ? Mémorisé par la page. */
 	plusOuvert: boolean;
 	setPlusOuvert(ouvert: boolean): void;
-	/** Le quiz est un Learn : la barre propose le rôle. */
+	/** The quiz is a Learn: « Plus » offers the role (a Test has none). */
 	estLecon: boolean;
 	/** L'élément `read` de l'étape de la question (src/lecture-etape.ts) :
 	    son cours s'affiche au-dessus du rendu, son titre et son texte s'y
@@ -83,7 +85,8 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 	parent.classList.add("qbd-qz-er");
 	/** Faux dès le nettoyage : une modale restée ouverte ne touche plus rien. */
 	let vivant = true;
-	renderBarre(parent, q, cb, () => vivant);
+	// `index` counts from 0 and is -1 for a reading: the list's number is index + 1.
+	renderBarre(parent, q, index + 1, cb, () => vivant);
 
 	const hoteRendu = ajouter(parent, "div", "qbd-qz-er-rendu");
 	let demonter: (() => void) | null = null;
@@ -156,17 +159,21 @@ export function renderQuestionEditRendu(parent: HTMLElement, q: DraftQuestion, i
 	};
 }
 
-/* ── La barre : type et rôle ──────────────────────────────── */
+/* ── La barre : numéro et type ────────────────────────────── */
 
-function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks, estVivant: () => boolean): void {
+function renderBarre(parent: HTMLElement, q: DraftQuestion, numero: number, cb: EditionCallbacks, estVivant: () => boolean): void {
 	const barre = ajouter(parent, "div", "qbd-qz-er-barre");
 	const ui = currentHost().ui;
 
-	/* Une LECTURE n'a pas de réponse, donc pas de type : le moteur la rend
-	   sans contrôle quel que soit `_type`. Le sélecteur est caché tant que
-	   le rôle vaut « read », et revient si on change le rôle. */
+	// The list's own circle (number, or the reading's book), never a copy.
+	renderNumero(barre, q, numero);
+
+	/* A READING has no answer, hence no type: the engine renders it without a
+	   control whatever `_type` says. The selector stays hidden while the role
+	   is "read" and returns when the role changes (which repaints the panel,
+	   `onListeChange`). A Test has no role, so nothing hides it there. */
 	const zoneType = ajouter(barre, "span", "qbd-qz-er-barre-zone");
-	zoneType.hidden = q.role === "read";
+	zoneType.hidden = cb.estLecon && q.role === "read";
 	ajouter(zoneType, "span", "qbd-qz-er-barre-nom", t("editor.render.type"));
 	const type = createSelect(zoneType, {
 		value: q._type,
@@ -204,12 +211,14 @@ function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks
 		},
 	});
 	type.el.setAttribute("aria-label", t("editor.render.type"));
+}
 
-	/* Le rôle n'a de sens que dans un Learn (engine/lesson.ts) ; une question
-	   qui en porte déjà un le montre aussi, pour qu'on puisse le corriger. */
-	if (!cb.estLecon && !q.role) return;
-	ajouter(barre, "span", "qbd-qz-er-barre-nom", t("editor.render.role"));
-	const role = createSelect(barre, {
+/** The role of a Learn's question, in « Plus » (rare field): a role only
+    drives a Learn (engine/lesson.ts), so a Test never gets one. Written like
+    before, through the same `onChange`. */
+function renderRole(box: HTMLElement, q: DraftQuestion, cb: EditionCallbacks): void {
+	const sec = bloc(box, t("editor.render.role"));
+	const role = createSelect(sec, {
 		value: q.role ?? "test",
 		options: QUESTION_ROLES.map(r => ({ value: r, label: t(ROLE_LIBELLES[r]) })),
 		onChange: (v) => {
@@ -218,8 +227,8 @@ function renderBarre(parent: HTMLElement, q: DraftQuestion, cb: EditionCallbacks
 			// Sans rôle, une question EST un test : rien à écrire.
 			if (r === "test" && !q.role) return;
 			q.role = r;
-			zoneType.hidden = r === "read";
 			cb.onChange();
+			// Repaints the panel, so the bar shows or hides the type again.
 			cb.onListeChange();
 		},
 	});

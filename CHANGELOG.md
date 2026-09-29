@@ -51,6 +51,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The question editor shows the same number badge as the list (the book for a reading) and no longer prints "Question 14 of 20", which counted readings; the Role menu moved into More for a Learn and is gone for a Test.
 - A course's quizzes show as two separate buttons, each with its type and question count, instead of a Learn | Test toggle that made them look like two modes of one quiz.
 - A folder's upcoming exams show their Edit and Delete buttons directly instead of a ⋮ menu.
 - An exam's date is picked in the app's own calendar instead of the grey system one, and shown written out in full ("Wednesday, September 30, 2026"). An exam now needs a name and takes an optional coefficient, shown as "coef. 2" in its row. The "Related tasks" section of a folder's Review plan is gone.
