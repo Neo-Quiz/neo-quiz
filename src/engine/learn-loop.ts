@@ -17,36 +17,13 @@
    `npm run check:learn-loop`.
    ══════════════════════════════════════════════════════════ */
 
-/** How a Learn question stands: never checked, right the first time, right
-    after a miss, or not right yet (or given up after three retries). */
-export type LearnVerdict = "none" | "first" | "retried" | "missed";
+import type { LearnResume, LearnVerdict, QuizState } from "../types/quiz";
 
 export const LEARN_VERDICTS: readonly LearnVerdict[] = ["none", "first", "retried", "missed"];
 
-/** A missed question waiting for its retry, and how many OTHER questions
-    have been checked since it was missed. */
-export interface LearnQueueEntry {
-	qi: number;
-	since: number;
-}
-
-/** Where the normal order resumes once the pending retries are done: a
-    question index, `"end"` (past the last question), or `null` when the
-    learner is not away on a retry. */
-export type LearnResume = number | "end" | null;
-
-export interface LearnLoopState {
-	learnVerdicts: LearnVerdict[];
-	/** Misses per question in this session (the first one included). */
-	learnMisses: number[];
-	/** The question is being retried: its answer was cleared, it is open. */
-	learnRetrying: boolean[];
-	/** The CURRENT attempt of the question has been checked: its card shows
-	    the correction (`isRevealed`, engine/learn.ts). */
-	learnChecked: boolean[];
-	learnQueue: LearnQueueEntry[];
-	learnResume: LearnResume;
-}
+/** The part of the quiz state this module reads and writes (types/quiz.ts). */
+export type LearnLoopState = Pick<QuizState,
+	"learnVerdicts" | "learnMisses" | "learnRetrying" | "learnChecked" | "learnPending" | "learnQueue" | "learnResume" | "learnRetryQi">;
 
 /** Other questions to check before a missed one comes back. */
 export const RETRY_LAG = 2;
@@ -59,8 +36,10 @@ export function emptyLearnState(n: number): LearnLoopState {
 		learnMisses: new Array<number>(n).fill(0),
 		learnRetrying: new Array<boolean>(n).fill(false),
 		learnChecked: new Array<boolean>(n).fill(false),
+		learnPending: new Array<boolean>(n).fill(false),
 		learnQueue: [],
 		learnResume: null,
+		learnRetryQi: null,
 	};
 }
 
@@ -80,9 +59,10 @@ export interface LearnCheckOutcome {
  * arrow): a verdict is given once per attempt.
  */
 export function applyCheck(s: LearnLoopState, qi: number, correct: boolean): LearnCheckOutcome | null {
-	if (s.learnChecked[qi] && !s.learnRetrying[qi]) return null;
+	if (s.learnChecked[qi] && !s.learnRetrying[qi] && !s.learnPending[qi]) return null;
 	const firstCheck = s.learnVerdicts[qi] === "none";
 	s.learnRetrying[qi] = false;
+	s.learnPending[qi] = false;
 	s.learnChecked[qi] = true;
 	s.learnQueue = s.learnQueue.filter(e => e.qi !== qi);
 	for (const e of s.learnQueue) e.since++;
@@ -104,6 +84,14 @@ export function applyNeutralCheck(s: LearnLoopState, qi: number): void {
 	s.learnChecked[qi] = true;
 }
 
+/** A written answer is checked: its card shows the model answer, and the
+    verdict waits for the learner's own rating (`applyCheck` then accepts
+    it once). */
+export function revealForSelfRating(s: LearnLoopState, qi: number): void {
+	s.learnChecked[qi] = true;
+	s.learnPending[qi] = true;
+}
+
 export type LearnMove =
 	| { kind: "retry"; qi: number; resume: Exclude<LearnResume, null> }
 	| { kind: "go"; qi: number | null };
@@ -123,7 +111,18 @@ export function nextLearnMove(
 	stepOf: (qi: number) => number | null,
 	next: (qi: number) => number | null,
 ): LearnMove {
-	const target = s.learnResume === "end" ? null : s.learnResume ?? next(current);
+	/* A retry left WITHOUT being checked (the learner jumped away by a bead
+	   or the previous arrow) goes back in the queue, due at once: it is not
+	   lost, and it is not red forever for want of a second chance. */
+	s.learnRetrying.forEach((retrying, qi) => {
+		if (retrying && qi !== current && !s.learnChecked[qi] && !s.learnQueue.some(e => e.qi === qi)) {
+			s.learnQueue.push({ qi, since: RETRY_LAG });
+		}
+	});
+	// The resume point only holds on the retried card itself.
+	const away = s.learnResume !== null && s.learnRetryQi === current;
+	if (!away) s.learnResume = null;
+	const target = away ? (s.learnResume === "end" ? null : s.learnResume as number) : next(current);
 	const leaving = target === null || stepOf(target) !== stepOf(current);
 	const others = s.learnQueue.filter(e => e.qi !== current);
 	const pick = others.find(e => e.since >= RETRY_LAG)
@@ -139,12 +138,15 @@ export function beginRetry(s: LearnLoopState, qi: number, resume: Exclude<LearnR
 	s.learnQueue = s.learnQueue.filter(e => e.qi !== qi);
 	s.learnRetrying[qi] = true;
 	s.learnChecked[qi] = false;
+	s.learnPending[qi] = false;
 	s.learnResume = resume;
+	s.learnRetryQi = qi;
 }
 
 /** The learner is back in the normal order. */
 export function resumeNormalOrder(s: LearnLoopState): void {
 	s.learnResume = null;
+	s.learnRetryQi = null;
 }
 
 export interface LearnSummary {

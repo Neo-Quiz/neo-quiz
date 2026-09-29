@@ -82,6 +82,15 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const entry = ctx.slideMap[cur] as { questionIndex?: number } | undefined;
 		const isActive = ctx.isQuestionSlideIndex(cur) && entry?.questionIndex === i;
 		const active = isActive ? "active" : "";
+		/* THE LEARN VERDICT comes first (engine/learn.ts, 2026-09-29): green =
+		   right the first time, orange = right after a miss, red = not right
+		   yet. It outlives the lock too: after the results, a retried question
+		   stays orange, never "correct" by its last answer alone. */
+		const verdict = ctx.learn.verdictOf(i);
+		if (verdict !== "none") return `${active} ${verdict === "first" ? "correct" : verdict === "retried" ? "retried" : "wrong"}`.trim();
+		// A Learn `pre` question is a guess by design: never green nor red,
+		// not even once the results lock the quiz.
+		if (ctx.learn.isCheckable(i) && !ctx.learn.isGraded(i)) return `${active} ${ctx.hasAnyAnswer(i) ? "answered" : ""}`.trim();
 		// Décision PAR QUESTION (isTextOnlyFor) : en mode Leçon, seul l'onglet
 		// d'une question de rôle "recall" doit refléter l'auto-évaluation ; les
 		// autres onglets du même quiz restent QCM même si un `qi` voisin est recall.
@@ -93,6 +102,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			return active;
 		}
 		if (!ctx.hasAnyAnswer(i)) return active;
+		if (!ctx.isRevealed(i)) return `${active} answered`.trim();
+		// A checked `pre` question has no verdict: it stays "answered".
 		if (!ctx.quizState.locked) return `${active} answered`.trim();
 		return `${active} ${ctx.isCorrect(i) ? "correct" : "wrong"}`.trim();
 	}
@@ -155,10 +166,14 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			? "engine.nav.nextQuestion"
 			: ctx.textOnly.isExamAnswerPhase() ? "engine.exam.finish" : "engine.nav.results");
 		const prevLabel = ctx.escapeHtmlAttr(t("engine.nav.prevQuestion"));
-		const nextAttr = ctx.escapeHtmlAttr(nextLabel);
+		/* In a Learn, the next arrow on an answered, unchecked question CHECKS
+		   it first ("Check, then Continue"): its label says so. `data-nav-label`
+		   keeps the moving label for `learn.syncControls`, which updates it as
+		   an answer is typed without a re-render. */
+		const nextAttr = ctx.escapeHtmlAttr(ctx.learn.canCheck(qi) ? t("engine.learn.check") : nextLabel);
 		return `<div class="quiz-question-nav">
 			<button class="quiz-nav-btn quiz-prev-btn" type="button" aria-label="${prevLabel}"${isFirst ? " disabled" : ""}>${ICON_ARROW_LEFT}</button>
-			<button class="quiz-nav-btn quiz-next-btn" type="button" aria-label="${nextAttr}">${ICON_ARROW_RIGHT}</button>
+			<button class="quiz-nav-btn quiz-next-btn" type="button" aria-label="${nextAttr}" data-nav-label="${ctx.escapeHtmlAttr(nextLabel)}">${ICON_ARROW_RIGHT}</button>
 		</div>`;
 	}
 
@@ -190,7 +205,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const sel = ctx.quizState.selections[qi];
 		if (q.multiSelect) {
 			const selected = sel instanceof Set && sel.has(oi);
-			if (!ctx.quizState.locked) return selected ? "selected" : "";
+			if (!ctx.isRevealed(qi)) return selected ? "selected" : "";
 			const correct = Array.isArray(q.correctIndices) && q.correctIndices.includes(oi);
 			if (selected && correct) return "correct";
 			if (selected && !correct) return "wrong";
@@ -198,7 +213,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			return "";
 		}
 		const selected = sel === oi;
-		if (!ctx.quizState.locked) return selected ? "selected" : "";
+		if (!ctx.isRevealed(qi)) return selected ? "selected" : "";
 		const correct = oi === q.correctIndex;
 		if (selected && correct) return "correct";
 		if (selected && !correct) return "wrong";
@@ -293,16 +308,17 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// QCM/ordering → number[] (buildShuffleMap) ; cast erasé, runtime `|| []` intact.
 		const shuffled = (ctx.quizState.shuffleMap[qi] as number[]) || [];
 		const pick = ctx.quizState.orderingPick[qi];
+		const revealed = ctx.isRevealed(qi);
 
 		const slots = items.map((_, si) => {
 			const oi = Array.isArray(sel) ? sel[si] : null;
 			const filled = oi !== null;
 			let cls = "quiz-slot";
 			if (filled) cls += " filled";
-			if (!ctx.quizState.locked && pick !== null) cls += " can-place";
-			if (ctx.quizState.locked && filled) cls += oi === correctOrder[si] ? " correct" : " wrong";
+			if (!revealed && pick !== null) cls += " can-place";
+			if (revealed && filled) cls += oi === correctOrder[si] ? " correct" : " wrong";
 
-			return `<div class="${cls}" data-order-slot="${si}" role="button" tabindex="0" ${(!ctx.quizState.locked && filled) ? `draggable="true" data-slot-item="${oi}"` : ""}>
+			return `<div class="${cls}" data-order-slot="${si}" role="button" tabindex="0" ${(!revealed && filled) ? `draggable="true" data-slot-item="${oi}"` : ""}>
 				<div class="quiz-slot-label">${ctx.sanitize.renderInlineText(slotLabels[si] ?? String(si + 1))}</div>
 				<div class="quiz-slot-value">${filled ? ctx.sanitize.renderInlineText(items[oi]) : t("engine.ordering.dropHere")}</div>
 			</div>`;
@@ -310,12 +326,12 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 		const possibilities = shuffled.map(oi => {
 			const used = ctx.orderingSelectionIncludes(qi, oi);
-			const picked = !used && pick === oi && !ctx.quizState.locked;
+			const picked = !used && pick === oi && !revealed;
 			let cls = "quiz-possibility";
 			if (used) cls += " used";
 			if (picked) cls += " selected-pick";
 
-			return `<div class="${cls}" data-order-item="${oi}" role="button" tabindex="0" ${(!used && !ctx.quizState.locked) ? `draggable="true"` : ""}>
+			return `<div class="${cls}" data-order-item="${oi}" role="button" tabindex="0" ${(!used && !revealed) ? `draggable="true"` : ""}>
 				${ctx.sanitize.renderInlineText(items[oi])}
 			</div>`;
 		}).join("");
@@ -339,29 +355,30 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const shuffledRows = Array.isArray(shuffleData.rows) ? shuffleData.rows : [...Array(rows.length).keys()];
 		const shuffledChoices = Array.isArray(shuffleData.choices) ? shuffleData.choices : [...Array(choices.length).keys()];
 		const pick = ctx.quizState.matchPick[qi];
+		const revealed = ctx.isRevealed(qi);
 
 		const slots = shuffledRows.map(rowIndex => {
 			const chosen = Array.isArray(sel) ? sel[rowIndex] : null;
 			const filled = chosen !== null;
 			let cls = "quiz-slot";
 			if (filled) cls += " filled";
-			if (!ctx.quizState.locked && pick !== null) cls += " can-place";
-			if (ctx.quizState.locked && filled && Array.isArray(correctMap) && correctMap.length === rows.length) {
+			if (!revealed && pick !== null) cls += " can-place";
+			if (revealed && filled && Array.isArray(correctMap) && correctMap.length === rows.length) {
 				cls += chosen === correctMap[rowIndex] ? " correct" : " wrong";
 			}
 
-			return `<div class="${cls}" data-match-slot="${rowIndex}" role="button" tabindex="0" ${(!ctx.quizState.locked && filled) ? `draggable="true" data-slot-choice="${chosen}"` : ""}>
+			return `<div class="${cls}" data-match-slot="${rowIndex}" role="button" tabindex="0" ${(!revealed && filled) ? `draggable="true" data-slot-choice="${chosen}"` : ""}>
 				<div class="quiz-slot-label">${ctx.sanitize.renderInlineText(rows[rowIndex])}</div>
 				<div class="quiz-slot-value">${filled ? ctx.sanitize.renderInlineText(choices[chosen] ?? t("engine.matching.unknownChoice")) : t("engine.matching.dropHere")}</div>
 			</div>`;
 		}).join("");
 
 		const possibilities = shuffledChoices.map(ci => {
-			const picked = !ctx.quizState.locked && pick === ci;
+			const picked = !revealed && pick === ci;
 			let cls = "quiz-possibility";
 			if (picked) cls += " selected-pick";
 
-			return `<div class="${cls}" data-match-choice="${ci}" role="button" tabindex="0" ${!ctx.quizState.locked ? `draggable="true"` : ""}>
+			return `<div class="${cls}" data-match-choice="${ci}" role="button" tabindex="0" ${!revealed ? `draggable="true"` : ""}>
 				${ctx.sanitize.renderInlineText(choices[ci])}
 			</div>`;
 		}).join("");
@@ -460,7 +477,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// rien de ce qu'elle vient de faire. isTextOnlyMode() seule restait
 		// fausse en Lecon (practiceMode y reste "qcm"), meme quand AUCUNE
 		// question de la session n'a de vraie correction.
-		if (ctx.textOnly?.isTextOnlyForAll?.()) {
+		// A Learn keeps its score and its three numbers (engine/learn.ts): its
+		// written answers were judged on their cards, first attempt first.
+		if (ctx.textOnly?.isTextOnlyForAll?.() && !ctx.learn.isActive()) {
 			const results = ctx.textOnly.computeResults();
 			const isExamCorrection = ctx.isExamMode && ctx.examEnded;
 			const title = t(isExamCorrection ? "engine.result.freeTextCorrection" : "engine.result.trainingTitle");
@@ -496,8 +515,17 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			? `<p class="quiz-textonly-correction-hint">${t(pendingWritten > 1 ? "engine.result.pendingWritten.other" : "engine.result.pendingWritten.one", { count: pendingWritten })}</p>`
 			: "";
 		const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
+		/* A LEARN says how the questions went (2026-09-29): right the first
+		   time, right after a retry, still to review — the same three colours
+		   as the beads. */
+		let learnSummary = "";
+		if (ctx.learn.isActive()) {
+			const sum = ctx.learn.summary();
+			const stat = (cls: string, n: number, key: TransKey) => `<div class="quiz-learn-summary-stat ${cls}"><strong>${n}</strong><span>${t(key)}</span></div>`;
+			learnSummary = `<div class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</div>`;
+		}
 		// Le score (« 12/20 », « 60 % ») reste du code : seule l'étiquette est traduite.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${lessonExamBtn}${retakeExamBtn}</div></section></div>`;
 	}
 
 
@@ -656,14 +684,14 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// possible), le clic ne produisait sinon aucun effet visible ; sa
 		// disparition EST l'effet visible attendu, en plus du re-rendu qui la
 		// déclenche (interactions.ts markLessonPreSkipped).
-		const dontKnowBtn = (!hintBtn && !isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.quizState.locked && !ctx.quizState.lessonPreSkipped[qi])
+		const dontKnowBtn = (!hintBtn && !isRead && !isTextOnly && ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "pre" && !ctx.isRevealed(qi) && !ctx.quizState.lessonPreSkipped[qi])
 			? `<button class="quiz-help-btn quiz-lesson-dontknow-btn" type="button">${ICON_HELP}<span>${t("engine.lesson.dontKnow")}</span></button>`
 			: "";
 		// Mode leçon (ex "learn") : la leçon s'affiche AVANT que la question soit
 		// verrouillée, jamais après (revoir la leçon une fois corrigé n'a pas de
 		// sens). Classes CSS `quiz-learn-*` conservées telles quelles. Une carte
 		// "read" n'a rien à corriger : ce bloc n'a pas de sens dessus non plus.
-		const lessonContent = (!isRead && !isTextOnly && ctx.quizMode === "lesson" && !ctx.quizState.locked)
+		const lessonContent = (!isRead && !isTextOnly && ctx.quizMode === "lesson" && !ctx.isRevealed(qi))
 			? renderLessonHtml(q, ctx.sanitize)
 			: "";
 		const learnSection = lessonContent
@@ -691,6 +719,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   le support n'est qu'une référence à côté d'une question, et son
 		   plafond de hauteur garde tout son sens. */
 		const roleClass = ctx.isLessonMode() ? ` quiz-role-${ctx.roleOfQuestion(qi)}` : "";
+		/* `quiz-learn-revealed`: this card shows its correction (engine/learn.ts) —
+		   read by the option styles and by the glossary and ▶ rules, which
+		   used to read the quiz's global lock alone. */
+		const revealedClass = ctx.isRevealed(qi) ? " quiz-learn-revealed" : "";
 
 		/* Une LECTURE a son propre écran (2026-09-26), dans son style
 		   (`corpsLecture`, engine/passage.ts). Son titre est écrit DANS la
@@ -710,10 +742,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			courteHtml = corpsLectureCourte(ctx, l, String(l.prompt ?? ""), texte).html;
 		}
 
-		return `<div class="quiz-track-item${roleClass}" data-slide-kind="question" data-qi="${qi}">
+		return `<div class="quiz-track-item${roleClass}${revealedClass}" data-slide-kind="question" data-qi="${qi}">
 			<section class="quiz-card"${sectionIdAttr}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
 				${passageSection}
 				${courteHtml}
+				${ctx.learn.retryNoteHtml(qi)}
 				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
 				${ctx.isFlashcardQuestion(q) ? "" : `<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>`}
 				${body}
@@ -722,7 +755,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				${indiceHtml}
 				${hintBtn}
 				${dontKnowBtn}
-				${!isRead && !isTextOnly && ctx.quizState.locked ? explanationHtml(qi) : ""}
+				${ctx.learn.checkButtonHtml(qi)}
+				${!isRead && !isTextOnly && ctx.isRevealed(qi) ? explanationHtml(qi) : ""}
 				${questionNavHtml(qi)}
 			</section>
 		</div>`;

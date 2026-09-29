@@ -218,6 +218,13 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   question, quiz modifié entre deux sessions (question supprimée, ajoutée,
   options ajoutées — mélange et sélection rejetés), photo corrompue → le quiz
   s'ouvre de zéro. Rangée par IDENTIFIANT de question, jamais par index. Dans la CI.
+- `npm run check:learn-loop` — la BOUCLE DE REPRISE d'un Learn
+  (`src/engine/learn-loop.ts`, noyau pur ; câblage `src/engine/learn.ts`) :
+  une question ratée ne revient jamais aussitôt (deux autres vérifications,
+  ou la fin de son étape), trois reprises au plus, un verdict par essai, et
+  « juste après une reprise » n'est jamais compté juste du premier coup. Le
+  câblage (journal au PREMIER essai seulement, score) est éprouvé par
+  `check:engine-review`, la photo par `check:session`. Dans la CI.
 - `npm run check:stats` — l'HISTORIQUE DES TENTATIVES du magasin de stats
   (`src/dashboard/stats-store.ts`) : meilleur score et nombre de tentatives
   DÉRIVÉS de la liste (supprimer la meilleure le fait redescendre), un score

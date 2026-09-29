@@ -25,6 +25,8 @@ export interface InteractionHandlers {
 	bindStaticControls(): void;
 	bindZoomFixHandlers(): void;
 	destroyZoomFixHandlers(): void;
+	/** The next arrow of question `qi` (button, bar, → key, Enter in a field). */
+	advanceFrom(qi: number): void;
 }
 
 export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
@@ -60,8 +62,9 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		commitQuestionInteraction(qi, { syncHeight: true });
 		// La diapositive SUIVANTE, pas l'index suivant : une lecture absorbée
 		// entre les deux n'a pas d'écran.
-		const suivante = ctx.questionSuivante(qi);
-		if (suivante !== null) ctx.goToQuestion(suivante);
+		// Like the next arrow: a missed question of the step may come back
+		// first (engine/learn.ts). Nothing past the last question.
+		if (ctx.questionSuivante(qi) !== null) advanceFrom(qi);
 	}
 
 	/* The press SPRING of an option (2026-09-27). A click re-renders the whole
@@ -101,7 +104,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		trackItem.querySelectorAll<HTMLElement>(".quiz-option").forEach(el => {
 			const oi = Number(el.dataset.orig);
 			const trySelect = () => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				const gained: number[] = [];
 				const lost: number[] = [];
 				if (isMulti) {
@@ -150,7 +153,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		trackItem.querySelectorAll<HTMLElement>("[data-order-item]").forEach(el => {
 			const oi = Number(el.dataset.orderItem);
 			const pickItem = () => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked || ctx.orderingSelectionIncludes(qi, oi)) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi) || ctx.orderingSelectionIncludes(qi, oi)) return;
 				ctx.quizState.orderingPick[qi] = ctx.quizState.orderingPick[qi] === oi ? null : oi;
 				commitQuestionInteraction(qi, { syncHeight: true });
 			};
@@ -162,7 +165,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				}
 			});
 			el.addEventListener("dragstart", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked || ctx.orderingSelectionIncludes(qi, oi)) return void e.preventDefault();
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi) || ctx.orderingSelectionIncludes(qi, oi)) return void e.preventDefault();
 				if (e.dataTransfer) {
 					e.dataTransfer.effectAllowed = "move";
 					e.dataTransfer.setData("text/plain", JSON.stringify({ mode: "order", oi, sourceSlot: -1 }));
@@ -179,7 +182,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		trackItem.querySelectorAll<HTMLElement>("[data-order-slot]").forEach(el => {
 			const si = Number(el.dataset.orderSlot);
 			const actOnSlot = () => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				const sel = ctx.quizState.selections[qi];
 				const picked = ctx.quizState.orderingPick[qi];
 				if (!Array.isArray(sel)) return;
@@ -201,7 +204,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				}
 			});
 			el.addEventListener("dragstart", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return void e.preventDefault();
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return void e.preventDefault();
 				const sel = slotSelection(qi);
 				if (!sel) return void e.preventDefault();
 				const oi = sel[si];
@@ -218,7 +221,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				trackItem.querySelectorAll("[data-order-slot]").forEach(s => s.classList.remove("dragover", "drag-ready", "swap-target"));
 			});
 			el.addEventListener("dragover", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				e.preventDefault();
 				const sel = slotSelection(qi);
 				el.classList.add("dragover");
@@ -229,7 +232,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			el.addEventListener("drop", e => {
 				e.preventDefault();
 				el.classList.remove("dragover", "swap-target");
-				if (ctx.quizState.locked || ctx.quizState.isSliding) return;
+				if (ctx.isRevealed(qi) || ctx.quizState.isSliding) return;
 				const sel = slotSelection(qi);
 				if (!sel) return;
 				const raw = e.dataTransfer ? e.dataTransfer.getData("text/plain") : "";
@@ -268,7 +271,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		trackItem.querySelectorAll<HTMLElement>("[data-match-choice]").forEach(el => {
 			const ci = Number(el.dataset.matchChoice);
 			const pickChoice = () => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				ctx.quizState.matchPick[qi] = ctx.quizState.matchPick[qi] === ci ? null : ci;
 				commitQuestionInteraction(qi, { syncHeight: true });
 			};
@@ -280,7 +283,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				}
 			});
 			el.addEventListener("dragstart", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return void e.preventDefault();
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return void e.preventDefault();
 				if (e.dataTransfer) {
 					e.dataTransfer.effectAllowed = "copyMove";
 					e.dataTransfer.setData("text/plain", JSON.stringify({ mode: "match", ci, sourceSlot: -1 }));
@@ -297,7 +300,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		trackItem.querySelectorAll<HTMLElement>("[data-match-slot]").forEach(el => {
 			const si = Number(el.dataset.matchSlot);
 			const actOnSlot = () => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				const picked = ctx.quizState.matchPick[qi];
 				const sel = slotSelection(qi);
 				if (!sel) return;
@@ -319,7 +322,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				}
 			});
 			el.addEventListener("dragstart", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return void e.preventDefault();
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return void e.preventDefault();
 				const sel = slotSelection(qi);
 				if (!sel) return void e.preventDefault();
 				const ci = sel[si];
@@ -336,7 +339,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				trackItem.querySelectorAll("[data-match-slot]").forEach(s => s.classList.remove("dragover", "drag-ready", "swap-target"));
 			});
 			el.addEventListener("dragover", e => {
-				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
+				if (ctx.quizState.isSliding || ctx.isRevealed(qi)) return;
 				e.preventDefault();
 				const sel = slotSelection(qi);
 				el.classList.add("dragover");
@@ -347,7 +350,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			el.addEventListener("drop", e => {
 				e.preventDefault();
 				el.classList.remove("dragover", "swap-target");
-				if (ctx.quizState.locked || ctx.quizState.isSliding) return;
+				if (ctx.isRevealed(qi) || ctx.quizState.isSliding) return;
 				const sel = slotSelection(qi);
 				if (!sel) return;
 				const raw = e.dataTransfer ? e.dataTransfer.getData("text/plain") : "";
@@ -446,11 +449,26 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		});
 
 		const nextBtn = trackItem.querySelector(".quiz-next-btn");
-		if (nextBtn) nextBtn.addEventListener("click", () => {
-			const suivante = ctx.questionSuivante(qi);
-			if (suivante !== null) ctx.goToQuestion(suivante);
-			else goPastLastQuestion();
+		if (nextBtn) nextBtn.addEventListener("click", () => advanceFrom(qi));
+
+		// Learn: the card's own Check button (engine/learn.ts).
+		const checkBtn = trackItem.querySelector<HTMLButtonElement>(".quiz-learn-check-btn");
+		if (checkBtn) checkBtn.addEventListener("click", e => {
+			e.preventDefault();
+			if (ctx.quizState.isSliding) return;
+			ctx.learn.checkQuestion(qi);
 		});
+	}
+
+	/* THE NEXT ARROW of a question — the card's button, the application's bar
+	   (which clicks it) and the → key. In a Learn it checks an answered
+	   question first, then brings a missed one back when it is due
+	   (engine/learn.ts); everywhere else it goes to the next slide. */
+	function advanceFrom(qi: number): void {
+		const move = ctx.learn.advance(qi);
+		if (move.kind !== "go") return;
+		if (move.qi !== null) ctx.goToQuestion(move.qi);
+		else goPastLastQuestion();
 	}
 
 	function bindSubmitSlideControls(rootEl: Element | null): void {
@@ -569,14 +587,8 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			let navigated = false;
 			if (e.key === "ArrowRight") {
 				if (ctx.isQuestionSlideIndex(cur)) {
-					const qi = (ctx.slideMap[cur] as { questionIndex: number }).questionIndex;
-					if (ctx.questionSuivante(qi) !== null) {
-						ctx.goToSlide(cur + 1, { forceRender: false });
-						navigated = true;
-					} else {
-						goPastLastQuestion();
-						navigated = true;
-					}
+					advanceFrom((ctx.slideMap[cur] as { questionIndex: number }).questionIndex);
+					navigated = true;
 				}
 				else if (ctx.isSubmitSlideIndex(cur)) { ctx.goToResults(); navigated = true; }
 			} else {
@@ -744,6 +756,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		bindExamStartButton,
 		bindStaticControls,
 		bindZoomFixHandlers,
-		destroyZoomFixHandlers
+		destroyZoomFixHandlers,
+		advanceFrom
 	};
 }

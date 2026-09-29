@@ -243,14 +243,19 @@
   border-top-right-radius: var(--quiz-card-radius);
 }
 
-/* Neutral options (neither correct nor selected) once the quiz is locked. */
-.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected){
+/* Neutral options (neither correct nor selected) once the quiz is locked,
+   or once a Learn card is checked on its own (`quiz-learn-revealed`,
+   engine/learn.ts). */
+.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected),
+.quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected){
   opacity: 0.5;
   cursor: default;
 }
 
 .quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover,
-.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible{
+.quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover,
+.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible,
+.quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible{
   outline: none;
   transform: none;
   box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
@@ -259,7 +264,8 @@
 }
 
 /* A locked option is no longer a button: it does not sink when clicked. */
-.quiz-is-locked .quiz-option:active{
+.quiz-is-locked .quiz-option:active,
+.quiz-learn-revealed .quiz-option:active{
   transform: none;
   box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
 }
@@ -271,7 +277,9 @@
 }
 
 .quiz-is-locked .quiz-option.wrong:hover,
-.quiz-is-locked .quiz-option.wrong:focus-visible{
+.quiz-learn-revealed .quiz-option.wrong:hover,
+.quiz-is-locked .quiz-option.wrong:focus-visible,
+.quiz-learn-revealed .quiz-option.wrong:focus-visible{
   outline: none;
   transform: translate3d(2px,0,0);
   box-shadow:
@@ -280,7 +288,9 @@
 }
 
 .quiz-is-locked .quiz-option.missed:hover,
-.quiz-is-locked .quiz-option.missed:focus-visible{
+.quiz-learn-revealed .quiz-option.missed:hover,
+.quiz-is-locked .quiz-option.missed:focus-visible,
+.quiz-learn-revealed .quiz-option.missed:focus-visible{
   transform: none;
 }
 

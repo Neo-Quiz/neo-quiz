@@ -99,6 +99,14 @@ export const EN_ENGINE = {
 	"engine.lesson.roleRecall": "From memory",
 	/* Task 7 : la pré-question ne peut pas être sautée sans tentative explicite. */
 	"engine.lesson.dontKnow": "I don't know",
+	/* The Learn retry loop (engine/learn.ts, 2026-09-29): each question is
+	   checked on its card, a missed one comes back later. */
+	"engine.learn.check": "Check",
+	"engine.learn.retryNote": "You missed this one earlier: try again.",
+	"engine.learn.summaryFirst": "Right the first time",
+	"engine.learn.summaryRetried": "Right after a retry",
+	"engine.learn.summaryMissed": "To review",
+	"engine.learn.rateTitle": "Was your answer right?",
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Your answer...",

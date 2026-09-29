@@ -95,6 +95,42 @@
   --tab-text: #fff;
 }
 
+/* LEARN, right AFTER a miss (engine/learn.ts, 2026-09-29): orange, between
+   the green of right-first-time and the red of not-right-yet. amber-700
+   keeps white text readable. */
+.quiz-tab.retried{
+  --tab-face: color-mix(in srgb, #b45309 42%, var(--background-primary));
+  --tab-border: color-mix(in srgb, #f59e0b 45%, transparent);
+  --tab-edge: #7c3a06;
+  --tab-text: #fff;
+}
+
+/* A MARK per verdict, so the meaning never rests on colour alone (red and
+   green blindness): a check, a circling arrow, a cross, in a small disc at
+   the top right of the tab. Plain text glyphs, drawn by the font. */
+.quiz-tab.correct::before,
+.quiz-tab.retried::before,
+.quiz-tab.wrong::before{
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--tab-edge);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+.quiz-tab.correct::before{ content: "\2713"; }
+.quiz-tab.retried::before{ content: "\21BB"; }
+.quiz-tab.wrong::before{ content: "\2715"; }
+
 /* The current question: a solid fill of its colour. */
 .quiz-tab.active{
   --tab-face: var(--quiz-primary);
@@ -104,6 +140,7 @@
 }
 .quiz-tab.correct.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
 .quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
+.quiz-tab.retried.active{ --tab-face: #b45309; --tab-edge: #7c3a06; }
 /* The self-rated states too (2026-09-28): without these, a current bead
    already rated fell on the pale tints of text-only.css (a flashcard rated
    "I knew it" became an almost black green as soon as you stood on it).

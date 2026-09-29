@@ -153,7 +153,9 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		return executionVisible({
 			inStatement: !!bloc.closest(".quiz-question"),
 			reading: !!bloc.closest(".quiz-card[data-lecture]"),
-			corrected: !!bloc.closest(".quiz-is-locked"),
+			// The global lock, or a Learn card checked on its own (`quiz-learn-revealed`,
+			// engine/learn.ts): the same sign as the glossary's.
+			corrected: !!bloc.closest(".quiz-is-locked, .quiz-learn-revealed"),
 			runInLastHint: q?.runInLastHint === true && runInLastHintProbleme(q) === null,
 			allHintLevelsSeen: Number.isInteger(qi) && ctx.hint.tousNiveauxVus(qi),
 		});

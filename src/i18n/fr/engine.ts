@@ -80,6 +80,12 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.lesson.roleRead": "Lecture",
 	"engine.lesson.roleRecall": "De mémoire",
 	"engine.lesson.dontKnow": "Je ne sais pas",
+	"engine.learn.check": "Vérifier",
+	"engine.learn.retryNote": "Cette question vous avait échappé : réessayez.",
+	"engine.learn.summaryFirst": "Juste du premier coup",
+	"engine.learn.summaryRetried": "Juste après une reprise",
+	"engine.learn.summaryMissed": "À revoir",
+	"engine.learn.rateTitle": "Votre réponse était-elle juste ?",
 
 	/* ── Question texte / terminal ── */
 	"engine.text.placeholder": "Votre réponse...",

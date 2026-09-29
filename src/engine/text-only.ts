@@ -10,6 +10,8 @@ import type {
 import { renderLessonHtml } from "./sanitizer";
 import { countAnswerLines } from "./terminal";
 import { t, type TransKey } from "../i18n";
+import { isNumericQuestion } from "./numeric";
+import { usesMathField } from "./math-input";
 
 /* Icône Lucide `check` inline, même tracé que celle du cours (lecture-rendu.ts
    ICON_BOOK/`quiz-lecture-coche`) : le moteur n'a pas d'autre canal d'icône
@@ -109,12 +111,29 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			&& !ctx.isFlashcardQuestion(q);
 	}
 
+	/* An `explain` question ("in your own words", 2026-09-29) is a few
+	   sentences: it can never match its model answer word for word, and was
+	   marked wrong every time by the text comparison. In a Learn it is
+	   SELF-RATED like a written recall: the model answer is shown, the
+	   learner says whether theirs was right. A numeric, equation or terminal
+	   answer keeps its real correction. */
+	function isExplainWritten(qi: number, q: QuizQuestion): boolean {
+		return ctx.isLessonMode()
+			&& ctx.roleOfQuestion(qi) === "explain"
+			&& ctx.isTextQuestion(q)
+			&& !ctx.isClozeQuestion(q)
+			&& !isNumericQuestion(q)
+			&& !usesMathField(q)
+			&& !ctx.terminal?.getTerminalTextVariant?.(q);
+	}
+
 	function isTextOnlyFor(qi: number): boolean {
 		const q = ctx.quiz[qi];
 		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
 		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
 		if (ctx.isFlashcardQuestion(q)) return true;
 		if (isTextOnlyMode()) return true;
+		if (isExplainWritten(qi, q)) return true;
 		return ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall" && isRecallForcedTextOnly(q);
 	}
 
@@ -306,12 +325,12 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   « J'avais juste » / « J'avais faux » — jamais de « En partie » : ce
 	   troisième état reste RÉSERVÉ aux trois boutons de la carte mémoire
 	   (flashcardBodyHtml, note()), seule survivance de RATINGS.partial. */
-	function verdictIconButtonsHtml(qi: number): string {
+	function verdictIconButtonsHtml(qi: number, disabled = false): string {
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
 		const btn = (value: "understood" | "review", cls: string, icon: string, labelKey: TransKey) => {
 			const selected = current === value;
 			const label = t(labelKey);
-			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}">${icon}</button>`;
+			return `<button class="quiz-textonly-verdict-icon-btn ${cls}${selected ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${selected}" aria-label="${ctx.escapeHtmlAttr(label)}"${disabled ? " disabled" : ""}>${icon}</button>`;
 		};
 		return `<div class="quiz-textonly-verdict-icon-row">
 			${btn("understood", "right", ICON_CHECK, "engine.textOnly.verdict.right")}
@@ -350,9 +369,11 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   (cards.ts), quel que soit son habillage (pourcentage QCM ou grille
 	   compris/partiel/à revoir). */
 	function writtenReviewSectionHtml(): string {
+		// A written answer already judged on its Learn card (engine/learn.ts)
+		// keeps that verdict: it is not asked again here.
 		const indices = ctx.quiz
 			.map((_, i) => i)
-			.filter(i => isTextOnlyFor(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]));
+			.filter(i => isTextOnlyFor(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && (ctx.learn?.verdictOf?.(i) ?? "none") === "none");
 		if (indices.length === 0) return "";
 		return `<div class="quiz-textonly-written-review">${indices.map(writtenReviewCardHtml).join("")}</div>`;
 	}
@@ -410,9 +431,11 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const verso = typeof q.answer === "string" && q.answer.trim()
 			? ctx.sanitize.renderInlineText(q.answer)
 			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
+		// In a Learn, the rating IS the check: given once per attempt.
+		const rated = ctx.learn.isGraded(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
 		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
 			const on = current === value;
-			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
+			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"${rated ? " disabled" : ""}><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
 		};
 		const animate = justFlipped === qi;
 		if (animate) justFlipped = null;
@@ -454,7 +477,13 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   réponse acceptée d'une question texte — entre 1 et 6, jamais un champ
 	   de 10 lignes pour une réponse d'une ligne. Aucune référence connue
 	   (classement, appariement…) : 1 ligne, elle grandit avec la saisie. */
-	function expectedWrittenRows(q: QuizQuestion): number {
+	function expectedWrittenRows(q: QuizQuestion, qi: number): number {
+		// An explanation in your own words starts at four lines (terminal.ts, same rule).
+		if (ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "explain") return Math.max(4, expectedWrittenRowsOf(q));
+		return expectedWrittenRowsOf(q);
+	}
+
+	function expectedWrittenRowsOf(q: QuizQuestion): number {
 		const indices = getCorrectOptionIndices(q);
 		if (indices.length > 0) {
 			const qc = q as QcmQuestion | MultiSelectQuestion;
@@ -465,9 +494,26 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return countAnswerLines(accepted[0] ?? "", 6);
 	}
 
+	/* A written answer CHECKED in a Learn (engine/learn.ts, 2026-09-29): the
+	   same correction as the results screen gives — the model answer and the
+	   explanation — then the learner's own verdict, on the card. Once given,
+	   the verdict holds for this attempt (a retry asks again). */
+	function learnCorrectionHtml(q: QuizQuestion, qi: number): string {
+		const pending = ctx.learn.isPendingSelfRating(qi);
+		return `<div class="quiz-textonly-learn-correction">
+			${expectedAnswerHtml(q)}
+			${learningHtml(q, { plain: true })}
+			<div class="quiz-textonly-learn-rate">
+				<span class="quiz-textonly-learn-rate-title">${t("engine.learn.rateTitle")}</span>
+				${verdictIconButtonsHtml(qi, !pending)}
+			</div>
+		</div>`;
+	}
+
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
 		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
 		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
+		const checkedInLearn = ctx.learn.isCheckable(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
 
 		return `<div class="quiz-textonly">
@@ -483,9 +529,11 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					autocapitalize="off"
 					autocomplete="off"
 					autocorrect="off"
-					rows="${expectedWrittenRows(q)}"
+					rows="${expectedWrittenRows(q, qi)}"
+					${checkedInLearn ? `readonly aria-readonly="true"` : ""}
 				>${ctx.escapeHtmlText(value)}</textarea>
 			</div>
+			${checkedInLearn ? learnCorrectionHtml(q, qi) : ""}
 		</div>`;
 	}
 
@@ -569,6 +617,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				if (ctx.quizState.isSliding) return;
 				const rating = normalizeRating(btn.dataset.textonlyRating as TextOnlyRating | undefined);
 				if (!rating) return;
+				if ((btn as HTMLButtonElement).disabled) return;
 				ctx.quizState.textOnlyRatings[qi] = rating;
 				// Le verdict existe MAINTENANT : c'est ici, et pas à l'écran de
 				// résultats, qu'une restitution devient un signal de mémoire.
@@ -576,6 +625,22 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				// (types/engine-ctx.ts) — un `?.` ici masquerait un câblage manquant
 				// au lieu d'échouer bruyamment (fix round 1, 2026-09-02).
 				ctx.recordReview(qi, rating);
+				// In a Learn the rating is the flashcard's check (engine/learn.ts).
+				ctx.learn.selfVerdict(qi, rating);
+				ctx.commitQuestionInteraction(qi, { syncHeight: true });
+			});
+		});
+
+		// A written answer checked in a Learn: the learner's own verdict, on the card.
+		trackItem.querySelectorAll<HTMLButtonElement>(".quiz-textonly-learn-rate .quiz-textonly-verdict-icon-btn[data-textonly-rating]").forEach(btn => {
+			btn.addEventListener("click", e => {
+				e.preventDefault();
+				if (ctx.quizState.isSliding || btn.disabled) return;
+				const rating = normalizeRating(btn.dataset.textonlyRating as TextOnlyRating | undefined);
+				if (!rating) return;
+				ctx.quizState.textOnlyRatings[qi] = rating;
+				ctx.recordReview(qi, rating);
+				ctx.learn.selfVerdict(qi, rating);
 				ctx.commitQuestionInteraction(qi, { syncHeight: true });
 			});
 		});

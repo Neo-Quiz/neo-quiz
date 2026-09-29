@@ -87,5 +87,37 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, SESSIO
 	r.check("classement : indice hors des items", restaurer({ v: 1, courante: null, ecrite: 1, questions: { classement: { selection: [99999, 0, 1] } } }, ids, base).selections[3], [null, null, null]);
 	r.check("appariement : indice hors des choix", restaurer({ v: 1, courante: null, ecrite: 1, questions: { appariement: { selection: [5, 0] } } }, ids, base).selections[4], [null, null]);
 	r.check("carte mémoire : number rejeté", restaurer({ v: 1, courante: null, ecrite: 1, questions: { carte: { selection: 42 } } }, ids, base).selections[5], null);
+
+	/* THE LEARN RETRY LOOP (2026-09-29): verdicts, misses, the retry flag,
+	   the queue and the resume point survive a closed app, by id. */
+	const learn = {
+		learnVerdicts: ["first", "missed", "retried", "none", "none", "missed"],
+		learnMisses: [0, 2, 1, 0, 0, 1],
+		learnRetrying: [false, true, false, false, false, false],
+		learnChecked: [true, false, true, false, false, true],
+		learnPending: [false, false, false, false, false, false],
+		learnQueue: [{ qi: 5, since: 1 }],
+		learnResume: 3,
+		learnRetryQi: 1,
+	};
+	const photoLearn = photographier({ ...etat, ...learn }, ids, 1, 1);
+	r.check("Learn: the queue and resume point are written by id", [photoLearn.file, photoLearn.suite], [[{ id: "carte", depuis: 1 }], "classement"]);
+	const retourLearn = restaurer(JSON.parse(JSON.stringify(photoLearn)), ids, base);
+	r.check("Learn round trip: verdicts, misses, retry flag, checked",
+		[retourLearn.learnVerdicts, retourLearn.learnMisses, retourLearn.learnRetrying, retourLearn.learnChecked],
+		[learn.learnVerdicts, learn.learnMisses, learn.learnRetrying, learn.learnChecked]);
+	r.check("Learn round trip: the queue and resume point", [retourLearn.learnQueue, retourLearn.learnResume], [[{ qi: 5, since: 1 }], 3]);
+	r.check("Learn: the retried question of the resume point, by id", [photoLearn.enReprise, retourLearn.learnRetryQi], ["multiple", 1]);
+	r.check("Learn: a checked card whose options changed does not reopen checked",
+		restaurer({ ...photoLearn, questions: { ...photoLearn.questions, unique: { ...photoLearn.questions.unique, melange: [0, 1] } } }, ids, base).learnChecked[0], false);
+	r.check("Learn: past the end is kept", restaurer({ ...photoLearn, suite: "end" }, ids, base).learnResume, "end");
+	r.check("Learn: a queued question removed from the quiz leaves the queue",
+		restaurer({ ...photoLearn, file: [{ id: "disparue", depuis: 1 }, { id: "carte", depuis: 2 }] }, ids, base).learnQueue, [{ qi: 5, since: 2 }]);
+	r.check("Learn: a malformed queue or verdict is ignored, the quiz still opens",
+		(() => { const x = restaurer({ ...photoLearn, file: "x", suite: 7, questions: { unique: { verdict: "bravo", ratees: -1 } } }, ids, base); return [x.learnQueue, x.learnResume, x.learnVerdicts[0], x.learnMisses[0]]; })(),
+		[[], null, "none", 0]);
+	const ancienne = restaurer(photo, ids, base);
+	r.check("a snapshot from before the retry loop restores with no verdict and an empty queue",
+		[ancienne.learnVerdicts.every(v => v === "none"), ancienne.learnQueue, ancienne.learnResume], [true, [], null]);
 	r.done();
 });

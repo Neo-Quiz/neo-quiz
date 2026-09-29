@@ -21,6 +21,8 @@ import { createResultsSaver } from "./engine/results-save";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
+import { createLearnHandlers } from "./engine/learn";
+import { emptyLearnState } from "./engine/learn-loop";
 import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
 import { mathifyElement } from "./engine/mathjax";
@@ -240,6 +242,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// Lu APRÈS `lesson` : aucune dépendance entre les deux, ordre alphabétique
 	// de queue comme les autres modules sans référence croisée à l'assemblage.
 	const termes = createTermesHandlers(ctx);
+	// The Learn retry loop (engine/learn.ts): reads the state lazily, like the others.
+	const learn = createLearnHandlers(ctx);
 
 	// Fonctions utilitaires seront définies après les constantes SLIDE_* pour éviter TDZ
 
@@ -269,6 +273,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		cloze,
 		lesson,
 		termes,
+		learn,
+		isRevealed: learn.isRevealed,
 		// depuis lesson : accessors (pas des flags __quiz*), voir engine/lesson.ts.
 		isLessonMode: lesson.isLessonMode,
 		lessonSlices: lesson.lessonSlices,
@@ -434,6 +440,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		// Task 8 : cf. QuizState.recorded (src/types/quiz.ts). Vide à l'assemblage,
 		// comme resultsCounted, avant que resetQuiz() ne l'aligne sur ctx.quiz.
 		recorded: [],
+		// The Learn retry loop (engine/learn-loop.ts): nothing checked yet.
+		...emptyLearnState(quiz.length),
 		isSliding: false,
 		slideToken: 0
 	};

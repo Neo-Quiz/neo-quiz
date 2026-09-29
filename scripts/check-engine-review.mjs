@@ -24,8 +24,8 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(
-	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts"],
-	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }) => {
+	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts"],
+	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }) => {
 	/**
 	 * Construit un ctx minimal, avec le câblage croisé réel des méthodes
 	 * aplaties (même pattern qu'engine.ts).
@@ -49,6 +49,7 @@ await withSrcModule(
 		reviewSink: sinkOverride,
 		statsStore = { updateRecord() {} },
 		textOnly,
+		quizMode,
 	}) {
 		const appels = [];
 		const sink = sinkOverride === undefined
@@ -78,6 +79,13 @@ await withSrcModule(
 			isCodeQuestion: () => false,
 			termes: { poserTermes: () => {}, fermerBulle: () => {} },
 			isLessonMode: () => isLessonMode,
+			// The Learn retry loop (engine/learn.ts) reads the CURRENT mode.
+			quizMode: quizMode ?? (isLessonMode ? "lesson" : "quiz"),
+			sliceOfQuestion: () => null,
+			questionSuivante: (qi) => (qi + 1 < quiz.length ? qi + 1 : null),
+			goToQuestion: () => {},
+			initSelections: () => quiz.map(() => null),
+			buildShuffleMap: () => quiz.map(() => null),
 			originalQuizMode,
 			roleOfQuestion: (i) => roles[i],
 			closeHintModal: () => {},
@@ -108,7 +116,14 @@ await withSrcModule(
 			lastQuestionIndex: 0,
 			pendingResultsLock: false,
 			resultsCounted: false,
+			shuffleMap: quiz.map(() => null),
+			orderingPick: quiz.map(() => null),
+			matchPick: quiz.map(() => null),
+			...emptyLearnState(quiz.length),
 		};
+		// The REAL Learn handlers, lazy like in engine.ts.
+		ctx.learn = createLearnHandlers(ctx);
+		ctx.isRevealed = ctx.learn.isRevealed;
 
 		const handlers = createStateHandlers(ctx);
 		Object.assign(ctx, {
@@ -680,6 +695,63 @@ await withSrcModule(
 		ctx.goToResults();
 		r.check("une fois jugée : 1 question faite sur 1",
 			[updates[1].questionsDone, updates[1].totalQuestions], [1, 1]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   Case L — THE LEARN RETRY LOOP (engine/learn.ts, 2026-09-29): the
+	   journal keeps the FIRST attempt only, the score counts right-first-time
+	   answers only.
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("Learn — check, retry, first attempt journalled once");
+		const quiz = [
+			{ id: "a", title: "A", prompt: "A ?", options: ["x", "y"], correctIndex: 0 },
+			{ id: "b", title: "B", prompt: "B ?", options: ["x", "y"], correctIndex: 1 },
+			{ id: "c", title: "C", prompt: "C ?", options: ["x", "y"], correctIndex: 0 },
+		];
+		const { ctx, appels } = makeCtx({ quiz, selections: [0, 0, 1], isLessonMode: true, roles: ["test", "test", "test"], textOnly: null });
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+		ctx.quizState.textOnlyAnswers = ["", "", ""];
+		ctx.quizState.textOnlyChecked = [false, false, false];
+
+		r.check("an answered Learn question can be checked", ctx.learn.canCheck(0), true);
+		ctx.learn.checkQuestion(0);
+		r.check("right the first time: green, revealed, journalled at the check",
+			[ctx.learn.verdictOf(0), ctx.isRevealed(0), appels.length], ["first", true, 1]);
+		r.check("a revealed question cannot be checked again", ctx.learn.canCheck(0), false);
+
+		ctx.learn.checkQuestion(1);
+		r.check("a miss: red, queued, journalled wrong",
+			[ctx.learn.verdictOf(1), ctx.quizState.learnQueue, appels[1]?.grade], ["missed", [{ qi: 1, since: 0 }], "wrong"]);
+
+		// Q2 answered wrong too, then its retry comes back later.
+		ctx.learn.checkQuestion(2);
+		// From the last question, past the end: the queued ones come back.
+		const move = ctx.learn.advance(2);
+		r.check("past the last question, a missed one comes back", [move.kind, ctx.quizState.learnRetrying[1]], ["retry", true]);
+		r.check("its answer is cleared for the retry", ctx.quizState.selections[1], null);
+		ctx.quizState.selections[1] = 1;
+		ctx.learn.checkQuestion(1);
+		r.check("right on its retry: orange, and NOT journalled again",
+			[ctx.learn.verdictOf(1), appels.length], ["retried", 3]);
+		r.check("the score counts right-first-time answers only (1 of 3)",
+			[ctx.computeScorePercent().correct, ctx.computeScorePercent().total], [1, 3]);
+
+		ctx.goToResults();
+		r.check("the results journal nothing more for checked questions", appels.length, 3);
+		r.done();
+	}
+
+	{
+		const r = makeReporter("Learn — outside a Learn, nothing changes");
+		const quiz = [{ id: "a", title: "A", prompt: "A ?", options: ["x", "y"], correctIndex: 0 }];
+		const { ctx } = makeCtx({ quiz, selections: [0], isLessonMode: false, roles: [undefined], textOnly: null });
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+		ctx.quizState.textOnlyAnswers = [""];
+		ctx.quizState.textOnlyChecked = [false];
+		r.check("no check outside a Learn", [ctx.learn.isActive(), ctx.learn.canCheck(0), ctx.isRevealed(0)], [false, false, false]);
+		r.check("the next arrow goes straight on", ctx.learn.advance(0), { kind: "go", qi: null });
 		r.done();
 	}
 });

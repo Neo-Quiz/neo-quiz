@@ -330,6 +330,23 @@ export type PracticeMode = "qcm" | "text";
 /** Auto-évaluation en mode entraînement texte libre (engine/text-only.js RATINGS). */
 export type TextOnlyRating = "understood" | "partial" | "review";
 
+/** How a Learn question stands in the retry loop (engine/learn-loop.ts):
+    never checked, right the first time, right after a miss, or not right
+    yet (or given up after three retries). */
+export type LearnVerdict = "none" | "first" | "retried" | "missed";
+
+/** A missed Learn question waiting for its retry, and how many OTHER
+    questions have been checked since it was missed. */
+export interface LearnQueueEntry {
+	qi: number;
+	since: number;
+}
+
+/** Where the normal order resumes once the pending retries are done: a
+    question index, `"end"` (past the last question), or `null` when the
+    learner is not away on a retry. */
+export type LearnResume = number | "end" | null;
+
 /**
  * Sélection courante pour une question, selon sa variante
  * (engine.js initSelections) :
@@ -434,6 +451,24 @@ export interface QuizState {
 	 * Remis à zéro par `resetQuiz`, comme `resultsCounted`.
 	 */
 	recorded: boolean[];
+	/* THE LEARN RETRY LOOP (engine/learn-loop.ts, 2026-09-29): each question
+	   of a Learn is checked on its card, a missed one comes back later. Reset
+	   by `resetQuiz`, kept in the session snapshot. */
+	learnVerdicts: LearnVerdict[];
+	/** Misses per question in this session, the first one included. */
+	learnMisses: number[];
+	/** The question is being retried: its answer was cleared, it is open. */
+	learnRetrying: boolean[];
+	/** The CURRENT attempt has been checked: its card shows the correction. */
+	learnChecked: boolean[];
+	/** Checked and showing its model answer, waiting for the learner's own
+	    verdict (a written answer). */
+	learnPending: boolean[];
+	learnQueue: LearnQueueEntry[];
+	learnResume: LearnResume;
+	/** The retried question the resume point belongs to: leaving another
+	    way (a bead, the previous arrow) drops the resume point. */
+	learnRetryQi: number | null;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { QuestionSelection, QuestionShuffleEntry, QuizState, TextOnlyRating } from "../types/quiz";
+import type { LearnQueueEntry, LearnResume, LearnVerdict, QuestionSelection, QuestionShuffleEntry, QuizState, TextOnlyRating } from "../types/quiz";
 
 /* ══════════════════════════════════════════════════════════
    LA PHOTO DE SESSION D'UN QUIZ (2026-09-26) — reprendre là où on s'était
@@ -31,6 +31,15 @@ export interface EtatQuestion {
 	jnsp?: boolean;
 	indice?: boolean;
 	journalisee?: boolean;
+	/* The Learn retry loop (engine/learn-loop.ts, 2026-09-29), each key only
+	   when it differs from a fresh question: the verdict, the misses, being
+	   retried, the current attempt checked, a written answer waiting for
+	   its own verdict. */
+	verdict?: Exclude<LearnVerdict, "none">;
+	ratees?: number;
+	reprise?: boolean;
+	verifieeLearn?: boolean;
+	enAttente?: boolean;
 }
 
 export interface SessionQuiz {
@@ -40,10 +49,19 @@ export interface SessionQuiz {
 	questions: Record<string, EtatQuestion>;
 	/** Horodatage de l'écriture (ms) : la session la plus récente l'emporte. */
 	ecrite: number;
+	/** Learn: the missed questions waiting for their retry, by id. Absent
+	    from a snapshot taken before the retry loop existed. */
+	file?: Array<{ id: string; depuis: number }>;
+	/** Learn: where the normal order resumes after the retries — an id, or
+	    "end" past the last question. */
+	suite?: string;
+	/** Learn: the retried question that resume point belongs to, by id. */
+	enReprise?: string;
 }
 
 export type EtatPhoto = Pick<QuizState,
-	"selections" | "shuffleMap" | "textOnlyAnswers" | "textOnlyChecked" | "textOnlyRatings" | "lessonPreSkipped" | "hintSeen" | "recorded">;
+	"selections" | "shuffleMap" | "textOnlyAnswers" | "textOnlyChecked" | "textOnlyRatings" | "lessonPreSkipped" | "hintSeen" | "recorded"
+	| "learnVerdicts" | "learnMisses" | "learnRetrying" | "learnChecked" | "learnPending" | "learnQueue" | "learnResume" | "learnRetryQi">;
 
 export interface Restauration extends EtatPhoto {
 	/** INDEX de la question sur laquelle rouvrir. */
@@ -51,6 +69,7 @@ export interface Restauration extends EtatPhoto {
 }
 
 const NOTES: readonly TextOnlyRating[] = ["understood", "partial", "review"];
+const VERDICTS: readonly LearnVerdict[] = ["first", "retried", "missed"];
 
 function serialiser(s: QuestionSelection): SelectionSerialisee {
 	if (s instanceof Set) return [...s].sort((a, b) => a - b);
@@ -78,17 +97,31 @@ export function photographier(etat: EtatPhoto, ids: readonly string[], courante:
 		if (etat.lessonPreSkipped[i]) e.jnsp = true;
 		if (etat.hintSeen[i]) e.indice = true;
 		if (etat.recorded[i]) e.journalisee = true;
+		const v = etat.learnVerdicts?.[i];
+		if (v && v !== "none") e.verdict = v;
+		if (etat.learnMisses?.[i]) e.ratees = etat.learnMisses[i];
+		if (etat.learnRetrying?.[i]) e.reprise = true;
+		if (etat.learnChecked?.[i]) e.verifieeLearn = true;
+		if (etat.learnPending?.[i]) e.enAttente = true;
 		// Un mélange seul n'est pas une réponse : une question jamais touchée
 		// n'encombre pas la photo (elle sera remélangée, ce qui est sans effet).
 		const cles = Object.keys(e).filter(k => k !== "melange");
 		if (cles.length > 0) questions[id] = e;
 	});
-	return {
+	const photo: SessionQuiz = {
 		v: SESSION_VERSION,
 		courante: courante === null ? null : (ids[courante] ?? null),
 		questions,
 		ecrite: maintenant,
 	};
+	const file = (etat.learnQueue ?? []).filter(e => ids[e.qi] !== undefined).map(e => ({ id: ids[e.qi], depuis: e.since }));
+	if (file.length > 0) photo.file = file;
+	const r = etat.learnResume;
+	if (r === "end") photo.suite = "end";
+	else if (typeof r === "number" && ids[r] !== undefined) photo.suite = ids[r];
+	const rq = etat.learnRetryQi;
+	if (typeof rq === "number" && ids[rq] !== undefined) photo.enReprise = ids[rq];
+	return photo;
 }
 
 const estEntier = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0;
@@ -162,6 +195,14 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 		lessonPreSkipped: new Array<boolean>(n).fill(false),
 		hintSeen: new Array<boolean>(n).fill(false),
 		recorded: new Array<boolean>(n).fill(false),
+		learnVerdicts: new Array<LearnVerdict>(n).fill("none"),
+		learnMisses: new Array<number>(n).fill(0),
+		learnRetrying: new Array<boolean>(n).fill(false),
+		learnChecked: new Array<boolean>(n).fill(false),
+		learnPending: new Array<boolean>(n).fill(false),
+		learnQueue: [],
+		learnResume: null,
+		learnRetryQi: null,
 	};
 
 	ids.forEach((id, i) => {
@@ -194,7 +235,35 @@ export function restaurer(brut: unknown, ids: readonly string[], base: { selecti
 		if (e.jnsp === true) r.lessonPreSkipped[i] = true;
 		if (e.indice === true) r.hintSeen[i] = true;
 		if (e.journalisee === true) r.recorded[i] = true;
+		if (typeof e.verdict === "string" && VERDICTS.includes(e.verdict)) r.learnVerdicts[i] = e.verdict;
+		if (estEntier(e.ratees)) r.learnMisses[i] = e.ratees;
+		if (e.reprise === true) r.learnRetrying[i] = true;
+		/* A card checked with options that have changed since: its answer was
+		   dropped above, so it must not reopen as checked — it would show a
+		   correction with no answer, and could never be answered again. */
+		if (e.verifieeLearn === true && !melangeRejete) r.learnChecked[i] = true;
+		if (e.enAttente === true && !melangeRejete) r.learnPending[i] = true;
 	});
+
+	/* The Learn queue and resume point, by id: a question removed from the
+	   quiz since simply leaves the queue. A malformed value is ignored, never
+	   a reason to reopen the quiz from zero. */
+	const file: LearnQueueEntry[] = [];
+	if (Array.isArray(p.file)) {
+		for (const e of p.file as unknown[]) {
+			const x = e as { id?: unknown; depuis?: unknown } | null;
+			if (!x || typeof x.id !== "string" || !estEntier(x.depuis)) continue;
+			const qi = ids.indexOf(x.id);
+			if (qi >= 0 && !file.some(f => f.qi === qi)) file.push({ qi, since: x.depuis });
+		}
+	}
+	r.learnQueue = file;
+	let suite: LearnResume = null;
+	if (p.suite === "end") suite = "end";
+	else if (typeof p.suite === "string" && ids.indexOf(p.suite) >= 0) suite = ids.indexOf(p.suite);
+	r.learnResume = suite;
+	const enReprise = typeof p.enReprise === "string" ? ids.indexOf(p.enReprise) : -1;
+	r.learnRetryQi = enReprise >= 0 ? enReprise : null;
 
 	const ici = p.courante === null ? -1 : ids.indexOf(p.courante);
 	if (ici >= 0) r.courante = ici;

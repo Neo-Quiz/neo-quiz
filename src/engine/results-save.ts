@@ -352,7 +352,9 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			title: q?.title || `Question ${qi + 1}`,
 			kind: getQuestionKind(q),
 			promptText: getQuestionPromptText(q),
-			answer: mode === "training" ? buildTextOnlyAnswer(q, qi) : buildQcmAnswer(q, qi),
+			// Per question: a written answer (a Learn recall or explanation) keeps
+			// its own text even inside a quiz that is otherwise corrected.
+			answer: mode === "training" || ctx.textOnly?.isTextOnlyFor?.(qi) ? buildTextOnlyAnswer(q, qi) : buildQcmAnswer(q, qi),
 			lessonText: getLessonText(q),
 			explanationText: getExplanationText(q)
 		};

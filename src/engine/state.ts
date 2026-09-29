@@ -175,6 +175,15 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		let correct = 0, total = 0, pendingWritten = 0;
 		for (let i = 0; i < ctx.quiz.length; i++) {
 			if (sansReponse(i)) continue;
+			/* A LEARN VERDICT decides (engine/learn.ts, 2026-09-29): the score
+			   counts the answers right the FIRST time. A retry is learning, not
+			   a score — right after a miss stays out of it. */
+			const verdict = ctx.learn?.verdictOf?.(i) ?? "none";
+			if (verdict !== "none") {
+				total++;
+				if (verdict === "first") correct++;
+				continue;
+			}
 			// CORRECTIF (2026-09-27, retour #17) : une réponse écrite pas encore
 			// auto-évaluée (écran des résultats) n'est ni juste ni fausse — la
 			// compter fausse pénaliserait un score qui n'a simplement pas encore
@@ -223,7 +232,8 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			});
 		}
 		const { pct, correct, total } = computeScorePercent();
-		return JSON.stringify({ mode: ctx.quizState.practiceMode, locked: ctx.quizState.locked, pct, correct, total, savedResultsPath: ctx.quizState.savedResultsPath || null });
+		const learn = ctx.learn?.isActive?.() ? ctx.learn.summary() : null;
+		return JSON.stringify({ mode: ctx.quizState.practiceMode, locked: ctx.quizState.locked, pct, correct, total, learn, savedResultsPath: ctx.quizState.savedResultsPath || null });
 	};
 
 	function clearNavTabPressState(tab: HTMLElement | null): void {
@@ -412,6 +422,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 		// La longueur du fil rempli de la frise de perles (application).
 		ctx.container.querySelector<HTMLElement>(".quiz-nav")?.style.setProperty("--quiz-nav-pos", String(ctx.cards.navPosition()));
+		// Learn: the Check buttons and next arrows follow an answer typed
+		// without a card re-render (engine/learn.ts).
+		ctx.learn?.syncControls?.();
 	}
 
 	function setPracticeMode(mode: PracticeMode): void {
@@ -570,7 +583,10 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 			const statsStore = ctx.statsSink;
 			if (statsStore && ctx.sourcePath) {
-				const modeTexte = !!ctx.textOnly?.isTextOnlyForAny?.();
+				/* A Learn (engine/learn.ts) has a real score even with written
+				   answers: each is judged on its card, and the score counts the
+				   answers right the first time. */
+				const modeTexte = !!ctx.textOnly?.isTextOnlyForAny?.() && !ctx.learn?.isActive?.();
 				const { pct, total, pendingWritten } = computeScorePercent();
 				/* FIX round 1 de revue task 6b (2026-09-01) : `questionsDone` comptait
 				   TOUTES les cartes (0..ctx.quiz.length), alors que `total` ci-dessus
@@ -701,6 +717,8 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// sans cette remise à zéro, une question déjà journalisée à la tentative
 		// précédente ne serait plus jamais recomptée (Task 8).
 		ctx.quizState.recorded = ctx.quiz.map(() => false);
+		// The Learn retry loop starts over too (engine/learn-loop.ts).
+		Object.assign(ctx.quizState, ctx.learn.emptyState());
 		ctx.quizState.slideToken++;
 
 		if (!preserveSliding) ctx.quizState.isSliding = false;

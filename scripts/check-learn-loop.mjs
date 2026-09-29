@@ -11,7 +11,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/engine/learn-loop.ts", (m) => {
 	const r = makeReporter("Learn retry loop");
-	const { emptyLearnState, applyCheck, applyNeutralCheck, nextLearnMove, beginRetry, resumeNormalOrder, learnSummary, RETRY_LAG, MAX_RETRIES } = m;
+	const { emptyLearnState, applyCheck, applyNeutralCheck, revealForSelfRating, nextLearnMove, beginRetry, resumeNormalOrder, learnSummary, RETRY_LAG, MAX_RETRIES } = m;
 
 	/* Two steps: questions 0-4 in step 1, 5-7 in step 2. */
 	const N = 8;
@@ -109,6 +109,34 @@ await withSrcModule("src/engine/learn-loop.ts", (m) => {
 		applyCheck(s, 6, true);
 		r.check("past the end every queued one comes back, even with too few checks",
 			nextLearnMove(s, 7, stepOf, next), { kind: "retry", qi: 5, resume: "end" });
+	}
+
+	{
+		const s = emptyLearnState(N);
+		applyCheck(s, 0, false);
+		applyCheck(s, 1, true);
+		applyCheck(s, 2, true);
+		const move = nextLearnMove(s, 2, stepOf, next);
+		beginRetry(s, 0, move.resume);
+		// The learner leaves the retry by a bead, to question 6, and moves on from there.
+		r.check("a retry left unchecked by a jump goes back in the queue, due",
+			(nextLearnMove(s, 6, stepOf, next), s.learnQueue), [{ qi: 0, since: RETRY_LAG }]);
+		r.check("…and the resume point of that retry no longer holds", s.learnResume, null);
+		const s2 = emptyLearnState(N);
+		applyCheck(s2, 0, false); applyCheck(s2, 1, true); applyCheck(s2, 2, true);
+		beginRetry(s2, 0, 3);
+		applyCheck(s2, 0, true);
+		r.check("from another question than the retried one, next follows the normal order",
+			nextLearnMove(s2, 5, stepOf, next), { kind: "go", qi: 6 });
+	}
+
+	{
+		const s = emptyLearnState(N);
+		revealForSelfRating(s, 0);
+		r.check("a written answer checked: revealed, waiting for its own verdict", [s.learnChecked[0], s.learnPending[0], s.learnVerdicts[0]], [true, true, "none"]);
+		const o = applyCheck(s, 0, false);
+		r.check("its self-verdict is accepted once, as a first check", [o?.verdict, o?.firstCheck, s.learnPending[0]], ["missed", true, false]);
+		r.check("a second self-verdict for the same attempt is refused", applyCheck(s, 0, true), null);
 	}
 
 	{

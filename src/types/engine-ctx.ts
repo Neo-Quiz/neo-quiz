@@ -80,6 +80,7 @@ import type { ResultsSaverHandlers } from "../engine/results-save";
 import type { PassageHandlers } from "../engine/passage";
 import type { ClozeHandlers } from "../engine/cloze";
 import type { LessonHandlers } from "../engine/lesson";
+import type { LearnHandlers } from "../engine/learn";
 import type { TermesHandlers } from "../engine/termes";
 
 /**
@@ -266,6 +267,11 @@ export interface EngineCtx {
 	lesson: LessonHandlers;
 	/** Souligne les termes du glossaire + bulle de définition — engine/termes.ts. */
 	termes: TermesHandlers;
+	/** The Learn retry loop: check each question, retry a missed one — engine/learn.ts. */
+	learn: LearnHandlers;
+	/** Is card `qi` showing its correction: the global lock after the results,
+	    or a Learn card whose current attempt was checked (engine/learn.ts). */
+	isRevealed: LearnHandlers["isRevealed"];
 
 	/* ════════════════════════════════════════════════
 	   Méthodes APLATIES issues des sous-modules (1er Object.assign, :156-219).

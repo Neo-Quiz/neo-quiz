@@ -271,11 +271,11 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		const isPowerShell = terminalVariant === "powershell";
 		const maxLength = getTextMaxLength(q);
 
-		const statusClass = ctx.quizState.locked
+		const statusClass = ctx.isRevealed(qi)
 			? (ctx.isCorrect(qi) ? "correct" : "wrong")
 			: (value.trim() ? "filled" : "");
 
-		const readOnlyAttr = ctx.quizState.locked ? `readonly aria-readonly="true"` : "";
+		const readOnlyAttr = ctx.isRevealed(qi) ? `readonly aria-readonly="true"` : "";
 		const maxLengthAttr = Number.isFinite(maxLength) ? `maxlength="${maxLength}"` : "";
 
 		// `q.placeholder` vient du .md de l'utilisateur (donnée du quiz) : il prime
@@ -429,7 +429,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 		const applyStatus = (latex: string) => {
 			host.classList.remove("filled", "correct", "wrong");
-			if (ctx.quizState.locked) {
+			if (ctx.isRevealed(qi)) {
 				host.classList.add(isTextAnswerCorrect(q, latex) ? "correct" : "wrong");
 			} else if (String(latex || "").trim()) {
 				host.classList.add("filled");
@@ -442,12 +442,12 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			// Gabarit guidé optionnel de l'IA (« x = ▯ ») — seulement si
 			// l'élève n'a encore rien saisi.
 			template: q?.answerTemplate || "",
-			readOnly: !!ctx.quizState.locked,
+			readOnly: !!ctx.isRevealed(qi),
 			// Même raison qu'au champ texte : MathLive affiche ce placeholder
 			// comme du texte nu, pas comme du HTML.
 			placeholder: ctx.sanitize.stripInlineMarkdown(q?.placeholder || ""),
 			onInput: (latex) => {
-				if (ctx.quizState.locked) return;
+				if (ctx.isRevealed(qi)) return;
 				ctx.invalidateSavedResults?.();
 				ctx.quizState.selections[qi] = latex;
 				applyStatus(latex);
@@ -458,9 +458,10 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			},
 			onEnter: () => {
 				if (ctx.quizState.isSliding || ctx.quizState.locked) return;
-				// La diapositive suivante (une lecture absorbée n'en a pas).
-				const suivante = ctx.questionSuivante(qi);
-				if (suivante !== null) ctx.goToQuestion(suivante);
+				// Like the next arrow: in a Learn, Enter checks the answer first
+				// (engine/learn.ts); the last question stays where it is.
+				if (ctx.questionSuivante(qi) === null && !ctx.learn.canCheck(qi)) return;
+				ctx.interactions.advanceFrom(qi);
 			},
 		});
 		applyStatus(field.getValue());
@@ -542,7 +543,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		const getLiveTextStatus = (): string => {
 			const currentValue = String(textarea.value ?? "");
 
-			if (ctx.quizState.locked) {
+			if (ctx.isRevealed(qi)) {
 				return isTextAnswerCorrect(q, currentValue) ? "correct" : "wrong";
 			}
 
@@ -658,7 +659,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			const beforeRangeWidth = measureWidth(beforeRange);
 			const selectedWidth = isSelectionRange ? Math.max(1, measureWidth(selectedText)) : 0;
 
-			const isFocused = document.activeElement === textarea && !ctx.quizState.locked;
+			const isFocused = document.activeElement === textarea && !ctx.isRevealed(qi);
 			const isCollapsed = rangeStart === rangeEnd;
 			const hasInlineChar = rangeStart < value.length;
 
@@ -761,7 +762,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		};
 
 		const startCommandSelectionTracking = (e: MouseEvent): void => {
-			if (!isCommand || ctx.quizState.locked) return;
+			if (!isCommand || ctx.isRevealed(qi)) return;
 			if (e && typeof e.button === "number" && e.button !== 0) return;
 			if (commandSelectionTracking) return;
 
@@ -809,7 +810,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 		textarea.addEventListener("input", () => {
 			queueSync();
 
-			if (ctx.quizState.locked) return;
+			if (ctx.isRevealed(qi)) return;
 			// Pendant un slide : persister la saisie sans re-render, sinon les derniers
 			// caractères tapés ne sont jamais enregistrés dans selections[qi] (scoring périmé).
 			if (ctx.quizState.isSliding) { persistSelection(); return; }
@@ -820,7 +821,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			requestAnimationFrame(() => {
 				queueSync();
 
-				if (ctx.quizState.locked) return;
+				if (ctx.isRevealed(qi)) return;
 				if (ctx.quizState.isSliding) { persistSelection(); return; }
 				commitValue();
 			});
@@ -831,7 +832,7 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 			stopCommandSelectionTracking();
 			// Filet de sécurité : persister la valeur courante à la perte de focus
 			// (couvre une saisie terminée juste avant une navigation/slide).
-			if (!ctx.quizState.locked) persistSelection();
+			if (!ctx.isRevealed(qi)) persistSelection();
 			queueSync();
 		});
 		textarea.addEventListener("click", () => queueSync());
@@ -851,15 +852,14 @@ export function createTerminalHandlers(ctx: EngineCtx): TerminalHandlers {
 
 				commitValue();
 
-				const suivante = ctx.questionSuivante(qi);
-				if (suivante !== null) ctx.goToQuestion(suivante);
+				if (ctx.questionSuivante(qi) === null && !ctx.learn.canCheck(qi)) return;
+				ctx.interactions.advanceFrom(qi);
 				return;
 			}
 
-			const suivante = ctx.questionSuivante(qi);
-			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && suivante !== null) {
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && (ctx.learn.canCheck(qi) || ctx.questionSuivante(qi) !== null)) {
 				e.preventDefault();
-				ctx.goToQuestion(suivante);
+				ctx.interactions.advanceFrom(qi);
 			}
 
 			queueSync();

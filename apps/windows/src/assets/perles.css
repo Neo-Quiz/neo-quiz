@@ -381,8 +381,28 @@
 	--tab-edge: color-mix(in srgb, #000 45%, var(--quiz-hint));
 	--tab-text: #fff;
 }
+/* Learn, right after a miss (engine/learn.ts, 2026-09-29): orange. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.retried:not(.active) {
+	--tab-face: color-mix(in srgb, #d97706 78%, #2b2a33);
+	--tab-edge: #7c3a06;
+	--tab-text: #fff;
+}
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.wrong:not(.active) {
 	--tab-face: color-mix(in srgb, var(--quiz-danger) 70%, #2b2a33);
 	--tab-edge: #6f1111;
 	--tab-text: #fff;
+}
+
+/* The verdict MARK of a bead (nav-tabs.css, 2026-09-29), scaled to the bead:
+   a check, a circling arrow or a cross at its top right, so right / after
+   a miss / not yet never rest on colour alone. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.correct::before,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.retried::before,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.wrong::before {
+	top: calc(var(--taille) * -0.12);
+	right: calc(var(--taille) * -0.12);
+	width: calc(var(--taille) * 0.46);
+	height: calc(var(--taille) * 0.46);
+	font-size: calc(var(--taille) * 0.3);
+	box-shadow: 0 0 0 1.5px var(--background-primary);
 }

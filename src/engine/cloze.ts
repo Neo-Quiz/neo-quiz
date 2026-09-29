@@ -240,7 +240,7 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 		const { marked, blanks } = markSlots(q.cloze);
 		const sel = ctx.quizState.selections[qi];
 		const values: unknown[] = Array.isArray(sel) ? sel : [];
-		const locked = ctx.quizState.locked;
+		const locked = ctx.isRevealed(qi);
 
 		// Le gabarit ENTIER passe par le rendu (markdown + images), trous
 		// marqués : une paire `…` ou **…** qui enjambe un trou reste une paire.
@@ -311,7 +311,7 @@ export function createClozeHandlers(ctx: EngineCtx): ClozeHandlers {
 			if (!Number.isFinite(bi)) return;
 
 			input.addEventListener("input", () => {
-				if (ctx.quizState.locked) return;
+				if (ctx.isRevealed(qi)) return;
 				const current = ctx.quizState.selections[qi];
 				if (!Array.isArray(current)) return;
 				ctx.invalidateSavedResults?.();

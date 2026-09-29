@@ -136,9 +136,11 @@ function entreesDejaVues(zone: Element): Set<number> {
     une carte peut être corrigée AVANT le verrou global (`.quiz-flashcard-back`
     n'existe dans le DOM qu'une fois retournée, engine/text-only.ts
     `flashcardBodyHtml`). Une carte sans explication (`q.explain` absent)
-    resterait autrement invisible au verrou : ce n'est PAS le signe retenu. */
+    resterait autrement invisible au verrou : ce n'est PAS le signe retenu.
+    A Learn card checked on its own (engine/learn.ts, 2026-09-29) is
+    corrected too: its track item carries `quiz-learn-revealed`. */
 function carteCorrigee(carte: Element): boolean {
-	return !!carte.closest(".quiz-is-locked") || !!carte.querySelector(".quiz-flashcard-back");
+	return !!carte.closest(".quiz-is-locked, .quiz-learn-revealed") || !!carte.querySelector(".quiz-flashcard-back");
 }
 
 /** Les entrées du glossaire présentes dans le contenu PROTÉGÉ de `carte`
