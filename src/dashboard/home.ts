@@ -12,7 +12,7 @@ import { moduleIcon } from "./module-icons";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { poserBouton3d } from "./cta3d";
 import { lireModuleMap } from "./module-map-note";
-import { createOptionCard, importSharedFolder, openCreateFolderModal } from "./folder-create";
+import { createOptionCard, importSharedFolder } from "./folder-create";
 import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
@@ -20,8 +20,9 @@ import { renderHomeSide, type HomeExam } from "./home-week";
 
 /* ══════════════════════════════════════════════════════════
    HOME VIEW — what to work on today (redesigned 2026-09-29, after the
-   StudySmarter home): the Resume card, then one card per folder with an open
-   task (home-folders.ts) and the week with the next exam (home-week.ts).
+   StudySmarter home): one card per folder with an open task
+   (home-folders.ts), the week and quick actions beside them, then the Resume
+   card below the folders when a quiz is in progress.
    The global counters and the grid of quiz cards are gone: they did not say
    what to do. Spec: docs/superpowers/specs/2026-09-29-home-page-design.md.
 ══════════════════════════════════════════════════════════ */
@@ -113,9 +114,8 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		   tile's edge, it read as a smear rather than light. */
 		const page = ajouter(container, "div", "qbd-home-page");
 
-		/* No header (2026-09-29): no title, no "Generate a quiz" — the page
-		   says what to do by itself, and "Create a new folder" closes it
-		   (below the folders). */
+		/* No header (2026-09-29): no title and no "Generate a quiz" — the
+		   folder cards and the side column say what to do by themselves. */
 
 		// ── Resume: the latest quiz in progress (a returning user's primary action) ──
 		const resumeQuiz = inProgress
@@ -125,33 +125,12 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 				const lb = (stats[b.path] && stats[b.path].lastPlayed) || 0;
 				return lb - la;
 			})[0];
-		if (resumeQuiz) {
-			renderResumeHero(page, resumeQuiz, stats[resumeQuiz.path], map);
-		}
-
 		// ── The folders and the week ──
 		const now = Date.now();
 		const todayStart = startOfDay(now);
 		const todayIso = isoLocal(now);
 		const groups = buildModuleGroups(quizzes, stats, map);
 		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
-		/* "Create a new folder", under the folders (after StudySmarter's "Add
-		   a new set"): a quiet outlined pill, the page's only creation action. */
-		const newFolder = (parent: HTMLElement): void => {
-			const b = ajouter(parent, "button", "qbd-home-newfolder");
-			b.type = "button";
-			currentHost().ui.setIcon(ajouter(b, "span", "qbd-home-newfolder-icon"), "folder-plus");
-			ajouter(b, "span", undefined, t("dashboard.home.newFolder"));
-			b.addEventListener("click", () => openCreateFolderModal(ctx, map, allQuizzes, rerender));
-		};
-		if (folders.length === 0) {
-			const done = ajouter(page, "div", "qbd-home-done");
-			currentHost().ui.setIcon(ajouter(done, "span", "qbd-home-done-icon"), "circle-check");
-			ajouter(done, "p", "qbd-home-done-title", t("dashboard.home.allDone"));
-			ajouter(done, "p", "qbd-home-done-hint", t("dashboard.home.allDoneHint"));
-			newFolder(done);
-			return;
-		}
 		// Every upcoming exam of every folder — a folder with nothing to do
 		// today can still have its exam this week.
 		const exams: HomeExam[] = groups
@@ -160,12 +139,22 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 
 		const layout = ajouter(page, "div", "qbd-home-layout");
 		const column = ajouter(layout, "div", "qbd-home-folders");
-		for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart);
-		newFolder(column);
-		renderHomeSide(layout, {
+		if (folders.length === 0) {
+			const done = ajouter(column, "div", "qbd-home-done");
+			currentHost().ui.setIcon(ajouter(done, "span", "qbd-home-done-icon"), "circle-check");
+			ajouter(done, "p", "qbd-home-done-title", t("dashboard.home.allDone"));
+			ajouter(done, "p", "qbd-home-done-hint", t("dashboard.home.allDoneHint"));
+		} else {
+			for (const folder of folders) renderHomeFolder(column, ctx, folder, stats, todayStart);
+		}
+		if (resumeQuiz) renderResumeHero(column, resumeQuiz, stats[resumeQuiz.path], map);
+
+		const side = ajouter(layout, "div", "qbd-home-side");
+		renderHomeSide(side, {
 			ctx, folders, exams, todayStart, weekOffset,
 			moveWeek: (delta) => { weekOffset += delta; rerender(); },
 		});
+		renderQuickActions(side, map, allQuizzes);
 	}
 
 	/* "Resume" card (redrawn 2026-09-29, button restyled the same day): a
@@ -222,6 +211,18 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		ajouter(cta, "span", undefined, t("dashboard.home.resumeBtn"));
 		poserBouton3d(cta);
 		cta.addEventListener("click", (e) => { e.stopPropagation(); ctx.openQuiz(quiz); });
+	}
+
+	/** The two creation shortcuts below the calendar, using the exact option
+	    rows of the folder creation modal. */
+	function renderQuickActions(container: HTMLElement, map: ModuleMap, quizzes: QuizIndexEntry[]): void {
+		const card = ajouter(container, "section", "qbd-home-quick");
+		ajouter(card, "h2", "qbd-home-quick-title", t("dashboard.home.quickActions"));
+		const options = ajouter(card, "div", "qbd-home-quick-options");
+		createOptionCard(null, options, "folder-plus", "#4573ff", t("dashboard.quizzes.newFolderTitle"), t("dashboard.quizzes.createEmptyDesc"),
+			() => openNewFolderModal(ctx, map, quizzes, rerender));
+		createOptionCard(null, options, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
+			() => void importSharedFolder(ctx, map, quizzes, rerender));
 	}
 
 	function renderOnboarding(container: HTMLElement, map: ModuleMap, allQuizzes: QuizIndexEntry[]): void {

@@ -109,7 +109,7 @@
 	gap: 16px;
 	width: 100%;
 	height: auto;
-	margin: 0 0 18px;
+	margin: 0;
 	padding: 16px 20px !important;
 	border: 1px solid var(--qbd-surface-edge) !important;
 	border-radius: 15px;
@@ -124,7 +124,10 @@
 }
 @media (prefers-reduced-motion: reduce) {
 	.qbd-root .qbd-resume-hero,
-	.qbd-resume-hero { transition: none; }
+	.qbd-resume-hero,
+	.qbd-homef-task-label,
+	.qbd-home-quick .qbd-create-option,
+	.qbd-home-quick .qbd-create-option-icon { transition: none; }
 }
 
 .qbd-root .qbd-resume-hero:hover,
@@ -200,40 +203,6 @@
 .qbd-root .qbd-resume-cta { flex: 0 0 auto; align-self: center; }
 .qbd-resume-cta .qbd-cta3d-face { padding: 10px 20px; font-size: 14px; }
 
-/* ── "Create a new folder", under the folders (after StudySmarter's "Add a
-   new set"): a quiet outlined pill, centred. */
-.qbd-root .qbd-home-newfolder,
-.qbd-home-newfolder {
-	display: inline-flex;
-	align-items: center;
-	align-self: center;
-	gap: 8px;
-	height: auto;
-	margin: 6px auto 0;
-	padding: 10px 20px !important;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 22%, transparent) !important;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--background-secondary) 70%, transparent) !important;
-	box-shadow: none !important;
-	color: var(--text-normal);
-	font: inherit;
-	font-size: 13.5px;
-	font-weight: 600;
-	cursor: pointer;
-	transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.qbd-root .qbd-home-newfolder:hover,
-.qbd-home-newfolder:hover {
-	border-color: color-mix(in srgb, var(--text-normal) 40%, transparent) !important;
-	background: color-mix(in srgb, var(--text-normal) 8%, var(--background-secondary)) !important;
-}
-
-.qbd-home-newfolder-icon { display: inline-flex; color: var(--text-muted); }
-.qbd-home-newfolder-icon svg { width: 16px; height: 16px; }
-
-.qbd-home-done .qbd-home-newfolder { margin-top: 18px; }
-
 /* The page keeps the breathing space the removed stats band had above it
    (2026-09-29), so its first card does not stick to the tile's top edge. */
 .qbd-home-page { padding-top: 28px; }
@@ -244,7 +213,7 @@
 	grid-template-columns: minmax(0, 1fr) 290px;
 	gap: 18px;
 	align-items: start;
-	margin-top: 18px;
+	margin-top: 0;
 }
 
 .qbd-home-folders {
@@ -254,10 +223,11 @@
 	min-width: 0;
 }
 
-/* The only tiles of the page (with the Resume card): the content. Inside,
-   rows and text only — never a second box. */
+/* The page's glass surfaces. The calendar and Quick actions share the exact
+   same edge, background and width through their side-column track. */
 .qbd-homef,
-.qbd-homes {
+.qbd-homes,
+.qbd-home-quick {
 	background: var(--qbd-surface-bg);
 	border: 1px solid var(--qbd-surface-edge);
 	border-radius: 15px;
@@ -436,10 +406,25 @@
 .qbd-root .qbd-homef-more:hover { color: var(--text-normal); }
 .qbd-homef-more-chev svg { width: 14px; height: 14px; }
 
+.qbd-root .qbd-homef-name:focus-visible,
+.qbd-root .qbd-homef-task:focus-visible,
+.qbd-root .qbd-homef-more:focus-visible,
+.qbd-root .qbd-homes-arrow:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
 /* ── The side column ── */
-.qbd-homes {
+.qbd-home-side {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
 	position: sticky;
 	top: 0;
+}
+
+.qbd-homes {
 	padding: 14px 16px 4px;
 }
 
@@ -557,6 +542,30 @@
 	font-size: 12.5px;
 }
 
+/* The same option rows as the creation modal, inside a glass surface below
+   the calendar. Descriptions stay on one muted line in the narrow track. */
+.qbd-home-quick {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	padding: 14px 8px 8px;
+}
+
+.qbd-home-quick-title {
+	margin: 0 8px 4px;
+	color: var(--text-normal);
+	font-size: 14px;
+	font-weight: 650;
+}
+
+.qbd-home-quick-options { min-width: 0; }
+.qbd-home-quick .qbd-create-option { box-sizing: border-box; min-width: 0; padding: 10px 8px !important; }
+.qbd-home-quick .qbd-create-option-desc {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* ── Nothing to do anywhere ── */
 .qbd-home-done {
 	display: flex;
@@ -583,14 +592,13 @@
 	font-size: 13px;
 }
 
-/* A narrow page: one column, the week ABOVE the folders. `.is-mobile`:
-   Obsidian's mobile emulation, where the viewport query does not fire
-   (dashboard-base.css stacks the grid itself). */
+/* A narrow page: one column in DOM order, so keyboard focus follows the
+   folders, Resume, calendar and Quick actions exactly as they are painted. */
 @media (max-width: 900px) {
 	.qbd-home-layout { grid-template-columns: 1fr; }
-	.qbd-homes { order: -1; position: static; }
+	.qbd-home-side { position: static; }
 }
-.is-mobile .qbd-homes { order: -1; position: static; }
+.is-mobile .qbd-home-side { position: static; }
 
 @media (max-width: 600px) {
 	.qbd-resume-hero { flex-wrap: wrap; }

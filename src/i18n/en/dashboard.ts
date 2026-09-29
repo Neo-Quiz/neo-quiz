@@ -57,7 +57,7 @@ export const EN_DASHBOARD = {
 	"dashboard.home.allDone": "All caught up",
 	"dashboard.home.allDoneHint": "Nothing to review or learn today.",
 	"dashboard.home.resumeLabel": "Pick up where you left off",
-	"dashboard.home.newFolder": "Create a new folder",
+	"dashboard.home.quickActions": "Quick actions",
 	"dashboard.home.resumeAria": "Resume {title}",
 	"dashboard.home.resumeBtn": "Resume",
 

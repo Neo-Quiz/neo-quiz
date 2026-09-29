@@ -6,6 +6,7 @@
  * work, a week drawn from a Sunday or broken by a daylight saving change.
  *     npm run check:home
  */
+import { parseHTML } from "linkedom";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/dashboard/home-tasks.ts", (H) => {
@@ -61,5 +62,118 @@ await withSrcModule("src/dashboard/home-tasks.ts", (H) => {
 	r.check("days until an exam", H.daysUntil("2026-10-04", H.startOfDay(mercredi)), 4);
 	r.check("isoLocal is local, never UTC", H.isoLocal(new Date(2026, 8, 30, 23, 30).getTime()), "2026-09-30");
 
+	r.done();
+});
+
+const { document, window } = parseHTML("<html><body></body></html>");
+globalThis.document = document;
+globalThis.window = window;
+
+await withSrcModule(["src/dashboard/home.ts", "src/host/current.ts"], async (Home, Host) => {
+	const r = makeReporter("Home — page layout and quick actions");
+	const quiz = (path, title, mode) => ({
+		path,
+		basename: title,
+		title,
+		mtime: 1,
+		questions: 10,
+		readings: 0,
+		items: [],
+		types: ["single"],
+		quizType: "single",
+		mode,
+	});
+	const resumeQuiz = quiz("Course/Resume.md", "Resume quiz", "learn");
+	const nextQuiz = quiz("Course/Next.md", "Next quiz", "practice");
+	const quizzes = [resumeQuiz, nextQuiz];
+	let stats = {
+		[resumeQuiz.path]: {
+			bestScore: 0,
+			questionsDone: 3,
+			totalQuestions: 10,
+			lastPlayed: 20,
+			attempts: 0,
+		},
+	};
+	let openedModalTitle = null;
+	const host = {
+		links: { resolve: () => null },
+		ui: {
+			setIcon: (el, name) => el.setAttribute("data-icon", name),
+			notice: () => {},
+		},
+		modals: {
+			open: (spec) => {
+				openedModalTitle = spec.title ?? null;
+				const panelEl = document.createElement("div");
+				const contentEl = panelEl.appendChild(document.createElement("div"));
+				const handle = { panelEl, contentEl, close: () => {} };
+				spec.onOpen(handle);
+				return handle;
+			},
+		},
+	};
+	Host.installHost(host);
+
+	const scanner = {
+		getQuizzes: () => quizzes,
+		getQuiz: (path) => quizzes.find(q => q.path === path) ?? null,
+	};
+	const ctx = {
+		scanner,
+		statsStore: { getAll: () => stats },
+		settings: {},
+		saveSettings: async () => {},
+		navigate: () => {},
+		recordNav: () => {},
+		openQuiz: () => {},
+		openSettings: () => {},
+		canOpen: () => true,
+	};
+	const container = document.createElement("main");
+	const home = Home.createHomeHandlers(ctx);
+	home.render(container);
+	await Promise.resolve();
+	await Promise.resolve();
+
+	const mainColumn = container.querySelector(".qbd-home-folders");
+	const sideColumn = container.querySelector(".qbd-home-side");
+	r.check("the page starts with the folder and side columns",
+		[...container.querySelector(".qbd-home-layout")?.children ?? []].map(el => el.className),
+		["qbd-home-folders", "qbd-home-side"]);
+	r.check("the Resume card follows the folder cards in the main column",
+		[...mainColumn?.children ?? []].map(el => el.className),
+		["qbd-homef", "qbd-resume-hero"]);
+	r.check("Quick actions follows the calendar in the side column",
+		[...sideColumn?.children ?? []].map(el => el.className),
+		["qbd-homes", "qbd-home-quick"]);
+
+	const quick = sideColumn?.querySelector(".qbd-home-quick");
+	const quickButtons = [...quick?.querySelectorAll("button.qbd-create-option") ?? []];
+	r.check("Quick actions contains two real option buttons",
+		quickButtons.map(button => ({
+			title: button.querySelector(".qbd-create-option-title")?.textContent,
+			icon: button.querySelector(".qbd-create-option-icon")?.getAttribute("data-icon"),
+		})),
+		[
+			{ title: "New folder", icon: "folder-plus" },
+			{ title: "Import a shared folder", icon: "download" },
+		]);
+	quickButtons[0]?.click();
+	r.check("New folder opens the direct folder-name modal", openedModalTitle, "New folder");
+	r.check("the removed creation pill is absent", container.querySelector(".qbd-home-newfolder"), null);
+
+	stats = Object.fromEntries(quizzes.map(q => [q.path, {
+		bestScore: 100,
+		questionsDone: 10,
+		totalQuestions: 10,
+		lastPlayed: 20,
+		attempts: 1,
+	}]));
+	home.render(container);
+	r.check("Quick actions remains available when every folder is caught up",
+		container.querySelectorAll(".qbd-home-quick .qbd-create-option").length, 2);
+
+	Host.uninstallHost();
 	r.done();
 });
