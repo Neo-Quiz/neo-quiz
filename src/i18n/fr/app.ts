@@ -42,7 +42,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.menu.checkUpdates": "Vérifier les mises à jour…",
 	"app.menu.settings": "Réglages…",
 	"app.menu.view": "Affichage",
-	"app.menu.scale": "Échelle de l'interface",
 	"app.menu.reload": "Recharger",
 	"app.menu.fullscreen": "Plein écran",
 	"app.menu.devtools": "Outils de développement",

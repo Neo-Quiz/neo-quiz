@@ -187,8 +187,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 		observateurMenu.observe(ancre, { attributes: true, attributeFilter: ["data-open"] });
 		fermerMenu = ouvrirMenuApp(ancre, {
 			version: application.version,
-			zoom: () => currentZoom,
-			executer(id, value) {
+			executer(id) {
 				if (id === "check-updates") {
 					/* It used to open Settings as well, where an update section
 					   showed the result; that section left on 2026-09-17, and the
@@ -203,8 +202,6 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					   le `<a target="_blank">` de l'ancienne section
 					   « À propos ». */
 					window.open(manifeste.helpUrl, "_blank", "noopener");
-				} else if (id.startsWith("scale-") && typeof value === "number") {
-					setZoom(value);
 				} else if (id === "next-wallpaper") {
 					deps.fondSuivant();
 				} else if (id === "reload") {

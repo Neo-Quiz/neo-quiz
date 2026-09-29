@@ -19,8 +19,7 @@ import { poserIcone } from "../host/ui";
 
 export interface ActionsMenu {
 	version: string;
-	zoom(): number;
-	executer(id: string, value?: number): void;
+	executer(id: string): void;
 }
 
 /** Un niveau ouvert de la cascade : le panneau posé à l'écran et l'index de
@@ -30,6 +29,9 @@ interface Panneau {
 	el: HTMLElement;
 	lignes: HTMLButtonElement[];
 	actif: number;
+	/** The row that opened this panel (a submenu), so a pointer coming back
+	    onto it does not rebuild the panel it already shows. */
+	proprietaire?: HTMLElement;
 }
 
 /**
@@ -38,7 +40,7 @@ interface Panneau {
  * barre s'en sert pour teinter le chevron).
  */
 export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void {
-	const arbre = buildMenu({ version: deps.version, zoom: deps.zoom() });
+	const arbre = buildMenu({ version: deps.version });
 
 	const couche = document.createElement("div");
 	couche.className = "nq-menu-couche";
@@ -55,6 +57,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	const ecran = (px: number): number => px * zoom;
 
 	function fermer(): void {
+		window.clearTimeout(minuteurSortie);
 		document.removeEventListener("keydown", surClavier, true);
 		window.removeEventListener("blur", fermer);
 		ancre.removeAttribute("data-open");
@@ -85,7 +88,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 
 	/** Construit et pose le panneau du niveau `niveau` pour `entrees`, à la
 	    position donnée. Ferme d'abord tout niveau plus profond. */
-	function ouvrirNiveau(niveau: number, entrees: EntreeMenu[], left: number, top: number): void {
+	function ouvrirNiveau(niveau: number, entrees: EntreeMenu[], left: number, top: number, proprietaire?: HTMLElement): void {
 		fermerDepuis(niveau);
 
 		const panneau = document.createElement("div");
@@ -111,9 +114,10 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				verifier.textContent = entree.checkLabel;
 				verifier.addEventListener("click", () => activer(entree, verifier));
 				verifier.addEventListener("mouseenter", () => {
-					panneau_focaliser(lignes.indexOf(verifier));
+					allumer(niveau, verifier);
 					fermerDepuis(niveau + 1);
 				});
+				verifier.addEventListener("mouseleave", () => eteindre(niveau, verifier));
 				const depot = document.createElement("button");
 				depot.type = "button";
 				depot.className = "nq-menu-apropos-github";
@@ -123,10 +127,11 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				depot.setAttribute("aria-label", entree.repoLabel);
 				depot.append(marqueGithub());
 				depot.addEventListener("click", () => { deps.executer("repo"); fermer(); });
-				// The mark takes the focus on hover, as a line does: one
-				// highlighted target at a time, never "Check for updates" left
-				// lit while the pointer is on the mark.
-				depot.addEventListener("mouseenter", () => { depot.focus(); fermerDepuis(niveau + 1); });
+				// The mark is lit on hover, as a line is: one highlighted
+				// target at a time, never "Check for updates" left lit while
+				// the pointer is on the mark.
+				depot.addEventListener("mouseenter", () => { allumer(niveau, depot); fermerDepuis(niveau + 1); });
+				depot.addEventListener("mouseleave", () => eteindre(niveau, depot));
 				rangee.append(verifier, depot);
 				lignes.push(verifier);
 				continue;
@@ -136,15 +141,11 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			ligne.type = "button";
 			ligne.className = "nq-menu-ligne";
 
-			const coche = ajouter(ligne, "span", "nq-menu-coche");
-			if (entree.kind === "check" && entree.checked) poserIcone(coche, "check");
+			ajouter(ligne, "span", "nq-menu-coche");
 
 			ajouter(ligne, "span", "nq-menu-libelle", entree.label);
 
-			if (entree.kind === "action" || entree.kind === "check") {
-				const raccourci = "shortcut" in entree ? entree.shortcut : undefined;
-				if (raccourci) ajouter(ligne, "span", "nq-menu-raccourci", raccourci);
-			}
+			if (entree.kind === "action" && entree.shortcut) ajouter(ligne, "span", "nq-menu-raccourci", entree.shortcut);
 
 			if (entree.kind === "submenu") {
 				ligne.setAttribute("aria-expanded", "false");
@@ -156,33 +157,57 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 
 			ligne.addEventListener("click", () => activer(entree, ligne));
 			ligne.addEventListener("mouseenter", () => {
-				panneau_focaliser(lignes.indexOf(ligne));
+				allumer(niveau, ligne);
 				if (entree.kind === "submenu") ouvrirSousMenu(niveau, entree, ligne);
 				else fermerDepuis(niveau + 1);
 			});
+			ligne.addEventListener("mouseleave", () => eteindre(niveau, ligne));
 
 			panneau.appendChild(ligne);
 			lignes.push(ligne);
 		}
 
 		positionner(panneau, left, top);
-		panneaux[niveau] = { entrees, el: panneau, lignes, actif: -1 };
+		panneaux[niveau] = { entrees, el: panneau, lignes, actif: -1, proprietaire };
 	}
 
-	function panneau_focaliser(index: number): void {
-		const p = panneaux[panneaux.length - 1];
+	/* THE HIGHLIGHT IS `data-actif`, NOT `:focus`. Focus was set on hover and
+	   never taken back when the pointer left, so a row stayed lit after the
+	   pointer was gone; and it was always given to the LAST panel, so with a
+	   submenu open, hovering a row of the parent lit a row of the submenu
+	   (then removed it, leaving "Check for updates" with no highlight at all).
+	   The level is now explicit, and a leave clears its own row. Focus still
+	   follows, for keyboard and screen readers. */
+	function allumer(niveau: number, cible: HTMLElement | null): void {
+		const p = panneaux[niveau];
 		if (!p) return;
-		p.actif = index;
-		for (const [i, l] of p.lignes.entries()) {
-			if (i === index) l.focus();
+		for (const el of p.el.querySelectorAll("[data-actif]")) {
+			if (el !== cible) el.removeAttribute("data-actif");
 		}
+		p.actif = cible ? p.lignes.indexOf(cible as HTMLButtonElement) : -1;
+		if (!cible) return;
+		cible.setAttribute("data-actif", "");
+		cible.focus({ preventScroll: true });
+	}
+
+	/** The pointer leaves `cible`: it goes dark, unless it is the row whose
+	    submenu is open (kept lit by `aria-expanded`). */
+	function eteindre(niveau: number, cible: HTMLElement): void {
+		const p = panneaux[niveau];
+		if (!p || !cible.hasAttribute("data-actif")) return;
+		cible.removeAttribute("data-actif");
+		if (p.actif === p.lignes.indexOf(cible as HTMLButtonElement)) p.actif = -1;
+		if (document.activeElement === cible) cible.blur();
 	}
 
 	function ouvrirSousMenu(niveauParent: number, entree: EntreeMenu & { kind: "submenu" }, ligneEl: HTMLElement): void {
+		// The pointer coming back from the submenu onto its own row: the
+		// panel is already there, rebuilding it made it blink.
+		if (panneaux[niveauParent + 1]?.proprietaire === ligneEl) return;
 		panneaux[niveauParent].lignes.forEach(l => l.removeAttribute("aria-expanded"));
 		ligneEl.setAttribute("aria-expanded", "true");
 		const rect = ligneEl.getBoundingClientRect();
-		ouvrirNiveau(niveauParent + 1, entree.items, ecran(rect.right) - 4, ecran(rect.top) - 12);
+		ouvrirNiveau(niveauParent + 1, entree.items, ecran(rect.right) - 4, ecran(rect.top) - 12, ligneEl);
 	}
 
 	function activer(entree: EntreeMenu, ligneEl: HTMLElement): void {
@@ -197,9 +222,6 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		} else if (entree.kind === "action") {
 			deps.executer(entree.id);
 			fermer();
-		} else if (entree.kind === "check") {
-			deps.executer(entree.id, entree.value);
-			fermer();
 		}
 	}
 
@@ -207,23 +229,25 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		if (e.key === "Escape") { e.preventDefault(); fermer(); return; }
 		const p = panneaux[panneaux.length - 1];
 		if (!p) return;
+		const niveau = panneaux.length - 1;
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
-			panneau_focaliser((p.actif + 1 + p.lignes.length) % p.lignes.length);
+			allumer(niveau, p.lignes[(p.actif + 1 + p.lignes.length) % p.lignes.length]);
 		} else if (e.key === "ArrowUp") {
 			e.preventDefault();
-			panneau_focaliser((p.actif - 1 + p.lignes.length) % p.lignes.length);
+			allumer(niveau, p.lignes[(p.actif - 1 + p.lignes.length) % p.lignes.length]);
 		} else if (e.key === "ArrowRight") {
 			const entree = p.entrees.filter(x => x.kind !== "separator")[p.actif];
 			if (entree && entree.kind === "submenu") {
 				e.preventDefault();
-				ouvrirSousMenu(panneaux.length - 1, entree, p.lignes[p.actif]);
-				panneau_focaliser(0);
+				ouvrirSousMenu(niveau, entree, p.lignes[p.actif]);
+				allumer(niveau + 1, panneaux[niveau + 1]?.lignes[0] ?? null);
 			}
 		} else if (e.key === "ArrowLeft") {
 			if (panneaux.length > 1) {
 				e.preventDefault();
-				fermerDepuis(panneaux.length - 1);
+				fermerDepuis(niveau);
+				allumer(niveau - 1, panneaux[niveau - 1].lignes.find(l => l.getAttribute("aria-expanded") === "true") ?? null);
 			}
 		} else if (e.key === "Enter") {
 			if (p.actif >= 0) {
@@ -236,6 +260,22 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 
 	couche.addEventListener("mousedown", (e) => {
 		if (e.target === couche) fermer();
+	});
+
+	/* The pointer OUT of the panels, over the bare layer: the open submenus
+	   fold back and the row that opened them goes dark (it stayed lit through
+	   `aria-expanded`, and the submenu stayed open, however far the pointer
+	   was). The short delay lets a pointer cross the gap between a row and its
+	   submenu, or graze the layer on the way, without losing the cascade.
+	   The root panel stays: only a click outside or Escape closes the menu. */
+	let minuteurSortie: number | undefined;
+	couche.addEventListener("mouseover", (e) => {
+		window.clearTimeout(minuteurSortie);
+		if (e.target !== couche || panneaux.length < 2) return;
+		minuteurSortie = window.setTimeout(() => {
+			fermerDepuis(1);
+			panneaux[0]?.lignes.forEach(l => l.removeAttribute("aria-expanded"));
+		}, 250);
 	});
 	document.addEventListener("keydown", surClavier, true);
 	window.addEventListener("blur", fermer);

@@ -1,8 +1,7 @@
 /* ══════════════════════════════════════════════════════════
    L'ARBRE DU MENU D'APPLICATION — pur
 
-   Relu à chaque ouverture, pour que `t()` suive la langue et que la coche
-   d'échelle suive le zoom courant. Aucun DOM, aucun pont : `check:menu-app`
+   Relu à chaque ouverture, pour que `t()` suive la langue. Aucun DOM, aucun pont : `check:menu-app`
    l'éprouve tel quel. Le PRODUIT n'est jamais traduit (`PRODUCT_NAME`).
 ══════════════════════════════════════════════════════════ */
 import { t } from "../../../../src/i18n";
@@ -14,7 +13,6 @@ export type EntreeMenu =
 	   is gone (Ctrl+, and the rail's Settings button remain). */
 	| { kind: "about"; id: string; version: string; checkLabel: string; repoLabel: string }
 	| { kind: "action"; id: string; label: string; shortcut?: string; disabled?: boolean }
-	| { kind: "check"; id: string; label: string; value: number; checked: boolean }
 	| { kind: "separator"; id: string }
 	| { kind: "submenu"; id: string; label: string; items: EntreeMenu[] };
 
@@ -43,7 +41,7 @@ export function palierZoomVoisin(courant: number, sens: 1 | -1): number {
 	return [...PALIERS_ZOOM].reverse().find(p => p < base - 0.001) ?? PALIERS_ZOOM[0];
 }
 
-export function buildMenu(ctx: { version: string; zoom: number }): EntreeMenu[] {
+export function buildMenu(ctx: { version: string }): EntreeMenu[] {
 	return [
 		/* The repository link came to this menu on 2026-09-17, when the
 		   Settings' "About" section was removed: it belongs with the version.
@@ -56,10 +54,8 @@ export function buildMenu(ctx: { version: string; zoom: number }): EntreeMenu[] 
 		   which Chromium handles by itself in every field (Blink's
 		   editing_behavior.cc); nobody reached them by the menu. */
 		{ kind: "submenu", id: "view", label: t("app.menu.view"), items: [
-			{ kind: "submenu", id: "scale", label: t("app.menu.scale"), items: PALIERS_ZOOM.map(p => ({
-				kind: "check" as const, id: `scale-${Math.round(p * 100)}`, label: `${Math.round(p * 100)} %`, value: p,
-				checked: Math.abs(p - ctx.zoom) < 0.001,
-			})) },
+			/* No "Interface scale" submenu since 2026-09-29: the zoom is
+			   reached by Ctrl + wheel and its bubble (`palierZoomVoisin`). */
 			{ kind: "action", id: "next-wallpaper", label: t("app.menu.nextWallpaper"), shortcut: "Ctrl+Shift+B" },
 			{ kind: "separator", id: "view-sep" },
 			{ kind: "action", id: "reload", label: t("app.menu.reload"), shortcut: "Ctrl+R" },

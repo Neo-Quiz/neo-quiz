@@ -67,7 +67,6 @@ export const EN_APP = {
 	"app.menu.checkUpdates": "Check for updates…",
 	"app.menu.settings": "Settings…",
 	"app.menu.view": "Display",
-	"app.menu.scale": "Interface scale",
 	"app.menu.reload": "Reload",
 	"app.menu.fullscreen": "Toggle full screen",
 	"app.menu.devtools": "Show developer tools",

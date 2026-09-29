@@ -1352,7 +1352,11 @@ body::after {
 .nq-menu-raccourci { flex: none; margin-left: 24px; color: var(--text-faint); font-size: 12px; }
 .nq-menu-chevron { display: flex; flex: none; margin-left: 24px; color: var(--text-muted); }
 .nq-menu-chevron svg { width: 14px; height: 14px; }
-.nq-menu-ligne:hover, .nq-menu-ligne:focus, .nq-menu-ligne[aria-expanded="true"] { background: var(--background-modifier-hover); outline: none; }
+/* Lit by `data-actif` (set on pointer enter, cleared on leave, moved by the
+   arrows: ui/menu-app.ts), never by `:hover`/`:focus` — they did not agree on
+   which row was current, and `:focus` outlived the pointer. */
+.nq-menu-ligne { transition: background-color 80ms ease-out; outline: none; }
+.nq-menu-ligne[data-actif], .nq-menu-ligne[aria-expanded="true"] { background: var(--background-modifier-hover); }
 .nq-menu-separateur { height: 1px; margin: 6px 0; background: var(--background-modifier-border); }
 /* The top row (2026-09-29): the version, "Check for updates" and the GitHub
    mark, aligned on the labels of the rows below (28 px, the check column). */
@@ -1361,9 +1365,10 @@ body::after {
 .nq-menu-apropos-verifier { flex: 1 1 auto; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
 .nq-menu-apropos-github { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .nq-menu-apropos-github svg { width: 16px; height: 16px; }
-/* One highlighted target at a time: the one with the focus, which a hover
-   gives (menu-app.ts), exactly as the menu's lines. */
-.nq-menu-apropos-verifier:focus, .nq-menu-apropos-github:focus { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
+/* One highlighted target at a time: the one marked `data-actif` (menu-app.ts),
+   exactly as the menu's lines. */
+.nq-menu-apropos-verifier, .nq-menu-apropos-github { outline: none; transition: background-color 80ms ease-out, color 80ms ease-out; }
+.nq-menu-apropos-verifier[data-actif], .nq-menu-apropos-github[data-actif] { background: var(--background-modifier-hover); color: var(--text-normal); }
 
 /* ══════════════════════════════════════════════════════════
    LES BARRES DE DÉFILEMENT DE LA FENÊTRE
