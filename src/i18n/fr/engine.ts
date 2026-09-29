@@ -35,6 +35,14 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.exam.questionCount.one": "{count} question",
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Terminer l'examen",
+
+	/* ── Rendre un Test (engine/hand-in.ts) ── */
+	"engine.handIn.button": "Rendre le test",
+	"engine.handIn.unanswered.one": "{count} question sans réponse",
+	"engine.handIn.unanswered.other": "{count} questions sans réponse",
+	"engine.handIn.confirmSub": "Rendre quand même ? Une question sans réponse compte comme fausse.",
+	"engine.handIn.confirm": "Rendre",
+	"engine.handIn.keepAnswering": "Continuer à répondre",
 	"engine.exam.timeUpLocked": "Temps écoulé ! Le quiz a été verrouillé.",
 
 	/* ── Questions à choix ── */

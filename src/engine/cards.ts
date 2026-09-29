@@ -161,9 +161,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const slide = ctx.getSlideIndexForQuestion(qi);
 		const isFirst = slide <= 0;
 		const isLast = ctx.questionSuivante(qi) === null;
-		const nextLabel = t(!isLast
-			? "engine.nav.nextQuestion"
-			: ctx.textOnly.isExamAnswerPhase() ? "engine.exam.finish" : "engine.nav.results");
+		const nextLabel = t(!isLast ? "engine.nav.nextQuestion" : ctx.handIn.lastArrowLabel());
 		const prevLabel = ctx.escapeHtmlAttr(t("engine.nav.prevQuestion"));
 		/* In a Learn, the next arrow on an answered, unchecked question CHECKS
 		   it first ("Check, then Continue"): its label says so. `data-nav-label`
@@ -643,7 +641,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   (engine/hint.ts indiceCarte). Une réponse libre a son indice aussi
 		   (retour #1 : CHAQUE question d'un Learn en a un) ; seule la carte
 		   mémoire n'en a pas, puisqu'elle se retourne pour se lire. */
-		const indice = !isRead && !ctx.isFlashcardQuestion(q) ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
+		// An Exam shows no hint at all (engine/hand-in.ts showsHints).
+		const indice = !isRead && !ctx.isFlashcardQuestion(q) && ctx.handIn.showsHints() ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
 		const hintBtn = indice.bouton;
 		const indiceHtml = indice.revele;
 		// Task 7 (mode Lesson) : « Je ne sais pas » sur une pré-question — une

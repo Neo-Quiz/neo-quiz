@@ -264,8 +264,10 @@
 		0 var(--help-depth) 0 0 var(--help-edge);
 }
 /* The END SCREEN's beads (results.css): the face and edge of the navigation
-   row's, so that both rows read as one object. */
-#neo-quiz-root > .qbd-qz .quiz-submit-perle {
+   row's, so that both rows read as one object. The hand-in confirmation of
+   a Test (engine/hand-in.ts) shows the same beads, portaled to <body>. */
+#neo-quiz-root > .qbd-qz .quiz-submit-perle,
+body > .quiz-handin-overlay .quiz-submit-perle {
 	--perle-face: #2b2a33;
 	--perle-face-hover: color-mix(in srgb, #fff 5%, #2b2a33);
 	--perle-edge: #141319;

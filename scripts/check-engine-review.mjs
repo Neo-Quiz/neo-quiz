@@ -739,3 +739,95 @@ await withSrcModule(
 		r.done();
 	}
 });
+
+/* HANDING IN A TEST (engine/hand-in.ts, spec 2026-09-29 §2.1, §3.2, §3.3):
+   a Test never lands on the submit slide. Complete → straight to the
+   correction; questions left unanswered → a confirmation, and nothing is
+   handed in until it is accepted; already handed in → the results. A Learn
+   is not a Test and keeps its submit step. An Exam shows no hints. */
+await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
+	const r = makeReporter("Hand in a Test");
+	/* The smallest DOM the confirmation needs: an element that records what
+	   was put in <body>, and the document's key listeners WITH their capture
+	   flag — a listener removed with another flag than it was added with
+	   stays in a real DOM. */
+	const corps = [];
+	const cles = [];
+	const element = () => {
+		const el = {
+			className: "", innerHTML: "",
+			addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+			remove() { const i = corps.indexOf(el); if (i >= 0) corps.splice(i, 1); },
+		};
+		return el;
+	};
+	globalThis.document = {
+		activeElement: null,
+		createElement: element,
+		body: { appendChild: (el) => corps.push(el) },
+		addEventListener: (k, f, capture) => cles.push({ k, f, capture: !!capture }),
+		removeEventListener: (k, f, capture) => {
+			const i = cles.findIndex(c => c.k === k && c.f === f && c.capture === !!capture);
+			if (i >= 0) cles.splice(i, 1);
+		},
+	};
+	const makeCtx = ({ quizMode = "quiz", missing = [], locked = false, isExamMode = false, textOnly = null } = {}) => {
+		const appels = [];
+		const ctx = {
+			quizMode, isExamMode, textOnly,
+			quizState: { locked },
+			SLIDE_RESULTS_INDEX: 9,
+			HINT_TITLE_ID: "t",
+			__quizGlobalCleanups: [],
+			getMissingIndices: () => missing,
+			goToResults: () => appels.push("results"),
+			goToSubmit: () => appels.push("submit"),
+			goToSlide: (i) => appels.push("slide " + i),
+			goToQuestion: (i) => appels.push("question " + i),
+			escapeHtmlText: (s) => s, escapeHtmlAttr: (s) => s,
+		};
+		ctx.handIn = createHandInHandlers(ctx);
+		return { ctx, appels };
+	};
+
+	r.check("a Practice and an Exam are Tests, a Learn is not",
+		["quiz", "exam", "lesson"].map(quizMode => makeCtx({ quizMode }).ctx.handIn.isTest()), [true, true, false]);
+
+	/* Past the last question: the → key, the Results tab and the last arrow. */
+	const passe = (o) => { const x = makeCtx(o); x.ctx.handIn.pastLastQuestion(); x.ctx.handIn.closeConfirm(); return x.appels; };
+	r.check("past the last question: a complete Test is handed in, never the submit slide",
+		[passe({}), passe({ quizMode: "exam" })], [["results"], ["results"]]);
+	r.check("past the last question: a Learn keeps its submit step", passe({ quizMode: "lesson", missing: [0] }), ["submit"]);
+	r.check("past the last question: already handed in, the results slide", passe({ locked: true }), ["slide 9"]);
+	r.check("the last arrow says \"Hand in the test\" in a Test not handed in, \"Results\" otherwise",
+		[makeCtx().ctx.handIn.lastArrowLabel(), makeCtx({ quizMode: "exam" }).ctx.handIn.lastArrowLabel(),
+			makeCtx({ locked: true }).ctx.handIn.lastArrowLabel(), makeCtx({ quizMode: "lesson" }).ctx.handIn.lastArrowLabel()],
+		["engine.handIn.button", "engine.handIn.button", "engine.nav.results", "engine.nav.results"]);
+	r.check("hints show in a Practice and a Learn, never in an Exam",
+		[makeCtx().ctx.handIn.showsHints(), makeCtx({ quizMode: "lesson" }).ctx.handIn.showsHints(), makeCtx({ quizMode: "exam", isExamMode: true }).ctx.handIn.showsHints()],
+		[true, true, false]);
+
+	const complet = makeCtx();
+	complet.ctx.handIn.handIn();
+	r.check("every question answered: straight to the correction, no confirmation",
+		[complet.appels, complet.ctx.handIn.isConfirmOpen(), corps.length], [["results"], false, 0]);
+
+	const incomplet = makeCtx({ missing: [1, 4] });
+	incomplet.ctx.handIn.handIn();
+	r.check("questions unanswered: a confirmation, nothing handed in yet",
+		[incomplet.appels, incomplet.ctx.handIn.isConfirmOpen(), corps.length, cles.length], [[], true, 1, 1]);
+	r.check("the confirmation names what is left", /2 questions unanswered/.test(corps[0]?.innerHTML ?? ""), true);
+	r.check("closing it hands nothing in and leaves nothing behind",
+		[incomplet.ctx.handIn.closeConfirm(), incomplet.appels, corps.length, cles.length, incomplet.ctx.handIn.closeConfirm()], [true, [], 0, 0, false]);
+
+	const rendu = makeCtx({ locked: true, missing: [0] });
+	rendu.ctx.handIn.handIn();
+	r.check("already handed in: the results, no confirmation", [rendu.appels, rendu.ctx.handIn.isConfirmOpen()], [["slide 9"], false]);
+
+	const detruit = makeCtx({ missing: [0] });
+	detruit.ctx.handIn.handIn();
+	detruit.ctx.__quizGlobalCleanups.forEach(f => f());
+	r.check("destroying the quiz removes an open confirmation", [corps.length, cles.length], [0, 0]);
+	delete globalThis.document;
+	r.done();
+});

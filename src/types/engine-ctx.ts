@@ -81,6 +81,7 @@ import type { PassageHandlers } from "../engine/passage";
 import type { ClozeHandlers } from "../engine/cloze";
 import type { LessonHandlers } from "../engine/lesson";
 import type { LearnHandlers } from "../engine/learn";
+import type { HandInHandlers } from "../engine/hand-in";
 import type { TermesHandlers } from "../engine/termes";
 
 /**
@@ -263,6 +264,8 @@ export interface EngineCtx {
 	termes: TermesHandlers;
 	/** The Learn retry loop: check each question, retry a missed one — engine/learn.ts. */
 	learn: LearnHandlers;
+	/** Handing in a Test: the last arrow, the unanswered confirmation — engine/hand-in.ts. */
+	handIn: HandInHandlers;
 	/** Is card `qi` showing its correction: the global lock after the results,
 	    or a Learn card whose current attempt was checked (engine/learn.ts). */
 	isRevealed: LearnHandlers["isRevealed"];

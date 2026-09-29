@@ -22,6 +22,7 @@ import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
 import { createLearnHandlers } from "./engine/learn";
+import { createHandInHandlers } from "./engine/hand-in";
 import { installCodeLangBubble } from "./engine/code-lang-bubble";
 import { emptyLearnState } from "./engine/learn-loop";
 import { createTermesHandlers } from "./engine/termes";
@@ -238,6 +239,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	const termes = createTermesHandlers(ctx);
 	// The Learn retry loop (engine/learn.ts): reads the state lazily, like the others.
 	const learn = createLearnHandlers(ctx);
+	// Handing in a Test (engine/hand-in.ts).
+	const handIn = createHandInHandlers(ctx);
 
 	// Fonctions utilitaires seront définies après les constantes SLIDE_* pour éviter TDZ
 
@@ -268,6 +271,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		lesson,
 		termes,
 		learn,
+		handIn,
 		isRevealed: learn.isRevealed,
 		// depuis lesson : accessors (pas des flags __quiz*), voir engine/lesson.ts.
 		isLessonMode: lesson.isLessonMode,

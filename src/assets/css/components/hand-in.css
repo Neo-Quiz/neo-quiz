@@ -1,0 +1,68 @@
+/* =========================================================
+   HANDING IN A TEST (engine/hand-in.ts, 2026-09-29): the confirmation
+   shown when questions are left unanswered — what is left as numbered
+   beads (the submit screen's, pages/results.css), then "Keep answering"
+   and "Hand in". Portaled to <body> like the hint modal. What is missing
+   is amber, not red: a question left empty is not a mistake yet.
+   ========================================================= */
+
+.quiz-handin-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2vw, 18px);
+  box-sizing: border-box;
+  background: color-mix(in srgb, #000 32%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: quiz-handin-fade var(--quiz-dur-mid, 180ms) ease;
+}
+
+.quiz-handin-modal{
+  width: min(460px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 24px 24px 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  text-align: center;
+  box-shadow: 0 24px 56px rgba(0,0,0,0.24);
+  animation: quiz-handin-rise var(--quiz-dur-mid, 180ms) ease;
+}
+
+.quiz-handin-title{
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: color-mix(in srgb, #f59e0b 80%, var(--text-normal));
+}
+
+.quiz-handin-sub{
+  margin: 6px 0 18px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.quiz-handin-modal .quiz-submit-perles{
+  margin-bottom: 8px;
+}
+
+@keyframes quiz-handin-fade{
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes quiz-handin-rise{
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .quiz-handin-overlay,
+  .quiz-handin-modal{
+    animation: none;
+  }
+}

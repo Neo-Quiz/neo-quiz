@@ -590,18 +590,10 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		if (resultsTab) bindNavTab(resultsTab, goPastLastQuestion);
 	}
 
-	/* Au-delà de la dernière question : UNE règle pour la touche →, l'onglet
-	   « Résultats » et le bouton suivant de la dernière carte — trois copies
-	   divergeraient à la première retouche.
-	   isTextOnlyMode() GLOBAL à dessein : sauter l'écran de soumission n'a de
-	   sens que si TOUT le quiz est en réponse libre (chemin historique) — une
-	   tranche de Leçon mélangeant "test" et "recall" doit garder l'étape de
-	   soumission, qui vérifie les questions manquantes du quiz entier. */
+	/* Past the last question: ONE rule for the → key, the Results tab and the
+	   last card's next arrow, kept in engine/hand-in.ts (pastLastQuestion). */
 	function goPastLastQuestion(): void {
-		if (ctx.textOnly?.isExamAnswerPhase?.()) ctx.goToSubmit();
-		else if (ctx.textOnly?.isTextOnlyMode?.()) ctx.goToResults();
-		else if (ctx.quizState.locked) ctx.goToSlide(ctx.SLIDE_RESULTS_INDEX, { forceRender: false });
-		else ctx.goToSubmit();
+		ctx.handIn.pastLastQuestion();
 	}
 
 	function destroyZoomFixHandlers(): void {

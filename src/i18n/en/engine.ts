@@ -46,6 +46,14 @@ export const EN_ENGINE = {
 	"engine.exam.questionCount.one": "{count} question",
 	"engine.exam.questionCount.other": "{count} questions",
 	"engine.exam.finish": "Finish the exam",
+
+	/* ── Handing in a Test (engine/hand-in.ts) ── */
+	"engine.handIn.button": "Hand in the test",
+	"engine.handIn.unanswered.one": "{count} question unanswered",
+	"engine.handIn.unanswered.other": "{count} questions unanswered",
+	"engine.handIn.confirmSub": "Hand in anyway? An unanswered question counts as wrong.",
+	"engine.handIn.confirm": "Hand in",
+	"engine.handIn.keepAnswering": "Keep answering",
 	"engine.exam.timeUpLocked": "Time's up! The quiz has been locked.",
 
 	/* ── Questions à choix ── */
