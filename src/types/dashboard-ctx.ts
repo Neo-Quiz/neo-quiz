@@ -352,7 +352,14 @@ export interface DashboardShellCtx {
 	    propre classe, comme `createSelect`. */
 	renderGroupingSelect?: (
 		container: HTMLElement,
-		opts: { value: string; options: { value: string; label: string }[]; onChange: (value: string) => void },
+		opts: {
+			value: string; options: { value: string; label: string }[]; onChange: (value: string) => void;
+			/* Optional drawing of the trigger and of each option (the subject
+			   filter puts its icon before the name, 2026-09-29). Passed
+			   through to `createSelect` as is. */
+			renderTrigger?: (labelEl: HTMLElement, current: { value: string; label: string } | null) => void;
+			renderOption?: (optBtn: HTMLElement, option: { value: string; label: string }) => void;
+		},
 	) => { el: HTMLElement };
 	/** Ouvre la note d'un quiz, éventuellement en édition. Optionnel et ABSENT
 	    côté application jusqu'à la tranche 3 : ouvrir un quiz vierge qu'on ne

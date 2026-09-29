@@ -111,8 +111,13 @@ export function renderQuizGrid(
 	/** Quiz des DOSSIERS archivés — rendus en CARTES DE DOSSIER dans une
 	    section repliable en pied de grille (jamais de cartes de quiz :
 	    l'archivage n'existe qu'au niveau dossier, Ahmed 2026-07-19). */
-	archivedQuizzes: QuizIndexEntry[] = []
+	archivedQuizzes: QuizIndexEntry[] = [],
+	/** Keeps only the folders it accepts (the subject filter, 2026-09-29).
+	    Applied to the FOLDERS, not to the quizzes: a declared folder with no
+	    quiz shows as a card too, and must leave with the others. */
+	garder?: (m: ModuleGroup) => boolean,
 ): void {
+	const garde = (m: ModuleGroup): boolean => !garder || garder(m);
 	treeEl.replaceChildren();
 	// Cascade d'ENTRÉE globale : un seul compteur traverse toutes les
 	// sections (en-têtes ET cartes de dossier) — même formule que les cartes
@@ -134,7 +139,8 @@ export function renderQuizGrid(
 	// dans la section « Archivés » (sinon elle resterait en grille à 0 quiz).
 	const sasVide = deps.ctx.generatedFolder?.();
 	const modules = modulesAffiches(filtered, stats, map,
-		Object.keys(deps.ctx.settings.quizzesModuleOverrides || {}), archivedFolders, sasVide);
+		Object.keys(deps.ctx.settings.quizzesModuleOverrides || {}), archivedFolders, sasVide).filter(garde);
+	if (garder && modules.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
 
 	if (mode === "recent") {
 		for (const g of buildRecentModuleGroups(modules, stats, sasVide)) {
@@ -160,7 +166,8 @@ export function renderQuizGrid(
 	// tous les dossiers du flag). Clé « archived: » : « : » est interdit dans
 	// un chemin Obsidian, aucune collision possible.
 	if (archivedQuizzes.length > 0 || archivedFolders.length > 0) {
-		const archivedModules = buildModuleGroups(archivedQuizzes, stats, map, archivedFolders);
+		const archivedModules = buildModuleGroups(archivedQuizzes, stats, map, archivedFolders).filter(garde);
+		if (archivedModules.length === 0) return;
 		const body = renderCollapsibleSection(deps, treeEl, "archived:", t("dashboard.quizzes.archivedSection"), archivedModules.length, { entryDelay, defaultOpen: false });
 		renderModuleGrid(deps, body, archivedModules, map, entryDelay);
 	}

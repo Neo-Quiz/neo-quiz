@@ -138,6 +138,42 @@
 	box-shadow: var(--qbd-glass-sheen) !important;
 }
 
+/* The subject filter and the grouping select, side by side on the left
+   (2026-09-29, StudySmarter's "All subjects" + "Recent"). */
+.qbd-quizzes-group-selects {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+/* The subject's icon before its name, in the trigger and in each option. */
+.qbd-quizzes-subject-select .qbd-select-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 9px;
+}
+
+.qbd-quizzes-subject-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.qbd-quizzes-subject-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-select-option .qbd-quizzes-subject-icon {
+	margin-right: 8px;
+}
+
+.qbd-select-option .qbd-quizzes-subject-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
 .qbd-quizzes-group-select .qbd-select-chevron svg {
 	width: 18px;
 	height: 18px;

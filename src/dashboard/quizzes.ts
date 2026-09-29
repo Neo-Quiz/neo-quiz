@@ -15,6 +15,11 @@ import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
 import { moduleIcon } from "./module-icons";
+import { modulesAffiches } from "./quiz-modules";
+import type { ModuleGroup } from "./quiz-modules";
+import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
+import type { CategorieQuiz } from "./categorie-quiz";
+import { peindreIconeCategorie, libelleCategorie } from "./categorie-affichage";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES VIEW — Dashboard
@@ -112,6 +117,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	/* Module ouvert (drill-down) : null = grille ; sinon on affiche les quiz de
 	   ce module + un fil d'Ariane. État d'interface, non persisté. */
 	let openModuleFolder: string | null = null;
+	/* The SUBJECT filter of the grid (2026-09-29, after StudySmarter's
+	   "All subjects"): `null` = every folder. Interface state, not
+	   persisted, like the open folder. */
+	let sujetFiltre: CategorieQuiz | null = null;
+	/** A folder's subject, deduced from its path and name (categorie-quiz.ts). */
+	const sujetDe = (m: ModuleGroup): CategorieQuiz => categorieDuDossier(m.path ?? m.folder, m.name);
 
 	/* Dernière vue PEINTE ("root" ou chemin du dossier ouvert) : render() la
 	   compare à la vue courante pour distinguer une ENTRÉE (navigation, drill
@@ -207,7 +218,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				toggleExpanded,
 				rerender: () => { if (containerRef) render(containerRef); },
 				openModule,
-			}, treeEl, currentGrouping(), applyFilters(quizzes), stats, map, archivedQuizzes);
+			}, treeEl, currentGrouping(), applyFilters(quizzes), stats, map, archivedQuizzes,
+				sujetFiltre === null ? undefined : (m) => sujetDe(m) === sujetFiltre);
 		}
 	}
 
@@ -219,6 +231,45 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		folder: "dashboard.quizzes.groupByFolder",
 		ue: "dashboard.quizzes.groupByUE"
 	};
+
+	/* "All subjects" and the subjects of the folders on screen, each with its
+	   icon — never a subject no folder has: choosing it could only empty the
+	   page. `general` is left out (it is "no subject found", not a subject);
+	   those folders stay under "All subjects". A chosen subject that no
+	   longer matches any folder falls back to "All subjects". */
+	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
+		if (!ctx.renderGroupingSelect) return;
+		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
+			Object.keys(ctx.settings.quizzesModuleOverrides || {}), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).map(sujetDe));
+		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
+		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
+		const TOUS = "";
+		const icone = (el: HTMLElement, value: string): void => {
+			const ic = ajouter(el, "span", "qbd-quizzes-subject-icon");
+			if (value === TOUS) currentHost().ui.setIcon(ic, "layout-grid");
+			else peindreIconeCategorie(ic, value as CategorieQuiz);
+		};
+		const select = ctx.renderGroupingSelect(parent, {
+			value: sujetFiltre ?? TOUS,
+			options: [
+				{ value: TOUS, label: t("dashboard.quizzes.allSubjects") },
+				...sujets.map(c => ({ value: c, label: libelleCategorie(c) })),
+			],
+			onChange: (v) => {
+				sujetFiltre = v === TOUS ? null : v as CategorieQuiz;
+				if (containerRef) render(containerRef);
+			},
+			renderTrigger: (labelEl, current) => {
+				icone(labelEl, current?.value ?? TOUS);
+				ajouter(labelEl, "span", undefined, current?.label ?? t("dashboard.quizzes.allSubjects"));
+			},
+			renderOption: (optBtn, option) => {
+				icone(optBtn, option.value);
+				ajouter(optBtn, "span", "qbd-select-option-label", option.label);
+			},
+		});
+		select.el.classList.add("qbd-quizzes-group-select", "qbd-quizzes-subject-select");
+	}
 
 	function render(container: HTMLElement): void {
 		containerRef = container;
@@ -382,6 +433,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		// `.qbd-quizzes-group` (dashboard-quizzes.css), poussant la grille pour rien.
 		if (openModuleFolder === null && (ctx.renderGroupingSelect || ctx.createFolder)) {
 			const groupWrap = ajouter(container, "div", "qbd-quizzes-group");
+			// The two selects on the left, "New folder" on the right.
+			const selects = ajouter(groupWrap, "div", "qbd-quizzes-group-selects");
+			renderSubjectFilter(selects, quizzes, stats);
 			// Vrai SELECT (createSelect, ui-select.ts), pas un menu d'actions :
 			// options exclusives dont une active → menu d'OPTIONS à la largeur
 			// du trigger, check accent à droite, bordure accent à l'ouverture
@@ -393,7 +447,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// rendu passe donc par `ctx.renderGroupingSelect`, optionnel.
 			// Absent côté application : l'axe déjà persisté reste actif, sans
 			// bouton pour le changer (bouton MASQUÉ, Ruling 7).
-			const groupSelect = ctx.renderGroupingSelect?.(groupWrap, {
+			const groupSelect = ctx.renderGroupingSelect?.(selects, {
 				value: currentGrouping(),
 				options: GROUPING_ORDER.map(g => ({ value: g, label: t(GROUPING_LABEL_KEYS[g]), section: g === "ue" ? t("dashboard.quizzes.groupCustom") : undefined })),
 				onChange: (v) => { setGrouping(v as GroupingKey); render(container); }
