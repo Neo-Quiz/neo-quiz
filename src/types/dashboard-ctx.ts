@@ -101,6 +101,9 @@ export interface AiSettings {
 	    across the full width; `chat`, requests on the right as in a
 	    messaging app. Persisted values, never translated. */
 	aiTranscriptLayout?: "full" | "chat";
+	/** The message "Explain" sends about a played question (2026-09-29,
+	    `explain-prompt.ts` placeholders). Empty: the translated default. */
+	aiExplainPrompt?: string;
 	/* PLUS DE CHEMINS D'EXÉCUTABLE DE CLI (2026-09-17). Deux champs des
 	   Réglages désignaient l'exécutable à lancer quand la sonde automatique
 	   échouait. Le processus principal fusionne désormais le `PATH` du REGISTRE

@@ -307,6 +307,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   tuyau n'est lue qu'une fois, une ligne non JSON ne casse rien, un flux sans
   fin est borné, et le `result` final d'un flux Claude est toujours trouvé
   (sans lui, toute génération Claude échouerait). Dans la CI.
+- `npm run check:explain` — le prompt du bouton « Expliquer » d'une question
+  (`src/explain-prompt.ts`, 2026-09-29) : les choix partent avec les lettres
+  AFFICHÉES (options mélangées), la bonne réponse de chaque type (choix,
+  classement, association, trous, saisie), jamais un champ `{…}` brut, et une
+  ligne dont tous les champs sont vides part avec son intitulé. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

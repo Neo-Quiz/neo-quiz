@@ -1751,3 +1751,24 @@ label.nq-set-ligne {
 	font-weight: 600;
 	color: var(--text-faint);
 }
+
+/* The Explain prompt: a monospace field at the page's width, so its
+   placeholders read as such. */
+.nq-set-prompt {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+	font-size: 12.5px;
+	line-height: 1.5;
+	resize: vertical;
+}
+
+.nq-set-prompt:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}

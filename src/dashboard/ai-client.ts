@@ -90,9 +90,21 @@ export interface ReponseQuiz {
 	titre?: string;
 }
 
+/** One turn of a conversation with the model (`AiClient.chat`). */
+export interface ChatTurn {
+	role: "user" | "assistant";
+	text: string;
+}
+
 /** Client IA — retour de createAiClient(plugin). */
 export interface AiClient {
 	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz>;
+	/** A CONVERSATION with Claude Code or Codex (2026-09-29): the whole
+	    history goes with each message — the CLI stays stateless, launched
+	    with the same fixed options and no tool as a generation — and the
+	    answer comes back as prose. `context` is attached text (notes read by
+	    the page). Any other provider rejects with a message saying so. */
+	chat(history: ChatTurn[], options?: { context?: string; onTranscript?: (event: TranscriptEvent) => void }): Promise<string>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -347,6 +359,7 @@ ${hintsBlock}
 	GLOSSARY: the configuration object at the end of the array (see above) carries a "glossary" of 5 to 15 KEY TERMS of the source — the technical notions a student must know, never everyday words. Each entry is { "term": "...", "definition": "..." }, plus an optional "aliases": ["..."] for another form of the SAME term used in the text (an acronym, an abbreviation, e.g. "LIFO" for "stack"). Write "term" EXACTLY as it appears in the readings and explanations — same spelling, same form; a term written differently is never matched and never underlined. Write "term" in PLAIN TEXT, NEVER between backticks, even for a keyword or a function of the language: the bare name is the term (e.g. "yield", not \`yield\`) — it is still recognized wherever that name appears inside inline \`code\`. "definition" is ONE OR TWO SENTENCES in markdown (**bold**, \`code\`, a $formula$), understandable on its own WITHOUT the course, and NEVER a copy of a question's answer or explanation. No duplicate term, no filler word.
 ${categorieBloc}
 	QUIZ TITLE: the very first line of the array, right after the opening bracket, is a JSON5 line comment giving the quiz a name: '// title: <name>'. The name is what a student would write on the cover: 3 to 8 words naming its subject and scope (e.g. "Python : types, listes et exceptions"), in the language of the content, WITHOUT the word "quiz" and without a trailing period. Exactly one such line, nowhere else.
+	ADDRESSING THE LEARNER: when the quiz is in French, every text that speaks to the learner (prompt, hint, explain, reading) says « tu » (tu, ton, ta, tes, toi), never « vous ».
 
 	LANGUAGE — THIS IS A HARD RULE: write ALL the content you produce (title, prompt, options, answer, explain, hint, objectives, glossary) in THE SAME LANGUAGE AS THE USER REQUEST BELOW. If the request is in French, write the quiz in French; in Arabic, in Arabic; in English, in English. When the request provides source material (a text, a note, images), follow the language of that material. NEVER translate the content into English just because these instructions are in English. The FIELD NAMES (title, prompt, options…) and the JSON5 structure always stay exactly as specified above, in English. Keep the technical terms of the source exactly as the source writes them.
 
@@ -929,6 +942,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   compte Pro/Max/Team/Enterprise. Prompt complet par stdin
 	   (aucun échappement d'argument), sortie --output-format json. */
 	async function callClaudeCode(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<ReponseQuiz> {
+		return parseReponseQuiz(await callClaudeCodeTexte(model, systemPrompt, userPrompt, images));
+	}
+
+	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
+	    prose answer for `chat` (2026-09-29). */
+	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<string> {
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.claudeDesktopOnly"));
 		}
@@ -1058,7 +1077,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 
 		console.log("[quiz-blocks] Claude Code success - response length:", content.length);
-		return parseReponseQuiz(content);
+		return content;
 	}
 
 	/* ── ChatGPT via le CLI Codex (abonnement ChatGPT) ──
@@ -1067,6 +1086,11 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   écrite dans un fichier (-o) pour un parsing propre. Sandbox read-only et
 	   --ignore-user-config isolent la génération (pas de MCP/hooks perso). */
 	async function callCodex(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false): Promise<ReponseQuiz> {
+		return parseReponseQuiz(await callCodexTexte(model, systemPrompt, userPrompt, images, effort, fast));
+	}
+
+	/** The call itself, returning the model's TEXT (see `callClaudeCodeTexte`). */
+	async function callCodexTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false): Promise<string> {
 		if (!currentHost().platform.isDesktopApp) {
 			// Même libellé que le hint du composer (« Codex CLI » explicite).
 			throw new Error(t("ai.hint.codexDesktopOnly"));
@@ -1144,7 +1168,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw new Error(t("ai.err.codexEmpty"));
 		}
 		console.log("[quiz-blocks] Codex success - response length:", raw.length);
-		return parseReponseQuiz(raw);
+		return raw;
 	}
 
 	/* Events `codex exec --json` : une ligne = un objet. Deux seulement nous
@@ -1441,8 +1465,59 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		return parseOllamaResponse(content);
 	}
 
+	/* The chat's system prompt: in English, as every instruction to the
+	   model; the answer follows the language of the conversation. */
+	const CHAT_SYSTEM = [
+		"You are a patient tutor inside Neo Quiz, a revision app. The learner is studying for an exam and asks you questions about their course, a quiz question, or anything they did not understand.",
+		"Answer in the language the learner writes in; in French, ALWAYS address the learner as « tu » (tu, ton, ta, tes), never « vous ». Be clear and concrete: start with the direct answer, then explain why, with a short example when it helps. Use Markdown (short paragraphs, lists, **bold** for the key idea, fenced code blocks naming their language for any code, $…$ for math).",
+		"You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.",
+	].join("\n\n");
+
+	async function chat(history: ChatTurn[], options: { context?: string; onTranscript?: (event: TranscriptEvent) => void } = {}): Promise<string> {
+		aborted = false;
+		pendingUsage = null;
+		transcriptSink = options.onTranscript ?? null;
+		await refreshCliCaches();
+		try {
+			const provider = settings.get().aiProvider || "";
+			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
+			const turns = history.filter(h => h.text.trim());
+			const last = turns[turns.length - 1];
+			if (!last || last.role !== "user") throw new Error(t("ai.chat.empty"));
+			const earlier = turns.slice(0, -1).map(h => (h.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + h.text.trim()).join("\n\n");
+			const userPrompt = [
+				options.context?.trim() ? "COURSE MATERIAL ATTACHED BY THE LEARNER:\n" + options.context.trim() : "",
+				earlier ? "CONVERSATION SO FAR:\n" + earlier : "",
+				"LEARNER'S NEW MESSAGE:\n" + last.text.trim(),
+			].filter(Boolean).join("\n\n---\n\n");
+			if (provider === "claude-code") {
+				model = resolveClaudeModel(model);
+				return (await callClaudeCodeTexte(model, CHAT_SYSTEM, userPrompt)).trim();
+			}
+			if (provider === "codex") {
+				model = resolveCodexModel(model);
+				const effort = resolveEffort("codex", settings.get().aiEffort, model);
+				const m = getCodexModels().find(x => x.value === model);
+				const fast = !!settings.get().aiCodexFast && !!(m && m.fast);
+				return (await callCodexTexte(model, CHAT_SYSTEM, userPrompt, [], effort, fast)).trim();
+			}
+			throw new Error(t("ai.chat.providerUnsupported"));
+		} catch (err) {
+			if (aborted) {
+				const e = new Error("Discussion annulée") as Error & { aborted?: boolean };
+				e.aborted = true;
+				throw e;
+			}
+			throw err;
+		} finally {
+			abortCurrent = null;
+			transcriptSink = null;
+		}
+	}
+
 	return {
 		generate,
+		chat,
 		abort: () => { if (abortCurrent) abortCurrent(); },
 		get lastUsage() { return lastUsage; }
 	};

@@ -300,6 +300,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    (hints, time limit, Exam mode) is chosen when it starts, never here.
 	    Holds for the page session, like the count and the type. */
 	let modeGeneration: ModeGeneration = "learn";
+	/* CHAT (2026-09-29): the third choice of the selector, after Learn and
+	   Test — a message to Claude Code or Codex, answered in prose in the
+	   same conversation, with the earlier chat turns as its memory. */
+	let discussion = false;
 	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
 	   the attached documents, `false` = one quiz per document. Only offered
 	   with at least two documents and no image (`decouperParFichier` keeps a
@@ -348,6 +352,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 		disposition: () => (settings().aiTranscriptLayout === "chat" ? "chat" : "full"),
+		copier: deps.copyText,
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -379,6 +384,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		lastUsage = p.usage;
 		planTranchesEnvoye = p.planTranches;
 		noteLearnLiee = p.noteLearn;
+		// Only a quiz line has a product to open; a chat line never gets here.
+		if (l.demande.mode === "chat") return;
 		resultatFige = { mode: l.demande.mode, destination: l.demande.destination, reglages: l.demande.reglages, ligne: l.id };
 		generationId++;
 		generatedDraft = null;
@@ -920,6 +927,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
 		if (conversation) {
+			/* "New chat" (named "New request" until 2026-09-29). */
 			majNouvelle = poserNouvelleDemande(ajouter(stage, "div", "qbd-ai-fil-tete"), fileGen);
 			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
 		}
@@ -1620,7 +1628,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// les yeux, et la parenthèse gênait. Le champ RESTE facultatif avec une
 		// pièce jointe (`canGenerate` accepte texte OU images OU notes) ; c'est
 		// seulement le texte qui ne bouge plus.
-		composerInput.placeholder = t("ai.composer.placeholder");
+		composerInput.placeholder = t(discussion ? "ai.chat.placeholder" : "ai.composer.placeholder");
 		composerInput.value = composerText;
 		/* Les tuiles suivent le texte VIVANT à chaque rendu (retour d'une
 		   demande annulée, préréglage, collage par le picker « @ ») : le
@@ -1790,9 +1798,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* The sliding block (measured on claude.ai on 2026-09-23), shared
 		   with a course's sheet: `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const selectMode = (m: ModeGeneration): void => {
-			if (modeGeneration === m) return;
-			modeGeneration = m;
+		const selectMode = (m: ModeGeneration | "chat"): void => {
+			if (m === "chat" ? discussion : (!discussion && modeGeneration === m)) return;
+			discussion = m === "chat";
+			if (m !== "chat") modeGeneration = m;
+			composerInput.placeholder = t(discussion ? "ai.chat.placeholder" : "ai.composer.placeholder");
+			// A chat has no quiz options (count, type, destination).
+			optsBtn.hidden = discussion;
 			paintSeg(true);
 			/* The options are not the same from one type to the other: the icon
 			   lights up in accent then fades, so that a first-time user sees that
@@ -1802,37 +1814,39 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			void optsBtn.offsetWidth;
 			optsBtn.classList.add("qbd-ai-opts-pulse");
 		};
-		const segBtns = (["learn", "practice"] as const).map(kind => {
+		const segBtns = (["learn", "practice", "chat"] as const).map(kind => {
 			const b = ajouter(seg, "button", "qbd-ai-seg-btn");
 			b.type = "button";
 			b.setAttribute("role", "radio");
 			/* A Test is generated as a "practice" file: the label is the type's,
 			   `quizModeLabel` reads "Test" for it. */
-			ajouter(b, "span", "qbd-ai-seg-label", quizModeLabel(kind));
+			ajouter(b, "span", "qbd-ai-seg-label", kind === "chat" ? t("ai.chat.label") : quizModeLabel(kind));
 			b.addEventListener("click", () => selectMode(kind));
 			/* Each type's goal, on hover, above (reference: the bubble of
 			   claude.ai's "Chat | Cowork"). */
 			attachHoverTip(b, (tip) => {
 				tip.classList.add("qbd-hover-tip--card");
-				ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(kind));
+				ajouter(tip, "div", "qbd-hover-tip-title", kind === "chat" ? t("ai.chat.label") : quizModeLabel(kind));
 				/* What GENERATING this type gives — not the course sheet's
 				   description of an existing quiz (`quizModeTip`). */
-				ajouter(tip, "div", "qbd-hover-tip-body", t(kind === "learn" ? "ai.type.learnGenerateTip" : "ai.type.testGenerateTip"));
+				ajouter(tip, "div", "qbd-hover-tip-body", t(kind === "learn" ? "ai.type.learnGenerateTip" : kind === "chat" ? "ai.chat.tip" : "ai.type.testGenerateTip"));
 			});
 			return { kind, b };
 		});
 		const paintSeg = (anime: boolean): void => {
+			const courant = discussion ? "chat" : modeGeneration;
 			segBtns.forEach(({ kind, b }) => {
-				const active = kind === modeGeneration;
+				const active = kind === courant;
 				b.classList.toggle("is-active", active);
 				b.setAttribute("aria-checked", String(active));
 			});
-			placerIndicateur(indic, segBtns.find(({ kind }) => kind === modeGeneration)!.b, anime);
+			placerIndicateur(indic, segBtns.find(({ kind }) => kind === courant)!.b, anime);
 		};
 		// Measure after insertion in the document (real widths of the options).
 		requestAnimationFrame(() => paintSeg(false));
 		const optsBtn = ajouter(composerBottom, "button", "qbd-ai-composer-opts");
 		optsBtn.type = "button";
+		optsBtn.hidden = discussion;
 		host.ui.setIcon(optsBtn, "settings-2");
 		labelIconButton(optsBtn, t("ai.composer.quizOptions"));
 		optsBtn.addEventListener("click", () => {
@@ -3852,6 +3866,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   écouteurs `document` (Esc, collage) continueraient de tourner sous la
 		   génération CLI qui vient de partir. */
 		arreterAttenteWeb();
+		/* A chat goes to the two CLIs that can hold one; the others (a web
+		   site, Ollama, Antigravity) are told so instead of failing later. */
+		if (discussion) {
+			const p = settings().aiProvider || "";
+			if (p !== "claude-code" && p !== "codex") { host.ui.notice(t("ai.chat.providerUnsupported")); return; }
+			const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: [] };
+			if (!envoi.text.trim()) { host.ui.notice(t("ai.chat.empty")); return; }
+			fileGen.envoyer({ ...envoi, mode: "chat", count: null, type: "", destination: "", reglages: figerReglages(settings()), categorie: "general" });
+			viderComposer();
+			render(container);
+			return;
+		}
 		if (aiProviders.estCanalWeb(settings().aiProvider || "")) {
 			/* Le composer GARDE la demande pendant l'attente du site ; tout ce
 			   qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit

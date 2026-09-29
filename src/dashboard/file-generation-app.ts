@@ -53,7 +53,9 @@ export function figerReglages(s: AiSettings): ReglagesFiges {
 /** Une demande telle qu'elle est partie : le texte, les pièces déjà LUES,
     et chaque option de la génération. */
 export interface DemandeFile extends DemandeTexte {
-	mode: ModeGeneration;
+	/** `chat` (2026-09-29): a message to the model, answered in prose — no
+	    quiz, no note. The previous chat turns of the queue go with it. */
+	mode: ModeGeneration | "chat";
 	count: number | null;
 	type: string;
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
@@ -82,6 +84,10 @@ export interface ProduitGeneration {
 export interface ResultatFile {
 	titre: string;
 	chemin: string;
+	/** A chat answer: the model's prose (Markdown). No note, `chemin` empty. */
+	texte?: string;
+	/** How long the model worked on a chat answer, in ms. */
+	dureeMs?: number;
 	/** Le nombre de questions écrites, pour la carte de résultat. */
 	questions?: number;
 }
@@ -203,6 +209,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		};
 		const client = createAiClient(figes);
 		clientCourant = client;
+		if (d.mode === "chat") { await discuter(ligne, client); return; }
 		try {
 			// « Lecture du document… » quand la demande en porte un.
 			etapeDe(ligne.id, d.notes.length || d.images.length ? "lecture" : "preparation");
@@ -260,12 +267,50 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 	}
 
+	/** A CHAT line: the conversation so far (the chat lines before it that
+	    have an answer), its attached notes as context, the answer streamed
+	    into its transcript and kept as its result. Same queue, same stop,
+	    same errors as a generation. */
+	async function discuter(ligne: LigneGeneration, client: AiClient): Promise<void> {
+		const d = ligne.demande;
+		try {
+			etapeDe(ligne.id, "redaction");
+			const historique: { role: "user" | "assistant"; text: string }[] = [];
+			for (const l of file.lignes) {
+				if (l.id >= ligne.id || l.demande.mode !== "chat" || !l.resultat?.texte) continue;
+				historique.push({ role: "user", text: l.demande.text }, { role: "assistant", text: l.resultat.texte });
+			}
+			historique.push({ role: "user", text: d.text });
+			const contexte = d.notes.map(n => (d.notes.length > 1 ? "--- " + n.name + " ---\n" : "") + n.content).join("\n\n");
+			const transcript = transcriptVide();
+			transcripts.set(ligne.id, transcript);
+			const texte = await client.chat(historique, {
+				context: contexte,
+				onTranscript: (ev) => {
+					if (transcripts.get(ligne.id) !== transcript) return;
+					appliquer(transcript, ev);
+					transcriptChange(ligne.id);
+				},
+			});
+			if (!tourne(ligne.id)) return;
+			file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
+		} catch (err) {
+			const e = err as Error & { aborted?: boolean };
+			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
+		} finally {
+			if (clientCourant === client) clientCourant = null;
+			etapes.delete(ligne.id);
+			file = F.solder(file, ligne.id);
+			pomper();
+		}
+	}
+
 	/** Écrit la note du quiz produit. Un échec ne perd rien : la ligne passe
 	    en « échec d'enregistrement » avec son quiz, et ne relancera jamais le
 	    CLI. */
 	async function enregistrer(id: number, d: DemandeFile): Promise<void> {
 		const p = d.produit;
-		if (!p) return;
+		if (!p || d.mode === "chat") return;
 		const deps = lireDeps();
 		// Le brouillon UNE FOIS (lot D) : `draft.questions` exclut déjà l'objet
 		// de configuration final — sa longueur est le compteur affiché,

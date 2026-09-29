@@ -32,6 +32,7 @@ import type { TransKey } from "../i18n";
 import { t } from "../i18n";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
+import { renderMarkdownPreview } from "../markdown-preview";
 
 export interface VueFile {
 	/** Pose la zone des tours dans `parent` (à chaque rendu de la page). */
@@ -71,14 +72,14 @@ export function creerVueFile(opts: {
 	    paint: `full` stretches every turn across the column, `chat` keeps
 	    the requests on the right. */
 	disposition?: () => "full" | "chat";
+	/** Copies a chat answer (the host's clipboard). */
+	copier?: (texte: string) => Promise<boolean>;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
 	let desabonner: (() => void) | null = null;
 	let horloge: number | null = null;
 	let desabonnerTranscript: (() => void) | null = null;
-	/** The finished lines whose transcript the user opened. */
-	const transcriptsOuverts = new Set<number>();
 	/** L'identifiant du dernier tour peint ; -1 force le retour en bas. */
 	let dernierPeint = -1;
 
@@ -146,7 +147,7 @@ export function creerVueFile(opts: {
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
 		const meta = ajouter(message, "div", "qbd-ai-message-meta");
-		ajouter(meta, "span", undefined, quizModeLabel(d.mode));
+		ajouter(meta, "span", undefined, d.mode === "chat" ? t("ai.chat.label") : quizModeLabel(d.mode));
 		const providerId = d.reglages.aiProvider || "";
 		const p = providerId ? aiProviders.getProvider(providerId) : null;
 		if (p) {
@@ -158,8 +159,65 @@ export function creerVueFile(opts: {
 		}
 	}
 
+	/* ── A CHAT ANSWER (2026-09-29), as MonoCode shows one: a line with the
+	   model and how long it worked, then the answer as PROSE — Markdown
+	   rendered by `renderMarkdownPreview`, the only HTML it writes, every
+	   text through the first gate of the sanitizer — then Copy. While the
+	   model writes, the same prose grows in place (`surTranscript`). */
+	function textePourProse(l: LigneGeneration): string {
+		return enCours(l) ? (opts.file.transcript(l.id)?.text ?? "") : (l.resultat?.texte ?? "");
+	}
+
+	function remplirProse(prose: HTMLElement, l: LigneGeneration): void {
+		const texte = textePourProse(l);
+		if (!texte.trim()) {
+			prose.replaceChildren();
+			ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
+			return;
+		}
+		prose.innerHTML = renderMarkdownPreview(texte);
+	}
+
+	function peindreReponseChat(parent: HTMLElement, l: LigneGeneration): void {
+		const rep = ajouter(parent, "div", "qbd-ai-chat-reponse");
+		const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
+		const providerId = l.demande.reglages.aiProvider || "";
+		const p = providerId ? aiProviders.getProvider(providerId) : null;
+		if (p) {
+			const logo = ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
+			aiProviders.setBrandLogo(logo, p.logo);
+		}
+		const id = l.demande.reglages.aiModel || p?.defaultModel || "";
+		const nom = p ? (id ? aiProviders.libelleModele(providerId, id) : p.name) : "";
+		if (enCours(l)) {
+			ajouter(tete, "span", undefined, t("ai.chat.working", { model: nom }));
+			const temps = ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (l.debut ?? Date.now())));
+			temps.dataset.debut = String(l.debut ?? Date.now());
+			temps.setAttribute("aria-hidden", "true");
+		} else {
+			ajouter(tete, "span", undefined, t("ai.chat.worked", { model: nom, time: duree(l.resultat?.dureeMs ?? 0) }));
+		}
+		const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
+		prose.dataset.ligne = String(l.id);
+		remplirProse(prose, l);
+		if (!enCours(l) && l.resultat?.texte) {
+			const pied = ajouter(rep, "div", "qbd-ai-chat-pied");
+			const texte = l.resultat.texte;
+			if (opts.copier) {
+				boutonIcone(pied, "copy", t("ai.chat.copy"), () => {
+					void opts.copier?.(texte).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed")));
+				});
+			}
+			boutonIcone(pied, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
+		}
+	}
+
 	/** La réponse, selon l'état de la ligne. */
 	function peindreReponse(parent: HTMLElement, l: LigneGeneration): void {
+		if (l.demande.mode === "chat" && (enCours(l) || (l.etat === "prete" && l.resultat?.texte !== undefined))) {
+			peindreReponseChat(parent, l);
+			return;
+		}
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
 		if (l.etat === "cours" || l.etat === "enregistrement") {
 			const etincelle = ajouter(rep, "span", "qbd-ai-etincelle");
@@ -213,14 +271,19 @@ export function creerVueFile(opts: {
 		}
 	}
 
-	/* ── THE LIVE TRANSCRIPT (2026-09-29, after MonoCode) ──
-	   Under the running request, what the CLI is doing: its reasoning, the
-	   tools it calls, and the answer as it is written. A finished request
-	   keeps it behind "Show the transcript". Updated IN PLACE on each chunk
-	   (`abonnerTranscript`), never by repainting the queue. */
+	/* ── THE LIVE TRANSCRIPT (2026-09-29), as MonoCode shows an agent's work ──
+	   Under each request, one SUMMARY LINE per kind of work — "Thought",
+	   "Used 2 tools", "Wrote the quiz · 214 lines" — muted, with a chevron;
+	   a click unfolds it and shows every detail, a second click folds it.
+	   While the model writes, the writing line is unfolded and follows the
+	   text; once done it folds back into its summary. Updated IN PLACE on
+	   each chunk (`abonnerTranscript`), never by repainting the queue. */
 	const enCours = (l: LigneGeneration): boolean => l.etat === "cours" || l.etat === "enregistrement";
+	/** The lines the user unfolded, and the live ones they folded: `id:kind`. */
+	const deplies = new Set<string>();
+	const replies = new Set<string>();
 
-	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean): void {
+	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean, id: number): void {
 		const ancien = bloc.querySelector<HTMLElement>(".qbd-ai-transcript-texte");
 		const hautAncien = ancien ? ancien.scrollTop : 0;
 		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
@@ -229,25 +292,43 @@ export function creerVueFile(opts: {
 			if (vivant) ajouter(bloc, "div", "qbd-ai-transcript-attente", t("ai.transcript.waiting"));
 			return;
 		}
+		/** A summary line and, when unfolded, its detail. Live lines start
+		    unfolded for the part being written. */
+		const ligne = (cle: string, icone: string, libelle: string, ouvertParDefaut: boolean, detail: (corps: HTMLElement) => void): void => {
+			const k = id + ":" + cle;
+			const ouvert = deplies.has(k) || (ouvertParDefaut && !replies.has(k));
+			const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
+			b.type = "button";
+			b.setAttribute("aria-expanded", String(ouvert));
+			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), icone);
+			ajouter(b, "span", "qbd-ai-transcript-ligne-texte", libelle);
+			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-chevron"), ouvert ? "chevron-down" : "chevron-right");
+			b.addEventListener("click", () => {
+				if (ouvert) { deplies.delete(k); replies.add(k); } else { deplies.add(k); replies.delete(k); }
+				remplirTranscript(bloc, tr, vivant, id);
+			});
+			if (ouvert) detail(ajouter(bloc, "div", "qbd-ai-transcript-detail"));
+		};
+		const ecrit = !!tr.text;
 		if (tr.thinking) {
-			const s = ajouter(bloc, "div", "qbd-ai-transcript-section");
-			const titre = ajouter(s, "div", "qbd-ai-transcript-titre");
-			host.ui.setIcon(ajouter(titre, "span", "qbd-ai-transcript-titre-icone"), "brain");
-			ajouter(titre, "span", undefined, t("ai.transcript.thinking"));
-			// `textContent` (through `ajouter`): the model's text is never HTML here.
-			ajouter(s, "div", "qbd-ai-transcript-reflexion", tr.thinking.trim());
+			ligne("thinking", "brain", t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), vivant && !ecrit, corps => {
+				// `textContent` (through `ajouter`): the model's text is never HTML here.
+				ajouter(corps, "div", "qbd-ai-transcript-reflexion", tr.thinking.trim());
+			});
 		}
-		for (const nom of tr.tools) {
-			const o = ajouter(bloc, "div", "qbd-ai-transcript-outil");
-			host.ui.setIcon(ajouter(o, "span", "qbd-ai-transcript-titre-icone"), "wrench");
-			ajouter(o, "span", undefined, t("ai.transcript.tool", { name: nom }));
+		if (tr.tools.length) {
+			ligne("tools", "wrench", t(tr.tools.length === 1 ? "ai.transcript.toolsOne" : "ai.transcript.toolsOther", { count: tr.tools.length }), false, corps => {
+				for (const nom of tr.tools) ajouter(corps, "div", "qbd-ai-transcript-outil", nom);
+			});
 		}
-		if (tr.text) {
-			const s = ajouter(bloc, "div", "qbd-ai-transcript-section");
-			const titre = ajouter(s, "div", "qbd-ai-transcript-titre");
+		if (ecrit) {
+			const lignes = tr.text.split("\n").length;
+			/* The WRITING is never folded (only the activity is, as
+			   MonoCode's "Ran 11 commands"): its heading, then the text. */
+			const titre = ajouter(bloc, "div", "qbd-ai-transcript-titre");
 			host.ui.setIcon(ajouter(titre, "span", "qbd-ai-transcript-titre-icone"), "pen-line");
-			ajouter(titre, "span", undefined, t("ai.transcript.writing"));
-			const texte = ajouter(s, "pre", "qbd-ai-transcript-texte", tr.text);
+			ajouter(titre, "span", undefined, vivant ? t("ai.transcript.writingLive") : t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes }));
+			const texte = ajouter(bloc, "pre", "qbd-ai-transcript-texte", tr.text);
 			// Follows the writing, unless the user scrolled up to read.
 			texte.scrollTop = suivait ? texte.scrollHeight : hautAncien;
 		}
@@ -258,24 +339,21 @@ export function creerVueFile(opts: {
 		// No transcript: a provider that answers in one piece (Ollama, Antigravity).
 		if (!tr) return;
 		const vivant = enCours(l);
-		if (!vivant) {
-			const ouvert = transcriptsOuverts.has(l.id);
-			const b = ajouter(parent, "button", "qbd-ai-transcript-bascule");
-			b.type = "button";
-			b.setAttribute("aria-expanded", String(ouvert));
-			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-bascule-icone"), ouvert ? "chevron-down" : "chevron-right");
-			ajouter(b, "span", undefined, t(ouvert ? "ai.transcript.hide" : "ai.transcript.show"));
-			b.addEventListener("click", () => {
-				if (ouvert) transcriptsOuverts.delete(l.id); else transcriptsOuverts.add(l.id);
-				peindre();
-			});
-			if (!ouvert) return;
-		}
+		/* A chat answer IS its text, shown as prose: the transcript only adds
+		   the reasoning and the tools, when the model shared any. */
+		if (l.demande.mode === "chat" && !tr.thinking && tr.tools.length === 0) return;
 		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
 		bloc.dataset.ligne = String(l.id);
+		if (l.demande.mode === "chat") bloc.dataset.chat = "1";
 		bloc.setAttribute("role", "log");
 		bloc.setAttribute("aria-label", t("ai.transcript.label"));
-		remplirTranscript(bloc, tr, vivant);
+		remplirTranscript(bloc, l.demande.mode === "chat" ? { ...tr, text: "" } : tr, vivant, l.id);
+	}
+
+	/** Follows the end of the conversation smoothly, as MonoCode does while
+	    an agent writes — only when the user was already at the bottom. */
+	function suivre(fil: HTMLElement | null, etaitEnBas: boolean): void {
+		if (fil && etaitEnBas) fil.scrollTo({ top: fil.scrollHeight, behavior: "smooth" });
 	}
 
 	function surTranscript(id: number): void {
@@ -283,13 +361,22 @@ export function creerVueFile(opts: {
 		const l = opts.file.lignes().find(x => x.id === id);
 		const tr = opts.file.transcript(id);
 		if (!l || !tr) return;
+		const fil = defileur();
+		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 120;
+		const prose = zone.querySelector<HTMLElement>(`.qbd-ai-chat-prose[data-ligne="${id}"]`);
+		if (prose && enCours(l)) {
+			remplirProse(prose, l);
+			const blocChat = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
+			if (blocChat) remplirTranscript(blocChat, { ...tr, text: "" }, true, id);
+			else if (tr.thinking || tr.tools.length) { peindre(); return; }
+			suivre(fil, enBas);
+			return;
+		}
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
 		// First chunk of a run painted before its transcript existed: one repaint.
 		if (!bloc) { if (enCours(l)) peindre(); return; }
-		const fil = defileur();
-		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
-		remplirTranscript(bloc, tr, enCours(l));
-		if (fil && enBas) fil.scrollTop = fil.scrollHeight;
+		remplirTranscript(bloc, tr, enCours(l), id);
+		suivre(fil, enBas);
 	}
 
 	/** Le conteneur qui défile (le fil de la page), s'il y en a un. */
@@ -312,8 +399,10 @@ export function creerVueFile(opts: {
 			const tour = ajouter(zone, "div", "qbd-ai-tour");
 			tour.setAttribute("role", "listitem");
 			peindreMessage(tour, l);
-			peindreReponse(tour, l);
-			peindreTranscript(tour, l);
+			/* As MonoCode: while the model works, its status line then its
+			   activity; once done, the activity summary then the answer. */
+			if (l.etat === "cours" || l.etat === "enregistrement") { peindreReponse(tour, l); peindreTranscript(tour, l); }
+			else { peindreTranscript(tour, l); peindreReponse(tour, l); }
 		}
 		/* Un tour NOUVEAU se lit à l'identifiant du dernier, pas au nombre de
 		   tours : une réponse fermée pendant qu'une demande part laisse le
@@ -336,6 +425,18 @@ export function creerVueFile(opts: {
 	return {
 		rendre(parent) {
 			zone = ajouter(parent, "div", "qbd-ai-file");
+			/* "Back to the latest" (MonoCode's round chevron above the
+			   composer): shown once the user scrolled up from the bottom of
+			   the conversation, it glides back down. */
+			const bas = ajouter(parent, "button", "qbd-ai-fil-bas");
+			bas.type = "button";
+			bas.setAttribute("aria-label", t("ai.transcript.toLatest"));
+			host.ui.setIcon(bas, "chevron-down");
+			bas.hidden = true;
+			bas.addEventListener("click", () => parent.scrollTo({ top: parent.scrollHeight, behavior: "smooth" }));
+			const majBas = (): void => { bas.hidden = parent.scrollHeight - parent.scrollTop - parent.clientHeight < 120; };
+			parent.addEventListener("scroll", majBas, { passive: true });
+			new ResizeObserver(majBas).observe(zone);
 			zone.setAttribute("role", "list");
 			zone.setAttribute("aria-label", t("ai.queue.label"));
 			zone.setAttribute("aria-live", "polite");

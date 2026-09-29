@@ -25,7 +25,9 @@ import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
 import { renderInteractiveQuiz } from "../../../../src/engine";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
-import { parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
+import { extractExamOptions, parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
+import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
+import { monterBoutonExpliquer } from "./explain";
 import { ajouter } from "../../../../src/dom";
 import { quizModeIcon, quizModeLabel } from "../../../../src/dashboard/quiz-card";
 import { brancherPerles } from "./perles";
@@ -84,6 +86,9 @@ export async function openQuizPage(
 	   s'était arrêté. Optionnel comme les deux puits ci-dessus, pour les
 	   mêmes raisons. */
 	sessions?: SessionsApp,
+	/* The AI settings, for the "Explain" button of a played question
+	   (`ui/explain.ts`). Absent: no button. */
+	aiSettings?: AiSettingsHost,
 ): Promise<QuizPageHandle> {
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
@@ -151,6 +156,8 @@ export async function openQuizPage(
 	};
 	const withoutEngine = (): QuizPageHandle => ({ teardown: demonterSansMoteur, launchCancelled: false });
 
+	/* The questions as the engine indexes them (`data-qi`), for "Explain". */
+	let questionsJouees: Record<string, unknown>[] = [];
 	let source: string;
 	try {
 		source = await currentHost().fs.read(entry.path);
@@ -177,6 +184,7 @@ export async function openQuizPage(
 		/* `parseQuizSource` THROWS on invalid JSON5 — hence the try: a half-written
 		   block must say why, not leave an empty screen. */
 		const quiz = parseQuizSource(bloc[1]);
+		questionsJouees = extractExamOptions(quiz).questions as unknown as Record<string, unknown>[];
 		/* The app's side of "Set up your test": the modal and the settings last
 		   used for this quiz. A Learn never asks (the engine skips it). */
 		setupPage = createTestSetupPage({
@@ -241,6 +249,10 @@ export async function openQuizPage(
 	const debrancherPerles = brancherPerles(hote);
 	/* The two bars that stay in place while a question scrolls (`ui/quiz-bars.ts`). */
 	const detachBars = attachQuizBars(hote);
+	/* "Explain" in the header, right: not in an Exam (it hides with the clock). */
+	const demonterExpliquer = aiSettings && questionsJouees.length
+		? monterBoutonExpliquer(entete, hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings })
+		: null;
 	let fait = false;
 	return {
 		launchCancelled: false,
@@ -253,6 +265,7 @@ export async function openQuizPage(
 			setupPage?.cancelModal();
 			debrancherPerles();
 			detachBars();
+			demonterExpliquer?.();
 			document.removeEventListener("mousedown", surBoutonSouris, true);
 			document.removeEventListener("mouseup", surBoutonSouris, true);
 			try {

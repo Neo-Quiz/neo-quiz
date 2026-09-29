@@ -31,6 +31,7 @@
     "check:prompt": "node scripts/check-prompt.mjs",
     "check:categorie": "node scripts/check-categorie.mjs",
     "check:transcript": "node scripts/check-transcript.mjs",
+    "check:explain": "node scripts/check-explain.mjs",
     "check:web-channel": "node scripts/check-web-channel.mjs",
     "check:dashboard-dom": "node scripts/check-dashboard-dom.mjs",
     "check:view-enter": "node scripts/check-view-enter.mjs",

@@ -160,3 +160,126 @@
 	border-color: color-mix(in srgb, var(--quiz-danger) 40%, transparent);
 	background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
 }
+
+/* "EXPLAIN" (2026-09-29, `ui/explain.ts`): a quiet pill at the right end of
+   the header, on the line of the cross and the title — where the test clock
+   sits in an Exam, and the clock and the button never show together. */
+.qbd-qz-header .qbd-qz-explain {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 34px;
+	margin-left: auto;
+	margin-right: 4px;
+	padding: 0 14px 0 11px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 5%, transparent);
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13.5px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.qbd-qz-header .qbd-qz-explain:hover {
+	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+	border-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+
+.qbd-qz-header .qbd-qz-explain[hidden] {
+	display: none;
+}
+
+.qbd-qz-explain-icon {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.qbd-qz-explain-icon svg {
+	width: 15px;
+	height: 15px;
+}
+
+/* The explanation window: the conversation scrolls, the field stays below. */
+.nq-explain-modal {
+	width: min(760px, calc(100vw - 32px));
+	height: min(640px, 85vh);
+}
+
+.nq-explain-modal .modal-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	overflow: hidden;
+}
+
+.nq-explain-fil {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 4px 6px 8px 2px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb-bg) transparent;
+}
+
+.nq-explain-demande {
+	border: 1px solid var(--background-modifier-border);
+	font-size: 13.5px;
+	max-height: 160px;
+	overflow-y: auto;
+}
+
+.nq-explain-composer {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+	padding: 8px 8px 8px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 14px;
+	background: var(--background-secondary);
+}
+
+.nq-explain-champ {
+	flex: 1;
+	min-height: 24px;
+	max-height: 160px;
+	padding: 4px 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 14px;
+	line-height: 1.5;
+	resize: none;
+	outline: none;
+}
+
+.nq-explain-envoi {
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	border: 0;
+	border-radius: 9px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	cursor: pointer;
+}
+
+.nq-explain-envoi:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.nq-explain-envoi svg {
+	width: 16px;
+	height: 16px;
+}

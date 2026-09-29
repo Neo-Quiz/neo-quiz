@@ -399,6 +399,26 @@ export function renderSettings(
 		onChange: valeur => { void deps.aiSettings.save({ aiTranscriptLayout: valeur === "chat" ? "chat" : "full" }); },
 	});
 
+	/* The message "Explain" sends about a played question (2026-09-29,
+	   `ui/explain.ts`): editable, with its placeholders listed; empty means
+	   the translated default, which "Reset" brings back. Saved when the
+	   field loses the focus, not on every key. */
+	const expliquer = section(aiPage, t("app.settings.explainPrompt"), t("app.settings.explainPromptHint"));
+	const zone = ajouter(expliquer, "textarea", "nq-set-prompt");
+	zone.rows = 9;
+	zone.value = deps.aiSettings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
+	zone.setAttribute("aria-label", t("app.settings.explainPrompt"));
+	zone.addEventListener("change", () => {
+		const v = zone.value.trim();
+		void deps.aiSettings.save({ aiExplainPrompt: v === t("ai.explain.defaultPrompt").trim() ? "" : v });
+	});
+	const reinit = ajouter(ajouter(expliquer, "div", "nq-reglages-actions"), "button", "nq-reglages-changer", t("app.settings.explainPromptReset"));
+	reinit.type = "button";
+	reinit.addEventListener("click", () => {
+		zone.value = t("ai.explain.defaultPrompt");
+		void deps.aiSettings.save({ aiExplainPrompt: "" });
+	});
+
 	/* ═══ APPEARANCE ═══ */
 	const demonterFond = monterReglagesFond(card(section(pages.get("appearance")!, t("app.settings.wallpaper"))));
 

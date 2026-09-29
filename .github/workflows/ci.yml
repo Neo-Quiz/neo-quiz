@@ -51,6 +51,11 @@ jobs:
       - name: Generation transcript decoding
         run: npm run check:transcript
 
+      # THE "EXPLAIN" PROMPT of a question: its choices, its expected answer
+      # and the learner's go with it, never a raw placeholder.
+      - name: Explain prompt of a question
+        run: npm run check:explain
+
       # LE MARKDOWN DE BLOC ET DE LIGNE d'un texte de quiz (paragraphes,
       # listes, tableaux, blocs de code colorés, images, liens) : gras et
       # italique interprétés, une formule LaTeX ou un chemin Windows laissés

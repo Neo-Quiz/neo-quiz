@@ -32,8 +32,8 @@
 	justify-content: flex-end;
 }
 
-/* « Nouvelle demande » : un bouton texte discret, comme « Nouveau » de
-   claude.ai — un fond seulement au survol. */
+/* Â« Nouvelle demande Â» : un bouton texte discret, comme Â« Nouveau Â» de
+   claude.ai â€” un fond seulement au survol. */
 .qbd-ai-nouvelle {
 	display: inline-flex;
 	align-items: center;
@@ -514,4 +514,170 @@
 .qbd-ai-transcript-bascule-icone svg {
 	width: 14px;
 	height: 14px;
+}
+
+/* ── A CHAT ANSWER (2026-09-29), after MonoCode: the model and its time on
+   one muted line, then the answer as prose at reading size, then a row of
+   small icon buttons. No tile: an answer is the page's text. ── */
+.qbd-ai-chat-reponse {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+
+.qbd-ai-chat-tete {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.qbd-ai-chat-tete .qbd-provider-logo { width: 14px; height: 14px; }
+.qbd-ai-chat-tete .qbd-provider-logo svg,
+.qbd-ai-chat-tete .qbd-provider-logo img { width: 13px; height: 13px; }
+
+.qbd-ai-chat-prose {
+	font-size: 14.5px;
+	line-height: 1.7;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-chat-attente {
+	color: var(--text-faint);
+}
+
+.qbd-ai-chat-pied {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: -2px;
+}
+
+.qbd-ai-composer-opts[hidden] {
+	display: none;
+}
+
+/* Code in a chat answer keeps a code line height: the prose's 1.7 spread
+   each line of a program apart. */
+.qbd-ai-chat-prose pre,
+.qbd-ai-chat-prose pre code {
+	line-height: 1.5;
+}
+
+/* ── THE TRANSCRIPT AS SUMMARY LINES (2026-09-29, MonoCode) ──
+   One muted line per kind of work, icon, label and chevron; the detail
+   unfolds under it, indented under the icon. Replaces the old ruled log. */
+.qbd-ai-transcript {
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	border-left: 0;
+}
+
+.qbd-ai-transcript-ligne {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 100%;
+	padding: 3px 8px 3px 4px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	transition: color 120ms ease, background-color 120ms ease;
+}
+
+.qbd-ai-transcript-ligne:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.qbd-ai-transcript-ligne-texte {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.qbd-ai-transcript-chevron {
+	display: inline-flex;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.qbd-ai-transcript-ligne:hover .qbd-ai-transcript-chevron,
+.qbd-ai-transcript-ligne[aria-expanded="true"] .qbd-ai-transcript-chevron {
+	opacity: 1;
+}
+
+.qbd-ai-transcript-chevron svg {
+	width: 13px;
+	height: 13px;
+}
+
+.qbd-ai-transcript-detail {
+	margin: 2px 0 8px 26px;
+	min-width: 0;
+	animation: qbd-ai-deplie 160ms ease-out;
+}
+
+@keyframes qbd-ai-deplie {
+	from { opacity: 0; transform: translateY(-3px); }
+	to { opacity: 1; transform: none; }
+}
+
+.qbd-ai-transcript-detail .qbd-ai-transcript-outil {
+	font-family: var(--font-monospace);
+	font-size: 12.5px;
+	font-weight: 400;
+	color: var(--text-muted);
+	padding: 1px 0;
+}
+
+/* "Back to the latest": a round chevron that floats above the composer. */
+.qbd-ai-fil-bas {
+	position: sticky;
+	bottom: 10px;
+	align-self: center;
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	margin-top: -30px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 50%;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+	cursor: pointer;
+	z-index: 2;
+}
+
+.qbd-ai-fil-bas:hover {
+	color: var(--text-normal);
+}
+
+.qbd-ai-fil-bas[hidden] {
+	display: none;
+}
+
+.qbd-ai-fil-bas svg {
+	width: 16px;
+	height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-transcript-detail { animation: none; }
+}
+
+/* The heading of the always-shown writing, and room above it. */
+.qbd-ai-transcript > .qbd-ai-transcript-titre {
+	margin: 6px 0 4px 4px;
 }
