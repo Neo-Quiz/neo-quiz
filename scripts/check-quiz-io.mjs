@@ -100,8 +100,8 @@ function premierEcart(obtenu, attendu) {
    celui que `detail-io.ts` voit. Un build par entrée donnerait à chacune sa
    copie du singleton, et `currentHost()` jetterait côté module vérifié. */
 await withSrcModule(
-	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts"],
-	async (io, hote, exp) => {
+	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts", "src/dashboard/quiz-mode-change.ts"],
+	async (io, hote, exp, modeChange) => {
 	const r = makeReporter("Écriture d'un bloc");
 
 	/** Un faux HÔTE sur une carte en mémoire : un chemin, un contenu, une date.
@@ -491,6 +491,44 @@ await withSrcModule(
 		const relu = await io.loadQuizDraft(v.chemin);
 		r.check("12. read back as an Exam, no phantom question",
 			typeof relu === "object" ? [relu.examOptions?.mode, relu.examOptions?.durationMinutes, relu.questions.length] : relu, ["exam", 125, 1]);
+	}
+
+	/* ─────────── 13. CHANGING THE MODE in the editor (spec 2026-09-29 §5.1) ─────────── */
+
+	{
+		/* Practice → Exam → Practice through the REAL write path: the
+		   configuration is rewritten, the Exam gets the fallback duration (one
+		   question → 1 min), going back removes it; the custom key follows;
+		   no retired key is ever written; a Learn is not convertible. */
+		const { changeMode, noteNameForMode } = modeChange;
+		const source = [
+			"[",
+			"	{ id: 'q1', title: 'Unite', prompt: \"Enonce.\", options: ['un', 'deux'], correctIndex: 0, explain: 'Parce que.' },",
+			"	{ mode: 'quiz', owner: 'alice' },",
+			"]",
+		].join(LF);
+		const v = vault(note({ source }));
+		const bloc = () => JSON5.parse(v.contenu.slice(v.contenu.indexOf("[", v.contenu.indexOf(OUVERTURE)), v.contenu.lastIndexOf("]") + 1)).at(-1);
+		const lu = await io.loadQuizDraft(v.chemin);
+		lu.examOptions = changeMode(lu.examOptions, "exam", lu.questions.length);
+		r.check("13. to Exam: the save goes through", await io.saveQuizDraft(lu), true);
+		r.check("13. to Exam: mode, fallback duration, custom key kept", bloc(), { mode: "exam", examDurationMinutes: 1, owner: "alice" });
+		const examen = await io.loadQuizDraft(v.chemin);
+		examen.examOptions = changeMode(examen.examOptions, "practice", examen.questions.length);
+		r.check("13. back to Practice: the save goes through", await io.saveQuizDraft(examen), true);
+		r.check("13. back to Practice: explicit Practice, no duration, custom key kept", bloc(), { mode: "quiz", owner: "alice" });
+		const relu = await io.loadQuizDraft(v.chemin);
+		r.check("13. read back as a Practice, one question, no duration",
+			typeof relu === "object" ? [relu.examOptions?.mode, relu.examOptions?.durationMinutes, relu.questions.length] : relu, ["quiz", undefined, 1]);
+		r.check("13. never a retired key", /examMode|examAutoSubmit|examShowTimer|learnMode/.test(v.contenu), false);
+		r.check("13. to Practice, the draft itself drops the duration", changeMode({ mode: "exam", durationMinutes: 45, glossary: [] }, "practice", 3), { mode: "quiz", glossary: [] });
+		r.check("13. an Exam keeps the duration it already has", changeMode({ mode: "exam", durationMinutes: 45 }, "exam", 3)?.durationMinutes, 45);
+		r.check("13. a Learn is not convertible", [changeMode({ mode: "lesson" }, "exam", 3), changeMode({ mode: "lesson" }, "practice", 3)], [null, null]);
+		r.check("13. the note's suffix follows the mode; a name without the suffix stays",
+			[noteNameForMode("CM1 — Practice", "practice", "exam"), noteNameForMode("CM1 — Exam", "exam", "practice"), noteNameForMode("Révisions", "practice", "exam"), noteNameForMode("CM1 — Exam", "exam", "exam")],
+			["CM1 — Exam", "CM1 — Practice", null, null]);
+		r.check("13. a collision counter is dropped from the new name (freeNotePath adds its own)",
+			[noteNameForMode("CM1 — Exam (2)", "exam", "practice"), noteNameForMode("CM1 — Practice (3)", "practice", "exam")], ["CM1 — Practice", "CM1 — Exam"]);
 	}
 
 	r.done();

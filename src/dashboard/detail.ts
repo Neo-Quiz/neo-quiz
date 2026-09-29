@@ -10,6 +10,10 @@ import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
 import { glossaryHeaderAction, texteBadgeGlossaire } from "./glossaire-modal";
+import { modeHeaderAction, texteBadgeMode } from "./quiz-mode-action";
+import { changeMode, modeOfOptions, noteNameForMode } from "./quiz-mode-change";
+import { moveQuizTo } from "./quiz-menu";
+import type { ModeQuiz } from "../quiz-format";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
 import { closeAllSelects } from "./ui-select";
 import { mathifyElement } from "../engine/mathjax";
@@ -111,6 +115,11 @@ export interface QuizPageSpec {
 	autreMode?: { quiz: QuizIndexEntry; open(): void };
 	/** Le menu « ⋮ » de la fiche : celui de la carte du quiz (hôte). */
 	menu?(anchor: HTMLElement): void;
+	/** After a Test's mode changed in the editor and was SAVED: the host
+	    renames its note (" — Practice" ↔ " — Exam") and reopens it (spec
+	    2026-09-29 §5.1). Absent (a quiz in memory, the Generate page): the
+	    page just repaints. */
+	renameForMode?(from: ModeQuiz, to: ModeQuiz): Promise<void>;
 }
 
 /** Dépendances d'une page « quiz », indépendantes du dashboard — et de
@@ -220,9 +229,28 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 					const frere = quizFrere(quiz, ctx.scanner.getQuizzes());
 					return frere ? { quiz: frere, open: () => ctx.navigate("detail", { quiz: frere }) } : undefined;
 				})(),
-				/* Le menu de la carte, avec un repeint qui relit le quiz : renommé,
-				   la page le reprend ; supprimé ou déplacé hors du catalogue, on
-				   revient en arrière. */
+				/* Renaming after a mode change goes through `moveQuizTo`, the path
+				   that keeps review history and stats; a note named by hand keeps
+				   its name (quiz-mode-change.ts noteNameForMode). Reopened in
+				   editing, on its new path. */
+				renameForMode: async (from, to) => {
+					const courant = ctx.scanner.getQuiz(quiz.path) ?? quiz;
+					const nom = noteNameForMode(courant.basename, from, to);
+					let chemin = courant.path;
+					if (nom) {
+						const coupe = chemin.lastIndexOf("/");
+						const dossier = coupe >= 0 ? chemin.slice(0, coupe) : "";
+						const nomDossier = dossier.slice(dossier.lastIndexOf("/") + 1);
+						chemin = (await moveQuizTo(ctx, courant, dossier, nomDossier, nom)) ?? chemin;
+					}
+					const fichier = currentHost().fs.getFile(chemin);
+					if (fichier) await ctx.scanner.scanFile(fichier);
+					const frais = ctx.scanner.getQuiz(chemin);
+					if (frais) ctx.navigate("detail", { quiz: frais, edit: true });
+				},
+				/* The card's menu, with a repaint that re-reads the quiz: renamed,
+				   the page picks it up; deleted or moved out of the catalogue, we go
+				   back. */
 				menu: ctx.openCardMenu ? (anchor) => ctx.openCardMenu!(quiz, anchor, () => {
 					const frais = ctx.scanner.getQuiz(quiz.path);
 					if (frais) ctx.navigate("detail", { quiz: frais });
@@ -469,6 +497,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			if (editing) {
 				const btn = page.querySelector<HTMLElement>('[data-qbd-key="glossary"]');
 				if (btn) setActionBadge(btn, texteBadgeGlossaire(draft));
+				const modeBtn = page.querySelector<HTMLElement>('[data-qbd-key="mode"]');
+				if (modeBtn) setActionBadge(modeBtn, texteBadgeMode(draft));
 			}
 			activeIdx = Math.min(activeIdx, Math.max(0, draft.questions.length - 1));
 			paint(listCol, panel, nav, spec);
@@ -486,18 +516,25 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		};
 		const start = spec.start;
 		const actions = (spec.actions || []).map(a => ({ label: a.label, icon: a.icon, onClick: avant(a.onClick) }));
-		/* « Vocabulaire » (tâche 4 du lot D) : dès que `editing` est vrai, PAS
-		   seulement une fois `draft` chargé — sinon le bouton manque en
-		   arrivant DIRECTEMENT en édition (menu « Modifier », création d'un
-		   quiz) : `renderHeader` tourne avant `spec.load()`, `draft` vaut
-		   encore `null`, et rien ne repeint l'en-tête à lui seul quand il
-		   arrive. `getDraft` (une closure sur `draft`, jamais sa valeur
-		   figée) laisse l'action lire le brouillon du moment, AU CLIC ; la
-		   pastille (posée à `undefined` tant que rien n'est chargé) est
-		   rafraîchie séparément une fois `draft` prêt, plus bas. */
+		/* "Vocabulary" (task 4 of batch D) and "Mode": as soon as `editing` is
+		   true, NOT only once `draft` is loaded — otherwise the buttons are
+		   missing when arriving DIRECTLY in editing (the "Edit" menu, creating a
+		   quiz): `renderHeader` runs before `spec.load()`, `draft` is still
+		   `null`, and nothing repaints the header by itself when it arrives.
+		   `getDraft` (a closure over `draft`, never its frozen value) lets the
+		   actions read the draft of the moment, ON CLICK; their badges (set to
+		   `undefined` while nothing is loaded) are refreshed separately once
+		   `draft` is ready, below. */
 		if (editing) {
 			const gloss = glossaryHeaderAction(() => draft, scheduleSave);
 			actions.push({ ...gloss, onClick: avant(gloss.onClick) });
+			/* "Mode" (spec 2026-09-29 §5.1): Practice ⇄ Exam, an Exam's duration.
+			   Only on a quiz the page WRITES: an unsaved draft (the Generate page)
+			   is named from the mode it was generated in. */
+			if (spec.save) {
+				const mode = modeHeaderAction(() => draft, (to) => { void changeQuizMode(spec, to); }, changeExamDuration);
+				actions.push({ ...mode, onClick: avant(mode.onClick) });
+			}
 		}
 		renderEntete(page, {
 			title: spec.title,
@@ -1072,14 +1109,64 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		});
 	}
 
-	/** Écrit MAINTENANT ce qui est en attente (sortie de page, lancement,
-	    ouverture d'un autre quiz). Vise le brouillon FIGÉ au moment de la
-	    frappe, jamais celui affiché à cet instant.
+	/** A Test changes mode (spec 2026-09-29 §5.1): the configuration is
+	    rewritten (quiz-mode-change.ts) and WRITTEN at once, IN the save chain
+	    — never beside it, where it would race a debounced write on the note's
+	    compare-and-swap. The same draft carries the edits still pending, so a
+	    pending write is folded into this one. A failed write restores the
+	    previous mode and renames nothing; then the host renames the note. */
+	async function changeQuizMode(spec: QuizPageSpec, to: "practice" | "exam"): Promise<void> {
+		const d = draft;
+		const save = currentSpec?.save;
+		if (!d || !save) return;
+		const from = modeOfOptions(d.examOptions);
+		const next = changeMode(d.examOptions, to, d.questions.length);
+		if (!next || from === to) return;
+		const before = d.examOptions;
+		d.examOptions = next;
+		if (saveTimer) {
+			window.clearTimeout(saveTimer);
+			saveTimer = null;
+			pendingSave = null;
+		}
+		let ok = false;
+		saveChain = saveChain.then(() => save(d)).then((r) => { ok = r; }, () => { ok = false; });
+		await saveChain;
+		if (!ok) {
+			d.examOptions = before;
+			currentHost().ui.notice(t("dashboard.quiz.saveError"));
+			repaint();
+			return;
+		}
+		if (!spec.renameForMode) { repaint(); return; }
+		try {
+			await spec.renameForMode(from, to);
+		} catch (e) {
+			// The mode IS saved: only the note's name lags behind. Say so.
+			console.error("[quiz-blocks] renaming after a mode change failed:", e);
+			currentHost().ui.notice(t("editor.mode.renameFailed"));
+			repaint();
+		}
+	}
 
-	    Rend LA CHAÎNE, pas seulement l'écriture qu'on vient de lancer : une
-	    écriture partie par la minuterie un instant plus tôt est encore en vol,
-	    et une fenêtre qui se ferme sur « rien en attente » l'aurait coupée en
-	    plein milieu. La chaîne ne rejette jamais (`runSave`). */
+	/** An Exam's duration, from the Mode action's Duration dialog. */
+	function changeExamDuration(minutes: number): void {
+		const d = draft;
+		if (!d || modeOfOptions(d.examOptions) !== "exam") return;
+		d.examOptions = { ...d.examOptions, durationMinutes: minutes };
+		scheduleSave();
+		const btn = currentContainer?.querySelector<HTMLElement>('[data-qbd-key="mode"]');
+		if (btn) setActionBadge(btn, texteBadgeMode(d));
+	}
+
+	/** Writes what is pending NOW (leaving the page, starting the quiz,
+	    opening another quiz). Aims at the draft FROZEN when it was typed,
+	    never the one on display at this instant.
+
+	    Returns THE CHAIN, not only the write just started: a write the timer
+	    sent a moment earlier is still in flight, and a window closing on
+	    "nothing pending" would have cut it in the middle. The chain never
+	    rejects (`runSave`). */
 	function flushSave(): Promise<void> {
 		if (saveTimer && pendingSave) {
 			window.clearTimeout(saveTimer);

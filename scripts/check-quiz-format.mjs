@@ -24,6 +24,9 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		[nomDeNote("CM1", "learn"), nomDeNote("CM1", "practice"), nomDeNote("CM1", "exam")], ["CM1 — Learn", "CM1 — Practice", "CM1 — Exam"]);
 	r.check("displayed title without the suffix of its mode",
 		[titreSansMode("CM1 — Learn", "learn"), titreSansMode("CM1 — Practice", "practice"), titreSansMode("Réseaux — Exam", "exam")], ["CM1", "CM1", "Réseaux"]);
+	r.check("a collision counter after the suffix stays in the title (freeNotePath's \" (2)\")",
+		[titreSansMode("CM1 — Exam (2)", "exam"), titreSansMode("Réseaux — Practice (12)", "practice"), titreSansMode("CM1 (2)", "exam"), titreSansMode("CM1 — Exam(2)", "exam")],
+		["CM1 (2)", "Réseaux (12)", "CM1 (2)", "CM1 — Exam(2)"]);
 	r.check("a suffix that is not the real mode's stays, and so does a name that is ONLY the suffix",
 		[titreSansMode("CM1 — Learn", "practice"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice"), titreSansMode("CM1 — Exam", "practice"), titreSansMode("CM1 — Practice", "exam")],
 		["CM1 — Learn", " — Learn", "Quiz libre", "CM1 — Exam", "CM1 — Practice"]);

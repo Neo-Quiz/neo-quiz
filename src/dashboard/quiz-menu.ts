@@ -346,31 +346,36 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
 		: t("dashboard.quizzes.deleted"));
 }
 
-/* ── Déplacer UN quiz vers un autre dossier connu ──
-   Contrairement à `moveModuleTo` (qui déplace un DOSSIER entier entre deux
-   racines), ceci déplace la NOTE d'un quiz vers un dossier de « Mes quiz »
-   choisi dans le sous-menu — même dossier de destination que la page (les
-   groupes de `buildUeGroups`/`buildModuleGroups`, sur la même `map`).
+/* ── Move ONE quiz to another known folder ──
+   Unlike `moveModuleTo` (which moves a whole FOLDER between two roots),
+   this moves a quiz's NOTE to a "My quizzes" folder chosen in the submenu —
+   the same destination folders as the page (the groups of
+   `buildUeGroups`/`buildModuleGroups`, on the same `map`). With a new
+   `basename` it also RENAMES the note in place: a Test's mode change
+   (" — Practice" ↔ " — Exam", dashboard/detail.ts).
 
-   Nom libre par `freeNotePath` (même garde que « Nouveau quiz » /
-   `folder-create.ts`) : jamais d'écrasement, un homonyme reçoit " (2)".
+   A free name through `freeNotePath` (the same guard as "New quiz" /
+   `folder-create.ts`): never an overwrite, a namesake gets " (2)".
 
-   `targetName` sert UNIQUEMENT à nommer la cible dans les messages (succès,
-   dossier disparu) — jamais à écrire, où seul `targetFolder` (un chemin du
-   contrat) compte.
+   `targetName` ONLY names the target in messages (success, folder gone) —
+   never used to write, where only `targetFolder` (a contract path) counts.
 
-   NON corrigés ici, signalés par la re-revue du 2026-09-27 comme ANTÉRIEURS
-   à ce chantier et hors de ce lot : `freeNotePath` (`folder-create.ts`)
-   n'échappe que les caractères interdits Windows, jamais les noms réservés
-   (`CON`, `NUL`, `COM1`…) ni un point/espace final — un nom pareil se pose
-   sur le disque mais devient quasi indélébile depuis l'Explorateur (Mineur 3,
-   `move-to-rereview.md`). Et `bornerEcriture` (`perimetre.ts`) résout le
-   chemin à CHAQUE appel plutôt qu'une fois pour la durée de l'opération : un
-   dossier intermédiaire remplacé par une jonction entre deux résolutions
-   sortirait du périmètre (Mineur 4, même revue) — il faudrait déjà un
-   acteur écrivant sur le disque en dehors de l'app, que le pont ne permet
-   pas de créer. */
-export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string, targetName: string): Promise<string | null> {
+   NOT fixed here, reported by the re-review of 2026-09-27 as PREDATING this
+   work and out of its batch: `freeNotePath` (`folder-create.ts`) only
+   escapes Windows' forbidden characters, never reserved names (`CON`,
+   `NUL`, `COM1`…) nor a trailing dot/space — such a name lands on disk but
+   becomes nearly undeletable from Explorer (Minor 3,
+   `move-to-rereview.md`). And `bornerEcriture` (`perimetre.ts`) resolves
+   the path on EACH call rather than once for the operation: an intermediate
+   folder replaced by a junction between two resolutions would leave the
+   perimeter (Minor 4, same review) — it would already take an actor writing
+   to disk outside the app, which the bridge does not allow to create. */
+export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, targetFolder: string, targetName: string,
+	/* A NEW file name (without `.md`), for a rename in place: changing a
+	   Test's mode renames "— Practice" ↔ "— Exam" (spec 2026-09-29 §5.1) —
+	   the same path as a move, so review history and stats follow. Absent:
+	   the note keeps its name. */
+	basename: string = quiz.basename): Promise<string | null> {
 	const host = currentHost();
 	/* REVUE (2026-09-27) : un dossier CONNU du catalogue (il a déjà un quiz,
 	   donc un `ModuleGroup`) peut avoir disparu du DISQUE depuis — supprimé
@@ -384,7 +389,7 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 		host.ui.notice(t("dashboard.quizzes.moveFolderMissing", { target: targetName }));
 		return null;
 	}
-	const to = await freeNotePath(targetFolder, quiz.basename);
+	const to = await freeNotePath(targetFolder, basename);
 	try {
 		await host.fs.rename(quiz.path, to);
 	} catch (e) {
