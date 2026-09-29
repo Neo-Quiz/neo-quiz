@@ -193,6 +193,8 @@ release notes.
 - The explanation shown after correcting a question now uses the same font and size as the question text, instead of a smaller, harder to read one.
 - `\neq`, `\ne`, `\notin` and `\not=` now show their diagonal stroke instead of an empty box.
 - A terminal window no longer flashes on screen when the app checks the Antigravity account (Settings, generation): Antigravity's own background update check, which opened it, is now turned off for the processes the app launches. CLI account status also loads in the background right after launch, so Settings shows it immediately.
+- Coming back from a quiz's page to its folder, the Documents, Links and Notes tile no longer blinks out and back in at the end of the motion.
+
 
 ## [1.19.0] - 2026-09-23
 

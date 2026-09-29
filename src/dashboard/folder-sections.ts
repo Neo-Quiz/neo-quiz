@@ -9,7 +9,7 @@ import { freeNotePath } from "./folder-create";
 import { ajouterLien, lireContenuDossier, nomSansExtension, retirerLien, titreDepuisUrl, urlValide } from "./folder-contents";
 import { openConfirmModal } from "../editor/modals";
 import { estImage, fileIcon } from "./file-icons";
-import type { LienDossier } from "./folder-contents";
+import type { ContenuDossier, LienDossier } from "./folder-contents";
 import { suivreDebord } from "./detail-fiche";
 
 /** Le nombre de lignes qu'une liste de section montre avant de défiler dans
@@ -45,15 +45,29 @@ export interface FolderSectionsDeps {
    « Documents » celui qui regardait ses notes. */
 const ongletParDossier = new Map<string, number>();
 
-export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDeps): void {
+/* The last content read of each folder, so that a page painted AGAIN shows
+   its tile at once instead of an empty spot until `listDir` answers. It bit
+   on the way back from a quiz to its folder (`sheet-stack.ts`): the folder is
+   painted twice, in the sheet coming forward and, at the end of the
+   transition, in the real panel — and the second painting had no tile for a
+   few frames, so the zone blinked out and back in. */
+const dernierContenu = new Map<string, ContenuDossier>();
+
+export function renderFolderSections(parent: HTMLElement, depsBrutes: FolderSectionsDeps): void {
+	/* An action (add, delete, new note) repaints the page for a content that
+	   just changed: the memorised one would flash stale, so it is dropped first. */
+	const deps: FolderSectionsDeps = {
+		...depsBrutes,
+		rerender: () => { dernierContenu.delete(depsBrutes.folder); depsBrutes.rerender(); },
+	};
 	/* UNE tuile pour les trois (2026-09-25) : Documents, Liens et Notes en
 	   ONGLETS, dans la même matière que les cartes de quiz mais bordée de
 	   POINTILLÉS — la zone des ressources se distingue sans changer de
 	   texture. Un état vide ne s'affiche plus que si l'on ouvre son onglet. */
 	const wrap = ajouter(parent, "div", "qbd-folder-sections");
 	const estQuiz = (path: string): boolean => !!deps.ctx.scanner.getQuiz(path);
-	void lireContenuDossier(deps.folder, estQuiz).then(contenu => {
-		if (!wrap.isConnected) return;
+	const peindre = (contenu: ContenuDossier): void => {
+		wrap.replaceChildren();
 		const onglets = ajouter(wrap, "div", "qbd-folder-tabs");
 		onglets.setAttribute("role", "tablist");
 		const indic = ajouter(onglets, "div", "qbd-folder-tabs-indic");
@@ -127,6 +141,15 @@ export function renderFolderSections(parent: HTMLElement, deps: FolderSectionsDe
 		});
 		// Mesuré au prochain cadre : les onglets doivent être posés.
 		requestAnimationFrame(() => montrer(ongletParDossier.get(deps.folder) ?? 0, false));
+	};
+	const memorise = dernierContenu.get(deps.folder);
+	if (memorise) peindre(memorise);
+	void lireContenuDossier(deps.folder, estQuiz).then(contenu => {
+		if (!wrap.isConnected) return;
+		dernierContenu.set(deps.folder, contenu);
+		// Same content as the one already shown: nothing to repaint.
+		if (memorise && JSON.stringify(memorise) === JSON.stringify(contenu)) return;
+		peindre(contenu);
 	});
 }
 
