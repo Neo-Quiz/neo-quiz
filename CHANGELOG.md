@@ -41,6 +41,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The home page's Resume card no longer shows a percentage: it simply reopens the quiz on the question where you stopped.
 - The home page opens on your study time (total, per day, best day), estimated from your answers; the blue glow at the top and the "Add an exam" link are gone.
 - The side rail has new effects: entries are dimmed at rest, a soft surface appears on hover, they shrink slightly when pressed, and the current page is a frosted-glass card with a filled icon. The logo at the top is now a line icon that opens the GitHub repository, where you can leave a star.
 - A folder's header no longer has a Share button, which left the folder name cut off: Share is in its ⋯ menu. In New quiz, "Create an empty quiz" is now "Create a quiz manually".

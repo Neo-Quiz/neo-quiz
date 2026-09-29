@@ -11,7 +11,6 @@ import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
 import { createOptionCard, importSharedFolder, openCreateFolderModal } from "./folder-create";
-import { renderProgressRing } from "./quiz-card";
 import { openNewFolderModal } from "./module-edit";
 import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
@@ -177,12 +176,6 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		});
 	}
 
-	/* "Resume" card (redrawn 2026-09-29): the whole card is the button — no
-	   framed button inside it (no tile in a tile). The quiz's progress as a
-	   ring with its %, the title and where it comes from, and on the right an
-	   accent TEXT action. The accent is the quiz FOLDER's, like its card: the
-	   ring stays the progress blue of every ring. It resumes the quiz where it
-	   was left, like the folder's next step. */
 	/** The stats band at the top of the page (after StudySmarter's): total
 	    study time, the daily average and the best day, ESTIMATED from the
 	    answers' timestamps (`study-time.ts` says how). Hidden until a first
@@ -205,17 +198,20 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		}
 	}
 
+	/* "Resume" card (redrawn 2026-09-29): the whole card is the button — no
+	   framed button inside it (no tile in a tile). The title and where it
+	   comes from, and on the right an accent TEXT action; the accent is the
+	   quiz FOLDER's, like its card. No progress ring or percentage (removed
+	   2026-09-29): the card's only job is to reopen the quiz on the question
+	   where it was left, like the folder's next step. */
 	function renderResumeHero(container: HTMLElement, quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined, accent: string): void {
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;
-		const pct = total > 0 ? Math.round(done / total * 100) : 0;
 
 		const hero = ajouter(container, "button", "qbd-resume-hero");
 		hero.type = "button";
 		hero.style.setProperty("--accent", accent);
 		hero.addEventListener("click", () => ctx.openQuiz(quiz));
-
-		renderProgressRing(hero, pct, "progress", 54, 5);
 
 		const info = ajouter(hero, "span", "qbd-resume-info");
 		const label = ajouter(info, "span", "qbd-resume-label");

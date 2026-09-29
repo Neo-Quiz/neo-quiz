@@ -160,8 +160,6 @@
 	outline-offset: 2px;
 }
 
-.qbd-resume-hero .qbd-ring { flex: 0 0 auto; }
-
 .qbd-resume-info {
 	display: flex;
 	flex-direction: column;
