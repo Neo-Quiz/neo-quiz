@@ -1355,7 +1355,9 @@ body::after {
 .nq-menu-apropos-verifier { flex: 1 1 auto; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
 .nq-menu-apropos-github { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .nq-menu-apropos-github svg { width: 16px; height: 16px; }
-.nq-menu-apropos-verifier:hover, .nq-menu-apropos-verifier:focus, .nq-menu-apropos-github:hover, .nq-menu-apropos-github:focus-visible { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
+/* One highlighted target at a time: the one with the focus, which a hover
+   gives (menu-app.ts), exactly as the menu's lines. */
+.nq-menu-apropos-verifier:focus, .nq-menu-apropos-github:focus { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
 
 /* ══════════════════════════════════════════════════════════
    LES BARRES DE DÉFILEMENT DE LA FENÊTRE

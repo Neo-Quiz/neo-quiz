@@ -116,11 +116,16 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				const depot = document.createElement("button");
 				depot.type = "button";
 				depot.className = "nq-menu-apropos-github";
-				depot.title = entree.repoLabel;
+				// No `title`: Windows' native tooltip looked out of place in the
+				// menu; the mark speaks for itself, its name stays for a
+				// screen reader.
 				depot.setAttribute("aria-label", entree.repoLabel);
 				depot.append(marqueGithub());
 				depot.addEventListener("click", () => { deps.executer("repo"); fermer(); });
-				depot.addEventListener("mouseenter", () => fermerDepuis(niveau + 1));
+				// The mark takes the focus on hover, as a line does: one
+				// highlighted target at a time, never "Check for updates" left
+				// lit while the pointer is on the mark.
+				depot.addEventListener("mouseenter", () => { depot.focus(); fermerDepuis(niveau + 1); });
 				rangee.append(verifier, depot);
 				lignes.push(verifier);
 				continue;
