@@ -922,28 +922,37 @@
 	box-shadow: none !important;
 	color: var(--quiz-primary);
 	cursor: pointer;
-	transition: background-color 150ms ease, transform 150ms ease;
+	transition: background-color 150ms ease;
 }
+/* 3D edge on the TRIANGLE, same language as `.qbd-cta3d`: a face raised on
+   a darker edge (`--quiz-primary-edge`, global on body) that sinks onto it
+   on click. `filter: drop-shadow` and not `box-shadow`: drop-shadow follows
+   the painted shape of the svg (the triangle), whereas box-shadow would
+   draw a rectangle under its 18px box. No blur, so the edge stays solid. */
 .qbd-quiz-card-play svg {
 	width: 18px;
 	height: 18px;
 	margin-left: 2px; /* a triangle's optical centre sits right of its box's */
 	fill: currentColor;
+	filter: drop-shadow(0 2px 0 var(--quiz-primary-edge));
+	transition: transform 100ms ease-out, filter 100ms ease-out;
 }
 .qbd-quiz-card-play:hover {
-	color: var(--quiz-primary) !important;
+	color: color-mix(in srgb, var(--quiz-primary) 85%, #fff) !important;
 	background: color-mix(in srgb, var(--quiz-primary) 16%, transparent) !important;
 }
-.qbd-quiz-card-play:active {
-	transform: scale(0.92);
+.qbd-quiz-card-play:active svg {
+	transform: translateY(2px);
+	filter: drop-shadow(0 0 0 var(--quiz-primary-edge));
 }
 .qbd-quiz-card-play:focus-visible {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-quiz-card-play { transition: none; }
-	.qbd-quiz-card-play:active { transform: none; }
+	.qbd-quiz-card-play,
+	.qbd-quiz-card-play svg { transition: none; }
+	.qbd-quiz-card-play:active svg { transform: none; }
 }
 
 /* ── LE BOUTON 3D de Brilliant (« Continue course »), dans le bleu des
