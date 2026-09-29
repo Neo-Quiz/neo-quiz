@@ -135,6 +135,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- The back arrow of the quiz editor returns to the quiz's page, as "Done" does, instead of closing it and going back to the folder.
 - "Try again" then reaching the score again now counts the new attempt in the Progress tab and in spaced review; it counted only the first one.
 - Moving to another question no longer makes the quiz as tall as its longest reading for the length of the slide, and no longer flashes a scrollbar at the end of each move.
 - Fill in the blanks with a blank inside a formula ($du = ▢ dx$) shows the formula around the blank instead of raw LaTeX, and a blank whose answer is itself written in LaTeX (a fraction) is a blank again.

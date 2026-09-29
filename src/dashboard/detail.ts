@@ -539,7 +539,15 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// « Générer » garde sa ligne d'usage.
 			kicker: spec.stats ? dossierDuQuiz(spec.stats.path) : spec.subtitle,
 			editing,
-			onBack: () => { void flushSave(); spec.onBack(); },
+			/* In editing, the arrow goes back to the quiz's FICHE, like "Done",
+			   not out of the page: leaving the editor lands on the quiz, and the
+			   fiche's own arrow then goes back to the folder. Without a fiche
+			   (the Generate page), it leaves the page as before. */
+			onBack: () => {
+				void flushSave();
+				if (editing && spec.stats && spec.start) toggleEditing(page);
+				else spec.onBack();
+			},
 			onToggleEditing: () => toggleEditing(page),
 			actions,
 			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
