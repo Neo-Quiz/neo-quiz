@@ -208,6 +208,7 @@ release notes.
 - In a Learn, a recall question whose choices are the question itself ("Which of these statements are true?", or any multiple-choice recall) keeps its choices instead of turning into a free answer whose statements had disappeared; generated single-choice recalls are now written to be answerable without their options.
 - A Learn reading that compares three things or more in a table uses the card's full width, instead of squeezing the table into the reading column one word per line.
 - Generate no longer takes an attached .html file for a web development course when the file's name, the destination folder or the request name another subject: a Python revision sheet saved as a web page sent to a Python folder is Python.
+- A timed test's clock no longer sits on a dark rectangular band across the quiz: in the app it is just its track and its time.
 
 
 ## [1.19.0] - 2026-09-23

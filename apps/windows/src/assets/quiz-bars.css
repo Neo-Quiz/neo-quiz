@@ -77,3 +77,14 @@
 #neo-quiz-root > .qbd-qz > .qz-bottom-bar.is-empty {
 	visibility: hidden;
 }
+
+/* THE TEST CLOCK, on the still top floor (2026-09-29). Its sticky glass
+   (`pages/exam.css`, shared with the plugin, where the whole page scrolls)
+   hides nothing here — only the question scrolls, below the beads — and it
+   read as a dark box with square corners across the panel. In the app the
+   clock is the bare track and its time pill. */
+.qbd-qz .quiz-exam-timer {
+	background: transparent;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
