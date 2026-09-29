@@ -1806,19 +1806,11 @@ export interface OpenOptionsMenuOptions {
 	typeAuto?: boolean;
 	onTypeAuto?: () => void;
 	/**
-	 * DESTINATION du quiz généré : les dossiers proposés, le premier étant le
-	 * défaut. Absente ou vide = pas de ligne Destination.
-	 */
-	folders?: { value: string; label: string; icon?: string; color?: string; sub?: string }[];
-	/** Dossier courant (une `value` de `folders`). */
-	folder?: string;
-	onFolder?: (value: string) => void;
-	/**
 	 * CATÉGORIE du quiz (retour #7, 2026-09-26) : « Automatique » en tête,
 	 * dont l'indice dit ce qui est détecté, puis la liste. Absente = pas de
 	 * ligne Catégorie.
 	 */
-	categories?: { value: string; label: string; icon: string }[];
+	categories?: OptionCategorie[];
 	/** La catégorie choisie (une `value` de `categories`), `null` = Automatique. */
 	categorie?: string | null;
 	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
@@ -1826,13 +1818,25 @@ export interface OpenOptionsMenuOptions {
 	onCategorie?: (value: string | null) => void;
 }
 
+/** One subject of the options menu: its icon is Lucide (`icon`) or drawn
+    by `renderIcon` (a flag). With `children`, a GROUP (the languages): its
+    row opens them in a second, searchable flyout, and `value` is unused. */
+export interface OptionCategorie {
+	value: string;
+	label: string;
+	icon?: string;
+	renderIcon?: (el: HTMLElement) => void;
+	section?: string;
+	children?: OptionCategorie[];
+}
+
 /*
- * openOptionsMenu(anchorEl, opts) — les options de génération, en TROIS
- * lignes (référence : menus de claude.ai) : icône, nom, valeur courante en
- * gris, chevron. Chaque ligne ouvre son choix dans un flyout à côté du menu,
- * au survol comme au clic ou à la flèche droite — la même mécanique que le
- * flyout de niveaux du menu des modèles. Rien n'est imbriqué dans le menu :
- * un `createSelect` appellerait `closeAllSelects()` et fermerait le parent.
+ * openOptionsMenu(anchorEl, opts) — the generation options, one row each
+ * (subject, questions, type; reference: claude.ai's menus): icon, name,
+ * current value in grey, chevron. Each row opens its choice in a flyout
+ * beside the menu, on hover as on click or right arrow — the same mechanism
+ * as the model menu's level flyout. Nothing is nested in the menu: a
+ * `createSelect` would call `closeAllSelects()` and close the parent.
  */
 export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOptions): MenuHandle {
 	if (toggleCloseForAnchor(anchorEl)) return { close() {} };
@@ -1846,22 +1850,133 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	let fly: HTMLDivElement | null = null;
 	let flyRow: HTMLElement | null = null;
 	let timer = 0;
+	/* A SECOND level, opened from a row of the flyout that holds children
+	   (the languages among the subjects, 2026-09-29). */
+	let sousFly: HTMLDivElement | null = null;
+	let sousRow: HTMLElement | null = null;
+	const fermerSous = (): void => {
+		if (sousFly) { sousFly.remove(); sousFly = null; }
+		if (sousRow) { sousRow.classList.remove("is-open"); sousRow.setAttribute("aria-expanded", "false"); sousRow = null; }
+	};
 	const fermerFly = (): void => {
 		window.clearTimeout(timer);
+		fermerSous();
 		if (fly) { fly.remove(); fly = null; }
 		if (flyRow) { flyRow.classList.remove("is-open"); flyRow.setAttribute("aria-expanded", "false"); flyRow = null; }
 	};
 	const fermerBientot = (): void => {
 		window.clearTimeout(timer);
 		timer = window.setTimeout(() => {
-			if (fly?.matches(":hover") || flyRow?.matches(":hover")) return;
+			if (fly?.matches(":hover") || flyRow?.matches(":hover") || sousFly?.matches(":hover")) return;
 			fermerFly();
 		}, 160);
 	};
 
-	interface Choix { label: string; hint?: string; icon?: string; color?: string; sub?: string; actif: boolean; choisir(): void }
+	/** `section`: a heading shown BEFORE this choice (the subject groups).
+	    `renderIcon`: draws an icon that is not Lucide (a flag) in place of
+	    `icon`. `enfants`: the choice is a GROUP, opening its children in a
+	    second flyout with its own search (`filtreEnfants`); a search in the
+	    first flyout reaches them too. */
+	interface Choix {
+		label: string; hint?: string; icon?: string; renderIcon?: (el: HTMLElement) => void; color?: string; sub?: string; section?: string;
+		actif: boolean; choisir(): void;
+		enfants?: Choix[]; filtreEnfants?: { placeholder: string; vide: string };
+	}
+	const plier = (x: string): string => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-	const ligne = (icon: string, titre: string, valeur: () => string, choix: () => Choix[], extra?: (f: HTMLDivElement, maj: () => void) => void): void => {
+	/** One choice's row, in a flyout list. */
+	const dessinerChoix = (liste: HTMLElement, c: Choix, apres: () => void): HTMLButtonElement => {
+		const b = ajouter(liste, "button", "qbd-select-option");
+		b.type = "button";
+		b.setAttribute("role", "menuitemradio");
+		b.setAttribute("aria-checked", String(c.actif));
+		if (c.icon || c.renderIcon) {
+			const i = ajouter(b, "span", "qbd-opts-dd-icon");
+			if (c.color) i.style.setProperty("--accent", c.color);
+			if (c.renderIcon) c.renderIcon(i);
+			else if (c.icon) host.ui.setIcon(i, c.icon);
+		}
+		const body = ajouter(b, "span", "qbd-opts-dd-body");
+		// `textContent` (via `ajouter`): folder names come from the disk.
+		ajouter(body, "span", "qbd-opts-dd-name", c.label);
+		if (c.sub) ajouter(body, "span", "qbd-opts-dd-sub", c.sub);
+		if (c.hint) ajouter(b, "span", "qbd-action-menu-hint", c.hint);
+		const chk = ajouter(b, "span", "qbd-select-check");
+		if (c.actif) host.ui.setIcon(chk, "check");
+		b.addEventListener("click", () => { c.choisir(); apres(); });
+		return b;
+	};
+
+	/** A search field over a list: returns the list element and a way to
+	    read the folded query. The field lives OUTSIDE the list that gets
+	    redrawn: a click on a choice must not wipe what is being typed. */
+	const champRecherche = (f: HTMLElement, filtre: { placeholder: string }, remplir: () => void): { liste: HTMLDivElement; recherche: () => string } => {
+		let recherche = "";
+		const champ = ajouter(f, "input", "qbd-opts-search");
+		champ.type = "search";
+		champ.placeholder = filtre.placeholder;
+		champ.setAttribute("aria-label", filtre.placeholder);
+		const liste = ajouter(f, "div", "qbd-opts-flyout-list");
+		champ.addEventListener("input", () => { recherche = plier(champ.value.trim()); remplir(); });
+		champ.addEventListener("keydown", (e) => {
+			if (e.key === "ArrowDown") { e.preventDefault(); liste.querySelector<HTMLElement>("button")?.focus(); }
+		});
+		return { liste, recherche: () => recherche };
+	};
+
+	/** Places a flyout beside `cote` (the menu or the first flyout), aligned
+	    on `row`; on the left when the screen lacks room on the right. */
+	const placer = (f: HTMLElement, cote: HTMLElement, row: HTMLElement): void => {
+		const mr = cote.getBoundingClientRect();
+		const rr = row.getBoundingClientRect();
+		f.style.visibility = "hidden";
+		f.style.left = "0px";
+		f.style.top = "0px";
+		const fr = f.getBoundingClientRect();
+		const aDroite = mr.right + 4 + fr.width <= window.innerWidth - 8;
+		f.style.left = (aDroite ? mr.right + 4 : Math.max(8, mr.left - 4 - fr.width)) + "px";
+		f.style.top = Math.min(Math.max(8, rr.top - 4), window.innerHeight - fr.height - 8) + "px";
+		f.style.visibility = "";
+	};
+
+	/** Opens a group's children in the second flyout, beside the first. */
+	const ouvrirSous = (row: HTMLElement, groupe: Choix, apres: () => void): void => {
+		if (sousRow === row && sousFly) return;
+		fermerSous();
+		if (!fly || !groupe.enfants) return;
+		sousRow = row;
+		row.classList.add("is-open");
+		row.setAttribute("aria-expanded", "true");
+		const f = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu qbd-opts-flyout");
+		sousFly = f;
+		f.setAttribute("role", "menu");
+		f.addEventListener("mouseenter", () => window.clearTimeout(timer));
+		f.addEventListener("mouseleave", fermerBientot);
+		const enfants = groupe.enfants;
+		let lire = (): string => "";
+		let liste: HTMLDivElement = f;
+		const remplir = (): void => {
+			liste.replaceChildren();
+			const q = lire();
+			for (const c of enfants) {
+				if (q && !plier(c.label).includes(q)) continue;
+				dessinerChoix(liste, c, () => { apres(); remplir(); });
+			}
+			if (q && !liste.querySelector("button") && groupe.filtreEnfants) ajouter(liste, "div", "qbd-opts-empty", groupe.filtreEnfants.vide);
+		};
+		if (groupe.filtreEnfants) {
+			const r = champRecherche(f, groupe.filtreEnfants, () => remplir());
+			liste = r.liste;
+			lire = r.recherche;
+		}
+		remplir();
+		placer(f, fly, row);
+	};
+
+	/* `filtre`: a search field heads the flyout, for a list too long to
+	   scan (the forty-odd subjects, 2026-09-29) — its placeholder, and the
+	   line shown when nothing matches. */
+	const ligne = (icon: string, titre: string, valeur: () => string, choix: () => Choix[], extra?: (f: HTMLDivElement, maj: () => void) => void, filtre?: { placeholder: string; vide: string }): void => {
 		const row = ajouter(menuEl, "button", "qbd-select-option qbd-opts-row");
 		row.type = "button";
 		row.setAttribute("aria-haspopup", "menu");
@@ -1886,43 +2001,75 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 			f.setAttribute("role", "menu");
 			f.addEventListener("mouseenter", () => window.clearTimeout(timer));
 			f.addEventListener("mouseleave", fermerBientot);
+			/* The search: matched without case or accents, on the label and
+			   its section — and on the children of a group, which then show
+			   right here under the group's name, without opening it. */
+			let lire = (): string => "";
+			let liste: HTMLDivElement = f;
 			const remplir = (): void => {
-				f.replaceChildren();
-				for (const c of choix()) {
-					const b = ajouter(f, "button", "qbd-select-option");
-					b.type = "button";
-					b.setAttribute("role", "menuitemradio");
-					b.setAttribute("aria-checked", String(c.actif));
-					if (c.icon) {
-						const i = ajouter(b, "span", "qbd-opts-dd-icon");
-						if (c.color) i.style.setProperty("--accent", c.color);
-						host.ui.setIcon(i, c.icon);
+				liste.replaceChildren();
+				const q = lire();
+				let section: string | undefined;
+				let sectionPosee: string | undefined;
+				const entete = (titre: string | undefined): void => {
+					/* The heading of the group, once, before its first VISIBLE
+					   choice: a filter that keeps "Physics" alone keeps
+					   "Sciences" above it, and drops the empty groups. */
+					if (titre && titre !== sectionPosee) {
+						ajouter(liste, "div", "qbd-action-menu-section", titre);
+						sectionPosee = titre;
 					}
-					const body = ajouter(b, "span", "qbd-opts-dd-body");
-					// `textContent` (via `ajouter`) : les noms de dossier viennent du disque.
-					ajouter(body, "span", "qbd-opts-dd-name", c.label);
-					if (c.sub) ajouter(body, "span", "qbd-opts-dd-sub", c.sub);
-					if (c.hint) ajouter(b, "span", "qbd-action-menu-hint", c.hint);
-					const chk = ajouter(b, "span", "qbd-select-check");
-					if (c.actif) host.ui.setIcon(chk, "check");
-					b.addEventListener("click", () => { c.choisir(); majValeur(); remplir(); });
+				};
+				const apres = (): void => { majValeur(); remplir(); };
+				for (const c of choix()) {
+					if (c.section) section = c.section;
+					if (c.enfants) {
+						if (q) {
+							for (const e of c.enfants) {
+								if (!plier(`${e.label} ${c.label}`).includes(q)) continue;
+								entete(c.label);
+								dessinerChoix(liste, e, apres);
+							}
+							continue;
+						}
+						entete(section);
+						const b = dessinerChoix(liste, { ...c, choisir: () => undefined }, () => undefined);
+						b.setAttribute("aria-haspopup", "menu");
+						b.setAttribute("aria-expanded", "false");
+						b.removeAttribute("aria-checked");
+						b.classList.add("qbd-opts-group-row");
+						const chk = b.querySelector<HTMLElement>(".qbd-select-check");
+						if (chk) { chk.replaceChildren(); host.ui.setIcon(chk, "chevron-right"); }
+						const ouvrirGroupe = (): void => { window.clearTimeout(timer); ouvrirSous(b, c, apres); };
+						b.addEventListener("mouseenter", ouvrirGroupe);
+						b.addEventListener("click", ouvrirGroupe);
+						b.addEventListener("keydown", (e) => {
+							if (e.key !== "ArrowRight") return;
+							e.preventDefault();
+							ouvrirGroupe();
+							sousFly?.querySelector<HTMLElement>("input, button")?.focus();
+						});
+						continue;
+					}
+					if (q && !plier(`${c.label} ${section ?? ""}`).includes(q)) continue;
+					entete(section);
+					const b = dessinerChoix(liste, c, apres);
+					// Hovering another choice closes an open group.
+					b.addEventListener("mouseenter", fermerSous);
 				}
-				if (extra) extra(f, () => { majValeur(); remplir(); });
+				if (filtre && q && !liste.querySelector("button")) ajouter(liste, "div", "qbd-opts-empty", filtre.vide);
+				if (extra) extra(liste, apres);
 			};
+			if (filtre) {
+				const r = champRecherche(f, filtre, () => { fermerSous(); remplir(); });
+				liste = r.liste;
+				lire = r.recherche;
+			}
 			remplir();
 
-			/* À droite du menu, alignée sur la ligne ; à gauche si l'écran
-			   manque de place (le bouton Options est à droite du composer). */
-			const mr = menuEl.getBoundingClientRect();
-			const rr = row.getBoundingClientRect();
-			f.style.visibility = "hidden";
-			f.style.left = "0px";
-			f.style.top = "0px";
-			const fr = f.getBoundingClientRect();
-			const aDroite = mr.right + 4 + fr.width <= window.innerWidth - 8;
-			f.style.left = (aDroite ? mr.right + 4 : Math.max(8, mr.left - 4 - fr.width)) + "px";
-			f.style.top = Math.min(Math.max(8, rr.top - 4), window.innerHeight - fr.height - 8) + "px";
-			f.style.visibility = "";
+			/* Right of the menu, aligned on the row; on the left when the
+			   screen lacks room (the Options button is right of the composer). */
+			placer(f, menuEl, row);
 		};
 
 		row.addEventListener("mouseenter", () => { window.clearTimeout(timer); ouvrir(); });
@@ -1983,6 +2130,33 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 		});
 	};
 
+	/* ── Subject: Automatic (the detection), or a forced subject ──
+	   FIRST row since 2026-09-29: it shapes the whole quiz, where count and
+	   type only tune it. (The output folder left this menu the same day for
+	   its own row at the top of the composer, ai.ts.) */
+	const categories = opts.categories ?? [];
+	if (categories.length > 0) {
+		// The leaves, groups flattened: what a value can be.
+		const feuilles = categories.flatMap(c => c.children ?? [c]);
+		let categorie: string | null = feuilles.some(c => c.value === opts.categorie) ? String(opts.categorie) : null;
+		const versChoix = (c: OptionCategorie): Choix => ({
+			label: c.label, icon: c.icon, renderIcon: c.renderIcon, section: c.section, actif: categorie === c.value,
+			choisir: () => { categorie = c.value; if (opts.onCategorie) opts.onCategorie(c.value); },
+			...(c.children ? {
+				enfants: c.children.map(versChoix),
+				// The group shows which of its children is chosen.
+				hint: c.children.find(e => e.value === categorie)?.label,
+				filtreEnfants: { placeholder: t("ai.categorie.searchLanguage"), vide: t("ai.categorie.noMatchLanguage") },
+			} : {}),
+		});
+		ligne("tag", t("dashboard.select.optionsCategory"),
+			() => categorie === null ? t("ai.categorie.auto") : (feuilles.find(c => c.value === categorie)?.label ?? t("ai.categorie.auto")),
+			() => [
+				{ label: t("ai.categorie.auto"), hint: opts.categorieDetectee, actif: categorie === null, choisir: () => { categorie = null; if (opts.onCategorie) opts.onCategorie(null); } },
+				...categories.map(versChoix),
+			], undefined, { placeholder: t("ai.categorie.search"), vide: t("ai.categorie.noMatch") });
+	}
+
 	/* ── Questions ── */
 	const PRESETS = [5, 10, 15, 20, 30];
 	let count = Math.min(100, Math.max(1, Math.round(Number(opts.count) || 5)));
@@ -2016,33 +2190,6 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 			...opts.types.map(x => ({ label: x, actif: !typeAuto && type === x, choisir: () => { type = x; typeAuto = false; if (opts.onType) opts.onType(x); } })),
 		]);
 
-	/* ── Destination ── */
-	const folders = opts.folders ?? [];
-	if (folders.length > 0) {
-		let folder = folders.some(f => f.value === opts.folder) ? String(opts.folder) : folders[0].value;
-		ligne("folder", t("dashboard.select.optionsDestination"),
-			() => (folders.find(f => f.value === folder) ?? folders[0]).label,
-			() => folders.map(f => ({
-				label: f.label, icon: f.icon, color: f.color, sub: f.sub, actif: f.value === folder,
-				choisir: () => { folder = f.value; if (opts.onFolder) opts.onFolder(folder); },
-			})));
-	}
-
-	/* ── Catégorie : Automatique (la détection), ou une catégorie forcée ── */
-	const categories = opts.categories ?? [];
-	if (categories.length > 0) {
-		let categorie: string | null = categories.some(c => c.value === opts.categorie) ? String(opts.categorie) : null;
-		ligne("tag", t("dashboard.select.optionsCategory"),
-			() => categorie === null ? t("ai.categorie.auto") : (categories.find(c => c.value === categorie)?.label ?? t("ai.categorie.auto")),
-			() => [
-				{ label: t("ai.categorie.auto"), hint: opts.categorieDetectee, actif: categorie === null, choisir: () => { categorie = null; if (opts.onCategorie) opts.onCategorie(null); } },
-				...categories.map(c => ({
-					label: c.label, icon: c.icon, actif: categorie === c.value,
-					choisir: () => { categorie = c.value; if (opts.onCategorie) opts.onCategorie(c.value); },
-				})),
-			]);
-	}
-
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──
 	const rect = anchorEl.getBoundingClientRect();
 	menuEl.style.visibility = "hidden";
@@ -2069,19 +2216,20 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 
 	function onDocDown(e: MouseEvent): void {
 		const cible = e.target as Node | null;
-		if (cible && (anchorEl.contains(cible) || menuEl.contains(cible) || fly?.contains(cible))) return;
+		if (cible && (anchorEl.contains(cible) || menuEl.contains(cible) || fly?.contains(cible) || sousFly?.contains(cible))) return;
 		closeMenu();
 	}
 
 	function onKeyDown(e: KeyboardEvent): void {
 		if (e.key !== "Escape") return;
-		// Échap ferme d'abord le flyout, puis le menu.
-		if (fly) { const row = flyRow; fermerFly(); row?.focus(); } else closeMenu();
+		// Escape closes the second flyout first, then the flyout, then the menu.
+		if (sousFly) { const row = sousRow; fermerSous(); row?.focus(); }
+		else if (fly) { const row = flyRow; fermerFly(); row?.focus(); } else closeMenu();
 	}
 
 	function onScroll(e: Event): void {
 		const cible = e.target as Node | null;
-		if (cible && (menuEl.contains(cible) || fly?.contains(cible))) return;
+		if (cible && (menuEl.contains(cible) || fly?.contains(cible) || sousFly?.contains(cible))) return;
 		closeMenu();
 	}
 

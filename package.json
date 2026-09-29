@@ -93,6 +93,7 @@
     "version:major": "node scripts/set-version.mjs major"
   },
   "dependencies": {
+    "country-flag-icons": "^1.6.20",
     "json5": "^2.2.3",
     "mathlive": "^0.110.0",
     "refractor": "^5.0.0"

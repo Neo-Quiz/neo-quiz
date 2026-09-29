@@ -1,10 +1,28 @@
-/* Domaine « ai » — anglais, dictionnaire de RÉFÉRENCE.
-   Toute clé ajoutée ici doit l'être aussi dans i18n/fr/ai.ts (le typage de
-   FR_AI l'impose). Clés préfixées « ai. » : un domaine ne marche jamais
-   sur les clés d'un autre. */
+/* "ai" domain — English, the REFERENCE dictionary.
+   Every key added here must also be added to i18n/fr/ai.ts (FR_AI's type
+   enforces it). Keys are prefixed "ai." so one domain never steps on
+   another's keys. */
 export const EN_AI = {
-	/* ── Page « Générer » ── */
-	"ai.page.title": "Generate a quiz",
+	/* ── "Generate" page ── */
+	/* The page greeting, drawn at random from the part of the day's pool plus
+	   the "any" pool (ai.ts, `GREETINGS`). Keep them SHORT: a 46px serif on
+	   one line above the composer. */
+	"ai.greeting.morning1": "Good morning",
+	"ai.greeting.morning2": "Coffee and a quiz?",
+	"ai.greeting.morning3": "Fresh mind, fresh start",
+	"ai.greeting.afternoon1": "Good afternoon",
+	"ai.greeting.afternoon2": "Afternoon study break?",
+	"ai.greeting.afternoon3": "Ready for a round?",
+	"ai.greeting.evening1": "Good evening",
+	"ai.greeting.evening2": "Evening review?",
+	"ai.greeting.evening3": "One last round?",
+	"ai.greeting.night1": "Burning the midnight oil?",
+	"ai.greeting.night2": "Late-night revision?",
+	"ai.greeting.night3": "Quiet hours, clear mind",
+	"ai.greeting.any1": "What are we learning today?",
+	"ai.greeting.any2": "Back at it",
+	"ai.greeting.any3": "Let's learn something",
+	"ai.greeting.any4": "What's on the syllabus?",
 
 	/* ── Composer ── */
 	"ai.composer.placeholder": "What should the quiz be about?",
@@ -22,6 +40,7 @@ export const EN_AI = {
 	"ai.preview.openFailed": "Could not open {name}",
 	"ai.preview.props": "Properties",
 	"ai.composer.quizOptions": "Quiz options",
+	"ai.composer.destination": "Output folder: {folder}",
 	"ai.composer.generate": "Generate quiz",
 	"ai.composer.stop": "Stop",
 	"ai.composer.open": "Open",
@@ -82,9 +101,11 @@ export const EN_AI = {
 	"ai.mode.group": "Goal",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
-	/* La catégorie d'un quiz (categorie-quiz.ts) : son nom, et l'avis
-	   « détecté » près du bouton des options. */
+	/* A quiz's subject (categorie-quiz.ts): its name, its menu section, and
+	   the "detected" notice in the composer's output-folder row. */
 	"ai.categorie.auto": "Automatic",
+	"ai.categorie.search": "Search subjects…",
+	"ai.categorie.noMatch": "No matching subject",
 	"ai.categorie.python": "Python",
 	"ai.categorie.c": "C",
 	"ai.categorie.bash": "Bash / Linux",
@@ -93,10 +114,75 @@ export const EN_AI = {
 	"ai.categorie.maths": "Maths",
 	"ai.categorie.reseau": "Networking",
 	"ai.categorie.general": "General",
+	"ai.categorie.cpp": "C++",
+	"ai.categorie.java": "Java",
+	"ai.categorie.csharp": "C#",
+	"ai.categorie.rust": "Rust",
+	"ai.categorie.go": "Go",
+	"ai.categorie.algo": "Algorithms",
+	"ai.categorie.genie": "Software engineering",
+	"ai.categorie.git": "Git",
+	"ai.categorie.secu": "Cybersecurity",
+	"ai.categorie.os": "Operating systems",
+	"ai.categorie.archi": "Computer architecture",
+	"ai.categorie.cloud": "Cloud & DevOps",
+	"ai.categorie.ia": "AI & data science",
+	"ai.categorie.physique": "Physics",
+	"ai.categorie.chimie": "Chemistry",
+	"ai.categorie.bio": "Biology",
+	"ai.categorie.medecine": "Medicine & health",
+	"ai.categorie.electronique": "Electronics",
+	"ai.categorie.histoire": "History",
+	"ai.categorie.geo": "Geography",
+	"ai.categorie.philo": "Philosophy",
+	"ai.categorie.litterature": "Literature",
+	"ai.categorie.eco": "Economics",
+	"ai.categorie.gestion": "Management & business",
+	"ai.categorie.droit": "Law",
+	"ai.categorie.psycho": "Psychology",
+	"ai.categorie.anglais": "English",
+	"ai.categorie.francais": "French",
+	"ai.categorie.espagnol": "Spanish",
+	"ai.categorie.allemand": "German",
+	"ai.categorie.langues": "Other languages",
+	"ai.categorie.chinois": "Chinese (Mandarin)",
+	"ai.categorie.hindi": "Hindi",
+	"ai.categorie.arabe": "Arabic",
+	"ai.categorie.bengali": "Bengali",
+	"ai.categorie.portugais": "Portuguese",
+	"ai.categorie.russe": "Russian",
+	"ai.categorie.ourdou": "Urdu",
+	"ai.categorie.indonesien": "Indonesian",
+	"ai.categorie.japonais": "Japanese",
+	"ai.categorie.marathi": "Marathi",
+	"ai.categorie.telougou": "Telugu",
+	"ai.categorie.turc": "Turkish",
+	"ai.categorie.tamoul": "Tamil",
+	"ai.categorie.cantonais": "Cantonese",
+	"ai.categorie.vietnamien": "Vietnamese",
+	"ai.categorie.coreen": "Korean",
+	"ai.categorie.italien": "Italian",
+	"ai.categorie.persan": "Persian",
+	"ai.categorie.polonais": "Polish",
+	"ai.categorie.neerlandais": "Dutch",
+	"ai.categorie.swahili": "Swahili",
+	"ai.categorie.thai": "Thai",
+	"ai.categorie.grec": "Greek",
+	"ai.categorie.hebreu": "Hebrew",
+	"ai.categorie.suedois": "Swedish",
+	"ai.categorie.ukrainien": "Ukrainian",
+	"ai.categorie.searchLanguage": "Search languages…",
+	"ai.categorie.noMatchLanguage": "No matching language",
+	"ai.categorie.musique": "Music",
+	"ai.categorie.arts": "Art & art history",
+	"ai.categorie.conduite": "Driving test",
+	"ai.categorie.section.programming": "Programming",
+	"ai.categorie.section.computing": "Computing & systems",
+	"ai.categorie.section.sciences": "Sciences",
+	"ai.categorie.section.humanities": "Humanities & society",
+	"ai.categorie.section.languages": "Languages",
+	"ai.categorie.section.other": "Other",
 	"ai.categorie.detected": "{name} detected",
-	/* « Maths détectées » en français : l'accord suit un nom pluriel féminin. */
-	"ai.categorie.detectedPlural": "{name} detected",
-	"ai.categorie.tip": "The quiz is written for this subject. Change it in the quiz options.",
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Select a provider",

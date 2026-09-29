@@ -26,9 +26,9 @@ import { aiSettingsDefaults } from "./ai-settings-host";
 import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
-import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker } from "./ui-select";
+import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker, openActionMenu } from "./ui-select";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { categorieChoisie, detecterCategorie } from "./categorie-quiz";
+import { categorieChoisie, detecterCategorie, estCategorie } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
@@ -84,6 +84,34 @@ const OUTIL_DE_ID: Record<string, OutilCompte> = { "claude-code": "claude", code
     d'installation : trois secondes, assez court pour que la détection semble
     immédiate, assez long pour ne pas lancer un CLI en boucle serrée. */
 const SONDE_CONNEXION_MS = 3000;
+
+type GreetingSlot = "morning" | "afternoon" | "evening" | "night";
+
+/** The part of the day for a local hour: morning 5–12, afternoon 12–18,
+    evening 18–23, night otherwise. */
+function greetingSlot(hour: number): GreetingSlot {
+	if (hour >= 5 && hour < 12) return "morning";
+	if (hour >= 12 && hour < 18) return "afternoon";
+	if (hour >= 18 && hour < 23) return "evening";
+	return "night";
+}
+
+/** The page greetings, claude.ai style: short (they are set in a 46px
+    serif and must hold on one line above the composer), a few per part of
+    the day, plus a pool that fits any hour. KEYS, not strings: `t()` runs
+    at render, so a language change applies to the greeting already picked. */
+const GREETINGS: Record<GreetingSlot | "any", readonly TransKey[]> = {
+	morning: ["ai.greeting.morning1", "ai.greeting.morning2", "ai.greeting.morning3"],
+	afternoon: ["ai.greeting.afternoon1", "ai.greeting.afternoon2", "ai.greeting.afternoon3"],
+	evening: ["ai.greeting.evening1", "ai.greeting.evening2", "ai.greeting.evening3"],
+	night: ["ai.greeting.night1", "ai.greeting.night2", "ai.greeting.night3"],
+	any: ["ai.greeting.any1", "ai.greeting.any2", "ai.greeting.any3", "ai.greeting.any4"],
+};
+
+function pickGreeting(slot: GreetingSlot): TransKey {
+	const pool = [...GREETINGS[slot], ...GREETINGS.any];
+	return pool[Math.floor(Math.random() * pool.length)] ?? "ai.greeting.any1";
+}
 
 /* Les pièces jointes et la demande vivent dans `generation-demande.ts`,
    partagé avec la file de génération ; ré-exportées pour leurs lecteurs. */
@@ -249,6 +277,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   le modèle et l'effort au moment où elle part. */
 	const settings = () => deps.settings.get();
 	const saveSettings = (patch: Parameters<AiSettingsHost["save"]>[0]) => deps.settings.save(patch);
+	/* The greeting picked for the welcome hero. The page re-renders often
+	   (provider change, attachment, settings), and a greeting redrawn on
+	   each would flicker under the user's eyes: it is kept until the part of
+	   the day changes, the hero comes back after a request, or the page is
+	   entered again (`entrer`). */
+	let greeting: { slot: GreetingSlot; key: TransKey } | null = null;
+	let heroShown = false;
 	let composerText = "";
 	/* Caret du composer, préservé à travers les render() : render détruit et
 	   recrée le textarea, et sans ça tout attachement (chip, image, mention)
@@ -273,6 +308,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
 	   reste du composer (spec de la file, 2026-09-26). */
 	let destinationDuPreset = false;
+	/** Repaints the output-folder row of the composer, set at each render. */
+	let paintDestination: (() => void) | null = null;
 	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
 	   déduite à l'envoi des pièces jointes, du dossier et de la demande
 	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
@@ -822,10 +859,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 	}
 
-	/* L'entrée de la COQUILLE (et de tout hôte) : une vraie navigation vers
-	   « Générer » doit peindre, même si la scène précédente a été détachée. */
+	/* The SHELL's entry (and any host's): a real navigation to "Generate"
+	   must paint, even if the previous stage was detached. A visit is also
+	   what draws a new greeting, like each new chat on claude.ai. */
 	function entrer(container: HTMLElement): Promise<void> {
 		stageRef = null;
+		heroShown = false;
 		return render(container);
 	}
 
@@ -870,18 +909,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 
 		// ── Page header ──
-		// Absent en résultat (la page du quiz porte son propre titre) et dès
-		// qu'une demande est partie : sur claude.ai le hero d'accueil cède la
-		// place à la conversation à la seconde où l'on envoie. Le garder
-		// au-dessus de la bulle donnerait l'impression de n'être jamais parti.
-		if (phase !== "result" && !sentMessage && !conversation) {
+		// Absent in result (the quiz page carries its own title) and as soon
+		// as a request has left: on claude.ai the welcome hero gives way to
+		// the conversation the second you send. Keeping it above the bubble
+		// would feel like never having left.
+		const showHero = phase !== "result" && !sentMessage && !conversation;
+		if (showHero) {
 			const titleRow = ajouter(formCol, "div", "qbd-ai-title-row");
 			const titleIcon = ajouter(titleRow, "span", "qbd-ai-title-icon");
-			// Glyphe de marque NU à côté du titre serif, comme l'astérisque de
-			// claude.ai — « sparkles » retenu sur planche comparative (2026-07-16).
+			// BARE brand glyph next to the serif title, like claude.ai's
+			// asterisk — "sparkles" picked on a comparison board (2026-07-16).
 			host.ui.setIcon(titleIcon, "sparkles");
-			ajouter(titleRow, "h2", "qbd-ai-title", t("ai.page.title"));
+			// A greeting rather than a fixed "Generate a quiz" (2026-09-29):
+			// the page is the app's welcome, not a form label.
+			const slot = greetingSlot(new Date().getHours());
+			if (!greeting || greeting.slot !== slot || !heroShown) greeting = { slot, key: pickGreeting(slot) };
+			ajouter(titleRow, "h2", "qbd-ai-title", t(greeting.key));
 		}
+		heroShown = showHero;
 
 
 		// Zone du loader de génération : AU-DESSUS du composer (demande
@@ -1412,6 +1457,58 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			document.removeEventListener("focusin", surAilleurs, true);
 		} };
 
+		/* The OUTPUT FOLDER, at the top of the composer (2026-09-29, after
+		   Monocode's "Current checkout" row): where the quiz will be written is
+		   seen before sending, not found in the options menu afterwards. A click
+		   opens the same destinations as the options menu; with a single one
+		   (the default) the row only informs and opens nothing. */
+		const destRow = ajouter(composer, "div", "qbd-ai-composer-dest");
+		const destBtn = ajouter(destRow, "button", "qbd-ai-dest");
+		destBtn.type = "button";
+		paintDestination = (): void => {
+			const options = destinationOptions();
+			const current = options.find(d => d.value === destination) ?? options[0];
+			destBtn.replaceChildren();
+			/* A folder glyph and the name, nothing else (no root, no chevron):
+			   a plain folder icon rather than the module's own, tinted with its
+			   colour, so the row reads as "where it goes" at a glance. The
+			   root stays in the menu. */
+			const icon = ajouter(destBtn, "span", "qbd-ai-dest-icon");
+			host.ui.setIcon(icon, "folder");
+			if (current.color) icon.style.color = current.color;
+			ajouter(destBtn, "span", "qbd-ai-dest-label", current.label);
+			destBtn.disabled = options.length <= 1;
+			destBtn.setAttribute("aria-label", t("ai.composer.destination", { folder: current.label }));
+		};
+		paintDestination();
+		destBtn.addEventListener("click", () => {
+			openActionMenu(destBtn, destinationOptions().map(d => ({
+				icon: d.icon || "folder",
+				iconColor: d.color || undefined,
+				label: d.label,
+				hint: d.sub,
+				onClick: () => {
+					destination = d.value;
+					destinationDuPreset = false;
+					majAvisCategorie();
+					paintDestination?.();
+				},
+			})), { className: "qbd-menu-claude" });
+		});
+		/* The SUBJECT notice (feedback #7), right of the folder since
+		   2026-09-29 — it sat before the Options icon, in the bottom bar:
+		   "Python detected", text and icon, no badge; hidden for `general`.
+		   Where the quiz goes and what it is about read together, before
+		   sending. Repainted on each composer change (`updateGenerateBtn`).
+		   Without a provider the options are hidden: the notice too. */
+		avisCategorieEl = null;
+		if (provider) {
+			const avis = ajouter(destRow, "span", "qbd-ai-categorie");
+			avis.hidden = true;
+			avisCategorieEl = avis;
+			majAvisCategorie();
+		}
+
 		// Zone de texte : le textarea et la rangée de chips « notes »
 		// partagent ce conteneur (position relative). La rangée se
 		// superpose en absolu sur la PREMIÈRE ligne du texte — un
@@ -1698,45 +1795,36 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		host.ui.setIcon(optsBtn, "settings-2");
 		labelIconButton(optsBtn, t("ai.composer.quizOptions"));
 		optsBtn.addEventListener("click", () => {
-			// Le menu ne connaît que des libellés : on traduit à l'aller et on
-			// retraduit la sélection en valeur canonique au retour.
-			const dossiers = destinationOptions();
+			// The menu only knows labels: translate on the way in, and map the
+			// selection back to its canonical value on the way out. The output
+			// folder is not here: it has its own row at the top of the composer.
 			openOptionsMenu(optsBtn, {
 				count: questionCount ?? 10,
 				countAuto: questionCount === null, onCountAuto: () => { questionCount = null; },
 				typeAuto: questionType === TYPE_VALUES[0], onTypeAuto: () => { questionType = TYPE_VALUES[0]; },
 				type: typeLabel(questionType), types: typeLabels().slice(1),
-				// Une SEULE entrée (le défaut) n'est pas un choix : pas de section.
-				folders: dossiers.length > 1 ? dossiers : undefined,
-				folder: destination,
 				onCount: (n) => { questionCount = n; },
 				onType: (label) => { questionType = typeValue(label); },
-				onFolder: (value) => { destination = value; destinationDuPreset = false; majAvisCategorie(); },
-				/* La catégorie : Automatique dit ce qu'elle détecte, sinon le
-				   choix force celle du prompt (retour #7). */
+				/* The subject: Automatic says what it detects, otherwise the
+				   choice forces the prompt's (feedback #7). A value that is not
+				   a known subject (a group row) is never kept. */
 				categories: choixCategories(),
 				categorie: categorieChoix,
 				categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
 				onCategorie: (value) => {
-					categorieChoix = choixCategories().find(c => c.value === value)?.value ?? null;
+					categorieChoix = estCategorie(value) ? value : null;
 					majAvisCategorie();
 				},
 				// Barème et durée : avec le Mock exam, sous-projet à part.
 			});
 		});
-		// Tooltip au survol : l'état courant (« 5 questions · Mixte »),
-		// relu à chaque hover — pattern attachHoverTip.
+		// Hover tooltip: the current state ("5 questions · Mixed"), re-read
+		// on each hover — attachHoverTip pattern. The folder no longer shows
+		// here: the composer's own row always does.
 		attachHoverTip(optsBtn, (tip) => {
 			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
 			const ty = questionType === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(questionType);
 			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
-			/* Le dossier en seconde ligne, et SEULEMENT quand il n'est pas le
-			   défaut : l'infobulle sert à voir d'un coup d'œil ce qui sort de
-			   l'ordinaire, pas à répéter l'état normal. */
-			if (destination) {
-				const choisi = destinationOptions().find(d => d.value === destination);
-				if (choisi) ajouter(tip, "div", "qbd-hover-tip-body", choisi.label);
-			}
 		});
 
 		/* Consultation du forfait, à sa place de contrôle : dans le composer,
@@ -1768,21 +1856,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (buildModelControl) buildModelControl(composerTools);
 		// L'icône Options est à droite du modèle (2026-09-23).
 		composerTools.appendChild(optsBtn);
-		/* L'avis de CATÉGORIE, juste avant l'icône Options (retour #7) :
-		   « Python détecté », texte et icône, sans pastille ; caché pour
-		   `general`. Repeint à chaque changement du composer
-		   (`updateGenerateBtn`). */
-		// Sans fournisseur, les options sont cachées (plus bas) : l'avis aussi.
-		avisCategorieEl = null;
-		if (provider) {
-			const avis = document.createElement("span");
-			avis.className = "qbd-ai-categorie";
-			avis.hidden = true;
-			composerTools.insertBefore(avis, optsBtn);
-			attachHoverTip(avis, (tip) => { ajouter(tip, "div", "qbd-hover-tip-body", t("ai.categorie.tip")); });
-			avisCategorieEl = avis;
-			majAvisCategorie();
-		}
 
 		// Bouton générer dans le composer (façon bouton d'envoi claude.ai) :
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.
@@ -3374,10 +3447,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return dossierParDefaut(settings().aiOutputFolder);
 	}
 
-	/** Les destinations proposées dans le popover des options : le défaut
-	    d'abord (valeur `""`), puis les dossiers que l'hôte déclare. Le défaut
-	    est retiré des autres s'il y figure — un même dossier deux fois dans une
-	    liste de choix est un défaut d'affichage, pas une option de plus. */
+	/** The destinations offered by the composer's output-folder row: the
+	    default first (value `""`), then the folders the host declares. The
+	    default is removed from the others if it appears there — the same
+	    folder twice in a list of choices is a display defect, not one more
+	    option. */
 	function destinationOptions(): { value: string; label: string; icon: string; color: string; sub: string }[] {
 		const defaut = defaultDestination();
 		const racine = host.paths.defaultRoot();

@@ -154,6 +154,8 @@ export const EN_DASHBOARD = {
 	   over a month » sonnait comme un reproche là où les deux autres étaient
 	   positifs — un groupe décrit un intervalle, il ne juge pas. */
 	"dashboard.quizzes.groupByUE": "UE",
+	"dashboard.quizzes.allSubjects": "All subjects",
+	"dashboard.quizzes.noSubjectMatch": "No folder for this subject.",
 	"dashboard.quizzes.groupByFolder": "Folder",
 	"dashboard.quizzes.groupCustom": "Custom",
 	"dashboard.quizzes.noUe": "No course unit",
@@ -357,7 +359,6 @@ export const EN_DASHBOARD = {
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
 	"dashboard.select.optionsCustom": "Custom",
-	"dashboard.select.optionsDestination": "Folder",
 	"dashboard.select.optionsCategory": "Subject",
 	"dashboard.select.noteSearch": "Search a note…",
 	"dashboard.select.noteOpen": "Open notes",

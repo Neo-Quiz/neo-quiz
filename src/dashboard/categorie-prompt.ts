@@ -1,16 +1,53 @@
 /* ══════════════════════════════════════════════════════════
-   LE COMPLÉMENT DE PROMPT DE CHAQUE CATÉGORIE (retour #7, 2026-09-26)
+   EACH SUBJECT'S PROMPT ADDITION (feedback #7, 2026-09-26)
 
-   Ajouté au prompt système commun par `composerPrompts` (ai-client.ts)
-   quand la demande porte une catégorie autre que `general`. ANGLAIS, comme
-   le reste du prompt : la langue du quiz suit toujours la demande (règle
-   LANGUAGE). Bref : une consigne de plus, pas un second prompt.
-   `npm run check:prompt` vérifie que chaque complément part bien.
+   Appended to the common system prompt by `composerPrompts` (ai-client.ts)
+   when the request carries a subject other than `general`. In ENGLISH, like
+   the rest of the prompt: the quiz's language always follows the request
+   (LANGUAGE rule). Short: one more instruction, not a second prompt.
+   `npm run check:prompt` checks that each addition is sent.
 ══════════════════════════════════════════════════════════ */
 
-import type { CategorieQuiz } from "./categorie-quiz";
+import type { CategorieQuiz, LangueQuiz } from "./categorie-quiz";
 
-const COMPLEMENTS: Readonly<Record<Exclude<CategorieQuiz, "general">, string>> = {
+/* The languages without an addition of their own share one, built from
+   their English name and, for a non-Latin script, how to write it
+   (2026-09-29). English, French, Spanish and German keep theirs below. */
+type LangueGenerique = Exclude<LangueQuiz, "anglais" | "francais" | "espagnol" | "allemand">;
+const LANGUES: Readonly<Record<LangueGenerique, { nom: string; ecriture?: string }>> = {
+	chinois: { nom: "MANDARIN CHINESE", ecriture: "in simplified characters, with pinyin (tone marks included) in parentheses" },
+	hindi: { nom: "HINDI", ecriture: "in Devanagari, with a romanization in parentheses" },
+	arabe: { nom: "ARABIC", ecriture: "in Arabic script (Modern Standard Arabic unless the request names a dialect), with short-vowel marks where they help and a transliteration in parentheses" },
+	bengali: { nom: "BENGALI", ecriture: "in Bengali script, with a romanization in parentheses" },
+	portugais: { nom: "PORTUGUESE", ecriture: "with every accent; European or Brazilian Portuguese as the request says, stating which one when it matters" },
+	russe: { nom: "RUSSIAN", ecriture: "in Cyrillic, with stress marks where they help and a transliteration in parentheses" },
+	ourdou: { nom: "URDU", ecriture: "in Perso-Arabic script, with a romanization in parentheses" },
+	indonesien: { nom: "INDONESIAN" },
+	japonais: { nom: "JAPANESE", ecriture: "in kana and kanji, with the reading (furigana in kana, then romaji) in parentheses" },
+	marathi: { nom: "MARATHI", ecriture: "in Devanagari, with a romanization in parentheses" },
+	telougou: { nom: "TELUGU", ecriture: "in Telugu script, with a romanization in parentheses" },
+	turc: { nom: "TURKISH", ecriture: "with every Turkish letter (ç, ğ, ı, İ, ö, ş, ü)" },
+	tamoul: { nom: "TAMIL", ecriture: "in Tamil script, with a romanization in parentheses" },
+	cantonais: { nom: "CANTONESE", ecriture: "in traditional characters, with Jyutping in parentheses" },
+	vietnamien: { nom: "VIETNAMESE", ecriture: "with every tone mark" },
+	coreen: { nom: "KOREAN", ecriture: "in Hangul, with a romanization in parentheses" },
+	italien: { nom: "ITALIAN", ecriture: "with every accent" },
+	persan: { nom: "PERSIAN (FARSI)", ecriture: "in Perso-Arabic script, with a transliteration in parentheses" },
+	polonais: { nom: "POLISH", ecriture: "with every Polish letter" },
+	neerlandais: { nom: "DUTCH" },
+	swahili: { nom: "SWAHILI" },
+	thai: { nom: "THAI", ecriture: "in Thai script, with a romanization showing the tone in parentheses" },
+	grec: { nom: "MODERN GREEK", ecriture: "in the Greek alphabet with accents, and a transliteration in parentheses" },
+	hebreu: { nom: "HEBREW", ecriture: "in Hebrew script (with vowel points where they help), and a transliteration in parentheses" },
+	suedois: { nom: "SWEDISH", ecriture: "with å, ä and ö" },
+	ukrainien: { nom: "UKRAINIAN", ecriture: "in Cyrillic, with a transliteration in parentheses" },
+};
+
+function complementLangue({ nom, ecriture }: { nom: string; ecriture?: string }): string {
+	return `SUBJECT: ${nom} AS A FOREIGN LANGUAGE. Write the questions ABOUT the language in the language of the request, and the ${nom} material itself correctly${ecriture ? `, ${ecriture}` : ""}. Include vocabulary matching, fill-in-the-blank grammar questions, and translation questions answered in text with accepted variants. Each explanation states the rule with one more example.`;
+}
+
+const COMPLEMENTS: Readonly<Record<Exclude<CategorieQuiz, "general" | LangueGenerique>, string>> = {
 	python: `SUBJECT: PYTHON. Every code block is fenced as \`\`\`python and is a complete, RUNNABLE example (imports and definitions included, no "..." placeholders). Include questions on the OUTPUT of a short program: the prompt shows the code, the learner writes exactly what \`print\` displays. Whenever an idiom appears (list comprehension, slicing, unpacking, f-string, \`enumerate\`, \`zip\`, a lambda), detail it: the compact form, its result, then its equivalent with a plain loop — e.g. \`[2 * i for i in range(4)]\` gives \`[0, 2, 4, 6]\`, the same as \`res = []\`, \`for i in range(4):\`, \`res.append(2 * i)\`. Name the exact built-in functions and methods (\`len\`, \`append\`, \`range\`).`,
 	c: `SUBJECT: C PROGRAMMING. Every code block is fenced as \`\`\`c and compiles as is (includes and \`main\` when it runs). Include questions on the OUTPUT of a short program (\`printf\` with its format), on pointers and memory (\`&\`, \`*\`, \`malloc\`/\`free\`), and "find the bug" questions (off-by-one, missing \`free\`, uninitialized variable). Show the types of every variable.`,
 	bash: `SUBJECT: SHELL AND LINUX. Every code block is fenced as \`\`\`bash. Include questions where the learner types the COMMAND that does a task (terminalVariant "bash"), and questions on the output of a command. Detail every option used (\`ls -la\`: \`-l\` long listing, \`-a\` hidden files) and every pipe step.`,
@@ -18,10 +55,45 @@ const COMPLEMENTS: Readonly<Record<Exclude<CategorieQuiz, "general">, string>> =
 	web: `SUBJECT: WEB DEVELOPMENT. Fence each block with its language (\`\`\`html, \`\`\`css, \`\`\`javascript). Include questions on what a snippet DISPLAYS or does in the browser, and on the value a JavaScript expression returns. Detail compact syntax (arrow functions, destructuring, template literals, CSS selectors) with its long equivalent.`,
 	maths: `SUBJECT: MATHEMATICS. Every formula is in LaTeX between dollars. Prefer numeric questions ("numeric": true) and mathInput questions for results, and ordering questions for the steps of a method. Every explanation shows the computation step by step, one line per step, with the intermediate results.`,
 	reseau: `SUBJECT: NETWORKING. Use exact protocol names, layers and port numbers. Include calculation questions (subnet masks, number of hosts, network and broadcast addresses) answered as numbers or addresses, ordering questions for the steps of an exchange (DHCP, TCP handshake, DNS resolution), and matching questions between protocols and layers. Show every calculation in binary where it helps.`,
+	cpp: `SUBJECT: C++. Every code block is fenced as \`\`\`cpp and compiles as is (includes, \`main\` when it runs, modern C++17 or later). Include questions on the OUTPUT of a short program (\`std::cout\`), on references versus pointers, object lifetime (constructors, destructors, RAII, smart pointers), and "find the bug" questions. Name the exact standard-library types and algorithms (\`std::vector\`, \`std::map\`, \`std::sort\`).`,
+	java: `SUBJECT: JAVA. Every code block is fenced as \`\`\`java and compiles as is (class and \`main\` when it runs). Include questions on the OUTPUT of a short program (\`System.out.println\`), on classes, inheritance, interfaces and polymorphism, on exceptions (checked versus unchecked), and on collections (\`ArrayList\`, \`HashMap\`). Show the declared type of every variable.`,
+	csharp: `SUBJECT: C#. Every code block is fenced as \`\`\`csharp and compiles as is. Include questions on the OUTPUT of a short program (\`Console.WriteLine\`), on classes, interfaces, properties, value versus reference types, and LINQ; detail each compact LINQ query with its step-by-step equivalent.`,
+	rust: `SUBJECT: RUST. Every code block is fenced as \`\`\`rust and compiles as is. Include questions on ownership, borrowing and lifetimes ("does this compile, and why not?"), on \`Option\`/\`Result\` and pattern matching, and on the OUTPUT of a short program (\`println!\`). Quote the compiler's reasoning in plain words when a snippet is rejected.`,
+	go: `SUBJECT: GO. Every code block is fenced as \`\`\`go and compiles as is (\`package main\`, imports). Include questions on the OUTPUT of a short program (\`fmt.Println\`), on slices versus arrays, structs and interfaces, error handling (\`err != nil\`), goroutines and channels.`,
+	algo: `SUBJECT: ALGORITHMS AND DATA STRUCTURES. Write algorithms in the course's language if it has one, otherwise in Python fenced as \`\`\`python. Include questions on the time and space COMPLEXITY (big O) with its justification, ordering questions for the steps of an algorithm on a small input (a sort, a graph traversal, Dijkstra), and questions on the state of a structure after a sequence of operations (stack, queue, heap, binary search tree). Trace every step in the explanation.`,
+	genie: `SUBJECT: SOFTWARE ENGINEERING. Use the exact names of principles, patterns and diagrams (SOLID, MVC, Observer, class diagram, sequence diagram). Include scenario questions ("which pattern fits this need?"), matching questions between a pattern and its intent, and questions on a short code snippet that violates a principle. Explain each answer with the problem the principle or pattern solves.`,
+	git: `SUBJECT: GIT AND VERSION CONTROL. Every code block is fenced as \`\`\`bash. Include questions where the learner types the COMMAND for a task (terminalVariant "bash"), questions on the state of the repository (branches, HEAD, staging area) after a sequence of commands, and ordering questions for a workflow (branch, commit, merge or rebase, push). Detail every option used.`,
+	secu: `SUBJECT: CYBERSECURITY. Stay on the defensive and educational side: explain how an attack works so that it can be recognized and prevented, never a ready-to-use exploit against a real target. Use exact names (CIA triad, OWASP Top 10 categories, CVE, the tools of the course). Include scenario questions ("which vulnerability does this log / request show?"), matching questions between an attack and its countermeasure, and, when relevant, questions on the command a tool is run with (terminalVariant "bash").`,
+	os: `SUBJECT: OPERATING SYSTEMS. Include calculation and trace questions (scheduling with FCFS, SJF, Round Robin: order of execution, waiting and turnaround times; page replacement with FIFO, LRU: number of faults), questions on processes versus threads, synchronization (mutex, semaphore, deadlock conditions), and memory management. Show every trace as a step-by-step table in the explanation.`,
+	archi: `SUBJECT: COMPUTER ARCHITECTURE. Include conversion questions (binary, hexadecimal, two's complement) answered as exact values, questions on the effect of a short assembly sequence on registers (fenced as \`\`\`asm), questions on logic gates and truth tables, and on the processor (pipeline, cache, instruction cycle). Show every conversion and every register state step by step.`,
+	cloud: `SUBJECT: CLOUD AND DEVOPS. Fence each block with its language (\`\`\`dockerfile, \`\`\`yaml, \`\`\`bash). Include questions on what a Dockerfile, a Compose or Kubernetes manifest, or a CI pipeline DOES, questions where the learner types the command for a task, and matching questions between a service or concept and its role. Detail every instruction and option used.`,
+	ia: `SUBJECT: ARTIFICIAL INTELLIGENCE AND DATA SCIENCE. Formulas are in LaTeX between dollars; code is fenced as \`\`\`python. Include questions on choosing a model or metric for a situation, calculation questions (accuracy, precision, recall, a gradient step, a small regression) answered as numbers, and questions on overfitting, train/validation/test splits and bias. Show every computation step by step.`,
+	physique: `SUBJECT: PHYSICS. Every formula is in LaTeX between dollars, with units. Prefer numeric questions ("numeric": true) for results, with the expected unit stated in the prompt, and ordering questions for the steps of a method. Every explanation states the law used, then the computation step by step with units, then checks the order of magnitude.`,
+	chimie: `SUBJECT: CHEMISTRY. Formulas and equations are in LaTeX between dollars (\`$\\ce{...}$\` is not available: write $H_2O$, $\\rightarrow$). Include questions on balancing equations, stoichiometry calculations answered as numbers with units, and on naming and structure. Every explanation shows the computation step by step with units.`,
+	bio: `SUBJECT: BIOLOGY AND LIFE SCIENCES. Use exact scientific vocabulary. Include ordering questions for processes (mitosis phases, protein synthesis, a metabolic pathway), matching questions between structures and functions, and questions that interpret an experiment or a result. Each explanation links the answer to the underlying mechanism.`,
+	medecine: `SUBJECT: MEDICINE AND HEALTH. Use exact medical terminology and current standard references. Include clinical-vignette questions (a short case, then the most likely diagnosis, the next step or the mechanism), matching questions between structures, drugs or signs and their role, and ordering questions for physiological sequences. Each explanation gives the reasoning, and why the other options are wrong. The quiz is for studying, not for medical advice.`,
+	electronique: `SUBJECT: ELECTRONICS. Every formula is in LaTeX between dollars, with units. Include circuit calculation questions (Ohm's and Kirchhoff's laws, dividers, RC time constants, gain) answered as numbers with units, questions on component behaviour (diode, transistor, op-amp), and, for digital electronics, truth tables and logic. Show every computation step by step.`,
+	histoire: `SUBJECT: HISTORY. Give exact dates, names and places. Include ordering questions (chronology of events), matching questions between events, people and dates, and cause-and-consequence questions. Each explanation places the answer in its context, in two or three sentences.`,
+	geo: `SUBJECT: GEOGRAPHY. Use exact place names and current data (state the year for figures). Include matching questions (country and capital, feature and location), ordering questions (by size, population, from north to south), and questions that interpret a situation (climate, land use, geopolitics). Each explanation adds one memorable fact.`,
+	philo: `SUBJECT: PHILOSOPHY. Attribute every idea to its author and work, with the exact concept name. Include matching questions between philosophers and theses or concepts, questions on the meaning of a short quotation, and questions that distinguish close notions. Each explanation states the argument, not just the name.`,
+	litterature: `SUBJECT: LITERATURE. Give exact authors, titles, dates and movements. Include matching questions (work, author, movement), questions on a short quoted passage (figure of speech, tone, meaning), and questions on the plot and characters when a work is studied. Each explanation quotes or points to the text.`,
+	eco: `SUBJECT: ECONOMICS. Formulas are in LaTeX between dollars. Include questions on mechanisms (what happens to prices, output or employment when…), calculation questions (growth rate, elasticity, GDP components) answered as numbers, and matching questions between concepts and authors or schools. Each explanation walks through the mechanism step by step.`,
+	gestion: `SUBJECT: MANAGEMENT AND BUSINESS. Use exact terms and models (SWOT, PESTEL, the 4 Ps, balance sheet, income statement). Include case questions ("which strategy / indicator fits this company?"), calculation questions (margins, ratios, break-even point) answered as numbers, and matching questions between tools and their use. Show every calculation step by step.`,
+	droit: `SUBJECT: LAW. Cite the exact legal sources the course relies on (articles, codes, landmark cases), and say which legal system when it matters. Include case questions (facts, then the applicable rule and the solution), matching questions between notions and definitions, and questions that distinguish close legal notions. Each explanation follows the reasoning: rule, application to the facts, conclusion.`,
+	psycho: `SUBJECT: PSYCHOLOGY. Attribute theories and experiments to their authors, with dates. Include scenario questions ("which concept or bias explains this behaviour?"), matching questions between theories, authors and key experiments, and questions on research methods. Each explanation links the answer to the evidence behind it.`,
+	anglais: `SUBJECT: ENGLISH AS A FOREIGN LANGUAGE. Write the questions about English in the language of the request, and the English material itself in correct English. Include fill-in-the-blank questions (tenses, prepositions, phrasal verbs), translation questions answered in text with accepted variants, and vocabulary matching. Each explanation states the grammar rule with one more example.`,
+	francais: `SUBJECT: FRENCH LANGUAGE. The French material itself is in correct French. Include fill-in-the-blank questions (conjugation, agreement of the past participle, homophones), questions that spot and correct a mistake, and vocabulary questions. Text answers accept every correct spelling variant. Each explanation states the rule with one more example.`,
+	espagnol: `SUBJECT: SPANISH AS A FOREIGN LANGUAGE. The Spanish material itself is in correct Spanish, with accents. Include fill-in-the-blank questions (ser/estar, conjugation, prepositions), translation questions answered in text with accepted variants, and vocabulary matching. Each explanation states the rule with one more example.`,
+	allemand: `SUBJECT: GERMAN AS A FOREIGN LANGUAGE. The German material itself is in correct German (capitalized nouns, umlauts). Include fill-in-the-blank questions (cases and declensions, verb position, conjugation), translation questions answered in text with accepted variants, and vocabulary matching with the article of each noun. Each explanation states the rule with one more example.`,
+	langues: `SUBJECT: A FOREIGN LANGUAGE. Identify the language from the request or the material, and write the material in it correctly (script, accents, and a romanization in parentheses for non-Latin scripts). Include vocabulary matching, fill-in-the-blank grammar questions, and translation questions answered in text with accepted variants. Each explanation states the rule with one more example.`,
+	musique: `SUBJECT: MUSIC. Use exact musical terms (intervals, chords, keys, forms, periods). Include questions on theory (the notes of a chord or scale, an interval, a key signature), matching questions between works, composers and periods, and ordering questions (chronology, the sections of a form). Each explanation states the rule or the context.`,
+	arts: `SUBJECT: ART AND ART HISTORY. Give exact artists, works, dates and movements. Include matching questions (work, artist, movement), ordering questions (chronology of movements), and questions on the characteristics that identify a movement or technique. Each explanation names what to look for in the work.`,
+	conduite: `SUBJECT: DRIVING THEORY TEST. Follow the traffic rules of the country implied by the request (France's Code de la route when it is in French and nothing else is said). Include situation questions (who has priority, what to do, which speed limit), questions on the meaning of a sign described in words, and on safety distances and stopping. Each explanation states the rule and the reason for it.`,
 };
 
-/** Le complément de la catégorie, `""` pour `general`. */
+/** The subject's addition, `""` for `general`. */
 export function complementCategorie(categorie: CategorieQuiz | undefined): string {
 	if (!categorie || categorie === "general") return "";
-	return COMPLEMENTS[categorie] ?? "";
+	if (categorie in LANGUES) return complementLangue(LANGUES[categorie as LangueGenerique]);
+	return COMPLEMENTS[categorie as keyof typeof COMPLEMENTS] ?? "";
 }

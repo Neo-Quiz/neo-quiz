@@ -33,6 +33,19 @@
 	padding: 24px 12px;
 }
 
+/* Ambient halo behind the welcome hero (greeting + composer), 2026-09-29.
+   Painted as the stage's own background rather than a pseudo-element: the
+   stage's ::before/::after are already the vertical spacers, and a large
+   positioned layer would overflow the scrolling stage and add a horizontal
+   scrollbar in a narrow window. Its centre sits at ~37 % of the height,
+   where the spacers put the hero. Tied to the greeting's presence with
+   `:has`, so it leaves with the hero once a request is sent. */
+.qbd-ai-stage:has(> .qbd-ai-title-row) {
+	background:
+		radial-gradient(ellipse 560px 300px at 50% 37%, color-mix(in srgb, var(--interactive-accent) 16%, transparent), transparent 70%),
+		radial-gradient(ellipse 1000px 560px at 50% 40%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 72%);
+}
+
 .qbd-ai-stage--idle::before,
 .qbd-ai-stage--error::before,
 .qbd-ai-stage--web::before,
@@ -54,6 +67,12 @@
    du 2026-07-16 visait la HAUTEUR (cf. bloc états centrés), pas ceci. */
 .qbd-ai-stage .qbd-ai-composer {
 	width: min(732px, 100%);
+	/* 8px on top, not 14px: with the input's one-line minimum, it pays for
+	   the output-folder row, so the compact composer (result, conversation)
+	   does not grow either. Scoped to the stage: the folder page's composer
+	   (`--dossier`, dashboard-planning.css) shares the base rule and has no
+	   such row. */
+	padding-top: 8px;
 	flex-shrink: 0;
 	text-align: left;
 }
@@ -68,7 +87,9 @@
 .qbd-ai-stage--web .qbd-ai-composer,
 .qbd-ai-stage--connexion .qbd-ai-composer {
 	margin-top: 18px;
-	padding: 24px 24px 18px;
+	/* 18px on top, not 24px: pays, with the input below, for the gap
+	   between the output-folder row and the prompt. */
+	padding: 18px 24px 18px;
 	border-radius: 22px;
 }
 
@@ -76,9 +97,12 @@
 .qbd-ai-stage--error .qbd-ai-composer-input,
 .qbd-ai-stage--web .qbd-ai-composer-input,
 .qbd-ai-stage--connexion .qbd-ai-composer-input {
-	/* 58px : compense les +2px de la barre agrandie (contrôles 30→34)
-	   pour garder le composer aux 142px validés. */
-	min-height: 58px;
+	/* One line only since the output-folder row took the empty space
+	   under the prompt (2026-09-29): 58px → 24px, with the 6px taken from
+	   the top padding, gives back the row (28px) and its 12px gap to the
+	   prompt, so the composer keeps its validated height. (58px itself
+	   offset the +2px of the enlarged bar, controls 30→34.) */
+	min-height: 24px;
 	font-size: 15px;
 }
 
@@ -156,13 +180,18 @@
 	}
 }
 
-/* ── Page header — échelle de la référence claude.ai (cap height ≈ 4,5 %
-   de la largeur du composer ; 46px VALIDÉ par Ahmed sur banc — conservé
-   tel quel lors de l'élargissement 732→800), serif régulière façon
-   display, glyphe de marque NU (sans pastille) à hauteur des capitales. */
+/* ── Page header — claude.ai reference scale (cap height ≈ 4.5 % of the
+   composer width; 46px VALIDATED on a test bench — kept as is when the
+   composer widened 732→800), regular display-style serif, BARE brand glyph
+   (no badge) at cap height. Since greetings replaced "Generate a quiz"
+   (2026-09-29) the text varies: they are written short, but one that runs
+   long (a translation) wraps, balanced, inside a reading width instead of
+   running past the composer. */
 .qbd-ai-title-row {
 	display: flex;
 	align-items: center;
+	justify-content: center;
+	max-width: min(820px, 100%);
 	gap: 14px;
 }
 
@@ -175,21 +204,24 @@
 }
 
 .qbd-ai-title-icon svg {
-	/* 38px pour un rendu effectif ≈ hauteur des capitales (le path Lucide
-	   ne remplit pas sa viewBox). */
+	/* 38px renders ≈ cap height (the Lucide path does not fill its
+	   viewBox). */
 	width: 38px;
 	height: 38px;
 }
 
 .qbd-ai-title {
-	/* Constantia retenue sur banc comparatif (2026-07-16) — replis serif
-	   old-style pour macOS/mobile où elle est absente. */
+	/* Constantia picked on a comparison bench (2026-07-16) — old-style
+	   serif fallbacks for macOS/mobile, where it is missing. */
 	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 	font-size: 46px;
 	font-weight: 400;
+	line-height: 1.15;
 	color: var(--text-normal);
 	margin: 0;
 	letter-spacing: -0.01em;
+	text-wrap: balance;
+	min-width: 0;
 }
 
 /* ── Sélecteur de fournisseur (logos + statut) ── */
@@ -742,17 +774,95 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Survol et état ACTIF : UN SEUL contour, discret (référence claude.ai :
-   accent atténué mêlé à la bordure, pas de ring vif). Il ne tombe qu'au clic
-   ailleurs — `--actif` est posé et retiré par la page (`composerActif`,
-   ai.ts), pas par `:focus-within`, que le moindre menu ouvert depuis le
-   composer faisait perdre. Deux teintes (35 % au survol, 55 % au focus) et
-   une règle de survol plus spécifique que celle du focus faisaient changer
-   le contour selon la souris (Ahmed, 2026-09-19). */
+/* Hover and ACTIVE state: ONE contour, discreet (claude.ai reference: a
+   muted accent blended into the border, no bright ring). It only drops on
+   a click elsewhere — `--actif` is set and removed by the page
+   (`composerActif`, ai.ts), not by `:focus-within`, which the slightest
+   menu opened from the composer made it lose. Two tints (35 % on hover,
+   55 % on focus) and a hover rule more specific than the focus one made
+   the contour change with the mouse (2026-09-19). */
 .qbd-ai-composer:hover:not(.qbd-ai-composer--dragover),
 .qbd-ai-composer--actif:not(.qbd-ai-composer--dragover) {
 	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
 	box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+
+/* Under the welcome hero, the composer also glows softly into the halo
+   (2026-09-29). Same shadow on hover and when active, for the reason given
+   just above: the contour must not change with the mouse. */
+.qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer {
+	box-shadow: 0 14px 40px -18px rgb(0 0 0 / 0.5);
+}
+
+.qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer:hover:not(.qbd-ai-composer--dragover),
+.qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer--actif:not(.qbd-ai-composer--dragover) {
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent),
+		0 10px 44px -10px color-mix(in srgb, var(--interactive-accent) 32%, transparent);
+}
+
+/* Output-folder row at the top of the composer (after Monocode's "Current
+   checkout"): muted, small, left-aligned — it informs, the prompt below
+   stays the focus. The negative margin pulls the button's own padding back
+   so its icon lines up with the text of the prompt. */
+.qbd-ai-composer-dest {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	margin: -6px 0 0 -8px;
+}
+
+/* In the centered hero the prompt sits lower, clear of the row: there was
+   room to spare there (see the input's min-height in the centered states). */
+.qbd-ai-stage--idle .qbd-ai-composer-dest,
+.qbd-ai-stage--error .qbd-ai-composer-dest,
+.qbd-ai-stage--web .qbd-ai-composer-dest,
+.qbd-ai-stage--connexion .qbd-ai-composer-dest {
+	margin-bottom: 12px;
+}
+
+.qbd-ai-dest {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+	max-width: 100%;
+	height: 28px;
+	padding: 0 8px;
+	border-radius: 8px;
+	background: transparent !important;
+	border: none;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	transition: color 0.14s ease, background 0.14s ease;
+}
+
+.qbd-ai-dest:hover:not(:disabled) {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover) !important;
+}
+
+.qbd-ai-dest:disabled {
+	cursor: default;
+	opacity: 1;
+}
+
+.qbd-ai-dest-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+}
+
+.qbd-ai-dest-icon svg {
+	width: 15px;
+	height: 15px;
+}
+
+.qbd-ai-dest-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .qbd-ai-composer--dragover {
@@ -794,7 +904,7 @@
 	font-size: 13.5px;
 	line-height: 1.55;
 	font-family: var(--font-interface, inherit);
-	min-height: 42px;
+	min-height: 22px;
 	max-height: 220px;
 	overflow-y: auto;
 }
@@ -882,16 +992,19 @@
 	display: none;
 }
 
-/* L'avis de CATÉGORIE (retour #7, 2026-09-26) : « Python détecté », juste
-   avant l'icône Options. Du TEXTE avec son icône, discret, sans pastille ni
-   bordure : une métadonnée, pas un bouton. */
+/* The SUBJECT notice (feedback #7, 2026-09-26): "Python detected", in the
+   output-folder row since 2026-09-29, right of the folder with a clear
+   gap between the two (they must not read as one label). TEXT with its
+   icon, discreet, no badge or border: metadata, not a button. */
 .qbd-ai-categorie {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
-	margin-right: 2px;
+	gap: 6px;
+	/* 16px plus the folder button's own 8px of padding: ~24px of air. */
+	margin-left: 16px;
+	min-width: 0;
 	color: var(--text-muted);
-	font-size: 12px;
+	font-size: 13px;
 	white-space: nowrap;
 	animation: qbd-ai-categorie-in 200ms ease-out;
 }
@@ -2829,6 +2942,66 @@
 
 .qbd-opts-flyout {
 	min-width: 212px;
+}
+
+/* The subjects flyout (forty-odd choices, 2026-09-29): a search field on
+   top, then the grouped list, which scrolls inside the window's height
+   instead of running off the screen. */
+.qbd-opts-flyout:has(> .qbd-opts-flyout-list) {
+	display: flex;
+	flex-direction: column;
+	min-width: 248px;
+	max-height: min(520px, calc(100vh - 16px));
+}
+
+.qbd-opts-flyout-list {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.qbd-opts-search {
+	flex-shrink: 0;
+	width: auto;
+	height: 30px;
+	margin: 2px 2px 6px;
+	padding: 0 10px;
+	border-radius: 7px;
+	border: 1px solid var(--background-modifier-border);
+	background: color-mix(in srgb, var(--text-normal) 5%, transparent);
+	color: var(--text-normal);
+	font-size: 13px;
+	box-shadow: none;
+}
+
+.qbd-opts-search:focus {
+	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+	outline: none;
+}
+
+/* A language's flag, in place of a Lucide glyph (menus, the subject notice,
+   the folders filter): 3:2, the width of an icon, a hairline so the white
+   bands of a flag keep an edge on a light theme. */
+.qbd-categorie-drapeau {
+	display: block;
+	width: 18px;
+	height: 12px;
+	border-radius: 2px;
+	object-fit: cover;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+/* The "Languages" row opens its group: a chevron where a choice has its
+   check. */
+.qbd-opts-group-row .qbd-select-check svg {
+	opacity: 0.7;
+}
+
+.qbd-opts-empty {
+	padding: 8px 10px;
+	color: var(--text-faint);
+	font-size: 13px;
 }
 
 .qbd-opts-flyout .qbd-select-option {

@@ -126,6 +126,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 
 	/* ── Regroupement ── */
 	"dashboard.quizzes.groupByUE": "UE",
+	"dashboard.quizzes.allSubjects": "Toutes les matières",
+	"dashboard.quizzes.noSubjectMatch": "Aucun dossier pour cette matière.",
 	"dashboard.quizzes.groupByFolder": "Dossier",
 	"dashboard.quizzes.groupCustom": "Personnalisé",
 	"dashboard.quizzes.noUe": "Sans UE",
@@ -315,7 +317,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.optionsQuestions": "Questions",
 	"dashboard.select.optionsType": "Type",
 	"dashboard.select.optionsCustom": "Personnalisé",
-	"dashboard.select.optionsDestination": "Dossier",
 	"dashboard.select.optionsCategory": "Sujet",
 	"dashboard.select.noteSearch": "Rechercher une note…",
 	"dashboard.select.noteOpen": "Notes ouvertes",
