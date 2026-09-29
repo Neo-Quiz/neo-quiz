@@ -22,7 +22,7 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 		"Avant le quiz",
 		"```quiz-blocks fold",
 		"[",
-		"  { mode: 'lesson', source: '[[Cours]]' },",
+		"  { mode: 'learn', source: '[[Cours]]' },",
 		"  'parasite',",
 		"  { prompt: 'Sans titre', role: 'test', slice: 4 },",
 		"  { id: 'dup', title: 'Premiere', prompt: 'Q1', role: 'pre', slice: 1 },",
@@ -149,10 +149,20 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	r.check("un renommage depuis un chemin inconnu scanne quand même",
 		!!scanner.getQuiz("Cours/reseau3.md"), true);
 
-	/* L'OBJECTIF du bloc, affiché en badge (2026-09-23) : l'ancien mode
-	   `lesson` du bloc ci-dessus est un Practice ; un bloc `{ mode: 'learn' }`
-	   est un Learn. */
-	r.check("un bloc en mode hérité est un Practice", entry?.mode, "practice");
+	/* The block's PURPOSE, shown as a badge (2026-09-23), and the Exam of
+	   2026-09-29: `{ mode: 'exam' }` is an Exam whose " — Exam" suffix
+	   leaves the title; the retired `mode: 'lesson'` is a Practice for the
+	   badge AND for the engine (its reading is counted as a question). */
+	r.check("the block above, { mode: 'learn' }, is a Learn", entry?.mode, "learn");
+	content = "```quiz-blocks\n[\n  { title: 'Q1', prompt: '?', options: ['a', 'b'], correctIndex: 0, explain: 'x' },\n  { mode: 'exam', examDurationMinutes: 90 },\n]\n```\n";
+	const examen = { ...fichierHote, path: "Cours/Réseaux — Exam.md", basename: "Réseaux — Exam", name: "Réseaux — Exam.md" };
+	await scanner.scanFile(examen);
+	r.check("a { mode: 'exam' } block is an Exam, titled without \" — Exam\"",
+		[scanner.getQuiz(examen.path)?.mode, scanner.getQuiz(examen.path)?.title, scanner.getQuiz(examen.path)?.questions], ["exam", "Réseaux", 1]);
+	content = "```quiz-blocks\n[\n  { title: 'Avant', prompt: '?', role: 'pre', slice: 1 },\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'lesson', source: '[[CM1]]' },\n]\n```\n";
+	await scanner.scanFile(fichierHote);
+	r.check("the retired mode: 'lesson' is a Practice, its reading counted",
+		[scanner.getQuiz(fichierHote.path)?.mode, scanner.getQuiz(fichierHote.path)?.lecon, scanner.getQuiz(fichierHote.path)?.questions], ["practice", false, 2]);
 	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'learn', objectives: ['Lire'] },\n]\n```\n";
 	await scanner.scanFile(fichierHote);
 	r.check("un bloc { mode: 'learn' } est un Learn", scanner.getQuiz(fichierHote.path)?.mode, "learn");

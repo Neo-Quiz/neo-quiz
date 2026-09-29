@@ -328,7 +328,8 @@ await withSrcModule(["src/quiz-utils.ts", "src/editor/convert.ts"], (qu, convert
 	r.check("mode exact reconnu", idx([q, { mode: "learn" }]), 1);
 	r.check("mode a la casse tolerante", idx([q, { mode: "Learn" }]), 1);
 	r.check("mode a espaces tolere", idx([q, { mode: " exam " }]), 1);
-	r.check("examMode booleen reconnu", idx([q, { examMode: true }]), 1);
+	// Retired on 2026-09-29 (spec §1.1): the booleans no longer mark a configuration.
+	r.check("examMode / learnMode booleans no longer recognised", [idx([q, { examMode: true }]), idx([q, { learnMode: true }])], [-1, -1]);
 	r.check("mode en TETE reconnu", idx([{ mode: "learn" }, q]), 0);
 	// Ce qui ne doit surtout PAS etre pris pour une configuration.
 	r.check("chaine mode etrangere ignoree",

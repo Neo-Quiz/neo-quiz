@@ -41,6 +41,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- The quiz format no longer reads `mode: "lesson"`, `examMode`, `learnMode`, `examAutoSubmit` or `examShowTimer`: a Learn writes `mode: "learn"`, and a timed exam `mode: "exam"` with `examDurationMinutes`, now up to 300 minutes (a missing duration gives 1 min 30 per question, rounded to 5 minutes).
 - The home page's Resume card no longer shows a percentage: it simply reopens the quiz on the question where you stopped.
 - The blue glow at the top of the home page and its "Add an exam" link are gone.
 - The side rail has new effects: entries are dimmed at rest, a soft surface appears on hover, they shrink slightly when pressed, and the current page is a frosted-glass card with a filled icon. The logo at the top is now a line icon that opens the GitHub repository, where you can leave a star.

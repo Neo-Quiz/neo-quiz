@@ -37,9 +37,8 @@ export type QuestionTypeTag = "single" | "multiple" | "text" | "ordering" | "mat
  */
 export type QuizTypeTag = "mixed" | "single" | "multiple" | "text" | "ordering" | "matching" | "flashcard";
 
-/** Forme minimale lue sur un item brut du tableau JSON5 par le scanner. */
+/** Minimal shape the scanner reads on a raw item of the JSON5 array. */
 interface RawQuizItem extends Pick<ParsedQuizItem, "id"> {
-	examMode?: boolean;
 	multiSelect?: boolean;
 	type?: string;
 	title?: string;
@@ -74,26 +73,28 @@ export interface QuizMeta {
 	items: QuizItemRef[];
 	types: QuestionTypeTag[];
 	quizType: QuizTypeTag;
-	/** L'OBJECTIF du bloc (`modeDuBloc`) : Learn s'il porte `{ mode: "learn" }`,
-	    Practice sinon. Affiché en badge, à droite du type ; son suffixe
-	    éventuel (« — Learn ») est retiré du titre (`titreSansMode`). */
+	/** The block's PURPOSE (`modeDuBloc`): Learn with `{ mode: "learn" }`, Exam
+	    with `{ mode: "exam" }`, Practice otherwise. Shown as a badge, right of
+	    the type; its suffix, if any (" — Learn", " — Exam"…), is stripped from
+	    the title (`titreSansMode`). */
 	mode: ModeQuiz;
-	/** Le bloc est une Leçon POUR LE MOTEUR (`extractExamOptions(...).quizMode
-	    === "lesson"`, qui accepte aussi `mode: 'lesson'`, contrairement à
-	    `mode`) : ce que la règle des lectures absorbées lit
-	    (src/lecture-etape.ts). Optionnel pour les entrées fabriquées ailleurs
-	    (absent = pas une Leçon). */
+	/** The block is a Learn FOR THE ENGINE (`extractExamOptions(...).quizMode
+	    === "lesson"`): what the absorbed-readings rule reads
+	    (src/lecture-etape.ts). Since the `lesson` value was retired
+	    (2026-09-29) it always agrees with `mode === "learn"`; it stays the
+	    engine's reading on purpose. Optional for entries built elsewhere
+	    (absent = not a Learn). */
 	lecon?: boolean;
 }
 
 /**
- * Entrée du cache du scanner (une par note contenant un bloc quiz-blocks).
- * `title` vaut `file.basename` sans le suffixe de son mode (« — Learn »,
- * « — Practice » : le badge le dit déjà, 2026-09-23), dans
- * scanVault ET scanFile — scanFile.js d'origine omettait ce champ sur les
- * mises à jour incrémentales, un oubli de recopie qui rendait `quiz.title`
- * `undefined` après le premier `create`/`modify` ; corrigé ici en alignant
- * scanFile sur scanVault pour que le champ reste honnêtement non-optionnel).
+ * An entry of the scanner's cache (one per note holding a quiz-blocks block).
+ * `title` is `file.basename` without the suffix of its mode (" — Learn",
+ * " — Practice", " — Exam": the badge already says it, 2026-09-23), in
+ * scanVault AND scanFile — the original scanFile.js left this field out of
+ * incremental updates, a copying slip that made `quiz.title` `undefined`
+ * after the first `create`/`modify`; fixed here by aligning scanFile on
+ * scanVault so that the field stays honestly non-optional.
  */
 export interface QuizIndexEntry extends QuizMeta {
 	path: string;

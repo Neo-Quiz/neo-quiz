@@ -1,34 +1,56 @@
 /**
- * Le FORMAT Learn / Practice, lu par le module réel `src/quiz-format.ts`.
+ * The Learn / Test FORMAT, read through the real modules `src/quiz-format.ts`
+ * and `src/quiz-utils.ts`.
  *
- * Ce qu'il empêche : un Practice sans explication, un Learn dont une
- * tranche n'a pas sa pré-question, sa lecture ou ses rappels, un `slice` qui
- * ne pointe nulle part — tous acceptés sans un mot jusqu'ici ; et un ancien
- * bloc `mode: "exam"` pris pour un Learn. Un manque est SIGNALÉ, jamais un
- * échec : la vérification rend une liste, elle ne lève rien.
+ * What it prevents: a Practice or an Exam without explanations, a Learn
+ * whose slice lacks its pre-question, reading or recalls, a `slice` that
+ * points nowhere — all accepted without a word before; an Exam taken for a
+ * Practice (or its " — Exam" suffix left in the title); a retired key
+ * (`lesson`, `examMode`, `learnMode`, `examAutoSubmit`, `examShowTimer`)
+ * still read; and an Exam duration outside [1, 300] or missing without the
+ * fallback rule. A gap is REPORTED, never a failure: the check returns a
+ * list, it throws nothing.
  *
  *     npm run check:quiz-format
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, fusionnerConfigsFinales, estCarte }) => {
-	const r = makeReporter("Format Learn / Practice");
+await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDesTranches, lireBlocQuiz, nomDeNote, titreSansMode, completerConfigLearn, fusionnerConfigsFinales, estCarte, fallbackExamDuration, clampExamDuration }) => {
+	const r = makeReporter("Format Learn / Test");
 
-	/* Le mode reste dans le NOM du fichier (lisible dans Obsidian) mais pas
-	   dans le TITRE affiché par l'application, qui le montre en badge. */
-	r.check("nom de fichier Learn et Practice", [nomDeNote("CM1", "learn"), nomDeNote("CM1", "practice")], ["CM1 — Learn", "CM1 — Practice"]);
-	r.check("titre affiché sans le suffixe de son mode",
-		[titreSansMode("CM1 — Learn", "learn"), titreSansMode("CM1 — Practice", "practice")], ["CM1", "CM1"]);
-	r.check("un suffixe qui n'est pas celui du mode réel reste, un nom qui n'est QUE le suffixe aussi",
-		[titreSansMode("CM1 — Learn", "practice"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice")],
-		["CM1 — Learn", " — Learn", "Quiz libre"]);
+	/* The mode stays in the file NAME (readable in Obsidian) but not in the
+	   displayed TITLE of the application, which shows it as a badge. */
+	r.check("file name of a Learn, a Practice and an Exam",
+		[nomDeNote("CM1", "learn"), nomDeNote("CM1", "practice"), nomDeNote("CM1", "exam")], ["CM1 — Learn", "CM1 — Practice", "CM1 — Exam"]);
+	r.check("displayed title without the suffix of its mode",
+		[titreSansMode("CM1 — Learn", "learn"), titreSansMode("CM1 — Practice", "practice"), titreSansMode("Réseaux — Exam", "exam")], ["CM1", "CM1", "Réseaux"]);
+	r.check("a suffix that is not the real mode's stays, and so does a name that is ONLY the suffix",
+		[titreSansMode("CM1 — Learn", "practice"), titreSansMode(" — Learn", "learn"), titreSansMode("Quiz libre", "practice"), titreSansMode("CM1 — Exam", "practice"), titreSansMode("CM1 — Practice", "exam")],
+		["CM1 — Learn", " — Learn", "Quiz libre", "CM1 — Exam", "CM1 — Practice"]);
 	const q = (o) => ({ title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que.", ...o });
 
 	r.check("bloc sans objet de mode = Practice", modeDuBloc([q()]), "practice");
 	r.check("objet { mode: \"learn\" } = Learn", modeDuBloc([q(), { mode: "learn", objectives: ["x"] }]), "learn");
-	r.check("modes hérités exam, lesson, examMode, learnMode = Practice",
-		[{ mode: "exam" }, { mode: "lesson" }, { examMode: true }, { learnMode: true }].map(c => modeDuBloc([q(), c])),
-		["practice", "practice", "practice", "practice"]);
+	r.check("{ mode: \"exam\" } = Exam, case and spaces tolerated",
+		[{ mode: "exam", examDurationMinutes: 60 }, { mode: " Exam " }].map(c => modeDuBloc([q(), c])), ["exam", "exam"]);
+	r.check("retired values lesson, examMode, learnMode = Practice",
+		[{ mode: "lesson" }, { examMode: true }, { learnMode: true }].map(c => modeDuBloc([q(), c])),
+		["practice", "practice", "practice"]);
+
+	/* Duration of an Exam (spec 2026-09-29 §1.1-§1.2): bounded to [1, 300],
+	   1 min 30 per question rounded to 5 minutes when missing. */
+	r.check("fallback duration: 1 min 30 per question, rounded to 5 min",
+		[1, 2, 10, 15, 20, 33].map(fallbackExamDuration), [1, 5, 15, 25, 30, 50]);
+	r.check("fallback duration: bounded to [1, 300]", [fallbackExamDuration(0), fallbackExamDuration(-3), fallbackExamDuration(500)], [1, 1, 300]);
+	r.check("typed duration: whole minutes within [1, 300], null when not a positive number",
+		[clampExamDuration(90), clampExamDuration(301), clampExamDuration(0.4), clampExamDuration("45"), clampExamDuration(0), clampExamDuration("x"), clampExamDuration(undefined), clampExamDuration(-5)],
+		[90, 300, 1, 45, null, null, null, null]);
+	r.check("Exam: every question without an explanation is named, no slice required",
+		verifierFormat("exam", [q({ title: "Pile", explain: "" }), q({ title: "File" }), { mode: "exam", examDurationMinutes: 30 }]),
+		[{ kind: "sansExplication", questions: ["Pile"] }]);
+	r.check("Exam: a flashcard without a back is reported",
+		verifierFormat("exam", [q({ title: "Carte", options: undefined, correctIndex: undefined, flashcard: true })]),
+		[{ kind: "carteSansReponse", questions: ["Carte"] }]);
 	/* Glossaire (lot D, 2026-09-27) : un Practice terminé par la configuration
 	   que la génération écrit désormais (`{ mode: "quiz", glossary }`) reste un
 	   Practice, sans manque — ni devenir un Learn, ni signaler d'objectifs
@@ -251,5 +273,29 @@ await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemand
 		trouverLearn(notes, "Racine/XTI", "CM1")?.path, "Racine/XTI/Parcours CM1 v2.md");
 	r.check("aucun Learn de cette source : null", trouverLearn(notes, "Racine/XTI", "CM3"), null);
 	r.check("un Learn d'un sous-dossier ne compte pas", trouverLearn(notes, "Racine/XTI/Autre", "CM2"), null);
+	r.done();
+});
+
+/* The ENGINE's reading of the configuration (`extractExamOptions`), which
+   decides what is played: an Exam and its clock, a Learn, or a Practice. */
+await withSrcModule("src/quiz-utils.ts", ({ extractExamOptions, findQuizModeConfigIndex }) => {
+	const r = makeReporter("Configuration read by the engine");
+	const q = (o) => ({ title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, ...o });
+	const lu = (config, n = 1) => extractExamOptions([...Array.from({ length: n }, (_, i) => q({ title: `Q${i}` })), config]);
+
+	const exam = lu({ mode: "exam", examDurationMinutes: 125 });
+	r.check("mode: \"exam\" is an Exam with its duration, up to 300", [exam.quizMode, exam.examOptions?.durationMinutes, lu({ mode: "exam", examDurationMinutes: 999 }).examOptions?.durationMinutes], ["exam", 125, 300]);
+	/* 14 questions → 20 min, 15 → 25: counting the configuration object as a
+	   question would show. */
+	r.check("an Exam without a duration gets the fallback rule, on its questions only", lu({ mode: "exam" }, 14).examOptions?.durationMinutes, 20);
+	r.check("examAutoSubmit / examShowTimer are no longer read",
+		[lu({ mode: "exam", examDurationMinutes: 10, examAutoSubmit: false, examShowTimer: false }).examOptions].map(o => [o?.autoSubmit, o?.showTimer]), [[true, true]]);
+	r.check("mode: \"learn\" is a Learn, mode: \"quiz\" a Practice", [lu({ mode: "learn" }).quizMode, lu({ mode: "quiz" }).quizMode], ["lesson", "quiz"]);
+	/* Retired values (spec 2026-09-29 §1.1): `mode: "lesson"` is not a mode
+	   any more, and the booleans do not make a configuration — no
+	   compatibility, the vaults had no such note. */
+	r.check("mode: \"lesson\" is not a Learn", lu({ mode: "lesson", source: "[[CM1]]" }).quizMode, "quiz");
+	r.check("examMode / learnMode no longer mark a configuration",
+		[findQuizModeConfigIndex([q(), { examMode: true }]), findQuizModeConfigIndex([q(), { learnMode: true }])], [-1, -1]);
 	r.done();
 });

@@ -3,36 +3,60 @@ import JSON5 from "json5";
 import type { QuizQuestion, ExamOptions } from "./types/quiz";
 import { lireGlossaire, type EntreeGlossaire } from "./glossaire";
 
-/** Mode d'un quiz, lu dans l'objet de configuration optionnel en fin de tableau.
-    "learn" a été renommé "lesson" (task 0 du lot mode leçon, 2026-08-31) : ce
-    fichier n'écrit et ne renvoie plus jamais que "lesson", mais continue de
-    LIRE "learn" indéfiniment (cf. normalizeQuizMode) — un quiz partagé écrit
-    avec l'ancien nom doit continuer de fonctionner. */
+/** A quiz's mode, read from the optional configuration object of the array.
+    The format writes `mode: "learn"` (a Learn), `mode: "exam"` (a Test in
+    Exam) or nothing (a Test in Practice; `mode: "quiz"` says the same thing
+    explicitly). "lesson" is only the INTERNAL name of a Learn, kept by the
+    engine: since 2026-09-29 (spec 2026-09-29-test-practice-exam-design §1.1)
+    a block that writes `mode: "lesson"` is no longer read as a Learn, and the
+    old `examMode` / `learnMode` booleans are no longer read at all — no quiz
+    note of the vaults used them when they were retired. */
 type QuizMode = "lesson" | "exam" | "quiz";
 
 /**
- * Objet de configuration optionnel placé en dernier élément du tableau JSON5
- * d'un bloc quiz-blocks (mode examen/leçon) — pas une question, distingué par
- * l'absence de `prompt` et la présence d'un des champs mode (extractExamOptions).
+ * Optional configuration object of a quiz-blocks JSON5 array (usually its
+ * last item) — not a question: recognised by the absence of `prompt` and the
+ * presence of one of the markers of `isQuizModeConfig`.
  */
 interface QuizModeConfig {
-	examMode?: boolean;
-	/** Raccourci historique de `mode: "learn"` (désormais "lesson") — alias lu
-	    en repli, jamais écrit (aucun raccourci équivalent pour "lesson"). */
-	learnMode?: boolean;
 	mode?: string;
 	examDurationMinutes?: number;
-	examAutoSubmit?: boolean;
-	examShowTimer?: boolean;
-	/** Référence libre vers la note source de la leçon (ex. un lien `[[...]]`) —
-	    jamais lue comme un marqueur de question par `isStrictQuizModeConfig`. */
+	/** Free reference to the source note of the quiz (e.g. a `[[...]]` link) —
+	    never read as a question marker by `isStrictQuizModeConfig`. */
 	source?: string;
-	/** Glossaire du quiz (lot D, 2026-09-27) : un objet SANS énoncé qui en
-	    porte un est la configuration, même sans `mode` ni `source` — un bloc
-	    écrit à la main peut ne vouloir déclarer QUE des termes. Brut, jamais
-	    validé ici : `extractExamOptions` le passe à `lireGlossaire`
-	    (src/glossaire.ts), qui filtre les entrées invalides. */
+	/** The quiz's glossary (batch D, 2026-09-27): an object WITHOUT a prompt
+	    that carries one is the configuration, even without `mode` or `source`
+	    — a hand-written block may only want to declare terms. Raw, never
+	    validated here: `extractExamOptions` hands it to `lireGlossaire`
+	    (src/glossaire.ts), which filters out invalid entries. */
 	glossary?: unknown;
+}
+
+/** Bounds of an Exam's duration, in minutes (spec 2026-09-29 §1.1: the upper
+    bound went from 180 to 300). */
+export const EXAM_DURATION_MIN = 1;
+export const EXAM_DURATION_MAX = 300;
+
+/** A duration brought back to whole minutes within [EXAM_DURATION_MIN,
+    EXAM_DURATION_MAX]; `null` when the value is not a positive number. */
+export function clampExamDuration(value: unknown): number | null {
+	const n = typeof value === "number" ? value
+		: typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+	if (!Number.isFinite(n) || n <= 0) return null;
+	return Math.max(EXAM_DURATION_MIN, Math.min(EXAM_DURATION_MAX, Math.round(n)));
+}
+
+/** The duration of an Exam that does not state one (spec 2026-09-29 §1.2):
+    1 min 30 per question, rounded to the nearest 5 minutes, within the
+    bounds. Shared by the engine (a hand-written Exam without a duration),
+    generation (the model omitted it) and the editor (switching to Exam), so
+    that the three never disagree on the same quiz. Re-exported by
+    `src/quiz-format.ts`, the format's vocabulary; it lives here because
+    `quiz-format.ts` already imports this module. */
+export function fallbackExamDuration(questionCount: number): number {
+	const n = Number.isFinite(questionCount) && questionCount > 0 ? questionCount : 0;
+	const rounded = Math.round((n * 1.5) / 5) * 5;
+	return Math.max(EXAM_DURATION_MIN, Math.min(EXAM_DURATION_MAX, rounded));
 }
 
 interface ParseQuizSourceOptions {
@@ -87,9 +111,6 @@ function parseQuizSource(source?: string | null, options: ParseQuizSourceOptions
 function isQuizModeConfig(item: unknown): boolean {
 	const q = item as (QuizQuestion & QuizModeConfig) | null | undefined;
 	if (!q || typeof q !== "object" || Array.isArray(q) || q.prompt) return false;
-	/* `q.learnMode` : alias hérité de `mode: "learn"` (renommé "lesson") — lu
-	   indéfiniment, jamais écrit. */
-	if (q.examMode === true || q.learnMode === true) return true;
 	/* FIX round 1 de revue (task 8) : un bloc écrit à la main comme
 	   `[{ source: "[[...]]" }]`, SANS `mode`, n'était reconnu par aucune des
 	   deux conditions ci-dessus/dessous — l'objet devenait une question
@@ -112,42 +133,32 @@ function isQuizModeConfig(item: unknown): boolean {
 	   lot D (bulles de vocabulaire, 2026-09-27) : un quiz écrit à la main doit
 	   pouvoir déclarer un glossaire sans déclarer de mode. */
 	if (Array.isArray(q.glossary)) return true;
-	/* Les TROIS modes du plugin, pas « une chaîne quelconque ». Une question
-	   légitime nommée `{ title: 'Quel mode choisir ?', mode: 'transport' }`
-	   passait pour la configuration du bloc et DISPARAISSAIT à la réécriture —
-	   et en dernière position, même une question complète avec ses réponses
-	   (`mode: 'dark'`) y passait (revue codex 2026-07-31). C'est déjà la liste
-	   que `readModeConfig` accepte : la reconnaissance et la lecture parlent
-	   maintenant du même vocabulaire. */
+	/* The format's modes, not "any string". A legitimate question such as
+	   `{ title: 'Which mode?', mode: 'transport' }` used to pass for the
+	   block's configuration and VANISHED on rewrite — and in last position,
+	   even a complete question with its answers (`mode: 'dark'`) did (codex
+	   review 2026-07-31). It is the list `readModeConfig` accepts too:
+	   recognition and reading speak the same vocabulary. */
 	return normalizeQuizMode(q.mode) !== null;
 }
 
 /**
- * Le mode écrit dans un bloc, ramené à sa forme canonique — ou `null` si ce
- * n'en est pas un.
+ * The mode written in a block, brought back to its internal name — or `null`
+ * when it is not one.
  *
- * TOLÉRANT à la casse et aux espaces, pour TOUS les modes — alias hérité
- * ("learn") comme noms canoniques ("quiz", "lesson", "exam") : un bloc écrit
- * à la main contient `mode: 'Learn'` ou `mode: 'exam '` aussi facilement que
- * la forme exacte, et exiger l'exactitude ferait pire que l'ancien code —
- * celui-ci reconnaissait au moins l'objet comme une configuration (quitte à
- * retomber sur le mode quiz), là où un refus net le transformerait en
- * question fantôme.
+ * TOLERANT of case and spaces: a hand-written block says `mode: 'Learn'` or
+ * `mode: 'exam '` as easily as the exact form, and requiring exactness would
+ * turn the object into a phantom question instead of a configuration.
  *
- * Round 1 de revue (2026-08-31) : une première version de cette fonction
- * exigeait la casse EXACTE pour "lesson" mais pas pour "learn" — asymétrie
- * absurde entre l'alias et le nom canonique (`mode: 'Lesson'` fantôme,
- * `mode: 'Learn'` reconnu), corrigée ici : la casse est tolérée partout.
- *
- * "learn" reste reconnu indéfiniment : c'est l'alias hérité du mode renommé
- * "lesson" (task 0, 2026-08-31), et un quiz partagé écrit avant le
- * renommage doit continuer de s'ouvrir.
+ * `"learn"` → the internal `"lesson"`; `"exam"`; `"quiz"` (an explicit
+ * Practice). `"lesson"` itself is no longer a format value (retired on
+ * 2026-09-29, spec §1.1): the internal name is code, not format.
  */
 export function normalizeQuizMode(value: unknown): QuizMode | null {
 	if (typeof value !== "string") return null;
 	const m = value.trim().toLowerCase();
 	if (m === "learn") return "lesson";
-	return m === "quiz" || m === "lesson" || m === "exam" ? m : null;
+	return m === "quiz" || m === "exam" ? m : null;
 }
 
 /**
@@ -238,59 +249,51 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 	quizMode: QuizMode;
 	examOptions: ExamOptions | null;
 	lessonExamOptions: ExamOptions | null;
-	/** Glossaire du quiz, déjà filtré aux entrées valides (`lireGlossaire`) —
-	    tableau vide sans objet de configuration, ou si celui-ci ne porte pas
-	    de `glossary`. */
+	/** The quiz's glossary, already filtered to its valid entries
+	    (`lireGlossaire`) — empty without a configuration object, or when it
+	    carries no `glossary`. */
 	glossary: EntreeGlossaire[];
 } {
 	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, lessonExamOptions: null, glossary: [] };
 
-	/* N'IMPORTE OÙ dans le tableau, pas seulement en dernier. L'export écrit
-	   toujours la configuration à la fin, mais un quiz écrit à la main — ou
-	   par un modèle — la place volontiers en tête. Le moteur affichait alors
-	   une première carte VIDE et comptait une question de plus, là où la page
-	   « quiz » et le scanner, eux, la reconnaissaient déjà partout : « 0/11 »
-	   pour un quiz de dix questions.
+	/* ANYWHERE in the array, not only last. The export always writes the
+	   configuration at the end, but a quiz written by hand — or by a model —
+	   readily puts it first. The engine then showed an EMPTY first card and
+	   counted one question too many, where the quiz page and the scanner
+	   already recognised it anywhere: "0/11" for a ten-question quiz.
 
-	   La DERNIÈRE position garde le critère large (c'est là que l'export écrit,
-	   et deux notes réelles y ont une ligne vide qui porte leur mode) ; partout
-	   ailleurs, le critère STRICT — ailleurs qu'à la fin, se tromper ne coûte
-	   pas un mode mais une question. */
+	   One rule everywhere (`findQuizModeConfigIndex`): away from the end, a
+	   mistake would not cost a mode but a question. */
 	const configIdx = findQuizModeConfigIndex(quizArray);
 	const lastItem = configIdx >= 0 ? quizArray[configIdx] as QuizQuestion & QuizModeConfig : undefined;
 
 	if (lastItem) {
-		/* Déterminer le mode : "lesson" | "exam" | "quiz". `mode` prime sur les
-		   deux booléens historiques, et passe par la même normalisation que la
-		   RECONNAISSANCE — sans quoi un `mode: 'Learn'` serait admis comme
-		   configuration puis lu comme un mode quiz. `lastItem.learnMode` reste
-		   l'alias hérité de `mode: "learn"` (renommé "lesson"). */
-		const quizMode: QuizMode = normalizeQuizMode(lastItem.mode)
-			?? (lastItem.examMode === true ? "exam"
-				: lastItem.learnMode === true ? "lesson"
-					: "quiz");
+		/* The mode goes through the same normalisation as RECOGNITION —
+		   otherwise a `mode: 'Learn'` would be accepted as a configuration,
+		   then read as a Practice. */
+		const quizMode: QuizMode = normalizeQuizMode(lastItem.mode) ?? "quiz";
+		const questions = quizArray.filter((_, i) => i !== configIdx);
 
-		// Construction des options d'examen
+		/* An Exam that does not state its duration (written by hand) gets the
+		   fallback rule, as generation and the editor would have written it
+		   (spec 2026-09-29 §1.2). `examAutoSubmit` / `examShowTimer` are no
+		   longer read: an Exam is a visible clock and a hand-in at zero. */
 		const buildExamOpts = (): ExamOptions => ({
-			durationMinutes: Math.max(1, Math.min(180, Number(lastItem.examDurationMinutes) || 10)),
-			autoSubmit: lastItem.examAutoSubmit !== false,
-			showTimer: lastItem.examShowTimer !== false
+			durationMinutes: clampExamDuration(lastItem.examDurationMinutes) ?? fallbackExamDuration(questions.length),
+			autoSubmit: true,
+			showTimer: true
 		});
 
-		// Options d'examen (mode exam actif)
-		let examOptions: ExamOptions | null = null;
-		if (quizMode === "exam") {
-			examOptions = buildExamOpts();
-		}
+		const examOptions: ExamOptions | null = quizMode === "exam" ? buildExamOpts() : null;
 
-		// Options d'examen pour le mode leçon (utilisé par "Passer l'examen")
+		// Exam options of a Learn that carries a duration ("Take the exam").
 		let lessonExamOptions: ExamOptions | null = null;
 		if (quizMode === "lesson" && lastItem.examDurationMinutes != null) {
 			lessonExamOptions = buildExamOpts();
 		}
 
 		return {
-			questions: quizArray.filter((_, i) => i !== configIdx),
+			questions,
 			quizMode,
 			examOptions,
 			lessonExamOptions,
