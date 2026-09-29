@@ -1,15 +1,16 @@
 Language logos of the code-block badge, embedded in src/code-logos.ts.
 
+- Seti, the file icons VS Code shows by default: glyphs of the seti.woff
+  font of VS Code 1.139.1 (extensions/theme-seti/icons), drawn as SVG paths
+  with their dark-theme colour; language mapping from
+  vs-seti-icon-theme.json. MIT: LICENSE-seti.txt (Seti UI by Jesse Weed,
+  and the theme-seti extension of VS Code).
 - Devicon 2.17.0 (https://devicon.dev, npm "devicon"), MIT licence:
-  LICENSE-devicon.txt. Files icons/<name>/<name>-original.svg, and
-  icons/objectivec/objectivec-plain.svg.
-- Simple Icons 16.33.0 (https://simpleicons.org, npm "simple-icons"),
-  CC0-1.0: LICENSE-simple-icons.md. Files icons/toml.svg, icons/less.svg,
-  icons/graphql.svg, filled with their Simple Icons brand colour.
+  LICENSE-devicon.txt. Files icons/<name>/<name>-original.svg, for the
+  languages Seti has no glyph for and for MySQL, PostgreSQL and SQLite.
 
-Optimized with svgo 4 (--multipass --precision=1). Monochrome dark logos
-recoloured light for the dark code background: the list is in the header of
-src/code-logos.ts.
+Optimized with svgo 4 (--multipass). The glyph frame and precision are
+described in the header of src/code-logos.ts.
 
 The logos themselves remain trademarks of their respective owners; they are
 shown only to name the language of a code block.

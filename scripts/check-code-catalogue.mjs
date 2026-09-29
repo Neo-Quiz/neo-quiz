@@ -54,8 +54,8 @@ await withSrcModule(
 		CODE_CATALOGUE.filter(e => (e.logo === undefined) === (e.icon === undefined)).map(e => e.id), []);
 	r.check("every logo named exists",
 		CODE_CATALOGUE.filter(e => e.logo !== undefined && !Object.prototype.hasOwnProperty.call(CODE_LOGOS, e.logo)).map(e => e.id), []);
-	r.check("every icon is one of the three Lucide icons",
-		CODE_CATALOGUE.filter(e => e.icon !== undefined && !["terminal", "database", "file-code"].includes(e.icon)).map(e => e.id), []);
+	r.check("every icon is the Lucide file-code icon",
+		CODE_CATALOGUE.filter(e => e.icon !== undefined && e.icon !== "file-code").map(e => e.id), []);
 	const used = new Set(CODE_CATALOGUE.map(e => e.logo).filter(Boolean));
 	r.check("every embedded logo is used", Object.keys(CODE_LOGOS).filter(k => !used.has(k)), []);
 
@@ -71,9 +71,9 @@ await withSrcModule(
 	r.check("every badge is a data: SVG with no quote, angle bracket nor ampersand",
 		CODE_CATALOGUE.filter((e, i) => !srcs[i].startsWith("data:image/svg+xml,") || /["<>&]/.test(srcs[i])).map(e => e.id), []);
 	r.check("a badge decodes back to its SVG",
-		decodeURIComponent(codeLanguageBadgeSrc(codeLanguageOf("rust")).slice("data:image/svg+xml,".length)), CODE_LOGOS.rust);
+		decodeURIComponent(codeLanguageBadgeSrc(codeLanguageOf("rust")).slice("data:image/svg+xml,".length)), CODE_LOGOS["seti-rust"]);
 	r.check("an icon badge is a Lucide SVG",
-		decodeURIComponent(codeLanguageBadgeSrc(codeLanguageOf("sql")).slice("data:image/svg+xml,".length)).includes('<ellipse cx="12" cy="5" rx="9" ry="3"/>'), true);
+		decodeURIComponent(codeLanguageBadgeSrc(codeLanguageOf("lisp")).slice("data:image/svg+xml,".length)).includes('<path d="M14 2v5a1 1 0 0 0 1 1h5"/>'), true);
 
 	r.check("every tag is coloured by a registered grammar",
 		tags.filter(t => colorerCode("x = 1", t, s => s, 1000) === null), []);

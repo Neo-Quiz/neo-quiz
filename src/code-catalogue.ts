@@ -15,9 +15,9 @@
 import { CODE_LOGOS } from "./code-logos";
 import type { CodeLogoId } from "./code-logos";
 
-/** A language with no official logo is drawn with a Lucide icon instead
-    (lucide 1.41.0: `terminal`, `database`, `file-code`). */
-export type CodeLanguageIcon = "terminal" | "database" | "file-code";
+/** A language with neither a Seti glyph nor an official logo is drawn with
+    a Lucide icon instead (lucide 1.41.0: `file-code`). */
+export type CodeLanguageIcon = "file-code";
 
 export interface CodeCatalogueEntry {
 	/** The canonical tag, lower case. */
@@ -36,87 +36,87 @@ export interface CodeCatalogueEntry {
 
 export const CODE_CATALOGUE: readonly CodeCatalogueEntry[] = [
 	// Web
-	{ id: "html", name: "HTML", aliases: ["htm", "xhtml"], logo: "html5", grammar: "markup" },
-	{ id: "css", name: "CSS", aliases: [], logo: "css3", grammar: "css" },
-	{ id: "scss", name: "SCSS", aliases: [], logo: "sass", grammar: "scss" },
-	{ id: "sass", name: "Sass", aliases: [], logo: "sass", grammar: "sass" },
-	{ id: "less", name: "Less", aliases: [], logo: "less", grammar: "less" },
-	{ id: "javascript", name: "JavaScript", aliases: ["js", "mjs", "cjs", "node"], logo: "javascript", grammar: "javascript" },
-	{ id: "typescript", name: "TypeScript", aliases: ["ts", "mts", "cts"], logo: "typescript", grammar: "typescript" },
-	{ id: "jsx", name: "JSX", aliases: [], logo: "react", grammar: "jsx" },
-	{ id: "tsx", name: "TSX", aliases: [], logo: "react", grammar: "tsx" },
+	{ id: "html", name: "HTML", aliases: ["htm", "xhtml"], logo: "seti-html-3", grammar: "markup" },
+	{ id: "css", name: "CSS", aliases: [], logo: "seti-css", grammar: "css" },
+	{ id: "scss", name: "SCSS", aliases: [], logo: "seti-sass", grammar: "scss" },
+	{ id: "sass", name: "Sass", aliases: [], logo: "seti-sass", grammar: "sass" },
+	{ id: "less", name: "Less", aliases: [], logo: "seti-less", grammar: "less" },
+	{ id: "javascript", name: "JavaScript", aliases: ["js", "mjs", "cjs", "node"], logo: "seti-javascript", grammar: "javascript" },
+	{ id: "typescript", name: "TypeScript", aliases: ["ts", "mts", "cts"], logo: "seti-typescript", grammar: "typescript" },
+	{ id: "jsx", name: "JSX", aliases: [], logo: "seti-react", grammar: "jsx" },
+	{ id: "tsx", name: "TSX", aliases: [], logo: "seti-react", grammar: "tsx" },
 	// No Vue grammar in refractor: a single-file component reads as HTML, its
 	// `<script>` and `<style>` coloured by the grammars markup embeds.
-	{ id: "vue", name: "Vue", aliases: [], logo: "vuejs", grammar: "markup" },
+	{ id: "vue", name: "Vue", aliases: [], logo: "seti-vue", grammar: "markup" },
 	// Python and data
-	{ id: "python", name: "Python", aliases: ["py", "python3", "py3"], logo: "python", grammar: "python" },
-	{ id: "r", name: "R", aliases: [], logo: "r", grammar: "r" },
-	{ id: "julia", name: "Julia", aliases: ["jl"], logo: "julia", grammar: "julia" },
+	{ id: "python", name: "Python", aliases: ["py", "python3", "py3"], logo: "seti-python", grammar: "python" },
+	{ id: "r", name: "R", aliases: [], logo: "seti-r", grammar: "r" },
+	{ id: "julia", name: "Julia", aliases: ["jl"], logo: "seti-julia", grammar: "julia" },
 	{ id: "matlab", name: "MATLAB", aliases: [], logo: "matlab", grammar: "matlab" },
 	// C and systems
-	{ id: "c", name: "C", aliases: ["h"], logo: "c", grammar: "c" },
-	{ id: "cpp", name: "C++", aliases: ["c++", "cc", "cxx", "hpp", "hh", "hxx"], logo: "cplusplus", grammar: "cpp" },
-	{ id: "csharp", name: "C#", aliases: ["cs", "c#", "dotnet"], logo: "csharp", grammar: "csharp" },
+	{ id: "c", name: "C", aliases: ["h"], logo: "seti-c", grammar: "c" },
+	{ id: "cpp", name: "C++", aliases: ["c++", "cc", "cxx", "hpp", "hh", "hxx"], logo: "seti-cpp", grammar: "cpp" },
+	{ id: "csharp", name: "C#", aliases: ["cs", "c#", "dotnet"], logo: "seti-c-sharp", grammar: "csharp" },
 	// `m` is Objective-C (as in GitHub's linguist), not MATLAB.
-	{ id: "objectivec", name: "Objective-C", aliases: ["objc", "objective-c", "m", "mm"], logo: "objectivec", grammar: "objectivec" },
-	{ id: "rust", name: "Rust", aliases: ["rs"], logo: "rust", grammar: "rust" },
-	{ id: "zig", name: "Zig", aliases: [], logo: "zig", grammar: "zig" },
+	{ id: "objectivec", name: "Objective-C", aliases: ["objc", "objective-c", "m", "mm"], logo: "seti-c-2", grammar: "objectivec" },
+	{ id: "rust", name: "Rust", aliases: ["rs"], logo: "seti-rust", grammar: "rust" },
+	{ id: "zig", name: "Zig", aliases: [], logo: "seti-zig", grammar: "zig" },
 	// JVM and mobile
-	{ id: "java", name: "Java", aliases: [], logo: "java", grammar: "java" },
-	{ id: "kotlin", name: "Kotlin", aliases: ["kt", "kts"], logo: "kotlin", grammar: "kotlin" },
-	{ id: "scala", name: "Scala", aliases: ["sc"], logo: "scala", grammar: "scala" },
-	{ id: "groovy", name: "Groovy", aliases: ["gradle"], logo: "groovy", grammar: "groovy" },
-	{ id: "swift", name: "Swift", aliases: [], logo: "swift", grammar: "swift" },
-	{ id: "dart", name: "Dart", aliases: [], logo: "dart", grammar: "dart" },
+	{ id: "java", name: "Java", aliases: [], logo: "seti-java", grammar: "java" },
+	{ id: "kotlin", name: "Kotlin", aliases: ["kt", "kts"], logo: "seti-kotlin", grammar: "kotlin" },
+	{ id: "scala", name: "Scala", aliases: ["sc"], logo: "seti-scala", grammar: "scala" },
+	{ id: "groovy", name: "Groovy", aliases: ["gradle"], logo: "seti-grails", grammar: "groovy" },
+	{ id: "swift", name: "Swift", aliases: [], logo: "seti-swift", grammar: "swift" },
+	{ id: "dart", name: "Dart", aliases: [], logo: "seti-dart", grammar: "dart" },
 	// Backend
-	{ id: "php", name: "PHP", aliases: [], logo: "php", grammar: "php" },
-	{ id: "ruby", name: "Ruby", aliases: ["rb"], logo: "ruby", grammar: "ruby" },
-	{ id: "go", name: "Go", aliases: ["golang"], logo: "go", grammar: "go" },
-	{ id: "elixir", name: "Elixir", aliases: ["ex", "exs"], logo: "elixir", grammar: "elixir" },
+	{ id: "php", name: "PHP", aliases: [], logo: "seti-php", grammar: "php" },
+	{ id: "ruby", name: "Ruby", aliases: ["rb"], logo: "seti-ruby", grammar: "ruby" },
+	{ id: "go", name: "Go", aliases: ["golang"], logo: "seti-go2", grammar: "go" },
+	{ id: "elixir", name: "Elixir", aliases: ["ex", "exs"], logo: "seti-elixir", grammar: "elixir" },
 	{ id: "erlang", name: "Erlang", aliases: ["erl"], logo: "erlang", grammar: "erlang" },
-	{ id: "perl", name: "Perl", aliases: ["pl"], logo: "perl", grammar: "perl" },
+	{ id: "perl", name: "Perl", aliases: ["pl"], logo: "seti-perl", grammar: "perl" },
 	// Shell. A zsh script or a terminal session reads mostly as bash.
-	{ id: "bash", name: "Bash", aliases: [], logo: "bash", grammar: "bash" },
-	{ id: "shell", name: "Shell", aliases: ["sh", "zsh", "console", "shell-session"], icon: "terminal", grammar: "bash" },
-	{ id: "powershell", name: "PowerShell", aliases: ["ps1", "pwsh", "ps"], logo: "powershell", grammar: "powershell" },
-	{ id: "batch", name: "Batch", aliases: ["bat", "cmd", "dos"], icon: "terminal", grammar: "batch" },
+	{ id: "bash", name: "Bash", aliases: [], logo: "seti-shell", grammar: "bash" },
+	{ id: "shell", name: "Shell", aliases: ["sh", "zsh", "console", "shell-session"], logo: "seti-shell", grammar: "bash" },
+	{ id: "powershell", name: "PowerShell", aliases: ["ps1", "pwsh", "ps"], logo: "seti-powershell", grammar: "powershell" },
+	{ id: "batch", name: "Batch", aliases: ["bat", "cmd", "dos"], logo: "seti-windows", grammar: "batch" },
 	// Databases. T-SQL and PL/pgSQL have no grammar of their own: plain SQL.
-	{ id: "sql", name: "SQL", aliases: [], icon: "database", grammar: "sql" },
+	{ id: "sql", name: "SQL", aliases: [], logo: "seti-db", grammar: "sql" },
 	{ id: "mysql", name: "MySQL", aliases: ["mariadb"], logo: "mysql", grammar: "sql" },
 	{ id: "postgresql", name: "PostgreSQL", aliases: ["postgres", "psql", "pgsql"], logo: "postgresql", grammar: "sql" },
-	{ id: "plpgsql", name: "PL/pgSQL", aliases: [], icon: "database", grammar: "sql" },
-	{ id: "tsql", name: "T-SQL", aliases: ["t-sql", "mssql"], icon: "database", grammar: "sql" },
+	{ id: "plpgsql", name: "PL/pgSQL", aliases: [], logo: "seti-db", grammar: "sql" },
+	{ id: "tsql", name: "T-SQL", aliases: ["t-sql", "mssql"], logo: "seti-db", grammar: "sql" },
 	{ id: "sqlite", name: "SQLite", aliases: ["sqlite3"], logo: "sqlite", grammar: "sql" },
 	// Embedded
 	{ id: "arduino", name: "Arduino", aliases: ["ino"], logo: "arduino", grammar: "arduino" },
 	// Functional
-	{ id: "haskell", name: "Haskell", aliases: ["hs"], logo: "haskell", grammar: "haskell" },
-	{ id: "ocaml", name: "OCaml", aliases: ["ml"], logo: "ocaml", grammar: "ocaml" },
-	{ id: "fsharp", name: "F#", aliases: ["fs", "f#", "fsx"], logo: "fsharp", grammar: "fsharp" },
+	{ id: "haskell", name: "Haskell", aliases: ["hs"], logo: "seti-haskell", grammar: "haskell" },
+	{ id: "ocaml", name: "OCaml", aliases: ["ml"], logo: "seti-ocaml", grammar: "ocaml" },
+	{ id: "fsharp", name: "F#", aliases: ["fs", "f#", "fsx"], logo: "seti-f-sharp", grammar: "fsharp" },
 	{ id: "lisp", name: "Lisp", aliases: ["elisp", "emacs-lisp", "common-lisp"], icon: "file-code", grammar: "lisp" },
 	{ id: "scheme", name: "Scheme", aliases: ["scm"], icon: "file-code", grammar: "scheme" },
-	{ id: "clojure", name: "Clojure", aliases: ["clj", "cljs", "edn"], logo: "clojure", grammar: "clojure" },
+	{ id: "clojure", name: "Clojure", aliases: ["clj", "cljs", "edn"], logo: "seti-clojure", grammar: "clojure" },
 	// Scripts
-	{ id: "lua", name: "Lua", aliases: [], logo: "lua", grammar: "lua" },
+	{ id: "lua", name: "Lua", aliases: [], logo: "seti-lua", grammar: "lua" },
 	{ id: "vbnet", name: "Visual Basic", aliases: ["vb", "vb.net", "visualbasic", "visual-basic"], logo: "visualbasic", grammar: "vbnet" },
 	{ id: "vba", name: "VBA", aliases: ["vbs", "vbscript"], icon: "file-code", grammar: "visual-basic" },
 	{ id: "pascal", name: "Pascal", aliases: ["pas", "delphi", "objectpascal"], icon: "file-code", grammar: "pascal" },
 	{ id: "fortran", name: "Fortran", aliases: ["f90", "f95", "f03"], logo: "fortran", grammar: "fortran" },
 	// Data and configuration
-	{ id: "json", name: "JSON", aliases: ["jsonc", "json5"], logo: "json", grammar: "json" },
-	{ id: "xml", name: "XML", aliases: ["svg", "xsd", "xsl", "xslt", "plist"], logo: "xml", grammar: "markup" },
-	{ id: "yaml", name: "YAML", aliases: ["yml"], logo: "yaml", grammar: "yaml" },
-	{ id: "toml", name: "TOML", aliases: [], logo: "toml", grammar: "toml" },
-	{ id: "ini", name: "INI", aliases: ["cfg", "properties"], icon: "file-code", grammar: "ini" },
+	{ id: "json", name: "JSON", aliases: ["jsonc", "json5"], logo: "seti-json", grammar: "json" },
+	{ id: "xml", name: "XML", aliases: ["svg", "xsd", "xsl", "xslt", "plist"], logo: "seti-xml", grammar: "markup" },
+	{ id: "yaml", name: "YAML", aliases: ["yml"], logo: "seti-yml", grammar: "yaml" },
+	{ id: "toml", name: "TOML", aliases: [], logo: "seti-config", grammar: "toml" },
+	{ id: "ini", name: "INI", aliases: ["cfg", "properties"], logo: "seti-config", grammar: "ini" },
 	// Documents
-	{ id: "markdown", name: "Markdown", aliases: ["md"], logo: "markdown", grammar: "markdown" },
-	{ id: "latex", name: "LaTeX", aliases: ["tex"], logo: "latex", grammar: "latex" },
+	{ id: "markdown", name: "Markdown", aliases: ["md"], logo: "seti-markdown", grammar: "markdown" },
+	{ id: "latex", name: "LaTeX", aliases: ["tex"], logo: "seti-tex", grammar: "latex" },
 	// DevOps
-	{ id: "dockerfile", name: "Dockerfile", aliases: ["docker"], logo: "docker", grammar: "docker" },
-	{ id: "makefile", name: "Makefile", aliases: ["make", "mk"], icon: "file-code", grammar: "makefile" },
-	{ id: "cmake", name: "CMake", aliases: [], logo: "cmake", grammar: "cmake" },
-	{ id: "terraform", name: "Terraform", aliases: ["hcl", "tf"], logo: "terraform", grammar: "hcl" },
-	{ id: "graphql", name: "GraphQL", aliases: ["gql"], logo: "graphql", grammar: "graphql" },
+	{ id: "dockerfile", name: "Dockerfile", aliases: ["docker"], logo: "seti-docker", grammar: "docker" },
+	{ id: "makefile", name: "Makefile", aliases: ["make", "mk"], logo: "seti-makefile", grammar: "makefile" },
+	{ id: "cmake", name: "CMake", aliases: [], logo: "seti-makefile-3", grammar: "cmake" },
+	{ id: "terraform", name: "Terraform", aliases: ["hcl", "tf"], logo: "seti-terraform", grammar: "hcl" },
+	{ id: "graphql", name: "GraphQL", aliases: ["gql"], logo: "seti-graphql", grammar: "graphql" },
 ];
 
 /* Every tag (id and alias) → its entry. A plain object read ONLY through
@@ -145,8 +145,6 @@ export function codeLanguageOf(tag: unknown): CodeCatalogueEntry | null {
    foreground of the code block's fixed dark palette (quiz-card.css,
    `--qmc-fg` #c0caf5, dimmed). */
 const ICON_BODIES: Readonly<Record<CodeLanguageIcon, string>> = {
-	"terminal": '<path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>',
-	"database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
 	"file-code": '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/>',
 };
 const ICON_STROKE = "#9aa5ce";
@@ -158,7 +156,7 @@ function iconSvg(icon: CodeLanguageIcon): string {
 /** The `src` of the entry's badge: its logo, else its icon. Percent-encoded,
     not base64 (a third smaller); `encodeURIComponent` leaves no `"`, `<` or
     `&`, so the result is safe inside a quoted attribute as it is. Encoded
-    once per entry: the largest logo is ~30 KB, drawn on every render. */
+    once per entry: the largest logo is ~5 KB, drawn on every render. */
 const BADGE_SRC = new Map<CodeCatalogueEntry, string>();
 export function codeLanguageBadgeSrc(entry: CodeCatalogueEntry): string {
 	let src = BADGE_SRC.get(entry);
