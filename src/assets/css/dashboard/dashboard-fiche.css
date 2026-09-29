@@ -362,6 +362,15 @@
 	color: var(--text-muted);
 	white-space: nowrap;
 }
+/* A reading's circle: the book instead of a number, in the readings'
+   purple (resource-btn.css). */
+.qbd-fiche-num.qbd-fiche-num--read {
+	padding: 0;
+	background: #613cf6;
+}
+.qbd-fiche-num-icon { display: inline-flex; }
+.qbd-fiche-num-icon svg { width: 12px; height: 12px; }
+
 .qbd-fiche-num {
 	flex-shrink: 0;
 	min-width: 22px;

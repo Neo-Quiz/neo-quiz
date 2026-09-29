@@ -830,7 +830,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// L'index du BROUILLON : la vignette se retrouve par lui, pas par
 			// sa position dans la liste (qui saute les lectures absorbées).
 			card.dataset.qi = String(i);
-			const top = renderTop(card, q, pos + 1);
+			// Numbered as on the fiche and in the quiz: a reading has none.
+			const top = renderTop(card, q, numeroDe(i));
 			top.classList.add("qbd-qz-card-top");
 			const text = questionText(q);
 			const label = ajouter(card, "span", "qbd-qz-card-text" + (text ? "" : " is-empty"), text || t("dashboard.quiz.promptEmpty"));

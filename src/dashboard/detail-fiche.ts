@@ -259,14 +259,20 @@ const OPTION_COURTE = 32;
     rendu, pour qu'elles s'y greffent. */
 export function renderTop(card: HTMLElement, q: DraftQuestion, numero: number): HTMLElement {
 	const top = ajouter(card, "span", "qbd-fiche-q-top");
-	// 0 : une lecture de Learn restée un écran, qui n'a pas de numéro de
-	// question (src/lecture-etape.ts) — son icône de livre suffit.
-	if (numero > 0) ajouter(top, "span", "qbd-fiche-num", String(numero));
 	if (q.role === "read") {
-		// Une lecture n'attend pas de réponse : son type n'apprendrait rien.
-		icone(top, "book-open", "qbd-fiche-q-icon");
+		/* A reading has no question number (src/lecture-etape.ts): its circle
+		   carries the book, in the readings' purple (the reading bead, the
+		   resource button), in place of a number and of the small icon before
+		   its label (2026-09-29). Its type would teach nothing: it expects
+		   no answer. */
+		const rond = ajouter(top, "span", "qbd-fiche-num qbd-fiche-num--read");
+		icone(rond, "book-open", "qbd-fiche-num-icon");
 		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleRead"));
-	} else if (q.role === "explain") {
+		return top;
+	}
+	// 0: a card without a question number — its type's icon says what it is.
+	if (numero > 0) ajouter(top, "span", "qbd-fiche-num", String(numero));
+	if (q.role === "explain") {
 		// Une explication est toujours libre : son type n'apprendrait rien non plus.
 		icone(top, "pen-line", "qbd-fiche-q-icon");
 		ajouter(top, "span", "qbd-fiche-q-type", t("engine.lesson.roleExplain"));
