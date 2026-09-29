@@ -95,11 +95,24 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examWeight"));
 			const weightRow = ajouter(c, "div", "qbd-planning-weight-row");
-			const weightInput = ajouter(weightRow, "input", "qbd-medit-input");
+			// The field is a small frame around a bare input plus the unit, shown as a
+			// muted suffix right after the typed number: the user never types the unit.
+			const weightField = ajouter(weightRow, "div", "qbd-planning-weight-field");
+			const weightInput = ajouter(weightField, "input", "qbd-planning-weight-input");
+			const weightSuffix = ajouter(weightField, "span", "qbd-planning-weight-suffix");
+			weightSuffix.setAttribute("aria-hidden", "true");
+			weightField.addEventListener("mousedown", (e) => {
+				if (e.target !== weightInput) { e.preventDefault(); weightInput.focus(); }
+			});
+			// The input is as wide as its text (in ch) so the suffix hugs the number.
+			const fitWeight = (): void => {
+				weightInput.style.width = `${Math.max(1, weightInput.value.length || weightInput.placeholder.length)}ch`;
+			};
 			weightInput.type = "text";
 			weightInput.inputMode = "decimal";
 			weightInput.placeholder = t("dashboard.planning.examWeightPlaceholder");
 			weightInput.value = weight;
+			fitWeight();
 			const weightError = ajouter(c, "p", "qbd-medit-hint qbd-planning-weight-error", t("dashboard.planning.examWeightInvalid"));
 			weightError.id = "qbd-planning-weight-error";
 			weightError.hidden = true;
@@ -119,6 +132,7 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				return { kind, b };
 			});
 			const paintUnit = (anime: boolean): void => {
+				weightSuffix.textContent = t(unit === "coef" ? "dashboard.planning.examWeightSuffixCoef" : "dashboard.planning.examWeightPercent");
 				for (const { kind, b } of unitBtns) {
 					b.classList.toggle("is-active", kind === unit);
 					b.setAttribute("aria-checked", String(kind === unit));
@@ -141,13 +155,22 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			nomInput.addEventListener("input", () => { nom = nomInput.value; majEtat(); });
 			weightInput.addEventListener("input", () => {
 				// A typed "%" is the unit, not part of the number: it flips the
-				// toggle and leaves the field with the number alone.
-				if (/%\s*$/.test(weightInput.value)) {
-					weightInput.value = weightInput.value.replace(/\s*%\s*$/, "");
+				// toggle and is not inserted.
+				if (weightInput.value.includes("%")) {
 					unit = "percent";
 					paintUnit(true);
 				}
-				weight = weightInput.value;
+				// Digits and ONE decimal separator only; anything else is dropped.
+				let sepVu = false;
+				const propre = weightInput.value.replace(/[^0-9.,]|[.,]/g, (m) => {
+					if (!/[.,]/.test(m)) return "";
+					if (sepVu) return "";
+					sepVu = true;
+					return m;
+				});
+				if (propre !== weightInput.value) weightInput.value = propre;
+				weight = propre;
+				fitWeight();
 				majEtat();
 			});
 			dateBtn.addEventListener("click", () => {
