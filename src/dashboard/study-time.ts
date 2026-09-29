@@ -44,9 +44,11 @@ export function studyStats(times: readonly number[], now: number): StudyStats | 
 	return { totalMs, perDayMs: totalMs / days, recordMs: Math.max(...byDay.values()) };
 }
 
-/** "45 min" under an hour, "2.5 h" above (one decimal, the UI's locale). */
+/** StudySmarter's compact form: "2.5h" from an hour up (one decimal, the
+    UI's locale: "2,5h" in French), "45min" below — where "0.8h" would read
+    worse than the minutes. */
 export function formatStudyTime(ms: number, lang: string): string {
 	const minutes = Math.round(ms / 60_000);
-	if (minutes < 60) return `${minutes} min`;
-	return `${new Intl.NumberFormat(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 3_600_000)} h`;
+	if (minutes < 60) return `${minutes}min`;
+	return `${new Intl.NumberFormat(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 3_600_000)}h`;
 }
