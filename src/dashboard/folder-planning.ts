@@ -264,8 +264,11 @@ export function renderFolderPlanning(
 		}
 	}
 
-	// ── Composer : demander un quiz sur ce dossier (tâche 5) ──
-	if (ctx.canOpen("ai")) {
+	/* ── Composer: ask for a quiz on this folder (task 5) ──
+	   HIDDEN (2026-09-29) until it can choose its provider and model like
+	   Generate's own composer; the code stays for that. */
+	const COMPOSER_READY = false;
+	if (COMPOSER_READY && ctx.canOpen("ai")) {
 		const emplacement = ajouter(gauche, "div", "qbd-planning-composer");
 		renderComposerDossier(emplacement, ctx, details.folder);
 	}
