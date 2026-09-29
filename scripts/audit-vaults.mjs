@@ -238,13 +238,12 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 				console.error("ILLISIBLE  " + f + "\n           " + e.message);
 				continue;
 			}
-			/* Le mode réémet un objet de configuration ; le compte doit suivre.
-			   Même règle que l'export (editor/export.ts exportAll) : un mode
-			   `lesson` (readModeConfig normalise déjà l'alias hérité "learn" —
-			   task 0 du lot mode leçon, 2026-08-31), un examen actif, un mode
-			   `quiz` ÉCRIT, ou des clés personnalisées à rendre. */
+			/* The mode writes a configuration object back; the count must follow.
+			   Same rule as the export (editor/export.ts exportAll): a Learn
+			   (readModeConfig already normalises "learn" to "lesson"), an Exam,
+			   a WRITTEN `quiz` mode, or custom keys to give back. */
 			const emetConfig = !!examOptions && (examOptions.mode === "lesson"
-				|| examOptions.enabled || examOptions.mode === "quiz"
+				|| examOptions.mode === "exam" || examOptions.mode === "quiz"
 				|| !!examOptions._extra);
 			const attendu = qs.length + (emetConfig ? 1 : 0);
 			if (relu.length !== attendu) {

@@ -437,7 +437,6 @@ await withSrcModule(
 		const lu = await io.loadQuizDraft(v.chemin);
 		r.check("11. pas encore de configuration", lu.examOptions, null);
 		lu.examOptions = {
-			enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true,
 			glossary: [{ term: "pile", definition: "Structure LIFO." }],
 		};
 		r.check("11. la sauvegarde passe", await io.saveQuizDraft(lu), true);
@@ -449,6 +448,49 @@ await withSrcModule(
 			[{ term: "pile", definition: "Structure LIFO." }]);
 		r.check("11. la question d'origine survit seule (pas de question fantôme)",
 			typeof relu === "object" ? relu.questions.length : relu, 1);
+	}
+
+	/* ─────────── 12. an EXAM through the real round trip ─────────── */
+
+	{
+		/* Spec 2026-09-29 §1.1: an Exam is `mode: 'exam'` and its duration.
+		   Written by hand with the retired keys next to them: a save must keep
+		   the mode, the duration and the unknown key, and drop the retired
+		   keys — before the editor model was reduced, the save rewrote an Exam
+		   as `examMode: true`, which reading no longer recognises: the note lost
+		   its mode and gained an empty question. */
+		const sourceExamen = [
+			"[",
+			"	{",
+			"		id: 'q1',",
+			"		title: 'Unite',",
+			"		prompt: \"Enonce.\",",
+			"		options: ['un', 'deux'],",
+			"		correctIndex: 0,",
+			"		explain: 'Parce que.',",
+			"	},",
+			"",
+			"	{",
+			"		mode: 'exam',",
+			"		examDurationMinutes: 125,",
+			"		examAutoSubmit: false,",
+			"		examShowTimer: false,",
+			"		owner: 'alice',",
+			"	},",
+			"]",
+		].join(LF);
+		const v = vault(note({ source: sourceExamen }));
+		const lu = await io.loadQuizDraft(v.chemin);
+		r.check("12. an Exam is read with its duration",
+			typeof lu === "object" ? [lu.examOptions?.mode, lu.examOptions?.durationMinutes, lu.questions.length] : lu, ["exam", 125, 1]);
+		lu.questions[0].prompt = "Enonce modifie";
+		r.check("12. the save goes through", await io.saveQuizDraft(lu), true);
+		const bloc = JSON5.parse(v.contenu.slice(v.contenu.indexOf("[", v.contenu.indexOf(OUVERTURE)), v.contenu.lastIndexOf("]") + 1));
+		r.check("12. rewritten as mode: 'exam' and its duration, unknown key kept, retired keys dropped",
+			bloc.at(-1), { mode: "exam", examDurationMinutes: 125, owner: "alice" });
+		const relu = await io.loadQuizDraft(v.chemin);
+		r.check("12. read back as an Exam, no phantom question",
+			typeof relu === "object" ? [relu.examOptions?.mode, relu.examOptions?.durationMinutes, relu.questions.length] : relu, ["exam", 125, 1]);
 	}
 
 	r.done();

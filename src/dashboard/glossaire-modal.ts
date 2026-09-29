@@ -8,7 +8,6 @@ import type { EntreeGlossaire } from "../glossaire";
 import type { EnteteAction } from "./detail-head";
 import { setActionBadge } from "./detail-head";
 import type { QuizDraft } from "./detail-io";
-import type { EditorExamOptions } from "../types/editor-ctx";
 
 /* ══════════════════════════════════════════════════════════
    MODALE « VOCABULAIRE » (page d'un quiz, mode édition — tâche 4 du lot D)
@@ -33,21 +32,13 @@ import type { EditorExamOptions } from "../types/editor-ctx";
    (`.qbd-gloss-modal .qb-direct`, même fichier).
 ══════════════════════════════════════════════════════════ */
 
-/** Les défauts du moteur (`quiz-utils.ts buildExamOpts`), jamais des valeurs
-    « raisonnables » choisies ici : un quiz sans objet de configuration qui
-    gagne un glossaire ne doit PAS gagner un examen activé pour autant. */
-const OPTIONS_EXAMEN_NEUTRES: Pick<EditorExamOptions, "enabled" | "durationMinutes" | "autoSubmit" | "showTimer"> = {
-	enabled: false,
-	durationMinutes: 10,
-	autoSubmit: true,
-	showTimer: true,
-};
-
-/** Garantit `draft.examOptions` et son tableau `glossary`, SANS jamais
-    activer l'examen, et rend la référence à MUTER — la même tout au long de
-    la session d'édition (la modale, comme l'export, la lit en place). */
+/** Ensures `draft.examOptions` and its `glossary` array WITHOUT ever giving
+    the quiz a mode — a quiz without a configuration object that gains a
+    glossary stays a Practice (the export then writes `mode: 'quiz'`) — and
+    returns the reference to MUTATE, the same throughout the editing session
+    (the modal, like the export, reads it in place). */
 function garantirGlossaire(draft: QuizDraft): EntreeGlossaire[] {
-	draft.examOptions ??= { ...OPTIONS_EXAMEN_NEUTRES };
+	draft.examOptions ??= {};
 	draft.examOptions.glossary ??= [];
 	return draft.examOptions.glossary;
 }

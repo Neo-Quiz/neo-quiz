@@ -32,52 +32,55 @@
  * `npm run check` chez l'appelant au lieu d'être silencieusement absent.
  */
 
-import type { ExamOptions } from "./quiz";
 import type * as EditorUtils from "../editor/utils";
 import type { DraftQuestion } from "../editor/utils";
 import type { EntreeGlossaire } from "../glossaire";
 
 /**
- * Options d'examen côté ÉDITION. Sur-ensemble de `ExamOptions` (types/quiz.ts),
- * qui modélise les options ACTIVES telles que lues par le moteur une fois
- * l'examen construit (quiz-utils.ts extractExamOptions) : ce dernier n'a pas de
- * champ `enabled` car sa seule présence (non-null) vaut activation. Le
- * FORMULAIRE, lui, existe même quand l'examen est désactivé, et garde donc un
- * interrupteur explicite en plus des trois champs de `ExamOptions`.
+ * The block's configuration object on the EDITING side (read by
+ * `readModeConfig`, written by `exportAll`). Since 2026-09-29 (spec
+ * 2026-09-29-test-practice-exam-design §5.1) it holds only the mode, the
+ * duration of an Exam, the glossary and the keys it does not know: the
+ * `enabled` switch, `autoSubmit` and `showTimer` went with the retired
+ * `examMode` / `examAutoSubmit` / `examShowTimer` keys.
  */
-export interface EditorExamOptions extends ExamOptions {
-	enabled: boolean;
+export interface EditorExamOptions {
 	/**
-	 * Mode du quiz, tel qu'il était écrit dans le bloc lu — déjà NORMALISÉ
-	 * (readModeConfig) : "learn" a été renommé "lesson" (task 0 du lot mode
-	 * leçon, 2026-08-31), et cette valeur ne vaut donc plus jamais "learn".
-	 * Mémorisé pour être réémis à l'identique (editor/export.ts) : sans lui,
-	 * un quiz importé en mode leçon ressortait en mode examen, ou perdait son
-	 * mode.
+	 * The quiz's mode as written in the block read — already NORMALISED
+	 * (readModeConfig): a Learn is the internal "lesson", never "learn".
+	 * Kept to be written back as it was (editor/export.ts): without it, a quiz
+	 * imported as a Learn came out as an exam, or lost its mode.
 	 */
 	mode?: "quiz" | "lesson" | "exam";
 	/**
-	 * Clés de l'objet de mode que le plugin ne connaît pas, gardées telles
-	 * quelles pour être réémises. Sans elles, un bloc écrit à la main perdait
-	 * ses annotations personnelles à la première sauvegarde — même traitement
-	 * que `_extraFields` sur une question.
+	 * An Exam's duration in minutes, within [1, 300] (quiz-utils.ts
+	 * `clampExamDuration`). Only read and written for an Exam; absent there,
+	 * the export writes the fallback rule (`fallbackExamDuration`), so a saved
+	 * Exam always carries an explicit duration.
+	 */
+	durationMinutes?: number;
+	/**
+	 * Keys of the mode object the plugin does not know, kept as they are to be
+	 * written back. Without them, a hand-written block lost its personal
+	 * annotations at the first save — same treatment as `_extraFields` on a
+	 * question.
 	 */
 	_extra?: Record<string, unknown>;
 	/**
-	 * Glossaire du quiz (lot D, 2026-09-27), lu par `readModeConfig`
-	 * (editor/convert.ts) via `lireGlossaire` — déjà validé (`term`/`definition`
-	 * non vides, `aliases` filtré). Sorti de `_extra` pour ne pas être réémis
-	 * deux fois : c'est `editor/export.ts` `exportAll` qui l'écrit
-	 * explicitement, dans l'objet de configuration. La modale « Vocabulaire »
-	 * (tâche 4 du lot) modifie ce champ directement.
+	 * The quiz's glossary (batch D, 2026-09-27), read by `readModeConfig`
+	 * (editor/convert.ts) through `lireGlossaire` — already validated
+	 * (non-empty `term`/`definition`, filtered `aliases`). Out of `_extra` so
+	 * as not to be written twice: `editor/export.ts` `exportAll` writes it
+	 * explicitly in the configuration object. The Vocabulary modal (task 4 of
+	 * the batch) changes this field directly.
 	 */
 	glossary?: EntreeGlossaire[];
 	/**
-	 * Les éléments du tableau `glossary` de la note que `lireGlossaire` a
-	 * écartés (terme ou définition vides, forme inattendue), gardés BRUTS pour
-	 * être réécrits tels quels : ce qu'on ne comprend pas, on le rend. Sans
-	 * eux, une entrée en cours d'écriture à la main disparaissait à la première
-	 * sauvegarde d'une autre question (revue du 2026-09-27).
+	 * The items of the note's `glossary` array that `lireGlossaire` set aside
+	 * (empty term or definition, unexpected shape), kept RAW to be written back
+	 * as they are: what we do not understand, we give back. Without them, an
+	 * entry being written by hand vanished at the first save of another
+	 * question (review of 2026-09-27).
 	 */
 	_glossaryRest?: unknown[];
 }

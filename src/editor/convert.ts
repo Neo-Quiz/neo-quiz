@@ -3,7 +3,7 @@ import type { DraftQuestion, QuestionTypeKey } from "./utils";
 import { _htmlToText } from "./modals";
 import type { ParsedQuizItem } from "./modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
-import { normalizeQuizMode, pickLessonFields } from "../quiz-utils";
+import { clampExamDuration, normalizeQuizMode, pickLessonFields } from "../quiz-utils";
 import { lireGlossaire } from "../glossaire";
 import { normalizeTerminalVariantName, defaultTerminalPromptPrefix } from "../engine/terminal";
 import { QUESTION_ROLES, type QuestionRole } from "../types/quiz";
@@ -26,38 +26,25 @@ import { niveauxIndice } from "../quiz-hint";
    sous le nom `isModeConfig` ; il a été retiré pour qu'un appelant ne puisse
    plus le prendre pour la règle complète. */
 
-/** Options du bloc lues depuis l'objet de mode. */
+/** The block's options, read from its configuration object. */
 export function readModeConfig(q: ParsedQuizItem): EditorExamOptions {
-	/* Même normalisation que le moteur (quiz-utils.ts) : un bloc écrit à la main
-	   dit volontiers `mode: 'Learn'`, et la reconnaissance l'accepte — la
-	   lecture ne peut pas, elle, le renvoyer au mode quiz. `normalizeQuizMode`
-	   ramène l'alias hérité "learn" à son nom canonique "lesson" (renommé task 0
-	   du lot mode leçon, 2026-08-31) ; `q.learnMode` est le raccourci hérité
-	   équivalent. */
-	const mode: "quiz" | "lesson" | "exam" = normalizeQuizMode(q.mode)
-		?? (q.examMode === true ? "exam"
-			: q.learnMode === true ? "lesson"
-				: "quiz");
+	/* Same normalisation as the engine (quiz-utils.ts): a hand-written block
+	   readily says `mode: 'Learn'`, and recognition accepts it — reading must
+	   not send it back to a Practice. */
+	const mode: "quiz" | "lesson" | "exam" = normalizeQuizMode(q.mode) ?? "quiz";
+	/* Bounds are the ENGINE's (`clampExamDuration`): reading rewrites the
+	   block, and a diverging bound would show 999 while the exam lasts 300.
+	   Only an Exam has a duration; on another mode the key is dropped at the
+	   next save (spec 2026-09-29 §5.1: switching to Practice removes it). */
+	const duree = mode === "exam" ? clampExamDuration(q.examDurationMinutes) : null;
 	return {
 		mode,
-		// Le chrono n'est « activé » que pour un vrai mode examen ; un mode
-		// leçon peut en porter un (« Passer l'examen »), auquel cas il annonce
-		// une durée.
-		enabled: mode === "exam" || (mode === "lesson" && q.examDurationMinutes != null),
-		/* Les défauts sont ceux du MOTEUR (quiz-utils.ts buildExamOpts), pas
-		   des valeurs « raisonnables » choisies ici : la lecture réécrit le
-		   bloc, et un défaut divergent transformait silencieusement
-		   `{ examMode: true }` en `examAutoSubmit: false` — le comportement de
-		   l'examen changeait sans que personne n'y touche. Bornes comprises :
-		   une durée de 999 s'afficherait telle quelle mais durerait 180. */
-		durationMinutes: Math.max(1, Math.min(180, Number(q.examDurationMinutes) || 10)),
-		autoSubmit: q.examAutoSubmit !== false,
-		showTimer: q.examShowTimer !== false,
-		// Glossaire (lot D, 2026-09-27) : lu par `lireGlossaire` (src/glossaire.ts),
-		// qui filtre déjà les entrées incomplètes — un tableau vide quand le bloc
-		// n'en porte pas.
+		...(duree !== null ? { durationMinutes: duree } : {}),
+		// Glossary (batch D, 2026-09-27): read by `lireGlossaire`
+		// (src/glossaire.ts), which already filters out incomplete entries —
+		// an empty array when the block carries none.
 		glossary: lireGlossaire(q.glossary),
-		// Ce que la lecture écarte est gardé brut, pour être rendu tel quel.
+		// What reading sets aside is kept raw, to be written back as it was.
 		_glossaryRest: Array.isArray(q.glossary)
 			? q.glossary.filter(e => lireGlossaire([e]).length === 0)
 			: undefined,
@@ -65,19 +52,25 @@ export function readModeConfig(q: ParsedQuizItem): EditorExamOptions {
 	};
 }
 
-/** Les clés de l'objet de mode que le plugin ne connaît pas. Même principe que
-    `_extraFields` sur une question : ce qu'on ne comprend pas, on le rend.
-    `glossary` est EXCLUE : elle est lue explicitement ci-dessus dans
-    `EditorExamOptions.glossary`, et la laisser ici la ferait écrire DEUX fois
-    à l'export (une fois par le champ dédié, une fois via `_extra`). */
+/** Keys of the configuration object that are neither read nor written back:
+    the duration (read above, for an Exam only) and the keys retired on
+    2026-09-29 (spec §1.1). Left in `_extra`, a retired key would be written
+    back forever. */
+const CLES_NON_REEMISES = new Set(["mode", "examDurationMinutes",
+	"examMode", "learnMode", "examAutoSubmit", "examShowTimer"]);
+
+/** The keys of the mode object the plugin does not know. Same principle as
+    `_extraFields` on a question: what we do not understand, we give back.
+    `glossary` is EXCLUDED: it is read explicitly above into
+    `EditorExamOptions.glossary`, and leaving it here would write it TWICE on
+    export (once through the dedicated field, once through `_extra`). */
 function extraModeFields(q: ParsedQuizItem): Record<string, unknown> | undefined {
-	const connues = new Set(["mode", "examMode", "learnMode",
-		"examDurationMinutes", "examAutoSubmit", "examShowTimer"]);
-	// Un `glossary` qui n'est pas un tableau n'est pas lu : il reste une clé
-	// inconnue, rendue telle quelle.
+	const connues = new Set(CLES_NON_REEMISES);
+	// A `glossary` that is not an array is not read: it stays an unknown key,
+	// written back as it is.
 	if (Array.isArray(q.glossary)) connues.add("glossary");
-	// `Object.create(null)`, comme `_extraFields` : un objet ordinaire absorbe
-	// une clé nommée `__proto__` au lieu de la stocker.
+	// `Object.create(null)`, like `_extraFields`: an ordinary object absorbs a
+	// key named `__proto__` instead of storing it.
 	const extra: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
 	for (const cle of Object.keys(q)) {
 		if (!connues.has(cle)) extra[cle] = (q as Record<string, unknown>)[cle];

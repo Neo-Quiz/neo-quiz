@@ -524,26 +524,23 @@ export interface StatsRecord {
 }
 
 /**
- * Question brute telle que lue du JSON5 (parseQuizSource) ou d'un marqueur
- * mode-examen. Forme volontairement permissive (index signature) : l'import
- * lit des champs hétérogènes et préserve les clés inconnues (_extraFields).
+ * A raw question as read from the JSON5 (parseQuizSource), or the block's
+ * configuration object. Deliberately permissive shape (index signature): the
+ * import reads heterogeneous fields and keeps unknown keys (_extraFields).
  */
 export interface ParsedQuizItem {
 	[key: string]: unknown;
-	examMode?: boolean;
-	/** Raccourci hérité de `mode: "learn"` (renommé "lesson", quiz-utils.ts) —
-	    lu en repli, jamais écrit : aucun raccourci équivalent pour "lesson". */
-	learnMode?: boolean;
-	/** Mode du bloc : « quiz » | « lesson » | « exam » (ou l'alias hérité
-	    « learn », lu en repli). Marqueur de l'objet de configuration. */
+	/** The block's mode: "learn" | "exam" | "quiz" (quiz-utils.ts
+	    normalizeQuizMode). Marker of the configuration object. The retired
+	    `examMode`, `learnMode`, `examAutoSubmit` and `examShowTimer` keys are
+	    no longer read (2026-09-29). */
 	mode?: string;
+	/** An Exam's duration in minutes, within [1, 300]. */
 	examDurationMinutes?: number;
-	examAutoSubmit?: boolean;
-	examShowTimer?: boolean;
-	/** Glossaire du bloc, sur l'objet de CONFIGURATION seulement (lot D,
-	    2026-09-27) — brut, lu par `lireGlossaire` (src/glossaire.ts), qui
-	    filtre les entrées invalides ; sa seule présence (même un tableau
-	    vide) suffit à distinguer une configuration sans `mode`
+	/** The block's glossary, on the CONFIGURATION object only (batch D,
+	    2026-09-27) — raw, read by `lireGlossaire` (src/glossaire.ts), which
+	    filters out invalid entries; its mere presence (even an empty array)
+	    is enough to tell a configuration without `mode` apart
 	    (quiz-utils.ts isQuizModeConfig). */
 	glossary?: unknown;
 	ordering?: unknown;

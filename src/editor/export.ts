@@ -1,7 +1,7 @@
 import { escHtml, esc5, md2html, isRichHtml } from "./utils";
 import type { DraftQuestion } from "./utils";
 import type { EditorExamOptions } from "../types/editor-ctx";
-import { pickLessonFields } from "../quiz-utils";
+import { clampExamDuration, fallbackExamDuration, pickLessonFields } from "../quiz-utils";
 import { assignQuestionIds } from "../quiz-ids";
 import { QUESTION_ROLES } from "../types/quiz";
 import type { EntreeGlossaire } from "../glossaire";
@@ -394,51 +394,47 @@ function exportAll(questions: DraftQuestion[], examOptions: EditorExamOptions | 
 	const ids = assignQuestionIds(questions.map(q => ({ id: q._sourceId, title: q.title })));
 	const parts = questions.map((q, i) => exportQuestion(q, i, ids[i]));
 
-	/* L'objet de mode est réémis SOUS SA FORME D'ORIGINE. Un quiz importé en
-	   mode leçon ressortait en mode examen (ou perdait son mode), parce que
-	   l'export ne savait écrire que `examMode: true`. `examOptions.mode` est
-	   déjà NORMALISÉ (readModeConfig) : il vaut toujours le nom interne
-	   canonique "lesson", jamais l'alias hérité "learn" — mais depuis le
-	   format Learn (2026-09-23) l'export RÉÉCRIT ce mode sous le nom du
-	   format, `mode: 'learn'` (voir plus bas). */
+	/* The mode object is written back IN ITS ORIGINAL FORM. A quiz imported as
+	   a Learn used to come out as an exam (or lose its mode), because the
+	   export could only write `examMode: true`. `examOptions.mode` is already
+	   NORMALISED (readModeConfig): a Learn is always the internal "lesson",
+	   written back under the format's name, `mode: 'learn'` (see below). */
 	const mode = examOptions?.mode;
-	const timing = examOptions
-		? `\t\texamDurationMinutes: ${examOptions.durationMinutes},\n\t\texamAutoSubmit: ${examOptions.autoSubmit},\n\t\texamShowTimer: ${examOptions.showTimer},\n`
-		: "";
-	/* Les clés que le plugin ne comprend pas sont RENDUES, comme sur une
-	   question : un bloc écrit à la main perdait sinon ses annotations
-	   personnelles à la première sauvegarde. */
+	/* Keys the plugin does not understand are GIVEN BACK, as on a question:
+	   a hand-written block otherwise lost its personal annotations at the
+	   first save. */
 	const extra = Object.entries(examOptions?._extra || {})
 		.map(([k, v]) => `\t\t${json5Key(k)}: ${json5Value(v)},\n`).join("");
-	// Glossaire (lot D, 2026-09-27) : chaîne vide sans entrée exploitable — voir
-	// `glossaryLine`. Ajouté APRÈS `extra` dans chaque branche, comme dans
-	// l'exemple de la spec (`{ mode: 'learn', objectives: [...], glossary: [...] }`).
+	// Glossary (batch D, 2026-09-27): an empty string without a usable entry —
+	// see `glossaryLine`. Added AFTER `extra` in every branch, as in the spec's
+	// example (`{ mode: 'learn', objectives: [...], glossary: [...] }`).
 	const glossaire = glossaryLine(examOptions?.glossary, examOptions?._glossaryRest);
 	if (mode === "lesson") {
-		/* Learn (2026-09-23) : le nom interne canonique reste "lesson" tant que
-		   le moteur de leçon joue ces blocs (plan 2 le remplace), mais la note
-		   porte le nom du format, `mode: 'learn'` — que `normalizeQuizMode`
-		   relit en "lesson". */
-		parts.push(`\t// Learn\n\t{\n\t\tmode: 'learn',\n${examOptions?.enabled ? timing : ""}${extra}${glossaire}\t}`);
-	} else if (examOptions && examOptions.enabled) {
-		parts.push(`\t// Options mode examen\n\t{\n\t\texamMode: true,\n${timing}${extra}${glossaire}\t}`);
+		parts.push(`\t// Learn\n\t{\n\t\tmode: 'learn',\n${extra}${glossaire}\t}`);
+	} else if (mode === "exam") {
+		/* An Exam (spec 2026-09-29 §1.1): `mode: 'exam'` and its duration,
+		   nothing else — the retired `examMode` / `examAutoSubmit` /
+		   `examShowTimer` are never written. A saved Exam ALWAYS carries an
+		   explicit duration: the fallback rule when none was set (§1.2). */
+		const duree = clampExamDuration(examOptions?.durationMinutes) ?? fallbackExamDuration(questions.length);
+		parts.push(`\t// Exam\n\t{\n\t\tmode: 'exam',\n\t\texamDurationMinutes: ${duree},\n${extra}${glossaire}\t}`);
 	} else if (mode === "quiz") {
-		/* Le mode `quiz` est le comportement par défaut, mais s'il est ÉCRIT
-		   dans la note c'est un choix : le taire faisait disparaître l'objet de
-		   configuration entier — et ses clés personnalisées avec. */
+		/* The `quiz` mode is the default behaviour, but when it is WRITTEN in
+		   the note it is a choice: keeping quiet about it made the whole
+		   configuration object vanish — and its custom keys with it. */
 		parts.push(`\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n${extra}${glossaire}\t}`);
 	} else if (glossaire) {
-		/* Glossaire à écrire mais AUCUN mode reconnu par les trois branches
-		   ci-dessus (`readModeConfig` en attribue pourtant toujours un dès qu'un
-		   objet de configuration existe — cette branche ne se déclenche donc que
-		   pour un `EditorExamOptions` construit à la main, ex. la modale
-		   « Vocabulaire » sur un Practice qui n'avait PAS d'objet de
-		   configuration). `mode: 'quiz'` est écrit explicitement : une version
-		   PLUS ANCIENNE du greffon reconnaît `mode`, pas `glossary` seul (spec §2)
-		   — sans lui, l'objet redeviendrait une question fantôme pour elle. */
+		/* A glossary to write but NO mode recognised by the branches above
+		   (`readModeConfig` always gives one as soon as a configuration object
+		   exists — so this branch only fires for an `EditorExamOptions` built by
+		   hand, e.g. the Vocabulary modal on a Practice that had NO
+		   configuration object). `mode: 'quiz'` is written explicitly: an
+		   OLDER version of the plugin recognises `mode`, not `glossary` alone
+		   (spec §2) — without it, the object would become a phantom question
+		   for that version. */
 		parts.push(`\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n${extra}${glossaire}\t}`);
 	} else if (extra) {
-		// Un objet de mode sans mode reconnaissable, mais porteur de contenu.
+		// A mode object without a recognisable mode, but carrying content.
 		parts.push(`\t{\n${extra}\t}`);
 	}
 	return "[\n" + parts.join(",\n\n") + "\n]";

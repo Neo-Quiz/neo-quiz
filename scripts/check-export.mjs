@@ -141,20 +141,31 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 		return [premier, JSON5.parse(exportAll([q], null))[0].id];
 	})(), ["alpha", "alpha"]);
 
-	// Le mode du bloc est réémis sous sa forme d'origine.
-	const mode = (examOptions) => {
-		const parsed = JSON5.parse(exportAll([question({})], examOptions));
+	// The block's mode is written back in its original form.
+	const mode = (examOptions, n = 1) => {
+		const parsed = JSON5.parse(exportAll(Array.from({ length: n }, () => question({})), examOptions));
 		return parsed[parsed.length - 1];
 	};
-	/* "lesson" et non "learn" : `examOptions.mode` arrive ici déjà NORMALISÉ
-	   par readModeConfig (task 0 du lot mode leçon, 2026-08-31) — l'export ne
-	   reçoit donc plus jamais l'ancien nom, seulement le nouveau. */
-	r.check("mode lesson conservé",
-		mode({ mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true }),
+	/* "lesson" and not "learn": `examOptions.mode` arrives here already
+	   NORMALISED by readModeConfig — the export only ever receives the
+	   internal name, and writes the format's name, `mode: 'learn'`. */
+	r.check("a Learn is written as mode: 'learn'",
+		mode({ mode: "lesson" }),
 		{ mode: "learn" });
-	r.check("mode examen avec chrono",
-		mode({ mode: "exam", enabled: true, durationMinutes: 20, autoSubmit: true, showTimer: false }),
-		{ examMode: true, examDurationMinutes: 20, examAutoSubmit: true, examShowTimer: false });
+	/* An Exam (spec 2026-09-29 §1.1): `mode: 'exam'` and its duration, never
+	   the retired `examMode` / `examAutoSubmit` / `examShowTimer`. */
+	r.check("Exam: mode and duration only",
+		mode({ mode: "exam", durationMinutes: 20 }),
+		{ mode: "exam", examDurationMinutes: 20 });
+	r.check("Exam without a duration: the fallback rule is written (1 question → 1 min)",
+		mode({ mode: "exam" }), { mode: "exam", examDurationMinutes: 1 });
+	// 14 questions → 20 min: a constant, or the lower bound, would show.
+	r.check("Exam without a duration: the fallback rule follows the question count (14 → 20 min)",
+		mode({ mode: "exam" }, 14), { mode: "exam", examDurationMinutes: 20 });
+	r.check("Exam duration bounded to 300 on write",
+		mode({ mode: "exam", durationMinutes: 999 }).examDurationMinutes, 300);
+	r.check("a Learn never writes a duration",
+		mode({ mode: "lesson", durationMinutes: 15 }), { mode: "learn" });
 
 	/* Renommage lesson (task 0) : le nom hérité d'une QUESTION (`learnHtml`)
 	   est lu en repli mais jamais réécrit — seul `lessonHtml` doit apparaître
@@ -208,7 +219,7 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 		relire([question({ _extraFields: { topic: "listes vs tuples", timeLimit: 20 } })], p => [p[0].topic, p[0].timeLimit]),
 		["listes vs tuples", 20]);
 	r.check("objectives de l'objet Learn conservés",
-		(() => { const s = exportAll([question()], { mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, _extra: { objectives: ["Définir une liste"] } }); return JSON5.parse(s).at(-1).objectives; })(),
+		(() => { const s = exportAll([question()], { mode: "lesson", _extra: { objectives: ["Définir une liste"] } }); return JSON5.parse(s).at(-1).objectives; })(),
 		["Définir une liste"]);
 	r.check("slice non entier tu a l'ecriture",
 		relire([{ id: "d", slice: 1.5, prompt: "P" }], p => p[0].slice), undefined);
@@ -221,29 +232,29 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 	   chaîne vide ajoutée en trop suffirait à le faire rougir. */
 	const SANS_GLOSSAIRE = {
 		quiz: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Mode quiz\n\t{\n\t\tmode: 'quiz',\n\t}\n]",
-		exam: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Options mode examen\n\t{\n\t\texamMode: true,\n\t\texamDurationMinutes: 20,\n\t\texamAutoSubmit: true,\n\t\texamShowTimer: false,\n\t}\n]",
+		exam: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Exam\n\t{\n\t\tmode: 'exam',\n\t\texamDurationMinutes: 20,\n\t}\n]",
 		lesson: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t// Learn\n\t{\n\t\tmode: 'learn',\n\t}\n]",
 		extraOnly: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t},\n\n\t{\n\t\tsource: '[[Note]]',\n\t}\n]",
 		nul: "[\n\t{\n\t\tid: 'titre',\n\t\ttitle: 'Titre',\n\t\tprompt: 'Énoncé',\n\t\toptions: [\n\t\t\t'a',\n\t\t\t'b',\n\t\t],\n\t\tcorrectIndex: 0,\n\t}\n]",
 	};
 	r.check("quiz sans glossaire : octet pour octet inchangé",
-		exportAll([question({})], { mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true }),
+		exportAll([question({})], { mode: "quiz" }),
 		SANS_GLOSSAIRE.quiz);
 	r.check("examen sans glossaire : octet pour octet inchangé",
-		exportAll([question({})], { mode: "exam", enabled: true, durationMinutes: 20, autoSubmit: true, showTimer: false }),
+		exportAll([question({})], { mode: "exam", durationMinutes: 20 }),
 		SANS_GLOSSAIRE.exam);
 	r.check("lesson sans glossaire : octet pour octet inchangé",
-		exportAll([question({})], { mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true }),
+		exportAll([question({})], { mode: "lesson" }),
 		SANS_GLOSSAIRE.lesson);
 	r.check("objet sans mode reconnu, sans glossaire : octet pour octet inchangé",
-		exportAll([question({})], { enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, _extra: { source: "[[Note]]" } }),
+		exportAll([question({})], { _extra: { source: "[[Note]]" } }),
 		SANS_GLOSSAIRE.extraOnly);
 	r.check("aucune configuration, sans glossaire : octet pour octet inchangé",
 		exportAll([question({})], null),
 		SANS_GLOSSAIRE.nul);
 	// Un glossaire VIDE (tableau `[]`) ne doit rien ajouter non plus.
 	r.check("glossaire vide : aucun champ `glossary` écrit",
-		exportAll([question({})], { mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [] }),
+		exportAll([question({})], { mode: "quiz", glossary: [] }),
 		SANS_GLOSSAIRE.quiz);
 
 	// Le glossaire s'ajoute APRÈS `_extra`, dans les trois branches qui
@@ -257,7 +268,7 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 		{ term: "pile", definition: definitionPiegee, aliases: ["LIFO"] },
 	];
 	const lessonAvecGlossaire = exportAll([question({})],
-		{ mode: "lesson", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: glossaireDeTest });
+		{ mode: "lesson", glossary: glossaireDeTest });
 	const configLesson = JSON5.parse(lessonAvecGlossaire).at(-1);
 	r.check("glossaire écrit dans l'objet Learn", configLesson.glossary?.length, 1);
 	r.check("définition (gras, backslash, latex, apostrophes, saut de ligne) intacte",
@@ -272,7 +283,7 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 		{ term: "propre", definition: "d", aliases: ["  ", ""] },
 	];
 	const nettoye = JSON5.parse(exportAll([question({})],
-		{ mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: glossaireSale })).at(-1);
+		{ mode: "quiz", glossary: glossaireSale })).at(-1);
 	r.check("entrées incomplètes ignorées", nettoye.glossary.length, 1);
 	r.check("l'entrée propre survit", nettoye.glossary[0].term, "propre");
 	r.check("aliases entièrement vides omis", "aliases" in nettoye.glossary[0], false);
@@ -289,7 +300,7 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 			_extra: { example: "un annuaire téléphonique", category: "structures" },
 		}];
 		const ecrit = JSON5.parse(exportAll([question({})],
-			{ mode: "quiz", enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: avecExtra })).at(-1);
+			{ mode: "quiz", glossary: avecExtra })).at(-1);
 		r.check("clé inconnue « example » conservée", ecrit.glossary[0].example, "un annuaire téléphonique");
 		r.check("clé inconnue « category » conservée", ecrit.glossary[0].category, "structures");
 		r.check("ordre : term/definition/aliases avant les clés inconnues",
@@ -303,7 +314,7 @@ await withSrcModule("src/editor/export.ts", ({ exportAll }) => {
 	   reconnaît pas `glossary` seul) verrait l'objet comme une question
 	   fantôme (spec §2). */
 	const practiceSansConfig = exportAll([question({}), question({ title: "Deuxième" })],
-		{ enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [{ term: "x", definition: "y" }] });
+		{ glossary: [{ term: "x", definition: "y" }] });
 	r.check("Practice sans config + glossaire : `mode: 'quiz'` ajouté",
 		practiceSansConfig.includes("mode: 'quiz',"), true);
 	const parsedPractice = JSON5.parse(practiceSansConfig);
@@ -368,7 +379,15 @@ await withSrcModule(["src/quiz-utils.ts", "src/editor/convert.ts"], (qu, convert
 	// "lesson" et non "learn" : readModeConfig normalise l'alias hérité au nom
 	// canonique (task 0 du lot mode leçon, 2026-08-31).
 	r.check("lecture normalisee", convert.readModeConfig({ mode: "Learn" }).mode, "lesson");
-	r.check("lecture d'un booleen", convert.readModeConfig({ examMode: true }).mode, "exam");
+	/* Retired on 2026-09-29 (spec §1.1): the booleans and "lesson" are no
+	   longer read, and never written back through `_extra`. */
+	r.check("examMode / mode: \"lesson\" no longer read", [convert.readModeConfig({ examMode: true }).mode, convert.readModeConfig({ mode: "lesson" }).mode], ["quiz", "quiz"]);
+	r.check("retired keys are not kept to be written back",
+		convert.readModeConfig({ mode: "exam", examMode: true, learnMode: false, examAutoSubmit: false, examShowTimer: true, owner: "alice" })._extra, { owner: "alice" });
+	r.check("an Exam's duration is read within [1, 300]; another mode has none",
+		[convert.readModeConfig({ mode: "exam", examDurationMinutes: 125 }).durationMinutes, convert.readModeConfig({ mode: "exam", examDurationMinutes: 999 }).durationMinutes,
+			convert.readModeConfig({ mode: "exam" }).durationMinutes, convert.readModeConfig({ mode: "learn", examDurationMinutes: 15 }).durationMinutes],
+		[125, 300, undefined, undefined]);
 
 	r.done();
 });
@@ -424,7 +443,7 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 	r.check("sans configuration : aucun index reconnu", qu.findQuizModeConfigIndex([q, q2]), -1);
 	const questionsConverties = [q, q2].map(convert.convertParsedToInternal);
 	const sourcePractice = exp.exportAll(questionsConverties,
-		{ enabled: false, durationMinutes: 10, autoSubmit: true, showTimer: true, glossary: [{ term: "x", definition: "y" }] });
+		{ glossary: [{ term: "x", definition: "y" }] });
 	const parsedPractice = JSON5.parse(sourcePractice);
 	const idxPractice = qu.findQuizModeConfigIndex(parsedPractice);
 	r.check("Practice sans config + glossaire : l'objet écrit est reconnu comme configuration",
@@ -455,15 +474,15 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts", "src/quiz-
 			JSON5.parse(exp.exportAll([questionConvertie], nonTableau)).at(-1).glossary, "à écrire");
 	}
 
-	/* Les branches EXAMEN et LEARN CHRONOMÉTRÉ portent aussi le glossaire. */
+	/* The EXAM branch carries the glossary too; a Learn has no duration any more. */
 	{
 		const g = [{ term: "pile", definition: "LIFO" }];
 		const examen = JSON5.parse(exp.exportAll([questionConvertie],
-			{ enabled: true, mode: "exam", durationMinutes: 20, autoSubmit: true, showTimer: true, glossary: g })).at(-1);
-		r.check("examen : glossaire et durée écrits", [examen.examMode, examen.examDurationMinutes, examen.glossary], [true, 20, g]);
-		const learnChrono = JSON5.parse(exp.exportAll([questionConvertie],
-			{ enabled: true, mode: "lesson", durationMinutes: 15, autoSubmit: true, showTimer: true, glossary: g })).at(-1);
-		r.check("Learn chronométré : glossaire et durée écrits", [learnChrono.mode, learnChrono.examDurationMinutes, learnChrono.glossary], ["learn", 15, g]);
+			{ mode: "exam", durationMinutes: 20, glossary: g })).at(-1);
+		r.check("Exam: glossary and duration written", [examen.mode, examen.examDurationMinutes, examen.glossary], ["exam", 20, g]);
+		const learn = JSON5.parse(exp.exportAll([questionConvertie],
+			{ mode: "lesson", durationMinutes: 15, glossary: g })).at(-1);
+		r.check("Learn: glossary written, no duration", [learn.mode, learn.examDurationMinutes, learn.glossary], ["learn", undefined, g]);
 	}
 
 	r.done();
