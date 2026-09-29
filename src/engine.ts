@@ -314,6 +314,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		getMissingIndices: state.getMissingIndices,
 		isCorrect: state.isCorrect,
 		computeScorePercent: state.computeScorePercent,
+		countRightWithHint: state.countRightWithHint,
 		getSubmitSlideSignature: state.getSubmitSlideSignature,
 		getResultsSlideSignature: state.getResultsSlideSignature,
 		goToQuestion: state.goToQuestion,

@@ -73,5 +73,16 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	r.check("plafond de tentatives", e.tentatives.length, MAX_TENTATIVES);
 	r.check("la meilleure est toujours gardée", e.bestScore, 95);
 	r.check("tentativesDe : du plus récent au plus ancien", tentativesDe(e)[0].date >= tentativesDe(e)[1].date, true);
+
+	/* A Test's attempt keeps its right answers found with a hint (spec
+	   2026-09-29 §2.2) — through a deletion and its undo too; none, no field. */
+	const { store: sAide } = fabriquer();
+	sAide.updateRecord("g.md", { bestScore: 80, questionsDone: 15, totalQuestions: 15, withHint: 2 });
+	sAide.updateRecord("g.md", { bestScore: 60, questionsDone: 15, totalQuestions: 15, withHint: 0 });
+	const [sansAide, avecAide] = tentativesDe(sAide.getRecord("g.md"));
+	r.check("an attempt keeps its hint count, and has none without a hint", [avecAide.withHint, "withHint" in sansAide], [2, false]);
+	const retireeAide = sAide.supprimerTentative("g.md", avecAide.date);
+	sAide.restaurerTentative("g.md", retireeAide);
+	r.check("… through a deletion and its undo", tentativesDe(sAide.getRecord("g.md")).find(x => x.date === avecAide.date)?.withHint, 2);
 	r.done();
 });

@@ -17,6 +17,9 @@ export interface Tentative {
 	/** Le résumé d'avant l'historique (meilleur score, dernière partie),
 	    lu comme UNE tentative : rien n'est perdu, et il se supprime aussi. */
 	ancienne?: true;
+	/** A Test's right answers that used a hint (spec 2026-09-29 §2.2);
+	    absent when there are none. */
+	withHint?: number;
 }
 
 /** Au-delà, les plus anciennes tombent — la meilleure est toujours gardée. */
@@ -143,7 +146,11 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 		let maintenant = Date.now();
 		if (maintenant <= lastTimestamp) maintenant = lastTimestamp + 1;
 		lastTimestamp = maintenant;
-		const tentative: Tentative = { date: maintenant, pct: update.texteLibre ? null : (update.bestScore || 0) };
+		const tentative: Tentative = {
+			date: maintenant,
+			pct: update.texteLibre ? null : (update.bestScore || 0),
+			...(update.withHint && update.withHint > 0 ? { withHint: update.withHint } : {}),
+		};
 		const base: QuizStatRecord = {
 			...existing,
 			questionsDone: Math.max(existing.questionsDone, update.questionsDone || 0),

@@ -493,8 +493,12 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			const stat = (cls: string, n: number, key: TransKey) => `<div class="quiz-learn-summary-stat ${cls}"><strong>${n}</strong><span>${t(key)}</span></div>`;
 			learnSummary = `<div class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</div>`;
 		}
-		// Le score (« 12/20 », « 60 % ») reste du code : seule l'étiquette est traduite.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong></p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
+		/* A TEST says how many right answers used a hint: "12/15, 2 with a
+		   hint" (spec 2026-09-29 §2.2). Counted, never taken off the score. */
+		const withHint = ctx.handIn.isTest() ? ctx.countRightWithHint() : 0;
+		const withHintNote = withHint > 0 ? `<span class="quiz-result-with-hint">, ${t("engine.result.withHint", { count: withHint })}</span>` : "";
+		// The score ("12/20", "60 %") stays code: only the label is translated.
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong>${withHintNote}</p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 	}
 
 

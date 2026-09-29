@@ -44,6 +44,7 @@ release notes.
 - The quiz format no longer reads `mode: "lesson"`, `examMode`, `learnMode`, `examAutoSubmit` or `examShowTimer`: a Learn writes `mode: "learn"`, and a timed exam `mode: "exam"` with `examDurationMinutes`, now up to 300 minutes (a missing duration gives 1 min 30 per question, rounded to 5 minutes).
 - A Learn no longer ends with a "Take the exam" button, even when it carries a duration: an exam is now a quiz of its own.
 - A Practice or an exam is handed in from its last question with "Hand in the test", instead of going through an end screen: when questions are left unanswered, a window lists them (click one to go back to it) and asks whether to hand in anyway. An exam no longer shows hints, even when the quiz has some.
+- A handed-in Practice or exam says how many right answers used a hint ("12/15, 2 with a hint"), and so does its attempt in the Progress tab; the score itself does not change. For spaced review, a question answered right with a hint, wrong or left blank counts as missed, and the review log is written only when the test is handed in.
 - The home page's Resume card no longer shows a percentage: it simply reopens the quiz on the question where you stopped.
 - The blue glow at the top of the home page and its "Add an exam" link are gone.
 - The side rail has new effects: entries are dimmed at rest, a soft surface appears on hover, they shrink slightly when pressed, and the current page is a frosted-glass card with a filled icon. The logo at the top is now a line icon that opens the GitHub repository, where you can leave a star.
@@ -123,6 +124,7 @@ release notes.
 - Writing an answer in your own words no longer has a Check button: you write it and move on, and it self-assesses on the results screen instead, where each written answer shows what you wrote, the correct answer, the explanation, and two icon-only buttons to mark it right or wrong; a written answer left unassessed doesn't count against your score.
 
 ### Fixed
+- "Try again" then reaching the score again now counts the new attempt in the Progress tab and in spaced review; it counted only the first one.
 - Moving to another question no longer makes the quiz as tall as its longest reading for the length of the slide, and no longer flashes a scrollbar at the end of each move.
 - Fill in the blanks with a blank inside a formula ($du = ▢ dx$) shows the formula around the blank instead of raw LaTeX, and a blank whose answer is itself written in LaTeX (a fraction) is a blank again.
 - An answer typed in the equation editor is no longer marked wrong for how the editor writes it: a derivative prime (f'(3) = 6), a decimal comma (1,5 for 1.5) and a fraction typed with a slash (15/7) now match the expected answer.

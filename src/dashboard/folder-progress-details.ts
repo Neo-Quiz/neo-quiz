@@ -169,6 +169,7 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 	ajouter(row, "span", "qbd-folder-attempt-date", formatDateHeure(new Date(tentative.date)));
 	const infos = ajouter(row, "span", "qbd-folder-attempt-info");
 	ajouter(infos, "span", "qbd-folder-attempt-pct", tentative.pct === null ? t("dashboard.quizzes.attemptFree") : t("dashboard.quizzes.attemptPct", { pct: tentative.pct }));
+	if (tentative.withHint) ajouter(infos, "span", "qbd-folder-attempt-hint", t("dashboard.quizzes.attemptWithHint", { count: tentative.withHint }));
 	if (tentative.ancienne) ajouter(infos, "span", "qbd-folder-attempt-old", t("dashboard.quizzes.attemptOld"));
 	const supprimer = ajouter(row, "button", "qbd-folder-attempt-delete");
 	supprimer.type = "button";

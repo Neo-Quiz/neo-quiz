@@ -183,6 +183,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.attemptsToggle": "Attempts",
 	"dashboard.quizzes.attemptFree": "Free answers",
 	"dashboard.quizzes.attemptPct": "{pct}%",
+	"dashboard.quizzes.attemptWithHint": "{count} with a hint",
 	"dashboard.quizzes.attemptOld": "Before history",
 	"dashboard.quizzes.attemptDelete": "Delete this attempt",
 	"dashboard.quizzes.attemptDeleted": "Attempt deleted",

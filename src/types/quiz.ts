@@ -433,13 +433,14 @@ export interface QuizState {
 	 */
 	hintSeen: boolean[];
 	/**
-	 * Questions DÉJÀ journalisées pour l'ordonnanceur pendant cette session.
+	 * Questions ALREADY logged for the scheduler during this session.
 	 *
-	 * Une auto-évaluation journalise immédiatement (le verdict existe) ;
-	 * la soumission journalise tout le reste. Sans ce drapeau, une question
-	 * notée à la main serait comptée deux fois, et sa seconde entrée
-	 * ferait croître son intervalle à quelques secondes d'intervalle.
-	 * Remis à zéro par `resetQuiz`, comme `resultsCounted`.
+	 * In a Learn a self-assessment logs at once (the verdict exists); the
+	 * results log everything else. In a Test everything is logged at
+	 * hand-in (engine/state.ts recordReview). Without this flag, a question
+	 * rated by hand would be counted twice, and its second entry would grow
+	 * its interval a few seconds apart. Reset by `resetQuiz`, like
+	 * `resultsCounted`.
 	 */
 	recorded: boolean[];
 	/* THE LEARN RETRY LOOP (engine/learn-loop.ts, 2026-09-29): each question
@@ -509,6 +510,9 @@ export interface StatsRecord {
 	totalQuestions: number;
 	/** Quiz à réponses libres seulement : pas de pourcentage (tentative `pct: null`). */
 	texteLibre?: boolean;
+	/** A Test's right answers that used a hint (spec 2026-09-29 §2.2), kept
+	    on its attempt; absent when there are none. */
+	withHint?: number;
 }
 
 /**

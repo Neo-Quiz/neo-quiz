@@ -49,6 +49,11 @@ await withSrcModule(
 		statsStore = { updateRecord() {} },
 		textOnly,
 		quizMode,
+		/* A Test's verdicts are written at hand-in only (`goToResults` sets
+		   `resultsCounted` first): a direct `recordReview` on a Test must
+		   say it is past the hand-in. */
+		handedIn = false,
+		hintSeen = [],
 	}) {
 		const appels = [];
 		const sink = sinkOverride === undefined
@@ -113,7 +118,8 @@ await withSrcModule(
 			current: ctx.SLIDE_RESULTS_INDEX,
 			lastQuestionIndex: 0,
 			pendingResultsLock: false,
-			resultsCounted: false,
+			resultsCounted: handedIn,
+			hintSeen: hintSeen.length ? hintSeen : quiz.map(() => false),
 			shuffleMap: quiz.map(() => null),
 			orderingPick: quiz.map(() => null),
 			matchPick: quiz.map(() => null),
@@ -129,6 +135,7 @@ await withSrcModule(
 			isComplete: handlers.isComplete,
 			isCorrect: handlers.isCorrect,
 			computeScorePercent: handlers.computeScorePercent,
+			countRightWithHint: handlers.countRightWithHint,
 			updateNavHighlight: handlers.updateNavHighlight,
 			goToSlide: handlers.goToSlide,
 			recordReview: handlers.recordReview,
@@ -174,11 +181,11 @@ await withSrcModule(
 		// DÉFAUT de `makeCtx` (déstructuration avec valeur par défaut) — c'est
 		// justement `null` qui simule un `_reviewStore` absent (Task 7, "le
 		// store dégrade plutôt que de bloquer le greffon").
-		const { ctx: sansPuits } = makeCtx({ quiz, selections: [null], reviewSink: null });
+		const { ctx: sansPuits } = makeCtx({ quiz, selections: [null], reviewSink: null, handedIn: true });
 		sansPuits.recordReview(0, "correct");
 		r.check("puits absent : rien n'est marqué journalisé", sansPuits.quizState.recorded[0], false);
 
-		const { ctx: sansChemin, appels } = makeCtx({ quiz, selections: [null], sourcePath: "" });
+		const { ctx: sansChemin, appels } = makeCtx({ quiz, selections: [null], sourcePath: "", handedIn: true });
 		sansChemin.recordReview(0, "correct");
 		r.check("sourcePath absent (aperçu éditeur) : aucun appel au puits", appels.length, 0);
 		r.check("sourcePath absent : rien n'est marqué journalisé", sansChemin.quizState.recorded[0], false);
@@ -188,7 +195,7 @@ await withSrcModule(
 	{
 		const r = makeReporter("recordReview — dédoublonnage (une fois par session)");
 		const quiz = [{ id: "q1", title: "T1" }];
-		const { ctx, appels } = makeCtx({ quiz, selections: [null] });
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], handedIn: true });
 		ctx.recordReview(0, "correct");
 		ctx.recordReview(0, "correct");
 		r.check("deux appels, un seul enregistrement journalisé", appels.length, 1);
@@ -214,7 +221,7 @@ await withSrcModule(
 		const r = makeReporter("recordReview — role included as soon as the block is a Learn");
 		const quiz = [{ id: "q1", title: "T1" }];
 
-		const { ctx: horsLecon, appels: a1 } = makeCtx({ quiz, selections: [null], isLessonMode: false, roles: ["recall"] });
+		const { ctx: horsLecon, appels: a1 } = makeCtx({ quiz, selections: [null], isLessonMode: false, roles: ["recall"], handedIn: true });
 		horsLecon.recordReview(0, "understood");
 		r.check("bloc jamais Leçon : pas de propriété 'role'", Object.prototype.hasOwnProperty.call(a1[0], "role"), false);
 
@@ -250,7 +257,7 @@ await withSrcModule(
 			{ title: "Titre à vérifier" },
 			{ id: "q-explicit", title: "Autre titre" },
 		];
-		const { ctx, appels } = makeCtx({ quiz, selections: [null, null] });
+		const { ctx, appels } = makeCtx({ quiz, selections: [null, null], handedIn: true });
 		r.check("id de repli calculé à la main", ctx.questionIds[0], "titre-v-rifier");
 		ctx.recordReview(0, "correct");
 		ctx.recordReview(1, "wrong");
@@ -443,7 +450,7 @@ await withSrcModule(
 		const originalError = console.error;
 		console.error = (...args) => { erreurs.push(args); };
 		try {
-			const { ctx: ctxDirect } = makeCtx({ quiz, selections: [null], reviewSink: sinkQuiLeve });
+			const { ctx: ctxDirect } = makeCtx({ quiz, selections: [null], reviewSink: sinkQuiLeve, handedIn: true });
 			let leveDirect = null;
 			try { ctxDirect.recordReview(0, "correct"); } catch (e) { leveDirect = e; }
 			r.check("recordReview seul : rien ne remonte", leveDirect, null);
@@ -538,9 +545,13 @@ await withSrcModule(
 		ctx.textOnly.bindTextOnlyQuestion(fakeTrackItem([bouton]), 0);
 		bouton.click();
 		bouton.click();
-		r.check("« À revoir » : faux, complet, UNE ligne au journal",
-			[ctx.isCorrect(0), ctx.isComplete(0), appels],
-			[false, true, [{ q: "Cours/ch1.md::carte1", grade: "review" }]]);
+		/* Outside a Learn the card is part of a TEST: its rating waits for the
+		   hand-in (spec 2026-09-29 §2.4), then is written as rated, once. */
+		r.check("« À revoir » : faux, complet, rien au journal avant de rendre",
+			[ctx.isCorrect(0), ctx.isComplete(0), appels], [false, true, []]);
+		ctx.goToResults();
+		r.check("… puis UNE ligne au journal, avec sa note, au moment de rendre",
+			appels, [{ q: "Cours/ch1.md::carte1", grade: "review" }]);
 
 		const sansVerso = { id: "carte2", title: "Vide", prompt: "P", flashcard: true };
 		r.check("carte sans verso : « Réponse manquante », jamais une exception",
@@ -736,6 +747,80 @@ await withSrcModule(
 		ctx.quizState.textOnlyChecked = [false];
 		r.check("no check outside a Learn", [ctx.learn.isActive(), ctx.learn.canCheck(0), ctx.isRevealed(0)], [false, false, false]);
 		r.check("the next arrow goes straight on", ctx.learn.advance(0), { kind: "go", qi: null });
+		r.done();
+	}
+	{
+		/* VERDICTS OF A TEST, at hand-in (spec 2026-09-29 §2.4): right without a
+		   hint → correct; right WITH a hint → wrong; wrong → wrong; unanswered
+		   → wrong. The score does not change (the hint is only counted); the
+		   attempt keeps its "right with a hint" count. */
+		const r = makeReporter("Test — verdicts at hand-in");
+		const q = (id) => ({ id, title: id, options: ["a", "b"], correctIndex: 0 });
+
+		/* A written answer (self-assessed) of a Test: left BLANK it is failed
+		   at hand-in; written but not rated yet, it waits for its rating on
+		   the results screen. */
+		const ecrit = (texte) => {
+			const x = makeCtx({ quiz: [{ id: "ecrit", title: "E" }], selections: [null],
+				textOnly: { isTextOnlyFor: () => true, isRated: () => false, hasAnyAnswer: () => texte, isTextOnlyForAny: () => true } });
+			x.ctx.goToResults();
+			return x.appels.map(a => a.grade);
+		};
+		r.check("a written answer left blank is failed at hand-in; written, it waits for its rating",
+			[ecrit(false), ecrit(true)], [["wrong"], []]);
+		const quiz = [q("seul"), q("aide"), q("faux"), q("vide"), q("faux-aide")];
+		const records = [];
+		const statsStore = { updateRecord: (path, rec) => records.push(rec) };
+		const { ctx, appels } = makeCtx({ quiz, selections: [0, 0, 1, null, 1], hintSeen: [false, true, false, false, true], statsStore });
+		ctx.recordReview(0, "correct");
+		r.check("nothing is written before the hand-in", appels.length, 0);
+		ctx.goToResults();
+		r.check("one verdict per question: right alone, right with a hint, wrong, unanswered",
+			appels.map(a => [a.q.split("::")[1], a.grade]),
+			[["seul", "correct"], ["aide", "wrong"], ["faux", "wrong"], ["vide", "wrong"], ["faux-aide", "wrong"]]);
+		r.check("the score still counts the right answer found with a hint",
+			[ctx.computeScorePercent().correct, ctx.computeScorePercent().total, ctx.countRightWithHint()], [2, 5, 1]);
+		r.check("the attempt keeps its \"right with a hint\" count", records.map(x => x.withHint), [1]);
+
+		/* "Try again" (resetQuiz) starts a NEW attempt: before 2026-09-29 it
+		   left \`resultsCounted\` true, so the next score counted no attempt and
+		   logged no verdict. */
+		const reset = createStateHandlers(ctx).resetQuiz;
+		Object.assign(ctx, {
+			track: { clearTrackTransitionFallback() {} },
+			viewport: { destroyActiveSlideResizeObserver() {}, destroyAllSlidesResizeObserver() {}, destroyViewportResizeObserver() {} },
+			clearBackgroundWarmIdleHandle() {}, cancelEnsureTrackVisibleRaf() {}, setSlidingClass() {},
+			initTextOnlyAnswers: () => quiz.map(() => ""), initTextOnlyChecked: () => quiz.map(() => false),
+			initTextOnlyRatings: () => quiz.map(() => null), initOrderingPicks: () => quiz.map(() => null), initMatchPicks: () => quiz.map(() => null),
+			passage: { resetPassageState() {} }, stopExamTimer() {}, render() {},
+		});
+		reset();
+		// Played through again, on the results slide as in the other cases (no track to slide).
+		ctx.quizState.current = ctx.SLIDE_RESULTS_INDEX;
+		ctx.quizState.selections = [0, 0, 0, 0, 0];
+		ctx.goToResults();
+		r.check("after \"Try again\", the next hand-in is a new attempt with its verdicts",
+			[records.length, appels.length], [2, 10]);
+		r.done();
+	}
+
+	{
+		const r = makeReporter("Test — a self-assessed answer with a hint, and a Learn unchanged");
+		const quiz = [{ id: "ecrit", title: "E" }];
+		const { ctx, appels } = makeCtx({ quiz, selections: [null], hintSeen: [true], handedIn: true });
+		ctx.recordReview(0, "understood");
+		r.check("\"understood\" with a hint is \"review\" in a Test", appels[0]?.grade, "review");
+		const learn = makeCtx({ quiz, selections: [null], isLessonMode: true, hintSeen: [true] });
+		learn.ctx.recordReview(0, "correct");
+		r.check("a Learn writes as it goes, and a hint does not change its verdict", learn.appels[0]?.grade, "correct");
+		const learnVide = makeCtx({ quiz: [{ id: "v", title: "V", options: ["a", "b"], correctIndex: 0 }], selections: [null], isLessonMode: true, roles: ["test"] });
+		learnVide.ctx.goToResults();
+		r.check("a Learn writes nothing for an unanswered question", learnVide.appels.length, 0);
+		const records = [];
+		const learnAide = makeCtx({ quiz: [{ id: "a", title: "A", options: ["a", "b"], correctIndex: 0 }], selections: [0], isLessonMode: true, roles: ["test"], hintSeen: [true],
+			statsStore: { updateRecord: (path, rec) => records.push(rec) } });
+		learnAide.ctx.goToResults();
+		r.check("a Learn's attempt carries no hint count", [records.length, records[0]?.withHint], [1, undefined]);
 		r.done();
 	}
 });

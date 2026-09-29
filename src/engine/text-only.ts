@@ -619,11 +619,12 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				if (!rating) return;
 				if ((btn as HTMLButtonElement).disabled) return;
 				ctx.quizState.textOnlyRatings[qi] = rating;
-				// Le verdict existe MAINTENANT : c'est ici, et pas à l'écran de
-				// résultats, qu'une restitution devient un signal de mémoire.
-				// Appel NON optionnel : `recordReview` est REQUIS sur EngineCtx
-				// (types/engine-ctx.ts) — un `?.` ici masquerait un câblage manquant
-				// au lieu d'échouer bruyamment (fix round 1, 2026-09-02).
+				// In a Learn the verdict exists NOW: here, and not on the results
+				// screen, a recall becomes a memory signal. In a Test,
+				// `recordReview` holds it until the hand-in (engine/state.ts).
+				// NON-optional call: `recordReview` is REQUIRED on EngineCtx
+				// (types/engine-ctx.ts) — a `?.` here would hide a missing wiring
+				// instead of failing loudly (fix round 1, 2026-09-02).
 				ctx.recordReview(qi, rating);
 				// In a Learn the rating is the flashcard's check (engine/learn.ts).
 				ctx.learn.selfVerdict(qi, rating);

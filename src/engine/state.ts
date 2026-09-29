@@ -12,6 +12,8 @@ export interface StateHandlers {
 	getMissingIndices(): number[];
 	isCorrect(i: number): boolean;
 	computeScorePercent(): QuizResult;
+	/** Right answers that used a hint — counted, never a penalty on the score. */
+	countRightWithHint(): number;
 	getSubmitSlideSignature(): string;
 	getResultsSlideSignature(): string;
 	setPracticeMode(mode: PracticeMode): void;
@@ -29,6 +31,13 @@ export interface StateHandlers {
 	goToResults(): void;
 	resetQuiz(opts?: { preserveSliding?: boolean }): void;
 	recordReview(i: number, grade: ReviewGrade): void;
+}
+
+/** The grade of a Test question answered with a hint: a success becomes a
+    failure — "correct" → "wrong", a self-assessed "understood" → "review";
+    anything else is already a failure and stays as it is. */
+export function gradeWithHint(grade: ReviewGrade): ReviewGrade {
+	return grade === "correct" ? "wrong" : grade === "understood" ? "review" : grade;
 }
 
 export function createStateHandlers(ctx: EngineCtx): StateHandlers {
@@ -165,6 +174,16 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		}
 
 		return sel !== null && sel === q.correctIndex;
+	}
+
+	function countRightWithHint(): number {
+		let n = 0;
+		for (let i = 0; i < ctx.quiz.length; i++) {
+			if (sansReponse(i) || !ctx.quizState.hintSeen?.[i]) continue;
+			if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
+			if (isCorrect(i)) n++;
+		}
+		return n;
 	}
 
 	function computeScorePercent(): QuizResult {
@@ -499,6 +518,17 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		if (ctx.quizState.recorded[i]) return;
 		const id = ctx.questionIds[i];
 		if (!id) return;
+		/* A TEST's verdicts are written at hand-in, never before
+		   (spec 2026-09-29 §2.4): `goToResults` sets `resultsCounted` before
+		   its loop, so a card judged while answering (a flashcard rated on its
+		   card) waits for the hand-in — and an Exam abandoned before it
+		   writes nothing. */
+		const test = ctx.quizMode !== "lesson";
+		if (test && !ctx.quizState.resultsCounted) return;
+		/* Right WITH a hint is failed for the scheduler in a Test: the
+		   question was not recalled unaided. The displayed score does not
+		   change (`countRightWithHint` only counts it). A Learn is unchanged. */
+		if (test && ctx.quizState.hintSeen?.[i]) grade = gradeWithHint(grade);
 		const role = ctx.quizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
 		try {
 			// Le puits est une FORME destinée à d'autres hôtes (types/engine-ctx.ts) :
@@ -606,11 +636,14 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 					if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
 					if (isComplete(i)) questionsDone++;
 				}
+				// A Test's attempt keeps its "right with a hint" count (spec §2.2).
+				const withHint = ctx.quizMode !== "lesson" ? countRightWithHint() : 0;
 				statsStore.updateRecord(ctx.sourcePath, {
 					bestScore: modeTexte ? 0 : pct,
 					questionsDone,
 					totalQuestions: (total + pendingWritten) || ctx.quiz.length,
-					texteLibre: modeTexte
+					texteLibre: modeTexte,
+					...(withHint > 0 ? { withHint } : {})
 				});
 			}
 
@@ -629,31 +662,40 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			for (let i = 0; i < ctx.quiz.length; i++) {
 				if (ctx.quizState.recorded[i]) continue;
 				const role = ctx.quizMode === "lesson" ? ctx.roleOfQuestion(i) : undefined;
-				/* CORRECTIF (2026-09-27, revue lot A1, C1) : une réponse écrite
-				   (recall à choix, hors carte mémoire) est « répondue » dès
-				   qu'elle contient du texte (isComplete, retour #14) mais pas
-				   encore « jugée » — son verdict juste/faux n'existe qu'après un
-				   clic sur l'écran des résultats (text-only.ts
-				   bindWrittenReviewControls). Sans cette distinction,
-				   `isCorrect(i)` valait systématiquement faux ici (pas encore
-				   notée) et journalisait "wrong" AVANT le clic ; `recordReview`
-				   posait alors `recorded[i] = true`, et le vrai verdict de
-				   l'utilisateur, journalisé ensuite par le clic, était rejeté par
-				   la garde anti-doublon — deux entrées contradictoires n'auraient
-				   jamais dû compter, mais c'est la FAUSSE qui gagnait la course.
-				   On saute ces questions-là ICI (rien n'est écrit, `recorded[i]`
-				   reste faux) : bindWrittenReviewControls reste le SEUL point qui
-				   les journalise, avec le vrai verdict, quel que soit le moment où
-				   l'utilisateur clique. Si l'utilisateur quitte les résultats sans
-				   évaluer, rien n'est donc écrit pour cette question cette
-				   session-ci — cohérent avec `!isComplete` juste en dessous, qui
-				   ne journalise pas non plus une question jamais atteinte. */
-				if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)) continue;
+				/* FIX (2026-09-27, batch A1 review, C1): a written answer (a recall
+				   with choices, not a flashcard) is "answered" as soon as it holds
+				   text (isComplete, feedback #14) but not yet "judged" — its
+				   right/wrong verdict only exists after a click on the results
+				   screen (text-only.ts bindWrittenReviewControls). Without this
+				   distinction, `isCorrect(i)` was always false here (not rated yet)
+				   and logged "wrong" BEFORE the click; `recordReview` then set
+				   `recorded[i] = true`, and the user's real verdict, logged next by
+				   the click, was rejected by the anti-duplicate guard — two
+				   contradictory entries should never have counted, but the WRONG
+				   one won the race. These questions are skipped HERE (nothing is
+				   written, `recorded[i]` stays false): bindWrittenReviewControls
+				   stays the ONLY point that logs them, with the real verdict,
+				   whenever the user clicks. If the user leaves the results without
+				   rating, nothing is written for that question this session —
+				   consistent with `!isComplete` just below, which does not log a
+				   question never reached either ...
+				   except, in a TEST, a written answer left BLANK: nothing is waiting
+				   to be judged, it was handed in empty — failed like any unanswered
+				   question (spec 2026-09-29 §2.4), below. */
+				if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)
+					&& (ctx.quizMode === "lesson" || ctx.textOnly.hasAnyAnswer(i))) continue;
 				let grade: ReviewGrade;
 				if (ctx.isLessonMode() && role === "read") grade = "seen";
 				else if (ctx.quizState.lessonPreSkipped[i]) grade = "skipped";
-				else if (!isComplete(i)) continue; // sans réponse : rien ne s'est passé
-				else grade = isCorrect(i) ? "correct" : "wrong";
+				/* Unanswered: nothing happened in a Learn; in a TEST, the question
+				   was handed in blank — failed (spec 2026-09-29 §2.4). */
+				else if (!isComplete(i)) { if (ctx.quizMode === "lesson") continue; grade = "wrong"; }
+				/* A self-assessed card of a TEST (a flashcard rated while
+				   answering) keeps its own rating: its verdict waited for the
+				   hand-in. A Learn is unchanged. */
+				else grade = ctx.quizMode !== "lesson" && ctx.textOnly?.isTextOnlyFor?.(i) && ctx.quizState.textOnlyRatings?.[i]
+					? ctx.quizState.textOnlyRatings[i] as ReviewGrade
+					: isCorrect(i) ? "correct" : "wrong";
 				recordReview(i, grade);
 			}
 		}
@@ -695,6 +737,10 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// sans cette remise à zéro, une question déjà journalisée à la tentative
 		// précédente ne serait plus jamais recomptée (Task 8).
 		ctx.quizState.recorded = ctx.quiz.map(() => false);
+		/* ... and a new attempt for the dashboard: without this, "Try again"
+		   then the score again counted no attempt and logged no verdict — the
+		   whole of `goToResults` sits behind this guard. */
+		ctx.quizState.resultsCounted = false;
 		// The Learn retry loop starts over too (engine/learn-loop.ts).
 		Object.assign(ctx.quizState, ctx.learn.emptyState());
 		ctx.quizState.slideToken++;
@@ -727,6 +773,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		getMissingIndices,
 		isCorrect,
 		computeScorePercent,
+		countRightWithHint,
 		getSubmitSlideSignature,
 		getResultsSlideSignature,
 		setPracticeMode,

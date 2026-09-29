@@ -165,6 +165,7 @@ export const EN_ENGINE = {
 	"engine.result.reviewAnswers": "Review my answers",
 	"engine.result.ratedLabel": "Self-assessed:",
 	"engine.result.correctLabel": "Correct answers:",
+	"engine.result.withHint": "{count} with a hint",
 	"engine.result.pending.one": "Not assessed",
 	"engine.result.pending.other": "Not assessed",
 	"engine.result.pendingWritten.one": "{count} written answer is not self-assessed yet — it doesn't count in the score.",

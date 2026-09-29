@@ -1206,6 +1206,9 @@
 .qbd-folder-attempt-date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qbd-folder-attempt-info { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .qbd-folder-attempt-old { color: var(--text-faint); }
+/* A Test's right answers that used a hint (spec 2026-09-29 §2.2): the
+   amber of the hint button's bulb, quiet. */
+.qbd-folder-attempt-hint { color: color-mix(in srgb, #f59e0b 70%, var(--text-muted)); }
 .qbd-root .qbd-folder-attempt-delete {
 	height: 20px;
 	width: 20px;

@@ -286,6 +286,7 @@ export interface EngineCtx {
 	getMissingIndices: StateHandlers["getMissingIndices"];
 	isCorrect: StateHandlers["isCorrect"];
 	computeScorePercent: StateHandlers["computeScorePercent"];
+	countRightWithHint: StateHandlers["countRightWithHint"];
 	getSubmitSlideSignature: StateHandlers["getSubmitSlideSignature"];
 	getResultsSlideSignature: StateHandlers["getResultsSlideSignature"];
 	goToQuestion: StateHandlers["goToQuestion"];

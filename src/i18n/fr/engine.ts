@@ -146,6 +146,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.result.reviewAnswers": "Corriger mes réponses",
 	"engine.result.ratedLabel": "Auto-évaluées :",
 	"engine.result.correctLabel": "Bonnes réponses :",
+	"engine.result.withHint": "dont {count} avec indice",
 	"engine.result.pending.one": "Non évaluée",
 	"engine.result.pending.other": "Non évaluées",
 	"engine.result.pendingWritten.one": "{count} réponse écrite n'est pas encore auto-évaluée — elle ne compte pas dans le score.",

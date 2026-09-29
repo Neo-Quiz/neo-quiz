@@ -153,6 +153,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.attemptsToggle": "Tentatives",
 	"dashboard.quizzes.attemptFree": "Réponses libres",
 	"dashboard.quizzes.attemptPct": "{pct} %",
+	"dashboard.quizzes.attemptWithHint": "dont {count} avec indice",
 	"dashboard.quizzes.attemptOld": "Avant l'historique",
 	"dashboard.quizzes.attemptDelete": "Supprimer cette tentative",
 	"dashboard.quizzes.attemptDeleted": "Tentative supprimée",
