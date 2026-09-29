@@ -173,9 +173,9 @@
 	height: 18px;
 }
 
-/* Bouton pilule « Nouveau dossier » — copie du « Create Study Set » de
-   StudySmarter : pilule inversée theme-aware (blanc sur sombre), icône +.
-   !important contre le chrome .theme-dark button (0,1,1). */
+/* The "New folder" pill — a copy of StudySmarter's "Create Study Set": an
+   inverted, theme-aware pill (white on dark), + icon. !important against
+   the .theme-dark button chrome (0,1,1). */
 .qbd-btn--create {
 	display: inline-flex;
 	align-items: center;
@@ -188,24 +188,28 @@
 	color: var(--background-secondary) !important;
 	font-size: 13px;
 	font-weight: 600;
-	box-shadow: none !important;
+	/* 3D (2026-09-29), the same depth as the 3D buttons (`.qbd-cta3d`,
+	   "Start the quiz"): the face stands 4px above a solid edge, drawn as a
+	   hard shadow so the button keeps its size in the layout. The edge is
+	   the face darkened. */
+	--qbd-create-edge: color-mix(in srgb, var(--text-normal) 55%, var(--background-secondary));
+	box-shadow: 0 4px 0 0 var(--qbd-create-edge) !important;
 	cursor: pointer;
-	transform-origin: center;
-	transition: background 0.15s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+	transition: background 0.15s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
 }
 
-/* Survol StudySmarter (captures Ahmed 2026-07-18) : la pilule blanche vire
-   au gris clair (#FFFFFF → #ECECED, ~7 % vers le gris) — theme-aware en
-   mêlant le fond inversé à la surface de page. */
+/* StudySmarter hover (screenshots, 2026-07-18): the white pill turns light
+   grey (#FFFFFF → #ECECED, ~7 % towards grey) — theme-aware by mixing the
+   inverted background with the page surface. */
 .qbd-btn--create:hover {
 	background: color-mix(in srgb, var(--text-normal) 92%, var(--background-secondary)) !important;
 }
 
-/* Clic StudySmarter : le bouton RÉTRÉCIT pendant l'appui puis reprend sa
-   taille au relâché (le retour passe par la transition transform du repos). */
-.qbd-btn--create:active {
-	transform: scale(0.95);
-	transition-duration: 0.15s, 90ms;
+/* Click: the face sinks onto its edge (100 ms ease-out, like `.qbd-cta3d`),
+   and rises again on release. */
+.qbd-btn--create:active:not(:disabled) {
+	transform: translateY(4px);
+	box-shadow: 0 0 0 0 var(--qbd-create-edge) !important;
 }
 .qbd-btn--create .qbd-btn-icon svg {
 	width: 15px;

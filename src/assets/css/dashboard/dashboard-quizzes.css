@@ -851,10 +851,10 @@
 
 
 
-/* Même pilule pour « Nouveau dossier » (ligne du regroupement, racine)
-   que pour « Nouveau quiz » (hero du drill) — demande Ahmed 2026-07-20.
-   Et pour « Generate a quiz » de l'accueil (contrat visuel 2026-07-28) : une
-   seule géométrie d'action primaire dans tout le dashboard, définie ici. */
+/* The same pill for "New folder" (grouping row, root) as for "New quiz"
+   (the drill hero) — asked on 2026-07-20. And for the home's "Generate a
+   quiz" (visual contract 2026-07-28): one geometry of primary action in the
+   whole dashboard, defined here. */
 .qbd-quizzes-folder-hero .qbd-btn--create,
 .qbd-home-header .qbd-btn--create,
 .qbd-onboarding .qbd-btn--create,
@@ -866,6 +866,8 @@
 	background: rgba(231, 235, 247, 0.92) !important;
 	color: #141a2c !important;
 	font-size: 14px;
+	/* The edge under this pill's face (3D, dashboard-components.css). */
+	--qbd-create-edge: #9aa2bb;
 }
 
 /* ══════════════════════════════════════════════════════════
