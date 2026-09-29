@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Added
+- A play button at the top right of a course card starts it at once: its only mode, or a choice between Learn, Test and Exam when the card gathers several.
 - Timed exams: a test can be an Exam, with a start screen giving its duration and number of questions, a clock at the top that turns orange then red and shows hours from 60 minutes on, no hints, and an automatic hand-in at zero with the answers given so far. An exam is never resumed: closed before it is handed in, it leaves no attempt and no review.
 - Leaving an exam before handing it in asks first, from the quiz's close button or the mouse's back button: "Leave the exam? It will not be saved.", with Leave and Continue the exam; the clock keeps running meanwhile.
 - The quiz editor has a Mode button next to Vocabulary: a test switches between Practice and Exam, an exam's duration is set there (30, 60, 90 or 120 minutes, or any length from 1 to 300), and a note named "— Practice" or "— Exam" is renamed to match, keeping its review history. A Learn shows its mode but stays a Learn.
@@ -50,6 +51,7 @@ release notes.
 - Learn quizzes check each question on its card: a Check button (the next arrow checks first too) shows the correction and the explanation at once. A missed question comes back later, after two other questions or at the end of its step, with its answer cleared and its options reshuffled, up to three times; its bead is green when right the first time, orange when right after a miss and red while not right yet, each with a small mark. Flashcards and written answers are judged on their card, "In your own words" answers included (they were always marked wrong). The results say how many were right the first time, right after a retry and still to review; the score and the review history keep the first attempt only.
 
 ### Changed
+- A Practice now reads "Test" on cards, quiz pages and progress, with a written-sheet icon; "Practice" only names the Test's sub-mode on the Generate page.
 - The back arrow of a quiz's page sits exactly where a folder's does: going back from a quiz to its folder, then to Folders, is two clicks without moving the mouse.
 - Generated Practice questions get a hint only when one helps, instead of one on every question.
 - Generated fill-in-the-blanks no longer frame a blank with the chevrons, brackets or quotes of its answer (#include <▢>): those go inside the blank, which no longer hints at the answer.

@@ -268,12 +268,15 @@ export const EN_DASHBOARD = {
 	/* ── Carte de quiz (état) ── */
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */
 	"dashboard.card.more": "More actions",
+	"dashboard.card.play": "Start",
+	"dashboard.card.pickMode": "Which mode?",
 
 	/* ── Type de quiz (calculé par le scanner, traduit au rendu) ── */
 	"dashboard.quizType.mixed": "Mixed",
 	/* L'objectif d'un quiz, en badge : noms anglais dans les deux langues (spec Learn/Practice). */
 	"dashboard.quizMode.learn": "Learn",
 	"dashboard.quizMode.practice": "Practice",
+	"dashboard.quizMode.test": "Test",
 	"dashboard.quizMode.exam": "Exam",
 	"dashboard.quizMode.examTip": "A timed test without help: no hints, corrected once handed in, handed in automatically when time is up.",
 	"dashboard.quizType.single": "Single choice",

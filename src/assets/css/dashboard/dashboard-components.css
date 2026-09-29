@@ -577,65 +577,12 @@
    bouton play et le badge de type reprennent cette couleur — le quiz hérite
    l'identité de son dossier. Base sombre #181d2b (hex du handoff, cohérent avec
    les cartes dossier). L'état reste porté par la pastille. ── */
-.qbd-root .qbd-quiz-card--tinted .qbd-quiz-card-play {
-	background: color-mix(in oklab, var(--accent) 20%, #181d2b);
-	color: var(--accent);
-}
-.qbd-root .qbd-quiz-card--tinted .qbd-quiz-card-play:hover {
-	background: color-mix(in oklab, var(--accent) 34%, #181d2b);
-	color: var(--accent);
-}
 .qbd-quiz-card--tinted .qbd-quiz-card-badge {
 	background: color-mix(in oklab, var(--accent) 20%, #181d2b);
 	color: color-mix(in oklab, var(--accent) 75%, #ffffff);
 }
 
 
-/* Bouton lecture rond — présent dès que l'appelant fournit `opts.onPlay`
-   (accueil ET « Mes quiz »). `.qbd-root` préfixe pour passer devant le chrome
-   natif `button:not(.clickable-icon){background:var(--interactive-normal)}`
-   d'Obsidian (spécificité 0,1,1 > 0,1,0 d'une classe seule) — sinon un
-   rectangle gris remplace le cercle transparent voulu. Toujours visible
-   (pas de reveal au survol de la carte comme l'ancien chevron) : c'est
-   désormais une action réelle, y compris au toucher (mobile), où il n'y a
-   pas de hover pour la révéler. */
-.qbd-root .qbd-quiz-card-play {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	width: 26px;
-	height: 26px;
-	padding: 0;
-	border: none;
-	border-radius: 999px;
-	/* Fond PLEIN, pas transparent : rond + transparent ne laissait qu'un
-	   triangle gris pâle, lu comme une icône décorative — le défaut même du
-	   chevron qu'il remplace. C'est le fond qui en fait un contrôle. La teinte
-	   d'accent le distingue aussi de la pastille d'état, à quelques pixels de
-	   là, qui elle n'est PAS cliquable. */
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-	cursor: pointer;
-	transition: background 0.14s ease, color 0.14s ease, transform 0.08s ease;
-}
-
-.qbd-quiz-card-play svg {
-	width: 14px;
-	height: 14px;
-}
-
-/* Le repos étant déjà plein, le survol ÉCLAIRCIT l'accent au lieu de poser un
-   voile translucide (qui, sur un fond plein, l'assombrissait au lieu de le
-   mettre en avant). */
-.qbd-root .qbd-quiz-card-play:hover {
-	background: var(--interactive-accent-hover);
-	color: var(--text-on-accent);
-}
-
-.qbd-quiz-card-play:active {
-	transform: scale(0.92);
-}
 
 /* Variante propre au dossier ouvert, fidèle au handoff 7a. Le composant
    partagé garde son apparence historique sur l'accueil et les autres vues. */
@@ -797,38 +744,6 @@
 	font-size: 10.5px;
 }
 
-.qbd-root .qbd-quiz-card.qbd-quiz-card--folder .qbd-quiz-card-play {
-	width: 32px;
-	height: 32px;
-	border-radius: 9px;
-	background: color-mix(in srgb, var(--accent) 8%, transparent);
-	color: var(--accent);
-	box-shadow: none;
-	transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
-}
-
-.qbd-root .qbd-quiz-card.qbd-quiz-card--folder .qbd-quiz-card-play:hover {
-	background: color-mix(in srgb, var(--accent) 22%, transparent);
-	color: var(--accent);
-	box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.qbd-quiz-card--folder .qbd-quiz-card-play svg {
-	width: 19px;
-	height: 19px;
-}
-
-.qbd-quiz-card--folder .qbd-quiz-card-play svg circle {
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.5;
-}
-
-.qbd-quiz-card--folder .qbd-quiz-card-play svg > path:first-child,
-.qbd-quiz-card--folder .qbd-quiz-card-play svg polygon {
-	fill: currentColor;
-	stroke: none;
-}
 
 /* ── Empty states ── */
 .qbd-empty-state {
@@ -985,6 +900,47 @@
 
 .qbd-quiz-card-modes .qbd-card-more {
 	flex-shrink: 0;
+}
+
+/* PLAY, top right of a course card (2026-09-29): a ghost icon of the "⋯"
+   family — no tile in a tile —, the accent only on hover. !important
+   against the .theme-dark button chrome, as `.qbd-card-more`. */
+.qbd-quiz-card-play {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	margin: -4px -6px 0 auto;
+	padding: 0 !important;
+	border: none !important;
+	border-radius: 999px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+.qbd-quiz-card-play svg {
+	width: 16px;
+	height: 16px;
+	fill: currentColor;
+}
+.qbd-quiz-card-play:hover {
+	color: var(--interactive-accent) !important;
+	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent) !important;
+}
+.qbd-quiz-card-play:active {
+	transform: scale(0.92);
+}
+.qbd-quiz-card-play:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-quiz-card-play { transition: none; }
+	.qbd-quiz-card-play:active { transform: none; }
 }
 
 /* ── LE BOUTON 3D de Brilliant (« Continue course »), dans le bleu des

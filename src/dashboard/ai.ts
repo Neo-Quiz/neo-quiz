@@ -3,7 +3,7 @@ import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeQuiz } from "../quiz-format";
 import { clampExamDuration, completeExamConfig, completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
-import { quizModeIcon, quizModeLabel, quizModeTip } from "./quiz-card";
+import { quizModeIcon, quizModeLabel, quizModeTip, testSubModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, oneQuizByDefault, canChooseQuizCount, typedExamDuration } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
@@ -1792,7 +1792,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* The sliding block (measured on claude.ai on 2026-09-23), shared
 		   with a course's sheet: `seg-indic.ts`. */
 		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const testLabel = (): string => `${t("ai.mode.test")} · ${quizModeLabel(testKind)}`;
+		const testLabel = (): string => `${t("ai.mode.test")} · ${testSubModeLabel(testKind)}`;
 		const selectMode = (m: ModeQuiz): void => {
 			if (m !== "learn") testKind = m;
 			if (modeGeneration === m) return;
@@ -1842,7 +1842,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const openTestMenu = (anchor: HTMLElement): void => {
 			const testActive = modeGeneration !== "learn";
 			openActionMenu(anchor, (["practice", "exam"] as const).map(m => ({
-				icon: quizModeIcon(m), label: quizModeLabel(m),
+				icon: m === "exam" ? quizModeIcon(m) : "dumbbell", label: testSubModeLabel(m),
 				disabled: testActive && modeGeneration === m,
 				onClick: () => selectMode(m),
 			})));

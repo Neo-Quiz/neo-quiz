@@ -1,4 +1,4 @@
-import { currentHost } from "../host/current";
+import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -7,6 +7,7 @@ import type { ModeQuiz } from "../quiz-format";
 import type { QuizStatRecord } from "./stats-store";
 import { computeQuizState } from "./quiz-mastery";
 import { parMode } from "./course-pairs";
+import { createOptionCard } from "./folder-create";
 
 /* Tag de type de quiz (calculé au scan) → clé de traduction, résolue au rendu.
    Table explicite plutôt qu'une clé construite par concaténation : `t()` n'accepte
@@ -49,9 +50,18 @@ export function quizTypeLabel(tag: QuizTypeTag): string {
 }
 
 /** The label of a quiz's mode (shared by the card, the page and the app's
-    player): Learn / Practice / Exam, translated (spec 2026-09-29 §1.4). */
+    player): Learn / Test / Exam, translated. A Practice reads "Test"
+    (2026-09-29, after spec §1.4 which said "Practice"): the product has two
+    kinds, Learn and Test, and "Practice" only names the Test's sub-mode on
+    the Generate page (`testSubModeLabel`). */
 export function quizModeLabel(mode: ModeQuiz): string {
-	return t(mode === "learn" ? "dashboard.quizMode.learn" : mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.practice");
+	return t(mode === "learn" ? "dashboard.quizMode.learn" : mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.test");
+}
+
+/** The two sub-modes of a Test, as the Generate page's Test menu names
+    them: Practice / Exam. */
+export function testSubModeLabel(mode: "practice" | "exam"): string {
+	return t(mode === "exam" ? "dashboard.quizMode.exam" : "dashboard.quizMode.practice");
 }
 
 /** The one-sentence goal of a mode (hover bubbles of the Generate page's
@@ -60,10 +70,10 @@ export function quizModeTip(mode: ModeQuiz): string {
 	return t(mode === "learn" ? "ai.mode.learnTip" : mode === "exam" ? "dashboard.quizMode.examTip" : "ai.mode.practiceTip");
 }
 
-/** The Lucide icon of a mode: a book to learn, a dumbbell to practise, a
-    timer for an exam. */
+/** The Lucide icon of a mode: a book to learn, a written sheet for a
+    test, a timer for an exam. */
 export function quizModeIcon(mode: ModeQuiz): string {
-	return mode === "learn" ? "book-open" : mode === "exam" ? "timer" : "dumbbell";
+	return mode === "learn" ? "book-open" : mode === "exam" ? "timer" : "file-text";
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -185,6 +195,25 @@ export function renderQuizCard(
 	   pas acquis. */
 	if (opts?.showRing !== false) renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
 
+	/* PLAY (2026-09-29): starts the course straight from its card — its only
+	   mode at once, or a choice of mode when the card gathers several. A
+	   ghost icon of the "⋯" family, never a framed button: no tile in a
+	   tile. */
+	if (opts?.onPlay) {
+		const onPlay = opts.onPlay;
+		const play = ajouter(haut, "button", "qbd-quiz-card-play");
+		play.type = "button";
+		play.setAttribute("aria-label", t("dashboard.card.play"));
+		play.title = t("dashboard.card.play");
+		currentHost().ui.setIcon(play, "play");
+		play.addEventListener("click", (e) => {
+			e.stopPropagation();
+			const modes = [quiz, ...freres].sort(parMode);
+			if (modes.length === 1) onPlay(modes[0]);
+			else openModePicker(modes, onPlay);
+		});
+	}
+
 	/* LES MODES : une pastille par mode, même couleur pour tous, jamais de
 	   coche. Plus de pourcentage (2026-09-25) : l'anneau reste le seul chiffre
 	   de la carte, et le détail par mode vit dans l'onglet « Progression » du
@@ -265,4 +294,24 @@ export function renderProgressRing(parent: HTMLElement, pct: number, tone: "fres
 	const centre = ajouter(ring, "span", "qbd-ring-pct", String(Math.round(pct)));
 	ajouter(centre, "span", "qbd-ring-sign", "%");
 	return ring;
+}
+
+/** One colour per mode in the mode picker, like the options of the
+    creation modals (`createOptionCard`). */
+const MODE_ACCENT: Record<ModeQuiz, string> = { learn: "#a78bfa", practice: "#4573ff", exam: "#f5a524" };
+
+/** "Which mode?" when a course card gathers several modes: the rows of the
+    creation modals, one per mode, with its number of questions. */
+function openModePicker(modes: QuizIndexEntry[], onPlay: (quiz: QuizIndexEntry) => void): void {
+	requireHost("modals").open({
+		className: "qbd-create-modal",
+		title: t("dashboard.card.pickMode"),
+		onOpen: (m) => {
+			for (const q of modes) {
+				createOptionCard(m, m.contentEl, quizModeIcon(q.mode), MODE_ACCENT[q.mode], quizModeLabel(q.mode),
+					t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }),
+					() => onPlay(q));
+			}
+		},
+	});
 }
