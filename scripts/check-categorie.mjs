@@ -91,6 +91,14 @@ await withSrcModule("src/dashboard/categorie-quiz.ts", ({ CATEGORIES, detecterCa
 	r.check("languages: a language name in a file with another subject is that subject",
 		d({ pieces: ["Histoire en français.pdf"] }), "histoire");
 
+	r.check("an .html attachment is a document first: its name, the folder, the request decide before its extension",
+		[d({ pieces: ["revision-xti301.html"], dossier: "Efrei/XTI301 - Écosystème Python" }),
+			d({ pieces: ["python-cheatsheet.html"] }),
+			d({ pieces: ["revision.html"], demande: "les listes en Python" }),
+			d({ pieces: ["index.html"] }),
+			d({ pieces: ["index.html", "style.css"], dossier: "Efrei/XTI301 - Écosystème Python" })],
+		["python", "python", "python", "web", "web"]);
+
 	r.check("estCategorie : les seules valeurs connues", [estCategorie("python"), estCategorie("auto"), estCategorie("Python"), estCategorie(3)], [true, false, false, false]);
 	r.done();
 });

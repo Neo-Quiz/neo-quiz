@@ -152,6 +152,9 @@ const EXTENSIONS: Readonly<Partial<Record<Specifique, readonly string[]>>> = {
 	rust: ["rs"], go: ["go"], bash: ["sh"], sql: ["sql"], web: ["html", "css", "js", "ts", "jsx", "tsx", "php"],
 };
 
+/* A document format that is also a web file (see `detecterCategorie`). */
+const EXTENSION_DOCUMENT = /\.html?$/i;
+
 /* Words that only count in a NAME (file, folder), never in a sentence. The
    letter C alone: "Programmation C.pdf", "TP C" — but "c'est" in a
    sentence is not the language. A language NAME in a sentence usually
@@ -303,7 +306,21 @@ function categorieDe(textes: readonly string[], estNom: boolean): CategorieQuiz 
 export function detecterCategorie(indices: IndicesCategorie): CategorieQuiz {
 	const pieces = (indices.pieces ?? []).filter(p => typeof p === "string" && p.trim() !== "");
 	const parPieces = pieces.length ? categorieDe(pieces, true) : null;
-	if (parPieces) return parPieces;
+	/* An .html attachment is as often a DOCUMENT — a saved page, a revision
+	   sheet a tool exported — as web code: "revision-xti301.html", sent to
+	   a folder named "XTI301 - Écosystème Python" for a request about
+	   strings and dictionaries, came out "Web" (2026-09-29), and the prompt
+	   lost its Python rules. When that extension is the only thing the
+	   names say, the name without it, then the folder, then the request
+	   decide first; the extension only settles what nothing else does. */
+	let parExtensionDocument: CategorieQuiz | null = null;
+	if (parPieces && pieces.some(p => EXTENSION_DOCUMENT.test(p))) {
+		const sansExtension = categorieDe(pieces.map(p => p.replace(EXTENSION_DOCUMENT, "")), true);
+		if (sansExtension) return sansExtension;
+		parExtensionDocument = parPieces;
+	} else if (parPieces) {
+		return parPieces;
+	}
 	/* Each segment of the path is a name, read from the DEEPEST up: the
 	   course folder says more than the programme above it
 	   ("Bachelor Cybersécurité/XTI301 - Écosystème Python" is Python). Read
@@ -314,7 +331,7 @@ export function detecterCategorie(indices: IndicesCategorie): CategorieQuiz {
 		if (parSegment) return parSegment;
 	}
 	const demande = indices.demande ?? "";
-	return (demande.trim() ? categorieDe([demande], false) : null) ?? "general";
+	return (demande.trim() ? categorieDe([demande], false) : null) ?? parExtensionDocument ?? "general";
 }
 
 /** A FOLDER's subject, for the subject filter of the folders page
