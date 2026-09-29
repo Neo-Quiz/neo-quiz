@@ -30,7 +30,6 @@ export const EN_DASHBOARD = {
 	"dashboard.nav.soon": "Coming soon",
 
 	/* ── Accueil ── */
-	"dashboard.home.subtitle": "Here is what to focus on today.",
 	"dashboard.home.generate": "Generate a quiz",
 	// A folder card (spec 2026-09-29-home-page-design.md §2).
 	"dashboard.home.openTasksOne": "{count} open task",

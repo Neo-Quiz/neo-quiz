@@ -13,25 +13,6 @@
 	min-width: 0;
 }
 
-/* Même famille display que les autres titres de page (.qbd-quizzes-title du
-   dossier ouvert, .qbd-ai-title de « Générer ») : Constantia, échelle 28px du
-   drill — le sans-serif 20px/800 était le dernier vestige d'un autre système. */
-.qbd-home-title {
-	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-	font-size: 28px;
-	font-weight: 700;
-	color: var(--text-normal);
-	margin: 0 0 4px;
-	letter-spacing: -0.02em;
-}
-
-.qbd-home-subtitle {
-	font-size: 13px;
-	color: var(--text-muted);
-	margin: 0;
-	line-height: 1.5;
-}
-
 /* ══════════════════════════════════════════════════════════
    ENTRY TRANSITION — the same grammar as "My quizzes" (keyframes
    qbd-folder-hero-in / qbd-folder-card-in, dashboard-quizzes.css). The
@@ -110,7 +91,8 @@
 	height: 28px;
 }
 
-/* Même famille display que le titre de l'accueil peuplé (.qbd-home-title). */
+/* The same display family as the other page titles (.qbd-quizzes-title,
+   .qbd-ai-title). */
 .qbd-onboarding-title {
 	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 	font-size: 28px;

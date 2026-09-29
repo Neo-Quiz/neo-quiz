@@ -20,7 +20,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.nav.soon": "Bientôt disponible",
 
 	/* ── Accueil ── */
-	"dashboard.home.subtitle": "Voici ce sur quoi vous concentrer aujourd'hui.",
 	"dashboard.home.generate": "Générer un quiz",
 	"dashboard.home.openTasksOne": "{count} tâche ouverte",
 	"dashboard.home.openTasksOther": "{count} tâches ouvertes",

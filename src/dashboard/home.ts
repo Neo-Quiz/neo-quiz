@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "../branding";
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
@@ -120,11 +119,11 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const page = ajouter(container, "div", "qbd-home-page");
 		ajouter(page, "div", "qbd-home-glow").setAttribute("aria-hidden", "true");
 
-		// ── Header ──
+		// ── Header ── No title nor subtitle (2026-09-29): the page says what
+		// to do by itself. The left side stays, empty, to keep the Generate
+		// button on the right.
 		const header = ajouter(page, "div", "qbd-home-header");
-		const headerLeft = ajouter(header, "div", "qbd-home-header-left");
-		ajouter(headerLeft, "h2", "qbd-home-title", PRODUCT_NAME);
-		ajouter(headerLeft, "p", "qbd-home-subtitle", t("dashboard.home.subtitle"));
+		ajouter(header, "div", "qbd-home-header-left");
 
 		// Light pill IDENTICAL to "+ New folder" of "My quizzes": one grammar
 		// of primary action in the dashboard (contract 2026-07-28). HIDDEN (not
