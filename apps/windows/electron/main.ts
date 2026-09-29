@@ -48,7 +48,7 @@ import { chargerPathRegistre } from "./process";
 import { surveillerCachesCli } from "./surveillant-cli";
 import { perimetreInitial } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM } from "./pont";
+import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
 import { creerMiseAJour } from "./mise-a-jour";
 import type { MiseAJour } from "./mise-a-jour";
@@ -290,8 +290,10 @@ function creerFenetre(): void {
 			} catch {
 				return;
 			}
-			if (typeof z === "number" && Number.isFinite(z) && z >= 0.25 && z <= 1.5) {
-				fenetre?.webContents.setZoomFactor(z);
+			// Clamped, not ignored: a zoom saved below the current minimum (25 %,
+			// 50 %) opens at 75 %, the same value the renderer reads back.
+			if (typeof z === "number" && Number.isFinite(z)) {
+				fenetre?.webContents.setZoomFactor(borneZoom(z));
 			}
 		})();
 	});

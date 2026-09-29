@@ -57,7 +57,7 @@ import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
 import type { MiseAJour } from "./mise-a-jour";
-import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM } from "./pont";
+import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
@@ -1360,7 +1360,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		deps.fenetre.commande(nom);
 	});
 	ipcMain.handle(CANAUX.affichageZoom, async (_e, facteur: unknown) => {
-		const f = typeof facteur === "number" && Number.isFinite(facteur) ? Math.min(1.5, Math.max(0.25, facteur)) : 1;
+		const f = borneZoom(facteur);
 		deps.fenetre.zoom(f);
 		await deps.reglagesOuErreur().ecrire(CLE_REGLAGES_ZOOM, f);
 	});

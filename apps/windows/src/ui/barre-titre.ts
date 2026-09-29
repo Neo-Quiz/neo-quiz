@@ -18,7 +18,7 @@ import { poserGlyphe } from "./glyphes-fenetre";
 import { ouvrirMenuApp } from "./menu-app";
 import { palierZoomVoisin } from "./menu-app-arbre";
 import { createZoomBubble } from "./zoom-bubble";
-import { CLE_REGLAGES_ZOOM } from "../../electron/pont";
+import { CLE_REGLAGES_ZOOM, borneZoom } from "../../electron/pont";
 import type { EtatFenetre } from "../../electron/pont";
 import application from "../../package.json";
 // L'URL du dépôt, pour l'entrée « Source code » du menu d'application.
@@ -126,8 +126,9 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	let currentZoom = 1;
 	void pont().reglages.lire(CLE_REGLAGES_ZOOM).then(v => {
 		if (typeof v !== "number") return;
-		currentZoom = v;
-		zoomBubble.setApplied(v);
+		// The same clamp as the main process applied (`main.ts`).
+		currentZoom = borneZoom(v);
+		zoomBubble.setApplied(currentZoom);
 	});
 
 	/* ─── EVERY ZOOM CHANGE GOES THROUGH HERE — wheel, menu and the bubble's

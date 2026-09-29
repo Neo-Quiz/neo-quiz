@@ -611,7 +611,7 @@ export interface Pont {
 	/** Le zoom et les deux commandes qu'un menu natif exposait
 	    (`Ctrl+R`, `Ctrl+Alt+I`), retirées avec lui. */
 	affichage: {
-		/** Borné 0.25..1.5 par le principal, et PERSISTÉ sous la clé
+		/** Borné ZOOM_MIN..ZOOM_MAX par le principal, et PERSISTÉ sous la clé
 		    `CLE_REGLAGES_ZOOM` : la barre dessinée par le rendu (tâche 2) n'a
 		    donc pas à relire ce réglage elle-même au démarrage suivant, le
 		    principal l'applique déjà (`main.ts`, `did-finish-load`). */
@@ -867,11 +867,26 @@ export const CLE_REGLAGES_IA = "ai";
    `settings.json`, ignoré — l'effacer n'apporterait rien et demanderait une
    migration pour un octet. */
 
-/** La clé du ZOOM persisté (`neo.reglages`), lue par le principal au chargement
-    de la page et écrite par lui seul (`affichage.zoom` borne puis persiste) :
-    le rendu ne l'écrit jamais directement, pour que la borne 0.25..1.5
-    s'applique aussi à une valeur que la tâche 2 tenterait d'écrire à la main. */
+/** The key of the persisted ZOOM (`neo.reglages`), read by the main process
+    when the page loads and written by it alone (`affichage.zoom` clamps, then
+    persists): the renderer never writes it directly, so that the
+    ZOOM_MIN..ZOOM_MAX bound also applies to a value written by hand. */
 export const CLE_REGLAGES_ZOOM = "zoom";
+
+/** The zoom bounds, shared by the main process (clamp) and the renderer (the
+    steps of `ui/menu-app-arbre.ts`, whose first and last they are). Below
+    75 % the page was measured unusable (2026-09-29): the panel, capped in
+    width, shrank to a narrow column of unreadable text, on a small window as
+    on a full screen. */
+export const ZOOM_MIN = 0.75;
+export const ZOOM_MAX = 1.5;
+
+/** A persisted or requested factor brought into the bounds; anything that is
+    not a number is 100 %. A factor saved before the bound was raised (25 %,
+    50 %) comes back as 75 %, never ignored. */
+export function borneZoom(f: unknown): number {
+	return typeof f === "number" && Number.isFinite(f) ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, f)) : 1;
+}
 
 /* LA CLÉ « reprise » N'EXISTE PLUS ICI (2026-09-17). Elle portait
    l'interrupteur « rouvrir là où on s'était arrêté » ; l'application rouvre

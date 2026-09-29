@@ -15,10 +15,12 @@ export type EntreeMenu =
 	| { kind: "separator"; id: string }
 	| { kind: "submenu"; id: string; label: string; items: EntreeMenu[] };
 
-/** A browser's zoom steps from 25 %, capped at 150 % (both asked on
-    2026-09-28). The bounds of the main process (`canaux.ts`, `main.ts`) are
-    the first and last. */
-export const PALIERS_ZOOM = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.33, 1.4, 1.5];
+/** A browser's zoom steps, from 75 % to 150 %. Every step was looked at on
+    screen, on a small window and full screen (2026-09-29): 25, 33, 50 and
+    67 % were removed, the page there was a narrow column of unreadable text.
+    The first and last are the main process's bounds (`ZOOM_MIN`/`ZOOM_MAX`,
+    electron/pont.ts). */
+export const PALIERS_ZOOM = [0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.33, 1.4, 1.5];
 
 /** The NEIGHBOUR step of a value, up (`1`) or down (`-1`): what Ctrl +
     wheel and the zoom bubble ask for (`ui/barre-titre.ts`), and the only way

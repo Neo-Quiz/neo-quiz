@@ -8,7 +8,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/src/ui/menu-app-arbre.ts", ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin }) => {
+await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/electron/pont.ts"], ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin }, { ZOOM_MIN, ZOOM_MAX, borneZoom }) => {
 	const r = makeReporter("Application menu — tree");
 	const menu = buildMenu({ version: "2.5.2", zoom: 1 });
 	r.check("three top-level submenus", menu.map(e => e.id), ["app", "edit", "view"]);
@@ -19,8 +19,15 @@ await withSrcModule("apps/windows/src/ui/menu-app-arbre.ts", ({ buildMenu, PALIE
 	r.check("no duplicate id", new Set(ids).size, ids.length);
 	r.check("the version is the first row of the Neo Quiz submenu",
 		menu[0].items[0], { kind: "version", id: "version", label: "2.5.2" });
-	r.check("the scale steps have the main process's bounds (0.25..1.5)",
-		[Math.min(...PALIERS_ZOOM), Math.max(...PALIERS_ZOOM)], [0.25, 1.5]);
+	r.check("the scale steps have the main process's bounds (0.75..1.5)",
+		[Math.min(...PALIERS_ZOOM), Math.max(...PALIERS_ZOOM)], [0.75, 1.5]);
+	r.check("the first and last steps ARE the main process's bounds (electron/pont.ts)",
+		[PALIERS_ZOOM[0], PALIERS_ZOOM[PALIERS_ZOOM.length - 1]], [ZOOM_MIN, ZOOM_MAX]);
+	/* A zoom saved before the minimum was raised (25 %, 50 %) is clamped,
+	   never ignored: ignored, the page opened at 100 % while the bubble and
+	   the check mark believed the saved value. */
+	r.check("a saved zoom below the minimum comes back at the minimum", [borneZoom(0.25), borneZoom(0.5)], [0.75, 0.75]);
+	r.check("above the maximum, the maximum; not a number, 100 %", [borneZoom(3), borneZoom("x"), borneZoom(Number.NaN)], [1.5, 1, 1]);
 	r.check("the scale steps are sorted, each one larger than the last",
 		PALIERS_ZOOM.every((p, i) => i === 0 || p > PALIERS_ZOOM[i - 1]), true);
 	const scale = menu[2].items.find(e => e.id === "scale");
@@ -36,14 +43,14 @@ await withSrcModule("apps/windows/src/ui/menu-app-arbre.ts", ({ buildMenu, PALIE
 	r.check("one notch up from 100 %", palierZoomVoisin(1, 1), 1.1);
 	r.check("one notch down from 100 %", palierZoomVoisin(1, -1), 0.9);
 	r.check("at the maximum, up no longer moves", palierZoomVoisin(1.5, 1), 1.5);
-	r.check("at the minimum, down no longer moves", palierZoomVoisin(0.25, -1), 0.25);
+	r.check("at the minimum, down no longer moves", palierZoomVoisin(0.75, -1), 0.75);
 	r.check("from a value between two steps, up takes the next one", palierZoomVoisin(1.05, 1), 1.1);
 	r.check("from a value between two steps, down takes the previous one", palierZoomVoisin(1.05, -1), 1);
 	/* `getZoomFactor` returns 1.0999999999999999 for the 1.1 step: a strict
 	   comparison would return 1.1 itself, hence a dead notch. */
 	r.check("a step's float is not its own neighbour", palierZoomVoisin(1.0999999999999999, 1), 1.25);
 	r.check("out of bounds above, back into the list", palierZoomVoisin(2, 1), 1.5);
-	r.check("out of bounds below, back into the list", palierZoomVoisin(0.2, -1), 0.25);
+	r.check("out of bounds below, back into the list", palierZoomVoisin(0.2, -1), 0.75);
 	r.check("a value that is not a number counts as 100 %", palierZoomVoisin(Number.NaN, 1), 1.1);
 	r.done();
 });
