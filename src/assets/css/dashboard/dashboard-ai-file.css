@@ -187,20 +187,22 @@
 
 .qbd-ai-reponse-icone svg { width: 18px; height: 18px; }
 
-/* L'étincelle de claude.ai pendant la réflexion : elle tourne et respire. */
-.qbd-ai-etincelle {
+/* The provider's logo while the model works (MonoCode): it turns slowly and
+   breathes. */
+.qbd-ai-logo-travail {
 	display: inline-flex;
 	flex-shrink: 0;
-	color: var(--interactive-accent);
-	animation: qbd-ai-etincelle 2.4s ease-in-out infinite;
+	animation: qbd-ai-logo-travail 2.8s linear infinite;
 }
-
-.qbd-ai-etincelle svg { width: 20px; height: 20px; }
-
-@keyframes qbd-ai-etincelle {
-	0%   { transform: rotate(0deg) scale(1); opacity: 1; }
-	50%  { transform: rotate(180deg) scale(0.82); opacity: 0.7; }
-	100% { transform: rotate(360deg) scale(1); opacity: 1; }
+.qbd-ai-logo-travail .qbd-provider-logo,
+.qbd-ai-logo-travail svg {
+	width: 16px;
+	height: 16px;
+}
+@keyframes qbd-ai-logo-travail {
+	0%   { transform: rotate(0deg) scale(1); }
+	50%  { transform: rotate(180deg) scale(0.85); }
+	100% { transform: rotate(360deg) scale(1); }
 }
 
 /* Le texte d'état balayé d'un reflet, comme « Réflexion… » de claude.ai. */
@@ -340,7 +342,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-ai-etincelle,
+	.qbd-ai-logo-travail,
 	.qbd-ai-reponse-etape { animation: none; }
 	.qbd-ai-reponse-etape { color: var(--text-muted); background: none; }
 }

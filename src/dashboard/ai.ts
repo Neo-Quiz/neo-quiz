@@ -4039,13 +4039,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   each get their path), then the Tests of rising difficulty over
 			   all of them together. One `lot`: the queue shows the request once
 			   and names each step (file-generation-vue.ts). */
-			const docs = decouperParFichier(d, false);
+			/* Learn | Test decides WHICH quizzes (2026-09-30): Learn makes the
+			   Learns only, one per document; Test makes the Tests only, of
+			   rising difficulty over all the documents. */
+			const docs = modeGeneration === "learn" ? decouperParFichier(d, false) : [];
+			const tests = modeGeneration === "learn" ? 0 : PALIERS_TEST;
 			const lot = Date.now().toString(36);
-			const etapes = docs.length + PALIERS_TEST;
+			const etapes = docs.length + tests;
 			docs.forEach((doc, i) => {
 				fileGen.envoyer({ ...doc, ...base, mode: "learn", preparation: { examen, palier: 0, paliers: PALIERS_TEST, document: doc.notes.length === 1 && d.notes.length > 1 ? doc.notes[0].name : undefined, lot, etape: i + 1, etapes } });
 			});
-			for (let palier = 1; palier <= PALIERS_TEST; palier++) {
+			for (let palier = 1; palier <= tests; palier++) {
 				fileGen.envoyer({ ...d, ...base, mode: "practice", preparation: { examen, palier, paliers: PALIERS_TEST, lot, etape: docs.length + palier, etapes } });
 			}
 			examCible = null;

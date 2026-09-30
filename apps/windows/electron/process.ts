@@ -2206,6 +2206,19 @@ export function lancer(spec: {
  */
 const verrous = new Map<string, Promise<void>>();
 const ATTENTE_VERROU_MS = 15000;
+/**
+ * THE TOOLS THAT TAKE THE LOCK: Antigravity only, since 2026-09-30.
+ *
+ * Claude Code and Codex run SIDE BY SIDE: each call is its own process,
+ * with no session kept (`--no-session-persistence`) and its files in a
+ * temporary folder of its own (`avecFichiers`). Their lock blocked
+ * generation for real: an Explain answer being written, a stopped CLI slow
+ * to die, a reloaded page whose CLI still ran — each held it past the
+ * quarter-minute wait, and the next quiz failed with "a claude generation
+ * is already running". The queue of the Generate page runs one generation
+ * at a time by itself; nothing else needs the tool to wait.
+ */
+const OUTILS_EXCLUSIFS: ReadonlySet<string> = new Set(["agy"]);
 
 /**
  * Lance un CLI, pièces jointes comprises. C'est `HostProcess.run`
@@ -2260,15 +2273,28 @@ export async function run(spec: {
 	if (spec.marqueur === undefined && ((spec.fichiers && spec.fichiers.length > 0) || spec.sortieFichier)) {
 		throw erreurCli("refuse", "pièces jointes ou fichier de sortie sans marqueur : aucun jeton ne pourrait les désigner");
 	}
+	const exclusif = OUTILS_EXCLUSIFS.has(spec.tool);
 	const attenteMax = options.attenteVerrouMs ?? ATTENTE_VERROU_MS;
 	const debut = Date.now();
-	for (let pris = verrous.get(spec.tool); pris; pris = verrous.get(spec.tool)) {
+	for (let pris = exclusif ? verrous.get(spec.tool) : undefined; pris; pris = verrous.get(spec.tool)) {
 		const reste = attenteMax - (Date.now() - debut);
 		if (reste <= 0) throw erreurCli("occupe", "une génération " + spec.tool + " est déjà en cours");
 		await Promise.race([pris, new Promise<void>(resolve => setTimeout(resolve, reste))]);
 	}
 	let liberer: () => void = () => {};
-	verrous.set(spec.tool, new Promise<void>(resolve => { liberer = resolve; }));
+	const monVerrou = new Promise<void>(resolve => { liberer = resolve; });
+	if (exclusif) verrous.set(spec.tool, monVerrou);
+	/* RELEASED AT THE STOP, not at the death of the process (2026-09-30):
+	   the page moves on to the next generation as soon as it stops one,
+	   while killing the tree of a CLI can take longer than the lock's
+	   quarter-minute wait — the next one then failed with "already
+	   running". A stopped run no longer owns the tool: only ITS lock is
+	   released, never one taken since. */
+	const relacher = (): void => {
+		if (verrous.get(spec.tool) === monVerrou) verrous.delete(spec.tool);
+		liberer();
+	};
+	spec.signal?.addEventListener("abort", relacher, { once: true });
 	try {
 		const executable = resoudreExecutable(spec.tool, env);
 		/* Rejeté AVANT d'écrire quoi que ce soit : un dossier temporaire créé
@@ -2300,7 +2326,7 @@ export async function run(spec: {
 		}, env);
 		return Object.assign({}, resultat, { sortie });
 	} finally {
-		verrous.delete(spec.tool);
-		liberer();
+		spec.signal?.removeEventListener("abort", relacher);
+		relacher();
 	}
 }

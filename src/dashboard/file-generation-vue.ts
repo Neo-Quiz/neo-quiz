@@ -159,17 +159,8 @@ export function creerVueFile(opts: {
 			}
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
-		const meta = ajouter(message, "div", "qbd-ai-message-meta");
-		ajouter(meta, "span", undefined, quizModeLabel(d.mode));
-		const providerId = d.reglages.aiProvider || "";
-		const p = providerId ? aiProviders.getProvider(providerId) : null;
-		if (p) {
-			const modele = ajouter(meta, "span", "qbd-ai-file-modele");
-			const logo = ajouter(modele, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
-			aiProviders.setBrandLogo(logo, p.logo);
-			const id = d.reglages.aiModel || p.defaultModel || "";
-			ajouter(modele, "span", undefined, id ? aiProviders.libelleModele(providerId, id) : p.name);
-		}
+		/* No "Learn · Opus 5.5" under the request any more (2026-09-30): the
+		   working line and the result already name the model and the type. */
 	}
 
 	/* ── AN ANSWER IN PROSE, written instead of a quiz because the request
@@ -223,11 +214,21 @@ export function creerVueFile(opts: {
 		}
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
 		if (l.etat === "cours" || l.etat === "enregistrement") {
-			const etincelle = ajouter(rep, "span", "qbd-ai-etincelle");
-			etincelle.setAttribute("aria-hidden", "true");
-			host.ui.setIcon(etincelle, "sparkles");
+			/* THE WORKING LINE, as MonoCode shows it (2026-09-30): the
+			   provider's logo turning, then "Opus 5.5 working for 0:12" with a
+			   light sweeping across. Reading a document and saving the note keep
+			   their own words; the model's own work is named after the model. */
+			const providerId = l.demande.reglages.aiProvider || "";
+			const fournisseur = providerId ? aiProviders.getProvider(providerId) : null;
+			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
+			logo.setAttribute("aria-hidden", "true");
+			if (fournisseur) aiProviders.setBrandLogo(ajouter(logo, "span", "qbd-provider-logo qbd-provider-logo--" + fournisseur.logo), fournisseur.logo);
+			else host.ui.setIcon(logo, "sparkles");
 			const etape = l.etat === "enregistrement" ? "enregistrement" : (opts.file.etape(l.id) ?? "preparation");
-			ajouter(rep, "span", "qbd-ai-reponse-etape", t(TEXTE_ETAPE[etape]));
+			const idModele = l.demande.reglages.aiModel || fournisseur?.defaultModel || "";
+			const nomModele = fournisseur ? (idModele ? aiProviders.libelleModele(providerId, idModele) : fournisseur.name) : "";
+			const texte = etape === "redaction" && nomModele ? t("ai.queue.working", { model: nomModele }) : t(TEXTE_ETAPE[etape]);
+			ajouter(rep, "span", "qbd-ai-reponse-etape", texte);
 			if (l.etat === "cours") {
 				const temps = ajouter(rep, "span", "qbd-ai-file-temps", duree(Date.now() - (l.debut ?? Date.now())));
 				temps.dataset.debut = String(l.debut ?? Date.now());
@@ -297,10 +298,8 @@ export function creerVueFile(opts: {
 		const hautAncien = ancien ? ancien.scrollTop : 0;
 		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
 		bloc.replaceChildren();
-		if (!tr.thinking && !tr.text && tr.tools.length === 0) {
-			if (vivant) ajouter(bloc, "div", "qbd-ai-transcript-attente", t("ai.transcript.waiting"));
-			return;
-		}
+		// Nothing said yet: the working line above already shows the model at work.
+		if (!tr.thinking && !tr.text && tr.tools.length === 0) return;
 		/** A summary line and, when unfolded, its detail. Live lines start
 		    unfolded for the part being written. */
 		const ligne = (cle: string, icone: string, libelle: string, ouvertParDefaut: boolean, detail: (corps: HTMLElement) => void): void => {

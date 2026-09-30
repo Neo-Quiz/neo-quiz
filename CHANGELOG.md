@@ -16,6 +16,9 @@ release notes.
 ## [1.20.6] - 2026-09-30
 
 ### Fixed
+- A generation no longer fails with "a claude generation is already running": Claude Code and Codex runs no longer wait for one another (an Explain answer, a stopped run slow to end or a reloaded window used to block the next quiz), and reloading or closing the window stops the runs it had started instead of leaving them going unseen.
+- The line of a running generation shows the provider's logo turning and "Opus 5.5 working for 0:12", as MonoCode does, instead of a sparkle and "Waiting for the model's first words"; the mode and model are no longer repeated under each request.
+- With /exam, Learn | Test chooses which quizzes are made: Learn makes one Learn per document, Test makes the three Tests of rising difficulty.
 - An /exam preparation shows its request once in the queue, then one line per step ("Step 3 of 10 · Learn · CM3.pdf", "Step 9 of 10 · Test 2 of 3"), instead of the same request repeated for every document.
 - /exam finds the exam's course folder even when none of its quizzes is left in it (looked for by name in the vault), lists its documents, and sends the preparation's quizzes to that folder instead of Generated; giving up the exam gives the destination back.
 - The composer's glow on Generate is no longer cut in a straight line along the sidebar, and the new lists (chats, search, the exam's documents) use the app's own scrollbar.

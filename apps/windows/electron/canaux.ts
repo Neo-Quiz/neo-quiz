@@ -1279,7 +1279,33 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	   L'ENVELOPPE (`ResultatCli`, `pont.ts`) et non un rejet : l'IPC perd le
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
-	const cliEnVol = new Map<number, AbortController>();
+	const cliEnVol = new Map<number, { controleur: AbortController; page: Electron.WebContents }>();
+	/* A PAGE THAT GOES AWAY TAKES ITS CLIs WITH IT (2026-09-30): a reload of
+	   the window (update, crash, Ctrl+R) left the running Claude Code going
+	   in the background, answering nobody — and holding the tool's lock, so
+	   the next generation failed with "already running", or waited on a
+	   model the page could no longer hear. The runs a page started are
+	   stopped when it navigates away, crashes or is destroyed. */
+	const pagesSuivies = new WeakSet<Electron.WebContents>();
+	const annulerRunsDe = (page: Electron.WebContents): void => {
+		for (const [cle, run] of cliEnVol) {
+			if (run.page !== page) continue;
+			run.controleur.abort();
+			cliEnVol.delete(cle);
+		}
+	};
+	const suivrePage = (page: Electron.WebContents): void => {
+		if (pagesSuivies.has(page)) return;
+		pagesSuivies.add(page);
+		page.on("did-start-navigation", (...a: unknown[]) => {
+			const details = a[0] as { isMainFrame?: boolean; isSameDocument?: boolean } | undefined;
+			const surPlace = typeof a[2] === "boolean" ? a[2] : details?.isSameDocument === true;
+			const cadrePrincipal = typeof a[3] === "boolean" ? a[3] : details?.isMainFrame !== false;
+			if (cadrePrincipal && !surPlace) annulerRunsDe(page);
+		});
+		page.on("render-process-gone", () => annulerRunsDe(page));
+		page.once("destroyed", () => annulerRunsDe(page));
+	};
 
 	ipcMain.handle(CANAUX.processusRun, async (e, spec: unknown, requeteId: unknown, flux: unknown): Promise<ResultatCli> => {
 		const s = (spec && typeof spec === "object" ? spec : {}) as Partial<RequeteCli>;
@@ -1313,7 +1339,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			? (texte: string): void => { if (!expediteur.isDestroyed()) expediteur.send(CANAUX.processusFlux, { id, texte }); }
 			: undefined;
 		const controleur = new AbortController();
-		if (!Number.isNaN(id)) cliEnVol.set(id, controleur);
+		const enVolCli = { controleur, page: expediteur };
+		suivrePage(expediteur);
+		if (!Number.isNaN(id)) cliEnVol.set(id, enVolCli);
 		try {
 			const res = await run({
 				tool,
@@ -1339,11 +1367,11 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			   repart à 1 après un `location.reload()`, et le `finally` d'un appel
 			   de l'ancienne page ne doit pas emporter l'entrée de la nouvelle —
 			   qui deviendrait inannulable. Même raison qu'au réseau. */
-			if (cliEnVol.get(id) === controleur) cliEnVol.delete(id);
+			if (cliEnVol.get(id) === enVolCli) cliEnVol.delete(id);
 		}
 	});
 	ipcMain.handle(CANAUX.processusAnnuler, (_e, requeteId: unknown) => {
-		if (typeof requeteId === "number") cliEnVol.get(requeteId)?.abort();
+		if (typeof requeteId === "number") cliEnVol.get(requeteId)?.controleur.abort();
 	});
 
 	ipcMain.handle(CANAUX.armerFermeture, () => deps.fermeture.armer());

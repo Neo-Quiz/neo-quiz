@@ -1148,7 +1148,7 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle,
 	    n'existe plus. */
 	const poserNodeNu = () => {
 		const dossier = mkdtempSync(join(racine, "nodenu-"));
-		for (const nom of ["codex", "claude"]) {
+		for (const nom of ["codex", "claude", "agy"]) {
 			const lanceur = join(dossier, process.platform === "win32" ? nom + ".cmd" : nom);
 			if (process.platform === "win32") {
 				writeFileSync(lanceur, "@echo off\r\n\"" + process.execPath + "\" %*\r\n");
@@ -1323,25 +1323,55 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle,
 		});
 
 		/* ── UN SEUL `run` PAR OUTIL, LE SUIVANT ATTEND, ET LE VERROU EST RELÂCHÉ ── */
-		await cas(r, "un second run du même outil ATTEND le premier ; au-delà du délai il rejette « occupe » ; un autre outil passe", async () => {
+		await cas(r, "Antigravity: a second run WAITS for the first; past the wait it rejects « occupe »; another tool passes", async () => {
 			const lent = join(racine, "lent.js");
 			writeFileSync(lent, "setTimeout(() => { process.stdout.write('FINI'); }, 500);");
-			/* Une SONDE d'une seconde ne doit plus faire échouer la génération
-			   lancée pendant qu'elle tourne (vécu le 2026-09-20 avec `agy
-			   models`) : le second attend, puis passe. */
-			const premier = run({ tool: "codex", args: [lent], stdin: "" }, { env: envNode });
-			const second = await run({ tool: "codex", args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 3000 });
-			/* Mais une génération qui dure plus que l'attente reste un `occupe`,
-			   un nom, pas un silence. */
-			const troisieme = run({ tool: "codex", args: [lent], stdin: "" }, { env: envNode });
-			const impatient = await nomDuRejet(run({ tool: "codex", args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 50 }));
-			/* Le verrou est par OUTIL : bloquer Codex pendant que Claude tourne
-			   serait une limite inventée, et l'utilisateur ne peut de toute façon
-			   lancer qu'une génération à la fois par fournisseur. */
+			/* A one-second PROBE must not fail the generation started while it
+			   runs (lived on 2026-09-20 with `agy models`): the second waits,
+			   then passes. */
+			const premier = run({ tool: "agy", args: [lent], stdin: "" }, { env: envNode });
+			const second = await run({ tool: "agy", args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 3000 });
+			const troisieme = run({ tool: "agy", args: [lent], stdin: "" }, { env: envNode });
+			const impatient = await nomDuRejet(run({ tool: "agy", args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 50 }));
 			const autre = await run({ tool: "claude", args: [lent], stdin: "" }, { env: envNode });
-			r.check("un second run du même outil ATTEND le premier ; au-delà du délai il rejette « occupe » ; un autre outil passe",
+			r.check("Antigravity: a second run WAITS for the first; past the wait it rejects « occupe »; another tool passes",
 				{ premier: (await premier).stdout, second: second.stdout, impatient, troisieme: (await troisieme).stdout, autre: autre.stdout },
 				{ premier: "FINI", second: "OUT:2:", impatient: "occupe", troisieme: "FINI", autre: "FINI" });
+		});
+
+		/* CLAUDE CODE AND CODEX NEVER BLOCK ONE ANOTHER (2026-09-30): the lock
+		   made a generation fail with "already running" while an Explain
+		   answer, a CLI slow to die or a reloaded page's run held it. Two runs
+		   of the same tool now go side by side: the second never waits for
+		   the first, and never rejects « occupe ». */
+		await cas(r, "Claude Code and Codex: two runs of the same tool run side by side, never « occupe »", async () => {
+			const lent = join(racine, "lent-long.js");
+			writeFileSync(lent, "setTimeout(() => { process.stdout.write('FINI'); }, 1500);");
+			const resultats = {};
+			for (const tool of ["claude", "codex"]) {
+				const premier = run({ tool, args: [lent], stdin: "" }, { env: envNode });
+				const debut = Date.now();
+				const second = await run({ tool, args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 50 });
+				resultats[tool] = { second: second.stdout, sansAttente: Date.now() - debut < 1400, premier: (await premier).stdout };
+			}
+			r.check("Claude Code and Codex: two runs of the same tool run side by side, never « occupe »", resultats, {
+				claude: { second: "OUT:2:", sansAttente: true, premier: "FINI" },
+				codex: { second: "OUT:2:", sansAttente: true, premier: "FINI" },
+			});
+		});
+
+		/* A STOPPED RUN LETS GO OF THE LOCK AT ONCE: killing a CLI's tree can
+		   take longer than the wait, so the lock is released at the stop, not
+		   at the death of the process. */
+		await cas(r, "Antigravity: a stopped run releases the lock at the stop", async () => {
+			const dormeur = join(racine, "dormeur-long.js");
+			writeFileSync(dormeur, "setTimeout(() => {}, 20000);");
+			const c = new AbortController();
+			const arrete = nomDuRejet(run({ tool: "agy", args: [dormeur], stdin: "", signal: c.signal }, { env: envNode }));
+			await new Promise(res => setTimeout(res, 300));
+			c.abort();
+			const ensuite = await run({ tool: "agy", args: [rapporteur], stdin: "ok" }, { env: envNode, attenteVerrouMs: 50 });
+			r.check("Antigravity: a stopped run releases the lock at the stop", { ensuite: ensuite.stdout, arrete: await arrete }, { ensuite: "OUT:2:", arrete: "annule" });
 		});
 
 		await cas(r, "le verrou est relâché sur TOUTES les issues, y compris un échec", async () => {
