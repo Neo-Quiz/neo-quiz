@@ -232,6 +232,12 @@ jobs:
       - name: Generation queue
         run: npm run check:file-generation
 
+      # A generation survives a reload of its page: its CLI is detached, not
+      # killed, and attached again by the same window only; unclaimed, it is
+      # stopped after the delay; a closed window stops its runs at once.
+      - name: Resumable CLI runs
+        run: npm run check:cli-resume
+
       # Le bootstrapper lance l'installeur NSIS en silence : l'ordre des
       # arguments et la sélection du paquet ne peuvent donc pas être relus à
       # l'écran. Ce contrôle charge le noyau réellement appelé par l'installeur.

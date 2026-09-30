@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Fixed
+- Reloading the window during a generation no longer loses it: the queue comes back as it was, and the quiz being written keeps going with the same Claude Code or Codex run instead of being lost (or started again).
 - A bead answered with a hint keeps its verdict mark (the bulb now sits at the opposite corner), every numbered bead has a name for screen readers ("Question 3, right, with hint"), and a file still loading when you start a folder preset no longer lands in the new composer.
 
 ## [1.20.9] - 2026-09-30

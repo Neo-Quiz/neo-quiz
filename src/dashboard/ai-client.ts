@@ -81,6 +81,11 @@ export interface GenerateOptions {
 	    CLI's work as it happens — Claude Code and Codex only; the other
 	    providers answer in one piece. */
 	onTranscript?: (event: TranscriptEvent) => void;
+	/** The resume key of this generation (2026-09-30, `HostProcess.run`):
+	    stable across a reload of the page, so the queue restored after it
+	    attaches to the CLI still running instead of launching a new one.
+	    Each CLI call of the generation gets its own key from it. */
+	reprise?: string;
 }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
@@ -187,7 +192,7 @@ export interface AiClient {
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
-	planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options?: { onTranscript?: (event: TranscriptEvent) => void }): Promise<EtapePlan[]>;
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string }): Promise<EtapePlan[]>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -775,6 +780,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	let aborted = false;
 	/** Where the running generation's transcript goes (`GenerateOptions`). */
 	let transcriptSink: ((event: TranscriptEvent) => void) | null = null;
+	/** The resume key of the running generation or plan, and how many CLI
+	    calls it has made: call N is resumed under `<key>-N`. The order of
+	    calls depends only on the request and the answers, so the replay of
+	    a line after a reload asks the same keys in the same order. */
+	let repriseBase: string | null = null;
+	let appelsCli = 0;
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -826,6 +837,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			marqueur: spec.marqueur,
 			fichiers: spec.fichiers,
 			sortieFichier: spec.sortieFichier,
+			reprise: repriseBase ? `${repriseBase}-${appelsCli++}` : undefined,
 		});
 	}
 
@@ -842,6 +854,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	async function generate(prompt: string, options: GenerateOptions = {}): Promise<ReponseQuiz> {
 		aborted = false;
 		transcriptSink = options.onTranscript ?? null;
+		repriseBase = options.reprise ?? null;
+		appelsCli = 0;
 		pendingUsage = null;
 		lastUsage = null;
 		/* L'INSTANTANÉ des fichiers de CLI, relu AVANT l'appel : `resolveCodexModel`
@@ -878,6 +892,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		} finally {
 			abortCurrent = null;
 			transcriptSink = null;
+			repriseBase = null;
 		}
 	}
 
@@ -1605,10 +1620,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    document at once, then chooses the quizzes that will cover everything
 	    that can come up — their number, their order, what each covers.
 	    `typeImpose`: the Learn | Test selector, which the plan follows. */
-	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options: { onTranscript?: (event: TranscriptEvent) => void } = {}): Promise<EtapePlan[]> {
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string } = {}): Promise<EtapePlan[]> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
+		repriseBase = options.reprise ?? null;
+		appelsCli = 0;
 		await refreshCliCaches();
 		try {
 			const provider = settings.get().aiProvider || "";
@@ -1646,6 +1663,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		} finally {
 			abortCurrent = null;
 			transcriptSink = null;
+			repriseBase = null;
 		}
 	}
 

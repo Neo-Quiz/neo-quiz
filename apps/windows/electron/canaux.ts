@@ -64,6 +64,15 @@ import { autoriserHote, fetchBorne } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises } from "./gabarits-cli";
+import { creerReprises, estCleReprise } from "./resumable-runs";
+
+/** How long a generation whose page reloaded waits to be claimed again
+    before it is stopped: a reload takes seconds, a restored queue restarts
+    its line at once. */
+const DELAI_REPRISE_MS = 60_000;
+/** The output kept for a later attach (characters): the transcript of a
+    long generation, never the result, which is held apart. */
+const TAILLE_MAX_REPRISE = 8_000_000;
 import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
@@ -1279,20 +1288,27 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	   L'ENVELOPPE (`ResultatCli`, `pont.ts`) et non un rejet : l'IPC perd le
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
-	const cliEnVol = new Map<number, { controleur: AbortController; page: Electron.WebContents }>();
+	const cliEnVol = new Map<number, { controleur: AbortController; page: Electron.WebContents; reprenable: boolean }>();
 	/* A PAGE THAT GOES AWAY TAKES ITS CLIs WITH IT (2026-09-30): a reload of
 	   the window (update, crash, Ctrl+R) left the running Claude Code going
 	   in the background, answering nobody — and holding the tool's lock, so
 	   the next generation failed with "already running", or waited on a
 	   model the page could no longer hear. The runs a page started are
-	   stopped when it navigates away, crashes or is destroyed. */
+	   stopped when it navigates away, crashes or is destroyed.
+
+	   EXCEPT A RESUMABLE RUN (same day, `resumable-runs.ts`): a generation
+	   sent with a resume key is DETACHED on navigation or crash, and the
+	   reloaded page attaches to it again; only its window being destroyed,
+	   or nobody asking for it within the minute, stops it. */
+	const reprises = creerReprises<Electron.WebContents>({ delaiMs: DELAI_REPRISE_MS, tailleMax: TAILLE_MAX_REPRISE });
 	const pagesSuivies = new WeakSet<Electron.WebContents>();
-	const annulerRunsDe = (page: Electron.WebContents): void => {
+	const quitterPage = (page: Electron.WebContents, definitif: boolean): void => {
 		for (const [cle, run] of cliEnVol) {
 			if (run.page !== page) continue;
-			run.controleur.abort();
+			if (!run.reprenable || definitif) run.controleur.abort();
 			cliEnVol.delete(cle);
 		}
+		if (definitif) reprises.detruire(page); else reprises.detacher(page);
 	};
 	const suivrePage = (page: Electron.WebContents): void => {
 		if (pagesSuivies.has(page)) return;
@@ -1301,10 +1317,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			const details = a[0] as { isMainFrame?: boolean; isSameDocument?: boolean } | undefined;
 			const surPlace = typeof a[2] === "boolean" ? a[2] : details?.isSameDocument === true;
 			const cadrePrincipal = typeof a[3] === "boolean" ? a[3] : details?.isMainFrame !== false;
-			if (cadrePrincipal && !surPlace) annulerRunsDe(page);
+			if (cadrePrincipal && !surPlace) quitterPage(page, false);
 		});
-		page.on("render-process-gone", () => annulerRunsDe(page));
-		page.once("destroyed", () => annulerRunsDe(page));
+		page.on("render-process-gone", () => quitterPage(page, false));
+		page.once("destroyed", () => quitterPage(page, true));
 	};
 
 	ipcMain.handle(CANAUX.processusRun, async (e, spec: unknown, requeteId: unknown, flux: unknown): Promise<ResultatCli> => {
@@ -1338,30 +1354,59 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const surStdout = flux === true && !Number.isNaN(id)
 			? (texte: string): void => { if (!expediteur.isDestroyed()) expediteur.send(CANAUX.processusFlux, { id, texte }); }
 			: undefined;
-		const controleur = new AbortController();
-		const enVolCli = { controleur, page: expediteur };
 		suivrePage(expediteur);
+		/* THE RESUME KEY. Its run is found again only by THIS page and only
+		   once detached (`rattacher`): the key never reaches another
+		   window's run, and a run still attached is never shared. The tool
+		   and arguments were judged above like any call; an attach launches
+		   nothing new. */
+		const cleReprise = estCleReprise(s.reprise) ? s.reprise : null;
+		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, surStdout ?? null) : null;
+		if (rattache) {
+			const enVolRattache = { controleur: rattache.controleur, page: expediteur, reprenable: true };
+			if (!Number.isNaN(id)) cliEnVol.set(id, enVolRattache);
+			try {
+				return await rattache.resultat;
+			} finally {
+				if (cliEnVol.get(id) === enVolRattache) cliEnVol.delete(id);
+			}
+		}
+		const controleur = new AbortController();
+		/* A key already used by a run still attached (a second call of the
+		   same page under the same key) is not resumable: launched plainly. */
+		const reprenable = !!cleReprise && !reprises.enCours(expediteur, cleReprise);
+		const enVolCli = { controleur, page: expediteur, reprenable };
 		if (!Number.isNaN(id)) cliEnVol.set(id, enVolCli);
+		const executer = async (emettre?: (texte: string) => void): Promise<ResultatCli> => {
+			try {
+				const res = await run({
+					tool,
+					args,
+					stdin: typeof s.stdin === "string" ? s.stdin : "",
+					timeoutMs: typeof s.timeoutMs === "number" ? s.timeoutMs : undefined,
+					marqueur: typeof s.marqueur === "string" ? s.marqueur : undefined,
+					fichiers,
+					sortieFichier: typeof s.sortieFichier === "string" ? s.sortieFichier : undefined,
+					signal: controleur.signal,
+				}, { surStdout: emettre });
+				return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
+			} catch (e) {
+				/* Le NOM survit, c'est tout l'objet de l'enveloppe. « erreur » est le
+				   défaut d'une exception qui n'en porterait pas — jamais un nom du
+				   contrat choisi au hasard, qui mentirait sur la cause. */
+				const nom = e instanceof Error && e.name ? e.name : "erreur";
+				const message = e instanceof Error ? e.message : String(e);
+				console.warn(LOG_PREFIX, "CLI", tool, "en échec:", nom, message);
+				return { ok: false, nom, message };
+			}
+		};
 		try {
-			const res = await run({
-				tool,
-				args,
-				stdin: typeof s.stdin === "string" ? s.stdin : "",
-				timeoutMs: typeof s.timeoutMs === "number" ? s.timeoutMs : undefined,
-				marqueur: typeof s.marqueur === "string" ? s.marqueur : undefined,
-				fichiers,
-				sortieFichier: typeof s.sortieFichier === "string" ? s.sortieFichier : undefined,
-				signal: controleur.signal,
-			}, { surStdout });
-			return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
-		} catch (e) {
-			/* Le NOM survit, c'est tout l'objet de l'enveloppe. « erreur » est le
-			   défaut d'une exception qui n'en porterait pas — jamais un nom du
-			   contrat choisi au hasard, qui mentirait sur la cause. */
-			const nom = e instanceof Error && e.name ? e.name : "erreur";
-			const message = e instanceof Error ? e.message : String(e);
-			console.warn(LOG_PREFIX, "CLI", tool, "en échec:", nom, message);
-			return { ok: false, nom, message };
+			/* A resumable run streams through the registry, which buffers the
+			   output for a later attach, even when this call asked for no
+			   stream. */
+			return reprenable && cleReprise
+				? await reprises.lancer(expediteur, cleReprise, controleur, executer, surStdout ?? null)
+				: await executer(surStdout);
 		} finally {
 			/* Retirée SEULEMENT si c'est encore la sienne : le compteur du rendu
 			   repart à 1 après un `location.reload()`, et le `finally` d'un appel

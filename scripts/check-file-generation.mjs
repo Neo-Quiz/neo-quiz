@@ -108,6 +108,27 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
 	r.check("réessayer l'enregistrement d'un échec de GÉNÉRATION ne fait rien",
 		F.ligne(F.reessayerEnregistrement(F.echouer(g, 3, "boom"), 3), 3)?.etat, "echouee");
 
+	/* A RELOADED PAGE (2026-09-30): the queue saved before the reload comes
+	   back. The running line stays running (it attaches to its CLI), unless
+	   its answer had arrived: then only the note is left to write. A line
+	   being stopped is gone. New lines never reuse an id — a resume key is
+	   built from it. */
+	let h = F.fileVide();
+	for (const x of [{ texte: "A" }, { texte: "B" }, { texte: "C" }]) h = F.ajouter(h, x).file;
+	h = F.demarrerSuivant(h, 700).file;
+	r.check("completer: the answer rides with the running line", F.ligne(F.completer(h, 1, { texte: "A", produit: ["q"] }), 1)?.demande.produit, ["q"]);
+	r.check("completer: never on a waiting line", F.ligne(F.completer(h, 2, { texte: "B", produit: ["q"] }), 2)?.demande.produit, undefined);
+	const aProduit = (dm) => !!dm.produit;
+	let rest = F.restaurer(h, aProduit);
+	r.check("restaurer: the running line keeps running, with its start time", [F.ligne(rest, 1)?.etat, F.ligne(rest, 1)?.debut], ["cours", 700]);
+	rest = F.restaurer(F.completer(h, 1, { texte: "A", produit: ["q"] }), aProduit);
+	r.check("restaurer: a running line whose answer arrived only writes its note",
+		[F.ligne(rest, 1)?.etat, F.ligne(rest, 1)?.demande.produit], ["enregistrement", ["q"]]);
+	r.check("restaurer: its note write does not take the queue's place", F.demarrerSuivant(rest, 800).ligne?.demande.texte, "B");
+	rest = F.restaurer(F.annuler(h, 1).file, aProduit);
+	r.check("restaurer: a line being stopped is gone", rest.lignes.map(l => l.id), [2, 3]);
+	r.check("restaurer: new ids never reuse an old one", F.ajouter(F.restaurer({ lignes: h.lignes, prochainId: 1 }, aProduit), { texte: "D" }).id, 4);
+
 	r.done();
 });
 

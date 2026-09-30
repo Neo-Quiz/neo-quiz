@@ -44,9 +44,12 @@ temps qu'Ahmed : un code en français n'est lisible que par des francophones.
 
 ## La mémoire du projet est la note du vault, pas un fichier de mémoire
 
-`C:\obsidian-vaults\Personal\Projets\Neo Quiz\Objectifs & Idées.md` est
+`C:\obsidian-vaults\Personal\Projets\Neo Quiz\Neo Quiz.md` est
 **la** mémoire du chantier en cours : ce qui est fait, en cours, à faire, et
-combien il en reste. Décidé le 2026-09-17 (« c'est ce dossier qui doit te
+combien il en reste — plus les idées, l'objectif Android, la stack et les
+décisions. Elle a absorbé `Objectifs & Idées.md` et `Décisions.md` le
+2026-09-30 (« tout ce qu'il me faut dans cette note-là ») ; seul
+l'historique reste à part, dans `Versions publiées.md`. Décidé le 2026-09-17 (« c'est ce dossier qui doit te
 servir de mémoire du projet, au moins pour les plans ; à chaque fois je dois
 dire de mettre à jour les tâches, c'est épuisant »). Règles, **sans jamais
 attendre qu'Ahmed le demande** :
@@ -71,7 +74,9 @@ attendre qu'Ahmed le demande** :
   dernière ligne dit « Le plan compte N tâches. ».
 - **Plus de `[/]` au dispatch** : le callout `plan-active` dit déjà que le
   plan est en cours. **À chaque revue close** : `- [x]` + SHA court entre
-  parenthèses. Le plan fini, son callout passe `> [!plan-done]-`. Un bug ou
+  parenthèses. Le plan fini, son callout passe `> [!plan-done]-`, et part dans
+  `Versions publiées.md` (entrée `[!goal-done]` de la version) une fois
+  publié : la note ne garde que ce qui reste à faire. Un bug ou
   une idée vus à l'écran pendant le chantier : une ligne de plus dans la liste
   de la version, le jour même.
 - **Toujours par un agent** (jamais la session principale), avec le texte
@@ -312,6 +317,16 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   AFFICHÉES (options mélangées), la bonne réponse de chaque type (choix,
   classement, association, trous, saisie), jamais un champ `{…}` brut, et une
   ligne dont tous les champs sont vides part avec son intitulé. Dans la CI.
+- `npm run check:cli-resume` — une génération SURVIT au rechargement de sa
+  page (2026-09-30, `apps/windows/electron/resumable-runs.ts`) : un CLI lancé
+  avec une clé de reprise (`HostProcess.run`, `reprise`) est DÉTACHÉ, pas tué,
+  quand la page navigue ou plante ; la page rechargée (même `WebContents`)
+  s'y RATTACHE sous la même clé — sortie rejouée, puis résultat — et jamais
+  une autre fenêtre ; personne ne le réclame en une minute : il est arrêté ;
+  une fenêtre détruite arrête les siens aussitôt. La file elle-même est
+  gardée dans IndexedDB, limitée à la session de la fenêtre
+  (`dashboard/generation-queue-store.ts`), et restaurée par
+  `restaurer` (`check:file-generation`). Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une

@@ -551,6 +551,12 @@ export interface HostProcess {
 		    `dashboard/transcript.ts`). The same text still comes back whole
 		    in `stdout` at the end. A host that cannot stream ignores it. */
 		onStdout?: (chunk: string) => void;
+		/** A RESUME KEY (2026-09-30), stable across a reload of the page:
+		    `[A-Za-z0-9_-]{8,120}`. A run launched with one survives its page
+		    reloading; the reloaded page calling again with the same key gets
+		    the SAME run (its output replayed, then its result) instead of a
+		    new one. A host that cannot keep a run alive ignores it. */
+		reprise?: string;
 	}): Promise<{ stdout: string; stderr: string; code: number | null; sortie?: string }>;
 	/** Le fichier de cache/config du CLI, à un chemin FIXE tenu par l'hôte
 	    (Codex : `$CODEX_HOME` ou `~/.codex/models_cache.json` ; Claude :

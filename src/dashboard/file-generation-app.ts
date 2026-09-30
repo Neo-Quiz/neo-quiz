@@ -12,7 +12,10 @@
    joue (`main.ts` remplace alors le tableau de bord). La page « Générer »
    s'y ABONNE pour peindre les lignes et s'en désabonne en se démontant ;
    elle ne la possède pas. Fermer l'application la perd — les quiz déjà
-   enregistrés restent.
+   enregistrés restent. A RELOAD of the page no longer does (2026-09-30):
+   the queue is saved after each change and read back, and the line that
+   was running attaches to its CLI, which the main process kept alive
+   (`generation-queue-store.ts`, `apps/windows/electron/resumable-runs.ts`).
 
    L'application ne change JAMAIS de page d'elle-même : un quiz prêt reste
    une ligne avec « Ouvrir », et un avis le dit si « Générer » n'est pas à
@@ -37,6 +40,7 @@ import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
 import { appliquer, transcriptVide } from "./transcript";
 import type { Transcript } from "./transcript";
+import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -179,7 +183,19 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		publier();
 	}
 
+	/* KEPT ACROSS A RELOAD (2026-09-30, `generation-queue-store.ts`): every
+	   change of the queue is saved, and the queue saved before a reload is
+	   read back once, below. Until then, a request sent waits in `differees`
+	   — the restored lines come first, and their ids must not be reused. */
+	let restauree = false;
+	const differees: DemandeFile[] = [];
+	let derniereGardee: FileGeneration<DemandeFile, ResultatFile> | null = null;
+
 	function publier(): void {
+		if (restauree && file !== derniereGardee) {
+			derniereGardee = file;
+			void garderFile(file);
+		}
 		/* Le SIGNAL du rail (l'icône « Générer » s'anime tant qu'une
 		   génération tourne, même depuis une autre page) : posé ici, au seul
 		   endroit qui sait si la file travaille. */
@@ -230,6 +246,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
+				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
 					if (transcripts.get(ligne.id) !== transcript) return;
@@ -271,9 +288,13 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			   pour le survol du bouton d'usage, si un hôte de la page le fournit
 			   un jour : l'application ne fournit pas `usage`, et le greffon n'a
 			   plus la page « Générer ». */
-			// Le quiz est GARDÉ avec la demande avant toute écriture.
+			/* Le quiz est GARDÉ avec la demande avant toute écriture — dans la
+			   file aussi, donc dans sa sauvegarde : une page rechargée pendant
+			   l'écriture écrit la note sans redemander le modèle. */
+			const complete: DemandeFile = { ...d, produit: { questions, titre: titrePreparation(d) ?? reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } };
+			file = F.completer(file, ligne.id, complete);
 			etapeDe(ligne.id, "enregistrement");
-			await enregistrer(ligne.id, { ...d, produit: { questions, titre: titrePreparation(d) ?? reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } });
+			await enregistrer(ligne.id, complete);
 		} catch (err) {
 			/* Asked for no quiz: the prose is the answer, shown in place of a quiz. */
 			if (err instanceof NoQuizAnswer) {
@@ -305,6 +326,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			etapeDe(ligne.id, "redaction");
 			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mode, {
+				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
 					appliquer(transcript, ev);
@@ -359,6 +381,23 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 
+	/* THE QUEUE OF BEFORE THE RELOAD, read back once. Its running line runs
+	   again: under the same resume key, its generation attaches to the CLI
+	   the main process kept alive (or, past the minute it waits, starts
+	   afresh). A line whose answer had arrived only writes its note. */
+	void relireFile<FileGeneration<DemandeFile, ResultatFile>>().then(sauvee => {
+		if (sauvee && Array.isArray(sauvee.lignes)) {
+			file = F.restaurer(sauvee, d => !!d.produit);
+		}
+		restauree = true;
+		for (const d of differees.splice(0)) file = F.ajouter(file, d).file;
+		for (const l of file.lignes) {
+			if (l.etat === "cours") void executer(l);
+			else if (l.etat === "enregistrement") void enregistrer(l.id, l.demande).finally(publier);
+		}
+		pomper();
+	});
+
 	return {
 		lignes: () => file.lignes,
 		etape: (id) => etapes.get(id) ?? null,
@@ -371,6 +410,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			if (d) void enregistrer(id, d).finally(publier);
 		},
 		envoyer(demande) {
+			if (!restauree) { differees.push(demande); return; }
 			file = F.ajouter(file, demande).file;
 			pomper();
 		},
@@ -419,6 +459,13 @@ export function titrePreparation(d: Pick<DemandeFile, "mode" | "preparation">): 
 		? (p.document ? `Learn ${p.document.replace(/\.[^.]+$/, "")}` : "Learn")
 		: `Test ${p.palier}`;
 	return nettoyerTitre(`${p.examen.nom} — ${etape}`);
+}
+
+/** The resume key of a line's run: the window's session, the line, and its
+    start — the same after a reload (the queue keeps both), a new one for a
+    retry (a new start). */
+function cleReprise(ligne: LigneGeneration): string {
+	return `${sessionDeFenetre()}-${ligne.id}-${ligne.debut ?? 0}`;
 }
 
 /** Les images en base64 pour l'API de vision, lues au moment de partir. */

@@ -152,6 +152,29 @@ export function reessayer<D, R>(file: FileGeneration<D, R>, id: number): FileGen
 	return { ...file, lignes: [...file.lignes.filter(x => x.id !== id), { id: l.id, etat: "attente", demande: l.demande }] };
 }
 
+/** The model's answer arrived: the line's request now carries it
+    (`demande`), BEFORE the note is written — a reload between the two must
+    write that note, never ask the model again. Only on a working line. */
+export function completer<D, R>(file: FileGeneration<D, R>, id: number, demande: D): FileGeneration<D, R> {
+	const etat = ligne(file, id)?.etat;
+	if (etat !== "cours" && etat !== "enregistrement") return file;
+	return remplacer(file, id, l => ({ ...l, demande }));
+}
+
+/** THE QUEUE OF A RELOADED PAGE (2026-09-30), from the one saved before
+    the reload. A line being stopped (`arret`) is gone: its process was
+    already told to die. A line running whose answer had already arrived
+    (`aProduit`) only has its note left to write: `enregistrement`. Every
+    other line keeps its state — the caller runs the `cours` line again,
+    which attaches to its CLI still running (`HostProcess.run`, `reprise`). */
+export function restaurer<D, R>(file: FileGeneration<D, R>, aProduit: (demande: D) => boolean): FileGeneration<D, R> {
+	const lignes = file.lignes
+		.filter(l => l.etat !== "arret")
+		.map(l => (l.etat === "cours" && aProduit(l.demande) ? { id: l.id, etat: "enregistrement" as const, demande: l.demande } : l));
+	const plusGrand = lignes.reduce((m, l) => Math.max(m, l.id), 0);
+	return { lignes, prochainId: Math.max(file.prochainId, plusGrand + 1) };
+}
+
 /** La croix : ferme une ligne prête ou échouée. Une ligne qui attend ou qui
     tourne ne se ferme pas, elle s'annule. */
 export function fermer<D, R>(file: FileGeneration<D, R>, id: number): FileGeneration<D, R> {

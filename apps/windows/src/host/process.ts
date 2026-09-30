@@ -58,7 +58,7 @@ export function createWindowsProcess(): HostProcess {
 			   rejetterait un `AbortSignal`, et `invoke` échouerait avant même que
 			   le principal ne voie l'appel. Le reste est recopié champ par champ —
 			   `RequeteCli` (`pont.ts`) dit exactement ce qui passe. */
-			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, onStdout } = spec;
+			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, onStdout, reprise } = spec;
 			/* Déjà annulé avant l'envoi : rien à lancer. Le contrat nomme cette
 			   issue `annule`, et le principal n'a pas à voir partir un CLI que
 			   personne n'attend plus. */
@@ -78,7 +78,7 @@ export function createWindowsProcess(): HostProcess {
 				: null;
 			try {
 				const res = await pont().processus.run(
-					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier },
+					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, reprise },
 					id,
 					!!onStdout,
 				);
