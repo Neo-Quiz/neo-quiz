@@ -19,6 +19,9 @@ release notes.
 - In a Learn, a single-choice question is checked as soon as you click an answer, and its Check button is gone; multiple choice, written answers, blanks, ordering and matching keep it.
 - Under a question you have checked (or a Test you have handed in), an Explain button opens a window that you can close and open again without losing anything: a chat like claude.ai's, with the history above and a composer below that starts with the Explain prompt as a tile (its pencil opens the Settings on the prompt), the provider (Claude Code or Codex CLI, Claude Code by default when installed, else Codex CLI), the model, the effort, the usage gauge and the send arrow. Sent, the prompt joins the history and you go on with follow-up questions. It is not there before the correction, nor in an exam.
 - The row of numbered beads under a question shows every question at the same size, always readable, and goes on to a second line when they do not fit; the small dots and the magnifier are gone.
+- Generate has a sidebar on the left, like claude.ai's: New (a new chat, the current one is archived first), Generated quizzes (the folder where they are written) and Archived chats (kept on this computer, readable and deletable), instead of the New chat button at the top right.
+- Maths written between dollar signs, inline or in display form, are now typeset in the chat of Generate and in the Explain window.
+- The Explain button and the send arrow of its window take the colours of the provider's logo (a gradient), and the window opens with its composer in the middle, dropping to the bottom with the first message.
 - The A, B, C and D letters of single-choice answers are a little smaller.
 - Explain and Chat now explain the way learning research recommends: the answer first, then the why step by step, what each wrong choice gets wrong, an everyday analogy with its limit, a worked example and a short check question.
 

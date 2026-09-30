@@ -30,6 +30,7 @@ import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host"
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
 import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
+import { mathifyElement } from "../../../../src/engine/mathjax";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
 import { attacherUsage } from "./comptes";
 
@@ -167,6 +168,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	};
 
 	const peindreLogoBouton = (): void => {
+		// The colours of the button follow the provider's logo (CSS on `data-nq-fournisseur`).
+		bouton.dataset.nqFournisseur = courant;
 		boutonLogo.replaceChildren();
 		if (peutExpliquer()) {
 			const p = aiProviders.getProvider(courant);
@@ -244,15 +247,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				champ.rows = 1;
 				champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
 				const pied = ajouter(composer, "div", "qz-mini-pied");
-				const outils = ajouter(pied, "div", "qz-mini-outils");
 				/* The consumption of the provider, where the Settings already show
 				   it: a gauge that opens its popover (Claude Code and Codex). */
-				const usageBtn = ajouter(outils, "button", "qbd-select qz-mini-fournisseur qz-mini-usage");
+				const usageBtn = ajouter(pied, "button", "qbd-select qz-mini-fournisseur qz-mini-usage");
 				usageBtn.type = "button";
 				host.ui.setIcon(usageBtn, "gauge");
 				usageBtn.title = t("ai.usage.title");
 				usageBtn.setAttribute("aria-label", t("ai.usage.title"));
 				attacherUsage(usageBtn, () => (courant === "codex" ? "codex" : "claude"));
+				const outils = ajouter(pied, "div", "qz-mini-outils");
 				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
 				fournisseurBtn.type = "button";
 				const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
@@ -274,6 +277,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						host.ui.setIcon(ajouter(fournisseurBtn, "span", "qbd-provider-logo"), "circle-dashed");
 						fournisseurBtn.title = t("ai.provider.choose");
 					}
+					m.panelEl.dataset.nqFournisseur = courant;
 					usageBtn.hidden = modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
 					if (peutExpliquer()) {
 						modeleLabel.textContent = libelleModele();
@@ -333,6 +337,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				   which is cheap at the length of these conversations. */
 				const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
 				const peindreFil = (): void => {
+					// No message yet: the composer sits in the middle of the window, and drops to the bottom at the first one.
+					m.contentEl.classList.toggle("nq-explain-vide", conv.messages.length === 0);
 					const bas = enBas() || fil.childElementCount === 0;
 					fil.replaceChildren();
 					for (const msg of conv.messages) {
@@ -351,7 +357,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
 						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
-						else if (msg.text) prose.innerHTML = renderMarkdownPreview(msg.text);
+						else if (msg.text) {
+							prose.innerHTML = renderMarkdownPreview(msg.text);
+							if (msg.text.includes("$")) void mathifyElement(prose);
+						}
 						else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
 					}
 					if (bas) fil.scrollTop = fil.scrollHeight;

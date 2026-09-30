@@ -178,9 +178,21 @@
 }
 /* The button that opens the Explain window: the 3D blue of the arrows, with the
    provider's logo. */
+/* The colours follow the provider's logo (`data-nq-fournisseur`, set by ui/explain.ts):
+   a gradient and its edge; the arrows' blue when no provider is known. */
+[data-nq-fournisseur="claude-code"] {
+	--nq-face: linear-gradient(135deg, #f3946f, #d2613b);
+	--nq-edge: #9d4527;
+	--nq-face-hover: linear-gradient(135deg, #f7a583, #dc6d47);
+}
+[data-nq-fournisseur="codex"] {
+	--nq-face: linear-gradient(135deg, #5f8bff, #b05cf2);
+	--nq-edge: #4b45b5;
+	--nq-face-hover: linear-gradient(135deg, #7399ff, #bc72f5);
+}
 .qz-explain-btn {
-	--face: var(--quiz-primary);
-	--edge: var(--quiz-primary-edge);
+	--face: var(--nq-face, var(--quiz-primary));
+	--edge: var(--nq-edge, var(--quiz-primary-edge));
 	--depth: 4px;
 	appearance: none;
 	display: inline-flex;
@@ -201,7 +213,7 @@
 	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 .qz-explain-btn:hover {
-	background: var(--quiz-primary-light);
+	background: var(--nq-face-hover, var(--quiz-primary-light));
 }
 .qz-explain-btn:active {
 	transform: translateY(var(--depth));
@@ -313,8 +325,8 @@
 	height: 16px;
 }
 .qz-mini-envoi {
-	--face: var(--quiz-primary);
-	--edge: var(--quiz-primary-edge);
+	--face: var(--nq-face, var(--quiz-primary));
+	--edge: var(--nq-edge, var(--quiz-primary-edge));
 	--depth: 4px;
 	appearance: none;
 	display: inline-flex;
@@ -333,7 +345,7 @@
 	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
 .qz-mini-envoi:hover {
-	background: var(--quiz-primary-light);
+	background: var(--nq-face-hover, var(--quiz-primary-light));
 }
 .qz-mini-envoi:active {
 	transform: translateY(var(--depth));
@@ -442,4 +454,23 @@
 
 .nq-explain-msg-user .qz-mini-tuile {
 	align-self: flex-end;
+}
+
+/* Nothing said yet: the history is empty, the composer is centred in the
+   window and drops to the bottom with the first message. */
+.nq-explain-modal .modal-content.nq-explain-vide {
+	justify-content: center;
+}
+.nq-explain-modal .modal-content.nq-explain-vide .nq-explain-fil {
+	display: none;
+}
+/* The usage gauge keeps its distance from the tools on its right. */
+.qz-mini-pied > .qz-mini-usage {
+	margin-right: auto;
+}
+/* In the Explain window the footer spans the whole card: the usage gauge on
+   the left, the provider, model, effort and send arrow on the right. */
+.nq-explain-composer .qz-mini-pied {
+	width: 100%;
+	margin-left: 0;
 }

@@ -33,6 +33,7 @@ import { t } from "../i18n";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
+import { mathifyElement } from "../engine/mathjax";
 
 export interface VueFile {
 	/** Pose la zone des tours dans `parent` (à chaque rendu de la page). */
@@ -172,6 +173,8 @@ export function creerVueFile(opts: {
 			return;
 		}
 		prose.innerHTML = renderMarkdownPreview(texte);
+		// $…$ and $…$ are typeset after each repaint (the answer rewrites the HTML as it grows).
+		if (texte.includes("$")) void mathifyElement(prose);
 	}
 
 	function peindreReponseChat(parent: HTMLElement, l: LigneGeneration): void {

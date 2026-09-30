@@ -34,6 +34,8 @@ import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
+import { archiveChat, deleteArchivedChat, readArchivedChats } from "./chat-archives";
+import type { ArchivedTurn } from "./chat-archives";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -229,6 +231,9 @@ export interface AiPageDeps {
 	scanner: Scanner;
 	statsStore: StatsStore;
 	navigate(view: DashboardViewName, data?: NavigateData): void;
+	/** Opens the page of the folder where generated quizzes are written ("Generated quizzes"
+	    of the sidebar). Absent: no such entry. */
+	openGenerated?(): void;
 	/** Les notes OUVERTES dans l'hôte (onglets Obsidian), en tête des deux
 	    pickers de notes. Absent = aucune : l'application n'a pas d'onglets. */
 	openFiles?(): HostFile[];
@@ -683,6 +688,63 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return i < 0 ? TYPE_VALUES[0] : TYPE_VALUES[i];
 	};
 
+	/** The chat on screen, as turns: what the learner asked and what came back. */
+	function archiverConversation(): void {
+		const turns: ArchivedTurn[] = [];
+		for (const l of fileGen.lignes()) {
+			if (l.demande.mode !== "chat") continue;
+			turns.push({ role: "user", text: l.demande.text });
+			turns.push({ role: "assistant", text: l.resultat?.texte ?? fileGen.transcript(l.id)?.text ?? "" });
+		}
+		archiveChat(turns);
+	}
+
+	/** "Archived chats": the list, then one chat read back, read-only. */
+	function ouvrirArchives(): void {
+		requireHost("modals").open({
+			className: "qbd-archives-modal",
+			title: t("ai.side.archived"),
+			onOpen: (m) => {
+				const corps = m.contentEl;
+				const liste = (): void => {
+					corps.replaceChildren();
+					const toutes = readArchivedChats();
+					if (toutes.length === 0) { ajouter(corps, "div", "qbd-archives-vide", t("ai.side.archivedEmpty")); return; }
+					for (const c of toutes) {
+						const ligne = ajouter(corps, "div", "qbd-archives-ligne");
+						const ouvrir = ajouter(ligne, "button", "qbd-archives-ouvrir");
+						ouvrir.type = "button";
+						ajouter(ouvrir, "span", "qbd-archives-titre", (c.turns[0]?.text ?? "").split("\n")[0].slice(0, 90));
+						ajouter(ouvrir, "span", "qbd-archives-date", new Date(c.date).toLocaleString());
+						ouvrir.addEventListener("click", () => lire(c.turns));
+						const suppr = ajouter(ligne, "button", "qbd-archives-suppr");
+						suppr.type = "button";
+						suppr.title = t("ai.side.archivedDelete");
+						suppr.setAttribute("aria-label", t("ai.side.archivedDelete"));
+						host.ui.setIcon(suppr, "trash-2");
+						suppr.addEventListener("click", () => { deleteArchivedChat(c.id); liste(); });
+					}
+				};
+				const lire = (turns: ArchivedTurn[]): void => {
+					corps.replaceChildren();
+					const retour = ajouter(corps, "button", "qbd-archives-retour");
+					retour.type = "button";
+					host.ui.setIcon(ajouter(retour, "span"), "arrow-left");
+					ajouter(retour, "span", undefined, t("ai.side.back"));
+					retour.addEventListener("click", liste);
+					const fil = ajouter(corps, "div", "qbd-archives-fil");
+					for (const tour of turns) {
+						if (tour.role === "user") { ajouter(fil, "div", "qbd-ai-bulle", tour.text); continue; }
+						const prose = ajouter(fil, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
+						prose.innerHTML = renderMarkdownPreview(tour.text);
+						if (tour.text.includes("$")) void mathifyElement(prose);
+					}
+				};
+				liste();
+			},
+		});
+	}
+
 	function canGenerate(): boolean {
 		/* Une demande EN VOL sur un site, ou une attente de connexion, ne
 		   repart pas : le composer la montre encore, et le clic comme Entrée
@@ -927,14 +989,30 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   quand la liste se vide. */
 		const conversation = (phase === "idle" || phase === "error") && enConversation(fileGen);
 		modeConversation = conversation;
+		/* THE SIDEBAR, on the left of the page like claude.ai's: a new chat, the
+		   quizzes generated so far (the folder they are written to), and the
+		   chats that were archived by "New". */
+		container.classList.add("qbd-ai-avec-lateral");
+		const lateral = ajouter(container, "nav", "qbd-ai-lateral");
+		majNouvelle = poserNouvelleDemande(lateral, fileGen, archiverConversation);
+		if (deps.openGenerated) {
+			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");
+			genere.type = "button";
+			host.ui.setIcon(ajouter(genere, "span", "qbd-ai-lateral-icone"), "folder-open");
+			ajouter(genere, "span", undefined, t("ai.side.generated"));
+			genere.addEventListener("click", () => deps.openGenerated?.());
+		}
+		const archives = ajouter(lateral, "button", "qbd-ai-lateral-item");
+		archives.type = "button";
+		host.ui.setIcon(ajouter(archives, "span", "qbd-ai-lateral-icone"), "archive");
+		ajouter(archives, "span", undefined, t("ai.side.archived"));
+		archives.addEventListener("click", () => ouvrirArchives());
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
 		if (conversation) {
-			/* "New chat" (named "New request" until 2026-09-29). */
-			majNouvelle = poserNouvelleDemande(ajouter(stage, "div", "qbd-ai-fil-tete"), fileGen);
 			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
 		}
 
@@ -1949,7 +2027,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				if (canGenerate()) void startGeneration(containerRef);
 			});
 		} else {
-			sendBtn.setAttribute("aria-label", t("ai.composer.generate"));
+			sendBtn.setAttribute("aria-label", t(chatCapable() ? "ai.composer.send" : "ai.composer.generate"));
 			host.ui.setIcon(sendIcon, "arrow-up");
 			sendBtn.addEventListener("click", () => {
 				/* Le ■ de claude.ai : composer vide pendant une génération, le
@@ -3732,7 +3810,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			btn.classList.toggle("qbd-ai-composer-send--stop", arret);
 			const icone = btn.querySelector<HTMLElement>(".qbd-ai-composer-send-icon");
 			if (icone) host.ui.setIcon(icone, arret ? "square" : "arrow-up");
-			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t("ai.composer.generate"));
+			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t(chatCapable() ? "ai.composer.send" : "ai.composer.generate"));
 		}
 		const canGen = arret || canGenerate();
 		if (quizBtnRef) {
