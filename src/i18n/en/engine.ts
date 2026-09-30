@@ -33,6 +33,7 @@ export const EN_ENGINE = {
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Results",
+	"engine.nav.finish": "Finish",
 	"engine.nav.prevQuestion": "Previous question",
 	"engine.nav.nextQuestion": "Next question",
 

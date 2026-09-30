@@ -25,6 +25,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Résultats",
+	"engine.nav.finish": "Terminer",
 	"engine.nav.prevQuestion": "Question précédente",
 	"engine.nav.nextQuestion": "Question suivante",
 

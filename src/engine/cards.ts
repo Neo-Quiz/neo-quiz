@@ -25,6 +25,9 @@ const ICON_HELP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" f
 /* Lucide flag : l'onglet « Résultats » quand la navigation est une frise de
    perles (l'application, `perles.css`) ; masqué ailleurs (nav-tabs.css). */
 const ICON_DRAPEAU = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>';
+/* Lucide trophy: the same tab once the quiz is handed in (2026-09-30) — the
+   score is there to see again, the flag of the finish line is behind. */
+const ICON_TROPHEE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
 /* Lucide triangle-alert / circle-check: the end screen, depending on whether
    questions remain. */
 const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
@@ -45,6 +48,9 @@ export interface CardHandlers {
 	tabClass(i: number): string;
 	navHtml(): string;
 	navPosition(): number;
+	/** The last tab of the row: its classes (without `active`), its content,
+	    and which of its two states it is — read by `updateNavHighlight`. */
+	resultTab(): { cls: string; html: string; etat: "finish" | "scored" };
 	optionClass(qi: number, oi: number): string;
 	optionContentHtml(q: QcmQuestion | MultiSelectQuestion, oi: number): string;
 	explanationHtml(qi: number): string;
@@ -137,6 +143,16 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return k > 0 ? k / onglets.length : 0;
 	}
 
+	/* The last tab has TWO states (2026-09-30): while the quiz is being done,
+	   the flag of the finish line ("Finish"); once handed in and the score
+	   seen, a trophy ("Results") in the accent colour — the corrections are
+	   being read, the score is one click away. */
+	function resultTab(): { cls: string; html: string; etat: "finish" | "scored" } {
+		return ctx.quizState.locked
+			? { cls: "quiz-tab is-result is-scored", etat: "scored", html: `<span class="quiz-tab-drapeau">${ICON_TROPHEE}</span><span class="quiz-tab-libelle">${t("engine.nav.results")}</span>` }
+			: { cls: "quiz-tab is-result", etat: "finish", html: `<span class="quiz-tab-drapeau">${ICON_DRAPEAU}</span><span class="quiz-tab-libelle">${t("engine.nav.finish")}</span>` };
+	}
+
 	function navHtml(): string {
 		const resultsActive = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
 		const onglets = ongletsNav();
@@ -156,8 +172,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			   never HTML). A book alone did not say which reading it opens. */
 			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" data-titre="${nom}">${ICON_LIVRE}</a>`;
 		};
+		const r = resultTab();
+		const fin = `<a class="${r.cls} ${resultsActive}" href="#" data-nav-results="1" data-etat="${r.etat}">${r.html}</a>`;
 		// `--quiz-nav-n` : le nombre de perles, « Résultats » compris.
-		return `<div class="quiz-nav" style="--quiz-nav-n:${onglets.length + 1};--quiz-nav-pos:${navPosition()}">${onglets.map(onglet).join("")}<a class="quiz-tab is-result ${resultsActive}" href="#" data-nav-results="1"><span class="quiz-tab-drapeau">${ICON_DRAPEAU}</span><span class="quiz-tab-libelle">${t("engine.nav.results")}</span></a></div>`;
+		return `<div class="quiz-nav" style="--quiz-nav-n:${onglets.length + 1};--quiz-nav-pos:${navPosition()}">${onglets.map(onglet).join("")}${fin}</div>`;
 	}
 
 	/* Précédente / suivante sous chaque question (2026-09-23) : des ICÔNES
@@ -760,6 +778,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		tabClass,
 		navHtml,
 		navPosition,
+		resultTab,
 		optionClass,
 		optionContentHtml,
 		explanationHtml,

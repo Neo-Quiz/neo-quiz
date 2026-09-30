@@ -437,7 +437,10 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		const resultsTab = ctx.container.querySelector<HTMLElement>("[data-nav-results]");
 		if (resultsTab) {
 			const active = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
-			resultsTab.className = buildNavTabClass(`quiz-tab is-result ${active}`.trim(), resultsTab);
+			const r = ctx.cards.resultTab();
+			resultsTab.className = buildNavTabClass(`${r.cls} ${active}`.trim(), resultsTab);
+			// Handed in since the row was drawn: the flag becomes the trophy.
+			if (resultsTab.dataset.etat !== r.etat) { resultsTab.innerHTML = r.html; resultsTab.dataset.etat = r.etat; }
 		}
 		// La longueur du fil rempli de la frise de perles (application).
 		ctx.container.querySelector<HTMLElement>(".quiz-nav")?.style.setProperty("--quiz-nav-pos", String(ctx.cards.navPosition()));

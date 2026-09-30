@@ -179,6 +179,16 @@
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
 
+/* Handed in: the score to see again, in the accent blue (cards.ts). */
+.quiz-tab.is-result.is-scored{
+  --tab-face: var(--quiz-primary);
+  --tab-edge: var(--quiz-primary-edge);
+}
+.quiz-tab.is-result.is-scored:hover,
+.quiz-tab.is-result.is-scored:focus-visible{
+  background: var(--quiz-primary-light);
+}
+
 /* The key sinks. `.is-pressing`: the class the engine sets during the
    press animation that precedes navigation (keyboard included). */
 .quiz-tab:active,
