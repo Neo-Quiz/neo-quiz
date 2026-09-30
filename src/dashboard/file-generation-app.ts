@@ -26,7 +26,7 @@ import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
 import { NoQuizAnswer, createAiClient } from "./ai-client";
-import type { AiClient, ImagePayload } from "./ai-client";
+import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
@@ -62,6 +62,9 @@ export interface DemandeFile extends DemandeTexte {
 	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi comme le
 	    reste : son complément part dans le prompt système. */
 	categorie: CategorieQuiz;
+	/** "/exam" (2026-09-30): this request is one step of a preparation — the
+	    Learn (`palier` 0) or the Test of level `palier` out of `paliers`. */
+	preparation?: PreparationExamen;
 	/** Le quiz que le modèle a produit, gardé dès sa réception : si l'écriture
 	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
 	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
@@ -221,7 +224,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const transcript = transcriptVide();
 			transcripts.set(ligne.id, transcript);
 			const reponse = await client.generate(prompt, {
-				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie,
+				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
 					if (transcripts.get(ligne.id) !== transcript) return;

@@ -18,6 +18,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.expand": "Afficher le document",
 
 	"engine.lecture.keyPoints": "À retenir",
+	"engine.lecture.source": "Source : {source}",
 	"engine.lecture.flipHint": "Cliquez sur une carte, ou appuyez sur Entrée, pour la retourner.",
 	"engine.lecture.flipAria": "{front} : retourner la carte",
 	"engine.lecture.flippedAria": "{front} : {back}",

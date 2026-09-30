@@ -75,11 +75,13 @@ export async function texteDesPages(pdfjs: PdfJsLib, data: Uint8Array): Promise<
 			const contenu = await page.getTextContent();
 			pages.push(contenu.items.map(it => it.str ?? "").join(" "));
 		}
-		/* `trim()` sur l'ensemble et non par page : une page blanche au milieu
-		   d'un cours reste une section vide entre deux lignes vides, comme
-		   avant ; seul un document ENTIÈREMENT vide rend "" (le signal du
-		   scanné). */
-		return pages.join("\n\n").trim();
+		/* Only a document ENTIRELY empty gives "" (the signal of a scan); a
+		   blank page in the middle of a course stays an empty section.
+		   Each page opens with its number, "[p. 3]" (2026-09-30): a Learn
+		   cites the pages each reading comes from, and the model only knows
+		   them from these marks. */
+		if (!pages.some(p => p.trim())) return "";
+		return pages.map((p, i) => `[p. ${i + 1}]\n${p}`).join("\n\n").trim();
 	} finally {
 		await doc.destroy();
 	}

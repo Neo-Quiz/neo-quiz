@@ -91,3 +91,39 @@ await withSrcModule("src/dashboard/search-items.ts", ({ searchItems }) => {
 	r.check("capped", titres("", "all", 2).length, 2);
 	r.done();
 });
+
+/* THE /exam COMMAND (`src/dashboard/exam-command.ts`): the menu opens on the
+   command or a beginning of it, at the START of the field only; what follows
+   the full command filters the exams; a sent "/exam subject" keeps the subject. */
+await withSrcModule("src/dashboard/exam-command.ts", ({ trouverCommandeExam, retirerCommandeExam }) => {
+	const r = makeReporter("/exam command");
+	const cmd = (texte) => trouverCommandeExam(texte, texte.length);
+	r.check("\"/\" alone opens the menu", cmd("/")?.requete, "");
+	r.check("a beginning of the command too", cmd("/ex")?.requete, "");
+	r.check("\"/prepare-exam\" is not a command", cmd("/prepare-exam"), null);
+	r.check("what follows filters", cmd("/exam réseaux")?.requete, "réseaux");
+	r.check("another command opens nothing", cmd("/help"), null);
+	r.check("a filter after an unfinished command opens nothing", cmd("/ex réseaux"), null);
+	r.check("not at the start of the field", cmd("revoir /exam"), null);
+	r.check("not on a second line", cmd("/exam\nsujet"), null);
+	r.check("the command leaves the subject", retirerCommandeExam("/exam Les piles"), { texte: "Les piles", commande: true });
+	r.check("no command, the text as it is", retirerCommandeExam("/examen"), { texte: "/examen", commande: false });
+	r.done();
+});
+
+/* THE PREPARATION PROMPT (`composerPrompts`): each step says what it is,
+   the exam is named, the quantity has no cap, and a Learn cites its pages. */
+await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
+	const r = makeReporter("/exam prompts");
+	const examen = { nom: "Contrôle réseaux", date: "2026-10-02", module: "XTI301" };
+	const sys = (mode, palier) => composerPrompts("x", { mode, preparation: { examen, palier, paliers: 3 } }).systemPrompt;
+	r.check("the exam is named", sys("learn", 0).includes("Contrôle réseaux"), true);
+	r.check("the Learn step", sys("learn", 0).includes("THIS STEP: the Learn path"), true);
+	r.check("Test 1 is the fundamentals", sys("practice", 1).includes("FUNDAMENTALS"), true);
+	r.check("the last Test is at the exam's level", sys("practice", 3).includes("AT THE EXAM'S LEVEL"), true);
+	r.check("no 20-question cap in a preparation", sys("learn", 0).includes("at most 20 questions"), false);
+	r.check("a Learn cites its sources", composerPrompts("x", { mode: "learn" }).systemPrompt.includes('"cite"'), true);
+	r.check("a Test does not", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('"cite"'), false);
+	r.check("no preparation block without /exam", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("EXAM PREPARATION"), false);
+	r.done();
+});

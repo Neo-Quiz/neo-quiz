@@ -72,6 +72,8 @@ export interface GenerateOptions {
 	/** Practice only: the slices of the Learn of the same source, to set
 	    `slice` (spec §2). Ignored in Learn. */
 	planTranches?: { slice: number; titre: string }[];
+	/** "/exam": the step of the preparation this generation is. */
+	preparation?: PreparationExamen;
 	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi : son
 	    complément s'ajoute au prompt système. Absente ou `general` : rien. */
 	categorie?: CategorieQuiz;
@@ -85,6 +87,14 @@ export interface GenerateOptions {
     pour le quiz (`// title:` en tête du tableau ; `title` de l'objet pour
     Ollama). `titre` absent quand le modèle n'en a pas donné : le nom du
     fichier retombe alors sur la demande. */
+/** One step of an exam preparation ("/exam"): the Learn (`palier` 0), then
+    the Tests of level 1 to `paliers`, the last at the exam's level. */
+export interface PreparationExamen {
+	examen?: { nom: string; date: string; module: string };
+	palier: number;
+	paliers: number;
+}
+
 export interface ReponseQuiz {
 	questions: unknown[];
 	titre?: string;
@@ -292,8 +302,33 @@ export const PHRASE_FINALE_CLI = "Reply ONLY with the JSON5 array, with no expla
  * One prompt PER TYPE: Learn and Test (Learn/Practice spec §2). No prompt
  * asks for an Exam: how a Test is taken is chosen when it starts.
  */
+/** A Learn cites where each reading comes from: the document and its pages,
+    read on the "[p. N]" marks of an attached PDF. */
+const LEARN_SOURCES = `SOURCES OF THE READINGS: when the content comes from attached documents, EVERY "read" card has "cite": the document's file name and the page or pages it draws on, read on the "[p. N]" marks that open each page of a PDF — for example "cite": "CM3 - Réseaux.pdf, p. 12-14". Rephrase freely to explain better than the document does; the source says where to read the original. A document without page marks is cited by its name alone. No "cite" when nothing is attached.
+
+`;
+
+/** The instructions of one step of an exam preparation ("/exam"). */
+function blocPreparation(p: PreparationExamen | undefined, learn: boolean): string {
+	if (!p) return "";
+	const examen = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
+	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. Do not stop at 20 questions if the sources need more to be covered.`;
+	const etape = learn
+		? "THIS STEP: the Learn path, from the basics up to the exam's level, in the order the notions build on each other."
+		: p.palier >= p.paliers
+			? `THIS STEP: Test ${p.palier} of ${p.paliers}, AT THE EXAM'S LEVEL — the hardest: questions like the real exam, combining notions, traps, full exercises.`
+			: p.palier === 1
+				? `THIS STEP: Test 1 of ${p.paliers}, the FUNDAMENTALS: definitions, direct application, one notion per question.`
+				: `THIS STEP: Test ${p.palier} of ${p.paliers}, a notch harder: applying and linking notions, fewer direct recalls.`;
+	const titre = p.examen ? ` Title it after the exam and the step, for example "// title: ${p.examen.nom} — ${learn ? "Learn" : `Test ${p.palier}`}".` : "";
+	return `${but}
+	${etape}${titre}
+
+	`;
+}
+
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
-	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie } = options;
+	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie, preparation } = options;
 	const learn = mode === "learn";
 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
@@ -312,7 +347,9 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	The questions must be ANSWERABLE FROM THE DOCUMENT ALONE and test understanding — main idea, inference, meaning in context, cause and effect, the author's intent, what can or cannot be concluded — NOT recall of outside knowledge. Mix single-choice, multiple-choice and free-text among them`
 		: "free-text questions";
 
-	const quantite = count != null
+	const quantite = count == null && preparation
+		? "QUANTITY: as many questions as it takes to cover everything this step asks for — no fixed maximum. Never pad with trivia."
+		: count != null
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
 		? "QUANTITY: at most 20 questions in total, every role counted — usually 2 or 3 slices. Cover what can be examined on the source, the most important first; go beyond 20 ONLY if the source truly cannot be learned in fewer, and never pad with trivia. A learner who sees 50 questions gives up before starting."
@@ -394,7 +431,7 @@ ${categorieBloc}
 
 	NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.
 
-	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
+${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
 	${quantite}
 

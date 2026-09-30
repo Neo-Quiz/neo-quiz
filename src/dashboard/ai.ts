@@ -36,6 +36,8 @@ import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserC
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
+import { PALIERS_TEST, attachExamCommand, dateCourte, retirerCommandeExam } from "./exam-command";
+import type { ExamCible, ExamCommandHandle } from "./exam-command";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -231,6 +233,8 @@ export interface AiPageDeps {
 	scanner: Scanner;
 	statsStore: StatsStore;
 	navigate(view: DashboardViewName, data?: NavigateData): void;
+	/** The upcoming exams of every folder, for the "/exam" menu. Absent: an empty menu. */
+	upcomingExams?(): ExamCible[];
 	/** Opens the page of the folder where generated quizzes are written ("Generated quizzes"
 	    of the sidebar). Absent: no such entry. */
 	openGenerated?(): void;
@@ -305,6 +309,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    (hints, time limit, Exam mode) is chosen when it starts, never here.
 	    Holds for the page session, like the count and the type. */
 	let modeGeneration: ModeGeneration = "learn";
+	/** The exam picked in the "/exam" menu: the next send is a whole
+	    preparation for it (`exam-command.ts`). Cleared once sent. */
+	let examCible: ExamCible | null = null;
 	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
 	   the attached documents, `false` = one quiz per document. Only offered
 	   with at least two documents and no image (`decouperParFichier` keeps a
@@ -695,7 +702,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* Un document encore EN LECTURE (ou dont la lecture a échoué) : son
 		   texte n'est pas là, rien ne part sans lui. */
 		if (noteAttachments.some(n => n.lecture)) return false;
-		return !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
+		return !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0 || examCible);
 	}
 
 	/* Les cartes de pièces jointes et la lecture immédiate d'un PDF
@@ -1650,8 +1657,26 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		zoneVideo = ajouter(textZone, "div", "qbd-ai-video-row");
 		tuilesVideo.rendre(zoneVideo);
 
+		/* The exam picked in the "/exam" menu, as a tile above the prompt: its
+		   cross gives up the preparation. Drawn in place, never by a render
+		   (a render would take the focus from the prompt). */
+		const tuileExam = ajouter(textZone, "div", "qbd-ai-exam-cible");
+		const peindreExamCible = (): void => {
+			tuileExam.replaceChildren();
+			tuileExam.hidden = !examCible;
+			if (!examCible) return;
+			host.ui.setIcon(ajouter(tuileExam, "span", "qbd-ai-exam-cible-icone"), "graduation-cap");
+			ajouter(tuileExam, "span", "qbd-ai-exam-cible-texte", t("ai.exam.tile", { exam: examCible.nom, module: examCible.module, date: dateCourte(examCible.date) }));
+			const croix = ajouter(tuileExam, "button", "qbd-ai-exam-cible-retirer");
+			croix.type = "button";
+			croix.setAttribute("aria-label", t("ai.exam.remove"));
+			host.ui.setIcon(croix, "x");
+			croix.addEventListener("click", () => { examCible = null; peindreExamCible(); updateGenerateBtn(generateBtnRef); });
+		};
+		peindreExamCible();
 		const composerInput = ajouter(textZone, "textarea", "qbd-ai-composer-input");
 		let mentions: MentionPickerHandle | null = null;
+		let commandeExam: ExamCommandHandle | null = null;
 		// UN SEUL placeholder, quoi qu'il y ait de joint (demande Ahmed,
 		// 2026-09-17). La variante « Ajouter des instructions (facultatif) »
 		// qui apparaissait dès la première pièce jointe changeait le texte sous
@@ -1776,6 +1801,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// (sinon effacer une lettre de sa recherche supprimerait une
 			// pièce jointe) ne doivent lui être volés.
 			if (mentions && mentions.isOpen()) return;
+			if (commandeExam && commandeExam.isOpen()) return;
 			// Backspace en tout début de champ (rien à gauche du caret,
 			// aucune sélection) : retire la DERNIÈRE pièce jointe —
 			// convention chips (Gmail, Slack). Un Backspace avec du texte à
@@ -1806,6 +1832,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			},
 			// Lu au rendu (le réglage peut changer sans rouvrir la vue).
 			getExtraRoots: () => settings().aiMentionExtraFolders || [],
+		});
+		commandeExam = attachExamCommand(composerInput, composer, {
+			exams: () => deps.upcomingExams?.() ?? [],
+			onPick: (exam) => { examCible = exam; peindreExamCible(); updateGenerateBtn(generateBtnRef); },
+			onTextReplaced: (value) => {
+				composerText = value;
+				composerCaret = 0;
+				autoGrow();
+				updateGenerateBtn(generateBtnRef);
+			},
 		});
 
 		// Rangée du bas : bouton « + » (gauche), puis à droite le modèle +
@@ -3730,7 +3766,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// (aucun fournisseur configuré). En vol sur un site ou en attente de
 		// connexion, `canGenerate` est faux : le bouton reste visible (le
 		// composer garde la demande) mais grisé.
-		const hasContent = !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0);
+		const hasContent = !!(composerText.trim() || images.length > 0 || noteAttachments.length > 0 || examCible);
 		/* Composer VIDE pendant qu'une génération tourne : le bouton devient le
 		   ■ de claude.ai, qui l'arrête. Avec du contenu, la flèche envoie dans
 		   la file, derrière elle. Pas sur le bouton « Ouvrir » d'un site. */
@@ -3916,6 +3952,26 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function envoyerDansLaFile(jointesVideo: NoteAttachment[]): void {
 		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
 		const reglages = figerReglages(settings());
+		/* "/exam": a whole PREPARATION over every document at once — a Learn
+		   over everything that can come up, then Tests of rising difficulty,
+		   the last at the exam's level. Each is a line of the queue, run one
+		   after the other with the same sources. */
+		const commande = retirerCommandeExam(envoi.text);
+		if (examCible || commande.commande) {
+			const d: DemandeTexte = { ...envoi, text: commande.texte };
+			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
+			const examen = examCible ?? undefined;
+			for (let palier = 0; palier <= PALIERS_TEST; palier++) {
+				fileGen.envoyer({
+					...d, mode: palier === 0 ? "learn" : "practice", count: null, type: questionType, destination, reglages, categorie,
+					preparation: { examen, palier, paliers: PALIERS_TEST },
+				});
+			}
+			examCible = null;
+			viderComposer();
+			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
+			return;
+		}
 		for (const d of decouperParFichier(envoi, oneQuiz)) {
 			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
 			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */

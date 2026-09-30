@@ -26,6 +26,7 @@ export const EN_ENGINE = {
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */
 	"engine.lecture.keyPoints": "Key points",
+	"engine.lecture.source": "Source: {source}",
 	"engine.lecture.flipHint": "Click a card, or press Enter, to flip it.",
 	"engine.lecture.flipAria": "{front}: flip the card",
 	"engine.lecture.flippedAria": "{front}: {back}",

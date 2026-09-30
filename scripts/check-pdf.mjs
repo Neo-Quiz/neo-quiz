@@ -80,15 +80,15 @@ await withSrcModule("apps/windows/src/host/pdf-texte.ts", async ({ texteDesPages
 	const r = makeReporter("PDF — le texte des pages");
 
 	const deuxPages = await texteDesPages(pdfjs, fabriquerPdf(["Introduction a Python", "Les listes et les tuples"]));
-	r.check("les mots d'une page sont joints par une espace, les pages par une ligne vide",
-		deuxPages, "Introduction a Python\n\nLes listes et les tuples");
+	r.check("words joined by a space, pages by an empty line, each page opened by its number",
+		deuxPages, "[p. 1]\nIntroduction a Python\n\n[p. 2]\nLes listes et les tuples");
 
 	const scanne = await texteDesPages(pdfjs, fabriquerPdf([null, null]));
 	r.check("un PDF sans couche texte rend la chaîne vide — le signal du scanné", scanne, "");
 
 	const trou = await texteDesPages(pdfjs, fabriquerPdf(["Avant", null, "Apres"]));
 	r.check("une page blanche au milieu reste une section vide, pas une page perdue",
-		trou, "Avant\n\n\n\nApres");
+		trou, "[p. 1]\nAvant\n\n[p. 2]\n\n\n[p. 3]\nApres");
 
 	/* LES OCTETS DE L'APPELANT SURVIVENT — le défaut du 2026-09-17, vu à
 	   l'écran (« This PDF could not be drawn », après un texte pourtant
@@ -103,7 +103,7 @@ await withSrcModule("apps/windows/src/host/pdf-texte.ts", async ({ texteDesPages
 		await texteDesPages(pdfjs, octets);
 		r.check("après une extraction, les octets de l'appelant sont intacts", octets.byteLength, taille);
 		const encore = await texteDesPages(pdfjs, octets);
-		r.check("… et un second usage des MÊMES octets rend le même texte", encore, "Une page");
+		r.check("… et un second usage des MÊMES octets rend le même texte", encore, "[p. 1]\nUne page");
 		const doc = await ouvrirDocument(pdfjs, octets);
 		r.check("… y compris par ouvrirDocument, la porte des deux entrées", doc.numPages, 1);
 		await doc.destroy();

@@ -56,7 +56,8 @@ import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
-import { cleModule } from "../review/catalogue";
+import { cleModule, libelleModule } from "../review/catalogue";
+import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
@@ -597,6 +598,13 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		},
 		quizFolders: () => dossiersDeQuiz(),
 		copyText: copierTexte,
+		// The "/exam" menu: every upcoming exam of every folder, nearest first.
+		upcomingExams: () => {
+			const aujourdhui = isoLocal(Date.now());
+			return Object.entries(examens())
+				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle) })))
+				.sort((a, b) => a.date.localeCompare(b.date));
+		},
 	});
 
 	/**

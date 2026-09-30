@@ -384,3 +384,11 @@
   font-size: 0.9em;
   color: var(--text-muted);
 }
+
+/* Where a reading comes from: the document and its pages ("cite"), small and
+   muted under the reading — a reference, not content. */
+.quiz-lecture-source {
+	margin-top: 14px;
+	font-size: 0.82em;
+	color: var(--text-muted);
+}

@@ -121,7 +121,13 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	}
 	const retenir = l.retenir ? retenirHtml(l.retenir, p) : "";
 	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${p.inline(titre)}</h3>` : "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${corps}${retenir}</div>` };
+	/* Where the reading comes from ("cite", 2026-09-30): the document and its
+	   pages, written by the generator — the original to read again. */
+	const cite = (item as { cite?: unknown } | null)?.cite;
+	const source = typeof cite === "string" && cite.trim()
+		? `<div class="quiz-lecture-source">${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
+		: "";
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${corps}${retenir}${source}</div>` };
 }
 
 /**

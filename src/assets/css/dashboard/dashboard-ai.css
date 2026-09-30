@@ -39,11 +39,25 @@
    positioned layer would overflow the scrolling stage and add a horizontal
    scrollbar in a narrow window. Its centre sits at ~37 % of the height,
    where the spacers put the hero. Tied to the greeting's presence with
-   `:has`, so it leaves with the hero once a request is sent. */
-.qbd-ai-stage:has(> .qbd-ai-title-row) {
+   `:has`, so it leaves with the hero once a request is sent.
+   Painted across the WHOLE panel since the sidebar came (2026-09-30): on
+   the stage alone, its wide ellipse stopped dead at the sidebar's edge and
+   drew a seam. Its centre stays the stage's: half the sidebar (220 px) and
+   its gap (8 px) to the right of the panel's middle. A layer under the
+   content (`isolation` keeps it above the panel's own glass). */
+.qbd-content:has(> .qbd-ai-stage > .qbd-ai-title-row) {
+	position: relative;
+	isolation: isolate;
+}
+.qbd-content:has(> .qbd-ai-stage > .qbd-ai-title-row)::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
 	background:
-		radial-gradient(ellipse 560px 300px at 50% 37%, color-mix(in srgb, var(--interactive-accent) 16%, transparent), transparent 70%),
-		radial-gradient(ellipse 1000px 560px at 50% 40%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 72%);
+		radial-gradient(ellipse 560px 300px at calc(50% + 114px) 37%, color-mix(in srgb, var(--interactive-accent) 16%, transparent), transparent 70%),
+		radial-gradient(ellipse 1000px 560px at calc(50% + 114px) 40%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 72%);
 }
 
 .qbd-ai-stage--idle::before,
