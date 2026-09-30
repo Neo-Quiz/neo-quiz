@@ -2854,7 +2854,8 @@
 /* Boutons icône du pied de composer (options, usage) : même gabarit que le
    « + », d'où le groupement — trois copies de la même règle divergeraient. */
 .qbd-ai-composer-opts,
-.qbd-ai-composer-usage {
+.qbd-ai-composer-usage,
+.qbd-ai-composer-quiz {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2872,13 +2873,15 @@
 }
 
 .qbd-ai-composer-opts:hover,
-.qbd-ai-composer-usage:hover {
+.qbd-ai-composer-usage:hover,
+.qbd-ai-composer-quiz:hover {
 	color: var(--text-normal);
 	background: var(--background-modifier-hover) !important;
 }
 
 .qbd-ai-composer-opts svg,
-.qbd-ai-composer-usage svg {
+.qbd-ai-composer-usage svg,
+.qbd-ai-composer-quiz svg {
 	width: 18px;
 	height: 18px;
 }

@@ -556,7 +556,8 @@
 	margin-top: -2px;
 }
 
-.qbd-ai-composer-opts[hidden] {
+.qbd-ai-composer-opts[hidden],
+.qbd-ai-composer-quiz[hidden] {
 	display: none;
 }
 

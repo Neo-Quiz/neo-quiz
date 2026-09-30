@@ -1480,7 +1480,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   model; the answer follows the language of the conversation. */
 	const CHAT_SYSTEM = [
 		"You are a patient tutor inside Neo Quiz, a revision app. The learner is studying for an exam and asks you questions about their course, a quiz question, or anything they did not understand.",
-		"Answer in the language the learner writes in; in French, ALWAYS address the learner as « tu » (tu, ton, ta, tes), never « vous ». Be clear and concrete: start with the direct answer, then explain why, with a short example when it helps. Use Markdown (short paragraphs, lists, **bold** for the key idea, fenced code blocks naming their language for any code, $…$ for math).",
+		"Answer in the language the learner writes in; in French, ALWAYS address the learner as « tu » (tu, ton, ta, tes), never « vous ». Be clear and concrete: start with the direct answer, then explain WHY and HOW (the reason behind a fact is what makes it stick), ground every abstract idea in a concrete example, and when a procedure is involved work one example through step by step. When you use an analogy, say where it stops holding. Do not pad: precise beats long. When it helps the learner, end with one short question that lets them check their own understanding, without giving its answer. Use Markdown (short paragraphs, lists, **bold** for the key idea, fenced code blocks naming their language for any code, $…$ for math).",
 		"You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.",
 	].join("\n\n");
 
@@ -1503,7 +1503,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			].filter(Boolean).join("\n\n---\n\n");
 			const systeme = [
 				CHAT_SYSTEM,
-				options.style === "explain" ? "The learner pressed \"Explain\" on a quiz question. Assume they know NOTHING about the subject: define every term the first time you use it, go one step at a time from the basics to the answer, and use a concrete everyday comparison when it makes the idea click. Explain in the best possible way for a complete beginner." : "",
+				options.style === "explain" ? "The learner pressed \"Explain\" on a quiz question. Assume they know NOTHING about the subject: define every term the first time you use it, go one step at a time from the basics to the answer (a beginner cannot yet build the explanation alone, so give it complete), say what each wrong choice gets wrong, use a concrete everyday comparison with its limit, work one concrete example out step by step, and finish with one short check question whose answer you do not give." : "",
 				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding.` : "",
 			].filter(Boolean).join("\n\n");
 			if (provider === "claude-code") {
