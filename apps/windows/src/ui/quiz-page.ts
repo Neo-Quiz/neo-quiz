@@ -30,7 +30,6 @@ import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host"
 import { monterBoutonExpliquer } from "./explain";
 import { ajouter } from "../../../../src/dom";
 import { quizModeIcon, quizModeLabel } from "../../../../src/dashboard/quiz-card";
-import { brancherPerles } from "./perles";
 import { attachQuizBars } from "./quiz-bars";
 // Types en `import type` seulement : ils viennent du noyau et de `types/quiz`,
 // et ce fichier ne doit tirer aucune implémentation de plus.
@@ -243,10 +242,6 @@ export async function openQuizPage(
 
 	   Idempotent (`fait`) and tolerant: a teardown called twice, or after a
 	   destruction the engine already did, must not break navigation. */
-	/* The strip of pearls (compact mode and magnifier, `ui/perles.ts`):
-	   unplugged before the engine is destroyed, which empties the container it
-	   watches. */
-	const debrancherPerles = brancherPerles(hote);
 	/* The two bars that stay in place while a question scrolls (`ui/quiz-bars.ts`). */
 	const detachBars = attachQuizBars(hote);
 	/* "Explain" in the header, right: not in an Exam (it hides with the clock). */
@@ -263,7 +258,6 @@ export async function openQuizPage(
 			   so that its promise settles (the engine treats it as a cancel) and no
 			   modal outlives the page. */
 			setupPage?.cancelModal();
-			debrancherPerles();
 			detachBars();
 			demonterExpliquer?.();
 			document.removeEventListener("mousedown", surBoutonSouris, true);

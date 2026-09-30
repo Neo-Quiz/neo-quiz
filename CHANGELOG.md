@@ -18,6 +18,7 @@ release notes.
 - In Generate, the composer is always a conversation with Claude Code or Codex: Enter and the arrow send a message, and Learn | Test now choose the type of quiz that the new Generate quiz button builds from what you wrote and attached.
 - In a Learn, a single-choice question is checked as soon as you click an answer, and its Check button is gone; multiple choice, written answers, blanks, ordering and matching keep it.
 - The Explain button can only be pressed once you have answered the question, and its window shows a one-line label instead of the whole prompt.
+- The row of numbered beads under a question shows every question at the same size, always readable, and goes on to a second line when they do not fit; the small dots and the magnifier are gone.
 - The A, B, C and D letters of single-choice answers are a little smaller.
 - Explain and Chat now explain the way learning research recommends: the answer first, then the why step by step, what each wrong choice gets wrong, an everyday analogy with its limit, a worked example and a short check question.
 

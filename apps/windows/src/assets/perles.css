@@ -21,17 +21,9 @@
    parcours numéroté d'autrefois (« coloré en bleu de partout ») et les
    losanges pour les lectures et la fin (« une mauvaise idée »).
 
-   TOUJOURS SUR UNE LIGNE (« deux lignes c'est ultra moche ») :
-   - tant qu'elles tiennent, les perles font 32 px (« augmente un peu la
-     taille de tout »), la courante 36 (40 était « trop gros ») ;
-   - au-delà, la rangée passe en MODE COMPACT (`is-compacte`, posée par
-     `ui/perles.ts`, qui porte aussi la loupe) : de petits points, une perle
-     numérotée tous les 5 (`is-repere`, posée par le moteur), les lectures et
-     la fin en taille moyenne, la courante en taille pleine ; au survol, la
-     perle sous la souris et ses voisines grossissent comme le Dock de macOS
-     (`--zoom`) et montrent leur numéro ;
-   - en dernier recours, les perles rétrécissent ensemble (`flex-shrink`,
-     `aspect-ratio`) plutôt que de passer à la ligne ou de déborder.
+   ONE SIZE, ALWAYS READABLE (2026-09-30): no compact mode, no magnifier,
+   no thread; the beads wrap onto further lines when they do not fit. This
+   replaces the 2026-09-27 rule that the row stays on a single line.
 
    L'APPLICATION SEULE : le greffon garde ses onglets « Q1 ». Le moteur ne
    fait que poser des crochets neutres pour lui (`quiz-tab-q`, le drapeau,
@@ -39,61 +31,23 @@
    est celle du quiz JOUÉ (`#neo-quiz-root > .qbd-qz`).
    ══════════════════════════════════════════════════════════ */
 
+/* ONE SIZE FOR EVERY BEAD, ALWAYS READABLE (2026-09-30): the compact mode
+   (small dots, a number every fifth, a magnifier) and the thread between the
+   beads are gone. Every bead is 32 px with its number, the current one is
+   told by its blue face, and when they do not fit on one line the row goes
+   on to the next one, centred. */
 #neo-quiz-root > .qbd-qz .quiz-nav {
-	--perle: min(32px, calc((100cqw - 4px - (var(--quiz-nav-n, 1) - 1) * 4px) / var(--quiz-nav-n, 1)));
-	--perle-courante: calc(var(--perle) + 4px);
-	--point: 10px;
-	--fil: color-mix(in srgb, var(--text-normal) 14%, transparent);
-	/* La part parcourue : le même fil, ÉCLAIRCI (« la ligne s'éclaircit au
-	   lieu de devenir bleue »), mais d'un cran seulement (« une couleur pas
-	   trop claire » : 42 % tranchait trop). */
-	--fil-parcouru: color-mix(in srgb, var(--text-normal) 26%, transparent);
+	--perle: 32px;
 	--lecture-fond: #3a3380;
 	--lecture: #8b7cf6;
-	container-type: inline-size;
 	position: relative;
-	flex-wrap: nowrap;
-	justify-content: space-between;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
 	align-items: center;
-	gap: 4px;
-	min-height: 52px;
-	padding: 0 6px;
+	gap: 10px 8px;
+	padding: 6px 6px 10px;
 	border-bottom: none;
-}
-
-/* Le fil, d'un centre de perle à l'autre, et sa part parcourue jusqu'à la
-   perle courante (`--quiz-nav-pos`, de 0 à 1, cards.ts / state.ts). En
-   compact, les perles n'ont plus la même taille : `ui/perles.ts` mesure les
-   centres et pose le fil en pixels. */
-#neo-quiz-root > .qbd-qz .quiz-nav::before,
-#neo-quiz-root > .qbd-qz .quiz-nav::after {
-	content: "";
-	position: absolute;
-	z-index: 0;
-	top: 50%;
-	left: calc(6px + var(--perle) / 2);
-	height: 3px;
-	margin-top: -1.5px;
-	border-radius: 3px;
-	pointer-events: none;
-}
-#neo-quiz-root > .qbd-qz .quiz-nav::before {
-	right: calc(6px + var(--perle) / 2);
-	background: var(--fil);
-}
-#neo-quiz-root > .qbd-qz .quiz-nav::after {
-	width: calc((100cqw - var(--perle)) * var(--quiz-nav-pos, 0));
-	background: var(--fil-parcouru);
-	transition: width 0.35s ease;
-}
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte::before {
-	left: var(--fil-debut, 0px);
-	right: auto;
-	width: var(--fil-long, 0px);
-}
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte::after {
-	left: var(--fil-debut, 0px);
-	width: var(--fil-rempli, 0px);
 }
 
 /* La perle : le BOUTON 3D des actions de la page d'un quiz (`.qbd-cta3d`,
@@ -117,8 +71,7 @@
 }
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab {
 	--taille: var(--perle);
-	flex: 0 1 auto;
-	min-width: 0;
+	flex: 0 0 auto;
 	z-index: 1;
 	display: grid;
 	place-items: center;
@@ -218,34 +171,6 @@
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab-drapeau svg {
 	width: calc(var(--taille) * 0.46);
 	height: calc(var(--taille) * 0.46);
-}
-
-/* La perle courante : plus grande, sans halo — « Commencer le quiz » n'en
-   a pas. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active {
-	--taille: var(--perle-courante);
-}
-
-/* ── MODE COMPACT : des points, et la loupe ──
-   `--z`, de 0 (point) à 1 (perle pleine), vaut le plus grand de `--zoom`
-   (la loupe, posée par `ui/perles.ts`) et de `--zoom-min` (ce qu'une perle
-   garde au repos). Le numéro n'apparaît qu'à partir de 0,4 : sur un point
-   de 10 px, il ne serait qu'une tache. */
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab {
-	--z: max(var(--zoom, 0), var(--zoom-min, 0));
-	--taille: calc(var(--point) + (32px - var(--point)) * var(--z));
-	--texte: clamp(0, (var(--z) - 0.3) * 10, 1);
-	/* La tranche suit la taille : 4 px sous un point de 10 l'écraseraient. */
-	--tab-depth: calc(1px + 3px * var(--z));
-}
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-repere,
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-lecture,
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.is-result {
-	--zoom-min: 0.6;
-}
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab.active,
-#neo-quiz-root > .qbd-qz .quiz-nav.is-compacte .quiz-tab:focus-visible {
-	--zoom-min: 1;
 }
 
 /* THE HELP BUTTON ("Hint", "I don't know", hint-modal.css) takes the beads'
