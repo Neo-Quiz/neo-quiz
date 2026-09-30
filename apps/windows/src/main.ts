@@ -38,7 +38,7 @@ import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
 import type { SensEcran } from "./ui/transition-etat";
-import { renderSettings } from "./ui/settings";
+import { renderSettings, viserPromptExpliquer } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
@@ -412,7 +412,7 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	try {
 		const page = await openQuizPage(root, entry, () => {
 			mount(root, scanner, store, stats, sessions);
-		}, store, stats, sessions, reglagesIa);
+		}, store, stats, sessions, reglagesIa, () => { viserPromptExpliquer(); ouvrirReglages(); });
 		/* A LAUNCH CANCELLED in the "Set up your test" modal (2026-09-29): the
 		   page was never shown (its screen is out of `root` and was invisible
 		   while loading), so nothing plays. The kept dashboard, exactly as it

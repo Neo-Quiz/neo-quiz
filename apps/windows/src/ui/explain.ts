@@ -71,6 +71,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	questions: Record<string, unknown>[];
 	titre: string;
 	settings: AiSettingsHost;
+	/** Opens the Settings on the field that holds the Explain prompt. */
+	ouvrirPrompt(): void;
 }): () => void {
 	const host = currentHost();
 	/* A mini composer in a row of the panel, right under the question and above
@@ -84,8 +86,22 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const barre = panneau.querySelector(":scope > .qz-bottom-bar");
 	if (barre) panneau.insertBefore(rangee, barre);
 	const mini = ajouter(rangee, "div", "qz-mini");
+	/* THE PROMPT TILE (the "pasted" tile of claude.ai's composer): a small
+	   card with the start of the prompt that will be sent and a pencil that
+	   opens the Settings on the field where it is written, so that the
+	   learner sees what is sent, where it comes from and where to change it. */
+	const tuile = ajouter(mini, "div", "qz-mini-tuile");
+	const apercu = ajouter(tuile, "div", "qz-mini-tuile-texte");
+	const tuilePied = ajouter(tuile, "div", "qz-mini-tuile-pied");
+	ajouter(tuilePied, "span", "qz-mini-tuile-nom", t("ai.explain.tile"));
+	const crayon = ajouter(tuilePied, "button", "qz-mini-tuile-edit");
+	crayon.type = "button";
+	crayon.title = t("ai.explain.tileEdit");
+	crayon.setAttribute("aria-label", t("ai.explain.tileEdit"));
+	host.ui.setIcon(crayon, "pencil");
+	crayon.addEventListener("click", () => deps.ouvrirPrompt());
 	const champ = ajouter(mini, "textarea", "qz-mini-champ");
-	champ.rows = 2;
+	champ.rows = 1;
 	champ.placeholder = t("ai.explain.miniPlaceholder");
 	const pied = ajouter(mini, "div", "qz-mini-pied");
 	/* The LOGO of the provider chosen in Settings (Claude Code's or Codex's):
@@ -153,10 +169,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		});
 	});
 
-	/* The field ALWAYS holds the prompt about the question on screen, ready to
-	   send and free to edit. It is rebuilt when the question changes, unless
-	   the learner has changed the text (then it is theirs). */
-	let defaut = "";
+	/* The prompt of the question on screen, built from the template of the
+	   Settings; the tile shows its start. */
 	const messagePour = (slide: HTMLElement): string | null => {
 		const q = deps.questions[Number(slide.dataset.qi)];
 		if (!q) return null;
@@ -164,19 +178,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
 		return remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
 	};
-	const remplir = (slide: HTMLElement): void => {
-		const neuf = messagePour(slide);
-		if (neuf === null || neuf === defaut) return;
-		if (champ.value === defaut || champ.value.trim() === "") champ.value = neuf;
-		defaut = neuf;
-	};
 
 	/* Hidden in an Exam (the engine puts its clock straight into the host) and
 	   until the question is corrected. */
 	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
 		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !slide || !corrigee(slide);
-		if (!rangee.hidden && slide) remplir(slide);
+		if (rangee.hidden || !slide) return;
+		const texte = messagePour(slide) ?? "";
+		if (apercu.textContent !== texte) apercu.textContent = texte;
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
@@ -187,14 +197,14 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		if (!peutExpliquer()) { host.ui.notice(t("ai.chat.providerUnsupported")); return; }
 		const slide = questionAffichee(hote);
 		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
-		if (!slide || !q) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		remplir(slide);
-		const message = champ.value.trim() || defaut;
-		/* The window shows a one-line label when the prompt is the untouched
-		   default (it is long); an edited prompt is shown as written. */
-		const affiche = message === defaut ? t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }) : message;
-		champ.value = defaut;
-		ouvrirExplication(message, deps.settings, affiche);
+		const base = slide ? messagePour(slide) : null;
+		if (!slide || !q || base === null) { host.ui.notice(t("ai.explain.noQuestion")); return; }
+		/* What the learner typed is added to the prompt as their own question. */
+		const perso = champ.value.trim();
+		const message = perso ? base + "\n\n" + t("ai.explain.myQuestion") + "\n" + perso : base;
+		const etiquette = t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() });
+		champ.value = "";
+		ouvrirExplication(message, deps.settings, perso ? etiquette + "\n" + perso : etiquette);
 	};
 	envoi.addEventListener("click", lancer);
 	champ.addEventListener("keydown", (e) => {

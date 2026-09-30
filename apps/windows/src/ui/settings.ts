@@ -51,6 +51,12 @@ const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
    reload that `onFoldersChanged` triggers). Not persisted — a new session
    opens on General. */
 let lastCategory: Category = "general";
+/** The next opening lands on the Explain prompt (the AI page, scrolled to it). */
+let viserPrompt = false;
+export function viserPromptExpliquer(): void {
+	lastCategory = "ai";
+	viserPrompt = true;
+}
 
 /** A titled block of a category: its heading, an optional help line. */
 function section(parent: HTMLElement, title: string | null, help?: string): HTMLElement {
@@ -438,6 +444,10 @@ export function renderSettings(
 	const demonterLangages = mountLanguagePackSettings(section(languagesPage, null, t("settings.languages.hint")));
 
 	show(lastCategory);
+	if (viserPrompt) {
+		viserPrompt = false;
+		requestAnimationFrame(() => { expliquer.scrollIntoView({ block: "center" }); zone.focus(); });
+	}
 
 	/* The unmount no longer unsubscribes the updater: its section left on
 	   2026-09-17, and the only subscription left is the rail's, which lives
