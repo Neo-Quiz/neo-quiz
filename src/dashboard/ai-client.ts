@@ -100,6 +100,41 @@ export interface PreparationExamen {
 	lot?: string;
 	etape?: number;
 	etapes?: number;
+	/** The step of the PLAN the model made after reading every document
+	    (2026-09-30): its title, what it covers, and the whole plan's titles. */
+	titre?: string;
+	focus?: string;
+	plan?: string[];
+}
+
+/** One step of the plan of an exam preparation, chosen by the model. */
+export interface EtapePlan {
+	titre: string;
+	type: "learn" | "practice";
+	focus: string;
+}
+
+/** Reads the plan the model wrote (a JSON array, possibly fenced): only valid
+    steps are kept, of the allowed type when one is imposed; at most 12. */
+export function lirePlan(texte: string, typeImpose?: "learn" | "practice"): EtapePlan[] {
+	const brut = retirerFence(texte).trim();
+	const debut = brut.indexOf("[");
+	const fin = brut.lastIndexOf("]");
+	if (debut < 0 || fin <= debut) return [];
+	let liste: unknown;
+	try { liste = JSON5.parse(brut.slice(debut, fin + 1)); } catch { return []; }
+	if (!Array.isArray(liste)) return [];
+	const etapes: EtapePlan[] = [];
+	for (const x of liste) {
+		if (!x || typeof x !== "object") continue;
+		const o = x as Record<string, unknown>;
+		const titre = typeof o.title === "string" ? o.title.trim() : "";
+		const focus = typeof o.covers === "string" ? o.covers.trim() : "";
+		const type = o.type === "test" || o.type === "practice" ? "practice" : o.type === "learn" ? "learn" : null;
+		if (!titre || !type) continue;
+		etapes.push({ titre, focus, type: typeImpose ?? type });
+	}
+	return etapes.slice(0, 12);
 }
 
 export interface ReponseQuiz {
@@ -145,6 +180,8 @@ export interface AiClient {
 	    answer comes back as prose. `context` is attached text (notes read by
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
+	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options?: { onTranscript?: (event: TranscriptEvent) => void }): Promise<EtapePlan[]>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -318,6 +355,13 @@ const LEARN_SOURCES = `SOURCES OF THE READINGS: when the content comes from atta
 /** The instructions of one step of an exam preparation ("/exam"). */
 function blocPreparation(p: PreparationExamen | undefined, learn: boolean): string {
 	if (!p) return "";
+	/* A step of the model's own PLAN: the whole plan, then exactly this
+	   quiz's part — the other quizzes cover the rest. */
+	if (p.titre) {
+		const examenP = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
+		const plan = (p.plan ?? []).map((x, i) => `${i + 1}. ${x}`).join("\n\t");
+		return `EXAM PREPARATION${examenP}: after reading all the documents you planned these quizzes, which together cover everything that can come up:\n\t${plan}\n\tTHIS QUIZ is number ${p.etape ?? 1}, "${p.titre}": ${p.focus || p.titre}. Cover EXACTLY that part, every notion, method and classic exercise of it, from the basics up to the exam's level; the other quizzes cover the rest. No fixed number of questions: as many as this part needs.\n\n\t`;
+	}
 	const examen = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
 	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. Do not stop at 20 questions if the sources need more to be covered.`;
 	const etape = learn
@@ -1545,6 +1589,54 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		"You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.",
 	].join("\n\n");
 
+	/** THE PLAN OF AN EXAM PREPARATION (2026-09-30): the model reads EVERY
+	    document at once, then chooses the quizzes that will cover everything
+	    that can come up — their number, their order, what each covers.
+	    `typeImpose`: the Learn | Test selector, which the plan follows. */
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options: { onTranscript?: (event: TranscriptEvent) => void } = {}): Promise<EtapePlan[]> {
+		aborted = false;
+		pendingUsage = null;
+		transcriptSink = options.onTranscript ?? null;
+		await refreshCliCaches();
+		try {
+			const provider = settings.get().aiProvider || "";
+			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
+			const genre = typeImpose === "learn"
+				? "LEARN paths only (\"type\": \"learn\"): each one teaches a part of the program step by step"
+				: "TESTS only (\"type\": \"test\"): in rising difficulty, the last ones at the exam's level";
+			const systeme = [
+				"You plan the revision of a learner for an exam, inside Neo Quiz. You have no tools: the documents are in the message.",
+				`First read ALL the documents, to see the whole program. Then plan the quizzes that together cover EVERYTHING that can come up in the exam — every notion, definition, method and classic exercise — no more, no less: as many quizzes as the program needs (usually 3 to 8), never one per document by reflex; group what belongs together, split what is too big for one quiz. Plan ${genre}.`,
+				"Answer with ONLY a JSON array, one object per quiz, in the order to take them: { \"title\": \"short title of the quiz, in the language of the documents\", \"type\": \"learn\" or \"test\", \"covers\": \"one sentence: exactly what this quiz covers\" }. Nothing before or after the array.",
+			].join("\n\n");
+			const userPrompt = [documents.trim() ? "THE DOCUMENTS:\n" + documents.trim() : "", "THE LEARNER'S REQUEST:\n" + demande.trim()].filter(Boolean).join("\n\n---\n\n");
+			let texte: string;
+			if (provider === "claude-code") {
+				model = resolveClaudeModel(model);
+				texte = await callClaudeCodeTexte(model, systeme, userPrompt);
+			} else if (provider === "codex") {
+				model = resolveCodexModel(model);
+				const effort = resolveEffort("codex", settings.get().aiEffort, model);
+				const m = getCodexModels().find(x => x.value === model);
+				texte = await callCodexTexte(model, systeme, userPrompt, [], effort, !!settings.get().aiCodexFast && !!(m && m.fast));
+			} else {
+				// A provider that cannot hold this exchange: the fixed plan of before.
+				return [];
+			}
+			return lirePlan(texte, typeImpose);
+		} catch (err) {
+			if (aborted) {
+				const e = new Error("Planification annulée") as Error & { aborted?: boolean };
+				e.aborted = true;
+				throw e;
+			}
+			throw err;
+		} finally {
+			abortCurrent = null;
+			transcriptSink = null;
+		}
+	}
+
 	async function chat(history: ChatTurn[], options: ChatOptions = {}): Promise<string> {
 		aborted = false;
 		pendingUsage = null;
@@ -1595,6 +1687,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	return {
 		generate,
 		chat,
+		planifier,
 		abort: () => { if (abortCurrent) abortCurrent(); },
 		get lastUsage() { return lastUsage; }
 	};

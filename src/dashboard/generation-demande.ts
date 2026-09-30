@@ -186,6 +186,9 @@ export interface Enregistrement {
 	/** The type REQUESTED (the selector's value when the request was sent). */
 	modeDemande: ModeGeneration;
 	titreModele?: string;
+	/** A name decided by the app, over the document's (a quiz of an "/exam"
+	    plan is named by its step: "Lists and tuples — Learn"). */
+	titreImpose?: string;
 	demande: { text: string; notes: { name: string }[] } | null;
 	/** Chemin du contrat choisi, ou "" pour le dossier par défaut. */
 	destination: string;
@@ -218,7 +221,7 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		const pieces = e.demande?.notes ?? [];
 		const source = nomDeSource(pieces, e.demande?.text ?? "", defaut, folderName(folder));
 		const mode = modeDuBloc(e.questions);
-		const base = pieces.length ? source : nomDeSource([], e.titreModele || e.demande?.text || "", defaut);
+		const base = e.titreImpose || (pieces.length ? source : nomDeSource([], e.titreModele || e.demande?.text || "", defaut));
 		const path = await freeNotePath(folder, nomDeNote(base, mode));
 		const provider = e.reglages.aiProvider || "";
 		/* Sur un SITE, le modèle et l'effort sont les siens : `model` porte le

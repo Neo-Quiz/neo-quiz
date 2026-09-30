@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- /exam plans the preparation itself: the AI first reads every joined document at once, then chooses the quizzes that cover everything that can come up (their number, their order, what each covers), of the type chosen in Learn | Test. The conversation keeps one message and one answer, the plan, with the quiz being made under it; the plan shows in the sidebar, the current quiz animated, a finished one opening at a click, and each quiz is named after its step.
+
 ## [1.20.7] - 2026-09-30
 
 ### Fixed

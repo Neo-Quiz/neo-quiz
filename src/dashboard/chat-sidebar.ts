@@ -62,7 +62,9 @@ function enregistrer(file: FileGenerationApp): void {
 		enCours ??= { id: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7), tours: new Map() };
 		if (enCours.tours.has(l.id)) continue;
 		const reponse = l.resultat.texte ?? t("ai.side.quizMade", { title: l.resultat.titre });
-		enCours.tours.set(l.id, { titre: titreDe(l), tours: [{ role: "user", text: l.demande.text }, { role: "assistant", text: reponse }] });
+		// A quiz of an "/exam" plan repeats the request of its plan: only what it made is kept.
+		const etapeDePlan = !!l.demande.preparation?.lot && !l.demande.planifier;
+		enCours.tours.set(l.id, { titre: etapeDePlan ? "" : titreDe(l), tours: etapeDePlan ? [{ role: "assistant", text: reponse }] : [{ role: "user", text: l.demande.text }, { role: "assistant", text: reponse }] });
 		change = true;
 	}
 	if (!change || !enCours) return;

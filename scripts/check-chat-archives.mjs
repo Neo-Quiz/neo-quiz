@@ -146,3 +146,15 @@ await withSrcModule("src/dashboard/file-generation-app.ts", ({ titrePreparation 
 	r.check("outside a preparation, the model's title", titrePreparation({ mode: "learn" }), undefined);
 	r.done();
 });
+
+/* THE PLAN the model writes after reading every document: a JSON array,
+   fenced or not, read leniently, the type imposed by Learn | Test. */
+await withSrcModule("src/dashboard/ai-client.ts", ({ lirePlan }) => {
+	const r = makeReporter("/exam plan");
+	const brut = 'Voici le plan :\n```json\n[{ "title": "Listes", "type": "learn", "covers": "les listes" }, { "title": "Tuples", "type": "test", "covers": "tuples" }, { "type": "learn" }]\n```';
+	r.check("valid steps kept, a step without title dropped", lirePlan(brut).map(e => e.titre + ":" + e.type), ["Listes:learn", "Tuples:practice"]);
+	r.check("Learn | Test imposes the type", lirePlan(brut, "learn").map(e => e.type), ["learn", "learn"]);
+	r.check("an unreadable answer gives no plan", lirePlan("désolé, je ne peux pas"), []);
+	r.check("at most 12 steps", lirePlan(JSON.stringify(Array.from({ length: 20 }, (_, i) => ({ title: "Q" + i, type: "test" })))).length, 12);
+	r.done();
+});

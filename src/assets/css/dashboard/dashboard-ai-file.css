@@ -1119,17 +1119,117 @@
 	background: color-mix(in srgb, #fff 12%, var(--interactive-accent)) !important;
 }
 
-/* A later step of an "/exam" preparation: one line, no repeated request. */
-.qbd-ai-message--etape .qbd-ai-message-meta {
-	gap: 8px;
+/* Where an "/exam" plan stands, under its request: the quiz being made. */
+.qbd-ai-avancement {
+	margin-top: 14px;
+}
+.qbd-ai-avancement-titre {
+	margin-bottom: 6px;
+	font-size: 13px;
+	font-weight: 600;
 	color: var(--text-muted);
 }
-.qbd-ai-etape-icone {
-	display: inline-flex;
+
+/* THE PLAN in the sidebar (plan-sidebar.ts): one line per quiz, the one
+   being made glowing softly, a done one opening its quiz. */
+.qbd-ai-plan {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 14px;
 }
-.qbd-ai-etape-icone svg {
-	width: 14px;
-	height: 14px;
+.qbd-ai-plan[hidden] {
+	display: none;
+}
+.qbd-ai-plan-titre {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 0 10px 6px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+.qbd-ai-plan-examen {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-normal);
+	font-weight: 600;
+}
+.qbd-ai-plan-etape {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: 13.5px;
+	text-align: left;
+}
+.qbd-ai-plan-etape.is-done {
+	color: var(--text-normal);
+	cursor: pointer;
+}
+.qbd-ai-plan-etape.is-done:hover {
+	background: var(--background-modifier-hover) !important;
+}
+.qbd-ai-plan-etape.is-failed .qbd-ai-plan-icone {
+	color: var(--text-error);
+}
+.qbd-ai-plan-etape.is-done .qbd-ai-plan-icone {
+	color: var(--quiz-success, #16a34a);
+}
+.qbd-ai-plan-icone {
+	display: inline-flex;
+	flex: none;
+}
+.qbd-ai-plan-icone svg {
+	width: 15px;
+	height: 15px;
+}
+.qbd-ai-plan-nom {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* The quiz being made: a soft accent background that breathes, its loader
+   turning, and a light sweeping across its name. */
+.qbd-ai-plan-etape.is-current {
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--interactive-accent) 14%, transparent) !important;
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	animation: qbd-ai-plan-respire 1.8s ease-in-out infinite;
+}
+.qbd-ai-plan-etape.is-current .qbd-ai-plan-icone {
+	color: var(--interactive-accent);
+	animation: qbd-ai-plan-tourne 1.1s linear infinite;
+}
+.qbd-ai-plan-etape.is-current .qbd-ai-plan-nom {
+	background: linear-gradient(90deg, var(--text-normal) 0%, var(--text-normal) 35%, #fff 50%, var(--text-normal) 65%, var(--text-normal) 100%);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: qbd-ai-reflet 2.2s linear infinite;
+}
+@keyframes qbd-ai-plan-respire {
+	0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 20%, transparent); }
+	50% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 55%, transparent); }
+}
+@keyframes qbd-ai-plan-tourne {
+	to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-plan-etape.is-current,
+	.qbd-ai-plan-etape.is-current .qbd-ai-plan-icone,
+	.qbd-ai-plan-etape.is-current .qbd-ai-plan-nom { animation: none; }
+	.qbd-ai-plan-etape.is-current .qbd-ai-plan-nom { color: var(--text-normal); background: none; }
 }
 
 /* The exam's prompt tile at the head of the documents' row: same line, no

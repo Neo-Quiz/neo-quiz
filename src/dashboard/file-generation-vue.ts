@@ -111,20 +111,20 @@ export function creerVueFile(opts: {
 		b.addEventListener("click", action);
 	}
 
-	/** A later step of an "/exam" preparation (2026-09-30): the request was
-	    shown with the first step, so this one only says what it makes —
-	    "Step 3 of 10 · Learn · CM3.pdf", "Step 9 of 10 · Test 2 of 3". Ten
-	    copies of the same request, same text, same cover, read as a bug. */
-	function peindreEtape(parent: HTMLElement, l: LigneGeneration): void {
-		const p = l.demande.preparation;
-		if (!p) return;
-		const ligne = ajouter(parent, "div", "qbd-ai-message qbd-ai-message--etape");
-		const meta = ajouter(ligne, "div", "qbd-ai-message-meta");
-		host.ui.setIcon(ajouter(meta, "span", "qbd-ai-etape-icone"), l.demande.mode === "learn" ? "book-open" : "graduation-cap");
-		const quoi = l.demande.mode === "learn"
-			? (p.document ? `${quizModeLabel("learn")} · ${p.document}` : quizModeLabel("learn"))
-			: t("ai.exam.stepTest", { n: p.palier, total: p.paliers });
-		ajouter(meta, "span", undefined, p.etape && p.etapes ? `${t("ai.exam.step", { n: p.etape, total: p.etapes })} · ${quoi}` : quoi);
+	/** Where an "/exam" plan stands, under its request (2026-09-30): ONE
+	    message, ONE answer — the plan; its quizzes do not stack up in the
+	    conversation (the sidebar lists them). Only the quiz being made shows
+	    here, "Quiz 2 of 5: Lists and tuples", with its working line, and a
+	    quiz that failed, with its error and Try again. */
+	function peindreAvancement(parent: HTMLElement, lot: string, lignes: readonly LigneGeneration[]): void {
+		const etapes = lignes.filter(x => x.demande.preparation?.lot === lot && !x.demande.planifier);
+		for (const l of etapes) {
+			if (l.etat !== "cours" && l.etat !== "enregistrement" && l.etat !== "echouee") continue;
+			const p = l.demande.preparation;
+			const bloc = ajouter(parent, "div", "qbd-ai-avancement");
+			ajouter(bloc, "div", "qbd-ai-avancement-titre", t("ai.exam.planProgress", { n: p?.etape ?? 0, total: p?.etapes ?? etapes.length, title: p?.titre ?? "" }));
+			peindreReponse(bloc, l);
+		}
 	}
 
 	/** Le message de l'utilisateur : vignettes, bulle, mode et modèle. */
@@ -401,22 +401,18 @@ export function creerVueFile(opts: {
 		zone.classList.add("qbd-ai-file--full");
 		// L'état `arret` ne se montre pas : pour l'utilisateur, la ligne est annulée.
 		const visibles = opts.file.lignes().filter(l => l.etat !== "arret");
-		/* The lots whose request is already on screen: their next steps only
-		   name themselves (`peindreEtape`). */
-		const lotsMontres = new Set<string>();
 		for (const l of visibles) {
+			const lot = l.demande.preparation?.lot;
+			// The quizzes of a plan live in the sidebar, not in the conversation.
+			if (lot && !l.demande.planifier) continue;
 			const tour = ajouter(zone, "div", "qbd-ai-tour");
 			tour.setAttribute("role", "listitem");
-			const lot = l.demande.preparation?.lot;
-			if (lot && lotsMontres.has(lot)) peindreEtape(tour, l);
-			else {
-				peindreMessage(tour, l);
-				if (lot) { lotsMontres.add(lot); peindreEtape(tour, l); }
-			}
+			peindreMessage(tour, l);
 			/* As MonoCode: while the model works, its status line then its
 			   activity; once done, the activity summary then the answer. */
 			if (l.etat === "cours" || l.etat === "enregistrement") { peindreReponse(tour, l); peindreTranscript(tour, l); }
 			else { peindreTranscript(tour, l); peindreReponse(tour, l); }
+			if (lot) peindreAvancement(tour, lot, visibles);
 		}
 		/* Un tour NOUVEAU se lit à l'identifiant du dernier, pas au nombre de
 		   tours : une réponse fermée pendant qu'une demande part laisse le

@@ -65,6 +65,10 @@ export interface DemandeFile extends DemandeTexte {
 	/** "/exam" (2026-09-30): this request is one step of a preparation — the
 	    Learn (`palier` 0) or the Test of level `palier` out of `paliers`. */
 	preparation?: PreparationExamen;
+	/** "/exam" (2026-09-30): this line PLANS the preparation — the model reads
+	    every document, chooses the quizzes, and each becomes a line of the
+	    queue behind this one. It makes no quiz itself. */
+	planifier?: boolean;
 	/** Le quiz que le modèle a produit, gardé dès sa réception : si l'écriture
 	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
 	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
@@ -211,6 +215,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		};
 		const client = createAiClient(figes);
 		clientCourant = client;
+		if (d.planifier) { await planifier(ligne, client); return; }
 		try {
 			// « Lecture du document… » quand la demande en porte un.
 			etapeDe(ligne.id, d.notes.length || d.images.length ? "lecture" : "preparation");
@@ -273,6 +278,48 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 	}
 
+	/** THE PLANNING LINE of an "/exam" preparation: the model reads every
+	    document and plans the quizzes; each becomes a line behind this one,
+	    with the whole plan, its part, and all the documents. The plan shows
+	    as this line's answer. A plan it could not read falls back on one
+	    quiz of the chosen type over everything. */
+	async function planifier(ligne: LigneGeneration, client: AiClient): Promise<void> {
+		const d = ligne.demande;
+		try {
+			etapeDe(ligne.id, d.notes.length ? "lecture" : "redaction");
+			const { prompt } = composerDemande(d);
+			const transcript = transcriptVide();
+			transcripts.set(ligne.id, transcript);
+			etapeDe(ligne.id, "redaction");
+			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mode, {
+				onTranscript: (ev) => {
+					if (transcripts.get(ligne.id) !== transcript) return;
+					appliquer(transcript, ev);
+					transcriptChange(ligne.id);
+				},
+			});
+			if (!tourne(ligne.id)) return;
+			const quiz = plan.length ? plan : [{ titre: d.preparation?.examen?.nom ?? t("ai.exam.planFallback"), type: d.mode, focus: "" }];
+			const titres = quiz.map(e => e.titre);
+			quiz.forEach((e, i) => {
+				file = F.ajouter(file, {
+					...d, planifier: false, mode: e.type,
+					preparation: { ...(d.preparation ?? { palier: 0, paliers: 0 }), titre: e.titre, focus: e.focus, plan: titres, etape: i + 1, etapes: quiz.length },
+				}).file;
+			});
+			const texte = t("ai.exam.planIntro", { count: quiz.length }) + "\n\n" + quiz.map((e, i) => `${i + 1}. **${e.titre}**${e.focus ? " — " + e.focus : ""}`).join("\n");
+			file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
+		} catch (err) {
+			const e = err as Error & { aborted?: boolean };
+			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
+		} finally {
+			if (clientCourant === client) clientCourant = null;
+			etapes.delete(ligne.id);
+			file = F.solder(file, ligne.id);
+			pomper();
+		}
+	}
+
 	/** Écrit la note du quiz produit. Un échec ne perd rien : la ligne passe
 	    en « échec d'enregistrement » avec son quiz, et ne relancera jamais le
 	    CLI. */
@@ -285,7 +332,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		// `p.questions.length` comptait le glossaire comme une question.
 		const draft = brouillonDe(p.questions);
 		const entree = await enregistrerQuiz({
-			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre,
+			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre, titreImpose: titrePreparation(d),
 			demande: d, destination: d.destination, reglages: { ...deps.settings.get(), ...d.reglages },
 			usage: p.usage, planTranches: p.planTranches, noteLearn: p.noteLearn, scanner: deps.scanner,
 		});
@@ -351,6 +398,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
     "Contrôle continu — Test 3". `undefined` outside a preparation. */
 export function titrePreparation(d: Pick<DemandeFile, "mode" | "preparation">): string | undefined {
 	const p = d.preparation;
+	// A step of the model's plan is named by the plan: "Lists and tuples".
+	if (p?.titre) return nettoyerTitre(p.titre);
 	if (!p?.examen) return undefined;
 	const etape = d.mode === "learn"
 		? (p.document ? `Learn ${p.document.replace(/\.[^.]+$/, "")}` : "Learn")

@@ -36,6 +36,7 @@ import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserC
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
+import { poserPlan } from "./plan-sidebar";
 import { ouvrirDocumentsExam } from "./exam-documents";
 import { PALIERS_TEST, attachExamCommand, promptPreparation, retirerCommandeExam } from "./exam-command";
 import type { ExamCible, ExamCommandHandle } from "./exam-command";
@@ -989,6 +990,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			ajouter(genere, "span", undefined, t("ai.side.generated"));
 			genere.addEventListener("click", () => deps.openGenerated?.());
 		}
+		/* The plan of an "/exam" preparation, while it lasts (plan-sidebar.ts). */
+		poserPlan(lateral, fileGen, (chemin) => {
+			const quiz = deps.scanner.getQuiz(chemin);
+			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
+			else host.ui.notice(t("ai.queue.missing"));
+		});
 		poserListeChats(lateral);
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
@@ -4039,19 +4046,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   each get their path), then the Tests of rising difficulty over
 			   all of them together. One `lot`: the queue shows the request once
 			   and names each step (file-generation-vue.ts). */
-			/* Learn | Test decides WHICH quizzes (2026-09-30): Learn makes the
-			   Learns only, one per document; Test makes the Tests only, of
-			   rising difficulty over all the documents. */
-			const docs = modeGeneration === "learn" ? decouperParFichier(d, false) : [];
-			const tests = modeGeneration === "learn" ? 0 : PALIERS_TEST;
-			const lot = Date.now().toString(36);
-			const etapes = docs.length + tests;
-			docs.forEach((doc, i) => {
-				fileGen.envoyer({ ...doc, ...base, mode: "learn", preparation: { examen, palier: 0, paliers: PALIERS_TEST, document: doc.notes.length === 1 && d.notes.length > 1 ? doc.notes[0].name : undefined, lot, etape: i + 1, etapes } });
-			});
-			for (let palier = 1; palier <= tests; palier++) {
-				fileGen.envoyer({ ...d, ...base, mode: "practice", preparation: { examen, palier, paliers: PALIERS_TEST, lot, etape: docs.length + palier, etapes } });
-			}
+			/* ONE LINE, the PLAN (2026-09-30): the model reads every document,
+			   then chooses the quizzes; each comes behind it in the queue, and
+			   the sidebar shows the plan as it goes. Learn | Test decides the
+			   kind of quizzes planned. */
+			fileGen.envoyer({ ...d, ...base, mode: modeGeneration, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
 			examCible = null;
 			viderComposer();
 			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
