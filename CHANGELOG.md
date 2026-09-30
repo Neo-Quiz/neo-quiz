@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.3] - 2026-09-30
+
 ### Changed
 - Generate always makes a quiz again: Enter and the arrow generate the Learn or Test you chose, and the chat is gone. A request that explicitly asks for no quiz ("no quiz, just explain") gets an answer in prose instead.
 - In the transcript of a generation, the text being written folds by itself past 15 lines; its heading keeps counting the lines, and a click unfolds it.
