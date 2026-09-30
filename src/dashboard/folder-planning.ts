@@ -365,10 +365,9 @@ export function renderFolderPlanning(
 					t(examen.weightUnit === "percent" ? "dashboard.planning.examPercent" : "dashboard.planning.examCoef",
 						{ n: new Intl.NumberFormat(currentLang()).format(examen.coefficient) }));
 			}
-			if (seancesExamen?.length) {
-				const aujourdhui = aujourdhuiIsoLocal(Date.now());
-				ajouter(infos, "span", "qbd-planning-exam-days", t("dashboard.planning.sessionsDone", { n: seancesExamen.filter(d => d < aujourdhui).length, total: seancesExamen.length }));
-			} else if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
+			// A continuous assessment says its sessions and its span, nothing
+			// more: "3 of 6 done" read as a score (2026-09-30).
+			if (!seancesExamen?.length && ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
 			// Edit and Delete are shown directly as two ghost icon buttons
 			// (no "..." menu: two actions do not need one).
 			const actions = ajouter(ligne, "div", "qbd-planning-exam-actions");

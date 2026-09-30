@@ -396,7 +396,6 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.sessionRemove": "Remove this session",
 	"dashboard.planning.sessionsCountOne": "{n} session",
 	"dashboard.planning.sessionsCountOther": "{n} sessions",
-	"dashboard.planning.sessionsDone": "{n} of {total} done",
 	"dashboard.planning.dateCalendar": "Calendar",
 	"dashboard.planning.datePrevMonth": "Previous month",
 	"dashboard.planning.dateNextMonth": "Next month",

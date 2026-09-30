@@ -355,7 +355,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.planning.sessionRemove": "Retirer cette séance",
 	"dashboard.planning.sessionsCountOne": "{n} séance",
 	"dashboard.planning.sessionsCountOther": "{n} séances",
-	"dashboard.planning.sessionsDone": "{n} sur {total} passées",
 	"dashboard.planning.dateCalendar": "Calendrier",
 	"dashboard.planning.datePrevMonth": "Mois précédent",
 	"dashboard.planning.dateNextMonth": "Mois suivant",
