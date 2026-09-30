@@ -50,10 +50,10 @@ async function cas(r, nom, fn) {
 	}
 }
 
-await withSrcModule("src/cli-install-cmd.ts", async ({ commandeInstallation, commandeInstallationLancee, PREFIXE_JOURNAL_GO }) => {
+await withSrcModule("src/cli-install-cmd.ts", async ({ commandeInstallation }) => {
 await withSrcModule("apps/windows/electron/process.ts", async ({
-	OUTILS, argumentsTerminal, avecFichiers, cheminCache, dossierPersonnel, dossiersCli, emplacementsOllama, encoderCommande, environnementOutil,
-	estOutilAutorise, lireAncre, lireCache, lirePlacement, rectangleTerminal, scriptConnexion, scriptDisposerPourSite, scriptDisposerPourTerminal, scriptFermerTerminal, scriptInstallation, scriptPoserFenetre, scriptRestaurerNavigateur, scriptUsageTerminal,
+	OUTILS, argumentsTerminal, avecFichiers, openPlainTerminal, plainTerminalArguments, cheminCache, dossierPersonnel, dossiersCli, emplacementsOllama, encoderCommande, environnementOutil,
+	estOutilAutorise, lireAncre, lireCache, lirePlacement, rectangleTerminal, scriptConnexion, scriptDisposerPourSite, scriptDisposerPourTerminal, scriptFermerTerminal, scriptPoserFenetre, scriptRestaurerNavigateur, scriptUsageTerminal,
 }) => {
 	const r = makeReporter("Électron — les CLI");
 	const racine = mkdtempSync(join(tmpdir(), "quiz-process-"));
@@ -195,7 +195,7 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 		   « installé » et le terminal « terme non reconnu » — puis affichait quand
 		   même « Claude Code est connecté », parce que le `Write-Host` suivait la
 		   commande sans condition. */
-		const msgs = { succes: "c'est fini", echec: "raté", echecInstallation: "install ratée", agyCountdown: "60 secondes", agyExpire: "lien expiré" };
+		const msgs = { succes: "c'est fini", echec: "raté", agyCountdown: "60 secondes", agyExpire: "lien expiré" };
 		const envDossiers = { USERPROFILE: "C:\\U\\x", HOME: "C:\\U\\x", LOCALAPPDATA: "C:\\U\\x\\AppData\\Local", APPDATA: "C:\\U\\x\\AppData\\Roaming" };
 		{
 			const dossiers = dossiersCli(envDossiers);
@@ -211,9 +211,8 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 				   (ci-dessus) est dérivé : sans lui, le script serait composé avec le
 				   vrai `process.env` de la machine qui lance ce contrôle, et le cas
 				   suivant ne pourrait jamais retrouver dedans les chemins fabriqués. */
-				const inst = scriptInstallation(outil, "Neo Quiz - " + outil, msgs, envDossiers);
 				const cx = scriptConnexion(outil, "Neo Quiz - " + outil, msgs, envDossiers);
-				for (const [nom, script] of [["installation", inst], ["connexion", cx]]) {
+				for (const [nom, script] of [["connexion", cx]]) {
 					r.check(outil + " " + nom + " : le titre de la fenêtre est la première ligne",
 						script.startsWith("$host.UI.RawUI.WindowTitle = 'Neo Quiz - " + outil + "'"), true);
 					r.check(outil + " " + nom + " : le PATH reçoit le registre ET chaque dossier des CLI",
@@ -256,43 +255,9 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 						{ trap: /\ntrap \{[\s\S]*Read-Host[\s\S]*\n\}/.test(script), transcription: script.includes("Start-Transcript -Path") },
 						{ trap: true, transcription: true });
 				}
-				/* L'installation qui échoue n'enchaîne pas la connexion : le test de
-				   son code de sortie précède la ligne de connexion. */
-				const iInstall = inst.indexOf(commandeInstallationLancee(outil, true));
-				const iGarde = inst.indexOf("if ($LASTEXITCODE -ne 0)");
-				r.check(outil + " installation : un installateur qui échoue arrête le script avec son message, avant la connexion",
-					{ ordre: iInstall > 0 && iGarde > iInstall && iGarde < inst.indexOf("\n" + (outil === "claude" ? "claude auth login" : "codex login")), message: inst.slice(iGarde).includes("Write-Host 'install ratée'") },
-					{ ordre: true, message: true });
 			}
-			/* L'installateur de Codex demande « Start Codex now? [y/N] » à la fin et
-	   bloquait la fenêtre sur cette question (VM, 2026-09-19) :
-	   `CODEX_NON_INTERACTIVE` doit être posé AVANT la ligne d'installation,
-	   et seulement pour Codex. */
-	{
-		const codexInst = scriptInstallation("codex", "t", msgs, envDossiers);
-		const iVar = codexInst.indexOf("$env:CODEX_NON_INTERACTIVE = '1'");
-		r.check("codex installation : CODEX_NON_INTERACTIVE posé avant l'installateur, et pas ailleurs",
-			{
-				avant: iVar > 0 && iVar < codexInst.indexOf(commandeInstallationLancee("codex", true)),
-				claude: scriptInstallation("claude", "t", msgs, envDossiers).includes("CODEX_NON_INTERACTIVE"),
-			},
-			{ avant: true, claude: false });
-	}
 	/* ── ANTIGRAVITY (`agy`) : le remplaçant de Gemini CLI ── */
 	{
-		const inst = scriptInstallation("agy", "Neo Quiz - Antigravity CLI", msgs, envDossiers);
-		const ligneInstall = commandeInstallationLancee("agy", true);
-		r.check("agy installation : l'installateur officiel, sans prérequis ni nettoyage npm (un binaire Go)",
-			{
-				/* La ligne est indentee dans le `try` du reessai : c'est son
-				   ENVELOPPE qui a change le 2026-09-20 (503 de Google), jamais la
-				   ligne elle-meme, celle que le modal affiche. */
-				officiel: inst.includes("\n    " + ligneInstall + "\n") && ligneInstall.includes("antigravity.google/cli/install.ps1"),
-				/* Avant la ligne d'installation seulement : le rechargement du
-				   PATH, plus bas, cite le dossier npm de l'utilisateur. */
-				npm: /npm install|Get-Command npm|npm_config|Node\.js/.test(inst.slice(0, inst.indexOf(ligneInstall))),
-			},
-			{ officiel: true, npm: false });
 		/* La connexion est HEADLESS et c'est le SCRIPT qui ouvre le navigateur :
 		   `agy -p` écrit l'URL Google sur stderr et attend SOIXANTE secondes
 		   EN INTERNE, puis abandonne sans rendre la main (mesuré les
@@ -366,17 +331,6 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 				{ agy: cx.includes("while ($true) {") && cl.includes("while ($true) {") === false, jugeAgy: cl.includes("if ($LASTEXITCODE -eq 0)") },
 				{ agy: true, jugeAgy: true });
 		}
-		/* `install.ps1` de Google pose `$ErrorActionPreference = "Stop"` dans
-		   la session (par `iex`) : sous `Stop`, la première ligne relue —
-		   l'URL — arrêtait le script (vécu le 2026-09-20). `Continue` doit
-		   être remis ENTRE l'installation et le lancement. */
-		{
-			const iContinue = inst.indexOf("$ErrorActionPreference = 'Continue'");
-			const iInstall = inst.indexOf(ligneInstall);
-			const iAppelInst = inst.indexOf("$p = Start-Process -FilePath \"agy\"");
-			r.check("agy installation : ErrorActionPreference remis à Continue APRÈS l'installateur de Google et AVANT l'appel headless",
-				iInstall > 0 && iContinue > iInstall && iAppelInst > iContinue, true);
-		}
 		r.check("agy : son dossier d'installation Windows est dans les dossiers des CLI",
 			dossiersCli(envDossiers).includes("C:\\U\\x\\AppData\\Local\\agy\\bin"), true);
 	}
@@ -433,74 +387,52 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 	   l'entrée). Un cas d'exécution reste à écrire le jour où le harnais
 	   saura tenir une console. */
 
-	const ollama = scriptInstallation("ollama", "Neo Quiz - Ollama", msgs);
-			r.check("ollama installation : ni connexion ni REPL, le message puis la fin",
-				{ login: /login|\nclaude|\ncodex/.test(ollama), succes: ollama.includes("Write-Host 'c''est fini'") }, { login: false, succes: true });
-			r.check("connexion ollama : null, jamais un terminal sur rien", scriptConnexion("ollama", "t", msgs), null);
+				r.check("connexion ollama : null, jamais un terminal sur rien", scriptConnexion("ollama", "t", msgs), null);
 
-			/* ── CE QUI EST MONTRÉ EST CE QUI PART, avec DEUX écarts écrits ──
-			   Ollama : deux drapeaux d'accord non interactif. Claude : la ligne
-			   affichée tourne dans un SOUS-PROCESSUS, parce que `install.ps1` fait
-			   `exit 1` sur chaque échec et qu'un `exit` dans un `irm | iex` lancé dans
-			   la session ferme la fenêtre entière, sans un mot — le code de sortie
-			   n'existerait pas, et la branche « échec » du script ne serait jamais
-			   atteinte. Codex l'a déjà, sous sa forme officielle. */
-			for (const outil of ["claude", "codex", "ollama"]) {
-				const script = scriptInstallation(outil, "t", msgs);
-				const affichee = commandeInstallation(outil, true).code;
-				const lancee = commandeInstallationLancee(outil, true);
-				r.check(outil + " : la ligne lancée CONTIENT la ligne affichée, et le script la contient",
-					{ dansLeScript: script.includes(lancee), contient: lancee.includes(affichee) }, { dansLeScript: true, contient: true });
-			}
-			r.check("les écarts entre affiché et lancé sont exactement les trois admis",
-				{
-					claude: commandeInstallationLancee("claude", true),
-					codex: commandeInstallationLancee("codex", true) === commandeInstallation("codex", true).code,
-					ollama: commandeInstallationLancee("ollama", true).slice(commandeInstallation("ollama", true).code.length),
-					/* Antigravity : le sous-processus (comme Claude) PUIS un filtre
-					   d'affichage qui retire le préfixe de journalisation Go — et
-					   rien d'autre : la ligne affichée est dedans, telle quelle. */
-					agy: commandeInstallationLancee("agy", true).startsWith('powershell -ExecutionPolicy Bypass -c "irm https://antigravity.google/cli/install.ps1 | iex" 2>&1 | ForEach-Object {')
-						&& commandeInstallationLancee("agy", true).includes("[Console]::Out.WriteLine(")
-						&& !commandeInstallationLancee("agy", true).includes("Write-Host"),
-				},
-				{
-					claude: 'powershell -ExecutionPolicy Bypass -c "irm https://claude.ai/install.ps1 | iex"',
-					codex: true,
-					ollama: " --accept-source-agreements --accept-package-agreements",
-					agy: true,
-				});
-			/* LE FILTRE, sur de vraies lignes de l'installateur (2026-09-20) : le
-			   préfixe tombe, le message reste, et une ligne ordinaire — le succès,
-			   l'URL de connexion — passe intacte. Éprouvé avec le moteur de
-			   PowerShell lui-même. */
+			/* ── THE COMMAND SHOWN (2026-09-30) ──
+			   The automatic installation is gone: the install window SHOWS a command
+			   to copy, and that text is the only form there is. On Windows the
+			   PowerShell scripts run in a `-NoProfile` sub-process (Codex's
+			   "OSArchitecture cannot be found" came from the profile, seen in the
+			   owner's VM on 2026-09-18); Ollama stays a plain winget line. */
 			{
-				const echantillon = [
-					"ERROR: logging before google.Init: I0920 19:58:12.796444       1 installer.go:27] Running Antigravity CLI setup...",
-					"ERROR: logging before google.Init: I0920 19:58:13.267352       1 installer_windows.go:179] PATH verification: C:\\Users\\Ahmed\\AppData\\Local\\agy\\bin is correctly configured in Environment PATH.",
-					"✅ Antigravity CLI installed successfully at C:\\Users\\Ahmed\\AppData\\Local\\agy\\bin\\agy.exe",
-					"  https://accounts.google.com/o/oauth2/auth?access_type=offline",
-				];
-				const { execFileSync } = await import("node:child_process");
-				/* La sortie de `powershell.exe` est lue ici en UTF-8 : sans le dire,
-				   la console du harnais rend la coche « ✅ » en « ? » — un défaut
-				   du TEST, pas du filtre. */
-				const ps = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $p = '" + PREFIXE_JOURNAL_GO + "'; @(" + echantillon.map(l => "'" + l.replace(/'/g, "''") + "'").join(",") + ") | ForEach-Object { [Console]::Out.WriteLine(($_ -replace $p, '')) }";
-				let sortie = "";
-				try {
-					sortie = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps], { encoding: "utf8", windowsHide: true, timeout: 20000 });
-				} catch (e) { sortie = "ÉCHEC : " + String(e && e.message); }
-				r.check("le préfixe de journalisation Go tombe, le message reste, le reste passe intact",
-					sortie.split(/\r?\n/).filter(Boolean),
-					[
-						"Running Antigravity CLI setup...",
-						"PATH verification: C:\\Users\\Ahmed\\AppData\\Local\\agy\\bin is correctly configured in Environment PATH.",
-						"✅ Antigravity CLI installed successfully at C:\\Users\\Ahmed\\AppData\\Local\\agy\\bin\\agy.exe",
-						"  https://accounts.google.com/o/oauth2/auth?access_type=offline",
-					]);
+				const enc = { claude: "https://claude.ai/install.ps1", codex: "https://chatgpt.com/codex/install.ps1", agy: "https://antigravity.google/cli/install.ps1" };
+				for (const [outil, url] of Object.entries(enc)) {
+					r.check(outil + " : the Windows command is the -NoProfile sub-process form",
+						commandeInstallation(outil, true).code,
+						'powershell -NoProfile -ExecutionPolicy ByPass -c "irm ' + url + ' | iex"');
+				}
+				r.check("ollama : the Windows command stays the winget line", commandeInstallation("ollama", true).code, "winget install --id Ollama.Ollama -e");
+				r.check("outside Windows the commands are the curl lines, no PowerShell",
+					["claude", "codex", "agy", "ollama"].map(o => /powershell|-NoProfile/.test(commandeInstallation(o, false).code)),
+					[false, false, false, false]);
 			}
-			r.check("hors Windows, la ligne lancée de Claude reste celle affichée (bash n'a pas ce problème)",
-				commandeInstallationLancee("claude", false), commandeInstallation("claude", false).code);
+			/* ── THE PLAIN TERMINAL ("Open a terminal") ──
+			   Opens PowerShell in the home folder and runs NOTHING: the arguments
+			   carry no script, no encoded command, no -ArgumentList, and the home
+			   folder (the one interpolated value) is quoted, apostrophes doubled. */
+			{
+				const a = plainTerminalArguments({ USERPROFILE: "C:\Users\O'Brien" });
+				r.check("plainTerminalArguments : Start-Process powershell.exe in the home folder, nothing to run",
+					{
+						debut: a.slice(0, 2),
+						total: a.length,
+						commande: a[2],
+						rien: /EncodedCommand|ArgumentList|-Command\s.*-Command|iex|irm/.test(a[2]),
+					},
+					{
+						debut: ["-NoProfile", "-Command"],
+						total: 3,
+						commande: "Start-Process powershell.exe -WorkingDirectory 'C:\Users\O''Brien'",
+						rien: false,
+					});
+				r.check("plainTerminalArguments : a typographic apostrophe in the path cannot close the quote",
+					plainTerminalArguments({ USERPROFILE: "C:\l’an" })[2],
+					"Start-Process powershell.exe -WorkingDirectory 'C:\l’’an'");
+				r.check("openPlainTerminal is exported and takes no caller argument",
+					{ type: typeof openPlainTerminal, arite: openPlainTerminal.length },
+					{ type: "function", arite: 0 });
+			}
 
 			const script = "Write-Host 'é | $x'";
 			const b64 = encoderCommande(script);
@@ -1763,6 +1695,9 @@ await withSrcModule("apps/windows/electron/surveillant-cli.ts", async ({ surveil
 		   DOIT voir. `windowsHide` y redonnerait un `conhost` sans fenêtre
 		   (mesuré, en-tête d'`argumentsTerminal`). */
 		{ fichier: RACINE + "/process.ts", appel: 'spawn("powershell.exe", argumentsTerminal(titre, script), { stdio: "ignore" })' },
+		/* The plain terminal of the manual install path (2026-09-30): the same
+		   ShellExecute launcher, for a window the user types in. */
+		{ fichier: RACINE + "/process.ts", appel: 'spawn("powershell.exe", plainTerminalArguments(env), { stdio: "ignore" })' },
 		/* La fenêtre de mise à jour : l'application ELLE-MÊME (un exécutable
 		   graphique Electron, sans console), qui doit se montrer. */
 		{ fichier: RACINE + "/fenetre-maj.ts", appel: 'spawn(exeLie, [ DRAPEAU_FENETRE_MAJ, version, langue, `--user-data-dir=${join(dirname(exeLie), "profil")}`, ], { detached: true, windowsHide: false, stdio: "ignore" })' },

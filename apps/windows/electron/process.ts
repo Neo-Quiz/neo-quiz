@@ -62,9 +62,6 @@ import type { AncreTerminal } from "../../../src/host/types";
    deux règles pour un même appel du code partagé. */
 import { extensionsExecutables, ligneCmd, porteSautDeLigne } from "../../../src/host/cli-args";
 import { LOG_PREFIX } from "../../../src/branding";
-/* LA COMMANDE D'INSTALLATION, source unique partagée avec le modal qui
-   l'affiche (voir son en-tête). Pure : aucun Node, donc lisible des deux côtés. */
-import { commandeInstallationLancee } from "../../../src/cli-install-cmd";
 
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
@@ -287,14 +284,14 @@ export async function demarrerOllama(env: NodeJS.ProcessEnv = process.env): Prom
 }
 
 /* ══════════════════════════════════════════════════════════
-   INSTALLER UN CLI — UN TERMINAL VISIBLE, UNE RECETTE FIXE
+   CONNECTER UN CLI — UN TERMINAL VISIBLE, UNE RECETTE FIXE
 
-   « Utilisable par n'importe qui » (spec du 2026-09-17, § 3c) : l'utilisateur
-   ne sait pas ce qu'est PowerShell et ne collera pas une commande. L'app
-   ouvre donc le terminal ELLE-MÊME, avec la recette OFFICIELLE de chaque
-   outil ; la fenêtre montre l'installateur travailler puis la connexion, et
-   se ferme seule quand tout a réussi ; elle reste ouverte sur un message
-   rouge quand quelque chose a échoué.
+   L'app ouvre le terminal ELLE-MÊME, avec la recette de connexion de chaque
+   outil ; la fenêtre se ferme seule quand tout a réussi ; elle reste ouverte
+   sur un message rouge quand quelque chose a échoué. (L'installation
+   automatique, qui passait par ici, est retirée depuis le 2026-09-30 : la
+   voie manuelle du modal d'installation remplace la recette, et ne demande au
+   principal qu'un terminal VIDE, `openPlainTerminal`.)
 
    LA RECETTE VIT ICI, jamais dans le rendu : `canaux.ts` ne reçoit qu'un nom
    d'outil, jugé par `estOutilAutorise` avant tout. `-EncodedCommand` porte
@@ -320,8 +317,8 @@ export async function demarrerOllama(env: NodeJS.ProcessEnv = process.env): Prom
    par `Start-Process` qui reste.
 
    LE PATH DE LA SESSION EST RECHARGÉ avant de lancer `claude`/`codex` :
-   `claude install` écrit le PATH utilisateur dans le registre, et la session
-   PowerShell déjà ouverte ne le voit pas (lu dans install.ps1).
+   un CLI installé écrit le PATH utilisateur dans le registre, et la session
+   PowerShell déjà ouverte ne le voit pas.
 ══════════════════════════════════════════════════════════ */
 
 /** Une chaîne littérale PowerShell entre apostrophes (la seule forme qui
@@ -336,16 +333,11 @@ export function citerPs(texte: string): string {
 	return "'" + texte.replace(/['\u2018\u2019\u201A\u201B]/g, c => c + c) + "'";
 }
 
-/** Les trois textes que la fenêtre peut afficher, traduits par `canaux.ts`
-    sur la langue de l'application. `echecInstallation` n'a de sens que pour
-    `scriptInstallation` ; `scriptConnexion` l'ignore. */
+/** Les textes que la fenêtre peut afficher, traduits par `canaux.ts` sur la
+    langue de l'application. */
 export interface MessagesTerminal {
 	succes: string;
 	echec: string;
-	echecInstallation?: string;
-	/** Ce qui s'affiche entre deux tentatives d'installation (le service de
-	    l'editeur n'a pas repondu). */
-	reessai?: string;
 	/** Antigravity seulement, lus par `agyConnexion` : l'avertissement des 60
 	    secondes affiché AVANT de lancer le CLI, et le message d'expiration
 	    affiché quand le script tue la tentative au bout de 70 s. Traduits par
@@ -584,74 +576,9 @@ function entete(titre: string): string[] {
 }
 
 /**
- * Le script PowerShell complet qui installe `tool` puis y connecte le
- * compte. PURE. `titre` en est la PREMIÈRE ligne (`$host.UI.RawUI.
- * WindowTitle`) : c'est la seule façon de le porter jusqu'à la fenêtre une
- * fois que `argumentsTerminal` ne le cite plus sur la ligne de commande.
- *
- * LA LIGNE D'INSTALLATION EST CELLE QUE LE MODAL AFFICHE
- * (`src/cli-install-cmd.ts`, partagé), aux deux écarts près que ce module
- * documente et que `npm run check:electron-process` fige. Un installateur qui
- * rend un code non nul arrête le script sur son message : on n'enchaîne pas
- * la connexion d'un outil qui n'est pas là.
- */
-export function scriptInstallation(tool: Outil, titre: string, messages: MessagesTerminal, env: NodeJS.ProcessEnv = process.env): string {
-	const lignes: string[] = [
-		...entete(titre),
-		/* `install.ps1` de Codex finit par « Start Codex now? [y/N] » et
-		   attendait qu'on tape n puis Entrée (vu dans la VM le 2026-09-19),
-		   alors que la connexion suit juste après. `CODEX_NON_INTERACTIVE`
-		   est la variable que ce script lit pour répondre « non » à toutes
-		   ses questions (`Prompt-YesNo`, lu dans install.ps1 le 2026-09-19).
-		   Posée dans la SESSION, elle est héritée par le sous-processus
-		   PowerShell qui exécute l'installateur. */
-		...(tool === "codex" ? ["$env:CODEX_NON_INTERACTIVE = '1'"] : []),
-		/* DEUX TENTATIVES, TRENTE SECONDES D'ECART. Le 2026-09-20,
-		   `antigravity.google` a repondu « 503 Server Error - The service you
-		   requested is not available yet. Please try again in 30 seconds. » :
-		   un App Engine qui demarre a froid, retabli deux minutes plus tard.
-		   L'utilisateur, lui, voyait une pile rouge et une modale qui tournait
-		   sans fin. Le delai est celui que Google DEMANDE dans son message. La
-		   LIGNE d'installation est inchangee - c'est toujours celle que le
-		   modal affiche (`src/cli-install-cmd.ts`) ; seule son enveloppe
-		   reessaie, et le second essai est ANNONCE a l'ecran. */
-		"$essai = 0",
-		"while ($true) {",
-		"  $essai++",
-		"  $echec = $false",
-		"  try {",
-		"    " + commandeInstallationLancee(tool, true),
-		"    if ($LASTEXITCODE -ne 0) { $echec = $true }",
-		"  } catch {",
-		"    $echec = $true",
-		"    Write-Host $_ -ForegroundColor DarkGray",
-		"  }",
-		"  if (-not $echec) { break }",
-		"  if ($essai -ge 2) {",
-		"    Write-Host " + citerPs(messages.echecInstallation || messages.echec) + " -ForegroundColor Red",
-		"    Read-Host | Out-Null",
-		"    exit 1",
-		"  }",
-		"  Write-Host " + citerPs(messages.reessai || "The service did not answer. Trying again in 30 seconds...") + " -ForegroundColor Yellow",
-		"  Start-Sleep -Seconds 30",
-		"}",
-	];
-	const connexion = commandeConnexion(tool, messages);
-	if (connexion === null) {
-		/* Ollama : pas de compte par terminal, c'est son application qui
-		   démarre. Le message, le compte à rebours, et la fenêtre se ferme. */
-		lignes.push("Write-Host " + citerPs(messages.succes) + " -ForegroundColor Green", ...compteARebours(""));
-		return lignes.join("\n");
-	}
-	lignes.push(rechargerPath(env), connexion, ...issue(messages, tool === "agy" ? "$connecte" : undefined));
-	return lignes.join("\n");
-}
-
-/**
  * Le script PowerShell qui CONNECTE le compte d'un outil déjà installé.
- * PURE, jumelle de `scriptInstallation` — et volontairement plus courte :
- * rien n'est téléchargé, rien n'est exécuté depuis le réseau, on lance un
- * exécutable qui est déjà là.
+ * PURE — rien n'est téléchargé, rien n'est exécuté depuis le réseau, on
+ * lance un exécutable qui est déjà là.
  *
  * `null` pour Ollama, qui n'a pas de compte par terminal : l'appelant en fait
  * « indisponible » plutôt qu'une fenêtre ouverte sur rien.
@@ -1585,6 +1512,34 @@ function fermerTerminalPrecedent(titre: string): void {
 	}
 }
 
+/** The arguments that open a PLAIN PowerShell window (2026-09-30), in the
+    user's home folder, running NOTHING: no `-Command` for the new window, no
+    `-EncodedCommand`, no script. Same ShellExecute route as `argumentsTerminal`
+    (the only one that opens a real window, hosted by the user's default
+    terminal), so the window is the user's to type in. The one interpolated
+    value is the home folder, quoted by `citerPs`. PURE. */
+export function plainTerminalArguments(env: NodeJS.ProcessEnv = process.env): string[] {
+	return ["-NoProfile", "-Command", `Start-Process powershell.exe -WorkingDirectory ${citerPs(dossierPersonnel(env))}`];
+}
+
+/** Opens that plain window. No argument from the caller, by design: the
+    bridge channel takes none either. `false` off Windows or when the launch
+    fails. */
+export function openPlainTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+	if (process.platform !== "win32") return false;
+	try {
+		// Neither `detached` nor `windowsHide`, same as `lancerTerminal`: the
+		// launcher dies at once and the window opened by ShellExecute stays.
+		const child = spawn("powershell.exe", plainTerminalArguments(env), { stdio: "ignore" });
+		child.on("error", e => { console.warn(LOG_PREFIX, "plain terminal not launched:", e); });
+		child.unref();
+		return true;
+	} catch (e) {
+		console.warn(LOG_PREFIX, "plain terminal not launched:", e);
+		return false;
+	}
+}
+
 export function lancerTerminal(titre: string, script: string): boolean {
 	if (process.platform !== "win32") return false;
 	try {
@@ -1596,11 +1551,11 @@ export function lancerTerminal(titre: string, script: string): boolean {
 		   fenêtre. Le processus lanceur meurt tout de suite ; c'est la fenêtre
 		   ouverte par ShellExecute qui reste. */
 		const enfant = spawn("powershell.exe", argumentsTerminal(titre, script), { stdio: "ignore" });
-		enfant.on("error", e => { console.warn(LOG_PREFIX, "terminal d'installation non lancé:", e); });
+		enfant.on("error", e => { console.warn(LOG_PREFIX, "terminal non lancé:", e); });
 		enfant.unref();
 		return true;
 	} catch (e) {
-		console.warn(LOG_PREFIX, "terminal d'installation non lancé:", e);
+		console.warn(LOG_PREFIX, "terminal non lancé:", e);
 		return false;
 	}
 }
@@ -1750,7 +1705,7 @@ export function estOutilAutorise(tool: unknown): tool is Outil {
  *
  * Elle sert deux fois, et c'est tout l'intérêt : `environnementEnfant` l'ajoute
  * au PATH avec lequel l'application SONDE et LANCE les CLI, et les scripts du
- * terminal (`scriptInstallation`, `scriptConnexion`) l'ajoutent au PATH de la
+ * terminal (`scriptConnexion`) l'ajoutent au PATH de la
  * fenêtre PowerShell. Jusqu'au 2026-09-19 le terminal ne rechargeait que le
  * PATH du REGISTRE : quand `install.ps1` de Claude n'y écrivait pas
  * `~/.local/bin` (VM d'Ahmed, 2026-09-18), l'application disait « installé »
@@ -1812,7 +1767,7 @@ export function dossiersCli(env: NodeJS.ProcessEnv = process.env): string[] {
  * même plus touché (3 fois sur 3). La valeur est `true` EN MINUSCULES : `1`
  * et `TRUE` ont été essayées et laissent la console s'ouvrir. Posée pour
  * CHAQUE lancement de l'application (sondes et générations), jamais dans le
- * terminal d'installation ou de connexion, qui ne passe pas par ici : `agy`
+ * terminal de connexion, qui ne passe pas par ici : `agy`
  * se met à jour quand l'utilisateur le lance lui-même.
  */
 export const ENV_SANS_MAJ_AGY = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" } as const;

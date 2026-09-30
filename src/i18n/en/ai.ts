@@ -273,11 +273,6 @@ export const EN_AI = {
 	"ai.install.what.codex": "OpenAI's command-line tool, used with a ChatGPT subscription. Not the Codex desktop app.",
 	"ai.install.what.ollama": "Free models on your own computer, no account needed.",
 	"ai.install.what.antigravity-cli": "Google's command-line tool for Gemini, used with your Google account. It replaced Gemini CLI for personal accounts.",
-	/* « Install » seul : c'est « Install manually », juste au-dessus, qui a
-	   besoin de se qualifier ; le bouton principal fait l'installation, un
-	   point c'est tout (Ahmed, 2026-09-20). */
-	"ai.install.auto": "Install",
-		"ai.install.manual": "Install manually",
 	"ai.install.step1": "Open PowerShell: Windows + X, then I.",
 	"ai.install.step1Unix": "Open a terminal.",
 	"ai.install.step2": "Copy this command, paste it (right click) and press Enter:",
@@ -289,10 +284,17 @@ export const EN_AI = {
 	"ai.install.learnMore": "Learn more",
 	"ai.install.copy": "Copy",
 	"ai.install.copied": "Copied",
-	"ai.install.running": "Installing in PowerShell… Neo Quiz will detect it.",
+	"ai.install.waiting": "Waiting for the installation… Neo Quiz will detect it.",
+	"ai.install.openTerminal": "Open a terminal",
+	"ai.install.help.title": "Doesn't work?",
+	"ai.install.help.path": "\"{command}\" is not recognized right after \"Installation complete\": close the terminal and open a new one. The PATH is only read when a terminal starts.",
+	"ai.install.help.antivirus": "An antivirus (Defender, McAfee) blocks the command: allow it, or install from the official page:",
+	"ai.install.help.network": "Company network, \"SSL/TLS secure channel\" error, or a Cloudflare \"Just a moment…\" page: try again later, or from another network.",
+	"ai.install.help.networkClaude": "For Claude Code, you can also install with winget:",
+	"ai.install.help.stuck": "Claude Code stays on \"Setting up Claude Code…\": close it and install with winget instead:",
 	"ai.install.detected": "{name} v{version} is installed.",
 	"ai.install.detectedNoVersion": "{name} is installed.",
-	"ai.install.terminalFailed": "PowerShell could not be opened. Follow the manual steps below.",
+	"ai.install.terminalFailed": "The terminal could not be opened. Open one yourself: Windows + X, then I.",
 
 	/* ── Connexion du compte, depuis l'écran d'échec de génération ── */
 	"ai.login.button": "Sign in",

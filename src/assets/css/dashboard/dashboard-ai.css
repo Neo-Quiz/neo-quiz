@@ -2048,12 +2048,13 @@
    et la modale grandit, comme avant. */
 .qbd-install-modal .modal-content { display: flex; flex-direction: column; }
 .qbd-install-modal .qbd-install-what { order: 1; }
-.qbd-install-modal .modal-content > .qbd-quizzes-node { order: 2; }
+.qbd-install-modal .modal-content > .qbd-install-steps { order: 2; }
+.qbd-install-modal .modal-content > .qbd-quizzes-node { order: 3; }
 /* `order` SEUL : le `margin-top: auto` d'avant servait à pousser le pied
    quand un plancher étirait la boîte. Le plancher retiré, il ne poussait
    plus rien — mais, plus spécifique, il écrasait l'écart de 22 px écrit plus
    bas, et les deux voies se touchaient (Ahmed, 2026-09-20). */
-.qbd-install-modal .qbd-install-state { order: 3; }
+.qbd-install-modal .qbd-install-state { order: 4; }
 .qbd-install-modal .qbd-install-auto { order: 4; }
 .qbd-install-modal .qbd-install-learn { order: 5; }
 .qbd-install-modal .modal-title { font-size: 1.22em; margin-bottom: 16px; }
@@ -2208,6 +2209,15 @@
 .qbd-install-manual-row .qbd-quizzes-node-chevron svg { width: 16px; height: 16px; }
 
 .qbd-install-steps { margin: 10px 0 0; padding-left: 22px; line-height: 1.6; }
+/* "Open a terminal" (2026-09-30): a small secondary button under the first
+   step, on its own line. */
+.qbd-install-terminal { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; }
+.qbd-install-terminal svg { width: 14px; height: 14px; }
+/* The help lines of the collapsed "Doesn't work?" block. */
+.qbd-install-help { margin: 6px 0 0; padding-left: 22px; line-height: 1.6; color: var(--text-muted); font-size: 13.5px; }
+.qbd-install-help li { margin: 0 0 8px; }
+.qbd-install-help-code { font-family: var(--font-monospace, ui-monospace, monospace); color: var(--text-normal); overflow-wrap: anywhere; }
+.qbd-install-help-link { color: var(--interactive-accent); overflow-wrap: anywhere; }
 .qbd-install-steps li { margin: 0 0 12px; }
 .qbd-install-steps li:last-child { margin-bottom: 4px; }
 

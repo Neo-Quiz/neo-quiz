@@ -23,6 +23,8 @@ import { t, currentLang } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { openConfirmModal } from "../../../../src/editor/modals";
 import { checkOllamaCompte, setBrandLogo, sondeConnexion } from "../../../../src/dashboard/ai-providers";
+import { openInstallModal } from "../../../../src/dashboard/ai-install-modal";
+import type { InstallProvider } from "../../../../src/dashboard/ai-install-modal";
 import { demarrerConnexionCli, poserCroixAnnuler, renderCarteAttenteConnexion } from "../../../../src/dashboard/connexion-cli";
 import type { OutilConnectable } from "../../../../src/dashboard/connexion-cli";
 import { pont } from "../host/pont";
@@ -777,11 +779,34 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 		});
 	}
 
+	/* INSTALL (2026-09-30): no automatic installation any more. The button
+	   opens the install window of the tool, with the official command to copy, a
+	   button that opens a terminal, and help when it fails. The window probes
+	   the machine every three seconds and closes itself once the tool is seen;
+	   the row is redrawn when it closes, whatever the reason. */
+	function ouvrirInstallation(outil: CliTool): void {
+		const provider: InstallProvider = outil === "claude" ? "claude-code" : outil === "agy" ? "antigravity-cli" : outil;
+		openInstallModal({
+			provider,
+			probe: async () => {
+				const [etat] = await requireHost("process").etatComptes([outil]);
+				return etat?.installe ? { ok: true } : { ok: false };
+			},
+			onDetected: async () => { /* nothing to save: the row reads the machine */ },
+			onClose: () => { if (!detruit) void redessiner(true); },
+			copyText: async (texte) => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
+		});
+	}
+
 	async function surClicAction(
 		outil: CliTool,
 		action: "installer" | "connecter" | "deconnecter",
 		bouton: HTMLButtonElement,
 	): Promise<void> {
+		if (action === "installer") {
+			ouvrirInstallation(outil);
+			return;
+		}
 		if (action === "deconnecter") {
 			// FERMÉ AVANT D'OUVRIR LA MODALE, comme `redessiner` et
 			// `poserSquelette` : le popover d'usage est à z-index 1000, au-dessus
@@ -835,21 +860,12 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 				await connecterAvecAttente(outil as OutilConnectable);
 				return;
 			}
-			const verdict = await requireHost("process").installerCli(outil);
-			if (verdict === "indisponible") {
-				currentHost().ui.notice(t("app.comptes.installFailed", { name: nomOutil(outil) }));
-			}
-			// `"lance"` ou `"annule"` : rien à dire de plus ici, le terminal (s'il
-			// est parti) fait le reste — la ligne se redessine, au pire inchangée.
 		} catch (e) {
 			// Un rejet du pont ou du serveur Ollama (panne réseau, IPC refusé) :
 			// même message que le verdict `indisponible`, jamais une exception qui
 			// remonterait jusqu'au clic et laisserait le bouton figé désactivé.
 			console.warn(LOG_PREFIX, "action de compte impossible:", e);
-			currentHost().ui.notice(t(
-				action === "installer" ? "app.comptes.installFailed" : "app.comptes.connectFailed",
-				{ name: nomOutil(outil) },
-			));
+			currentHost().ui.notice(t("app.comptes.connectFailed", { name: nomOutil(outil) }));
 		} finally {
 			if (!detruit) await redessiner(true);
 		}

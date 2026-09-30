@@ -1,23 +1,25 @@
 /* ══════════════════════════════════════════════════════════
-   LE MODAL D'UN FOURNISSEUR ABSENT — ET L'INSTALLATION EN UN CLIC
+   THE WINDOW OF A MISSING PROVIDER: THE OFFICIAL COMMAND, TO COPY
 
-   Spec « utilisable par n'importe qui » (2026-09-17, § 3b). L'utilisateur ne
-   sait pas ce qu'est un terminal : le modal dit ce qu'est l'outil en une
-   phrase, propose de l'installer AUTOMATIQUEMENT (l'hôte ouvre PowerShell
-   avec la recette officielle, `HostProcess.installerCli`), et garde, repliée,
-   la voie manuelle en quatre étapes pour qui la préfère — ou pour un hôte
-   qui ne sait pas ouvrir de terminal.
+   Spec "usable by anyone" (2026-09-17, section 3b), reworked on 2026-09-30:
+   the AUTOMATIC installation (a button that had the host open PowerShell and
+   run the recipe) is gone. Less code that launches commands is less security
+   surface to watch, and the manual way is easy and fully reliable. The
+   window says what the tool is in one sentence, shows the official command
+   (copyable), offers an "Open a terminal" button (the host opens an EMPTY
+   PowerShell window and runs nothing: `HostProcess.openTerminal`, no
+   argument), and keeps, collapsed, a "Doesn't work?" help block with the
+   failures seen in practice.
 
-   Trois états : `initial`, `en-cours` (le terminal est parti, la sonde du
-   fournisseur tourne toutes les 3 s), `detecte` (la page a écrit le
-   fournisseur dans les réglages, « Continuer » ferme). La sonde est coupée
-   à la fermeture ET à la détection : jamais un minuteur orphelin.
+   Two states: `initial` (the probe of the provider runs every 3 s from the
+   moment the window opens) and `detecte` (the page wrote the provider to the
+   settings, the window closes by itself). The probe is stopped on close AND
+   on detection: never an orphan timer.
 ══════════════════════════════════════════════════════════ */
 import { LOG_PREFIX } from "../branding";
 import { getProvider, setBrandLogo } from "./ai-providers";
 import { commandeInstallation } from "../cli-install-cmd";
-import { ajouter, ancreApresRelayout, ancreRemontee, CLASSE_MODALE_HAUT } from "../dom";
-import { poserOnde } from "./onde";
+import { ajouter } from "../dom";
 import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
 import { renderCollapsibleSection } from "./collapsible";
@@ -26,14 +28,14 @@ export type InstallProvider = "claude-code" | "codex" | "ollama" | "antigravity-
 
 export interface InstallModalDeps {
 	provider: InstallProvider;
-	/** La sonde du fournisseur, forcée (sans TTL). */
+	/** The provider's probe, forced (no TTL). */
 	probe(): Promise<{ ok: true; version?: string } | { ok: false }>;
-	/** Appelé une fois sur détection : la page écrit le fournisseur dans les réglages. */
+	/** Called once on detection: the page writes the provider to the settings. */
 	onDetected(): Promise<void>;
-	/** Appelé à la fermeture, quel que soit l'état : la page rafraîchit statuts et
-	    hints. `detecte` dit si la fermeture suit une DÉTECTION (le terminal a
-	    fini) plutôt qu'un abandon — la page s'en sert pour enchaîner sur la
-	    connexion sans attendre un clic de plus. */
+	/** Called on close, whatever the state: the page refreshes statuses and
+	    hints. `detecte` says whether the close follows a DETECTION rather than
+	    an abandon: the page uses it to chain on the sign-in without waiting
+	    for one more click. */
 	onClose(detecte: boolean): void;
 	copyText?(texte: string): Promise<boolean>;
 	renderCodeBlock?(host: HTMLElement, code: string, lang: string): void;
@@ -45,19 +47,20 @@ const DOCS: Record<InstallProvider, string> = {
 	"claude-code": "https://code.claude.com/docs/en/setup",
 	codex: "https://learn.chatgpt.com/docs/codex/cli",
 	ollama: "https://ollama.com/download",
-	"antigravity-cli": "https://antigravity.google/docs/cli/install/",
+	"antigravity-cli": "https://antigravity.google/docs/cli/install",
 };
 const SONDE_MS = 3000;
 
-/* La commande elle-même vit dans `src/cli-install-cmd.ts`, PARTAGÉE avec le
-   processus principal qui l'exécute : ce qui est montré ici est littéralement
-   ce que le bouton « Installer automatiquement » lance. Voir l'en-tête de ce
-   module pour ce que la divergence d'avant a coûté. */
-/* Coloration d'une ligne de shell SANS colorateur embarqué : les commandes
-   du modal sont trois lignes connues (irm, curl, winget), pas du code
-   arbitraire — une grammaire à quatre jetons suffit (chaîne "…", drapeau
-   -x/--xx, tube |, le reste étant la commande en tête de segment). Chaque
-   jeton est un span, le texte passe par textContent : rien n'est interprété. */
+/** The winget fallback for Claude Code (publisher Anthropic PBC), shown in the
+    help block for a blocked network and for an install stuck on "Setting up". */
+const WINGET_CLAUDE = "winget install --id Anthropic.ClaudeCode -e";
+
+/* The command itself lives in `src/cli-install-cmd.ts`: see its header. */
+/* Coloring of one shell line WITHOUT an embedded highlighter: the commands of
+   the window are a few known lines (powershell, curl, winget), not arbitrary
+   code, so a four-token grammar is enough (string "…", flag -x/--xx, pipe |,
+   the rest being the command at the head of a segment). Each token is a
+   span, the text goes through textContent: nothing is interpreted. */
 export function colorerCommande(code: HTMLElement, ligne: string): void {
 	const re = /"[^"]*"|\|| +|[^\s"|]+/g;
 	let debutSegment = true;
@@ -72,8 +75,8 @@ export function colorerCommande(code: HTMLElement, ligne: string): void {
 		if (cls) ajouter(code, "span", cls, m);
 		else code.appendChild(document.createTextNode(m));
 		if (m.startsWith('"')) {
-			// Une chaîne contient elle-même une commande (irm … | iex) : on
-			// la colore à son tour, mais dans un span de chaîne.
+			// A string holds a command itself (irm … | iex): color it in turn,
+			// but inside a string span.
 			const inner = code.lastElementChild as HTMLElement;
 			inner.textContent = "";
 			inner.appendChild(document.createTextNode('"'));
@@ -87,25 +90,54 @@ export function installCmd(provider: InstallProvider, isWindows: boolean): { cod
 	return commandeInstallation(OUTILS[provider], isWindows);
 }
 
+/** The help block: a collapsed "Doesn't work?" section with short lines for
+    the failures seen in practice. Windows only (every line is about the
+    PowerShell scripts or winget). Links go through `host.shell.openUrl`. */
+function renderHelp(c: HTMLElement, provider: InstallProvider): void {
+	const host = currentHost();
+	let ouvert = false;
+	/* `defaultOpen: false`, never `ouvert`: `wireCollapseToggle` computes
+	   `collapsed = defaultOpen ? isExpanded(key) : !isExpanded(key)`; with
+	   `isExpanded: () => ouvert` (true = open), `false` gives `collapsed =
+	   !ouvert`, which is what we want. The state is local, never persisted. */
+	// The badge of the row counts the lines below it.
+	const lignes = (provider === "ollama" ? 0 : 1) + 2 + (provider === "claude-code" ? 2 : 0);
+	const corps = renderCollapsibleSection(
+		{ isExpanded: () => ouvert, toggleExpanded: () => { ouvert = !ouvert; } },
+		c, "install-help", t("ai.install.help.title"), lignes, { defaultOpen: false, rowClass: "qbd-install-manual-row" },
+	);
+	const liste = ajouter(corps, "ul", "qbd-install-help");
+	if (provider !== "ollama") {
+		ajouter(liste, "li", undefined, t("ai.install.help.path", { command: OUTILS[provider] }));
+	}
+	const antivirus = ajouter(liste, "li", undefined, t("ai.install.help.antivirus") + " ");
+	const lien = ajouter(antivirus, "a", "qbd-install-help-link", DOCS[provider]);
+	lien.href = DOCS[provider];
+	lien.addEventListener("click", (e) => {
+		e.preventDefault();
+		void host.shell.openUrl(DOCS[provider]);
+	});
+	ajouter(liste, "li", undefined, t("ai.install.help.network"));
+	if (provider === "claude-code") {
+		ajouter(ajouter(liste, "li", undefined, t("ai.install.help.networkClaude") + " "), "code", "qbd-install-help-code", WINGET_CLAUDE);
+		ajouter(ajouter(liste, "li", undefined, t("ai.install.help.stuck") + " "), "code", "qbd-install-help-code", WINGET_CLAUDE);
+	}
+}
+
 export function openInstallModal(deps: InstallModalDeps): void {
 	const host = currentHost();
 	const name = NOMS[deps.provider];
 	const win = host.platform.isWindows;
 	let sonde: number | null = null;
 	const couperSonde = (): void => { if (sonde !== null) { window.clearInterval(sonde); sonde = null; } };
-	// Posé à `true` UNIQUEMENT à la détection réelle (pas à une fermeture
-	// prématurée par la croix) : c'est ce que `onClose` transmet à la page.
+	// Set to `true` ONLY on a real detection (not on an early close by the
+	// cross): it is what `onClose` hands to the page.
 	let detecte = false;
-	/* L'abonnement à « la fenêtre du terminal est posée » (l'instant où la
-	   modale remonte), retiré dès qu'il a servi ou à la fermeture. */
-	let desabonnerPose: (() => void) | null = null;
-	/* Et à « le navigateur s'est ouvert » (les deux colonnes). */
-	let desabonnerNav: (() => void) | null = null;
 
-	/* Le LOGO DE MARQUE dans la ligne du titre (2026-09-18) : coloré, sans
-	   pastille ni contour. Le fournisseur et sa couleur viennent du catalogue
-	   partagé (`ai-providers.ts`), le même que celui du menu — une seconde
-	   table aurait fini par en diverger. */
+	/* The BRAND LOGO in the title row (2026-09-18): colored, no badge, no
+	   outline. The provider and its color come from the shared catalogue
+	   (`ai-providers.ts`), the same as the menu's: a second table would end up
+	   diverging. */
 	const marque = getProvider(deps.provider);
 	requireHost("modals").open({
 		className: "qbd-install-modal",
@@ -119,149 +151,58 @@ export function openInstallModal(deps: InstallModalDeps): void {
 			m.panelEl.dataset.state = "initial";
 			ajouter(c, "p", "qbd-install-what", t(`ai.install.what.${deps.provider}`));
 
-			/* L'état « en cours » / « détecté » vit dans cette zone ; le bouton
-			   automatique n'existe que là où l'hôte sait ouvrir un terminal. */
-			const etat = ajouter(c, "div", "qbd-install-state");
-			let manuelOuvert: (() => void) | null = null;
-
+			const etapes = ajouter(c, "ol", "qbd-install-steps");
+			const li1 = ajouter(etapes, "li", undefined, t(win ? "ai.install.step1" : "ai.install.step1Unix"));
+			/* "Open a terminal": only where the host can (the app, on Windows).
+			   The host opens an EMPTY window and runs nothing; the user pastes
+			   the command of the next step into it. */
 			if (win && host.process) {
-				const auto = ajouter(c, "button", "qbd-btn--create qbd-install-auto");
-				auto.type = "button";
-				// L'onde nait sous le doigt (choisi a l'ecran le 2026-09-20).
-				poserOnde(auto);
-				host.ui.setIcon(ajouter(auto, "span", "qbd-btn-icon"), "download");
-				/* PLUS de phrase sous le bouton (2026-09-18) : la confirmation
-				   NATIVE que l'hôte ouvre juste après disait déjà les deux
-				   mêmes choses — « Neo Quiz va ouvrir PowerShell et y lancer
-				   l'installation officielle de X » et « vous verrez tout ce que
-				   fait l'installateur » (`app.installCli.message` et
-				   `.detail`). La lire deux fois à deux secondes d'intervalle ne
-				   rassurait pas, ça encombrait. */
-				ajouter(auto, "span", undefined, t("ai.install.auto"));
-				auto.addEventListener("click", async () => {
-					auto.disabled = true;
-					/* Un rejet du pont (outil hors liste blanche, panne de l'IPC) laissait
-					   jusqu'ici le bouton inactif sans un mot : on le traite comme le
-					   verdict « indisponible ». */
-					let verdict: "lance" | "annule" | "indisponible";
+				const ouvrir = ajouter(li1, "button", "qbd-btn qbd-install-terminal");
+				ouvrir.type = "button";
+				host.ui.setIcon(ajouter(ouvrir, "span", "qbd-btn-icon qbd-btn-icon--sm"), "terminal");
+				ajouter(ouvrir, "span", undefined, t("ai.install.openTerminal"));
+				ouvrir.addEventListener("click", async () => {
+					ouvrir.disabled = true;
+					let verdict: "lance" | "indisponible" = "indisponible";
 					try {
-						/* La modale mesure la place qu'elle AURA une fois remontée
-						   (sans bouger encore) : c'est là que le terminal se posera.
-						   Elle ne remonte qu'au signal `surTerminalPose`, quand la
-						   fenêtre est en place — remontée dès le clic, elle serait
-						   en hauteur sans raison (Ahmed, 2026-09-20). */
-						desabonnerPose = host.process!.surTerminalPose?.(() => {
-							m.panelEl.classList.add(CLASSE_MODALE_HAUT);
-							desabonnerPose?.();
-							desabonnerPose = null;
-						}) ?? null;
-						/* LES DEUX COLONNES : le navigateur de la connexion à gauche,
-						   Neo Quiz à droite — la modale a rétréci, le terminal la
-						   suit (Ahmed, 2026-09-20). */
-						desabonnerNav = host.process!.surNavigateurOuvert?.(() => {
-							void ancreApresRelayout(m.panelEl).then(a => host.process?.replacerTerminal?.(a));
-						}) ?? null;
-						verdict = await host.process!.installerCli(OUTILS[deps.provider], ancreRemontee(m.panelEl));
+						verdict = await host.process!.openTerminal();
 					} catch (e) {
-						console.warn(LOG_PREFIX, "installation impossible:", e);
-						auto.disabled = false;
-						host.ui.notice(t("ai.install.terminalFailed"));
-						manuelOuvert?.();
-						return;
+						console.warn(LOG_PREFIX, "terminal not opened:", e);
 					}
-					if (verdict === "annule") { auto.disabled = false; desabonnerPose?.(); desabonnerPose = null; return; }
-					if (verdict === "indisponible") {
-						auto.disabled = false;
-						host.ui.notice(t("ai.install.terminalFailed"));
-						manuelOuvert?.();
-						return;
-					}
-					m.panelEl.dataset.state = "en-cours";
-					etat.replaceChildren();
-					ajouter(etat, "span", "qbd-install-spinner");
-					ajouter(etat, "span", undefined, t("ai.install.running"));
-					sonde = window.setInterval(() => {
-						void deps.probe().then(async (res) => {
-							if (!res.ok || sonde === null) return;
-							couperSonde();
-							await deps.onDetected();
-							detecte = true;
-							/* LE TERMINAL N'A PAS FINI quand le binaire apparaît : il
-							   enchaîne la CONNEXION du compte. Ce n'est plus CE modal
-							   qui l'attend (il le disait par une ligne d'état, jusqu'au
-							   2026-09-20) : il montre sa coche et se ferme, et c'est la
-							   modale « En attente de la connexion » de la page qui prend
-							   la suite, à la même place — celle qui sonde le compte et
-							   dit quand il est vu (Ahmed : « le modal Waiting for
-							   sign-in doit apparaître au moment où c'est installé »). */
-							m.panelEl.dataset.state = "detecte";
-							etat.replaceChildren();
-							host.ui.setIcon(ajouter(etat, "span", "qbd-install-check"), "check");
-							ajouter(etat, "span", undefined, res.version
-								? t("ai.install.detected", { name, version: res.version })
-								: t("ai.install.detectedNoVersion", { name }));
-							/* Le modal se ferme SEUL, une seconde et demie après la coche
-							   (demande d'Ahmed, 2026-09-19) : l'utilisateur l'a ouvert
-							   pour UTILISER cet outil, pas pour cliquer « Continuer ».
-							   La page reprend aussitôt — fournisseur choisi, compte déjà
-							   connecté par le terminal. */
-							window.setTimeout(() => m.close(), 1500);
-						});
-					}, SONDE_MS);
+					ouvrir.disabled = false;
+					if (verdict !== "lance") host.ui.notice(t("ai.install.terminalFailed"));
 				});
 			}
-
-			/* La voie manuelle : repliée sous Windows (le bouton fait le travail),
-			   ouverte et seule ailleurs. `renderCollapsibleSection` veut un état de
-			   repli ; ici il est local au modal, jamais persisté.
-
-			   `defaultOpen: false` — jamais `ouvert` : `wireCollapseToggle` calcule
-			   `collapsed = defaultOpen ? isExpanded(key) : !isExpanded(key)`.
-			   Avec `isExpanded: () => ouvert` (true = ouvert), passer `ouvert` ici
-			   inverserait la lecture ; `false` donne `collapsed = !ouvert`, ce
-			   qu'on veut. */
-			let ouvert = !(win && host.process);
-			const corps = renderCollapsibleSection(
-				{ isExpanded: () => ouvert, toggleExpanded: () => { ouvert = !ouvert; } },
-				c, "install-manual", t("ai.install.manual"), 4, { defaultOpen: false, rowClass: "qbd-install-manual-row" },
-			);
-			manuelOuvert = () => {
-				if (ouvert) return;
-				(c.querySelector(".qbd-install-manual-row .qbd-quizzes-node-head") as HTMLButtonElement | null)?.click();
-			};
-			const etapes = ajouter(corps, "ol", "qbd-install-steps");
-			ajouter(etapes, "li", undefined, t(win ? "ai.install.step1" : "ai.install.step1Unix"));
 			const li2 = ajouter(etapes, "li", undefined, t("ai.install.step2"));
 			const cmd = installCmd(deps.provider, win);
 			const bloc = ajouter(li2, "div", "qbd-install-code markdown-rendered markdown-preview-view");
 			if (deps.renderCodeBlock) deps.renderCodeBlock(bloc, cmd.code, cmd.lang);
 			else colorerCommande(ajouter(ajouter(bloc, "pre"), "code", "language-" + cmd.lang), cmd.code);
-			/* DANS le bloc, en haut à droite, et révélé au survol : le geste
-			   d'Obsidian et de tous les blocs de code qu'on connaît. Sous le
-			   bloc, il chevauchait son icône et son libellé débordait — une
-			   largeur d'`inline-block` trop courte pour son contenu. Ici il est
-			   positionné, donc sa taille ne contraint plus rien. */
+			/* INSIDE the block, top right, revealed on hover: the gesture of
+			   Obsidian and of every code block people know. Under the block it
+			   overlapped the icon and its label overflowed. Here it is
+			   positioned, so its size no longer constrains anything. */
 			const copier = ajouter(bloc, "button", "qbd-btn qbd-install-copy");
 			copier.type = "button";
 			const copierIcone = ajouter(copier, "span", "qbd-btn-icon qbd-btn-icon--sm");
 			host.ui.setIcon(copierIcone, "copy");
-			/* L ICONE SEULE : le mot doublait un pictogramme que tout le monde
-			   connaît, dans un coin où la place est comptée. Le libellé survit HORS
-			   ECRAN — un bouton sans nom accessible est muet pour un lecteur
-			   d écran — et c est lui qui dit « Copié » après le clic. */
+			/* THE ICON ALONE: the word doubled a pictogram everyone knows, in a
+			   corner where room is tight. The label survives OFF SCREEN (a
+			   button without an accessible name is mute for a screen reader)
+			   and it is what says "Copied" after the click. */
 			const copierTexte = ajouter(copier, "span", "qbd-sr-only", t("ai.install.copy"));
 			copier.addEventListener("click", async () => {
-				/* Par l'hôte dès qu'il sait copier : dans la fenêtre de l'app,
-				   `navigator.clipboard` est refusé par le principal et échouerait
-				   en silence — c'est pourquoi `copyText` existe. */
+				/* Through the host whenever it can copy: in the app window,
+				   `navigator.clipboard` is refused by the main process and would
+				   fail silently, which is why `copyText` exists. */
 				const ok = deps.copyText
 					? await deps.copyText(cmd.code)
 					: await navigator.clipboard.writeText(cmd.code).then(() => true, () => false);
 				if (!ok) return;
-				/* La confirmation porte sur les DEUX : l'icône seule changeait
-				   pendant que le mot « Copier » restait, ce qui se lit comme une
-				   invitation à recliquer. Le bouton reste visible tant qu'elle
-				   dure (`data-copie`), même si la souris a quitté le bloc. */
+				/* The confirmation covers BOTH: the icon alone changed while the
+				   word "Copy" stayed, which reads as an invitation to click
+				   again. The button stays visible while it lasts (`data-copie`),
+				   even if the mouse left the block. */
 				copierIcone.replaceChildren();
 				host.ui.setIcon(copierIcone, "check");
 				copierTexte.textContent = t("ai.install.copied");
@@ -276,16 +217,40 @@ export function openInstallModal(deps: InstallModalDeps): void {
 			ajouter(etapes, "li", undefined, t(`ai.install.step3.${deps.provider}`));
 			ajouter(etapes, "li", undefined, t("ai.install.step4"));
 
+			if (win) renderHelp(c, deps.provider);
+
+			/* The state row: a spinner while the probe waits, a check when the
+			   tool is seen. */
+			const etat = ajouter(c, "div", "qbd-install-state");
+			ajouter(etat, "span", "qbd-install-spinner");
+			ajouter(etat, "span", undefined, t("ai.install.waiting"));
+
 			const lien = ajouter(c, "a", "qbd-install-learn", t("ai.install.learnMore"));
 			lien.href = DOCS[deps.provider];
 			lien.target = "_blank";
 			lien.rel = "noopener";
+
+			sonde = window.setInterval(() => {
+				void deps.probe().then(async (res) => {
+					if (!res.ok || sonde === null) return;
+					couperSonde();
+					await deps.onDetected();
+					detecte = true;
+					/* The window shows its check and closes: the page takes over
+					   (the sign-in wait, for the tools that have an account). */
+					m.panelEl.dataset.state = "detecte";
+					etat.replaceChildren();
+					host.ui.setIcon(ajouter(etat, "span", "qbd-install-check"), "check");
+					ajouter(etat, "span", undefined, res.version
+						? t("ai.install.detected", { name, version: res.version })
+						: t("ai.install.detectedNoVersion", { name }));
+					/* It closes BY ITSELF, a second and a half after the check: the
+					   user opened it to USE this tool, not to click "Continue". */
+					window.setTimeout(() => m.close(), 1500);
+				});
+			}, SONDE_MS);
 		},
 		onClose: () => {
-			desabonnerPose?.();
-			desabonnerPose = null;
-			desabonnerNav?.();
-			desabonnerNav = null;
 			couperSonde();
 			deps.onClose(detecte);
 		},

@@ -126,7 +126,7 @@ const pont: Pont = {
 		lireCache: tool => ipcRenderer.invoke(CANAUX.processusLireCache, tool),
 		ollamaInstalle: () => ipcRenderer.invoke(CANAUX.processusOllamaInstalle),
 		demarrerOllama: () => ipcRenderer.invoke(CANAUX.processusDemarrerOllama),
-		installer: (tool, ancre) => ipcRenderer.invoke(CANAUX.processusInstaller, tool, ancre),
+		openTerminal: () => ipcRenderer.invoke(CANAUX.processusOpenTerminal),
 		connecter: (tool, ancre) => ipcRenderer.invoke(CANAUX.processusConnecter, tool, ancre),
 		attendreFinTerminal: () => ipcRenderer.invoke(CANAUX.processusAttendreFinTerminal),
 		surTerminalPose(rappel) {

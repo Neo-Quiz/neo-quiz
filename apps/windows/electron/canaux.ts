@@ -52,7 +52,7 @@ import { t } from "../../../src/i18n";
 import { validerReglagesIa } from "./garde-ia";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptInstallation, scriptUsageTerminal } from "./process";
+import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
 import { deconnecterCompte, etatComptes, usageCompte } from "./comptes";
 import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
@@ -1018,18 +1018,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.processusOllamaInstalle, () => ollamaInstalle());
 	ipcMain.handle(CANAUX.processusDemarrerOllama, () => demarrerOllama());
 
-	/* ─── INSTALLER UN CLI ───
-	   Même porte que `processusRun` : le NOM est jugé avant tout, la recette
-	   est celle de `process.ts`, et une confirmation NATIVE — rédigée ici, sur
-	   la langue posée par `main.ts` — précède le lancement, comme pour l'hôte
-	   Ollama des réglages. `cancelId` = refus : fermer la boîte, c'est dire
-	   non. Le bouton par défaut est ANNULER (`defaultId: 1`), comme la porte
-	   de l'hôte Ollama juste au-dessus : une frappe réflexe sur Entrée ne doit
-	   pas lancer un script d'installation distant. Hors Windows,
-	   `indisponible` sans rien lancer : le modal du rendu montre alors les
-	   étapes manuelles. */
 	const NOMS_OUTILS: Record<Outil, string> = { claude: "Claude Code", codex: "Codex CLI", ollama: "Ollama", agy: "Antigravity CLI" };
-	const SOURCES_OUTILS: Record<Outil, string> = { claude: "claude.ai/install.ps1", codex: "chatgpt.com/codex/install.ps1", ollama: "winget (Ollama.Ollama)", agy: "antigravity.google/cli/install.ps1" };
 	/* ─── LE TERMINAL JUSTE SOUS LA MODALE, DANS NEO QUIZ ───
 	   Neo Quiz ne bouge plus (la disposition gauche/droite du matin a été
 	   écartée : Ahmed, 2026-09-20, « on ne fait aucune des deux options »).
@@ -1142,7 +1131,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	/* LA MODALE A BOUGÉ (Neo Quiz vient de passer à droite) : le rendu renvoie
 	   son nouveau rectangle, et le terminal est reposé dessous. Même lecture
-	   champ par champ que l'ancre d'`installer`. */
+	   champ par champ que l'ancre de `connecter`. */
 	ipcMain.handle(CANAUX.processusReplacerTerminal, (_e, ancre: unknown) => {
 		/* Une préparation attend cette mesure pour LANCER le terminal : elle
 		   la prend, et rien n'est encore à replacer. */
@@ -1209,48 +1198,18 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		return "lance";
 	});
 
-	ipcMain.handle(CANAUX.processusInstaller, async (_e, tool: unknown, ancre: unknown): Promise<"lance" | "annule" | "indisponible"> => {
-		if (!estOutilAutorise(tool)) {
-			console.warn(LOG_PREFIX, "installation refusée, outil hors liste:", tool);
-			throw erreurCli("refuse", "outil hors liste : " + String(tool));
-		}
-		if (process.platform !== "win32") return "indisponible";
-		const name = NOMS_OUTILS[tool];
-		const options = {
-			type: "question" as const,
-			title: t("app.installCli.title", { name }),
-			message: t("app.installCli.message", { name }),
-			detail: t("app.installCli.detail", { source: SOURCES_OUTILS[tool] }),
-			buttons: [t("app.installCli.run"), t("app.installCli.cancel")],
-			defaultId: 1,
-			cancelId: 1,
-		};
-		const parent = deps.fenetreCourante();
-		const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-		if (response !== 0) return "annule";
-		const titre = PRODUCT_NAME + " - " + name;
-		const messages = {
-			succes: t("app.installCli.done", { name }),
-			echec: t("app.connectCli.failed", { name }),
-			echecInstallation: t("app.installCli.failed", { name }),
-			reessai: t("app.installCli.retry"),
-		};
-		/* Les colonnes D'ABORD (le navigateur finira par s'ouvrir), puis le
-		   terminal sous la modale remesurée. */
-		const place = await preparerColonnes(lireAncre(ancre));
-		if (!lancerTerminal(titre, scriptInstallation(tool, titre, messages))) return "indisponible";
-		disposerAvecTerminal(titre, place);
-		return "lance";
-	});
+	/* ─── OPEN A PLAIN TERMINAL ───
+	   The "Open a terminal" button of the manual install path (2026-09-30). It
+	   takes NO argument: no name, no command, no path comes from the renderer,
+	   so a compromised renderer can only obtain an empty PowerShell window under
+	   the user's eyes, never a command run. Not Windows: `indisponible`. */
+	ipcMain.handle(CANAUX.processusOpenTerminal, (): "lance" | "indisponible" => openPlainTerminal() ? "lance" : "indisponible");
 
 	/* ─── CONNECTER UN CLI ───
 	   Même porte, même jugement du nom, et SANS confirmation native : cet
 	   appel ne télécharge rien et n'exécute aucun script distant — il lance
 	   `codex login` / `claude auth login`, un exécutable déjà présent et déjà
-	   sur la liste blanche. La confirmation d'`installer` garde un `irm | iex` ;
-	   la recopier ici ferait payer à l'utilisateur, pour une fenêtre de
-	   connexion qu'il vient lui-même de demander, le prix d'un risque qui n'est
-	   pas là. `scriptConnexion` rend `null` pour Ollama, dont le compte se
+	   sur la liste blanche. `scriptConnexion` rend `null` pour Ollama, dont le compte se
 	   connecte par le navigateur (`/api/me` rend l'adresse, voir
 	   `ai-providers.ts`). */
 	ipcMain.handle(CANAUX.processusConnecter, async (_e, tool: unknown, ancre: unknown): Promise<"lance" | "annule" | "indisponible"> => {

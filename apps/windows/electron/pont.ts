@@ -508,17 +508,13 @@ export interface Pont {
 		lireCache(tool: "claude" | "codex"): Promise<{ mtimeMs: number; json: unknown; catalogue?: unknown } | null>;
 		ollamaInstalle(): Promise<boolean>;
 		demarrerOllama(): Promise<boolean>;
-		/** Ouvre un terminal VISIBLE qui installe l'outil puis y connecte le
-		    compte : `HostProcess.installerCli` vu du rendu. Le NOM est ce qui
-		    traverse — jamais un chemin ni une recette — et `canaux.ts` le juge
-		    par `estOutilAutorise` avant toute autre chose, comme `run`. Une
-		    confirmation NATIVE du principal précède le lancement, écrite et
-		    traduite là-bas (comme pour l'hôte Ollama des réglages) : un rendu
-		    compromis ne peut ni la formuler ni y répondre. */
-		installer(tool: Outil, ancre?: AncreTerminal): Promise<"lance" | "annule" | "indisponible">;
+		/** `HostProcess.openTerminal` as seen from the renderer: opens a plain
+		    PowerShell window in the home folder and runs nothing. NO argument
+		    crosses: no name, no command, no path. */
+		openTerminal(): Promise<"lance" | "indisponible">;
 		/** Ouvre un terminal VISIBLE qui connecte le compte d'un outil DÉJÀ
-		    installé : `HostProcess.connecterCli` vu du rendu. Même porte et
-		    même jugement du nom qu'`installer`, mais SANS confirmation native :
+		    installé : `HostProcess.connecterCli` vu du rendu. Le NOM est jugé par
+		    `estOutilAutorise` avant toute autre chose, SANS confirmation native :
 		    rien n'est téléchargé ni exécuté depuis le réseau, seul part un
 		    exécutable qui est déjà sur la liste blanche. Ce qu'un rendu
 		    compromis obtiendrait ici, c'est une fenêtre de connexion ouverte
@@ -795,7 +791,7 @@ export const CANAUX = {
 	processusLireCache: "neo:process/lire-cache",
 	processusOllamaInstalle: "neo:process/ollama-installe",
 	processusDemarrerOllama: "neo:process/demarrer-ollama",
-	processusInstaller: "neo:process/installer",
+	processusOpenTerminal: "neo:process/open-terminal",
 	processusConnecter: "neo:process/connecter",
 	processusAttendreFinTerminal: "neo:process/attendre-fin-terminal",
 	/** POUSSÉ par le principal (`webContents.send`), comme `evenement` et

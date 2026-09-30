@@ -582,31 +582,27 @@ export interface HostProcess {
 	    best-effort : `false` quand rien n'a pu être lancé. L'appelant constate
 	    le résultat en interrogeant le serveur, pas ici. */
 	demarrerOllama(): Promise<boolean>;
-	/** Ouvre un terminal VISIBLE qui installe l'outil puis y connecte le
-	    compte (recette fixe de l'hôte). `lance` : le terminal est parti, c'est
-	    la sonde de l'appelant (`checkClaudeCode`…) qui constatera le résultat ;
-	    `annule` : l'utilisateur a refusé la confirmation de l'hôte ;
-	    `indisponible` : l'hôte ne sait pas ouvrir de terminal (hors Windows)
-	    ou le lancement a échoué. */
-	installerCli(tool: CliTool, ancre?: AncreTerminal): Promise<"lance" | "annule" | "indisponible">;
+	/** Opens a plain PowerShell window in the user's home folder and runs
+	    NOTHING in it (2026-09-30): the manual install path of the install
+	    window ("Open a terminal"), where the user pastes the command shown
+	    there. It takes NO argument on purpose: no name, no command, no path
+	    crosses from the renderer, so the capability cannot run anything. `lance`:
+	    the window was opened; `indisponible`: the host cannot open a terminal
+	    (not Windows) or the launch failed. */
+	openTerminal(): Promise<"lance" | "indisponible">;
 	/** Ouvre un terminal VISIBLE qui CONNECTE le compte d'un outil DÉJÀ
-	    installé (`codex login`, `claude auth login`). Mêmes verdicts
-	    qu'`installerCli`, et même règle : le rendu n'envoie qu'un NOM, jugé
-	    par l'hôte ; la recette vit chez lui.
-
-	    POURQUOI UN MEMBRE À PART et non un drapeau d'`installerCli` : les deux
-	    recettes n'ont ni la même surface ni le même risque. Installer TÉLÉCHARGE
-	    puis EXÉCUTE un script distant (`irm … | iex`), ce que l'hôte fait
-	    précéder d'une confirmation native ; connecter ne lance qu'un exécutable
-	    déjà présent et déjà sur la liste blanche. Les fondre demanderait à
-	    l'appelant de savoir laquelle des deux il déclenche, et c'est
-	    précisément ce que le nom de la méthode doit dire.
+	    installé (`codex login`, `claude auth login`). Verdicts : `lance`,
+	    `annule`, `indisponible`. Le rendu n'envoie qu'un NOM, jugé par l'hôte ;
+	    la recette vit chez lui. Connecter ne lance qu'un exécutable déjà
+	    présent et déjà sur la liste blanche (l'installation automatique, qui
+	    téléchargeait puis exécutait un script distant, n'existe plus depuis le
+	    2026-09-30).
 
 	    `ollama` n'a pas de compte : l'hôte rend `indisponible` plutôt que
 	    d'ouvrir un terminal sur rien. */
 	connecterCli(tool: CliTool, ancre?: AncreTerminal): Promise<"lance" | "annule" | "indisponible">;
 	/** Rend la main quand la fenêtre du DERNIER terminal lancé par
-	    `installerCli` ou `connecterCli` a disparu — tout de suite s'il n'y en
+	    `connecterCli` a disparu — tout de suite s'il n'y en
 	    a pas, ou s'il n'a jamais été trouvé. C'est ce que le modal
 	    d'installation attend pour se fermer : détecter le binaire ne suffit
 	    pas, le terminal enchaîne la CONNEXION du compte juste après, et un

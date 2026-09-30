@@ -123,7 +123,6 @@ export const EN_APP = {
 	"app.comptes.install": "Install",
 	"app.comptes.connect": "Sign in",
 	"app.comptes.disconnect": "Sign out",
-	"app.comptes.installFailed": "Could not install {name}.",
 	"app.comptes.connectFailed": "Could not sign in to {name}.",
 	"app.comptes.logoutTitle": "Sign out of {name}?",
 	"app.comptes.logoutMessage": "Neo Quiz will sign this account out of {name}.",
@@ -218,14 +217,6 @@ export const EN_APP = {
 	"app.fond.effetsNonEcrits": "The wallpaper brightness and blur could not be saved.",
 
 	/* ── Installer un CLI depuis l'app : la confirmation NATIVE du principal ── */
-	"app.installCli.title": "Install {name}?",
-	"app.installCli.message": "Neo Quiz will open PowerShell and run the official {name} installer there.",
-	"app.installCli.detail": "Source: {source}. You will see everything the installer does. The window closes by itself when it is done.",
-	"app.installCli.run": "Open PowerShell and install",
-	"app.installCli.cancel": "Cancel",
-	"app.installCli.retry": "The service did not answer. Trying again in 30 seconds…",
-	"app.installCli.done": "{name} is set up. Back to Neo Quiz…",
-	"app.installCli.failed": "Installing {name} failed. Close this window and try again from Neo Quiz, or follow the manual steps there.",
 	"app.connectCli.done": "{name} is connected. Back to Neo Quiz…",
 	"app.connectCli.failed": "Signing in to {name} failed. Close this window and try again from Neo Quiz.",
 } as const;

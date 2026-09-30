@@ -767,7 +767,7 @@ function installerPont(fichiers = {}, perimetre = null) {
 			},
 			async ollamaInstalle() { journal.push(["processus.ollamaInstalle"]); return true; },
 			async demarrerOllama() { journal.push(["processus.demarrerOllama"]); return true; },
-			async installer(tool, ancre) { journal.push(["processus.installer", tool, ancre]); return "lance"; },
+			async openTerminal(...args) { journal.push(["processus.openTerminal", ...args]); return "lance"; },
 			surTerminalPose(rappel) { journal.push(["processus.surTerminalPose"]); poseDuTerminal = rappel; return () => journal.push(["processus.surTerminalPose:off"]); },
 			surCachesCli(rappel) { journal.push(["processus.surCachesCli"]); cachesCli = rappel; return () => journal.push(["processus.surCachesCli:off"]); },
 		},
@@ -1982,12 +1982,11 @@ await withSrcModule("apps/windows/src/host/process.ts", async ({ createWindowsPr
 				appels: ["processus.lireCache:codex", "processus.ollamaInstalle", "processus.demarrerOllama"],
 			});
 
-		/* L'ANCRE traverse avec le nom : c'est le rectangle SOUS LEQUEL le
-		   principal pose la fenêtre du terminal (la modale mesurée remontée).
-		   Rien d'autre ne traverse, et un appel sans ancre reste valide. */
-		r.check("installerCli relaie le NOM de l'outil et son ANCRE au canal, et rend son verdict",
-			{ verdict: await processus.installerCli("claude", { x: 1, y: 2, largeur: 3, hauteur: 4 }), appel: pont.journal.find(l => l[0] === "processus.installer") },
-			{ verdict: "lance", appel: ["processus.installer", "claude", { x: 1, y: 2, largeur: 3, hauteur: 4 }] });
+		/* "Open a terminal" (2026-09-30): the call reaches the bridge with NO
+		   argument at all, whatever the caller passes, and returns its verdict. */
+		r.check("openTerminal : no argument crosses the bridge, the verdict comes back",
+			{ verdict: await processus.openTerminal("claude", { x: 1 }), appel: pont.journal.find(l => l[0] === "processus.openTerminal") },
+			{ verdict: "lance", appel: ["processus.openTerminal"] });
 		/* `surTerminalPose` : l'abonnement descend au pont, et le rappel du
 		   principal remonte tel quel — c'est lui qui fait remonter la modale. */
 		{

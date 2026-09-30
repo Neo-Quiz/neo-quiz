@@ -21,6 +21,9 @@ release notes.
 ### Changed
 - The "Generated quizzes" folder leaves the Folders grid for a button in the top bar, with its quiz count; it can no longer be renamed, archived, moved or deleted.
 
+### Removed
+- The automatic installation of Claude Code, Codex, Antigravity and Ollama: the install window shows the official command to copy, a button to open a terminal, and help when it fails.
+
 ### Fixed
 - The documents list of a folder no longer crushes its rows when it has more than eight files.
 - A folder with no quiz yet keeps the exams you add to its review plan, and shows the ones it already had.

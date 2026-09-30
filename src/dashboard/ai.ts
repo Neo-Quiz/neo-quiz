@@ -12,7 +12,7 @@ import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-g
 import { creerVueFile } from "./file-generation-vue";
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
-import { ajouter, CLASSE_MODALE_HAUT } from "../dom";
+import { ajouter } from "../dom";
 import { attachHoverTip } from "./hover-tip";
 import { openConfirmModal } from "../editor/modals";
 import { LOG_PREFIX } from "../branding";
@@ -85,7 +85,6 @@ type Phase = "idle" | "result" | "error" | "connexion" | "web";
 type OutilCompte = "claude" | "codex" | "ollama" | "agy";
 /** L'identifiant de fournisseur de chaque outil à compte, et l'inverse. */
 const ID_DE_OUTIL: Record<OutilCompte, string> = { claude: "claude-code", codex: "codex", ollama: "ollama", agy: "antigravity-cli" };
-const OUTIL_DE_ID: Record<string, OutilCompte> = { "claude-code": "claude", codex: "codex", ollama: "ollama", "antigravity-cli": "agy" };
 
 /** Le pas de la sonde de connexion, le même que celui du modal
     d'installation : trois secondes, assez court pour que la détection semble
@@ -515,7 +514,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	 * phase — et, fermée par l'UTILISATEUR (Échap, fond, croix), elle appelle
 	 * `annuler`. `interne` distingue les deux fermetures.
 	 */
-	function creerModalePhase(spec: { phase: Phase; className: string; rendre: (corps: HTMLElement) => void; annuler: () => void; ouverte?: (m: HostModalHandle) => void }): () => void {
+	function creerModalePhase(spec: { phase: Phase; className: string; rendre: (corps: HTMLElement) => void; annuler: () => void }): () => void {
 		let modale: HostModalHandle | null = null;
 		let corps: HTMLElement | null = null;
 		let interne = false;
@@ -524,7 +523,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				if (!modale) {
 					modale = requireHost("modals").open({
 						className: spec.className,
-						onOpen: (m) => { corps = m.contentEl; poserCroixAnnuler(m); spec.ouverte?.(m); },
+						onOpen: (m) => { corps = m.contentEl; poserCroixAnnuler(m); },
 						onClose: () => {
 							modale = null;
 							corps = null;
@@ -2554,24 +2553,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				if (settings().aiProvider === id) return;
 				await saveSettings({ aiProvider: id, aiModel: aiProviders.getProvider(id).defaultModel });
 			},
-			onClose: (detecte) => {
+			/* Statuses and hints are re-read. No sign-in wait is chained any
+			   more (2026-09-30): it was the automatic install's terminal that
+			   signed in, and there is none. If the tool is not signed in, the
+			   page shows its usual "Sign in" hint. */
+			onClose: () => {
 				rafraichir();
 				render(containerRef);
-				/* Après une installation AUTOMATIQUE, le terminal enchaîne déjà sur
-				   la connexion (process.ts) : la page passe directement en
-				   « En attente de la connexion », sans un clic de plus. Sauf pour
-				   Ollama, dont le compte passe par le navigateur : là, c'est le
-				   hint qui le propose (on n'ouvre pas un site sans un clic). */
-				if (!detecte || id === "ollama") return;
-				const tool = OUTIL_DE_ID[id] as "claude" | "codex" | "agy";
-				/* LE TERMINAL EST DÉJÀ POSÉ sous la place remontée : la modale
-				   d'attente doit s'ouvrir remontée, sans transition, à la place
-				   exacte que le modal d'installation vient de quitter. */
-				attenteSousTerminal = true;
-				void aiProviders.sondeConnexion(tool)().then(connecte => {
-					if (!connecte && !disposed && (settings().aiProvider || "") === id) attendreCompte(tool, "hint");
-					else attenteSousTerminal = false;
-				});
 			},
 			copyText: deps.copyText,
 			renderCodeBlock: deps.renderCodeBlock,
@@ -2719,8 +2707,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   CLI lui-même : il n'a AUCUNE sonde de connexion non interactive (ses
 		   identifiants vont au gestionnaire d'identifiants Windows), donc pas
 		   de `verifierCompte` ici. Un compte non connecté se découvre à la
-		   génération, où le message dit quoi faire ; la connexion elle-même est
-		   enchaînée par le terminal d'installation. */
+		   génération, où le message dit quoi faire ; the sign-in itself goes
+		   through the "Sign in" hint once the tool is installed. */
 		aiProviders.checkAntigravity(force).then(res => {
 			if (res.ok) {
 				setStatus("antigravity-cli", providerSelect, "ok", t("ai.status.antigravityOk", { version: res.version }));
@@ -3232,9 +3220,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (tool === "ollama") attendreCompte(tool, origine);
 	}
 
-	/** La carte d'attente et sa sonde, jusqu'à ce que le compte soit vu. Séparée
-	    de `demarrerConnexion` parce qu'après une installation automatique le
-	    terminal est DÉJÀ ouvert sur la connexion : on attend sans rien lancer. */
+	/** The wait card and its probe, until the account is seen. Split from
+	    `demarrerConnexion` so the wait can start BEFORE the terminal is launched
+	    (the modal is measured first; the terminal is placed under it). */
 	function attendreCompte(tool: OutilCompte, origine: "erreur" | "hint"): void {
 		couperSondeConnexion();
 		/* Le hint « pas connecté » a pu être posé juste AVANT l'attente (sonde
@@ -3312,22 +3300,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/* Les deux modales de phase de la page (la génération n'en a plus : elle
 	   passe par la file) : connexion (fermer = annuler l'attente),
 	   erreur (fermer = reprendre la demande dans le composer). */
-	/* Vrai quand un terminal est déjà posé sous la place remontée : la modale
-	   d'attente s'ouvre alors DÉJÀ remontée (classe posée à l'ouverture, sans
-	   transition), pour reprendre exactement la place du modal
-	   d'installation qui vient de se fermer. */
-	let attenteSousTerminal = false;
 	const syncLoginModal = creerModalePhase({
 		phase: "connexion", className: "qbd-web-wait-modal qbd-login-wait-modal",
 		rendre: renderConnexion, annuler: annulerConnexion,
-		ouverte: (m) => {
-			if (!attenteSousTerminal) return;
-			attenteSousTerminal = false;
-			m.panelEl.style.transition = "none";
-			m.panelEl.classList.add(CLASSE_MODALE_HAUT);
-			void m.panelEl.offsetHeight;
-			m.panelEl.style.transition = "";
-		},
 	});
 	const syncErrorModal = creerModalePhase({
 		phase: "error", className: "qbd-web-wait-modal qbd-error-modal",

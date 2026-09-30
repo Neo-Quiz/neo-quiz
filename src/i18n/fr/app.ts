@@ -78,7 +78,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.comptes.install": "Installer",
 	"app.comptes.connect": "Se connecter",
 	"app.comptes.disconnect": "Se déconnecter",
-	"app.comptes.installFailed": "Impossible d'installer {name}.",
 	"app.comptes.connectFailed": "Impossible de se connecter à {name}.",
 	"app.comptes.logoutTitle": "Se déconnecter de {name} ?",
 	"app.comptes.logoutMessage": "Neo Quiz déconnectera ce compte de {name}.",
@@ -150,14 +149,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.fond.pixels": "{n} px",
 	"app.fond.effetsNonEcrits": "La luminosité et le flou du fond n'ont pas pu être enregistrés.",
 
-	"app.installCli.title": "Installer {name} ?",
-	"app.installCli.message": "Neo Quiz va ouvrir PowerShell et y lancer l'installation officielle de {name}.",
-	"app.installCli.detail": "Source : {source}. Vous verrez tout ce que fait l'installateur. La fenêtre se ferme d'elle-même quand c'est terminé.",
-	"app.installCli.run": "Ouvrir PowerShell et installer",
-	"app.installCli.cancel": "Annuler",
-	"app.installCli.retry": "Le service n’a pas répondu. Nouvelle tentative dans 30 secondes…",
-	"app.installCli.done": "{name} est installé. Retour dans Neo Quiz…",
-	"app.installCli.failed": "L'installation de {name} a échoué. Fermez cette fenêtre et réessayez depuis Neo Quiz, ou suivez-y les étapes manuelles.",
 	"app.connectCli.done": "{name} est connecté. Retour dans Neo Quiz…",
 	"app.connectCli.failed": "La connexion à {name} a échoué. Fermez cette fenêtre et réessayez depuis Neo Quiz.",
 };
