@@ -128,6 +128,16 @@ export function renderModuleCard(
 	}
 
 	card.addEventListener("click", () => onOpen(group));
+	// Keyboard: the card is a button; Enter/Space open it like a click. Only
+	// when the card itself has focus, so the menu button keeps its own keys.
+	card.tabIndex = 0;
+	card.setAttribute("role", "button");
+	card.setAttribute("aria-label", group.name || t("dashboard.quizzes.noFolder"));
+	card.addEventListener("keydown", (e) => {
+		if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+		e.preventDefault();
+		onOpen(group);
+	});
 	return card;
 }
 

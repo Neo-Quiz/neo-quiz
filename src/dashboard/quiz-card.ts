@@ -246,6 +246,16 @@ export function renderQuizCard(
 	card.addEventListener("click", () => {
 		if (typeof onOpen === "function") onOpen(quiz);
 	});
+	// Keyboard: same as a click, only when the card itself has focus (its
+	// inner buttons keep their own keys).
+	card.tabIndex = 0;
+	card.setAttribute("role", "button");
+	card.setAttribute("aria-label", quiz.title);
+	card.addEventListener("keydown", (e) => {
+		if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+		e.preventDefault();
+		if (typeof onOpen === "function") onOpen(quiz);
+	});
 
 	return card;
 }

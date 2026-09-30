@@ -1658,3 +1658,11 @@
 	.qbd-drop-zone,
 	.qbd-drop-zone-icon { transition: none; }
 }
+
+/* Keyboard focus ring of the folder and quiz cards (same ring as the
+   question cards of a quiz page). */
+.qbd-module-card:focus-visible,
+.qbd-quiz-card.qbd-quiz-card--folder:focus-visible {
+	outline: 2px solid var(--quiz-primary);
+	outline-offset: 2px;
+}

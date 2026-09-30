@@ -290,6 +290,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	/* La fiche d'un quiz (detail-fiche.ts). */
 	"dashboard.fiche.part": "Partie {n}",
 	"dashboard.fiche.editQuestion": "Modifier la question {n}",
+	"dashboard.fiche.editReading": "Modifier la lecture : {title}",
 	"dashboard.fiche.search": "Rechercher",
 	"dashboard.fiche.type.equation": "Équation",
 	"dashboard.fiche.type.programOutput": "Sortie de programme",

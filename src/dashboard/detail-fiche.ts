@@ -13,7 +13,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { questionText } from "./detail-io";
 import { texteQuizHtml } from "../editor/question-preview";
 import { codeClozeHtml, fillSlots, markSlots, protectCodeSlots, restoreCodeSlots } from "../engine/cloze";
-import { renderInlineText } from "../engine/sanitizer";
+import { renderInlineText, stripInlineMarkdown } from "../engine/sanitizer";
 import { reinitialiserBudgetRendu } from "../engine/code-highlight";
 import { quizModeIcon, quizModeLabel, quizModeTip, renderQuizTypeIcon } from "./quiz-card";
 import { setBrandLogo } from "./ai-providers";
@@ -425,7 +425,7 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 	const numeros = numerosAffiches(deps.questions, deps.lecon);
 	for (const i of idx) {
 		const q = deps.questions[i];
-		const n = numeros[i] || i + 1;
+		const n = numeros[i] ?? i + 1;
 		const card = ajouter(grille, "div", "qbd-fiche-q qbd-fiche-card");
 		// Une lecture de Learn n'a pas de numéro (0) : la carte n'en montre pas.
 		renderTop(card, q, numeros[i] ?? n);
@@ -466,7 +466,11 @@ function renderGrille(body: HTMLElement, idx: number[], deps: FicheDeps, attirer
 		card.classList.add("is-editable");
 		card.tabIndex = 0;
 		card.setAttribute("role", "button");
-		card.setAttribute("aria-label", t("dashboard.fiche.editQuestion", { n }));
+		// A reading has no number (0): it gets its own label, so no two
+		// buttons of the grid share one.
+		card.setAttribute("aria-label", q.role === "read"
+			? t("dashboard.fiche.editReading", { title: stripInlineMarkdown(q.title).trim() || `${t("engine.lesson.roleRead")} ${i + 1}` })
+			: t("dashboard.fiche.editQuestion", { n }));
 		card.addEventListener("click", () => editer(i));
 		card.addEventListener("keydown", (e) => {
 			if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;

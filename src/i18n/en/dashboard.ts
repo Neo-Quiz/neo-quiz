@@ -331,6 +331,7 @@ export const EN_DASHBOARD = {
 	/* La fiche d'un quiz (detail-fiche.ts). */
 	"dashboard.fiche.part": "Part {n}",
 	"dashboard.fiche.editQuestion": "Edit question {n}",
+	"dashboard.fiche.editReading": "Edit reading: {title}",
 	"dashboard.fiche.search": "Search",
 	"dashboard.fiche.type.equation": "Equation",
 	"dashboard.fiche.type.programOutput": "Program output",
