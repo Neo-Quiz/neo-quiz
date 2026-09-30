@@ -269,6 +269,27 @@
 	align-items: center;
 	gap: 4px;
 }
+.qz-mini-fournisseur {
+	display: inline-grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	margin-right: -2px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	cursor: pointer;
+}
+.qz-mini-fournisseur:hover {
+	background: var(--background-modifier-hover) !important;
+}
+.qz-mini-fournisseur .qbd-provider-logo,
+.qz-mini-fournisseur .qbd-provider-logo svg {
+	width: 16px;
+	height: 16px;
+}
 .qz-mini-envoi {
 	--face: var(--quiz-primary);
 	--edge: var(--quiz-primary-edge);

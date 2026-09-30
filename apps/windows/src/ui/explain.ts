@@ -24,7 +24,7 @@ import { createAiClient } from "../../../../src/dashboard/ai-client";
 import type { ChatTurn } from "../../../../src/dashboard/ai-client";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
-import { openEffortSlider, openModelMenu } from "../../../../src/dashboard/ui-select";
+import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
 
@@ -104,11 +104,11 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	champ.rows = 1;
 	champ.placeholder = t("ai.explain.miniPlaceholder");
 	const pied = ajouter(mini, "div", "qz-mini-pied");
-	/* The LOGO of the provider chosen in Settings (Claude Code's or Codex's):
-	   it says who will answer. Sparkles when the provider cannot explain
-	   (sending then says so). */
-	const icone = ajouter(pied, "span", "qbd-qz-explain-icon");
 	const outils = ajouter(pied, "div", "qz-mini-outils");
+	/* The PROVIDER, its logo right before the model's name: it says who will
+	   answer and opens the list of those that can (below). */
+	const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
+	fournisseurBtn.type = "button";
 	const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
 	modeleBtn.type = "button";
 	const modeleLabel = ajouter(modeleBtn, "span", "qbd-select-label");
@@ -120,25 +120,40 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	envoi.setAttribute("aria-label", t("ai.explain.button"));
 	host.ui.setIcon(ajouter(envoi, "span"), "arrow-up");
 
-	const fournisseur = (): string => deps.settings.get().aiProvider || "";
-	const peutExpliquer = (): boolean => ["claude-code", "codex"].includes(fournisseur());
+	/* The providers that can HOLD a conversation — the two CLIs the chat of
+	   Generate speaks to (`AiClient.chat`). Ollama and Antigravity CLI cannot
+	   yet: their calls only know how to return a quiz. */
+	const LOCAUX = ["claude-code", "codex"];
+	/* The provider of this composer: the one of the Settings when it can chat,
+	   else the first installed (Claude Code, then Codex), else none — the
+	   learner is asked to pick. Written to the Settings only when it differs
+	   at send time or is picked by hand, so that merely opening a quiz never
+	   changes the provider of the Generate page. */
+	let courant = LOCAUX.includes(deps.settings.get().aiProvider || "") ? (deps.settings.get().aiProvider as string) : "";
+	const fournisseur = (): string => courant;
+	const peutExpliquer = (): boolean => courant !== "";
 	const modeles = (): aiProviders.ModelDef[] =>
 		fournisseur() === "claude-code" ? aiProviders.getClaudeModels() : aiProviders.getDefaultModels("codex");
-	const modeleCourant = (): string => fournisseur() === "claude-code"
-		? aiProviders.resolveClaudeModel(deps.settings.get().aiModel)
-		: aiProviders.resolveCodexModel(deps.settings.get().aiModel);
+	/* The model of the Settings belongs to the provider it was chosen for:
+	   another provider falls back to its own default. */
+	const modeleCourant = (): string => {
+		const reglage = deps.settings.get().aiProvider === courant ? deps.settings.get().aiModel : "";
+		return courant === "claude-code" ? aiProviders.resolveClaudeModel(reglage) : aiProviders.resolveCodexModel(reglage);
+	};
 	const efforts = () => aiProviders.getEfforts(fournisseur(), modeleCourant());
 	const effortCourant = (): string => aiProviders.resolveEffort(fournisseur(), deps.settings.get().aiEffort, modeleCourant());
 
 	const peindreOutils = (): void => {
-		icone.replaceChildren();
-		icone.className = "qbd-qz-explain-icon";
+		fournisseurBtn.replaceChildren();
 		if (peutExpliquer()) {
 			const p = aiProviders.getProvider(fournisseur());
-			icone.classList.add("qbd-provider-logo", "qbd-provider-logo--" + p.logo);
-			aiProviders.setBrandLogo(icone, p.logo);
+			const logo = ajouter(fournisseurBtn, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
+			aiProviders.setBrandLogo(logo, p.logo);
+			fournisseurBtn.title = p.name;
 		} else {
-			host.ui.setIcon(icone, "sparkles");
+			// No provider yet: an empty slot, the click opens the list.
+			host.ui.setIcon(ajouter(fournisseurBtn, "span", "qbd-provider-logo"), "circle-dashed");
+			fournisseurBtn.title = t("ai.provider.choose");
 		}
 		modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
 		if (!peutExpliquer()) return;
@@ -147,6 +162,36 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const ev = effortCourant();
 		effortLabel.textContent = efforts().find(e => e.value === ev)?.label ?? ev;
 	};
+	const choisirFournisseur = async (id: string): Promise<void> => {
+		courant = id;
+		await deps.settings.save({ aiProvider: id, aiModel: aiProviders.getProvider(id).defaultModel });
+		peindreOutils();
+	};
+	fournisseurBtn.addEventListener("click", () => {
+		openProviderMenu(fournisseurBtn, {
+			brands: aiProviders.MARQUES
+				.map(m => ({
+					value: m.id,
+					label: m.name,
+					logo: m.logo,
+					channels: m.canaux.filter(c => LOCAUX.includes(c.id)).map(c => ({ value: c.id, label: c.label, sub: c.sub, logo: c.logo || m.logo })),
+				}))
+				.filter(b => b.channels.length > 0),
+			current: courant,
+			renderLogo: (el, logo) => aiProviders.setBrandLogo(el, logo),
+			onPick: (id) => { void choisirFournisseur(id); },
+		});
+	});
+	/* No usable provider in the Settings: the default is the first CLI that is
+	   installed, Claude Code before Codex. */
+	if (!peutExpliquer()) {
+		void (async () => {
+			const claude = await aiProviders.checkClaudeCode();
+			if (claude.ok) courant = "claude-code";
+			else if ((await aiProviders.checkCodex()).ok) courant = "codex";
+			if (fournisseurBtn.isConnected) peindreOutils();
+		})();
+	}
 	peindreOutils();
 	void aiProviders.refreshCliCaches().then(change => { if (change && modeleBtn.isConnected) peindreOutils(); });
 	modeleBtn.addEventListener("click", async () => {
@@ -193,8 +238,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	hote.addEventListener("input", majVisibilite);
 	majVisibilite();
 
-	const lancer = (): void => {
-		if (!peutExpliquer()) { host.ui.notice(t("ai.chat.providerUnsupported")); return; }
+	const lancer = async (): Promise<void> => {
+		if (!peutExpliquer()) { fournisseurBtn.click(); return; }
 		const slide = questionAffichee(hote);
 		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
 		const base = slide ? messagePour(slide) : null;
@@ -204,15 +249,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const message = perso ? base + "\n\n" + t("ai.explain.myQuestion") + "\n" + perso : base;
 		const etiquette = t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() });
 		champ.value = "";
+		/* The provider shown here is the one that answers: the client reads the Settings. */
+		if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
 		ouvrirExplication(message, deps.settings, perso ? etiquette + "\n" + perso : etiquette);
 	};
-	envoi.addEventListener("click", lancer);
+	envoi.addEventListener("click", () => void lancer());
 	champ.addEventListener("keydown", (e) => {
 		// The quiz has its own keys (arrows, Space, 1/2): none of them belongs to this field.
 		e.stopPropagation();
 		if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
 		e.preventDefault();
-		lancer();
+		void lancer();
 	});
 
 	return () => { observateur.disconnect(); hote.removeEventListener("input", majVisibilite); rangee.remove(); };
