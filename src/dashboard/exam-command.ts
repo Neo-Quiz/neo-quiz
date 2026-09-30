@@ -47,6 +47,13 @@ export function retirerCommandeExam(texte: string): { texte: string; commande: b
 	return m ? { texte: texte.slice(m[0].length), commande: true } : { texte, commande: false };
 }
 
+/** The request written FOR the learner once an exam is picked, shown as a
+    prompt tile in the composer (like the Explain window's) and sent as the
+    text of the request; what the learner types is added under it. */
+export function promptPreparation(exam: ExamCible): string {
+	return t("ai.exam.prompt", { exam: exam.nom, module: exam.module, date: dateCourte(exam.date) });
+}
+
 /** "30 Sept" in the language of the app. */
 export function dateCourte(iso: string): string {
 	const [a, mo, j] = iso.split("-").map(Number);

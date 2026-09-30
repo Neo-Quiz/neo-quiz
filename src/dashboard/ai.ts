@@ -36,7 +36,7 @@ import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserC
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
-import { PALIERS_TEST, attachExamCommand, dateCourte, retirerCommandeExam } from "./exam-command";
+import { PALIERS_TEST, attachExamCommand, promptPreparation, retirerCommandeExam } from "./exam-command";
 import type { ExamCible, ExamCommandHandle } from "./exam-command";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
@@ -1657,23 +1657,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		zoneVideo = ajouter(textZone, "div", "qbd-ai-video-row");
 		tuilesVideo.rendre(zoneVideo);
 
-		/* The exam picked in the "/exam" menu, as a tile above the prompt: its
-		   cross gives up the preparation. Drawn in place, never by a render
-		   (a render would take the focus from the prompt). */
+		/* The exam picked in the "/exam" menu: the request is WRITTEN for the
+		   learner, as a prompt tile above the field (the Explain window's
+		   tile); what is typed in the field is added under it. Its cross gives
+		   up the preparation. Drawn in place, never by a render (a render would
+		   take the focus from the field). */
 		const tuileExam = ajouter(textZone, "div", "qbd-ai-exam-cible");
-		const peindreExamCible = (): void => {
-			tuileExam.replaceChildren();
-			tuileExam.hidden = !examCible;
-			if (!examCible) return;
-			host.ui.setIcon(ajouter(tuileExam, "span", "qbd-ai-exam-cible-icone"), "graduation-cap");
-			ajouter(tuileExam, "span", "qbd-ai-exam-cible-texte", t("ai.exam.tile", { exam: examCible.nom, module: examCible.module, date: dateCourte(examCible.date) }));
-			const croix = ajouter(tuileExam, "button", "qbd-ai-exam-cible-retirer");
-			croix.type = "button";
-			croix.setAttribute("aria-label", t("ai.exam.remove"));
-			host.ui.setIcon(croix, "x");
-			croix.addEventListener("click", () => { examCible = null; peindreExamCible(); updateGenerateBtn(generateBtnRef); });
-		};
-		peindreExamCible();
 		const composerInput = ajouter(textZone, "textarea", "qbd-ai-composer-input");
 		let mentions: MentionPickerHandle | null = null;
 		let commandeExam: ExamCommandHandle | null = null;
@@ -1683,7 +1672,22 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// les yeux, et la parenthèse gênait. Le champ RESTE facultatif avec une
 		// pièce jointe (`canGenerate` accepte texte OU images OU notes) ; c'est
 		// seulement le texte qui ne bouge plus.
-		composerInput.placeholder = t("ai.composer.placeholder");
+		const peindreExamCible = (): void => {
+			tuileExam.replaceChildren();
+			tuileExam.hidden = !examCible;
+			composerInput.placeholder = t(examCible ? "ai.exam.addDetails" : "ai.composer.placeholder");
+			if (!examCible) return;
+			ajouter(tuileExam, "div", "qbd-ai-exam-cible-texte", promptPreparation(examCible));
+			const pied = ajouter(tuileExam, "div", "qbd-ai-exam-cible-pied");
+			ajouter(pied, "span", "qbd-ai-exam-cible-nom", t("ai.exam.tileName"));
+			const croix = ajouter(pied, "button", "qbd-ai-exam-cible-retirer");
+			croix.type = "button";
+			croix.title = t("ai.exam.remove");
+			croix.setAttribute("aria-label", t("ai.exam.remove"));
+			host.ui.setIcon(croix, "x");
+			croix.addEventListener("click", () => { examCible = null; peindreExamCible(); updateGenerateBtn(generateBtnRef); });
+		};
+		peindreExamCible();
 		composerInput.value = composerText;
 		/* Les tuiles suivent le texte VIVANT à chaque rendu (retour d'une
 		   demande annulée, préréglage, collage par le picker « @ ») : le
@@ -3958,7 +3962,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   after the other with the same sources. */
 		const commande = retirerCommandeExam(envoi.text);
 		if (examCible || commande.commande) {
-			const d: DemandeTexte = { ...envoi, text: commande.texte };
+			/* With an exam picked, the request is the prompt written for the
+			   learner, what they typed added under it. */
+			const precisions = commande.texte.trim();
+			const texte = examCible ? promptPreparation(examCible) + (precisions ? "\n\n" + precisions : "") : commande.texte;
+			const d: DemandeTexte = { ...envoi, text: texte };
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
 			const examen = examCible ?? undefined;
 			for (let palier = 0; palier <= PALIERS_TEST; palier++) {
