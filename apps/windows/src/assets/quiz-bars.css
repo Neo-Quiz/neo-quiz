@@ -392,9 +392,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+	/* No `scrollbar-width` here: it would switch off the window's own scrollbar (shell.css). */
 	padding: 4px 6px 8px 2px;
-	scrollbar-width: thin;
-	scrollbar-color: var(--scrollbar-thumb-bg) transparent;
 }
 
 .nq-explain-demande {
