@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.7] - 2026-09-30
+
 ### Fixed
 - A generation no longer fails with "a claude generation is already running": Claude Code and Codex runs no longer wait for one another (an Explain answer, a stopped run slow to end or a reloaded window used to block the next quiz), and reloading or closing the window stops the runs it had started instead of leaving them going unseen.
 - The line of a running generation shows the provider's logo turning and "Opus 5.5 working for 0:12", as MonoCode does, instead of a sparkle and "Waiting for the model's first words"; the mode and model are no longer repeated under each request.
