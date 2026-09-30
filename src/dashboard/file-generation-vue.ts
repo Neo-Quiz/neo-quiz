@@ -270,6 +270,12 @@ export function creerVueFile(opts: {
 	const deplies = new Set<string>();
 	const replies = new Set<string>();
 
+	/** The lines a written answer may show before its section folds: about what
+	    the box shows without scrolling (320 px). */
+	const LIGNES_AVANT_REPLI = 15;
+	/** Lines just unfolded by a click: their detail slides in once. */
+	const ouvertures = new Set<string>();
+
 	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean, id: number): void {
 		const ancien = bloc.querySelector<HTMLElement>(".qbd-ai-transcript-texte");
 		const hautAncien = ancien ? ancien.scrollTop : 0;
@@ -291,10 +297,13 @@ export function creerVueFile(opts: {
 			ajouter(b, "span", "qbd-ai-transcript-ligne-texte", libelle);
 			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-chevron"), ouvert ? "chevron-down" : "chevron-right");
 			b.addEventListener("click", () => {
-				if (ouvert) { deplies.delete(k); replies.add(k); } else { deplies.add(k); replies.delete(k); }
+				if (ouvert) { deplies.delete(k); replies.add(k); } else { deplies.add(k); replies.delete(k); ouvertures.add(k); }
 				remplirTranscript(bloc, tr, vivant, id);
 			});
-			if (ouvert) detail(ajouter(bloc, "div", "qbd-ai-transcript-detail"));
+			/* The unfolding slides in only when a click opened it: the block is
+			   rebuilt at every chunk of a live answer, which would replay it. */
+			const anime = ouvertures.delete(k);
+			if (ouvert) detail(ajouter(bloc, "div", "qbd-ai-transcript-detail" + (anime ? " qbd-ai-transcript-detail--anime" : "")));
 		};
 		const ecrit = !!tr.text;
 		if (tr.thinking) {
@@ -310,14 +319,18 @@ export function creerVueFile(opts: {
 		}
 		if (ecrit) {
 			const lignes = tr.text.split("\n").length;
-			/* The WRITING is never folded (only the activity is, as
-			   MonoCode's "Ran 11 commands"): its heading, then the text. */
-			const titre = ajouter(bloc, "div", "qbd-ai-transcript-titre");
-			host.ui.setIcon(ajouter(titre, "span", "qbd-ai-transcript-titre-icone"), "pen-line");
-			ajouter(titre, "span", undefined, vivant ? t("ai.transcript.writingLive") : t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes }));
-			const texte = ajouter(bloc, "pre", "qbd-ai-transcript-texte", tr.text);
-			// Follows the writing, unless the user scrolled up to read.
-			texte.scrollTop = suivait ? texte.scrollHeight : hautAncien;
+			/* The WRITING folds by itself past `LIGNES_AVANT_REPLI` lines (a
+			   whole quiz in JSON5 buried the conversation); the heading keeps
+			   counting while it is folded, and a click opens it for good. */
+			const long = lignes > LIGNES_AVANT_REPLI;
+			const libelle = !vivant
+				? t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes })
+				: long ? t("ai.transcript.writingLiveCount", { count: lignes }) : t("ai.transcript.writingLive");
+			ligne("writing", "pen-line", libelle, !long, corps => {
+				const texte = ajouter(corps, "pre", "qbd-ai-transcript-texte", tr.text);
+				// Follows the writing, unless the user scrolled up to read.
+				texte.scrollTop = suivait ? texte.scrollHeight : hautAncien;
+			});
 		}
 	}
 

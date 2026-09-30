@@ -373,6 +373,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.transcript.toolsOne": "A utilisé 1 outil",
 	"ai.transcript.toolsOther": "A utilisé {count} outils",
 	"ai.transcript.writingLive": "Écrit",
+	"ai.transcript.writingLiveCount": "Écrit · {count} lignes",
 	"ai.transcript.wroteOne": "A écrit 1 ligne",
 	"ai.transcript.wroteOther": "A écrit {count} lignes",
 	"ai.transcript.toLatest": "Revenir au dernier message",

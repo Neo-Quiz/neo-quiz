@@ -417,6 +417,7 @@ export const EN_AI = {
 	"ai.transcript.toolsOne": "Used 1 tool",
 	"ai.transcript.toolsOther": "Used {count} tools",
 	"ai.transcript.writingLive": "Writing",
+	"ai.transcript.writingLiveCount": "Writing · {count} lines",
 	"ai.transcript.wroteOne": "Wrote 1 line",
 	"ai.transcript.wroteOther": "Wrote {count} lines",
 	"ai.transcript.toLatest": "Back to the latest message",

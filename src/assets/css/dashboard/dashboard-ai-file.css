@@ -394,7 +394,6 @@
 	min-width: 0;
 }
 
-.qbd-ai-transcript-titre,
 .qbd-ai-transcript-outil {
 	display: inline-flex;
 	align-items: center;
@@ -587,6 +586,8 @@
 .qbd-ai-transcript-detail {
 	margin: 2px 0 8px 26px;
 	min-width: 0;
+}
+.qbd-ai-transcript-detail--anime {
 	animation: qbd-ai-deplie 160ms ease-out;
 }
 
@@ -637,12 +638,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-ai-transcript-detail { animation: none; }
-}
-
-/* The heading of the always-shown writing, and room above it. */
-.qbd-ai-transcript > .qbd-ai-transcript-titre {
-	margin: 6px 0 4px 4px;
+	.qbd-ai-transcript-detail--anime { animation: none; }
 }
 
 /* THE SIDEBAR of the Generate page (2026-09-30), on the left like claude.ai's:
