@@ -24,9 +24,17 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		r.check(`${mode} : la règle LANGUAGE est gardée`, systemPrompt.includes("THE SAME LANGUAGE AS THE USER REQUEST"), true);
 	}
 	const auto = composerPrompts("x", { mode: "practice", count: null, type: "Compréhension" }).systemPrompt;
-	r.check("Auto + Compréhension : aucun nombre inventé", [/exactly (null|undefined|NaN)/.test(auto), auto.includes("between 10 and 20")], [false, true]);
+	r.check("Auto + Compréhension : aucun nombre inventé", [/exactly (null|undefined|NaN)/.test(auto), auto.includes("as many questions as the source has EXAMINABLE POINTS")], [false, true]);
 	r.check("nombre fixé : exactement N", composerPrompts("x", { mode: "practice", count: 12 }).systemPrompt.includes("exactly 12 questions"), true);
-	r.check("Learn en Auto : 20 questions au plus, sauf nécessité", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("at most 20 questions in total"), true);
+	/* NI PLUS NI MOINS (2026-09-30) : une question par point examinable, jamais
+	   un plafond ni un gabarit fixe par tranche — 537 questions pour 3 CM le
+	   même jour, 1 amorce + 1 « explique » + 3 rappels par notion, quelle
+	   qu'elle soit. */
+	const learnAuto = composerPrompts("x", { mode: "learn", count: null }).systemPrompt;
+	r.check("Learn en Auto : autant de questions que de points examinables, ni plus ni moins", [
+		learnAuto.includes("as many questions as the source has EXAMINABLE POINTS"),
+		/at most 20 questions|two to four questions|exactly one question with "role": "explain"/.test(learnAuto),
+	], [true, false]);
 	r.check("le code d'une phrase va entre backticks, dans les deux modes (sinon __init__ s'affiche en gras)",
 		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes("goes between backticks in EVERY text field")), [true, true]);
 	r.check("Learn : chaque pré-question a un indice", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("EVERY pre question also has \"hint\""), true);

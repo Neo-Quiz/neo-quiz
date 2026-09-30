@@ -121,7 +121,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	r.check("the Learn step", sys("learn", 0).includes("THIS STEP: the Learn path"), true);
 	r.check("Test 1 is the fundamentals", sys("practice", 1).includes("FUNDAMENTALS"), true);
 	r.check("the last Test is at the exam's level", sys("practice", 3).includes("AT THE EXAM'S LEVEL"), true);
-	r.check("a preparation keeps the usual size of one quiz (at most 20 in a Learn)", sys("learn", 0).includes("at most 20 questions"), true);
+	r.check("a preparation asks one question per examinable point", sys("learn", 0).includes("as many questions as the source has EXAMINABLE POINTS"), true);
 	r.check("a Learn cites its sources", composerPrompts("x", { mode: "learn" }).systemPrompt.includes('"cite"'), true);
 	r.check("a Test does not", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('"cite"'), false);
 	r.check("no preparation block without /exam", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("EXAM PREPARATION"), false);
@@ -164,8 +164,20 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ lirePlan }) => {
 await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	const r = makeReporter("/exam plan step size");
 	const sys = (mode) => composerPrompts("x", { mode, preparation: { examen: { nom: "CC", date: "2026-10-02", module: "XTI301" }, palier: 0, paliers: 3, titre: "Listes", focus: "les listes", plan: ["Listes", "Tuples"], etape: 1, etapes: 2 } }).systemPrompt;
-	r.check("a Learn step keeps its 20-question cap", sys("learn").includes("at most 20 questions"), true);
-	r.check("a Test step keeps 10 to 20 questions", sys("practice").includes("between 10 and 20 questions"), true);
+	r.check("a Learn step: one question per examinable point", sys("learn").includes("as many questions as the source has EXAMINABLE POINTS"), true);
+	r.check("a Test step: one question per examinable point", sys("practice").includes("as many questions as the source has EXAMINABLE POINTS"), true);
 	r.check("never an uncapped quantity", /no fixed (maximum|number)/i.test(sys("learn") + sys("practice")), false);
+	r.done();
+});
+
+/* THE EXAMINABLE POINTS of a plan step: read from the plan, and given to
+   the quiz as the only ones it asks about, one question each. */
+await withSrcModule("src/dashboard/ai-client.ts", ({ lirePlan, composerPrompts }) => {
+	const r = makeReporter("/exam examinable points");
+	const plan = lirePlan('[{ "title": "Listes", "type": "learn", "covers": "les listes", "points": ["len", "append", "", 3, "slicing [n:p:step]"] }]');
+	r.check("the points are read, empty or non-text ones dropped", plan[0].points, ["len", "append", "slicing [n:p:step]"]);
+	r.check("a plan without points still reads", lirePlan('[{ "title": "T", "type": "test" }]')[0].points, []);
+	const sys = composerPrompts("x", { mode: "learn", preparation: { palier: 0, paliers: 3, titre: "Listes", focus: "les listes", plan: ["Listes"], etape: 1, etapes: 1, points: ["len", "append"] } }).systemPrompt;
+	r.check("the step's points are listed, one question each", [sys.includes("- len"), sys.includes("- append"), sys.includes("ONE question per point")], [true, true, true]);
 	r.done();
 });

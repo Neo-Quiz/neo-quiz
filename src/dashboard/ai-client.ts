@@ -105,6 +105,9 @@ export interface PreparationExamen {
 	titre?: string;
 	focus?: string;
 	plan?: string[];
+	/** The EXAMINABLE POINTS this quiz covers, listed by the plan: one
+	    question each, no other (2026-09-30). */
+	points?: string[];
 }
 
 /** One step of the plan of an exam preparation, chosen by the model. */
@@ -112,6 +115,8 @@ export interface EtapePlan {
 	titre: string;
 	type: "learn" | "practice";
 	focus: string;
+	/** Every examinable point of this quiz: the quiz asks one question per point. */
+	points: string[];
 }
 
 /** Reads the plan the model wrote (a JSON array, possibly fenced): only valid
@@ -132,7 +137,8 @@ export function lirePlan(texte: string, typeImpose?: "learn" | "practice"): Etap
 		const focus = typeof o.covers === "string" ? o.covers.trim() : "";
 		const type = o.type === "test" || o.type === "practice" ? "practice" : o.type === "learn" ? "learn" : null;
 		if (!titre || !type) continue;
-		etapes.push({ titre, focus, type: typeImpose ?? type });
+		const points = Array.isArray(o.points) ? o.points.filter((x): x is string => typeof x === "string" && !!x.trim()).map(x => x.trim()) : [];
+		etapes.push({ titre, focus, type: typeImpose ?? type, points });
 	}
 	return etapes.slice(0, 12);
 }
@@ -360,10 +366,14 @@ function blocPreparation(p: PreparationExamen | undefined, learn: boolean): stri
 	if (p.titre) {
 		const examenP = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
 		const plan = (p.plan ?? []).map((x, i) => `${i + 1}. ${x}`).join("\n\t");
-		return `EXAM PREPARATION${examenP}: after reading all the documents you planned these quizzes, which together cover everything that can come up:\n\t${plan}\n\tTHIS QUIZ is number ${p.etape ?? 1}, "${p.titre}": ${p.focus || p.titre}. Cover EXACTLY that part, its key notions, methods and classic exercises, from the basics up to the exam's level; the other quizzes cover the rest. Keep the usual size of ONE quiz (the QUANTITY below): the plan has already split the program, so this quiz stays short.\n\n\t`;
+		const points = (p.points ?? []).map(x => "- " + x).join("\n\t");
+		const liste = points
+			? `\n\tITS EXAMINABLE POINTS, the only ones this quiz asks about — ONE question per point (two only for a point with two genuinely different angles), no question outside this list, no point left without its question:\n\t${points}`
+			: " Cover EXACTLY that part, with one question per examinable point of it (the QUANTITY below).";
+		return `EXAM PREPARATION${examenP}: after reading all the documents you planned these quizzes, which together cover everything that can come up:\n\t${plan}\n\tTHIS QUIZ is number ${p.etape ?? 1}, "${p.titre}": ${p.focus || p.titre}, from the basics up to the exam's level; the other quizzes cover the rest, so never ask about their points.${liste}\n\n\t`;
 	}
 	const examen = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
-	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. The work is split between the quizzes: each keeps the usual size of one quiz.`;
+	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. The work is split between the quizzes: each asks exactly what its part needs.`;
 	const etape = learn
 		? `THIS STEP: the Learn path${p.document ? ` of the document "${p.document}" (one Learn per document of the exam; the Tests cover them all)` : ""}, from the basics up to the exam's level, in the order the notions build on each other.`
 		: p.palier >= p.paliers
@@ -406,12 +416,12 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	const quantite = count != null
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
-		? "QUANTITY: at most 20 questions in total, every role counted — usually 2 or 3 slices. Cover what can be examined on the source, the most important first; go beyond 20 ONLY if the source truly cannot be learned in fewer, and never pad with trivia. A learner who sees 50 questions gives up before starting."
-		: "QUANTITY: between 10 and 20 questions, chosen by you from the source: ONLY what can be examined, the most important first. Never pad with trivia.";
+		? "QUANTITY: exactly as many questions as the source has EXAMINABLE POINTS — no more, no less. An examinable point is a fact, definition, rule, method or classic trap the exam can ask about: it gets ONE recall question, two only when it has two genuinely different angles (its syntax AND its classic trap, say). NEVER two questions on the same point, no trivia, no filler; and no examinable point left without its question. A slice is a real notion, not a detail: group the small related points of one notion in the same slice."
+		: "QUANTITY: exactly as many questions as the source has EXAMINABLE POINTS — no more, no less: one question per fact, definition, rule, method or classic trap the exam can ask about, NEVER two on the same point, no trivia, no filler, and no examinable point left out. The number follows the source, never a target.";
 
 	const blocMode = learn ? `MODE: LEARN. You are writing a guided LEARNING PATH through the source — not a test, and not a summary to read.
 	Split the source into SLICES, numbered from 1 in "slice", each small enough for ONE screen of reading. Every slice contains, in this order:
-	  1. one or two questions with "role": "pre", asked BEFORE the reading on what the slice is about to teach. The learner is expected to fail: keep them short (single choice preferred) and give "explain". EVERY pre question also has "hint": a clue that lets someone who has NOT read the slice yet reason toward the answer (the principle to apply, an analogy, what a key word means) — never the answer itself. Answering blind with no help at all is discouraging.
+	  1. zero or one question with "role": "pre", asked BEFORE the reading, ONLY when the slice brings a genuinely NEW idea the learner could reason about beforehand — not for a syntax detail nor a plain fact. The learner is expected to fail: keep it short (single choice preferred) and give "explain". EVERY pre question also has "hint": a clue that lets someone who has NOT read the slice yet reason toward the answer (the principle to apply, an analogy, what a key word means) — never the answer itself. Answering blind with no help at all is discouraging.
 	  2. exactly one card with "role": "read": "title" names the slice and "prompt" holds the passage — the slice's content REPHRASED clearly in at most about 150 words, keeping the teacher's technical terms EXACTLY as in the source. When the slice lists arbitrary items (layers, steps, keywords), add a mnemonic. A read card has no options and no answer. For a PROCEDURAL slice (code, method, calculation), the read card is a fully WORKED EXAMPLE, correct, step by step. Every idiom or compact line of a reading is explained IN FULL, the way a good tutor does: the compact form, its result, then the developed equivalent (for example \`[2 * i for i in range(4)]\` gives \`[0, 2, 4, 6]\`, the same as a \`for\` loop that calls \`append\` on an empty list); never leave a compact line unexplained.
 	  READING STYLE: CHOOSE for each read card, from its content, the "lecture" style that fits it best. VARY the style between slices according to what each one teaches, and NEVER take "page" by default:
 	    - "lecture": "etapes" for ONE IDEA PER LINE: a procedure, ideas that follow one another, a list of rules. "etapes" lists them in order, one short step per string, and "prompt" is a one-sentence introduction. Example: { "lecture": "etapes", "prompt": "Create and activate a virtual environment.", "etapes": ["Go to the project folder.", "Run \`python -m venv .venv\`.", "Activate it before installing anything."] };
@@ -419,8 +429,8 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	    - "lecture": "page" ONLY for a CONTINUOUS text that explains itself in one block (a reasoning, a story, a definition developed in prose). Example: { "lecture": "page", "prompt": "Python is interpreted: the interpreter runs the .py file directly…" }.
 	    Every reading is its own screen, placed after the pre questions of its slice, EXCEPT "etapes" readings that are either SHORT (a few lines: at most about 60 words and 4 steps) or a METHOD to apply in the question that follows, even long: for a method set "methode": true on the read card (for example a calculation procedure the next question asks to carry out). Such readings are shown open above that question instead. When a slice fits in a few lines of steps, you may write such a short reading.
 	  KEY POINTS: a read card may add "retenir", what to keep from it: { "forme": "cartes", "items": [{ "recto": "term", "verso": "its meaning in a few words" }, ...] } for TERMS to memorize (flip cards), or { "forme": "recap", "items": ["fact to keep", ...] } for FACTS to keep (a checked recap); 2 to 5 items, never a copy of a later question's answer. Omit "retenir" when it adds nothing.
-	  3. exactly one question with "role": "explain" and "type": "text": ask the learner to explain the slice's key idea in their own words (why, how, a relation, an example). "answer" holds a MODEL ANSWER of 2 to 4 sentences.
-	  4. two to four questions with "role": "recall": retrieval from memory of what the slice taught, each with "explain". For a procedural slice use: a "cloze" with the missing step, a text question predicting the OUTPUT of a code snippet ("terminalVariant": "python"), an "ordering" question rebuilding the lines of the code, a single-choice "find the bug". A recall can also be a FLASHCARD: set "flashcard": true, put the question in "prompt" (front) and the expected answer in "answer" (back), add "explain"; no "options", no "type". Use a flashcard ONLY when the answer fits in one sentence, one formula or one line of code (a definition, a syntax, the output of a short expression), never for a question that needs reasoning or several lines, and for at most half of the recalls of a slice. A slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE flashcard among its recalls. A SINGLE-choice recall is shown WITHOUT its options (the learner answers from memory, then rates the answer): its "prompt" must be answerable on its own, never "which of these…", "among the following…"; when the statements themselves are what is judged, make it a "multiSelect" question, which keeps its options.
+	  3. one question with "role": "explain" and "type": "text" ONLY on a slice that carries a KEY IDEA of the path (a why, a mechanism, a relation) — never on a slice of syntax or plain facts: ask the learner to explain that idea in their own words. "answer" holds a MODEL ANSWER of 2 to 4 sentences.
+	  4. one question with "role": "recall" per examinable point of the slice (see QUANTITY), each with "explain": retrieval from memory of what the slice taught, never two recalls on the same point. For a procedural slice use: a "cloze" with the missing step, a text question predicting the OUTPUT of a code snippet ("terminalVariant": "python"), an "ordering" question rebuilding the lines of the code, a single-choice "find the bug". A recall can also be a FLASHCARD: set "flashcard": true, put the question in "prompt" (front) and the expected answer in "answer" (back), add "explain"; no "options", no "type". Use a flashcard ONLY when the answer fits in one sentence, one formula or one line of code (a definition, a syntax, the output of a short expression), never for a question that needs reasoning or several lines, and for at most half of the recalls of a slice. A slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE flashcard among its recalls. A SINGLE-choice recall is shown WITHOUT its options (the learner answers from memory, then rates the answer): its "prompt" must be answerable on its own, never "which of these…", "among the following…"; when the statements themselves are what is judged, make it a "multiSelect" question, which keeps its options.
 	HINTS IN LEARN: EVERY question of the path has "hint" — pre, explain and recall alike; only the read cards and the flashcards have none.
 	A "read" passage NEVER contains the exact sentence that a later question of the same slice asks for: recall must be retrieval, not copying. Do not ask to "justify your answer" everywhere.
 	"topic": optional short label of a family of notions that are easily confused, shared by the questions that test it.
@@ -1608,8 +1618,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				: "TESTS only (\"type\": \"test\"): in rising difficulty, the last ones at the exam's level";
 			const systeme = [
 				"You plan the revision of a learner for an exam, inside Neo Quiz. You have no tools: the documents are in the message.",
-				`First read ALL the documents, to see the whole program. Then plan the quizzes that together cover EVERYTHING that can come up in the exam — every notion, definition, method and classic exercise — no more, no less: as many quizzes as the program needs (usually 3 to 8), never one per document by reflex; group what belongs together, split what is too big for one quiz. Plan ${genre}.`,
-				"Answer with ONLY a JSON array, one object per quiz, in the order to take them: { \"title\": \"short title of the quiz, in the language of the documents\", \"type\": \"learn\" or \"test\", \"covers\": \"one sentence: exactly what this quiz covers\" }. Nothing before or after the array.",
+				`First read ALL the documents, to see the whole program. Then list EVERY EXAMINABLE POINT of it — a fact, definition, rule, method or classic trap an exam can ask about; one point per distinct thing, never the same thing twice, at the GRAIN OF ONE EXAM QUESTION: the variants of one rule are ONE point ("the modes r, w and a of open" is one point, not three; "the arithmetic operators" splits only where a trap lies, like / versus //). The plain FACTS the course states are examinable too — who created what, dates, names, definitions ("who created Python?" is a real exam question); only course logistics and installation steps are not. Then group the points into the quizzes that will cover them: as many quizzes as the program needs (usually 3 to 8), never one per document by reflex; related points together. Every point in exactly ONE quiz: the quizzes together cover 100% of what can come up, and nothing twice. Plan ${genre}.`,
+				"Answer with ONLY a JSON array, one object per quiz, in the order to take them: { \"title\": \"short title of the quiz, in the language of the documents\", \"type\": \"learn\" or \"test\", \"covers\": \"one sentence: what this quiz covers\", \"points\": [\"each examinable point of this quiz, a short phrase in the language of the documents\", ...] }. Nothing before or after the array.",
 			].join("\n\n");
 			const userPrompt = [documents.trim() ? "THE DOCUMENTS:\n" + documents.trim() : "", "THE LEARNER'S REQUEST:\n" + demande.trim()].filter(Boolean).join("\n\n---\n\n");
 			let texte: string;

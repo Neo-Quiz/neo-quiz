@@ -360,6 +360,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.exam.needDocuments": "Joins d’abord les documents sur lesquels porte l’examen.",
 	"ai.exam.documentsLine": "L’examen porte uniquement sur ces documents : {list}.",
 	"ai.exam.planIntro": "Plan de la préparation : {count} quiz, générés l’un après l’autre.",
+	"ai.exam.planIntroPoints": "Plan de la préparation : {count} quiz qui couvrent {points} points examinables, une question chacun, générés l’un après l’autre.",
 	"ai.exam.planFallback": "Préparation",
 	"ai.exam.planTitle": "Plan",
 	"ai.exam.planning": "Lecture des documents et plan…",

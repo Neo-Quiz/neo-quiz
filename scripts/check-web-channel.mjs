@@ -36,7 +36,7 @@ await withSrcModule(
 		const d = client.composerPrompts("x", {});
 		r.check("sans options : mode Practice par défaut, Auto, mixte, sujet", [
 			d.systemPrompt.includes("MODE: PRACTICE"),
-			d.systemPrompt.includes("between 10 and 20 questions"),
+			d.systemPrompt.includes("as many questions as the source has EXAMINABLE POINTS"),
 			d.systemPrompt.includes("the mix of question types that best fits a written exam"),
 			d.userPrompt.startsWith("Generate the quiz about the following topic"),
 		], [true, true, true, true]);

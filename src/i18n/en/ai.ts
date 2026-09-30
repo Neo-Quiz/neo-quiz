@@ -404,6 +404,7 @@ export const EN_AI = {
 	"ai.exam.needDocuments": "Join the documents the exam covers first.",
 	"ai.exam.documentsLine": "The exam covers these documents only: {list}.",
 	"ai.exam.planIntro": "Plan of the preparation: {count} quizzes, made one after the other.",
+	"ai.exam.planIntroPoints": "Plan of the preparation: {count} quizzes covering {points} examinable points, one question each, made one after the other.",
 	"ai.exam.planFallback": "Preparation",
 	"ai.exam.planTitle": "Plan",
 	"ai.exam.planning": "Reading the documents and planning…",

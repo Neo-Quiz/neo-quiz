@@ -228,7 +228,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, "redaction");
 			const transcript = transcriptVide();
 			transcripts.set(ligne.id, transcript);
-			const reponse = await client.generate(prompt, {
+			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
@@ -237,6 +237,19 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 					transcriptChange(ligne.id);
 				},
 			});
+			/* AN UNREADABLE ANSWER IS ASKED ONCE MORE (2026-09-30): a model
+			   sometimes writes a quiz whose JSON5 does not parse ("invalid
+			   character 'u' at 7:26") — 2 quizzes out of 8 in one /exam plan.
+			   The same request usually comes back clean: it is sent again once,
+			   silently; a second failure is shown with its Try again. */
+			let reponse: Awaited<ReturnType<typeof lancer>>;
+			try {
+				reponse = await lancer();
+			} catch (err) {
+				if (!(err instanceof SyntaxError) || !tourne(ligne.id)) throw err;
+				console.warn(LOG_PREFIX, "réponse illisible, nouvel essai :", err.message);
+				reponse = await lancer();
+			}
 			if (!tourne(ligne.id)) return;
 			/* The final configuration FIRST, merged: a model that answers with two
 			   consecutive objects (the mode in one, the glossary in the other, in
@@ -299,15 +312,16 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				},
 			});
 			if (!tourne(ligne.id)) return;
-			const quiz = plan.length ? plan : [{ titre: d.preparation?.examen?.nom ?? t("ai.exam.planFallback"), type: d.mode, focus: "" }];
+			const quiz = plan.length ? plan : [{ titre: d.preparation?.examen?.nom ?? t("ai.exam.planFallback"), type: d.mode, focus: "", points: [] as string[] }];
 			const titres = quiz.map(e => e.titre);
 			quiz.forEach((e, i) => {
 				file = F.ajouter(file, {
 					...d, planifier: false, mode: e.type,
-					preparation: { ...(d.preparation ?? { palier: 0, paliers: 0 }), titre: e.titre, focus: e.focus, plan: titres, etape: i + 1, etapes: quiz.length },
+					preparation: { ...(d.preparation ?? { palier: 0, paliers: 0 }), titre: e.titre, focus: e.focus, points: e.points, plan: titres, etape: i + 1, etapes: quiz.length },
 				}).file;
 			});
-			const texte = t("ai.exam.planIntro", { count: quiz.length }) + "\n\n" + quiz.map((e, i) => `${i + 1}. **${e.titre}**${e.focus ? " — " + e.focus : ""}`).join("\n");
+			const nbPoints = quiz.reduce((n, e) => n + e.points.length, 0);
+			const texte = t(nbPoints ? "ai.exam.planIntroPoints" : "ai.exam.planIntro", { count: quiz.length, points: nbPoints }) + "\n\n" + quiz.map((e, i) => `${i + 1}. **${e.titre}**${e.focus ? " — " + e.focus : ""}${e.points.length ? ` (${e.points.length})` : ""}`).join("\n");
 			file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
 		} catch (err) {
 			const e = err as Error & { aborted?: boolean };
