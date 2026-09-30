@@ -14,7 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
-- The last bead of a quiz shows where you are: a green flag ("Finish") while you do the quiz, then a blue trophy ("Results") once it is handed in and you read the corrections.
+- The last bead of a quiz shows where you are: a green flag ("Finish") while you do the quiz, then a gold trophy ("Results") once it is handed in and you read the corrections.
 
 ## [1.20.4] - 2026-09-30
 

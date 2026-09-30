@@ -179,14 +179,20 @@
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
 
-/* Handed in: the score to see again, in the accent blue (cards.ts). */
+/* Handed in: the score to see again, in the GOLD of a trophy (cards.ts) — a
+   gradient from pale to deep gold. `--tab-face` stays a plain gold: the
+   rules that mix it (hover, the edge) cannot mix a gradient. The icon is a
+   dark brown: white on gold would not read. */
 .quiz-tab.is-result.is-scored{
-  --tab-face: var(--quiz-primary);
-  --tab-edge: var(--quiz-primary-edge);
+  --tab-face: #e0a91c;
+  --tab-edge: #8a5f06;
+  --tab-text: #3d2a02;
+  --tab-or: linear-gradient(150deg, #fde68a 0%, #f6c945 38%, #dc9f12 72%, #b87a06 100%);
+  background: var(--tab-or);
 }
 .quiz-tab.is-result.is-scored:hover,
 .quiz-tab.is-result.is-scored:focus-visible{
-  background: var(--quiz-primary-light);
+  background: linear-gradient(150deg, #fff0b3 0%, #f9d561 38%, #e6ad24 72%, #c78a10 100%);
 }
 
 /* The key sinks. `.is-pressing`: the class the engine sets during the
