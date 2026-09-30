@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- After visiting Generate, the Folders page (and every other page) no longer splits into two columns with its toolbar stranded on the left.
+
 ## [1.20.2] - 2026-09-30
 
 ### Changed

@@ -685,14 +685,15 @@
 
 /* THE SIDEBAR of the Generate page (2026-09-30), on the left like claude.ai's:
    a new chat, the generated quizzes, the archived chats. It replaces the
-   "New chat" button that sat at the top right of the conversation. */
-.qbd-ai-avec-lateral {
+   "New chat" button that sat at the top right of the conversation. The panel
+   is shared by every page: the row applies only while it holds the sidebar. */
+.qbd-content:has(> .qbd-ai-lateral) {
 	display: flex;
 	flex-direction: row;
 	align-items: stretch;
 	gap: 8px;
 }
-.qbd-ai-avec-lateral > .qbd-ai-stage {
+.qbd-ai-lateral ~ .qbd-ai-stage {
 	flex: 1;
 	min-width: 0;
 }

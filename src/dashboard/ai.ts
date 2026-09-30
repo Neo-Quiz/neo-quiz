@@ -992,7 +992,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* THE SIDEBAR, on the left of the page like claude.ai's: a new chat, the
 		   quizzes generated so far (the folder they are written to), and the
 		   chats that were archived by "New". */
-		container.classList.add("qbd-ai-avec-lateral");
+		/* The row layout keys on the sidebar being there (`:has`), never on a
+		   class set on `container`: it is the panel shared by every page, and a
+		   class left on it laid Folders out in two columns after Generate. */
 		const lateral = ajouter(container, "nav", "qbd-ai-lateral");
 		majNouvelle = poserNouvelleDemande(lateral, fileGen, archiverConversation);
 		if (deps.openGenerated) {
