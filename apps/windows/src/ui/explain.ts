@@ -33,6 +33,7 @@ import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
 import { attacherUsage } from "./comptes";
+import { openConfirmModal } from "../../../../src/editor/modals";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -99,14 +100,26 @@ interface Conversation {
 	enCours: boolean;
 	/** The prompt tile has been sent: the composer is a plain one from now on. */
 	envoye: boolean;
+	/** The learner took the prompt tile away (its cross, confirmed): the first
+	    message is what they type. */
+	sansPrompt: boolean;
 	/** Repaints the window; null while it is closed. */
 	repeindre: (() => void) | null;
 }
 
 /** The prompt tile: the start of the text, its name, and (in the composer)
-    a pencil that opens the Settings on the field where it is written. */
-function creerTuile(parent: HTMLElement, texte: string, ouvrirPrompt?: () => void): HTMLElement {
+    a pencil that opens the Settings on the field where it is written, and a
+    round cross in its corner, shown on hover, that takes it away. */
+function creerTuile(parent: HTMLElement, texte: string, ouvrirPrompt?: () => void, retirer?: () => void): HTMLElement {
 	const tuile = ajouter(parent, "div", "qz-mini-tuile");
+	if (retirer) {
+		const croix = ajouter(tuile, "button", "qz-mini-tuile-retirer");
+		croix.type = "button";
+		croix.title = t("ai.explain.tileRemove");
+		croix.setAttribute("aria-label", t("ai.explain.tileRemove"));
+		currentHost().ui.setIcon(croix, "x");
+		croix.addEventListener("click", retirer);
+	}
 	ajouter(tuile, "div", "qz-mini-tuile-texte", texte);
 	const pied = ajouter(tuile, "div", "qz-mini-tuile-pied");
 	ajouter(pied, "span", "qz-mini-tuile-nom", t("ai.explain.tile"));
@@ -220,7 +233,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const conversationDe = (qi: number): Conversation => {
 		let c = conversations.get(qi);
 		if (!c) {
-			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, envoye: false, repeindre: null };
+			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, envoye: false, sansPrompt: false, repeindre: null };
 			conversations.set(qi, c);
 		}
 		return c;
@@ -252,12 +265,24 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				   sent again — without it, a follow-up would leave without the
 				   question. Before that there is nothing to type: the tile IS the
 				   message. */
+				/* Taking the tile away is WARNED: without the prompt, the model
+				   does not know which question the learner means. */
+				const retirerTuile = (): void => {
+					openConfirmModal(t("ai.explain.removeTitle"), t("ai.explain.removeMessage"), t("ai.explain.removeConfirm"), t("ai.explain.removeCancel"), (ok) => {
+						if (!ok) return;
+						conv.sansPrompt = true;
+						majTuile();
+						majEnvoi();
+						champ.focus();
+					});
+				};
+				const avecTuile = (): boolean => !conv.envoye && !conv.sansPrompt;
 				const majTuile = (): void => {
 					const tuile = composer.querySelector(":scope > .qz-mini-tuile");
-					if (conv.envoye) tuile?.remove();
-					else if (!tuile) composer.insertBefore(creerTuile(composer, prompt, () => deps.ouvrirPrompt()), champ);
-					champ.readOnly = !conv.envoye;
-					champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
+					if (!avecTuile()) tuile?.remove();
+					else if (!tuile) composer.insertBefore(creerTuile(composer, prompt, () => deps.ouvrirPrompt(), retirerTuile), champ);
+					champ.readOnly = avecTuile();
+					champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : conv.sansPrompt ? "ai.explain.ownQuestion" : "ai.explain.miniPlaceholder");
 				};
 				majTuile();
 				const pied = ajouter(composer, "div", "qz-mini-pied");
@@ -305,7 +330,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					host.ui.setIcon(ajouter(envoi, "span"), conv.enCours ? "square" : "arrow-up");
 					envoi.setAttribute("aria-label", t(conv.enCours ? "ai.explain.stop" : "ai.explain.send"));
 					// The first message may go without a word: the prompt tile is enough.
-					envoi.disabled = !conv.enCours && conv.envoye && !champ.value.trim();
+					envoi.disabled = !conv.enCours && !avecTuile() && !champ.value.trim();
 				};
 				peindreOutils();
 				majEnvoi();
@@ -391,17 +416,18 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const envoyer = async (): Promise<void> => {
 					if (conv.enCours) return;
 					const perso = champ.value.trim();
-					if (conv.envoye && !perso) return;
+					const parTuile = avecTuile();
+					if (!parTuile && !perso) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
 					const premier = !conv.envoye;
-					const texte = premier ? prompt : perso;
+					const texte = parTuile ? prompt : perso;
 					champ.value = "";
 					champ.style.height = "auto";
 					/* The provider shown here is the one that answers: the client reads the Settings. */
 					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
 					conv.envoye = true;
 					conv.historique.push({ role: "user", text: texte });
-					conv.messages.push({ role: "user", text: premier ? "" : perso, tuile: premier ? prompt : undefined });
+					conv.messages.push({ role: "user", text: parTuile ? "" : perso, tuile: parTuile ? prompt : undefined });
 					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true };
 					conv.messages.push(rep);
 					conv.enCours = true;

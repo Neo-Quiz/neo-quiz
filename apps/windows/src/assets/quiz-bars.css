@@ -491,3 +491,40 @@
 .nq-explain-champ[readonly] {
 	cursor: default;
 }
+
+.qz-mini-tuile {
+	position: relative;
+}
+/* The round cross in the corner, like claude.ai's pasted text: hidden at
+   rest, shown when the tile is hovered or holds the focus. */
+.qz-mini-tuile-retirer {
+	position: absolute;
+	top: -9px;
+	right: -9px;
+	display: grid;
+	place-items: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 30%, transparent);
+	border-radius: 50%;
+	background: var(--background-primary) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	cursor: pointer;
+	opacity: 0;
+	transform: scale(0.85);
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.qz-mini-tuile:hover .qz-mini-tuile-retirer,
+.qz-mini-tuile-retirer:focus-visible {
+	opacity: 1;
+	transform: none;
+}
+.qz-mini-tuile-retirer:hover {
+	background: var(--background-modifier-hover) !important;
+}
+.qz-mini-tuile-retirer svg {
+	width: 12px;
+	height: 12px;
+}

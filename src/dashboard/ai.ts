@@ -1680,7 +1680,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			ajouter(tuileExam, "div", "qbd-ai-exam-cible-texte", promptPreparation(examCible));
 			const pied = ajouter(tuileExam, "div", "qbd-ai-exam-cible-pied");
 			ajouter(pied, "span", "qbd-ai-exam-cible-nom", t("ai.exam.tileName"));
-			const croix = ajouter(pied, "button", "qbd-ai-exam-cible-retirer");
+			// The round cross in the corner, shown on hover (claude.ai's pasted text).
+			const croix = ajouter(tuileExam, "button", "qbd-ai-exam-cible-retirer");
 			croix.type = "button";
 			croix.title = t("ai.exam.remove");
 			croix.setAttribute("aria-label", t("ai.exam.remove"));
