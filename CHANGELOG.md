@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- /exam finds the exam's course folder even when none of its quizzes is left in it (looked for by name in the vault), lists its documents, and sends the preparation's quizzes to that folder instead of Generated; giving up the exam gives the destination back.
+- The composer's glow on Generate is no longer cut in a straight line along the sidebar, and the new lists (chats, search, the exam's documents) use the app's own scrollbar.
+
 ## [1.20.5] - 2026-09-30
 
 ### Changed

@@ -21,8 +21,12 @@ export interface ExamCible {
 	date: string;
 	/** The course folder it belongs to. */
 	module: string;
-	/** That folder's contract path, where its documents are listed. */
+	/** That folder's contract path, where its documents are listed; absent
+	    when no quiz of the catalogue lives in it any more — it is then
+	    looked for by NAME (`module`) under `racine` (exam-documents.ts). */
 	dossier?: string;
+	/** The id of the root (vault) the folder is in. */
+	racine?: string;
 }
 
 /** How many Tests follow the Learn, from the basics to the exam's level. */

@@ -315,6 +315,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
+	/** The destination was set by the exam (its course folder): giving up
+	    the exam gives it back to the default folder. */
+	let destinationParExam = false;
 	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
 	   the attached documents, `false` = one quiz per document. Only offered
 	   with at least two documents and no image (`decouperParFichier` keeps a
@@ -693,6 +696,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ouvrirDocumentsExam({
 			examen: exam.nom,
 			dossier: exam.dossier,
+			racine: exam.racine,
+			nomDossier: exam.module,
+			/* The quizzes of a preparation go to the exam's course folder, not
+			   to "Generated": the destination follows the exam. */
+			onDossier: (chemin) => {
+				exam.dossier = chemin;
+				if (examCible !== exam || destination === chemin) return;
+				destination = chemin;
+				destinationDuPreset = false;
+				destinationParExam = true;
+				void render(containerRef);
+			},
 			estQuiz: (p) => !!deps.scanner.getQuiz(p),
 			joints: () => noteAttachments.map(n => n.path).filter((p): p is string => !!p),
 			joindre: (p) => attachVaultPath(p),
@@ -1710,7 +1725,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			croix.title = t("ai.exam.remove");
 			croix.setAttribute("aria-label", t("ai.exam.remove"));
 			host.ui.setIcon(croix, "x");
-			croix.addEventListener("click", () => { examCible = null; peindreExamCible(); updateGenerateBtn(generateBtnRef); });
+			croix.addEventListener("click", () => {
+				examCible = null;
+				if (destinationParExam) { destination = ""; destinationParExam = false; void render(containerRef); return; }
+				peindreExamCible();
+				updateGenerateBtn(generateBtnRef);
+			});
 		};
 		peindreExamCible();
 		composerInput.value = composerText;

@@ -14,10 +14,37 @@ import { t } from "../i18n";
 import { lireContenuDossier } from "./folder-contents";
 import { badgeDeFichier, couperNomAuMilieu, fileIcon } from "./file-icons";
 
+/** The folder named `nom` under the root `racine`, looked for level by level
+    (hidden folders, the trash and the versions skipped), at most six deep.
+    The first found, or `undefined`. */
+export async function trouverDossier(racine: string, nom: string): Promise<string | undefined> {
+	const fs = currentHost().fs;
+	const cible = nom.normalize("NFC");
+	let niveau = [racine];
+	for (let profondeur = 0; profondeur < 6 && niveau.length; profondeur++) {
+		const suivant: string[] = [];
+		for (const d of niveau) {
+			let entrees: { name: string; path: string; isFolder: boolean }[] = [];
+			try { entrees = await fs.listDir(d); } catch { continue; }
+			for (const e of entrees) {
+				if (!e.isFolder || e.name.startsWith(".")) continue;
+				if (e.name.normalize("NFC") === cible) return e.path;
+				suivant.push(e.path);
+			}
+		}
+		niveau = suivant;
+	}
+	return undefined;
+}
+
 export function ouvrirDocumentsExam(opts: {
 	examen: string;
-	/** The course folder (contract path); absent: the window says so. */
+	/** The course folder (contract path); absent: looked for by `nomDossier` under `racine`. */
 	dossier?: string;
+	racine?: string;
+	nomDossier?: string;
+	/** The folder once found: the page makes it the destination. */
+	onDossier?(chemin: string): void;
 	estQuiz(path: string): boolean;
 	/** The paths already joined to the request. */
 	joints(): string[];
@@ -35,12 +62,18 @@ export function ouvrirDocumentsExam(opts: {
 			fini.type = "button";
 			fini.addEventListener("click", () => modal.close());
 
-			if (!opts.dossier) {
-				ajouter(liste, "div", "qbd-exam-docs-vide", t("ai.exam.docsNoFolder"));
-				return;
-			}
 			ajouter(liste, "div", "qbd-exam-docs-vide", t("ai.attach.reading"));
-			void lireContenuDossier(opts.dossier, opts.estQuiz).then(contenu => {
+			void (async () => {
+				const dossier = opts.dossier ?? (opts.racine && opts.nomDossier ? await trouverDossier(opts.racine, opts.nomDossier) : undefined);
+				if (!dossier) {
+					liste.replaceChildren();
+					ajouter(liste, "div", "qbd-exam-docs-vide", t("ai.exam.docsNoFolder"));
+					return;
+				}
+				opts.onDossier?.(dossier);
+				return lireContenuDossier(dossier, opts.estQuiz);
+			})().then(contenu => {
+				if (!contenu) return;
 				liste.replaceChildren();
 				const fichiers = [...contenu.documents, ...contenu.notes];
 				if (fichiers.length === 0) { ajouter(liste, "div", "qbd-exam-docs-vide", t("ai.exam.docsEmpty")); return; }

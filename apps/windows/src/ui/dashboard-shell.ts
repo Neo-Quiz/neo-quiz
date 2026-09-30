@@ -625,7 +625,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				return undefined;
 			};
 			return Object.entries(examens())
-				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle), dossier: dossierDe(cle) })))
+				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle), dossier: dossierDe(cle), racine: cle.split("/")[0] })))
 				.sort((a, b) => a.date.localeCompare(b.date));
 		},
 	});

@@ -769,7 +769,6 @@
 	min-height: 0;
 	overflow-y: auto;
 	padding-top: 10px;
-	scrollbar-width: thin;
 }
 .qbd-search-section {
 	padding: 6px 12px;
@@ -823,7 +822,6 @@
 	overflow-y: auto;
 	margin-top: 14px;
 	padding-bottom: 16px;
-	scrollbar-width: thin;
 }
 .qbd-ai-chats-jour {
 	padding: 16px 10px 6px;
@@ -1048,7 +1046,6 @@
 	gap: 4px;
 	max-height: min(420px, 60vh);
 	overflow-y: auto;
-	scrollbar-width: thin;
 }
 .qbd-exam-docs-vide {
 	padding: 18px 8px;

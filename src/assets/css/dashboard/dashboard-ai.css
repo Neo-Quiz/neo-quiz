@@ -80,6 +80,12 @@
 .qbd-ai-lateral ~ .qbd-ai-stage:has(> .qbd-ai-title-row) > * {
 	translate: calc(-1 * clamp(0px, (100cqw - 732px) / 2, 114px)) 0;
 }
+/* The hero's stage does not CLIP (2026-09-30): moved left, the composer's
+   glow reached the stage's edge and was cut there in a straight line, by
+   the sidebar. A too-short window scrolls the panel instead. */
+.qbd-ai-lateral ~ .qbd-ai-stage:has(> .qbd-ai-title-row) {
+	overflow: visible;
+}
 
 .qbd-ai-stage--idle::after,
 .qbd-ai-stage--error::after,
