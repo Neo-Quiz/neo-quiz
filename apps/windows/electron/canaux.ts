@@ -40,6 +40,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, screen, shell } from "electron";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 // Le dossier par défaut CHOISI est créé ici s'il manque — voir son canal.
 import * as fsp from "node:fs/promises";
 import { LOG_PREFIX, PRODUCT_NAME } from "../../../src/branding";
@@ -73,6 +74,13 @@ const DELAI_REPRISE_MS = 60_000;
 /** The output kept for a later attach (characters): the transcript of a
     long generation, never the result, which is held apart. */
 const TAILLE_MAX_REPRISE = 8_000_000;
+
+/** The fingerprint of a CLI call for an attach: the tool, the arguments and
+    the input, with the call's random marker taken out of both. */
+function empreinteAppel(tool: string, args: readonly string[], stdin: string, marqueur: string): string {
+	const sans = (x: string): string => (marqueur ? x.split(marqueur).join("") : x);
+	return createHash("sha256").update(JSON.stringify([tool, args.map(sans), sans(stdin)])).digest("hex");
+}
 import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
@@ -1361,7 +1369,12 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   and arguments were judged above like any call; an attach launches
 		   nothing new. */
 		const cleReprise = estCleReprise(s.reprise) ? s.reprise : null;
-		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, surStdout ?? null) : null;
+		/* What the run is asked, WITHOUT its marker: the marker is drawn at
+		   random for each call (`nouveauMarqueur`), so the replay of a line
+		   after a reload carries a new one in its tokens — the rest must be
+		   the same for an attach. */
+		const empreinte = cleReprise ? empreinteAppel(tool, args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
+		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, empreinte, surStdout ?? null) : null;
 		if (rattache) {
 			const enVolRattache = { controleur: rattache.controleur, page: expediteur, reprenable: true };
 			if (!Number.isNaN(id)) cliEnVol.set(id, enVolRattache);
@@ -1372,9 +1385,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			}
 		}
 		const controleur = new AbortController();
-		/* A key already used by a run still attached (a second call of the
-		   same page under the same key) is not resumable: launched plainly. */
-		const reprenable = !!cleReprise && !reprises.enCours(expediteur, cleReprise);
+		/* A key already held (by this window or another, attached or not) is
+		   not resumable: launched plainly, stopped with its page as before. */
+		const reprenable = !!cleReprise && reprises.libre(cleReprise);
 		const enVolCli = { controleur, page: expediteur, reprenable };
 		if (!Number.isNaN(id)) cliEnVol.set(id, enVolCli);
 		const executer = async (emettre?: (texte: string) => void): Promise<ResultatCli> => {
@@ -1405,7 +1418,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			   output for a later attach, even when this call asked for no
 			   stream. */
 			return reprenable && cleReprise
-				? await reprises.lancer(expediteur, cleReprise, controleur, executer, surStdout ?? null)
+				? await reprises.lancer(expediteur, cleReprise, empreinte, controleur, executer, surStdout ?? null)
 				: await executer(surStdout);
 		} finally {
 			/* Retirée SEULEMENT si c'est encore la sienne : le compteur du rendu
@@ -1415,8 +1428,11 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			if (cliEnVol.get(id) === enVolCli) cliEnVol.delete(id);
 		}
 	});
-	ipcMain.handle(CANAUX.processusAnnuler, (_e, requeteId: unknown) => {
-		if (typeof requeteId === "number") cliEnVol.get(requeteId)?.controleur.abort();
+	ipcMain.handle(CANAUX.processusAnnuler, (e, requeteId: unknown) => {
+		/* Only the window that launched the call stops it (security review
+		   of 2026-09-30): ids are per page, another window's could match. */
+		const enVol = typeof requeteId === "number" ? cliEnVol.get(requeteId) : undefined;
+		if (enVol && enVol.page === e.sender) enVol.controleur.abort();
 	});
 
 	ipcMain.handle(CANAUX.armerFermeture, () => deps.fermeture.armer());

@@ -50,7 +50,7 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
 		const cli = faux();
 		const vus = [];
-		const p = reg.lancer("page", "cle-ordinaire", new AbortController(), cli.demarrer, t => vus.push(t));
+		const p = reg.lancer("page", "cle-ordinaire", "E", new AbortController(), cli.demarrer, t => vus.push(t));
 		cli.dire("a"); cli.dire("b");
 		cli.finir("fini");
 		const res = await p;
@@ -65,15 +65,15 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		const cli = faux();
 		const controleur = new AbortController();
 		const avant = [];
-		void reg.lancer("page", "cle-reload", controleur, cli.demarrer, t => avant.push(t));
+		void reg.lancer("page", "cle-reload", "E", controleur, cli.demarrer, t => avant.push(t));
 		cli.dire("un ");
 		reg.detacher("page");
 		cli.dire("deux ");
 		r.check("detached: the old page hears nothing more", avant, ["un "]);
 		r.check("detached: the CLI is NOT stopped", controleur.signal.aborted, false);
-		r.check("another window never attaches it", reg.rattacher("autre-page", "cle-reload", null), null);
+		r.check("another window never attaches it", reg.rattacher("autre-page", "cle-reload", "E", null), null);
 		const apres = [];
-		const rattache = reg.rattacher("page", "cle-reload", t => apres.push(t));
+		const rattache = reg.rattacher("page", "cle-reload", "E", t => apres.push(t));
 		r.check("the reloaded page attaches to the same run", rattache?.controleur === controleur, true);
 		r.check("attached: what was said before AND during the reload is replayed", apres.join(""), "un deux ");
 		cli.dire("trois");
@@ -84,19 +84,19 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		r.check("attached: the result reaches the new page", (await rattache.resultat).stdout, "quiz");
 		await tick();
 		r.check("attached: nothing is held once delivered", reg.taille(), 0);
-		r.check("a key is attached once: a second attach finds nothing", reg.rattacher("page", "cle-reload", null), null);
+		r.check("a key is attached once: a second attach finds nothing", reg.rattacher("page", "cle-reload", "E", null), null);
 	}
 
 	// 3. The run ENDS while the page is reloading: the result waits for it.
 	{
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
 		const cli = faux();
-		void reg.lancer("page", "cle-finie", new AbortController(), cli.demarrer, null);
+		void reg.lancer("page", "cle-finie", "E", new AbortController(), cli.demarrer, null);
 		reg.detacher("page");
 		cli.finir("tenu");
 		await tick();
 		r.check("ended while detached: the result is held", reg.taille(), 1);
-		const rattache = reg.rattacher("page", "cle-finie", null);
+		const rattache = reg.rattacher("page", "cle-finie", "E", null);
 		r.check("ended while detached: the reloaded page gets it", (await rattache.resultat).stdout, "tenu");
 		r.check("ended while detached: then it is forgotten", reg.taille(), 0);
 	}
@@ -106,13 +106,13 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
 		const cli = faux();
 		const controleur = new AbortController();
-		void reg.lancer("page", "cle-orpheline", controleur, cli.demarrer, null);
+		void reg.lancer("page", "cle-orpheline", "E", controleur, cli.demarrer, null);
 		reg.detacher("page");
 		avancer(59000);
 		r.check("unclaimed: still running before the delay", controleur.signal.aborted, false);
 		avancer(2000);
 		r.check("unclaimed: stopped after the delay", controleur.signal.aborted, true);
-		r.check("unclaimed: forgotten", [reg.taille(), reg.rattacher("page", "cle-orpheline", null)], [0, null]);
+		r.check("unclaimed: forgotten", [reg.taille(), reg.rattacher("page", "cle-orpheline", "E", null)], [0, null]);
 	}
 
 	// 5. The window is destroyed: its runs stop at once, another window's do not.
@@ -120,8 +120,8 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
 		const a = new AbortController();
 		const b = new AbortController();
-		void reg.lancer("fenetre-1", "cle-fenetre-1", a, faux().demarrer, null);
-		void reg.lancer("fenetre-2", "cle-fenetre-2", b, faux().demarrer, null);
+		void reg.lancer("fenetre-1", "cle-fenetre-1", "E", a, faux().demarrer, null);
+		void reg.lancer("fenetre-2", "cle-fenetre-2", "E", b, faux().demarrer, null);
 		reg.detruire("fenetre-1");
 		r.check("destroyed: its run is stopped now, the other window's is not", [a.signal.aborted, b.signal.aborted], [true, false]);
 		r.check("destroyed: only the other window's run is held", reg.taille(), 1);
@@ -131,12 +131,12 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 	{
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 5, minuteries });
 		const cli = faux();
-		void reg.lancer("page", "cle-bornee", new AbortController(), cli.demarrer, null);
+		void reg.lancer("page", "cle-bornee", "E", new AbortController(), cli.demarrer, null);
 		cli.dire("abc"); cli.dire("defgh"); cli.dire("ij");
 		reg.detacher("page");
 		const vus = [];
-		const rattache = reg.rattacher("page", "cle-bornee", t => vus.push(t));
-		r.check("bounded: the replay stops at the limit", vus.join(""), "abcij");
+		const rattache = reg.rattacher("page", "cle-bornee", "E", t => vus.push(t));
+		r.check("bounded: the replay stops at the limit, with no hole in the middle", vus.join(""), "abc");
 		cli.finir("resultat entier");
 		r.check("bounded: the result is whole", (await rattache.resultat).stdout, "resultat entier");
 	}
@@ -144,19 +144,42 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 	// 7. A launch that rejects still gives an envelope to whoever attaches.
 	{
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
-		void reg.lancer("page", "cle-rejet", new AbortController(), () => Promise.reject(Object.assign(new Error("tué"), { name: "annule" })), null).catch(() => {});
+		void reg.lancer("page", "cle-rejet", "E", new AbortController(), () => Promise.reject(Object.assign(new Error("tué"), { name: "annule" })), null).catch(() => {});
 		reg.detacher("page");
 		await tick();
-		const rattache = reg.rattacher("page", "cle-rejet", null);
+		const rattache = reg.rattacher("page", "cle-rejet", "E", null);
 		r.check("a rejection is held as a named envelope", await rattache?.resultat, { ok: false, nom: "annule", message: "tué" });
 	}
 
 	// 8. A run still attached is never shared with a second call of the same key.
 	{
 		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
-		void reg.lancer("page", "cle-partagee", new AbortController(), faux().demarrer, null);
-		r.check("still attached: enCours says so", reg.enCours("page", "cle-partagee"), true);
-		r.check("still attached: not attachable", reg.rattacher("page", "cle-partagee", null), null);
+		void reg.lancer("page", "cle-partagee", "E", new AbortController(), faux().demarrer, null);
+		r.check("still attached: the key is not free", reg.libre("cle-partagee"), false);
+		r.check("still attached: not attachable", reg.rattacher("page", "cle-partagee", "E", null), null);
+	}
+
+	/* 9. Security review of 2026-09-30: ANOTHER window sending a held key
+	   never evicts that run — evicted, it could no longer be detached nor
+	   stopped, and would run on with its tool's lock. */
+	{
+		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
+		const a = new AbortController();
+		void reg.lancer("fenetre-1", "cle-convoitee", "E", a, faux().demarrer, null);
+		const autre = faux();
+		void reg.lancer("fenetre-2", "cle-convoitee", "E", new AbortController(), autre.demarrer, null);
+		reg.detruire("fenetre-1");
+		r.check("a held key is not overwritten: closing its window still stops it", a.signal.aborted, true);
+		r.check("the other window's call ran unregistered", reg.taille(), 0);
+	}
+
+	// 10. An attach must ask the same thing: another request never gets this answer.
+	{
+		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
+		void reg.lancer("page", "cle-empreinte", "quiz CM1", new AbortController(), faux().demarrer, null);
+		reg.detacher("page");
+		r.check("fingerprint: a different request is not attached", reg.rattacher("page", "cle-empreinte", "quiz CM2", null), null);
+		r.check("fingerprint: the same request is", reg.rattacher("page", "cle-empreinte", "quiz CM1", null) !== null, true);
 	}
 
 	r.done();

@@ -47,6 +47,12 @@ interface Entree<P> {
 	taille: number;
 	/** Where the live output goes now; `null` while detached. */
 	relais: ((texte: string) => void) | null;
+	/** What the run was asked (tool, arguments, input): an attach must ask
+	    the same, or it would get another generation's answer. */
+	empreinte: string;
+	/** The buffer reached `tailleMax`: nothing more is kept, so a replay
+	    is a clean beginning, never one with holes. */
+	plein: boolean;
 	detache: boolean;
 	fini: boolean;
 	minuteur: unknown;
@@ -57,16 +63,18 @@ export interface Reprises<P> {
 	    receive every chunk of output: it is buffered and relayed. The
 	    promise is the run's result for the CALLER; once detached, the result
 	    is held for the next attach instead. */
-	lancer(page: P, cle: string, controleur: AbortController,
+	lancer(page: P, cle: string, empreinte: string, controleur: AbortController,
 		demarrer: (emettre: (texte: string) => void) => Promise<ResultatCli>,
 		relais: ((texte: string) => void) | null): Promise<ResultatCli>;
 	/** The detached run of `page` under `cle`, now attached: its buffered
 	    output is replayed into `relais` first. `null` when there is none (a
 	    fresh run must be launched). */
-	rattacher(page: P, cle: string, relais: ((texte: string) => void) | null): { resultat: Promise<ResultatCli>; controleur: AbortController } | null;
-	/** Does `cle` name a run of `page` that is still attached (running for a
-	    live caller)? */
-	enCours(page: P, cle: string): boolean;
+	rattacher(page: P, cle: string, empreinte: string, relais: ((texte: string) => void) | null): { resultat: Promise<ResultatCli>; controleur: AbortController } | null;
+	/** Is `cle` free? A key already held, by this page or ANOTHER one, is
+	    never overwritten: that run would leave the registry without being
+	    stopped, and nothing would detach or stop it any more (security
+	    review of 2026-09-30). The caller then launches a plain run. */
+	libre(cle: string): boolean;
 	/** The page navigated or its renderer died: its runs are detached and
 	    will be stopped unless attached again within the delay. */
 	detacher(page: P): void;
@@ -90,17 +98,22 @@ export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; 
 	}
 
 	return {
-		lancer(page, cle, controleur, demarrer, relais) {
+		lancer(page, cle, empreinte, controleur, demarrer, relais) {
+			// Never overwrite a held key (see `libre`): a plain run, unregistered.
+			if (entrees.has(cle)) return demarrer(t => { if (relais) relais(t); });
 			const e: Entree<P> = {
 				page, controleur, resultat: Promise.resolve({ ok: false, nom: "erreur", message: "" }),
-				morceaux: [], taille: 0, relais, detache: false, fini: false, minuteur: null,
+				morceaux: [], taille: 0, relais, empreinte, plein: false, detache: false, fini: false, minuteur: null,
 			};
 			const emettre = (texte: string): void => {
 				/* Buffered up to `tailleMax` characters: past it, a reattached
-				   transcript misses a part of the middle — never the result. */
-				if (e.taille + texte.length <= options.tailleMax) {
+				   transcript misses its end until the live output resumes —
+				   never the result, and never a hole in the middle. */
+				if (!e.plein && e.taille + texte.length <= options.tailleMax) {
 					e.morceaux.push(texte);
 					e.taille += texte.length;
+				} else {
+					e.plein = true;
 				}
 				if (e.relais) {
 					try { e.relais(texte); } catch { /* a dead listener never stops a run */ }
@@ -121,9 +134,9 @@ export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; 
 			entrees.set(cle, e);
 			return e.resultat;
 		},
-		rattacher(page, cle, relais) {
+		rattacher(page, cle, empreinte, relais) {
 			const e = entrees.get(cle);
-			if (!e || e.page !== page || !e.detache) return null;
+			if (!e || e.page !== page || !e.detache || e.empreinte !== empreinte) return null;
 			if (e.minuteur !== null) { minuteries.annuler(e.minuteur); e.minuteur = null; }
 			e.detache = false;
 			if (relais) {
@@ -138,10 +151,7 @@ export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; 
 			if (e.fini) oublier(cle, e);
 			return { resultat: e.resultat, controleur: e.controleur };
 		},
-		enCours(page, cle) {
-			const e = entrees.get(cle);
-			return !!e && e.page === page && !e.detache;
-		},
+		libre: (cle) => !entrees.has(cle),
 		detacher(page) {
 			for (const [cle, e] of entrees) {
 				if (e.page !== page || e.detache) continue;
