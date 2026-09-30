@@ -123,7 +123,7 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				/* Learn, single choice: the click IS the answer, so it is
 				   checked on the spot, without the Check button. Multiple
 				   choice keeps the button (the answer is several clicks). */
-				if (!isMulti && ctx.learn.canCheck(qi)) ctx.learn.checkQuestion(qi);
+				if (ctx.learn.checksOnClick(qi) && ctx.learn.canCheck(qi)) ctx.learn.checkQuestion(qi);
 			};
 			el.addEventListener("click", trySelect);
 			el.addEventListener("keydown", e => {

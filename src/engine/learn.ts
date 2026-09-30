@@ -47,6 +47,8 @@ export interface LearnHandlers {
 	isRevealed(qi: number): boolean;
 	/** Checkable now: answered, not revealed yet (a flashcard checks by its rating). */
 	canCheck(qi: number): boolean;
+	/** A single-choice Learn card: checked by the click, no Check button. */
+	checksOnClick(qi: number): boolean;
 	/** A written answer revealed and waiting for the learner's own verdict. */
 	isPendingSelfRating(qi: number): boolean;
 	verdictOf(qi: number): LearnVerdict;
@@ -170,8 +172,16 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 		return { kind: "go", qi: move.qi };
 	}
 
+	/** A single-choice card checks on the click itself: the Check button
+	    would have nothing left to do, so it is not drawn. */
+	function checksOnClick(qi: number): boolean {
+		const q = ctx.quiz[qi];
+		return isCheckable(qi) && !ctx.textOnly.isTextOnlyFor(qi) && !ctx.isTextQuestion(q) && !ctx.isClozeQuestion(q)
+			&& !ctx.isOrderingQuestion(q) && !ctx.isMatchingQuestion(q) && !(q as { multiSelect?: boolean }).multiSelect;
+	}
+
 	function checkButtonHtml(qi: number): string {
-		if (!isCheckable(qi) || isRevealed(qi) || ctx.isFlashcardQuestion(ctx.quiz[qi])) return "";
+		if (!isCheckable(qi) || isRevealed(qi) || ctx.isFlashcardQuestion(ctx.quiz[qi]) || checksOnClick(qi)) return "";
 		return `<button class="quiz-action-btn success quiz-learn-check-btn" type="button" data-learn-check="${qi}"${canCheck(qi) ? "" : " disabled"}>${t("engine.learn.check")}</button>`;
 	}
 
@@ -205,6 +215,7 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 		isGraded,
 		isRevealed,
 		canCheck,
+		checksOnClick,
 		isPendingSelfRating,
 		verdictOf,
 		checkQuestion,

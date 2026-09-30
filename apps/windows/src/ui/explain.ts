@@ -85,9 +85,20 @@ export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, de
 	const majVisibilite = (): void => {
 		bouton.hidden = !!hote.querySelector(":scope > .quiz-exam-timer");
 	};
-	const observateur = new MutationObserver(majVisibilite);
-	observateur.observe(hote, { childList: true });
+	/* Clickable only once the question on screen has an answer: without
+	   one the prompt would carry an empty "My answer" and explain nothing
+	   about the learner's own choice. */
+	const majActivation = (): void => {
+		const slide = questionAffichee(hote);
+		const repondu = !!slide && maReponse(slide) !== "";
+		bouton.disabled = !repondu;
+		bouton.title = t(repondu ? "ai.explain.buttonTip" : "ai.explain.answerFirst");
+	};
+	const observateur = new MutationObserver(() => { majVisibilite(); majActivation(); });
+	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
+	hote.addEventListener("input", majActivation);
 	majVisibilite();
+	majActivation();
 
 	bouton.addEventListener("click", () => {
 		const provider = deps.settings.get().aiProvider || "";
@@ -98,15 +109,15 @@ export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, de
 		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
 		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
 		const message = remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
-		ouvrirExplication(message, deps.settings);
+		ouvrirExplication(message, deps.settings, t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }));
 	});
 
-	return () => { observateur.disconnect(); bouton.remove(); };
+	return () => { observateur.disconnect(); hote.removeEventListener("input", majActivation); bouton.remove(); };
 }
 
 /** The explanation window: the conversation, written live, and a field for
     the next question. Closing it stops a running answer. */
-function ouvrirExplication(premier: string, settings: AiSettingsHost): void {
+function ouvrirExplication(premier: string, settings: AiSettingsHost, libellePremier: string): void {
 	const host = currentHost();
 	const client = createAiClient(settings);
 	const historique: ChatTurn[] = [];
@@ -133,11 +144,11 @@ function ouvrirExplication(premier: string, settings: AiSettingsHost): void {
 
 			const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 60;
 
-			async function envoyer(texte: string): Promise<void> {
+			async function envoyer(texte: string, affiche?: string): Promise<void> {
 				if (enCours || !texte.trim()) return;
 				enCours = true;
 				historique.push({ role: "user", text: texte.trim() });
-				ajouter(fil, "div", "qbd-ai-bulle nq-explain-demande", texte.trim());
+				ajouter(fil, "div", "qbd-ai-bulle nq-explain-demande", (affiche ?? texte).trim());
 				const rep = ajouter(fil, "div", "qbd-ai-chat-reponse");
 				const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
 				const p = aiProviders.getProvider(settings.get().aiProvider || "");
@@ -214,7 +225,7 @@ function ouvrirExplication(premier: string, settings: AiSettingsHost): void {
 				void envoyer(texte);
 			});
 			majEnvoi();
-			void envoyer(premier);
+			void envoyer(premier, libellePremier);
 		},
 		// Closing stops a running answer: nobody would read it.
 		onClose: () => { if (enCours) client.abort(); },
