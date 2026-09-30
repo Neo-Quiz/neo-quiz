@@ -176,7 +176,7 @@
   border: none;
   background: none;
   font-family: "Neo Quiz Mono", "JetBrains Mono", var(--font-monospace, monospace);
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
   color: var(--text-muted);
@@ -396,7 +396,7 @@
 .quiz-options-image-grid > .quiz-option[data-letter]::before{
   width: 20px;
   height: 20px;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .quiz-options-image-grid > .quiz-option .quiz-option-embed-wrap{

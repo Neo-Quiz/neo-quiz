@@ -935,7 +935,7 @@
 	border-radius: 6px;
 	background: none;
 	font-family: "Neo Quiz Mono", "JetBrains Mono", var(--font-monospace, monospace);
-	font-size: 17px;
+	font-size: 14px;
 	font-weight: 700;
 	line-height: 1;
 	color: var(--text-muted);
