@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════════════════
    "EXPLAIN" ON A PLAYED QUESTION (2026-09-29)
 
-   A button in the quiz's header, on the line of the close cross: it sends
+   A button in its own row under the question, above the arrows: it sends
    the question on screen to Claude Code or Codex — the prompt is a template
    the learner can change (Settings › AI), filled by `explain-prompt.ts` —
    and opens the answer in a window, written live, with room for follow-up
@@ -58,13 +58,20 @@ function maReponse(slide: HTMLElement): string {
 	return saisies.join(" ; ");
 }
 
-export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, deps: {
+export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	questions: Record<string, unknown>[];
 	titre: string;
 	settings: AiSettingsHost;
 }): () => void {
 	const host = currentHost();
-	const bouton = ajouter(entete, "button", "qbd-qz-explain");
+	/* A row of the panel, right under the question and above the bar of
+	   arrows (`ui/quiz-bars.ts` keeps the slides clear of it). */
+	const panneau = hote.closest<HTMLElement>(".qbd-qz");
+	if (!panneau) return () => {};
+	const rangee = ajouter(panneau, "div", "qz-above-bar qz-explain-row");
+	const barre = panneau.querySelector(":scope > .qz-bottom-bar");
+	if (barre) panneau.insertBefore(rangee, barre);
+	const bouton = ajouter(rangee, "button", "qbd-qz-explain");
 	bouton.type = "button";
 	bouton.title = t("ai.explain.buttonTip");
 	/* The LOGO of the provider chosen in Settings (Claude Code's or
@@ -83,7 +90,7 @@ export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, de
 
 	/* Hidden in an Exam: the engine puts its clock straight into the host. */
 	const majVisibilite = (): void => {
-		bouton.hidden = !!hote.querySelector(":scope > .quiz-exam-timer");
+		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer");
 	};
 	/* Clickable only once the question on screen has an answer: without
 	   one the prompt would carry an empty "My answer" and explain nothing
@@ -112,7 +119,7 @@ export function monterBoutonExpliquer(entete: HTMLElement, hote: HTMLElement, de
 		ouvrirExplication(message, deps.settings, t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }));
 	});
 
-	return () => { observateur.disconnect(); hote.removeEventListener("input", majActivation); bouton.remove(); };
+	return () => { observateur.disconnect(); hote.removeEventListener("input", majActivation); rangee.remove(); };
 }
 
 /** The explanation window: the conversation, written live, and a field for

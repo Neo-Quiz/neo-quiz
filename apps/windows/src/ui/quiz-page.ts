@@ -246,7 +246,7 @@ export async function openQuizPage(
 	const detachBars = attachQuizBars(hote);
 	/* "Explain" in the header, right: not in an Exam (it hides with the clock). */
 	const demonterExpliquer = aiSettings && questionsJouees.length
-		? monterBoutonExpliquer(entete, hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings })
+		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings })
 		: null;
 	let fait = false;
 	return {

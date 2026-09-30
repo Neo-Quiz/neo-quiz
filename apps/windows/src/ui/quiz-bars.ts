@@ -93,7 +93,8 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		const contentBottom = panelRect.top + (panel.clientTop + panel.clientHeight
 			- parseFloat(getComputedStyle(panel).paddingBottom || "0")) * scale;
 		const trailing = host.getBoundingClientRect().bottom - viewportRect.bottom;
-		const room = (contentBottom - viewportRect.top - trailing) / scale - bar.offsetHeight;
+		const room = (contentBottom - viewportRect.top - trailing) / scale - bar.offsetHeight
+			- (panel.querySelector<HTMLElement>(":scope > .qz-above-bar:not([hidden])")?.offsetHeight ?? 0);
 		const value = `${Math.max(0, Math.floor(room))}px`;
 		/* Skipping an unchanged value keeps the loop (height → host resized →
 		   refresh) visibly finite. */
