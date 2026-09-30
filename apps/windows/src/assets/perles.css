@@ -221,13 +221,23 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 }
 
 /* AN ANSWERED QUESTION (2026-09-30): the bead keeps the NEUTRAL face of an
-   unanswered one and only carries a small blue dot (see "answered dot"
-   below). It used to be a medium blue, which could not be told apart from
-   the CURRENT bead (full blue). */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active) {
+   unanswered one and RECEDES (45 % opacity) — done, while the beads still
+   to answer stand out. It used to be a medium blue, which could not be told
+   apart from the CURRENT bead (full blue); a blue dot was tried and dropped.
+   Back to full opacity on hover or focus, through the bead's own `opacity`
+   transition. A bead turned but not yet rated (`checked`) is done too. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active),
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active) {
 	--tab-face: #2b2a33;
 	--tab-edge: #141319;
 	--tab-text: #fff;
+	opacity: 0.45;
+}
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active):hover,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active):focus-visible,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):hover,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):focus-visible {
+	opacity: 1;
 }
 
 /* THE CURRENT BEAD's moving shine (2026-09-27): the same light sweep as
@@ -291,12 +301,7 @@ body > .quiz-handin-overlay .quiz-submit-perle {
    a colour mixed into the darkest background (a flashcard rated "I knew it"
    was an almost black green). Green = knew it / right, amber = partly or to
    review, red = wrong; turned but not yet rated is treated like answered
-   (neutral face, blue dot). */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active) {
-	--tab-face: #2b2a33;
-	--tab-edge: #141319;
-	--tab-text: #fff;
-}
+   (see "AN ANSWERED QUESTION" above). */
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.understood:not(.active),
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.correct:not(.active) {
 	--tab-face: color-mix(in srgb, var(--quiz-success) 80%, #2b2a33);
@@ -333,27 +338,6 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	height: calc(var(--taille) * 0.46);
 	font-size: calc(var(--taille) * 0.3);
 	box-shadow: 0 0 0 1.5px var(--background-primary);
-}
-
-/* The answered DOT (2026-09-30): a small blue dot at the top left of an
-   answered bead (or one turned but not yet rated), scaled to the bead, with
-   the same thin outline as the verdict mark. `::before` is free here: the
-   verdict mark only exists on correct / retried / wrong, excluded below along
-   with the current bead and readings. The hint bulb (`::after`, top left)
-   only comes with a verdict, so the two never share the corner. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active, .is-lecture, .correct, .retried, .wrong)::before,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active, .is-lecture, .understood, .partial, .review, .correct, .retried, .wrong)::before {
-	content: "";
-	position: absolute;
-	top: calc(var(--taille) * -0.03);
-	left: calc(var(--taille) * -0.03);
-	z-index: 1;
-	width: calc(var(--taille) * 0.17);
-	height: calc(var(--taille) * 0.17);
-	border-radius: 50%;
-	background: var(--quiz-primary);
-	box-shadow: 0 0 0 1.5px var(--background-primary);
-	pointer-events: none;
 }
 
 /* The hint BULB of a bead (nav-tabs.css, `used-hint`), scaled the same way but

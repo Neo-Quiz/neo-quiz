@@ -13,7 +13,9 @@
    ========================================================= */
 
 .qb-terme{
-  cursor: help;
+  /* The cursor stays the text's own (2026-09-30): the question-mark cursor
+     of `help` was jarring over a word that only shows its definition. */
+  cursor: inherit;
   border-bottom: 1px dotted color-mix(in srgb, var(--quiz-primary) 60%, transparent);
   text-decoration: none;
   border-radius: 2px;
