@@ -136,3 +136,13 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	r.check("its title names it without the extension", sys.includes("CC — Learn CM2 - Listes"), true);
 	r.done();
 });
+
+/* The NAME of a preparation's quiz is imposed: the exam, then the step. */
+await withSrcModule("src/dashboard/file-generation-app.ts", ({ titrePreparation }) => {
+	const r = makeReporter("/exam quiz names");
+	const examen = { nom: "Contrôle continu - 20%", date: "2026-09-30", module: "XTI301" };
+	r.check("a Test is named after the exam and its level", titrePreparation({ mode: "practice", preparation: { examen, palier: 2, paliers: 3 } }), "Contrôle continu - 20% — Test 2");
+	r.check("a Learn names its document, without the extension", titrePreparation({ mode: "learn", preparation: { examen, palier: 0, paliers: 3, document: "CM2 - Programmation Python.pdf" } }), "Contrôle continu - 20% — Learn CM2 - Programmation Python");
+	r.check("outside a preparation, the model's title", titrePreparation({ mode: "learn" }), undefined);
+	r.done();
+});

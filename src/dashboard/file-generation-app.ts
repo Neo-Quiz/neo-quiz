@@ -25,7 +25,7 @@ import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
-import { NoQuizAnswer, createAiClient } from "./ai-client";
+import { NoQuizAnswer, createAiClient, nettoyerTitre } from "./ai-client";
 import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
@@ -255,7 +255,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			   plus la page « Générer ». */
 			// Le quiz est GARDÉ avec la demande avant toute écriture.
 			etapeDe(ligne.id, "enregistrement");
-			await enregistrer(ligne.id, { ...d, produit: { questions, titre: reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } });
+			await enregistrer(ligne.id, { ...d, produit: { questions, titre: titrePreparation(d) ?? reponse.titre, usage, planTranches: learn.plan, noteLearn: learn.note } });
 		} catch (err) {
 			/* Asked for no quiz: the prose is the answer, shown in place of a quiz. */
 			if (err instanceof NoQuizAnswer) {
@@ -343,6 +343,19 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			return () => { abonnes.delete(a); };
 		},
 	};
+}
+
+/** The name of a quiz of an "/exam" preparation, imposed rather than left
+    to the model (which named three Tests "CM3", "CM3 (2)", "CM3 (3)" on
+    2026-09-30): the exam, then the step — "Contrôle continu — Learn CM2",
+    "Contrôle continu — Test 3". `undefined` outside a preparation. */
+export function titrePreparation(d: Pick<DemandeFile, "mode" | "preparation">): string | undefined {
+	const p = d.preparation;
+	if (!p?.examen) return undefined;
+	const etape = d.mode === "learn"
+		? (p.document ? `Learn ${p.document.replace(/\.[^.]+$/, "")}` : "Learn")
+		: `Test ${p.palier}`;
+	return nettoyerTitre(`${p.examen.nom} — ${etape}`);
 }
 
 /** Les images en base64 pour l'API de vision, lues au moment de partir. */
