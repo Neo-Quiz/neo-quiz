@@ -28,6 +28,8 @@ const ICON_DRAPEAU = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24
 /* Lucide trophy: the same tab once the quiz is handed in (2026-09-30) — the
    score is there to see again, the flag of the finish line is behind. */
 const ICON_TROPHEE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
+/** How long the flag takes to become the trophy (nav-tabs.css, the same duration). */
+const DUREE_ARRIVEE_MS = 900;
 /* Lucide triangle-alert / circle-check: the end screen, depending on whether
    questions remain. */
 const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
@@ -50,7 +52,7 @@ export interface CardHandlers {
 	navPosition(): number;
 	/** The last tab of the row: its classes (without `active`), its content,
 	    and which of its two states it is — read by `updateNavHighlight`. */
-	resultTab(): { cls: string; html: string; etat: "finish" | "scored" };
+	resultTab(): { cls: string; html: string; etat: "finish" | "scored"; style: string };
 	optionClass(qi: number, oi: number): string;
 	optionContentHtml(q: QcmQuestion | MultiSelectQuestion, oi: number): string;
 	explanationHtml(qi: number): string;
@@ -147,11 +149,26 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   the flag of the finish line ("Finish"); once handed in and the score
 	   seen, a trophy ("Results") in the accent colour — the corrections are
 	   being read, the score is one click away. */
-	function resultTab(): { cls: string; html: string; etat: "finish" | "scored" } {
-		return ctx.quizState.locked
-			? { cls: "quiz-tab is-result is-scored", etat: "scored", html: `<span class="quiz-tab-drapeau">${ICON_TROPHEE}</span><span class="quiz-tab-libelle">${t("engine.nav.results")}</span>` }
-			: { cls: "quiz-tab is-result", etat: "finish", html: `<span class="quiz-tab-drapeau">${ICON_DRAPEAU}</span><span class="quiz-tab-libelle">${t("engine.nav.finish")}</span>` };
+	function resultTab(): { cls: string; html: string; etat: "finish" | "scored"; style: string } {
+		const etat = ctx.quizState.locked ? "scored" : "finish";
+		/* THE CHANGE IS ANIMATED (nav-tabs.css `.is-arrivee`): the green
+		   flag gives way to the gold trophy. The row is rebuilt a few frames
+		   after the lock (`ctx.render()`, track.ts), which would restart or
+		   cut the animation: the time already played goes on each new tab as
+		   a NEGATIVE delay (`--arrivee`), so it carries on where it was. */
+		if (etatVu === "finish" && etat === "scored") arriveeDebut = performance.now();
+		etatVu = etat;
+		const ecoule = performance.now() - arriveeDebut;
+		const arrivee = etat === "scored" && arriveeDebut > 0 && ecoule < DUREE_ARRIVEE_MS;
+		const style = arrivee ? `--arrivee:-${Math.round(ecoule)}ms` : "";
+		return etat === "scored"
+			? { cls: "quiz-tab is-result is-scored" + (arrivee ? " is-arrivee" : ""), etat, style, html: `<span class="quiz-tab-drapeau">${ICON_TROPHEE}</span><span class="quiz-tab-libelle">${t("engine.nav.results")}</span>` }
+			: { cls: "quiz-tab is-result", etat, style, html: `<span class="quiz-tab-drapeau">${ICON_DRAPEAU}</span><span class="quiz-tab-libelle">${t("engine.nav.finish")}</span>` };
 	}
+
+	/** The state of the last tab last drawn, and when it became the trophy. */
+	let etatVu: "finish" | "scored" | null = null;
+	let arriveeDebut = 0;
 
 	function navHtml(): string {
 		const resultsActive = (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) ? "active" : "";
@@ -173,7 +190,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${nom}" data-titre="${nom}">${ICON_LIVRE}</a>`;
 		};
 		const r = resultTab();
-		const fin = `<a class="${r.cls} ${resultsActive}" href="#" data-nav-results="1" data-etat="${r.etat}">${r.html}</a>`;
+		const fin = `<a class="${r.cls} ${resultsActive}" href="#" data-nav-results="1" data-etat="${r.etat}"${r.style ? ` style="${r.style}"` : ""}>${r.html}</a>`;
 		// `--quiz-nav-n` : le nombre de perles, « Résultats » compris.
 		return `<div class="quiz-nav" style="--quiz-nav-n:${onglets.length + 1};--quiz-nav-pos:${navPosition()}">${onglets.map(onglet).join("")}${fin}</div>`;
 	}

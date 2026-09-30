@@ -441,6 +441,8 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 			resultsTab.className = buildNavTabClass(`${r.cls} ${active}`.trim(), resultsTab);
 			// Handed in since the row was drawn: the flag becomes the trophy.
 			if (resultsTab.dataset.etat !== r.etat) { resultsTab.innerHTML = r.html; resultsTab.dataset.etat = r.etat; }
+			if (r.style) resultsTab.style.setProperty("--arrivee", r.style.slice("--arrivee:".length));
+			else resultsTab.style.removeProperty("--arrivee");
 		}
 		// La longueur du fil rempli de la frise de perles (application).
 		ctx.container.querySelector<HTMLElement>(".quiz-nav")?.style.setProperty("--quiz-nav-pos", String(ctx.cards.navPosition()));

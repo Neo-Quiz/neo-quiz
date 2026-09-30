@@ -341,5 +341,6 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 }
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:hover,
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:focus-visible {
-	background: linear-gradient(150deg, #fff0b3 0%, #f9d561 38%, #e6ad24 72%, #c78a10 100%);
+	background: var(--tab-or);
+	filter: brightness(1.1);
 }

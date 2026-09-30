@@ -180,19 +180,71 @@
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
 
 /* Handed in: the score to see again, in the GOLD of a trophy (cards.ts) — a
-   gradient from pale to deep gold. `--tab-face` stays a plain gold: the
-   rules that mix it (hover, the edge) cannot mix a gradient. The icon is a
-   dark brown: white on gold would not read. */
+   gradient from bright to deep gold, deep enough for a WHITE trophy, which a
+   dark-gold shadow lifts off the metal. `--tab-face` stays a plain gold: the
+   rules that mix it (the edge) cannot mix a gradient. The hover brightens
+   through `filter`, which, unlike a gradient, can be transitioned. */
 .quiz-tab.is-result.is-scored{
-  --tab-face: #e0a91c;
-  --tab-edge: #8a5f06;
-  --tab-text: #3d2a02;
-  --tab-or: linear-gradient(150deg, #fde68a 0%, #f6c945 38%, #dc9f12 72%, #b87a06 100%);
+  --tab-face: #c98a0c;
+  --tab-edge: #7a4f03;
+  --tab-text: #fff;
+  --tab-or: linear-gradient(150deg, #f8cf4f 0%, #e3a417 36%, #c1820a 70%, #9a6304 100%);
+  position: relative;
   background: var(--tab-or);
+  transition: filter 0.15s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
+}
+.quiz-tab.is-result.is-scored .quiz-tab-drapeau svg{
+  filter: drop-shadow(0 1px 1px rgb(90 52 0 / 0.75));
 }
 .quiz-tab.is-result.is-scored:hover,
 .quiz-tab.is-result.is-scored:focus-visible{
-  background: linear-gradient(150deg, #fff0b3 0%, #f9d561 38%, #e6ad24 72%, #c78a10 100%);
+  background: var(--tab-or);
+  filter: brightness(1.1);
+}
+
+/* THE CHANGE, flag to trophy (cards.ts `resultTab`, 900 ms): the green face
+   melts into the gold, the trophy rises in with a small overshoot, and a
+   gold glow breathes out once. `--arrivee` is the NEGATIVE delay that lets a
+   rebuilt row carry on where the previous one was. */
+.quiz-tab.is-arrivee{
+  animation: qz-or-lueur 900ms ease-out both;
+  animation-delay: var(--arrivee, 0ms);
+}
+.quiz-tab.is-arrivee::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--quiz-success);
+  pointer-events: none;
+  animation: qz-or-vert 900ms ease-out both;
+  animation-delay: var(--arrivee, 0ms);
+}
+.quiz-tab.is-arrivee .quiz-tab-drapeau{
+  position: relative;
+  animation: qz-or-trophee 900ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  animation-delay: var(--arrivee, 0ms);
+}
+@keyframes qz-or-vert{
+  0%, 15%{ opacity: 1; }
+  60%, 100%{ opacity: 0; }
+}
+@keyframes qz-or-trophee{
+  0%{ opacity: 0; transform: scale(0.3) rotate(-25deg); }
+  25%{ opacity: 0; transform: scale(0.3) rotate(-25deg); }
+  65%{ opacity: 1; transform: scale(1.22) rotate(8deg); }
+  100%{ opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes qz-or-lueur{
+  0%, 30%{ filter: drop-shadow(0 0 0 rgb(250 204 21 / 0)); }
+  60%{ filter: drop-shadow(0 0 10px rgb(250 204 21 / 0.85)); }
+  100%{ filter: drop-shadow(0 0 0 rgb(250 204 21 / 0)); }
+}
+@media (prefers-reduced-motion: reduce){
+  .quiz-tab.is-arrivee,
+  .quiz-tab.is-arrivee::before,
+  .quiz-tab.is-arrivee .quiz-tab-drapeau{ animation: none; }
+  .quiz-tab.is-arrivee::before{ opacity: 0; }
 }
 
 /* The key sinks. `.is-pressing`: the class the engine sets during the
