@@ -350,6 +350,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.explain.asked": "Explique-moi cette question : {question}",
 	"ai.explain.tile": "Prompt",
 	"ai.explain.tileEdit": "Modifier le prompt dans les réglages",
+	"ai.explain.miniPlaceholder": "Ajoute une précision (facultatif)",
+	"ai.explain.myQuestion": "Ma question en particulier :",
 	"ai.explain.title": "Explication",
 	"ai.explain.defaultPrompt": "Explique-moi cette question de mon quiz « {quiz} » comme si je ne connaissais rien au sujet. Procède dans cet ordre :\n1. La bonne réponse, en une phrase.\n2. Le pourquoi, pas à pas, en définissant chaque terme dès sa première apparition.\n3. Pour chaque autre choix, l'erreur précise qu'il pousse à faire.\n4. Une analogie tirée du quotidien, avec sa limite (ce qu'elle ne dit pas).\n5. Un exemple concret résolu étape par étape.\n6. Le point de cours à retenir, puis une petite question de vérification, sans sa réponse, pour que j'essaie de m'en souvenir.\n\nQuestion :\n{question}\n\nChoix :\n{options}\n\nBonne réponse : {answer}\nMa réponse : {myAnswer}\nExplication du quiz : {explanation}",
 	"ai.explain.followUp": "Pose une autre question…",

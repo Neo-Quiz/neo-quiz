@@ -176,20 +176,47 @@
 .qz-explain-row[hidden] {
 	display: none;
 }
-.qz-mini {
-	width: min(560px, 100%);
-	display: flex;
-	flex-direction: row;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: 12px;
-	padding: 10px 12px 8px 16px;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
-	border-radius: 16px;
-	background: color-mix(in srgb, var(--background-primary) 55%, transparent);
-	-webkit-backdrop-filter: blur(14px);
-	backdrop-filter: blur(14px);
+/* The button that opens the Explain window: the 3D blue of the arrows, with the
+   provider's logo. */
+.qz-explain-btn {
+	--face: var(--quiz-primary);
+	--edge: var(--quiz-primary-edge);
+	--depth: 4px;
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 36px;
+	margin-bottom: var(--depth);
+	padding: 0 18px 0 14px;
+	border: 0;
+	border-radius: 12px;
+	background: var(--face);
+	color: #fff;
+	font: inherit;
+	font-size: 14px;
+	font-weight: 700;
+	box-shadow: 0 var(--depth) 0 0 var(--edge);
+	cursor: pointer;
+	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
+.qz-explain-btn:hover {
+	background: var(--quiz-primary-light);
+}
+.qz-explain-btn:active {
+	transform: translateY(var(--depth));
+	box-shadow: 0 0 0 0 var(--edge);
+}
+.qz-explain-btn-logo {
+	display: inline-grid;
+	place-items: center;
+}
+.qz-explain-btn-logo .qbd-provider-logo,
+.qz-explain-btn-logo svg {
+	width: 16px;
+	height: 16px;
+}
+
 /* The prompt tile: the start of what will be sent, faded at the bottom, its
    name and a pencil that opens the Settings on the prompt. */
 .qz-mini-tuile {
@@ -367,17 +394,29 @@
 }
 
 .nq-explain-composer {
+	flex: none;
 	display: flex;
-	align-items: flex-end;
+	flex-direction: column;
 	gap: 8px;
-	padding: 8px 8px 8px 14px;
+	padding: 10px 12px 8px 16px;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 14px;
+	border-radius: 16px;
 	background: var(--background-secondary);
 }
 
+/* A message of the learner, on the right: the prompt tile then, under it, what
+   they typed. */
+.nq-explain-msg-user {
+	align-self: flex-end;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 8px;
+	max-width: 80%;
+}
+
 .nq-explain-champ {
-	flex: 1;
+	width: 100%;
 	min-height: 24px;
 	max-height: 160px;
 	padding: 4px 0;
@@ -393,49 +432,14 @@
 
 /* The send arrow: the 3D blue of the quiz's arrows; without a text to send it
    goes flat and grey instead of a washed-out blue. */
-.nq-explain-envoi {
-	--face: var(--quiz-primary);
-	--edge: var(--quiz-primary-edge);
-	--depth: 4px;
-	flex: none;
-	display: grid;
-	place-items: center;
-	width: 36px;
-	height: 32px;
-	margin-bottom: var(--depth);
-	padding: 0;
-	border: 0;
-	border-radius: 11px;
-	background: var(--face);
-	color: #fff;
-	box-shadow: 0 var(--depth) 0 0 var(--edge);
-	cursor: pointer;
-	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
-}
-.nq-explain-envoi:hover:not(:disabled) {
-	background: var(--quiz-primary-light);
-}
-.nq-explain-envoi:active:not(:disabled) {
-	transform: translateY(var(--depth));
-	box-shadow: 0 0 0 0 var(--edge);
-}
-.nq-explain-envoi:disabled {
-	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
-	color: color-mix(in srgb, var(--text-normal) 40%, transparent);
-	box-shadow: none;
-	transform: translateY(var(--depth));
-	cursor: default;
-}
-
-.nq-explain-envoi svg {
-	width: 16px;
-	height: 16px;
-}
-
 /* The provider's logo in "Explain", at the size of the former icon. */
 .qbd-qz-explain-icon.qbd-provider-logo,
 .qbd-qz-explain-icon.qbd-provider-logo svg,
 .qbd-qz-explain-icon.qbd-provider-logo img {
 	width: 15px;
 	height: 15px;
+}
+
+.nq-explain-msg-user .qz-mini-tuile {
+	align-self: flex-end;
 }

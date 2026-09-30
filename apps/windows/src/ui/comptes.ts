@@ -318,6 +318,58 @@ function poserUsagePopoverContenu(pop: HTMLElement, outil: OutilAvecUsage, entre
 	}
 }
 
+/**
+ * THE SAME USAGE POPOVER, from another window (the Explain conversation): a
+ * click on `ancre` opens it (a second click, a click elsewhere or Escape
+ * closes it), with the gauges the Settings show. `outil` is read at each
+ * click: the provider can change while the window stays open.
+ */
+export function attacherUsage(ancre: HTMLElement, outil: () => OutilAvecUsage): void {
+	let pop: HTMLElement | null = null;
+	let jeton = 0;
+	const fermer = (): void => {
+		jeton++;
+		pop?.remove();
+		pop = null;
+		document.removeEventListener("mousedown", surClicAilleurs, true);
+		document.removeEventListener("keydown", surEchap, true);
+	};
+	function surClicAilleurs(e: MouseEvent): void {
+		if (pop && !pop.contains(e.target as Node) && !ancre.contains(e.target as Node)) fermer();
+	}
+	function surEchap(e: KeyboardEvent): void {
+		if (e.key === "Escape") fermer();
+	}
+	const positionner = (): void => {
+		if (!pop) return;
+		const r = ancre.getBoundingClientRect();
+		pop.style.visibility = "hidden";
+		const pr = pop.getBoundingClientRect();
+		const left = Math.max(8, Math.min(r.right - pr.width, window.innerWidth - pr.width - 8));
+		let top = r.top - pr.height - 6;
+		if (top < 8) top = r.bottom + 6;
+		pop.style.left = left + "px";
+		pop.style.top = top + "px";
+		pop.style.visibility = "";
+	};
+	ancre.addEventListener("click", () => {
+		if (pop) { fermer(); return; }
+		const cible = outil();
+		const monJeton = ++jeton;
+		pop = ajouter(document.body, "div", "nq-usage-popover");
+		poserUsagePopoverChargement(pop, cible);
+		positionner();
+		document.addEventListener("mousedown", surClicAilleurs, true);
+		document.addEventListener("keydown", surEchap, true);
+		void lireUsageAvecAge(cible).then((entree) => {
+			if (monJeton !== jeton || !pop) return;
+			pop.replaceChildren();
+			poserUsagePopoverContenu(pop, cible, entree);
+			positionner();
+		});
+	});
+}
+
 export function monterReglagesComptes(section: HTMLElement): () => void {
 	let detruit = false;
 	/** L'adresse de connexion Ollama, retenue depuis le dernier redessin —

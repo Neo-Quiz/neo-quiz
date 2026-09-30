@@ -1,11 +1,15 @@
 /* ══════════════════════════════════════════════════════════
    "EXPLAIN" ON A PLAYED QUESTION (2026-09-29)
 
-   A button in its own row under the question, above the arrows: it sends
-   the question on screen to Claude Code or Codex — the prompt is a template
-   the learner can change (Settings › AI), filled by `explain-prompt.ts` —
-   and opens the answer in a window, written live, with room for follow-up
-   questions. It replaces a screenshot and a typed prompt.
+   A button in its own row under the question, above the arrows, once the
+   question is corrected: it opens a WINDOW that can be closed and opened again
+   without losing anything — the conversation about a question lives as long as
+   the quiz page, a running answer goes on while the window is closed. The
+   window is a chat like claude.ai's: the history above, below a composer that
+   starts with a tile holding the Explain prompt (a template the learner can
+   change in Settings › AI, filled by `explain-prompt.ts`), the provider,
+   model and effort, and the send arrow. Sent, the tile joins the history and
+   the composer goes on with follow-up questions.
 
    Not in an Exam: the button hides as soon as the test clock shows (the
    engine adds `.quiz-exam-timer` to the host), in Learn and in a Test
@@ -21,12 +25,13 @@ import { ajouter } from "../../../../src/dom";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { createAiClient } from "../../../../src/dashboard/ai-client";
-import type { ChatTurn } from "../../../../src/dashboard/ai-client";
+import type { AiClient, ChatTurn } from "../../../../src/dashboard/ai-client";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
 import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
+import { attacherUsage } from "./comptes";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -67,6 +72,52 @@ function maReponse(slide: HTMLElement): string {
 	return saisies.join(" ; ");
 }
 
+/** One message of a conversation, as the window shows it. A user message that
+    carries the prompt shows it as a tile, like a pasted text on claude.ai. */
+interface Message {
+	role: "user" | "assistant";
+	text: string;
+	tuile?: string;
+	modele?: string;
+	debut?: number;
+	duree?: number;
+	enCours?: boolean;
+	erreur?: string;
+	arrete?: boolean;
+}
+
+/** The conversation about ONE question: it lives as long as the quiz page, so
+    that closing the window and opening it again loses nothing — a running
+    answer goes on being written while the window is closed. */
+interface Conversation {
+	messages: Message[];
+	historique: ChatTurn[];
+	client: AiClient;
+	enCours: boolean;
+	/** The prompt tile has been sent: the composer is a plain one from now on. */
+	envoye: boolean;
+	/** Repaints the window; null while it is closed. */
+	repeindre: (() => void) | null;
+}
+
+/** The prompt tile: the start of the text, its name, and (in the composer)
+    a pencil that opens the Settings on the field where it is written. */
+function creerTuile(parent: HTMLElement, texte: string, ouvrirPrompt?: () => void): HTMLElement {
+	const tuile = ajouter(parent, "div", "qz-mini-tuile");
+	ajouter(tuile, "div", "qz-mini-tuile-texte", texte);
+	const pied = ajouter(tuile, "div", "qz-mini-tuile-pied");
+	ajouter(pied, "span", "qz-mini-tuile-nom", t("ai.explain.tile"));
+	if (ouvrirPrompt) {
+		const crayon = ajouter(pied, "button", "qz-mini-tuile-edit");
+		crayon.type = "button";
+		crayon.title = t("ai.explain.tileEdit");
+		crayon.setAttribute("aria-label", t("ai.explain.tileEdit"));
+		currentHost().ui.setIcon(crayon, "pencil");
+		crayon.addEventListener("click", ouvrirPrompt);
+	}
+	return tuile;
+}
+
 export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	questions: Record<string, unknown>[];
 	titre: string;
@@ -75,144 +126,73 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	ouvrirPrompt(): void;
 }): () => void {
 	const host = currentHost();
-	/* A mini composer in a row of the panel, right under the question and above
-	   the bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It
-	   only shows once the question on screen has been corrected (Check in a
-	   Learn, the hand-in of a Test): before that, the answer is not yet known.
-	   */
+	/* The button sits in a row of the panel, under the question and above the
+	   bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It only
+	   shows once the question on screen has been corrected (Check in a Learn,
+	   the hand-in of a Test): before that, the answer is not yet known. */
 	const panneau = hote.closest<HTMLElement>(".qbd-qz");
 	if (!panneau) return () => {};
 	const rangee = ajouter(panneau, "div", "qz-above-bar qz-explain-row");
 	const barre = panneau.querySelector(":scope > .qz-bottom-bar");
 	if (barre) panneau.insertBefore(rangee, barre);
-	const mini = ajouter(rangee, "div", "qz-mini");
-	/* THE PROMPT TILE (the "pasted" tile of claude.ai's composer): a small
-	   card with the start of the prompt that will be sent and a pencil that
-	   opens the Settings on the field where it is written, so that the
-	   learner sees what is sent, where it comes from and where to change it. */
-	const tuile = ajouter(mini, "div", "qz-mini-tuile");
-	const apercu = ajouter(tuile, "div", "qz-mini-tuile-texte");
-	const tuilePied = ajouter(tuile, "div", "qz-mini-tuile-pied");
-	ajouter(tuilePied, "span", "qz-mini-tuile-nom", t("ai.explain.tile"));
-	const crayon = ajouter(tuilePied, "button", "qz-mini-tuile-edit");
-	crayon.type = "button";
-	crayon.title = t("ai.explain.tileEdit");
-	crayon.setAttribute("aria-label", t("ai.explain.tileEdit"));
-	host.ui.setIcon(crayon, "pencil");
-	crayon.addEventListener("click", () => deps.ouvrirPrompt());
-	const pied = ajouter(mini, "div", "qz-mini-pied");
-	const outils = ajouter(pied, "div", "qz-mini-outils");
-	/* The PROVIDER, its logo right before the model's name: it says who will
-	   answer and opens the list of those that can (below). */
-	const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
-	fournisseurBtn.type = "button";
-	const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
-	modeleBtn.type = "button";
-	const modeleLabel = ajouter(modeleBtn, "span", "qbd-select-label");
-	const effortBtn = ajouter(outils, "button", "qbd-select qbd-effort-trigger qbd-composer-plain");
-	effortBtn.type = "button";
-	const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
-	const envoi = ajouter(outils, "button", "qz-mini-envoi");
-	envoi.type = "button";
-	envoi.setAttribute("aria-label", t("ai.explain.button"));
-	host.ui.setIcon(ajouter(envoi, "span"), "arrow-up");
+	const bouton = ajouter(rangee, "button", "qz-explain-btn");
+	bouton.type = "button";
+	const boutonLogo = ajouter(bouton, "span", "qz-explain-btn-logo");
+	ajouter(bouton, "span", undefined, t("ai.explain.button"));
 
 	/* The providers that can HOLD a conversation — the two CLIs the chat of
 	   Generate speaks to (`AiClient.chat`). Ollama and Antigravity CLI cannot
 	   yet: their calls only know how to return a quiz. */
 	const LOCAUX = ["claude-code", "codex"];
-	/* The provider of this composer: the one of the Settings when it can chat,
+	/* The provider of the window: the one of the Settings when it can chat,
 	   else the first installed (Claude Code, then Codex), else none — the
 	   learner is asked to pick. Written to the Settings only when it differs
 	   at send time or is picked by hand, so that merely opening a quiz never
 	   changes the provider of the Generate page. */
 	let courant = LOCAUX.includes(deps.settings.get().aiProvider || "") ? (deps.settings.get().aiProvider as string) : "";
-	const fournisseur = (): string => courant;
 	const peutExpliquer = (): boolean => courant !== "";
 	const modeles = (): aiProviders.ModelDef[] =>
-		fournisseur() === "claude-code" ? aiProviders.getClaudeModels() : aiProviders.getDefaultModels("codex");
+		courant === "claude-code" ? aiProviders.getClaudeModels() : aiProviders.getDefaultModels("codex");
 	/* The model of the Settings belongs to the provider it was chosen for:
 	   another provider falls back to its own default. */
 	const modeleCourant = (): string => {
 		const reglage = deps.settings.get().aiProvider === courant ? deps.settings.get().aiModel : "";
 		return courant === "claude-code" ? aiProviders.resolveClaudeModel(reglage) : aiProviders.resolveCodexModel(reglage);
 	};
-	const efforts = () => aiProviders.getEfforts(fournisseur(), modeleCourant());
-	const effortCourant = (): string => aiProviders.resolveEffort(fournisseur(), deps.settings.get().aiEffort, modeleCourant());
-
-	const peindreOutils = (): void => {
-		fournisseurBtn.replaceChildren();
-		if (peutExpliquer()) {
-			const p = aiProviders.getProvider(fournisseur());
-			const logo = ajouter(fournisseurBtn, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
-			aiProviders.setBrandLogo(logo, p.logo);
-			fournisseurBtn.title = p.name;
-		} else {
-			// No provider yet: an empty slot, the click opens the list.
-			host.ui.setIcon(ajouter(fournisseurBtn, "span", "qbd-provider-logo"), "circle-dashed");
-			fournisseurBtn.title = t("ai.provider.choose");
-		}
-		modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
-		if (!peutExpliquer()) return;
+	const efforts = () => aiProviders.getEfforts(courant, modeleCourant());
+	const effortCourant = (): string => aiProviders.resolveEffort(courant, deps.settings.get().aiEffort, modeleCourant());
+	const libelleModele = (): string => {
 		const cur = modeleCourant();
-		modeleLabel.textContent = modeles().find(m => m.value === cur)?.label ?? cur;
-		const ev = effortCourant();
-		effortLabel.textContent = efforts().find(e => e.value === ev)?.label ?? ev;
+		return modeles().find(m => m.value === cur)?.label ?? cur;
 	};
+
+	const peindreLogoBouton = (): void => {
+		boutonLogo.replaceChildren();
+		if (peutExpliquer()) {
+			const p = aiProviders.getProvider(courant);
+			const logo = ajouter(boutonLogo, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
+			aiProviders.setBrandLogo(logo, p.logo);
+		} else {
+			host.ui.setIcon(boutonLogo, "sparkles");
+		}
+	};
+	peindreLogoBouton();
+	/* No usable provider in the Settings: the default is the first CLI that is
+	   installed, Claude Code before Codex. */
+	const detecterDefaut = async (): Promise<void> => {
+		if (peutExpliquer()) return;
+		if ((await aiProviders.checkClaudeCode()).ok) courant = "claude-code";
+		else if ((await aiProviders.checkCodex()).ok) courant = "codex";
+		if (bouton.isConnected) peindreLogoBouton();
+	};
+	void detecterDefaut();
 	const choisirFournisseur = async (id: string): Promise<void> => {
 		courant = id;
 		await deps.settings.save({ aiProvider: id, aiModel: aiProviders.getProvider(id).defaultModel });
-		peindreOutils();
+		peindreLogoBouton();
 	};
-	fournisseurBtn.addEventListener("click", () => {
-		openProviderMenu(fournisseurBtn, {
-			brands: aiProviders.MARQUES
-				.map(m => ({
-					value: m.id,
-					label: m.name,
-					logo: m.logo,
-					channels: m.canaux.filter(c => LOCAUX.includes(c.id)).map(c => ({ value: c.id, label: c.label, sub: c.sub, logo: c.logo || m.logo })),
-				}))
-				.filter(b => b.channels.length > 0),
-			current: courant,
-			renderLogo: (el, logo) => aiProviders.setBrandLogo(el, logo),
-			onPick: (id) => { void choisirFournisseur(id); },
-		});
-	});
-	/* No usable provider in the Settings: the default is the first CLI that is
-	   installed, Claude Code before Codex. */
-	if (!peutExpliquer()) {
-		void (async () => {
-			const claude = await aiProviders.checkClaudeCode();
-			if (claude.ok) courant = "claude-code";
-			else if ((await aiProviders.checkCodex()).ok) courant = "codex";
-			if (fournisseurBtn.isConnected) peindreOutils();
-		})();
-	}
-	peindreOutils();
-	void aiProviders.refreshCliCaches().then(change => { if (change && modeleBtn.isConnected) peindreOutils(); });
-	modeleBtn.addEventListener("click", async () => {
-		await aiProviders.refreshCliCaches();
-		if (!modeleBtn.isConnected) return;
-		openModelMenu(modeleBtn, {
-			models: modeles(),
-			moreModels: fournisseur() === "claude-code" ? aiProviders.getClaudeMoreModels() : undefined,
-			currentModel: modeleCourant(),
-			efforts: [],
-			onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); peindreOutils(); },
-		});
-	});
-	effortBtn.addEventListener("click", () => {
-		openEffortSlider(effortBtn, {
-			variant: fournisseur() === "claude-code" ? "claude" : "codex",
-			efforts: efforts(),
-			currentEffort: effortCourant(),
-			onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); peindreOutils(); },
-		});
-	});
 
-	/* The prompt of the question on screen, built from the template of the
-	   Settings; the tile shows its start. */
+	/* The prompt of a question, built from the template of the Settings. */
 	const messagePour = (slide: HTMLElement): string | null => {
 		const q = deps.questions[Number(slide.dataset.qi)];
 		if (!q) return null;
@@ -226,144 +206,233 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
 		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !slide || !corrigee(slide);
-		if (rangee.hidden || !slide) return;
-		const texte = messagePour(slide) ?? "";
-		if (apercu.textContent !== texte) apercu.textContent = texte;
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
-	hote.addEventListener("input", majVisibilite);
 	majVisibilite();
 
-	const lancer = async (): Promise<void> => {
-		if (!peutExpliquer()) { fournisseurBtn.click(); return; }
-		const slide = questionAffichee(hote);
-		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
-		const base = slide ? messagePour(slide) : null;
-		if (!slide || !q || base === null) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		const etiquette = t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() });
-		/* The provider shown here is the one that answers: the client reads the Settings. */
-		if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
-		ouvrirExplication(base, deps.settings, etiquette);
+	const conversations = new Map<number, Conversation>();
+	const conversationDe = (qi: number): Conversation => {
+		let c = conversations.get(qi);
+		if (!c) {
+			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, envoye: false, repeindre: null };
+			conversations.set(qi, c);
+		}
+		return c;
 	};
-	envoi.addEventListener("click", () => void lancer());
 
-	return () => { observateur.disconnect(); hote.removeEventListener("input", majVisibilite); rangee.remove(); };
-}
+	bouton.addEventListener("click", () => {
+		const slide = questionAffichee(hote);
+		const qi = slide ? Number(slide.dataset.qi) : NaN;
+		if (!slide || !deps.questions[qi]) { host.ui.notice(t("ai.explain.noQuestion")); return; }
+		ouvrirFenetre(qi, messagePour(slide) ?? "");
+	});
 
-/** The explanation window: the conversation, written live, and a field for
-    the next question. Closing it stops a running answer. */
-function ouvrirExplication(premier: string, settings: AiSettingsHost, libellePremier: string): void {
-	const host = currentHost();
-	const client = createAiClient(settings);
-	const historique: ChatTurn[] = [];
-	let enCours = false;
+	/** The window: the history above, the composer below. Built again at each
+	    opening from the conversation, which is what survives. */
+	function ouvrirFenetre(qi: number, prompt: string): void {
+		const conv = conversationDe(qi);
+		let horloge = 0;
+		requireHost("modals").open({
+			className: "nq-explain-modal",
+			title: t("ai.explain.title"),
+			onOpen: (m) => {
+				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
+				const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
+				if (!conv.envoye) creerTuile(composer, prompt, () => deps.ouvrirPrompt());
+				const champ = ajouter(composer, "textarea", "nq-explain-champ");
+				champ.rows = 1;
+				champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
+				const pied = ajouter(composer, "div", "qz-mini-pied");
+				const outils = ajouter(pied, "div", "qz-mini-outils");
+				/* The consumption of the provider, where the Settings already show
+				   it: a gauge that opens its popover (Claude Code and Codex). */
+				const usageBtn = ajouter(outils, "button", "qbd-select qz-mini-fournisseur qz-mini-usage");
+				usageBtn.type = "button";
+				host.ui.setIcon(usageBtn, "gauge");
+				usageBtn.title = t("ai.usage.title");
+				usageBtn.setAttribute("aria-label", t("ai.usage.title"));
+				attacherUsage(usageBtn, () => (courant === "codex" ? "codex" : "claude"));
+				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
+				fournisseurBtn.type = "button";
+				const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
+				modeleBtn.type = "button";
+				const modeleLabel = ajouter(modeleBtn, "span", "qbd-select-label");
+				const effortBtn = ajouter(outils, "button", "qbd-select qbd-effort-trigger qbd-composer-plain");
+				effortBtn.type = "button";
+				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
+				const envoi = ajouter(outils, "button", "qz-mini-envoi");
+				envoi.type = "button";
 
-	requireHost("modals").open({
-		className: "nq-explain-modal",
-		title: t("ai.explain.title"),
-		onOpen: (m) => {
-			const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
-			const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
-			const champ = ajouter(composer, "textarea", "nq-explain-champ");
-			champ.rows = 1;
-			champ.placeholder = t("ai.explain.followUp");
-			const envoi = ajouter(composer, "button", "nq-explain-envoi");
-			envoi.type = "button";
-
-			const majEnvoi = (): void => {
-				envoi.replaceChildren();
-				host.ui.setIcon(envoi, enCours ? "square" : "arrow-up");
-				envoi.setAttribute("aria-label", t(enCours ? "ai.explain.stop" : "ai.explain.send"));
-				envoi.disabled = !enCours && !champ.value.trim();
-			};
-
-			const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 60;
-
-			async function envoyer(texte: string, affiche?: string): Promise<void> {
-				if (enCours || !texte.trim()) return;
-				enCours = true;
-				historique.push({ role: "user", text: texte.trim() });
-				ajouter(fil, "div", "qbd-ai-bulle nq-explain-demande", (affiche ?? texte).trim());
-				const rep = ajouter(fil, "div", "qbd-ai-chat-reponse");
-				const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
-				const p = aiProviders.getProvider(settings.get().aiProvider || "");
-				const logo = ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
-				aiProviders.setBrandLogo(logo, p.logo);
-				const id = settings.get().aiModel || p.defaultModel || "";
-				const nom = id ? aiProviders.libelleModele(settings.get().aiProvider || "", id) : p.name;
-				const etat = ajouter(tete, "span", undefined, t("ai.chat.working", { model: nom }));
-				const temps = ajouter(tete, "span", "qbd-ai-file-temps", "0:00");
-				const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-				ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
-				fil.scrollTop = fil.scrollHeight;
+				const peindreOutils = (): void => {
+					fournisseurBtn.replaceChildren();
+					if (peutExpliquer()) {
+						const p = aiProviders.getProvider(courant);
+						aiProviders.setBrandLogo(ajouter(fournisseurBtn, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
+						fournisseurBtn.title = p.name;
+					} else {
+						host.ui.setIcon(ajouter(fournisseurBtn, "span", "qbd-provider-logo"), "circle-dashed");
+						fournisseurBtn.title = t("ai.provider.choose");
+					}
+					usageBtn.hidden = modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
+					if (peutExpliquer()) {
+						modeleLabel.textContent = libelleModele();
+						const ev = effortCourant();
+						effortLabel.textContent = efforts().find(e => e.value === ev)?.label ?? ev;
+					}
+					peindreLogoBouton();
+				};
+				const majEnvoi = (): void => {
+					envoi.replaceChildren();
+					host.ui.setIcon(ajouter(envoi, "span"), conv.enCours ? "square" : "arrow-up");
+					envoi.setAttribute("aria-label", t(conv.enCours ? "ai.explain.stop" : "ai.explain.send"));
+					// The first message may go without a word: the prompt tile is enough.
+					envoi.disabled = !conv.enCours && conv.envoye && !champ.value.trim();
+				};
+				peindreOutils();
 				majEnvoi();
+				void detecterDefaut().then(() => { if (fournisseurBtn.isConnected) peindreOutils(); });
+				fournisseurBtn.addEventListener("click", () => {
+					openProviderMenu(fournisseurBtn, {
+						brands: aiProviders.MARQUES
+							.map(mq => ({
+								value: mq.id,
+								label: mq.name,
+								logo: mq.logo,
+								channels: mq.canaux.filter(c => LOCAUX.includes(c.id)).map(c => ({ value: c.id, label: c.label, sub: c.sub, logo: c.logo || mq.logo })),
+							}))
+							.filter(b => b.channels.length > 0),
+						current: courant,
+						renderLogo: (el, logo) => aiProviders.setBrandLogo(el, logo),
+						onPick: (id) => { void choisirFournisseur(id).then(peindreOutils); },
+					});
+				});
+				void aiProviders.refreshCliCaches().then(change => { if (change && modeleBtn.isConnected) peindreOutils(); });
+				modeleBtn.addEventListener("click", async () => {
+					await aiProviders.refreshCliCaches();
+					if (!modeleBtn.isConnected) return;
+					openModelMenu(modeleBtn, {
+						models: modeles(),
+						moreModels: courant === "claude-code" ? aiProviders.getClaudeMoreModels() : undefined,
+						currentModel: modeleCourant(),
+						efforts: [],
+						onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); peindreOutils(); },
+					});
+				});
+				effortBtn.addEventListener("click", () => {
+					openEffortSlider(effortBtn, {
+						variant: courant === "claude-code" ? "claude" : "codex",
+						efforts: efforts(),
+						currentEffort: effortCourant(),
+						onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); peindreOutils(); },
+					});
+				});
 
-				const debut = Date.now();
-				const horloge = window.setInterval(() => { temps.textContent = duree(Date.now() - debut); }, 1000);
-				let texteVivant = "";
-				let image = 0;
-				const peindre = (): void => {
-					image = 0;
-					const bas = enBas();
-					prose.innerHTML = renderMarkdownPreview(texteVivant);
+				/* THE HISTORY, painted from the conversation. Only the last answer
+				   changes while it is written; every message is repainted with it,
+				   which is cheap at the length of these conversations. */
+				const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
+				const peindreFil = (): void => {
+					const bas = enBas() || fil.childElementCount === 0;
+					fil.replaceChildren();
+					for (const msg of conv.messages) {
+						if (msg.role === "user") {
+							const bloc = ajouter(fil, "div", "nq-explain-msg-user");
+							if (msg.tuile) creerTuile(bloc, msg.tuile);
+							if (msg.text) ajouter(bloc, "div", "qbd-ai-bulle nq-explain-demande", msg.text);
+							continue;
+						}
+						const rep = ajouter(fil, "div", "qbd-ai-chat-reponse");
+						const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
+						const p = aiProviders.getProvider(courant || "claude-code");
+						aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
+						const nom = msg.modele ?? "";
+						ajouter(tete, "span", undefined, msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
+						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
+						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
+						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
+						else if (msg.text) prose.innerHTML = renderMarkdownPreview(msg.text);
+						else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
+					}
 					if (bas) fil.scrollTop = fil.scrollHeight;
 				};
-				try {
-					const reponse = await client.chat(historique, {
-						style: "explain",
-						maxChars: settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT,
-						onTranscript: (ev) => {
-							if (ev.kind !== "text") return;
-							texteVivant += ev.text;
-							if (!image) image = requestAnimationFrame(peindre);
-						},
-					});
-					if (image) cancelAnimationFrame(image);
-					historique.push({ role: "assistant", text: reponse });
-					texteVivant = reponse;
-					peindre();
-					etat.textContent = t("ai.chat.worked", { model: nom, time: duree(Date.now() - debut) });
-					temps.remove();
-				} catch (err) {
-					if (image) cancelAnimationFrame(image);
-					historique.pop();
-					const e = err as Error & { aborted?: boolean };
-					temps.remove();
-					etat.textContent = e?.aborted ? t("ai.explain.stop") : "";
-					prose.replaceChildren();
-					if (!e?.aborted) ajouter(prose, "div", "qbd-ai-reponse-erreur", e?.message || t("ai.error.checkSettings"));
-				} finally {
-					window.clearInterval(horloge);
-					enCours = false;
-					majEnvoi();
-				}
-			}
+				let image = 0;
+				conv.repeindre = () => {
+					if (image) return;
+					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); } });
+				};
+				peindreFil();
+				// The time an answer has been running ticks once a second.
+				horloge = window.setInterval(() => { if (conv.enCours) conv.repeindre?.(); }, 1000);
 
-			champ.addEventListener("input", () => {
-				champ.style.height = "auto";
-				champ.style.height = Math.min(champ.scrollHeight, 160) + "px";
-				majEnvoi();
-			});
-			champ.addEventListener("keydown", (e) => {
-				if (e.key !== "Enter" || e.shiftKey) return;
-				e.preventDefault();
-				const texte = champ.value;
-				champ.value = "";
-				champ.style.height = "auto";
-				void envoyer(texte);
-			});
-			envoi.addEventListener("click", () => {
-				if (enCours) { client.abort(); return; }
-				const texte = champ.value;
-				champ.value = "";
-				champ.style.height = "auto";
-				void envoyer(texte);
-			});
-			majEnvoi();
-			void envoyer(premier, libellePremier);
-		},
-		// Closing stops a running answer: nobody would read it.
-		onClose: () => { if (enCours) client.abort(); },
-	});
+				const envoyer = async (): Promise<void> => {
+					if (conv.enCours) return;
+					const perso = champ.value.trim();
+					if (conv.envoye && !perso) return;
+					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
+					const premier = !conv.envoye;
+					const texte = premier ? (perso ? prompt + "\n\n" + t("ai.explain.myQuestion") + "\n" + perso : prompt) : perso;
+					champ.value = "";
+					champ.style.height = "auto";
+					/* The provider shown here is the one that answers: the client reads the Settings. */
+					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
+					conv.envoye = true;
+					conv.historique.push({ role: "user", text: texte });
+					conv.messages.push({ role: "user", text: perso, tuile: premier ? prompt : undefined });
+					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), debut: Date.now(), enCours: true };
+					conv.messages.push(rep);
+					conv.enCours = true;
+					if (premier) composer.querySelector(".qz-mini-tuile")?.remove();
+					champ.placeholder = t("ai.explain.followUp");
+					conv.repeindre?.();
+					try {
+						const reponse = await conv.client.chat(conv.historique, {
+							style: "explain",
+							maxChars: deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT,
+							onTranscript: (ev) => {
+								if (ev.kind !== "text") return;
+								rep.text += ev.text;
+								conv.repeindre?.();
+							},
+						});
+						rep.text = reponse;
+						conv.historique.push({ role: "assistant", text: reponse });
+					} catch (err) {
+						const e = err as Error & { aborted?: boolean };
+						conv.historique.pop();
+						if (e?.aborted) rep.arrete = true;
+						else rep.erreur = e?.message || t("ai.error.checkSettings");
+					} finally {
+						rep.enCours = false;
+						rep.duree = Date.now() - (rep.debut ?? Date.now());
+						conv.enCours = false;
+						conv.repeindre?.();
+					}
+				};
+				champ.addEventListener("input", () => {
+					champ.style.height = "auto";
+					champ.style.height = Math.min(champ.scrollHeight, 160) + "px";
+					majEnvoi();
+				});
+				champ.addEventListener("keydown", (e) => {
+					if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+					e.preventDefault();
+					void envoyer();
+				});
+				envoi.addEventListener("click", () => {
+					if (conv.enCours) { conv.client.abort(); return; }
+					void envoyer();
+				});
+				champ.focus();
+			},
+			// Closing the window keeps the conversation; only the painting stops.
+			onClose: () => { window.clearInterval(horloge); conv.repeindre = null; },
+		});
+	}
+
+	return () => {
+		observateur.disconnect();
+		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
+		rangee.remove();
+	};
 }
