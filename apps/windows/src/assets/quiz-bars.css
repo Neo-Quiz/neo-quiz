@@ -192,33 +192,42 @@
    name and a pencil that opens the Settings on the prompt. */
 .qz-mini-tuile {
 	align-self: flex-start;
-	width: 190px;
+	box-sizing: border-box;
+	width: 118px;
+	height: 118px;
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	padding: 8px 10px 6px;
+	justify-content: space-between;
+	padding: 9px 8px 8px;
 	border: 1px solid color-mix(in srgb, var(--text-normal) 12%, transparent);
 	border-radius: 12px;
 	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
 }
 .qz-mini-tuile-texte {
-	max-height: 46px;
+	flex: 1;
+	min-height: 0;
 	overflow: hidden;
-	font-size: 10.5px;
-	line-height: 1.35;
+	font-size: 10px;
+	line-height: 1.4;
 	color: var(--text-muted);
 	overflow-wrap: anywhere;
-	-webkit-mask-image: linear-gradient(#000 55%, transparent);
-	mask-image: linear-gradient(#000 55%, transparent);
+	-webkit-mask-image: linear-gradient(#000 60%, transparent);
+	mask-image: linear-gradient(#000 60%, transparent);
 }
 .qz-mini-tuile-pied {
+	flex: none;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	gap: 6px;
 }
 .qz-mini-tuile-nom {
-	font-size: 11.5px;
+	padding: 1px 6px;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 35%, transparent);
+	border-radius: 5px;
+	font-size: 11px;
 	font-weight: 700;
+	line-height: 1.35;
 	color: var(--text-normal);
 }
 .qz-mini-tuile-edit {
@@ -227,20 +236,19 @@
 	width: 24px;
 	height: 24px;
 	padding: 0;
-	border: 0;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 14%, transparent);
 	border-radius: 7px;
-	background: transparent !important;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent) !important;
 	box-shadow: none !important;
-	color: var(--text-muted);
+	color: var(--text-normal);
 	cursor: pointer;
 }
 .qz-mini-tuile-edit:hover {
-	color: var(--text-normal);
 	background: var(--background-modifier-hover) !important;
 }
 .qz-mini-tuile-edit svg {
-	width: 15px;
-	height: 15px;
+	width: 13px;
+	height: 13px;
 }
 .qz-mini-champ {
 	width: 100%;
