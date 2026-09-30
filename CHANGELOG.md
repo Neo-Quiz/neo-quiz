@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.5] - 2026-09-30
+
 ### Changed
 - Picking an exam after /exam writes the request for you, as a Prompt tile above the field like the Explain window's (its pencil opens its new section in Settings › AI, where it can be changed); what you type is added under it. A window then lists the documents of the exam's course folder: each click joins one, as @ would, and nothing is sent until at least one is joined. The preparation makes one Learn per joined document, then three Tests of rising difficulty over them all.
 - On Generate, the greeting and the composer sit lower and centred on the whole panel, no longer pushed to the right by the sidebar.
