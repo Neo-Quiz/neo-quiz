@@ -125,6 +125,7 @@ export const EN_DASHBOARD = {
 	"dashboard.folder.createNote": "Create a note",
 	"dashboard.folder.newNoteDefaultName": "New note",
 	"dashboard.folder.noteCreateError": "Could not create the note",
+	"dashboard.folder.opening": "Opening…",
 	"dashboard.folder.openFailed": "Could not open {name}",
 	/* Suppression : un AVERTISSEMENT avant, toujours (demande Ahmed
 	   2026-09-17). Un document ou une note va à la CORBEILLE (`fs.trash`), et

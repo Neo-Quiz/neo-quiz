@@ -108,6 +108,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.folder.createNote": "Créer une note",
 	"dashboard.folder.newNoteDefaultName": "Nouvelle note",
 	"dashboard.folder.noteCreateError": "Impossible de créer la note",
+	"dashboard.folder.opening": "Ouverture…",
 	"dashboard.folder.openFailed": "Impossible d'ouvrir {name}",
 	"dashboard.folder.deleteAction": "Supprimer",
 	"dashboard.folder.deleteCancel": "Annuler",

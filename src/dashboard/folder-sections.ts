@@ -135,7 +135,8 @@ export function renderFolderSections(parent: HTMLElement, depsBrutes: FolderSect
 			action: { icon: "pen-line", label: "dashboard.folder.createNote", onClick: () => void creerUneNote(deps) },
 			items: contenu.notes.map(e => ({
 				icon: fileIcon(e.name), label: nomSansExtension(e.name), meta: "md",
-				onOpen: () => void ouvrirNote(deps, e),
+				onOpen: () => ouvrirNote(deps, e),
+				external: true,
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
 			})),
 		});
@@ -165,7 +166,10 @@ interface SectionSpec {
 	/** `thumb` : l'URL d'une VIGNETTE, qui prend la place de l'icône. Une
 	    image se reconnaît à ce qu'elle montre, pas à un glyphe partagé par
 	    tous les fichiers de son format. */
-	items: { icon: string; label: string; meta: string; thumb?: string | null; onOpen: () => void; onDelete: () => void }[];
+	items: { icon: string; label: string; meta: string; thumb?: string | null; onOpen: () => void | Promise<unknown>;
+		/** True when the click hands the file to the system's default app:
+		    the row then shows the "opening" state while the app starts. */
+		external?: boolean; onDelete: () => void }[];
 }
 
 function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): HTMLElement {
@@ -234,6 +238,33 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 	}
 
 	return section;
+}
+
+/** The OS returns before the viewer window is visible, so the row keeps its
+    "opening" state for at least this long, whatever the call took. */
+const OUVERTURE_MIN_MS = 1200;
+
+/** Puts the row in its `is-opening` state (spinner instead of the file icon,
+    "Opening..." instead of the type), runs the open, and restores the row
+    exactly once the call settled AND the minimum time elapsed. */
+async function montrerOuverture(
+	item: HTMLElement, bouton: HTMLElement, boite: HTMLElement, meta: HTMLElement,
+	it: SectionSpec["items"][number],
+): Promise<void> {
+	const icone = Array.from(boite.childNodes);
+	const texte = meta.textContent;
+	item.classList.add("is-opening");
+	bouton.setAttribute("aria-busy", "true");
+	boite.replaceChildren();
+	currentHost().ui.setIcon(boite, "loader-circle");
+	meta.textContent = t("dashboard.folder.opening");
+	const minimum = new Promise<void>(r => window.setTimeout(r, OUVERTURE_MIN_MS));
+	try { await it.onOpen(); } catch { /* the open path reports its own failure */ }
+	await minimum;
+	boite.replaceChildren(...icone);
+	meta.textContent = texte;
+	bouton.removeAttribute("aria-busy");
+	item.classList.remove("is-opening");
 }
 
 /* ── Documents ── */

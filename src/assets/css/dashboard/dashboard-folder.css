@@ -176,6 +176,8 @@
 	display: flex;
 	align-items: center;
 	border-radius: 10px;
+	position: relative;
+	overflow: hidden;
 	transition: background 0.15s ease;
 }
 
@@ -217,6 +219,71 @@
 	font: inherit;
 	text-align: left;
 	cursor: pointer;
+	transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+/* Press: a short dip, so the click is felt before anything else happens. */
+.qbd-folder-item-open:active {
+	transform: scale(0.985);
+	filter: brightness(0.88);
+}
+
+.qbd-folder-item:hover .qbd-folder-item-icon {
+	color: var(--text-normal);
+}
+
+.qbd-folder-item:hover .qbd-folder-item-name {
+	color: var(--text-normal);
+}
+
+/* Opening with the system's default app: the viewer takes a few seconds to
+   appear, so the row shows the work in progress (spinner, label, light sweep). */
+.qbd-folder-item.is-opening {
+	background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+	pointer-events: none;
+}
+
+.qbd-folder-item.is-opening .qbd-folder-item-icon,
+.qbd-folder-item.is-opening .qbd-folder-item-meta {
+	color: var(--interactive-accent);
+}
+
+.qbd-folder-item.is-opening .qbd-folder-item-icon svg {
+	animation: qbd-folder-spin 0.9s linear infinite;
+}
+
+.qbd-folder-item.is-opening::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--interactive-accent) 22%, transparent) 50%, transparent 70%);
+	transform: translateX(-100%);
+	animation: qbd-folder-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes qbd-folder-spin {
+	to { transform: rotate(360deg); }
+}
+
+@keyframes qbd-folder-sweep {
+	to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-folder-item.is-opening .qbd-folder-item-icon svg,
+	.qbd-folder-item.is-opening::after {
+		animation: none;
+	}
+	.qbd-folder-item.is-opening::after {
+		display: none;
+	}
+	.qbd-folder-item.is-opening .qbd-folder-item-open {
+		opacity: 0.65;
+	}
+	.qbd-folder-item-open:active {
+		transform: none;
+	}
 }
 
 .qbd-folder-item-delete {
