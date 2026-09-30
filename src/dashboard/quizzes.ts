@@ -497,6 +497,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				onChange: (v) => { setGrouping(v as GroupingKey); render(container); }
 			});
 			groupSelect?.el.classList.add("qbd-quizzes-group-select");
+			// The Generated folder's own entry, after the two selects: it left the
+			// grid (9f6b0356), and was unreachable from Folders while this call
+			// was missing (night QA, 2026-10-01).
+			renderGeneratedButton(selects, quizzes, stats);
 
 			// « Nouveau dossier » sur la MÊME ligne que le chip UE/Recent, calé à
 			// droite, même pilule que « Nouveau quiz » du drill (demande Ahmed
