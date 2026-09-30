@@ -1116,3 +1116,16 @@
 .qbd-exam-docs-fini:hover {
 	background: color-mix(in srgb, #fff 12%, var(--interactive-accent)) !important;
 }
+
+/* A later step of an "/exam" preparation: one line, no repeated request. */
+.qbd-ai-message--etape .qbd-ai-message-meta {
+	gap: 8px;
+	color: var(--text-muted);
+}
+.qbd-ai-etape-icone {
+	display: inline-flex;
+}
+.qbd-ai-etape-icone svg {
+	width: 14px;
+	height: 14px;
+}

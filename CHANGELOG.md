@@ -16,6 +16,7 @@ release notes.
 ## [1.20.6] - 2026-09-30
 
 ### Fixed
+- An /exam preparation shows its request once in the queue, then one line per step ("Step 3 of 10 · Learn · CM3.pdf", "Step 9 of 10 · Test 2 of 3"), instead of the same request repeated for every document.
 - /exam finds the exam's course folder even when none of its quizzes is left in it (looked for by name in the vault), lists its documents, and sends the preparation's quizzes to that folder instead of Generated; giving up the exam gives the destination back.
 - The composer's glow on Generate is no longer cut in a straight line along the sidebar, and the new lists (chats, search, the exam's documents) use the app's own scrollbar.
 

@@ -403,6 +403,8 @@ export const EN_AI = {
 	"ai.exam.docsNoFolder": "The folder of this exam could not be found. Join its documents with + or @.",
 	"ai.exam.needDocuments": "Join the documents the exam covers first.",
 	"ai.exam.documentsLine": "The exam covers these documents only: {list}.",
+	"ai.exam.step": "Step {n} of {total}",
+	"ai.exam.stepTest": "Test {n} of {total}",
 	"ai.exam.addDetails": "Add details if you want",
 	"ai.exam.none": "No upcoming exam: add one in the Planning tab of a folder, or write the subject after /exam.",
 	"ai.search.placeholder": "Search",

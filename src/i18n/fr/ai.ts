@@ -359,6 +359,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.exam.docsNoFolder": "Le dossier de cet examen est introuvable. Joins ses documents avec + ou @.",
 	"ai.exam.needDocuments": "Joins d’abord les documents sur lesquels porte l’examen.",
 	"ai.exam.documentsLine": "L’examen porte uniquement sur ces documents : {list}.",
+	"ai.exam.step": "Étape {n} sur {total}",
+	"ai.exam.stepTest": "Test {n} sur {total}",
 	"ai.exam.addDetails": "Ajoute des précisions si tu veux",
 	"ai.exam.none": "Aucun examen à venir : ajoute-en un dans l'onglet Planning d'un dossier, ou écris le sujet après /exam.",
 	"ai.search.placeholder": "Rechercher",

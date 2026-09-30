@@ -4033,12 +4033,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const base = { count: null, type: questionType, destination, reglages, categorie };
 			/* THE RIGHT NUMBER OF QUIZZES: one Learn per document (CM1, CM2, CM3
 			   each get their path), then the Tests of rising difficulty over
-			   all of them together. */
-			for (const doc of decouperParFichier(d, false)) {
-				fileGen.envoyer({ ...doc, ...base, mode: "learn", preparation: { examen, palier: 0, paliers: PALIERS_TEST, document: doc.notes.length === 1 && d.notes.length > 1 ? doc.notes[0].name : undefined } });
-			}
+			   all of them together. One `lot`: the queue shows the request once
+			   and names each step (file-generation-vue.ts). */
+			const docs = decouperParFichier(d, false);
+			const lot = Date.now().toString(36);
+			const etapes = docs.length + PALIERS_TEST;
+			docs.forEach((doc, i) => {
+				fileGen.envoyer({ ...doc, ...base, mode: "learn", preparation: { examen, palier: 0, paliers: PALIERS_TEST, document: doc.notes.length === 1 && d.notes.length > 1 ? doc.notes[0].name : undefined, lot, etape: i + 1, etapes } });
+			});
 			for (let palier = 1; palier <= PALIERS_TEST; palier++) {
-				fileGen.envoyer({ ...d, ...base, mode: "practice", preparation: { examen, palier, paliers: PALIERS_TEST } });
+				fileGen.envoyer({ ...d, ...base, mode: "practice", preparation: { examen, palier, paliers: PALIERS_TEST, lot, etape: docs.length + palier, etapes } });
 			}
 			examCible = null;
 			viderComposer();

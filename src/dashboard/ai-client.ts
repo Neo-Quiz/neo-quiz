@@ -95,6 +95,11 @@ export interface PreparationExamen {
 	paliers: number;
 	/** A Learn covers ONE of the exam's documents (its name); the Tests, all of them. */
 	document?: string;
+	/** The preparation this step belongs to, and its place in it (1-based):
+	    the queue shows the request once, then names each step. Not in the prompt. */
+	lot?: string;
+	etape?: number;
+	etapes?: number;
 }
 
 export interface ReponseQuiz {
