@@ -45,6 +45,14 @@ function questionAffichee(hote: HTMLElement): HTMLElement | null {
 	return s && s.dataset.slideKind === "question" && s.dataset.qi !== undefined ? s : null;
 }
 
+/** The question on that slide has been CORRECTED (a Learn card once checked, a
+    Test once handed in): its verdict or its explanation is on screen. The
+    mini composer waits for it, so that nobody is told the answer early. */
+function corrigee(slide: HTMLElement): boolean {
+	return slide.classList.contains("quiz-learn-revealed")
+		|| !!slide.querySelector(".quiz-explain, .quiz-option.correct, .quiz-option.wrong, .quiz-option.missed");
+}
+
 /** What the learner has answered on that slide, as they see it. */
 function maReponse(slide: HTMLElement): string {
 	const options = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")];
@@ -67,9 +75,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const host = currentHost();
 	/* A mini composer in a row of the panel, right under the question and above
 	   the bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It
-	   only shows once the question on screen has an answer: without one the
-	   prompt would carry an empty "My answer" and explain nothing about the
-	   learner's own choice. Empty, it sends the default Explain prompt; with a
+	   only shows once the question on screen has been corrected (Check in a
+	   Learn, the hand-in of a Test): before that, the answer is not yet known.
+	   Empty, it sends the default Explain prompt; with a
 	   text, the text is added as the learner's own question. */
 	const panneau = hote.closest<HTMLElement>(".qbd-qz");
 	if (!panneau) return () => {};
@@ -150,8 +158,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	   while the question has no answer. */
 	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
-		const repondu = !!slide && maReponse(slide) !== "";
-		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !repondu;
+		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !slide || !corrigee(slide);
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
