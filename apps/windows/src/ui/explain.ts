@@ -80,6 +80,8 @@ interface Message {
 	text: string;
 	tuile?: string;
 	modele?: string;
+	/** The provider that answered: its logo stays when another is picked later. */
+	fournisseur?: string;
 	debut?: number;
 	duree?: number;
 	enCours?: boolean;
@@ -236,18 +238,28 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	function ouvrirFenetre(qi: number, prompt: string): void {
 		const conv = conversationDe(qi);
 		let horloge = 0;
+		let fermerUsage: (() => void) | null = null;
 		requireHost("modals").open({
 			className: "nq-explain-modal",
 			title: t("ai.explain.title"),
 			onOpen: (m) => {
 				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
 				const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
-				if (!conv.envoye) creerTuile(composer, prompt, () => deps.ouvrirPrompt());
 				const champ = ajouter(composer, "textarea", "nq-explain-champ");
 				champ.rows = 1;
-				// Before the first message there is nothing to type: the prompt tile IS the message.
-				champ.readOnly = !conv.envoye;
-				champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
+				/* The prompt tile shows until the prompt has been ANSWERED: a first
+				   message that fails or is stopped brings it back, so that it can be
+				   sent again — without it, a follow-up would leave without the
+				   question. Before that there is nothing to type: the tile IS the
+				   message. */
+				const majTuile = (): void => {
+					const tuile = composer.querySelector(":scope > .qz-mini-tuile");
+					if (conv.envoye) tuile?.remove();
+					else if (!tuile) composer.insertBefore(creerTuile(composer, prompt, () => deps.ouvrirPrompt()), champ);
+					champ.readOnly = !conv.envoye;
+					champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
+				};
+				majTuile();
 				const pied = ajouter(composer, "div", "qz-mini-pied");
 				/* The consumption of the provider, where the Settings already show
 				   it: a gauge that opens its popover (Claude Code and Codex). */
@@ -256,7 +268,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				host.ui.setIcon(usageBtn, "gauge");
 				usageBtn.title = t("ai.usage.title");
 				usageBtn.setAttribute("aria-label", t("ai.usage.title"));
-				attacherUsage(usageBtn, () => (courant === "codex" ? "codex" : "claude"));
+				fermerUsage = attacherUsage(usageBtn, () => (courant === "codex" ? "codex" : "claude"));
 				const outils = ajouter(pied, "div", "qz-mini-outils");
 				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
 				fournisseurBtn.type = "button";
@@ -352,7 +364,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						}
 						const rep = ajouter(fil, "div", "qbd-ai-chat-reponse");
 						const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
-						const p = aiProviders.getProvider(courant || "claude-code");
+						const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
 						aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
 						const nom = msg.modele ?? "";
 						ajouter(tete, "span", undefined, msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
@@ -370,7 +382,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				let image = 0;
 				conv.repeindre = () => {
 					if (image) return;
-					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); } });
+					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); majTuile(); } });
 				};
 				peindreFil();
 				// The time an answer has been running ticks once a second.
@@ -390,12 +402,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					conv.envoye = true;
 					conv.historique.push({ role: "user", text: texte });
 					conv.messages.push({ role: "user", text: premier ? "" : perso, tuile: premier ? prompt : undefined });
-					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), debut: Date.now(), enCours: true };
+					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true };
 					conv.messages.push(rep);
 					conv.enCours = true;
-					if (premier) composer.querySelector(".qz-mini-tuile")?.remove();
-					champ.readOnly = false;
-					champ.placeholder = t("ai.explain.followUp");
+					majTuile();
 					conv.repeindre?.();
 					try {
 						const reponse = await conv.client.chat(conv.historique, {
@@ -412,6 +422,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					} catch (err) {
 						const e = err as Error & { aborted?: boolean };
 						conv.historique.pop();
+						// The prompt was never answered: its tile comes back (`majTuile`).
+						if (premier) conv.envoye = false;
 						if (e?.aborted) rep.arrete = true;
 						else rep.erreur = e?.message || t("ai.error.checkSettings");
 					} finally {
@@ -438,7 +450,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				champ.focus();
 			},
 			// Closing the window keeps the conversation; only the painting stops.
-			onClose: () => { window.clearInterval(horloge); conv.repeindre = null; },
+			onClose: () => { window.clearInterval(horloge); fermerUsage?.(); conv.repeindre = null; },
 		});
 	}
 

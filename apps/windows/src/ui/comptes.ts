@@ -322,9 +322,10 @@ function poserUsagePopoverContenu(pop: HTMLElement, outil: OutilAvecUsage, entre
  * THE SAME USAGE POPOVER, from another window (the Explain conversation): a
  * click on `ancre` opens it (a second click, a click elsewhere or Escape
  * closes it), with the gauges the Settings show. `outil` is read at each
- * click: the provider can change while the window stays open.
+ * click: the provider can change while the window stays open. Returns what
+ * closes it, for the window that goes away with its popover open.
  */
-export function attacherUsage(ancre: HTMLElement, outil: () => OutilAvecUsage): void {
+export function attacherUsage(ancre: HTMLElement, outil: () => OutilAvecUsage): () => void {
 	let pop: HTMLElement | null = null;
 	let jeton = 0;
 	const fermer = (): void => {
@@ -368,6 +369,7 @@ export function attacherUsage(ancre: HTMLElement, outil: () => OutilAvecUsage): 
 			positionner();
 		});
 	});
+	return fermer;
 }
 
 export function monterReglagesComptes(section: HTMLElement): () => void {

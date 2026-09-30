@@ -305,17 +305,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    (hints, time limit, Exam mode) is chosen when it starts, never here.
 	    Holds for the page session, like the count and the type. */
 	let modeGeneration: ModeGeneration = "learn";
-	/* CHAT is the composer's permanent behaviour (2026-09-30): Enter and the
-	   arrow send a message to Claude Code or Codex, answered in prose in the
-	   same conversation, with the earlier chat turns as its memory. Learn |
-	   Test only choose the type of quiz that the "Generate quiz" button
-	   builds. A provider that cannot hold a chat (a web site, Ollama,
-	   Antigravity) keeps generating on send, so the composer is never dead. */
-	let quizBtnRef: HTMLButtonElement | null = null;
-	const chatCapable = (): boolean => {
-		const p = settings().aiProvider || "";
-		return p === "claude-code" || p === "codex";
-	};
 	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
 	   the attached documents, `false` = one quiz per document. Only offered
 	   with at least two documents and no image (`decouperParFichier` keeps a
@@ -395,8 +384,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		lastUsage = p.usage;
 		planTranchesEnvoye = p.planTranches;
 		noteLearnLiee = p.noteLearn;
-		// Only a quiz line has a product to open; a chat line never gets here.
-		if (l.demande.mode === "chat") return;
 		resultatFige = { mode: l.demande.mode, destination: l.demande.destination, reglages: l.demande.reglages, ligne: l.id };
 		generationId++;
 		generatedDraft = null;
@@ -688,13 +675,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return i < 0 ? TYPE_VALUES[0] : TYPE_VALUES[i];
 	};
 
-	/** The chat on screen, as turns: what the learner asked and what came back. */
+	/** The conversation on screen, as turns: what the learner asked and what
+	    came back — the prose answer, or the name of the quiz that was made. */
 	function archiverConversation(): void {
 		const turns: ArchivedTurn[] = [];
 		for (const l of fileGen.lignes()) {
-			if (l.demande.mode !== "chat") continue;
+			if (l.etat !== "prete" || !l.resultat) continue;
 			turns.push({ role: "user", text: l.demande.text });
-			turns.push({ role: "assistant", text: l.resultat?.texte ?? fileGen.transcript(l.id)?.text ?? "" });
+			turns.push({ role: "assistant", text: l.resultat.texte ?? t("ai.side.quizMade", { title: l.resultat.titre }) });
 		}
 		archiveChat(turns);
 	}
@@ -1714,7 +1702,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// les yeux, et la parenthèse gênait. Le champ RESTE facultatif avec une
 		// pièce jointe (`canGenerate` accepte texte OU images OU notes) ; c'est
 		// seulement le texte qui ne bouge plus.
-		composerInput.placeholder = t(chatCapable() ? "ai.chat.placeholder" : "ai.composer.placeholder");
+		composerInput.placeholder = t("ai.composer.placeholder");
 		composerInput.value = composerText;
 		/* Les tuiles suivent le texte VIVANT à chaque rendu (retour d'une
 		   demande annulée, préréglage, collage par le picker « @ ») : le
@@ -1996,22 +1984,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.
 		// Il reste un bouton d'ENVOI pendant une génération : l'arrêt vit sur
 		// la ligne de la file (■).
-		/* "Generate quiz": builds the quiz of the type chosen in Learn | Test
-		   from the composer's text and attachments, while Enter and the arrow
-		   keep talking. Only where the arrow chats; elsewhere the arrow
-		   itself generates. */
-		quizBtnRef = null;
-		if (chatCapable()) {
-			const quizBtn = ajouter(composerTools, "button", "qbd-ai-composer-quiz");
-			quizBtn.type = "button";
-			host.ui.setIcon(quizBtn, "sparkles");
-			labelIconButton(quizBtn, t("ai.composer.generate"));
-			attachHoverTip(quizBtn, (tip) => ajouter(tip, "div", "qbd-hover-tip-title", t("ai.composer.generate")));
-			quizBtn.addEventListener("click", () => {
-				if (canGenerate()) void startGeneration(containerRef, true);
-			});
-			quizBtnRef = quizBtn;
-		}
 		const sendBtn = ajouter(composerTools, "button", "qbd-ai-composer-send");
 		sendBtn.type = "button";
 		const sendIcon = ajouter(sendBtn, "span", "qbd-ai-composer-send-icon");
@@ -2029,7 +2001,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				if (canGenerate()) void startGeneration(containerRef);
 			});
 		} else {
-			sendBtn.setAttribute("aria-label", t(chatCapable() ? "ai.composer.send" : "ai.composer.generate"));
+			sendBtn.setAttribute("aria-label", t("ai.composer.generate"));
 			host.ui.setIcon(sendIcon, "arrow-up");
 			sendBtn.addEventListener("click", () => {
 				/* Le ■ de claude.ai : composer vide pendant une génération, le
@@ -3812,13 +3784,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			btn.classList.toggle("qbd-ai-composer-send--stop", arret);
 			const icone = btn.querySelector<HTMLElement>(".qbd-ai-composer-send-icon");
 			if (icone) host.ui.setIcon(icone, arret ? "square" : "arrow-up");
-			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t(chatCapable() ? "ai.composer.send" : "ai.composer.generate"));
+			btn.setAttribute("aria-label", arret ? t("ai.composer.stop") : t("ai.composer.generate"));
 		}
 		const canGen = arret || canGenerate();
-		if (quizBtnRef) {
-			quizBtnRef.hidden = !hasContent;
-			quizBtnRef.disabled = !canGenerate();
-		}
 		btn.classList.toggle("is-visible", hasContent || arret);
 		btn.disabled = !canGen;
 		btn.classList.toggle("qbd-ai-composer-send--disabled", !canGen);
@@ -3928,7 +3896,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return tuiles;
 	}
 
-	async function startGeneration(container: HTMLElement | null, asQuiz = false): Promise<void> {
+	async function startGeneration(container: HTMLElement | null): Promise<void> {
 		/* VERROU d'abord, et de façon synchrone : sans lui, Entrée ou un
 		   second clic pendant l'attente ci-dessous envoyait la MÊME demande
 		   une seconde fois (revue codex 2026-07-31). */
@@ -3967,16 +3935,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   écouteurs `document` (Esc, collage) continueraient de tourner sous la
 		   génération CLI qui vient de partir. */
 		arreterAttenteWeb();
-		/* A chat goes to the two CLIs that can hold one; the others (a web
-		   site, Ollama, Antigravity) are told so instead of failing later. */
-		if (!asQuiz && chatCapable()) {
-			const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: [] };
-			if (!envoi.text.trim()) { host.ui.notice(t("ai.chat.empty")); return; }
-			fileGen.envoyer({ ...envoi, mode: "chat", count: null, type: "", destination: "", reglages: figerReglages(settings()), categorie: "general" });
-			viderComposer();
-			render(container);
-			return;
-		}
 		if (aiProviders.estCanalWeb(settings().aiProvider || "")) {
 			/* Le composer GARDE la demande pendant l'attente du site ; tout ce
 			   qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit

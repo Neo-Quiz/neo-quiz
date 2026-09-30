@@ -13,7 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Generate always makes a quiz again: Enter and the arrow generate the Learn or Test you chose, and the chat is gone. A request that explicitly asks for no quiz ("no quiz, just explain") gets an answer in prose instead.
+
 ### Fixed
+- In the Explain window, a first message that fails or is stopped brings the prompt tile back, so that it can be sent again instead of leaving follow-ups without the question.
 - After visiting Generate, the Folders page (and every other page) no longer splits into two columns with its toolbar stranded on the left.
 
 ## [1.20.2] - 2026-09-30

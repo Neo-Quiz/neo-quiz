@@ -47,6 +47,13 @@ await withSrcModule(
 		const brut = `[{ title: "Q1", prompt: "Combien font 2+2 ?", options: ["3", "4"], correctIndex: 1 }]`;
 		r.check("un tableau nu", client.parseReponseQuiz(brut).questions.length, 1);
 		r.check("… sans titre : `titre` absent, le nom viendra de la demande", client.parseReponseQuiz(brut).titre, undefined);
+		/* No quiz asked for: the marker line turns the answer into prose to
+		   show, never an error; the marker elsewhere changes nothing. */
+		const sansQuiz = (texte) => { try { client.parseReponseQuiz(texte); return "quiz"; } catch (e) { return e instanceof client.NoQuizAnswer ? e.texte : "erreur"; } };
+		r.check("NO_QUIZ first line: the prose is the answer", sansQuiz("\n NO_QUIZ\r\nUne **pile** est LIFO.\n"), "Une **pile** est LIFO.");
+		r.check("NO_QUIZ inside a word is not the marker", sansQuiz("NO_QUIZZES are fun"), "erreur");
+		r.check("a quiz mentioning NO_QUIZ stays a quiz", sansQuiz(`[{ prompt: "NO_QUIZ ?", options: ["a", "b"], correctIndex: 0 }]`), "quiz");
+		r.check("the generation prompt names the marker", client.composerPrompts("x").systemPrompt.includes(client.NO_QUIZ_MARKER), true);
 		const fence = "Voici le quiz demandé :\n\n```json5\n// neo-quiz k7f2q9abcd\n" + brut + "\n```\n\nBon courage !";
 		r.check("un tableau dans une fence, avec de la prose autour et le commentaire du jeton",
 			client.parseReponseQuiz(fence).questions.length, 1);
@@ -217,7 +224,7 @@ const codePage = (await transform(fonctions.join("\n"), { loader: "ts" })).code;
 const refus = makeReporter("Canal web : refus pendant une attente");
 for (const avecImage of [false, true]) {
 	const contexte = {
-		phase: "web", demarrage: false, chatCapable: () => false, composerText: "Nouvelle demande", composerCaret: null,
+		phase: "web", demarrage: false, composerText: "Nouvelle demande", composerCaret: null,
 		noteAttachments: [], images: avecImage ? [{ url: "blob:test" }] : [], oneQuiz: false,
 		sentMessage: { text: "Demande précédente", images: [], notes: [] }, sentAnimPending: false,
 		arrets: 0, retraits: 0, rendus: [],

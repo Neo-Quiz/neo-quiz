@@ -90,6 +90,18 @@ export interface ReponseQuiz {
 	titre?: string;
 }
 
+/** The first line of an answer written INSTEAD of a quiz: Generate always
+    makes a quiz, unless the request explicitly asks for none (2026-09-30). */
+export const NO_QUIZ_MARKER = "NO_QUIZ";
+
+/** Thrown by the parser when the model answered in prose on request
+    (`NO_QUIZ_MARKER`): not a failure, the text is the answer to show. */
+export class NoQuizAnswer extends Error {
+	constructor(readonly texte: string) {
+		super("no quiz requested");
+	}
+}
+
 /** One turn of a conversation with the model (`AiClient.chat`). */
 export interface ChatTurn {
 	role: "user" | "assistant";
@@ -382,6 +394,8 @@ ${categorieBloc}
 
 	NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.
 
+	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
+
 	${quantite}
 
 	Generate ${typeInstruction}. ${PHRASE_FINALE_CLI}`;
@@ -551,6 +565,8 @@ export function nettoyerTitre(brut: string): string | undefined {
  * la closure de `createAiClient` le 2026-09-18 : la page « Générer » la lit
  * aussi pour le canal web. */
 export function parseReponseQuiz(content: string): ReponseQuiz {
+	const sansQuiz = content.trim().match(new RegExp("^" + NO_QUIZ_MARKER + "[ \\t]*(?:\\r?\\n|$)"));
+	if (sansQuiz) throw new NoQuizAnswer(content.trim().slice(sansQuiz[0].length).trim());
 	let cleaned = retirerFence(content);
 	cleaned = repairLatexBackslashes(cleaned);
 

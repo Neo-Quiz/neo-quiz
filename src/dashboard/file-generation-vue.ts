@@ -144,7 +144,7 @@ export function creerVueFile(opts: {
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
 		const meta = ajouter(message, "div", "qbd-ai-message-meta");
-		ajouter(meta, "span", undefined, d.mode === "chat" ? t("ai.chat.label") : quizModeLabel(d.mode));
+		ajouter(meta, "span", undefined, quizModeLabel(d.mode));
 		const providerId = d.reglages.aiProvider || "";
 		const p = providerId ? aiProviders.getProvider(providerId) : null;
 		if (p) {
@@ -156,28 +156,24 @@ export function creerVueFile(opts: {
 		}
 	}
 
-	/* ── A CHAT ANSWER (2026-09-29), as MonoCode shows one: a line with the
-	   model and how long it worked, then the answer as PROSE — Markdown
-	   rendered by `renderMarkdownPreview`, the only HTML it writes, every
-	   text through the first gate of the sanitizer — then Copy. While the
-	   model writes, the same prose grows in place (`surTranscript`). */
-	function textePourProse(l: LigneGeneration): string {
-		return enCours(l) ? (opts.file.transcript(l.id)?.text ?? "") : (l.resultat?.texte ?? "");
+	/* ── AN ANSWER IN PROSE, written instead of a quiz because the request
+	   asked for none (`NoQuizAnswer`), as MonoCode shows one: a line with the
+	   model and how long it worked, then the Markdown rendered by
+	   `renderMarkdownPreview`, the only HTML it writes, every text through the
+	   first gate of the sanitizer — then Copy. While the model writes, the line
+	   is an ordinary generation: nobody knows yet whether a quiz comes. */
+	function enProse(l: LigneGeneration): boolean {
+		return l.etat === "prete" && l.resultat?.texte !== undefined;
 	}
 
 	function remplirProse(prose: HTMLElement, l: LigneGeneration): void {
-		const texte = textePourProse(l);
-		if (!texte.trim()) {
-			prose.replaceChildren();
-			ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
-			return;
-		}
+		const texte = l.resultat?.texte ?? "";
 		prose.innerHTML = renderMarkdownPreview(texte);
 		// $…$ and $…$ are typeset after each repaint (the answer rewrites the HTML as it grows).
 		if (texte.includes("$")) void mathifyElement(prose);
 	}
 
-	function peindreReponseChat(parent: HTMLElement, l: LigneGeneration): void {
+	function peindreReponseProse(parent: HTMLElement, l: LigneGeneration): void {
 		const rep = ajouter(parent, "div", "qbd-ai-chat-reponse");
 		const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
 		const providerId = l.demande.reglages.aiProvider || "";
@@ -188,18 +184,10 @@ export function creerVueFile(opts: {
 		}
 		const id = l.demande.reglages.aiModel || p?.defaultModel || "";
 		const nom = p ? (id ? aiProviders.libelleModele(providerId, id) : p.name) : "";
-		if (enCours(l)) {
-			ajouter(tete, "span", undefined, t("ai.chat.working", { model: nom }));
-			const temps = ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (l.debut ?? Date.now())));
-			temps.dataset.debut = String(l.debut ?? Date.now());
-			temps.setAttribute("aria-hidden", "true");
-		} else {
-			ajouter(tete, "span", undefined, t("ai.chat.worked", { model: nom, time: duree(l.resultat?.dureeMs ?? 0) }));
-		}
+		ajouter(tete, "span", undefined, t("ai.chat.worked", { model: nom, time: duree(l.resultat?.dureeMs ?? 0) }));
 		const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-		prose.dataset.ligne = String(l.id);
 		remplirProse(prose, l);
-		if (!enCours(l) && l.resultat?.texte) {
+		if (l.resultat?.texte) {
 			const pied = ajouter(rep, "div", "qbd-ai-chat-pied");
 			const texte = l.resultat.texte;
 			if (opts.copier) {
@@ -213,8 +201,8 @@ export function creerVueFile(opts: {
 
 	/** La réponse, selon l'état de la ligne. */
 	function peindreReponse(parent: HTMLElement, l: LigneGeneration): void {
-		if (l.demande.mode === "chat" && (enCours(l) || (l.etat === "prete" && l.resultat?.texte !== undefined))) {
-			peindreReponseChat(parent, l);
+		if (enProse(l)) {
+			peindreReponseProse(parent, l);
 			return;
 		}
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
@@ -340,13 +328,14 @@ export function creerVueFile(opts: {
 		const vivant = enCours(l);
 		/* A chat answer IS its text, shown as prose: the transcript only adds
 		   the reasoning and the tools, when the model shared any. */
-		if (l.demande.mode === "chat" && !tr.thinking && tr.tools.length === 0) return;
+		const prose = enProse(l);
+		if (prose && !tr.thinking && tr.tools.length === 0) return;
 		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
 		bloc.dataset.ligne = String(l.id);
-		if (l.demande.mode === "chat") bloc.dataset.chat = "1";
+		if (prose) bloc.dataset.chat = "1";
 		bloc.setAttribute("role", "log");
 		bloc.setAttribute("aria-label", t("ai.transcript.label"));
-		remplirTranscript(bloc, l.demande.mode === "chat" ? { ...tr, text: "" } : tr, vivant, l.id);
+		remplirTranscript(bloc, prose ? { ...tr, text: "" } : tr, vivant, l.id);
 	}
 
 	/** Follows the end of the conversation smoothly, as MonoCode does while
@@ -362,15 +351,6 @@ export function creerVueFile(opts: {
 		if (!l || !tr) return;
 		const fil = defileur();
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 120;
-		const prose = zone.querySelector<HTMLElement>(`.qbd-ai-chat-prose[data-ligne="${id}"]`);
-		if (prose && enCours(l)) {
-			remplirProse(prose, l);
-			const blocChat = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
-			if (blocChat) remplirTranscript(blocChat, { ...tr, text: "" }, true, id);
-			else if (tr.thinking || tr.tools.length) { peindre(); return; }
-			suivre(fil, enBas);
-			return;
-		}
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
 		// First chunk of a run painted before its transcript existed: one repaint.
 		if (!bloc) { if (enCours(l)) peindre(); return; }
