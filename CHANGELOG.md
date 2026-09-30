@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Each quiz of an /exam plan keeps the usual size of one quiz (at most 20 questions in a Learn, 10 to 20 in a Test): the plan already splits the program, and uncapped quizzes of 50 to 110 questions made the preparation last an hour.
+
 ## [1.20.8] - 2026-09-30
 
 ### Changed

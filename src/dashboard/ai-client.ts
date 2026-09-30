@@ -360,10 +360,10 @@ function blocPreparation(p: PreparationExamen | undefined, learn: boolean): stri
 	if (p.titre) {
 		const examenP = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
 		const plan = (p.plan ?? []).map((x, i) => `${i + 1}. ${x}`).join("\n\t");
-		return `EXAM PREPARATION${examenP}: after reading all the documents you planned these quizzes, which together cover everything that can come up:\n\t${plan}\n\tTHIS QUIZ is number ${p.etape ?? 1}, "${p.titre}": ${p.focus || p.titre}. Cover EXACTLY that part, every notion, method and classic exercise of it, from the basics up to the exam's level; the other quizzes cover the rest. No fixed number of questions: as many as this part needs.\n\n\t`;
+		return `EXAM PREPARATION${examenP}: after reading all the documents you planned these quizzes, which together cover everything that can come up:\n\t${plan}\n\tTHIS QUIZ is number ${p.etape ?? 1}, "${p.titre}": ${p.focus || p.titre}. Cover EXACTLY that part, its key notions, methods and classic exercises, from the basics up to the exam's level; the other quizzes cover the rest. Keep the usual size of ONE quiz (the QUANTITY below): the plan has already split the program, so this quiz stays short.\n\n\t`;
 	}
 	const examen = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
-	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. Do not stop at 20 questions if the sources need more to be covered.`;
+	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. The work is split between the quizzes: each keeps the usual size of one quiz.`;
 	const etape = learn
 		? `THIS STEP: the Learn path${p.document ? ` of the document "${p.document}" (one Learn per document of the exam; the Tests cover them all)` : ""}, from the basics up to the exam's level, in the order the notions build on each other.`
 		: p.palier >= p.paliers
@@ -399,9 +399,11 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	The questions must be ANSWERABLE FROM THE DOCUMENT ALONE and test understanding — main idea, inference, meaning in context, cause and effect, the author's intent, what can or cannot be concluded — NOT recall of outside knowledge. Mix single-choice, multiple-choice and free-text among them`
 		: "free-text questions";
 
-	const quantite = count == null && preparation
-		? "QUANTITY: as many questions as it takes to cover everything this step asks for — no fixed maximum. Never pad with trivia."
-		: count != null
+	/* A preparation keeps the usual QUANTITY of one quiz (2026-09-30): an
+	   uncapped one gave eight Learns of 52 to 113 questions — some 600 in
+	   all, and an hour of generation. The plan splits the program; each
+	   quiz of it stays one quiz. */
+	const quantite = count != null
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
 		? "QUANTITY: at most 20 questions in total, every role counted — usually 2 or 3 slices. Cover what can be examined on the source, the most important first; go beyond 20 ONLY if the source truly cannot be learned in fewer, and never pad with trivia. A learner who sees 50 questions gives up before starting."

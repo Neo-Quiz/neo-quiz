@@ -121,7 +121,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	r.check("the Learn step", sys("learn", 0).includes("THIS STEP: the Learn path"), true);
 	r.check("Test 1 is the fundamentals", sys("practice", 1).includes("FUNDAMENTALS"), true);
 	r.check("the last Test is at the exam's level", sys("practice", 3).includes("AT THE EXAM'S LEVEL"), true);
-	r.check("no 20-question cap in a preparation", sys("learn", 0).includes("at most 20 questions"), false);
+	r.check("a preparation keeps the usual size of one quiz (at most 20 in a Learn)", sys("learn", 0).includes("at most 20 questions"), true);
 	r.check("a Learn cites its sources", composerPrompts("x", { mode: "learn" }).systemPrompt.includes('"cite"'), true);
 	r.check("a Test does not", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('"cite"'), false);
 	r.check("no preparation block without /exam", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("EXAM PREPARATION"), false);
@@ -156,5 +156,16 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ lirePlan }) => {
 	r.check("Learn | Test imposes the type", lirePlan(brut, "learn").map(e => e.type), ["learn", "learn"]);
 	r.check("an unreadable answer gives no plan", lirePlan("désolé, je ne peux pas"), []);
 	r.check("at most 12 steps", lirePlan(JSON.stringify(Array.from({ length: 20 }, (_, i) => ({ title: "Q" + i, type: "test" })))).length, 12);
+	r.done();
+});
+
+/* A step of the model's plan keeps the usual size too (eight Learns of 52 to
+   113 questions on 2026-09-30): never "as many as needed". */
+await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
+	const r = makeReporter("/exam plan step size");
+	const sys = (mode) => composerPrompts("x", { mode, preparation: { examen: { nom: "CC", date: "2026-10-02", module: "XTI301" }, palier: 0, paliers: 3, titre: "Listes", focus: "les listes", plan: ["Listes", "Tuples"], etape: 1, etapes: 2 } }).systemPrompt;
+	r.check("a Learn step keeps its 20-question cap", sys("learn").includes("at most 20 questions"), true);
+	r.check("a Test step keeps 10 to 20 questions", sys("practice").includes("between 10 and 20 questions"), true);
+	r.check("never an uncapped quantity", /no fixed (maximum|number)/i.test(sys("learn") + sys("practice")), false);
 	r.done();
 });
