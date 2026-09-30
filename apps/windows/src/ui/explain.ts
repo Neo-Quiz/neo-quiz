@@ -24,6 +24,7 @@ import { createAiClient } from "../../../../src/dashboard/ai-client";
 import type { ChatTurn } from "../../../../src/dashboard/ai-client";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
+import { openEffortSlider, openModelMenu } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
 
@@ -64,62 +65,122 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	settings: AiSettingsHost;
 }): () => void {
 	const host = currentHost();
-	/* A row of the panel, right under the question and above the bar of
-	   arrows (`ui/quiz-bars.ts` keeps the slides clear of it). */
+	/* A mini composer in a row of the panel, right under the question and above
+	   the bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It
+	   only shows once the question on screen has an answer: without one the
+	   prompt would carry an empty "My answer" and explain nothing about the
+	   learner's own choice. Empty, it sends the default Explain prompt; with a
+	   text, the text is added as the learner's own question. */
 	const panneau = hote.closest<HTMLElement>(".qbd-qz");
 	if (!panneau) return () => {};
 	const rangee = ajouter(panneau, "div", "qz-above-bar qz-explain-row");
 	const barre = panneau.querySelector(":scope > .qz-bottom-bar");
 	if (barre) panneau.insertBefore(rangee, barre);
-	const bouton = ajouter(rangee, "button", "qbd-qz-explain");
-	bouton.type = "button";
-	bouton.title = t("ai.explain.buttonTip");
-	/* The LOGO of the provider chosen in Settings (Claude Code's or
-	   Codex's), read at each paint: it says who will answer. Sparkles when
-	   the provider cannot explain (the click then says so). */
-	const icone = ajouter(bouton, "span", "qbd-qz-explain-icon");
-	const id = deps.settings.get().aiProvider || "";
-	if (id === "claude-code" || id === "codex") {
-		const p = aiProviders.getProvider(id);
-		icone.classList.add("qbd-provider-logo", "qbd-provider-logo--" + p.logo);
-		aiProviders.setBrandLogo(icone, p.logo);
-	} else {
-		host.ui.setIcon(icone, "sparkles");
-	}
-	ajouter(bouton, "span", undefined, t("ai.explain.button"));
+	const mini = ajouter(rangee, "div", "qz-mini");
+	const champ = ajouter(mini, "textarea", "qz-mini-champ");
+	champ.rows = 1;
+	champ.placeholder = t("ai.explain.miniPlaceholder");
+	const pied = ajouter(mini, "div", "qz-mini-pied");
+	/* The LOGO of the provider chosen in Settings (Claude Code's or Codex's):
+	   it says who will answer. Sparkles when the provider cannot explain
+	   (sending then says so). */
+	const icone = ajouter(pied, "span", "qbd-qz-explain-icon");
+	const outils = ajouter(pied, "div", "qz-mini-outils");
+	const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
+	modeleBtn.type = "button";
+	const modeleLabel = ajouter(modeleBtn, "span", "qbd-select-label");
+	const effortBtn = ajouter(outils, "button", "qbd-select qbd-effort-trigger qbd-composer-plain");
+	effortBtn.type = "button";
+	const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
+	const envoi = ajouter(outils, "button", "qz-mini-envoi");
+	envoi.type = "button";
+	envoi.setAttribute("aria-label", t("ai.explain.button"));
+	host.ui.setIcon(ajouter(envoi, "span"), "arrow-up");
 
-	/* Hidden in an Exam: the engine puts its clock straight into the host. */
-	const majVisibilite = (): void => {
-		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer");
+	const fournisseur = (): string => deps.settings.get().aiProvider || "";
+	const peutExpliquer = (): boolean => ["claude-code", "codex"].includes(fournisseur());
+	const modeles = (): aiProviders.ModelDef[] =>
+		fournisseur() === "claude-code" ? aiProviders.getClaudeModels() : aiProviders.getDefaultModels("codex");
+	const modeleCourant = (): string => fournisseur() === "claude-code"
+		? aiProviders.resolveClaudeModel(deps.settings.get().aiModel)
+		: aiProviders.resolveCodexModel(deps.settings.get().aiModel);
+	const efforts = () => aiProviders.getEfforts(fournisseur(), modeleCourant());
+	const effortCourant = (): string => aiProviders.resolveEffort(fournisseur(), deps.settings.get().aiEffort, modeleCourant());
+
+	const peindreOutils = (): void => {
+		icone.replaceChildren();
+		icone.className = "qbd-qz-explain-icon";
+		if (peutExpliquer()) {
+			const p = aiProviders.getProvider(fournisseur());
+			icone.classList.add("qbd-provider-logo", "qbd-provider-logo--" + p.logo);
+			aiProviders.setBrandLogo(icone, p.logo);
+		} else {
+			host.ui.setIcon(icone, "sparkles");
+		}
+		modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
+		if (!peutExpliquer()) return;
+		const cur = modeleCourant();
+		modeleLabel.textContent = modeles().find(m => m.value === cur)?.label ?? cur;
+		const ev = effortCourant();
+		effortLabel.textContent = efforts().find(e => e.value === ev)?.label ?? ev;
 	};
-	/* Clickable only once the question on screen has an answer: without
-	   one the prompt would carry an empty "My answer" and explain nothing
-	   about the learner's own choice. */
-	const majActivation = (): void => {
+	peindreOutils();
+	void aiProviders.refreshCliCaches().then(change => { if (change && modeleBtn.isConnected) peindreOutils(); });
+	modeleBtn.addEventListener("click", async () => {
+		await aiProviders.refreshCliCaches();
+		if (!modeleBtn.isConnected) return;
+		openModelMenu(modeleBtn, {
+			models: modeles(),
+			moreModels: fournisseur() === "claude-code" ? aiProviders.getClaudeMoreModels() : undefined,
+			currentModel: modeleCourant(),
+			efforts: [],
+			onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); peindreOutils(); },
+		});
+	});
+	effortBtn.addEventListener("click", () => {
+		openEffortSlider(effortBtn, {
+			variant: fournisseur() === "claude-code" ? "claude" : "codex",
+			efforts: efforts(),
+			currentEffort: effortCourant(),
+			onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); peindreOutils(); },
+		});
+	});
+
+	/* Hidden in an Exam (the engine puts its clock straight into the host) and
+	   while the question has no answer. */
+	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
 		const repondu = !!slide && maReponse(slide) !== "";
-		bouton.disabled = !repondu;
-		bouton.title = t(repondu ? "ai.explain.buttonTip" : "ai.explain.answerFirst");
+		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !repondu;
 	};
-	const observateur = new MutationObserver(() => { majVisibilite(); majActivation(); });
+	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
-	hote.addEventListener("input", majActivation);
+	hote.addEventListener("input", majVisibilite);
 	majVisibilite();
-	majActivation();
 
-	bouton.addEventListener("click", () => {
-		const provider = deps.settings.get().aiProvider || "";
-		if (provider !== "claude-code" && provider !== "codex") { host.ui.notice(t("ai.chat.providerUnsupported")); return; }
+	const lancer = (): void => {
+		if (!peutExpliquer()) { host.ui.notice(t("ai.chat.providerUnsupported")); return; }
 		const slide = questionAffichee(hote);
 		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
 		if (!slide || !q) { host.ui.notice(t("ai.explain.noQuestion")); return; }
 		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
 		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
-		const message = remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
-		ouvrirExplication(message, deps.settings, t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }));
+		let message = remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
+		const perso = champ.value.trim();
+		if (perso) message += "\n\n" + t("ai.explain.myQuestion") + "\n" + perso;
+		champ.value = "";
+		ouvrirExplication(message, deps.settings, perso || t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }));
+	};
+	envoi.addEventListener("click", lancer);
+	champ.addEventListener("keydown", (e) => {
+		// The quiz has its own keys (arrows, Space, 1/2): none of them belongs to this field.
+		e.stopPropagation();
+		if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+		e.preventDefault();
+		lancer();
 	});
 
-	return () => { observateur.disconnect(); hote.removeEventListener("input", majActivation); rangee.remove(); };
+	return () => { observateur.disconnect(); hote.removeEventListener("input", majVisibilite); rangee.remove(); };
 }
 
 /** The explanation window: the conversation, written live, and a field for

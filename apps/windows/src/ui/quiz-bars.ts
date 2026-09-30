@@ -67,6 +67,8 @@ export function attachQuizBars(host: HTMLElement): () => void {
 			panel?.removeEventListener("wheel", onWheel);
 			panel = found;
 			panel.append(bar);
+			/* The mini composer above the bar shows and hides itself: the slides' room follows. */
+			mutations.observe(panel, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
 			resize.observe(panel);
 			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
