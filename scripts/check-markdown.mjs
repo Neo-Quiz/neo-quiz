@@ -61,6 +61,11 @@ const CAS = [
 		+ "<span class=\"token punctuation\">(</span>n<span class=\"token punctuation\">)</span>"
 		+ "<span class=\"token punctuation\">:</span> "
 		+ "<span class=\"token keyword\">return</span> n</code> ici"],
+	/* The same, written on THREE lines around one line of code (an ordering
+	   item of a generated Learn, 2026-09-30): code, never raw backticks. */
+	["bloc de code sur trois lignes autour d'une ligne, langage inconnu : code nu",
+		"```mystere\nx < y\n``` ici",
+		"<code class=\"quiz-md-code-inline language-mystere\">x &lt; y</code> ici"],
 	["bloc de code sur une seule ligne, langage inconnu : code nu, sans span",
 		"```mystere x < y``` ici",
 		"<code class=\"quiz-md-code-inline language-mystere\">x &lt; y</code> ici"],

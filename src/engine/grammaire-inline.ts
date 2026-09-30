@@ -67,7 +67,13 @@ export function motifCodeSimple(): RegExp {
     un analyseur, pas une expression régulière — hors du périmètre de cette
     tâche pour un cas qu'un auteur ou un modèle colle rarement de lui-même. */
 export function motifCodeTriple(): RegExp {
-	return /```(?:([\w+#.-]+)[ \t]+)?((?:(?!```)[^\n])+?)```/g;
+	/* ALSO a fence written on THREE lines around ONE line of code
+	   (```python / return total / ```) in an element that cannot open a
+	   block (2026-09-30: an ordering item of a generated Learn showed its
+	   backticks raw): the language may end its line, and the code may be
+	   followed by a line break before the closing. The code itself stays on
+	   one line — a real multi-line block is not an inline element's. */
+	return /```(?:([\w+#.-]+)(?:[ \t]+|[ \t]*\r?\n)|\r?\n)?((?:(?!```)[^\n])+?)\r?\n?```/g;
 }
 
 /** Une suite de QUATRE étoiles ou plus n'est pas de l'emphase : aucune

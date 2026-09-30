@@ -141,7 +141,11 @@ await withSrcModule(["src/engine/sanitizer.ts", "src/quiz-utils.ts"], (sanitizer
 	const verifier = (fichier, qi, nom, valeur) => {
 		if (typeof valeur !== "string" || !valeur.trim()) return;
 		champs++;
-		const reste = retirerLitteraux(rendre(nom, valeur));
+		/* A Python DUNDER (`__name__`, `__init__.py`, `__main__`) is an
+		   identifier, shown as it is — never an underscore emphasis the
+		   engine forgot (2026-09-30: the first quizzes on Python modules). */
+		const reste = retirerLitteraux(rendre(nom, valeur))
+			.replace(/(^|[^\p{L}\p{N}_])__[\p{L}\p{N}]+(?:_[\p{L}\p{N}]+)*__(?:\.[a-z]+)?(?![\p{L}\p{N}])/gu, "$1");
 		for (const [libelle, motif] of MOTIFS) {
 			if (!motif.test(reste)) continue;
 			parMotif.set(libelle, (parMotif.get(libelle) || 0) + 1);

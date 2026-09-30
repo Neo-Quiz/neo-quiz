@@ -16,6 +16,7 @@ release notes.
 ### Fixed
 - A generated quiz asks exactly as many questions as its source has examinable points, no more, no less: one question per fact, rule, method or classic trap, never two on the same point, and a Learn no longer adds a warm-up and an "explain" question to every notion. With /exam, the AI lists the examinable points of the whole program when it plans (course facts such as who created Python included) and each quiz asks one question per point of its own list: the same six documents now give about 210 questions in Learn instead of 537.
 - A quiz whose answer comes back unreadable is asked again once, silently, before showing an error.
+- A line of code written between fences on three lines in an ordering item or an option (```python, the code, ```) shows as code, no longer with its backticks raw.
 
 ## [1.20.8] - 2026-09-30
 
