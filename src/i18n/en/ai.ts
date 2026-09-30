@@ -393,7 +393,6 @@ export const EN_AI = {
 	"ai.explain.answerFirst": "Answer the question first to have it explained",
 	"ai.explain.asked": "Explain this question to me: {question}",
 	"ai.explain.miniPlaceholder": "Anything specific to ask? (empty: just explain it)",
-	"ai.explain.myQuestion": "My specific question:",
 	"ai.explain.title": "Explanation",
 	"ai.explain.defaultPrompt": "Explain this question from my quiz « {quiz} » as if I knew nothing about the subject. Go in this order:\n1. The right answer, in one sentence.\n2. Why, step by step, defining every term the first time it appears.\n3. For each other choice, the precise mistake it invites.\n4. An everyday analogy, with its limit (what it does not say).\n5. A concrete example worked out step by step.\n6. The course point to remember, then a short check question, without its answer, so that I try to recall it.\n\nQuestion:\n{question}\n\nChoices:\n{options}\n\nRight answer: {answer}\nMy answer: {myAnswer}\nThe quiz's explanation: {explanation}",
 	"ai.explain.followUp": "Ask a follow-up question…",

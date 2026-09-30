@@ -77,8 +77,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	   the bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It
 	   only shows once the question on screen has been corrected (Check in a
 	   Learn, the hand-in of a Test): before that, the answer is not yet known.
-	   Empty, it sends the default Explain prompt; with a
-	   text, the text is added as the learner's own question. */
+	   */
 	const panneau = hote.closest<HTMLElement>(".qbd-qz");
 	if (!panneau) return () => {};
 	const rangee = ajouter(panneau, "div", "qz-above-bar qz-explain-row");
@@ -86,7 +85,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	if (barre) panneau.insertBefore(rangee, barre);
 	const mini = ajouter(rangee, "div", "qz-mini");
 	const champ = ajouter(mini, "textarea", "qz-mini-champ");
-	champ.rows = 1;
+	champ.rows = 2;
 	champ.placeholder = t("ai.explain.miniPlaceholder");
 	const pied = ajouter(mini, "div", "qz-mini-pied");
 	/* The LOGO of the provider chosen in Settings (Claude Code's or Codex's):
@@ -154,11 +153,30 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		});
 	});
 
+	/* The field ALWAYS holds the prompt about the question on screen, ready to
+	   send and free to edit. It is rebuilt when the question changes, unless
+	   the learner has changed the text (then it is theirs). */
+	let defaut = "";
+	const messagePour = (slide: HTMLElement): string | null => {
+		const q = deps.questions[Number(slide.dataset.qi)];
+		if (!q) return null;
+		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
+		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
+		return remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
+	};
+	const remplir = (slide: HTMLElement): void => {
+		const neuf = messagePour(slide);
+		if (neuf === null || neuf === defaut) return;
+		if (champ.value === defaut || champ.value.trim() === "") champ.value = neuf;
+		defaut = neuf;
+	};
+
 	/* Hidden in an Exam (the engine puts its clock straight into the host) and
-	   while the question has no answer. */
+	   until the question is corrected. */
 	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
 		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !slide || !corrigee(slide);
+		if (!rangee.hidden && slide) remplir(slide);
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
@@ -170,13 +188,13 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const slide = questionAffichee(hote);
 		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
 		if (!slide || !q) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
-		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
-		let message = remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
-		const perso = champ.value.trim();
-		if (perso) message += "\n\n" + t("ai.explain.myQuestion") + "\n" + perso;
-		champ.value = "";
-		ouvrirExplication(message, deps.settings, perso || t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }));
+		remplir(slide);
+		const message = champ.value.trim() || defaut;
+		/* The window shows a one-line label when the prompt is the untouched
+		   default (it is long); an edited prompt is shown as written. */
+		const affiche = message === defaut ? t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() }) : message;
+		champ.value = defaut;
+		ouvrirExplication(message, deps.settings, affiche);
 	};
 	envoi.addEventListener("click", lancer);
 	champ.addEventListener("keydown", (e) => {

@@ -191,6 +191,8 @@
 .qz-mini-champ {
 	width: 100%;
 	min-height: 24px;
+	max-height: 52px;
+	overflow-y: auto;
 	padding: 0;
 	border: 0;
 	outline: 0;
