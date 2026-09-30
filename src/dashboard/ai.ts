@@ -1660,7 +1660,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   button inside the composer's card would be a tile within a tile).
 			   `aria-pressed` = ONE quiz over all the documents. */
 			oneQuizBtn = null;
-			if (canChooseQuizCount(noteAttachments.length, images.length)) {
+			// Not for an exam: its preparation makes one Learn per document anyway.
+			if (canChooseQuizCount(noteAttachments.length, images.length) && !examCible) {
 				const toggle = ajouter(contenuZone, "button", "qbd-ai-onequiz");
 				toggle.type = "button";
 				host.ui.setIcon(ajouter(toggle, "span", "qbd-ai-onequiz-icon"), "layers");
@@ -1693,6 +1694,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   up the preparation. Drawn in place, never by a render (a render would
 		   take the focus from the field). */
 		const tuileExam = ajouter(textZone, "div", "qbd-ai-exam-cible");
+		/* With documents joined, the tile opens THEIR row, on the same line
+		   (claude.ai: the pasted text and the files side by side). */
+		if (chipsRow) chipsRow.prepend(tuileExam);
 		const composerInput = ajouter(textZone, "textarea", "qbd-ai-composer-input");
 		let mentions: MentionPickerHandle | null = null;
 		let commandeExam: ExamCommandHandle | null = null;

@@ -1129,3 +1129,17 @@
 	width: 14px;
 	height: 14px;
 }
+
+/* The exam's prompt tile at the head of the documents' row: same line, no
+   margin of its own (the row spaces its cards). */
+.qbd-ai-composer-chips > .qbd-ai-exam-cible {
+	flex: none;
+	width: 120px;
+	height: 120px;
+	margin: 0;
+}
+/* The row's overflow leaves 8 px around its cards for their crosses. */
+.qbd-ai-composer-chips > .qbd-ai-exam-cible .qbd-ai-exam-cible-retirer {
+	top: -8px;
+	right: -8px;
+}
