@@ -245,6 +245,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				if (!conv.envoye) creerTuile(composer, prompt, () => deps.ouvrirPrompt());
 				const champ = ajouter(composer, "textarea", "nq-explain-champ");
 				champ.rows = 1;
+				// Before the first message there is nothing to type: the prompt tile IS the message.
+				champ.readOnly = !conv.envoye;
 				champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : "ai.explain.miniPlaceholder");
 				const pied = ajouter(composer, "div", "qz-mini-pied");
 				/* The consumption of the provider, where the Settings already show
@@ -380,18 +382,19 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (conv.envoye && !perso) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
 					const premier = !conv.envoye;
-					const texte = premier ? (perso ? prompt + "\n\n" + t("ai.explain.myQuestion") + "\n" + perso : prompt) : perso;
+					const texte = premier ? prompt : perso;
 					champ.value = "";
 					champ.style.height = "auto";
 					/* The provider shown here is the one that answers: the client reads the Settings. */
 					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
 					conv.envoye = true;
 					conv.historique.push({ role: "user", text: texte });
-					conv.messages.push({ role: "user", text: perso, tuile: premier ? prompt : undefined });
+					conv.messages.push({ role: "user", text: premier ? "" : perso, tuile: premier ? prompt : undefined });
 					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), debut: Date.now(), enCours: true };
 					conv.messages.push(rep);
 					conv.enCours = true;
 					if (premier) composer.querySelector(".qz-mini-tuile")?.remove();
+					champ.readOnly = false;
 					champ.placeholder = t("ai.explain.followUp");
 					conv.repeindre?.();
 					try {

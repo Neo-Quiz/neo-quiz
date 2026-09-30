@@ -488,3 +488,7 @@
 	color: color-mix(in srgb, var(--text-normal) 52%, transparent);
 	opacity: 1;
 }
+
+.nq-explain-champ[readonly] {
+	cursor: default;
+}
