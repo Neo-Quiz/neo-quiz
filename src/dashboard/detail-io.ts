@@ -237,7 +237,9 @@ export function questionText(q: DraftQuestion): string {
 	   longtemps porté sa propre copie des règles de flanc — deux copies d'une
 	   grammaire aussi pointue finissent par diverger, et c'est la vignette qui
 	   se serait mise à mentir sur ce que la carte affiche. */
-	return stripInlineMarkdown(q.prompt || q.title || "")
+	// Fence lines (```lang / ```) are block syntax, which the inline grammar
+	// leaves as literal backticks: drop them, keep the code between them.
+	return stripInlineMarkdown((q.prompt || q.title || "").replace(/^[ \t]*(?:`{3,}|~{3,})[^\n]*$/gm, ""))
 		// Les titres, eux, n'existent pas en INLINE : le rendu les laisse tels
 		// quels dans une carte, mais une vignette d'une ligne n'en veut pas.
 		.replace(/^\s*#{1,6}\s+/gm, "")

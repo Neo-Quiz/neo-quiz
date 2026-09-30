@@ -27,6 +27,7 @@ release notes.
 
 ### Fixed
 - Folder and quiz cards can be focused and opened with Enter or Space, and the question grid gives readings their own label so no two buttons share one.
+- The keyboard keeps working after an action removes the focused button (such as rating a written answer), the Explain settings no longer name only Claude Code and Codex, and a question card in the editor list no longer shows raw code fences.
 - The documents list of a folder no longer crushes its rows when it has more than eight files.
 - A folder with no quiz yet keeps the exams you add to its review plan, and shows the ones it already had.
 - Opening a document from a folder now shows it: the row presses in on click, swaps its icon for a spinner, reads "Opening…" and sweeps a soft light while the default app starts.

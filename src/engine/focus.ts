@@ -1,6 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 
 interface QuestionFocusDescriptor {
+	/** Empty when focus was on a control without a stable selector. */
 	selector: string;
 	/** Les cibles de REPLI, dans l'ordre, quand `selector` a disparu du
 	    nouveau rendu (le bouton d'indice après son dernier niveau). */
@@ -95,17 +96,34 @@ export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
 			descriptor.selector = '.quiz-resource-btn';
 		}
 
-		return descriptor.selector ? { selector: descriptor.selector, fallbacks: descriptor.fallbacks, scrollX: descriptor.scrollX, scrollY: descriptor.scrollY } : null;
+		// Focus was inside the card but on a control we have no selector for
+		// (or one that disappears, e.g. the self-rating buttons after a
+		// verdict): keep an empty selector so restoreQuestionFocus can still
+		// hand focus to the new card instead of letting it fall to <body>.
+		return { selector: descriptor.selector ?? "", fallbacks: descriptor.fallbacks, scrollX: descriptor.scrollX, scrollY: descriptor.scrollY };
 	}
 
 	function restoreQuestionFocus(rootEl: Element | null | undefined, descriptor: QuestionFocusDescriptor | null | undefined): void {
-		if (!rootEl || !descriptor?.selector) return;
+		if (!rootEl || !descriptor) return;
 		requestAnimationFrame(() => {
 			if (ctx.__quizDestroyed) return;
-			const target = [descriptor.selector, ...(descriptor.fallbacks ?? [])]
+			let target = [descriptor.selector, ...(descriptor.fallbacks ?? [])]
+				.filter(Boolean)
 				.map(s => rootEl.querySelector<HTMLElement>(s))
 				.find((el): el is HTMLElement => !!el) ?? null;
-			if (!target || typeof target.focus !== "function") return;
+			if (!target) {
+				// The focused control is gone. Keep the keyboard alive (the arrow
+				// keys are bound on the quiz container) by focusing the new card
+				// itself, but only when focus really fell to <body>: never steal
+				// it from an element the user moved to outside the quiz.
+				const active = document.activeElement;
+				if (active && active !== document.body) return;
+				if (!rootEl.isConnected || !(rootEl instanceof HTMLElement)) return;
+				if (!rootEl.hasAttribute("tabindex")) rootEl.setAttribute("tabindex", "-1");
+				rootEl.style.outline = "none";
+				target = rootEl;
+			}
+			if (typeof target.focus !== "function") return;
 			try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (_) {} }
 			try { window.scrollTo(descriptor.scrollX ?? 0, descriptor.scrollY ?? 0); } catch (_) {}
 		});
