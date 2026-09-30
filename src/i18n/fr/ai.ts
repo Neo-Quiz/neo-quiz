@@ -348,8 +348,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.explain.buttonTip": "Demander à Claude Code ou Codex de t'expliquer cette question",
 	"ai.explain.answerFirst": "Réponds d'abord à la question pour te la faire expliquer",
 	"ai.explain.asked": "Explique-moi cette question : {question}",
-	"ai.explain.miniPlaceholder": "Ajoute une précision (facultatif)",
-	"ai.explain.myQuestion": "Ma question en particulier :",
 	"ai.explain.tile": "Prompt",
 	"ai.explain.tileEdit": "Modifier le prompt dans les réglages",
 	"ai.explain.title": "Explication",

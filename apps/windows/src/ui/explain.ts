@@ -100,9 +100,6 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	crayon.setAttribute("aria-label", t("ai.explain.tileEdit"));
 	host.ui.setIcon(crayon, "pencil");
 	crayon.addEventListener("click", () => deps.ouvrirPrompt());
-	const champ = ajouter(mini, "textarea", "qz-mini-champ");
-	champ.rows = 1;
-	champ.placeholder = t("ai.explain.miniPlaceholder");
 	const pied = ajouter(mini, "div", "qz-mini-pied");
 	const outils = ajouter(pied, "div", "qz-mini-outils");
 	/* The PROVIDER, its logo right before the model's name: it says who will
@@ -244,23 +241,12 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const q = slide ? deps.questions[Number(slide.dataset.qi)] : undefined;
 		const base = slide ? messagePour(slide) : null;
 		if (!slide || !q || base === null) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		/* What the learner typed is added to the prompt as their own question. */
-		const perso = champ.value.trim();
-		const message = perso ? base + "\n\n" + t("ai.explain.myQuestion") + "\n" + perso : base;
 		const etiquette = t("ai.explain.asked", { question: String((q as { title?: unknown }).title ?? "").trim() });
-		champ.value = "";
 		/* The provider shown here is the one that answers: the client reads the Settings. */
 		if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
-		ouvrirExplication(message, deps.settings, perso ? etiquette + "\n" + perso : etiquette);
+		ouvrirExplication(base, deps.settings, etiquette);
 	};
 	envoi.addEventListener("click", () => void lancer());
-	champ.addEventListener("keydown", (e) => {
-		// The quiz has its own keys (arrows, Space, 1/2): none of them belongs to this field.
-		e.stopPropagation();
-		if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
-		e.preventDefault();
-		void lancer();
-	});
 
 	return () => { observateur.disconnect(); hote.removeEventListener("input", majVisibilite); rangee.remove(); };
 }

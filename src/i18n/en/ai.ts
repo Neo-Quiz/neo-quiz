@@ -392,8 +392,6 @@ export const EN_AI = {
 	"ai.explain.buttonTip": "Ask Claude Code or Codex to explain this question",
 	"ai.explain.answerFirst": "Answer the question first to have it explained",
 	"ai.explain.asked": "Explain this question to me: {question}",
-	"ai.explain.miniPlaceholder": "Add a detail (optional)",
-	"ai.explain.myQuestion": "My specific question:",
 	"ai.explain.tile": "Prompt",
 	"ai.explain.tileEdit": "Edit the prompt in the settings",
 	"ai.explain.title": "Explanation",
