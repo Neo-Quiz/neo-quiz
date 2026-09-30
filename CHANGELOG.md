@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.4] - 2026-09-30
+
 ### Added
 - /exam in the Generate composer opens a menu of your upcoming exams, like @ for files. Sent, it prepares the exam as a whole: a Learn over everything that can come up, then three Tests of rising difficulty, the last at the exam's level, from the same documents.
 - Each reading of a generated Learn names its source under it: the document and the pages it comes from (the pages of an attached PDF are now numbered for the model).
