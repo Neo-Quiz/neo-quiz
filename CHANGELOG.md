@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.2] - 2026-09-30
+
 ### Changed
 - The Generate page always shows its conversation across the full width, so everything Claude Code or Codex does stays visible; the Generation layout setting is gone.
 - In Generate, the composer is always a conversation with Claude Code or Codex: Enter and the arrow send a message, and Learn | Test now choose the type of quiz that the new Generate quiz button builds from what you wrote and attached.
