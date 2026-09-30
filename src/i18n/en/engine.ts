@@ -36,6 +36,12 @@ export const EN_ENGINE = {
 	"engine.nav.finish": "Finish",
 	"engine.nav.prevQuestion": "Previous question",
 	"engine.nav.nextQuestion": "Next question",
+	"engine.nav.tab": "Question {n}",
+	"engine.nav.tabCorrect": "Question {n}, right",
+	"engine.nav.tabRetried": "Question {n}, right after a retry",
+	"engine.nav.tabWrong": "Question {n}, wrong",
+	"engine.nav.tabAnswered": "Question {n}, answered",
+	"engine.nav.tabWithHint": "{label}, with hint",
 
 	/* ── Exam ── */
 	/* The start screen of a TIMED quiz: it announces the clock, nothing to

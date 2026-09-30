@@ -2878,7 +2878,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   un skip silencieux — régression corrigée ici). */
 	async function addComposerFiles(
 		files: File[],
-		origin?: { source: "vault" | "external"; path: string }
+		origin?: { source: "vault" | "external"; path: string },
+		// Preset epoch of the ORIGINAL caller (it may have awaited a disk read
+		// already); by default, the epoch at the time of this call.
+		epoque: number = epochPreset
 	): Promise<void> {
 		const imgs: File[] = [];
 		const rejected: string[] = [];
@@ -2893,6 +2896,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			} else if (/\.(md|txt)$/i.test(file.name) || file.type.startsWith("text/")) {
 				try {
 					const content = await file.text();
+					// A read started before a preset must not land in the new preset's composer.
+					if (epoque !== epochPreset) return;
 					const key = attachmentKey({ source, path: origin?.path, name: file.name });
 					if (noteAttachments.some(n => attachmentKey(n) === key)) {
 						host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: file.name }));
@@ -2906,6 +2911,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				rejected.push(file.name);
 			}
 		}
+		// Same guard after the last await: a stale batch adds nothing (no notice either).
+		if (epoque !== epochPreset) return;
 		if (imgs.length) {
 			addImageFiles(imgs); // render inclus
 		} else {
@@ -2924,6 +2931,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// name seul : sinon un « AGENTS.md » du vault percute à tort un
 		// « AGENTS.md » externe/déposé de contenu différent (régression
 		// corrigée ici — cf. rapport de tâche).
+		const epoque = epochPreset;
 		const key = attachmentKey({ source: "vault", path: file.path, name: file.name });
 		if (noteAttachments.some(n => attachmentKey(n) === key)) {
 			host.ui.notice(t("ai.notice.noteAlreadyAttached", { name: file.basename }));
@@ -2931,6 +2939,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		try {
 			const content = await host.fs.read(file.path);
+			// A read started before a preset must not land in the new preset's composer.
+			if (epoque !== epochPreset) return;
 			// file.name (PAS file.basename) : la chip affiche le nom complet
 			// AVEC son extension, comme les fichiers .md/.txt/PDF attachés via
 			// addComposerFiles (déjà sur file.name).
@@ -2962,6 +2972,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   pas un dédoublonnage par nom seul qui le confondrait avec un fichier
 	   externe homonyme. */
 	async function attachVaultPath(path: string): Promise<void> {
+		const epoque = epochPreset;
 		const f = host.fs.getFile(path);
 		if (!f) return;
 		const ext = f.extension.toLowerCase();
@@ -2970,9 +2981,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (ext === "pdf") { await joindrePdf(f.name, () => host.fs.readBinary(f.path), "vault", f.path); return; }
 		try {
 			const octets = await host.fs.readBinary(f.path);
+			// A read started before a preset must not land in the new preset's composer.
+			if (epoque !== epochPreset) return;
 			// `slice()` : un `Uint8Array` sur un tampon partagé n'est pas un `BlobPart`.
 			const file = new File([octets.slice()], f.name, { type: mimeForName(f.name) });
-			await addComposerFiles([file], { source: "vault", path: f.path });
+			await addComposerFiles([file], { source: "vault", path: f.path }, epoque);
 		} catch (e) {
 			host.ui.notice(t("ai.notice.noteReadFailed", { name: f.name }));
 		}
@@ -2989,6 +3002,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   pas de lecture pour un doublon détecté à l'avance. */
 	async function attachExternalPath(path: string): Promise<void> {
 		if (!host.platform.isDesktopApp) return;
+		const epoque = epochPreset;
 		const name = path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
 		const key = attachmentKey({ source: "external", path, name });
 		if (noteAttachments.some(n => attachmentKey(n) === key)) {
@@ -3001,10 +3015,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			/* Par le contrat (`externe.readBinary`, chemin ABSOLU) : dans
 			   l'application, c'est un canal BORNÉ au périmètre, pas un `fs`. */
 			const octets = await host.fs.externe.readBinary(path);
+			// A read started before a preset must not land in the new preset's composer.
+			if (epoque !== epochPreset) return;
 			// mimeForName : addComposerFiles teste file.type EN PREMIER pour les
 			// images, un File sans type finirait en chip texte au lieu d'une vignette.
 			const file = new File([octets.slice()], name, { type: mimeForName(name) });
-			await addComposerFiles([file], { source: "external", path });
+			await addComposerFiles([file], { source: "external", path }, epoque);
 		} catch (e) {
 			host.ui.notice(t("ai.notice.noteReadFailed", { name }));
 		}

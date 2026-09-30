@@ -433,6 +433,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		ctx.container.querySelectorAll<HTMLElement>("[data-nav]").forEach(tab => {
 			const i = Number(tab.dataset.nav);
 			tab.className = buildNavTabClass(`quiz-tab ${ctx.cards.tabClass(i)}`.trim(), tab);
+			// Only the class is rewritten here: keep the accessible name in step
+			// (readings keep their title label, set by navHtml).
+			if (!tab.classList.contains("is-lecture")) tab.setAttribute("aria-label", ctx.cards.tabLabel(i));
 		});
 		const resultsTab = ctx.container.querySelector<HTMLElement>("[data-nav-results]");
 		if (resultsTab) {

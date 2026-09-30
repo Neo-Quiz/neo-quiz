@@ -37,9 +37,10 @@ const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 /** THE HINT BADGE (spec 2026-09-29-test-practice-exam-design §2.3): a dot
-    whose question used its hint carries the Hint button's bulb instead of
-    its verdict mark (✓, ↻, ✗) — `used-hint`, drawn by nav-tabs.css. Only on
-    a dot that HAS a verdict mark; its colour still follows the result.
+    whose question used its hint carries the Hint button's bulb IN ADDITION to
+    its verdict mark (✓, ↻, ✗): `used-hint`, the bulb drawn in `::after` at the
+    top left by nav-tabs.css, the mark staying in `::before` at the top right.
+    Only on a dot that HAS a verdict mark; its colour still follows the result.
     Test and Learn alike. PURE, so that check:engine-review holds it. */
 export function withHintBadge(etat: string, hintUsed: boolean): string {
 	if (!hintUsed || !/(^|\s)(correct|retried|wrong)(\s|$)/.test(etat)) return etat;
@@ -48,6 +49,8 @@ export function withHintBadge(etat: string, hintUsed: boolean): string {
 
 export interface CardHandlers {
 	tabClass(i: number): string;
+	/** Accessible name of the numbered tab `i`, rebuilt from its state. */
+	tabLabel(i: number): string;
 	navHtml(): string;
 	navPosition(): number;
 	/** The last tab of the row: its classes (without `active`), its content,
@@ -91,6 +94,21 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   (`perles.css`). Sans effet sur les onglets du greffon. */
 		const etat = withHintBadge(tabEtat(i), !!ctx.quizState.hintSeen?.[i]);
 		return `${n === 0 ? "is-lecture " : n % 5 === 0 ? "is-repere " : ""}${etat}`.trim();
+	}
+
+	/** The accessible name of a numbered tab, from the state string `tabClass`
+	    returns; any class it does not know gives the plain "Question N". */
+	function tabLabel(i: number): string {
+		const cls = ` ${tabClass(i)} `;
+		const n = numero(i);
+		const has = (c: string): boolean => cls.includes(` ${c} `);
+		const key: TransKey | null = has("correct") ? "engine.nav.tabCorrect"
+			: has("retried") ? "engine.nav.tabRetried"
+			: has("wrong") ? "engine.nav.tabWrong"
+			: has("answered") ? "engine.nav.tabAnswered"
+			: null;
+		const base = key ? t(key, { n }) : t("engine.nav.tab", { n });
+		return has("used-hint") ? t("engine.nav.tabWithHint", { label: base }) : base;
 	}
 
 	function tabEtat(i: number): string {
@@ -182,7 +200,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   drapeau, les onglets du greffon les affichent tels quels. */
 		const onglet = (i: number): string => {
 			const n = numero(i);
-			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}"><span class="quiz-tab-q">Q</span>${n}</a>`;
+			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${ctx.escapeHtmlAttr(tabLabel(i))}"><span class="quiz-tab-q">Q</span>${n}</a>`;
 			const nom = ctx.escapeHtmlAttr(stripInlineMarkdown(ctx.quiz[i]?.title || t("engine.lesson.roleRead")));
 			/* `data-titre`: the reading's title, shown ABOVE the bead on hover by
 			   the application's bead row (perles.css, CSS `attr()` — plain text,
@@ -700,7 +718,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const indice = !isRead && !ctx.isFlashcardQuestion(q) && ctx.handIn.showsHints() ? ctx.hint.indiceCarte(qi, ICON_BULB) : { bouton: "", revele: "" };
 		/* No Hint button once the card shows its correction (a handed-in Test,
 		   a checked Learn card): the explanation is there, and a hint read
-		   AFTER the verdict would turn its ✓ into the bulb (withHintBadge)
+		   AFTER the verdict would add the bulb to its mark (withHintBadge)
 		   although it did not help. Levels already seen stay displayed. */
 		const hintBtn = ctx.isRevealed(qi) ? "" : indice.bouton;
 		const indiceHtml = indice.revele;
@@ -793,6 +811,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 	return {
 		tabClass,
+		tabLabel,
 		navHtml,
 		navPosition,
 		resultTab,

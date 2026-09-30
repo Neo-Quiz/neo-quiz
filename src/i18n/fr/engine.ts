@@ -28,6 +28,12 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.nav.finish": "Terminer",
 	"engine.nav.prevQuestion": "Question précédente",
 	"engine.nav.nextQuestion": "Question suivante",
+	"engine.nav.tab": "Question {n}",
+	"engine.nav.tabCorrect": "Question {n}, juste",
+	"engine.nav.tabRetried": "Question {n}, juste après une reprise",
+	"engine.nav.tabWrong": "Question {n}, fausse",
+	"engine.nav.tabAnswered": "Question {n}, répondue",
+	"engine.nav.tabWithHint": "{label}, avec indice",
 
 	/* ── Exam ── */
 	"engine.exam.timedTitle": "Examen",

@@ -966,7 +966,7 @@ await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
 });
 
 /* THE HINT BADGE (spec 2026-09-29 §2.3): a dot whose question used its hint
-   shows the bulb INSTEAD of its verdict mark — only when it has one (right,
+   shows the bulb IN ADDITION to its verdict mark (::before / ::after) — only when it has one (right,
    retried, wrong), in a Test and in a Learn; the verdict class stays, so the
    colour still follows the result. */
 await withSrcModule("src/engine/cards.ts", ({ withHintBadge, createCardRenderers }) => {
@@ -984,6 +984,8 @@ await withSrcModule("src/engine/cards.ts", ({ withHintBadge, createCardRenderers
 	const cards = createCardRenderers(ctx);
 	r.check("tabClass: the bulb on the dot answered with a hint, the plain mark on the other",
 		[cards.tabClass(0), cards.tabClass(1)], ["correct used-hint", "wrong"]);
+	r.check("tabLabel: verdict and hint spoken, plain number otherwise",
+		[cards.tabLabel(0), cards.tabLabel(1)], ["Question 1, right, with hint", "Question 2, wrong"]);
 	// Before the hand-in a Test's dots only say "answered": no verdict, no bulb.
 	ctx.quizState.locked = false;
 	ctx.isRevealed = () => false;
