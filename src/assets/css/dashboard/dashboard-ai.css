@@ -42,8 +42,7 @@
    `:has`, so it leaves with the hero once a request is sent.
    Painted across the WHOLE panel since the sidebar came (2026-09-30): on
    the stage alone, its wide ellipse stopped dead at the sidebar's edge and
-   drew a seam. Its centre stays the stage's: half the sidebar (220 px) and
-   its gap (8 px) to the right of the panel's middle. A layer under the
+   drew a seam. Centred on the panel, like the hero itself (below). A layer under the
    content (`isolation` keeps it above the panel's own glass). */
 .qbd-content:has(> .qbd-ai-stage > .qbd-ai-title-row) {
 	position: relative;
@@ -56,8 +55,8 @@
 	z-index: -1;
 	pointer-events: none;
 	background:
-		radial-gradient(ellipse 560px 300px at calc(50% + 114px) 37%, color-mix(in srgb, var(--interactive-accent) 16%, transparent), transparent 70%),
-		radial-gradient(ellipse 1000px 560px at calc(50% + 114px) 40%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 72%);
+		radial-gradient(ellipse 560px 300px at 50% 42%, color-mix(in srgb, var(--interactive-accent) 16%, transparent), transparent 70%),
+		radial-gradient(ellipse 1000px 560px at 50% 45%, color-mix(in srgb, var(--interactive-accent) 7%, transparent), transparent 72%);
 }
 
 .qbd-ai-stage--idle::before,
@@ -65,7 +64,21 @@
 .qbd-ai-stage--web::before,
 .qbd-ai-stage--connexion::before {
 	content: "";
-	flex: 0.44 0 0;
+	/* 0.7, not 0.44 (2026-09-30): with the sidebar the hero read too high. */
+	flex: 0.7 0 0;
+}
+
+/* THE HERO CENTRED ON THE PANEL, not on the stage (2026-09-30): the stage
+   starts after the sidebar (220 px + 8 px gap), so its middle sits 114 px
+   right of the panel's, and the greeting and composer looked pushed to the
+   right. They move back left by those 114 px — never by more than the free
+   room on their left (`(100cqw - 732px) / 2`, the composer being 732 px), so
+   a narrow window never slides them under the sidebar. */
+.qbd-ai-lateral ~ .qbd-ai-stage {
+	container-type: inline-size;
+}
+.qbd-ai-lateral ~ .qbd-ai-stage:has(> .qbd-ai-title-row) > * {
+	translate: calc(-1 * clamp(0px, (100cqw - 732px) / 2, 114px)) 0;
 }
 
 .qbd-ai-stage--idle::after,

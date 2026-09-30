@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 - Picking an exam after /exam writes the request for you, as a Prompt tile above the field like the Explain window's; what you type is added under it.
+- On Generate, the greeting and the composer sit lower and centred on the whole panel, no longer pushed to the right by the sidebar.
 - The prompt tiles (Explain, /exam) show a round cross in their corner on hover, like claude.ai's pasted text; removing the Explain prompt asks first, since the AI then no longer knows which question you mean.
 - The last bead of a quiz shows where you are: a green flag ("Finish") while you do the quiz, then a gold trophy ("Results") once it is handed in and you read the corrections.
 
