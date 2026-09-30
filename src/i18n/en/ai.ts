@@ -198,7 +198,6 @@ export const EN_AI = {
 	"ai.provider.ollamaSub": "Local and cloud",
 
 	/* ── Canaux (le second niveau du menu : par quelle voie on parle à la marque) ── */
-	"ai.channel.cliSub": "On your machine",
 	"ai.channel.webSub": "In your browser",
 	"ai.channel.notWiredYet": "Design preview: {site} is not wired up yet.",
 	"ai.channel.noImages": "Images can't be sent to a website. Remove them, or pick a CLI channel.",
@@ -383,7 +382,9 @@ export const EN_AI = {
 	"ai.transcript.show": "Show the transcript",
 	"ai.transcript.hide": "Hide the transcript",
 	"ai.chat.empty": "Write a message first.",
-	"ai.chat.providerUnsupported": "Chatting works with Claude Code and Codex CLI: choose one of them in the provider menu.",
+	"ai.chat.providerUnsupported": "Chatting works with Claude Code, Codex, Antigravity and Ollama: choose one of them in the provider menu.",
+	"ai.explain.ollamaLocal": "Ollama · local",
+	"ai.explain.ollamaCloud": "Ollama · cloud",
 	"ai.side.new": "New",
 	"ai.side.generated": "Generated quizzes",
 	"ai.side.chats": "Chats",

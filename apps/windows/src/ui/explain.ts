@@ -29,6 +29,7 @@ import type { AiClient, ChatTurn } from "../../../../src/dashboard/ai-client";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
 import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../src/dashboard/ui-select";
+import type { OpenProviderMenuOptions, ProviderBrandOption } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
 import { remplirPromptExplication } from "../../../../src/explain-prompt";
@@ -156,10 +157,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const boutonLogo = ajouter(bouton, "span", "qz-explain-btn-logo");
 	ajouter(bouton, "span", undefined, t("ai.explain.button"));
 
-	/* The providers that can HOLD a conversation — the two CLIs the chat of
-	   Generate speaks to (`AiClient.chat`). Ollama and Antigravity CLI cannot
-	   yet: their calls only know how to return a quiz. */
-	const LOCAUX = ["claude-code", "codex"];
+	/* The providers that can HOLD a conversation: the four channels that
+	   `AiClient.chat` speaks to (the websites cannot be driven from here). */
+	const LOCAUX = ["claude-code", "codex", "antigravity-cli", "ollama"];
+	/* Channels whose effort has its own button; Antigravity levels and the
+	   Ollama thinking level sit inside the model menu, as on the Generate page. */
+	const aBoutonEffort = (): boolean => courant === "claude-code" || courant === "codex";
+	/* What the last probes said, as the Generate page reads them: a channel in
+	   error ("err") is listed but cannot be picked, a stopped Ollama ("warn")
+	   can. */
+	const statuts: Record<string, string> = {};
+	let ollamaLocaux: aiProviders.OllamaDetectedModel[] = [];
 	/* The provider of the window: the one of the Settings when it can chat,
 	   else the first installed (Claude Code, then Codex), else none — the
 	   learner is asked to pick. Written to the Settings only when it differs
@@ -167,19 +175,110 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	   changes the provider of the Generate page. */
 	let courant = LOCAUX.includes(deps.settings.get().aiProvider || "") ? (deps.settings.get().aiProvider as string) : "";
 	const peutExpliquer = (): boolean => courant !== "";
+	/* The Ollama models, as the Generate page lists them: the user's selection,
+	   the cloud catalog, then the local models the server reports. */
+	interface ModeleOllama { value: string; label: string; cloud: boolean; icon: string | null; thinking: boolean }
+	const listeOllama = (): ModeleOllama[] => {
+		const r = deps.settings.get();
+		const norm = (v: string): string => v.replace(/:latest$/, "");
+		const installes = new Set(ollamaLocaux.map(m => norm(m.name)));
+		const decorer = (meta: aiProviders.OllamaModelMeta): ModeleOllama =>
+			({ value: meta.value, label: meta.label, cloud: meta.cloud, thinking: meta.thinking !== false, icon: meta.cloud ? "cloud" : (installes.has(norm(meta.value)) ? null : "download") });
+		const liste = aiProviders.resolveOllamaSelection(r.aiOllamaModels, r.aiOllamaCatalog).map(decorer);
+		for (const entry of aiProviders.getOllamaCatalog(r.aiOllamaCatalog)) {
+			if (liste.length >= aiProviders.OLLAMA_MAX_MODELS) break;
+			if (!aiProviders.isOllamaCloudModel(entry.value) || liste.some(o => o.value === entry.value)) continue;
+			liste.push(decorer(aiProviders.getOllamaModelMeta(entry.value, r.aiOllamaCatalog)));
+		}
+		for (const m of ollamaLocaux) {
+			if (liste.some(o => o.value === m.name || norm(o.value) === norm(m.name))) continue;
+			liste.push({ value: m.name, label: norm(m.name), cloud: false, icon: null, thinking: (m.capabilities || []).includes("thinking") });
+		}
+		return liste;
+	};
 	const modeles = (): aiProviders.ModelDef[] =>
-		courant === "claude-code" ? aiProviders.getClaudeModels() : aiProviders.getDefaultModels("codex");
+		courant === "claude-code" ? aiProviders.getClaudeModels()
+			: courant === "antigravity-cli" ? aiProviders.getAntigravityModels()
+			: courant === "ollama" ? listeOllama().map(o => ({ value: o.value, label: o.label }))
+			: aiProviders.getDefaultModels("codex");
 	/* The model of the Settings belongs to the provider it was chosen for:
 	   another provider falls back to its own default. */
 	const modeleCourant = (): string => {
 		const reglage = deps.settings.get().aiProvider === courant ? deps.settings.get().aiModel : "";
-		return courant === "claude-code" ? aiProviders.resolveClaudeModel(reglage) : aiProviders.resolveCodexModel(reglage);
+		if (courant === "claude-code") return aiProviders.resolveClaudeModel(reglage);
+		if (courant === "antigravity-cli") return aiProviders.resolveAntigravityModel(reglage);
+		if (courant === "ollama") {
+			/* As in the Generate page: a local model that is installed first. */
+			const liste = listeOllama();
+			return (reglage && liste.some(o => o.value === reglage) ? reglage : "")
+				|| liste.find(o => !o.cloud && o.icon === null)?.value || liste[0]?.value || "";
+		}
+		return aiProviders.resolveCodexModel(reglage);
 	};
 	const efforts = () => aiProviders.getEfforts(courant, modeleCourant());
 	const effortCourant = (): string => aiProviders.resolveEffort(courant, deps.settings.get().aiEffort, modeleCourant());
 	const libelleModele = (): string => {
 		const cur = modeleCourant();
-		return modeles().find(m => m.value === cur)?.label ?? cur;
+		return modeles().find(m => m.value === cur)?.label ?? (courant === "ollama" ? aiProviders.prettyOllamaLabel(cur) : cur);
+	};
+	const NIVEAU: Record<string, string> = { low: "Low", medium: "Medium", high: "High" };
+	/** The model menu: Antigravity carries its levels per model, Ollama its thinking levels and plan split. */
+	const ouvrirMenuModeles = (ancre: HTMLElement, recharger: () => void): void => {
+		const r = deps.settings.get();
+		if (courant === "antigravity-cli") {
+			const liste = aiProviders.getAntigravityModels();
+			if (liste.length === 0) { host.ui.notice(t("ai.model.cliListUnavailable")); return; }
+			openModelMenu(ancre, {
+				head: t("dashboard.select.modelHead"),
+				models: liste.map(m => {
+					const niveaux = aiProviders.getEfforts(courant, m.value);
+					if (!niveaux.length) return { value: m.value, label: m.label };
+					const n = aiProviders.niveauAntigravity(r.aiAntigravityLevels, m.value);
+					return { value: m.value, label: m.label, level: NIVEAU[n] || n, levels: niveaux.map(e => ({ value: e.value, label: NIVEAU[e.value] || e.label })), currentLevel: n };
+				}),
+				currentModel: modeleCourant(),
+				efforts: [],
+				onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); recharger(); },
+				onPickLevel: async (v, niveau) => {
+					await deps.settings.save({ aiModel: v, aiAntigravityLevels: { ...(deps.settings.get().aiAntigravityLevels || {}), [v]: niveau } });
+					recharger();
+				},
+			});
+			return;
+		}
+		if (courant === "ollama") {
+			const liste = listeOllama();
+			const { principal, plus } = aiProviders.repartirParPlan(liste, r.aiOllamaPlanCompte || "", r.aiOllamaPlansAppris || {});
+			const cur = liste.find(o => o.value === modeleCourant());
+			openModelMenu(ancre, {
+				models: principal.map(o => ({ value: o.value, label: o.label, icon: o.icon })),
+				moreModels: plus.map(o => ({
+					value: o.value, label: o.label, icon: o.icon,
+					badge: t("ai.badge.pro"),
+					upgrade: { label: t("ai.upgrade.button"), onClick: () => { void host.shell.openUrl(aiProviders.OLLAMA_UPGRADE_URL); } },
+				})),
+				searchable: true,
+				currentModel: modeleCourant(),
+				efforts: cur && cur.thinking ? aiProviders.getEfforts("ollama") : [],
+				currentEffort: aiProviders.resolveEffort("ollama", r.aiEffort),
+				onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); recharger(); },
+				onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); recharger(); },
+			});
+			return;
+		}
+		openModelMenu(ancre, {
+			models: modeles(),
+			moreModels: courant === "claude-code" ? aiProviders.getClaudeMoreModels() : undefined,
+			currentModel: modeleCourant(),
+			efforts: [],
+			onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); recharger(); },
+		});
+	};
+	/** The subtitle of a provider row: the real tool behind the channel. */
+	const sousTitre = (id: string, fixe: string): string => {
+		if (id !== "ollama") return fixe;
+		if (courant !== "ollama") return "Ollama";
+		return t(aiProviders.isOllamaCloudModel(modeleCourant()) ? "ai.explain.ollamaCloud" : "ai.explain.ollamaLocal");
 	};
 
 	const peindreLogoBouton = (): void => {
@@ -195,18 +294,41 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		}
 	};
 	peindreLogoBouton();
-	/* No usable provider in the Settings: the default is the first CLI that is
-	   installed, Claude Code before Codex. */
+	/* The same probes as the Generate page, run together: Claude Code, Codex,
+	   Antigravity and the Ollama server. A missing CLI is "err" (listed, not
+	   pickable), a stopped Ollama "warn", a mobile host "warn". */
+	const sonder = async (force = false): Promise<void> => {
+		const cli = async (id: string, sonde: Promise<aiProviders.ClaudeCodeStatus>): Promise<void> => {
+			const res = await sonde;
+			statuts[id] = res.ok ? "ok" : res.reason === "mobile" ? "warn" : "err";
+		};
+		const ollama = async (): Promise<void> => {
+			const res = await aiProviders.checkOllama(deps.settings.get().aiOllamaUrl, force);
+			if (res.ok) { statuts["ollama"] = "ok"; ollamaLocaux = res.models; return; }
+			statuts["ollama"] = (await aiProviders.checkOllamaInstalled(force)).installed ? "warn" : "err";
+		};
+		await Promise.all([
+			cli("claude-code", aiProviders.checkClaudeCode(force)),
+			cli("codex", aiProviders.checkCodex(force)),
+			cli("antigravity-cli", aiProviders.checkAntigravity(force)),
+			ollama(),
+		]);
+	};
+	/* No usable provider in the Settings: the default is the first channel
+	   that is installed, in the order of the menu. */
 	const detecterDefaut = async (): Promise<void> => {
 		if (peutExpliquer()) return;
-		if ((await aiProviders.checkClaudeCode()).ok) courant = "claude-code";
-		else if ((await aiProviders.checkCodex()).ok) courant = "codex";
+		await sonder();
+		const premier = LOCAUX.find(id => statuts[id] === "ok");
+		if (premier) courant = premier;
 		if (bouton.isConnected) peindreLogoBouton();
 	};
 	void detecterDefaut();
 	const choisirFournisseur = async (id: string): Promise<void> => {
 		courant = id;
 		await deps.settings.save({ aiProvider: id, aiModel: aiProviders.getProvider(id).defaultModel });
+		/* Ollama has no default model in the provider table: keep the one the window shows. */
+		if (id === "ollama") await deps.settings.save({ aiModel: modeleCourant() });
 		peindreLogoBouton();
 	};
 
@@ -317,7 +439,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						fournisseurBtn.title = t("ai.provider.choose");
 					}
 					m.panelEl.dataset.nqFournisseur = courant;
-					usageBtn.hidden = modeleBtn.hidden = effortBtn.hidden = !peutExpliquer();
+					modeleBtn.hidden = !peutExpliquer();
+					// The gauge and the effort button exist for Claude Code and Codex only.
+					usageBtn.hidden = effortBtn.hidden = !peutExpliquer() || !aBoutonEffort();
 					if (peutExpliquer()) {
 						modeleLabel.textContent = libelleModele();
 						const ev = effortCourant();
@@ -336,31 +460,44 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				majEnvoi();
 				void detecterDefaut().then(() => { if (fournisseurBtn.isConnected) peindreOutils(); });
 				fournisseurBtn.addEventListener("click", () => {
-					openProviderMenu(fournisseurBtn, {
-						brands: aiProviders.MARQUES
-							.map(mq => ({
-								value: mq.id,
-								label: mq.name,
-								logo: mq.logo,
-								channels: mq.canaux.filter(c => LOCAUX.includes(c.id)).map(c => ({ value: c.id, label: c.label, sub: c.sub, logo: c.logo || mq.logo })),
-							}))
-							.filter(b => b.channels.length > 0),
+					const masques = deps.settings.get().aiCanauxPayantsMasques;
+					const brands = (): ProviderBrandOption[] => aiProviders.MARQUES
+						.map(mq => ({
+							value: mq.id,
+							label: mq.name,
+							logo: mq.logo,
+							channels: mq.canaux.filter(c => LOCAUX.includes(c.id) && aiProviders.canalVisible(c.id, masques)).map(c => ({
+								value: c.id,
+								label: c.label,
+								sub: sousTitre(c.id, c.sub),
+								logo: c.logo || mq.logo,
+								badge: c.gratuit ? t("ai.badge.free") : undefined,
+								disabled: statuts[c.id] === "err",
+								dot: statuts[c.id] === "warn" || statuts[c.id] === "err" ? statuts[c.id] : null,
+							})),
+						}))
+						.filter(b => b.channels.length > 0);
+					// Probed again at each opening, like the Generate page: the menu repaints when the answers come.
+					const options: OpenProviderMenuOptions = {
+						brands: brands(),
 						current: courant,
 						renderLogo: (el, logo) => aiProviders.setBrandLogo(el, logo),
 						onPick: (id) => { void choisirFournisseur(id).then(peindreOutils); },
+					};
+					const menu = openProviderMenu(fournisseurBtn, options);
+					void sonder(true).then(() => {
+						if (!document.querySelector(".qbd-provider-menu")) return;
+						options.brands = brands();
+						menu.refresh();
 					});
 				});
 				void aiProviders.refreshCliCaches().then(change => { if (change && modeleBtn.isConnected) peindreOutils(); });
 				modeleBtn.addEventListener("click", async () => {
 					await aiProviders.refreshCliCaches();
 					if (!modeleBtn.isConnected) return;
-					openModelMenu(modeleBtn, {
-						models: modeles(),
-						moreModels: courant === "claude-code" ? aiProviders.getClaudeMoreModels() : undefined,
-						currentModel: modeleCourant(),
-						efforts: [],
-						onPickModel: async (v) => { await deps.settings.save({ aiModel: v }); peindreOutils(); },
-					});
+					if (courant === "antigravity-cli") await aiProviders.refreshAntigravityModels();
+					if (!modeleBtn.isConnected) return;
+					ouvrirMenuModeles(modeleBtn, peindreOutils);
 				});
 				effortBtn.addEventListener("click", () => {
 					openEffortSlider(effortBtn, {
@@ -425,6 +562,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					champ.style.height = "auto";
 					/* The provider shown here is the one that answers: the client reads the Settings. */
 					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
+					// Ollama: the model shown here (a default chosen by the window) is the one that answers.
+					else if (courant === "ollama" && deps.settings.get().aiModel !== modeleCourant()) await deps.settings.save({ aiModel: modeleCourant() });
 					conv.envoye = true;
 					conv.historique.push({ role: "user", text: texte });
 					conv.messages.push({ role: "user", text: parTuile ? "" : perso, tuile: parTuile ? prompt : undefined });

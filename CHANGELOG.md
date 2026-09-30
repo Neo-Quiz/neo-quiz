@@ -16,6 +16,7 @@ release notes.
 ### Added
 - An exam can now be described by its sessions: a continuous assessment lists every session date in the review plan instead of one day, and never drives the review schedule.
 - The app opens maximized.
+- The Explain chat can now use Antigravity and Ollama, and the provider menus name the real tool (Claude Code, Codex, Antigravity, Ollama) instead of "On your machine".
 
 ### Changed
 - The "Generated quizzes" folder leaves the Folders grid for a button in the top bar, with its quiz count; it can no longer be renamed, archived, moved or deleted.

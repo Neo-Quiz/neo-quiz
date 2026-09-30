@@ -177,7 +177,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.provider.ollamaSub": "Local et cloud",
 
 	/* ── Canaux (le second niveau du menu : par quelle voie on parle à la marque) ── */
-	"ai.channel.cliSub": "Sur votre machine",
 	"ai.channel.webSub": "Dans votre navigateur",
 	"ai.channel.notWiredYet": "Aperçu du design : {site} n'est pas encore câblé.",
 	"ai.channel.noImages": "Les images ne peuvent pas être envoyées à un site. Retirez-les, ou choisissez un canal CLI.",
@@ -339,7 +338,9 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.transcript.show": "Voir le transcript",
 	"ai.transcript.hide": "Masquer le transcript",
 	"ai.chat.empty": "Écrivez d'abord un message.",
-	"ai.chat.providerUnsupported": "La discussion fonctionne avec Claude Code et Codex CLI : choisissez l'un des deux dans le menu des fournisseurs.",
+	"ai.chat.providerUnsupported": "La discussion fonctionne avec Claude Code, Codex, Antigravity et Ollama : choisissez l'un d'eux dans le menu des fournisseurs.",
+	"ai.explain.ollamaLocal": "Ollama · local",
+	"ai.explain.ollamaCloud": "Ollama · cloud",
 	"ai.side.new": "Nouveau",
 	"ai.side.generated": "Quiz générés",
 	"ai.side.chats": "Chats",

@@ -987,6 +987,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   niveau de raisonnement est DANS le nom du modèle (`…-high`, `…-low`),
 	   donc pas d'effort à passer. */
 	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<ReponseQuiz> {
+		return parseReponseQuiz(await callAntigravityTexte(model, systemPrompt, userPrompt, images));
+	}
+
+	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
+	    prose answer for `chat`. */
+	async function callAntigravityTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<string> {
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.antigravityDesktopOnly"));
 		}
@@ -1056,7 +1062,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw new Error(t("ai.err.antigravityEmpty"));
 		}
 		console.log("[quiz-blocks] Antigravity success - response length:", raw.length);
-		return parseReponseQuiz(raw);
+		return raw;
 	}
 
 	/** Le flux `stream-json` d'Antigravity : une ligne = un événement, et c'est
@@ -1369,6 +1375,13 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	}
 
 	async function callOllama(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null): Promise<ReponseQuiz> {
+		return parseOllamaResponse(await callOllamaTexte(model, systemPrompt, userPrompt, ollamaUrl, authHeaders, images, effort, true));
+	}
+
+	/** The call itself, returning the model's TEXT. `quizSchema` constrains the
+	    answer to the quiz JSON schema (generation); `chat` passes false and gets
+	    free prose. */
+	async function callOllamaTexte(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null, quizSchema = false): Promise<string> {
 		if (!ollamaUrl) {
 			ollamaUrl = (settings.get().aiOllamaUrl || "http://localhost:11434").replace(/\/+$/, "");
 		}
@@ -1480,7 +1493,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 					   OMITTED them from the quiz, or improvised an object that became
 					   an empty question. `assemblerQuestionsOllama` (further down)
 					   rebuilds the final array from these root fields. */
-					format: {
+					...(quizSchema ? { format: {
 						type: "object",
 						properties: {
 							title: { type: "string" },
@@ -1521,7 +1534,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 							}
 						},
 						required: ["questions"]
-					}
+					} } : {})
 				})
 			}), ac.signal);
 
@@ -1605,7 +1618,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 
 		console.log("[quiz-blocks] Ollama response length:", content.length);
-		return parseOllamaResponse(content);
+		return content;
 	}
 
 	/* The chat's system prompt: in English, as every instruction to the
@@ -1699,6 +1712,19 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				const m = getCodexModels().find(x => x.value === model);
 				const fast = !!settings.get().aiCodexFast && !!(m && m.fast);
 				return (await callCodexTexte(model, systeme, userPrompt, [], effort, fast)).trim();
+			}
+			if (provider === "ollama") {
+				if (!model) model = resolveOllamaSelection(settings.get().aiOllamaModels, settings.get().aiOllamaCatalog)[0]?.value || "";
+				const ollamaUrl = (settings.get().aiOllamaUrl || "http://localhost:11434").replace(/\/+$/, "");
+				const key = (settings.get().aiOllamaCloudKey || "").trim();
+				const authHeader: Record<string, string> = key ? { "Authorization": "Bearer " + key } : {};
+				const effort = resolveEffort("ollama", settings.get().aiEffort);
+				return (await callOllamaTexte(model, systeme, userPrompt, ollamaUrl, authHeader, [], effort)).trim();
+			}
+			if (provider === "antigravity-cli") {
+				model = resolveAntigravityModel(model);
+				const effort = niveauAntigravity(settings.get().aiAntigravityLevels, model);
+				return (await callAntigravityTexte(antigravityModelId(model, effort), systeme, userPrompt)).trim();
 			}
 			throw new Error(t("ai.chat.providerUnsupported"));
 		} catch (err) {

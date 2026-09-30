@@ -399,7 +399,7 @@ export const MARQUES: Marque[] = [
 		logo: "claude",
 		canaux: [
 			{ id: "claude-web", label: "claude.ai", get sub() { return t("ai.channel.webSub"); }, type: "web", web: { nouvelle: "https://claude.ai/new", parametre: "q", urlMax: 63000 }, avertissement: true, gratuit: true },
-			{ id: "claude-code", label: "Claude Code", get sub() { return t("ai.channel.cliSub"); }, type: "cli", logo: "claudecode", gratuit: false }
+			{ id: "claude-code", label: "Claude Code", sub: "Claude Code", type: "cli", logo: "claudecode", gratuit: false }
 		]
 	},
 	{
@@ -408,7 +408,7 @@ export const MARQUES: Marque[] = [
 		logo: "openai",
 		canaux: [
 			{ id: "chatgpt-web", label: "chatgpt.com", get sub() { return t("ai.channel.webSub"); }, type: "web", web: { nouvelle: "https://chatgpt.com/", parametre: "prompt", urlMax: 59000 }, gratuit: true },
-			{ id: "codex", label: "Codex CLI", get sub() { return t("ai.channel.cliSub"); }, type: "cli", logo: "codex", gratuit: false }
+			{ id: "codex", label: "Codex CLI", sub: "Codex", type: "cli", logo: "codex", gratuit: false }
 		]
 	},
 	{
@@ -426,7 +426,7 @@ export const MARQUES: Marque[] = [
 			/* Antigravity CLI est GRATUIT (un simple compte Google) : établi
 			   2026-09-22, ce qui le rendrait faux est le même que pour tout
 			   autre canal — Google fermant son accès gratuit à Antigravity. */
-			{ id: "antigravity-cli", label: "Antigravity CLI", get sub() { return t("ai.channel.cliSub"); }, type: "cli", logo: "antigravity", gratuit: true }
+			{ id: "antigravity-cli", label: "Antigravity CLI", sub: "Antigravity", type: "cli", logo: "antigravity", gratuit: true }
 		]
 	},
 	{
