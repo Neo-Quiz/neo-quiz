@@ -371,7 +371,7 @@ export const EN_DASHBOARD = {
 	"dashboard.select.noteEmpty": "No note open — type to search",
 
 	/* ── Review plan (folder-planning.ts, task 4, 2026-09-26) ── */
-	"dashboard.planning.exams": "Upcoming exams",
+	"dashboard.planning.exams": "Exams",
 	"dashboard.planning.examAdd": "Add an exam",
 	"dashboard.planning.examEdit": "Edit",
 	"dashboard.planning.examDelete": "Delete",
@@ -399,7 +399,8 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.dateCalendar": "Calendar",
 	"dashboard.planning.datePrevMonth": "Previous month",
 	"dashboard.planning.dateNextMonth": "Next month",
-	"dashboard.planning.examsEmptyTitle": "No upcoming exams",
+	"dashboard.planning.examPast": "Past",
+	"dashboard.planning.examsEmptyTitle": "No exams",
 	"dashboard.planning.examsEmptyHint": "Add an exam date to get review tasks planned for it.",
 	"dashboard.planning.manageExams": "Manage exams",
 	/* ── Composer du dossier (folder-planning.ts, task 5, 2026-09-26) ── */

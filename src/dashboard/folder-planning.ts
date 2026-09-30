@@ -37,12 +37,21 @@ function aujourdhuiIsoLocal(now: number): string {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** The folder's exams dated `>= today` (string comparison of `YYYY-MM-DD`,
-    same rule as `examenProchain` on the app side), sorted by date. */
-function examensAVenir(ctx: DashboardShellCtx, group: ModuleGroup): ExamenDossier[] {
-	const tous = ctx.examens?.(group) ?? [];
-	const aujourdhui = aujourdhuiIsoLocal(Date.now());
-	return tous.filter(e => e.date >= aujourdhui).sort((a, b) => a.date.localeCompare(b.date));
+/** ALL of the folder's exams, past ones included, sorted by date (a
+    continuous assessment's `date` is its last session). Only this list shows
+    past exams: the scheduler, home and AI targets keep using upcoming ones.
+    Without the past ones the weights did not add up. */
+function tousLesExamens(ctx: DashboardShellCtx, group: ModuleGroup): ExamenDossier[] {
+	return [...(ctx.examens?.(group) ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** How long ago a PAST exam was (existing "Xd ago" key of the time helpers);
+    a month or more just says "Past". */
+function ilYa(ms: number): string {
+	const aujourdhui = new Date();
+	aujourdhui.setHours(0, 0, 0, 0);
+	const jours = Math.round((aujourdhui.getTime() - ms) / 86_400_000);
+	return jours >= 1 && jours < 30 ? t("dashboard.time.days", { n: jours }) : t("dashboard.planning.examPast");
 }
 
 /** Days left before an exam already known to be UPCOMING (`ms >=` today's
@@ -79,6 +88,9 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 	let weight = examen?.coefficient === undefined ? "" : String(examen.coefficient).replace(".", ",");
 	let unit: ExamWeightUnit = examen?.weightUnit === "percent" ? "percent" : "coef";
 	// Continuous assessment: graded over several sessions instead of on one day.
+	// Editing an exam whose saved date is already past stays possible: the
+	// "from today" rule only applies to a new exam or an upcoming one.
+	const dejaPasse = !!examen && examen.date < aujourdhuiIsoLocal(Date.now());
 	let kind: "date" | "sessions" = examen?.seances ? "sessions" : "date";
 	const seances: string[] = [...(examen?.seances ?? [])];
 
@@ -228,8 +240,8 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				// A continuous assessment needs its sessions (past ones are normal, but
 				// the LAST one must not be past); a dated exam needs a date from today.
 				const finValide = kind === "sessions"
-					? seances.length > 0 && seances.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) && [...seances].sort().pop()! >= aujourdhuiIsoLocal(Date.now())
-					: !!date && date >= aujourdhuiIsoLocal(Date.now());
+					? seances.length > 0 && seances.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) && (dejaPasse || [...seances].sort().pop()! >= aujourdhuiIsoLocal(Date.now()))
+					: !!date && (dejaPasse || date >= aujourdhuiIsoLocal(Date.now()));
 				save.disabled = !nom.trim() || !finValide || !weightValide;
 			};
 			paintUnit(false);
@@ -258,7 +270,7 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				majEtat();
 			});
 			dateBtn.addEventListener("click", () => {
-				openDatePicker(dateBtn, date, { min: aujourdhuiIsoLocal(Date.now()) }, (iso) => {
+				openDatePicker(dateBtn, date, dejaPasse ? {} : { min: aujourdhuiIsoLocal(Date.now()) }, (iso) => {
 					date = iso;
 					majDate();
 					majEtat();
@@ -300,39 +312,21 @@ export function renderFolderPlanning(
 	const gauche = ajouter(vue, "div", "qbd-planning-col qbd-planning-col--left");
 	const droite = ajouter(vue, "div", "qbd-planning-col qbd-planning-col--right");
 
-	// Repli persisté : mêmes réglages que « Mes quiz »/l'accueil, deux clés
-	// distinctes pour ne jamais confondre le repli d'une section avec celui
-	// d'un dossier ou d'une autre page (ruling task 4).
-	const collapse = {
-		isExpanded: (key: string) => new Set(ctx.settings.quizzesExpandedFolders || []).has(key),
-		toggleExpanded: (key: string) => {
-			const set = new Set(ctx.settings.quizzesExpandedFolders || []);
-			if (set.has(key)) set.delete(key); else set.add(key);
-			ctx.settings.quizzesExpandedFolders = [...set];
-			ctx.saveSettings().catch(() => {});
-		},
-	};
+	const tous = tousLesExamens(ctx, group);
+	const aujourdhui = aujourdhuiIsoLocal(Date.now());
 
-	const aVenir = examensAVenir(ctx, group);
-
-	// ── "Upcoming exams" ──
-	const examensCorps = renderCollapsibleSection(collapse, gauche, "planning:exams", t("dashboard.planning.exams"), aVenir.length, {
-		// « + » à droite de l'en-tête, jamais dans le bouton d'en-tête lui-même
-		// (un bouton dans un bouton est invalide — même geste que « See all »
-		// de l'accueil).
-		rowClass: "qbd-planning-exams-head-row",
-		headRow: (row) => {
-			const plus = ajouter(row, "button", "qbd-planning-exam-add");
-			plus.type = "button";
-			plus.setAttribute("aria-label", t("dashboard.planning.examAdd"));
-			currentHost().ui.setIcon(plus, "plus");
-			plus.addEventListener("click", (e) => {
-				e.stopPropagation();
-				ouvrirModalExamen(ctx, group, null, rerender);
-			});
-		},
-	});
-	if (aVenir.length === 0) {
+	// ── "Exams": a plain title, not collapsible ──
+	const examensNoeud = ajouter(gauche, "div", "qbd-quizzes-node");
+	const examensTete = ajouter(examensNoeud, "div", "qbd-planning-exams-head-row");
+	ajouter(examensTete, "span", "qbd-quizzes-node-label", t("dashboard.planning.exams"));
+	ajouter(examensTete, "span", "qbd-quizzes-node-badge", String(tous.length));
+	const plus = ajouter(examensTete, "button", "qbd-planning-exam-add");
+	plus.type = "button";
+	plus.setAttribute("aria-label", t("dashboard.planning.examAdd"));
+	currentHost().ui.setIcon(plus, "plus");
+	plus.addEventListener("click", () => ouvrirModalExamen(ctx, group, null, rerender));
+	const examensCorps = ajouter(examensNoeud, "div", "qbd-planning-exams-body");
+	if (tous.length === 0) {
 		const vide = ajouter(examensCorps, "div", "qbd-planning-exams-empty");
 		currentHost().ui.setIcon(ajouter(vide, "div", "qbd-planning-exams-empty-icon"), "calendar-days");
 		ajouter(vide, "p", "qbd-planning-exams-empty-title", t("dashboard.planning.examsEmptyTitle"));
@@ -344,8 +338,9 @@ export function renderFolderPlanning(
 		ajouterBtn.addEventListener("click", () => ouvrirModalExamen(ctx, group, null, rerender));
 	} else {
 		const liste = ajouter(examensCorps, "div", "qbd-planning-exam-list");
-		for (const examen of aVenir) {
-			const ligne = ajouter(liste, "div", "qbd-planning-exam-row");
+		for (const examen of tous) {
+			const passe = examen.date < aujourdhui;
+			const ligne = ajouter(liste, "div", passe ? "qbd-planning-exam-row is-past" : "qbd-planning-exam-row");
 			const texte = ajouter(ligne, "div", "qbd-planning-exam-text");
 			ajouter(texte, "span", "qbd-planning-exam-name", examen.nom);
 			const ms = parseExamDate(examen.date);
@@ -367,7 +362,8 @@ export function renderFolderPlanning(
 			}
 			// A continuous assessment says its sessions and its span, nothing
 			// more: "3 of 6 done" read as a score (2026-09-30).
-			if (!seancesExamen?.length && ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
+			// A past continuous assessment (last session past) is done too.
+			if ((!seancesExamen?.length || passe) && ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", passe ? ilYa(ms) : joursRestants(ms));
 			// Edit and Delete are shown directly as two ghost icon buttons
 			// (no "..." menu: two actions do not need one).
 			const actions = ajouter(ligne, "div", "qbd-planning-exam-actions");

@@ -330,7 +330,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.noteEmpty": "Aucune note ouverte — tapez pour chercher",
 
 	/* ── Planning de révisions (folder-planning.ts, tâche 4, 2026-09-26) ── */
-	"dashboard.planning.exams": "Examens à venir",
+	"dashboard.planning.exams": "Examens",
 	"dashboard.planning.examAdd": "Ajouter un examen",
 	"dashboard.planning.examEdit": "Modifier",
 	"dashboard.planning.examDelete": "Supprimer",
@@ -358,7 +358,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.planning.dateCalendar": "Calendrier",
 	"dashboard.planning.datePrevMonth": "Mois précédent",
 	"dashboard.planning.dateNextMonth": "Mois suivant",
-	"dashboard.planning.examsEmptyTitle": "Pas d'examens à venir",
+	"dashboard.planning.examPast": "Passé",
+	"dashboard.planning.examsEmptyTitle": "Aucun examen",
 	"dashboard.planning.examsEmptyHint": "Ajoutez une date d'examen pour recevoir des révisions planifiées.",
 	"dashboard.planning.manageExams": "Gérer les examens",
 	/* ── Composer du dossier (folder-planning.ts, tâche 5, 2026-09-26) ── */

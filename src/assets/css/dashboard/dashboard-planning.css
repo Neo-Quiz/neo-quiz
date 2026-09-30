@@ -43,6 +43,9 @@
 .qbd-planning-exams-head-row {
 	display: flex;
 	align-items: center;
+	gap: 8px;
+	min-height: 52px;
+	padding: 0 8px;
 }
 .qbd-root .qbd-planning-exam-add {
 	display: inline-flex;
@@ -79,6 +82,11 @@
 	border-radius: 10px;
 }
 .qbd-planning-exam-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+/* A past exam is DONE: the row recedes, back to full on hover or focus
+   (same idea as an answered question bead). */
+.qbd-planning-exam-row.is-past { opacity: 0.45; transition: opacity 0.15s ease; }
+.qbd-planning-exam-row.is-past:hover,
+.qbd-planning-exam-row.is-past:focus-within { opacity: 1; }
 /* Edit / Delete at the end of an exam row: ghost round icon buttons, like
    `.qbd-card-more`. !important beats the `.theme-dark button` chrome (0,1,1),
    which would otherwise repaint a grey fill and an inset shadow. */

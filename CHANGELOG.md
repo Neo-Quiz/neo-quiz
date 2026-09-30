@@ -19,6 +19,7 @@ release notes.
 - The Explain chat can now use Antigravity and Ollama, and the provider menus name the real tool (Claude Code, Codex, Antigravity, Ollama) instead of "On your machine".
 
 ### Changed
+- A folder's review plan lists all its exams under a plain "Exams" title, past ones included and dimmed, so the weights add up; a past exam can still be edited.
 - The "Generated quizzes" folder leaves the Folders grid for a button in the top bar, with its quiz count; it can no longer be renamed, archived, moved or deleted.
 
 ### Removed
