@@ -85,12 +85,13 @@ export function lastPlayedOf(quizzes: readonly QuizIndexEntry[], stats: Record<s
 }
 
 /** An exam of a folder (`ExamenDossier`), reduced to what the home reads. */
-export interface ExamLike { nom: string; date: string }
+export interface ExamLike { nom: string; date: string; seances?: readonly string[] }
 
 /** The upcoming exams (`date >= today`, both `YYYY-MM-DD` LOCAL strings, the
-    same rule as the folder's Review plan), nearest first. */
+    same rule as the folder's Review plan), nearest first. A continuous
+    assessment (`seances`) is not a day to prepare for: it is left out. */
 export function upcomingExams<E extends ExamLike>(exams: readonly E[], todayIso: string): E[] {
-	return exams.filter(e => e.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date));
+	return exams.filter(e => !e.seances && e.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** `YYYY-MM-DD` of a LOCAL date — never UTC: `toISOString` would move an

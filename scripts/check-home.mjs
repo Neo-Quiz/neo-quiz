@@ -42,6 +42,9 @@ await withSrcModule("src/dashboard/home-tasks.ts", (H) => {
 	r.check("upcoming exams: past ones dropped, nearest first",
 		H.upcomingExams([{ nom: "x", date: "2026-09-28" }, { nom: "y", date: "2026-10-09" }, { nom: "z", date: "2026-09-29" }], "2026-09-29").map(e => e.nom),
 		["z", "y"]);
+	r.check("upcoming exams: a continuous assessment is left out",
+		H.upcomingExams([{ nom: "s", date: "2026-10-09", seances: ["2026-10-02", "2026-10-09"] }, { nom: "z", date: "2026-09-29" }], "2026-09-29").map(e => e.nom),
+		["z"]);
 	r.check("success: mean best score of the quizzes played only",
 		H.successOf([L1, P1, L2], { "L1.md": { bestScore: 80, attempts: 2 }, "P1.md": { bestScore: 40, attempts: 1 } }), 60);
 	r.check("success: 0 when nothing was played", H.successOf([L1], {}), 0);

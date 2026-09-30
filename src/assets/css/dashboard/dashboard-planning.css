@@ -414,6 +414,12 @@
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
 }
+/* The exam modal's Date | Sessions toggle and its sessions list. */
+.qbd-planning-kind { margin: 12px 0 4px; }
+.qbd-planning-sessions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.qbd-planning-session-row { display: flex; align-items: center; gap: 6px; }
+.qbd-planning-session-row .qbd-planning-date-field { flex: 1; min-width: 0; }
+.qbd-planning-sessions-count { margin-left: 8px; color: var(--text-faint); font-weight: 400; }
 .qbd-planning-weight-error {
 	color: var(--color-red, #f87171);
 }

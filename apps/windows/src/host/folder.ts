@@ -617,6 +617,15 @@ export function examens(): Record<string, Examen[]> {
 	return tableExamens;
 }
 
+/** Cleans a stored `seances` list: valid ISO dates only, unique, sorted, at
+    most 60. Anything unusable (not an array, nothing valid left) is `undefined`,
+    so the exam stays a plain dated exam. */
+function readSeances(brut: unknown): string[] | undefined {
+	if (!Array.isArray(brut)) return undefined;
+	const propres = [...new Set(brut.filter((d): d is string => typeof d === "string" && DATE_ISO.test(d)))].sort().slice(0, 60);
+	return propres.length ? propres : undefined;
+}
+
 /**
  * Valide la forme du réglage `examens`, ignore les entrées invalides, et
  * MIGRE, tant que le réglage neuf n'a jamais été écrit (`brut` absent),
@@ -634,11 +643,17 @@ export function lireExamens(brut: unknown, anciennes: unknown): Record<string, E
 				&& typeof (e as Examen).id === "string" && (e as Examen).id !== ""
 				&& typeof (e as Examen).nom === "string"
 				&& typeof (e as Examen).date === "string" && DATE_ISO.test((e as Examen).date))
-				.map(e => ({
-					id: e.id, nom: e.nom, date: e.date,
-					// An invalid weight is dropped, never the exam.
-					...readExamWeight(e.coefficient, e.weightUnit),
-				}));
+				.map(e => {
+					const seances = readSeances(e.seances);
+					return {
+						id: e.id, nom: e.nom,
+						// A continuous assessment's date is always its last session.
+						date: seances ? seances[seances.length - 1] : e.date,
+						// An invalid weight is dropped, never the exam.
+						...readExamWeight(e.coefficient, e.weightUnit),
+						...(seances ? { seances } : {}),
+					};
+				});
 			if (valides.length) out[module] = valides.sort((a, b) => a.date.localeCompare(b.date));
 		}
 	}
@@ -672,7 +687,8 @@ export function retirerExamenDe(t: Record<string, Examen[]>, module: string, id:
 /** Le premier examen de date `>= aujourdhui` (comparaison de chaînes
     `AAAA-MM-JJ`), sinon `null`. */
 export function examenProchain(liste: readonly Examen[], aujourdhui: string): Examen | null {
-	return [...liste].sort((a, b) => a.date.localeCompare(b.date)).find(e => e.date >= aujourdhui) ?? null;
+	// A continuous assessment (`seances`) never drives the review schedule.
+	return [...liste].filter(e => !e.seances).sort((a, b) => a.date.localeCompare(b.date)).find(e => e.date >= aujourdhui) ?? null;
 }
 
 /** `AAAA-MM-JJ` LOCAL — jamais UTC, sans quoi un examen du jour même

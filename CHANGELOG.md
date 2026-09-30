@@ -13,7 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+- An exam can now be described by its sessions: a continuous assessment lists every session date in the review plan instead of one day, and never drives the review schedule.
+
 ### Fixed
+- A folder with no quiz yet keeps the exams you add to its review plan, and shows the ones it already had.
 - Opening a document from a folder now shows it: the row presses in on click, swaps its icon for a spinner, reads "Opening…" and sweeps a soft light while the default app starts.
 - The current question stands out in the bead row: answered questions now show a blue dot instead of a blue bead.
 - Reloading the window during a generation no longer loses it: the queue comes back as it was, and the quiz being written keeps going with the same Claude Code or Codex run instead of being lost (or started again).

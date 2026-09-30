@@ -360,6 +360,16 @@ await withSrcModule("apps/windows/src/host/folder.ts", async ({ lireDossiers, id
 		r.check("prochain : aujourd'hui compris", examenProchain(t2[m], "2027-03-01")?.id, "b");
 		r.check("prochain : le passé exclu, le suivant pris", examenProchain(t2[m], "2027-03-02")?.id, "a");
 		r.check("prochain : tout passé", examenProchain(t2[m], "2027-07-01"), null);
+		const sc = (seances, date = "2027-02-02") => lireExamens({ [m]: [{ id: "a", nom: "P", date, seances }] }, undefined)[m][0];
+		r.check("sessions are kept sorted and deduped, date forced to the last one", sc(["2027-03-09", "2027-01-05", "2027-03-09", "2027-02-01"]), { id: "a", nom: "P", date: "2027-03-09", seances: ["2027-01-05", "2027-02-01", "2027-03-09"] });
+		r.check("invalid session dates are dropped", sc(["2027-01-05", "nope", 7, "2027-13", null]), { id: "a", nom: "P", date: "2027-01-05", seances: ["2027-01-05"] });
+		for (const vide of [[], ["x", 3], "2027-01-01", {}])
+		r.check(`sessions empty after cleaning (${JSON.stringify(vide)}): field removed, date kept`, sc(vide), { id: "a", nom: "P", date: "2027-02-02" });
+		r.check("an old exam without sessions is unchanged", lireExamens({ [m]: [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 20, weightUnit: "percent" }] }, undefined)[m], [{ id: "a", nom: "P", date: "2027-02-02", coefficient: 20, weightUnit: "percent" }]);
+		r.check("sessions are capped at 60", sc(Array.from({ length: 70 }, (_, i) => "2027-01-" + String(i % 28 + 1).padStart(2, "0") + "").concat(Array.from({ length: 70 }, (_, i) => "2028-" + String(i % 12 + 1).padStart(2, "0") + "-" + String(i % 28 + 1).padStart(2, "0"))))?.seances.length <= 60, true);
+		const continu = { id: "c", nom: "Suivi", date: "2027-05-01", seances: ["2027-04-01", "2027-05-01"] };
+		r.check("a continuous assessment never drives the schedule (examenProchain)", examenProchain([continu], "2027-03-01"), null);
+		r.check("...and does not hide the next dated exam", examenProchain([continu, { id: "d", nom: "Final", date: "2027-06-01" }], "2027-03-01")?.id, "d");
 		r.check("date locale ISO", aujourdhuiIso(new Date(2027, 0, 5, 23, 30).getTime()), "2027-01-05");
 	}
 

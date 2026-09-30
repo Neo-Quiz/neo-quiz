@@ -40,6 +40,12 @@ export interface ExamenDossier {
 	/** What `coefficient` means; absent is "coef", so exams saved before the
 	    percentage existed stay valid. Only ever written as "percent". */
 	weightUnit?: "coef" | "percent";
+	/** Continuous assessment: the dates of ALL its sessions (sorted, unique
+	    `YYYY-MM-DD`, at most 60). An exam WITH `seances` is graded over those
+	    sessions instead of on one day; its `date` is ALWAYS its last session,
+	    so every reader of `date` (sorting, validation, lists) keeps working.
+	    It never drives the review schedule. */
+	seances?: string[];
 }
 
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */

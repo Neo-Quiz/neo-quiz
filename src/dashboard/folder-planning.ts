@@ -57,6 +57,15 @@ function joursRestants(ms: number): string {
 		: t("dashboard.quizzes.progressExamIn", { count: jours });
 }
 
+/** Most sessions a continuous assessment can list (same cap as the stored format). */
+const MAX_SEANCES = 60;
+
+/** "Sep 9" / "9 sept.": a session day without its year. */
+function formatSeanceJour(iso: string): string {
+	const ms = parseExamDate(iso);
+	return ms === null ? iso : new Intl.DateTimeFormat(currentLang(), { day: "numeric", month: "short" }).format(new Date(ms));
+}
+
 /** An exam's modal, to add (`examen: null`) or edit one. Name (required), Date
     (the app's own picker, no earlier than today) and Weight (optional: a number
     and a Coef. | % toggle, a "%" typed in the field flips the toggle); Save
@@ -69,6 +78,9 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 	let date = examen?.date ?? "";
 	let weight = examen?.coefficient === undefined ? "" : String(examen.coefficient).replace(".", ",");
 	let unit: ExamWeightUnit = examen?.weightUnit === "percent" ? "percent" : "coef";
+	// Continuous assessment: graded over several sessions instead of on one day.
+	let kind: "date" | "sessions" = examen?.seances ? "sessions" : "date";
+	const seances: string[] = [...(examen?.seances ?? [])];
 
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
@@ -84,8 +96,33 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			   name ("edit text", or the weight's placeholder "2"). */
 			nomInput.setAttribute("aria-label", t("dashboard.planning.examName"));
 
-			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examDate"));
-			const dateBtn = ajouter(c, "button", "qbd-medit-select qbd-planning-date-field");
+			// Date | Sessions toggle: same segmented selector as Coef. | %.
+			const kindSeg = ajouter(c, "div", "qbd-planning-unit qbd-planning-kind");
+			kindSeg.setAttribute("role", "radiogroup");
+			kindSeg.setAttribute("aria-label", t("dashboard.planning.examKind"));
+			const kindIndic = ajouter(kindSeg, "div", "qbd-planning-unit-indic");
+			const kindBtns = (["date", "sessions"] as const).map(k => {
+				const b = ajouter(kindSeg, "button", "qbd-planning-unit-btn",
+					t(k === "date" ? "dashboard.planning.examKindDate" : "dashboard.planning.examKindSessions"));
+				b.type = "button";
+				b.setAttribute("role", "radio");
+				b.addEventListener("click", () => { kind = k; paintKind(true); majEtat(); });
+				return { k, b };
+			});
+			const dateBlock = ajouter(c, "div");
+			const sessionsBlock = ajouter(c, "div");
+			const paintKind = (anime: boolean): void => {
+				for (const { k, b } of kindBtns) {
+					b.classList.toggle("is-active", k === kind);
+					b.setAttribute("aria-checked", String(k === kind));
+				}
+				dateBlock.hidden = kind !== "date";
+				sessionsBlock.hidden = kind !== "sessions";
+				placerIndicateur(kindIndic, kindBtns.find(({ k }) => k === kind)!.b, anime);
+			};
+
+			ajouter(dateBlock, "p", "qbd-medit-label", t("dashboard.planning.examDate"));
+			const dateBtn = ajouter(dateBlock, "button", "qbd-medit-select qbd-planning-date-field");
 			dateBtn.type = "button";
 			dateBtn.setAttribute("aria-haspopup", "dialog");
 			dateBtn.setAttribute("aria-expanded", "false");
@@ -96,6 +133,41 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				dateText.classList.toggle("is-empty", !date);
 			};
 			majDate();
+
+			// Sessions: one date field per session, a count, an add button.
+			const sessionsHead = ajouter(sessionsBlock, "p", "qbd-medit-label", t("dashboard.planning.examKindSessions"));
+			const sessionsCount = ajouter(sessionsHead, "span", "qbd-planning-sessions-count");
+			const sessionsList = ajouter(sessionsBlock, "div", "qbd-planning-sessions");
+			const addSession = ajouter(sessionsBlock, "button", "qbd-folder-section-action");
+			addSession.type = "button";
+			currentHost().ui.setIcon(ajouter(addSession, "span", "qbd-folder-section-action-icon"), "plus");
+			ajouter(addSession, "span", undefined, t("dashboard.planning.sessionAdd"));
+			const renderSeances = (): void => {
+				sessionsList.textContent = "";
+				seances.forEach((iso, i) => {
+					const row = ajouter(sessionsList, "div", "qbd-planning-session-row");
+					const btn = ajouter(row, "button", "qbd-medit-select qbd-planning-date-field");
+					btn.type = "button";
+					btn.setAttribute("aria-haspopup", "dialog");
+					const text = ajouter(btn, "span", "qbd-planning-date-text", iso ? formatExamDate(iso, currentLang()) : t("dashboard.planning.datePick"));
+					text.classList.toggle("is-empty", !iso);
+					currentHost().ui.setIcon(ajouter(btn, "span", "qbd-planning-date-icon"), "calendar");
+					btn.addEventListener("click", () => {
+						openDatePicker(btn, seances[i], {}, (picked) => { seances[i] = picked; renderSeances(); majEtat(); });
+					});
+					const remove = ajouter(row, "button", "qbd-planning-exam-action");
+					remove.type = "button";
+					remove.setAttribute("aria-label", t("dashboard.planning.sessionRemove"));
+					remove.title = t("dashboard.planning.sessionRemove");
+					currentHost().ui.setIcon(remove, "x");
+					remove.addEventListener("click", () => { seances.splice(i, 1); renderSeances(); majEtat(); });
+				});
+				sessionsCount.textContent = seances.length
+					? t(seances.length === 1 ? "dashboard.planning.sessionsCountOne" : "dashboard.planning.sessionsCountOther", { n: seances.length })
+					: "";
+				addSession.hidden = seances.length >= MAX_SEANCES;
+			};
+			addSession.addEventListener("click", () => { seances.push(""); renderSeances(); majEtat(); });
 
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.planning.examWeight"));
 			const weightRow = ajouter(c, "div", "qbd-planning-weight-row");
@@ -153,9 +225,16 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 				const weightValide = parseExamWeight(weight, unit) !== null;
 				weightInput.setAttribute("aria-invalid", String(!weightValide));
 				weightError.hidden = weightValide;
-				save.disabled = !nom.trim() || !date || date < aujourdhuiIsoLocal(Date.now()) || !weightValide;
+				// A continuous assessment needs its sessions (past ones are normal, but
+				// the LAST one must not be past); a dated exam needs a date from today.
+				const finValide = kind === "sessions"
+					? seances.length > 0 && seances.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) && [...seances].sort().pop()! >= aujourdhuiIsoLocal(Date.now())
+					: !!date && date >= aujourdhuiIsoLocal(Date.now());
+				save.disabled = !nom.trim() || !finValide || !weightValide;
 			};
 			paintUnit(false);
+			paintKind(false);
+			renderSeances();
 			majEtat();
 			nomInput.addEventListener("input", () => { nom = nomInput.value; majEtat(); });
 			weightInput.addEventListener("input", () => {
@@ -188,10 +267,13 @@ function ouvrirModalExamen(ctx: DashboardShellCtx, group: ModuleGroup, examen: E
 			save.addEventListener("click", () => {
 				const parsed = parseExamWeight(weight, unit);
 				if (save.disabled || parsed === null) return;
+				const triees = [...new Set(seances)].sort();
 				ctx.enregistrerExamen?.(group, {
 					id: examen?.id ?? Date.now().toString(36),
 					nom: nom.trim(),
-					date,
+					// A continuous assessment's date is always its last session.
+					date: kind === "sessions" ? triees[triees.length - 1] : date,
+					...(kind === "sessions" ? { seances: triees } : {}),
 					// Only a percentage stores its unit; "coef" is the absent default.
 					...(parsed === undefined ? {} : { coefficient: parsed.value, ...(parsed.unit === "percent" ? { weightUnit: "percent" as const } : {}) }),
 				});
@@ -268,13 +350,25 @@ export function renderFolderPlanning(
 			ajouter(texte, "span", "qbd-planning-exam-name", examen.nom);
 			const ms = parseExamDate(examen.date);
 			const infos = ajouter(texte, "div", "qbd-planning-exam-infos");
-			ajouter(infos, "span", "qbd-planning-exam-date", formatExamDate(examen.date, currentLang()));
+			const seancesExamen = examen.seances;
+			if (seancesExamen?.length) {
+				// Continuous assessment: count and span of its sessions, then how many are past.
+				const premiere = seancesExamen[0], derniere = seancesExamen[seancesExamen.length - 1];
+				const compte = t(seancesExamen.length === 1 ? "dashboard.planning.sessionsCountOne" : "dashboard.planning.sessionsCountOther", { n: seancesExamen.length });
+				const plage = premiere === derniere ? formatSeanceJour(premiere) : `${formatSeanceJour(premiere)} → ${formatSeanceJour(derniere)}`;
+				ajouter(infos, "span", "qbd-planning-exam-date", `${compte} · ${plage}`);
+			} else {
+				ajouter(infos, "span", "qbd-planning-exam-date", formatExamDate(examen.date, currentLang()));
+			}
 			if (examen.coefficient !== undefined) {
 				ajouter(infos, "span", "qbd-planning-exam-coef",
 					t(examen.weightUnit === "percent" ? "dashboard.planning.examPercent" : "dashboard.planning.examCoef",
 						{ n: new Intl.NumberFormat(currentLang()).format(examen.coefficient) }));
 			}
-			if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
+			if (seancesExamen?.length) {
+				const aujourdhui = aujourdhuiIsoLocal(Date.now());
+				ajouter(infos, "span", "qbd-planning-exam-days", t("dashboard.planning.sessionsDone", { n: seancesExamen.filter(d => d < aujourdhui).length, total: seancesExamen.length }));
+			} else if (ms !== null) ajouter(infos, "span", "qbd-planning-exam-days", joursRestants(ms));
 			// Edit and Delete are shown directly as two ghost icon buttons
 			// (no "..." menu: two actions do not need one).
 			const actions = ajouter(ligne, "div", "qbd-planning-exam-actions");
