@@ -361,8 +361,9 @@
 .nq-explain-demande {
 	border: 1px solid var(--background-modifier-border);
 	font-size: 13.5px;
-	max-height: 160px;
-	overflow-y: auto;
+	/* A message of the history shows whole: in the column, a bubble that may
+	   shrink is squeezed to a sliver and scrolls inside itself. */
+	flex: none;
 }
 
 .nq-explain-composer {
@@ -390,21 +391,39 @@
 	outline: none;
 }
 
+/* The send arrow: the 3D blue of the quiz's arrows; without a text to send it
+   goes flat and grey instead of a washed-out blue. */
 .nq-explain-envoi {
+	--face: var(--quiz-primary);
+	--edge: var(--quiz-primary-edge);
+	--depth: 4px;
 	flex: none;
 	display: grid;
 	place-items: center;
-	width: 32px;
+	width: 36px;
 	height: 32px;
+	margin-bottom: var(--depth);
+	padding: 0;
 	border: 0;
-	border-radius: 9px;
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
+	border-radius: 11px;
+	background: var(--face);
+	color: #fff;
+	box-shadow: 0 var(--depth) 0 0 var(--edge);
 	cursor: pointer;
+	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
-
+.nq-explain-envoi:hover:not(:disabled) {
+	background: var(--quiz-primary-light);
+}
+.nq-explain-envoi:active:not(:disabled) {
+	transform: translateY(var(--depth));
+	box-shadow: 0 0 0 0 var(--edge);
+}
 .nq-explain-envoi:disabled {
-	opacity: 0.4;
+	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+	color: color-mix(in srgb, var(--text-normal) 40%, transparent);
+	box-shadow: none;
+	transform: translateY(var(--depth));
 	cursor: default;
 }
 
