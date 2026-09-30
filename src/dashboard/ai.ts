@@ -3,7 +3,7 @@ import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
-import { quizModeLabel } from "./quiz-card";
+import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, canChooseQuizCount } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
@@ -34,7 +34,8 @@ import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
-import { poserListeChats, suivreConversations } from "./chat-sidebar";
+import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
+import { ouvrirRecherche } from "./chat-search";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -927,6 +928,22 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   class set on `container`: it is the panel shared by every page, and a
 		   class left on it laid Folders out in two columns after Generate. */
 		const lateral = ajouter(container, "nav", "qbd-ai-lateral");
+		/* "Search", first, like claude.ai's: a window over the quizzes and the
+		   chats (`chat-search.ts`). The entries stay put, only the chats scroll. */
+		const recherche = ajouter(lateral, "button", "qbd-ai-lateral-recherche");
+		recherche.type = "button";
+		host.ui.setIcon(ajouter(recherche, "span", "qbd-ai-lateral-icone"), "search");
+		ajouter(recherche, "span", undefined, t("ai.search.placeholder"));
+		recherche.addEventListener("click", () => ouvrirRecherche({
+			quizzes: () => deps.scanner.getQuizzes(),
+			iconeQuiz: (chemin) => quizModeIcon(deps.scanner.getQuiz(chemin)?.mode ?? "practice"),
+			ouvrirQuiz: (chemin) => {
+				const quiz = deps.scanner.getQuiz(chemin);
+				if (quiz) deps.navigate("detail", { quiz });
+				else host.ui.notice(t("ai.queue.missing"));
+			},
+			ouvrirSession: (chat) => ouvrirChat(chat),
+		}));
 		majNouvelle = poserNouvelleDemande(lateral, fileGen);
 		if (deps.openGenerated) {
 			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");

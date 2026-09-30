@@ -698,6 +698,123 @@
 	height: 18px;
 }
 
+/* "Search": drawn as a field, but a button that opens the search window. */
+.qbd-ai-lateral-recherche {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	height: 38px;
+	margin-bottom: 6px;
+	padding: 0 10px;
+	border: 1px solid var(--background-modifier-border) !important;
+	border-radius: 10px;
+	background: var(--background-modifier-form-field) !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 14px;
+	text-align: left;
+	cursor: text;
+}
+.qbd-ai-lateral-recherche:hover {
+	color: var(--text-normal);
+}
+
+/* The search window (`chat-search.ts`): the field, the three tabs, the list. */
+.qbd-search-modal {
+	width: min(640px, calc(100vw - 32px));
+	height: min(520px, 80vh);
+}
+.qbd-search-modal .modal-content {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+.qbd-search-champ {
+	width: 100%;
+	padding: 6px 4px;
+	border: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-size: 17px;
+	outline: none;
+}
+.qbd-search-onglets {
+	display: flex;
+	gap: 4px;
+	padding: 8px 0 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.qbd-search-onglet {
+	padding: 6px 12px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 14px;
+	cursor: pointer;
+}
+.qbd-search-onglet:hover {
+	color: var(--text-normal);
+}
+.qbd-search-onglet.is-active {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+	font-weight: 600;
+}
+.qbd-search-liste {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding-top: 10px;
+	scrollbar-width: thin;
+}
+.qbd-search-section {
+	padding: 6px 12px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+.qbd-search-vide {
+	padding: 24px 12px;
+	color: var(--text-muted);
+	text-align: center;
+}
+.qbd-search-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	padding: 9px 12px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-size: 14.5px;
+	text-align: left;
+	cursor: pointer;
+}
+.qbd-search-item.is-active {
+	background: var(--background-modifier-hover) !important;
+}
+.qbd-search-icone {
+	display: inline-flex;
+	flex: none;
+	color: var(--text-muted);
+}
+.qbd-search-icone svg {
+	width: 17px;
+	height: 17px;
+}
+.qbd-search-titre {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* THE CHATS, under the entries (`chat-sidebar.ts`): by day, like claude.ai's,
    scrolling on their own; the day in muted text, the chat in normal text. */
 .qbd-ai-chats {

@@ -68,3 +68,26 @@ await withSrcModule("src/dashboard/chat-archives.ts", ({ saveChat, readArchivedC
 	r.check("an old day is past the recent days", groupChatsByDay([chat("f", new Date(2026, 7, 31, 12).getTime(), "f", "x")], now, 30)[0].old, false);
 	r.done();
 });
+
+/* THE SEARCH of the Generate page (`src/dashboard/search-items.ts`): every
+   word must appear, accents and case ignored; a tab keeps its kind; with no
+   query, the most recent first, capped. */
+await withSrcModule("src/dashboard/search-items.ts", ({ searchItems }) => {
+	const r = makeReporter("Search of Generate");
+	const quizzes = [
+		{ path: "Cours/Réseaux TCP.md", title: "Réseaux TCP", mtime: 30 },
+		{ path: "Cours/Python.md", title: "Python", mtime: 10 },
+	];
+	const chats = [
+		{ id: "s1", date: 20, title: "Pile et file", turns: [{ role: "user", text: "Pile et file" }, { role: "assistant", text: "Une pile est LIFO." }] },
+	];
+	const titres = (q, tab, max) => searchItems(q, tab, quizzes, chats, max).map(i => i.kind + ":" + i.title);
+	r.check("no query: newest first, both kinds", titres("", "all"), ["quiz:Réseaux TCP", "session:Pile et file", "quiz:Python"]);
+	r.check("accents and case ignored", titres("RESEAUX", "all"), ["quiz:Réseaux TCP"]);
+	r.check("every word must appear", titres("reseaux python", "all"), []);
+	r.check("a session is found by what was said", titres("lifo", "all"), ["session:Pile et file"]);
+	r.check("the Quizzes tab shows no session", titres("", "quizzes"), ["quiz:Réseaux TCP", "quiz:Python"]);
+	r.check("the Sessions tab shows no quiz", titres("", "sessions"), ["session:Pile et file"]);
+	r.check("capped", titres("", "all", 2).length, 2);
+	r.done();
+});

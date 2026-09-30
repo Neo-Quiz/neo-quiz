@@ -90,8 +90,10 @@ function libelleJour(kind: "today" | "yesterday" | "day", jour: number): string 
 	return new Intl.DateTimeFormat(currentLang(), memeAnnee ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }).format(d);
 }
 
-/** A saved chat read back, read-only. */
-function ouvrirChat(chat: ArchivedChat): void {
+/** A saved chat read back, read-only. The conversation on screen is
+    already open: nothing to show. */
+export function ouvrirChat(chat: ArchivedChat): void {
+	if (chat.id === enCours?.id) return;
 	requireHost("modals").open({
 		className: "qbd-archives-modal",
 		title: chat.title || t("ai.side.untitled"),
