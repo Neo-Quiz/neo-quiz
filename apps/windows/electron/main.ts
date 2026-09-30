@@ -742,6 +742,11 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			fenetre: {
 				prete: () => {
 					if (!fenetre || fenetre.isDestroyed() || fenetre.isVisible()) return;
+					/* The app opens MAXIMIZED (2026-09-30), the work area
+					   filled. Here and not at creation: `maximize()` also shows
+					   the window, which must stay hidden until the renderer
+					   says it is ready. */
+					fenetre.maximize();
 					fenetre.show();
 					fenetre.focus();
 				},

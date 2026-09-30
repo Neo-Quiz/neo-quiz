@@ -15,8 +15,10 @@ release notes.
 
 ### Added
 - An exam can now be described by its sessions: a continuous assessment lists every session date in the review plan instead of one day, and never drives the review schedule.
+- The app opens maximized.
 
 ### Fixed
+- The documents list of a folder no longer crushes its rows when it has more than eight files.
 - A folder with no quiz yet keeps the exams you add to its review plan, and shows the ones it already had.
 - Opening a document from a folder now shows it: the row presses in on click, swaps its icon for a spinner, reads "Opening…" and sweeps a soft light while the default app starts.
 - The current question stands out in the bead row: answered questions fade (their bead is no longer blue), the ones left to answer stay bright.

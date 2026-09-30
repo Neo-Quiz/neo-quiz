@@ -178,6 +178,11 @@
 	border-radius: 10px;
 	position: relative;
 	overflow: hidden;
+	/* Never shrunk: `overflow: hidden` (which clips the opening sweep) takes
+	   away a flex item's automatic minimum height, and the scrolling list
+	   (`--defile`, capped at eight rows) then crushed every row to a few
+	   pixels (2026-09-30). */
+	flex-shrink: 0;
 	transition: background 0.15s ease;
 }
 
