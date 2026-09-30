@@ -474,3 +474,10 @@
 	width: 100%;
 	margin-left: 0;
 }
+
+/* The provider's logo on its own gradient would vanish (Claude's orange on an
+   orange face): on the button it is drawn in white. */
+.qz-explain-btn-logo .qbd-provider-logo,
+.qz-explain-btn-logo .qbd-provider-logo * {
+	filter: brightness(0) invert(1);
+}
