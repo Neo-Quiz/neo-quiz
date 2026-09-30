@@ -15,7 +15,7 @@ import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
 import { moduleIcon } from "./module-icons";
-import { modulesAffiches } from "./quiz-modules";
+import { modulesAffiches, estLeSas } from "./quiz-modules";
 import type { ModuleGroup } from "./quiz-modules";
 import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
@@ -255,7 +255,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (!ctx.renderGroupingSelect) return;
 		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
-			Object.keys(ctx.settings.quizzesModuleOverrides || {}), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).map(sujetDe));
+			Object.keys(ctx.settings.quizzesModuleOverrides || {}), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
 		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
 		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
 		const TOUS = "";
@@ -284,6 +284,24 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			},
 		});
 		select.el.classList.add("qbd-quizzes-group-select", "qbd-quizzes-subject-select");
+	}
+
+	/* The "Generated quizzes" folder is no card of the grid: a button of the
+	   top bar opens it, with the number of quizzes it holds (0 while empty or
+	   not created yet). Opening goes through `openModule`, like a card did, so
+	   the same sheet transition plays. Recognised by its PATH. */
+	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
+		const sas = ctx.generatedFolder?.();
+		if (!sas) return;
+		const groupe = modulesAffiches(quizzes, stats, effectiveMap(), [], [], sas).find(m => estLeSas(m, sas));
+		if (!groupe) return;
+		const btn = ajouter(parent, "button", "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
+		btn.type = "button";
+		const label = ajouter(btn, "span", "qbd-select-label");
+		currentHost().ui.setIcon(ajouter(label, "span", "qbd-quizzes-subject-icon"), "sparkles");
+		ajouter(label, "span", undefined, t("ai.side.generated"));
+		ajouter(label, "span", "qbd-quizzes-node-badge", String(groupe.quizzes.length));
+		btn.addEventListener("click", () => openModule(groupe.folder));
 	}
 
 	function render(container: HTMLElement): void {

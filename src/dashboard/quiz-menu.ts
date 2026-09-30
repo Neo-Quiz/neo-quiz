@@ -343,6 +343,7 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
 	   une exception remonter d'ici laissait le module A MOITIÉ supprimé avec
 	   une interface qui ne se redessinait même pas (revue codex 2026-07-31). */
 	let echecs = 0;
+	if (estLeSas(group, ctx.generatedFolder?.())) return;
 	derniereSuppression = [];
 	for (const q of group.quizzes) {
 		// Fichier introuvable (ou dossier à ce chemin — `getFile` rend null
@@ -669,7 +670,7 @@ async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: st
 	   chemin inexistant et échouait en disant « existe déjà » (2026-09-27).
 	   L'entrée n'est offerte qu'à un dossier qui a un chemin. */
 	const source = g.path;
-	if (!source) return false;
+	if (!source || estLeSas(g, ctx.generatedFolder?.())) return false;
 	const localFrom = host.paths.localPath(source);
 	// Une RACINE entière (un quiz posé à la racine, `localFrom === ""`) ne se
 	// déplace jamais par ce chemin : le menu la masque déjà (B-mineur,
@@ -703,6 +704,9 @@ async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: st
 export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (g: ModuleGroup, anchorEl?: HTMLElement) => ActionMenuItem[] {
 	return (g, anchorEl) => {
 		const archived = isFolderArchived(ctx, g.folder);
+		/* The "Generated" folder can be neither renamed, archived, moved nor
+		   deleted (by its PATH): it is where generations land. */
+		const fixe = estLeSas(g, ctx.generatedFolder?.());
 		const { shareQuiz } = ctx;
 		const host = currentHost();
 		const items: ActionMenuItem[] = [];
@@ -712,7 +716,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 			label: t("dashboard.quizzes.menuShare"),
 			onClick: () => { shareQuiz({ group: g }); },
 		});
-		items.push({
+		if (!fixe) items.push({
 			icon: "pencil",
 			label: t("dashboard.detail.edit"),
 			// Modal « Modifier dossier » calqué sur StudySmarter (nom / UE /
@@ -744,7 +748,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				});
 			},
 		});
-		items.push({
+		if (!fixe) items.push({
 			icon: "archive",
 			label: t(archived ? "dashboard.quizzes.menuUnarchive" : "dashboard.quizzes.menuArchive"),
 			// Direct dans les deux sens (demande Ahmed 2026-07-19 : plus
@@ -764,7 +768,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		// `quiz-modules.ts` lui donne alors `path = <rootId>`). La déplacer
 		// déplacerait tout le vault ; masquer l'entrée plutôt que de laisser
 		// `moveModuleTo` échouer sur « existe déjà » (revue du 2026-09-27, B-mineur).
-		if (anchorEl && roots.length > 1 && g.path && host.paths.localPath(g.path) !== "") {
+		if (!fixe && anchorEl && roots.length > 1 && g.path && host.paths.localPath(g.path) !== "") {
 			// Sous-menu au survol, comme « Move to » d'un quiz (2026-09-27).
 			const rootDeG = host.paths.rootOf(g.path);
 			const cibles = roots.filter(root => root.id !== rootDeG?.id);
@@ -793,7 +797,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				})),
 			});
 		}
-		items.push({
+		if (!fixe) items.push({
 			icon: "trash-2",
 			label: t("dashboard.quizzes.menuDeleteModule"),
 			danger: true,

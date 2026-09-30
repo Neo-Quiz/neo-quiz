@@ -118,7 +118,10 @@ export function renderQuizGrid(
 	    quiz shows as a card too, and must leave with the others. */
 	garder?: (m: ModuleGroup) => boolean,
 ): void {
-	const garde = (m: ModuleGroup): boolean => !garder || garder(m);
+	/* The "Generated" folder is not a card of the grid: the page's top bar
+	   has its own button for it (quizzes.ts), and it is counted in no group. */
+	const sasCache = deps.ctx.generatedFolder?.();
+	const garde = (m: ModuleGroup): boolean => !estLeSas(m, sasCache) && (!garder || garder(m));
 	treeEl.replaceChildren();
 	// Cascade d'ENTRÉE globale : un seul compteur traverse toutes les
 	// sections (en-têtes ET cartes de dossier) — même formule que les cartes
@@ -141,6 +144,10 @@ export function renderQuizGrid(
 	const sasVide = deps.ctx.generatedFolder?.();
 	const modules = modulesAffiches(filtered, stats, map,
 		Object.keys(deps.ctx.settings.quizzesModuleOverrides || {}), archivedFolders, sasVide).filter(garde);
+	if (!garder && modules.length === 0 && archivedQuizzes.length === 0 && archivedFolders.length === 0) {
+		ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.empty"));
+		return;
+	}
 	if (garder && modules.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
 
 	if (mode === "recent") {
