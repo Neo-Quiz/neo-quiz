@@ -51,11 +51,16 @@ const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
    reload that `onFoldersChanged` triggers). Not persisted — a new session
    opens on General. */
 let lastCategory: Category = "general";
-/** The next opening lands on the Explain prompt (the AI page, scrolled to it). */
-let viserPrompt = false;
+/** The next opening lands on a prompt of the AI page, scrolled to it: the
+    Explain one, or the "/exam" one. */
+let viserPrompt: "explain" | "exam" | null = null;
 export function viserPromptExpliquer(): void {
 	lastCategory = "ai";
-	viserPrompt = true;
+	viserPrompt = "explain";
+}
+export function viserPromptExam(): void {
+	lastCategory = "ai";
+	viserPrompt = "exam";
 }
 
 /** A titled block of a category: its heading, an optional help line. */
@@ -436,6 +441,26 @@ export function renderSettings(
 		void deps.aiSettings.save({ aiExplainPrompt: "" });
 	});
 
+	/* The request "/exam" writes for the learner once an exam is picked
+	   (2026-09-30, `exam-command.ts`): editable like the Explain prompt,
+	   {exam}, {module} and {date} replaced; empty means the translated
+	   default, which "Reset" brings back. Saved when the field loses the focus. */
+	const examen = section(aiPage, t("app.settings.examPrompt"), t("app.settings.examPromptHint"));
+	const zoneExam = ajouter(examen, "textarea", "nq-set-prompt");
+	zoneExam.rows = 5;
+	zoneExam.value = deps.aiSettings.get().aiExamPrompt?.trim() || t("ai.exam.defaultPrompt");
+	zoneExam.setAttribute("aria-label", t("app.settings.examPrompt"));
+	zoneExam.addEventListener("change", () => {
+		const v = zoneExam.value.trim();
+		void deps.aiSettings.save({ aiExamPrompt: v === t("ai.exam.defaultPrompt").trim() ? "" : v });
+	});
+	const reinitExam = ajouter(ajouter(examen, "div", "nq-reglages-actions"), "button", "nq-reglages-changer", t("app.settings.explainPromptReset"));
+	reinitExam.type = "button";
+	reinitExam.addEventListener("click", () => {
+		zoneExam.value = t("ai.exam.defaultPrompt");
+		void deps.aiSettings.save({ aiExamPrompt: "" });
+	});
+
 	/* ═══ APPEARANCE ═══ */
 	const demonterFond = monterReglagesFond(card(section(pages.get("appearance")!, t("app.settings.wallpaper"))));
 
@@ -445,8 +470,9 @@ export function renderSettings(
 
 	show(lastCategory);
 	if (viserPrompt) {
-		viserPrompt = false;
-		requestAnimationFrame(() => { expliquer.scrollIntoView({ block: "center" }); zone.focus(); });
+		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];
+		viserPrompt = null;
+		requestAnimationFrame(() => { bloc.scrollIntoView({ block: "center" }); champ.focus(); });
 	}
 
 	/* The unmount no longer unsubscribes the updater: its section left on

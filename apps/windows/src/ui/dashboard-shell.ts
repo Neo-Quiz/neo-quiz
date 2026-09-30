@@ -57,6 +57,7 @@ import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
+import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { monterBoutonRail } from "./mise-a-jour";
@@ -598,11 +599,20 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		},
 		quizFolders: () => dossiersDeQuiz(),
 		copyText: copierTexte,
+		// The pencil of the "/exam" tile: the Settings, on its prompt.
+		openExamPromptSettings: () => { viserPromptExam(); deps.onOpenSettings(); },
 		// The "/exam" menu: every upcoming exam of every folder, nearest first.
 		upcomingExams: () => {
 			const aujourdhui = isoLocal(Date.now());
+			const quiz = deps.scanner.getQuizzes();
+			/* The course folder of a key: the folder of any quiz filed under it
+			   (the key is the catalogue's, the documents are listed by path). */
+			const dossierDe = (cle: string): string | undefined => {
+				const q = quiz.find(x => cleModule(x.path, currentHost().paths) === cle);
+				return q ? q.path.slice(0, q.path.lastIndexOf("/")) : undefined;
+			};
 			return Object.entries(examens())
-				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle) })))
+				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle), dossier: dossierDe(cle) })))
 				.sort((a, b) => a.date.localeCompare(b.date));
 		},
 	});

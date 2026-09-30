@@ -93,6 +93,8 @@ export interface PreparationExamen {
 	examen?: { nom: string; date: string; module: string };
 	palier: number;
 	paliers: number;
+	/** A Learn covers ONE of the exam's documents (its name); the Tests, all of them. */
+	document?: string;
 }
 
 export interface ReponseQuiz {
@@ -314,13 +316,14 @@ function blocPreparation(p: PreparationExamen | undefined, learn: boolean): stri
 	const examen = p.examen ? ` for the exam "${p.examen.nom}" (${p.examen.module}, on ${p.examen.date})` : "";
 	const but = `EXAM PREPARATION${examen}: this quiz is one step of a full preparation made from the SAME sources — a Learn path, then ${p.paliers} Tests of rising difficulty. Together they must cover EVERYTHING that can come up in the exam: every notion, definition, method, calculation and classic exercise of the sources, not a sample. Do not stop at 20 questions if the sources need more to be covered.`;
 	const etape = learn
-		? "THIS STEP: the Learn path, from the basics up to the exam's level, in the order the notions build on each other."
+		? `THIS STEP: the Learn path${p.document ? ` of the document "${p.document}" (one Learn per document of the exam; the Tests cover them all)` : ""}, from the basics up to the exam's level, in the order the notions build on each other.`
 		: p.palier >= p.paliers
 			? `THIS STEP: Test ${p.palier} of ${p.paliers}, AT THE EXAM'S LEVEL — the hardest: questions like the real exam, combining notions, traps, full exercises.`
 			: p.palier === 1
 				? `THIS STEP: Test 1 of ${p.paliers}, the FUNDAMENTALS: definitions, direct application, one notion per question.`
 				: `THIS STEP: Test ${p.palier} of ${p.paliers}, a notch harder: applying and linking notions, fewer direct recalls.`;
-	const titre = p.examen ? ` Title it after the exam and the step, for example "// title: ${p.examen.nom} — ${learn ? "Learn" : `Test ${p.palier}`}".` : "";
+	const etapeNom = learn ? (p.document ? `Learn ${p.document.replace(/\.[^.]+$/, "")}` : "Learn") : `Test ${p.palier}`;
+	const titre = p.examen ? ` Title it after the exam and the step, for example "// title: ${p.examen.nom} — ${etapeNom}".` : "";
 	return `${but}
 	${etape}${titre}
 

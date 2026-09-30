@@ -36,6 +36,7 @@ import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserC
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
+import { ouvrirDocumentsExam } from "./exam-documents";
 import { PALIERS_TEST, attachExamCommand, promptPreparation, retirerCommandeExam } from "./exam-command";
 import type { ExamCible, ExamCommandHandle } from "./exam-command";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
@@ -235,6 +236,8 @@ export interface AiPageDeps {
 	navigate(view: DashboardViewName, data?: NavigateData): void;
 	/** The upcoming exams of every folder, for the "/exam" menu. Absent: an empty menu. */
 	upcomingExams?(): ExamCible[];
+	/** Opens the Settings on the "/exam" prompt (the pencil of its tile). Absent: no pencil. */
+	openExamPromptSettings?(): void;
 	/** Opens the page of the folder where generated quizzes are written ("Generated quizzes"
 	    of the sidebar). Absent: no such entry. */
 	openGenerated?(): void;
@@ -683,6 +686,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const i = typeLabels().indexOf(label);
 		return i < 0 ? TYPE_VALUES[0] : TYPE_VALUES[i];
 	};
+
+	/** The window of the exam's documents (`exam-documents.ts`): a click
+	    joins one, as "@CM1.pdf" would. */
+	function choisirDocumentsExam(exam: ExamCible): void {
+		ouvrirDocumentsExam({
+			examen: exam.nom,
+			dossier: exam.dossier,
+			estQuiz: (p) => !!deps.scanner.getQuiz(p),
+			joints: () => noteAttachments.map(n => n.path).filter((p): p is string => !!p),
+			joindre: (p) => attachVaultPath(p),
+		});
+	}
 
 	function canGenerate(): boolean {
 		/* Une demande EN VOL sur un site, ou une attente de connexion, ne
@@ -1677,9 +1692,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			tuileExam.hidden = !examCible;
 			composerInput.placeholder = t(examCible ? "ai.exam.addDetails" : "ai.composer.placeholder");
 			if (!examCible) return;
-			ajouter(tuileExam, "div", "qbd-ai-exam-cible-texte", promptPreparation(examCible));
+			ajouter(tuileExam, "div", "qbd-ai-exam-cible-texte", promptPreparation(examCible, settings().aiExamPrompt));
 			const pied = ajouter(tuileExam, "div", "qbd-ai-exam-cible-pied");
 			ajouter(pied, "span", "qbd-ai-exam-cible-nom", t("ai.exam.tileName"));
+			// The pencil opens the Settings on the prompt, like the Explain tile's.
+			if (deps.openExamPromptSettings) {
+				const crayon = ajouter(pied, "button", "qbd-ai-exam-cible-edit");
+				crayon.type = "button";
+				crayon.title = t("ai.exam.tileEdit");
+				crayon.setAttribute("aria-label", t("ai.exam.tileEdit"));
+				host.ui.setIcon(crayon, "pencil");
+				crayon.addEventListener("click", () => deps.openExamPromptSettings?.());
+			}
 			// The round cross in the corner, shown on hover (claude.ai's pasted text).
 			const croix = ajouter(tuileExam, "button", "qbd-ai-exam-cible-retirer");
 			croix.type = "button";
@@ -1840,7 +1864,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 		commandeExam = attachExamCommand(composerInput, composer, {
 			exams: () => deps.upcomingExams?.() ?? [],
-			onPick: (exam) => { examCible = exam; peindreExamCible(); updateGenerateBtn(generateBtnRef); },
+			onPick: (exam) => {
+				examCible = exam;
+				peindreExamCible();
+				updateGenerateBtn(generateBtnRef);
+				// Which documents is the exam marked on? Asked at once.
+				choisirDocumentsExam(exam);
+			},
 			onTextReplaced: (value) => {
 				composerText = value;
 				composerCaret = 0;
@@ -3963,18 +3993,32 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   after the other with the same sources. */
 		const commande = retirerCommandeExam(envoi.text);
 		if (examCible || commande.commande) {
+			/* An exam is prepared FROM ITS DOCUMENTS: none joined, the window
+			   that lists them opens again instead of sending. */
+			if (examCible && envoi.notes.length === 0 && envoi.images.length === 0) {
+				host.ui.notice(t("ai.exam.needDocuments"));
+				choisirDocumentsExam(examCible);
+				return;
+			}
 			/* With an exam picked, the request is the prompt written for the
-			   learner, what they typed added under it. */
+			   learner, the documents it covers named, what they typed added under it. */
 			const precisions = commande.texte.trim();
-			const texte = examCible ? promptPreparation(examCible) + (precisions ? "\n\n" + precisions : "") : commande.texte;
+			const noms = envoi.notes.map(n => n.name);
+			const texte = examCible
+				? [promptPreparation(examCible, settings().aiExamPrompt), noms.length ? t("ai.exam.documentsLine", { list: noms.join(", ") }) : "", precisions].filter(Boolean).join("\n\n")
+				: commande.texte;
 			const d: DemandeTexte = { ...envoi, text: texte };
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
 			const examen = examCible ?? undefined;
-			for (let palier = 0; palier <= PALIERS_TEST; palier++) {
-				fileGen.envoyer({
-					...d, mode: palier === 0 ? "learn" : "practice", count: null, type: questionType, destination, reglages, categorie,
-					preparation: { examen, palier, paliers: PALIERS_TEST },
-				});
+			const base = { count: null, type: questionType, destination, reglages, categorie };
+			/* THE RIGHT NUMBER OF QUIZZES: one Learn per document (CM1, CM2, CM3
+			   each get their path), then the Tests of rising difficulty over
+			   all of them together. */
+			for (const doc of decouperParFichier(d, false)) {
+				fileGen.envoyer({ ...doc, ...base, mode: "learn", preparation: { examen, palier: 0, paliers: PALIERS_TEST, document: doc.notes.length === 1 && d.notes.length > 1 ? doc.notes[0].name : undefined } });
+			}
+			for (let palier = 1; palier <= PALIERS_TEST; palier++) {
+				fileGen.envoyer({ ...d, ...base, mode: "practice", preparation: { examen, palier, paliers: PALIERS_TEST } });
 			}
 			examCible = null;
 			viderComposer();

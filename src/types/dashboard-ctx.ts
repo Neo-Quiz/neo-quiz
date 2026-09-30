@@ -99,6 +99,9 @@ export interface AiSettings {
 	/** The message "Explain" sends about a played question (2026-09-29,
 	    `explain-prompt.ts` placeholders). Empty: the translated default. */
 	aiExplainPrompt?: string;
+	/** The request "/exam" writes for the learner (2026-09-30, `exam-command.ts`,
+	    placeholders {exam}, {module}, {date}). Empty: the translated default. */
+	aiExamPrompt?: string;
 	/** The longest explanation "Explain" asks for, in characters. */
 	aiExplainMaxChars?: number;
 	/* PLUS DE CHEMINS D'EXÉCUTABLE DE CLI (2026-09-17). Deux champs des

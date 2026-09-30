@@ -127,3 +127,12 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	r.check("no preparation block without /exam", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("EXAM PREPARATION"), false);
 	r.done();
 });
+
+/* One Learn PER DOCUMENT of an exam: its step names the document, its title too. */
+await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
+	const r = makeReporter("/exam per document");
+	const sys = composerPrompts("x", { mode: "learn", preparation: { examen: { nom: "CC", date: "2026-10-02", module: "XTI301" }, palier: 0, paliers: 3, document: "CM2 - Listes.pdf" } }).systemPrompt;
+	r.check("the Learn names its document", sys.includes('the document "CM2 - Listes.pdf"'), true);
+	r.check("its title names it without the extension", sys.includes("CC — Learn CM2 - Listes"), true);
+	r.done();
+});

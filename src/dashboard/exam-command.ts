@@ -21,6 +21,8 @@ export interface ExamCible {
 	date: string;
 	/** The course folder it belongs to. */
 	module: string;
+	/** That folder's contract path, where its documents are listed. */
+	dossier?: string;
 }
 
 /** How many Tests follow the Learn, from the basics to the exam's level. */
@@ -50,8 +52,10 @@ export function retirerCommandeExam(texte: string): { texte: string; commande: b
 /** The request written FOR the learner once an exam is picked, shown as a
     prompt tile in the composer (like the Explain window's) and sent as the
     text of the request; what the learner types is added under it. */
-export function promptPreparation(exam: ExamCible): string {
-	return t("ai.exam.prompt", { exam: exam.nom, module: exam.module, date: dateCourte(exam.date) });
+export function promptPreparation(exam: ExamCible, modele?: string): string {
+	const valeurs: Record<string, string> = { exam: exam.nom, module: exam.module, date: dateCourte(exam.date) };
+	// The template of the Settings, else the translated default; one pass, so a value holding "{date}" stays as it is.
+	return (modele?.trim() || t("ai.exam.defaultPrompt")).replace(/\{(exam|module|date)\}/g, (_, cle: string) => valeurs[cle]);
 }
 
 /** "30 Sept" in the language of the app. */
