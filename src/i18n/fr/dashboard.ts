@@ -344,6 +344,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.planning.examWeightCoef": "Coef.",
 	"dashboard.planning.examWeightPercent": "%",
 	"dashboard.planning.examWeightInvalid": "Entre 0 et 100",
+	"dashboard.planning.examSaveFailed": "Impossible d'enregistrer cet examen : l'emplacement du dossier est inconnu.",
 	"dashboard.planning.examCoef": "coef. {n}",
 	"dashboard.planning.examPercent": "{n} %",
 	"dashboard.planning.datePick": "Choisir une date",

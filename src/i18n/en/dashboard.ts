@@ -385,6 +385,7 @@ export const EN_DASHBOARD = {
 	"dashboard.planning.examWeightCoef": "Coef.",
 	"dashboard.planning.examWeightPercent": "%",
 	"dashboard.planning.examWeightInvalid": "Between 0 and 100",
+	"dashboard.planning.examSaveFailed": "This exam could not be saved: the folder's location is unknown.",
 	"dashboard.planning.examCoef": "coef. {n}",
 	"dashboard.planning.examPercent": "{n} %",
 	"dashboard.planning.datePick": "Pick a date",

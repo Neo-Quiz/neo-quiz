@@ -53,7 +53,7 @@ import type { DashboardPageSettings, DashboardShellCtx, DashboardViewName, Navig
 import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner";
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
-import type { ModuleOverride } from "../../../../src/dashboard/quiz-modules";
+import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
@@ -125,6 +125,19 @@ export function regroupementModes(): boolean {
 export async function reglerRegroupementModes(actif: boolean): Promise<void> {
 	reglagesPagesCache.quizzesGroupModes = actif;
 	await ecrireReglage("quizzesGroupModes", actif);
+}
+
+/** The key of a folder's exams: its root and its name (`cleModule`), read
+    from the FOLDER's own path. It used to come from the folder's first quiz
+    only, so a folder with no quiz yet (a module just created, or emptied to
+    start over) dropped the exam it was given without a word. A quiz still
+    gives it when the group knows no path (folders declared before
+    2026-09-17). `null`: nothing to key it with. */
+function cleExamens(group: ModuleGroup): string | null {
+	const paths = currentHost().paths;
+	if (group.path) return cleModule(`${group.path}/_`, paths);
+	const quiz = group.quizzes[0];
+	return quiz ? cleModule(quiz.path, paths) : null;
 }
 
 function reglagesPages(): DashboardPageSettings {
@@ -512,23 +525,21 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   qu'une liste plate de toutes les matières, dont deux pouvaient porter
 		   le même nom.
 
-		   LA CONVERSION DE CLÉ EST ICI, et nulle part ailleurs : le code
-		   partagé ne connaît qu'un nom de segment, l'ordonnanceur veut une clé
-		   qui porte la racine. N'IMPORTE QUEL quiz du groupe la donne — ils
-		   sont tous dans le même dossier, donc tous sous la même clé (la page
-		   n'appelle jamais ces membres sur un groupe vide, et `cleModule`
-		   n'aurait alors rien à lire). */
+		   LA CONVERSION DE CLÉ EST ICI, et nulle part ailleurs (`cleExamens`) :
+		   le code partagé ne connaît qu'un nom de segment, l'ordonnanceur veut
+		   une clé qui porte la racine. */
 		examens: group => {
-			const quiz = group.quizzes[0];
-			return quiz ? (examens()[cleModule(quiz.path, currentHost().paths)] ?? []) : [];
+			const cle = cleExamens(group);
+			return cle ? (examens()[cle] ?? []) : [];
 		},
 		enregistrerExamen: (group, e) => {
-			const quiz = group.quizzes[0];
-			if (quiz) void enregistrerExamenReglage(cleModule(quiz.path, currentHost().paths), e);
+			const cle = cleExamens(group);
+			if (cle) void enregistrerExamenReglage(cle, e);
+			else currentHost().ui.notice(t("dashboard.planning.examSaveFailed"));
 		},
 		retirerExamen: (group, id) => {
-			const quiz = group.quizzes[0];
-			if (quiz) void retirerExamenReglage(cleModule(quiz.path, currentHost().paths), id);
+			const cle = cleExamens(group);
+			if (cle) void retirerExamenReglage(cle, id);
 		},
 		// « Nouveau quiz » : une note vierge, puis sa page en ÉDITION par
 		// `openQuizPath` ci-dessous — l'éditeur existe désormais dans la fenêtre.
