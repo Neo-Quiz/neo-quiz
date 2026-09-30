@@ -34,8 +34,7 @@ import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
-import { archiveChat, deleteArchivedChat, readArchivedChats } from "./chat-archives";
-import type { ArchivedTurn } from "./chat-archives";
+import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -344,6 +343,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		scanner: deps.scanner,
 		recordUsage: deps.usage ? (entry) => deps.usage!.record(entry) : undefined,
 	});
+	// Every conversation is saved as it goes, for the sidebar's list of chats.
+	suivreConversations(fileGen);
 	const vueFile = creerVueFile({
 		file: fileGen,
 		ouvrir: (chemin) => {
@@ -675,64 +676,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return i < 0 ? TYPE_VALUES[0] : TYPE_VALUES[i];
 	};
 
-	/** The conversation on screen, as turns: what the learner asked and what
-	    came back — the prose answer, or the name of the quiz that was made. */
-	function archiverConversation(): void {
-		const turns: ArchivedTurn[] = [];
-		for (const l of fileGen.lignes()) {
-			if (l.etat !== "prete" || !l.resultat) continue;
-			turns.push({ role: "user", text: l.demande.text });
-			turns.push({ role: "assistant", text: l.resultat.texte ?? t("ai.side.quizMade", { title: l.resultat.titre }) });
-		}
-		archiveChat(turns);
-	}
-
-	/** "Archived chats": the list, then one chat read back, read-only. */
-	function ouvrirArchives(): void {
-		requireHost("modals").open({
-			className: "qbd-archives-modal",
-			title: t("ai.side.archived"),
-			onOpen: (m) => {
-				const corps = m.contentEl;
-				const liste = (): void => {
-					corps.replaceChildren();
-					const toutes = readArchivedChats();
-					if (toutes.length === 0) { ajouter(corps, "div", "qbd-archives-vide", t("ai.side.archivedEmpty")); return; }
-					for (const c of toutes) {
-						const ligne = ajouter(corps, "div", "qbd-archives-ligne");
-						const ouvrir = ajouter(ligne, "button", "qbd-archives-ouvrir");
-						ouvrir.type = "button";
-						ajouter(ouvrir, "span", "qbd-archives-titre", (c.turns[0]?.text ?? "").split("\n")[0].slice(0, 90));
-						ajouter(ouvrir, "span", "qbd-archives-date", new Date(c.date).toLocaleString());
-						ouvrir.addEventListener("click", () => lire(c.turns));
-						const suppr = ajouter(ligne, "button", "qbd-archives-suppr");
-						suppr.type = "button";
-						suppr.title = t("ai.side.archivedDelete");
-						suppr.setAttribute("aria-label", t("ai.side.archivedDelete"));
-						host.ui.setIcon(suppr, "trash-2");
-						suppr.addEventListener("click", () => { deleteArchivedChat(c.id); liste(); });
-					}
-				};
-				const lire = (turns: ArchivedTurn[]): void => {
-					corps.replaceChildren();
-					const retour = ajouter(corps, "button", "qbd-archives-retour");
-					retour.type = "button";
-					host.ui.setIcon(ajouter(retour, "span"), "arrow-left");
-					ajouter(retour, "span", undefined, t("ai.side.back"));
-					retour.addEventListener("click", liste);
-					const fil = ajouter(corps, "div", "qbd-archives-fil");
-					for (const tour of turns) {
-						if (tour.role === "user") { ajouter(fil, "div", "qbd-ai-bulle", tour.text); continue; }
-						const prose = ajouter(fil, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-						prose.innerHTML = renderMarkdownPreview(tour.text);
-						if (tour.text.includes("$")) void mathifyElement(prose);
-					}
-				};
-				liste();
-			},
-		});
-	}
-
 	function canGenerate(): boolean {
 		/* Une demande EN VOL sur un site, ou une attente de connexion, ne
 		   repart pas : le composer la montre encore, et le clic comme Entrée
@@ -978,13 +921,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const conversation = (phase === "idle" || phase === "error") && enConversation(fileGen);
 		modeConversation = conversation;
 		/* THE SIDEBAR, on the left of the page like claude.ai's: a new chat, the
-		   quizzes generated so far (the folder they are written to), and the
-		   chats that were archived by "New". */
+		   quizzes generated so far (the folder they are written to), and every
+		   chat by day (`chat-sidebar.ts`). */
 		/* The row layout keys on the sidebar being there (`:has`), never on a
 		   class set on `container`: it is the panel shared by every page, and a
 		   class left on it laid Folders out in two columns after Generate. */
 		const lateral = ajouter(container, "nav", "qbd-ai-lateral");
-		majNouvelle = poserNouvelleDemande(lateral, fileGen, archiverConversation);
+		majNouvelle = poserNouvelleDemande(lateral, fileGen);
 		if (deps.openGenerated) {
 			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");
 			genere.type = "button";
@@ -992,11 +935,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			ajouter(genere, "span", undefined, t("ai.side.generated"));
 			genere.addEventListener("click", () => deps.openGenerated?.());
 		}
-		const archives = ajouter(lateral, "button", "qbd-ai-lateral-item");
-		archives.type = "button";
-		host.ui.setIcon(ajouter(archives, "span", "qbd-ai-lateral-icone"), "archive");
-		ajouter(archives, "span", undefined, t("ai.side.archived"));
-		archives.addEventListener("click", () => ouvrirArchives());
+		poserListeChats(lateral);
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.

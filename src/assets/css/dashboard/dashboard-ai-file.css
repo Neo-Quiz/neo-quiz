@@ -657,7 +657,10 @@
 }
 .qbd-ai-lateral {
 	flex: none;
-	width: 188px;
+	width: 220px;
+	/* As tall as the page, never taller: the chats scroll inside it. */
+	min-height: 0;
+	max-height: 100%;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -695,80 +698,112 @@
 	height: 18px;
 }
 
-/* "Archived chats": the list, then a chat read back. */
+/* THE CHATS, under the entries (`chat-sidebar.ts`): by day, like claude.ai's,
+   scrolling on their own; the day in muted text, the chat in normal text. */
+.qbd-ai-chats {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	margin-top: 14px;
+	padding-bottom: 16px;
+	scrollbar-width: thin;
+}
+.qbd-ai-chats-jour {
+	padding: 16px 10px 6px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+.qbd-ai-chats > .qbd-ai-chats-jour:first-child {
+	padding-top: 4px;
+}
+.qbd-ai-chat-item {
+	display: flex;
+	align-items: center;
+	border-radius: 8px;
+}
+.qbd-ai-chat-item:hover,
+.qbd-ai-chat-item.is-active {
+	background: var(--background-modifier-hover);
+}
+.qbd-ai-chat-ouvrir {
+	flex: 1;
+	min-width: 0;
+	padding: 7px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-size: 14px;
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.qbd-ai-chat-item.is-active .qbd-ai-chat-ouvrir {
+	cursor: default;
+}
+/* Delete: shown on the chat under the mouse or the keyboard only. */
+.qbd-ai-chat-suppr {
+	display: inline-flex;
+	flex: none;
+	padding: 6px;
+	margin-right: 2px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	cursor: pointer;
+	visibility: hidden;
+}
+.qbd-ai-chat-item:hover .qbd-ai-chat-suppr,
+.qbd-ai-chat-suppr:focus-visible {
+	visibility: visible;
+}
+.qbd-ai-chat-suppr:hover {
+	color: var(--text-normal);
+}
+.qbd-ai-chat-suppr svg {
+	width: 15px;
+	height: 15px;
+}
+/* "Older": the folded section of what is past thirty days. */
+.qbd-ai-chats-ancien {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	margin-top: 10px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+.qbd-ai-chats-ancien:hover {
+	color: var(--text-normal);
+}
+.qbd-ai-chats-chevron {
+	display: inline-flex;
+}
+.qbd-ai-chats-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* A chat read back, read-only. */
 .qbd-archives-modal {
 	width: min(680px, calc(100vw - 32px));
 	height: min(560px, 80vh);
 }
 .qbd-archives-modal .modal-content {
 	overflow-y: auto;
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-.qbd-archives-vide {
-	padding: 24px 4px;
-	color: var(--text-muted);
-	text-align: center;
-}
-.qbd-archives-ligne {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-.qbd-archives-ouvrir {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-	padding: 8px 12px;
-	border: 0;
-	border-radius: 10px;
-	background: transparent !important;
-	box-shadow: none !important;
-	color: var(--text-normal);
-	text-align: left;
-	cursor: pointer;
-}
-.qbd-archives-ouvrir:hover {
-	background: var(--background-modifier-hover) !important;
-}
-.qbd-archives-titre {
-	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-weight: 600;
-}
-.qbd-archives-date {
-	font-size: 12px;
-	color: var(--text-muted);
-}
-.qbd-archives-suppr,
-.qbd-archives-retour {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	border: 0;
-	border-radius: 8px;
-	background: transparent !important;
-	box-shadow: none !important;
-	color: var(--text-muted);
-	cursor: pointer;
-}
-.qbd-archives-suppr {
-	padding: 8px;
-}
-.qbd-archives-retour {
-	align-self: flex-start;
-	padding: 6px 10px;
-}
-.qbd-archives-suppr:hover,
-.qbd-archives-retour:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal);
 }
 .qbd-archives-fil {
 	display: flex;

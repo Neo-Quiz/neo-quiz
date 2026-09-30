@@ -29,15 +29,15 @@ export function libreDeRepartir(file: FileGenerationApp): "oui" | "occupee" | "n
 
 /** Le bouton « Nouvelle demande » en tête du fil. Rend de quoi le remettre
     à jour quand la file change (désactivé, avec la raison en infobulle). */
-export function poserNouvelleDemande(parent: HTMLElement, file: FileGenerationApp, avantDeFermer?: () => void): () => void {
+export function poserNouvelleDemande(parent: HTMLElement, file: FileGenerationApp): () => void {
 	const b = ajouter(parent, "button", "qbd-ai-lateral-item");
 	b.type = "button";
 	currentHost().ui.setIcon(ajouter(b, "span", "qbd-ai-lateral-icone"), "square-pen");
 	ajouter(b, "span", undefined, t("ai.side.new"));
 	b.addEventListener("click", () => {
 		if (libreDeRepartir(file) !== "oui") return;
-		// What was said is kept in "Archived chats" before the list is emptied.
-		avantDeFermer?.();
+		/* The list emptied, the conversation ends: it was saved as it went
+		   (`chat-sidebar.ts`). */
 		// La liste vidée, la page (abonnée à la file) revient à l'accueil.
 		for (const l of [...file.lignes()]) file.fermer(l.id);
 	});

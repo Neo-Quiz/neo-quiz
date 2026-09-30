@@ -16,6 +16,7 @@ release notes.
 ### Changed
 - Generate always makes a quiz again: Enter and the arrow generate the Learn or Test you chose, and the chat is gone. A request that explicitly asks for no quiz ("no quiz, just explain") gets an answer in prose instead.
 - In the transcript of a generation, the text being written folds by itself past 15 lines; its heading keeps counting the lines, and a click unfolds it.
+- The Generate sidebar lists every chat under its day (Today, Yesterday, then the date), like claude.ai's, in a list that scrolls on its own; the chat on screen is saved as it goes and shown highlighted, chats older than thirty days wait in a folded Older section, and a click reads a chat back. The Archived chats entry is gone.
 
 ### Fixed
 - In the Explain window, a first message that fails or is stopped brings the prompt tile back, so that it can be sent again instead of leaving follow-ups without the question.
