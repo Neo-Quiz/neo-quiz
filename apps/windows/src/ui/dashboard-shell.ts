@@ -607,9 +607,22 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			const quiz = deps.scanner.getQuizzes();
 			/* The course folder of a key: the folder of any quiz filed under it
 			   (the key is the catalogue's, the documents are listed by path). */
+			const nfc = (s: string): string => s.normalize("NFC");
 			const dossierDe = (cle: string): string | undefined => {
-				const q = quiz.find(x => cleModule(x.path, currentHost().paths) === cle);
-				return q ? q.path.slice(0, q.path.lastIndexOf("/")) : undefined;
+				const paths = currentHost().paths;
+				const exact = quiz.find(x => cleModule(x.path, paths) === cle);
+				if (exact) return exact.path.slice(0, exact.path.lastIndexOf("/"));
+				/* A key written under another root id or another Unicode form
+				   (seen on screen 2026-09-30: "folder not found" for a course of
+				   eight quizzes): the folder is found by its NAME, the key's last
+				   segment, anywhere in a quiz's path. */
+				const nom = nfc(libelleModule(cle));
+				for (const x of quiz) {
+					const segments = x.path.split("/");
+					const i = segments.findIndex(s => nfc(s) === nom);
+					if (i >= 0 && i < segments.length - 1) return segments.slice(0, i + 1).join("/");
+				}
+				return undefined;
 			};
 			return Object.entries(examens())
 				.flatMap(([cle, liste]) => upcomingExams(liste, aujourdhui).map(e => ({ id: e.id, nom: e.nom, date: e.date, module: libelleModule(cle), dossier: dossierDe(cle) })))

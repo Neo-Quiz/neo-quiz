@@ -31,7 +31,7 @@ export function ouvrirDocumentsExam(opts: {
 			ajouter(m.contentEl, "p", "qbd-exam-docs-aide", t("ai.exam.docsHint"));
 			const liste = ajouter(m.contentEl, "div", "qbd-exam-docs-liste");
 			const actions = ajouter(m.contentEl, "div", "qbd-exam-docs-actions");
-			const fini = ajouter(actions, "button", "qb-btn", t("ai.exam.docsDone"));
+			const fini = ajouter(actions, "button", "qbd-exam-docs-fini", t("ai.exam.docsDone"));
 			fini.type = "button";
 			fini.addEventListener("click", () => modal.close());
 
