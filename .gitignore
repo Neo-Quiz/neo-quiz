@@ -84,3 +84,6 @@ apps/android/app/src/main/assets/web/
 apps/android/app/src/main/jniLibs/
 *.jks
 *.keystore
+
+# The embedded Syncthing binary (fetched by `npm run fetch:syncthing`, never committed).
+apps/windows/vendor/

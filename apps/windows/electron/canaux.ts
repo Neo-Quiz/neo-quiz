@@ -58,7 +58,7 @@ import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
 import type { MiseAJour } from "./mise-a-jour";
-import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
@@ -109,6 +109,9 @@ import type { BacASable } from "./code-sandbox";
 /* THE LANGUAGE PACKS (task 9): download, verify, install, delete — the pack
    is pinned in `langages.ts`; the renderer only names the language. */
 import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langages";
+/* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
+   `main.ts` (never from the window). Only the three verbs below reach it. */
+import type { GestionSync } from "./syncthing";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -159,6 +162,9 @@ export interface DependancesCanaux {
 	    `main.ts` — this file only relays calls to it. Only Python reaches it
 	    today; `c`/`cpp` answer `not-installed` until task 8. */
 	code: BacASable;
+	/** The embedded Syncthing, `null` where there is none (Linux): the `sync`
+	    channels are then not registered at all. */
+	sync: GestionSync | null;
 	/** Where the language packs live (`userData/languages`, the same
 	    directory `main.ts` gives the sandbox), fixed by `main.ts`: never a
 	    path from the renderer. */
@@ -490,6 +496,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   `systeme.choisirDossierDefaut` qui la pose — mais la porte générique
 		   reste ouverte, et une clé gardée nulle part est une clé libre. */
 		if (cle === CLE_DOSSIER_DEFAUT) await verifierDossierDefaut(perimetre, valeur);
+		/* `syncActif` decides whether a binary is launched at startup: only the
+		   main process writes it (after a first pairing). */
+		if (cle === CLE_SYNC_ACTIF) throw new Error("réglage refusé : syncActif n'est écrit que par le processus principal");
 		await reglagesOuErreur().ecrire(String(cle), valeur);
 	});
 
@@ -1438,6 +1447,23 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.miseAJourInstaller, () => {
 		if (deps.miseAJour.armerInstallation()) deps.fermerPourInstaller();
 	});
+
+	/* ─── THE SYNC (embedded Syncthing) ───
+	   THREE verbs and two pushes, nothing else. What comes from the window is
+	   one string, a device id, checked in the main process before it reaches a
+	   config (`syncthing.ts`); no path, port, folder id or REST call ever
+	   crosses, and neither does the API key. */
+	if (deps.sync) {
+		const sync = deps.sync;
+		ipcMain.handle(CANAUX.syncEtatLire, () => sync.etat());
+		ipcMain.handle(CANAUX.syncAppairer, (_e, id: unknown) =>
+			typeof id === "string" && id.length <= 80 ? sync.appairer(id) : "invalide");
+		ipcMain.handle(CANAUX.syncOublier, async (_e, id: unknown) => {
+			if (typeof id === "string" && id.length <= 80) await sync.oublier(id);
+		});
+		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
+		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));
+	}
 
 	/* ─── LES VIDÉOS YOUTUBE (tâche 4) ───
 	   Le rendu ne passe qu'un IDENTIFIANT de vidéo, et ce qui traverse

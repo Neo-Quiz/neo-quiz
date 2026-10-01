@@ -49,6 +49,8 @@
 import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun } from "../../../src/host/types";
 import type { CodeLanguage } from "../../../src/code-languages";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
+import type { EtatSync } from "../../../src/dashboard/sync-etat";
+export type { EtatSync } from "../../../src/dashboard/sync-etat";
 export type { EtatMiseAJour, PhaseMiseAJour } from "./mise-a-jour-etat";
 import type { EtatMiseAJour } from "./mise-a-jour-etat";
 /* Le type des NOMS d'outils que le principal accepte de lancer/installer.
@@ -372,6 +374,27 @@ export interface Pont {
 		/** Windows : le FICHIER copié dans le presse-papiers, Discord au
 		    premier plan (l'utilisateur colle). `false` si rien n'est parti. */
 		discord(nom: string, octets: Uint8Array): Promise<boolean>;
+	};
+
+	/**
+	 * THE SYNC of the quiz folder (embedded Syncthing, `./syncthing.ts`). Absent
+	 * where there is no embedded binary (Linux): the Sync page is then not
+	 * offered. The window reaches THREE verbs and two pushes, nothing more:
+	 * never a folder, a path, a port, the API key or any REST call. A device id
+	 * is validated in the main process before it reaches a config.
+	 */
+	sync?: {
+		/** The state; also what starts the embedded Syncthing the first time
+		    the Sync page asks (the page cannot show this device's id otherwise). */
+		etat(): Promise<EtatSync>;
+		/** Pairs a device by its id. `invalide`: not an id (format or check
+		    characters), or our own. `indisponible`: Syncthing is not running. */
+		appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible">;
+		oublier(deviceId: string): Promise<void>;
+		surEtat(rappel: (etat: EtatSync) => void): () => void;
+		/** Another device's changes to the folder have landed (idle after
+		    remote items): time to reload what is read from the folder. */
+		surDonneesRecues(rappel: () => void): () => void;
 	};
 
 	systeme: {
@@ -781,6 +804,12 @@ export const CANAUX = {
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",
 	partageDiscord: "neo:partage/discord",
+	syncEtatLire: "neo:sync/etat-lire",
+	syncAppairer: "neo:sync/appairer",
+	syncOublier: "neo:sync/oublier",
+	/* Pushed to the window: the state, and "other devices' changes landed". */
+	syncEtat: "neo:sync/etat",
+	syncDonneesRecues: "neo:sync/donnees-recues",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
@@ -921,6 +950,12 @@ export const CLE_DOSSIER_DEFAUT = "defaultFolder";
     n'a jamais transité par le sélecteur n'est simplement pas SERVABLE par
     `app:` (403), il ne donne aucun accès disque supplémentaire au rendu. */
 export const CLE_REGLAGES_FOND = "fond";
+
+/** Whether the embedded Syncthing starts with the application (`neo.reglages`).
+    Set to `true` by the MAIN process alone, after a first successful pairing
+    (`syncthing.ts`): the window never writes it (`canaux.ts` refuses), because
+    it decides whether a binary is launched at startup. Absent = false. */
+export const CLE_SYNC_ACTIF = "syncActif";
 
 /** La luminosité et le flou du fond d'écran (`neo.reglages`) : `{ luminosite:
     number; flou: number }`, relu par `normaliserEffetsFond`

@@ -205,6 +205,13 @@ jobs:
       - name: Shared state
         run: npm run check:shared-state
 
+      # THE EMBEDDED SYNCTHING: only the neo-quiz folder, only from a paired
+      # device, device ids validated, launch arguments with nothing but their
+      # parameters, every REST call carrying the key. (The real-binary section
+      # runs on Windows after `npm run fetch:syncthing`.)
+      - name: Embedded Syncthing rules
+        run: npm run check:electron-syncthing
+
       # THE HOME PAGE: a folder's tasks in order (review, Learn, Test),
       # mastered quizzes left out, folders by nearest exam then latest work,
       # the week from Monday, local midnights across daylight saving.

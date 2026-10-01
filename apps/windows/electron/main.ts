@@ -48,8 +48,10 @@ import { chargerPathRegistre } from "./process";
 import { surveillerCachesCli } from "./surveillant-cli";
 import { perimetreInitial } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
+import { creerGestionSync } from "./syncthing";
+import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
 import type { MiseAJour } from "./mise-a-jour";
 import { creerReglages } from "./reglages";
@@ -128,6 +130,8 @@ let reglages: Reglages | null = null;
     au démarrage — le canal `systeme.dossierDefaut` le sert tel quel. */
 let dossierDefaut = "";
 let miseAJour: MiseAJour | null = null;
+/** The embedded Syncthing (Windows only), stopped with the application. */
+let sync: GestionSync | null = null;
 let fermetureArmee = false;
 let fermetureEnCours = false;
 let gardeFermeture: NodeJS.Timeout | null = null;
@@ -719,6 +723,23 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   and the install channels, so they can never look in two places. */
 		const dossierLangages = path.join(app.getPath("userData"), "languages");
 		code = creerBacASable(path.join(__dirname, "code"), dossierLangages, path.join(__dirname, "code-preload.cjs"));
+		/* THE EMBEDDED SYNCTHING (task 6): Windows only. The binary is the
+		   packaged one (`resources/syncthing/`) or, unpackaged, the vendored
+		   one (`npm run fetch:syncthing`) — a path decided HERE, never from the
+		   window. Its home is its own folder under the user data. Started at
+		   launch only once sync was switched on (by a first pairing); the Sync
+		   page starts it on demand before that. */
+		if (process.platform === "win32") {
+			sync = creerGestionSync({
+				exe: app.isPackaged
+					? path.join(process.resourcesPath, "syncthing", "syncthing.exe")
+					: path.join(__dirname, "..", "vendor", "syncthing", "syncthing.exe"),
+				home: path.join(donnees, "syncthing"),
+				root: () => dossierDefaut,
+				lireActif: async () => (await reglagesOuErreur().lire(CLE_SYNC_ACTIF)) === true,
+				poserActif: () => reglagesOuErreur().ecrire(CLE_SYNC_ACTIF, true),
+			});
+		}
 		const canaux = enregistrerCanaux({
 			perimetre,
 			reglagesOuErreur,
@@ -738,6 +759,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				terminee: terminerFermeture,
 			},
 			miseAJour,
+			sync,
 			fermerPourInstaller: () => fenetre?.close(),
 			fenetre: {
 				prete: () => {
@@ -801,6 +823,9 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		// retarder. Sans argument — la mise à jour automatique ne se règle
 		// plus, elle est le seul mode (voir `mise-a-jour-etat.ts`).
 		miseAJour.initialiser();
+		/* After the window, like the other background work: a slow start of
+		   Syncthing must never delay it. A failure is logged, never fatal. */
+		void sync?.demarrerSiActif().catch(e => console.warn(LOG_PREFIX, "sync unavailable:", e));
 	}).catch(e => {
 		/* Le FILET FINAL (fix round 1) : sans lui, une exception n'importe où
 		   dans cette chaîne (réglages, périmètre, réseau, fenêtre) rejette une
@@ -829,6 +854,20 @@ app.on("window-all-closed", () => {
 	   inaccessible), on installe quand même, en silence comme avant. Une mise à
 	   jour sans fenêtre vaut mieux qu'une mise à jour empêchée. */
 	const armee = miseAJour;
-	void lancerFenetreMaj(armee.etat().version ?? "", currentLang()).finally(() => armee.installerArmee());
+	/* Syncthing is stopped BEFORE the installer runs: a running
+	   `resources/syncthing/syncthing.exe` would keep the installer from
+	   replacing the install folder. */
+	const arretSync = sync ? sync.arreter().catch(() => undefined) : Promise.resolve();
+	void Promise.all([lancerFenetreMaj(armee.etat().version ?? "", currentLang()), arretSync]).finally(() => armee.installerArmee());
+});
+/* Any other way out: stop the embedded Syncthing first (it asks the process to
+   shut down, then kills it after a few seconds), THEN quit for real. Without
+   it, the child would outlive the app and keep the install folder locked. */
+let syncArrete = false;
+app.on("before-quit", e => {
+	if (!sync || syncArrete) return;
+	e.preventDefault();
+	syncArrete = true;
+	void sync.arreter().catch(() => undefined).finally(() => app.quit());
 });
 app.on("browser-window-focus", () => miseAJour?.surFocus());

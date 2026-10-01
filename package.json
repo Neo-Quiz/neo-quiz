@@ -59,6 +59,8 @@
     "check:electron-reglages": "node scripts/check-electron-reglages.mjs",
     "check:electron-reseau": "node scripts/check-electron-reseau.mjs",
     "check:electron-process": "node scripts/check-electron-process.mjs",
+    "check:electron-syncthing": "node scripts/check-electron-syncthing.mjs",
+    "fetch:syncthing": "node scripts/fetch-syncthing.mjs",
     "check:electron-video": "node scripts/check-electron-video.mjs",
     "check:electron-langages": "node scripts/check-electron-langages.mjs",
     "build:language-pack": "node scripts/build-language-pack.mjs",
@@ -99,6 +101,7 @@
     "country-flag-icons": "^1.6.20",
     "json5": "^2.2.3",
     "mathlive": "^0.110.0",
+    "qrcode": "^1.5.4",
     "refractor": "^5.0.0"
   },
   "devDependencies": {
@@ -106,6 +109,7 @@
     "@codemirror/view": "^6.38.6",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@types/node": "^26.4.0",
+    "@types/qrcode": "^1.5.6",
     "esbuild": "^0.28.2",
     "linkedom": "^0.18.13",
     "typescript": "^7.0.2"

@@ -21,7 +21,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { CANAUX } from "./pont";
-import type { EtatFenetre, EtatMiseAJour, EvenementDisque, Pont } from "./pont";
+import type { EtatFenetre, EtatMiseAJour, EtatSync, EvenementDisque, Pont } from "./pont";
 
 /* Les rappels de fermeture, et l'écouteur UNIQUE qui les sert. Un écouteur par
    appel à `surFermeture` répondrait autant de fois au principal, qui détruirait
@@ -187,6 +187,24 @@ const pont: Pont = {
 		zoom: facteur => ipcRenderer.invoke(CANAUX.affichageZoom, facteur),
 		recharger: () => ipcRenderer.invoke(CANAUX.affichageRecharger),
 		outilsDev: () => ipcRenderer.invoke(CANAUX.affichageOutilsDev),
+	},
+
+	/* THE SYNC: three verbs, two pushes, and only on Windows (the main process
+	   registers the handlers only there). Nothing else of Syncthing crosses. */
+	sync: process.platform !== "win32" ? undefined : {
+		etat: () => ipcRenderer.invoke(CANAUX.syncEtatLire),
+		appairer: deviceId => ipcRenderer.invoke(CANAUX.syncAppairer, String(deviceId)),
+		oublier: deviceId => ipcRenderer.invoke(CANAUX.syncOublier, String(deviceId)),
+		surEtat(rappel) {
+			const ecouteur = (_e: unknown, etat: EtatSync): void => rappel(etat);
+			ipcRenderer.on(CANAUX.syncEtat, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.syncEtat, ecouteur); };
+		},
+		surDonneesRecues(rappel) {
+			const ecouteur = (): void => rappel();
+			ipcRenderer.on(CANAUX.syncDonneesRecues, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.syncDonneesRecues, ecouteur); };
+		},
 	},
 
 	miseAJour: {
