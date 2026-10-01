@@ -208,6 +208,7 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 	r.check("notes and raster images are kept, flattened; svg, exe, pdf, oversize are ignored",
 		[cls.notes.map(n => n.name), cls.images.map(i => i.name), cls.ignored], [["CM1.md"], ["x.png"], 4]);
 	r.check("an image name: path flattened, hidden dots stripped, no extension refused", [nomImageImportee("a/b/c.PNG"), nomImageImportee("..png"), nomImageImportee("x"), nomImageImportee("x.png.bat")], ["c.png", null, null, null]);
+	r.check("Windows device names are refused as imported names", [nomImageImportee("CON.png"), nomImageImportee("d/nul.jpg"), zip.nomNoteImportee("COM1.md"), zip.nomNoteImportee("console.md")], [null, null, null, "console"]);
 
 	// What a share carries.
 	r.check("embedded images are found: wikilink with size and heading, markdown, not URLs",

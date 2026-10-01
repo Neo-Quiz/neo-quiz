@@ -139,13 +139,16 @@ export function parseZip(bytes: Uint8Array): ZipEntry[] {
     interdits et les points de tête (fichier caché, `..`), et seul un `.md`
     passe : nos partages n'écrivent que des notes, et un `.exe` ou un `.lnk`
     reçu n'a rien à faire dans un dossier de cours. */
+/** Windows device names (`CON.png` would hang a read): refused as imported names. */
+const RESERVE_WINDOWS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
 export function nomNoteImportee(nomDansArchive: string): string | null {
 	const dernier = nomDansArchive.split(/[\\/]/).pop() ?? "";
 	if (!/\.md$/i.test(dernier)) return null;
 	const nom = dernier.slice(0, -3)
 		.replace(/[:*?"<>|\u0000-\u001f]/g, "-")
 		.replace(/^[\s.]+|[\s.]+$/g, "");
-	return nom.length > 0 && nom.length <= 150 ? nom : null;
+	return nom.length > 0 && nom.length <= 150 && !RESERVE_WINDOWS.test(nom) ? nom : null;
 }
 
 /* ── Reading a RECEIVED archive (2026-10-01). `parseZip` above walks the local
@@ -269,7 +272,7 @@ export function nomImageImportee(nomDansArchive: string): string | null {
 	const base = dernier.slice(0, point)
 		.replace(/[:*?"<>|\u0000-\u001f]/g, "-")
 		.replace(/^[\s.]+|[\s.]+$/g, "");
-	return base.length > 0 && base.length <= 150 ? `${base}.${ext}` : null;
+	return base.length > 0 && base.length <= 150 && !RESERVE_WINDOWS.test(base) ? `${base}.${ext}` : null;
 }
 
 /** What a received archive holds that may be imported: the notes (as text) and
