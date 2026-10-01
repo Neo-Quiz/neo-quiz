@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.view.WindowInsets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -43,7 +45,7 @@ class MainActivity : ComponentActivity() {
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
         setContent {
-            if (granted) AndroidView(factory = { appWebView }) else AndroidView(factory = { FirstRunScreen(it) })
+            if (granted) AndroidView(factory = { withNavBar() }) else AndroidView(factory = { FirstRunScreen(it) })
         }
         // Edge-to-edge is enforced from targetSdk 35. The insets are applied once, as padding of the
         // activity's content view (a listener on the WebView itself never fires: Compose's AndroidView
@@ -80,6 +82,17 @@ class MainActivity : ComponentActivity() {
                 appWebView.askBack { handled -> if (!handled) finish() }
             }
         })
+    }
+
+    /**
+     * The WebView above, the page's bottom tab bar under it. The bar is a native view because the
+     * overscroll stretch is drawn over the whole WebView: a bar inside the page stretched with it.
+     */
+    private fun withNavBar(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        addView(appWebView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(appWebView.navBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
     /**

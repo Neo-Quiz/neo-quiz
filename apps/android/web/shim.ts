@@ -30,6 +30,10 @@ declare global {
 			/** Where the renderer builds the URLs of quiz images (`electron/ressources.ts`); Kotlin serves it (`ResourceRoute.kt`). */
 			resourceBase: string;
 			surRetour(gestionnaire: () => boolean): void;
+			/** Publishes the bottom tab bar's state; Kotlin draws it outside the WebView (`NavBarView.kt`). */
+			barre(etat: unknown): void;
+			/** A tap on a tab of that native bar: its index. */
+			surBarreClic(rappel: (index: number) => void): void;
 		};
 	}
 }
@@ -296,4 +300,7 @@ abonner<void>("android.retour", () => {
 	}
 	void appeler("android.retourTraite", [traite]).catch(() => {});
 });
-window.neoPlatform = { mobile: true, resourceBase: `${location.origin}/neo-res/`, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; } };
+window.neoPlatform = { mobile: true, resourceBase: `${location.origin}/neo-res/`, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; },
+	barre: (etat) => { void appeler("android.barre", [etat]).catch(() => {}); },
+	surBarreClic: (rappel) => { abonner<number>("android.barreClic", rappel); },
+};

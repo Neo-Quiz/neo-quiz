@@ -621,3 +621,79 @@ html.nq-mobile body {
 		touch-action: manipulation;
 	}
 }
+
+/* ══════════════════════════════════════════════════════════
+   THE BAR IS NATIVE (ui/barre-native.ts, NavBarView.kt)
+
+   Kotlin draws the tab bar under the WebView, so the stretch overscroll (drawn
+   over the whole WebView) moves the content and not the bar. The page's own
+   bar is hidden, and nothing reserves room for it any more: the viewport
+   already stops above it.
+   ══════════════════════════════════════════════════════════ */
+.nq-bar-native .is-mobile .qbd-sidebar {
+	display: none;
+}
+
+.nq-bar-native .is-mobile #neo-quiz-root > .qbd-layout {
+	padding-bottom: 0;
+}
+
+.nq-bar-native .is-mobile .qbd-qz-body--sheet > .qbd-qz-list {
+	bottom: 0;
+}
+
+.nq-bar-native .is-mobile .qbd-qz-list-scrim {
+	inset: 0;
+}
+
+.nq-bar-native .is-mobile .qbd-qz-list-toggle {
+	bottom: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   SETTINGS IS A PAGE ON A PHONE
+
+   The Settings modal fills the screen and scrolls as the DOCUMENT (the page
+   behind it is taken out of the layout while it is open), so it gets the
+   native stretch like every other page. A dialog's inner scroller never does.
+   ══════════════════════════════════════════════════════════ */
+body.is-mobile:has(.nq-reglages-modal) #neo-quiz-root {
+	display: none;
+}
+
+.is-mobile .modal-container:has(> .nq-reglages-modal) {
+	position: absolute;
+	inset: 0 0 auto 0;
+	min-height: 100vh;
+	padding: 0;
+	align-items: stretch;
+	background: var(--nq-bottom-bar-bg);
+}
+
+.is-mobile .modal-container:has(> .nq-reglages-modal) > .modal-bg {
+	display: none;
+}
+
+.is-mobile .modal-container > .nq-reglages-modal {
+	width: 100%;
+	height: auto;
+	min-height: 100vh;
+	max-height: none;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.is-mobile .nq-reglages-modal .modal-content {
+	overflow: visible;
+}
+
+.is-mobile .nq-set {
+	display: block;
+	height: auto;
+}
+
+.is-mobile .nq-set-volet {
+	overflow: visible;
+}

@@ -13,6 +13,7 @@ object Channels {
         "android.retourTraite",
         "android.calendrier",
         "android.revisionDemandee",
+        "android.barre",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",

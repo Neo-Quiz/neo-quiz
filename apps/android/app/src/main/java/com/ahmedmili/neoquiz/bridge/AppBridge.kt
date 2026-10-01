@@ -10,6 +10,7 @@ import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.sync.SyncChannel
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
+import com.ahmedmili.neoquiz.ui.NavBarView
 import com.ahmedmili.neoquiz.ui.PairConfirmDialog
 import com.ahmedmili.neoquiz.ui.QrScanner
 import java.io.File
@@ -27,6 +28,8 @@ class AppBridge(
     private val qr: QrScanner,
     private val back: BackChannel,
     private val perimeter: Perimeter,
+    /** The native bottom tab bar (`NavBarView`); the activity places it under the WebView. */
+    val navBar: NavBarView,
 ) {
     /** The image behind a `/neo-res/` URL, or `null` when the perimeter or the type allow-list refuses it. */
     fun resource(url: String): ResourceFile? = ResourceRoute.resolve(url, perimeter)
@@ -103,12 +106,13 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val syncChannel = SyncChannel(hub, qr::scan)
 
     val backChannel = BackChannel { bridge?.emit("android.retour", null) }
+    val navBar = NavBarView(activity).apply { onTap = { i -> bridge?.emit("android.barreClic", i) } }
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
         Unavailable.handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar).handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter)
+    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar)
 }

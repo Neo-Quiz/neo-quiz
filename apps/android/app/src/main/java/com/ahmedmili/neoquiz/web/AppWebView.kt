@@ -37,6 +37,9 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
     private val app = createAppBridge(activity, scope)
     private val bridge = app.bridge
 
+    /** The native bottom bar the page drives (`android.barre`); the activity lays it out under this view. */
+    val navBar get() = app.navBar
+
     private val assetLoader = WebViewAssetLoader.Builder()
         .setDomain(HOST)
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(activity))
