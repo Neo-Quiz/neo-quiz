@@ -25,7 +25,7 @@ export const EN_SETTINGS = {
 
 	/* ── Settings › Sync (task 6 of the Android v1 plan): the Sync page, shared by the apps ── */
 	"settings.sync.title": "Sync",
-	"settings.sync.hint": "Keeps your quiz folder identical on all your devices, directly between them, with no account and no server of ours. Add each device on the other one: one side shows its code, the other types it.",
+	"settings.sync.hint": "Keeps your quiz folder identical on all your devices, directly between them, with no account and no server of ours. Add each device on the other one: one side shows its code, the other types it. It runs on Syncthing (open source), built into Neo Quiz: nothing else to install, which is why Windows may name Syncthing when it asks for permission.",
 	"settings.sync.thisDevice": "This device",
 	"settings.sync.thisDeviceHint": "Give this code to your other devices, or let them scan the picture.",
 	"settings.sync.idLabel": "Device code",
