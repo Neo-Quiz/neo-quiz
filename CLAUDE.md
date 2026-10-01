@@ -56,9 +56,14 @@ servir de mémoire du projet, au moins pour les plans ; à chaque fois je dois
 dire de mettre à jour les tâches, c'est épuisant »). Règles, **sans jamais
 attendre qu'Ahmed le demande** :
 
-- **La forme de la note** (réorganisée le 2026-09-29, à la demande d'Ahmed) :
-  chaque version est un simple titre `## <span class="num">N.</span> Version
-  suivante `desktop-vX.Y.Z`` — plus de callout `[!goal]`. Sous ce titre,
+- **La forme de la note** (réorganisée le 2026-09-29, à la demande d'Ahmed ;
+  titre fixe depuis le 2026-10-01) : sous `# Version en cours`, UN SEUL titre
+  fixe, `## <span class="plan-en-cours">Plan en cours</span>` (ambre, la
+  couleur de `plan-active`, règle `.plan-en-cours` de `callouts.css`) — plus
+  de titre `N. Version suivante desktop-vX.Y.Z` par version : un correctif
+  sort parfois plusieurs fois par jour et le titre était périmé en quelques
+  heures, alors que `CHANGELOG.md` dit déjà ce que contient chaque version.
+  Plus de callout `[!goal]` non plus. Sous ce titre,
   chaque plan est un callout de premier niveau : `> [!plan-active]+` (en
   cours), `> [!plan-paused]-` (commencé puis mis en pause — ajouté le
   2026-09-29), `> [!plan]-` (pas commencé), `> [!plan-done]-` (terminé).
@@ -67,8 +72,8 @@ attendre qu'Ahmed le demande** :
   style vit dans le snippet `callouts.css` du vault.
   Les lignes isolées (à faire, bugs, idées, fait hors plan) forment une liste
   sous le titre, rangée par intertitres en gras.
-- **Au début d'une session** sur un chantier : lire le titre de la version en
-  cours et le callout `[!plan-active]` du chantier avant tout — c'est là, pas
+- **Au début d'une session** sur un chantier : lire « Plan en
+  cours » et le callout `[!plan-active]` du chantier avant tout — c'est là, pas
   dans `memory/`, que vit l'état du plan.
 - **Dès qu'un plan est commité** : ses N tâches y sont écrites en entier, une
   ligne `- [ ] <span class="num">TN.</span> **titre** : une phrase` par tâche,
