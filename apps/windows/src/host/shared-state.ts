@@ -58,6 +58,9 @@ export type ExamPair = readonly [string, string, boolean?];
 
 export interface SharedState {
 	load(): Promise<void>;
+	/** Reads again the files other devices wrote since `load()`; see the
+	    implementation for the `adoptStats` contract. */
+	refresh(adoptStats?: () => boolean): Promise<void>;
 	/** The merged exams of every loaded root. */
 	exams(): Record<string, ExamenDossier[]>;
 	/** The stats records folded from the merged attempts. */
@@ -148,8 +151,13 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		try { return readExamTable(JSON.parse(await fs.read(path)), root); } catch { return null; }
 	}
 
-	async function loadRoot(root: string): Promise<RootState> {
-		const state: RootState = { own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
+	/** `keep`: a refresh. OUR files are not read again (memory is the truth
+	    for what this device wrote, and an unreadable own file must not block
+	    the refresh), only the other devices' are. */
+	async function loadRoot(root: string, keep?: RootState): Promise<RootState> {
+		const state: RootState = keep
+			? { own: keep.own, others: [], ownEvents: keep.ownEvents, otherEvents: [], needsNewline: keep.needsNewline }
+			: { own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
 		const examDir = dir(root, EXAMS_DIR);
 		const names = new Set((await fs.list(examDir)).map(baseName));
 		const ownName = `${deviceId}.json`;
@@ -163,6 +171,7 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 			else if (n.endsWith(".json.tmp") && !names.has(n.slice(0, -4))) sources.add(n.slice(0, -4));
 		}
 		for (const n of sources) {
+			if (keep && n === ownName) continue;
 			const main = `${examDir}/${n}`;
 			let table: Record<string, StoredExam[]> | null = null;
 			let raw = "";
@@ -190,7 +199,7 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		const ownAtt = `${deviceId}.jsonl`;
 		for (const full of await fs.list(attDir)) {
 			const n = baseName(full);
-			if (!n.endsWith(".jsonl") || isConflictCopy(n)) continue;
+			if (!n.endsWith(".jsonl") || isConflictCopy(n) || (keep && n === ownAtt)) continue;
 			let text: string;
 			try { text = await fs.read(`${attDir}/${n}`); } catch (e) {
 				if (n === ownAtt) throw e; // never append to a file we could not read
@@ -233,6 +242,30 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		});
 		resnapshot();
 	}
+
+	/** Re-reads the OTHER devices' files of every loaded root (Syncthing
+	    delivered something). Runs in the write queue, so it never interleaves
+	    with a write. `adoptStats` is called right after, in the same queue slot:
+	    the stats store reloads its table from `stats()` and answers `true`, and
+	    only then does the diff base of `syncStats` move with it. Moving it
+	    while the store still holds an older table would make the next save
+	    DELETE the attempts of other devices the store has never seen; so a
+	    store with a save pending answers `false` and keeps its base (it will
+	    pick the new attempts up at the next refresh). A root that cannot be
+	    read keeps what it had. */
+	const refresh = (adoptStats?: () => boolean): Promise<void> => enqueue(async () => {
+		for (const [root, previous] of [...loaded]) {
+			if (!known(root)) continue;
+			try {
+				const fresh = await loadRoot(root, previous);
+				roots.set(root, Promise.resolve(fresh));
+			} catch (e) {
+				console.warn(`${LOG_PREFIX} refresh failed for ${root}, kept as it was:`, e);
+			}
+		}
+		examsCache = null;
+		if (adoptStats?.()) resnapshot();
+	});
 
 	function exams(): Record<string, ExamenDossier[]> {
 		return examsCache ??= mergeExams([...loaded.values()].flatMap(s => [s.own, ...s.others]));
@@ -407,7 +440,7 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		return skipped;
 	});
 
-	return { load, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
+	return { load, refresh, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
 }
 
 /* ══════════════════════════════════════════════════════════

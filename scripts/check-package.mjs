@@ -25,6 +25,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readFile } from "node:fs/promises";
 import { makeReporter } from "./lib/load-src.mjs";
 import { reecrireLatestYml } from "./update-info-after-signing.mjs";
+import { SYNCTHING } from "./syncthing-pins.mjs";
 
 /* `signtoolOptions.publisherName` n'est pas encore posé : le CN du
    certificat ne se lit que dans le journal CI, sur le premier exe signé par
@@ -111,6 +112,19 @@ r.check("la fenêtre Linux est associée à son entrée .desktop",
 r.check("files exclut node_modules et les sourcemaps",
 	[config.files.includes("!node_modules/**"), config.files.includes("!dist-electron/**/*.map")],
 	[true, true]);
+r.check("Windows embeds the pinned Syncthing beside the asar, Linux does not",
+	[JSON.stringify(config.win?.extraResources), config.linux?.extraResources ?? null, config.extraResources ?? null],
+	[JSON.stringify([{ from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }]), null, null]);
+r.check("the pin names the version the zip name and URL carry",
+	[SYNCTHING.zipName.includes(SYNCTHING.version), SYNCTHING.zipUrl.includes(`v${SYNCTHING.version}/${SYNCTHING.zipName}`), SYNCTHING.exeEntry.includes(`v${SYNCTHING.version}/`)],
+	[true, true, true]);
+r.check("the pin carries two SHA-256", [/^[0-9a-f]{64}$/.test(SYNCTHING.zipSha256), /^[0-9a-f]{64}$/.test(SYNCTHING.exeSha256)], [true, true]);
+/* The vendored binary, when fetched, is the pinned one (git-ignored, so the
+   only thing standing between a stale or swapped file and the installer). */
+const exeVendored = `${appWindows}vendor/syncthing/syncthing.exe`;
+if (existsSync(exeVendored)) {
+	r.check("vendored syncthing.exe matches its pin", createHash("sha256").update(readFileSync(exeVendored)).digest("hex"), SYNCTHING.exeSha256);
+}
 r.check("la désinstallation garde les données", config.nsis?.deleteAppDataOnUninstall, false);
 /* L'INSTALLATION EST PAR UTILISATEUR, ET CE CAS EXISTE POUR QU'ELLE LE RESTE.
 
@@ -190,6 +204,12 @@ if (existsSync(asar)) {
 	p.check("les deux sorties sont là",
 		[chemins.includes("/dist-electron/main.cjs"), chemins.includes("/dist-electron/preload.cjs"), chemins.includes("/dist/index.html")],
 		[true, true, true]);
+	/* The packaged Syncthing is the pinned binary, byte for byte. */
+	const exePaquet = `${appWindows}dist-installer/win-unpacked/resources/syncthing/syncthing.exe`;
+	p.check("syncthing.exe is packaged beside the asar", existsSync(exePaquet), true);
+	if (existsSync(exePaquet)) {
+		p.check("the packaged syncthing.exe matches its pin", createHash("sha256").update(readFileSync(exePaquet)).digest("hex"), SYNCTHING.exeSha256);
+	}
 	for (const f of ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]) {
 		p.check(`Embedded Pyodide: ${f}`, chemins.some(c => c.endsWith(`/dist-electron/code/pyodide/${f}`)), true);
 	}

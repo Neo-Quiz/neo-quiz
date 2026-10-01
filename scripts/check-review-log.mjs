@@ -323,6 +323,26 @@ await withSrcModule(["src/review/journal-set.ts", "src/scheduler/index.ts"], asy
 		set.destroy();
 	});
 
+	await essayer("cas 4b (second load(): a device file that synced in later is read, nothing twice)", async () => {
+		const fs = fsMemoire({
+			[`${DIR}/A.jsonl`]: ligne("a.md::q1", 1),
+			[`${DIR}/B.jsonl`]: ligne("a.md::q2", 2),
+		});
+		const set = creer(fs, "A");
+		await set.load();
+		set.append([{ t: "answer", q: "a.md::own", at: 9, grade: "correct" }]);
+		// Syncthing delivers: B grew, and a third device's file appeared.
+		fs.fichiers.set(`${DIR}/B.jsonl`, ligne("a.md::q2", 2) + ligne("a.md::q5", 5));
+		fs.fichiers.set(`${DIR}/C.jsonl`, ligne("a.md::q6", 6));
+		await set.load();
+		r.check("the new lines of B and the new file C are read; our unwritten line is kept",
+			set.lines().map(l => l.at), [1, 2, 5, 6, 9]);
+		await set.load();
+		r.check("a third load changes nothing (no device file read twice)", set.lines().map(l => l.at), [1, 2, 5, 6, 9]);
+		set.destroy();
+		await attendreEcritures();
+	});
+
 	await essayer("cas 5 (jamais de copie de l'ancien vers un fichier d'appareil)", async () => {
 		const fs = fsMemoire({ [ancien]: ligne("a.md::q1", 1) + ligne("a.md::q2", 2) });
 		const set = creer(fs);

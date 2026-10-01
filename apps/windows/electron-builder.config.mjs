@@ -92,6 +92,14 @@ export default async function () {
 		win: {
 			target: "nsis",
 			icon: "icons/icon.ico",
+			/* THE EMBEDDED SYNCTHING (task 6 of the Android v1 plan): the pinned
+			   official binary, fetched and hash-checked by `npm run
+			   fetch:syncthing` (never committed), copied BESIDE the asar so it
+			   can be executed. `electron/main.ts` launches exactly
+			   `resources/syncthing/syncthing.exe`; `check:package` compares its
+			   SHA-256 with the pin. Windows only: Linux builds do not carry it
+			   and the app offers no Sync page there. */
+			extraResources: [{ from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }],
 			// Sans espace : un nom qu'on `curl` sans guillemets depuis la release.
 			artifactName: "neo-quiz-setup-${version}.${ext}",
 			/* `signtoolOptions.publisherName` (lu par electron-updater dans

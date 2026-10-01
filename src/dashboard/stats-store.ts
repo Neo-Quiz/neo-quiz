@@ -55,6 +55,11 @@ export interface StatsStoreHost {
 
 export interface StatsStore {
 	load(): void;
+	/** Takes the host's table again (other devices' attempts arrived through
+	    the synced folder). Refuses, returning `false`, while a save of ours is
+	    still pending: replacing the table then would drop the attempt that
+	    save is about to write. Returns `true` when the table was replaced. */
+	reload(): boolean;
 	updateRecord(path: string, update: StatsRecord): QuizStatRecord;
 	getRecord(path: string): QuizStatRecord | null;
 	getAll(): Record<string, QuizStatRecord>;
@@ -129,6 +134,12 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 	/* ── Charger les stats depuis l'hôte ── */
 	function load(): void {
 		data = host.getStats();
+	}
+
+	function reload(): boolean {
+		if (saveTimer) return false;
+		data = host.getStats();
+		return true;
 	}
 
 	/* ── Debounced save ── */
@@ -273,6 +284,7 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 
 	return {
 		load,
+		reload,
 		updateRecord,
 		getRecord,
 		getAll,

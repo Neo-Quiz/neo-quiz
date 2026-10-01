@@ -26,7 +26,7 @@
    or at launch if sync was already switched on by a first pairing.
 ══════════════════════════════════════════════════════════ */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
@@ -99,6 +99,20 @@ function portLibre(port: number): Promise<boolean> {
 	});
 }
 
+/** Kills the process AND its children. On Windows Syncthing 2.x runs as a pair
+    (a wrapper process and the real one, both with the same command line, the
+    real one being a child of the first, observed on 2.1.5 even with
+    `--no-restart`): killing the wrapper alone would leave the real one
+    running, holding the port and the folder. `taskkill /T` takes the tree. */
+function tuerArbre(child: ChildProcess): void {
+	if (child.pid === undefined) return;
+	if (process.platform === "win32") {
+		spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+	} else {
+		child.kill("SIGKILL");
+	}
+}
+
 interface Lancement {
 	child: ChildProcess;
 	rest: Rest;
@@ -146,7 +160,7 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 		return { child, rest, ownId, fini };
 	} catch (e) {
 		/* Never leave the process behind a failed start. */
-		child.kill();
+		tuerArbre(child);
 		await Promise.race([fini, pause(3000)]);
 		throw e;
 	}
@@ -210,8 +224,8 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				if (detecteur.observer(ev)) recu = true;
 				/* The name Syncthing reports for a device that connected, kept
 				   when we have none yet (a device paired by id has no name). */
-				if (ev.type === "DeviceConnected" && typeof ev.data?.device === "string" && typeof ev.data.deviceName === "string" && ev.data.deviceName.trim()) {
-					const cfg = (await rest.devices()).find(d => d.deviceID === ev.data!.device);
+				if (ev.type === "DeviceConnected" && typeof ev.data?.id === "string" && typeof ev.data.deviceName === "string" && ev.data.deviceName.trim()) {
+					const cfg = (await rest.devices()).find(d => d.deviceID === ev.data!.id);
 					if (cfg && !cfg.name) await rest.putDevice({ ...cfg, name: ev.data.deviceName.trim().slice(0, 64) });
 				}
 			}
@@ -232,6 +246,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			await diffuser();
 			if (recu) for (const a of abonnesDonnees) a();
 		} catch (e) {
+			if (arrete) return; // the shutdown cut the call: expected
 			console.warn("[syncthing] poll failed:", e instanceof Error ? e.message : String(e));
 		} finally {
 			enTick = false;
@@ -312,7 +327,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			try { await rest.shutdown(); } catch { /* it may already be gone */ }
 			const parti = await Promise.race([fini.then(() => true), pause(5000).then(() => false)]);
 			if (!parti) {
-				child.kill();
+				tuerArbre(child);
 				await Promise.race([fini, pause(3000)]);
 			}
 		},

@@ -26,8 +26,12 @@ import { deviceLogName, isConflictCopy } from "./paths";
    Conflict copies of a device file (`A.sync-conflict-*.jsonl`) are ignored,
    neither read nor deleted.
 
-   The directory is listed once, at `load()`: a device file that syncs in
-   later is read at the next start.
+   The directory is listed at EVERY `load()`: a device file that syncs in
+   later is picked up by calling `load()` again (the app does, when Syncthing
+   reports that another device's changes landed). A second `load()` re-reads
+   each file (`createLogFile.load` merges what it reads with what it holds, so
+   our own lines still waiting to be written survive) and never opens a file
+   twice: the set of known paths outlives a call.
 ══════════════════════════════════════════════════════════ */
 
 export interface JournalSetDeps {
@@ -44,6 +48,8 @@ export function createJournalSet(deps: JournalSetDeps): LogFile {
 	const own = createLogFile({ fs: deps.fs, path: ownPath });
 	const legacy = createLogFile({ fs: deps.fs, path: deps.legacyPath });
 	const others: LogFile[] = [];
+	/** Paths already opened, across `load()` calls. */
+	const known = new Set<string>([ownPath]);
 	let listed = false;
 	let destroyed = false;
 	let cache: LogLine[] | null = null;
@@ -53,7 +59,6 @@ export function createJournalSet(deps: JournalSetDeps): LogFile {
 	async function load(): Promise<void> {
 		let names: string[] = [];
 		try { names = await deps.fs.list(deps.dir); } catch { /* missing directory = no device file yet */ }
-		const known = new Set<string>([ownPath]);
 		for (const full of names) {
 			const name = full.slice(full.lastIndexOf("/") + 1);
 			if (!name.endsWith(".jsonl") || isConflictCopy(name)) continue;

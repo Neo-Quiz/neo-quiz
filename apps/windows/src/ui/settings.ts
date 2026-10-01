@@ -35,12 +35,15 @@ import { monterReglagesComptes } from "./comptes";
 import { mountLanguagePackSettings } from "./language-packs";
 import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
+import { monterSync } from "../../../../src/dashboard/sync-page";
 
-type Category = "general" | "folders" | "ai" | "appearance" | "languages";
+type Category = "general" | "folders" | "sync" | "ai" | "appearance" | "languages";
 
 const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
 	{ id: "general", icon: "sliders-horizontal", label: "app.settings.general" },
 	{ id: "folders", icon: "folder", label: "app.settings.navFolders" },
+	/* Only where the bridge has the embedded Syncthing (Windows). */
+	{ id: "sync", icon: "refresh-cw", label: "settings.sync.title" },
 	{ id: "ai", icon: "sparkles", label: "app.settings.navAi" },
 	{ id: "appearance", icon: "image", label: "app.settings.navAppearance" },
 	{ id: "languages", icon: "code", label: "settings.languages.title" },
@@ -124,7 +127,25 @@ export function renderSettings(
 
 	const tabs = new Map<Category, HTMLButtonElement>();
 	const pages = new Map<Category, HTMLElement>();
-	for (const c of CATEGORIES) {
+	const sync = pont().sync;
+	/* The Sync page is mounted the FIRST TIME its tab is shown, not when the
+	   settings open: reading its state is what starts the embedded Syncthing,
+	   and opening the settings for the language must not launch a binary. */
+	let demonterSync: () => void = () => undefined;
+	let syncMonte = false;
+	function monterSyncUneFois(): void {
+		if (!sync || syncMonte) return;
+		syncMonte = true;
+		demonterSync = monterSync(pages.get("sync")!, {
+			etat: () => sync.etat(),
+			appairer: id => sync.appairer(id),
+			oublier: id => sync.oublier(id),
+			surEtat: rappel => sync.surEtat(rappel),
+			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
+		});
+	}
+	const categories = CATEGORIES.filter(c => c.id !== "sync" || sync);
+	for (const c of categories) {
 		const tab = ajouter(nav, "button", "nq-set-onglet");
 		tab.type = "button";
 		tab.id = `nq-set-onglet-${c.id}`;
@@ -152,12 +173,13 @@ export function renderSettings(
 			pages.get(c)!.hidden = !on;
 		}
 		pane.scrollTop = 0;
+		if (id === "sync") monterSyncUneFois();
 	}
 
 	/* Up and down arrows move between the categories, as in any vertical
 	   tab list; Home and End jump to the ends. */
 	nav.addEventListener("keydown", e => {
-		const ids = CATEGORIES.map(c => c.id);
+		const ids = categories.map(c => c.id);
 		const i = ids.indexOf(lastCategory);
 		const next = e.key === "ArrowDown" ? ids[(i + 1) % ids.length]
 			: e.key === "ArrowUp" ? ids[(i - 1 + ids.length) % ids.length]
@@ -468,7 +490,7 @@ export function renderSettings(
 	const languagesPage = pages.get("languages")!;
 	const demonterLangages = mountLanguagePackSettings(section(languagesPage, null, t("settings.languages.hint")));
 
-	show(lastCategory);
+	show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
 		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];
 		viserPrompt = null;
@@ -479,5 +501,5 @@ export function renderSettings(
 	   2026-09-17, and the only subscription left is the rail's, which lives
 	   as long as the shell. One is returned anyway because EVERY screen
 	   returns one. */
-	return () => { demonterComptes(); demonterFond(); demonterLangages(); root.replaceChildren(); };
+	return () => { demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
 }

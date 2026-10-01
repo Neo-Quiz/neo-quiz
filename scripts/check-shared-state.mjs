@@ -306,5 +306,46 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 		r.check("the failed load was not cached: the next call retries, and the save keeps the old exam",
 			json(fs, "Efrei/.neo-quiz/exams/dev.json")["Efrei/M"].map(e => e.id).sort(), ["k", "n"]);
 	}
+	// 11. refresh(): another device's files that synced in AFTER the load.
+	{
+		const fs = memFs();
+		const add = (path, date, pct, at) => JSON.stringify({ t: "add", path, attempt: { date, pct }, at }) + "\n";
+		const st = make(fs, "dev", ["Efrei"]); await st.load();
+		await st.recordAttempt("Efrei/q.md", { date: 10, pct: 50 });
+		await st.saveExam("Efrei/M", exam("mine", "2026-01-01"));
+		r.check("before: only our own data", [st.exams()["Efrei/M"].map(e => e.id), st.stats()["Efrei/q.md"].tentatives.map(t => t.date)], [["mine"], [10]]);
+		// Syncthing delivers another device's files (and a new attempt of the same quiz).
+		fs.files.set("Efrei/.neo-quiz/exams/other.json", JSON.stringify({ "Efrei/M": [{ id: "theirs", nom: "theirs", date: "2026-02-02", modifiedAt: 5_000_000 }] }));
+		fs.files.set("Efrei/.neo-quiz/attempts/other.jsonl", add("Efrei/q.md", 20, 80, 5));
+		r.check("without refresh the state does not move", [st.exams()["Efrei/M"].length, st.stats()["Efrei/q.md"].tentatives.length], [1, 1]);
+		let adopted = 0;
+		await st.refresh(() => { adopted++; return true; });
+		r.check("refresh: the other device's exam and attempt appear, ours stay",
+			[st.exams()["Efrei/M"].map(e => e.id).sort(), st.stats()["Efrei/q.md"].tentatives.map(t => t.date)], [["mine", "theirs"], [20, 10]]);
+		r.check("refresh calls the stats hook once, after the reload", adopted, 1);
+		// The stats store took the folded table: a save of it writes NOTHING (nothing was added or deleted).
+		const n = fs.writes.length;
+		await st.syncStats(st.stats());
+		r.check("after adopting, saving the stats table writes nothing", fs.writes.length - n, 0);
+		r.check("our own files were not rewritten by the refresh",
+			[json(fs, "Efrei/.neo-quiz/exams/dev.json")["Efrei/M"].map(e => e.id), lines(fs, "Efrei/.neo-quiz/attempts/dev.jsonl").length], [["mine"], 1]);
+		// A stats store with a save still pending refuses the hook: its table lacks the new attempt,
+		// and the diff base must NOT move, or saving would delete the other device's attempt.
+		fs.files.set("Efrei/.neo-quiz/attempts/third.jsonl", add("Efrei/q.md", 30, 90, 6));
+		await st.refresh(() => false);
+		const stale = st.stats(); delete stale["Efrei/q.md"].tentatives; 
+		const before = lines(fs, "Efrei/.neo-quiz/attempts/dev.jsonl").length;
+		const table = { "Efrei/q.md": { bestScore: 80, questionsDone: 0, totalQuestions: 0, lastPlayed: 20, attempts: 2, tentatives: [{ date: 20, pct: 80 }, { date: 10, pct: 50 }] } };
+		await st.syncStats(table);
+		r.check("a refused hook leaves the diff base: no delete event for the attempt the store never saw",
+			lines(fs, "Efrei/.neo-quiz/attempts/dev.jsonl").slice(before).filter(e => e.t === "del"), []);
+		// Our own unreadable file never blocks a refresh, and nothing of ours is re-read.
+		fs.files.set("Efrei/.neo-quiz/exams/late.json", JSON.stringify({ "Efrei/M": [{ id: "late", nom: "late", date: "2026-03-03", modifiedAt: 6_000_000 }] }));
+		const real = fs.read;
+		fs.read = async (p) => { if (p.endsWith("attempts/dev.jsonl") || p.endsWith("exams/dev.json")) throw new Error("locked"); return real(p); };
+		await st.refresh(() => true);
+		fs.read = real;
+		r.check("refresh never re-reads our own files (an unreadable one does not block it)", st.exams()["Efrei/M"].map(e => e.id).sort(), ["late", "mine", "theirs"]);
+	}
 	r.done();
 });

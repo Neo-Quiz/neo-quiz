@@ -563,6 +563,34 @@ async function demarrer(): Promise<void> {
 		   s'était arrêté. À côté du journal et des stats, un troisième
 		   système distinct (voir `review/sessions.ts`). */
 		const sessions = await creerSessionsApp();
+		/* OTHER DEVICES' CHANGES LANDED (the embedded Syncthing went back to
+		   idle after receiving files): the journals and the shared state are
+		   read from the synced folder only at load time, so without this the
+		   answers, attempts and exams of the other devices would stay
+		   invisible until the next start. The shell repaints afterwards. One
+		   reload at a time: events that arrive during one ask for one more. */
+		let rechargeEnCours = false;
+		let rechargeDemandee = false;
+		const rechargerApresSync = async (): Promise<void> => {
+			if (rechargeEnCours) { rechargeDemandee = true; return; }
+			rechargeEnCours = true;
+			try {
+				do {
+					rechargeDemandee = false;
+					await store.load();
+					/* `stats.reload()` refuses while a save of the store's own is
+					   pending; the shared state then keeps its diff base (see
+					   `SharedState.refresh`). */
+					await sharedState().refresh(() => stats.reload());
+				} while (rechargeDemandee);
+				demonterCourant?.repaint?.();
+			} catch (e) {
+				console.warn(LOG_PREFIX, "reload after sync failed:", e);
+			} finally {
+				rechargeEnCours = false;
+			}
+		};
+		pont().sync?.surDonneesRecues(() => { void rechargerApresSync(); });
 		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Quatre écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
 		   `stats` (même débounce, `dashboard/stats-store.ts`), la page d'un

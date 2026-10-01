@@ -1,0 +1,202 @@
+/* THE SYNC PAGE (`src/dashboard/sync-page.ts`): shared by both apps. Every
+   control is a visible button or field (nothing appears on hover only) and
+   no label is in capitals. */
+.qbd-sync {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	max-width: 640px;
+}
+
+.qbd-sync-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.qbd-sync-titre {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.qbd-sync-aide {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.qbd-sync-carte {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	background: var(--background-secondary);
+	overflow: hidden;
+}
+
+.qbd-sync-carte > * + * {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.qbd-sync-ligne {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 52px;
+	box-sizing: border-box;
+	padding: 10px 16px;
+}
+
+.qbd-sync-ligne-qr {
+	justify-content: center;
+}
+
+.qbd-sync-id-bloc {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	flex: 1;
+	min-width: 0;
+}
+
+.qbd-sync-etiquette,
+.qbd-sync-nom {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.qbd-sync-id,
+.qbd-sync-id-court {
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+.qbd-sync-qr {
+	width: 176px;
+	height: 176px;
+	border-radius: var(--radius-m);
+	background: #fff;
+	image-rendering: pixelated;
+}
+
+.qbd-sync-qr[hidden] {
+	display: none;
+}
+
+.qbd-sync-champ {
+	flex: 1;
+	min-width: 0;
+	padding: 7px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+	font-size: 12px;
+}
+
+.qbd-sync-champ:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+.qbd-sync-bouton {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: transparent;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.qbd-sync-bouton:hover:not(:disabled) {
+	border-color: var(--text-accent);
+}
+
+.qbd-sync-bouton:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+.qbd-sync-bouton:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.qbd-sync-bouton-icone {
+	display: inline-flex;
+}
+
+.qbd-sync-bouton-icone svg {
+	width: 14px;
+	height: 14px;
+}
+
+.qbd-sync-message {
+	margin: 0;
+	padding: 0 16px;
+	min-height: 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.qbd-sync-message:empty {
+	display: none;
+}
+
+.qbd-sync-message:not(:empty) {
+	padding: 8px 16px 10px;
+}
+
+.qbd-sync-message-erreur {
+	color: var(--text-error);
+}
+
+.qbd-sync-vide {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.qbd-sync-etat {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.qbd-sync-etat-ok {
+	color: var(--text-success);
+}
+
+.qbd-sync-etat-erreur {
+	color: var(--text-error);
+}
+
+.qbd-sync-point {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+@media (max-width: 520px) {
+	.qbd-sync-ligne {
+		flex-wrap: wrap;
+	}
+}

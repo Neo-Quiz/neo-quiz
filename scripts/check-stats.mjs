@@ -96,5 +96,18 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	const retireeExamen = sExamen.supprimerTentative("h.md", examen.date);
 	sExamen.restaurerTentative("h.md", retireeExamen);
 	r.check("… through a deletion and its undo", tentativesDe(sExamen.getRecord("h.md")).find(x => x.date === examen.date)?.exam, true);
+
+	/* RELOAD (the synced folder delivered other devices' attempts): the store
+	   takes the host's table again, UNLESS a save of its own is still pending:
+	   reloading then would drop the attempt that save is about to write. */
+	let table = { "r.md": { bestScore: 10, questionsDone: 1, totalQuestions: 2, lastPlayed: 5, attempts: 1, tentatives: [{ date: 5, pct: 10 }] } };
+	const sRecharge = createStatsStore({ getStats: () => structuredClone(table), saveStats: async () => {} });
+	sRecharge.load();
+	table = { ...table, "r.md": { ...table["r.md"], attempts: 2, tentatives: [{ date: 9, pct: 90 }, { date: 5, pct: 10 }] } };
+	r.check("reload with nothing pending takes the host's table", [sRecharge.reload(), sRecharge.getRecord("r.md").attempts], [true, 2]);
+	sRecharge.updateRecord("r.md", { bestScore: 40, questionsDone: 2, totalQuestions: 2 });
+	table = { ...table, "other.md": { bestScore: 1, questionsDone: 1, totalQuestions: 1, lastPlayed: 1, attempts: 1, tentatives: [{ date: 1, pct: 1 }] } };
+	r.check("reload with a save pending refuses and keeps the pending attempt", [sRecharge.reload(), sRecharge.getRecord("r.md").attempts, sRecharge.getRecord("other.md")], [false, 3, null]);
+	sRecharge.destroy();
 	r.done();
 });
