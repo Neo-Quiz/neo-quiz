@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.11] - 2026-10-01
+
 ### Added
 - Sync your quiz folder between your devices, built in: a Sync page in the settings shows this device's code (with a QR) and takes the code of another device; the folder then stays identical on both, directly between them.
 
