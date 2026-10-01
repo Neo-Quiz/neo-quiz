@@ -487,10 +487,73 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   ne se publie pas ; ce qui est publié reste, et se corrige par la version
   suivante.
 
+- `npm run check:shared-state` — l'état partagé PAR APPAREIL dans le dossier
+  synchronisé (`src/shared-state/merge.ts`, hôte Windows
+  `apps/windows/src/host/shared-state.ts`) : fusion pure des examens et des
+  tentatives, un fichier par racine et par appareil, migration unique, copies
+  de conflit Syncthing, déplacements. Dans la CI.
+- `npm run check:electron-syncthing` — le Syncthing embarqué
+  (`apps/windows/electron/syncthing*.ts`) : seul le dossier `neo-quiz` est
+  accepté, et seulement d'un appareil appairé par le propriétaire ; l'ID saisi
+  est validé avant d'atteindre une config ; arguments de lancement sans rien
+  d'autre que leurs paramètres ; clé sur chaque appel REST. Avec le binaire
+  épinglé (`npm run fetch:syncthing`), il éprouve aussi le vrai.
+- `npm run check:android-pont` — le pont Android vu de trois côtés, sans
+  appareil : chaque canal envoyé par le shim (`apps/android/web/shim.ts`) a
+  une entrée Kotlin (`Channels.ALL`) et réciproquement, chaque méthode de
+  `Pont` existe dans le shim, et la liste Kotlin des extensions exécutables
+  égale celle de Windows. Dans la CI.
+- `npm run check:android-code-pack` — la copie Android de l'empreinte du pack
+  C/C++ (`apps/android/web/pins.mjs`) égale `PACK_C`, et un pack ou une entrée
+  d'archive fautive est refusé sans rien écrire.
+- `npm run check:installer` change depuis le 2026-10-01 : il fige aussi que
+  l'entrée du bootstrapper (`installer/main.ts`) est bien BUNDLÉE (un import
+  perdu l'avait laissé bloqué sur l'écran de démarrage de desktop-v1.20.0 à
+  1.20.15).
+
 Vérification d'un changement = `npm run check`, plus `check:md` / `check:export` /
 `check:markers` si le rendu ou l'écriture sont touchés, **`check:quiz-io` dès que
 `dashboard/detail-io.ts` bouge** (c'est le seul chemin qui réécrit une note),
 `check:app` si le code partagé bouge, **puis** test manuel dans l'application (`npm run app:dev`).
+
+## Application Android (`apps/android/`)
+
+Spec : `docs/superpowers/specs/2026-10-01-android-v1-design.md`. Ici, seulement
+ce qu'il faut savoir avant de toucher.
+
+- **Architecture** : le rendu de l'application Windows tourne dans une WebView ;
+  `window.neo` y est implémenté en Kotlin (`shim.ts` côté web, `Channels.ALL`
+  côté Kotlin) avec le même PÉRIMÈTRE de sécurité que le processus principal
+  Electron. La barre du bas est une vue NATIVE sous la WebView (elle ne s'étire
+  pas). L'exécution de code tourne dans une WebView bac à sable séparée. Syncthing
+  est embarqué, dans un service. Les notifications de révision lisent une table
+  PRÉCALCULÉE (alarme en lecture seule), jamais le journal.
+- **Commandes** : `npm run android:web` construit le web ; l'APK de release se
+  construit dans un worktree temporaire PROPRE (jamais le dépôt de travail) :
+  `pwsh apps/android/scripts/with-keystore-password.ps1 ./gradlew.bat
+  assembleRelease --no-daemon`, installé par `adb -s <serial> install -r`.
+  **Jamais un build debug par-dessus l'application release** (signatures
+  différentes : désinstallation forcée, donc perte des données).
+- **Contrôles** : `check:android-pont`, `check:android-code-pack`, et les tests
+  JVM de Gradle (`./gradlew testDebugUnitTest`).
+- **Valeurs immuables** : `applicationId com.ahmedmili.neoquiz` ; le keystore vit
+  HORS du dépôt (mot de passe chiffré DPAPI à côté) et son SHA-256 est
+  enregistré dans la Google Play Console (Android Developer Console) : un autre
+  certificat = une autre application. Jamais de secret commité ni affiché.
+- **Appareils** : on teste sur le téléphone du propriétaire (USB, `adb -s`), pas
+  sur un émulateur (ceux de la machine appartiennent à une autre session) ;
+  JAMAIS de désinstallation ni de `pm clear` ; les permissions système sont à
+  lui.
+- **Étirement** : le défilement doit rester sur le scroller racine avec
+  `overscroll` d'étirement NATIF ; la barre du bas ne bouge jamais.
+- **Données par appareil** : `.neo-quiz/journal|exams|attempts/<appareil>` dans
+  le dossier synchronisé, un fichier par appareil (jamais d'écriture partagée,
+  fusion à la lecture : `check:shared-state`).
+- **Syncthing** : identifiant de dossier `neo-quiz` (seul accepté) ; l'instance
+  Windows n'ÉCOUTE JAMAIS (sortant + découverte globale + relais : pas
+  d'invite de pare-feu) ; Android écoute sur 22100/21028 ; tout appairage est
+  TOUJOURS confirmé nativement, un nom d'appareil distant est assaini avant
+  d'atteindre la boîte de dialogue.
 
 ## Build
 

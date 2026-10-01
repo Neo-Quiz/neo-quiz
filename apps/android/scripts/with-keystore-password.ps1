@@ -9,6 +9,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5 launched from pwsh 7 inherits pwsh's module path, which
+# makes ConvertTo-SecureString fail to autoload: restore the PS5 defaults.
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    $env:PSModulePath = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules') + ';' +
+        (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules') + ';' +
+        (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules')
+}
 $dir = if ($env:NEOQUIZ_KEYSTORE_DIR) { $env:NEOQUIZ_KEYSTORE_DIR } else { Join-Path $env:USERPROFILE 'Keys/neo-quiz' }
 
 $secure = Get-Content -LiteralPath (Join-Path $dir 'storepass.dpapi') | ConvertTo-SecureString

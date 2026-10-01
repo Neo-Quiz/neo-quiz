@@ -27,6 +27,11 @@ npm run app:dev        # the desktop app (Vite + Electron)
   through the contract in `src/host/types.ts`.
 - `apps/windows/` is the desktop app (Electron). `apps/windows/electron/` is
   the main process, the only code that touches the disk.
+- `apps/android/` is the Android app: the desktop renderer in a WebView, with
+  `window.neo` implemented in Kotlin. Build the web part with
+  `npm run android:web`, then `./gradlew assembleDebug` in `apps/android/`
+  (needs the Android SDK; the release keystore is private and never in the
+  repository).
 - `src/scheduler/` is the spaced repetition scheduler, a pure module with no
   dependency on any host, screen or clock.
 - `docs/` is the website, published to <https://neo-quiz.github.io>.
