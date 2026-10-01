@@ -63,9 +63,13 @@ html.nq-mobile {
    filled icon; the same background as the Android navigation area under it
    (themes.xml window_background), so both read as one block. */
 .is-mobile {
-	--nq-bottom-bar-bg: #0c111d;
-	--nq-bottom-bar-line: #1f242f;
-	--nq-bottom-bar-muted: #81838a;
+	/* StudySmarter layout, Neo Quiz colours (owner, 2026-10-01). */
+	/* The app backdrop: shell.css `--nq-lueur-fond` and Android themes.xml
+	   `window_background` (src/ cannot read the shell variable). */
+	--nq-bottom-bar-bg: #070b14;
+	--nq-bottom-bar-line: var(--background-modifier-border);
+	--nq-bottom-bar-muted: var(--text-muted);
+	--nq-bottom-bar-active: var(--interactive-accent);
 }
 
 .is-mobile .qbd-sidebar {
@@ -122,7 +126,7 @@ html.nq-mobile {
 	border-color: transparent !important;
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
-	color: #fff !important;
+	color: var(--nq-bottom-bar-active) !important;
 }
 
 /* Generate placeholder: same look, tapping does nothing. */
@@ -151,14 +155,13 @@ html.nq-mobile {
 	height: 25px;
 	stroke-width: 2;
 }
-/* Active: a filled icon. Lucide icons are outlines, so the shape is filled
-   with the label colour and inner circles (the gear hub) are punched back
-   out with the bar colour. */
+/* Active: a tinted icon. A full fill turns overlapping Lucide outlines (the
+   folders icon) into a blob, so the shape gets a light fill of the accent
+   under a slightly heavier stroke. */
 .is-mobile .qbd-nav-item--active .qbd-nav-icon svg {
 	fill: currentColor;
-}
-.is-mobile .qbd-nav-item--active .qbd-nav-icon svg circle {
-	fill: var(--nq-bottom-bar-bg);
+	fill-opacity: 0.22;
+	stroke-width: 2.25;
 }
 
 .is-mobile .qbd-nav-label {
