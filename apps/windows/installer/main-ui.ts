@@ -3,6 +3,13 @@ import { dirname, resolve } from "node:path";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { CANAUX_INSTALLATEUR, type InfosDisqueInstallateur } from "./protocole";
 import { urlLegale } from "./noyau";
+/* Side-effect import, and the ONLY thing that puts `main.ts` (the window, the
+   worker, the install channels) into the bundle: without it the container
+   shows its splash forever and no window ever opens (broken from 2026-09-27,
+   when the named import of `langueInstallateur` was removed). It must come
+   BEFORE this file's own `whenReady` so the window exists when it is resized.
+   `check:installer` bundles this entry and asserts the window is in it. */
+import "./main";
 
 const URL_COMMENTAIRES = "https://github.com/Neo-Quiz/neo-quiz/issues/new";
 const LARGEUR_FENETRE = 720;

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateSync } from "node:zlib";
+import { build } from "esbuild";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 /**
@@ -44,6 +45,17 @@ const canauxApplication = readFileSync(resolve(racine, "apps/windows/electron/ca
 const renduApplication = readFileSync(resolve(racine, "apps/windows/src/main.ts"), "utf8");
 
 const noyauInstallateur = readFileSync(resolve(racine, "apps/windows/installer/noyau.ts"), "utf8");
+
+/* The REAL entry point, bundled exactly as `installer/construire.mjs` does.
+   Reading the sources cannot see that `main.ts` fell out of the bundle: from
+   2026-09-27 (623e9360) `main-ui.ts` no longer imported it, and every
+   installer shipped since opened no window (only the portable container's
+   splash, forever) while all the checks stayed green. */
+const bundlePrincipal = (await build({
+	entryPoints: [resolve(racine, "apps/windows/installer/main-ui.ts")],
+	bundle: true, write: false, platform: "node", format: "cjs", target: "node22",
+	external: ["electron"], logLevel: "silent",
+})).outputFiles[0].text;
 
 await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquetInstallable, progressionInstallation, suivre, suiviInitial, argumentsNsis, langueDepuisLocale, urlLegale, URL_LATEST_YML, urlLatestYml, versionEpinglee }) => {
 	const r = makeReporter("Installateur — bootstrapper");
@@ -595,6 +607,15 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 			renduInstallateur.includes('"span", "nqi-legal-link"'),
 		],
 		[true, true, true, true, true, true, false]);
+
+	r.check("bundle principal : la fenêtre, le travailleur et le signal du splash y sont",
+		[
+			bundlePrincipal.includes("new import_electron.BrowserWindow("),
+			bundlePrincipal.includes("--neo-quiz-installer-worker"),
+			bundlePrincipal.includes("neo-quiz-splash-done"),
+			bundlePrincipal.includes("requestSingleInstanceLock"),
+		],
+		[true, true, true, true]);
 
 	for (const [langue, site] of [["EN", siteEn]]) {
 		r.check(`site ${langue} : Windows ne pointe plus sur l'ancien NSIS`,
