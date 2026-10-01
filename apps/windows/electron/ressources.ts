@@ -50,6 +50,19 @@ export const SCHEMA_RESSOURCES = "app";
 export const HOTE_RESSOURCES = "neo-res";
 
 /**
+ * The URL prefix of the resources, WITH its trailing slash. `app://neo-res/` on
+ * Windows; the Android shim sets `window.neoPlatform.resourceBase` to a path
+ * under the WebView's own origin (`https://appassets.androidplatform.net/neo-res/`),
+ * which Kotlin serves behind the same perimeter (`ResourceRoute.kt`): an Android
+ * WebView has no custom scheme handler. Read through `globalThis`, as this
+ * module is loaded by the main process and by checks outside any window.
+ */
+export function baseRessources(): string {
+	const base = (globalThis as { neoPlatform?: { resourceBase?: unknown } }).neoPlatform?.resourceBase;
+	return typeof base === "string" && base.endsWith("/") ? base : `${SCHEMA_RESSOURCES}://${HOTE_RESSOURCES}/`;
+}
+
+/**
  * L'URL affichable d'un fichier du disque (chemin ABSOLU, séparateurs `/`).
  *
  * Chaque segment est encodé (espaces, `#`, `?`, accents), SAUF le `:` du
@@ -59,7 +72,7 @@ export const HOTE_RESSOURCES = "neo-res";
 export function urlDeRessource(absolu: string): string {
 	const segments = String(absolu ?? "").replace(/\\/g, "/").split("/")
 		.map(s => encodeURIComponent(s).replace(/%3A/gi, ":"));
-	return `${SCHEMA_RESSOURCES}://${HOTE_RESSOURCES}/${segments.join("/")}`;
+	return `${baseRessources()}${segments.join("/")}`;
 }
 
 /**

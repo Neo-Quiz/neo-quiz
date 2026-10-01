@@ -11,6 +11,7 @@ import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.ahmedmili.neoquiz.bridge.ResourceRoute
 import com.ahmedmili.neoquiz.bridge.UrlDecision
 import com.ahmedmili.neoquiz.bridge.UrlPolicy
 import com.ahmedmili.neoquiz.bridge.createAppBridge
@@ -59,6 +60,7 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
                 if (!UrlPolicy.mayLoad(request.url.toString())) {
                     return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", mapOf("Content-Security-Policy" to UrlPolicy.CSP), java.io.ByteArrayInputStream(ByteArray(0)))
                 }
+                if (ResourceRoute.isResourceUrl(request.url.toString())) return resourceResponse(request)
                 val response = assetLoader.shouldInterceptRequest(request.url) ?: return null
                 response.responseHeaders = (response.responseHeaders ?: emptyMap()) + ("Content-Security-Policy" to UrlPolicy.CSP)
                 return response
@@ -100,6 +102,18 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         WebViewCompat.addWebMessageListener(this, "neoAndroid", origins) { _, message, _, isMainFrame, replyProxy ->
             // A sub-frame (an iframe the page embeds) never reaches the bridge, and never steals the event sink.
             if (isMainFrame) onMessage(message, replyProxy)
+        }
+    }
+
+    /** A quiz image: GET only, the perimeter and the type allow-list decide, 403 for everything else. */
+    private fun resourceResponse(request: WebResourceRequest): WebResourceResponse {
+        val headers = mapOf("Content-Security-Policy" to UrlPolicy.CSP, "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-cache")
+        val served = if (request.method == "GET") app.resource(request.url.toString()) else null
+        if (served == null) return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", headers, java.io.ByteArrayInputStream(ByteArray(0)))
+        return try {
+            WebResourceResponse(served.mime, null, 200, "OK", headers, java.io.FileInputStream(served.file))
+        } catch (_: java.io.IOException) {
+            WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, java.io.ByteArrayInputStream(ByteArray(0)))
         }
     }
 

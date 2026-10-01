@@ -23,7 +23,11 @@ class AppBridge(
     private val sync: SyncHub,
     private val qr: QrScanner,
     private val back: BackChannel,
+    private val perimeter: Perimeter,
 ) {
+    /** The image behind a `/neo-res/` URL, or `null` when the perimeter or the type allow-list refuses it. */
+    fun resource(url: String): ResourceFile? = ResourceRoute.resolve(url, perimeter)
+
     /** The Back key, asked of the page: false when there is nothing to go back to (the activity leaves). */
     suspend fun goBack(): Boolean = back.request()
 
@@ -102,5 +106,5 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
             settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel)
+    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter)
 }

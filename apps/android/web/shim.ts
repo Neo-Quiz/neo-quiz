@@ -25,7 +25,12 @@ declare global {
 		/** Injected by `addWebMessageListener` (AppWebView.kt). */
 		neoAndroid: NeoAndroidPort;
 		/** `surRetour`: the renderer's answer to the Back key (true = it went back). Android only, not part of `Pont`. */
-		neoPlatform: { mobile: boolean; surRetour(gestionnaire: () => boolean): void };
+		neoPlatform: {
+			mobile: boolean;
+			/** Where the renderer builds the URLs of quiz images (`electron/ressources.ts`); Kotlin serves it (`ResourceRoute.kt`). */
+			resourceBase: string;
+			surRetour(gestionnaire: () => boolean): void;
+		};
 	}
 }
 
@@ -286,4 +291,4 @@ abonner<void>("android.retour", () => {
 	}
 	void appeler("android.retourTraite", [traite]).catch(() => {});
 });
-window.neoPlatform = { mobile: true, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; } };
+window.neoPlatform = { mobile: true, resourceBase: `${location.origin}/neo-res/`, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; } };
