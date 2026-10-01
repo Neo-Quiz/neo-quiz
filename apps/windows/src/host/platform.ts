@@ -21,9 +21,17 @@ function plateformeChromium(): string {
 	return nav?.userAgentData?.platform || nav?.platform || nav?.userAgent || "";
 }
 
+/** True when the renderer runs in the Android app's WebView: its document-start
+    shim sets `window.neoPlatform = { mobile: true }` (`apps/android/web/shim.ts`).
+    Read through `globalThis` because this module is loaded outside any window
+    by `check:windows-host`. Absent on Windows, so the answer there stays false. */
+export function estMobile(): boolean {
+	return Boolean((globalThis as { neoPlatform?: { mobile?: boolean } }).neoPlatform?.mobile);
+}
+
 export function createWindowsPlatform(): HostPlatform {
 	return {
-		isMobile: false,
+		isMobile: estMobile(),
 		/* La fenêtre tourne sous Windows aujourd'hui, mais le paquet se
 		   construit aussi pour Linux (`pack:linux`) : la question est posée à
 		   Chromium plutôt que répondue en dur. `userAgentData.platform` quand

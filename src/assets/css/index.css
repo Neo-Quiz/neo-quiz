@@ -83,3 +83,6 @@
 /* L'éditeur d'un quiz (page du tableau de bord) : APRÈS les feuilles editor/*,
    dont il réhabille les classes qb-* du formulaire. */
 @import url('./dashboard/dashboard-editor.css');
+
+/* Phone and tablet: last, it overrides everything above. */
+@import url('./mobile.css');

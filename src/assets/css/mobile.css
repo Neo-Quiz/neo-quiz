@@ -1,0 +1,405 @@
+/* ══════════════════════════════════════════════════════════
+   PHONE AND TABLET (the Android app; the Windows app never matches).
+
+   Two switches, both set by `apps/windows/src/main.ts` only when the host
+   says `HostPlatform.isMobile`:
+
+   - `body.is-mobile`, the class Obsidian sets on its own mobile shell, which
+     the shared CSS already styles (single-column grids, taller targets, ...).
+     It follows the PHONE width (<= 600 px) only: a tablet (800 and 1280 CSS
+     px) keeps the desktop layout, with the rail on the left.
+   - `html.nq-mobile`, for what holds on both: no title bar.
+
+   WHY `.is-mobile` WAS NEVER ENOUGH ON ITS OWN. Home and Folders rendered
+   BLANK on the emulator: the app never set `.is-mobile`, so `dashboard-base.css`
+   only had its `@media (max-width: 600px)` rule, which makes the rail
+   `width: 100%` WITHOUT turning `.qbd-layout` into a column (that half lives
+   under `.is-mobile`). In a row the rail took the whole 368 px and the page
+   was squeezed to 23 px. This file turns the rail into a bottom bar.
+
+   TOUCH SIZES use `@media (pointer: coarse)` alone, so the Windows mouse
+   layout does not move by a pixel. Nothing here is `:hover`-only.
+   ══════════════════════════════════════════════════════════ */
+
+html.nq-mobile {
+	--nq-barre-ecran: 0px;
+}
+
+/* ── PHONE: the rail becomes a bottom bar, the panel runs edge to edge ── */
+.is-mobile {
+	--nq-panel-gap: 0px;
+	--nq-panel-radius: 0px;
+	/* Opaque enough to read on, and no blur (it costs a phone's GPU a full-screen
+	   backdrop). `--nq-panel-bg` is resolved where tokens.css defines it, so the
+	   alpha alone would not reach it: it is restated here. */
+	--nq-panel-alpha: 0.94;
+	--nq-panel-bg: color-mix(in srgb, var(--background-secondary) 94%, transparent);
+	--nq-panel-blur: none;
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout,
+.is-mobile #neo-quiz-root > .qbd-qz {
+	width: 100%;
+	max-width: none;
+	height: 100%;
+	gap: 0;
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-content,
+.is-mobile #neo-quiz-root > .qbd-qz {
+	border: 0;
+	border-radius: 0;
+}
+
+/* The bar is the LAST flex item, laid under the page. */
+.is-mobile #neo-quiz-root > .qbd-layout {
+	flex-direction: column-reverse;
+}
+
+.is-mobile .qbd-sidebar {
+	flex: none;
+	width: 100%;
+	height: 56px;
+	padding: 0;
+	align-items: stretch;
+	overflow: hidden;
+	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 0;
+	background: var(--background-secondary);
+	z-index: 2;
+}
+
+.is-mobile .qbd-nav-items {
+	flex: 2 1 0;
+	padding: 0;
+	gap: 0;
+	justify-content: stretch;
+}
+
+.is-mobile .qbd-nav-footer {
+	flex: 1 1 0;
+	padding: 0;
+}
+
+.is-mobile .qbd-nav-item,
+.is-mobile .qbd-nav-footer .qbd-nav-item {
+	flex: 1 1 0;
+	max-width: none;
+	height: 56px;
+	min-height: 56px;
+	padding: 4px 2px;
+	border-radius: 0;
+	justify-content: center;
+	gap: 2px;
+}
+
+.is-mobile .qbd-nav-label {
+	font-size: 11px;
+	line-height: 14px;
+}
+
+/* The update button and the app mark belong to the desktop rail. */
+.is-mobile .nq-maj,
+.is-mobile .nq-rail-logo {
+	display: none;
+}
+
+.is-mobile .qbd-content {
+	padding: 16px 14px;
+}
+
+/* Grids: `1fr` alone lets a long title stretch its track past the screen. */
+.is-mobile .qbd-home-layout,
+.is-mobile .qbd-home-grid,
+.is-mobile .qbd-module-grid,
+.is-mobile .qbd-quizzes-drill-grid {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+/* A folder's tabs and their action share one row: the action keeps its icon only. */
+.is-mobile .qbd-folder-sections {
+	padding-left: 8px;
+	padding-right: 8px;
+}
+
+.is-mobile .qbd-root .qbd-folder-tab {
+	padding-left: 6px;
+	padding-right: 6px;
+}
+
+.is-mobile .qbd-folder-section-action > span:not(.qbd-folder-section-action-icon) {
+	display: none;
+}
+
+/* ── Modals: full width with 16 px gutters ── */
+body.is-mobile:has(.qbd-sidebar) .modal-container,
+.is-mobile .modal-container {
+	/* No rail to keep clear of (modal.css pads 88 px on its left). */
+	padding: 16px;
+	align-items: center;
+}
+
+.is-mobile .modal-container > .modal {
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+	max-height: calc(100% - 32px);
+}
+
+/* Settings: the category list becomes a wrapping row of chips above the page. */
+.is-mobile .nq-reglages-modal {
+	height: 100%;
+}
+
+.is-mobile .nq-reglages-modal .modal-title {
+	width: auto;
+	right: 56px;
+	padding: 16px 16px 0;
+}
+
+.is-mobile .nq-set {
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: auto minmax(0, 1fr);
+}
+
+.is-mobile .nq-set-nav {
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 52px 12px 10px;
+	border-right: 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.is-mobile .nq-set-onglet {
+	height: 44px;
+	padding: 0 12px;
+}
+
+.is-mobile .nq-set-onglet::before {
+	display: none;
+}
+
+.is-mobile .nq-set-onglet[aria-selected="true"] {
+	background: var(--background-modifier-hover);
+}
+
+.is-mobile .nq-set-volet {
+	padding: 14px 14px 24px;
+}
+
+.is-mobile .nq-set-ligne {
+	flex-wrap: wrap;
+	gap: 10px 16px;
+}
+
+.is-mobile .nq-set-ligne-texte {
+	flex: 1 1 160px;
+}
+
+.is-mobile .nq-set-ligne-controle .qbd-select {
+	min-width: 0;
+}
+
+/* Sync: the code field takes a row of its own, 16 px so the keyboard does not zoom the page. */
+.is-mobile .qbd-sync-champ {
+	flex: 1 1 100%;
+	font-size: 16px;
+}
+
+.is-mobile .qbd-sync-bouton {
+	flex: 1 1 0;
+	justify-content: center;
+}
+
+/* Every modal stays inside the screen, a tablet's included. */
+html.nq-mobile .modal-container > .modal {
+	max-width: calc(100vw - 32px);
+}
+
+/* ── TOUCH (any touch-first device, tablet included) ── */
+@media (pointer: coarse) {
+	/* The numbered beads of a played quiz: 40 px beads 4 px apart, a 44 px pitch. */
+	/* `:root` raises the specificity above `apps/windows/src/assets/perles.css`,
+	   which is loaded after this file and sets `--perle: 32px` on the same selector. */
+	:root #neo-quiz-root > .qbd-qz .quiz-nav {
+		--perle: 40px;
+		gap: 4px;
+	}
+
+	.qbd-sync-bouton,
+	.qbd-sync-champ {
+		min-height: 44px;
+	}
+
+	.qbd-nav-item,
+	.nq-set-onglet,
+	.qbd-btn,
+	.qbd-btn--create,
+	.qbd-select,
+	.qbd-quizzes-crumb-back,
+	.modal-close-button,
+	.quiz-hint-btn,
+	.quiz-action-btn,
+	.qbd-cta3d,
+	.qbd-resume-cta,
+	.qbd-homef-more,
+	.qbd-homes-arrow,
+	.qbd-card-more,
+	.qbd-folder-view-tab,
+	.qbd-folder-tab,
+	.qbd-folder-section-action,
+	.qbd-folder-more-btn,
+	.qbd-quiz-card-play,
+	.qbd-quiz-card-mode-btn,
+	.qbd-fiche-mode-seg,
+	.qbd-fiche-search-input,
+	.qbd-qz-card-act,
+	.qbd-qz-list-add,
+	.qb-er-geste,
+	.qb-format-btn,
+	.qbd-qz-section-head,
+	.qbd-qz-section-toggle,
+	.qb-field-input,
+	.qbd-lecture-style-btn,
+	.quiz-nav-btn,
+	.qbd-root .qbd-qz-er-barre .qbd-select {
+		min-height: 44px;
+	}
+
+	/* Controls whose own rules out-rank the single-class list above. */
+	.qbd-root .qbd-select,
+	.qbd-root .qbd-qz-form .qb-field-input,
+	.qbd-root .qbd-qz-form .qbd-select,
+	.qbd-root .quiz-cloze-input,
+	.qbd-root .qbd-folder-item-delete {
+		min-height: 44px;
+	}
+
+	.qbd-root .qbd-folder-item-delete,
+	.qbd-root .qbd-qz-section-toggle {
+		min-width: 44px;
+	}
+
+	/* A name that is a link in a list row: the whole line is the target. */
+	.qbd-root .qbd-homef-name {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+	}
+
+	/* Icon-only controls get a 44 px square as well. */
+	.qbd-homes-arrow,
+	.qbd-card-more,
+	.qbd-folder-more-btn,
+	.qbd-quiz-card-play,
+	.qbd-qz-card-act,
+	.qb-er-geste,
+	.qb-format-btn,
+	.quiz-nav-btn,
+	.qbd-qz-back {
+		min-width: 44px;
+	}
+
+	.modal-close-button,
+	.qbd-quizzes-crumb-back {
+		min-width: 44px;
+	}
+}
+
+/* ── The editor's question list: a bottom sheet (detail-list-sheet.ts) ── */
+.is-mobile .qbd-qz-body--sheet > .qbd-qz-list {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 56px;
+	z-index: 4;
+	width: auto;
+	max-height: 65vh;
+	padding: 14px 14px 18px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 18px 18px 0 0;
+	background: var(--background-secondary);
+	box-shadow: 0 -12px 32px rgb(0 0 0 / 0.4);
+	overflow-y: auto;
+	transform: translateY(calc(100% + 64px));
+	visibility: hidden;
+	transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1), visibility 0s linear 220ms;
+}
+
+.is-mobile .qbd-qz-body--sheet.is-list-open > .qbd-qz-list {
+	transform: none;
+	visibility: visible;
+	transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.is-mobile .qbd-qz-list-scrim {
+	position: fixed;
+	inset: 0 0 56px;
+	z-index: 3;
+	background: rgb(0 0 0 / 0.3);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 220ms ease;
+}
+
+.is-mobile .qbd-qz-body--sheet.is-list-open > .qbd-qz-list-scrim {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.is-mobile .qbd-qz-list-toggle {
+	position: fixed;
+	right: 16px;
+	bottom: 72px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 48px;
+	padding: 0 18px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font: inherit;
+	font-weight: 600;
+	box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+	cursor: pointer;
+}
+
+.is-mobile .qbd-qz-list-toggle svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* The page behind the floating button keeps room to scroll past it. */
+.is-mobile .qbd-qz-body--sheet {
+	padding-bottom: 72px;
+}
+
+/* The list is a sheet only on a phone: its button and scrim never show elsewhere. */
+.qbd-qz-list-toggle,
+.qbd-qz-list-scrim {
+	display: none;
+}
+
+.is-mobile .qbd-qz-list-toggle {
+	display: inline-flex;
+}
+
+.is-mobile .qbd-qz-list-scrim {
+	display: block;
+}
+
+/* ── Folders toolbar: the selects wrap instead of clipping the "Generated quizzes" entry ── */
+.is-mobile .qbd-quizzes-group {
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.is-mobile .qbd-quizzes-group-selects {
+	flex-wrap: wrap;
+	gap: 8px;
+	min-width: 0;
+}

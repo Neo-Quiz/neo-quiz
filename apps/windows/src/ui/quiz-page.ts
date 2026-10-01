@@ -38,6 +38,7 @@ import type { QuestionRole, StatsRecord } from "../../../../src/types/quiz";
 import type { SessionsApp } from "../review/sessions";
 import { testSetups } from "../review/test-setups";
 import { createTestSetupPage, type TestSetupPage } from "./test-setup-host";
+import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 
 /** What `openQuizPage` hands back. */
 export interface QuizPageHandle {
@@ -127,8 +128,11 @@ export async function openQuizPage(
 		e.stopPropagation();
 		if (e.type === "mouseup" && e.button === 3) quitter();
 	};
+	/* The Android back key does the same (`retour-android.ts`). */
+	const surRetourAndroid = (e: Event): void => { if (prendreRetour(e)) quitter(); };
 	document.addEventListener("mousedown", surBoutonSouris, true);
 	document.addEventListener("mouseup", surBoutonSouris, true);
+	document.addEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 
 	const titrage = ajouter(entete, "div", "qbd-qz-headline");
 	// `title` et non `basename` : c'est le champ que `QuizIndexEntry` prévoit
@@ -154,6 +158,7 @@ export async function openQuizPage(
 	const demonterSansMoteur = (): void => {
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);
+		document.removeEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 	};
 	const withoutEngine = (): QuizPageHandle => ({ teardown: demonterSansMoteur, launchCancelled: false });
 
@@ -264,6 +269,7 @@ export async function openQuizPage(
 			demonterExpliquer?.();
 			document.removeEventListener("mousedown", surBoutonSouris, true);
 			document.removeEventListener("mouseup", surBoutonSouris, true);
+			document.removeEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 			try {
 				hote.__quizDestroy?.();
 			} catch (e) {

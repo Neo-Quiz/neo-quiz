@@ -81,6 +81,9 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 			// côté application avant la tranche 4) reste VISIBLE mais inerte —
 			// une barre qui change de forme entre deux hôtes se remarque plus
 			// qu'une entrée manifestement à venir.
+			/* An entry the host will never serve (Generate on a phone) is
+			   left out; a merely not-yet-ready one stays, disabled. */
+			if (currentHost().platform.isMobile && !ctx.canOpen(item.key)) continue;
 			const disabled = !ctx.canOpen(item.key);
 			const cls = [
 				"qbd-nav-item",

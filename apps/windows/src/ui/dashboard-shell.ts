@@ -31,6 +31,7 @@
 
 import { ajouter } from "../../../../src/dom";
 import { creerHistorique } from "./historique-nav";
+import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 import { dossierParDefaut } from "../../../../src/dashboard/generation-demande";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
@@ -414,7 +415,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à
 		   ce que l'hôte sache lancer un CLI (tâche 7 — d'ici là, une Notice
 		   « fournisseur indisponible » propre, jamais un composer mort). */
-		canOpen: () => true,
+		/* The AI page and every entry that leads to it (rail, Home, folder
+		   menus) are guarded by this: nothing generates on a phone or tablet. */
+		canOpen: (vue) => vue !== "ai" || !currentHost().platform.isMobile,
 		reviewStore: deps.reviewStore,
 		sessionOf: (path) => {
 			const s = deps.sessions?.toutes()[path];
@@ -894,6 +897,16 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		if (cible) appliquerNav(cible);
 	};
 
+	/* The Android back key (`retour-android.ts`): one step back in the same
+	   history, unless the shell is kept inert behind a played quiz. An empty
+	   history is left unhandled, so the key leaves the app. */
+	const surRetourAndroid = (e: Event): void => {
+		if (layout.inert || !historiqueNav.peutReculer()) return;
+		if (!prendreRetour(e)) return;
+		const cible = historiqueNav.reculer(etatCourant());
+		if (cible) appliquerNav(cible);
+	};
+
 	function naviguer(vue: DashboardViewName, data?: NavigateData, repaint: () => void = peindre): void {
 		/* « Créer avec l'IA » depuis un dossier : le préréglage est posé sur
 		   la page AVANT qu'elle se peigne — c'est son premier `render` qui
@@ -960,7 +973,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	logo.setAttribute("aria-haspopup", "menu");
 	logo.append(marqueRail());
 	logo.addEventListener("click", () => basculerMenuApp(logo));
-	navEl.prepend(logo);
+	/* The application menu belongs to the title bar, which a phone does not have. */
+	if (!currentHost().platform.isMobile) navEl.prepend(logo);
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement
 	// au pont pour toute la fenêtre (`mise-a-jour.ts`).
@@ -1012,12 +1026,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	document.addEventListener("keydown", surCtrlZ);
 	document.addEventListener("mousedown", surBoutonSouris, true);
 	document.addEventListener("mouseup", surBoutonSouris, true);
+	document.addEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 
 	const demonter = (): Promise<void> => {
 		if (demontage) return demontage;
 		document.removeEventListener("keydown", surCtrlZ);
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);
+		document.removeEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 		desabonner();
 		demonterMaj();
 		sheets.drop();

@@ -43,6 +43,8 @@ import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings, viserPromptExpliquer } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
+import { estMobile } from "./host/platform";
+import { retourAndroid } from "./ui/retour-android";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
 
 /*
@@ -414,7 +416,7 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	try {
 		const page = await openQuizPage(root, entry, () => {
 			mount(root, scanner, store, stats, sessions);
-		}, store, stats, sessions, reglagesIa, () => { viserPromptExpliquer(); ouvrirReglages(); });
+		}, store, stats, sessions, estMobile() ? undefined : reglagesIa, () => { viserPromptExpliquer(); ouvrirReglages(); });
 		/* A LAUNCH CANCELLED in the "Set up your test" modal (2026-09-29): the
 		   page was never shown (its screen is out of `root` and was invisible
 		   while loading), so nothing plays. The kept dashboard, exactly as it
@@ -475,7 +477,19 @@ async function demarrer(): Promise<void> {
 	/* Montée UNE FOIS, avant le premier écran : elle survit à tous les
 	   changements d'écran qui suivent (coquille, réglages), qui eux se
 	   démontent et se remontent par `demonterCourant`. */
-	monterBarreTitre(document.body, {
+	/* On a phone or tablet there is no window to drag, minimise or close, and
+	   no application menu to open: no title bar, and `--nq-barre-ecran: 0px`
+	   (shell.css, `.nq-mobile`) gives its 45 px back to the page. The class
+	   `is-mobile` (the one Obsidian sets, which the shared CSS already styles)
+	   follows the PHONE width only: a tablet keeps the desktop layout. */
+	if (estMobile()) {
+		document.documentElement.classList.add("nq-mobile");
+		(window as unknown as { neoPlatform: { surRetour(g: () => boolean): void } }).neoPlatform.surRetour(retourAndroid);
+		const etroit = window.matchMedia("(max-width: 600px)");
+		const suivre = (): void => { document.body.classList.toggle("is-mobile", etroit.matches); };
+		suivre();
+		etroit.addEventListener("change", suivre);
+	} else monterBarreTitre(document.body, {
 		/* DIRECTEMENT la fonction : elle ne ferme plus sur l'écran courant
 		   depuis que les Réglages sont une modale posée par-dessus lui. La
 		   barre de titre est montée une seule fois, avant le premier écran —

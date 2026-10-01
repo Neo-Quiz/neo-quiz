@@ -145,7 +145,10 @@ export function renderSettings(
 			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
 		});
 	}
-	const categories = CATEGORIES.filter(c => c.id !== "sync" || sync);
+	/* No AI category on a phone or tablet: generation and the Explain button are
+	   not offered there (`HostPlatform.isMobile`). */
+	const mobile = currentHost().platform.isMobile;
+	const categories = CATEGORIES.filter(c => (c.id !== "sync" || sync) && (c.id !== "ai" || !mobile));
 	for (const c of categories) {
 		const tab = ajouter(nav, "button", "nq-set-onglet");
 		tab.type = "button";
@@ -380,8 +383,11 @@ export function renderSettings(
 	void dessiner();
 
 	/* ═══ AI ═══ */
-	const aiPage = pages.get("ai")!;
-	const demonterComptes = monterReglagesComptes(section(aiPage, t("app.settings.accounts")));
+	/* On mobile the page is never attached (no category): it is built into a
+	   detached node so that the prompt sections below keep their handles, and
+	   the accounts (which talk to the CLIs) are not started. */
+	const aiPage = pages.get("ai") ?? document.createElement("div");
+	const demonterComptes = mobile ? () => {} : monterReglagesComptes(section(aiPage, t("app.settings.accounts")));
 
 	/* Paid assistants: one switch per channel that needs a subscription
 	   (today Claude Code and Codex CLI, the only ones with `Canal.gratuit ===

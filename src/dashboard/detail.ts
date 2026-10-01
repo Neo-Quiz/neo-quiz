@@ -25,6 +25,7 @@ import type { FicheOrigine } from "./detail-fiche";
 import { mountSlideHost, setSlide, slideTo, reserveTallest, finish as finishSlide } from "./detail-slide";
 import type { SlideHost } from "./detail-slide";
 import { makeDefault } from "../editor/utils";
+import { mountListSheet } from "./detail-list-sheet";
 import type { DraftQuestion } from "../editor/utils";
 import { lectureCourteDe, numeroAffiche, numerosAffiches, questionHote, questionsVisibles } from "../lecture-etape";
 import { applyModuleOverrides } from "./quiz-modules";
@@ -763,6 +764,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// au-dessus de chaque question de leur étape.
 		const vis = visibles();
 		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.length }));
+		/* Phone: while editing, the list is a bottom sheet over the page. */
+		if (editing) mountListSheet(listCol, vis.length);
 
 		const items = ajouter(listCol, "div", "qbd-qz-list-items");
 		/* La liste s'efface en fondu à ses bords dès qu'il reste des questions
