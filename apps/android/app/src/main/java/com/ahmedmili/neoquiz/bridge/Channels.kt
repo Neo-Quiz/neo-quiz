@@ -11,6 +11,8 @@ object Channels {
     val ALL: Set<String> = setOf(
         "demarrer",
         "android.retourTraite",
+        "android.calendrier",
+        "android.revisionDemandee",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",

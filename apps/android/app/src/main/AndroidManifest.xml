@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Android 13+: without it the foreground-service notification is hidden. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Daily review notification: an inexact alarm (no exact-alarm permission), re-armed after boot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -37,6 +39,15 @@
             android:name=".sync.SyncService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- The daily review alarm and its two re-arm moments. Not reachable by other apps (boot and
+             package-replaced are protected system broadcasts, which an unexported receiver still gets). -->
+        <receiver android:name=".notify.ReviewAlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Hands a file of the quiz folder to another app (`systeme.ouvrir`); URIs are only
              minted by the bridge after the perimeter check, and granted read-only per call. -->

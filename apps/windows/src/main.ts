@@ -45,6 +45,7 @@ import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { estMobile } from "./host/platform";
 import { retourAndroid } from "./ui/retour-android";
+import { armerCalendrier } from "./ui/calendrier-android";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
 
 /*
@@ -684,7 +685,12 @@ async function demarrer(): Promise<void> {
 		   premier montage — `reprendre` échoue silencieusement (quiz supprimé
 		   entre deux lancements) et laisse alors la coquille sur son défaut
 		   ("home"), sans Notice : une note disparue n'est pas une erreur. */
-		const derniereVue = await chargerReprise();
+		/* Android: a tap on the daily review notification lands on Home, where today's
+		   review is, instead of the last view; and the page hands the notification the
+		   next days' due counts each time it goes to the background. */
+		const depuisNotification = estMobile() && await pont().android?.revisionDemandee().catch(() => false);
+		if (estMobile()) armerCalendrier(store);
+		const derniereVue = depuisNotification ? { vue: "home" as const } : await chargerReprise();
 		if (derniereVue) reprendre(derniereVue, scanner);
 		mount(root, scanner, store, stats, sessions);
 	} catch (e) {

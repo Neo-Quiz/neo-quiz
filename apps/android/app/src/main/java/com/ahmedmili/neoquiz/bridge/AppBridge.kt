@@ -4,6 +4,9 @@ import android.app.Activity
 import android.os.Environment
 import com.ahmedmili.neoquiz.code.CodeSandbox
 import androidx.activity.ComponentActivity
+import com.ahmedmili.neoquiz.notify.CalendarChannel
+import com.ahmedmili.neoquiz.notify.DueCalendar
+import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.sync.SyncChannel
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
@@ -100,10 +103,11 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val syncChannel = SyncChannel(hub, qr::scan)
 
     val backChannel = BackChannel { bridge?.emit("android.retour", null) }
+    val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
         Unavailable.handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers(),
     )
     bridge = created
     return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter)

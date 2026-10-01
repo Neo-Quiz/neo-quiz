@@ -34,6 +34,10 @@ class BridgeTest {
                 override suspend fun forget(id: String) {}
             }, { null }).handlers() +
             BackChannel { }.handlers() +
+            com.ahmedmili.neoquiz.notify.CalendarChannel(com.ahmedmili.neoquiz.notify.DueCalendar(object : com.ahmedmili.neoquiz.notify.DueCalendar.Storage {
+                override fun read(): String? = null
+                override fun write(raw: String) {}
+            }), { }).handlers() +
             Unavailable.handlers()
     }
 

@@ -257,6 +257,11 @@ const pont: Pont = {
 		scanner: () => appeler("sync.scanner"),
 	},
 
+	android: {
+		calendrier: (table, textes) => appeler("android.calendrier", [table, textes]),
+		revisionDemandee: () => appeler<boolean>("android.revisionDemandee"),
+	},
+
 	code: {
 		run: (job) => appeler("code.run", [job]),
 		warm: (language) => appeler("code.warm", [language]),

@@ -377,6 +377,19 @@ export interface Pont {
 	};
 
 	/**
+	 * Android only (absent on Windows, which has no background alarm). The daily
+	 * review notification: no JavaScript ever runs in the background, so the page
+	 * precomputes the next days' due counts when it goes to the background and
+	 * hands them over; the alarm only READS that table.
+	 */
+	android?: {
+		/** Saves the due counts (`date` is a LOCAL `YYYY-MM-DD`) with the notification strings of the app language (`{count}` is replaced). */
+		calendrier(table: Array<{ date: string; due: number }>, textes: { title: string; bodyOne: string; bodyOther: string }): Promise<void>;
+		/** True once after a tap on the notification: the page then lands on Home, where today's review is. */
+		revisionDemandee(): Promise<boolean>;
+	};
+
+	/**
 	 * THE SYNC of the quiz folder (embedded Syncthing, `./syncthing.ts`). Absent
 	 * where there is no embedded binary (Linux): the Sync page is then not
 	 * offered. The window reaches THREE verbs and two pushes, nothing more:

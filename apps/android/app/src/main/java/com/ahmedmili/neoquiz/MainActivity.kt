@@ -13,6 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.viewinterop.AndroidView
+import android.content.Intent
+import com.ahmedmili.neoquiz.notify.ReviewAlarm
+import com.ahmedmili.neoquiz.notify.ReviewOpenRequest
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FirstRunScreen
 import com.ahmedmili.neoquiz.ui.hasAllFilesAccess
@@ -37,6 +40,9 @@ class MainActivity : ComponentActivity() {
         }
         granted = hasAllFilesAccess()
         askForNotifications()
+        // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
+        ReviewAlarm.scheduleNext(this)
+        if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
         setContent {
             if (granted) AndroidView(factory = { appWebView }) else AndroidView(factory = { FirstRunScreen(it) })
         }
@@ -48,6 +54,18 @@ class MainActivity : ComponentActivity() {
                 appWebView.askBack { handled -> if (!handled) finish() }
             }
         })
+    }
+
+    /**
+     * The app was already running when the review notification was tapped: the page restarts, and its
+     * startup asks `android.revisionDemandee` and lands on Home (where today's review is). The app was in
+     * the background, so its buffered writes have already been flushed.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (!intent.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false)) return
+        ReviewOpenRequest.raise()
+        if (loaded) appWebView.reload()
     }
 
     /** Android 13+: asked once, at first run, so the sync service's notification shows. Never blocks anything. */

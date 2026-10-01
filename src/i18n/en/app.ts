@@ -225,4 +225,9 @@ export const EN_APP = {
 	/* ── Installer un CLI depuis l'app : la confirmation NATIVE du principal ── */
 	"app.connectCli.done": "{name} is connected. Back to Neo Quiz…",
 	"app.connectCli.failed": "Signing in to {name} failed. Close this window and try again from Neo Quiz.",
+
+	/* ── The daily review notification (Android): strings handed to the app's native side with the table of due counts ── */
+	"app.notification.reviewTitle": "Time to review",
+	"app.notification.reviewBodyOne": "{count} question to review today",
+	"app.notification.reviewBodyOther": "{count} questions to review today",
 } as const;
