@@ -210,7 +210,7 @@ export function renderSettings(
 	   (`electron/main.ts`, `poserLocaleChromium`). A reload retranslated every
 	   label and left the date fields in the old locale. The restart costs a
 	   second more than a reload — which already lost the window's state. */
-	const langueSelect = createSelect(row(general, t("settings.language.name"), t("app.settings.languageHint")), {
+	const langueSelect = createSelect(row(general, t("settings.language.name"), t(currentHost().platform.isMobile ? "app.settings.languageHintMobile" : "app.settings.languageHint")), {
 		value: "auto",
 		options: [
 			{ value: "auto", label: t("app.settings.languageAuto") },
@@ -312,7 +312,7 @@ export function renderSettings(
 	   2026-09-17 — there is nothing left to suggest, every vault of the
 	   machine is already there. The cross dismisses it DURABLY: that is what
 	   keeps the next startup from reopening it. */
-	const sectionExtra = section(foldersPage, t("app.settings.extraFolders"), t("app.settings.extraFoldersHint"));
+	const sectionExtra = section(foldersPage, t("app.settings.extraFolders"), t(mobile ? "app.settings.extraFoldersHintMobile" : "app.settings.extraFoldersHint"));
 	const liste = ajouter(sectionExtra, "div", "nq-reglages-liste");
 	const actions = ajouter(sectionExtra, "div", "nq-reglages-actions");
 

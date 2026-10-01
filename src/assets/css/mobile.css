@@ -783,3 +783,11 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
 .is-mobile #neo-quiz-root > .qbd-qz .quiz-track-item {
 	padding-bottom: 16px;
 }
+
+/* THE SOFT KEYBOARD (ui/clavier.ts): while a text answer is typed, the bar of
+   arrows is hidden and its ~80 px go back to the question. The Check button is
+   in the slide itself, and the arrows return when the keyboard closes; sitting
+   above the keyboard they would still cost a fifth of the room that is left. */
+html.nq-keyboard #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
+	display: none;
+}

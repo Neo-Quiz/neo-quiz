@@ -26,6 +26,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	/* ── Réglages › Synchronisation (tâche 6 du plan Android v1) : la page, commune aux applications ── */
 	"settings.sync.title": "Synchronisation",
 	"settings.sync.hint": "Garde ton dossier de quiz identique sur tous tes appareils, directement de l'un à l'autre, sans compte ni serveur chez nous. Elle repose sur Syncthing (open source), intégré à Neo Quiz : Windows peut nommer Syncthing quand il demande une autorisation.",
+	"settings.sync.hintMobile": "Garde ton dossier de quiz identique sur tous tes appareils, directement de l'un à l'autre, sans compte ni serveur chez nous. Elle repose sur Syncthing (open source), intégré à Neo Quiz. Sur Windows, il peut nommer Syncthing quand il demande une autorisation.",
 	"settings.sync.starting": "Démarrage de la synchronisation…",
 	"settings.sync.statusOff": "La synchronisation ne tourne pas",
 	"settings.sync.statusNone": "Aucun appareil",

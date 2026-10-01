@@ -20,6 +20,13 @@ interface PontBarre {
 }
 
 const ACTIVE = "qbd-nav-item--active";
+const MODAL_CLOSE = ".modal-container .modal-close-button";
+const SETTINGS_MODAL = ".modal-container .nq-reglages-modal";
+
+/** The Settings button is the only rail button without a `data-nav` key. */
+function estReglages(btn: HTMLElement): boolean {
+	return !btn.dataset.nav;
+}
 
 function boutons(): HTMLElement[] {
 	return Array.from(document.querySelectorAll<HTMLElement>(".qbd-sidebar .qbd-nav-item"));
@@ -59,7 +66,12 @@ export function installBarreNative(pont: PontBarre): void {
 			}
 			const cs = getComputedStyle(barre);
 			// Cheap check first: the icons are only redrawn when the bar itself changed.
-			const rapide = JSON.stringify(boutons().map(b => [b.querySelector(".qbd-nav-label")?.textContent, b.classList.contains(ACTIVE), b.classList.contains("qbd-nav-item--placeholder")]));
+			/* While the Settings modal is shown, Settings is the active tab (the
+			   rail still marks the page under it: it becomes active again by
+			   itself when the modal closes). */
+			const reglagesOuverts = !!document.querySelector(SETTINGS_MODAL);
+			const estActif = (b: HTMLElement): boolean => reglagesOuverts ? estReglages(b) : b.classList.contains(ACTIVE);
+			const rapide = JSON.stringify(boutons().map(b => [b.querySelector(".qbd-nav-label")?.textContent, estActif(b), b.classList.contains("qbd-nav-item--placeholder")]));
 			if (rapide === dernier) return;
 			const items = [];
 			// The two tints are the rail's own computed colours, read from an
@@ -67,7 +79,7 @@ export function installBarreNative(pont: PontBarre): void {
 			const muted = couleur(boutons()[0], false);
 			const active = couleur(boutons()[0], true);
 			for (const btn of boutons()) {
-				const on = btn.classList.contains(ACTIVE);
+				const on = estActif(btn);
 				const label = btn.querySelector(".qbd-nav-label")?.textContent ?? "";
 				items.push({ id: btn.dataset.nav ?? "settings", label, active: on, placeholder: btn.classList.contains("qbd-nav-item--placeholder") });
 			}
@@ -95,8 +107,9 @@ export function installBarreNative(pont: PontBarre): void {
 		/* A modal (the Settings page) covers the page but not the bar: a tap on
 		   a tab closes it first, then goes to the tab (the click on a page that
 		   is still under a modal went nowhere). */
-		const fermer = document.querySelector<HTMLElement>(".modal-container .modal-close-button");
+		const fermer = document.querySelector<HTMLElement>(MODAL_CLOSE);
 		if (fermer) {
+			if (estReglages(btn) && document.querySelector(SETTINGS_MODAL)) return; // already on Settings
 			fermer.click();
 			if (!btn.classList.contains(ACTIVE)) window.setTimeout(() => btn.click(), 350);
 			return;
@@ -108,7 +121,7 @@ export function installBarreNative(pont: PontBarre): void {
 	document.documentElement.classList.add("nq-bar-native");
 	const racine = document.getElementById("neo-quiz-root") ?? document.body;
 	new MutationObserver(planifier).observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
-	new MutationObserver(planifier).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+	new MutationObserver(planifier).observe(document.body, { attributes: true, attributeFilter: ["class"], childList: true });
 	window.matchMedia("(max-width: 600px)").addEventListener("change", planifier);
 	planifier();
 }

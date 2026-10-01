@@ -70,6 +70,8 @@ export function attachQuizBars(host: HTMLElement): () => void {
 			/* The mini composer above the bar shows and hides itself: the slides' room follows. */
 			mutations.observe(panel, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
 			resize.observe(panel);
+			// The bar hiding (soft keyboard open, mobile.css) gives its room to the slides.
+			resize.observe(bar);
 			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
 		if (!panel) return;

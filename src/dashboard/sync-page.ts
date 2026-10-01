@@ -122,7 +122,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	statut.setAttribute("aria-live", "polite");
 	ajouter(statut, "span", "qbd-sync-point").setAttribute("aria-hidden", "true");
 	const statutTexte = ajouter(statut, "span", undefined, t("settings.sync.starting"));
-	ajouter(entete, "p", "qbd-sync-aide", t("settings.sync.hint"));
+	ajouter(entete, "p", "qbd-sync-aide", t(mobile ? "settings.sync.hintMobile" : "settings.sync.hint"));
 
 	/* ── This device: its ID, its QR code and ONE share button, nothing else ── */
 	const moi = ajouter(racine, "section", "qbd-sync-section");

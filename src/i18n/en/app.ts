@@ -99,6 +99,7 @@ export const EN_APP = {
 	   pesaient plus que ce qu'elles expliquaient, et celle-là ne se lit qu'au
 	   moment où l'on vise la croix. */
 	"app.settings.extraFoldersHint": "Your Obsidian vaults open by themselves.",
+	"app.settings.extraFoldersHintMobile": "Other folders Neo Quiz reads quizzes from.",
 	"app.settings.folderAlreadyOpen": "This folder is already open.",
 	"app.settings.folderInsideOpen": "This folder is already inside one of your open folders. Add it from Folders → New folder → Open an existing folder.",
 	"app.settings.folderContainsOpen": "This folder contains one of your open folders.",
@@ -187,6 +188,7 @@ export const EN_APP = {
 	"app.settings.nav": "Settings sections",
 	"app.settings.languageAuto": "Automatic (follow the system)",
 	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
+	"app.settings.languageHintMobile": "Interface language. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",
 	"app.settings.groupModes": "Group the Learn and Test of a course",
 	"app.settings.groupModesHint": "On the Folders page, a course with both a Learn and a Test shows as one card, with a button for each.",
