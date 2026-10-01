@@ -71,6 +71,25 @@ class ShareRulesTest {
         assertEquals(emptyList<Any>(), ShareRules.requests(null, emptyList(), id))
     }
 
+    @Test fun cleanNameDropsEverythingThatCouldForgeALineOrReorderText() {
+        val hostile = "Eve" + listOf(10, 13, 0x2028, 0x2029, 0x202e, 0x2066, 0x2069, 0x85).joinToString("") { Char(it).toString() } + "Device ID: " + id
+        assertEquals(("EveDevice ID: " + id).take(64), ShareRules.cleanName(hostile))
+        assertEquals("", ShareRules.cleanName(null))
+        assertEquals(64, ShareRules.cleanName("y".repeat(99)).length)
+        val shown = ShareRules.requests(JSONObject().put(other, JSONObject().put("name", hostile)), emptyList(), "OWN")[0]["nom"]!!
+        assertTrue(shown.none { it.code in listOf(10, 13, 0x2028, 0x2029, 0x202e) })
+    }
+
+    @Test fun requestsAreNewestFirstAndTheCapSaysHowManyAreHidden() {
+        val pending = JSONObject()
+            .put(other, JSONObject().put("name", "old").put("time", "2026-10-01T08:00:00Z"))
+            .put(id, JSONObject().put("name", "new").put("time", "2026-10-01T09:00:00Z"))
+        assertEquals(listOf("new", "old"), ShareRules.requests(pending, emptyList(), "OWN").map { it["nom"] })
+        assertEquals(0, ShareRules.requestsMore(pending, emptyList(), "OWN"))
+        assertEquals(listOf("new"), ShareRules.requests(pending, emptyList(), "OWN", 1).map { it["nom"] })
+        assertEquals(1, ShareRules.requestsMore(pending, emptyList(), "OWN", 1))
+    }
+
     @Test fun lastSeenIsMillisecondsAndNeverIsNull() {
         assertEquals(java.time.Instant.parse("2026-10-01T10:00:00Z").toEpochMilli(), ShareRules.lastSeen("2026-10-01T10:00:00Z"))
         assertEquals(java.time.Instant.parse("2026-10-01T08:00:00Z").toEpochMilli(), ShareRules.lastSeen("2026-10-01T10:00:00+02:00"))

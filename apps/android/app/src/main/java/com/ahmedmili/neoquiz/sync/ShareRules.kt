@@ -153,18 +153,36 @@ object ShareRules {
      * neither ours nor already paired; the name is the REMOTE's and untrusted: control characters
      * dropped, cut to 64, and the page renders it as text only.
      */
-    fun requests(pending: JSONObject?, paired: Collection<String>, ownId: String): List<Map<String, String>> {
+    fun requests(pending: JSONObject?, paired: Collection<String>, ownId: String, max: Int = MAX_REQUESTS): List<Map<String, String>> =
+        candidates(pending, paired, ownId).take(max)
+
+    /** How many valid requests the cap of [requests] hides (the page says "+N"). */
+    fun requestsMore(pending: JSONObject?, paired: Collection<String>, ownId: String, max: Int = MAX_REQUESTS): Int =
+        maxOf(0, candidates(pending, paired, ownId).size - max)
+
+    /** Every valid request, the most recent first (an unreadable time counts as oldest). */
+    private fun candidates(pending: JSONObject?, paired: Collection<String>, ownId: String): List<Map<String, String>> {
         if (pending == null) return emptyList()
-        val out = ArrayList<Map<String, String>>()
+        val found = ArrayList<Pair<Long, Map<String, String>>>()
         for (id in pending.keys()) {
-            if (out.size >= MAX_REQUESTS) break
             if (!isDeviceId(id) || !hasValidCheckDigits(id) || id == ownId || id in paired) continue
-            val raw = pending.optJSONObject(id)?.optString("name") ?: ""
-            val name = raw.filter { it.code > 0x1f && it.code != 0x7f }.trim().take(NAME_MAX)
-            out.add(mapOf("id" to id, "nom" to name.ifEmpty { id.take(7) }))
+            val info = pending.optJSONObject(id)
+            val time = try { java.time.OffsetDateTime.parse(info?.optString("time") ?: "").toInstant().toEpochMilli() } catch (_: Exception) { 0L }
+            found.add(time to mapOf("id" to id, "nom" to cleanName(info?.optString("name")).ifEmpty { id.take(7) }))
         }
-        return out
+        return found.sortedByDescending { it.first }.map { it.second }
     }
+
+    /**
+     * A name announced by ANOTHER device, made safe to show anywhere, a native dialog included
+     * (mirror of `nomSur`): control characters (no forged line), the Unicode line and paragraph
+     * separators and the bidi overrides/isolates (no reordered text) are dropped, then trimmed and
+     * cut to 64. Never trust the raw name.
+     */
+    fun cleanName(raw: String?): String = (raw ?: "").filter { c ->
+        val x = c.code
+        !(x <= 0x1f || x in 0x7f..0x9f || x == 0x2028 || x == 0x2029 || x in 0x202a..0x202e || x in 0x2066..0x2069)
+    }.trim().take(NAME_MAX)
 
     /** `lastSeen` of `GET /rest/stats/device` to milliseconds; `null` when never seen (Syncthing writes the zero date) or junk. */
     fun lastSeen(text: String?): Long? {

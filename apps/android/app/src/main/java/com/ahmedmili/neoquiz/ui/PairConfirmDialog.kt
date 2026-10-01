@@ -3,6 +3,7 @@ package com.ahmedmili.neoquiz.ui
 import android.app.Activity
 import android.app.AlertDialog
 import com.ahmedmili.neoquiz.R
+import com.ahmedmili.neoquiz.sync.ShareRules
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -18,7 +19,11 @@ import kotlinx.coroutines.withContext
 class PairConfirmDialog(private val activity: Activity) {
     suspend fun ask(deviceId: String, name: String): Boolean = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
-            val shown = if (name.isBlank()) deviceId else "$name\n$deviceId"
+            // The id FIRST on its own labelled line, the announced name LAST with its label; the name is
+            // the other device's, so it is cleaned again here (no forged line, no reordered text).
+            val clean = ShareRules.cleanName(name)
+            val shown = activity.getString(R.string.pair_id_line, deviceId) +
+                if (clean.isEmpty()) "" else "\n" + activity.getString(R.string.pair_name_line, clean)
             val dialog = AlertDialog.Builder(activity)
                 .setTitle(R.string.pair_title)
                 .setMessage(activity.getString(R.string.pair_message, shown))

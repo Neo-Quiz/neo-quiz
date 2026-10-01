@@ -1,5 +1,6 @@
 package com.ahmedmili.neoquiz.sync
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
@@ -26,6 +27,20 @@ class SyncChannelTest {
         val b = Backend(id)
         channel(b, ArrayList())["sync.ignorer"]!!(JSONArray().put(id))
         assertEquals(listOf(id), b.ignored)
+    }
+
+    @Test fun aSecondShareWhileOneIsOpenReturnsAtOnce() = runBlocking {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var calls = 0
+        val h = SyncChannel(Backend(id), { null }, { _ -> calls++; gate.await(); true }).handlers()["sync.partagerId"]!!
+        val first = async { h(JSONArray().put("systeme")) }
+        while (calls == 0) kotlinx.coroutines.yield()
+        assertFalse(h(JSONArray().put("systeme")) == true)
+        assertEquals(1, calls)
+        gate.complete(Unit)
+        assertTrue(first.await() == true)
+        // The lock is released afterwards.
+        assertTrue(h(JSONArray().put("systeme")) == true)
     }
 
     @Test fun onlyTheSystemChannelSharesAndOnlyThisDevicesOwnId() = runBlocking {

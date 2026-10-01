@@ -1481,7 +1481,18 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   is OURS (read from the running instance, validated), and `planPartage`
 		   builds the only two URLs that can ever be opened (`mailto:` and
 		   `discord://`) from it; any other channel gets `null` and does nothing. */
+		let partageSyncEnCours = false;
 		ipcMain.handle(CANAUX.syncPartagerId, async (_e, canal: unknown) => {
+			/* Single flight, like `partage.ts`: a second call while one is open is dropped. */
+			if (partageSyncEnCours) return false;
+			partageSyncEnCours = true;
+			try {
+				return await partagerIdSync(canal);
+			} finally {
+				partageSyncEnCours = false;
+			}
+		});
+		const partagerIdSync = async (canal: unknown): Promise<boolean> => {
 			const id = (await sync.etat()).appareil;
 			if (!isDeviceId(id)) return false;
 			const plan = planPartage(canal, id, { sujet: t("app.syncShare.subject"), corps: t("app.syncShare.body", { id }) });
@@ -1495,7 +1506,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				try { await shell.openExternal("https://discord.com/app"); } catch { return false; }
 			}
 			return true;
-		});
+		};
 		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
 		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));
 	}

@@ -51,6 +51,7 @@ import type { Perimetre } from "./perimetre";
 import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_SYNC_ROOT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
+import { nomSur } from "./syncthing-regles";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
 import type { MiseAJour } from "./mise-a-jour";
@@ -750,8 +751,10 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 						type: "warning" as const,
 						title: t("app.syncPair.title"),
 						message: t("app.syncPair.message"),
-						detail: t("app.syncPair.detail", { id, name: nom ? `
-${nom}` : "" }),
+						/* The ID FIRST on its own labelled line, the announced name LAST with
+						   its label: the name is the other device's and must never read as
+						   part of the ID line (`nomSur` also strips line breaks from it). */
+						detail: t("app.syncPair.detail", { id }) + (nom ? "\n" + t("app.syncPair.detailName", { name: nomSur(nom) }) : ""),
 						buttons: [t("app.syncPair.allow"), t("app.syncPair.deny")],
 						defaultId: 1,
 						cancelId: 1,

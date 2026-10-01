@@ -173,7 +173,10 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 
     override suspend fun state(): Map<String, Any?> = ensure()?.state() ?: SyncEngine.ABSENT
 
-    override suspend fun pair(id: String): String = ensure()?.pair(id) ?: PairResult.UNAVAILABLE
+    // One native dialog at a time: a second pairing while one is open is dropped, so a page cannot stack dialogs.
+    private val pairing = SingleFlight()
+
+    override suspend fun pair(id: String): String = pairing.run(PairResult.CANCELLED) { ensure()?.pair(id) ?: PairResult.UNAVAILABLE }
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
 

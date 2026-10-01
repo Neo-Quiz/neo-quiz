@@ -16,6 +16,8 @@
     <string name="review_channel_name">Daily review</string>
     <string name="pair_title">Pair this device?</string>
     <string name="pair_message">Your quizzes and review history will be shared with this device. Pair only a device you own.\n\n%1$s</string>
+    <string name="pair_id_line">Device ID: %1$s</string>
+    <string name="pair_name_line">Announced name: %1$s</string>
     <string name="pair_confirm">Pair</string>
     <string name="pair_cancel">Cancel</string>
 </resources>

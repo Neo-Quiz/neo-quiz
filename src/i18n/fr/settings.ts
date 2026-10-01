@@ -56,6 +56,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.unavailable": "La synchronisation n'a pas pu démarrer sur cet appareil.",
 	"settings.sync.requests": "Demandes",
 	"settings.sync.requestText": "« {name} » veut se synchroniser avec cet appareil",
+	"settings.sync.requestsMore": "+{n} autres",
 	"settings.sync.accept": "Accepter",
 	"settings.sync.ignore": "Ignorer",
 	"settings.sync.devices": "Tes appareils",

@@ -44,6 +44,8 @@ import {
 	creerDetecteurReception,
 	dernierVu,
 	demandesDepuis,
+	nomSur,
+	plusDemandes,
 	folderConfig,
 	folderEtat,
 	hasValidCheckDigits,
@@ -87,7 +89,7 @@ export interface StartOpts {
 
 const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected"] as const;
 const MAX_APPAREILS = 16;
-const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], dossier: { etat: "absent", pourcentage: null } };
+const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], demandesPlus: 0, dossier: { etat: "absent", pourcentage: null } };
 
 const pause = (ms: number): Promise<void> => new Promise(ok => setTimeout(ok, ms));
 
@@ -322,6 +324,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 					vuLe: dernierVu(vus[d.deviceID]?.lastSeen),
 				})),
 			demandes: demandesDepuis(attente, paires, ownId),
+			demandesPlus: plusDemandes(attente, paires, ownId),
 			dossier: folderEtat(statut),
 		};
 	}
@@ -411,7 +414,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				if (paires.includes(id)) return "ok";
 				if (paires.length >= MAX_APPAREILS) return "invalide";
 				const attente = (await courant.rest.pendingDevices())[id];
-				const nom = attente?.name?.trim().slice(0, 64) ?? "";
+				const nom = nomSur(attente?.name);
 				/* Nothing is paired without the owner's say: a native dialog,
 				   decided in the main process, that the window cannot answer. */
 				let accord = false;
@@ -506,6 +509,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 	let handle: SyncHandle | null = null;
 	let demarrage: Promise<SyncHandle | null> | null = null;
 	let fin = false;
+	let appairageEnCours = false;
 	const abonnesEtat = new Set<(e: EtatSync) => void>();
 	const abonnesDonnees = new Set<() => void>();
 
@@ -535,11 +539,19 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 	return {
 		async etat() { return (await obtenir())?.etat() ?? ETAT_ABSENT; },
 		async appairer(id) {
-			const h = await obtenir();
-			if (!h) return "indisponible";
-			const res = await h.appairer(id);
-			if (res === "ok") { try { await o.poserActif(); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
-			return res;
+			/* One native dialog at a time (like `partage.ts`): a second call while
+			   one is open is dropped, so a window cannot stack dialogs. */
+			if (appairageEnCours) return "annule";
+			appairageEnCours = true;
+			try {
+				const h = await obtenir();
+				if (!h) return "indisponible";
+				const res = await h.appairer(id);
+				if (res === "ok") { try { await o.poserActif(); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
+				return res;
+			} finally {
+				appairageEnCours = false;
+			}
 		},
 		async oublier(id) { await (await obtenir())?.oublier(id); },
 		async ignorer(id) { await (await obtenir())?.ignorer(id); },

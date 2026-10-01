@@ -56,6 +56,7 @@ export const EN_SETTINGS = {
 	"settings.sync.unavailable": "Sync could not start on this device.",
 	"settings.sync.requests": "Requests",
 	"settings.sync.requestText": "“{name}” wants to sync with this device",
+	"settings.sync.requestsMore": "+{n} more",
 	"settings.sync.accept": "Accept",
 	"settings.sync.ignore": "Ignore",
 	"settings.sync.devices": "Your devices",

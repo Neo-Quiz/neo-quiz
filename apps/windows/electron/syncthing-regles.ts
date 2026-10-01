@@ -281,17 +281,35 @@ const NOM_MAX = 64;
     have not paired. Only well-formed ids (format and check characters) that are
     neither ours nor already paired; the name is the REMOTE's and untrusted: cut
     to 64, control characters dropped, and the page renders it as text only. */
-export function demandesDepuis(pending: unknown, paires: readonly string[], ownId: string): DemandeSync[] {
+export function demandesDepuis(pending: unknown, paires: readonly string[], ownId: string, max: number = MAX_DEMANDES): DemandeSync[] {
+	return candidats(pending, paires, ownId).slice(0, max);
+}
+
+/** How many valid requests the cap of `demandesDepuis` hides (the page says "+N"). */
+export function plusDemandes(pending: unknown, paires: readonly string[], ownId: string, max: number = MAX_DEMANDES): number {
+	return Math.max(0, candidats(pending, paires, ownId).length - max);
+}
+
+/** Every valid request, the most recent first (an unreadable time counts as oldest). */
+function candidats(pending: unknown, paires: readonly string[], ownId: string): DemandeSync[] {
 	if (!pending || typeof pending !== "object" || Array.isArray(pending)) return [];
-	const sortie: DemandeSync[] = [];
-	for (const [id, info] of Object.entries(pending as Record<string, { name?: unknown } | null>)) {
-		if (sortie.length >= MAX_DEMANDES) break;
+	const lus: Array<DemandeSync & { t: number }> = [];
+	for (const [id, info] of Object.entries(pending as Record<string, { name?: unknown; time?: unknown } | null>)) {
 		if (!hasValidCheckDigits(id) || id === ownId || paires.includes(id)) continue;
-		// eslint-disable-next-line no-control-regex
-		const nom = typeof info?.name === "string" ? info.name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, NOM_MAX) : "";
-		sortie.push({ id, nom: nom || id.slice(0, 7) });
+		const t = typeof info?.time === "string" ? Date.parse(info.time) : NaN;
+		lus.push({ id, nom: nomSur(info?.name) || id.slice(0, 7), t: Number.isFinite(t) ? t : 0 });
 	}
-	return sortie;
+	return lus.sort((a, b) => b.t - a.t).map(({ id, nom }) => ({ id, nom }));
+}
+
+/** A name announced by ANOTHER device, made safe to show anywhere, a native
+    dialog included: control characters (so no forged line), the Unicode line and
+    paragraph separators, and the bidi overrides/isolates (so no reordered text)
+    are dropped, then trimmed and cut to 64. Never trust the raw name. */
+export function nomSur(brut: unknown): string {
+	if (typeof brut !== "string") return "";
+	// eslint-disable-next-line no-control-regex
+	return brut.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, NOM_MAX);
 }
 
 /** `lastSeen` of `GET /rest/stats/device` → milliseconds, `null` when the

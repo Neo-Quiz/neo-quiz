@@ -91,6 +91,18 @@ await withSrcModule(
 			r.check("a name is cut to 64 characters, control characters dropped, text only",
 				demandesDepuis({ [AUTRE_ID]: { name: "a\u0000<b>" + "z".repeat(100) } }, [], ID)[0].nom, ("a<b>" + "z".repeat(100)).slice(0, 64));
 			r.check("no name falls back to the first 7 characters of the id", demandesDepuis({ [AUTRE_ID]: {} }, [], ID), [{ id: AUTRE_ID, nom: AUTRE_ID.slice(0, 7) }]);
+			const hostile = "Eve" + [10, 13, 0x2028, 0x2029, 0x202e, 0x2066, 0x2069, 0x85].map(c => String.fromCharCode(c)).join("") + "Device ID: " + ID;
+			r.check("nomSur: no control, line/paragraph separator or bidi override survives a hostile name",
+				regles.nomSur(hostile), ("EveDevice ID: " + ID).slice(0, 64));
+			r.check("nomSur: non strings give nothing, length capped at 64", [regles.nomSur(7), regles.nomSur("y".repeat(99)).length], ["", 64]);
+			r.check("a hostile pending name cannot forge a line in the list either", [...demandesDepuis({ [AUTRE_ID]: { name: hostile } }, [], "OWN")[0].nom].some(c => [10, 13, 0x2028, 0x2029, 0x202e].includes(c.charCodeAt(0))), false);
+			{
+				const dates = { [AUTRE_ID]: { name: "old", time: "2026-10-01T08:00:00Z" }, [ID]: { name: "new", time: "2026-10-01T09:00:00Z" } };
+				r.check("the most recent request comes first", demandesDepuis(dates, [], "OWN").map(d => d.nom), ["new", "old"]);
+				r.check("plusDemandes counts what the cap hides (none here)", regles.plusDemandes(dates, [], "OWN"), 0);
+				r.check("plusDemandes with a cap of 1 hides one", regles.plusDemandes(dates, [], "OWN", 1), 1);
+				r.check("the cap keeps the newest", demandesDepuis(dates, [], "OWN", 1).map(d => d.nom), ["new"]);
+			}
 			r.check("garbage input gives nothing", [demandesDepuis(null, [], ID), demandesDepuis("x", [], ID), demandesDepuis([], [], ID)], [[], [], []]);
 		});
 
@@ -245,6 +257,23 @@ await withSrcModule(
 			r.check("the first start pins the default folder as syncRoot", [memoire.root, demarres[0]], [join(tmpO, "A"), join(tmpO, "A")]);
 			await g1.ignorer(AUTRE_ID);
 			r.check("ignorer reaches the running instance", ignores, [AUTRE_ID]);
+			{
+				/* One pairing dialog at a time: a second call while one is open returns at once. */
+				let liberer = () => {};
+				let appels = 0;
+				const lent = async () => ({ etat: async () => ({ actif: true }), appairer: () => { appels++; return new Promise(ok => { liberer = () => ok("ok"); }); }, oublier: async () => {}, ignorer: async () => {}, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} });
+				const g = sync.creerGestionSync({ exe: "x", home: "h", racineParDefaut: () => join(tmpO, "C"), lireRoot: async () => null, poserRoot: async () => {}, lireActif: async () => true, poserActif: async () => {}, confirmer: async () => true }, lent);
+				const premier = g.appairer(AUTRE_ID);
+				await new Promise(ok => setTimeout(ok, 20));
+				r.check("a second pairing while one is open returns at once, without reaching the instance", [await g.appairer(AUTRE_ID), appels], ["annule", 1]);
+				liberer();
+				r.check("the first one still completes", await premier, "ok");
+				const apres = g.appairer(AUTRE_ID);
+				await new Promise(ok => setTimeout(ok, 20));
+				liberer();
+				r.check("the lock is released afterwards", [await apres, appels], ["ok", 2]);
+				await g.arreter();
+			}
 			await g1.arreter();
 			const g2 = fabriquer(join(tmpO, "B"));
 			await g2.etat();

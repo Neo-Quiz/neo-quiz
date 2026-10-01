@@ -15,5 +15,7 @@ export interface EtatSync {
 	/** Devices that added THIS one and are waiting to be accepted. Names are the
 	    remote's, at most 64 characters: render as text only. */
 	demandes: Array<{ id: string; nom: string }>;
+	/** How many more requests exist than `demandes` lists (the page shows "+N"). */
+	demandesPlus: number;
 	dossier: { etat: "idle" | "syncing" | "error" | "absent"; pourcentage: number | null };
 }

@@ -243,6 +243,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	}
 
 	function peindreDemandes(e: EtatSync): void {
+		/* An ignored id that is no longer pending is forgotten: if it asks again
+		   later, it must show again. */
+		for (const id of [...ignorees]) if (!e.demandes.some(d => d.id === id)) ignorees.delete(id);
 		const visibles = e.demandes.filter(d => !ignorees.has(d.id));
 		demandesSection.hidden = visibles.length === 0;
 		demandesCarte.replaceChildren();
@@ -268,6 +271,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					.catch(() => { if (!demonte) currentHost().ui.notice(t("settings.sync.unavailable")); })
 					.then(() => rafraichir());
 			});
+		}
+		if (visibles.length > 0 && e.demandesPlus > 0) {
+			ajouter(ajouter(demandesCarte, "div", "qbd-sync-ligne"), "span", "qbd-sync-vide", t("settings.sync.requestsMore", { n: e.demandesPlus }));
 		}
 	}
 
@@ -368,7 +374,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	let pousse = false;
 	const desabonner = deps.surEtat(e => { pousse = true; peindre(e); });
 	void deps.etat().then(e => { if (!pousse) peindre(e); }).catch(() => {
-		if (!demonte) peindre({ actif: false, appareil: null, nom: "", appareils: [], demandes: [], dossier: { etat: "absent", pourcentage: null } });
+		if (!demonte) peindre({ actif: false, appareil: null, nom: "", appareils: [], demandes: [], demandesPlus: 0, dossier: { etat: "absent", pourcentage: null } });
 	});
 
 	return () => {

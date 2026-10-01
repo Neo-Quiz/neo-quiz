@@ -157,6 +157,7 @@ class SyncEngine(
                 )
             },
             "demandes" to ShareRules.requests(pending, others.map { it.getString("deviceID") }, r.ownId),
+            "demandesPlus" to ShareRules.requestsMore(pending, others.map { it.getString("deviceID") }, r.ownId),
             "dossier" to mapOf("etat" to folder.state, "pourcentage" to folder.percent),
         )
     }
@@ -218,7 +219,7 @@ class SyncEngine(
             if (id in paired) return@withContext PairResult.OK
             if (paired.size >= MAX_DEVICES) return@withContext PairResult.INVALID
             val waiting = r.instance.rest.pendingDevices().optJSONObject(id)
-            val name = waiting?.optString("name")?.trim()?.take(64) ?: ""
+            val name = ShareRules.cleanName(waiting?.optString("name"))
             // Nothing is paired without the owner's say: a native dialog the page cannot answer.
             val agreed = try { confirm(id, name) } catch (_: Exception) { false }
             if (!agreed) return@withContext PairResult.CANCELLED
@@ -270,7 +271,7 @@ class SyncEngine(
         private const val MAX_DEVICES = 16
         private val EVENTS = listOf("StateChanged", "ItemFinished", "DeviceConnected")
         val ABSENT: Map<String, Any?> = mapOf(
-            "actif" to false, "appareil" to null, "nom" to "", "appareils" to emptyList<Any>(), "demandes" to emptyList<Any>(),
+            "actif" to false, "appareil" to null, "nom" to "", "appareils" to emptyList<Any>(), "demandes" to emptyList<Any>(), "demandesPlus" to 0,
             "dossier" to mapOf("etat" to "absent", "pourcentage" to null),
         )
     }
