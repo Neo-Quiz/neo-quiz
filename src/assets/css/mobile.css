@@ -155,14 +155,8 @@ html.nq-mobile {
 	height: 25px;
 	stroke-width: 2;
 }
-/* Active: a tinted icon. A full fill turns overlapping Lucide outlines (the
-   folders icon) into a blob, so the shape gets a light fill of the accent
-   under a slightly heavier stroke. */
-.is-mobile .qbd-nav-item--active .qbd-nav-icon svg {
-	fill: currentColor;
-	fill-opacity: 0.22;
-	stroke-width: 2.25;
-}
+/* Active: the filled icon of the desktop rail (nav.ts tags the main shape,
+   dashboard-nav.css `.qbd-nav-fill`), in the accent colour of the label. */
 
 .is-mobile .qbd-nav-label {
 	font-size: 14px;
