@@ -452,15 +452,13 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 	   par arriver (détecteur de renommage de l'app), le second appel ne
 	   trouve plus l'ancienne clé et ne fait rien. */
 	ctx.statsStore.renamed(quiz.path, to);
-	/* PHOTOS DE SESSION (`quizSessions`, apps/windows/src/review/sessions.ts) :
-	   LIMITE ACCEPTÉE (Ahmed, 2026-09-27). `SessionsApp` n'est pas un membre
-	   de `DashboardShellCtx` — il vit uniquement côté application, hors du
-	   contrat partagé — donc ce module ne peut pas la faire suivre ici. Une
-	   session en cours sur ce quiz reste indexée sous l'ANCIEN chemin après un
-	   déplacement et ne reprendra pas. Si `sessions` entre un jour dans
-	   `DashboardShellCtx`, l'appel manquant est ICI, juste après la ligne
-	   `statsStore.renamed` ci-dessus : `ctx.sessions?.renommer(quiz.path, to)`
-	   (méthode à ajouter à `SessionsApp`, sur le modèle de `statsStore.renamed`). */
+	/* Everything the host keeps under this path (saved sessions, remembered
+	   test setups; exams and folder settings for a folder move): the host
+	   renames its own keys (`DashboardShellCtx.movedPrefix`). Before
+	   2026-10-01 a session in progress stayed indexed under the OLD path after a
+	   move and never resumed, an accepted limit while the session store was
+	   not reachable from this shared module. */
+	await ctx.movedPrefix?.(quiz.path, to);
 	return to;
 }
 
@@ -660,7 +658,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
     de dossier, puis transpose l'historique de révision qui lui appartient
     (§2.3 de la spec) — voir `moveModuleTo` plus bas pour le détail. Séparée
     de `buildModuleCardMenu` pour rester testable sans DOM. */
-async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: string): Promise<boolean> {
+export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: string): Promise<boolean> {
 	const host = currentHost();
 	/* Le CHEMIN du dossier, jamais `g.folder`, qui n'est que son NOM
 	   (« Templates » pour « Personal/Templates ») : le renommage visait un
@@ -695,6 +693,11 @@ async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: st
 		return false;
 	}
 	await ctx.reviewStore?.moved(source, to);
+	/* Stats (by path, prefix-aware) and everything the host keeps by path or
+	   module key (exams, sessions, test setups, folder settings) follow the
+	   folder; before 2026-10-01 only the review log did. */
+	ctx.statsStore.renamed(source, to);
+	await ctx.movedPrefix?.(source, to);
 	return true;
 }
 

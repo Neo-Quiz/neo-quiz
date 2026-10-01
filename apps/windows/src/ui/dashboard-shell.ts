@@ -55,7 +55,7 @@ import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
-import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
+import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
@@ -78,6 +78,7 @@ function marqueRail(): HTMLElement {
 import type { DerniereVue } from "./reprise";
 import type { SessionsApp } from "../review/sessions";
 import { testSetups } from "../review/test-setups";
+import { createMovedPrefix } from "../review/folder-move";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES DES PAGES « ACCUEIL » / « MES QUIZ »
@@ -541,6 +542,18 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			const cle = cleExamens(group);
 			if (cle) void retirerExamenReglage(cle, id);
 		},
+		/* A move carries what the app keeps by path or module key: exams,
+		   sessions, remembered test setups, folder paths of the page settings
+		   (`review/folder-move.ts`). */
+		movedPrefix: createMovedPrefix({
+			paths: () => currentHost().paths,
+			quizPaths: () => deps.scanner.getQuizzes().map(q => q.path),
+			renameExams: renommerExamens,
+			sessions: deps.sessions,
+			testSetups,
+			pageSettings: reglagesPages,
+			savePageSettings: enregistrerReglagesPages,
+		}),
 		// « Nouveau quiz » : une note vierge, puis sa page en ÉDITION par
 		// `openQuizPath` ci-dessous — l'éditeur existe désormais dans la fenêtre.
 		createQuiz: (folder, done) => openNewQuizModal(ctx, folder, done),

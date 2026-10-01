@@ -1,6 +1,7 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { SessionQuiz, SessionSink } from "../../../../src/engine/session";
 import { ecrireReglage, lireReglage } from "../host/folder";
+import { renommerCles } from "./folder-move";
 
 /* ══════════════════════════════════════════════════════════
    LES SESSIONS EN COURS, CÔTÉ APPLICATION (2026-09-26) — reprendre un quiz
@@ -21,6 +22,8 @@ export interface SessionsApp {
 	lire(chemin: string): SessionQuiz | null;
 	puits(chemin: string): SessionSink;
 	toutes(): Record<string, SessionQuiz>;
+	/** A quiz (or a folder, by prefix) moved: its snapshots follow it. */
+	renommer(de: string, vers: string): void;
 	vider(): Promise<void>;
 }
 
@@ -50,6 +53,7 @@ export async function creerSessionsApp(): Promise<SessionsApp> {
 			effacer: () => { if (chemin in cache) { delete cache[chemin]; planifier(); } },
 		}),
 		toutes: () => cache,
+		renommer: (de, vers) => { if (renommerCles(cache, de, vers)) planifier(); },
 		vider: () => ecrire(),
 	};
 }

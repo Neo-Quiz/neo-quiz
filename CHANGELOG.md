@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Moving a folder keeps its exams, attempts and saved sessions.
+
 ### Removed
 - The Obsidian plugin: quizzes are played, reviewed and edited in the app; the quiz-blocks note format is unchanged.
 

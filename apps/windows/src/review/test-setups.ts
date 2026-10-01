@@ -1,6 +1,7 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import { readTestSetup, type TestSetup } from "../../../../src/test-setup";
 import { ecrireReglage, lireReglage } from "../host/folder";
+import { renommerCles } from "./folder-move";
 
 /* ══════════════════════════════════════════════════════════
    THE SETTINGS LAST USED PER QUIZ (spec 2026-09-29-test-setup-modal-design.md
@@ -22,6 +23,8 @@ export interface TestSetupsApp {
 	read(path: string): TestSetup | null;
 	/** Remembers the setup this quiz is being played with. */
 	remember(path: string, setup: TestSetup): void;
+	/** A quiz (or a folder, by prefix) moved: its remembered setup follows it. */
+	renamed(from: string, to: string): void;
 }
 
 let loading: Promise<TestSetupsApp> | null = null;
@@ -45,6 +48,10 @@ export function testSetups(): Promise<TestSetupsApp> {
 			read: (path) => readTestSetup(cache[path]),
 			remember: (path, setup) => {
 				cache[path] = { hints: setup.hints, timeLimitMinutes: setup.timeLimitMinutes };
+				queue = queue.then(() => ecrireReglage(KEY, cache)).catch((e) => console.warn(LOG_PREFIX, "test setups not written:", e));
+			},
+			renamed: (from, to) => {
+				if (!renommerCles(cache, from, to)) return;
 				queue = queue.then(() => ecrireReglage(KEY, cache)).catch((e) => console.warn(LOG_PREFIX, "test setups not written:", e));
 			},
 		};

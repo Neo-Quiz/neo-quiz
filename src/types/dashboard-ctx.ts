@@ -291,6 +291,10 @@ export interface DashboardShellCtx {
 	   `setExamDate` (une seule date) — l'onglet Planning (tâche 4) les a
 	   remplacés. Absents = pas de liste d'examens dans l'onglet. */
 	examens?: (group: ModuleGroup) => ExamenDossier[];
+	/** A folder or quiz moved from `from` to `to` (contract paths): rename every
+	    key the host keeps under that prefix (exams, sessions, per-folder
+	    settings). Optional: a host that keeps none of them omits it. */
+	movedPrefix?(from: string, to: string): Promise<void>;
 	/** Ajoute ou remplace (même `id`) un examen du dossier. */
 	enregistrerExamen?: (group: ModuleGroup, e: ExamenDossier) => void;
 	/** Retire un examen du dossier par son `id`. */
