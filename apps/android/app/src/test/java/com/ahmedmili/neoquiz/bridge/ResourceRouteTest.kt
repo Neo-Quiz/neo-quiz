@@ -97,6 +97,16 @@ class ResourceRouteTest {
         assertFalse(ResourceRoute.isResourceUrl("$origin/assets/web/index.html"))
     }
 
+    @Test fun everyResponseIsAnInertDocument() {
+        val png = resolve(urlOf(File(root, "ok.png").path))
+        val svg = resolve(urlOf(File(root, "pic.svg").path))
+        for (served in listOf(png, svg, null)) {
+            val h = ResourceRoute.responseHeaders(served)
+            assertEquals("default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox", h["Content-Security-Policy"])
+            assertEquals("nosniff", h["X-Content-Type-Options"])
+        }
+    }
+
     @Test fun aSymlinkToANonImageIsRefused() {
         val link = File(root, "innocent.png")
         try {

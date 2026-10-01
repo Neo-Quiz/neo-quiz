@@ -34,6 +34,18 @@ object ResourceRoute {
         "svg" to "image/svg+xml",
     )
 
+    /**
+     * Headers of EVERY response of the route, served file or refusal. An SVG is harmless
+     * as an `<img>`, but loaded as a DOCUMENT (frame, object, navigation) its script would
+     * run in the app's origin and reach the bridge: this CSP gives it no script, no
+     * network and an opaque origin (`sandbox`), and `nosniff` pins the type.
+     */
+    fun responseHeaders(@Suppress("UNUSED_PARAMETER") served: ResourceFile?): Map<String, String> = mapOf(
+        "Content-Security-Policy" to "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+        "X-Content-Type-Options" to "nosniff",
+        "Cache-Control" to "no-cache",
+    )
+
     private val WINDOWS_DRIVE = Regex("^[A-Za-z]:/")
 
     /** True when the URL addresses the resource route of the app's own origin (whatever the path is). */

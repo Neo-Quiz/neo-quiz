@@ -107,8 +107,8 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
 
     /** A quiz image: GET only, the perimeter and the type allow-list decide, 403 for everything else. */
     private fun resourceResponse(request: WebResourceRequest): WebResourceResponse {
-        val headers = mapOf("Content-Security-Policy" to UrlPolicy.CSP, "X-Content-Type-Options" to "nosniff", "Cache-Control" to "no-cache")
         val served = if (request.method == "GET") app.resource(request.url.toString()) else null
+        val headers = ResourceRoute.responseHeaders(served)
         if (served == null) return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", headers, java.io.ByteArrayInputStream(ByteArray(0)))
         return try {
             WebResourceResponse(served.mime, null, 200, "OK", headers, java.io.FileInputStream(served.file))
