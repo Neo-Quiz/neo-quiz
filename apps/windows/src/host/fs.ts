@@ -411,7 +411,14 @@ export async function createWindowsIndex(carte: CarteRacines): Promise<MiroirDis
 	return {
 		all: index.all,
 		get: index.get,
-		apply: index.apply,
+		/* A NEW file written through `HostFs` (`recaler`) must reach the
+		   subscribers too, not only the index. The watcher's own `create` for
+		   it carries the mtime the write already recorded, so `versContrat`
+		   swallows it: with a silent `apply` the catalogue never heard about
+		   an imported shared folder's notes (empty card until a restart).
+		   Only `create` is announced: a `modify` of a known file stays
+		   silent, as before (no rescan on every autosave). */
+		apply: (ev) => (ev.kind === "create" ? diffuser(ev) : index.apply(ev)),
 		demarrerSurveillance,
 		onChange(cb) {
 			abonnes.add(cb);

@@ -1327,7 +1327,7 @@ await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsFs, bui
  * — la TRADUCTION. Le pont ne parle que d'absolu ; le catalogue ne connaît que
  *   les chemins du contrat, et il n'admet pas les dossiers cachés.
  */
-await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsIndex }) => {
+await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsIndex, createWindowsFs }) => {
 	const r = makeReporter("Hôte Windows — le miroir de l'index");
 	const pont = installerPont({
 		"D:/Quiz/Cours/ch1.md": "un",
@@ -1420,6 +1420,23 @@ await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsIndex }
 		pont.emettre({ kind: "modify", abs: "D:/Quiz/Cours/ch1.md", mtime: 7778 });
 		r.check("un événement dont le mtime diffère de celui du miroir passe, lui",
 			[vus.length, miroir.get("Quiz/Cours/ch1.md")?.mtime], [4, 7778]);
+
+		/* A NEW note written through HostFs (the shared-folder import) must
+		   reach the subscribers. `write` records the new mtime in the index, so
+		   the watcher's own `create` (same mtime) is swallowed: unless the
+		   write itself announces the create, the scanner never indexes the note
+		   and the imported folder stays an empty card until a restart. A
+		   `modify` of a known file stays silent (no rescan per autosave). */
+		const vusEcriture = [];
+		const desabonnerEcriture = miroir.onChange(ev => vusEcriture.push(ev.kind + " " + (ev.kind === "delete" ? ev.path : ev.file.path)));
+		await createWindowsFs(carte, miroir).write("Quiz/Cours (2)/importe.md", "x");
+		r.check("une note NEUVE écrite par HostFs est annoncée aux abonnés",
+			vusEcriture, ["create Quiz/Cours (2)/importe.md"]);
+		await createWindowsFs(carte, miroir).write("Quiz/Cours (2)/importe.md", "y");
+		r.check("réécrire une note déjà connue n'annonce rien",
+			vusEcriture.length, 1);
+		desabonnerEcriture();
+		vus.splice(4); // the later cases count the events of the pushed ones only
 
 		/* TÂCHE 5 : un `renameDir` poussé par le principal (paire déjà
 		   appariée, chemins ABSOLUS) doit atteindre les abonnés `onRenameDir`,
