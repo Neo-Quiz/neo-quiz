@@ -53,7 +53,7 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         // Hardware-accelerated (the default; never `LAYER_TYPE_SOFTWARE`) and the Android 12+ stretch
         // at the document's top and bottom edge, which WebView draws for the root scroller only.
         setLayerType(LAYER_TYPE_NONE, null)
-        overScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS
+        overScrollMode = OVER_SCROLL_ALWAYS
 
         webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
