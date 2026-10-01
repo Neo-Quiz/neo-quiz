@@ -22,7 +22,11 @@ class AppBridge(
     private val code: CodeSandbox,
     private val sync: SyncHub,
     private val qr: QrScanner,
+    private val back: BackChannel,
 ) {
+    /** The Back key, asked of the page: false when there is nothing to go back to (the activity leaves). */
+    suspend fun goBack(): Boolean = back.request()
+
     /** Releases what the bridge holds besides coroutines: the hidden code WebView, and the page's hold on the sync. */
     fun shutdown() {
         sync.detach()
@@ -91,11 +95,12 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     }
     val syncChannel = SyncChannel(hub, qr::scan)
 
+    val backChannel = BackChannel { bridge?.emit("android.retour", null) }
     val created = Bridge(
         scope,
         Unavailable.handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox, hub, qr)
+    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel)
 }

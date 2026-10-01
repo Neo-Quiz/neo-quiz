@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * The WebView that hosts the renderer built by `apps/windows` (Vite).
@@ -121,6 +122,14 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         app.shutdown()
         scope.cancel()
         super.destroy()
+    }
+
+    /** Asks the page to go back one step; `done(false)` when it has nowhere to go (called on the main thread). */
+    fun askBack(done: (Boolean) -> Unit) {
+        scope.launch {
+            val handled = app.goBack()
+            post { done(handled) }
+        }
     }
 
     /** Pushes the file events of what changed on disk while the app was away. */

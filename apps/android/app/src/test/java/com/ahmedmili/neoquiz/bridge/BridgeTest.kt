@@ -33,6 +33,7 @@ class BridgeTest {
                 override suspend fun pair(id: String) = "indisponible"
                 override suspend fun forget(id: String) {}
             }, { null }).handlers() +
+            BackChannel { }.handlers() +
             Unavailable.handlers()
     }
 

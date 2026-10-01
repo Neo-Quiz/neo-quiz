@@ -10,6 +10,7 @@ package com.ahmedmili.neoquiz.bridge
 object Channels {
     val ALL: Set<String> = setOf(
         "demarrer",
+        "android.retourTraite",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",

@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowInsets
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
@@ -40,6 +41,13 @@ class MainActivity : ComponentActivity() {
             if (granted) AndroidView(factory = { appWebView }) else AndroidView(factory = { FirstRunScreen(it) })
         }
         loadWhenGranted()
+        // Back goes back in the page's own history; only when it has none does the app leave.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!loaded) return finish()
+                appWebView.askBack { handled -> if (!handled) finish() }
+            }
+        })
     }
 
     /** Android 13+: asked once, at first run, so the sync service's notification shows. Never blocks anything. */

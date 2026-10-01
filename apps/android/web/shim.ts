@@ -24,7 +24,8 @@ declare global {
 	interface Window {
 		/** Injected by `addWebMessageListener` (AppWebView.kt). */
 		neoAndroid: NeoAndroidPort;
-		neoPlatform: { mobile: boolean };
+		/** `surRetour`: the renderer's answer to the Back key (true = it went back). Android only, not part of `Pont`. */
+		neoPlatform: { mobile: boolean; surRetour(gestionnaire: () => boolean): void };
 	}
 }
 
@@ -272,4 +273,17 @@ const pont: Pont = {
 
 window.neoAndroid.onmessage = onMessage;
 (window as unknown as { neo: Pont }).neo = pont;
-window.neoPlatform = { mobile: true };
+
+/* The Back key: Kotlin pushes `android.retour` and waits for the verdict on
+   `android.retourTraite`; `false` (or no answer in time) leaves the app. */
+let gestionnaireRetour: (() => boolean) | null = null;
+abonner<void>("android.retour", () => {
+	let traite = false;
+	try {
+		traite = gestionnaireRetour?.() ?? false;
+	} catch (e) {
+		console.warn("[neo-android] back handler failed", e);
+	}
+	void appeler("android.retourTraite", [traite]).catch(() => {});
+});
+window.neoPlatform = { mobile: true, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; } };
