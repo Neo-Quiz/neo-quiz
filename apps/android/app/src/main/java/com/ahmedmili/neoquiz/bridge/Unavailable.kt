@@ -13,7 +13,6 @@ import org.json.JSONArray
  */
 object Unavailable {
     private val value: Map<String, () -> Any?> = mapOf(
-        "partage.enregistrer" to { null },
         "partage.discord" to { false },
         "systeme.vaultsObsidian" to { emptyList<Any>() },
         "systeme.choisirFichiers" to { emptyList<Any>() },

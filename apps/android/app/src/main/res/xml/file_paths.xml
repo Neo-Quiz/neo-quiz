@@ -3,4 +3,7 @@
      Never the app's private data, never `/`. -->
 <paths>
     <external-path name="shared" path="." />
+    <!-- Only `cache/share/`: the files a share hands to the system share sheet, written by the
+         bridge itself (`ShareChannel`). The rest of the cache, and every private folder, stay out. -->
+    <cache-path name="share" path="share/" />
 </paths>

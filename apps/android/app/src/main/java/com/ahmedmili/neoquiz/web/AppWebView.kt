@@ -11,6 +11,7 @@ import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.ahmedmili.neoquiz.bridge.ChooserRules
 import com.ahmedmili.neoquiz.bridge.ResourceRoute
 import com.ahmedmili.neoquiz.bridge.UrlDecision
 import com.ahmedmili.neoquiz.bridge.UrlPolicy
@@ -86,15 +87,22 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
             }
         }
 
-        if (activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
-            // Debug builds only: page errors reach logcat (no file content: console messages are the page's own).
-            setWebContentsDebuggingEnabled(true)
-            webChromeClient = object : android.webkit.WebChromeClient() {
-                override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
-                    android.util.Log.d("NeoConsole", "${m.messageLevel()} ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
-                    return true
-                }
+        // Debug builds only: page errors reach logcat (no file content: console messages are the page's own).
+        val debuggable = activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (debuggable) setWebContentsDebuggingEnabled(true)
+        webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                if (!debuggable) return false
+                android.util.Log.d("NeoConsole", "${m.messageLevel()} ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
+                return true
             }
+
+            /** `<input type=file>` ("Import a shared folder"): without this, the tap does nothing in a WebView. */
+            override fun onShowFileChooser(
+                view: WebView,
+                callback: android.webkit.ValueCallback<Array<android.net.Uri>>,
+                params: FileChooserParams,
+            ): Boolean = pickFiles(callback, params)
         }
 
         check(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -111,6 +119,55 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
             // A sub-frame (an iframe the page embeds) never reaches the bridge, and never steals the event sink.
             if (isMainFrame) onMessage(message, replyProxy)
         }
+    }
+
+    private var chooserCallback: android.webkit.ValueCallback<Array<android.net.Uri>>? = null
+
+    private val chooser = (activity as androidx.activity.ComponentActivity).activityResultRegistry.register(
+        "neo-file-chooser", androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val callback = chooserCallback ?: return@register
+        chooserCallback = null
+        callback.onReceiveValue(importableUris(result.resultCode, result.data))
+    }
+
+    /**
+     * The system picker (`ACTION_OPEN_DOCUMENT`, so nothing needs a storage permission and the user alone
+     * chooses), restricted to what the page asked for (`.zip`, `.md`). Whatever comes back is checked by
+     * NAME ([ChooserRules.acceptsName]) before the page sees it: the picker's type filter is a hint only.
+     */
+    private fun pickFiles(callback: android.webkit.ValueCallback<Array<android.net.Uri>>, params: android.webkit.WebChromeClient.FileChooserParams): Boolean {
+        // A chooser still open: its page is gone or is asking again, cancel the old one.
+        chooserCallback?.onReceiveValue(null)
+        chooserCallback = callback
+        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(android.content.Intent.EXTRA_MIME_TYPES, ChooserRules.mimeTypes(params.acceptTypes))
+            .putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, params.mode == android.webkit.WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE)
+        return try {
+            chooser.launch(intent)
+            true
+        } catch (_: android.content.ActivityNotFoundException) {
+            chooserCallback = null
+            callback.onReceiveValue(null)
+            true
+        }
+    }
+
+    private fun importableUris(resultCode: Int, data: android.content.Intent?): Array<android.net.Uri>? {
+        if (resultCode != Activity.RESULT_OK || data == null) return null
+        val uris = buildList {
+            data.data?.let { add(it) }
+            data.clipData?.let { clip -> for (i in 0 until clip.itemCount) add(clip.getItemAt(i).uri) }
+        }.distinct()
+        val kept = uris.filter { uri ->
+            val name = activity.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+            ChooserRules.acceptsName(name)
+        }
+        return kept.toTypedArray().takeIf { it.isNotEmpty() }
     }
 
     /** A quiz image: GET only, the perimeter and the type allow-list decide, 403 for everything else. */
@@ -141,6 +198,8 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
     }
 
     override fun destroy() {
+        chooser.unregister()
+        chooserCallback?.onReceiveValue(null)
         app.shutdown()
         scope.cancel()
         super.destroy()

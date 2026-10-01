@@ -153,7 +153,7 @@ const pont: Pont = {
 	},
 
 	partage: {
-		enregistrer: (nom, octets) => appeler("partage.enregistrer", [nom, octets]),
+		enregistrer: (nom, octets) => appeler("partage.enregistrer", [nom, toBase64(octets)]),
 		discord: (nom, octets) => appeler("partage.discord", [nom, octets]),
 	},
 
