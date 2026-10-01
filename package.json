@@ -5,6 +5,8 @@
   "scripts": {
     "app:dev": "npm --prefix apps/windows run dev",
     "app:build": "npm --prefix apps/windows run build",
+    "android:web": "node apps/android/web/build.mjs",
+    "android:build": "npm run android:web && cd apps/android && gradlew assembleDebug",
     "check": "tsc --noEmit",
     "check:watch": "tsc --noEmit --watch",
     "check:app": "npm --prefix apps/windows run build",

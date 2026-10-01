@@ -1,0 +1,27 @@
+# Versions read from the official sources on 2026-10-01 (stable releases only):
+#  - AGP, Compose BOM, androidx.webkit, activity-compose: dl.google.com/dl/android/maven2 maven-metadata.xml
+#  - AGP minimum Gradle (9.6.0) and JDK: developer.android.com/build/releases/gradle-plugin
+#  - Kotlin, coroutines, JUnit: repo1.maven.org maven-metadata.xml
+#  - Gradle 9.8.0: services.gradle.org/versions/current
+#  - Compose BOM 2026.06.01, not the latest 2026.09.00: BOMs from 2026.08.00 on need compileSdk 37, and only
+#    platforms 35/36 are installed. compileSdk is 36; targetSdk stays 35.
+[versions]
+agp = "9.4.1"
+kotlin = "2.4.20"
+composeBom = "2026.06.01"
+webkit = "1.17.1"
+activityCompose = "1.13.0"
+coroutines = "1.11.0"
+junit = "4.13.2"
+
+[libraries]
+androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+junit = { module = "junit:junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

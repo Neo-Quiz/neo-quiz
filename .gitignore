@@ -74,3 +74,13 @@ temp/
 # The C/C++ language pack built by `npm run build:language-pack`: a release
 # asset (28 MB), never committed.
 dist-pack/
+
+# Android app: Gradle state, build output, local SDK path, the renderer copied
+# into the assets by `npm run android:web`, native libs, and signing material.
+apps/android/.gradle/
+apps/android/**/build/
+apps/android/local.properties
+apps/android/app/src/main/assets/web/
+apps/android/app/src/main/jniLibs/
+*.jks
+*.keystore
