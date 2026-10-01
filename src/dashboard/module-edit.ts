@@ -236,8 +236,12 @@ export function openModuleEditModal(
    overrides pour que sa carte (vide) apparaisse immédiatement. ── */
 
 /** Parent le plus fréquent des dossiers de module (déduit des chemins de
-    quiz) ; "" = racine du vault si rien n'est déductible. */
-export function commonModuleParent(quizzes: QuizIndexEntry[], map: ModuleMap): string {
+    quiz). Nothing deducible (empty catalogue: first folder of a fresh
+    install, a filtered list) gives `fallback`: the default root, as a
+    contract path. Without it the new folder was the bare path "name", which
+    belongs to no open root, and every attempt failed ("outside the opened
+    folders"). */
+export function commonModuleParent(quizzes: QuizIndexEntry[], map: ModuleMap, fallback = ""): string {
 	const counts = new Map<string, number>();
 	for (const q of quizzes) {
 		const folder = moduleForQuiz(q.path, map).folder;
@@ -249,7 +253,21 @@ export function commonModuleParent(quizzes: QuizIndexEntry[], map: ModuleMap): s
 	}
 	let best = "", bestN = 0;
 	for (const [prefix, n] of counts) if (n > bestN) { best = prefix; bestN = n; }
-	return best;
+	return best || fallback;
+}
+
+/** The default root as a contract path: where a folder goes when no quiz
+    says otherwise. */
+export function defaultParent(): string {
+	const paths = currentHost().paths;
+	return paths.contractPath(paths.defaultRoot().id, "");
+}
+
+/** The toast for a failed `mkdirs`: says WHY when the cause is known. */
+export function newFolderErrorMessage(err: unknown): string {
+	const detail = err instanceof Error ? err.message : String(err);
+	if (/hors des dossiers ouverts/.test(detail)) return t("dashboard.quizzes.newFolderErrorOutside");
+	return t("dashboard.quizzes.newFolderErrorReason", { reason: detail });
 }
 
 export function openNewFolderModal(
@@ -259,6 +277,9 @@ export function openNewFolderModal(
 	onCreated: () => void
 ): void {
 	let name = "";
+	// One request at a time: a second click while one runs did nothing useful
+	// but stack a second identical failure toast.
+	let busy = false;
 
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
@@ -266,17 +287,20 @@ export function openNewFolderModal(
 		onOpen: (m) => {
 			const create = async (): Promise<void> => {
 				const clean = name.trim().replace(/[\\/:*?"<>|]/g, "-");
-				if (!clean) return;
-				const parent = commonModuleParent(quizzes, map);
+				if (busy || !clean) return;
+				const parent = commonModuleParent(quizzes, map, defaultParent());
 				const path = parent ? `${parent}/${clean}` : clean;
+				busy = true;
 				try {
 					// `mkdirs` ne rejette pas si le dossier existe déjà : le test
 					// d'existence qui le précédait n'apportait rien. Un DOSSIER ne
 					// se cherche de toute façon pas dans l'index des `.md`.
 					await currentHost().fs.mkdirs(path);
-				} catch {
-					currentHost().ui.notice(t("dashboard.quizzes.newFolderError"));
+				} catch (e) {
+					currentHost().ui.notice(newFolderErrorMessage(e));
 					return;
+				} finally {
+					busy = false;
 				}
 				// Déclaré en override : la carte du dossier (0 quiz) apparaît tout de
 				// suite, sans attendre qu'un premier quiz y soit créé.

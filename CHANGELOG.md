@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Creating a folder no longer fails every time when no quiz exists yet (it is now created in your default folder), the error says why, and repeated identical notifications no longer stack.
+
 ## [1.20.17] - 2026-10-01
 
 ### Fixed

@@ -77,6 +77,22 @@ await withSrcModule("src/dashboard/module-edit.ts", async ({ buildModuleOverride
 	r.done();
 });
 
+/* ── Parent of a NEW folder (regression 2026-10-01) ──
+   An empty catalogue (first folder of a fresh install, a filtered list) used
+   to give "" , so the new folder was the bare path "1": no open root owns it
+   and every click on "Create" failed with the same toast. The default root
+   must be the fallback. */
+await withSrcModule("src/dashboard/module-edit.ts", async ({ commonModuleParent }) => {
+	const r = makeReporter("Nouveau dossier — parent");
+	const vide = { byFolder: new Map() };
+	r.check("catalogue vide : retombe sur la racine par défaut", commonModuleParent([], vide, "Neo Quiz"), "Neo Quiz");
+	r.check("sans repli, comportement inchangé", commonModuleParent([], vide), "");
+	const quiz = { path: "Efrei/B2/Reseaux/q.md" };
+	const map = { byFolder: new Map([["Reseaux", { folder: "Reseaux", name: "Reseaux", ue: null }]]) };
+	r.check("un quiz connu l'emporte sur le repli", commonModuleParent([quiz], map, "Neo Quiz"), "Efrei/B2");
+	r.done();
+});
+
 /* ── Le chemin réel d'un module, là où il se DÉDUIT et là où il se PORTE ──
    `folder` est un segment ; ce qu'on écrit veut un chemin du contrat. */
 await withSrcModule("src/dashboard/quiz-modules.ts", async ({ moduleForQuiz, applyModuleOverrides, buildModuleGroups }) => {

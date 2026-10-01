@@ -5,7 +5,7 @@ import type { HostModalHandle } from "../host/types";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleMap } from "./quiz-modules";
-import { openNewFolderModal, commonModuleParent } from "./module-edit";
+import { openNewFolderModal, commonModuleParent, defaultParent } from "./module-edit";
 import { nomNoteImportee, parseZip } from "./zip";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { makeDefault } from "../editor/utils";
@@ -109,7 +109,7 @@ export async function importSharedFolder(
 	// Dossier cible : base du zip, assainie, sous le parent commun des modules ;
 	// suffixe (2), (3)… si un dossier du même nom existe déjà.
 	const base = picked.name.replace(/\.zip$/i, "").replace(/[\\/:*?"<>|]/g, "-").trim() || "Import";
-	const parent = commonModuleParent(quizzes, map);
+	const parent = commonModuleParent(quizzes, map, defaultParent());
 	const root = parent ? `${parent}/${base}` : base;
 	let folderPath = root;
 	/* `fs.exists` (le DISQUE) et non `fs.getFile` : ce dernier ne consulte que

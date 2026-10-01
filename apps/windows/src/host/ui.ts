@@ -107,6 +107,9 @@ export function poserIcone(el: HTMLElement | null, name: string): void {
 			el.appendChild(svg);
 		}
 
+/** The toasts currently on screen, by message (see `notice`). */
+const toastsVivants = new Map<string, { toast: HTMLElement; minuteur: number }>();
+
 export function createWindowsUi(): HostUi {
 	return {
 		/* Le message arrive DÉJÀ TRADUIT par son appelant : l'hôte n'a aucune
@@ -117,11 +120,23 @@ export function createWindowsUi(): HostUi {
 		   fenêtre — la fenêtre d'une application de bureau, pas d'un onglet. */
 		notice(message, timeoutMs = DUREE_PAR_DEFAUT) {
 			try {
+				const texte = String(message);
+				/* One toast per message: repeating the same failing action (twelve
+				   clicks on a button that cannot succeed) used to stack twelve
+				   identical toasts. The live one is kept and its timer restarted. */
+				const vivant = toastsVivants.get(texte);
+				if (vivant && vivant.toast.isConnected) {
+					window.clearTimeout(vivant.minuteur);
+					vivant.minuteur = window.setTimeout(() => { vivant.toast.remove(); toastsVivants.delete(texte); }, Math.max(0, timeoutMs));
+					return;
+				}
 				const toast = document.createElement("div");
 				toast.className = "nq-toast";
-				toast.textContent = String(message);
+				toast.textContent = texte;
 				conteneurToasts().appendChild(toast);
-				window.setTimeout(() => toast.remove(), Math.max(0, timeoutMs));
+				const entree = { toast, minuteur: 0 };
+				entree.minuteur = window.setTimeout(() => { toast.remove(); toastsVivants.delete(texte); }, Math.max(0, timeoutMs));
+				toastsVivants.set(texte, entree);
 			} catch (e) {
 				// Même repli que l'hôte Obsidian : une notification perdue ne doit
 				// pas emporter le rendu avec elle.
