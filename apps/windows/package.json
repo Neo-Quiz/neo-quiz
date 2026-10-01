@@ -1,6 +1,6 @@
 {
   "name": "@neo-quiz/windows",
-  "version": "1.20.11",
+  "version": "1.20.12",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",

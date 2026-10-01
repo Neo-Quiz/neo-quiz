@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.12] - 2026-10-01
+
 ### Changed
 - While an update downloads, hovering its progress shows the downloaded and total size.
 
