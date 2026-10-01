@@ -28,6 +28,9 @@ class PairConfirmDialog(private val activity: Activity) {
                 .create()
             cont.invokeOnCancellation { dialog.dismiss() }
             dialog.show()
+            // Dialog buttons are all-caps by default in the Material theme; labels stay in sentence case.
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isAllCaps = false
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.isAllCaps = false
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.requestFocus()
         }
     }

@@ -42,6 +42,7 @@ class FirstRunScreen(context: Context) : LinearLayout(context) {
         })
         addView(Button(context).apply {
             setText(R.string.first_run_button)
+            isAllCaps = false // never all-caps labels
             setOnClickListener {
                 context.startActivity(
                     Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")),
@@ -55,6 +56,7 @@ class FirstRunScreen(context: Context) : LinearLayout(context) {
         })
         addView(Button(context).apply {
             setText(R.string.first_run_battery_button)
+            isAllCaps = false
             setOnClickListener { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
         })
     }

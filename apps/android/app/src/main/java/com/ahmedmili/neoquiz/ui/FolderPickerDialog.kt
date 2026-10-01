@@ -62,6 +62,9 @@ class FolderPickerDialog(private val activity: Activity, private val suggested: 
             list.setOnItemClickListener { _, _, position, _ -> show(rows[position].dir) }
             cont.invokeOnCancellation { dialog.dismiss() }
             dialog.show()
+            // Dialog buttons are all-caps by default in the Material theme; labels stay in sentence case.
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isAllCaps = false
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.isAllCaps = false
             show(storage)
         }
     }
