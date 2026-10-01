@@ -26,7 +26,7 @@
    or at launch if sync was already switched on by a first pairing.
 ══════════════════════════════════════════════════════════ */
 
-import { spawn, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
@@ -51,7 +51,8 @@ import {
 	optionsFixees,
 } from "./syncthing-regles";
 
-export type ResultatAppairage = "ok" | "invalide" | "indisponible";
+/** `annule`: the owner declined the native confirmation. */
+export type ResultatAppairage = "ok" | "invalide" | "indisponible" | "annule";
 
 export interface SyncHandle {
 	etat(): Promise<EtatSync>;
@@ -68,6 +69,13 @@ export interface StartOpts {
 	exe: string;
 	home: string;
 	root: string;
+	/** The native confirmation shown BEFORE a device is paired (a modal
+	    dialog with the device id and, if known, its name; default answer
+	    Cancel). Injected by `main.ts`; the window can never answer it. A
+	    rejection counts as a refusal. */
+	confirmer(deviceId: string, nom: string): Promise<boolean>;
+	/** The process table, injectable for checks. */
+	sys?: SysSync;
 	/** Poll period of the loop. 10 s in the app; shorter only in checks. */
 	intervalMs?: number;
 }
@@ -113,6 +121,76 @@ function tuerArbre(child: ChildProcess): void {
 	}
 }
 
+/* ─────────── orphans left by a hard kill of the app ─────────── */
+
+type Ou<T> = T | Promise<T>;
+
+/** What cleaning up an orphan needs from the system. */
+export interface SysSync {
+	/** Pids of `syncthing.exe` processes launched with this home. */
+	trouver(home: string): Ou<number[]>;
+	/** Image name of a live pid, `null` if there is none. */
+	imageDe(pid: number): Ou<string | null>;
+	tuerArbre(pid: number): Ou<void>;
+}
+
+function executer(cmd: string, args: string[], env?: Record<string, string>): Promise<string> {
+	return new Promise(ok => {
+		execFile(cmd, args, { windowsHide: true, encoding: "utf8", env: env ? { ...process.env, ...env } : process.env, timeout: 15_000 }, (_e, out) => ok(typeof out === "string" ? out : ""));
+	});
+}
+
+export const sysReel: SysSync = {
+	async trouver(home) {
+		if (process.platform !== "win32") return [];
+		/* The home travels in the environment, never spliced into the script. */
+		const sortie = await executer("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+			"Get-CimInstance Win32_Process -Filter \"Name='syncthing.exe'\" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('--home=' + $env:NQ_SYNC_HOME) } | ForEach-Object { $_.ProcessId }"],
+		{ NQ_SYNC_HOME: home });
+		return sortie.split(/\r?\n/).map(l => Number(l.trim())).filter(n => Number.isInteger(n) && n > 0);
+	},
+	async imageDe(pid) {
+		if (process.platform !== "win32") return null;
+		const sortie = await executer("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"]);
+		const m = /^"([^"]+)","(\d+)"/m.exec(sortie);
+		return m && Number(m[2]) === pid ? m[1] : null;
+	},
+	async tuerArbre(pid) {
+		if (process.platform !== "win32") return;
+		await executer("taskkill", ["/PID", String(pid), "/T", "/F"]);
+	},
+};
+
+const FICHIER_PID = "syncthing.pid";
+const estSyncthing = (image: string | null): boolean => image !== null && image.toLowerCase() === "syncthing.exe";
+
+/**
+ * Kills a Syncthing that survived a hard kill of the app (Task Manager, crash):
+ * it would keep the home locked and the listen port taken, so the next start
+ * could not run. Two sources: the pid written at the last start (killed ONLY if
+ * that pid is still a live `syncthing.exe`: a pid reused by another program is
+ * never touched), and any `syncthing.exe` launched with this very home (the
+ * real child of the wrapper, whose own pid is not the one we wrote). Waits
+ * until they are gone; returns the pids it killed.
+ */
+export async function libererHome(home: string, sys: SysSync = sysReel): Promise<number[]> {
+	const cibles = new Set<number>();
+	let ecrit = NaN;
+	try { ecrit = Number((await fs.readFile(path.join(home, FICHIER_PID), "utf8")).trim()); } catch { /* none */ }
+	if (Number.isInteger(ecrit) && ecrit > 0 && estSyncthing(await sys.imageDe(ecrit))) cibles.add(ecrit);
+	for (const pid of await sys.trouver(home)) cibles.add(pid);
+	for (const pid of cibles) await sys.tuerArbre(pid);
+	const limite = Date.now() + 5000;
+	while (cibles.size && Date.now() < limite) {
+		const vivants = new Set(await sys.trouver(home));
+		for (const pid of cibles) if (estSyncthing(await sys.imageDe(pid))) vivants.add(pid);
+		if (vivants.size === 0) break;
+		await pause(200);
+	}
+	await fs.rm(path.join(home, FICHIER_PID), { force: true });
+	return [...cibles];
+}
+
 interface Lancement {
 	child: ChildProcess;
 	rest: Rest;
@@ -129,6 +207,9 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 	}
 	await fs.mkdir(opts.home, { recursive: true });
 	await fs.mkdir(opts.root, { recursive: true });
+	/* A survivor of a previous run (hard kill, or a child left behind when the
+	   wrapper died) would hold the home lock: clear it first. */
+	await libererHome(opts.home, opts.sys ?? sysReel);
 	const port = await portLibreBoucle();
 	const cle = randomBytes(32).toString("hex");
 	const child = spawn(opts.exe, launchArgs(opts.home, port, cle), {
@@ -136,6 +217,7 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 		env: launchEnv(process.env),
 		stdio: "ignore",
 	});
+	if (child.pid !== undefined) await fs.writeFile(path.join(opts.home, FICHIER_PID), String(child.pid)).catch(() => undefined);
 	const fini = new Promise<void>(ok => { child.once("exit", () => ok()); child.once("error", () => ok()); });
 	let sorti = false;
 	void fini.then(() => { sorti = true; });
@@ -261,6 +343,8 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			if (redemarre) { mort = true; void diffuser().catch(() => undefined); return; }
 			redemarre = true;
 			try {
+				/* The wrapper died: the real child may still be running and
+				   holding the home; `lancer` clears it before spawning. */
 				courant = await lancer(opts);
 				since = 0;
 				detecteur = creerDetecteurReception();
@@ -288,9 +372,15 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				if (paires.includes(id)) return "ok";
 				if (paires.length >= MAX_APPAREILS) return "invalide";
 				const attente = (await courant.rest.pendingDevices())[id];
+				const nom = attente?.name?.trim().slice(0, 64) ?? "";
+				/* Nothing is paired without the owner's say: a native dialog,
+				   decided in the main process, that the window cannot answer. */
+				let accord = false;
+				try { accord = await opts.confirmer(id, nom); } catch { accord = false; }
+				if (!accord) return "annule";
 				await courant.rest.putDevice({
 					deviceID: id,
-					name: attente?.name?.trim().slice(0, 64) ?? "",
+					name: nom,
 					addresses: ["dynamic"],
 					introducer: false,
 					autoAcceptFolders: false,
@@ -330,6 +420,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				tuerArbre(child);
 				await Promise.race([fini, pause(3000)]);
 			}
+			await fs.rm(path.join(opts.home, FICHIER_PID), { force: true }).catch(() => undefined);
 		},
 	};
 }
@@ -350,14 +441,21 @@ export interface GestionSync {
 export interface OptionsGestion {
 	exe: string;
 	home: string;
-	/** Read at each start: the default folder can change between two. */
-	root(): string;
+	/** The default folder NOW. Only used the first time sync starts, to pin it
+	    as the shared folder; never read again (the window can change the
+	    default folder, and the shared folder must not follow). */
+	racineParDefaut(): string;
+	/** The pinned shared folder (`syncRoot`), `null` until the first start. */
+	lireRoot(): Promise<string | null>;
+	poserRoot(root: string): Promise<void>;
+	confirmer(deviceId: string, nom: string): Promise<boolean>;
+	sys?: SysSync;
 	lireActif(): Promise<boolean>;
 	/** Called after a first successful pairing: sync stays on from then. */
 	poserActif(): Promise<void>;
 }
 
-export function creerGestionSync(o: OptionsGestion): GestionSync {
+export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync = startSync): GestionSync {
 	let handle: SyncHandle | null = null;
 	let demarrage: Promise<SyncHandle | null> | null = null;
 	let fin = false;
@@ -368,7 +466,12 @@ export function creerGestionSync(o: OptionsGestion): GestionSync {
 		if (handle) return Promise.resolve(handle);
 		return demarrage ??= (async () => {
 			try {
-				const h = await startSync({ exe: o.exe, home: o.home, root: path.resolve(o.root()) });
+				let root = await o.lireRoot();
+				if (!root) {
+					root = path.resolve(o.racineParDefaut());
+					await o.poserRoot(root);
+				}
+				const h = await demarrer({ exe: o.exe, home: o.home, root, confirmer: o.confirmer, sys: o.sys });
 				if (fin) { await h.stop(); return null; }
 				h.surEtat(e => { for (const a of abonnesEtat) a(e); });
 				h.surDonneesRecues(() => { for (const a of abonnesDonnees) a(); });

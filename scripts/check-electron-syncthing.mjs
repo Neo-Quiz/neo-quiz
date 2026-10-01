@@ -14,7 +14,7 @@
  *     npm run check:electron-syncthing
  */
 import { createServer } from "node:http";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -100,6 +100,13 @@ await withSrcModule(
 				{ id: "neo-quiz", path: "C:/Neo Quiz", type: "sendreceive", devices: [ID, AUTRE_ID] });
 		});
 
+		await cas(r, "optionsFixees", async () => {
+			const o = regles.optionsFixees(true);
+			r.check("local discovery avoids the personal Syncthing's 21027",
+				[o.localAnnouncePort, o.localAnnounceMCAddr, o.localAnnounceEnabled], [21028, "[ff12::8384]:21028", undefined]);
+			r.check("nothing phones home", [o.urAccepted, o.crashReportingEnabled, o.autoUpgradeIntervalH, o.startBrowser], [-1, false, 0, false]);
+		});
+
 		await cas(r, "folderEtat", async () => {
 			const { folderEtat } = regles;
 			r.check("idle", folderEtat({ state: "idle", globalBytes: 10, inSyncBytes: 10 }), { etat: "idle", pourcentage: null });
@@ -130,6 +137,58 @@ await withSrcModule(
 			d = creerDetecteurReception();
 			r.check("a remote item then the NEXT local-only idle does not fire again",
 				[d.observer(ev("ItemFinished", { folder: "neo-quiz", item: "a.md" })), d.observer(idle), d.observer(ev("LocalIndexUpdated", { folder: "neo-quiz" })), d.observer(idle)], [false, true, false, false]);
+		});
+
+		await cas(r, "main-only settings", async () => {
+			const { reglageReserve } = regles;
+			r.check("syncActif and syncRoot cannot be written from the window; others can",
+				[reglageReserve("syncActif"), reglageReserve("syncRoot"), reglageReserve("defaultFolder"), reglageReserve("language")], [true, true, false, false]);
+		});
+
+		/* ───────── orphan cleanup, with a fake process table ───────── */
+		const tmpO = mkdtempSync(join(tmpdir(), "neo-sync-orphan-"));
+		const faux = (procs) => ({
+			procs,
+			tues: [],
+			trouver: (home) => [...procs].filter(([, p]) => p.home === home).map(([pid]) => pid),
+			imageDe: (pid) => procs.get(pid)?.image ?? null,
+			tuerArbre(pid) { this.tues.push(pid); procs.delete(pid); },
+		});
+		await cas(r, "libererHome", async () => {
+			const home = join(tmpO, "home");
+			mkdirSync(home, { recursive: true });
+			writeFileSync(join(home, "syncthing.pid"), "4242");
+			let sys = faux(new Map([[4242, { image: "syncthing.exe", home }], [4300, { image: "syncthing.exe", home }], [900, { image: "syncthing.exe", home: "other" }]]));
+			const tues = await sync.libererHome(home, sys);
+			r.check("the pid file's live syncthing and the child found by home are killed, another home is not", [[...tues].sort(), sys.tues.sort(), [...sys.procs.keys()]], [[4242, 4300], [4242, 4300], [900]]);
+			r.check("the pid file is removed", existsSync(join(home, "syncthing.pid")), false);
+			writeFileSync(join(home, "syncthing.pid"), "777");
+			sys = faux(new Map([[777, { image: "notepad.exe", home: "none" }]]));
+			r.check("a reused pid that is another program is never killed", [await sync.libererHome(home, sys), sys.tues, [...sys.procs.keys()]], [[], [], [777]]);
+			writeFileSync(join(home, "syncthing.pid"), "not a pid");
+			sys = faux(new Map());
+			r.check("a garbage pid file is ignored", await sync.libererHome(home, sys), []);
+			r.check("no pid file, nothing running: nothing to do", await sync.libererHome(join(tmpO, "none"), faux(new Map())), []);
+		});
+
+		/* ───────── the lazily started instance: root and pairing confirmation ───────── */
+		await cas(r, "creerGestionSync root", async () => {
+			const memoire = {};
+			const demarres = [];
+			const faussaire = async (o) => { demarres.push(o.root); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
+			const fabriquer = (defaut) => sync.creerGestionSync({
+				exe: "x", home: "h", racineParDefaut: () => defaut,
+				lireRoot: async () => memoire.root ?? null, poserRoot: async (v) => { memoire.root = v; },
+				lireActif: async () => true, poserActif: async () => {}, confirmer: async () => true,
+			}, faussaire);
+			const g1 = fabriquer(join(tmpO, "A"));
+			await g1.etat();
+			r.check("the first start pins the default folder as syncRoot", [memoire.root, demarres[0]], [join(tmpO, "A"), join(tmpO, "A")]);
+			await g1.arreter();
+			const g2 = fabriquer(join(tmpO, "B"));
+			await g2.etat();
+			r.check("changing the default folder afterwards does not move the shared folder", [memoire.root, demarres[1]], [join(tmpO, "A"), join(tmpO, "A")]);
+			await g2.arreter();
 		});
 
 		/* ───────── REST client, against a fake server ───────── */
@@ -229,7 +288,9 @@ await withSrcModule(
 				   start must reject with a clean error, not hang for 30 seconds. */
 				const t0 = Date.now();
 				let msg = null;
-				try { await sync.startSync({ exe: process.execPath, home: join(tmp, "h3"), root: join(tmp, "r3") }); } catch (e) { msg = String(e.message); }
+				const sysFaux = { tues: [], trouver: () => [31337], imageDe: () => null, tuerArbre(pid) { this.tues.push(pid); this.trouver = () => []; } };
+				try { await sync.startSync({ exe: process.execPath, home: join(tmp, "h3"), root: join(tmp, "r3"), confirmer: async () => false, sys: sysFaux }); } catch (e) { msg = String(e.message); }
+				r.check("a start first kills a survivor holding the same home", sysFaux.tues, [31337]);
 				r.check("a binary that exits at startup rejects fast", [!!msg && msg.includes("exited"), Date.now() - t0 < 15000], [true, true]);
 			});
 
@@ -237,14 +298,20 @@ await withSrcModule(
 			if (process.platform === "win32" && existsSync(exe)) {
 				await cas(r, "startSync with the real binary", async () => {
 					const avant = compter();
-					const h = await sync.startSync({ exe, home: join(tmp, "h2"), root: join(tmp, "r2") });
+					let reponse = false;
+					const demandes = [];
+					const h = await sync.startSync({ exe, home: join(tmp, "h2"), root: join(tmp, "r2"), confirmer: async (id, nom) => { demandes.push([id, nom]); return reponse; } });
 					try {
+						r.check("the pid file names the running process", /^\d+$/.test(readFileSync(join(tmp, "h2", "syncthing.pid"), "utf8").trim()), true);
 						const etat = await h.etat();
 						r.check("the state carries this device's id and the folder", { actif: etat.actif, id: regles.isDeviceId(etat.appareil ?? ""), dossier: etat.dossier.etat, appareils: etat.appareils }, { actif: true, id: true, dossier: "idle", appareils: [] });
 						r.check("an invalid id is refused, nothing paired", [await h.appairer("not-an-id"), (await h.etat()).appareils.length], ["invalide", 0]);
 						r.check("our own id is refused", await h.appairer(etat.appareil), "invalide");
 						r.check("an id with wrong check characters is refused", await h.appairer(ID.slice(0, 3) + (ID[3] === "A" ? "B" : "A") + ID.slice(4)), "invalide");
-						r.check("pairing a valid id works", await h.appairer(AUTRE_ID), "ok");
+						r.check("invalid ids never reach the confirmation dialog", demandes.length, 0);
+						r.check("a cancelled confirmation pairs nothing and says so", [await h.appairer(AUTRE_ID), (await h.etat()).appareils.length, demandes.map(d => d[0])], ["annule", 0, [AUTRE_ID]]);
+						reponse = true;
+						r.check("a confirmed pairing works", await h.appairer(AUTRE_ID), "ok");
 						const apres = await h.etat();
 						r.check("the paired device is listed, not connected", apres.appareils.map(a => [a.id, a.connecte]), [[AUTRE_ID, false]]);
 						await h.oublier(AUTRE_ID);
@@ -253,6 +320,7 @@ await withSrcModule(
 						await h.stop();
 					}
 					r.check("stop leaves no process behind", compter(), avant);
+					r.check("stop removes the pid file", existsSync(join(tmp, "h2", "syncthing.pid")), false);
 				});
 			} else {
 				console.log("real-binary section skipped (no win32 or no vendored syncthing.exe)");

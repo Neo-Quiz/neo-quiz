@@ -21,7 +21,7 @@ import type { EtatSync } from "./sync-etat";
 
 export interface SyncPageDeps {
 	etat(): Promise<EtatSync>;
-	appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible">;
+	appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 	oublier(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	/** Copies text to the clipboard through the host; `false` if it could not. */
@@ -125,6 +125,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			if (res === "ok") {
 				champ.value = "";
 				dire(t("settings.sync.added"), false);
+			} else if (res === "annule") {
+				dire("", false); // the owner declined the native dialog: nothing to report
 			} else {
 				dire(t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable"), true);
 			}

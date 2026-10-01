@@ -25,10 +25,20 @@
    `/rest/events` answer with the shapes read below.
 ══════════════════════════════════════════════════════════ */
 
+import { CLE_SYNC_ACTIF, CLE_SYNC_ROOT } from "./pont";
+
 export const FOLDER_ID = "neo-quiz";
+
+/** Settings only the main process writes: whether Syncthing starts at launch,
+    and which folder it shares. The generic settings write refuses them. */
+export function reglageReserve(cle: string): boolean {
+	return cle === CLE_SYNC_ACTIF || cle === CLE_SYNC_ROOT;
+}
 /** The port this app's Syncthing listens on (TCP and QUIC). The owner's
     personal Syncthing, if any, keeps the default 22000. */
 export const LISTEN_PORT = 22100;
+/** UDP port of this app's local discovery (Syncthing's own default is 21027). */
+export const PORT_ANNONCE_LAN = 21028;
 
 /** Lines of the folder's `.stignore`. `(?d)` lets Syncthing delete the
     ignored files when they block the removal of a directory. Conflict copies
@@ -130,6 +140,14 @@ export function optionsFixees(portLibre: boolean): Record<string, unknown> {
 		urAccepted: -1,
 		crashReportingEnabled: false,
 		autoUpgradeIntervalH: 0,
+		/* LAN discovery on its OWN port. Syncthing's default (21027, UDP) is
+		   already bound by a personal Syncthing on the same machine: observed on
+		   2.1.5, the second instance's IPv4 local discovery fails to bind
+		   ("Only one usage of each socket address") and so cannot hear other
+		   devices on the LAN. Every Neo Quiz instance uses `PORT_ANNONCE_LAN`,
+		   so they still find each other; the personal one is left alone. */
+		localAnnouncePort: PORT_ANNONCE_LAN,
+		localAnnounceMCAddr: `[ff12::8384]:${PORT_ANNONCE_LAN}`,
 	};
 }
 

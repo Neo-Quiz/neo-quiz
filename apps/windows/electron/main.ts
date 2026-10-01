@@ -48,7 +48,7 @@ import { chargerPathRegistre } from "./process";
 import { surveillerCachesCli } from "./surveillant-cli";
 import { perimetreInitial } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_SYNC_ROOT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
 import type { GestionSync } from "./syncthing";
@@ -735,7 +735,31 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 					? path.join(process.resourcesPath, "syncthing", "syncthing.exe")
 					: path.join(__dirname, "..", "vendor", "syncthing", "syncthing.exe"),
 				home: path.join(donnees, "syncthing"),
-				root: () => dossierDefaut,
+				/* The shared folder is PINNED the first time (see `CLE_SYNC_ROOT`):
+				   the default folder, which the window can change, is only read then. */
+				racineParDefaut: () => dossierDefaut,
+				lireRoot: async () => {
+					const v = await reglagesOuErreur().lire(CLE_SYNC_ROOT);
+					return typeof v === "string" && path.isAbsolute(v) ? v : null;
+				},
+				poserRoot: root => reglagesOuErreur().ecrire(CLE_SYNC_ROOT, root),
+				/* Native, modal on the window, default Cancel: same pattern as the
+				   Ollama host guard (`canaux.ts`, `garderReglagesIa`). */
+				confirmer: async (id, nom) => {
+					const options = {
+						type: "warning" as const,
+						title: t("app.syncPair.title"),
+						message: t("app.syncPair.message"),
+						detail: t("app.syncPair.detail", { id, name: nom ? `
+${nom}` : "" }),
+						buttons: [t("app.syncPair.allow"), t("app.syncPair.deny")],
+						defaultId: 1,
+						cancelId: 1,
+					};
+					const parent = fenetre && !fenetre.isDestroyed() ? fenetre : null;
+					const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+					return response === 0;
+				},
 				lireActif: async () => (await reglagesOuErreur().lire(CLE_SYNC_ACTIF)) === true,
 				poserActif: () => reglagesOuErreur().ecrire(CLE_SYNC_ACTIF, true),
 			});

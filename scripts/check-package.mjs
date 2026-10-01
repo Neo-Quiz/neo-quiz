@@ -118,6 +118,8 @@ r.check("Windows embeds the pinned Syncthing beside the asar, Linux does not",
 r.check("the pin names the version the zip name and URL carry",
 	[SYNCTHING.zipName.includes(SYNCTHING.version), SYNCTHING.zipUrl.includes(`v${SYNCTHING.version}/${SYNCTHING.zipName}`), SYNCTHING.exeEntry.includes(`v${SYNCTHING.version}/`)],
 	[true, true, true]);
+r.check("pack:win fetches the pinned Syncthing before building",
+	application.scripts["pack:win"].startsWith("node ../../scripts/fetch-syncthing.mjs && "), true);
 r.check("the pin carries two SHA-256", [/^[0-9a-f]{64}$/.test(SYNCTHING.zipSha256), /^[0-9a-f]{64}$/.test(SYNCTHING.exeSha256)], [true, true]);
 /* The vendored binary, when fetched, is the pinned one (git-ignored, so the
    only thing standing between a stale or swapped file and the installer). */

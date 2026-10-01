@@ -388,8 +388,9 @@ export interface Pont {
 		    the Sync page asks (the page cannot show this device's id otherwise). */
 		etat(): Promise<EtatSync>;
 		/** Pairs a device by its id. `invalide`: not an id (format or check
-		    characters), or our own. `indisponible`: Syncthing is not running. */
-		appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible">;
+		    characters), or our own. `indisponible`: Syncthing is not running.
+		    `annule`: the owner declined the native confirmation shown first. */
+		appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 		oublier(deviceId: string): Promise<void>;
 		surEtat(rappel: (etat: EtatSync) => void): () => void;
 		/** Another device's changes to the folder have landed (idle after
@@ -956,6 +957,13 @@ export const CLE_REGLAGES_FOND = "fond";
     (`syncthing.ts`): the window never writes it (`canaux.ts` refuses), because
     it decides whether a binary is launched at startup. Absent = false. */
 export const CLE_SYNC_ACTIF = "syncActif";
+
+/** The folder the embedded Syncthing shares (`neo-quiz`), as a canonical
+    absolute path. Written by the MAIN process alone, once, the first time sync
+    starts (the default folder at that moment); never derived again from
+    `defaultFolder`, which the window can change. The window cannot write it
+    (`canaux.ts`): repointing it would share any folder of the perimeter. */
+export const CLE_SYNC_ROOT = "syncRoot";
 
 /** La luminosité et le flou du fond d'écran (`neo.reglages`) : `{ luminosite:
     number; flou: number }`, relu par `normaliserEffetsFond`

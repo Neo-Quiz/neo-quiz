@@ -58,7 +58,7 @@ import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
 import type { MiseAJour } from "./mise-a-jour";
-import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
@@ -112,6 +112,7 @@ import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langa
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
+import { reglageReserve } from "./syncthing-regles";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -498,7 +499,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (cle === CLE_DOSSIER_DEFAUT) await verifierDossierDefaut(perimetre, valeur);
 		/* `syncActif` decides whether a binary is launched at startup: only the
 		   main process writes it (after a first pairing). */
-		if (cle === CLE_SYNC_ACTIF) throw new Error("réglage refusé : syncActif n'est écrit que par le processus principal");
+		if (reglageReserve(String(cle))) throw new Error("réglage refusé : " + String(cle) + " n'est écrit que par le processus principal");
 		await reglagesOuErreur().ecrire(String(cle), valeur);
 	});
 
@@ -544,7 +545,12 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		}
 		if (verdict.admettre) autoriserHote(verdict.admettre);
 	}
-	ipcMain.handle(CANAUX.reglagesSupprimer, (_e, cle: string) => reglagesOuErreur().supprimer(String(cle)));
+	ipcMain.handle(CANAUX.reglagesSupprimer, (_e, cle: string) => {
+		/* Removing `syncRoot` would let the next start pin the (renderer-changeable)
+		   default folder as the shared one: same refusal as the write. */
+		if (reglageReserve(String(cle))) throw new Error("réglage refusé : " + String(cle) + " n'est supprimé que par le processus principal");
+		return reglagesOuErreur().supprimer(String(cle));
+	});
 
 	ipcMain.handle(CANAUX.ouvrir, async (_e, abs: unknown) => {
 		/* BORNÉ comme une lecture : `shell.openPath` lance l'application par
