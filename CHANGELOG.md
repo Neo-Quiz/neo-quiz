@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.10] - 2026-10-01
+
 ### Added
 - An exam can now be described by its sessions: a continuous assessment lists every session date in the review plan instead of one day, and never drives the review schedule.
 - The app opens maximized.
