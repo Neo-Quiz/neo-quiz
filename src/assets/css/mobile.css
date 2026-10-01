@@ -93,9 +93,11 @@ html.nq-mobile {
 .is-mobile .qbd-sidebar .qbd-nav-item,
 .is-mobile .qbd-sidebar .qbd-nav-footer .qbd-nav-item {
 	--qbd-nav-cut: var(--nq-bottom-bar-bg);
-	flex: 0 0 73px;
-	width: 73px;
-	max-width: 73px;
+	/* 73 dp like StudySmarter, wider when a French label needs it. */
+	flex: 0 0 auto;
+	min-width: 73px;
+	width: auto;
+	max-width: none;
 	height: 56px;
 	min-height: 56px;
 	padding: 6px 0 0;
@@ -165,6 +167,9 @@ html.nq-mobile {
 	font-weight: 600;
 	text-transform: none;
 	white-space: nowrap;
+	overflow: visible;
+	text-overflow: clip;
+	max-width: none;
 }
 
 /* The update button and the app mark belong to the desktop rail. */
