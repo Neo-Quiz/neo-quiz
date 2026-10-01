@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$dir = if ($env:NEOQUIZ_KEYSTORE_DIR) { $env:NEOQUIZ_KEYSTORE_DIR } else { 'C:/Users/Ahmed/Keys/neo-quiz' }
+$dir = if ($env:NEOQUIZ_KEYSTORE_DIR) { $env:NEOQUIZ_KEYSTORE_DIR } else { Join-Path $env:USERPROFILE 'Keys/neo-quiz' }
 
 $secure = Get-Content -LiteralPath (Join-Path $dir 'storepass.dpapi') | ConvertTo-SecureString
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)

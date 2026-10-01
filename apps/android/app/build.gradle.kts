@@ -10,7 +10,7 @@ plugins {
 // from NEOQUIZ_KEYSTORE_PASSWORD (set for the child process only by
 // scripts/with-keystore-password.ps1). If either is missing, the release
 // build gets no signing config; debug builds are unaffected.
-val keystoreDir: String = System.getenv("NEOQUIZ_KEYSTORE_DIR") ?: "C:/Users/Ahmed/Keys/neo-quiz"
+val keystoreDir: String = System.getenv("NEOQUIZ_KEYSTORE_DIR") ?: (System.getProperty("user.home") + "/Keys/neo-quiz")
 val keystorePassword: String? = System.getenv("NEOQUIZ_KEYSTORE_PASSWORD")
 val keystoreProps = Properties().apply {
     val f = File(keystoreDir, "keystore.properties")

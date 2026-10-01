@@ -28,7 +28,7 @@ try {
 
 	rmSync(assets, { recursive: true, force: true });
 	mkdirSync(assets, { recursive: true });
-	cpSync(join(windowsApp, "dist"), assets, { recursive: true });
+	cpSync(join(windowsApp, "dist"), assets, { recursive: true, filter: (src) => !src.endsWith(".map") });
 
 	await build({
 		entryPoints: [join(here, "shim.ts")],
