@@ -405,6 +405,16 @@ export interface Pont {
 		    `annule`: the owner declined the native confirmation shown first. */
 		appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 		oublier(deviceId: string): Promise<void>;
+		/** Ignore on a pairing request: the main process forgets the pending
+		    device (it may ask again later). Pairs nothing. */
+		ignorer(deviceId: string): Promise<void>;
+		/** Shares THIS device's id. The window names a channel and nothing
+		    else: the main process builds the URL and the text itself from its
+		    own device id. Windows: `courriel` opens a `mailto:`, `discord`
+		    copies the text and opens Discord. Android: `systeme` opens the
+		    system share sheet. Any other channel is refused. `false` if it
+		    could not be done. */
+		partagerId(canal: "courriel" | "discord" | "systeme"): Promise<boolean>;
 		surEtat(rappel: (etat: EtatSync) => void): () => void;
 		/** Another device's changes to the folder have landed (idle after
 		    remote items): time to reload what is read from the folder. */
@@ -825,6 +835,8 @@ export const CANAUX = {
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
 	syncOublier: "neo:sync/oublier",
+	syncIgnorer: "neo:sync/ignorer",
+	syncPartagerId: "neo:sync/partager-id",
 	/* Pushed to the window: the state, and "other devices' changes landed". */
 	syncEtat: "neo:sync/etat",
 	syncDonneesRecues: "neo:sync/donnees-recues",

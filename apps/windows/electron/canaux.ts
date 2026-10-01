@@ -112,7 +112,7 @@ import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langa
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
-import { reglageReserve } from "./syncthing-regles";
+import { isDeviceId, planPartage, reglageReserve } from "./syncthing-regles";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -1473,6 +1473,28 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			typeof id === "string" && id.length <= 80 ? sync.appairer(id) : "invalide");
 		ipcMain.handle(CANAUX.syncOublier, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.oublier(id);
+		});
+		ipcMain.handle(CANAUX.syncIgnorer, async (_e, id: unknown) => {
+			if (typeof id === "string" && id.length <= 80) await sync.ignorer(id);
+		});
+		/* Sharing the id: the window sends a channel name, nothing else. The id
+		   is OURS (read from the running instance, validated), and `planPartage`
+		   builds the only two URLs that can ever be opened (`mailto:` and
+		   `discord://`) from it; any other channel gets `null` and does nothing. */
+		ipcMain.handle(CANAUX.syncPartagerId, async (_e, canal: unknown) => {
+			const id = (await sync.etat()).appareil;
+			if (!isDeviceId(id)) return false;
+			const plan = planPartage(canal, id, { sujet: t("app.syncShare.subject"), corps: t("app.syncShare.body", { id }) });
+			if (!plan) return false;
+			if (plan.copier !== null) { dernierTexteEcritParLapp = plan.copier; clipboard.writeText(plan.copier); }
+			try {
+				await shell.openExternal(plan.url);
+			} catch {
+				/* Discord's protocol is not registered: its web app instead. */
+				if (canal !== "discord") return false;
+				try { await shell.openExternal("https://discord.com/app"); } catch { return false; }
+			}
+			return true;
 		});
 		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
 		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));

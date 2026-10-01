@@ -56,6 +56,30 @@ class ShareRulesTest {
         assertFalse("nobody paired", ShareRules.acceptOffer("neo-quiz", id, emptyList()))
     }
 
+    @Test fun requestsAreWellFormedUnknownDevicesWithATextOnlyName() {
+        val bad = id.take(3) + (if (id[3] == 'A') 'B' else 'A') + id.drop(4)
+        val pending = JSONObject()
+            .put(other, JSONObject().put("name", "  Phone  ").put("address", "tcp://1.2.3.4:22000"))
+            .put(id, JSONObject().put("name", "Already paired"))
+            .put("not-an-id", JSONObject().put("name", "Forged"))
+            .put(bad, JSONObject().put("name", "Bad check characters"))
+        assertEquals(listOf(mapOf("id" to other, "nom" to "Phone")), ShareRules.requests(pending, listOf(id), "OWN"))
+        assertEquals("paired or own: never a request", emptyList<Any>(), ShareRules.requests(JSONObject().put(other, JSONObject().put("name", "x")).put(id, JSONObject().put("name", "y")), listOf(other), id))
+        assertEquals("cut to 64, control characters dropped", ("a<b>" + "z".repeat(100)).take(64),
+            ShareRules.requests(JSONObject().put(other, JSONObject().put("name", "a\u0000<b>" + "z".repeat(100))), emptyList(), id)[0]["nom"])
+        assertEquals("no name: the first 7 characters", other.take(7), ShareRules.requests(JSONObject().put(other, JSONObject()), emptyList(), id)[0]["nom"])
+        assertEquals(emptyList<Any>(), ShareRules.requests(null, emptyList(), id))
+    }
+
+    @Test fun lastSeenIsMillisecondsAndNeverIsNull() {
+        assertEquals(java.time.Instant.parse("2026-10-01T10:00:00Z").toEpochMilli(), ShareRules.lastSeen("2026-10-01T10:00:00Z"))
+        assertEquals(java.time.Instant.parse("2026-10-01T08:00:00Z").toEpochMilli(), ShareRules.lastSeen("2026-10-01T10:00:00+02:00"))
+        assertEquals(null, ShareRules.lastSeen("0001-01-01T00:00:00Z"))
+        assertEquals(null, ShareRules.lastSeen("1970-01-01T00:00:00Z"))
+        assertEquals(null, ShareRules.lastSeen("nope"))
+        assertEquals(null, ShareRules.lastSeen(null))
+    }
+
     @Test fun theSharedPathIsAlwaysDocumentsNeoQuiz() {
         val documents = File("/storage/emulated/0/Documents")
         assertEquals(File(documents, "Neo Quiz"), ShareRules.sharedRoot(documents))

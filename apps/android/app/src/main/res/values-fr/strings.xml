@@ -12,6 +12,8 @@
     <string name="sync_channel_name">Synchronisation</string>
     <string name="review_channel_name">Révision du jour</string>
     <string name="sync_notification_title">Neo Quiz se synchronise</string>
+    <string name="sync_share_subject">Mon identifiant d\'appareil Neo Quiz</string>
+    <string name="sync_share_body">Pour te synchroniser avec mon appareil dans Neo Quiz, ouvre Réglages, puis Synchronisation, et ajoute cet identifiant d\'appareil :\n\n%1$s</string>
     <string name="pair_title">Associer cet appareil ?</string>
     <string name="pair_message">Tes quiz et ton historique de révision seront partagés avec cet appareil. N\'associe qu\'un appareil qui t\'appartient.\n\n%1$s</string>
     <string name="pair_confirm">Associer</string>

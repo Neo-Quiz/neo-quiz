@@ -75,6 +75,49 @@ await withSrcModule(
 			r.check("acceptOffer refuses everyone when nobody is paired", acceptOffer({ folderId: "neo-quiz", deviceId: ID }, []), false);
 		});
 
+		/* An incoming pairing request: a device that added us and that we have not
+		   (the Sync page then offers Accept / Ignore, and Accept goes through the
+		   same native confirmation as typing a code). */
+		await cas(r, "demandesDepuis", async () => {
+			const { demandesDepuis } = regles;
+			const attente = {
+				[AUTRE_ID]: { name: "  Phone  ", address: "tcp://1.2.3.4:22000", time: "2026-10-01T10:00:00Z" },
+				[ID]: { name: "Already paired" },
+				"not-an-id": { name: "Forged" },
+				[ID.slice(0, 3) + (ID[3] === "A" ? "B" : "A") + ID.slice(4)]: { name: "Bad check characters" },
+			};
+			r.check("a valid unknown device is listed, name trimmed", demandesDepuis(attente, [ID], "OWN"), [{ id: AUTRE_ID, nom: "Phone" }]);
+			r.check("a paired device or our own id is never a request", demandesDepuis({ [AUTRE_ID]: { name: "x" }, [ID]: { name: "y" } }, [AUTRE_ID], ID), []);
+			r.check("a name is cut to 64 characters, control characters dropped, text only",
+				demandesDepuis({ [AUTRE_ID]: { name: "a\u0000<b>" + "z".repeat(100) } }, [], ID)[0].nom, ("a<b>" + "z".repeat(100)).slice(0, 64));
+			r.check("no name falls back to the first 7 characters of the id", demandesDepuis({ [AUTRE_ID]: {} }, [], ID), [{ id: AUTRE_ID, nom: AUTRE_ID.slice(0, 7) }]);
+			r.check("garbage input gives nothing", [demandesDepuis(null, [], ID), demandesDepuis("x", [], ID), demandesDepuis([], [], ID)], [[], [], []]);
+		});
+
+		await cas(r, "dernierVu", async () => {
+			r.check("a real date is milliseconds, Syncthing's never (year 1) and garbage are null",
+				[regles.dernierVu("2026-10-01T10:00:00Z"), regles.dernierVu("0001-01-01T00:00:00Z"), regles.dernierVu("1970-01-01T00:00:00Z"), regles.dernierVu("nope"), regles.dernierVu(undefined)],
+				[Date.parse("2026-10-01T10:00:00Z"), null, null, null, null]);
+		});
+
+		/* Sharing this device's id: the window names a CHANNEL from a closed set;
+		   the URL and the text are built here, from the validated own id. */
+		await cas(r, "planPartage", async () => {
+			const { planPartage } = regles;
+			const textes = { sujet: "My code & more", corps: "Code: " + ID };
+			const mail = planPartage("courriel", ID, textes);
+			r.check("courriel is a mailto with encoded subject and body, nothing copied",
+				mail, { url: "mailto:?subject=" + encodeURIComponent(textes.sujet) + "&body=" + encodeURIComponent(textes.corps), copier: null });
+			r.check("discord copies the text and opens only discord://", planPartage("discord", ID, textes), { url: "discord://", copier: textes.corps });
+			r.check("a channel outside the closed set gives nothing, whatever it carries",
+				["https://evil.example", "file:///c:/x.bat", "systeme", "", undefined, 3, { toString: () => "courriel" }].map(c => planPartage(c, ID, textes)), Array(7).fill(null));
+			r.check("an id that is not a device id is refused (nothing from the window is ever spliced)",
+				[planPartage("courriel", "javascript:alert(1)", textes), planPartage("courriel", null, textes)], [null, null]);
+			const tous = [planPartage("courriel", ID, { sujet: "\r\nBcc: x", corps: "%0d%0a" }), planPartage("discord", ID, textes)];
+			r.check("only the two fixed schemes ever reach openExternal", tous.every(p => p && /^(mailto:\?|discord:\/\/$)/.test(p.url)), true);
+			r.check("a subject with a line break stays encoded in one URL", tous[0].url.includes("\n") || tous[0].url.includes("\r"), false);
+		});
+
 		await cas(r, "launchArgs / launchEnv", async () => {
 			const { launchArgs, launchEnv } = regles;
 			r.check("launchArgs is exactly the verified flag list",
@@ -190,7 +233,8 @@ await withSrcModule(
 		await cas(r, "creerGestionSync root", async () => {
 			const memoire = {};
 			const demarres = [];
-			const faussaire = async (o) => { demarres.push(o.root); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
+			const ignores = [];
+			const faussaire = async (o) => { demarres.push(o.root); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, ignorer: async (id) => { ignores.push(id); }, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
 			const fabriquer = (defaut) => sync.creerGestionSync({
 				exe: "x", home: "h", racineParDefaut: () => defaut,
 				lireRoot: async () => memoire.root ?? null, poserRoot: async (v) => { memoire.root = v; },
@@ -199,6 +243,8 @@ await withSrcModule(
 			const g1 = fabriquer(join(tmpO, "A"));
 			await g1.etat();
 			r.check("the first start pins the default folder as syncRoot", [memoire.root, demarres[0]], [join(tmpO, "A"), join(tmpO, "A")]);
+			await g1.ignorer(AUTRE_ID);
+			r.check("ignorer reaches the running instance", ignores, [AUTRE_ID]);
 			await g1.arreter();
 			const g2 = fabriquer(join(tmpO, "B"));
 			await g2.etat();
@@ -263,15 +309,19 @@ await withSrcModule(
 				r.check("shutdown", { m: requetes.at(-1).method, u: requetes.at(-1).url }, { m: "POST", u: "/rest/system/shutdown" });
 				await api.putFolder({ id: "neo-quiz" });
 				r.check("putFolder", requetes.at(-1).url, "/rest/config/folders/neo-quiz");
+				await api.dismissPendingDevice(AUTRE_ID);
+				r.check("dismissPendingDevice is a DELETE of one pending device", { m: requetes.at(-1).method, u: requetes.at(-1).url }, { m: "DELETE", u: "/rest/cluster/pending/devices?device=" + AUTRE_ID });
+				await api.deviceStats();
+				r.check("deviceStats", { m: requetes.at(-1).method, u: requetes.at(-1).url }, { m: "GET", u: "/rest/stats/device" });
 				await api.pendingFolders(); await api.pendingDevices(); await api.connections(); await api.devices(); await api.folders();
 				r.check("every call sent the key", requetes.every(q => q.cle === CLE), true);
 			});
 			await cas(r, "rest refuses an id that is not a path segment", async () => {
 				let refus = 0;
-				for (const f of [() => api.deleteDevice("../folders/x"), () => api.putFolder({ id: "../x" }), () => api.folderStatus("a&b=c")]) {
+				for (const f of [() => api.dismissPendingDevice("x&device=y"), () => api.deleteDevice("../folders/x"), () => api.putFolder({ id: "../x" }), () => api.folderStatus("a&b=c")]) {
 					try { await f(); } catch { refus++; }
 				}
-				r.check("path-like ids never reach a URL", refus, 3);
+				r.check("path-like ids never reach a URL", refus, 4);
 			});
 		} finally {
 			serveur.closeAllConnections();

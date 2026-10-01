@@ -85,6 +85,19 @@ class SyncthingRestTest {
         assertTrue(seen.last().body.contains(".trash"))
     }
 
+    @Test fun dismissingAPendingDeviceIsOneValidatedDelete() {
+        val r = rest()
+        r.dismissPendingDevice(id)
+        assertEquals("DELETE", seen.last().method)
+        assertEquals("/rest/cluster/pending/devices?device=$id", seen.last().path)
+        r.deviceStats()
+        assertEquals("GET", seen.last().method)
+        assertEquals("/rest/stats/device", seen.last().path)
+        val n = seen.size
+        assertThrows(IllegalArgumentException::class.java) { r.dismissPendingDevice("x&device=y") }
+        assertEquals(n, seen.size)
+    }
+
     @Test fun shutdownAndAnEmptyBodyAreFine() {
         reply = ""
         status = 200

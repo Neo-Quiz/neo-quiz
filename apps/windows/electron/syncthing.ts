@@ -42,6 +42,8 @@ import {
 	LISTEN_PORT,
 	acceptOffer,
 	creerDetecteurReception,
+	dernierVu,
+	demandesDepuis,
 	folderConfig,
 	folderEtat,
 	hasValidCheckDigits,
@@ -59,6 +61,8 @@ export interface SyncHandle {
 	etat(): Promise<EtatSync>;
 	appairer(deviceId: string): Promise<ResultatAppairage>;
 	oublier(deviceId: string): Promise<void>;
+	/** The owner chose Ignore on a pairing request: forget that request. */
+	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	/** Fired once when another device's changes have landed (see
 	    `creerDetecteurReception`). */
@@ -83,7 +87,7 @@ export interface StartOpts {
 
 const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected"] as const;
 const MAX_APPAREILS = 16;
-const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, appareils: [], dossier: { etat: "absent", pourcentage: null } };
+const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], dossier: { etat: "absent", pourcentage: null } };
 
 const pause = (ms: number): Promise<void> => new Promise(ok => setTimeout(ok, ms));
 
@@ -299,12 +303,25 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		const [devices, connexions] = await Promise.all([rest.devices(), rest.connections()]);
 		let statut = null;
 		try { statut = await rest.folderStatus(FOLDER_ID); } catch { /* not configured: absent */ }
+		/* Both are extras: failing to read them must not hide the rest. */
+		let vus: Awaited<ReturnType<Rest["deviceStats"]>> = {};
+		try { vus = await rest.deviceStats(); } catch { /* no last-seen times */ }
+		let attente: unknown = {};
+		try { attente = await rest.pendingDevices(); } catch { /* no requests shown */ }
+		const paires = devices.filter(d => d.deviceID !== ownId).map(d => d.deviceID);
 		return {
 			actif: true,
 			appareil: ownId,
+			nom: os.hostname().slice(0, 64),
 			appareils: devices
 				.filter(d => d.deviceID !== ownId)
-				.map(d => ({ id: d.deviceID, nom: d.name || d.deviceID.slice(0, 7), connecte: connexions.connections?.[d.deviceID]?.connected === true })),
+				.map(d => ({
+					id: d.deviceID,
+					nom: d.name || d.deviceID.slice(0, 7),
+					connecte: connexions.connections?.[d.deviceID]?.connected === true,
+					vuLe: dernierVu(vus[d.deviceID]?.lastSeen),
+				})),
+			demandes: demandesDepuis(attente, paires, ownId),
 			dossier: folderEtat(statut),
 		};
 	}
@@ -428,6 +445,13 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			void diffuser().catch(() => undefined);
 		},
 
+		async ignorer(brut) {
+			const id = typeof brut === "string" ? brut.trim() : "";
+			if (!isDeviceId(id) || id === courant.ownId || mort) return;
+			try { await courant.rest.dismissPendingDevice(id); } catch { /* nothing pending: nothing to dismiss */ }
+			void diffuser().catch(() => undefined);
+		},
+
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },
 
@@ -453,6 +477,7 @@ export interface GestionSync {
 	etat(): Promise<EtatSync>;
 	appairer(deviceId: string): Promise<ResultatAppairage>;
 	oublier(deviceId: string): Promise<void>;
+	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	surDonneesRecues(rappel: () => void): () => void;
 	/** At launch: starts the instance if sync was switched on. */
@@ -517,6 +542,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			return res;
 		},
 		async oublier(id) { await (await obtenir())?.oublier(id); },
+		async ignorer(id) { await (await obtenir())?.ignorer(id); },
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },
 		async demarrerSiActif() { if (await o.lireActif()) await obtenir(); },

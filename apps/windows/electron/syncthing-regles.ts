@@ -264,3 +264,57 @@ export function creerDetecteurReception(): { observer(ev: EvenementSync): boolea
 		},
 	};
 }
+
+/* ───────── incoming requests, last seen, sharing the id ───────── */
+
+export interface DemandeSync {
+	id: string;
+	nom: string;
+}
+
+/** At most this many pending requests are shown: Syncthing lists every unknown
+    device that ever tried to connect, and the list is not the owner's to scroll. */
+export const MAX_DEMANDES = 8;
+const NOM_MAX = 64;
+
+/** `GET /rest/cluster/pending/devices` → the devices that added US and that we
+    have not paired. Only well-formed ids (format and check characters) that are
+    neither ours nor already paired; the name is the REMOTE's and untrusted: cut
+    to 64, control characters dropped, and the page renders it as text only. */
+export function demandesDepuis(pending: unknown, paires: readonly string[], ownId: string): DemandeSync[] {
+	if (!pending || typeof pending !== "object" || Array.isArray(pending)) return [];
+	const sortie: DemandeSync[] = [];
+	for (const [id, info] of Object.entries(pending as Record<string, { name?: unknown } | null>)) {
+		if (sortie.length >= MAX_DEMANDES) break;
+		if (!hasValidCheckDigits(id) || id === ownId || paires.includes(id)) continue;
+		// eslint-disable-next-line no-control-regex
+		const nom = typeof info?.name === "string" ? info.name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, NOM_MAX) : "";
+		sortie.push({ id, nom: nom || id.slice(0, 7) });
+	}
+	return sortie;
+}
+
+/** `lastSeen` of `GET /rest/stats/device` → milliseconds, `null` when the
+    device was never seen (Syncthing writes the zero date) or the text is junk. */
+export function dernierVu(texte: unknown): number | null {
+	if (typeof texte !== "string") return null;
+	const ms = Date.parse(texte);
+	return Number.isFinite(ms) && ms > Date.UTC(2000, 0, 1) ? ms : null;
+}
+
+export type CanalPartage = "courriel" | "discord";
+
+/**
+ * What sharing this device's id does, decided HERE from a closed set of
+ * channels and the validated own id: the window never names a URL or a
+ * command. `courriel` opens a `mailto:` carrying the text; `discord` copies the
+ * text and opens the Discord app by its protocol. Anything else gives `null`.
+ */
+export function planPartage(canal: unknown, id: unknown, textes: { sujet: string; corps: string }): { url: string; copier: string | null } | null {
+	if (!isDeviceId(id)) return null;
+	if (canal === "courriel") {
+		return { url: "mailto:?subject=" + encodeURIComponent(textes.sujet) + "&body=" + encodeURIComponent(textes.corps), copier: null };
+	}
+	if (canal === "discord") return { url: "discord://", copier: textes.corps };
+	return null;
+}

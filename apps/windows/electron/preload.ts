@@ -195,6 +195,8 @@ const pont: Pont = {
 		etat: () => ipcRenderer.invoke(CANAUX.syncEtatLire),
 		appairer: deviceId => ipcRenderer.invoke(CANAUX.syncAppairer, String(deviceId)),
 		oublier: deviceId => ipcRenderer.invoke(CANAUX.syncOublier, String(deviceId)),
+		ignorer: deviceId => ipcRenderer.invoke(CANAUX.syncIgnorer, String(deviceId)),
+		partagerId: canal => ipcRenderer.invoke(CANAUX.syncPartagerId, String(canal)),
 		surEtat(rappel) {
 			const ecouteur = (_e: unknown, etat: EtatSync): void => rappel(etat);
 			ipcRenderer.on(CANAUX.syncEtat, ecouteur);

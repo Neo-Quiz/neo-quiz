@@ -32,6 +32,7 @@ class BridgeTest {
                 override suspend fun state() = emptyMap<String, Any?>()
                 override suspend fun pair(id: String) = "indisponible"
                 override suspend fun forget(id: String) {}
+                override suspend fun ignore(id: String) {}
             }, { null }).handlers() +
             BackChannel { }.handlers() +
             NavBarChannel { }.handlers() +

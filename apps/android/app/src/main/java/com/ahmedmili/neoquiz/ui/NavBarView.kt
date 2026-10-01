@@ -2,19 +2,18 @@ package com.ahmedmili.neoquiz.ui
 
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.RippleDrawable
-import android.util.Base64
+import android.graphics.drawable.TransitionDrawable
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ahmedmili.neoquiz.R
 import org.json.JSONObject
 
 /**
@@ -24,7 +23,8 @@ import org.json.JSONObject
  * page stretched with the content. Outside the WebView it stays still, like Neo Calendar's. The
  * page stays the source of truth (labels, icons, which tab is active, whether the bar shows at
  * all): it publishes its state on `android.barre` (`NavBarChannel`) and gets a tap back as the
- * index of the tab. Icons arrive as PNGs the page rasterised from its own SVGs, in both states.
+ * index of the tab. Icons are Material Symbols Rounded vector drawables (outlined when inactive,
+ * filled when active), picked by the tab's `id`; the tint is the page's active / muted colour.
  */
 class NavBarView(context: Context) : LinearLayout(context) {
     /** Called on the main thread with the index of the tapped tab. */
@@ -33,7 +33,8 @@ class NavBarView(context: Context) : LinearLayout(context) {
     private val line = View(context)
     private val row = LinearLayout(context)
     private var signature = ""
-    private val icons = HashMap<String, Bitmap>()
+    /** Active state of each tab at the last render, to cross-fade only the tabs that changed. */
+    private val wasActive = HashMap<String, Boolean>()
 
     init {
         orientation = VERTICAL
@@ -73,7 +74,21 @@ class NavBarView(context: Context) : LinearLayout(context) {
                 if (!item.optBoolean("placeholder")) setOnClickListener { onTap(i) }
             }
             val icon = ImageView(context).apply {
-                bitmap(item.optString(if (on) "on" else "off"))?.let(::setImageBitmap)
+                val id = item.optString("id")
+                val pair = ICONS[id]
+                if (pair != null) {
+                    val outlined = resources.getDrawable(pair.first, context.theme)
+                    val filled = resources.getDrawable(pair.second, context.theme)
+                    // Fade from the state the tab was in to the new one (<= 150 ms); no fade on a plain redraw.
+                    val changed = wasActive[id] != null && wasActive[id] != on
+                    val from = if (on) outlined else filled
+                    val to = if (on) filled else outlined
+                    val fade = TransitionDrawable(arrayOf(if (changed) from else to, to))
+                    fade.startTransition(if (changed) FADE_MS else 0)
+                    setImageDrawable(fade)
+                    imageTintList = ColorStateList.valueOf(if (on) active else muted)
+                }
+                wasActive[id] = on
             }
             tab.addView(icon, LayoutParams(dp(25), dp(25)))
             tab.addView(
@@ -91,18 +106,18 @@ class NavBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    private fun bitmap(dataUrl: String): Bitmap? {
-        if (!dataUrl.startsWith(PNG_PREFIX)) return null
-        return icons.getOrPut(dataUrl) {
-            val bytes = Base64.decode(dataUrl.substring(PNG_PREFIX.length), Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
-        }
-    }
-
     private fun dp(v: Int) = (v * resources.displayMetrics.density + 0.5f).toInt()
 
     companion object {
-        private const val PNG_PREFIX = "data:image/png;base64,"
+        private const val FADE_MS = 120
+
+        /** Tab id (the page's `data-nav` key, or `settings`) to its (outlined, filled) drawables. */
+        private val ICONS = mapOf(
+            "home" to (R.drawable.ic_nav_home_outlined to R.drawable.ic_nav_home_filled),
+            "quizzes" to (R.drawable.ic_nav_folder_outlined to R.drawable.ic_nav_folder_filled),
+            "ai" to (R.drawable.ic_nav_generate_outlined to R.drawable.ic_nav_generate_filled),
+            "settings" to (R.drawable.ic_nav_settings_outlined to R.drawable.ic_nav_settings_filled),
+        )
 
         /** `rgb(1, 2, 3)` / `rgba(1, 2, 3, 0.5)` as the page's computed styles give them. */
         fun css(value: String, fallback: Int): Int {

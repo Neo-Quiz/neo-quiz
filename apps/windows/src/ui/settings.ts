@@ -140,6 +140,8 @@ export function renderSettings(
 			etat: () => sync.etat(),
 			appairer: id => sync.appairer(id),
 			oublier: id => sync.oublier(id),
+			ignorer: id => sync.ignorer(id),
+			partager: canal => sync.partagerId(canal),
 			surEtat: rappel => sync.surEtat(rappel),
 			scanner: sync.scanner ? () => sync.scanner!() : undefined,
 			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },

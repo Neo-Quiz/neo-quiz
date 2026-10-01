@@ -47,6 +47,10 @@ export interface PendingDevices {
 	[deviceId: string]: { name?: string; address?: string; time?: string };
 }
 
+export interface DeviceStats {
+	[deviceId: string]: { lastSeen?: string };
+}
+
 export interface Connections {
 	connections: { [deviceId: string]: { connected?: boolean } };
 }
@@ -105,6 +109,9 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 		events: (since: number, types?: readonly string[]) =>
 			json<EvenementSync[]>("GET", `/rest/events?since=${Math.max(0, Math.floor(since))}&timeout=1${types?.length ? "&events=" + encodeURIComponent(types.join(",")) : ""}`),
 		folderStatus: (id: string) => json<FolderStatus>("GET", `/rest/db/status?folder=${segment(id)}`),
+		/** Dismisses ONE pending device (the owner chose Ignore); it may come back the next time that device tries. */
+		async dismissPendingDevice(id: string): Promise<void> { await appeler("DELETE", `/rest/cluster/pending/devices?device=${segment(id)}`); },
+		deviceStats: () => json<DeviceStats>("GET", "/rest/stats/device"),
 		connections: () => json<Connections>("GET", "/rest/system/connections"),
 		async shutdown(): Promise<void> { await appeler("POST", "/rest/system/shutdown"); },
 	};

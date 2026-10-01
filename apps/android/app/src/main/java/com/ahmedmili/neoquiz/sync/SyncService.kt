@@ -31,6 +31,7 @@ interface SyncBackend {
     suspend fun state(): Map<String, Any?>
     suspend fun pair(id: String): String
     suspend fun forget(id: String)
+    suspend fun ignore(id: String)
 }
 
 /**
@@ -131,7 +132,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         val created = SyncEngine(
             launcher = { process.start() },
             root = root,
-            deviceName = Build.MODEL.take(64),
+            deviceName = ownName(),
             portFree = process::listenPortFree,
             confirm = { id, name -> confirmer?.invoke(id, name) ?: false },
             scope = scope,
@@ -148,6 +149,10 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             null
         }
     }
+
+    /** The name the owner gave this phone (Settings, About), else its model: shown on the page and on the other devices. */
+    private fun ownName(): String =
+        (android.provider.Settings.Global.getString(appContext.contentResolver, "device_name")?.trim()?.takeIf { it.isNotEmpty() } ?: Build.MODEL).take(64)
 
     /** Called by the service when it goes away. */
     suspend fun shutdown() = lock.withLock {
@@ -171,6 +176,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     override suspend fun pair(id: String): String = ensure()?.pair(id) ?: PairResult.UNAVAILABLE
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
+
+    override suspend fun ignore(id: String) { ensure()?.ignore(id) }
 
     companion object {
         private const val TAG = "NeoSync"

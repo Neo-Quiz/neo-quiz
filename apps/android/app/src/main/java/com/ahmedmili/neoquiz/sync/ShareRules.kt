@@ -143,6 +143,36 @@ object ShareRules {
             .put("ignorePerms", true)
     }
 
+    /** At most this many pending requests are shown. */
+    const val MAX_REQUESTS = 8
+    private const val NAME_MAX = 64
+
+    /**
+     * `GET /rest/cluster/pending/devices` to the devices that added US and that we have not paired
+     * (mirror of `demandesDepuis`). Only well-formed ids (format and check characters) that are
+     * neither ours nor already paired; the name is the REMOTE's and untrusted: control characters
+     * dropped, cut to 64, and the page renders it as text only.
+     */
+    fun requests(pending: JSONObject?, paired: Collection<String>, ownId: String): List<Map<String, String>> {
+        if (pending == null) return emptyList()
+        val out = ArrayList<Map<String, String>>()
+        for (id in pending.keys()) {
+            if (out.size >= MAX_REQUESTS) break
+            if (!isDeviceId(id) || !hasValidCheckDigits(id) || id == ownId || id in paired) continue
+            val raw = pending.optJSONObject(id)?.optString("name") ?: ""
+            val name = raw.filter { it.code > 0x1f && it.code != 0x7f }.trim().take(NAME_MAX)
+            out.add(mapOf("id" to id, "nom" to name.ifEmpty { id.take(7) }))
+        }
+        return out
+    }
+
+    /** `lastSeen` of `GET /rest/stats/device` to milliseconds; `null` when never seen (Syncthing writes the zero date) or junk. */
+    fun lastSeen(text: String?): Long? {
+        if (text == null) return null
+        val ms = try { java.time.OffsetDateTime.parse(text).toInstant().toEpochMilli() } catch (_: Exception) { return null }
+        return if (ms > 946_684_800_000L) ms else null // 2000-01-01
+    }
+
     /** `GET /rest/db/status` to what the page shows; `null` = the folder is not configured. Scanning counts as idle. */
     fun folderState(s: JSONObject?): FolderState {
         if (s == null) return FolderState("absent", null)

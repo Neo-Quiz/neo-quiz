@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A simpler Sync page: add a device from one side and accept it on the other.
+
 ## [1.20.14] - 2026-10-01
 
 ### Changed

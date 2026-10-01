@@ -1,6 +1,8 @@
 package com.ahmedmili.neoquiz.bridge
 
 import android.app.Activity
+import android.content.Intent
+import com.ahmedmili.neoquiz.R
 import android.os.Environment
 import com.ahmedmili.neoquiz.code.CodeSandbox
 import androidx.activity.ComponentActivity
@@ -16,7 +18,9 @@ import com.ahmedmili.neoquiz.ui.QrScanner
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 /** The assembled bridge plus the one thing the host asks of it besides messages: a rescan. */
 class AppBridge(
@@ -103,7 +107,18 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
             bridge?.emit("sync.donneesRecues", null)
         }
     }
-    val syncChannel = SyncChannel(hub, qr::scan)
+    // The share sheet carries a text built HERE from this device's id and the app's own strings: the page names a channel, nothing else.
+    val syncChannel = SyncChannel(hub, qr::scan) { id ->
+        try {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, activity.getString(R.string.sync_share_subject))
+                .putExtra(Intent.EXTRA_TEXT, activity.getString(R.string.sync_share_body, id))
+            withContext(Dispatchers.Main) { activity.startActivity(Intent.createChooser(send, null)) }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     val backChannel = BackChannel { bridge?.emit("android.retour", null) }
     val navBar = NavBarView(activity).apply { onTap = { i -> bridge?.emit("android.barreClic", i) } }

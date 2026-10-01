@@ -139,13 +139,24 @@ class SyncEngine(
         val connections = rest.connections().optJSONObject("connections") ?: JSONObject()
         val status = try { rest.folderStatus(ShareRules.FOLDER_ID) } catch (_: Exception) { null }
         val folder = ShareRules.folderState(status)
+        // Both are extras: failing to read them must not hide the rest.
+        val seen = try { rest.deviceStats() } catch (_: Exception) { JSONObject() }
+        val pending = try { rest.pendingDevices() } catch (_: Exception) { null }
+        val others = (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId }
         return mapOf(
             "actif" to true,
             "appareil" to r.ownId,
-            "appareils" to (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId }.map { d ->
+            "nom" to deviceName.take(64),
+            "appareils" to others.map { d ->
                 val id = d.getString("deviceID")
-                mapOf("id" to id, "nom" to d.optString("name").ifEmpty { id.take(7) }, "connecte" to (connections.optJSONObject(id)?.optBoolean("connected") == true))
+                mapOf(
+                    "id" to id,
+                    "nom" to d.optString("name").ifEmpty { id.take(7) },
+                    "connecte" to (connections.optJSONObject(id)?.optBoolean("connected") == true),
+                    "vuLe" to ShareRules.lastSeen(seen.optJSONObject(id)?.optString("lastSeen")),
+                )
             },
+            "demandes" to ShareRules.requests(pending, others.map { it.getString("deviceID") }, r.ownId),
             "dossier" to mapOf("etat" to folder.state, "pourcentage" to folder.percent),
         )
     }
@@ -225,6 +236,15 @@ class SyncEngine(
         }
     }
 
+    /** The owner chose Ignore on a pairing request: forget that pending device. Pairs nothing. */
+    suspend fun ignore(raw: String) = withContext(Dispatchers.IO) {
+        val id = raw.trim()
+        val r = current
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead) return@withContext
+        try { r.instance.rest.dismissPendingDevice(id) } catch (_: Exception) { /* nothing pending */ }
+        push()
+    }
+
     suspend fun forget(raw: String) = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
@@ -250,7 +270,7 @@ class SyncEngine(
         private const val MAX_DEVICES = 16
         private val EVENTS = listOf("StateChanged", "ItemFinished", "DeviceConnected")
         val ABSENT: Map<String, Any?> = mapOf(
-            "actif" to false, "appareil" to null, "appareils" to emptyList<Any>(),
+            "actif" to false, "appareil" to null, "nom" to "", "appareils" to emptyList<Any>(), "demandes" to emptyList<Any>(),
             "dossier" to mapOf("etat" to "absent", "pourcentage" to null),
         )
     }

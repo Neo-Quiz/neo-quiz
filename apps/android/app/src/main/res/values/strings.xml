@@ -11,6 +11,8 @@
     <string name="first_run_battery_button">Allow background sync</string>
     <string name="sync_channel_name">Sync</string>
     <string name="sync_notification_title">Neo Quiz is syncing</string>
+    <string name="sync_share_subject">My Neo Quiz device ID</string>
+    <string name="sync_share_body">To sync with my device in Neo Quiz, open Settings, then Sync, and add this device ID:\n\n%1$s</string>
     <string name="review_channel_name">Daily review</string>
     <string name="pair_title">Pair this device?</string>
     <string name="pair_message">Your quizzes and review history will be shared with this device. Pair only a device you own.\n\n%1$s</string>
