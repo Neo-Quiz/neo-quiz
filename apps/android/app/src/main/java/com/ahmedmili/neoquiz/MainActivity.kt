@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowInsets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,12 +33,6 @@ class MainActivity : ComponentActivity() {
         appWebView = AppWebView(this).apply {
             // AndroidView sizes a view by its layout params: wrap_content left the page 118 px tall.
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            // Edge-to-edge is enforced from targetSdk 35: keep the page clear of the bars and the keyboard.
-            setOnApplyWindowInsetsListener { v, insets ->
-                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                insets
-            }
         }
         granted = hasAllFilesAccess()
         askForNotifications()
@@ -45,6 +41,18 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
         setContent {
             if (granted) AndroidView(factory = { appWebView }) else AndroidView(factory = { FirstRunScreen(it) })
+        }
+        // Edge-to-edge is enforced from targetSdk 35. The insets are applied once, as padding of the
+        // activity's content view (a listener on the WebView itself never fires: Compose's AndroidView
+        // does not dispatch insets to its child), so every screen, native or web, stays clear of the
+        // status bar, the 3-button or gesture navigation bar, the cutout and the keyboard.
+        val content = findViewById<ViewGroup>(android.R.id.content)
+        ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime(),
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
         }
         loadWhenGranted()
         // Back goes back in the page's own history; only when it has none does the app leave.
