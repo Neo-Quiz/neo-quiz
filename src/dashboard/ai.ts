@@ -5,7 +5,7 @@ import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
-import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerQuiz, lienLearn, canChooseQuizCount } from "./generation-demande";
+import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn, canChooseQuizCount } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
 import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
@@ -18,7 +18,7 @@ import { openConfirmModal } from "../editor/modals";
 import { LOG_PREFIX } from "../branding";
 import * as aiProviders from "./ai-providers";
 import { demarrerConnexionCli, poserCroixAnnuler } from "./connexion-cli";
-import { composerPrompts, parseReponseQuiz } from "./ai-client";
+import { composerPrompts, parseReponseLot, parseReponseQuiz } from "./ai-client";
 import { nouveauJeton, texteWeb, preparerOuverture } from "./ai-web";
 import type { ResultatOuverture } from "./ai-web";
 import type { Scanner, QuizIndexEntry } from "./scanner";
@@ -393,12 +393,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// Une attente de site ou de connexion tient la page : ne pas l'écraser.
 		if (phase === "web" || phase === "connexion") { host.ui.notice(t("ai.queue.busy")); return; }
 		dropSentMessage();
-		sentMessage = { text: l.demande.text, notes: l.demande.notes, images: [] };
-		generatedQuestions = p.questions;
-		generatedTitre = p.titre;
+		/* ONE PASS: the line holds one quiz per document; the first one not
+		   written yet opens, alone, with its own document. */
+		const restant = p.lot?.find(q => !(p.faits ?? []).some(f => f.document === q.document));
+		const indice = restant && p.lot ? p.lot.indexOf(restant) : -1;
+		const notes = restant ? l.demande.notes.filter(n => n.name === restant.document) : l.demande.notes;
+		sentMessage = { text: l.demande.text, notes, images: [] };
+		generatedQuestions = restant ? restant.questions : p.questions;
+		generatedTitre = restant ? restant.titre : p.titre;
 		lastUsage = p.usage;
-		planTranchesEnvoye = p.planTranches;
-		noteLearnLiee = p.noteLearn;
+		planTranchesEnvoye = restant ? p.liens?.[indice]?.plan : p.planTranches;
+		noteLearnLiee = restant ? p.liens?.[indice]?.note : p.noteLearn;
 		resultatFige = { mode: l.demande.mode, destination: l.demande.destination, reglages: l.demande.reglages, ligne: l.id };
 		generationId++;
 		generatedDraft = null;
@@ -616,6 +621,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** La demande partie sur le site en ce moment (un fichier du lot, ou
 	    l'envoi entier) : c'est elle qui nomme la note reçue. */
 	let demandeWeb: SentMessage | null = null;
+	/** One pass on a site: the Learn each document follows (same order). */
+	let lotWebLiens: ({ plan?: { slice: number; titre: string }[]; note?: string } | undefined)[] | undefined;
 	/** Oublie le lot web : plus de fichier en attente, plus de progression. */
 	function oublierLotWeb(): void {
 		lotWebRestant = [];
@@ -3989,7 +3996,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit
 			   qu'une demande à la fois : le premier fichier part, les autres
 			   attendent la réponse du précédent (`recevoirReponse`). */
-			const parFichier = decouperParFichier(takeComposerMessage(jointesVideo), oneQuiz);
+			/* ONE PASS (2026-10-01): with several documents the site gets ALL of
+			   them in one request and answers with one quiz per document. */
+			const parFichier = decouperParFichier(takeComposerMessage(jointesVideo), oneQuiz, lectureEnUnePasse(settings().aiProvider || ""));
 			lotWebRestant = parFichier.slice(1);
 			lotWebPremier = null;
 			lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
@@ -4047,7 +4056,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
 			return;
 		}
-		for (const d of decouperParFichier(envoi, oneQuiz)) {
+		/* ONE PASS (2026-10-01): N quizzes = ONE line of the queue, ONE
+		   generation that reads every document and writes one quiz per
+		   document (Ollama keeps one line per document: `lectureEnUnePasse`). */
+		for (const d of decouperParFichier(envoi, oneQuiz, lectureEnUnePasse(reglages.aiProvider || ""))) {
 			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
 			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
@@ -4119,7 +4131,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		await preparerLienLearn(msg);
 		const planTranches = planTranchesEnvoye;
 		const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(msg.notes, msg.text));
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie }), jeton);
+		/* ONE PASS: the documents named in order, each with ITS Learn plan. */
+		const documents = msg.parDocument && msg.notes.length >= 2 ? msg.notes.map(n => n.name) : undefined;
+		lotWebLiens = undefined;
+		if (documents) {
+			const dossier = destination || defaultDestination();
+			lotWebLiens = await Promise.all(msg.notes.map(async n => {
+				const l = await lienLearn(deps.scanner, modeGeneration, dossier, { ...msg, notes: [n], parDocument: false });
+				return l.plan || l.note ? l : undefined;
+			}));
+		}
+		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie, documents, plansParDocument: lotWebLiens?.map(l => l?.plan) }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;
@@ -4246,6 +4268,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   La SCÈNE et non le conteneur : celui de la coquille reste dans le
 		   document quelle que soit la vue peinte. */
 		if (!stageRef?.isConnected) deps.navigate("ai");
+		if (demandeWeb?.parDocument && demandeWeb.notes.length >= 2) { await recevoirLotWeb(texte, demandeWeb); return; }
 		try {
 			const reponse = parseReponseQuiz(texte);
 			// Configuration scindée en deux objets consécutifs (lot D §5) : fusionnée
@@ -4299,6 +4322,54 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (premier) { premier(); return; }
 		phase = "result";
 		render(containerRef);
+	}
+
+	/** ONE PASS on a site (2026-10-01): the answer holds one quiz per document.
+	    A wrong count, an unknown tag or an empty quiz is an error shown with
+	    "reopen" (nothing is saved); otherwise one note per document is written
+	    (`enregistrerLot`, the names of a generation made for each document
+	    alone) and the page of the FIRST one opens. */
+	async function recevoirLotWeb(texte: string, msg: SentMessage): Promise<void> {
+		const mode = modeGeneration;
+		let quiz: { document: string; questions: unknown[]; titre?: string }[];
+		try {
+			quiz = parseReponseLot(texte, msg.notes.map(n => n.name)).map(q => {
+				const brut = fusionnerConfigsFinales(q.questions);
+				return { ...q, questions: mode === "learn" ? completerConfigLearn(brut) : brut };
+			});
+		} catch (err) {
+			errorMessage = (err as Error).message || t("ai.error.checkSettings");
+			errorLogin = null;
+			errorAction = "reopen";
+			phase = "error";
+			render(containerRef);
+			return;
+		}
+		lastUsage = null;
+		reponseRecue = { titre: t("ai.queue.lotSaved", { count: quiz.length }) };
+		void host.ui.premierPlan?.().catch(() => { /* la page reste juste derrière */ });
+		render(containerRef);
+		const [faits] = await Promise.all([
+			enregistrerLot({
+				demande: msg, lot: quiz, liens: lotWebLiens, modeDemande: mode, destination,
+				reglages: settings(), usage: null, scanner: deps.scanner,
+			}),
+			new Promise<void>(resolve => window.setTimeout(resolve, 1000)),
+		]);
+		reponseRecue = null;
+		if (disposed) return;
+		if (!faits) {
+			oublierLotWeb();
+			host.ui.notice(t("ai.notice.saveFailed"));
+			phase = "idle";
+			render(containerRef);
+			return;
+		}
+		oublierLotWeb();
+		host.ui.notice(t("ai.queue.lotSaved", { count: faits.length }));
+		const premier = deps.scanner.getQuiz(faits[0].chemin);
+		resetGeneration();
+		if (premier) deps.navigate("detail", { quiz: premier, entree: "generation" });
 	}
 
 	/* Insère le quiz dans la note choisie via le picker (« Insérer dans une

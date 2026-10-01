@@ -86,6 +86,17 @@ export interface GenerateOptions {
 	    attaches to the CLI still running instead of launching a new one.
 	    Each CLI call of the generation gets its own key from it. */
 	reprise?: string;
+	/** ONE PASS OVER N DOCUMENTS (2026-10-01): the names of the attached
+	    documents, in order, when the request asks for ONE quiz PER document
+	    from a single reading of all of them. At least two: the prompt then
+	    names them and asks for one quiz per document, each wrapped with its
+	    document name (`parseReponseLot` reads that answer). Absent or fewer
+	    than two: the usual single-quiz prompt, unchanged. */
+	documents?: string[];
+	/** With `documents`: the slice plan of the Learn of each document (same
+	    order, `undefined` for a document with no Learn) — a Test follows the
+	    Learn of ITS document. */
+	plansParDocument?: ({ slice: number; titre: string }[] | undefined)[];
 }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
@@ -153,6 +164,18 @@ export interface ReponseQuiz {
 	titre?: string;
 }
 
+/** How a CLI's text becomes a `ReponseQuiz`: one quiz, or (one pass over N
+    documents) `lot`, one quiz per document. */
+type LireReponse = (texte: string) => ReponseQuiz & { lot?: ReponseDocument[] };
+
+/** The quiz of ONE document in the answer of a one-pass generation. */
+export interface ReponseDocument {
+	/** The document's name, as it was given in `GenerateOptions.documents`. */
+	document: string;
+	questions: unknown[];
+	titre?: string;
+}
+
 /** The first line of an answer written INSTEAD of a quiz: Generate always
     makes a quiz, unless the request explicitly asks for none (2026-09-30). */
 export const NO_QUIZ_MARKER = "NO_QUIZ";
@@ -184,7 +207,9 @@ export interface ChatOptions {
 
 /** Client IA — retour de createAiClient(plugin). */
 export interface AiClient {
-	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz>;
+	/** With `options.documents`, resolves with `lot` (one quiz per document, in
+	    the documents' order) and an empty `questions`; otherwise one quiz. */
+	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz & { lot?: ReponseDocument[] }>;
 	/** A CONVERSATION with Claude Code or Codex (2026-09-29): the whole
 	    history goes with each message — the CLI stays stateless, launched
 	    with the same fixed options and no tool as a generation — and the
@@ -396,6 +421,7 @@ function blocPreparation(p: PreparationExamen | undefined, learn: boolean): stri
 
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
 	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie, preparation } = options;
+	const documents = (options.documents?.length ?? 0) >= 2 ? options.documents as string[] : null;
 	const learn = mode === "learn";
 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
@@ -462,6 +488,17 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	HINTS: a "hint" helps without giving the answer away. The learner can open it BEFORE any attempt, from a button under the question: never write it as if an answer had already been given ("you got it wrong", "try again"). Write it as a string, or, for a DIFFICULT question, as an array of 2 or 3 strings from the lightest clue to the most revealing one — the learner reveals them one by one. Put the KEY WORDS of every hint in **bold** (the reader colors them). Every hint gives a CONCRETE, DETAILED example, e.g. "like \`range(1, 3)\`, which gives \`[1, 2]\`". When the answer is written in the reading of the slice, the first level may send the learner back to it ("reread the paragraph on …").
 `;
 
+	/* ONE PASS OVER N DOCUMENTS (2026-10-01): the model reads them ALL first,
+	   then writes one quiz per document, each focused on its own document but
+	   written with the whole set in view. The answer wraps each quiz with its
+	   document name (`parseReponseLot`). */
+	const blocLot = documents ? `ONE QUIZ PER DOCUMENT — THIS OVERRIDES THE "JSON5 array of questions" FORMAT ABOVE: the request attaches ${documents.length} documents, in this order:
+${documents.map((d, i) => `\t${i + 1}. ${d}`).join("\n")}
+	Read ALL of them first, to have the whole set in view, then write EXACTLY ${documents.length} quizzes: one per document, in that order. Each quiz is focused on ITS document only, with no question repeated across quizzes — a notion that appears in several documents is asked in the quiz of the document that treats it best — and an explanation may refer to another document when it helps.
+	Your answer is ONE JSON5 array with ${documents.length} elements, one per document: { "document": "<the document's name, EXACTLY as listed above>", "title": "<the quiz title, see QUIZ TITLE>", "quiz": [ ...the array of questions described above, configuration object last... ] }. The QUIZ TITLE goes in "title" of each element, not in a comment. Every rule above (QUANTITY, MODE, GLOSSARY, LANGUAGE…) applies to EACH quiz on its own.
+
+	` : "";
+
 	const systemPrompt = `You are a quiz generator. Generate the quiz questions as a JSON5 array. Each question may have:
 	- title: short question title
 	- prompt: full question text
@@ -502,18 +539,24 @@ ${categorieBloc}
 
 ${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
-	${quantite}
+	${blocLot}${quantite}
 
 	Generate ${typeInstruction}. ${PHRASE_FINALE_CLI}`;
 
 	const plan = !learn && planTranches && planTranches.length
 		? `\n\nSLICE PLAN OF THE LEARNING PATH (use these numbers in "slice"):\n${planTranches.map(p => `${p.slice}. ${p.titre}`).join("\n")}`
 		: "";
+	const plansDocs = documents && !learn && options.plansParDocument
+		? documents.map((d, i) => {
+			const pl = options.plansParDocument?.[i];
+			return pl && pl.length ? `\n\nSLICE PLAN OF THE LEARNING PATH FOR "${d}" (use these numbers in "slice" for the quiz of that document):\n${pl.map(x => `${x.slice}. ${x.titre}`).join("\n")}` : "";
+		}).join("")
+		: "";
 	const userPrompt = (source === "topic"
 		? `Generate the quiz about the following topic (keep the quiz in the language of this topic):\n\n${prompt}`
 		: source === "text"
 		? `Generate the quiz based on the following text (keep the quiz in the language of this text):\n\n${prompt}`
-		: `Generate the quiz based on the provided images (keep the quiz in the language of the images and of this request): ${prompt}`) + plan;
+		: `Generate the quiz based on the provided images (keep the quiz in the language of the images and of this request): ${prompt}`) + plan + plansDocs;
 
 	return { systemPrompt, userPrompt };
 }
@@ -711,6 +754,40 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 	}
 
 	return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+}
+
+/** The name of a document for matching a quiz's tag: case, accents and the
+    spaces around it do not count (a model rewrites a tag slightly), but two
+    DIFFERENT names never collapse into one. */
+function cleDocument(nom: string): string {
+	return nom.normalize("NFC").trim().toLowerCase();
+}
+
+/** Reads the answer of a ONE-PASS generation over `documents` (2026-10-01):
+    a JSON5 array of `{ document, title?, quiz: [...] }`, one element per
+    document. Returns one entry per document, IN THE DOCUMENTS' ORDER whatever
+    the order of the answer. Anything else is an ERROR, never a partial result
+    and never a guessed mapping: a wrong number of quizzes, a tag matching no
+    document (or the same document twice), a quiz with no question, or an
+    answer that is not this shape — saving fewer quizzes than documents, or a
+    quiz under the wrong document, would be silent. */
+export function parseReponseLot(content: string, documents: readonly string[]): ReponseDocument[] {
+	const lu = parseReponseQuiz(content).questions;
+	const elements = lu.map(el => {
+		const o = el && typeof el === "object" && !Array.isArray(el) ? el as { document?: unknown; title?: unknown; quiz?: unknown } : null;
+		if (!o || typeof o.document !== "string" || !Array.isArray(o.quiz)) throw new Error(t("ai.err.lotShape"));
+		return { document: o.document, titre: typeof o.title === "string" ? nettoyerTitre(o.title) : undefined, questions: sansFauxTitres(o.quiz) };
+	});
+	if (elements.length !== documents.length) throw new Error(t("ai.err.lotCount", { expected: documents.length, got: elements.length }));
+	const parCle = new Map<string, ReponseDocument>();
+	for (const el of elements) {
+		const cle = cleDocument(el.document);
+		if (!documents.some(d => cleDocument(d) === cle)) throw new Error(t("ai.err.lotUnknown", { name: el.document.trim() }));
+		if (parCle.has(cle)) throw new Error(t("ai.err.lotDuplicate", { name: el.document.trim() }));
+		if (el.questions.length === 0) throw new Error(t("ai.err.lotEmpty", { name: el.document.trim() }));
+		parCle.set(cle, el);
+	}
+	return documents.map(d => ({ ...(parCle.get(cleDocument(d)) as ReponseDocument), document: d }));
 }
 
 /** Ajoute la virgule qu'un modèle a oubliée en fin de ligne, entre une
@@ -921,6 +998,14 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 
 		const { systemPrompt, userPrompt } = composerPrompts(prompt, options);
+		/* ONE PASS (2026-10-01): with two documents or more the answer is one
+		   quiz per document, read by `parseReponseLot` (a wrong count is an
+		   error, never fewer quizzes). Ollama never gets `documents`: its
+		   structured answer holds a single quiz (`lectureEnUnePasse`). */
+		const documents = options.documents;
+		const lire: LireReponse = documents && documents.length >= 2
+			? (texte) => ({ questions: [], lot: parseReponseLot(texte, documents) })
+			: parseReponseQuiz;
 
 		if (provider === "ollama") {
 			/* Le composer persiste le choix par défaut ; si la génération part
@@ -945,14 +1030,14 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			// seulement si CE modèle l'expose (cf. models_cache service_tiers).
 			const m = getCodexModels().find(x => x.value === model);
 			const fast = !!settings.get().aiCodexFast && !!(m && m.fast);
-			return callCodex(model, systemPrompt, userPrompt, images, effort, fast);
+			return callCodex(model, systemPrompt, userPrompt, images, effort, fast, lire);
 		} else if (provider === "antigravity-cli") {
 			/* `model` est la FAMILLE (« gemini-3.8-flash ») ; le CLI attend la
 			   variante au niveau retenu pour ELLE (« gemini-3.8-flash-high »). */
 			const effort = niveauAntigravity(settings.get().aiAntigravityLevels, model);
-			return callAntigravity(antigravityModelId(model, effort), systemPrompt, userPrompt, images);
+			return callAntigravity(antigravityModelId(model, effort), systemPrompt, userPrompt, images, lire);
 		} else {
-			return callClaudeCode(model, systemPrompt, userPrompt, images);
+			return callClaudeCode(model, systemPrompt, userPrompt, images, lire);
 		}
 	}
 
@@ -986,8 +1071,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   sans modèle connu, `--model` est omis et le CLI prend le sien. Le
 	   niveau de raisonnement est DANS le nom du modèle (`…-high`, `…-low`),
 	   donc pas d'effort à passer. */
-	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<ReponseQuiz> {
-		return parseReponseQuiz(await callAntigravityTexte(model, systemPrompt, userPrompt, images));
+	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
+		return lire(await callAntigravityTexte(model, systemPrompt, userPrompt, images));
 	}
 
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
@@ -1090,8 +1175,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   Aucune clé API : réutilise la session du CLI connecté au
 	   compte Pro/Max/Team/Enterprise. Prompt complet par stdin
 	   (aucun échappement d'argument), sortie --output-format json. */
-	async function callClaudeCode(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<ReponseQuiz> {
-		return parseReponseQuiz(await callClaudeCodeTexte(model, systemPrompt, userPrompt, images));
+	async function callClaudeCode(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
+		return lire(await callClaudeCodeTexte(model, systemPrompt, userPrompt, images));
 	}
 
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
@@ -1234,8 +1319,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   effort de raisonnement via -c model_reasoning_effort=…, réponse finale
 	   écrite dans un fichier (-o) pour un parsing propre. Sandbox read-only et
 	   --ignore-user-config isolent la génération (pas de MCP/hooks perso). */
-	async function callCodex(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false): Promise<ReponseQuiz> {
-		return parseReponseQuiz(await callCodexTexte(model, systemPrompt, userPrompt, images, effort, fast));
+	async function callCodex(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false, lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
+		return lire(await callCodexTexte(model, systemPrompt, userPrompt, images, effort, fast));
 	}
 
 	/** The call itself, returning the model's TEXT (see `callClaudeCodeTexte`). */

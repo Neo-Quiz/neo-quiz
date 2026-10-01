@@ -33,8 +33,8 @@ import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
-import { brouillonDe, composerDemande, dossierParDefaut, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
-import type { DemandeTexte } from "./generation-demande";
+import { brouillonDe, composerDemande, dossierParDefaut, enregistrerLot, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
+import type { DemandeTexte, QuizDuLot } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
@@ -86,6 +86,14 @@ export interface ProduitGeneration {
 	usage: AiUsage | null;
 	planTranches?: { slice: number; titre: string }[];
 	noteLearn?: string;
+	/** ONE PASS (2026-10-01, `DemandeFile.parDocument`): one quiz per document,
+	    in the documents' order — `questions` is then empty. */
+	lot?: { document: string; questions: unknown[]; titre?: string }[];
+	/** One pass: the Learn each document follows (same order). */
+	liens?: ({ plan?: { slice: number; titre: string }[]; note?: string } | undefined)[];
+	/** One pass: the notes already written, kept as they are saved so that a
+	    retry of the save writes only the missing ones. */
+	faits?: QuizDuLot[];
 }
 
 /** Ce qu'une ligne prête a produit : le nom de la note et son chemin, relu
@@ -100,6 +108,9 @@ export interface ResultatFile {
 	dureeMs?: number;
 	/** Le nombre de questions écrites, pour la carte de résultat. */
 	questions?: number;
+	/** ONE PASS: the quizzes saved, one per document, listed on the line
+	    (`titre` then only counts them, `chemin` is the first one). */
+	quiz?: { titre: string; chemin: string; questions: number }[];
 }
 
 /** L'étape d'une génération en cours, que la réponse affiche comme le texte
@@ -239,6 +250,14 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const images = await encoderImages(d.images);
 			const dossier = d.destination || dossierParDefaut(d.reglages.aiOutputFolder);
 			const learn = await lienLearn(deps.scanner, d.mode, dossier, d);
+			/* ONE PASS: each document follows ITS Learn, as when it was
+			   generated alone (`lienLearn` gives none for a request over several
+			   documents, so it is asked document by document). */
+			const documents = d.parDocument && d.notes.length >= 2 ? d.notes.map(n => n.name) : undefined;
+			const liens = documents ? await Promise.all(d.notes.map(async n => {
+				const l = await lienLearn(deps.scanner, d.mode, dossier, { ...d, notes: [n], parDocument: false });
+				return l.plan || l.note ? l : undefined;
+			})) : undefined;
 			// Annulée pendant la préparation : aucun processus n'est encore lancé.
 			if (!tourne(ligne.id)) return;
 			etapeDe(ligne.id, "redaction");
@@ -246,6 +265,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
+				documents, plansParDocument: liens?.map(l => l?.plan),
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
@@ -268,6 +288,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				reponse = await lancer();
 			}
 			if (!tourne(ligne.id)) return;
+			if (documents && reponse.lot) {
+				await produireLot(ligne, d, client, deps, reponse.lot, liens);
+				return;
+			}
 			/* The final configuration FIRST, merged: a model that answers with two
 			   consecutive objects (the mode in one, the glossary in the other, in
 			   any order) must lose neither — BEFORE anything below reads the
@@ -310,6 +334,27 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			file = F.solder(file, ligne.id);
 			pomper();
 		}
+	}
+
+	/** ONE PASS (2026-10-01): the answer holds one quiz per document, already
+	    checked (right count, each tag one document, no empty quiz): each is
+	    merged and completed as a single quiz would be, then kept WITH the
+	    request before any note is written, as for one quiz. */
+	async function produireLot(ligne: LigneGeneration, d: DemandeFile, client: AiClient, deps: DepsFile, lot: { document: string; questions: unknown[]; titre?: string }[], liens: ProduitGeneration["liens"]): Promise<void> {
+		const quiz = lot.map(q => {
+			const brut = fusionnerConfigsFinales(q.questions);
+			return { ...q, questions: d.mode === "learn" ? completerConfigLearn(brut) : brut };
+		});
+		if (quiz.some(q => !q.questions.length)) throw new Error(t("ai.error.checkSettings"));
+		const usage = client.lastUsage;
+		if (usage && deps.recordUsage) {
+			try { await deps.recordUsage({ ...usage, at: Date.now(), questionCount: quiz.reduce((n, q) => n + nombreDeQuestions(q.questions), 0) }); }
+			catch (e) { console.warn(LOG_PREFIX, "usage non enregistré:", e); }
+		}
+		const complete: DemandeFile = { ...d, produit: { questions: [], lot: quiz, liens, usage, faits: [] } };
+		file = F.completer(file, ligne.id, complete);
+		etapeDe(ligne.id, "enregistrement");
+		await enregistrer(ligne.id, complete);
 	}
 
 	/** THE PLANNING LINE of an "/exam" preparation: the model reads every
@@ -363,6 +408,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const p = d.produit;
 		if (!p) return;
 		const deps = lireDeps();
+		if (p.lot) { await enregistrerLotDeLigne(id, d, p, p.lot, deps); return; }
 		// Le brouillon UNE FOIS (lot D) : `draft.questions` exclut déjà l'objet
 		// de configuration final — sa longueur est le compteur affiché,
 		// `p.questions.length` comptait le glossaire comme une question.
@@ -378,6 +424,26 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 		const titre = entree.title || entree.basename;
 		file = F.terminer(file, id, { titre, chemin: entree.path, questions: draft.questions.length });
+		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
+	}
+
+	/** ONE PASS: one note per document. Each note written is kept in the line's
+	    request at once (`faits`), so a retry, or a reload, writes only the rest. */
+	async function enregistrerLotDeLigne(id: number, d: DemandeFile, p: ProduitGeneration, lot: NonNullable<ProduitGeneration["lot"]>, deps: DepsFile): Promise<void> {
+		const garder = (faits: QuizDuLot[]): void => {
+			const maintenant = F.ligne(file, id)?.demande ?? d;
+			file = F.completer(file, id, { ...maintenant, produit: { ...(maintenant.produit ?? p), faits } });
+		};
+		const faits = await enregistrerLot({
+			demande: d, lot, liens: p.liens, modeDemande: d.mode, destination: d.destination,
+			reglages: { ...deps.settings.get(), ...d.reglages }, usage: p.usage, scanner: deps.scanner, apresChaque: garder,
+		}, p.faits ?? []);
+		if (!faits) {
+			file = F.echouerEnregistrement(file, id, t("ai.notice.saveFailed"), F.ligne(file, id)?.demande ?? d);
+			return;
+		}
+		const titre = t("ai.queue.lotSaved", { count: faits.length });
+		file = F.terminer(file, id, { titre, chemin: faits[0].chemin, questions: faits.reduce((n, f) => n + f.questions, 0), quiz: faits.map(f => ({ titre: f.titre, chemin: f.chemin, questions: f.questions })) });
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 

@@ -364,6 +364,7 @@ export const EN_AI = {
 	"ai.queue.cancel": "Remove from the queue",
 	"ai.queue.close": "Close",
 	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
+	"ai.queue.lotSaved": "{count} quizzes, one per document",
 	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
 	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
 	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
@@ -500,6 +501,11 @@ export const EN_AI = {
 	/* ── Erreurs de génération (affichées dans l'écran d'erreur) ── */
 	"ai.err.unknown": "Unknown error",
 	"ai.err.notAnArray": "The AI response is not an array of questions.",
+	"ai.err.lotShape": "The AI answer is not one quiz per document: each element must name its document and hold its quiz. Nothing was saved.",
+	"ai.err.lotCount": "The AI wrote {got} quizzes for {expected} documents. Nothing was saved: try again.",
+	"ai.err.lotUnknown": "The AI wrote a quiz for \"{name}\", which is none of the attached documents. Nothing was saved: try again.",
+	"ai.err.lotDuplicate": "The AI wrote two quizzes for \"{name}\". Nothing was saved: try again.",
+	"ai.err.lotEmpty": "The AI wrote no question for \"{name}\". Nothing was saved: try again.",
 	/* Le modèle a répondu autre chose qu'un quiz. Ces deux messages remplacent
 	   l'erreur brute du parseur JSON5, incompréhensible sur de la prose. */
 	"ai.err.noFileAccess": "The quiz generator has no access to your files — it only sees what is in the composer. Paths written in your request are attached automatically when they can be found; when they cannot, attach the notes or documents with “+” or “@”, or paste their content.",

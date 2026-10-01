@@ -73,6 +73,11 @@ export interface DemandeTexte<I extends { file: File } = { file: File }> {
 	text: string;
 	notes: NoteAttachment[];
 	images: I[];
+	/** ONE PASS (2026-10-01): this request carries SEVERAL documents and asks
+	    for ONE quiz PER document from a single reading of all of them
+	    (`decouperParFichier`, "N quizzes"). Absent: one quiz over the whole
+	    request, as before. */
+	parDocument?: boolean;
 }
 
 /* Source et prompt déduits de la demande, partagés par le chemin CLI (la
@@ -97,14 +102,26 @@ export function composerDemande(msg: DemandeTexte): { source: "image" | "text" |
 }
 
 /** ONE QUIZ PER ATTACHED FILE (2026-09-23), unless the user chose "1 quiz"
-    (spec 2026-09-29 §4.3): one sub-message per file, the same instruction for
-    each, as soon as the request carries several documents and no image (an
-    image often illustrates THE document next to it, so an image keeps a
-    single quiz whatever the choice). `oneQuiz` is the state of the composer's
-    "N quizzes ↔ 1 quiz" toggle, whose default is N quizzes. */
-export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, oneQuiz: boolean): DemandeTexte<I>[] {
+    (spec 2026-09-29 §4.3): as soon as the request carries several documents
+    and no image (an image often illustrates THE document next to it, so an
+    image keeps a single quiz whatever the choice). `oneQuiz` is the state of
+    the composer's "N quizzes <-> 1 quiz" toggle, whose default is N quizzes.
+    `enUnePasse` (2026-10-01, `lectureEnUnePasse` of the provider): N quizzes
+    come from ONE generation that reads ALL the documents first and answers
+    with one quiz per document (the request is flagged `parDocument`); without
+    it, one sub-request per file, the same instruction for each, each seeing
+    only its own document. */
+export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, oneQuiz: boolean, enUnePasse = false): DemandeTexte<I>[] {
 	if (oneQuiz || msg.images.length > 0 || msg.notes.length < 2) return [msg];
+	if (enUnePasse) return [{ ...msg, parDocument: true }];
 	return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
+}
+
+/** Whether a provider can write N quizzes in one answer. Every one but Ollama:
+    its structured answer (`format` schema) holds exactly one quiz, so it keeps
+    one generation per document. */
+export function lectureEnUnePasse(provider: string): boolean {
+	return provider !== "ollama";
 }
 
 /** The name of a folder given as a contract path: its last segment, or the
@@ -259,4 +276,52 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		console.warn(LOG_PREFIX, "enregistrement du quiz généré en échec :", err);
 		return null;
 	}
+}
+
+/** What a one-pass generation saved for one document. */
+export interface QuizDuLot {
+	document: string;
+	titre: string;
+	chemin: string;
+	questions: number;
+}
+
+export interface EnregistrementLot extends Omit<Enregistrement, "draft" | "questions" | "titreModele" | "titreImpose" | "demande" | "planTranches" | "noteLearn"> {
+	/** The request: its instruction and the documents, in the order of `lot`. */
+	demande: { text: string; notes: { name: string }[] };
+	/** One entry per document, in the documents' order (`parseReponseLot`). */
+	lot: { document: string; questions: unknown[]; titre?: string }[];
+	/** Per document (same order): the Learn it follows and its slice plan. */
+	liens?: ({ plan?: { slice: number; titre: string }[]; note?: string } | undefined)[];
+	/** Called with everything saved so far after EACH note, so the caller can
+	    keep it: a retry must not write a note twice. */
+	apresChaque?: (faits: QuizDuLot[]) => void;
+}
+
+/** ONE PASS (2026-10-01): writes one note per document of a one-pass
+    generation, each through `enregistrerQuiz` with a request carrying ONLY its
+    document — so its name, its `source` and its Learn link are exactly those of
+    a generation made for that document alone. `deja` holds the notes already
+    saved by an earlier attempt: those documents are skipped (a retry never
+    writes a note twice). Returns every quiz saved, in the documents' order, or
+    `null` when a note could not be written (what was saved before it was
+    reported through `apresChaque`). */
+export async function enregistrerLot(e: EnregistrementLot, deja: readonly QuizDuLot[] = []): Promise<QuizDuLot[] | null> {
+	const faits: QuizDuLot[] = [...deja];
+	for (let i = 0; i < e.lot.length; i++) {
+		const q = e.lot[i];
+		if (faits.some(f => f.document === q.document)) continue;
+		const draft = brouillonDe(q.questions);
+		const lien = e.liens?.[i];
+		const entree = await enregistrerQuiz({
+			...e, draft, questions: q.questions, titreModele: q.titre,
+			demande: { text: e.demande.text, notes: [{ name: q.document }] },
+			planTranches: lien?.plan, noteLearn: lien?.note,
+		});
+		if (!entree) return null;
+		faits.push({ document: q.document, titre: entree.title || entree.basename, chemin: entree.path, questions: draft.questions.length });
+		e.apresChaque?.(faits.map(f => f));
+	}
+	// The documents' order, whatever the order of the saves of several attempts.
+	return e.lot.map(q => faits.find(f => f.document === q.document) as QuizDuLot);
 }

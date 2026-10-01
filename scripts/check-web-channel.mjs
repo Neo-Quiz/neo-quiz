@@ -215,10 +215,13 @@ const fonctions = noms.map(nom => {
    depuis son fichier réel — une copie ici divergerait sans un mot. */
 {
 	const sourceDemande = readFileSync("src/dashboard/generation-demande.ts", "utf8");
-	const debut = sourceDemande.search(/^export function decouperParFichier[<(]/m);
-	const fin = sourceDemande.indexOf("\n}", debut);
-	if (debut < 0 || fin < 0) throw new Error("Fonction introuvable : decouperParFichier");
-	fonctions.push(sourceDemande.slice(debut, fin + 2).replace(/^export /, ""));
+	// `lectureEnUnePasse` too (one pass over N documents, 2026-10-01): `startGeneration` calls it.
+	for (const nom of ["decouperParFichier", "lectureEnUnePasse"]) {
+		const debut = sourceDemande.search(new RegExp(`^export function ${nom}[<(]`, "m"));
+		const fin = sourceDemande.indexOf("\n}", debut);
+		if (debut < 0 || fin < 0) throw new Error("Fonction introuvable : " + nom);
+		fonctions.push(sourceDemande.slice(debut, fin + 2).replace(/^export /, ""));
+	}
 }
 const codePage = (await transform(fonctions.join("\n"), { loader: "ts" })).code;
 const refus = makeReporter("Canal web : refus pendant une attente");

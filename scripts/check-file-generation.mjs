@@ -257,3 +257,143 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 	hote.uninstallHost();
 	r.done();
 });
+
+/* U2 (2026-10-01): "N quizzes" is ONE generation over ALL the documents
+   (`decouperParFichier` with `enUnePasse`), whose answer holds one quiz per
+   document; `enregistrerLot` writes one note per document, named exactly as the
+   per-document generation names it (`enregistrerQuiz`), and is all-or-nothing
+   on the ANSWER (a wrong count never reaches it: the parser refuses first)
+   while a failed write keeps what was already saved. */
+await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts"], async (gd, hote) => {
+	const r = makeReporter("N quizzes in ONE pass");
+	const doc = (name) => ({ name, content: "texte " + name, source: "file" });
+	const msg = (docs, images = 0) => ({ text: "Fais un quiz", notes: docs.map(doc), images: Array.from({ length: images }, () => ({ file: {} })) });
+	const noms = (msgs) => msgs.map(m => m.notes.map(n => n.name));
+
+	const un = gd.decouperParFichier(msg(["CM1.md", "CM2.md", "CM3.md"]), false, true);
+	r.check("one pass: ONE request carrying every document, flagged per document", [noms(un), un[0].parDocument], [[["CM1.md", "CM2.md", "CM3.md"]], true]);
+	r.check("one pass: the instruction is kept", un[0].text, "Fais un quiz");
+	r.check("one pass: '1 quiz' stays one request, not flagged",
+		(() => { const m = gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), true, true); return [noms(m), m[0].parDocument]; })(), [[["CM1.md", "CM2.md"]], undefined]);
+	r.check("one pass: an image keeps ONE plain quiz", gd.decouperParFichier(msg(["CM1.md", "CM2.md"], 1), false, true)[0].parDocument, undefined);
+	r.check("one pass: a single document is never flagged", gd.decouperParFichier(msg(["CM1.md"]), false, true)[0].parDocument, undefined);
+	r.check("without the one-pass condition: one request per document, as before",
+		noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), false, false)), [["CM1.md"], ["CM2.md"]]);
+	r.check("which providers read in one pass: every one but Ollama (its structured answer holds a single quiz)",
+		["claude-cli", "claude-code", "codex", "antigravity-cli", "claude-web", "ollama"].map(gd.lectureEnUnePasse), [true, true, true, true, true, false]);
+
+	const ecrits = new Map();
+	const existants = new Set();
+	let echecApres = Infinity;
+	hote.installHost({
+		fs: {
+			mkdirs: async () => {},
+			exists: async (p) => existants.has(p),
+			write: async (p, contenu) => { if (ecrits.size >= echecApres) throw new Error("disque plein"); ecrits.set(p, contenu); existants.add(p); },
+			getFile: () => null,
+		},
+		paths: {
+			contractPath: (root, local) => root + "/" + local,
+			defaultRoot: () => ({ id: "R", name: "Neo Quiz" }),
+			localPath: (p) => (p === "R" ? "" : p.replace(/^R\//, "")),
+			rootOf: () => ({ id: "R", name: "Neo Quiz" }),
+		},
+		ui: { notice: () => {} },
+	});
+	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
+	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const q = (n) => ({ title: "Q" + n, prompt: "Énoncé " + n + " ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." });
+	const noms3 = ["CM1.pdf", "CM2.pdf", "CM3.pdf"];
+	const base = { modeDemande: "practice", destination: "R/Cours/Réseaux", reglages, usage: null, scanner };
+	const lot = noms3.map((d, i) => ({ document: d, questions: [q(i + 1)], titre: "Titre du modèle " + i }));
+	const demande = { text: "Fais un quiz", notes: noms3.map(n => ({ name: n })) };
+
+	/* The names of the per-document generation, as a reference. */
+	const refs = [];
+	for (const d of noms3) {
+		const questions = [q(1)];
+		const e = await gd.enregistrerQuiz({ ...base, draft: gd.brouillonDe(questions), questions, titreModele: "x", demande: { text: "Fais un quiz", notes: [{ name: d }] } });
+		refs.push(e.path);
+	}
+	ecrits.clear(); existants.clear();
+	const vus = [];
+	const faits = await gd.enregistrerLot({ ...base, demande, lot, apresChaque: (f) => vus.push(f.length) });
+	r.check("one note per document, named exactly like the per-document generation", faits?.map(f => f.chemin), refs);
+	r.check("each note's source is ITS document", [...ecrits.values()].map(c => /\n\s+source: "(CM\d)"\n/.exec(c)?.[1]), ["CM1", "CM2", "CM3"]);
+	r.check("each note holds ITS questions", [...ecrits.values()].map(c => /Énoncé (\d)/.exec(c)?.[1]), ["1", "2", "3"]);
+	r.check("the result lists the document, title and question count of each quiz", faits?.map(f => [f.document, f.questions]), noms3.map(n => [n, 1]));
+	r.check("progress is reported after each note", vus, [1, 2, 3]);
+
+	/* A write that fails midway: what was saved is kept, a retry writes the rest ONLY. */
+	ecrits.clear(); existants.clear();
+	echecApres = 1;
+	let gardes = [];
+	let res = await gd.enregistrerLot({ ...base, demande, lot, apresChaque: (f) => { gardes = f; } });
+	r.check("a failed write: null, and the note already written is reported", [res, gardes.map(f => f.document), ecrits.size], [null, ["CM1.pdf"], 1]);
+	echecApres = Infinity;
+	res = await gd.enregistrerLot({ ...base, demande, lot }, gardes);
+	r.check("the retry writes only the missing notes, no duplicate (no '(2)')", [res?.map(f => f.document), ecrits.size, [...ecrits.keys()].some(p => /\(2\)/.test(p))], [noms3, 3, false]);
+	hote.uninstallHost();
+	r.done();
+});
+
+/* U2, through the REAL queue (`file-generation-app.ts`) with a fake CLI: ONE
+   request over three documents is ONE line and ONE CLI call that carries every
+   document, its answer (one quiz per document) saves THREE notes, and a wrong
+   answer saves nothing and fails the line. No real CLI, no disk, no network. */
+await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.ts"], async (app, hote) => {
+	const r = makeReporter("N quizzes in ONE pass - the queue");
+	const classes = new Set();
+	globalThis.document = { documentElement: { classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } } };
+	const noms3 = ["CM1.pdf", "CM2.pdf", "CM3.pdf"];
+	const q = (n) => ({ title: "Q" + n, prompt: "Énoncé " + n + " ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." });
+	const bloc = (nom, n) => `{ document: ${JSON.stringify(nom)}, title: "Titre ${n}", quiz: [${JSON.stringify(q(n))}, { mode: "quiz", glossary: [] }] }`;
+	let reponse = "";
+	const appels = [];
+	const ecrits = new Map();
+	hote.installHost({
+		platform: { isDesktopApp: true },
+		process: { lireCache: async () => null, run: async (spec) => {
+			appels.push(spec);
+			const flux = JSON.stringify({ type: "result", is_error: false, result: reponse, usage: { input_tokens: 1, output_tokens: 1 } });
+			return { stdout: flux + "\n", stderr: "", code: 0 };
+		} },
+		fs: { mkdirs: async () => {}, exists: async (p) => ecrits.has(p), write: async (p, c) => { ecrits.set(p, c); }, getFile: () => null, read: async () => "" },
+		paths: {
+			contractPath: (root, local) => root + "/" + local, defaultRoot: () => ({ id: "R", name: "Neo Quiz" }),
+			localPath: (p) => (p === "R" ? "" : p.replace(/^R\//, "")), rootOf: () => ({ id: "R", name: "Neo Quiz" }),
+		},
+		ui: { notice: () => {} },
+	});
+	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
+	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const file = app.fileDeGeneration({ settings: { get: () => ({ ...reglages }), save: async () => {} }, scanner });
+	const demande = { text: "Fais un quiz", notes: noms3.map(n => ({ name: n, content: "contenu de " + n, source: "file" })), images: [], parDocument: true,
+		mode: "practice", count: null, type: "Mixte", destination: "R/Cours", reglages, categorie: "general" };
+	const attendre = async () => { for (let i = 0; i < 200 && file.lignes().some(l => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement"); i++) await new Promise(res => setTimeout(res, 10)); };
+	await new Promise(res => setTimeout(res, 50)); // the (empty) saved queue is read back first
+
+	reponse = "```json5\n[" + [bloc(noms3[2], 3), bloc(noms3[0], 1), bloc(noms3[1], 2)].join(",\n") + "]\n```";
+	file.envoyer(demande);
+	await attendre();
+	const l = file.lignes()[0];
+	r.check("one request: ONE line and ONE CLI call", [file.lignes().length, appels.length], [1, 1]);
+	r.check("the one call carries EVERY document, named in order", noms3.every((n, i) => appels[0].stdin.includes("--- " + n + " ---") && appels[0].stdin.includes(`${i + 1}. ${n}`)), true);
+	r.check("the line is ready, with one result per document", [l.etat, l.resultat?.quiz?.length], ["prete", 3]);
+	r.check("three notes saved, one per document, named as for a single document",
+		[...ecrits.keys()].sort(), ["R/Cours/CM1 — Practice.md", "R/Cours/CM2 — Practice.md", "R/Cours/CM3 — Practice.md"]);
+	r.check("each note holds its own quiz", [...ecrits.entries()].sort().map(([, c]) => /Énoncé (\d)/.exec(c)?.[1]), ["1", "2", "3"]);
+
+	/* A wrong count: an error on the line, nothing saved, the one CLI call made. */
+	ecrits.clear();
+	file.fermer(l.id);
+	reponse = "```json5\n[" + [bloc(noms3[0], 1), bloc(noms3[1], 2)].join(",\n") + "]\n```";
+	file.envoyer(demande);
+	await attendre();
+	const l2 = file.lignes()[0];
+	r.check("a wrong count of quizzes: the line fails with the reason, nothing is saved",
+		[l2.etat, l2.echec, /2 quizzes for 3 documents/.test(l2.erreur ?? ""), ecrits.size], ["echouee", "generation", true, 0]);
+	hote.uninstallHost();
+	delete globalThis.document;
+	r.done();
+});

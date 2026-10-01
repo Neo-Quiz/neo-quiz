@@ -194,3 +194,50 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ assemblerQuestionsOllama, p
 		[q1, { mode: "learn", objectives: ["Définir"], glossary: [{ term: "pile", definition: "LIFO." }] }]);
 	r.done();
 });
+
+/* U2 (2026-10-01): "N quizzes" reads ALL the documents in ONE generation, then
+   writes one quiz per document. The prompt names the documents in order and
+   asks for one wrapped quiz per document; every forbidden word of each type
+   stays absent; the single-quiz prompt is untouched. */
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, parseReponseQuiz, parseReponseLot }, { MOTS_INTERDITS }) => {
+	const r = makeReporter("One pass over N documents - prompt and parser");
+	const docs = ["CM1 - Réseaux.pdf", "CM2 - Routage.pdf", "CM3 - Sécurité.pdf"];
+	for (const mode of ["learn", "practice"]) {
+		const sans = composerPrompts("x", { mode });
+		const { systemPrompt: p, userPrompt } = composerPrompts("x", { mode, documents: docs });
+		r.check(`${mode}: the documents are named in order`,
+			docs.every((d, i) => p.includes(`${i + 1}. ${d}`)) && p.indexOf(docs[0]) < p.indexOf(docs[1]) && p.indexOf(docs[1]) < p.indexOf(docs[2]), true);
+		r.check(`${mode}: ONE quiz PER document, wrapped with its document name, no duplicate across quizzes`,
+			['EXACTLY 3 quizzes', '"document"', '"quiz"', "no question repeated across quizzes"].filter(s => !p.includes(s)), []);
+		r.check(`${mode}: no forbidden word of the type appears`, MOTS_INTERDITS[mode].filter(re => re.test(p)).map(String), []);
+		r.check(`${mode}: the single-quiz prompt does not change when no documents are given`,
+			[composerPrompts("x", { mode, documents: [] }).systemPrompt === sans.systemPrompt, composerPrompts("x", { mode, documents: ["a.md"] }).systemPrompt === sans.systemPrompt], [true, true]);
+		r.check(`${mode}: the user prompt is untouched`, userPrompt, sans.userPrompt);
+	}
+	r.check("a Test slice plan per document goes with ITS document",
+		(() => { const u = composerPrompts("x", { mode: "practice", documents: docs, plansParDocument: [[{ slice: 1, titre: "Couches" }], undefined, [{ slice: 1, titre: "Pare-feu" }]] }).userPrompt;
+			return [u.includes('SLICE PLAN OF THE LEARNING PATH FOR "CM1 - Réseaux.pdf"'), u.includes("1. Couches"), u.includes("CM2 - Routage.pdf"), u.includes("1. Pare-feu")]; })(),
+		[true, true, false, true]);
+
+	const q = (n) => ({ title: "Q" + n, prompt: "Énoncé " + n + " ?", options: ["a", "b"], correctIndex: 0 });
+	const bloc = (nom, n, titre) => `{ document: ${JSON.stringify(nom)}, title: ${JSON.stringify(titre ?? "T " + nom)}, quiz: [${JSON.stringify(q(n))}, { mode: "quiz", glossary: [] }] }`;
+	const reponse = (...b) => "```json5\n// neo-quiz abc\n[" + b.join(",\n") + "]\n```";
+	const lot = parseReponseLot(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc(docs[2], 3)), docs);
+	r.check("a well-formed answer: one entry per document, in the documents' order, with its questions and title",
+		[lot.map(x => x.document), lot.map(x => x.questions[0].title), lot[1].titre], [docs, ["Q1", "Q2", "Q3"], "T CM2 - Routage.pdf"]);
+	r.check("quizzes in another order are mapped by their tag, returned in document order",
+		parseReponseLot(reponse(bloc(docs[2], 3), bloc(docs[0], 1), bloc(docs[1], 2)), docs).map(x => x.questions[0].title), ["Q1", "Q2", "Q3"]);
+	r.check("a tag in another case or with stray spaces still matches its document",
+		parseReponseLot(reponse(bloc(" cm1 - réseaux.PDF ", 1), bloc(docs[1], 2), bloc(docs[2], 3)), docs).map(x => x.document), docs);
+	const echoue = (texte) => { try { parseReponseLot(texte, docs); return null; } catch (e) { return e.message; } };
+	r.check("too few quizzes is an ERROR, never fewer notes", echoue(reponse(bloc(docs[0], 1), bloc(docs[1], 2))) !== null, true);
+	r.check("too many quizzes is an ERROR", echoue(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc(docs[2], 3), bloc("CM4.pdf", 4))) !== null, true);
+	r.check("a tag matching no document is an ERROR naming it", (echoue(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc("CM9.pdf", 3))) ?? "").includes("CM9.pdf"), true);
+	r.check("the same document twice is an ERROR (the mapping is never guessed)", echoue(reponse(bloc(docs[0], 1), bloc(docs[0], 2), bloc(docs[1], 3))) !== null, true);
+	r.check("a quiz with no question is an ERROR", echoue(reponse(bloc(docs[0], 1), bloc(docs[1], 2), `{ document: ${JSON.stringify(docs[2])}, quiz: [] }`)) !== null, true);
+	r.check("a plain quiz array (single-quiz form) is an ERROR in lot mode", echoue("[" + JSON.stringify(q(1)) + "]") !== null, true);
+	r.check("the single-quiz form still reads as before", parseReponseQuiz("[" + JSON.stringify(q(1)) + "]").questions.length, 1);
+	r.check("a missing comma between two quizzes is repaired like in the single form",
+		parseReponseLot(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc(docs[2], 3)).replace(/\},\n\{/g, "}\n{"), docs).length, 3);
+	r.done();
+});

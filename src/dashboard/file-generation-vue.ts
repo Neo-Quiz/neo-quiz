@@ -249,13 +249,18 @@ export function creerVueFile(opts: {
 			/* La carte du quiz : c'est un CONTENU, elle a donc sa tuile ; son
 			   action est un texte, pas un bouton encadré dans la carte. */
 			const r = l.resultat;
-			const carte = ajouter(rep, "div", "qbd-ai-resultat");
-			host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
-			const corps = ajouter(carte, "div", "qbd-ai-resultat-corps");
-			ajouter(corps, "div", "qbd-ai-resultat-titre", r.titre);
-			if (r.questions) ajouter(corps, "div", "qbd-ai-resultat-sous", t(r.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: r.questions }));
-			bouton(carte, t("ai.queue.open"), () => opts.ouvrir(r.chemin));
-			boutonIcone(carte, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
+			/* ONE PASS (2026-10-01): one card per quiz written, each with its own
+			   Open; the close button sits on the last one. */
+			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0 }];
+			quiz.forEach((q, i) => {
+				const carte = ajouter(rep, "div", "qbd-ai-resultat");
+				host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
+				const corps = ajouter(carte, "div", "qbd-ai-resultat-corps");
+				ajouter(corps, "div", "qbd-ai-resultat-titre", q.titre);
+				if (q.questions) ajouter(corps, "div", "qbd-ai-resultat-sous", t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
+				bouton(carte, t("ai.queue.open"), () => opts.ouvrir(q.chemin));
+				if (i === quiz.length - 1) boutonIcone(carte, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
+			});
 			return;
 		}
 		if (l.etat === "echouee") {
