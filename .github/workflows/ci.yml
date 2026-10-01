@@ -255,20 +255,8 @@ jobs:
       - name: Changelog
         run: npm run check:changelog
 
-      # Mêmes étapes que release.yml, sans publication : une casse de build
-      # (loader manquant, import cassé) se voit au push, pas au moment du tag.
-      - name: Build
-        run: npm run build
-
-      - name: Check release artifacts
-        run: |
-          test -f dist/main.js
-          test -f dist/styles.css
-          ls -lh dist/
-
   # Le paquet Linux de l'application : AppImage exige un runner Linux, ce
-  # que le poste de développement (Windows) ne peut pas fournir. Job séparé du
-  # greffon : une casse ici ne bloque pas la publication du greffon Obsidian.
+  # que le poste de développement (Windows) ne peut pas fournir.
   #
   # DEUX `npm ci`, DANS CET ORDRE (Ruling 22). Le code partagé qu'`apps/windows`
   # compile importe des paquets déclarés uniquement dans le `package.json` de

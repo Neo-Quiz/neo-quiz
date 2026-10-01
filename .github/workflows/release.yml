@@ -1,14 +1,6 @@
 name: Release Neo Quiz
 
-# Deux PRODUITS INDÉPENDANTS, deux familles de tags, un seul flux de mise à
-# jour :
-#   - un tag NU `X.Y.Z` (sans préfixe, ex. `1.0.0`) PUBLIE le GREFFON
-#     (main.js, styles.css, manifest.json) — c'est le numéro que lit
-#     `obsidianmd/obsidian-releases` pour la liste communautaire. Les anciens
-#     tags `vX.Y.Z` (avant la tâche 3 du chantier « greffon lecteur »)
-#     publient encore le greffon, pour ne pas casser une release en cours.
-#     Sa release est marquée `make_latest: false` : BRAT et Obsidian ne
-#     lisent jamais « latest », ils lisent `manifest.json` sur `main` ;
+# Un seul produit, l'application, un seul flux de mise à jour :
 #   - un tag `desktop-vX.Y.Z` PUBLIE L'APPLICATION (installeur Windows,
 #     AppImage) — sa release n'est promue « latest » qu'APRÈS validation des
 #     assets Windows + Linux, parce qu'electron-updater (fournisseur github,
@@ -16,7 +8,7 @@ name: Release Neo Quiz
 #     `/releases/latest` puis le `latest.yml` de CETTE release — par la
 #     redirection `releases/latest/download/latest.yml` de github.com, jamais
 #     par l'API REST (60 requêtes par heure et par IP sans jeton) ;
-#   - `workflow_dispatch` RÉPÈTE par défaut sans publier, sur le produit choisi ;
+#   - `workflow_dispatch` RÉPÈTE par défaut sans publier ;
 #     avec `publish: true`, il publie par la MÊME chaîne. Cela permet une
 #     automatisation sans recopier les jobs de build ni leur logique de signature.
 # La signature Authenticode de l'installeur Windows (SignPath) est optionnelle,
@@ -25,23 +17,13 @@ name: Release Neo Quiz
 on:
   push:
     tags:
-      - 'v*'
       - 'desktop-v*'
-      - '[0-9]*'
   workflow_dispatch:
     inputs:
       version:
         description: "Version à construire (sans le v), écrite dans le fichier de version le temps du build"
         required: true
         default: "0.0.0-repetition"
-      product:
-        description: "Produit à construire"
-        required: true
-        type: choice
-        options:
-          - app
-          - plugin
-        default: "app"
       publish:
         description: "Publier réellement la release demandée"
         required: true
@@ -63,52 +45,28 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-      product: ${{ steps.version.outputs.product }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # `desktop-v*` → app, `v*` → plugin. En répétition, les deux entrées
-      # choisissent directement. Les entrées passent par l'environnement,
+      # `desktop-v*` → app. Les entrées passent par l'environnement,
       # jamais interpolées dans le script : interpolées, une valeur saisie
       # serait exécutée comme du shell.
-      - name: Resolve version, tag and product
+      - name: Resolve version and tag
         id: version
         shell: bash
         env:
           VERSION_SAISIE: ${{ github.event.inputs.version }}
-          PRODUIT_SAISI: ${{ github.event.inputs.product }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            produit="$PRODUIT_SAISI"
-            # Tag NU pour le greffon depuis la tâche 3 (chantier « greffon
-            # lecteur ») : pas de préfixe, `obsidianmd/obsidian-releases` lit
-            # le numéro tel quel.
-            if [ "$produit" = "app" ]; then prefixe="desktop-v"; else prefixe=""; fi
             echo "version=$VERSION_SAISIE" >> "$GITHUB_OUTPUT"
-            echo "tag=$prefixe$VERSION_SAISIE" >> "$GITHUB_OUTPUT"
-            echo "product=$produit" >> "$GITHUB_OUTPUT"
+            echo "tag=desktop-v$VERSION_SAISIE" >> "$GITHUB_OUTPUT"
           else
             tag="${GITHUB_REF#refs/tags/}"
             case "$tag" in
               desktop-v*)
-                echo "product=app" >> "$GITHUB_OUTPUT"
                 echo "version=${tag#desktop-v}" >> "$GITHUB_OUTPUT"
-                ;;
-              # Tag NU (« 1.0.0 »), la forme du greffon depuis la tâche 3.
-              # Avant v*) : un tag numérique ne commence jamais par une lettre,
-              # donc l'ordre n'a pas d'incidence, mais la même règle que
-              # `release.yml` en tête l'énonce dans cet ordre.
-              [0-9]*)
-                echo "product=plugin" >> "$GITHUB_OUTPUT"
-                echo "version=$tag" >> "$GITHUB_OUTPUT"
-                ;;
-              # Anciens tags du greffon (avant la tâche 3), gardés pour ne pas
-              # casser une release déjà en cours.
-              v*)
-                echo "product=plugin" >> "$GITHUB_OUTPUT"
-                echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
                 ;;
               *)
                 echo "Tag inattendu : $tag" >&2
@@ -126,19 +84,14 @@ jobs:
       # Les NOTES de la release viennent de CHANGELOG.md (tâche 2 du chantier
       # « utilisable par n'importe qui ») : une version de l'application sans
       # section dans le fichier ÉCHOUE ICI, avant qu'une release n'existe.
-      # Le greffon n'a pas de changelog : corps vide. Même garde que « Create
-      # Release » juste en dessous : une répétition `workflow_dispatch` porte
+      # Même garde que « Create Release » juste en dessous : une répétition `workflow_dispatch` porte
       # une version placeholder qui n'a aucune section dans le CHANGELOG, et
       # elle ne publie rien.
       - name: Release notes
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
         shell: bash
         run: |
-          if [ "${{ steps.version.outputs.product }}" = "app" ]; then
-            node scripts/changelog.mjs extract "${{ steps.version.outputs.version }}" > RELEASE_NOTES.md
-          else
-            : > RELEASE_NOTES.md
-          fi
+          node scripts/changelog.mjs extract "${{ steps.version.outputs.version }}" > RELEASE_NOTES.md
           cat RELEASE_NOTES.md
 
       # La release existe avant les builds pour recevoir leurs assets, mais
@@ -160,86 +113,11 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           make_latest: "false"
 
-  plugin:
-    needs: prepare
-    if: needs.prepare.outputs.product == 'plugin'
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm ci
-
-      # UNE SEULE façon d'écrire la version : le script du dépôt, jamais un
-      # `node -e` inline qui divergerait de lui.
-      # `set-version.mjs` SORT EN 1 quand le manifeste porte déjà le numéro
-      # (« Rien à changer ») : c'est le cas normal d'un tag posé juste après
-      # le commit « Version X ». Le mode répétition ne le voyait pas, il change
-      # toujours le numéro. D'où le test avant l'appel.
-      - name: Update plugin version
-        shell: bash
-        env:
-          VERSION_VOULUE: ${{ needs.prepare.outputs.version }}
-        run: |
-          actuelle=$(node -p "require('./src/assets/manifest.json').version")
-          if [ "$actuelle" != "$VERSION_VOULUE" ]; then node scripts/set-version.mjs --plugin "$VERSION_VOULUE"; fi
-
-      - name: Type check
-        run: npm run check
-
-      # Le build passe par esbuild.config.mjs : une config esbuild dupliquée ici
-      # diverge en silence (les loaders de fontes MathLive y ont manqué).
-      # Hors Windows, aucun vault n'est détecté : la sortie reste dans dist/.
-      - name: Build
-        run: npm run build
-
-      - name: Collect release files
-        run: |
-          mkdir -p release
-          cp dist/main.js dist/styles.css release/
-          cp src/assets/manifest.json release/manifest.json
-          ls -lh release/
-
-      - name: Upload plugin (répétition)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: neo-quiz-plugin
-          path: release/*
-          if-no-files-found: error
-
-      # La release existe déjà (job `prepare`) : ce step ne fait que lui
-      # attacher les fichiers. `make_latest` est RÉPÉTÉ ici parce que
-      # l'action renvoie un PATCH à l'API GitHub dont le défaut documenté
-      # est `true` : omis, une release du greffon redeviendrait « latest »
-      # et electron-updater ne trouverait plus d'installeur.
-      - name: Attach plugin to release
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ needs.prepare.outputs.tag }}"
-          make_latest: "false"
-          files: |
-            release/main.js
-            release/manifest.json
-            release/styles.css
-
   # L'application, deux paquets, deux runners. `needs: prepare` : la release
   # existe déjà quand ils y attachent leurs fichiers. Un échec de l'un des
   # deux n'annule pas l'autre.
   app-windows:
     needs: prepare
-    if: needs.prepare.outputs.product == 'app'
     runs-on: windows-latest
     # `actions: read` en plus de `contents: write` : un bloc `permissions`
     # explicite met tout le reste à `none`, et l'action SignPath a besoin de
@@ -259,7 +137,9 @@ jobs:
       - name: Install dependencies (apps/windows)
         run: npm ci
         working-directory: apps/windows
-      # Même garde que le job `plugin` : « Rien à changer » sort en 1.
+      # `set-version.mjs` SORT EN 1 quand le fichier porte déjà le numéro
+      # (« Rien à changer ») : c'est le cas normal d'un tag posé juste après le
+      # commit « Version X ». D'où le test avant l'appel.
       - name: Update app version
         shell: bash
         env:
@@ -432,7 +312,6 @@ jobs:
   # Linux du site. Les versions déjà publiées gardent leurs paquets Linux.
 #  app-linux:
 #    needs: prepare
-#    if: needs.prepare.outputs.product == 'app'
 #    runs-on: ubuntu-latest
 #    permissions:
 #      contents: write
@@ -448,7 +327,7 @@ jobs:
 #      - name: Install dependencies (apps/windows)
 #        run: npm ci
 #        working-directory: apps/windows
-#      # Même garde que le job `plugin` : « Rien à changer » sort en 1.
+#      # Même garde que le job `app-windows` : « Rien à changer » sort en 1.
 #      - name: Update app version
 #        shell: bash
 #        env:
@@ -500,18 +379,15 @@ jobs:
 #          set -euo pipefail
 #          gh release upload "${{ needs.prepare.outputs.tag }}"             apps/windows/dist-installer/*.AppImage             apps/windows/dist-installer/*.deb             apps/windows/dist-installer/latest-linux.yml             apps/windows/dist-installer/latest-linux-arm64.yml             --clobber
 
-#  # La page de téléchargement lit `docs/latest.json` (app) et
-#  # `docs/latest-plugin.json` (greffon), servis par GitHub Pages, sans limite
+#  # La page de téléchargement lit `docs/latest.json`, servi par GitHub Pages, sans limite
 #  # de requêtes, plutôt que l'API GitHub, qui refuse au-delà de 60 appels par
 #  # heure et par adresse IP sans jeton : une promo derrière un même réseau
 #  # l'atteignait en quelques minutes et la page perdait ses versions. Ce job
-#  # tourne une fois les jobs du produit publié finis, écrit SEULEMENT le
-#  # fichier du produit publié, et le pousse sur `main` (Pages se republie).
-#  # Des jobs SKIPPED (`plugin` sur une app, ou l'inverse) sont normaux : un seul
-#  # produit est construit par exécution.
+#  # tourne une fois les jobs de l'application finis, écrit `docs/latest.json`,
+#  # et le pousse sur `main` (Pages se republie).
   site:
-    needs: [prepare, plugin, app-windows]
-    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true') && needs.prepare.result == 'success' && needs.plugin.result != 'failure' && needs['app-windows'].result != 'failure' }}
+    needs: [prepare, app-windows]
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true') && needs.prepare.result == 'success' && needs['app-windows'].result != 'failure' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -523,7 +399,6 @@ jobs:
           ref: main
 
       - name: Verify app release assets and promote latest
-        if: needs.prepare.outputs.product == 'app'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
@@ -557,9 +432,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
-          PRODUCT: ${{ needs.prepare.outputs.product }}
         run: |
-          if [ "$PRODUCT" = "app" ]; then fichier="docs/latest.json"; else fichier="docs/latest-plugin.json"; fi
+          fichier="docs/latest.json"
           gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
             --jq '{tag_name, published_at, assets: [.assets[] | {name, size, browser_download_url}]}' \
             > "$fichier"

@@ -1,12 +1,10 @@
 /*
- * Monte la version d'un seul geste, sur l'application par défaut, sur le
- * plugin avec --plugin :
+ * Monte la version de l'application d'un seul geste :
  *
  *   npm run version:set -- patch             2.4.0-beta → 2.4.1-beta (app)
  *   npm run version:set -- minor             2.4.1-beta → 2.5.0-beta (app)
  *   npm run version:set -- major             2.5.0-beta → 3.0.0-beta (app)
  *   npm run version:set -- 3.0.0             le numéro exact, quand il le faut
- *   npm run version:set -- --plugin minor    même chose, sur le greffon
  *
  * CE QUE DIT UN NUMÉRO. Les trois nombres ne sont pas décoratifs : ils
  * répondent à « qu'est-ce que ça change pour moi ? ».
@@ -25,15 +23,10 @@
  * `.github/workflows/release.yml` qui décide `prerelease` sur la présence
  * d'un `-` dans le tag, donc ce choix a un effet direct sur GitHub.
  *
- * DEUX FICHIERS PORTENT UN NUMÉRO, DEUX FAMILLES DE TAGS. L'application et
- * le greffon sont deux produits indépendants, avec chacun leur numéro et
- * leur rythme de publication : l'application vit dans
- * `apps/windows/package.json` (lockfile synchronisé, tags `desktop-vX.Y.Z`), le
- * greffon dans `src/assets/manifest.json` (tag NU `X.Y.Z`, sans préfixe —
- * c'est le numéro que lit `obsidianmd/obsidian-releases`, cf. CLAUDE.md —
+ * UN FICHIER PORTE LE NUMÉRO. L'application vit dans
+ * `apps/windows/package.json` (lockfile synchronisé, tags `desktop-vX.Y.Z`) ;
  * la version de `package.json` racine est statique et ignorée,
- * volontairement, elle ne porte la version d'aucun des deux produits). La
- * cible par défaut est `app` ; `--plugin` bascule sur le greffon.
+ * volontairement.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -41,19 +34,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const VERSION_FILE = "apps/windows/package.json";
-const PLUGIN_VERSION_FILE = "src/assets/manifest.json";
 const LOCKFILE = "apps/windows/package-lock.json";
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 export const LEVELS = ["major", "minor", "patch"];
 
 export function isVersion(value) {
 	return typeof value === "string" && VERSION_PATTERN.test(value);
-}
-
-function versionFile(target) {
-	if (target === "app") return VERSION_FILE;
-	if (target === "plugin") return PLUGIN_VERSION_FILE;
-	throw new Error(`Cible inconnue : « ${target} ». Attendu : app ou plugin.`);
 }
 
 /** Le suffixe survit au bump ; un numéro exact peut changer le statut. */
@@ -71,16 +57,15 @@ export function nextVersion(current, level) {
 	return suffix ? bumped + suffix : bumped;
 }
 
-export async function currentVersion(target = "app") {
-	const file = versionFile(target);
+export async function currentVersion() {
+	const file = VERSION_FILE;
 	const { version } = JSON.parse(await readFile(path.join(repositoryRoot, file), "utf8"));
 	if (!isVersion(version)) throw new Error(`Version introuvable ou illisible dans ${file}.`);
 	return version;
 }
 
-export async function resolveVersion(request, target = "app") {
-	versionFile(target);
-	if (LEVELS.includes(request)) return nextVersion(await currentVersion(target), request);
+export async function resolveVersion(request) {
+	if (LEVELS.includes(request)) return nextVersion(await currentVersion(), request);
 	if (isVersion(request)) return request;
 	throw new Error(`Attendu : ${LEVELS.join(" | ")} ou un numéro comme 1.0.0, reçu « ${request} ».`);
 }
@@ -93,15 +78,15 @@ export function withVersion(text, version, file = VERSION_FILE) {
 	return text.replace(pattern, (_, prefix, suffix) => prefix + version + suffix);
 }
 
-export async function setVersion(version, target = "app") {
+export async function setVersion(version) {
 	if (!isVersion(version)) {
 		throw new Error(`Version attendue sous la forme 1.2.3 ou 1.2.3-beta, reçu « ${version} ».`);
 	}
-	const file = versionFile(target);
+	const file = VERSION_FILE;
 	const before = await readFile(path.join(repositoryRoot, file), "utf8");
 	const after = withVersion(before, version, file);
 	const changes = [{ file, before, after }];
-	if (target === "app") {
+	{
 		const lockBefore = await readFile(path.join(repositoryRoot, LOCKFILE), "utf8");
 		const lock = JSON.parse(lockBefore);
 		if (!isVersion(lock.version) || !isVersion(lock.packages?.[""]?.version)) {
@@ -126,17 +111,17 @@ export async function setVersion(version, target = "app") {
 const invokedScript = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : undefined;
 if (invokedScript === import.meta.url) {
 	try {
-		const args = process.argv.slice(2);
-		const target = args.includes("--plugin") ? "plugin" : "app";
-		const words = args.filter(argument => argument !== "--plugin");
-		if (words.length !== 1) throw new Error("Attendu : [--plugin] major | minor | patch | X.Y.Z.");
-		const version = await resolveVersion(words[0], target);
-		for (const file of await setVersion(version, target)) console.log("  " + file);
-		const tag = (target === "app" ? "desktop-v" : "") + version;
-		console.log(`\nVersion ${version}. Reste à publier :`);
+		const words = process.argv.slice(2);
+		if (words.length !== 1) throw new Error("Attendu : major | minor | patch | X.Y.Z.");
+		const version = await resolveVersion(words[0]);
+		for (const file of await setVersion(version)) console.log("  " + file);
+		const tag = "desktop-v" + version;
+		console.log(`
+Version ${version}. Reste à publier :`);
 		console.log(`  git commit -am "Version ${version}"`);
 		console.log(`  git tag ${tag} && git push --atomic origin main ${tag}`);
-		console.log(`\nOu, la prochaine fois : git ship ${target === "plugin" ? "--plugin " : ""}"Ce que ça change"`);
+		console.log(`
+Ou, la prochaine fois : git ship "Ce que ça change"`);
 	} catch (error) {
 		console.error(error.message);
 		process.exitCode = 1;

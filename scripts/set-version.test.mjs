@@ -98,7 +98,6 @@ async function fixture(t) {
 			packages: { "": { name: "@neo-quiz/windows", version: "1.0.0" },
 				"node_modules/example": { version: "5.4.3", integrity: "unchanged" } },
 		},
-		"src/assets/manifest.json": { id: "quiz-blocks", version: "2.6.1" },
 	};
 	for (const [file, document] of Object.entries(documents)) {
 		await writeFile(path.join(root, file), JSON.stringify(document, null, 2) + "\n");
@@ -114,15 +113,12 @@ async function fixture(t) {
 test("la lecture et les bumps visent l'application par défaut", async t => {
 	const f = await fixture(t);
 	assert.equal(await f.api.currentVersion(), "1.0.0");
-	assert.equal(await f.api.currentVersion("plugin"), "2.6.1");
 	assert.equal(await f.api.resolveVersion("minor"), "1.1.0");
-	assert.equal(await f.api.resolveVersion("patch", "plugin"), "2.6.2");
 	assert.equal(await f.api.resolveVersion("1.2.0-rc.1"), "1.2.0-rc.1");
 });
 
 test("un bump application synchronise le package et les deux versions racine du lockfile", async t => {
 	const f = await fixture(t);
-	const pluginBefore = await f.raw("src/assets/manifest.json");
 	const rootBefore = await f.raw("package.json");
 	assert.deepEqual(await f.api.setVersion("1.1.0-rc.1"), ["apps/windows/package.json", "apps/windows/package-lock.json"]);
 	assert.equal((await f.read("apps/windows/package.json")).version, "1.1.0-rc.1");
@@ -130,39 +126,15 @@ test("un bump application synchronise le package et les deux versions racine du 
 	assert.equal(lock.version, "1.1.0-rc.1");
 	assert.equal(lock.packages[""].version, "1.1.0-rc.1");
 	assert.deepEqual(lock.packages["node_modules/example"], { version: "5.4.3", integrity: "unchanged" });
-	assert.equal(await f.raw("src/assets/manifest.json"), pluginBefore);
 	assert.equal(await f.raw("package.json"), rootBefore);
 	assert.equal(await f.api.resolveVersion("patch"), "1.1.1-rc.1");
 });
-
-test("un bump plugin conserve les deux fichiers application octet pour octet", async t => {
-	const f = await fixture(t);
-	const appBefore = await f.raw("apps/windows/package.json");
-	const lockBefore = await f.raw("apps/windows/package-lock.json");
-	assert.deepEqual(await f.api.setVersion("2.7.0", "plugin"), ["src/assets/manifest.json"]);
-	assert.equal((await f.read("src/assets/manifest.json")).version, "2.7.0");
-	assert.equal(await f.raw("apps/windows/package.json"), appBefore);
-	assert.equal(await f.raw("apps/windows/package-lock.json"), lockBefore);
-});
-
-for (const args of [["--plugin", "patch"], ["patch", "--plugin"]]) {
-	test("la CLI sélectionne le plugin : " + args.join(" "), async t => {
-		const f = await fixture(t);
-		const result = spawnSync(process.execPath, [f.script, ...args], { encoding: "utf8" });
-		assert.equal(result.status, 0, result.stderr);
-		assert.equal((await f.read("src/assets/manifest.json")).version, "2.6.2");
-		assert.equal((await f.read("apps/windows/package.json")).version, "1.0.0");
-		assert.match(result.stdout, /git tag 2\.6\.2/);
-		assert.doesNotMatch(result.stdout, /desktop-v/);
-	});
-}
 
 test("la CLI livre l'application et annonce son tag par défaut", async t => {
 	const f = await fixture(t);
 	const result = spawnSync(process.execPath, [f.script, "patch"], { encoding: "utf8" });
 	assert.equal(result.status, 0, result.stderr);
 	assert.equal((await f.read("apps/windows/package.json")).version, "1.0.1");
-	assert.equal((await f.read("src/assets/manifest.json")).version, "2.6.1");
 	assert.match(result.stdout, /git tag desktop-v1\.0\.1/);
 });
 

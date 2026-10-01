@@ -25,16 +25,6 @@ test("sans rien, la livraison répare", () => {
 		request: null,
 		message: undefined,
 		watch: false,
-		target: "app",
-	});
-});
-
-test("le niveau précède le message", () => {
-	assert.deepEqual(readArguments(["--plugin", "minor", "Add ordering questions"]), {
-		request: "minor",
-		message: "Add ordering questions",
-		watch: false,
-		target: "plugin",
 	});
 });
 
@@ -43,7 +33,6 @@ test("un numéro écrit en toutes lettres tient lieu de niveau", () => {
 		request: "3.0.0",
 		message: "Sortie de bêta",
 		watch: false,
-		target: "app",
 	});
 });
 
@@ -52,31 +41,19 @@ test("un numéro avec suffixe -beta tient aussi lieu de niveau", () => {
 		request: "2.5.0-beta",
 		message: "Nouvelle bêta",
 		watch: false,
-		target: "app",
-	});
-});
-
-test("un niveau peut venir seul, quand l'arbre est déjà propre", () => {
-	assert.deepEqual(readArguments(["--plugin", "major"]), {
-		request: "major",
-		message: undefined,
-		watch: false,
-		target: "plugin",
 	});
 });
 
 test("le drapeau de suivi se glisse où il veut", () => {
-	assert.deepEqual(readArguments(["--plugin", "--watch", "minor", "Add a view"]), {
-		request: "minor",
+	assert.deepEqual(readArguments(["--watch", "Add a view"]), {
+		request: null,
 		message: "Add a view",
 		watch: true,
-		target: "plugin",
 	});
 	assert.deepEqual(readArguments(["Fix a leak", "--watch"]), {
 		request: null,
 		message: "Fix a leak",
 		watch: true,
-		target: "app",
 	});
 });
 
@@ -94,18 +71,12 @@ const UNRELEASED_VIDE = "# C\n\n## [Unreleased]\n\n## [1.1.0] - 2026-09-17\n";
 
 test("pour l'app, aucun niveau tapé : la requête est nulle, le CHANGELOG décide", () => {
 	assert.deepEqual(readArguments(["Fix collapse ghost pixels"]), {
-		request: null, message: "Fix collapse ghost pixels", watch: false, target: "app",
+		request: null, message: "Fix collapse ghost pixels", watch: false,
 	});
 });
 
 test("pour l'app, un niveau tapé est refusé et renvoie au CHANGELOG", () => {
 	assert.throws(() => readArguments(["minor", "msg"]), /CHANGELOG/);
-});
-
-test("pour le greffon, le niveau tapé reste la règle", () => {
-	assert.deepEqual(readArguments(["--plugin", "minor"]), {
-		request: "minor", message: undefined, watch: false, target: "plugin",
-	});
 });
 
 test("an Added entry ships as a patch by default; a minor is typed", () => {
@@ -255,8 +226,8 @@ test("stagedPathsFrom lit les chemins d'un statut porcelain", () => {
 });
 
 test("stagedPathsFrom tolère les fins de ligne CRLF", () => {
-	const porcelain = " M src/assets/manifest.json\r\n";
-	assert.deepEqual(stagedPathsFrom(porcelain), ["src/assets/manifest.json"]);
+	const porcelain = " M apps/windows/package.json\r\n";
+	assert.deepEqual(stagedPathsFrom(porcelain), ["apps/windows/package.json"]);
 });
 
 test("stagedPathsFrom ignore les lignes vides", () => {
@@ -361,19 +332,7 @@ test("pushArgs ne s'appuie jamais sur --follow-tags", () => {
 	assert.equal(pushArgs("2.4.1-beta").includes("--follow-tags"), false);
 });
 
-for (const args of [["--plugin", "minor", "Fix", "--watch"], ["minor", "Fix", "--watch", "--plugin"]]) {
-	test("le drapeau plugin se glisse où il veut : " + args.join(" "), () => {
-		assert.deepEqual(readArguments(args), { request: "minor", message: "Fix", watch: true, target: "plugin" });
-	});
-}
-
-test("les étiquettes du plugin sont NUES, sans préfixe", () => {
-	assert.deepEqual(tagArgs("2.6.2", "plugin"), ["tag", "2.6.2"]);
-	assert.deepEqual(pushArgs("2.6.2", "plugin"), ["push", "--atomic", "origin", "main", "2.6.2"]);
-});
-
 test("les conflits citent le tag et la commande de récupération de la bonne cible", () => {
 	assert.match(describeTagConflict({ local: true, remote: false }, "1.0.0"), /git tag -d desktop-v1\.0\.0/);
 	assert.match(describeTagConflict({ local: false, remote: true }, "1.0.0"), /desktop-v1\.0\.0/);
-	assert.match(describeTagConflict({ local: true, remote: false }, "2.6.1", "plugin"), /git tag -d 2\.6\.1/);
 });

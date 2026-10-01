@@ -4,7 +4,6 @@
  *   git ship "Fix collapse ghost pixels"   le travail, puis le correctif suivant (x.y.Z+1)
  *   git ship 1.2.0 "Sortie"                 un numéro explicite : c'est ainsi qu'une MINEURE sort
  *   git ship                                l'arbre est déjà propre : bump seul
- *   git ship --plugin minor                 le greffon garde le niveau tapé
  *
  * L'alias se pose une fois :
  *
@@ -20,7 +19,7 @@
  *   2. les vérifications (`runChecks`) — rien ne se commite avant qu'elles passent ;
  *   3. le commit du travail, quand il y en a — après confirmation de ce qui est balayé ;
  *   4. la montée de version de la cible choisie (`set-version.mjs`) ;
- *   5. le commit « Version X » et le tag `desktop-vX` (plugin : `X` nu, sans préfixe) ;
+ *   5. le commit « Version X » et le tag `desktop-vX` ;
  *   6. le push, atomique, de la branche ET de l'étiquette.
  *
  * Le push est la DERNIÈRE étape, et il est atomique. Tout ce qui casse avant
@@ -43,7 +42,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
 
-import { LEVELS, isVersion, resolveVersion, setVersion, currentVersion, nextVersion } from "./set-version.mjs";
+import { LEVELS, isVersion, setVersion, currentVersion, nextVersion } from "./set-version.mjs";
 import { FICHIER, lireUnreleased, deduireNiveau, niveauEntre, rang, figer } from "./changelog.mjs";
 
 const repositoryRoot = path.resolve(
@@ -61,34 +60,26 @@ const BRANCH = "main";
 export function readArguments(args) {
 	const words = [];
 	let watch = false;
-	let target = "app";
 
 	for (const argument of args) {
 		if (argument === "--watch") {
 			watch = true;
 			continue;
 		}
-		if (argument === "--plugin") {
-			target = "plugin";
-			continue;
-		}
 		if (argument.startsWith("-")) {
 			throw new Error(
-				`Drapeau inconnu : « ${argument} ». Options : --watch et --plugin.`
+				`Drapeau inconnu : « ${argument} ». Option : --watch.`
 			);
 		}
 		words.push(argument);
 	}
 
-	let request = target === "plugin" ? "patch" : null;
+	let request = null;
 	if (words.length > 0 && LEVELS.includes(words[0])) {
-		if (target !== "plugin") {
-			throw new Error(
-				`Pour l'application, le niveau ne se tape plus : il se déduit de la section [Unreleased] de ${FICHIER}. ` +
-					"Écris ce que la version change sous ### Added, ### Changed ou ### Fixed, puis `git ship \"Message\"`."
-			);
-		}
-		request = words.shift();
+		throw new Error(
+			`Pour l'application, le niveau ne se tape plus : il se déduit de la section [Unreleased] de ${FICHIER}. ` +
+				"Écris ce que la version change sous ### Added, ### Changed ou ### Fixed, puis `git ship \"Message\"`."
+		);
 	} else if (words.length > 0 && isVersion(words[0])) {
 		request = words.shift();
 	}
@@ -102,7 +93,7 @@ export function readArguments(args) {
 		);
 	}
 
-	return { request, message, watch, target };
+	return { request, message, watch };
 }
 
 /**
@@ -327,12 +318,12 @@ export function versionCommitArgs(version) {
 	return ["commit", "-am", `Version ${version}`];
 }
 
-export function tagArgs(version, target = "app") {
-	return ["tag", `${target === "plugin" ? "" : "desktop-v"}${version}`];
+export function tagArgs(version) {
+	return ["tag", `desktop-v${version}`];
 }
 
-export function pushArgs(version, target = "app") {
-	return ["push", "--atomic", "origin", BRANCH, tagArgs(version, target)[1]];
+export function pushArgs(version) {
+	return ["push", "--atomic", "origin", BRANCH, tagArgs(version)[1]];
 }
 
 /*
@@ -345,8 +336,8 @@ export function pushArgs(version, target = "app") {
  * question posée directement au distant, indépendante de ce que `git fetch`
  * a rapatrié dans les refs locales.
  */
-export function describeTagConflict({ local, remote }, version, target = "app") {
-	const tag = tagArgs(version, target)[1];
+export function describeTagConflict({ local, remote }, version) {
+	const tag = tagArgs(version)[1];
 	if (remote) {
 		return `L'étiquette ${tag} existe sur origin : cette version est déjà publiée.`;
 	}
@@ -406,7 +397,7 @@ async function ask(promptText) {
  * vérifications a sa raison d'être ici plutôt qu'au moment du push : passé le
  * premier commit, l'échec laisse un dépôt à démêler à la main.
  */
-function guard(version, target) {
+function guard(version) {
 	const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
 	if (branch !== BRANCH) {
 		throw new Error(
@@ -458,10 +449,10 @@ function guard(version, target) {
 	// FINDING 3, round 2 (revue) — `git tag --list` ne dit pas si l'étiquette
 	// vient d'origin ou n'a jamais quitté ce poste ; `ls-remote` interroge le
 	// distant directement, sans dépendre de ce que le fetch a rapatrié.
-	const tag = tagArgs(version, target)[1];
+	const tag = tagArgs(version)[1];
 	const local = git(["tag", "--list", tag]).trim() !== "";
 	const remote = git(["ls-remote", "--tags", "origin", tag]).trim() !== "";
-	const conflict = describeTagConflict({ local, remote }, version, target);
+	const conflict = describeTagConflict({ local, remote }, version);
 	if (conflict) throw new Error(conflict);
 
 	// Le distant a-t-il avancé sans nous ? Le savoir maintenant coûte un
@@ -478,21 +469,16 @@ function guard(version, target) {
 }
 
 async function ship(args) {
-	const { request, message, watch, target } = readArguments(args);
+	const { request, message, watch } = readArguments(args);
 
 	const porcelain = git(["status", "--porcelain"]);
 	const dirty = porcelain.trim() !== "";
 	const commitWork = worksToCommit(message, dirty);
 
 	let version;
-	let changelog = null;
-	if (target === "app") {
-		changelog = await readFile(path.join(repositoryRoot, FICHIER), "utf8");
-		({ version } = versionDepuisChangelog(changelog, await currentVersion("app"), request));
-	} else {
-		version = await resolveVersion(request, target);
-	}
-	guard(version, target);
+	const changelog = await readFile(path.join(repositoryRoot, FICHIER), "utf8");
+	({ version } = versionDepuisChangelog(changelog, await currentVersion(), request));
+	guard(version);
 
 	runChecks();
 
@@ -521,20 +507,18 @@ async function ship(args) {
 	}
 
 	console.log(`\nVersion ${version} :`);
-	for (const relativePath of await setVersion(version, target)) {
+	for (const relativePath of await setVersion(version)) {
 		console.log(`  ${relativePath}`);
 	}
 
-	if (changelog !== null) {
-		const date = new Date().toISOString().slice(0, 10);
-		await writeFile(path.join(repositoryRoot, FICHIER), figer(changelog, version, date), "utf8");
-		console.log(`  ${FICHIER}`);
-	}
+	const date = new Date().toISOString().slice(0, 10);
+	await writeFile(path.join(repositoryRoot, FICHIER), figer(changelog, version, date), "utf8");
+	console.log(`  ${FICHIER}`);
 
 	console.log("");
 	run("git", versionCommitArgs(version));
-	run("git", tagArgs(version, target));
-	run("git", pushArgs(version, target));
+	run("git", tagArgs(version));
+	run("git", pushArgs(version));
 
 	const actions = actionsUrl(git(["remote", "get-url", "origin"]).trim());
 	console.log(`\nVersion ${version} livrée.`);
