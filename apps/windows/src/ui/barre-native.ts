@@ -43,7 +43,7 @@ async function icone(btn: HTMLElement, active: boolean): Promise<{ png: string; 
 		for (const el of [svg, ...Array.from(svg.querySelectorAll("*"))]) {
 			const cs = getComputedStyle(el);
 			const st = (el as SVGElement).style;
-			for (const p of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity"]) st.setProperty(p, cs.getPropertyValue(p));
+			for (const p of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity"]) st.setProperty(p, cs.getPropertyValue(p));
 		}
 		svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 		svg.setAttribute("width", String(TAILLE_PX));
