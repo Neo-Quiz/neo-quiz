@@ -12,9 +12,15 @@ import java.util.concurrent.CopyOnWriteArrayList
  * primitive. The app-private directory (it holds `settings.json`, whose
  * `folders` key feeds the roots on the next start) is NEVER reachable, even
  * when a root contains it: otherwise a hostile renderer could write that file
- * raw and widen the perimeter persistently.
+ * raw and widen the perimeter persistently. The [excluded] folders (other apps' and this
+ * app's external data) are refused the same way.
  */
-class Perimeter(private val roots: () -> List<File>, private val privateDir: File) {
+class Perimeter(
+    private val roots: () -> List<File>,
+    private val privateDir: File,
+    /** Folders never reachable even inside a root (`Android/data`, `Android/obb`, the app's external dirs). */
+    private val excluded: () -> List<File> = { emptyList() },
+) {
 
     /** The canonical file when [abs] is inside the perimeter; throws `SecurityException("outside-perimeter")` otherwise. */
     fun check(abs: String): File {
@@ -24,6 +30,7 @@ class Perimeter(private val roots: () -> List<File>, private val privateDir: Fil
         val canonical = canonical(file) ?: throw refused()
         val priv = canonical(privateDir)
         if (priv != null && under(canonical, priv)) throw refused()
+        if (excluded().any { e -> canonical(e)?.let { under(canonical, it) } == true }) throw refused()
         if (roots().none { r -> canonical(r)?.let { under(canonical, it) } == true }) throw refused()
         return canonical
     }

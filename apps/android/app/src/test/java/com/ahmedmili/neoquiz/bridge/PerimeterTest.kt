@@ -51,6 +51,18 @@ class PerimeterTest {
         refused(File(link, "secret.md").path)
     }
 
+    @Test fun excludedFoldersAreRefusedEvenInsideARoot() {
+        val data = File(root, "Android/data").apply { mkdirs() }
+        val obb = File(root, "Android/obb").apply { mkdirs() }
+        val own = File(root, "Android/data/com.me/files").apply { mkdirs() }
+        val p = Perimeter({ listOf(root) }, privateDir, { listOf(data, obb, own) })
+        for (f in listOf(data, obb, File(data, "x/y.md"), File(obb, "z.obb"), File(own, "q.md"))) {
+            val e = assertThrows(f.path, SecurityException::class.java) { p.check(f.path) }
+            assertEquals("outside-perimeter", e.message)
+        }
+        assertTrue(p.check(File(root, "Android/media/ok.md").path).path.startsWith(root.path))
+    }
+
     @Test fun privateDirIsRefusedEvenWhenARootContainsIt() {
         val wide = Perimeter({ listOf(base) }, privateDir)
         val e = assertThrows(SecurityException::class.java) { wide.check(File(privateDir, "settings.json").path) }

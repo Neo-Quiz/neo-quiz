@@ -295,6 +295,13 @@ async function verifierDossierFond(perimetre: Perimetre, valeur: unknown): Promi
 		if (typeof embarque !== "string" || embarque.trim() === "") {
 			throw new Error("réglage fond refusé : embarque doit être une chaîne : " + String(embarque));
 		}
+		/* PAS de `dossier` NI d'`image` à côté : `perimetreInitial` admet
+		   `fond.dossier` au démarrage suivant, et cette forme sortait avant de le
+		   regarder — `{ embarque: "x", dossier: "<racine du disque>" }` élargissait
+		   le périmètre (revue de sécurité du 2026-10-01). */
+		if ("dossier" in valeur || "image" in valeur) {
+			throw new Error("réglage fond refusé : embarque n'admet ni dossier ni image");
+		}
 		return;
 	}
 	const dossier = (valeur as { dossier?: unknown }).dossier;

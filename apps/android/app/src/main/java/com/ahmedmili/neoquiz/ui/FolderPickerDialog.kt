@@ -49,7 +49,8 @@ class FolderPickerDialog(private val activity: Activity, private val suggested: 
                 }
                 if (dir != storage) dir.parentFile?.let { rows.add(Row(activity.getString(R.string.picker_up), it)) }
                 dir.listFiles().orEmpty()
-                    .filter { it.isDirectory && !it.name.startsWith(".") }
+                    // `Android` (data, obb) belongs to other apps and is outside the perimeter anyway.
+                    .filter { it.isDirectory && !it.name.startsWith(".") && !(dir == storage && it.name == "Android") }
                     .sortedBy { it.name.lowercase() }
                     .forEach { rows.add(Row(it.name + "/", it)) }
                 adapter.clear()

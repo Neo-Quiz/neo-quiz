@@ -262,6 +262,24 @@ await withSrcModule("apps/windows/electron/perimetre.ts", async ({ creerPerimetr
 			});
 		});
 
+		await cas(r, "un fond embarqué n'admet jamais de dossier, même si le fichier en porte un", async () => {
+			/* LE TROU (revue de sécurité, 2026-10-01) : la garde d'écriture rendait
+			   la main dès qu'`embarque` était présent, sans regarder `dossier`, et
+			   `perimetreInitial` lisait `fond.dossier` sans regarder `embarque` :
+			   `{ embarque: "x", dossier: "<racine du disque>" }` donnait ce dossier
+			   au périmètre au démarrage suivant. Un `dossier` existant et valide
+			   ici : seul le bug le ferait admettre. */
+			const donnees = join(dir, "userData-fond-embarque");
+			const cible = join(dir, "fond-embarque-cible");
+			await mkdir(cible, { recursive: true });
+			await mkdir(donnees, { recursive: true });
+			await writeFile(join(donnees, "settings.json"), JSON.stringify({ fond: { embarque: "x", dossier: cible, image: "a.jpg" } }), "utf-8");
+			await withSrcModule("apps/windows/electron/reglages.ts", async ({ creerReglages }) => {
+				const p = await perimetreInitial({ dossierDonnees: donnees, reglages: creerReglages(join(donnees, "settings.json")), dossierDefaut: join(dir, "defaut-absent-4") });
+				r.check("un fond embarqué n'admet jamais de dossier, même si le fichier en porte un", p.racines(), []);
+			});
+		});
+
 		await cas(r, "le défaut est dans racines() même sans réglage (premier lancement)", async () => {
 			/* C'est TOUTE la raison d'être de `dossierDefaut` : un utilisateur qui
 			   n'a jamais rien réglé (`settings.json` absent) doit quand même
@@ -740,5 +758,8 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 			nullAccepte: /valeur === null \|\| valeur === undefined\) return;/.test(source),
 		},
 		{ perimetreVerifie: true, imageBornee: true, nullAccepte: true });
+	r.check("verifierDossierFond refuse un `dossier` ou une `image` à côté d'`embarque` (sinon le périmètre du démarrage suivant s'élargit)",
+		/"dossier" in valeur \|\| "image" in valeur\) \{\s*throw/.test(source),
+		true);
 	r.done();
 }

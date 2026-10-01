@@ -25,7 +25,11 @@ class AppBridge(val bridge: Bridge, private val scan: ScanChannel, private val s
 fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val privateDir = activity.filesDir
     val allowed = AllowedRoots()
-    val perimeter = Perimeter(allowed::roots, privateDir)
+    val storage = Environment.getExternalStorageDirectory()
+    // Other apps' data and this app's own external dirs are never reachable, even under a root.
+    val excluded = listOf(File(storage, "Android/data"), File(storage, "Android/obb")) +
+        activity.getExternalFilesDirs(null).filterNotNull() + activity.externalCacheDirs.filterNotNull() + activity.obbDirs.filterNotNull()
+    val perimeter = Perimeter(allowed::roots, privateDir) { excluded }
     val documents = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Neo Quiz")
     val settings = SettingsChannel(
         file = File(privateDir, "settings.json"),

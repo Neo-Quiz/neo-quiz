@@ -231,7 +231,10 @@ export async function perimetreInitial(options: {
 	   c'est le cas que `check:electron-reglages` éprouve par discriminance. */
 	try {
 		const fond = await options.reglages.lire(CLE_REGLAGES_FOND);
-		const dossier = fond && typeof fond === "object" ? (fond as { dossier?: unknown }).dossier : undefined;
+		/* La forme EMBARQUÉE n'a aucun chemin : un `dossier` qui l'accompagne
+		   (écrit à la main, ou avant la garde) n'admet rien. */
+		const embarque = fond && typeof fond === "object" && (fond as { embarque?: unknown }).embarque !== undefined;
+		const dossier = fond && typeof fond === "object" && !embarque ? (fond as { dossier?: unknown }).dossier : undefined;
 		if (typeof dossier === "string" && dossier.trim() !== "") await perimetre.autoriser(dossier);
 	} catch (e) {
 		console.warn(LOG_PREFIX, "réglage du fond illisible au démarrage:", e);

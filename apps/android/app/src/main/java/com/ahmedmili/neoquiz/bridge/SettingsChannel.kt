@@ -101,15 +101,30 @@ class SettingsChannel(
         if (valeur.has("embarque")) {
             val e = valeur.opt("embarque")
             if (e !is String || e.isBlank()) throw IllegalArgumentException("réglage fond refusé : embarque doit être une chaîne : $e")
+            // The embedded form has no path: a `dossier` beside it would be read at the next start (`seedRoots`).
+            if (valeur.has("dossier") || valeur.has("image")) throw IllegalArgumentException("réglage fond refusé : embarque n'admet ni dossier ni image")
             return
         }
         val dossier = valeur.opt("dossier")
         val image = valeur.opt("image")
         if (dossier !is String || dossier.isBlank()) throw IllegalArgumentException("réglage fond refusé : dossier invalide : $dossier")
         if (!perimeter.contains(dossier)) throw IllegalArgumentException("réglage fond refusé : dossier hors périmètre : $dossier")
-        if (image !is String || image.isBlank() || "/" in image || "\\" in image || ".." in image) {
-            throw IllegalArgumentException("réglage fond refusé : image invalide : $image")
-        }
+        if (!validImage(image)) throw IllegalArgumentException("réglage fond refusé : image invalide : $image")
+    }
+
+    /** `image` is a file NAME from the folder listing, never a path. */
+    private fun validImage(image: Any?) = image is String && image.isNotBlank() && "/" !in image && "\\" !in image && ".." !in image
+
+    /**
+     * The folder a stored `fond` may add to the perimeter at startup: only a
+     * well-formed folder background (no `embarque`, a real `image` name). The stored
+     * value is judged again here: the file is not trusted for having passed the
+     * write guard once.
+     */
+    private fun backgroundFolder(fond: JSONObject): String? {
+        if (fond.has("embarque")) return null
+        val dossier = fond.opt("dossier") as? String ?: return null
+        return dossier.takeIf { it.isNotBlank() && validImage(fond.opt("image")) }
     }
 
     /** The paths of a `folders` value (array of `{ path }`) or of the legacy `folder` (a string). */
@@ -123,7 +138,7 @@ class SettingsChannel(
     suspend fun seedRoots() {
         for (key in listOf("folders", "folder")) folderPaths(lire(key)).forEach { allowed.allow(File(it)) }
         (lire(KEY_DEFAULT_FOLDER) as? String)?.let { allowed.allow(File(it)) }
-        ((lire("fond") as? JSONObject)?.opt("dossier") as? String)?.let { allowed.allow(File(it)) }
+        (lire("fond") as? JSONObject)?.let(::backgroundFolder)?.let { allowed.allow(File(it)) }
     }
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(

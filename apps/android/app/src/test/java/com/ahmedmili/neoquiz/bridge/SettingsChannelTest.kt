@@ -73,6 +73,33 @@ class SettingsChannelTest {
         }
     }
 
+    @Test fun anEmbeddedBackgroundCarriesNoFolderNorImage() {
+        val elsewhere = File(root.parentFile, "elsewhere2").apply { mkdirs() }
+        refused { settings.ecrire("fond", JSONObject().put("embarque", "x").put("dossier", elsewhere.path)) }
+        refused { settings.ecrire("fond", JSONObject().put("embarque", "x").put("dossier", root.path).put("image", "a.png")) }
+        refused { settings.ecrire("fond", JSONObject().put("embarque", "x").put("image", "a.png")) }
+    }
+
+    private fun reseed(json: JSONObject): List<File> = runBlocking {
+        settingsFile.writeText(json.toString())
+        val fresh = AllowedRoots()
+        SettingsChannel(settingsFile, Perimeter(fresh::roots, priv), fresh) { File(root.parentFile, "default") }.seedRoots()
+        fresh.roots()
+    }
+
+    @Test fun startupIgnoresTheFolderOfAnEmbeddedBackground() {
+        val elsewhere = File(root.parentFile, "elsewhere3").apply { mkdirs() }
+        assertEquals(emptyList<File>(), reseed(JSONObject().put("fond", JSONObject().put("embarque", "x").put("dossier", elsewhere.path).put("image", "a.png"))))
+    }
+
+    @Test fun startupRevalidatesTheFolderBackground() {
+        val elsewhere = File(root.parentFile, "elsewhere4").apply { mkdirs() }
+        assertEquals(listOf(elsewhere), reseed(JSONObject().put("fond", JSONObject().put("dossier", elsewhere.path).put("image", "a.png"))))
+        assertEquals(emptyList<File>(), reseed(JSONObject().put("fond", JSONObject().put("dossier", elsewhere.path).put("image", "../a.png"))))
+        assertEquals(emptyList<File>(), reseed(JSONObject().put("fond", JSONObject().put("dossier", elsewhere.path))))
+        assertEquals(emptyList<File>(), reseed(JSONObject().put("fond", JSONObject().put("dossier", "").put("image", "a.png"))))
+    }
+
     @Test fun syncKeysAreReserved() {
         refused { settings.ecrire("syncActif", true) }
         refused { settings.ecrire("syncRoot", root.path) }

@@ -23,7 +23,18 @@ import org.json.JSONArray
 class FilesChannel(private val perimeter: Perimeter, private val allowed: AllowedRoots) {
     private val locks = ConcurrentHashMap<String, Mutex>()
 
-    private fun lockOf(f: File): Mutex = locks.getOrPut(f.path) { Mutex() }
+    internal fun lockOf(f: File): Mutex = locks.getOrPut(f.path) { Mutex() }
+
+    /** Runs [block] holding the locks of every file given, taken in path order (two renames crossing each other cannot deadlock). */
+    private suspend fun <T> withLocks(vararg files: File, block: () -> T): T {
+        val mutexes = files.map { it.path }.distinct().sorted().map { path -> locks.getOrPut(path) { Mutex() } }
+        mutexes.forEach { it.lock() }
+        try {
+            return block()
+        } finally {
+            mutexes.reversed().forEach { it.unlock() }
+        }
+    }
 
     private fun mtimeOf(f: File): Map<String, Any?> = mapOf("mtime" to f.lastModified())
 
@@ -48,6 +59,8 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
     /** Appends under a per-path lock: the append is carried by the file system, never a read-then-rewrite. */
     suspend fun append(abs: String, contenu: String): Map<String, Any?> {
         val f = perimeter.check(abs)
+        // A link (even dangling) is never written through: its target could be anywhere.
+        if (Files.isSymbolicLink(f.toPath())) throw SecurityException("outside-perimeter")
         lockOf(f).withLock {
             FileOutputStream(f, true).use { it.write(contenu.toByteArray(Charsets.UTF_8)) }
         }
@@ -85,9 +98,11 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
         val r = perimeter.check(racine)
         if (a == r || !a.toPath().startsWith(r.toPath())) throw IllegalArgumentException("trash : ${a.path} n'est pas sous ${r.path}")
         val relative = r.toPath().relativize(a.toPath()).joinToString("/")
-        val target = freePath(File(r, ".trash/$relative"))
-        target.parentFile?.mkdirs()
-        Files.move(a.toPath(), target.toPath())
+        withLocks(a) {
+            val target = freePath(File(r, ".trash/$relative"))
+            target.parentFile?.mkdirs()
+            Files.move(a.toPath(), target.toPath())
+        }
     }
 
     /** The FILES of a folder, without descending; an absent folder is `[]`. Normalised with `/`. */
@@ -107,17 +122,19 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
 
     suspend fun remove(abs: String) {
         val f = perimeter.check(abs)
-        if (!f.delete() && f.exists()) throw java.io.IOException("cannot remove $abs")
+        withLocks(f) { if (!f.delete() && f.exists()) throw java.io.IOException("cannot remove $abs") }
     }
 
     /** Refuses when the destination exists (the review-log migration relies on it). */
     suspend fun rename(de: String, vers: String) {
         val from = perimeter.check(de)
         val to = perimeter.check(vers)
-        try {
-            Files.move(from.toPath(), to.toPath())
-        } catch (_: FileAlreadyExistsException) {
-            throw IllegalStateException("${to.path.replace('\\', '/')} existe déjà")
+        withLocks(from, to) {
+            try {
+                Files.move(from.toPath(), to.toPath())
+            } catch (_: FileAlreadyExistsException) {
+                throw IllegalStateException("${to.path.replace('\\', '/')} existe déjà")
+            }
         }
     }
 

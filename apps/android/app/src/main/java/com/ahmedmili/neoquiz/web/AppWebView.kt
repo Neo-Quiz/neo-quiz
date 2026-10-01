@@ -11,6 +11,8 @@ import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.ahmedmili.neoquiz.bridge.UrlDecision
+import com.ahmedmili.neoquiz.bridge.UrlPolicy
 import com.ahmedmili.neoquiz.bridge.createAppBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,12 +45,25 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         settings.domStorageEnabled = true
         settings.allowFileAccess = false
         settings.allowContentAccess = false
+        settings.setSupportMultipleWindows(false)
+        settings.javaScriptCanOpenWindowsAutomatically = false
 
         webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
             ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
+            // The page holds the bridge: only the app's assets load here, a link tapped by the
+            // user goes to the system browser, everything else is dropped.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                when (UrlPolicy.decide(request.url.toString())) {
+                    UrlDecision.ALLOW -> return false
+                    UrlDecision.EXTERNAL -> if (request.hasGesture()) openInBrowser(request.url)
+                    UrlDecision.BLOCK -> Unit
+                }
+                return true
+            }
         }
 
         if (activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
@@ -72,8 +87,16 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         // The shim must exist before any renderer script runs.
         val shim = activity.assets.open("web/neo-shim.js").bufferedReader().use { it.readText() }
         WebViewCompat.addDocumentStartJavaScript(this, shim, origins)
-        WebViewCompat.addWebMessageListener(this, "neoAndroid", origins) { _, message, _, _, replyProxy ->
-            onMessage(message, replyProxy)
+        WebViewCompat.addWebMessageListener(this, "neoAndroid", origins) { _, message, _, isMainFrame, replyProxy ->
+            // A sub-frame (an iframe the page embeds) never reaches the bridge, and never steals the event sink.
+            if (isMainFrame) onMessage(message, replyProxy)
+        }
+    }
+
+    private fun openInBrowser(uri: android.net.Uri) {
+        try {
+            activity.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addCategory(android.content.Intent.CATEGORY_BROWSABLE))
+        } catch (_: android.content.ActivityNotFoundException) {
         }
     }
 
@@ -98,7 +121,7 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
     }
 
     companion object {
-        const val HOST = "appassets.androidplatform.net"
+        const val HOST = UrlPolicy.HOST
         const val ORIGIN = "https://$HOST"
     }
 }

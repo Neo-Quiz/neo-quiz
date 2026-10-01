@@ -5,6 +5,8 @@ import java.nio.file.Files
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -116,6 +118,41 @@ class FilesChannelTest {
         assertEquals(emptyList<String>(), files.list(p("missing")))
         val entries = files.listerDossier(p("d")).associate { it["name"] to it["isFolder"] }
         assertEquals(mapOf<Any?, Any?>("e" to true, "one.md" to false), entries)
+    }
+
+    /** Holds the lock of [held] while [op] runs: it must not complete until the lock is released. */
+    private suspend fun waitsForLock(name: String, held: File, op: suspend () -> Unit) = coroutineScope {
+        val mutex = files.lockOf(held.canonicalFile)
+        mutex.lock()
+        val running = async(Dispatchers.Default) { op() }
+        delay(150)
+        assertFalse("$name did not wait for the lock", running.isCompleted)
+        mutex.unlock()
+        running.await()
+    }
+
+    @Test fun removeRenameAndTrashWaitForTheLockOfTheirPaths() = runBlocking {
+        for (n in listOf("a", "b", "c", "d", "e")) files.write(p("$n.md"), n)
+        waitsForLock("remove", File(p("a.md"))) { files.remove(p("a.md")) }
+        waitsForLock("rename source", File(p("b.md"))) { files.rename(p("b.md"), p("b2.md")) }
+        waitsForLock("rename destination", File(p("c2.md"))) { files.rename(p("c.md"), p("c2.md")) }
+        waitsForLock("trash", File(p("d.md"))) { files.trash(p("d.md"), root.path) }
+        assertFalse(File(p("a.md")).exists())
+        assertTrue(File(p("b2.md")).exists())
+        assertTrue(File(p("c2.md")).exists())
+        assertTrue(File(root, ".trash/d.md").exists())
+    }
+
+    @Test fun appendRefusesASymlinkAndNeverCreatesItsTarget() = runBlocking {
+        val outside = File(root.parentFile, "outside-target.txt")
+        val link = File(root, "log.jsonl")
+        try {
+            Files.createSymbolicLink(link.toPath(), outside.toPath())
+        } catch (e: Exception) {
+            org.junit.Assume.assumeNoException("symlinks need privileges here", e)
+        }
+        assertThrows(SecurityException::class.java) { runBlocking { files.append(link.path, "x") } }
+        assertFalse(outside.exists())
     }
 
     @Test fun everyChannelRefusesAPathOutsideThePerimeter() {
