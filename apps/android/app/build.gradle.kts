@@ -51,6 +51,8 @@ android {
         }
     }
 
+    // The bundled Pyodide stdlib is already deflated (zip): storing it again would only cost a second inflate.
+    androidResources { noCompress += "zip" }
     packaging { jniLibs { useLegacyPackaging = true } }
     buildFeatures { compose = true }
 }

@@ -63,9 +63,6 @@ object Unavailable {
         "video.installer" to { mapOf("ok" to false, "code" to "reseau") },
         "video.transcrire" to { mapOf("ok" to false, "code" to "inconnue", "detail" to "not available on Android") },
         "video.annuler" to { null },
-        "code.run" to { mapOf("status" to "unavailable", "stdout" to "", "error" to "not available on Android") },
-        "code.warm" to { null },
-        "langages.etat" to { mapOf("installe" to false, "version" to null, "octets" to 0) },
         "langages.installer" to { mapOf("ok" to false, "code" to "reseau") },
         "langages.supprimer" to { null },
         // Task 10 implements the sync channels.

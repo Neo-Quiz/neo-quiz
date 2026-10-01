@@ -81,6 +81,8 @@ apps/android/.gradle/
 apps/android/**/build/
 apps/android/local.properties
 apps/android/app/src/main/assets/web/
+apps/android/app/src/main/assets/code/
+apps/android/app/src/main/assets/code-shim.js
 apps/android/app/src/main/jniLibs/
 *.jks
 *.keystore

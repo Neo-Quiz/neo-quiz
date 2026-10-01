@@ -2,6 +2,7 @@ package com.ahmedmili.neoquiz.bridge
 
 import android.app.Activity
 import android.os.Environment
+import com.ahmedmili.neoquiz.code.CodeSandbox
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -9,7 +10,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /** The assembled bridge plus the one thing the host asks of it besides messages: a rescan. */
-class AppBridge(val bridge: Bridge, private val scan: ScanChannel, private val scope: CoroutineScope) {
+class AppBridge(val bridge: Bridge, private val scan: ScanChannel, private val scope: CoroutineScope, private val code: CodeSandbox) {
+    /** Releases what the bridge holds besides coroutines: the hidden code WebView. */
+    fun shutdown() = code.shutdown()
+
     /** Re-reads the started roots and pushes what changed (the app came to the foreground). */
     fun rescan() {
         scope.launch { scan.rescan() }
@@ -44,11 +48,12 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val scan = ScanChannel(perimeter) { event -> bridge?.emit("evenement", event) }
     // The synced folder is offered first while it is not a root.
     val suggested = { documents.takeIf { it.isDirectory && !perimeter.contains(it.path) } }
+    val codeSandbox = CodeSandbox(activity, scope)
     val system = SystemChannel(perimeter, allowed, settings, FolderPickerDialog(activity, suggested), AndroidFileOpener(activity))
     val created = Bridge(
         scope,
-        Unavailable.handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() + settings.handlers() + system.handlers(),
+        Unavailable.handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() + settings.handlers() + system.handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope)
+    return AppBridge(created, scan, scope, codeSandbox)
 }

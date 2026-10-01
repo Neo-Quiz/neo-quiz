@@ -22,11 +22,21 @@ class BridgeTest {
             ScanChannel(perimeter) { }.handlers() +
             SystemChannel(perimeter, allowed, settings, { null }, { true }).handlers() +
             settings.handlers() +
+            CodeChannel(object : com.ahmedmili.neoquiz.code.CodeEngine {
+                override suspend fun run(job: Any?) = JSONObject()
+                override fun warm(language: String) {}
+                override fun packState(name: String) = emptyMap<String, Any?>()
+            }).handlers() +
             Unavailable.handlers()
     }
 
     @Test fun handlersAndChannelsAreTheSameSet() {
         assertEquals(Channels.ALL, allHandlers().keys)
+    }
+
+    @Test fun theCodeChannelsAreHandledAndThePackIsNeverDownloaded() {
+        assertTrue(Unavailable.names.none { it in setOf("code.run", "code.warm", "langages.etat") })
+        assertTrue(Unavailable.names.containsAll(setOf("langages.installer", "langages.supprimer")))
     }
 
     @Test fun noChannelIsBothHandledAndUnavailable() {

@@ -109,6 +109,7 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
     }
 
     override fun destroy() {
+        app.shutdown()
         scope.cancel()
         super.destroy()
     }
