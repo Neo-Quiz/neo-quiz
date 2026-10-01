@@ -661,7 +661,7 @@ body.is-mobile:has(.nq-reglages-modal) #neo-quiz-root {
 	display: none;
 }
 
-.is-mobile .modal-container:has(> .nq-reglages-modal) {
+body.is-mobile .modal-container:has(> .nq-reglages-modal) {
 	position: absolute;
 	inset: 0 0 auto 0;
 	min-height: 100vh;
@@ -674,7 +674,10 @@ body.is-mobile:has(.nq-reglages-modal) #neo-quiz-root {
 	display: none;
 }
 
-.is-mobile .modal-container > .nq-reglages-modal {
+html.nq-mobile body.is-mobile .modal-container > .nq-reglages-modal {
+	margin: 0;
+	align-self: stretch;
+	max-width: none;
 	width: 100%;
 	height: auto;
 	min-height: 100vh;
