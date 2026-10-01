@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Built-in sync no longer triggers the Windows firewall prompt (the PC connects out to your other devices).
+
 ### Fixed
 
 - The main panel blurs the wallpaper again.

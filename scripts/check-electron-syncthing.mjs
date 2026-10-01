@@ -101,10 +101,25 @@ await withSrcModule(
 		});
 
 		await cas(r, "optionsFixees", async () => {
-			const o = regles.optionsFixees(true);
+			const o = regles.optionsFixees(true, "linux");
 			r.check("local discovery avoids the personal Syncthing's 21027",
 				[o.localAnnouncePort, o.localAnnounceMCAddr, o.localAnnounceEnabled], [21028, "[ff12::8384]:21028", undefined]);
+			const w = regles.optionsFixees(true, "win32");
+			r.check("win32: listens on nothing, only the relay pool (the PC dials out)", w.listenAddresses, ["dynamic+https://relays.syncthing.net/endpoint"]);
+			r.check("win32: no LAN announce (binds UDP), global discovery on, no NAT traversal, relays and dialing stay",
+				[w.localAnnounceEnabled, w.globalAnnounceEnabled, w.natEnabled, w.relaysEnabled], [false, true, false, true]);
+			r.check("other platforms keep listening on the pinned port",
+				[o.listenAddresses, o.localAnnounceEnabled, o.natEnabled], [["tcp://:22100", "quic://:22100", "dynamic+https://relays.syncthing.net/endpoint"], undefined, undefined]);
 			r.check("nothing phones home", [o.urAccepted, o.crashReportingEnabled, o.autoUpgradeIntervalH, o.startBrowser], [-1, false, 0, false]);
+		});
+
+		await cas(r, "configXmlSansEcoute", async () => {
+			const xml = "<configuration><options>\n        <listenAddress>tcp://0.0.0.0:1</listenAddress>\n        <listenAddress>dynamic+https://relays.syncthing.net/endpoint</listenAddress>\n        <listenAddress>quic://0.0.0.0:1</listenAddress>\n        <globalAnnounceEnabled>false</globalAnnounceEnabled>\n        <localAnnounceEnabled>true</localAnnounceEnabled>\n        <relaysEnabled>true</relaysEnabled>\n        <natEnabled>true</natEnabled>\n    </options>\n<gui><listenAddress>127.0.0.1:8384</listenAddress></gui></configuration>";
+			const w = regles.configXmlSansEcoute(xml, "win32");
+			r.check("win32: one relay listenAddress, no tcp/quic", w.match(/<listenAddress>[^<]*<\/listenAddress>/g), ["<listenAddress>dynamic+https://relays.syncthing.net/endpoint</listenAddress>", "<listenAddress>127.0.0.1:8384</listenAddress>"]);
+			r.check("win32: flags rewritten", [/<localAnnounceEnabled>false</.test(w), /<globalAnnounceEnabled>true</.test(w), /<natEnabled>false</.test(w), /<relaysEnabled>true</.test(w)], [true, true, true, true]);
+			r.check("idempotent", regles.configXmlSansEcoute(w, "win32"), w);
+			r.check("other platforms untouched", regles.configXmlSansEcoute(xml, "linux"), xml);
 		});
 
 		await cas(r, "folderEtat", async () => {

@@ -47,6 +47,7 @@ import {
 	hasValidCheckDigits,
 	isDeviceId,
 	launchArgs,
+	configXmlSansEcoute,
 	launchEnv,
 	optionsFixees,
 } from "./syncthing-regles";
@@ -199,6 +200,26 @@ interface Lancement {
 	fini: Promise<void>;
 }
 
+/** Before EVERY launch (Windows): make sure the home has a config and that it
+    does not listen. The default config binds 0.0.0.0, which makes Windows
+    Defender Firewall prompt the owner at the first start, before the REST
+    patch can run. */
+async function preparerConfig(opts: StartOpts): Promise<void> {
+	if (process.platform !== "win32") return;
+	const fichier = path.join(opts.home, "config.xml");
+	let xml: string;
+	try {
+		xml = await fs.readFile(fichier, "utf8");
+	} catch {
+		await new Promise<void>((ok, ko) => {
+			execFile(opts.exe, ["generate", "--home=" + opts.home], { windowsHide: true, env: launchEnv(process.env) }, e => (e ? ko(new Error("syncthing exited during first-run generate")) : ok()));
+		});
+		xml = await fs.readFile(fichier, "utf8");
+	}
+	const sortie = configXmlSansEcoute(xml, process.platform);
+	if (sortie !== xml) await fs.writeFile(fichier, sortie, "utf8");
+}
+
 async function lancer(opts: StartOpts): Promise<Lancement> {
 	try {
 		await fs.access(opts.exe);
@@ -210,6 +231,7 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 	/* A survivor of a previous run (hard kill, or a child left behind when the
 	   wrapper died) would hold the home lock: clear it first. */
 	await libererHome(opts.home, opts.sys ?? sysReel);
+	await preparerConfig(opts);
 	const port = await portLibreBoucle();
 	const cle = randomBytes(32).toString("hex");
 	const child = spawn(opts.exe, launchArgs(opts.home, port, cle), {
@@ -231,7 +253,7 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 			await pause(250);
 		}
 		const ownId = await rest.myId();
-		await rest.patchOptions(optionsFixees(await portLibre(LISTEN_PORT)));
+		await rest.patchOptions(optionsFixees(await portLibre(LISTEN_PORT), process.platform));
 		const appareils = await rest.devices();
 		const moi = appareils.find(d => d.deviceID === ownId);
 		const nom = os.hostname();

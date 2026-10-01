@@ -133,9 +133,18 @@ export function listenAddresses(portLibre: boolean): string[] {
 /** The options this app pins at every start: no browser, no usage report, no
     crash report, no self-upgrade. Everything else stays at Syncthing's default
     (global and local discovery, NAT traversal, relays). */
-export function optionsFixees(portLibre: boolean): Record<string, unknown> {
+export function optionsFixees(portLibre: boolean, platform: string): Record<string, unknown> {
+	/* On Windows the app instance never LISTENS: a listening socket on a
+	   non-loopback address makes Windows Defender Firewall prompt the owner
+	   the first time. Only the relay pool stays in `listenAddresses` (a relay
+	   listener dials OUT to the relay, it binds nothing locally). LAN announce
+	   binds UDP, so it is off; global discovery stays on, and so do relays and
+	   outbound dialing: the PC connects to the phone/tablet, which keep
+	   listening. NAT traversal (UPnP / NAT-PMP) may open ports: off. */
+	const sansEcoute = platform === "win32";
 	return {
-		listenAddresses: listenAddresses(portLibre),
+		listenAddresses: sansEcoute ? [RELAIS_DYNAMIQUE] : listenAddresses(portLibre),
+		...(sansEcoute ? { localAnnounceEnabled: false, globalAnnounceEnabled: true, natEnabled: false, relaysEnabled: true } : {}),
 		startBrowser: false,
 		urAccepted: -1,
 		crashReportingEnabled: false,
@@ -149,6 +158,29 @@ export function optionsFixees(portLibre: boolean): Record<string, unknown> {
 		localAnnouncePort: PORT_ANNONCE_LAN,
 		localAnnounceMCAddr: `[ff12::8384]:${PORT_ANNONCE_LAN}`,
 	};
+}
+
+/** The same rule applied to `config.xml` BEFORE the first launch: patching
+    through the REST API only happens once the process runs, and the default
+    config already listens on 0.0.0.0 (the firewall prompt fires on that bind,
+    however briefly). Text edit of the `<options>` block only; a no-op off
+    Windows. */
+export function configXmlSansEcoute(xml: string, platform: string): string {
+	if (platform !== "win32") return xml;
+	const fin = xml.indexOf("</options>");
+	const debut = xml.indexOf("<options");
+	if (debut < 0 || fin < 0) return xml;
+	let opts = xml.slice(debut, fin);
+	let place = false;
+	opts = opts.replace(/[ \t]*<listenAddress>[^<]*<\/listenAddress>\r?\n?/g, () => {
+		if (place) return "";
+		place = true;
+		return `        <listenAddress>${RELAIS_DYNAMIQUE}</listenAddress>\n`;
+	});
+	for (const [cle, val] of [["localAnnounceEnabled", "false"], ["globalAnnounceEnabled", "true"], ["natEnabled", "false"], ["relaysEnabled", "true"]]) {
+		opts = opts.replace(new RegExp(`<${cle}>[^<]*</${cle}>`), `<${cle}>${val}</${cle}>`);
+	}
+	return xml.slice(0, debut) + opts + xml.slice(fin);
 }
 
 export interface FolderConfig {
