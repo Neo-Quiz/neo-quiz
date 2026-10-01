@@ -113,7 +113,17 @@ export function installBarreNative(pont: PontBarre): void {
 
 	pont.surBarreClic((index) => {
 		const btn = boutons()[index];
-		if (btn && !btn.classList.contains("qbd-nav-item--placeholder")) btn.click();
+		if (!btn || btn.classList.contains("qbd-nav-item--placeholder")) return;
+		/* A modal (the Settings page) covers the page but not the bar: a tap on
+		   a tab closes it first, then goes to the tab (the click on a page that
+		   is still under a modal went nowhere). */
+		const fermer = document.querySelector<HTMLElement>(".modal-container .modal-close-button");
+		if (fermer) {
+			fermer.click();
+			if (!btn.classList.contains(ACTIVE)) window.setTimeout(() => btn.click(), 350);
+			return;
+		}
+		btn.click();
 	});
 
 	// From here the page's own bar stays hidden (mobile.css).
