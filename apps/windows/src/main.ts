@@ -44,6 +44,7 @@ import { renderSettings, viserPromptExpliquer } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { estMobile } from "./host/platform";
+import { installRipple } from "./ui/ripple";
 import { retourAndroid } from "./ui/retour-android";
 import { armerCalendrier } from "./ui/calendrier-android";
 import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
@@ -485,6 +486,7 @@ async function demarrer(): Promise<void> {
 	   follows the PHONE width only: a tablet keeps the desktop layout. */
 	if (estMobile()) {
 		document.documentElement.classList.add("nq-mobile");
+		installRipple();
 		(window as unknown as { neoPlatform: { surRetour(g: () => boolean): void } }).neoPlatform.surRetour(retourAndroid);
 		const etroit = window.matchMedia("(max-width: 600px)");
 		const suivre = (): void => { document.body.classList.toggle("is-mobile", etroit.matches); };

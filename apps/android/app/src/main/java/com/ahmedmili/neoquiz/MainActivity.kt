@@ -10,6 +10,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import android.content.res.Configuration
 import androidx.core.view.WindowInsetsCompat
+import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -63,8 +64,18 @@ class MainActivity : ComponentActivity() {
         }
         loadWhenGranted()
         // Back goes back in the page's own history; only when it has none does the app leave.
+        // Predictive back (manifest `enableOnBackInvokedCallback`): while the finger drags from the edge
+        // the page shrinks and follows it, like the system's own back animation; it springs back on
+        // cancel and on commit (the page then shows its previous screen, or the activity leaves).
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackStarted(backEvent: BackEventCompat) = appWebView.backPreview(backEvent.progress, backEvent.swipeEdge)
+
+            override fun handleOnBackProgressed(backEvent: BackEventCompat) = appWebView.backPreview(backEvent.progress, backEvent.swipeEdge)
+
+            override fun handleOnBackCancelled() = appWebView.backPreview(0f, BackEventCompat.EDGE_LEFT)
+
             override fun handleOnBackPressed() {
+                appWebView.backPreview(0f, BackEventCompat.EDGE_LEFT)
                 if (!loaded) return finish()
                 appWebView.askBack { handled -> if (!handled) finish() }
             }

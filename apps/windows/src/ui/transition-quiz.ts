@@ -150,6 +150,14 @@ export function mouvementReduit(): boolean {
 	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Phone width: no 500 ms sheet or quiz-launch choreography (it animates the
+    layout's own boxes, and the phone's page is the document, not a panel).
+    The incoming page plays the short transform/opacity entry of `mobile.css`
+    instead. */
+export function transitionCourte(): boolean {
+	return document.body.classList.contains("is-mobile");
+}
+
 /**
  * L'ENTRÉE PROPRE de la vue entrante est absorbée : c'est la transition qui
  * fait l'entrée. Sans ça, au retour d'un quiz, le `qbd-fade-in` de
@@ -209,7 +217,7 @@ export function jouerTransition(root: HTMLElement, sortants: HTMLElement[], entr
 		// Encore une vue gardée dessous : la grille reste, le quiz reste dessus.
 		if (garder.length === 0) root.classList.remove("nq-empile");
 	};
-	if ((aRetirer.length === 0 && garder.length === 0) || choisirMode(mouvementReduit(), document.visibilityState === "hidden") === "immediat") {
+	if ((aRetirer.length === 0 && garder.length === 0) || choisirMode(mouvementReduit() || transitionCourte(), document.visibilityState === "hidden") === "immediat") {
 		retirer();
 		return Promise.resolve();
 	}

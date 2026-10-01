@@ -474,3 +474,150 @@ html.nq-mobile .modal-container > .modal {
 	gap: 8px;
 	min-width: 0;
 }
+
+/* ══════════════════════════════════════════════════════════
+   NATIVE FEEL (T13e, 2026-10-01) — Phone only.
+
+   1. THE PAGE IS THE DOCUMENT. WebView applies Android 12's edge effect
+      (the stretch at the top and bottom of a list, the one Neo Calendar's
+      grid shows) to the ROOT scroller only; an inner `overflow: auto` box
+      gets nothing. On a phone, `.qbd-content` therefore stops being a
+      scroller: the layout takes its natural height, the document scrolls,
+      and the bottom bar is `position: fixed`. The desktop panel keeps its
+      own scrolling (rules in shell.css, untouched).
+      Not converted, on purpose: the played quiz (a fixed three-floor
+      column whose slides scroll on their own, quiz-bars.css) and modals.
+   ══════════════════════════════════════════════════════════ */
+html.nq-mobile,
+html.nq-mobile body {
+	height: auto;
+	min-height: 100%;
+}
+
+html.nq-mobile body {
+	overflow-x: clip;
+}
+
+.is-mobile #neo-quiz-root {
+	height: auto;
+	min-height: 100vh;
+	overflow: visible;
+	padding-top: 0;
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout {
+	height: auto;
+	min-height: 100vh;
+	overflow: visible;
+	/* Room for the fixed bar, so the last card scrolls clear of it. */
+	padding-bottom: 57px;
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-content {
+	flex: 1 0 auto;
+	overflow: visible;
+	height: auto;
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-sidebar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: auto;
+}
+
+/* ── Smooth scrolling: nothing that repaints the page while it moves ── */
+.is-mobile {
+	--qbd-glass-blur: none;
+	--qbd-glass-blur-dense: none;
+}
+
+.is-mobile .qbd-card,
+.is-mobile .qbd-quiz-card,
+.is-mobile .qbd-module-card,
+.is-mobile .qbd-qz-card,
+.is-mobile .qbd-fiche-card {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+/* ── Page transitions: short, transform + opacity only, Material easing ──
+   (the 500 ms sheet stack and quiz-launch choreography are off on a phone,
+   `transitionCourte` in ui/transition-quiz.ts). Only a played quiz, which is
+   mounted once per launch, enters this way: re-rendering a page (a filter, a
+   rename) must not replay an entry. No `fill-mode`: the animation
+   lets go of `transform` when it ends (see check:view-enter). */
+@keyframes nq-page-in {
+	from { opacity: 0; transform: translate3d(0, 16px, 0); }
+	to { opacity: 1; transform: none; }
+}
+
+.is-mobile #neo-quiz-root > .qbd-qz {
+	animation: nq-page-in 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.is-mobile #neo-quiz-root > .qbd-qz {
+		animation: none;
+	}
+}
+
+/* ══════════════════════════════════════════════════════════
+   TOUCH FEEDBACK AND TYPE (touch-first devices; the mouse never matches)
+   ══════════════════════════════════════════════════════════ */
+@media (pointer: coarse) {
+	html {
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* UI chrome is not selectable and shows no long-press callout; the text a
+	   learner may want to copy (questions, options, lectures, explanations,
+	   fields) opts back in. */
+	body {
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+
+	.quiz-card,
+	.quiz-md,
+	.quiz-prompt,
+	.quiz-option,
+	.quiz-explain,
+	.quiz-learn,
+	.qbd-lecture,
+	.qbd-lecture *,
+	.quiz-passage,
+	.quiz-result,
+	.katex,
+	pre,
+	code,
+	input,
+	textarea,
+	[contenteditable="true"] {
+		-webkit-user-select: text;
+		user-select: text;
+		-webkit-touch-callout: default;
+	}
+
+	/* The press feedback is the ripple (ui/ripple.ts): no hover tint stuck
+	   under a finger, no card shrinking on top of it. */
+	.qbd-card:active,
+	.qbd-quiz-card:active,
+	.qbd-module-card:active,
+	.qbd-qz-card:active {
+		transform: none;
+	}
+
+	/* A tap fires at once: no double-tap-zoom wait on controls. */
+	button,
+	a,
+	[role="button"],
+	.qbd-quiz-card,
+	.qbd-module-card,
+	.qbd-qz-card {
+		touch-action: manipulation;
+	}
+}

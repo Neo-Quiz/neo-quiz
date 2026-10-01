@@ -58,7 +58,7 @@
    the stack's `scaleX` for its 500 ms.
 ══════════════════════════════════════════════════════════ */
 
-import { mouvementReduit } from "./transition-quiz";
+import { mouvementReduit, transitionCourte } from "./transition-quiz";
 import { uneFois } from "./transition-etat";
 
 /* Measured on StudySmarter, identical to the quiz launch's values. */
@@ -236,7 +236,7 @@ export function createSheetStack(layout: HTMLElement, panel: HTMLElement): Sheet
 	}
 
 	function immediate(): boolean {
-		return mouvementReduit() || document.visibilityState === "hidden";
+		return mouvementReduit() || transitionCourte() || document.visibilityState === "hidden";
 	}
 
 	/** Waits for every animation, the hidden window or the fallback timer —

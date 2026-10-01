@@ -108,3 +108,10 @@
 	--text-success: rgb(0,151,26);
 	--text-warning: rgb(250, 179, 135);
 }
+
+/* Android app: the platform's own UI font (Roboto, or Google Sans on HyperOS)
+   for chrome and body text. The stack above leads with a Windows face; the app
+   has no brand font (nothing is embedded), so headings use it too. */
+html.nq-mobile {
+	--font-interface: system-ui, Roboto, "Google Sans", sans-serif;
+}

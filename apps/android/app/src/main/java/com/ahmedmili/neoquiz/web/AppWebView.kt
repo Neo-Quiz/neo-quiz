@@ -50,6 +50,11 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         settings.setSupportMultipleWindows(false)
         settings.javaScriptCanOpenWindowsAutomatically = false
 
+        // Hardware-accelerated (the default; never `LAYER_TYPE_SOFTWARE`) and the Android 12+ stretch
+        // at the document's top and bottom edge, which WebView draws for the root scroller only.
+        setLayerType(LAYER_TYPE_NONE, null)
+        overScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS
+
         webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -144,6 +149,15 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
             val handled = app.goBack()
             post { done(handled) }
         }
+    }
+
+    /** The predictive-back preview: shrinks the page and slides it away from the swiping edge (0 resets). */
+    fun backPreview(progress: Float, edge: Int) {
+        val p = progress.coerceIn(0f, 1f)
+        val dir = if (edge == androidx.activity.BackEventCompat.EDGE_RIGHT) -1f else 1f
+        scaleX = 1f - 0.08f * p
+        scaleY = 1f - 0.08f * p
+        translationX = dir * width * 0.03f * p
     }
 
     /** Pushes the file events of what changed on disk while the app was away. */
