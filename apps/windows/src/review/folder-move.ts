@@ -44,7 +44,8 @@ export interface MovedPrefixDeps {
 	/** The contract paths of every quiz the catalogue knows. */
 	quizPaths: () => string[];
 	/** Moves the exam lists from each old module key to its new one. */
-	renameExams: (pairs: ReadonlyArray<readonly [string, string]>) => Promise<void>;
+	/** Third element true: COPY (the old key still serves another folder). */
+	renameExams: (pairs: ReadonlyArray<readonly [string, string, boolean?]>) => Promise<void>;
 	sessions?: { renommer(from: string, to: string): void; vider(): Promise<void> };
 	testSetups: () => Promise<{ renamed(from: string, to: string): void }>;
 	/** The live page-settings object (the one `ctx.settings` is) and its writer. */
@@ -52,10 +53,19 @@ export interface MovedPrefixDeps {
 	savePageSettings: () => Promise<void>;
 }
 
-export function createMovedPrefix(deps: MovedPrefixDeps): (from: string, to: string) => Promise<void> {
-	return async (from, to) => {
+/** `quizPathsBefore`: every quiz path of the catalogue as it was BEFORE the
+    rename. The watcher (debounced 300 ms) may already have swapped old paths
+    for new ones when this runs, so the live catalogue cannot be trusted. */
+export function createMovedPrefix(deps: MovedPrefixDeps): (from: string, to: string, quizPathsBefore?: readonly string[]) => Promise<void> {
+	/* One step failing (a write refused) must not skip the others, nor throw
+	   out of a move whose rename already succeeded. */
+	const etape = async (nom: string, f: () => void | Promise<void>): Promise<void> => {
+		try { await f(); } catch (e) { console.warn("[quiz-blocks] folder move: could not carry", nom, e); }
+	};
+	return async (from, to, quizPathsBefore) => {
 		if (from === to) return;
 		const paths = deps.paths();
+		const tous = quizPathsBefore ?? deps.quizPaths();
 
 		/* EXAMS: keyed by module (`<rootId>/<parent folder>`), so the folder's own
 		   key changes root, and so does that of each sub-folder holding a quiz. */
@@ -66,22 +76,30 @@ export function createMovedPrefix(deps: MovedPrefixDeps): (from: string, to: str
 			if (a !== b) paires.set(a, b);
 		};
 		ajouter(from + "/_", to + "/_");
-		for (const p of deps.quizPaths()) {
+		for (const p of tous) {
 			if (p.startsWith(from + "/")) ajouter(p, to + p.slice(from.length));
 		}
-		await deps.renameExams([...paires]);
+		/* Module keys carry only the LAST folder segment: `Efrei/S3/Reseaux` and
+		   `Efrei/S4/Reseaux` share `Efrei/Reseaux`. An old key is MOVED only when
+		   no quiz outside the moved prefix still maps to it; else it is COPIED. */
+		const gardees = new Set(tous.filter(p => !sousPrefixe(p, from)).map(p => cleModule(p, paths)));
+		await etape("exams", () => deps.renameExams([...paires].map(([a, b]) => [a, b, gardees.has(a)] as const)));
 
-		deps.sessions?.renommer(from, to);
-		await deps.sessions?.vider();
-		(await deps.testSetups()).renamed(from, to);
+		await etape("sessions", async () => {
+			deps.sessions?.renommer(from, to);
+			await deps.sessions?.vider();
+		});
+		await etape("test setups", async () => { (await deps.testSetups()).renamed(from, to); });
 
-		const reglages = deps.pageSettings();
-		let change = false;
-		for (const ov of Object.values(reglages.quizzesModuleOverrides ?? {}) as ModuleOverride[]) {
-			if (ov?.path && sousPrefixe(ov.path, from)) { ov.path = to + ov.path.slice(from.length); change = true; }
-		}
-		const note = reglages.quizzesModuleMapNote;
-		if (note && sousPrefixe(note, from)) { reglages.quizzesModuleMapNote = to + note.slice(from.length); change = true; }
-		if (change) await deps.savePageSettings();
+		await etape("page settings", async () => {
+			const reglages = deps.pageSettings();
+			let change = false;
+			for (const ov of Object.values(reglages.quizzesModuleOverrides ?? {}) as ModuleOverride[]) {
+				if (ov?.path && sousPrefixe(ov.path, from)) { ov.path = to + ov.path.slice(from.length); change = true; }
+			}
+			const note = reglages.quizzesModuleMapNote;
+			if (note && sousPrefixe(note, from)) { reglages.quizzesModuleMapNote = to + note.slice(from.length); change = true; }
+			if (change) await deps.savePageSettings();
+		});
 	};
 }

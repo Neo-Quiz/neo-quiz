@@ -293,8 +293,10 @@ export interface DashboardShellCtx {
 	examens?: (group: ModuleGroup) => ExamenDossier[];
 	/** A folder or quiz moved from `from` to `to` (contract paths): rename every
 	    key the host keeps under that prefix (exams, sessions, per-folder
-	    settings). Optional: a host that keeps none of them omits it. */
-	movedPrefix?(from: string, to: string): Promise<void>;
+	    settings). `quizPathsBefore`: every quiz path of the catalogue as it was
+	    BEFORE the rename (the watcher may already have refreshed the live one).
+	    Optional: a host that keeps none of them omits it. */
+	movedPrefix?(from: string, to: string, quizPathsBefore?: readonly string[]): Promise<void>;
 	/** Ajoute ou remplace (même `id`) un examen du dossier. */
 	enregistrerExamen?: (group: ModuleGroup, e: ExamenDossier) => void;
 	/** Retire un examen du dossier par son `id`. */

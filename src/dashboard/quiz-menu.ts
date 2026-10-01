@@ -677,6 +677,9 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRoo
 	// l'arborescence de son ancien vault dans le dossier par défaut.
 	const nomDossier = localFrom.split("/").pop() ?? localFrom;
 	const to = host.paths.contractPath(toRootId, nomDossier);
+	/* The catalogue's paths BEFORE the rename: the watcher (300 ms debounce)
+	   may swap them for the new ones before `movedPrefix` runs. */
+	const cheminsAvant = ctx.scanner?.getQuizzes().map(q => q.path);
 	try {
 		await host.fs.rename(source, to);
 	} catch (e) {
@@ -697,7 +700,7 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRoo
 	   module key (exams, sessions, test setups, folder settings) follow the
 	   folder; before 2026-10-01 only the review log did. */
 	ctx.statsStore.renamed(source, to);
-	await ctx.movedPrefix?.(source, to);
+	await ctx.movedPrefix?.(source, to, cheminsAvant);
 	return true;
 }
 

@@ -727,23 +727,25 @@ export async function enregistrerExamen(module: string, e: Examen): Promise<void
     new keys, after a folder move (2026-10-01: the moved folder's exams stayed
     under the old key and vanished from its new card). When the new key
     already holds exams the lists MERGE (same `id`: the one already there
-    wins), sorted by date; an old key never survives. Returns the SAME table
+    wins), sorted by date; an old key never survives, unless the pair is a
+    COPY (third element true: another folder still uses the old key). Returns the SAME table
     when nothing moved, so the caller knows not to write. PURE. */
-export function deplacerCleExamens(t: Record<string, Examen[]>, paires: ReadonlyArray<readonly [string, string]>): Record<string, Examen[]> {
+export function deplacerCleExamens(t: Record<string, Examen[]>, paires: ReadonlyArray<readonly [string, string, boolean?]>): Record<string, Examen[]> {
 	let suivant = t;
-	for (const [ancienne, nouvelle] of paires) {
+	for (const [ancienne, nouvelle, copie] of paires) {
 		if (ancienne === nouvelle || !suivant[ancienne]) continue;
 		if (suivant === t) suivant = { ...t };
 		const deja = suivant[nouvelle] ?? [];
 		const ids = new Set(deja.map(e => e.id));
 		suivant[nouvelle] = [...deja, ...suivant[ancienne].filter(e => !ids.has(e.id))]
 			.sort((a, b) => a.date.localeCompare(b.date));
-		delete suivant[ancienne];
+		// A COPY (the old key still serves another folder) keeps the old list.
+		if (!copie) delete suivant[ancienne];
 	}
 	return suivant;
 }
 
-export async function renommerExamens(paires: ReadonlyArray<readonly [string, string]>): Promise<void> {
+export async function renommerExamens(paires: ReadonlyArray<readonly [string, string, boolean?]>): Promise<void> {
 	const suivant = deplacerCleExamens(tableExamens, paires);
 	if (suivant === tableExamens) return;
 	tableExamens = suivant;

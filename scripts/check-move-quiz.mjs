@@ -176,5 +176,75 @@ await withSrcModule(
 		r.check("5. rien à déplacer : la MÊME table (pas d'écriture)", fo.deplacerCleExamens(table, [["Z/Z", "B/X"]]) === table, true);
 	}
 
+	/* ── 6. Exam keys under a move: sub-folders, the watcher winning the race,
+	   and a same-named folder that stays behind ── */
+	{
+		const e = (id, date) => ({ id, nom: id, date });
+		const roots = [{ id: "Efrei", name: "Efrei" }, { id: "NeoQuiz", name: "Neo Quiz" }];
+		const paths = {
+			roots: () => roots,
+			rootOf: (p) => roots.find(x => p === x.id || p.startsWith(x.id + "/")),
+			localPath: (p) => p.split("/").slice(1).join("/"),
+			contractPath: (id, local) => id + "/" + local,
+		};
+		/** Runs moveModuleTo on `Efrei/S3/Reseaux`; `before` is what the scanner
+		    holds when the move starts, `live` what the stores' live reader sees
+		    once it runs (the watcher may have refreshed it by then). */
+		const deplacer = async (examens0, before, live) => {
+			let examens = examens0;
+			const ctx = {
+				statsStore: { renamed() {} },
+				scanner: { getQuizzes: () => before.map(path => ({ path })) },
+				movedPrefix: fm.createMovedPrefix({
+					paths: () => paths,
+					quizPaths: () => live,
+					renameExams: async (paires) => { examens = fo.deplacerCleExamens(examens, paires); },
+					testSetups: async () => ({ renamed() {} }),
+					pageSettings: () => ({}),
+					savePageSettings: async () => {},
+				}),
+			};
+			hote.installHost({ fs: { rename: async () => {} }, ui: { notice() {} }, paths });
+			try {
+				await qm.moveModuleTo(ctx, { path: "Efrei/S3/Reseaux", folder: "Reseaux", name: "Reseaux", quizzes: [] }, "NeoQuiz");
+			} finally { hote.uninstallHost(); }
+			return examens;
+		};
+		const avant = ["Efrei/S3/Reseaux/cm.md", "Efrei/S3/Reseaux/TD/q.md"];
+		const apres = ["NeoQuiz/Reseaux/cm.md", "NeoQuiz/Reseaux/TD/q.md"];
+		const base = () => ({ "Efrei/Reseaux": [e("f", "2026-12-01")], "Efrei/TD": [e("td", "2026-11-01")] });
+
+		const a = await deplacer(base(), avant, avant);
+		r.check("6a. sub-folder: its exam follows under NeoQuiz/TD, the old key is gone",
+			[a["NeoQuiz/TD"], "Efrei/TD" in a, a["NeoQuiz/Reseaux"]], [[e("td", "2026-11-01")], false, [e("f", "2026-12-01")]]);
+
+		const b = await deplacer(base(), avant, apres);
+		r.check("6b. the watcher already swapped the paths: same result",
+			[b["NeoQuiz/TD"], "Efrei/TD" in b, b["NeoQuiz/Reseaux"], "Efrei/Reseaux" in b], [[e("td", "2026-11-01")], false, [e("f", "2026-12-01")], false]);
+
+		const c = await deplacer(base(), [...avant, "Efrei/S4/Reseaux/cm.md"], avant);
+		r.check("6c. a same-named folder stays behind: the old key keeps its exams AND the new key gets a copy",
+			[c["Efrei/Reseaux"], c["NeoQuiz/Reseaux"], "Efrei/TD" in c], [[e("f", "2026-12-01")], [e("f", "2026-12-01")], false]);
+	}
+
+	/* ── 7. A failing step never skips the others, nor throws ── */
+	{
+		let setups = 0;
+		const roots = [{ id: "Efrei", name: "Efrei" }];
+		const paths = { rootOf: () => roots[0], localPath: (p) => p.split("/").slice(1).join("/") };
+		const warn = console.warn; console.warn = () => {};
+		let leve = null;
+		try {
+			await fm.createMovedPrefix({
+				paths: () => paths, quizPaths: () => [],
+				renameExams: async () => { throw new Error("disk full"); },
+				sessions: { renommer() { throw new Error("boom"); }, vider: async () => {} },
+				testSetups: async () => ({ renamed() { setups++; } }),
+				pageSettings: () => ({}), savePageSettings: async () => {},
+			})("Efrei/A", "Efrei/B");
+		} catch (e) { leve = e; } finally { console.warn = warn; }
+		r.check("7. exams and sessions fail: nothing thrown, setups still carried", [leve, setups], [null, 1]);
+	}
+
 	r.done();
 });
