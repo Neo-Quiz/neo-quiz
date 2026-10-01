@@ -51,6 +51,20 @@ function appeler<T = unknown>(canal: string, args: unknown[] = []): Promise<T> {
 	});
 }
 
+/** Bytes cross the bridge as base64 (JSON.stringify of a Uint8Array is an object of indexes). */
+function toBase64(bytes: Uint8Array): string {
+	let binary = "";
+	for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return btoa(binary);
+}
+
+function fromBase64(text: string): Uint8Array {
+	const binary = atob(text);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	return bytes;
+}
+
 /** Registers a callback for a pushed event; returns the unsubscribe. */
 function abonner<D>(evenement: string, rappel: (donnees: D) => void): () => void {
 	let set = listeners.get(evenement);
@@ -89,9 +103,9 @@ const pont: Pont = {
 	fichiers: {
 		read: (abs) => appeler("fichiers.read", [abs]),
 		readCached: (abs) => appeler("fichiers.readCached", [abs]),
-		readBinary: (abs) => appeler("fichiers.readBinary", [abs]),
+		readBinary: async (abs) => fromBase64(await appeler<string>("fichiers.readBinary", [abs])),
 		write: (abs, contenu) => appeler("fichiers.write", [abs, contenu]),
-		writeBinary: (abs, data) => appeler("fichiers.writeBinary", [abs, data]),
+		writeBinary: (abs, data) => appeler("fichiers.writeBinary", [abs, toBase64(data)]),
 		append: (abs, contenu) => appeler("fichiers.append", [abs, contenu]),
 		lirePourEcriture: (abs) => appeler("fichiers.lirePourEcriture", [abs]),
 		ecrireSiInchange: (abs, contenuLu, contenu) => appeler("fichiers.ecrireSiInchange", [abs, contenuLu, contenu]),

@@ -2,7 +2,6 @@ package com.ahmedmili.neoquiz.web
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -12,7 +11,11 @@ import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import org.json.JSONObject
+import com.ahmedmili.neoquiz.bridge.createAppBridge
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 /**
  * The WebView that hosts the renderer built by `apps/windows` (Vite).
@@ -25,6 +28,9 @@ import org.json.JSONObject
  */
 @SuppressLint("SetJavaScriptEnabled")
 class AppWebView(context: Context) : WebView(context) {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val bridge = createAppBridge(context, scope)
 
     private val assetLoader = WebViewAssetLoader.Builder()
         .setDomain(HOST)
@@ -60,17 +66,16 @@ class AppWebView(context: Context) : WebView(context) {
     }
 
     private fun onMessage(message: WebMessageCompat, reply: JavaScriptReplyProxy) {
+        // Never log the message: it carries file contents.
         val raw = message.data ?: return
-        Log.i(TAG, "bridge call: $raw")
-        val id = try {
-            JSONObject(raw).getLong("id")
-        } catch (e: Exception) {
-            Log.w(TAG, "unreadable bridge message", e)
-            return
-        }
-        // Every channel is implemented by a later task.
-        val answer = JSONObject().put("id", id).put("ok", false).put("erreur", "not-implemented")
-        reply.postMessage(answer.toString())
+        // Pushed events go to the page that spoke last (a reload gives a new proxy).
+        bridge.sink = { reply.postMessage(it) }
+        bridge.dispatch(raw) { reply.postMessage(it) }
+    }
+
+    override fun destroy() {
+        scope.cancel()
+        super.destroy()
     }
 
     fun loadApp() {
@@ -78,7 +83,6 @@ class AppWebView(context: Context) : WebView(context) {
     }
 
     companion object {
-        private const val TAG = "NeoQuiz"
         const val HOST = "appassets.androidplatform.net"
         const val ORIGIN = "https://$HOST"
     }
