@@ -49,6 +49,7 @@ export default defineConfig({
 	envPrefix: ["VITE_"],
 	build: {
 		target: "es2021",
+		cssMinify: "esbuild",
 		outDir: "dist",
 		sourcemap: true,
 	},

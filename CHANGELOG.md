@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The main panel blurs the wallpaper again.
+
 ## [1.20.13] - 2026-10-01
 
 ### Changed
