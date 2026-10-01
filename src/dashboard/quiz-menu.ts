@@ -794,6 +794,15 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 									host.ui.notice(t("dashboard.quizzes.moved", { target: root.name }));
 									rerender();
 								}
+							}).catch(e => {
+								/* `moveModuleTo` reports a failed rename itself; this catches
+								   anything thrown AFTER it (review log, stats, host keys) or
+								   before it, which used to be an unhandled rejection: no
+								   notice at all. The folder may already have moved, so the
+								   page refreshes too. */
+								console.error("[quiz-blocks] folder move failed:", g.path, "->", root.id, e);
+								host.ui.notice(t("dashboard.quizzes.moveFolderError"));
+								rerender();
 							});
 						});
 					},

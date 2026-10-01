@@ -29,7 +29,7 @@
  *
  *     npm run check:electron-index
  */
-import { mkdir, mkdtemp, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -46,7 +46,7 @@ async function cas(r, nom, fn) {
 	}
 }
 
-await withSrcModule("apps/windows/electron/index-fichiers.ts", async ({ creerIndex, contratDepuisAbsolu, renameDirVersAbsolu }) => {
+await withSrcModule(["apps/windows/electron/index-fichiers.ts", "apps/windows/electron/fichiers.ts"], async ({ creerIndex, contratDepuisAbsolu, renameDirVersAbsolu }, { creerFichiers }) => {
 	const r = makeReporter("Électron — index et surveillant");
 	const base = await mkdtemp(join(tmpdir(), "electron-index-check-"));
 	let n = 0;
@@ -413,18 +413,111 @@ await withSrcModule("apps/windows/electron/index-fichiers.ts", async ({ creerInd
 			}
 		});
 
-		/* PAS de cas d'intégration pour un dossier qui contient un sous-dossier :
-		   tenté, il rejette sur ce poste avec `EPERM: operation not permitted,
-		   rename` — Windows refuse de renommer un dossier PARENT tant qu'un
-		   descendant a une poignée ouverte, et chokidar en tient une sur chaque
-		   sous-dossier surveillé. Ce n'est pas un défaut de ce code : c'est une
-		   limite du disque réel que ce contrôle, qui en utilise un vrai, ne peut
-		   pas contourner. La réduction aux racines du mouvement
-		   (`racinesDuMouvement`) qui rendrait ce cas discriminant reste éprouvée
-		   PUREMENT dans `check-windows-host.mjs` (« le sous-dossier d'un dossier
-		   renommé n'est pas un second candidat »), sans jamais toucher le
-		   disque — voir le rapport de tâche pour ce doute.
-		 */
+		/* A folder holding a sub-folder cannot be renamed under a live chokidar
+		   watcher on Windows (EPERM: an OS handle is open on every watched
+		   directory). `suspendre` closes the watcher around the production rename,
+		   restarts it and reconciles the index. Real temp dirs, the real
+		   `fichiers.rename` (the function the IPC handler calls). */
+		await cas(r, "un dossier se déplace entre deux racines sous suspendre", async () => {
+			const rootA = await racineNeuve();
+			const rootB = await racineNeuve();
+			const fichiers = creerFichiers();
+			await mkdir(join(rootA, "Module", "sub"), { recursive: true });
+			await writeFile(join(rootA, "Module", "sub", "q.md"), "un");
+			await writeFile(join(rootA, "keep.md"), "reste");
+			const index = creerIndex([rootA, rootB]);
+			const evs = [];
+			const arreter = index.surveiller(ev => evs.push(ev), 50);
+			try {
+				await attendre(600); // initial crawl
+				r.check("setup : q.md est indexé", index.get("0/Module/sub/q.md") !== null, true);
+				evs.length = 0;
+				let erreur = null;
+				try {
+					await index.suspendre(() => fichiers.rename(join(rootA, "Module"), join(rootB, "Module")));
+				} catch (e) {
+					erreur = e;
+				}
+				r.check("le déplacement du dossier réussit (pas d'EPERM)", erreur ? String(erreur.message ?? erreur) : null, null);
+				r.check("l'index liste la nouvelle place", index.get("1/Module/sub/q.md") !== null, true);
+				r.check("l'index n'a plus l'ancienne place", index.get("0/Module/sub/q.md"), null);
+				r.check("un fichier non touché reste indexé", index.get("0/keep.md") !== null, true);
+				r.check("delete émis pour l'ancienne place",
+					evs.some(e => e.kind === "delete" && e.path === "0/Module/sub/q.md"), true);
+				r.check("create émis pour la nouvelle place",
+					evs.some(e => e.kind === "create" && e.file.path === "1/Module/sub/q.md"), true);
+				r.check("aucun événement pour un fichier inchangé",
+					evs.filter(e => (e.path ?? e.file?.path) === "0/keep.md").length, 0);
+				// Watcher is back: a new file under the moved folder is reported.
+				evs.length = 0;
+				await writeFile(join(rootB, "Module", "sub", "n.md"), "neuf");
+				await attendre(600);
+				r.check("le surveillant est reparti après la suspension",
+					evs.some(e => e.kind === "create" && e.file.path === "1/Module/sub/n.md"), true);
+			} finally {
+				arreter();
+			}
+		});
+
+		await cas(r, "fn qui jette : l'erreur remonte et le surveillant repart", async () => {
+			const racine = await racineNeuve();
+			const index = creerIndex([racine]);
+			const evs = [];
+			const arreter = index.surveiller(ev => evs.push(ev), 50);
+			try {
+				await attendre(300);
+				let message = null;
+				await index.suspendre(async () => { throw new Error("boom"); }).catch(e => { message = e.message; });
+				r.check("l'erreur de fn est relancée", message, "boom");
+				await writeFile(join(racine, "apres.md"), "x");
+				await attendre(600);
+				r.check("un fichier créé après l'échec est rapporté",
+					evs.some(e => e.kind === "create" && e.file.path === "0/apres.md"), true);
+			} finally {
+				arreter();
+			}
+		});
+
+		await cas(r, "suspendre sans surveillant lance fn directement", async () => {
+			const racine = await racineNeuve();
+			const index = creerIndex([racine]);
+			r.check("fn est exécutée et sa valeur rendue", await index.suspendre(async () => 42), 42);
+		});
+
+		await cas(r, "un fichier se renomme sans suspendre, sous le surveillant", async () => {
+			const racine = await racineNeuve();
+			const fichiers = creerFichiers();
+			await writeFile(join(racine, "a.md"), "un");
+			const index = creerIndex([racine]);
+			const arreter = index.surveiller(() => {}, 50);
+			try {
+				await attendre(500);
+				await fichiers.rename(join(racine, "a.md"), join(racine, "b.md"));
+				r.check("le fichier est renommé", (await readdir(racine)).includes("b.md"), true);
+				await attendre(500);
+				r.check("l'index suit le renommage",
+					[index.get("0/a.md") === null, index.get("0/b.md") !== null], [true, true]);
+			} finally {
+				arreter();
+			}
+		});
+
+		await cas(r, "deux suspendre concurrents sont sérialisés", async () => {
+			const racine = await racineNeuve();
+			const index = creerIndex([racine]);
+			const arreter = index.surveiller(() => {}, 50);
+			try {
+				await attendre(300);
+				const ordre = [];
+				const a = index.suspendre(async () => { ordre.push("a+"); await attendre(100); ordre.push("a-"); });
+				const b = index.suspendre(async () => { ordre.push("b+"); ordre.push("b-"); });
+				await Promise.all([a, b]);
+				r.check("pas d'entrelacement", ordre.join(","), "a+,a-,b+,b-");
+			} finally {
+				arreter();
+			}
+		});
+
 	} finally {
 		// `finally` : le dossier temporaire doit disparaître même si un cas a
 		// jeté une erreur inattendue, pas seulement un échec d'assertion.

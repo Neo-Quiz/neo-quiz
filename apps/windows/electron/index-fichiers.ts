@@ -25,6 +25,7 @@
 import { watch } from "chokidar";
 import type { Stats } from "node:fs";
 import * as path from "node:path";
+import { LOG_PREFIX } from "../../../src/branding";
 import type { HostFile, HostFileEvent } from "../../../src/host/types";
 import { dossierHorsCatalogue, evenementDeRenommageDossier, horsCatalogue } from "./catalogue";
 import { creerFichiers, stat } from "./fichiers";
@@ -33,7 +34,7 @@ import { creerFichiers, stat } from "./fichiers";
    justifie (les deux tirent `node:fs` ; revue finale, M3). Deux copies d'une
    même règle dans un même processus finissent par diverger, et la divergence
    ferait tomber les événements du surveillant dans le vide. */
-import { normaliser } from "./parcours";
+import { listerRacine, normaliser } from "./parcours";
 
 /**
  * Ce qu'un renommage de DOSSIER, apparié, doit pousser vers le rendu — tâche
@@ -79,6 +80,13 @@ export interface ArreterSurveillance {
     l'appariement des dossiers. */
 const FENETRE_RENOMMAGE_DOSSIER_MS = 300;
 
+/** What `monter` hands back: an awaitable stop, the `ready` signal, the watch table. */
+interface Montage {
+	arreter(): Promise<void>;
+	pret: Promise<void>;
+	getWatched(): Record<string, string[]>;
+}
+
 /** L'index en mémoire, plus la surveillance qui le tient à jour. */
 export interface Index {
 	all(): HostFile[];
@@ -112,6 +120,26 @@ export interface Index {
 	 * `evenementDeRenommageDossier`).
 	 */
 	surveiller(onEvenement: (ev: EvenementSurveillant) => void, delayMs?: number): ArreterSurveillance;
+	/**
+	 * Runs `fn` while the file watcher is fully CLOSED (every OS directory
+	 * handle released), then restarts it on the same roots and reconciles the
+	 * index with the disk: entries gone emit `delete`, new ones `create`, a
+	 * changed `.md` mtime `modify`; unchanged entries emit nothing (the restart
+	 * does not re-announce every file).
+	 *
+	 * WHY: chokidar keeps one OS handle per watched directory, and Windows
+	 * refuses to rename a directory while a handle is open on it or on any
+	 * descendant (EPERM). `watcher.unwatch(dir)` does not release them; only
+	 * `close()` does. A folder move therefore has to run inside this.
+	 *
+	 * Without a running watcher `fn` runs directly. If `fn` throws, the watcher
+	 * is restarted anyway and the error is rethrown. Concurrent calls are
+	 * serialised. Pairing a moved folder into a `renameDir` event is NOT done
+	 * here: the reconciliation only sees files, so a move surfaces as
+	 * `delete`s then `create`s (the caller that moved the folder already
+	 * transposes review history and stats by prefix).
+	 */
+	suspendre<T>(fn: () => Promise<T>): Promise<T>;
 }
 
 /** Le `HostFile` d'un chemin déjà au format contrat (indice de racine en
@@ -248,6 +276,230 @@ export function creerIndex(racines: string[]): Index {
 		apply(parChemin.has(cheminContrat) ? { kind: "modify", file } : { kind: "create", file });
 	}
 
+	/** One chokidar watcher on every root. `ignoreInitial` true is the RESTART
+	    after `suspendre`: nothing is re-announced, `reconcilier` diffs the disk
+	    against the index instead. */
+	function monter(onEvenement: (ev: EvenementSurveillant) => void, delayMs: number, ignoreInitial: boolean): Montage {
+		/**
+		 * La fonction `ignored` de chokidar : ce chemin doit-il rester HORS du
+		 * crawl ET de la surveillance — pas seulement filtré après coup ? Sans
+		 * elle, chokidar crawle et pose un watcher OS sur `.git/`, `.obsidian/`,
+		 * `node_modules/` et tout leur contenu, alors que `horsCatalogue` les
+		 * écarte de toute façon ensuite : c'est ce crawl, dans le processus
+		 * PRINCIPAL, qui le rend sourd à l'IPC pendant tout son déroulement.
+		 *
+		 * Chokidar 5 a retiré les globs : `ignored` est une fonction qui reçoit
+		 * un chemin ABSOLU natif (`\` sous Windows) et, TANTÔT SEULEMENT, ses
+		 * `stats` — chokidar refait un premier appel sans elles sur un chemin
+		 * déjà tranché ailleurs AVEC elles (son propre crawl les a déjà). Ne
+		 * jamais s'appuyer sur `stats` pour distinguer un fichier d'un dossier
+		 * dans le cas général ; sans elles, ne rien ignorer ici ne laisse rien
+		 * passer qui ne sera pas rejugé juste après, stats en main.
+		 *
+		 * PIÈGE, et c'est le point important : la règle porte sur le chemin
+		 * RELATIF à la racine surveillée (`contratDepuisAbsolu`), JAMAIS sur
+		 * l'absolu entier — un vault peut vivre sous un dossier caché
+		 * (`C:\Users\X\.mes-vaults\Personal`) ; tester tous les segments de
+		 * l'absolu ignorerait alors la racine elle-même et couperait TOUT
+		 * événement, en silence.
+		 *
+		 * RÉUTILISE `dossierHorsCatalogue` (dossiers) / `horsCatalogue`
+		 * (fichiers) de `catalogue.ts` — jamais une recopie de leur règle : deux
+		 * copies divergeraient en silence, comme l'en-tête de ce fichier le
+		 * rappelle déjà pour `normaliser`.
+		 *
+		 * CHOIX — un FICHIER caché directement sous une racine
+		 * (`racine/.gitignore`, `racine/.note.md`) reste SURVEILLÉ :
+		 * `horsCatalogue` ne teste que les segments INTERMÉDIAIRES d'un chemin de
+		 * fichier, jamais son propre nom, et `parcours.ts` (le parcours initial
+		 * qui hydrate le rendu) ne l'exclut pas non plus — il n'écarte que les
+		 * DOSSIERS (`dossierIgnore` n'y est appliqué qu'à `entree.isDirectory()`).
+		 * L'exclure ICI ferait diverger le surveillant du parcours initial : un
+		 * fichier listé au démarrage dont plus aucune modification ne serait
+		 * jamais rapportée, en silence. Un DOSSIER caché/`node_modules` est donc
+		 * écarté sur son propre nom ; un FICHIER ne l'est que par un dossier
+		 * ignoré sur son chemin, jamais par son propre nom.
+		 */
+		function ignorerChemin(absolu: string, stats?: Stats): boolean {
+			const chemin = contratDepuisAbsolu(racinesAbs, absolu);
+			// `null` : hors de toute racine — ne devrait jamais arriver, chokidar ne
+			// présente que ce qu'il trouve SOUS `racinesAbs` (voir le cas « le
+			// surveillant n'est monté que sur les racines qu'on lui donne » du
+			// contrôle) ; chemin réduit à l'indice (ex. « 0 ») : la racine
+			// elle-même, jamais ignorée.
+			if (chemin === null || !chemin.includes("/")) return false;
+			if (!stats) return false;
+			return stats.isDirectory() ? dossierHorsCatalogue(chemin) : horsCatalogue(chemin);
+		}
+
+		const watcher = watch(racinesAbs, {
+			ignoreInitial,
+			ignored: ignorerChemin,
+			// `false` et non `{ stabilityThreshold: 0, … }` : chokidar traite un
+			// seuil de zéro comme « toujours instable » sur certains systèmes de
+			// fichiers, alors que `false` désactive proprement l'attente — c'est
+			// la rupture du cas « delayMs à 0 » du contrôle.
+			awaitWriteFinish: delayMs > 0
+				? { stabilityThreshold: delayMs, pollInterval: Math.min(50, delayMs) }
+				: false,
+		});
+
+		/* Un `add`/`change` a besoin du `mtime` NEUF : chokidar ne le porte pas
+		   lui-même dans ces événements de façon fiable sur tous les systèmes de
+		   fichiers, donc on repasse par `stat` (la même primitive que
+		   `recaler`) plutôt que de lui faire confiance. */
+		function surFichier(kind: "create" | "modify", absolu: string): void {
+			const chemin = contratDepuisAbsolu(racinesAbs, absolu);
+			if (chemin === null || horsCatalogue(chemin)) return;
+			void stat(absolu).then(info => {
+				if (!info) return; // disparu entre l'événement et le `stat`.
+				const file = toHostFile(chemin, info.mtime);
+				const ev: HostFileEvent = { kind, file };
+				apply(ev);
+				onEvenement(ev);
+			});
+		}
+
+		function surSuppression(absolu: string): void {
+			const chemin = contratDepuisAbsolu(racinesAbs, absolu);
+			if (chemin === null || horsCatalogue(chemin)) return;
+			// Garde : ne pas annoncer la suppression d'un fichier qui n'a jamais
+			// été au catalogue (un `.tmp` d'éditeur, par exemple) — même règle
+			// que la réconciliation Tauri.
+			if (!parChemin.has(chemin)) return;
+			const ev: HostFileEvent = { kind: "delete", path: chemin };
+			apply(ev);
+			onEvenement(ev);
+		}
+
+		watcher.on("add", p => surFichier("create", p));
+		watcher.on("change", p => surFichier("modify", p));
+		watcher.on("unlink", surSuppression);
+
+		/* ─── l'appariement d'un renommage de DOSSIER — tâche 5 ───
+
+		   Chokidar remonte `unlinkDir` et `addDir` séparément, sans jamais
+		   les lier. On les ACCUMULE dans une fenêtre fixe
+		   (`FENETRE_RENOMMAGE_DOSSIER_MS`, distincte de `delayMs` — voir sa
+		   doc), puis on demande à `evenementDeRenommageDossier` (PURE, dans
+		   `catalogue.ts`) si la paire est CERTAINE. Rien n'est deviné ici :
+		   toute la décision vit dans cette fonction, ce module ne fait que
+		   lui fournir sa fenêtre. */
+		let dossiersSupprimes: string[] = [];
+		let dossiersCrees: string[] = [];
+		let minuterieDossier: ReturnType<typeof setTimeout> | null = null;
+
+		function planifierAppariement(): void {
+			if (minuterieDossier) clearTimeout(minuterieDossier);
+			minuterieDossier = setTimeout(() => {
+				minuterieDossier = null;
+				const supprimes = dossiersSupprimes;
+				const crees = dossiersCrees;
+				dossiersSupprimes = [];
+				dossiersCrees = [];
+				const paire = evenementDeRenommageDossier(supprimes, crees);
+				if (paire) onEvenement({ kind: "renameDir", from: paire.from, to: paire.to });
+			}, FENETRE_RENOMMAGE_DOSSIER_MS);
+		}
+
+		watcher.on("unlinkDir", absolu => {
+			const chemin = contratDepuisAbsolu(racinesAbs, absolu);
+			// FILTRÉ ICI, pas seulement dans la règle pure : un vault porte des
+			// centaines de sous-dossiers `.git`/`node_modules` que le parcours
+			// initial de chokidar (`ignoreInitial: false`) traverse aussi pour
+			// les DOSSIERS (rien ne les en exclut, à la différence des fichiers
+			// qui passent par `horsCatalogue` avant d'atteindre `onEvenement`) ;
+			// les laisser entrer dans la fenêtre ajouterait des candidats
+			// fantômes qui feraient échouer l'appariement d'un renommage
+			// pourtant univoque ailleurs dans le vault.
+			if (chemin === null || dossierHorsCatalogue(chemin)) return;
+			dossiersSupprimes.push(chemin);
+			planifierAppariement();
+		});
+		watcher.on("addDir", absolu => {
+			const chemin = contratDepuisAbsolu(racinesAbs, absolu);
+			if (chemin === null || dossierHorsCatalogue(chemin)) return;
+			dossiersCrees.push(chemin);
+			planifierAppariement();
+		});
+
+		let arretee = false;
+		/* Awaits `close()`: only once it resolves are the OS directory handles
+		   really released, which `suspendre` relies on before it lets a folder
+		   rename run. */
+		async function arreter(): Promise<void> {
+			if (arretee) return;
+			arretee = true;
+			if (minuterieDossier) clearTimeout(minuterieDossier);
+			await watcher.close();
+		}
+		const pret = new Promise<void>(resolve => { watcher.once("ready", () => resolve()); });
+		return { arreter, pret, getWatched: () => watcher.getWatched() };
+	}
+
+	/** The running subscription, so `suspendre` can restart it after closing it. */
+	let courant: {
+		onEvenement: (ev: EvenementSurveillant) => void;
+		delayMs: number;
+		monte: Montage | null;
+		arretee: boolean;
+	} | null = null;
+
+	/** Diffs the disk against the index and emits what changed while the
+	    watcher was closed. Same filters as the watcher (`horsCatalogue`). */
+	async function reconcilier(onEvenement: (ev: EvenementSurveillant) => void): Promise<void> {
+		const surDisque = new Map<string, number>();
+		for (let i = 0; i < racinesAbs.length; i++) {
+			for (const entree of await listerRacine(racinesAbs[i])) {
+				const chemin = contratDepuisAbsolu(racinesAbs, entree.chemin);
+				if (chemin === null || horsCatalogue(chemin)) continue;
+				surDisque.set(chemin, entree.mtime);
+			}
+		}
+		for (const chemin of [...parChemin.keys()]) {
+			if (surDisque.has(chemin)) continue;
+			const ev: HostFileEvent = { kind: "delete", path: chemin };
+			apply(ev);
+			onEvenement(ev);
+		}
+		for (const [chemin, mtime] of surDisque) {
+			const connu = parChemin.get(chemin);
+			// `mtime` is 0 for non-`.md` files (the walk does not stat them): an
+			// unknown date never counts as a change.
+			if (connu && (mtime === 0 || mtime === connu.mtime)) continue;
+			const file = toHostFile(chemin, mtime);
+			const ev: HostFileEvent = { kind: connu ? "modify" : "create", file };
+			apply(ev);
+			onEvenement(ev);
+		}
+	}
+
+	async function executerSuspendu<T>(fn: () => Promise<T>): Promise<T> {
+		const ecoute = courant;
+		if (!ecoute || !ecoute.monte) return fn();
+		const ancien = ecoute.monte;
+		ecoute.monte = null;
+		await ancien.arreter();
+		try {
+			return await fn();
+		} finally {
+			// Restart even when `fn` threw, unless the caller stopped the
+			// subscription meanwhile.
+			if (!ecoute.arretee) {
+				const neuf = monter(ecoute.onEvenement, ecoute.delayMs, true);
+				ecoute.monte = neuf;
+				try {
+					await neuf.pret;
+					await reconcilier(ecoute.onEvenement);
+				} catch (e) {
+					// Must not mask the error of `fn`; the next watcher events recalibrate.
+					console.warn(LOG_PREFIX, "index reconciliation failed after a suspension:", e);
+				}
+			}
+		}
+	}
+	let fileSuspension: Promise<unknown> = Promise.resolve();
+
 	return {
 		all() {
 			return [...parChemin.values()];
@@ -266,161 +518,21 @@ export function creerIndex(racines: string[]): Index {
 			if (racinesAbs.length === 0) {
 				return Object.assign(() => {}, { getWatched: () => ({}) as Record<string, string[]> });
 			}
-
-			/**
-			 * La fonction `ignored` de chokidar : ce chemin doit-il rester HORS du
-			 * crawl ET de la surveillance — pas seulement filtré après coup ? Sans
-			 * elle, chokidar crawle et pose un watcher OS sur `.git/`, `.obsidian/`,
-			 * `node_modules/` et tout leur contenu, alors que `horsCatalogue` les
-			 * écarte de toute façon ensuite : c'est ce crawl, dans le processus
-			 * PRINCIPAL, qui le rend sourd à l'IPC pendant tout son déroulement.
-			 *
-			 * Chokidar 5 a retiré les globs : `ignored` est une fonction qui reçoit
-			 * un chemin ABSOLU natif (`\` sous Windows) et, TANTÔT SEULEMENT, ses
-			 * `stats` — chokidar refait un premier appel sans elles sur un chemin
-			 * déjà tranché ailleurs AVEC elles (son propre crawl les a déjà). Ne
-			 * jamais s'appuyer sur `stats` pour distinguer un fichier d'un dossier
-			 * dans le cas général ; sans elles, ne rien ignorer ici ne laisse rien
-			 * passer qui ne sera pas rejugé juste après, stats en main.
-			 *
-			 * PIÈGE, et c'est le point important : la règle porte sur le chemin
-			 * RELATIF à la racine surveillée (`contratDepuisAbsolu`), JAMAIS sur
-			 * l'absolu entier — un vault peut vivre sous un dossier caché
-			 * (`C:\Users\X\.mes-vaults\Personal`) ; tester tous les segments de
-			 * l'absolu ignorerait alors la racine elle-même et couperait TOUT
-			 * événement, en silence.
-			 *
-			 * RÉUTILISE `dossierHorsCatalogue` (dossiers) / `horsCatalogue`
-			 * (fichiers) de `catalogue.ts` — jamais une recopie de leur règle : deux
-			 * copies divergeraient en silence, comme l'en-tête de ce fichier le
-			 * rappelle déjà pour `normaliser`.
-			 *
-			 * CHOIX — un FICHIER caché directement sous une racine
-			 * (`racine/.gitignore`, `racine/.note.md`) reste SURVEILLÉ :
-			 * `horsCatalogue` ne teste que les segments INTERMÉDIAIRES d'un chemin de
-			 * fichier, jamais son propre nom, et `parcours.ts` (le parcours initial
-			 * qui hydrate le rendu) ne l'exclut pas non plus — il n'écarte que les
-			 * DOSSIERS (`dossierIgnore` n'y est appliqué qu'à `entree.isDirectory()`).
-			 * L'exclure ICI ferait diverger le surveillant du parcours initial : un
-			 * fichier listé au démarrage dont plus aucune modification ne serait
-			 * jamais rapportée, en silence. Un DOSSIER caché/`node_modules` est donc
-			 * écarté sur son propre nom ; un FICHIER ne l'est que par un dossier
-			 * ignoré sur son chemin, jamais par son propre nom.
-			 */
-			function ignorerChemin(absolu: string, stats?: Stats): boolean {
-				const chemin = contratDepuisAbsolu(racinesAbs, absolu);
-				// `null` : hors de toute racine — ne devrait jamais arriver, chokidar ne
-				// présente que ce qu'il trouve SOUS `racinesAbs` (voir le cas « le
-				// surveillant n'est monté que sur les racines qu'on lui donne » du
-				// contrôle) ; chemin réduit à l'indice (ex. « 0 ») : la racine
-				// elle-même, jamais ignorée.
-				if (chemin === null || !chemin.includes("/")) return false;
-				if (!stats) return false;
-				return stats.isDirectory() ? dossierHorsCatalogue(chemin) : horsCatalogue(chemin);
-			}
-
-			const watcher = watch(racinesAbs, {
-				ignoreInitial: false,
-				ignored: ignorerChemin,
-				// `false` et non `{ stabilityThreshold: 0, … }` : chokidar traite un
-				// seuil de zéro comme « toujours instable » sur certains systèmes de
-				// fichiers, alors que `false` désactive proprement l'attente — c'est
-				// la rupture du cas « delayMs à 0 » du contrôle.
-				awaitWriteFinish: delayMs > 0
-					? { stabilityThreshold: delayMs, pollInterval: Math.min(50, delayMs) }
-					: false,
-			});
-
-			/* Un `add`/`change` a besoin du `mtime` NEUF : chokidar ne le porte pas
-			   lui-même dans ces événements de façon fiable sur tous les systèmes de
-			   fichiers, donc on repasse par `stat` (la même primitive que
-			   `recaler`) plutôt que de lui faire confiance. */
-			function surFichier(kind: "create" | "modify", absolu: string): void {
-				const chemin = contratDepuisAbsolu(racinesAbs, absolu);
-				if (chemin === null || horsCatalogue(chemin)) return;
-				void stat(absolu).then(info => {
-					if (!info) return; // disparu entre l'événement et le `stat`.
-					const file = toHostFile(chemin, info.mtime);
-					const ev: HostFileEvent = { kind, file };
-					apply(ev);
-					onEvenement(ev);
-				});
-			}
-
-			function surSuppression(absolu: string): void {
-				const chemin = contratDepuisAbsolu(racinesAbs, absolu);
-				if (chemin === null || horsCatalogue(chemin)) return;
-				// Garde : ne pas annoncer la suppression d'un fichier qui n'a jamais
-				// été au catalogue (un `.tmp` d'éditeur, par exemple) — même règle
-				// que la réconciliation Tauri.
-				if (!parChemin.has(chemin)) return;
-				const ev: HostFileEvent = { kind: "delete", path: chemin };
-				apply(ev);
-				onEvenement(ev);
-			}
-
-			watcher.on("add", p => surFichier("create", p));
-			watcher.on("change", p => surFichier("modify", p));
-			watcher.on("unlink", surSuppression);
-
-			/* ─── l'appariement d'un renommage de DOSSIER — tâche 5 ───
-
-			   Chokidar remonte `unlinkDir` et `addDir` séparément, sans jamais
-			   les lier. On les ACCUMULE dans une fenêtre fixe
-			   (`FENETRE_RENOMMAGE_DOSSIER_MS`, distincte de `delayMs` — voir sa
-			   doc), puis on demande à `evenementDeRenommageDossier` (PURE, dans
-			   `catalogue.ts`) si la paire est CERTAINE. Rien n'est deviné ici :
-			   toute la décision vit dans cette fonction, ce module ne fait que
-			   lui fournir sa fenêtre. */
-			let dossiersSupprimes: string[] = [];
-			let dossiersCrees: string[] = [];
-			let minuterieDossier: ReturnType<typeof setTimeout> | null = null;
-
-			function planifierAppariement(): void {
-				if (minuterieDossier) clearTimeout(minuterieDossier);
-				minuterieDossier = setTimeout(() => {
-					minuterieDossier = null;
-					const supprimes = dossiersSupprimes;
-					const crees = dossiersCrees;
-					dossiersSupprimes = [];
-					dossiersCrees = [];
-					const paire = evenementDeRenommageDossier(supprimes, crees);
-					if (paire) onEvenement({ kind: "renameDir", from: paire.from, to: paire.to });
-				}, FENETRE_RENOMMAGE_DOSSIER_MS);
-			}
-
-			watcher.on("unlinkDir", absolu => {
-				const chemin = contratDepuisAbsolu(racinesAbs, absolu);
-				// FILTRÉ ICI, pas seulement dans la règle pure : un vault porte des
-				// centaines de sous-dossiers `.git`/`node_modules` que le parcours
-				// initial de chokidar (`ignoreInitial: false`) traverse aussi pour
-				// les DOSSIERS (rien ne les en exclut, à la différence des fichiers
-				// qui passent par `horsCatalogue` avant d'atteindre `onEvenement`) ;
-				// les laisser entrer dans la fenêtre ajouterait des candidats
-				// fantômes qui feraient échouer l'appariement d'un renommage
-				// pourtant univoque ailleurs dans le vault.
-				if (chemin === null || dossierHorsCatalogue(chemin)) return;
-				dossiersSupprimes.push(chemin);
-				planifierAppariement();
-			});
-			watcher.on("addDir", absolu => {
-				const chemin = contratDepuisAbsolu(racinesAbs, absolu);
-				if (chemin === null || dossierHorsCatalogue(chemin)) return;
-				dossiersCrees.push(chemin);
-				planifierAppariement();
-			});
-
-			let arretee = false;
-			function arreter(): void {
-				if (arretee) return;
-				arretee = true;
-				if (minuterieDossier) clearTimeout(minuterieDossier);
-				void watcher.close();
-			}
-			// `getWatched`, greffé sur la fonction d'arrêt : voir la doc de
-			// `ArreterSurveillance` — `canaux.ts` continue de l'appeler comme une
-			// simple `() => void`, seul `check-electron-index.mjs` s'en sert.
-			return Object.assign(arreter, { getWatched: () => watcher.getWatched() });
+			const ecoute = { onEvenement, delayMs, monte: monter(onEvenement, delayMs, false) as Montage | null, arretee: false };
+			courant = ecoute;
+			const arreter = (): void => {
+				if (ecoute.arretee) return;
+				ecoute.arretee = true;
+				if (courant === ecoute) courant = null;
+				void ecoute.monte?.arreter();
+			};
+			// `getWatched` is grafted on the stop function: see `ArreterSurveillance`.
+			return Object.assign(arreter, { getWatched: () => ecoute.monte?.getWatched() ?? {} });
+		},
+		suspendre(fn) {
+			const course = fileSuspension.then(() => executerSuspendu(fn));
+			fileSuspension = course.then(() => undefined, () => undefined);
+			return course;
 		},
 	};
 }

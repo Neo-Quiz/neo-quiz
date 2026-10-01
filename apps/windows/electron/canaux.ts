@@ -419,8 +419,20 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.list, async (_e, dossier: unknown) =>
 		(await fichiers.list(await perimetre.borner(dossier))).map(normaliser));
 	ipcMain.handle(CANAUX.remove, async (_e, abs: unknown) => fichiers.remove(await perimetre.bornerEcriture(abs)));
-	ipcMain.handle(CANAUX.rename, async (_e, de: unknown, vers: unknown) =>
-		fichiers.rename(await perimetre.bornerEcriture(de), await perimetre.bornerEcriture(vers)));
+	/* A DIRECTORY (or junction) rename runs with the file watcher closed:
+	   chokidar holds one OS handle per watched directory and Windows refuses
+	   (EPERM) to rename a directory with an open handle on it or below it. The
+	   index restarts the watcher and reconciles itself afterwards, success or
+	   not (`Index.suspendre`). A FILE rename works under the watcher: it stays
+	   on the direct path. */
+	ipcMain.handle(CANAUX.rename, async (_e, de: unknown, vers: unknown) => {
+		const source = await perimetre.bornerEcriture(de);
+		const cible = await perimetre.bornerEcriture(vers);
+		const info = await fsp.lstat(source).catch(() => null);
+		const dossier = !!info && (info.isDirectory() || info.isSymbolicLink());
+		if (dossier && etat.index) return etat.index.suspendre(() => fichiers.rename(source, cible));
+		return fichiers.rename(source, cible);
+	});
 	ipcMain.handle(CANAUX.stat, async (_e, abs: unknown) => stat(await perimetre.borner(abs)));
 	/* Les trois canaux des RACINES EXTERNES du sélecteur « @ » (`HostFs.externe`,
 	   `src/host/types.ts`), BORNÉS comme tous les autres : c'est le périmètre,
