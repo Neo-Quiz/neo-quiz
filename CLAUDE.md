@@ -4,15 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Vue d'ensemble
 
-Plugin Obsidian LECTEUR qui joue des blocs de code ` ```quiz-blocks ` (tableau
-JSON5) en quiz interactifs : rendu avec transitions, mode examen, LaTeX,
-journal de révision partagé avec l'application Neo Quiz. Créer et éditer un
-quiz, générer par IA, vivent dans l'application (`apps/windows/`) depuis le
-chantier « greffon lecteur » (2026-09-13) — voir « Structure du dépôt » et
-« Architecture » plus bas. 100 % TypeScript strict (ESM). **Commentaires de
-code en ANGLAIS** (voir « Langue du code » ci-dessous) ; **UI traduite**
-(anglais par défaut, cf. « Langue » ci-dessous) — le plugin vise la liste
-communautaire d'Obsidian.
+Application Windows (Electron, `apps/windows/`) qui joue, révise, édite et
+génère par IA des quiz écrits en blocs de code ` ```quiz-blocks ` (tableau
+JSON5) dans des notes Markdown : rendu avec transitions, Test chronométré,
+LaTeX, journal de révision. Le greffon Obsidian a été SUPPRIMÉ du dépôt
+(décision d'Ahmed, 2026-10-01) ; le format de note `quiz-blocks` n'a pas
+bougé, et les anciennes releases du greffon restent publiées sur GitHub (une
+version publiée ne se supprime jamais). Le code partagé (`src/`) ne connaît
+aucun hôte : une application Android viendra, et n'aura à écrire qu'un hôte.
+100 % TypeScript strict (ESM). **Commentaires de code en ANGLAIS** (voir
+« Langue du code » ci-dessous) ; **UI traduite** (anglais par défaut, cf.
+« Langue » ci-dessous).
 
 ## Langue du code (depuis le 2026-09-27)
 
@@ -91,10 +93,10 @@ attendre qu'Ahmed le demande** :
   → une traduction oubliée est une **erreur de compilation**, pas un texte anglais
   qui fuit dans l'UI française.
 - Un dictionnaire **par domaine** (`settings`, `ai`, `dashboard`, `editor`, `engine`,
-  `plugin`), agrégé dans `src/i18n/{en,fr}.ts`. Nouveau domaine = un import de plus.
-- Réglage `language` : `auto` (défaut) | `en` | `fr`. `auto` lit **`window.i18next.language`**
-  (la langue d'OBSIDIAN, pas celle de l'OS ; API interne absente d'`obsidian.d.ts` →
-  repli sur `<html lang>` puis l'anglais).
+  `app`, `review`, `installer`), agrégé dans `src/i18n/{en,fr}.ts`. Nouveau domaine = un import de plus.
+- Réglage `language` : `auto` (défaut) | `en` | `fr`. `auto` lit la langue de l'HÔTE
+  (`host.platform.uiLanguage`, repli `navigator.language` puis `<html lang>` puis
+  l'anglais).
 - **PIÈGE** : `t()` doit être appelé **AU RENDU**. Une chaîne traduite dans une
   constante top-level est figée à la langue du démarrage et ignore le changement de
   langue → transformer la constante en fonction (c'est pourquoi `TUTORIALS` est une
@@ -114,7 +116,8 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
 
 - `npm run check` — typecheck. Toujours après une modif TS.
 - `npm run check:host` — **le cliquet de la frontière d'hôte**, SIX assertions :
-  aucun fichier de `src/` n'importe Obsidian hors de la liste `RESTANTS`, laquelle
+  aucun fichier de `src/` n'importe `obsidian` (garde-fou pour le futur hôte Android
+  et contre un retour du greffon) hors de la liste `RESTANTS`, laquelle
   ne peut que RÉTRÉCIR ; rien sous `apps/windows/` ; aucun fichier déjà libéré
   n'emploie les **extensions DOM** d'Obsidian (`createEl`, `empty`, `setText`…),
   qu'aucun `import` ne trahit — passer par `ajouter` de `src/dom.ts` ; **aucun
@@ -130,9 +133,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   `import { readFile } from "node:fs"` dans le rendu ne rougissait nulle part, et
   `perimetre.ts` importé du rendu recréait côté Chromium l'accès disque total que
   le pont existe pour retirer. `RESTANTS` et `EXCEPTIONS_APPS` sont VIDES depuis
-  la tâche 2 du chantier « greffon lecteur » (2026-09-13) : plus aucun fichier de
-  `src/` n'importe Obsidian ni `apps/` — les deux listes restent en place, vides,
-  comme cliquets pour un retour en arrière, pas comme couverture d'un reste.
+  le 2026-09-13 : plus aucun fichier de `src/` n'importe Obsidian ni `apps/` (le
+  greffon, qui en était le dernier consommateur, a été supprimé le 2026-10-01) —
+  les deux listes restent en place, vides, comme cliquets, pas comme couverture
+  d'un reste.
   Dans la CI : lancé à la main, ce serait la discipline et non le contrôle qui
   tiendrait la frontière.
 - `npm run check:dashboard-dom` — **le cliquet ne suffit pas seul** : `check:host`
@@ -154,13 +158,13 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
 - `npm run check:theme` — le thème de l'app définit toutes les variables CSS
   qu'Obsidian fournissait. Une oubliée ne produit AUCUNE erreur : un texte
   invisible sur un fond de la même couleur. Symétrique et dans la CI.
-- `npm run check:obsidian-host`, `check:windows-host` — les deux implémentations du
-  contrat `src/host/types.ts`. Tout cas neuf s'éprouve par DISCRIMINANCE : casser
+- `npm run check:windows-host` — l'implémentation du contrat `src/host/types.ts`
+  côté application. Tout cas neuf s'éprouve par DISCRIMINANCE : casser
   la règle, voir rougir, restaurer. Un cas vert quoi qu'on fasse ne prouve rien.
 - `npm run check:app` — typecheck + build de l'app, RENDU ET PROCESSUS PRINCIPAL
   Electron (deux `tsconfig` séparés, deux sorties : `dist/` et `dist-electron/`).
-  Il attrape une rupture du code PARTAGÉ vue depuis l'autre hôte, là où
-  `npm run check` ne voit que le greffon — et depuis la tranche Electron, c'est
+  Il attrape une rupture du code PARTAGÉ vue depuis l'hôte, là où
+  `npm run check` ne voit que `src/` — et depuis la tranche Electron, c'est
   le SEUL contrôle qui type `apps/windows/electron/` (`tsconfig.electron.json`).
   Aucun fichier qu'il atteint ne doit tirer `obsidian.d.ts` : un `import type`
   suffisait à neutraliser ce filet.
@@ -449,25 +453,17 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   doit se dérouler pour que `withSrcModule` retire son dossier temporaire.
 - **Juger un script sur son CODE DE SORTIE, jamais sur la fin de sa sortie** : un
   groupe vert peut suivre trois groupes rouges. C'est ainsi qu'un défaut est passé.
-- `npm run dev` / `npm run build` — greffon, watch ou production (déploie dans les
-  vaults). `npm run app:dev` / `app:build` — l'application Windows.
-- **Release** : deux produits indépendants, deux commandes `git ship` (alias posé
-  une fois, cf. `scripts/ship.mjs`) :
-  - `git ship "Message"` — l'application par défaut. Le niveau se lit dans
+- `npm run app:dev` / `app:build` — l'application Windows.
+- **Release** : une commande `git ship` (alias posé une fois, cf.
+  `scripts/ship.mjs`) :
+  - `git ship "Message"` — l'application. Le niveau se lit dans
     `## [Unreleased]` de `CHANGELOG.md` : `### Breaking` → major, toute autre
     entrée → patch (règle du 2026-09-30 ci-dessous) ; vide → refus. Une
     mineure se tape en numéro explicite `X.Y.0`, sur demande d'Ahmed. La section est figée en `## [X.Y.Z] - date` dans
     le commit « Version X.Y.Z », et `release.yml` la publie comme notes de la
     release. Chaque tâche qui change quelque chose de visible écrit sa ligne
     sous `[Unreleased]` dans son propre commit.
-  - `git ship --plugin [major|minor|patch|X.Y.Z] "Message"` — le greffon,
-    bumpe `src/assets/manifest.json`, tag NU `X.Y.Z` (sans préfixe depuis la
-    tâche 3 du chantier « greffon lecteur » — c'est le numéro que lit
-    `obsidianmd/obsidian-releases` ; les anciens tags `vX.Y.Z` restent acceptés
-    par `release.yml`), release GitHub `make_latest: false`.
-
-  `release.yml` construit le seul produit désigné par la famille de tag et publie.
-  (Pas `npm run release` : il pointe vers un fichier absent.)
+  `release.yml` construit l'application (tag `desktop-vX.Y.Z`) et publie.
 
 - **UNE LIVRAISON EST UN CORRECTIF PAR DÉFAUT** (règle d'Ahmed du 2026-09-30) :
   `git ship` publie x.y.Z+1 quel que soit le contenu de `[Unreleased]`
@@ -479,8 +475,8 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   en avoir supprimé dix dans la journée). Chaque suppression coûte : une
   installation existante ne voit JAMAIS un numéro plus petit comme une mise à
   jour — elle reste bloquée et il faut désinstaller/réinstaller à la main ; et
-  supprimer la release « latest » fait promouvoir automatiquement celle du
-  GREFFON par GitHub, alors que `releases/latest/download/latest.yml` est
+  supprimer la release « latest » fait promouvoir automatiquement la
+  précédente par GitHub, alors que `releases/latest/download/latest.yml` est
   précisément ce que lisent le bootstrapper et l'auto-updater (quelques minutes
   pendant lesquelles l'installeur ne trouve plus rien). Ce qui n'est pas prêt
   ne se publie pas ; ce qui est publié reste, et se corrige par la version
@@ -489,26 +485,16 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
 Vérification d'un changement = `npm run check`, plus `check:md` / `check:export` /
 `check:markers` si le rendu ou l'écriture sont touchés, **`check:quiz-io` dès que
 `dashboard/detail-io.ts` bouge** (c'est le seul chemin qui réécrit une note),
-`check:app` si le code partagé bouge, **puis** test manuel dans Obsidian.
+`check:app` si le code partagé bouge, **puis** test manuel dans l'application (`npm run app:dev`).
 
-## Build & déploiement (`esbuild.config.mjs`)
+## Build
 
-- **Un plugin = 3 fichiers** : `dist/main.js`, `dist/styles.css`, et
-  `src/assets/manifest.json`.
-- **Déploiement auto** : le build copie ces fichiers dans chaque
-  `C:\obsidian-vaults\*\.obsidian\plugins\quiz-blocks` déjà existant. Override par la
-  variable d'env `VAULT_PLUGIN_DIR`. Si aucun vault n'est détecté, la sortie reste
-  dans `dist/` — **pas de fallback `["."]`** (n'écrit jamais les artefacts dans le repo).
-- **CSS** : bundlé depuis `src/assets/css/plugin.css` (arbre de `@import`), qui
-  n'importe PAS les styles du tableau de bord, de l'éditeur, ni des quatre
-  composants de la page « Générer » (`ui-select`, `color-picker`,
-  `effort-slider`, `settings-code`) — ces classes ne sont référencées ni par
-  `src/engine` ni par `apps/obsidian` (le greffon ne rend plus qu'un quiz).
-  `src/assets/css/index.css`, qui les importe tous, reste l'entrée de
-  l'application (`apps/windows` consomme `src/assets/css/` par chemin
-  relatif). Les fontes MathLive (~300 Ko) sont inlinées en data-URI via le
-  loader esbuild → pas de CDN.
-- **main.js** : format `cjs`, `target es2020`, `external: ["obsidian", "electron"]`.
+- **L'application** se construit avec Vite + electron-builder
+  (`apps/windows/`, `npm run app:build`). Il n'y a plus de build à la racine :
+  `esbuild` n'y sert qu'aux scripts `check:*` (`scripts/lib/load-src.mjs`).
+- **CSS** : `src/assets/css/index.css` est l'entrée (arbre de `@import`) ;
+  `apps/windows` consomme `src/assets/css/` par chemin relatif. Les fontes
+  MathLive (~300 Ko) sont inlinées en data-URI → pas de CDN.
 
 ## Dépôt GitHub et site (depuis le 2026-09-27)
 
@@ -546,17 +532,9 @@ Vérification d'un changement = `npm run check`, plus `check:md` / `check:export
   (activé sur le dépôt). Pas de `CODE_OF_CONDUCT.md` tant qu'il n'y a pas
   d'autre contributeur (choix d'Ahmed, 2026-09-27).
 
-## Boucle de dev (appliquer une modif dans Obsidian)
+## Boucle de dev
 
-`build` **déploie** `main.js` (« Reload without saving » ne suffit pas toujours) :
-- CSS → désactiver/réactiver le plugin.
-- Rendu d'un quiz (moteur) → refermer/rouvrir la note, ou basculer le mode
-  d'affichage.
-- Sûr → redémarrage complet d'Obsidian, ou recharger via le CLI Obsidian
-  (`obsidian plugin:reload id=quiz-blocks`).
-
-Le tableau de bord, l'éditeur et la génération IA ne vivent plus dans
-Obsidian : leur boucle de dev est celle de l'application (`npm run app:dev`).
+La boucle de dev est celle de l'application (`npm run app:dev`).
 
 ## Structure du dépôt : un code partagé, plusieurs hôtes
 
@@ -583,10 +561,6 @@ Obsidian : leur boucle de dev est celle de l'application (`npm run app:dev`).
   Ce n'est plus vrai : le chantier 4 devra CONTOURNER une partie de `dashboard/`,
   pas la prendre en bloc. Les deux affirmations ne sont pas mises à jour l'une
   dans l'autre ; celle-ci, la plus récente, l'emporte.
-- `apps/obsidian/` — le greffon. `main.ts` → `plugin.ts` (`InteractiveQuizPlugin
-  extends Plugin`) et `host.ts`, la seule implémentation du contrat qui a le droit
-  d'importer Obsidian, et **le seul endroit du dépôt où un `TFile` devient un
-  `HostFile`** (une conversion recopiée à la main diverge en silence).
 - `apps/windows/` — l'application Windows (Electron + Vite). Elle consomme `src/` **par
   chemin relatif**, sans jamais copier un fichier : une copie divergerait sans un mot.
   Son thème est `src/theme/host-vars.css`. **L'hôte est SCINDÉ en deux, depuis la
@@ -604,26 +578,20 @@ Obsidian : leur boucle de dev est celle de l'application (`npm run app:dev`).
   que le périmètre existe pour retirer côté principal. Seuls `catalogue.ts`,
   `ressources.ts` et `pont.ts` (sans Node) sont importables du rendu ; `npm run
   check:host` le tient mécaniquement (assertion 6, liste `SANS_NODE`).
-- Une troisième application Android viendra ; elle n'aura à écrire qu'un hôte.
+- Une application Android viendra ; elle n'aura à écrire qu'un hôte.
 
 ## Architecture (le point important)
 
-Point d'entrée du greffon : `apps/obsidian/main.ts` → `apps/obsidian/plugin.ts`
-(`InteractiveQuizPlugin extends Plugin`). Réduit au LECTEUR depuis le chantier
-« greffon lecteur » (2026-09-13) : `plugin.ts` porte un `SettingTab` de deux
-réglages (langue, coloration), installe l'hôte (`installHost` en tête
-d'`onload`, `uninstallHost` en fin d'`onunload`), et enregistre le SEUL
-processeur de bloc `quiz-blocks` (→ moteur). Plus de vue dashboard, plus
-d'onglet `quiz-blocks-builder` : créer et éditer un quiz vivent dans
-l'application (voir plus bas).
+Point d'entrée de l'application : `apps/windows/src/main.ts` (rendu) et
+`apps/windows/electron/main.ts` (processus principal). Le greffon Obsidian
+(`apps/obsidian/`) a été supprimé le 2026-10-01.
 
 1. **Moteur de rendu** — `src/engine.ts` + `src/engine/*.ts` (17 modules), le
-   SEUL sous-système d'interface que le greffon embarque encore. Suit le
+   sous-système qui joue un quiz. Suit le
    pattern `createXHandlers(ctx)` par module et un **god-object `ctx` typé**,
    assemblé en plusieurs passes puis injecté dans toutes les factories
    (référence croisée). Le param d'appel externe est nommé `context`, le
-   god-object interne `ctx` — jamais confondus (ni avec le
-   `MarkdownPostProcessorContext` d'Obsidian).
+   god-object interne `ctx` — jamais confondus (ni avec un contexte propre à un hôte).
    `renderInteractiveQuiz(context)` construit le `ctx` (type `EngineCtx`, la plus
    grosse interface du projet), instancie les 17 factories, puis les greffe et
    **aplatit ~55 méthodes** sur `ctx` via `Object.assign`. Le type
@@ -639,8 +607,7 @@ l'application (voir plus bas).
 2. **Dashboard** — `src/dashboard/*.ts`, le second sous-système d'interface, au
    **même pattern** `createXHandlers(ctx)`, mais qui ne vit plus que dans
    `apps/windows/` : `apps/windows/src/ui/dashboard-shell.ts` en est l'hôte
-   (remplace l'`ItemView` `src/dashboard.ts`, disparu à la tâche 1 du chantier
-   « greffon lecteur »). 2 colonnes (Accueil / Mes quiz / Détail / Générer). Le
+   (a remplacé l'ancienne `ItemView` `src/dashboard.ts`, disparue avec le greffon). 2 colonnes (Accueil / Mes quiz / Détail / Générer). Le
    `ctx` (`DashboardCtx`) est **petit** : les 5 handlers (`nav`, `home`,
    `quizzes`, `detail`, `ai`) sont greffés sur la **vue** (`this`), pas sur
    `ctx`. `types/dashboard-ctx.ts` scinde donc `DashboardCtx` (le littéral) et
@@ -652,9 +619,8 @@ consultation ⇄ édition **sur place**. Décrite par une `QuizPageSpec` (titre,
 `load()`, `save?()`, retour, bouton principal), elle sert **deux hôtes**,
 tous deux dans l'application : la vue détail du dashboard et la page
 « Générer » (brouillon sans note jusqu'à son enregistrement automatique,
-`QuizDraft.file === null`). Le troisième hôte d'avant le chantier, l'onglet
-`quiz-blocks-builder` du greffon (`src/editor.ts`), est parti avec lui à la
-tâche 1.
+`QuizDraft.file === null`). Un troisième hôte, l'onglet `quiz-blocks-builder` du greffon
+(`src/editor.ts`), est parti avec lui.
 L'**éditeur en trois colonnes a été supprimé** le 2026-07-31 (« pas assez
 intuitif ») : il ne reste de `src/editor/` que ce que la page consomme —
 `editor-form.ts` (les champs par type, atteints via `dashboard/detail-form-bridge.ts`),
@@ -713,16 +679,14 @@ l'hôte qui lance et qui tue l'arbre de processus. Les **modèles sont lus
 dynamiquement** (cache des CLIs, catalogue `ollama.com`), **jamais codés en dur** — voir
 mémoire projet `codex-models-dynamic` et `ollama-latest-version-only`.
 
-**La page « Générer » sert les DEUX hôtes** depuis la tranche 5 (tâche 6) :
+**La page « Générer » ne connaît aucun hôte** :
 `createAiHandlers(deps: AiPageDeps)` ne reçoit plus ni `plugin` ni `app` — les
 réglages arrivent par un `AiSettingsHost` (`dashboard/ai-settings-host.ts`, dont
-`aiSettingsDefaults()` est la SEULE liste de défauts, lue par le greffon comme
-par l'app), et trois membres sont OPTIONNELS parce que l'application ne les a
-pas : `openFiles` (pas d'onglets), `usage` (l'écran d'usage reste au greffon —
-`ai-usage.ts` lit le trousseau du CLI et `usage-modal.ts` est une `Modal`) et
+`aiSettingsDefaults()` est la SEULE liste de défauts), et trois membres sont OPTIONNELS parce que
+l'application ne les a pas : `openFiles` (pas d'onglets), `usage` (l'écran
+d'usage appartenait au greffon — `ai-usage.ts` lit le trousseau du CLI) et
 `renderCodeBlock` (sans lui, un `<pre><code>` nu). **Le texte d'un PDF joint est
-un membre OPTIONNEL du contrat** (`HostPdf`) : le greffon le sert par le pdf.js
-embarqué d'Obsidian, l'application ne l'a pas et REFUSE le PDF
+un membre OPTIONNEL du contrat** (`HostPdf`) : l'application ne l'a pas et REFUSE le PDF
 (`ai.error.pdfUnsupportedInApp`) plutôt que d'en joindre le vide.
 
 **La clé `ai` des réglages de l'application est GARDÉE dans le processus
@@ -733,7 +697,7 @@ du réseau et hors réseau local demande une confirmation NATIVE, et
 compromis obtenait un hôte Internet dans la liste au lancement suivant.
 
 Le CLI est lancé **sans aucun outil** : le modèle ne peut ouvrir aucun fichier. C'est
-le PLUGIN qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
+l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
 dans le composer (vault, chemin absolu, racine externe configurée) et
 `startGeneration` les attache via les mêmes fonctions que le picker « @ ». Un chemin
 introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
@@ -742,8 +706,8 @@ introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
 
 - **Dropdowns** : `dashboard/ui-select.ts` est le **seul** dropdown autorisé (portalé au
   `<body>`) — jamais de `<select>` natif.
-- **Icônes** : Lucide via `host.ui.setIcon()` — `setIcon()` d'Obsidian sous le
-  greffon, les données de la bibliothèque `lucide` dans l'app. Jamais d'emoji.
+- **Icônes** : Lucide via `host.ui.setIcon()` — les données de la bibliothèque
+  `lucide` dans l'app. Jamais d'emoji.
 - **Maths** : LaTeX `$...$` partout, rendu MathJax natif (`engine/mathjax.ts`) + éditeur
   MathLive (`engine/math-input.ts`).
 - La dictée a été retirée le 2026-09-11 ; ses réglages persistés sont ignorés,
@@ -771,9 +735,9 @@ autre HTML de l'app repasse par les quatre portes ci-dessus.
 Deux règles qui ont chacune coûté un bug :
 
 - **Le HTML d'un quiz n'est pas forcément celui de l'utilisateur** : un quiz PARTAGÉ
-  arrive avec les `explainHtml` de son auteur, et le bloc est traité par ce plugin,
-  donc hors de portée du filtre d'Obsidian. Une interpolation brute y exécute du code
-  avec les droits d'Obsidian. C'est arrivé aux six chemins `*Html` à la fois, et au
+  arrive avec les `explainHtml` de son auteur, et un HTML non assaini s'exécute
+  avec les droits de la fenêtre de l'application (jadis, sous Obsidian, avec ceux
+  d'Obsidian). C'est arrivé aux six chemins `*Html` à la fois, et au
   libellé d'emplacement d'un classement (`quiz-slot-label`).
 - **Pour lire du HTML sans l'exécuter, `<template>`, jamais un `<div>` détaché** : un
   `<img src=x onerror=…>` se charge dans un `<div>` même hors de l'arbre affiché. Le
@@ -805,9 +769,10 @@ entier aurait décoloré 594 fragments des quiz d'Ahmed. Mesurer avant de tranch
   affiché vit dans `src/branding.ts` (`PRODUCT_NAME`, `LOG_PREFIX`) — seule source,
   il était en dur à sept endroits avant. Deux valeurs ne le suivent JAMAIS, et les
   renommer « par cohérence » détruirait des données :
-  `PLUGIN_ID = "quiz-blocks"` est le dossier de `.obsidian/plugins/`, où vivent les
-  réglages (le journal de révision, lui, a déménagé depuis la tranche 2 vers
-  `<racine>/.neo-quiz/`, partagé avec l'app — voir plus haut) ;
+  `PLUGIN_ID = "quiz-blocks"` est le dossier de `.obsidian/plugins/` de l'ancien
+  greffon (supprimé), où vivait l'ancien emplacement du journal de révision que
+  l'application lit encore pour le migrer (`apps/windows/src/host/roots.ts` ;
+  le journal vit désormais dans `<racine>/.neo-quiz/`) ;
   `QUIZ_BLOCK_LANGUAGE = "quiz-blocks"` est écrit dans **chaque note du
   vault**. C'est le rapport entre Obsidian et `.md`.
 
@@ -817,12 +782,8 @@ entier aurait décoloré 594 fragments des quiz d'Ahmed. Mesurer avant de tranch
   registre de l'installation NSIS (changé, chaque mise à jour installe une
   seconde copie), le second le nom du binaire Linux. `check:package` les fige.
 
-- **`manifest.json` vit dans `src/assets/`, pas à la racine** (inhabituel pour un plugin
-  Obsidian). C'est la version du GREFFON, bumpée par `release.yml` depuis un tag
-  `vX.Y.Z`. La version de l'APPLICATION vit dans `apps/windows/package.json`
-  (+ lockfile synchronisé), bumpée depuis un tag `desktop-vX.Y.Z` — les deux produits
-  sont indépendants depuis le 2026-09-13 (voir « Release » ci-dessus). Le
-  `package.json` de la racine du dépôt, lui, reste statique et ignoré : il ne
-  porte la version d'aucun des deux produits.
-- Modules visés < ~350 lignes (exceptions assumées : `ui-select`, `ai`, `engine`, `plugin`).
+- **La version de l'APPLICATION** vit dans `apps/windows/package.json` (+ lockfile
+  synchronisé), bumpée depuis un tag `desktop-vX.Y.Z`. Le `package.json` de la
+  racine du dépôt reste statique et ignoré : il ne porte la version de rien.
+- Modules visés < ~350 lignes (exceptions assumées : `ui-select`, `ai`, `engine`).
 - Docs de conception (workflow superpowers) : `docs/superpowers/{specs,plans}/`.

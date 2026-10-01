@@ -4,13 +4,11 @@ Please **do not** open a public issue for a vulnerability.
 
 Report it privately through
 [GitHub Security Advisories](https://github.com/Neo-Quiz/neo-quiz/security/advisories/new)
-on this repository. Include the product (desktop app or Obsidian plugin), its
-version, and enough detail to reproduce the problem.
+on this repository. Include the app version, and enough detail to reproduce the problem.
 
 ## Supported versions
 
-Only the latest release of each product receives fixes: the desktop app
-updates itself, and the plugin updates through BRAT.
+Only the latest release receives fixes; the desktop app updates itself.
 
 ## What matters most
 

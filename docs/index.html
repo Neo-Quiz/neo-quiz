@@ -184,7 +184,7 @@
 
 	/* Le cadre n'apparaît qu'au SURVOL, et sur la ligne entière (version et
 	   taille) : c'est l'invitation à choisir une release. Seules les cartes
-	   qui ont une version sélectionnable le montrent (pas Obsidian). */
+	   qui ont une version sélectionnable le montrent. */
 
 	.carte-meta.selectionnable {
 		cursor: pointer;
@@ -237,7 +237,7 @@
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 		border-color: var(--bordure);
 	}
-	/* ===== Obsidian card: command block built in ===== */
+	/* ===== Command block (copy button) ===== */
 
 
 	.carte-code {
@@ -297,48 +297,6 @@
 		width: 14px;
 		height: 14px;
 	}
-
-	.carte-obsidian-plus {
-		margin-top: 10px;
-		font-size: 11.5px;
-		color: var(--texte-attenue);
-	}
-
-	.carte-obsidian-plus a,
-	.carte-obsidian-plus button {
-		color: var(--texte-attenue);
-		background: none;
-		border: 0;
-		padding: 0;
-		font: inherit;
-		text-decoration: underline;
-		text-underline-offset: 2px;
-		cursor: pointer;
-	}
-
-	.carte-obsidian-plus a:hover,
-	.carte-obsidian-plus button:hover {
-		color: var(--texte);
-	}
-
-	.carte-obsidian-plus .ligne-copiable {
-		cursor: pointer;
-		overflow-x: auto;
-		white-space: nowrap;
-		display: block;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	}
-
-	.carte-obsidian-plus .ligne-copiable:hover {
-		color: var(--texte);
-	}
-
-	.carte-obsidian-plus a {
-		color: var(--texte-attenue);
-		text-decoration: underline;
-	}
-
-	.carte-obsidian-plus a:hover { color: var(--texte); }
 
 	/* Dropdown menu of published versions. */
 
@@ -500,7 +458,7 @@
 		.carte { width: 100%; max-width: 300px; }
 	}
 
-	/* ===== La modale Obsidian ===== */
+	/* ===== Modals ===== */
 	.modale { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
 	/* `display: flex` écraserait l'attribut `hidden` : la modale s'ouvrait
 	   toute seule au chargement. */
@@ -621,22 +579,6 @@
 				</span>
 			</a>
 
-			<!-- Obsidian: not a link, the install command fits inside the card. -->
-			<a class="carte carte-obsidian" id="carte-obsidian" href="https://github.com/Neo-Quiz/neo-quiz/blob/main/docs/guide/install.md#obsidian-plugin">
-				<span class="carte-icone">
-					<!-- Obsidian logo, same path as apps/windows/src/ui/marques.ts
-					     (source Simple Icons, CC0 license), brand color #7C3AED. -->
-					<svg viewBox="0 0 24 24" fill="#7C3AED">
-						<path d="M19.355 18.538a68.967 68.959 0 0 0 1.858-2.954.81.81 0 0 0-.062-.9c-.516-.685-1.504-2.075-2.042-3.362-.553-1.321-.636-3.375-.64-4.377a1.707 1.707 0 0 0-.358-1.05l-3.198-4.064a3.744 3.744 0 0 1-.076.543c-.106.503-.307 1.004-.536 1.5-.134.29-.29.6-.446.914l-.31.626c-.516 1.068-.997 2.227-1.132 3.59-.124 1.26.046 2.73.815 4.481.128.011.257.025.386.044a6.363 6.363 0 0 1 3.326 1.505c.916.79 1.744 1.922 2.415 3.5zM8.199 22.569c.073.012.146.02.22.02.78.024 2.095.092 3.16.29.87.16 2.593.64 4.01 1.055 1.083.316 2.198-.548 2.355-1.664.114-.814.33-1.735.725-2.58l-.01.005c-.67-1.87-1.522-3.078-2.416-3.849a5.295 5.295 0 0 0-2.778-1.257c-1.54-.216-2.952.19-3.84.45.532 2.218.368 4.829-1.425 7.531zM5.533 9.938c-.023.1-.056.197-.098.29L2.82 16.059a1.602 1.602 0 0 0 .313 1.772l4.116 4.24c2.103-3.101 1.796-6.02.836-8.3-.728-1.73-1.832-3.081-2.55-3.831zM9.32 14.01c.615-.183 1.606-.465 2.745-.534-.683-1.725-.848-3.233-.716-4.577.154-1.552.7-2.847 1.235-3.95.113-.235.223-.454.328-.664.149-.297.288-.577.419-.86.217-.47.379-.885.46-1.27.08-.38.08-.72-.014-1.043-.095-.325-.297-.675-.68-1.06a1.6 1.6 0 0 0-1.475.36l-4.95 4.452a1.602 1.602 0 0 0-.513.952l-.427 2.83c.672.59 2.328 2.316 3.335 4.711.09.21.175.43.253.653z"></path>
-					</svg>
-				</span>
-				<span class="carte-nom">Obsidian</span>
-				<span class="carte-meta" id="meta-obsidian">
-					<span class="carte-version" id="version-obsidian">…</span>
-					<span class="carte-taille" id="taille-obsidian"></span>
-				</span>
-
-			</a>
 		</div>
 
 		<div class="avertissements">
@@ -645,8 +587,6 @@
 		</div>
 	</main>
 
-	<!-- La modale Obsidian : deux boutons, rien à copier. Ouverte par la carte
-	     Obsidian (JS) ; sans JS la carte reste un lien vers le guide. -->
 	<!-- La modale Linux : les trois formats, remplis depuis `latest.json`
 	     (les noms versionnés changent à chaque release, donc aucun lien
 	     permanent possible sauf pour l'alias x86_64). Sans JavaScript la
@@ -677,28 +617,6 @@
 			<p class="modale-note">These are the 1.2.0 packages, the last Linux build. Newer versions are Windows only for now.</p>
 		</div>
 	</div>
-	<div class="modale" id="modale-obsidian" hidden>
-		<div class="modale-fond" data-fermer></div>
-		<div class="modale-panneau" role="dialog" aria-modal="true" aria-labelledby="modale-obsidian-titre">
-			<button type="button" class="modale-fermer" data-fermer aria-label="Close">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 8L16 16M16 8L8 16"></path></svg>
-			</button>
-			<h2 id="modale-obsidian-titre">Neo Quiz for Obsidian</h2>
-			<p class="modale-sous">Two clicks: BRAT, then Neo Quiz.</p>
-			<div class="etape">
-				<h3>1. Install BRAT</h3>
-				<p><a href="https://github.com/TfTHacker/obsidian42-brat">BRAT</a> installs plugins from GitHub. It keeps them updated on its own.</p>
-				<a class="bouton-etape" href="obsidian://show-plugin?id=obsidian42-brat">Install BRAT</a>
-			</div>
-			<div class="etape">
-				<h3>2. Install Neo Quiz</h3>
-				<p>Obsidian opens and BRAT adds Neo Quiz to the current vault. Enable it if Obsidian asks.</p>
-				<a class="bouton-etape bouton-etape--accent" href="obsidian://brat?plugin=Neo-Quiz/neo-quiz">Install Neo Quiz</a>
-			</div>
-			<p class="modale-note">Updates then arrive on their own, through BRAT.</p>
-		</div>
-	</div>
-
 	<footer class="pied">
 		<a href="https://github.com/Neo-Quiz/neo-quiz">Source code</a>
 		<span aria-hidden="true">·</span>
@@ -758,10 +676,9 @@
 			return true;
 		}
 
-		// Le dépôt publie DEUX familles de releases sur le même flux :
-		// `desktop-vX.Y.Z` pour l'application, `X.Y.Z` nu pour le greffon Obsidian.
-		// Sans ce filtre, le menu proposerait les releases du greffon, qui ne
-		// portent aucun installeur Windows.
+		// Les releases de l'application portent le tag `desktop-vX.Y.Z` ; le
+		// dépôt publie aussi d'autres releases (paquet de langages, anciennes
+		// versions du greffon Obsidian) qui ne portent aucun installeur Windows.
 		var MOTIF_TAG_APP = /^desktop-v\d+\.\d+\.\d+$/;
 
 		// `desktop-v1.10.0` → [1, 10, 0]. Ce qui manque vaut 0 : une comparaison
@@ -795,13 +712,13 @@
 
 		function formaterTaille(octets) {
 			var mo = octets / (1024 * 1024);
-			// Sous 10 Mo (le plugin), une décimale ; au-dessus (l'app), un entier.
+			// Sous 10 Mo, une décimale ; au-dessus (l'app), un entier.
 			return (mo < 10 ? mo.toFixed(1) : Math.round(mo)) + " MB";
 		}
 
 		// Fills in the version (and its size, on its own line) shown below
-		// a platform's name, from a given release. `extension` is null for
-		// Obsidian (no dedicated asset: only the version number matters).
+		// a platform's name, from a given release. `extension` is null when
+		// only the version number matters.
 		// `suffixe` ("latest" / "beta") flags that we're no longer looking
 		// at the latest stable release.
 		function afficherVersion(plateforme, release, extension, suffixe) {
@@ -817,9 +734,8 @@
 
 		var latestChargee = null;
 
-		// The file published by release.yml on this site first (`latest.json`
-		// for the app, `latest-plugin.json` for Obsidian — same shape as the
-		// API response, no request limit); the GitHub API only as a fallback:
+		// The file published by release.yml on this site first (`latest.json`,
+		// same shape as the API response, no request limit); the GitHub API only as a fallback:
 		// without a token it refuses past 60 calls per hour per IP address,
 		// which a shared network reaches in minutes.
 		function chargerJson(url) {
@@ -850,31 +766,6 @@
 					var el = document.getElementById(id);
 					if (el) el.textContent = "";
 				});
-			});
-
-		// Obsidian reads its own release stream, `latest-plugin.json`
-		// (published with `make_latest: false`, so it never shows up as the
-		// GitHub "latest" release). No API fallback here, on purpose: while
-		// no plugin release exists the file is absent, and a fallback burned
-		// one of the visitor's 60 unauthenticated API requests per hour on
-		// EVERY visit, to find nothing. The card simply stays empty until the
-		// first plugin release writes the file.
-		chargerJson("latest-plugin.json")
-			.then(function (donnees) {
-				var elObsidian = document.getElementById("version-obsidian");
-				var versionObsidian = String(donnees.tag_name || "").replace(/^(desktop-)?v/, "");
-				if (elObsidian && versionObsidian) elObsidian.textContent = "v" + versionObsidian;
-				// La taille du plugin : ses trois fichiers (main.js, styles.css,
-				// manifest.json) additionnés, ce que la commande télécharge.
-				var elTailleObsidian = document.getElementById("taille-obsidian");
-				var octetsPlugin = (donnees.assets || []).filter(function (a) {
-					return ["main.js", "styles.css", "manifest.json"].indexOf(String(a.name || "")) !== -1;
-				}).reduce(function (total, a) { return total + (a.size || 0); }, 0);
-				if (elTailleObsidian && octetsPlugin) elTailleObsidian.textContent = formaterTaille(octetsPlugin);
-			})
-			.catch(function () {
-				var el = document.getElementById("version-obsidian");
-				if (el) el.textContent = "";
 			});
 
 		// Makes the tile's version clickable: a menu of the ten latest published
@@ -1049,7 +940,7 @@
 			});
 		}
 
-		// Obsidian card: the copy button of the PowerShell command.
+		// The copy button of a command block.
 		function copierTexte(texte, bouton) {
 			navigator.clipboard.writeText(texte).then(function () {
 				if (!bouton) return;
@@ -1086,10 +977,8 @@
 		}
 
 
-		// La carte Obsidian ouvre la modale (deux boutons BRAT). Fermeture :
-		// la croix, le fond, Échap. Sans JS, la carte est un lien vers le guide.
-		// Deux tuiles ouvrent une modale au lieu de télécharger : Obsidian (BRAT)
-		// et Linux (trois formats). Même câblage pour les deux, écrit une fois.
+		// La carte Linux ouvre une modale (trois formats) au lieu de télécharger.
+		// Fermeture : la croix, le fond, Échap.
 		function brancherModale(idCarte, idModale) {
 			var carte = document.getElementById(idCarte);
 			var modale = document.getElementById(idModale);
@@ -1108,7 +997,6 @@
 				if (e.key === "Escape" && !modale.hidden) fermer();
 			});
 		}
-		brancherModale("carte-obsidian", "modale-obsidian");
 		brancherModale("carte-linux", "modale-linux");
 	</script>
 </body>

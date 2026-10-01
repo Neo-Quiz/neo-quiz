@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Removed
+- The Obsidian plugin: quizzes are played, reviewed and edited in the app; the quiz-blocks note format is unchanged.
+
 ## [1.20.10] - 2026-10-01
 
 ### Added

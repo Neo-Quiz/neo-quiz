@@ -6,7 +6,7 @@ are all welcome.
 ## Reporting a bug or suggesting a feature
 
 Open an [issue](https://github.com/Neo-Quiz/neo-quiz/issues/new). For a bug,
-say which product (desktop app or Obsidian plugin) and which version you use,
+say which version of the desktop app you use,
 what you did, what you expected and what happened. A screenshot or the quiz
 block that triggers the problem helps a lot.
 
@@ -19,14 +19,12 @@ Security problems are the exception: never report them in a public issue, see
 npm ci
 npm ci --prefix apps/windows
 npm run app:dev        # the desktop app (Vite + Electron)
-npm run build          # the Obsidian plugin, deployed to local vaults
 ```
 
 ## Repository layout
 
 - `src/` is the shared code. It knows no host: it asks for what it needs
   through the contract in `src/host/types.ts`.
-- `apps/obsidian/` is the Obsidian plugin (a quiz reader).
 - `apps/windows/` is the desktop app (Electron). `apps/windows/electron/` is
   the main process, the only code that touches the disk.
 - `src/scheduler/` is the spaced repetition scheduler, a pure module with no
@@ -60,13 +58,13 @@ detail.
 - **Quiz HTML is untrusted**: a shared quiz carries its author's HTML.
   Everything a quiz displays goes through `src/engine/sanitizer.ts`.
 - **Never rename persisted values**: the `quiz-blocks` note format and its
-  keys, `PLUGIN_ID`, `appId` and `executableName`. Renaming them would break
+  keys, `PLUGIN_ID` (where old review logs live), `appId` and `executableName`. Renaming them would break
   existing notes or installations.
 
 ## Releases
 
 Maintainers publish with `git ship` (see `scripts/ship.mjs`): a
-`desktop-vX.Y.Z` tag for the app, a bare `X.Y.Z` tag for the plugin. The
+`desktop-vX.Y.Z` tag. The
 `release.yml` workflow builds, signs and publishes the release, and installed
 apps update themselves from it.
 

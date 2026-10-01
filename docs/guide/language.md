@@ -1,6 +1,6 @@
 # Language
 
 
-The interface follows **your Obsidian language** by default (English, or French where translated). You can force it in **Settings → Neo Quiz → Language**: `Automatic`, `English`, or `Français`.
+The interface follows **your Windows language** by default (English, or French where translated). You can force it in **Settings → General → Language**: `Automatic`, `English`, or `Français`.
 
 ---
