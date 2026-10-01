@@ -289,5 +289,22 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 		await st.recordAttempt("Efrei/q.md", { date: 1, pct: 1 }).catch(() => { refused = true; });
 		r.check("own attempts file unreadable: the append is refused", [refused, fs.files.get("Efrei/.neo-quiz/attempts/dev.jsonl")], [true, "x\n"]);
 	}
+	// 10. An own exams file that cannot be READ is never replaced; a failed load is retried.
+	{
+		const fs = memFs();
+		const own = JSON.stringify({ "Efrei/M": [{ id: "k", nom: "k", date: "2026-01-01", modifiedAt: 1 }] });
+		fs.files.set("Efrei/.neo-quiz/exams/dev.json", own);
+		const real = fs.read; let locked = true;
+		fs.read = async (p) => { if (locked && p.endsWith("exams/dev.json")) throw new Error("locked"); return real(p); };
+		const st = make(fs); await quiet(() => st.load());
+		let refused = 0;
+		await st.saveExam("Efrei/M", exam("n", "2026-02-02")).catch(() => { refused++; });
+		await st.deleteExam("Efrei/M", "k").catch(() => { refused++; });
+		r.check("own exams file unreadable: saves refused, the file is untouched", [refused, fs.files.get("Efrei/.neo-quiz/exams/dev.json"), fs.writes.length], [2, own, 0]);
+		locked = false;
+		await st.saveExam("Efrei/M", exam("n", "2026-02-02"));
+		r.check("the failed load was not cached: the next call retries, and the save keeps the old exam",
+			json(fs, "Efrei/.neo-quiz/exams/dev.json")["Efrei/M"].map(e => e.id).sort(), ["k", "n"]);
+	}
 	r.done();
 });

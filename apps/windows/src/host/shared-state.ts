@@ -164,13 +164,21 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		}
 		for (const n of sources) {
 			const main = `${examDir}/${n}`;
-			let table = names.has(n) ? await readExamFile(main, root) : null;
+			let table: Record<string, StoredExam[]> | null = null;
+			let raw = "";
+			let readFailed = false;
+			if (names.has(n)) {
+				try { raw = await fs.read(main); } catch { readFailed = true; }
+				if (!readFailed) { try { table = readExamTable(JSON.parse(raw), root); } catch { /* kept aside below */ } }
+			}
 			if (!table && names.has(n + ".tmp")) table = await readExamFile(main + ".tmp", root);
 			if (!table) {
 				if (n === ownName && names.has(n)) {
-					/* Our own file is unreadable and the next write would replace
-					   it: keep the bytes aside first. */
-					const raw = await fs.read(main).catch(() => "");
+					/* Our own file could not be READ: the next write would replace
+					   it with only the new entry and lose every exam and tombstone
+					   it holds. Refuse (the root is then read-only), like attempts. */
+					if (readFailed) throw new Error(`own exams file unreadable: ${main}`);
+					/* Read but unparseable: keep the bytes aside before a write replaces it. */
 					if (raw.trim()) await fs.write(`${main}.corrupt-${clock()}`, raw);
 				}
 				console.warn(`${LOG_PREFIX} exams file unreadable:`, main);
@@ -201,7 +209,11 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 	function rootState(root: string): Promise<RootState> {
 		if (!known(root)) return Promise.reject(new Error(`unknown root: ${root}`));
 		let p = roots.get(root);
-		if (!p) roots.set(root, p = loadRoot(root));
+		if (!p) {
+			roots.set(root, p = loadRoot(root));
+			// A failed load is not cached: the next call retries.
+			p.catch(() => { if (roots.get(root) === p) roots.delete(root); });
+		}
 		return p;
 	}
 
