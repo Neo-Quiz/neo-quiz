@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowInsets
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import android.content.res.Configuration
 import androidx.core.view.WindowInsetsCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
@@ -47,6 +49,11 @@ class MainActivity : ComponentActivity() {
         // does not dispatch insets to its child), so every screen, native or web, stays clear of the
         // status bar, the 3-button or gesture navigation bar, the cutout and the keyboard.
         val content = findViewById<ViewGroup>(android.R.id.content)
+        // The app is always dark: light status/navigation bar icons on the dark background.
+        WindowCompat.getInsetsController(window, content).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
         ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime(),
@@ -62,6 +69,17 @@ class MainActivity : ComponentActivity() {
                 appWebView.askBack { handled -> if (!handled) finish() }
             }
         })
+    }
+
+    /**
+     * Rotation, fold/unfold and dark-mode changes are handled here (manifest `configChanges`) instead
+     * of recreating the activity, which reloaded the whole page. The WebView resizes itself and fires
+     * its own resize/media-query events; the insets are re-dispatched because they change with the
+     * orientation (bar sides, cutout).
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ViewCompat.requestApplyInsets(findViewById(android.R.id.content))
     }
 
     /**

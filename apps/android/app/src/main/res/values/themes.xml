@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.NeoQuiz" parent="android:Theme.Material.NoActionBar" />
+    <!-- The window background is the renderer's page background (nq-lueur-fond in shell.css): the
+         padded content view leaves the system-bar areas showing it, so no gray band appears there. -->
+    <color name="window_background">#070B14</color>
+    <style name="Theme.NeoQuiz" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:colorBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+    </style>
 </resources>
