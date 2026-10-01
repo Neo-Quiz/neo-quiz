@@ -27,6 +27,11 @@ class BridgeTest {
                 override fun warm(language: String) {}
                 override fun packState(name: String) = emptyMap<String, Any?>()
             }).handlers() +
+            com.ahmedmili.neoquiz.sync.SyncChannel(object : com.ahmedmili.neoquiz.sync.SyncBackend {
+                override suspend fun state() = emptyMap<String, Any?>()
+                override suspend fun pair(id: String) = "indisponible"
+                override suspend fun forget(id: String) {}
+            }, { null }).handlers() +
             Unavailable.handlers()
     }
 

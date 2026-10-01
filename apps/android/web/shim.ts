@@ -12,7 +12,7 @@
 
    The wire keys keep the names of the Windows bridge on purpose. */
 
-import type { Pont, EvenementDisque, EtatFenetre } from "../../windows/electron/pont";
+import type { Pont, EvenementDisque, EtatFenetre, EtatSync } from "../../windows/electron/pont";
 import type { EtatMiseAJour } from "../../windows/electron/mise-a-jour-etat";
 
 interface NeoAndroidPort {
@@ -240,6 +240,15 @@ const pont: Pont = {
 		},
 		transcrire: (id) => appeler("video.transcrire", [id]),
 		annuler: (id) => appeler("video.annuler", [id]),
+	},
+
+	sync: {
+		etat: () => appeler("sync.etat"),
+		appairer: (deviceId) => appeler("sync.appairer", [deviceId]),
+		oublier: (deviceId) => appeler("sync.oublier", [deviceId]),
+		surEtat: (rappel) => abonner<EtatSync>("sync.etat", rappel),
+		surDonneesRecues: (rappel) => abonner<void>("sync.donneesRecues", () => rappel()),
+		scanner: () => appeler("sync.scanner"),
 	},
 
 	code: {

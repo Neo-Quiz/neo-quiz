@@ -1,0 +1,17 @@
+Third-party software in Neo Quiz for Android
+
+Syncthing 2.1.5 (libsyncthingnative.so)
+  Licence: Mozilla Public License 2.0 (https://www.mozilla.org/MPL/2.0/)
+  Copyright (c) The Syncthing Authors.
+  Neo Quiz ships the unmodified binary built by the Syncthing-Fork project
+  (https://github.com/researchxxl/syncthing-android, release v2.1.5.0, file
+  com.github.catfriend1.syncthingfork_release_v2.1.5.0_arm64-v8a.apk), checked
+  against a pinned SHA-256 at build time.
+  Source code of Syncthing: https://github.com/syncthing/syncthing/tree/v2.1.5
+  Source code of the Android build: https://github.com/researchxxl/syncthing-android/tree/v2.1.5.0
+  Neo Quiz starts Syncthing as a separate process and talks to it over its REST API;
+  it does not modify or link against its code.
+
+ZXing and zxing-android-embedded (QR code scan)
+  Licence: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+  https://github.com/zxing/zxing, https://github.com/journeyapps/zxing-android-embedded

@@ -5,6 +5,16 @@
          The app is sideloaded, never published on Google Play. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
+    <!-- The embedded Syncthing: it runs as a foreground service (type dataSync), talks to the
+         network, and the Sync page scans the QR code of another device with the camera. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:allowBackup="false"
         android:label="Neo Quiz"
@@ -19,6 +29,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Keeps the embedded Syncthing alive in the background (not reachable by other apps). -->
+        <service
+            android:name=".sync.SyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Hands a file of the quiz folder to another app (`systeme.ouvrir`); URIs are only
              minted by the bridge after the perimeter check, and granted read-only per call. -->

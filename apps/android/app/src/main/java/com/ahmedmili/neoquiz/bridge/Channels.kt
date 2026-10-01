@@ -92,5 +92,6 @@ object Channels {
         "sync.etat",
         "sync.appairer",
         "sync.oublier",
+        "sync.scanner",
     )
 }

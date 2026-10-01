@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { createRequire } from "node:module";
 import { FICHIERS_PYODIDE } from "../../windows/electron/code/copier.mjs";
-import { PACK_C, assertPinEquals, extractPack, readWindowsPin } from "./pins.mjs";
+import { PACK_C, assertPinEquals, extractPack, installSyncthing, readWindowsPin } from "./pins.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..", "..", "..");
@@ -71,6 +71,9 @@ try {
 	});
 
 	await buildCodeSandbox();
+
+	// The embedded Syncthing (Task 10): pinned APKs, libraries under jniLibs (git-ignored).
+	await installSyncthing(join(repo, "dist-pack", "syncthing-android"), join(here, "..", "app"));
 
 	if (!existsSync(join(assets, "index.html")) || !existsSync(join(assets, "neo-shim.js"))) {
 		throw new Error("assets incomplete");

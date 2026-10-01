@@ -19,6 +19,10 @@ fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
  * user grants "All files access" to this app. Plain views, no extra UI
  * dependency; the activity swaps it for the app once the access is granted
  * (it re-checks on resume, i.e. when the user comes back from the setting).
+ *
+ * A second step, optional: the embedded sync runs in the background, which
+ * battery optimisation would cut short. It opens the system list of apps
+ * exempt from it (no permission needed: the user picks the app there).
  */
 class FirstRunScreen(context: Context) : LinearLayout(context) {
     init {
@@ -43,6 +47,15 @@ class FirstRunScreen(context: Context) : LinearLayout(context) {
                     Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")),
                 )
             }
+        })
+        addView(TextView(context).apply {
+            setText(R.string.first_run_battery_body)
+            textSize = 16f
+            setPadding(0, pad, 0, pad / 2)
+        })
+        addView(Button(context).apply {
+            setText(R.string.first_run_battery_button)
+            setOnClickListener { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
         })
     }
 }

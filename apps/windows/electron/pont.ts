@@ -396,6 +396,10 @@ export interface Pont {
 		/** Another device's changes to the folder have landed (idle after
 		    remote items): time to reload what is read from the folder. */
 		surDonneesRecues(rappel: () => void): () => void;
+		/** Android only (a camera): opens the scanner and resolves with the
+		    text of the QR code read (a candidate device id, validated by
+		    `appairer`), or `null` if the user gave up. Absent on Windows. */
+		scanner?(): Promise<string | null>;
 	};
 
 	systeme: {

@@ -7,4 +7,12 @@
     <string name="picker_cancel">Annuler</string>
     <string name="picker_up">.. (dossier parent)</string>
     <string name="picker_suggested">%1$s (suggéré)</string>
+    <string name="first_run_battery_body">Pour continuer à synchroniser avec ton ordinateur quand l\'appli est fermée, autorise-la à tourner en arrière-plan (sans restriction de batterie).</string>
+    <string name="first_run_battery_button">Autoriser la synchronisation en arrière-plan</string>
+    <string name="sync_channel_name">Synchronisation</string>
+    <string name="sync_notification_title">Neo Quiz se synchronise</string>
+    <string name="pair_title">Associer cet appareil ?</string>
+    <string name="pair_message">Tes quiz et ton historique de révision seront partagés avec cet appareil. N\'associe qu\'un appareil qui t\'appartient.\n\n%1$s</string>
+    <string name="pair_confirm">Associer</string>
+    <string name="pair_cancel">Annuler</string>
 </resources>

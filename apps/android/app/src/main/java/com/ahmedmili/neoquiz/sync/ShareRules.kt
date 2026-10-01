@@ -1,0 +1,187 @@
+package com.ahmedmili.neoquiz.sync
+
+import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** What the Sync page shows of the folder: `idle` / `syncing` / `error` / `absent`, and a percentage while syncing. */
+data class FolderState(val state: String, val percent: Int?)
+
+/**
+ * THE RULES OF THE EMBEDDED SYNCTHING, mirror of
+ * `apps/windows/electron/syncthing-regles.ts` (Task 6). Pure: no Android
+ * class, so the JVM tests break each rule and watch it fail.
+ *
+ * - one folder only ([FOLDER_ID]), always at `Documents/Neo Quiz` ([sharedRoot]),
+ *   never at a path that came from an offer or from the renderer;
+ * - a device is a device the owner PAIRED: an offer from anybody else is ignored;
+ * - a device id coming from the page is validated (format AND the Luhn check
+ *   characters Syncthing writes into every id) before it reaches a config;
+ * - the launch arguments carry nothing but their parameters, and the
+ *   environment is cleaned of every `ST*` variable (Syncthing reads
+ *   `STGUIADDRESS`, `STHOMEDIR`... from it).
+ *
+ * The literals (`isDeviceId`, `acceptOffer`, ports, ignore lines, options) are
+ * the same as the Windows file on purpose: both platforms must agree.
+ */
+object ShareRules {
+    const val FOLDER_ID = "neo-quiz"
+
+    /** TCP and QUIC port of this app's Syncthing; the owner's personal Syncthing-Fork keeps 22000. */
+    const val LISTEN_PORT = 22100
+
+    /**
+     * UDP port of this app's local discovery. Syncthing's default (21027) is
+     * the one the owner's personal Syncthing-Fork binds on the same phone; two
+     * instances cannot share it. Every Neo Quiz instance (PC and Android)
+     * uses this one, so they still find each other on the LAN.
+     */
+    const val LOCAL_ANNOUNCE_PORT = 21028
+
+    /** Lines of the folder's `.stignore`: conflict copies under `.neo-quiz/` are the app's to merge, never to propagate. */
+    val IGNORES: List<String> = listOf("(?d).neo-quiz/**/*.sync-conflict-*", "(?d).trash")
+
+    private const val DYNAMIC_RELAY = "dynamic+https://relays.syncthing.net/endpoint"
+    private val ID_FORMAT = Regex("^[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}$")
+    private val API_KEY = Regex("^[0-9a-f]{64}$")
+    private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+    /** The shared folder: `Documents/Neo Quiz`, whatever an offer or the page says. */
+    fun sharedRoot(documents: File): File = File(documents, "Neo Quiz")
+
+    /** `\A`..`\z`-style match: Kotlin's `matches` is anchored at both ends, so a trailing newline fails. */
+    fun isDeviceId(s: Any?): Boolean = s is String && ID_FORMAT.matches(s)
+
+    /** Syncthing's Luhn-32 check character of 13 data characters. */
+    private fun luhn32(data: String): Char {
+        var factor = 1
+        var sum = 0
+        for (c in data) {
+            var add = factor * ALPHABET.indexOf(c)
+            factor = if (factor == 2) 1 else 2
+            add = add / 32 + add % 32
+            sum += add
+        }
+        return ALPHABET[(32 - sum % 32) % 32]
+    }
+
+    /** Four blocks of 13 characters, each followed by its own check character: a mistyped character fails here. */
+    fun hasValidCheckDigits(id: String): Boolean {
+        if (!isDeviceId(id)) return false
+        val raw = id.replace("-", "")
+        for (i in 0 until 4) {
+            val block = raw.substring(i * 14, i * 14 + 14)
+            if (luhn32(block.substring(0, 13)) != block[13]) return false
+        }
+        return true
+    }
+
+    /** An offer is accepted only for the one folder, from a device the owner paired. */
+    fun acceptOffer(folderId: String, deviceId: String, paired: Collection<String>): Boolean =
+        folderId == FOLDER_ID && deviceId in paired
+
+    /** The arguments of `syncthing serve` (every flag checked against `serve --help` of v2.1.5). */
+    fun launchArgs(home: String, guiPort: Int, apiKey: String): List<String> {
+        require(home.isNotBlank()) { "syncthing: empty home" }
+        require(guiPort in 1024..65535) { "syncthing: bad GUI port" }
+        require(API_KEY.matches(apiKey)) { "syncthing: bad API key" }
+        return listOf(
+            "serve",
+            "--home=$home",
+            "--no-browser",
+            "--no-restart",
+            "--no-upgrade",
+            "--gui-address=127.0.0.1:$guiPort",
+            "--gui-apikey=$apiKey",
+        )
+    }
+
+    /** The environment of the child: the parent's minus every `ST*` variable, plus `STNOUPGRADE=1`. */
+    fun launchEnv(base: Map<String, String?>): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        for ((k, v) in base) {
+            if (v == null || Regex("^ST[A-Z0-9_]*$").matches(k)) continue
+            out[k] = v
+        }
+        out["STNOUPGRADE"] = "1"
+        return out
+    }
+
+    /** TCP and QUIC on the pinned port; when it is taken, any port. The relay pool lets two NATed devices meet. */
+    fun listenAddresses(portFree: Boolean): List<String> {
+        val port = if (portFree) LISTEN_PORT else 0
+        return listOf("tcp://:$port", "quic://:$port", DYNAMIC_RELAY)
+    }
+
+    /** The options pinned at every start: no browser, no usage or crash report, no self-upgrade, LAN discovery on its own port. */
+    fun fixedOptions(portFree: Boolean): JSONObject = JSONObject()
+        .put("listenAddresses", JSONArray(listenAddresses(portFree)))
+        .put("startBrowser", false)
+        .put("urAccepted", -1)
+        .put("crashReportingEnabled", false)
+        .put("autoUpgradeIntervalH", 0)
+        .put("localAnnouncePort", LOCAL_ANNOUNCE_PORT)
+        .put("localAnnounceMCAddr", "[ff12::8384]:$LOCAL_ANNOUNCE_PORT")
+
+    /** THE folder, shared with ourselves and with every paired device, once each. */
+    fun folderConfig(root: String, ownId: String, paired: Collection<String>): JSONObject {
+        val devices = JSONArray()
+        for (id in linkedSetOf(ownId) + paired) {
+            devices.put(JSONObject().put("deviceID", id).put("introducedBy", "").put("encryptionPassword", ""))
+        }
+        return JSONObject()
+            .put("id", FOLDER_ID)
+            .put("label", "Neo Quiz")
+            .put("path", root)
+            .put("type", "sendreceive")
+            .put("devices", devices)
+            .put("fsWatcherEnabled", true)
+            // Permission bits mean nothing between Windows and Android.
+            .put("ignorePerms", true)
+    }
+
+    /** `GET /rest/db/status` to what the page shows; `null` = the folder is not configured. Scanning counts as idle. */
+    fun folderState(s: JSONObject?): FolderState {
+        if (s == null) return FolderState("absent", null)
+        return when (s.optString("state")) {
+            "error" -> FolderState("error", null)
+            "syncing", "sync-preparing", "sync-waiting" -> {
+                val total = s.optLong("globalBytes", 0)
+                if (total <= 0) FolderState("syncing", null)
+                else FolderState("syncing", ((s.optLong("inSyncBytes", 0).coerceIn(0, total) * 100) / total).toInt())
+            }
+            else -> FolderState("idle", null)
+        }
+    }
+}
+
+/**
+ * Decides when OTHER devices' changes have landed, so the page reloads the
+ * journals and the shared state they live in, and the file scan runs.
+ *
+ * Syncthing 2.x emits `ItemFinished` ONLY for items the puller applied, i.e.
+ * items that came from another device (a local change produces
+ * `LocalIndexUpdated` and only that). Then the folder goes back to `idle`
+ * (`StateChanged`, `to: "idle"`). An error-free `ItemFinished` of our folder
+ * arms the detector; the next `StateChanged` to `idle` of our folder fires it
+ * once and disarms. The owner's own edits never fire.
+ */
+class ReceptionDetector {
+    private var armed = false
+
+    fun observe(ev: JSONObject): Boolean {
+        val d = ev.optJSONObject("data") ?: return false
+        if (d.optString("folder") != ShareRules.FOLDER_ID) return false
+        when (ev.optString("type")) {
+            "ItemFinished" -> {
+                if (!d.has("error") || d.isNull("error") || d.optString("error").isEmpty()) armed = true
+                return false
+            }
+            "StateChanged" -> if (d.optString("to") == "idle" && armed) {
+                armed = false
+                return true
+            }
+        }
+        return false
+    }
+}

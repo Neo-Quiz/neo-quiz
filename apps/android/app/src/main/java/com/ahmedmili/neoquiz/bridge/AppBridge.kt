@@ -3,20 +3,41 @@ package com.ahmedmili.neoquiz.bridge
 import android.app.Activity
 import android.os.Environment
 import com.ahmedmili.neoquiz.code.CodeSandbox
+import androidx.activity.ComponentActivity
+import com.ahmedmili.neoquiz.sync.SyncChannel
+import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
+import com.ahmedmili.neoquiz.ui.PairConfirmDialog
+import com.ahmedmili.neoquiz.ui.QrScanner
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /** The assembled bridge plus the one thing the host asks of it besides messages: a rescan. */
-class AppBridge(val bridge: Bridge, private val scan: ScanChannel, private val scope: CoroutineScope, private val code: CodeSandbox) {
-    /** Releases what the bridge holds besides coroutines: the hidden code WebView. */
-    fun shutdown() = code.shutdown()
+class AppBridge(
+    val bridge: Bridge,
+    private val scan: ScanChannel,
+    private val scope: CoroutineScope,
+    private val code: CodeSandbox,
+    private val sync: SyncHub,
+) {
+    /** Releases what the bridge holds besides coroutines: the hidden code WebView, and the page's hold on the sync. */
+    fun shutdown() {
+        sync.detach()
+        code.shutdown()
+    }
 
-    /** Re-reads the started roots and pushes what changed (the app came to the foreground). */
+    /**
+     * Re-reads the started roots and pushes what changed (the app came to the
+     * foreground). Changes another device synced while the page could not hear
+     * are announced after the scan, so the journals are reloaded on top of it.
+     */
     fun rescan() {
-        scope.launch { scan.rescan() }
+        scope.launch {
+            scan.rescan()
+            if (sync.takePendingReception()) bridge.emit("sync.donneesRecues", null)
+        }
     }
 }
 
@@ -50,10 +71,29 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val suggested = { documents.takeIf { it.isDirectory && !perimeter.contains(it.path) } }
     val codeSandbox = CodeSandbox(activity, scope)
     val system = SystemChannel(perimeter, allowed, settings, FolderPickerDialog(activity, suggested), AndroidFileOpener(activity))
+
+    // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
+    // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
+    val hub = SyncHub.get(activity)
+    val pairDialog = PairConfirmDialog(activity)
+    val qr = QrScanner(activity as ComponentActivity)
+    hub.confirmer = { id, name -> pairDialog.ask(id, name) }
+    hub.allowRoot = allowed::allow
+    hub.stateListener = { state -> bridge?.emit("sync.etat", state) }
+    hub.receivedListener = {
+        // Changes of another device landed: scan the folder (file events), then tell the page to reload its journals.
+        scope.launch {
+            scan.rescan()
+            bridge?.emit("sync.donneesRecues", null)
+        }
+    }
+    val syncChannel = SyncChannel(hub, qr::scan)
+
     val created = Bridge(
         scope,
-        Unavailable.handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() + settings.handlers() + system.handlers(),
+        Unavailable.handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
+            settings.handlers() + system.handlers() + syncChannel.handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox)
+    return AppBridge(created, scan, scope, codeSandbox, hub)
 }

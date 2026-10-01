@@ -45,6 +45,9 @@ android {
     }
 
     buildTypes {
+        // The emulator is x86_64: DEBUG builds carry the x86_64 Syncthing too (src/debug/jniLibs, see
+        // web/pins.mjs); release builds ship arm64-v8a only.
+        debug { ndk { abiFilters += "x86_64" } }
         release {
             isMinifyEnabled = false
             if (canSignRelease) signingConfig = signingConfigs.getByName("release")
@@ -63,6 +66,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.webkit)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.zxing.embedded)
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
 }

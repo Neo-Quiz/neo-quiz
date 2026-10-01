@@ -65,10 +65,6 @@ object Unavailable {
         "video.annuler" to { null },
         "langages.installer" to { mapOf("ok" to false, "code" to "reseau") },
         "langages.supprimer" to { null },
-        // Task 10 implements the sync channels.
-        "sync.etat" to { mapOf("actif" to false, "appareil" to null, "appareils" to emptyList<Any>(), "dossier" to mapOf("etat" to "absent", "pourcentage" to null)) },
-        "sync.appairer" to { "indisponible" },
-        "sync.oublier" to { null },
     )
 
     val names: Set<String> get() = value.keys

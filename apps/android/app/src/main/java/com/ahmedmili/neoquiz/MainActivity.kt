@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.viewinterop.AndroidView
+import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FirstRunScreen
 import com.ahmedmili.neoquiz.ui.hasAllFilesAccess
 import com.ahmedmili.neoquiz.web.AppWebView
@@ -40,7 +41,13 @@ class MainActivity : ComponentActivity() {
     /** The app is visible again: files may have changed (sync, another app). Silent until the page has hydrated. */
     override fun onStart() {
         super.onStart()
+        SyncHub.get(this).foreground = true
         appWebView.rescan()
+    }
+
+    override fun onStop() {
+        SyncHub.get(this).foreground = false
+        super.onStop()
     }
 
     /** Coming back from the "All files access" setting. */
@@ -55,6 +62,8 @@ class MainActivity : ComponentActivity() {
             loaded = true
             appWebView.loadApp()
         }
+        // Sync stays on once a device was paired: bring its foreground service back (the app is on screen, so Android allows it).
+        if (granted) SyncHub.get(this).let { if (it.isActive()) it.startService() }
     }
 
     override fun onDestroy() {
