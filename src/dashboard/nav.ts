@@ -81,14 +81,16 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 			// côté application avant la tranche 4) reste VISIBLE mais inerte —
 			// une barre qui change de forme entre deux hôtes se remarque plus
 			// qu'une entrée manifestement à venir.
-			/* An entry the host will never serve (Generate on a phone) is
-			   left out; a merely not-yet-ready one stays, disabled. */
-			if (currentHost().platform.isMobile && !ctx.canOpen(item.key)) continue;
-			const disabled = !ctx.canOpen(item.key);
+			/* On a phone, Generate is not served yet: it stays in the bar (four
+			   even columns) as an inert placeholder, aria-disabled and without
+			   a click handler, instead of the native disabled look. */
+			const placeholder = currentHost().platform.isMobile && !ctx.canOpen(item.key);
+			const disabled = !placeholder && !ctx.canOpen(item.key);
 			const cls = [
 				"qbd-nav-item",
 				activeNav === item.key ? "qbd-nav-item--active" : "",
 				disabled ? "qbd-nav-item--disabled" : "",
+				placeholder ? "qbd-nav-item--placeholder" : "",
 			].filter(Boolean).join(" ");
 			const btn = ajouter(navList, "button", cls);
 			// La clé sur le bouton : c'est par elle que le CSS anime l'icône
@@ -96,7 +98,7 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 			// racine du document, posé par `ai.ts`), sans que le rail ait à
 			// connaître la page.
 			btn.dataset.nav = item.key;
-			buttons.push({ key: item.key, el: btn });
+			if (!placeholder) buttons.push({ key: item.key, el: btn });
 
 			const iconWrap = ajouter(btn, "span", "qbd-nav-icon");
 			currentHost().ui.setIcon(iconWrap, item.icon);
@@ -107,6 +109,12 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 			if (disabled) {
 				btn.disabled = true;
 				btn.title = t("dashboard.nav.soon");
+			}
+
+			if (placeholder) {
+				btn.setAttribute("aria-disabled", "true");
+				btn.addEventListener("click", e => { e.preventDefault(); });
+				continue;
 			}
 
 			btn.addEventListener("click", () => {

@@ -156,7 +156,6 @@ body {
 	/* Le noir bleuté (StudySmarter : ≈ #070b14) vers lequel l'accent est
 	   tiré : la lueur est un vert ou un bleu SOUTENU, pas l'accent pur, qui
 	   laisserait mal lire la barre de titre sur un jaune ou un vert anis. */
-	--nq-lueur-fond: #070b14;
 	/* La part d'accent dans la teinte de la lueur. */
 	--nq-lueur-part: 60%;
 	/* L'alpha de la lueur tout en haut, et la hauteur où elle s'éteint. */

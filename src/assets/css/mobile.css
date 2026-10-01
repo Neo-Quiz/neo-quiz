@@ -59,18 +59,21 @@ html.nq-mobile {
 .is-mobile .qbd-sidebar {
 	flex: none;
 	width: 100%;
-	height: 56px;
+	height: 60px;
 	padding: 0;
 	align-items: stretch;
 	overflow: hidden;
 	border-top: 1px solid var(--background-modifier-border);
 	border-bottom: 0;
-	background: var(--background-secondary);
+	/* The colour the Android side paints the system bars (themes.xml
+	   `window_background`), so the bar and the navigation area under it read
+	   as one block. */
+	background: var(--nq-lueur-fond);
 	z-index: 2;
 }
 
 .is-mobile .qbd-nav-items {
-	flex: 2 1 0;
+	flex: 3 1 0;
 	padding: 0;
 	gap: 0;
 	justify-content: stretch;
@@ -81,21 +84,71 @@ html.nq-mobile {
 	padding: 0;
 }
 
-.is-mobile .qbd-nav-item,
-.is-mobile .qbd-nav-footer .qbd-nav-item {
+/* No tile: the active tab is told apart by a filled icon, a white semibold
+   label and full opacity; the others are muted grey. */
+.is-mobile .qbd-sidebar .qbd-nav-item,
+.is-mobile .qbd-sidebar .qbd-nav-footer .qbd-nav-item {
+	--qbd-nav-cut: var(--nq-lueur-fond);
 	flex: 1 1 0;
 	max-width: none;
-	height: 56px;
-	min-height: 56px;
-	padding: 4px 2px;
+	height: 60px;
+	min-height: 60px;
+	padding: 6px 2px;
 	border-radius: 0;
 	justify-content: center;
-	gap: 2px;
+	gap: 3px;
+	opacity: 1;
+	color: var(--text-muted) !important;
+	text-shadow: none;
+	font-weight: 500;
+}
+
+.is-mobile .qbd-nav-item::after {
+	display: none;
+}
+
+.is-mobile .qbd-sidebar .qbd-nav-item.qbd-nav-item--active {
+	background: transparent !important;
+	border-color: transparent !important;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	color: #fff !important;
+	font-weight: 600;
+}
+
+/* Generate placeholder: same muted look, tapping does nothing. */
+.is-mobile .qbd-nav-item--placeholder {
+	cursor: default;
+}
+
+/* Pressed: a quiet dip, no box. Keyboard focus keeps a ring. */
+.is-mobile .qbd-nav-item:active:not(:disabled):not(.qbd-nav-item--placeholder) {
+	transform: none;
+	opacity: 0.6;
+}
+.is-mobile .qbd-nav-item:focus-visible {
+	background: transparent !important;
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -4px;
+	border-radius: 8px;
+}
+
+.is-mobile .qbd-nav-icon {
+	width: 28px;
+	height: 28px;
+}
+.is-mobile .qbd-nav-icon svg {
+	width: 27px;
+	height: 27px;
+}
+.is-mobile .qbd-nav-item--active .qbd-nav-icon svg {
+	stroke-width: 2.25;
 }
 
 .is-mobile .qbd-nav-label {
 	font-size: 11px;
 	line-height: 14px;
+	text-transform: none;
 }
 
 /* The update button and the app mark belong to the desktop rail. */
