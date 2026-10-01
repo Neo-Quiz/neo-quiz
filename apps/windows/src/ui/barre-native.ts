@@ -10,10 +10,8 @@
    the WebView; a tap comes back as the index of the button, and this module
    clicks it. The page's own bar is hidden (`mobile.css`, `.nq-bar-native`).
 
-   ICONS are rasterised here, from the rail's own SVGs, in both states
-   (outline, and the filled shape of the active tab): the page's CSS decides
-   what each state looks like, so the values are read from COMPUTED styles of
-   an offscreen clone and written inline into the SVG before it is drawn.
+   ICONS are drawn by Kotlin (Material Symbols Rounded vector drawables,
+   outlined / filled); the page only sends each tab's id and the two tints.
 ══════════════════════════════════════════════════════════ */
 
 interface PontBarre {
@@ -21,40 +19,22 @@ interface PontBarre {
 	surBarreClic(rappel: (index: number) => void): void;
 }
 
-const TAILLE_PX = 100;
 const ACTIVE = "qbd-nav-item--active";
 
 function boutons(): HTMLElement[] {
 	return Array.from(document.querySelectorAll<HTMLElement>(".qbd-sidebar .qbd-nav-item"));
 }
 
-/** The rail icon of `btn` as a PNG data URL, drawn as it looks when the tab is `active`. */
-async function icone(btn: HTMLElement, active: boolean): Promise<{ png: string; couleur: string }> {
-	const clone = btn.cloneNode(true) as HTMLElement;
+/** The text colour of a rail button in the given state, from an offscreen clone's computed style. */
+function couleur(btn: HTMLElement | undefined, active: boolean): string {
+	if (!btn) return "";
+	const clone = btn.cloneNode(false) as HTMLElement;
 	clone.style.setProperty("position", "absolute", "important");
 	clone.style.setProperty("visibility", "hidden", "important");
-	for (const el of [clone, ...Array.from(clone.querySelectorAll<HTMLElement | SVGElement>("*"))]) el.style.setProperty("transition", "none", "important");
 	btn.parentElement?.append(clone);
 	try {
 		clone.classList.toggle(ACTIVE, active);
-		const couleur = getComputedStyle(clone).color;
-		const svg = clone.querySelector("svg");
-		if (!svg) return { png: "", couleur };
-		for (const el of [svg, ...Array.from(svg.querySelectorAll("*"))]) {
-			const cs = getComputedStyle(el);
-			const st = (el as SVGElement).style;
-			for (const p of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity"]) st.setProperty(p, cs.getPropertyValue(p));
-		}
-		svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		svg.setAttribute("width", String(TAILLE_PX));
-		svg.setAttribute("height", String(TAILLE_PX));
-		const image = new Image();
-		image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
-		await image.decode();
-		const canvas = document.createElement("canvas");
-		canvas.width = canvas.height = TAILLE_PX;
-		canvas.getContext("2d")?.drawImage(image, 0, 0, TAILLE_PX, TAILLE_PX);
-		return { png: canvas.toDataURL("image/png"), couleur };
+		return getComputedStyle(clone).color;
 	} finally {
 		clone.remove();
 	}
@@ -82,16 +62,14 @@ export function installBarreNative(pont: PontBarre): void {
 			const rapide = JSON.stringify(boutons().map(b => [b.querySelector(".qbd-nav-label")?.textContent, b.classList.contains(ACTIVE), b.classList.contains("qbd-nav-item--placeholder")]));
 			if (rapide === dernier) return;
 			const items = [];
-			let muted = "";
-			let active = "";
+			// The two tints are the rail's own computed colours, read from an
+			// offscreen clone in each state (the page's CSS decides them).
+			const muted = couleur(boutons()[0], false);
+			const active = couleur(boutons()[0], true);
 			for (const btn of boutons()) {
 				const on = btn.classList.contains(ACTIVE);
 				const label = btn.querySelector(".qbd-nav-label")?.textContent ?? "";
-				const off = await icone(btn, false);
-				const onIcone = await icone(btn, true);
-				muted = off.couleur;
-				active = onIcone.couleur;
-				items.push({ label, active: on, placeholder: btn.classList.contains("qbd-nav-item--placeholder"), off: off.png, on: onIcone.png });
+				items.push({ id: btn.dataset.nav ?? "settings", label, active: on, placeholder: btn.classList.contains("qbd-nav-item--placeholder") });
 			}
 			const etat = { visible: true, bg: cs.backgroundColor, line: cs.borderTopColor, muted, active, items };
 			dernier = rapide;
