@@ -27,6 +27,9 @@ export interface EtatMiseAJour {
 	phase: PhaseMiseAJour;
 	version?: string;
 	pourcent?: number;
+	/** Bytes received / total of the download in progress; null when the server gave no usable size. */
+	octetsRecus?: number | null;
+	octetsTotal?: number | null;
 	message?: string;
 }
 
@@ -34,7 +37,7 @@ export type EvenementMiseAJour =
 	| { type: "checking-for-update" }
 	| { type: "update-available"; version: string }
 	| { type: "update-not-available" }
-	| { type: "download-progress"; percent: number }
+	| { type: "download-progress"; percent: number; transferred?: number; total?: number }
 	| { type: "update-downloaded"; version: string }
 	| { type: "error"; message: string };
 
@@ -45,9 +48,17 @@ export function transition(etat: EtatMiseAJour, ev: EvenementMiseAJour): EtatMis
 		case "checking-for-update":
 			return { phase: "verification" };
 		case "update-available":
-			return { phase: "telechargement", version: ev.version, pourcent: 0 };
+			return { phase: "telechargement", version: ev.version, pourcent: 0, octetsRecus: null, octetsTotal: null };
 		case "download-progress":
-			return { ...etat, pourcent: Math.max(0, Math.min(100, Math.round(ev.percent))) };
+		{
+			/* A total that is missing, zero, negative or not finite is no size at
+			   all: both bytes fields go null so the UI never shows "0 MB / 0 MB".
+			   Received bytes are clamped to [0, total]. */
+			const total = typeof ev.total === "number" && Number.isFinite(ev.total) && ev.total > 0 ? ev.total : null;
+			const recu = total === null ? null
+				: Math.max(0, Math.min(total, Number.isFinite(ev.transferred) ? (ev.transferred as number) : 0));
+			return { ...etat, pourcent: Math.max(0, Math.min(100, Math.round(ev.percent))), octetsRecus: recu, octetsTotal: total };
+		}
 		case "update-downloaded":
 			return { phase: "prete", version: ev.version };
 		case "update-not-available":

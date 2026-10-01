@@ -25,13 +25,38 @@ await withSrcModule("apps/windows/electron/mise-a-jour-etat.ts", ({ ETAT_INITIAL
 		transition(ETAT_INITIAL, { type: "checking-for-update" }), { phase: "verification" });
 	r.check("update-available : téléchargement à 0 %, version connue",
 		transition({ phase: "verification" }, { type: "update-available", version: "2.5.2" }),
-		{ phase: "telechargement", version: "2.5.2", pourcent: 0 });
+		{ phase: "telechargement", version: "2.5.2", pourcent: 0, octetsRecus: null, octetsTotal: null });
 	r.check("download-progress : le pourcentage est arrondi et borné",
 		transition({ phase: "telechargement", version: "2.5.2", pourcent: 0 }, { type: "download-progress", percent: 43.7 }),
-		{ phase: "telechargement", version: "2.5.2", pourcent: 44 });
+		{ phase: "telechargement", version: "2.5.2", pourcent: 44, octetsRecus: null, octetsTotal: null });
+	const dl = { phase: "telechargement", version: "2.5.2", pourcent: 0, octetsRecus: null, octetsTotal: null };
+	r.check("download-progress : octets reçus et total portés par l'état",
+		transition(dl, { type: "download-progress", percent: 41, transferred: 41_000_000, total: 100_000_000 }),
+		{ phase: "telechargement", version: "2.5.2", pourcent: 41, octetsRecus: 41_000_000, octetsTotal: 100_000_000 });
+	r.check("download-progress : octets reçus jamais négatifs ni au-delà du total",
+		[
+			transition(dl, { type: "download-progress", percent: 1, transferred: -5, total: 100 }),
+			transition(dl, { type: "download-progress", percent: 100, transferred: 250, total: 100 }),
+		].map(e => [e.octetsRecus, e.octetsTotal]),
+		[[0, 100], [100, 100]]);
+	r.check("download-progress : total nul, négatif, absent ou NaN → aucun octet (pas de « 0 Mo / 0 Mo »)",
+		[
+			transition(dl, { type: "download-progress", percent: 5, transferred: 0, total: 0 }),
+			transition(dl, { type: "download-progress", percent: 5, transferred: 10, total: -1 }),
+			transition(dl, { type: "download-progress", percent: 5, transferred: 10 }),
+			transition(dl, { type: "download-progress", percent: 5, transferred: 10, total: NaN }),
+		].map(e => [e.octetsRecus, e.octetsTotal]),
+		[[null, null], [null, null], [null, null], [null, null]]);
+	r.check("download-progress : un total connu mais des octets reçus absents → 0 reçu",
+		(e => [e.octetsRecus, e.octetsTotal])(transition(dl, { type: "download-progress", percent: 0, total: 80 })),
+		[0, 80]);
 	r.check("update-downloaded : prête, sans pourcentage",
 		transition({ phase: "telechargement", version: "2.5.2", pourcent: 99 }, { type: "update-downloaded", version: "2.5.2" }),
 		{ phase: "prete", version: "2.5.2" });
+	r.check("update-downloaded : les octets sont oubliés",
+		"octetsRecus" in transition({ ...dl, octetsRecus: 5, octetsTotal: 9 }, { type: "update-downloaded", version: "2.5.2" }), false);
+	r.check("error : les octets sont oubliés",
+		"octetsRecus" in transition({ ...dl, octetsRecus: 5, octetsTotal: 9 }, { type: "error", message: "x" }), false);
 	r.check("update-not-available : à jour, sans version",
 		transition({ phase: "verification" }, { type: "update-not-available" }),
 		{ phase: "a-jour" });

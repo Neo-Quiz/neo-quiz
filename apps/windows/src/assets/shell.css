@@ -1217,6 +1217,29 @@ label.nq-set-ligne {
 }
 .nq-maj { gap: 0; }
 .nq-maj.is-prete:hover, .nq-maj.is-annonce, .nq-maj.is-installation { gap: 5px; }
+
+/* WHILE DOWNLOADING: no hover effect on the entry, only the detail. The rail
+   tints any entry under the cursor (`.qbd-sidebar .qbd-nav-item:hover`, and
+   `.qbd-nav-item:focus-visible` in dashboard-nav.css), both with !important,
+   so the override has to be !important as well and outrank them: five
+   classes here against four there. The button is not `disabled` (that would
+   block focus), so the click is ignored in JS instead. The label then shows
+   "<done> MB / <total> MB" on hover and keyboard focus, through the same
+   opening mechanism as the "ready" state; `has-detail` is absent when the
+   size is unknown, and the label stays closed. */
+.nq-maj.is-telechargement { cursor: default; }
+.qbd-sidebar .qbd-nav-item.nq-maj.is-telechargement:hover,
+.qbd-sidebar .qbd-nav-item.nq-maj.is-telechargement:focus-visible {
+	background: transparent !important;
+}
+.nq-maj.is-telechargement:active { transform: none; }
+.nq-maj.is-telechargement.has-detail:hover .qbd-nav-label,
+.nq-maj.is-telechargement.has-detail:focus-visible .qbd-nav-label {
+	max-height: 2.6em; opacity: 1; transform: none;
+	transition: max-height 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 220ms ease 80ms, transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.nq-maj.is-telechargement.has-detail:hover,
+.nq-maj.is-telechargement.has-detail:focus-visible { gap: 5px; }
 .nq-maj { transition: gap 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 200ms ease, transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), background 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.22s ease, filter 0.1s ease; }
 
 /* L'appui, puis « Installation… » : la flèche cède au spinner jusqu'à ce que

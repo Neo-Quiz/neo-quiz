@@ -77,7 +77,7 @@ export function creerMiseAJour(deps: {
 	autoUpdater.on("checking-for-update", () => appliquer({ type: "checking-for-update" }));
 	autoUpdater.on("update-available", info => appliquer({ type: "update-available", version: info.version }));
 	autoUpdater.on("update-not-available", () => appliquer({ type: "update-not-available" }));
-	autoUpdater.on("download-progress", p => appliquer({ type: "download-progress", percent: p.percent }));
+	autoUpdater.on("download-progress", p => appliquer({ type: "download-progress", percent: p.percent, transferred: p.transferred, total: p.total }));
 	autoUpdater.on("update-downloaded", info => appliquer({ type: "update-downloaded", version: info.version }));
 	// Le type de l'événement est `(error: Error, message?: string) => void` :
 	// `error` n'est jamais absent, contrairement à ce qu'un `catch` laisserait

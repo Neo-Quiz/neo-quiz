@@ -15,7 +15,7 @@
 import type { EtatMiseAJour } from "../../electron/pont";
 import { pont } from "../host/pont";
 import { currentHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
+import { t, currentLang } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import application from "../../package.json";
 
@@ -81,6 +81,21 @@ export async function verifierMaintenant(): Promise<void> {
 }
 
 /**
+ * "<done> MB / <total> MB" for a download in progress, or null when the size
+ * is unknown. Whole megabytes (bytes / 1 048 576, rounded); one decimal when
+ * the total is under 10 MB, with the decimal separator of the UI language.
+ */
+function detailTaille(recus: number | null | undefined, total: number | null | undefined): string | null {
+	if (typeof recus !== "number" || typeof total !== "number" || !(total > 0) || recus < 0) return null;
+	const mo = (n: number): string => {
+		const v = n / 1_048_576;
+		if (total / 1_048_576 >= 10) return String(Math.round(v));
+		return v.toFixed(1).replace(".", currentLang() === "fr" ? "," : ".");
+	};
+	return t("app.update.size", { done: mo(recus), total: mo(total) });
+}
+
+/**
  * LE CONTRÔLE DU RAIL — la mise à jour telle que Neo Calendar la montre
  * (`src/ui/calendar/UpdateBadge.tsx`, `.nc-update-control`), portée au rail
  * de Neo Quiz (demande d'Ahmed, 2026-09-19) : une CARTE à la couleur
@@ -119,7 +134,7 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 		currentHost().ui.setIcon(ajouter(pilule, "span", "nq-maj-icone"), "download");
 		libelle = ajouter(bouton, "span", "qbd-nav-label nq-maj-libelle", t("app.update.install"));
 		bouton.addEventListener("click", () => {
-			if (!bouton || bouton.disabled) return;
+			if (!bouton || bouton.disabled || bouton.classList.contains("is-telechargement")) return;
 			/* L'appui se VOIT (Ahmed, 2026-09-19) : la pilule s'enfonce, le
 			   chiffre cède la place à un spinner et le libellé dit ce qui se
 			   passe, jusqu'à ce que le principal ferme la fenêtre pour
@@ -155,10 +170,19 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 		   temps du fondu : un texte vidé au moment où il devrait s'effacer ne
 		   s'efface pas, il disparaît. */
 		if (telecharge && pourcent !== null) compteur.textContent = pourcent + " %";
-		libelle.textContent = t("app.update.install");
-		bouton.disabled = telecharge;
+		/* Not `disabled` while downloading: a disabled button takes no focus,
+		   and the size detail must show on keyboard focus too. `aria-disabled`
+		   keeps it inert for assistive tech; the click handler ignores it. */
+		const detail = telecharge ? detailTaille(e.octetsRecus, e.octetsTotal) : null;
+		bouton.toggleAttribute("aria-disabled", telecharge);
+		if (telecharge) bouton.setAttribute("aria-disabled", "true");
+		/* The label carries the size only while downloading; it opens on
+		   hover/focus (shell.css). Without a known size it stays the install label
+		   and stays closed. */
+		libelle.textContent = detail ?? t("app.update.install");
+		bouton.classList.toggle("has-detail", detail !== null);
 		bouton.setAttribute("aria-label", telecharge
-			? t("app.update.downloading") + (pourcent === null ? "" : " " + pourcent + " %")
+			? t("app.update.downloading") + (pourcent === null ? "" : " " + pourcent + " %") + (detail ? ", " + detail : "")
 			: t("app.update.install") + (e.version ? " " + e.version : ""));
 		/* S'ouvrir une fois, à l'instant où la descente s'achève — pas au
 		   montage : une mise à jour déjà prête quand la fenêtre s'ouvre attend

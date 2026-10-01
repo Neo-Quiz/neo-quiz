@@ -48,6 +48,7 @@ export const EN_APP = {
 	/* ── Mise à jour automatique (application seulement) ── */
 	"app.update.restart": "Restart to update",
 	"app.update.downloading": "Downloading update",
+	"app.update.size": "{done} MB / {total} MB",
 	"app.update.install": "Update",
 	"app.update.installing": "Installing…",
 	/* What "Check for updates…" of the application menu answers. */

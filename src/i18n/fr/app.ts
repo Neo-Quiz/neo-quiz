@@ -26,6 +26,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	/* ── Mise à jour automatique (application seulement) ── */
 	"app.update.restart": "Redémarrer pour mettre à jour",
 	"app.update.downloading": "Téléchargement de la mise à jour",
+	"app.update.size": "{done} Mo / {total} Mo",
 	"app.update.install": "Mise à jour",
 	"app.update.installing": "Installation…",
 	"app.update.checking": "Recherche de mises à jour…",
