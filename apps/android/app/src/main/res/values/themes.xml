@@ -2,7 +2,7 @@
 <resources>
     <!-- The window background is the renderer's page background (nq-lueur-fond in shell.css): the
          padded content view leaves the system-bar areas showing it, so no gray band appears there. -->
-    <color name="window_background">#070B14</color>
+    <color name="window_background">#0C111D</color>
     <style name="Theme.NeoQuiz" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:colorBackground">@color/window_background</item>

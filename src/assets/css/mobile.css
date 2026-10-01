@@ -56,51 +56,59 @@ html.nq-mobile {
 	flex-direction: column-reverse;
 }
 
+/* The bottom bar copies StudySmarter Android bar, measured on the owner
+   phone (2026-10-01, density 3): 4 tabs of 73 x 56 dp spread between 20 dp
+   side margins, a 1 dp top line, icon 25 dp at 6 dp from the top, label at
+   32 dp, all labels semibold; inactive grey #81838a, active white with a
+   filled icon; the same background as the Android navigation area under it
+   (themes.xml window_background), so both read as one block. */
+.is-mobile {
+	--nq-bottom-bar-bg: #0c111d;
+	--nq-bottom-bar-line: #1f242f;
+	--nq-bottom-bar-muted: #81838a;
+}
+
 .is-mobile .qbd-sidebar {
 	flex: none;
-	width: 100%;
-	height: 60px;
-	padding: 0;
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
 	align-items: stretch;
+	width: 100%;
+	height: 57px;
+	padding: 0 20px;
 	overflow: hidden;
-	border-top: 1px solid var(--background-modifier-border);
+	border-top: 1px solid var(--nq-bottom-bar-line);
 	border-bottom: 0;
-	/* The colour the Android side paints the system bars (themes.xml
-	   `window_background`), so the bar and the navigation area under it read
-	   as one block. */
-	background: var(--nq-lueur-fond);
+	background: var(--nq-bottom-bar-bg);
 	z-index: 2;
 }
 
-.is-mobile .qbd-nav-items {
-	flex: 3 1 0;
-	padding: 0;
-	gap: 0;
-	justify-content: stretch;
-}
-
+/* One flex row for the four tabs, whichever group they come from. */
+.is-mobile .qbd-nav-items,
 .is-mobile .qbd-nav-footer {
-	flex: 1 1 0;
-	padding: 0;
+	display: contents;
 }
 
-/* No tile: the active tab is told apart by a filled icon, a white semibold
-   label and full opacity; the others are muted grey. */
 .is-mobile .qbd-sidebar .qbd-nav-item,
 .is-mobile .qbd-sidebar .qbd-nav-footer .qbd-nav-item {
-	--qbd-nav-cut: var(--nq-lueur-fond);
-	flex: 1 1 0;
-	max-width: none;
-	height: 60px;
-	min-height: 60px;
-	padding: 6px 2px;
+	--qbd-nav-cut: var(--nq-bottom-bar-bg);
+	flex: 0 0 73px;
+	width: 73px;
+	max-width: 73px;
+	height: 56px;
+	min-height: 56px;
+	padding: 6px 0 0;
 	border-radius: 0;
-	justify-content: center;
-	gap: 3px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 1px;
 	opacity: 1;
-	color: var(--text-muted) !important;
+	color: var(--nq-bottom-bar-muted) !important;
 	text-shadow: none;
-	font-weight: 500;
+	font-weight: 600;
 }
 
 .is-mobile .qbd-nav-item::after {
@@ -113,10 +121,9 @@ html.nq-mobile {
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
 	color: #fff !important;
-	font-weight: 600;
 }
 
-/* Generate placeholder: same muted look, tapping does nothing. */
+/* Generate placeholder: same look, tapping does nothing. */
 .is-mobile .qbd-nav-item--placeholder {
 	cursor: default;
 }
@@ -134,21 +141,30 @@ html.nq-mobile {
 }
 
 .is-mobile .qbd-nav-icon {
-	width: 28px;
-	height: 28px;
+	width: 25px;
+	height: 25px;
 }
 .is-mobile .qbd-nav-icon svg {
-	width: 27px;
-	height: 27px;
+	width: 25px;
+	height: 25px;
+	stroke-width: 2;
 }
+/* Active: a filled icon. Lucide icons are outlines, so the shape is filled
+   with the label colour and inner circles (the gear hub) are punched back
+   out with the bar colour. */
 .is-mobile .qbd-nav-item--active .qbd-nav-icon svg {
-	stroke-width: 2.25;
+	fill: currentColor;
+}
+.is-mobile .qbd-nav-item--active .qbd-nav-icon svg circle {
+	fill: var(--nq-bottom-bar-bg);
 }
 
 .is-mobile .qbd-nav-label {
-	font-size: 11px;
-	line-height: 14px;
+	font-size: 14px;
+	line-height: 18px;
+	font-weight: 600;
 	text-transform: none;
+	white-space: nowrap;
 }
 
 /* The update button and the app mark belong to the desktop rail. */
@@ -365,7 +381,7 @@ html.nq-mobile .modal-container > .modal {
 	position: fixed;
 	left: 0;
 	right: 0;
-	bottom: 56px;
+	bottom: 57px;
 	z-index: 4;
 	width: auto;
 	max-height: 65vh;

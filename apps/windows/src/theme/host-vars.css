@@ -93,9 +93,6 @@
 	--interactive-accent: rgb(101,143,242);
 	--interactive-accent-hover: rgb(101,143,242);
 	/* Triplet SANS rgb() : consommé par des rgba(var(--…), .2). */
-	/* Blue-black page backdrop (shell.css) and Android system-bar colour (themes.xml
-	   `window_background`); the mobile bottom bar uses it to blend into both. */
-	--nq-lueur-fond: #070b14;
 	--interactive-accent-rgb: 101,143,242;
 	--interactive-normal: rgb(49, 50, 68);
 	--radius-l: 12px;
