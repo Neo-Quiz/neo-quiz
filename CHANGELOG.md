@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.14] - 2026-10-01
+
 ### Changed
 
 - Built-in sync no longer triggers the Windows firewall prompt (the PC connects out to your other devices).
