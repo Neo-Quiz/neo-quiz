@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- The downloadable installer opens its window again (it stayed on its splash screen since 1.20.0).
+
 ## [1.20.15] - 2026-10-01
 
 ### Changed
