@@ -78,6 +78,10 @@ export interface DemandeTexte<I extends { file: File } = { file: File }> {
 	    (`decouperParFichier`, "N quizzes"). Absent: one quiz over the whole
 	    request, as before. */
 	parDocument?: boolean;
+	/** The earlier turns of the conversation (`conversation-context.ts`),
+	    frozen at send time: a follow-up reaches the model WITH them, for every
+	    provider. */
+	contexte?: string;
 }
 
 /* Source et prompt déduits de la demande, partagés par le chemin CLI (la
@@ -98,7 +102,7 @@ export function composerDemande(msg: DemandeTexte): { source: "image" | "text" |
 		: source === "text"
 		? (msg.text.trim() ? msg.text.trim() + "\n\n" : "") + notesBlock
 		: msg.text.trim();
-	return { source, prompt };
+	return { source, prompt: msg.contexte ? msg.contexte + "\n\nNEW REQUEST:\n" + prompt : prompt };
 }
 
 /** ONE QUIZ PER ATTACHED FILE (2026-09-23), unless the user chose "1 quiz"

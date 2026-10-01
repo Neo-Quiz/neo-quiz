@@ -97,7 +97,8 @@
     "version:set": "node scripts/set-version.mjs",
     "version:patch": "node scripts/set-version.mjs patch",
     "version:minor": "node scripts/set-version.mjs minor",
-    "version:major": "node scripts/set-version.mjs major"
+    "version:major": "node scripts/set-version.mjs major",
+    "check:conversation-context": "node scripts/check-conversation-context.mjs"
   },
   "dependencies": {
     "country-flag-icons": "^1.6.20",

@@ -251,6 +251,8 @@ jobs:
       # que le processus annulé ait rendu le verrou de son CLI.
       - name: Generation queue
         run: npm run check:file-generation
+      - name: Conversation context
+        run: npm run check:conversation-context
 
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is

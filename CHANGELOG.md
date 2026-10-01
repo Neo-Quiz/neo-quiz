@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- A follow-up message on the Generate page ("make it multiple choice") now carries the earlier requests, the attached documents and the quizzes already produced, instead of reaching the model alone.
+- A number of questions written in the request ("20 questions") is now honoured when no count is picked in the options.
+
 ## [1.20.18] - 2026-10-01
 
 ### Fixed

@@ -34,6 +34,8 @@ import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { enConversation, poserNouvelleDemande } from "./conversation-mode";
+import { contexteConversation, documentsHeritiers } from "./conversation-context";
+import type { TourPrecedent } from "./conversation-context";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
@@ -4017,6 +4019,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    pendant que celle-ci tourne. */
 	function envoyerDansLaFile(jointesVideo: NoteAttachment[]): void {
 		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
+		/* A FOLLOW-UP carries the conversation: earlier requests, their
+		   documents (kept when this one attaches none) and what the quizzes
+		   produced contain. Without it the model got the bare sentence. */
+		const tours: TourPrecedent[] = fileGen.lignes().filter(l => l.etat !== "arret" && !l.demande.planifier).map(l => ({
+			text: l.demande.text,
+			notes: l.demande.notes.map(n => ({ name: n.name, content: n.content })),
+			quizzes: l.demande.produit?.lot
+				? l.demande.produit.lot.map(q => ({ title: q.titre, questions: q.questions }))
+				: l.demande.produit ? [{ title: l.demande.produit.titre, questions: l.demande.produit.questions }] : [],
+		}));
+		if (tours.length) {
+			envoi.contexte = contexteConversation(tours);
+			if (!envoi.notes.length && !envoi.images.length) {
+				const herites = documentsHeritiers(tours);
+				const parNom = new Map(fileGen.lignes().flatMap(l => l.demande.notes).map(n => [n.name, n] as const));
+				envoi.notes = herites.map(h => parNom.get(h.name)).filter((n): n is NoteAttachment => !!n);
+			}
+		}
 		const reglages = figerReglages(settings());
 		/* "/exam": a whole PREPARATION over every document at once — a Learn
 		   over everything that can come up, then Tests of rising difficulty,
