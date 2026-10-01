@@ -22,18 +22,10 @@ import org.json.JSONArray
  */
 class FilesChannel(private val perimeter: Perimeter, private val allowed: AllowedRoots) {
     private val locks = ConcurrentHashMap<String, Mutex>()
-    @Volatile private var started: List<File> = emptyList()
-
-    /** The roots declared by `demarrer`, filtered against the perimeter. */
-    fun startedRoots(): List<File> = started
 
     private fun lockOf(f: File): Mutex = locks.getOrPut(f.path) { Mutex() }
 
     private fun mtimeOf(f: File): Map<String, Any?> = mapOf("mtime" to f.lastModified())
-
-    suspend fun demarrer(racines: List<String>) {
-        started = racines.filter { perimeter.contains(it) }.map { perimeter.check(it) }
-    }
 
     suspend fun read(abs: String): String = perimeter.check(abs).readText(Charsets.UTF_8)
 
@@ -140,28 +132,7 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
         return if (f.exists()) mapOf("isFile" to f.isFile, "mtimeMs" to f.lastModified()) else null
     }
 
-    /** All the files of a root, recursively; hidden folders and `node_modules` are skipped, only `.md` get their mtime. */
-    suspend fun liste(racine: String): List<Map<String, Any?>> {
-        val out = ArrayList<Map<String, Any?>>()
-        fun walk(dir: File, shown: String) {
-            for (e in dir.listFiles().orEmpty()) {
-                val path = "$shown/${e.name}"
-                val p = e.toPath()
-                if (Files.isSymbolicLink(p)) continue
-                if (Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS)) {
-                    if (!e.name.startsWith(".") && e.name != "node_modules") walk(e, path)
-                } else if (Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)) {
-                    out.add(mapOf("chemin" to path, "mtime" to if (e.name.lowercase().endsWith(".md")) e.lastModified() else 0L))
-                }
-            }
-        }
-        val root = perimeter.check(racine)
-        walk(root, root.path.replace('\\', '/').trimEnd('/'))
-        return out
-    }
-
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
-        "demarrer" to { a -> demarrer(a.optJSONArray(0).strings()) },
         "fichiers.read" to { a -> read(a.path(0)) },
         "fichiers.readCached" to { a -> read(a.path(0)) },
         "fichiers.readBinary" to { a -> readBinary(a.path(0)) },
@@ -179,7 +150,6 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
         "fichiers.stat" to { a -> stat(a.path(0)) },
         "fichiers.statEntree" to { a -> statEntree(a.path(0)) },
         "fichiers.listerDossier" to { a -> listerDossier(a.path(0)) },
-        "fichiers.liste" to { a -> liste(a.path(0)) },
     )
 
     private fun freePath(wanted: File): File {

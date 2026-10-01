@@ -24,6 +24,7 @@
     "check:video": "node scripts/check-video.mjs",
     "check:video-tile": "node scripts/check-video-tile.mjs",
     "check:host": "node scripts/check-host.mjs",
+    "check:android-pont": "node scripts/check-android-pont.mjs",
     "check:text-search": "node scripts/check-text-search.mjs",
     "check:ai-providers": "node scripts/check-ai-providers.mjs",
     "check:prompt": "node scripts/check-prompt.mjs",

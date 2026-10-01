@@ -3,7 +3,6 @@ package com.ahmedmili.neoquiz.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.view.Gravity
@@ -12,12 +11,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ahmedmili.neoquiz.R
 
-/**
- * True once "All files access" is granted (the quiz folder lives in shared
- * storage). Android 10 (API 29) has no such setting: it is treated as granted
- * there, and the legacy storage permissions are not handled yet.
- */
-fun hasAllFilesAccess(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+/** True once "All files access" is granted (the quiz folder lives in shared storage). minSdk is 30: the setting always exists. */
+fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
 
 /**
  * The first-run screen: explains why, then opens the system page where the
@@ -44,7 +39,6 @@ class FirstRunScreen(context: Context) : LinearLayout(context) {
         addView(Button(context).apply {
             setText(R.string.first_run_button)
             setOnClickListener {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return@setOnClickListener
                 context.startActivity(
                     Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")),
                 )

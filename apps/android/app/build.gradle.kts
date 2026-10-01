@@ -26,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId = "com.ahmedmili.neoquiz"
-        minSdk = 29
+        minSdk = 30
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"

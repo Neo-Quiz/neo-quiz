@@ -118,30 +118,14 @@ class FilesChannelTest {
         assertEquals(mapOf<Any?, Any?>("e" to true, "one.md" to false), entries)
     }
 
-    @Test fun listeSkipsHiddenFoldersAndDatesOnlyMarkdown() = runBlocking {
-        files.mkdirs(p("c/.hidden"))
-        files.write(p("c/q.md"), "q")
-        files.write(p("c/img.png"), "i")
-        files.write(p("c/.hidden/z.md"), "z")
-        val out = files.liste(p("c"))
-        assertEquals(setOf("q.md", "img.png"), out.map { (it["chemin"] as String).substringAfterLast('/') }.toSet())
-        assertTrue((out.first { (it["chemin"] as String).endsWith("q.md") }["mtime"] as Long) > 0)
-        assertEquals(0L, out.first { (it["chemin"] as String).endsWith("img.png") }["mtime"])
-    }
-
     @Test fun everyChannelRefusesAPathOutsideThePerimeter() {
         val outside = File(root.parentFile, "outside.md").path
         val h = files.handlers()
-        for (name in h.keys.filter { it != "demarrer" }) {
+        for (name in h.keys) {
             val e = assertThrows(name, SecurityException::class.java) {
                 runBlocking { h.getValue(name)(JSONArray().put(outside).put("x").put("y")) }
             }
             assertEquals(name, "outside-perimeter", e.message)
         }
-    }
-
-    @Test fun demarrerKeepsOnlyAllowedRoots() = runBlocking {
-        files.handlers().getValue("demarrer")(JSONArray().put(JSONArray().put(root.path).put(root.parent)))
-        assertEquals(listOf(root.canonicalFile), files.startedRoots())
     }
 }

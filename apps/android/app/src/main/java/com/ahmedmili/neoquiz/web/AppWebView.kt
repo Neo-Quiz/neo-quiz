@@ -1,7 +1,7 @@
 package com.ahmedmili.neoquiz.web
 
 import android.annotation.SuppressLint
-import android.content.Context
+import android.app.Activity
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -27,14 +27,15 @@ import kotlinx.coroutines.cancel
  *  - Kotlin -> JS event: {"evenement":string,"donnees":any}
  */
 @SuppressLint("SetJavaScriptEnabled")
-class AppWebView(context: Context) : WebView(context) {
+class AppWebView(private val activity: Activity) : WebView(activity) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val bridge = createAppBridge(context, scope)
+    private val app = createAppBridge(activity, scope)
+    private val bridge = app.bridge
 
     private val assetLoader = WebViewAssetLoader.Builder()
         .setDomain(HOST)
-        .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+        .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(activity))
         .build()
 
     init {
@@ -50,6 +51,17 @@ class AppWebView(context: Context) : WebView(context) {
             ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
         }
 
+        if (activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            // Debug builds only: page errors reach logcat (no file content: console messages are the page's own).
+            setWebContentsDebuggingEnabled(true)
+            webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                    android.util.Log.d("NeoConsole", "${m.messageLevel()} ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
+                    return true
+                }
+            }
+        }
+
         check(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             "WebView lacks DOCUMENT_START_SCRIPT"
         }
@@ -58,7 +70,7 @@ class AppWebView(context: Context) : WebView(context) {
         }
         val origins = setOf(ORIGIN)
         // The shim must exist before any renderer script runs.
-        val shim = context.assets.open("web/neo-shim.js").bufferedReader().use { it.readText() }
+        val shim = activity.assets.open("web/neo-shim.js").bufferedReader().use { it.readText() }
         WebViewCompat.addDocumentStartJavaScript(this, shim, origins)
         WebViewCompat.addWebMessageListener(this, "neoAndroid", origins) { _, message, _, _, replyProxy ->
             onMessage(message, replyProxy)
@@ -77,6 +89,9 @@ class AppWebView(context: Context) : WebView(context) {
         scope.cancel()
         super.destroy()
     }
+
+    /** Pushes the file events of what changed on disk while the app was away. */
+    fun rescan() = app.rescan()
 
     fun loadApp() {
         loadUrl("$ORIGIN/assets/web/index.html")

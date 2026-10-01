@@ -117,6 +117,13 @@ jobs:
       - name: Host boundary ratchet
         run: npm run check:host
 
+      # THE ANDROID BRIDGE, WITHOUT A DEVICE: every channel the shim sends has a
+      # Kotlin entry (and the other way round), every `Pont` method exists in the
+      # shim, and the executable-extension list `systeme.ouvrir` refuses equals the
+      # Windows one. Reads repository files only.
+      - name: Android bridge channels
+        run: npm run check:android-pont
+
       # LE NOYAU DES VIDÉOS YouTube : la règle de la piste (manuelle dans la
       # langue de la vidéo, sinon automatique `-orig`, JAMAIS une piste
       # traduite) ne se voit dans aucun typecheck — la prendre, c'est joindre

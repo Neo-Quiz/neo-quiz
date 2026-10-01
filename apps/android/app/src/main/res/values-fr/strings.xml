@@ -3,4 +3,8 @@
     <string name="first_run_title">Accès à tous les fichiers</string>
     <string name="first_run_body">Neo Quiz garde tes quiz comme de simples fichiers dans Documents/Neo Quiz pour pouvoir les synchroniser avec ton ordinateur. Android te demande d\'autoriser « l\'accès à tous les fichiers » pour ça.</string>
     <string name="first_run_button">Ouvrir le réglage</string>
+    <string name="picker_use">Utiliser ce dossier</string>
+    <string name="picker_cancel">Annuler</string>
+    <string name="picker_up">.. (dossier parent)</string>
+    <string name="picker_suggested">%1$s (suggéré)</string>
 </resources>

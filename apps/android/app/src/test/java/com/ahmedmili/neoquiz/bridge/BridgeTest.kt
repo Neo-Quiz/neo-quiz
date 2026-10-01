@@ -17,8 +17,11 @@ class BridgeTest {
         val base = Files.createTempDirectory("bridge").toFile()
         val allowed = AllowedRoots()
         val perimeter = Perimeter(allowed::roots, File(base, "private"))
+        val settings = SettingsChannel(File(base, "private/settings.json"), perimeter, allowed) { File(base, "d") }
         return FilesChannel(perimeter, allowed).handlers() +
-            SettingsChannel(File(base, "private/settings.json"), perimeter, allowed) { File(base, "d") }.handlers() +
+            ScanChannel(perimeter) { }.handlers() +
+            SystemChannel(perimeter, allowed, settings, { null }, { true }).handlers() +
+            settings.handlers() +
             Unavailable.handlers()
     }
 

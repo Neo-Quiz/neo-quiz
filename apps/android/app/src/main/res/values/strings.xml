@@ -3,4 +3,8 @@
     <string name="first_run_title">All files access</string>
     <string name="first_run_body">Neo Quiz keeps your quizzes as plain files in Documents/Neo Quiz so they can sync with your computer. Android asks you to allow \"All files access\" for that.</string>
     <string name="first_run_button">Open the setting</string>
+    <string name="picker_use">Use this folder</string>
+    <string name="picker_cancel">Cancel</string>
+    <string name="picker_up">.. (parent folder)</string>
+    <string name="picker_suggested">%1$s (suggested)</string>
 </resources>

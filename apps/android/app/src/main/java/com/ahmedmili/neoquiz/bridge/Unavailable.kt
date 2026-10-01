@@ -13,15 +13,10 @@ import org.json.JSONArray
  */
 object Unavailable {
     private val value: Map<String, () -> Any?> = mapOf(
-        // Watcher: the Android hosts re-read on events of the sync, not on a file watcher.
-        "surveiller" to { null },
-        "dialogue.choisirDossier" to { null },
         "partage.enregistrer" to { null },
         "partage.discord" to { false },
-        "systeme.ouvrir" to { false },
         "systeme.copierTexte" to { null },
         "systeme.vaultsObsidian" to { emptyList<Any>() },
-        "systeme.choisirDossierDefaut" to { null },
         "systeme.choisirFichiers" to { emptyList<Any>() },
         "systeme.relancer" to { null },
         // Network and CLIs: `null` is the network-failure answer of `reseau.fetch`.
