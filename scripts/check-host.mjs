@@ -115,16 +115,13 @@ for (const f of fichiersTs("src")) {
 }
 
 /* 5. LE SENS DES DÉPENDANCES. `src/` est le code partagé : il ne connaît pas
-      ses hôtes. La tranche 3 a déplacé `editor.ts` et `quiz-open.ts` vers
-      `apps/obsidian/` parce qu'ils ne décrivaient qu'un onglet — et
-      `src/dashboard.ts`, qui est lui-même un `ItemView` en instance de départ,
-      les importe désormais de là. C'est la SEULE exception, et elle est
-      nommée : sans cette assertion, « juste un import depuis apps/ » serait la
+      ses hôtes. Les exceptions sont nommées
+      (`EXCEPTIONS_APPS`, vide aujourd'hui) : sans cette assertion, « juste un import depuis apps/ » serait la
       façon la plus rapide de contourner tout le reste du contrôle, sans
       qu'aucune des quatre assertions précédentes ne s'en aperçoive. */
 const IMPORTE_APPS = /(?:from\s*|require\s*\(\s*|(?<![.\w$])import\s*\(\s*)["'][^"']*\bapps\//;
 /* La seconde exception a VÉCU ce que le cliquet ci-dessous promet :
-   `ai-client.ts` consommait `buildChildEnv` d'`apps/obsidian/host.ts` tant
+   `ai-client.ts` consommait `buildChildEnv` d'un hôte tant
    qu'il lançait ses CLI lui-même (tranche 5, tâche 3). La tâche 4 l'a fait
    passer par `host.process.run` — l'import a disparu, et l'entrée avec lui. */
 /* `src/dashboard.ts` a disparu à la tâche 1 du chantier « greffon lecteur »

@@ -415,8 +415,7 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 	} catch (e) {
 		/* REVUE (2026-09-27) : le `catch` affichait TOUJOURS « existe déjà »,
 		   y compris pour une panne disque ou un permis refusé sans rapport
-		   avec un homonyme. Les DEUX hôtes (`apps/windows/electron/fichiers.ts`,
-		   `apps/obsidian/host.ts`) posent le même message reconnaissable pour
+		   avec un homonyme. L'hôte (`apps/windows/electron/fichiers.ts`) pose un message reconnaissable pour
 		   la collision (« <chemin> existe déjà ») — seul ce cas garde le
 		   toast précis ; tout le reste devient un échec générique, la cause
 		   réelle dans la console pour qui doit diagnostiquer. */
@@ -448,10 +447,8 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 	await ctx.reviewStore?.moved(quiz.path, to);
 	/* STATS (indexées par chemin) : `statsStore` n'est PAS optionnel sur ctx,
 	   on l'appelle donc sans garde. Nécessaire ici et pas seulement souhaitable :
-	   sous l'hôte Obsidian, `HostFs.rename` passe par l'ADAPTATEUR direct
-	   (`apps/obsidian/host.ts`), pas par `vault.rename` — aucun évènement
-	   "rename" du vault n'est émis, donc rien n'aurait autrement appelé
-	   `statsStore.renamed`. Idempotent : si l'évènement finissait quand même
+	   un hôte dont `HostFs.rename` n'émet aucun évènement de renommage
+	   (le contrat ne l'y oblige pas) laisserait `statsStore.renamed` sans appelant. Idempotent : si l'évènement finissait quand même
 	   par arriver (détecteur de renommage de l'app), le second appel ne
 	   trouve plus l'ancienne clé et ne fait rien. */
 	ctx.statsStore.renamed(quiz.path, to);

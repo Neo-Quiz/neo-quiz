@@ -367,10 +367,8 @@ await withSrcModule("apps/windows/src/host/roots.ts", async (mod) => {
 	r.check("un point de tête de nom n'est pas une extension",
 		couperExtension("Efrei/Cours/.gitignore"), { base: "Efrei/Cours/.gitignore", ext: "" });
 
-	/* SANS note d'accueil — la DIVERGENCE que le contrat nomme, et l'autre
-	   moitié est éprouvée côté Obsidian (« sans note citante, rien n'est inventé
-	   à sa place », `check:obsidian-host`) : là-bas Obsidian retombe sur son
-	   fichier ACTIF, ici la fenêtre n'en a pas et REJETTE.
+	/* SANS note d'accueil — la DIVERGENCE que le contrat nomme, (l'ancien hôte Obsidian retombait sur son fichier ACTIF) : ici la
+	   fenêtre n'en a pas et REJETTE.
 	   Ce que ce cas empêche : choisir une racine par défaut parmi les dix
 	   ouvertes. L'image partirait dans une racine, la note dans une autre, et la
 	   résolution de liens — BORNÉE à sa racine — ne la retrouverait jamais. Une
@@ -1501,7 +1499,7 @@ await withSrcModule("apps/windows/electron/ressources.ts", async ({ urlDeRessour
 		[null, null, null]);
 
 	/* LA CONTRAINTE, ÉPROUVÉE SUR LES DEUX LISTES QUI LA PORTENT — et par le
-	   TEXTE de leur source, comme le fait déjà `check:obsidian-host` pour la
+	   TEXTE de leur source, comme le faisait l'ancien contrôle de l'hôte Obsidian pour la
 	   liste des préfixes de `cards.ts`. Ce n'est pas un raccourci : passer par
 	   le VRAI `sanitizeQuizHtml` ne prouverait RIEN ici, parce que linkedom ne
 	   tient pas la sémantique d'un `<template>` — son `.content` est une

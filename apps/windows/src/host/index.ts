@@ -7,11 +7,9 @@
    « demander au processus principal par le pont » (`window.neo`) : la fenêtre
    n'a aucun accès direct, `contextIsolation` et `sandbox` le lui interdisent.
 
-   Ce fichier vit sous `apps/windows/` par construction, comme
-   `apps/obsidian/host.ts` : il est l'un des deux seuls endroits du dépôt où
-   dépendre d'un hôte est le but, pas une dette. `npm run check:host` balaie
+   Ce fichier vit sous `apps/windows/` par construction, (l'hôte du rendu) : dépendre d'un hôte y est le but, pas une dette. `npm run check:host` balaie
    `src/` (aucun import d'`obsidian`) ET `apps/windows/src/` (aucun non plus,
-   assertion 3) — les deux implémentations ne peuvent pas se contaminer.
+   assertion 3) — le code partagé ne se contamine pas.
 
    Depuis cette tâche, l'hôte est COMPOSITE : `carte` (`./roots.ts`) porte
    TOUTES les racines ouvertes, et ce module ne fait plus que la consommer —

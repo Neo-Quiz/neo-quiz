@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════
-   LA LIGNE DE COMMANDE D'UN CLI — la moitié PURE, partagée par les deux hôtes
+   LA LIGNE DE COMMANDE D'UN CLI — la moitié PURE, partagée par les hôtes
 
-   Tâche 7 de la génération IA dans l'application. Les deux hôtes qui lancent un
-   CLI (`apps/obsidian/host.ts` et `apps/windows/electron/process.ts`) doivent
+   Tâche 7 de la génération IA dans l'application. Les hôtes qui lancent un
+   CLI (`apps/windows/electron/process.ts`, puis l'hôte Android) doivent
    CITER leurs arguments de la même façon et chercher l'exécutable avec les
    mêmes extensions. Ce fichier est cette moitié-là.
 

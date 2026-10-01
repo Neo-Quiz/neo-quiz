@@ -428,7 +428,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.error.retry": "Réessayer",
 	"ai.error.checkSettings": "Vérifiez vos paramètres IA dans les paramètres du plugin.",
 	"ai.error.pdfUnsupportedInApp": "Les PDF joints ne sont pas encore pris en charge dans l'application Neo Quiz. Joignez le texte ou une image à la place.",
-	"ai.error.providerUnavailable": "Ce fournisseur n'est pas encore disponible ici. Choisissez Ollama, ou générez le quiz depuis le greffon Obsidian.",
+	"ai.error.providerUnavailable": "Ce fournisseur n'est pas encore disponible ici. Choisissez Ollama.",
 	"ai.result.count": "{count} questions générées",
 	"ai.result.untitled": "Quiz généré",
 	"ai.result.save": "Enregistrer",

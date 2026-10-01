@@ -8,8 +8,8 @@
    se charge partout, et `npm run check:pdf` l'éprouve avec le build Node
    (`pdfjs-dist/legacy`) sur de vrais PDF.
 
-   LE FORMAT DE SORTIE EST CELUI QUE LE GREFFON PRODUISAIT (`apps/obsidian/
-   host.ts` jusqu'à `be9559f`, par le pdf.js embarqué d'Obsidian) : les mots
+   LE FORMAT DE SORTIE EST CELUI QU'A TOUJOURS PRODUIT L'EXTRACTION (l'ancien greffon, jusqu'à
+   `be9559f`, par le pdf.js embarqué d'Obsidian) : les mots
    d'une page joints par une espace, les pages par une ligne vide. C'est ce
    que le prompt de génération a toujours reçu ; en changer ferait produire à
    l'application un autre quiz que le greffon pour le même cours.

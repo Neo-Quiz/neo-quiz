@@ -3,7 +3,6 @@ import { FR_AI } from "./fr/ai";
 import { FR_DASHBOARD } from "./fr/dashboard";
 import { FR_EDITOR } from "./fr/editor";
 import { FR_ENGINE } from "./fr/engine";
-import { FR_PLUGIN } from "./fr/plugin";
 import { FR_APP } from "./fr/app";
 import { FR_REVIEW } from "./fr/review";
 import { FR_INSTALLER } from "./fr/installer";
@@ -19,7 +18,6 @@ export const FR: Record<keyof typeof EN, string> = {
 	...FR_DASHBOARD,
 	...FR_EDITOR,
 	...FR_ENGINE,
-	...FR_PLUGIN,
 	...FR_APP,
 	...FR_REVIEW,
 	...FR_INSTALLER,

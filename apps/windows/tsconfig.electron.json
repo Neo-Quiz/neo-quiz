@@ -10,8 +10,7 @@
 	 *
 	 * CE FICHIER REFERME UN TROU NOMMÉ. Les rapports des tâches 1 et 2 l'ont
 	 * signalé chacun leur tour : AUCUN `tsconfig.json` du dépôt ne couvrait
-	 * `apps/windows/electron/` — ni celui de la racine (`src/` et
-	 * `apps/obsidian/`), ni celui d'à côté (`src/` de l'application). Trois
+	 * `apps/windows/electron/` — ni celui de la racine (`src/`), ni celui d'à côté (`src/` de l'application). Trois
 	 * fichiers déjà écrits n'étaient donc typés par aucun `npm run check*`, et
 	 * seul un `tsc` lancé à la main les avait jamais vus. Il est branché dans
 	 * `npm run build` de ce dossier, donc dans `npm run check:app`.

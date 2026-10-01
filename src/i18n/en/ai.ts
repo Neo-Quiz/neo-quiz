@@ -475,7 +475,7 @@ export const EN_AI = {
 	/* L'application n'embarque pas de moteur PDF (`HostPdf`, membre optionnel
 	   du contrat, absent côté app) : le PDF est refusé, jamais joint vide. */
 	"ai.error.pdfUnsupportedInApp": "PDF attachments are not supported in the Neo Quiz app yet. Attach the text or an image instead.",
-	"ai.error.providerUnavailable": "This provider is not available here yet. Pick Ollama, or generate the quiz from the Obsidian plugin.",
+	"ai.error.providerUnavailable": "This provider is not available here yet. Pick Ollama.",
 	"ai.result.count": "{count} questions generated",
 	"ai.result.untitled": "Generated quiz",
 	"ai.result.save": "Save",

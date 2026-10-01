@@ -1670,7 +1670,7 @@ export function getDefaultModels(providerId: string): ModelDef[] {
    Elles ne lancent plus rien elles-mêmes : `host.process` (`src/host/types.ts`)
    est la seule porte vers un CLI. Le PATH étendu, les emplacements
    d'installation d'Ollama et le démarrage détaché vivent maintenant dans les
-   hôtes (`apps/obsidian/host.ts`, `apps/windows/electron/process.ts`), parce
+   hôtes (`apps/windows/electron/process.ts`), parce
    que `require` n'existe pas dans le rendu de l'application : chaque sonde y
    aurait répondu « non installé » en silence. */
 

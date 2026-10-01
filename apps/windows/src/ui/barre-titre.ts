@@ -21,8 +21,9 @@ import { createZoomBubble } from "./zoom-bubble";
 import { CLE_REGLAGES_ZOOM, borneZoom } from "../../electron/pont";
 import type { EtatFenetre } from "../../electron/pont";
 import application from "../../package.json";
-// L'URL du dépôt, pour l'entrée « Source code » du menu d'application.
-import manifeste from "../../../../src/assets/manifest.json";
+
+/** The repository URL, for the "Source code" entry of the application menu. */
+const URL_DEPOT = "https://github.com/Neo-Quiz/neo-quiz";
 import { verifierMaintenant } from "./mise-a-jour";
 
 /** The toggle of the application menu, set by `monterBarreTitre`: the bar
@@ -201,7 +202,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					   (`electron/main.ts`). C'est le même chemin qu'empruntait
 					   le `<a target="_blank">` de l'ancienne section
 					   « À propos ». */
-					window.open(manifeste.helpUrl, "_blank", "noopener");
+					window.open(URL_DEPOT, "_blank", "noopener");
 				} else if (id === "next-wallpaper") {
 					deps.fondSuivant();
 				} else if (id === "reload") {

@@ -207,11 +207,8 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 					label: t("dashboard.quiz.welcomeStart"),
 					icon: "play",
 					// `ctx.openQuiz` et non un appel direct : c'est L'HÔTE qui
-					// décide ce que « jouer » veut dire. Sous Obsidian il vaut
-					// exactement l'ancien appel (`src/dashboard.ts:205`) ; dans
-					// la fenêtre il monte la page du moteur. Le fichier qui
-					// portait cet appel est parti dans `apps/obsidian/` : il ne
-					// parlait que d'onglets.
+					// décide ce que « jouer » veut dire. Dans
+					// la fenêtre il monte la page du moteur.
 					onClick: () => ctx.openQuiz(quiz),
 				},
 				isStale: host.isStale,

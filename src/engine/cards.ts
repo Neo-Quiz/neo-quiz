@@ -319,7 +319,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			   `http://asset.localhost` sous Tauri. Sans `asset:`, l'app
 			   réécrirait une URL déjà bonne au second passage — un défaut qui
 			   n'apparaîtrait qu'à l'exécution, dans l'app seulement. Un cas de
-			   check-obsidian-host garde cette liste. */
+			   check-windows-host garde cette liste. */
 			tpl.content.querySelectorAll("img[src]").forEach(img => {
 				const src = img.getAttribute("src") || "";
 				if (/^(https?:|data:|app:|asset:|tauri:)/i.test(src)) return;

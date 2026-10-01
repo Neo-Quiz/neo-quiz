@@ -9,10 +9,9 @@
 
    POURQUOI ICI ET PAS DANS CHAQUE HÔTE. La composition et la substitution des
    jetons ne touchent NI `fs`, NI `os`, NI `path` : elles sont pures. Les
-   dupliquer dans `apps/obsidian/host.ts` et `apps/windows/electron/process.ts`
-   — ce qu'a fait le premier jet de la tâche 4 — n'était pas forcé, et les deux
-   copies avaient déjà DIVERGÉ en une tranche (l'une prenait son environnement
-   en paramètre, l'autre non). Ce fichier n'importe rien de Node : le rendu de
+   dupliquer dans chaque hôte — ce qu'a fait le premier jet de la tâche 4 —
+   n'était pas forcé, et les deux copies avaient déjà DIVERGÉ en une tranche
+   (l'une prenait son environnement en paramètre, l'autre non). Ce fichier n'importe rien de Node : le rendu de
    l'application pourrait l'importer sans que `check:host` (assertion 6) ne
    rougisse. Seule la moitié `fs` reste chez chaque hôte.
 

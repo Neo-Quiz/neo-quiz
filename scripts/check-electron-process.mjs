@@ -466,8 +466,7 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 		   tâche 7 — il reçoit les arguments et le `stdin` SUBSTITUÉS, et peut
 		   écrire le fichier de sortie comme le ferait un CLI.
 
-		   LE FORMAT DES JETONS EST ÉCRIT ICI À LA MAIN, comme dans
-		   `check-obsidian-host.mjs` : c'est une promesse du contrat, et un
+		   LE FORMAT DES JETONS EST ÉCRIT ICI À LA MAIN, (comme l'était l'ancien contrôle de l'hôte Obsidian) : c'est une promesse du contrat, et un
 		   contrôle qui le lirait de `src/host/jetons.ts` resterait vert si le
 		   format changeait des deux côtés à la fois. */
 		const jeton = (m, quoi) => "{{nq-" + m + ":" + quoi + "}}";
@@ -926,8 +925,7 @@ await withSrcModule("src/host/jetons.ts", async ({
 	const valeurs = { marqueur: MARQ, chemins: ["/tmp/x/image-1.png"], sortie: "/tmp/x/out.txt", maison: "/home/a" };
 
 	/* LA FORME DES JETONS est une promesse du contrat : `HostProcess.run` la
-	   documente, et `check-obsidian-host.mjs` comme le groupe ci-dessus
-	   l'écrivent à la main. Ce cas est le seul endroit où la SOURCE est
+	   documente, et le groupe ci-dessus l'écrit à la main. Ce cas est le seul endroit où la SOURCE est
 	   comparée à la forme écrite : s'ils divergent, c'est ici qu'on le voit. */
 	r.check("les trois jetons portent le marqueur de l'appel",
 		[jetonFichier(MARQ, 1), jetonFichier(MARQ, 12), jetonSortie(MARQ), jetonHome(MARQ)],
@@ -1028,7 +1026,7 @@ await withSrcModule("src/host/jetons.ts", async ({
  * qui, sur la machine d'Ahmed, pointe vers le VRAI Codex officiel. Un `PATH`
  * scopé ne sert à rien si ces trois variables réintroduisent un dossier réel
  * juste après : le cas recevrait la réponse du vrai CLI au lieu de celle du
- * faux (défaut vécu, `check:obsidian-host`, ronde 2 de la tâche 4).
+ * faux (défaut vécu, ronde 2 de la tâche 4).
  */
 await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle, resoudreExecutable, run, tuerArbre }) => {
 	const r = makeReporter("Électron — lancer un CLI");

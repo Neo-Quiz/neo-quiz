@@ -93,7 +93,7 @@ export type HostFileEvent =
  * D'où le texte ici plutôt qu'un correctif dans la fenêtre seule : une promesse
  * TACITE n'est pas une promesse. L'hôte Android tiendrait la fraîcheur par
  * accident ou pas du tout, et `draftIsStale` s'y casserait sans un mot. Elle
- * est éprouvée des DEUX côtés (`check:obsidian-host`, `check:windows-host`).
+ * est éprouvée côté fenêtre (`check:windows-host`).
  *
  * Ce qu'elle NE couvre PAS, et c'est nommé exprès : `trash`, `remove` et
  * `rename` ne sont pas des écritures — le catalogue les apprend du surveillant,

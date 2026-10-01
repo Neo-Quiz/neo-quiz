@@ -2254,8 +2254,8 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 /** Ce que le picker demande d'un fichier, et rien de plus. Générique plutôt
     que `HostFile` : `onPick` rend à l'appelant l'objet QU'IL a fourni, donc
     `ai.ts` continue de recevoir ses `TFile` et de les passer à
-    `vault.process`. Convertir ici violerait la règle du dépôt — seul
-    `apps/obsidian/host.ts` change un `TFile` en `HostFile`. */
+    `vault.process`. Convertir ici violerait la règle du dépôt : le code partagé ne connaît
+    aucun type d'hôte. */
 export interface PickableFile { path: string; basename: string; }
 
 export interface OpenNotePickerOptions<F extends PickableFile = PickableFile> {

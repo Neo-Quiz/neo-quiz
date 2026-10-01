@@ -195,7 +195,7 @@ export function emplacementsOllama(
 /**
  * Ollama est-il INSTALLÉ, même serveur arrêté ?
  *
- * Deux sondes, dans l'ordre de l'hôte Obsidian (`apps/obsidian/host.ts`) :
+ * Deux sondes, in this order:
  * le binaire répond à `--version` (il couvre npm, brew, un PATH personnalisé),
  * sinon un emplacement d'installation officiel existe. Une seule des deux ne
  * suffit pas : un Ollama installé par brew n'est à aucun emplacement de la
@@ -1563,9 +1563,8 @@ export function lancerTerminal(titre: string, script: string): boolean {
 /* ══════════════════════════════════════════════════════════
    LES PIÈCES JOINTES D'UN APPEL, ET LE DOSSIER QUI LES PORTE
 
-   Jumeau de `avecFichiers` dans `apps/obsidian/host.ts` pour sa moitié DISQUE
-   seulement, et pour la même raison que `dossierPersonnel` l'est : chaque hôte
-   tient la promesse du contrat avec ses primitives, et rien ne peut être
+   Disk half of the attachments, kept here for the same reason as `dossierPersonnel`: each host
+   keeps la promesse du contrat avec ses primitives, et rien ne peut être
    partagé entre `apps/` (le rendu n'importerait pas ce module sans tirer Node
    avec lui, `check:host` assertion 6). Le reste ne l'est PLUS — voir plus bas.
 
@@ -1662,10 +1661,9 @@ export async function avecFichiers<T>(
 /**
  * Les CLI que ce processus accepte de lancer, et rien d'autre.
  *
- * LA MÊME LISTE QUE L'HÔTE OBSIDIAN (`CLI_AUTORISES`, `apps/obsidian/host.ts`),
- * `ollama` compris : le MÊME code partagé appelle les deux hôtes, et un outil
- * accepté d'un côté et refusé de l'autre ferait dépendre le sort d'un appel de
- * l'hôte qui l'exécute. Le rendu n'envoie qu'un NOM — jamais un chemin — et ce
+ * THE LIST OF NAMES the shared code may ask for (`ollama` included): any
+ * future host (Android) must accept the same names, or the fate of a call
+ * would depend on the host that runs it. Le rendu n'envoie qu'un NOM — jamais un chemin — et ce
  * nom est jugé par `canaux.ts` AVANT tout, puis ici : `process.run("x.bat")`
  * est ce que cette liste rend impossible, et c'est elle, et non le périmètre
  * des chemins, qui sépare « lancer le CLI de l'utilisateur » de « lancer ce
@@ -1684,10 +1682,9 @@ export function estOutilAutorise(tool: unknown): tool is Outil {
 
 /**
  * Le `PATH` étendu des processus enfants. PURE (l'environnement est un
- * paramètre). JUMEAU de `buildChildEnv` (`apps/obsidian/host.ts`), et pour la
- * même raison que `dossierPersonnel` l'est : il touche `path`, donc il ne peut
- * pas vivre dans `src/` (le rendu n'importe jamais Node), et un hôte n'importe
- * pas l'autre.
+ * paramètre). Kept here for the same reason as
+ * `dossierPersonnel`: it touches `path`, so it cannot live in `src/` (the
+ * renderer never imports Node).
  *
  * POURQUOI CES CHEMINS EN DUR. Une application de bureau démarre avec le `PATH`
  * du SYSTÈME, pas celui du terminal ; et un installateur qui modifie le `PATH`

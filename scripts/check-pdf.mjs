@@ -6,10 +6,10 @@
  * Ce que ce script empêche : que « Créer avec l'IA » depuis un dossier de
  * cours joigne un PDF au texte VIDE ou aux pages FONDUES sans que rien ne
  * le dise. Le prompt de génération a toujours reçu « les mots d'une page
- * joints par une espace, les pages par une ligne vide » (le format du
- * greffon, `apps/obsidian/host.ts` jusqu'à `be9559f`) ; un moteur ou une
+ * joints par une espace, les pages par une ligne vide » (le format de
+ * l'ancien greffon jusqu'à `be9559f`) ; un moteur ou une
  * mise à jour de `pdfjs-dist` qui changerait ce format ferait produire à
- * l'application un autre quiz que le greffon pour le même cours.
+ * l'application un autre quiz qu'avant pour le même cours.
  *
  * Les PDF sont ÉCRITS PAR LE SCRIPT (un fichier de deux pages, un fichier
  * sans couche texte) : aucun fichier binaire au dépôt, aucun vault requis,

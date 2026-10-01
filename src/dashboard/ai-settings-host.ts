@@ -27,11 +27,11 @@ export interface AiSettingsHost {
 }
 
 /**
- * LES DÉFAUTS DES RÉGLAGES IA — UNE SEULE LISTE POUR LES DEUX HÔTES.
+ * LES DÉFAUTS DES RÉGLAGES IA — UNE SEULE LISTE POUR TOUS LES HÔTES.
  *
- * Le greffon les étale dans son `DEFAULT_SETTINGS` (`apps/obsidian/plugin.ts`) ;
- * l'application hydrate son cache (`apps/windows/src/main.ts`, clé
- * `CLE_REGLAGES_IA` de `neo.reglages`) avec les MÊMES. Deux listes recopiées
+ * L'application hydrate son cache (`apps/windows/src/main.ts`, clé
+ * `CLE_REGLAGES_IA` de `neo.reglages`) avec cette liste, et tout futur hôte
+ * (Android) fera de même. Deux listes recopiées
  * divergeraient sans une erreur : un `aiEffort` à « high » d'un côté et à
  * « medium » de l'autre changerait le coût d'une génération selon l'hôte, pour
  * le même réglage affiché.

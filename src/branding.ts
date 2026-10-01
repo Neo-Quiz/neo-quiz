@@ -12,9 +12,10 @@
    phrases qui le CITENT, elles, restent dans les dictionnaires.
 
    Ne pas confondre avec deux valeurs qui, elles, ne doivent JAMAIS
-   suivre le nom du produit (`plugin.ts`) :
-   - `PLUGIN_ID` = le dossier de `.obsidian/plugins/`, où vivent les
-     réglages ET le journal de révision de l'utilisateur ;
+   suivre le nom du produit :
+   - `PLUGIN_ID` = le dossier de `.obsidian/plugins/` de l'ancien greffon,
+     où vivait le journal de révision de l'utilisateur (l'application le
+     lit encore pour le migrer) ;
    - `QUIZ_BLOCK_LANGUAGE` = le mot écrit dans chaque note du vault.
    Le format s'appelle `quiz-blocks`, le produit s'appelle autrement —
    exactement le rapport entre Obsidian et `.md`.
@@ -30,6 +31,6 @@ export const LOG_PREFIX = `[${PRODUCT_NAME}]`;
     de révision de l'utilisateur (ancien emplacement, avant migration vers
     `<racine>/.neo-quiz/`) — l'application le lit pour retrouver cet ancien
     journal. NE CHANGE JAMAIS, et ne suit PAS `PRODUCT_NAME` : c'était une
-    constante locale de `apps/obsidian/plugin.ts`, montée ici pour que
+    constante du greffon Obsidian (supprimé), gardée ici pour que
     l'application compose le même chemin sans le recopier en dur. */
 export const PLUGIN_ID = "quiz-blocks";
