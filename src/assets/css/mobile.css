@@ -198,6 +198,20 @@ html.nq-mobile {
 	padding-right: 6px;
 }
 
+/* The Content | Progress | Review plan switch of a folder: French labels made
+   it wider than the screen and clipped the last one. No left margin, tighter
+   tabs, and a row that may shrink to the screen. */
+.is-mobile .qbd-folder-view-tabs {
+	margin-left: 0;
+	max-width: 100%;
+}
+
+.is-mobile .qbd-root .qbd-folder-view-tab {
+	padding: 7px 11px;
+	font-size: 12.5px;
+	white-space: nowrap;
+}
+
 .is-mobile .qbd-folder-section-action > span:not(.qbd-folder-section-action-icon) {
 	display: none;
 }
@@ -743,4 +757,29 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
 
 .is-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab {
 	flex: none;
+}
+
+/* No keyboard on a touch screen: no "press Space" tip under a flashcard, no
+   key badge on its rating buttons. */
+@media (pointer: coarse) {
+	.quiz-fc-tip,
+	.quiz-fc-rate .quiz-flashcard-kbd {
+		display: none;
+	}
+}
+
+/* THE TEST CLOCK ON A PHONE sat on top of the title (quiz-bars.css puts it
+   at the right of the header line): the title now stops short of it. */
+.is-mobile .qbd-qz .quiz-exam-timer {
+	right: 16px;
+}
+
+.is-mobile .qbd-qz:has(.quiz-exam-timer) .qbd-qz-headline {
+	margin-right: 104px;
+}
+
+/* The last button of a question (Check) sat flush against the bar of arrows
+   once scrolled to the end: a little room under the content. */
+.is-mobile #neo-quiz-root > .qbd-qz .quiz-track-item {
+	padding-bottom: 16px;
 }

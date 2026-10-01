@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext HTTP is refused everywhere except the loopback address of the embedded
+     Syncthing's REST API (SyncthingRest.kt): from API 28 an app may not speak plain HTTP,
+     not even to 127.0.0.1, and the refusal is an IOException that the start-up loop
+     took for "not listening yet" until its 30 s deadline ("sync not available"). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

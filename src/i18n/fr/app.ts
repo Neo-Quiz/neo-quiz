@@ -122,7 +122,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.navAi": "IA",
 	"app.settings.navAppearance": "Apparence",
 	"app.settings.nav": "Sections des réglages",
-	"app.settings.languageAuto": "Automatique (suivre Windows)",
+	"app.settings.languageAuto": "Automatique (suivre le système)",
 	"app.settings.languageHint": "Langue de l'interface. L'installeur la règle sur la langue de la page de téléchargement ; changez-la ici à tout moment. Les quiz générés suivent toujours la langue de votre demande.",
 	"app.settings.timeFormat": "Format de l'heure",
 	"app.settings.groupModes": "Regrouper le Learn et le Test d'un même cours",

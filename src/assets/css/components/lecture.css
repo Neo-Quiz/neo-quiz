@@ -392,3 +392,15 @@
 	font-size: 0.82em;
 	color: var(--text-muted);
 }
+
+/* A comparison table on a phone: tighter cells, words that may break, so no
+   cell is clipped at the card's edge (night walkthrough, 2026-10-01). */
+.is-mobile .quiz-lecture-tableau{
+  font-size: 13px;
+}
+
+.is-mobile .quiz-lecture-tableau th,
+.is-mobile .quiz-lecture-tableau td{
+  padding: 8px 6px;
+  overflow-wrap: anywhere;
+}
