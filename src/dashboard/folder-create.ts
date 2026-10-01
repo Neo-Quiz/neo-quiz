@@ -6,7 +6,8 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleMap } from "./quiz-modules";
 import { openNewFolderModal, commonModuleParent, defaultParent } from "./module-edit";
-import { nomNoteImportee, parseZip } from "./zip";
+import { IMPORT_LIMITS, ZipReadError, classerArchive, nomNoteImportee, readZip } from "./zip";
+import type { ImportedArchive } from "./zip";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
@@ -86,10 +87,61 @@ function pickFile(accept: string): Promise<{ name: string; bytes: Uint8Array } |
 		input.addEventListener("change", async () => {
 			const file = input.files?.[0];
 			if (!file) { resolve(null); return; }
+			/* Refused BEFORE reading: `arrayBuffer()` of a multi-gigabyte file
+			   would hold it all in memory first. */
+			if (file.size > IMPORT_LIMITS.archive) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); resolve(null); return; }
 			resolve({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
 		});
 		input.click();
 	});
+}
+
+/** The notes and images of a RECEIVED archive, or `null` (the window already
+    said why): too big, not readable, or nothing importable in it. */
+async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<ImportedArchive | null> {
+	const host = currentHost();
+	try {
+		const { files } = await readZip(bytes);
+		const archive = classerArchive(files);
+		if (quizOnly) archive.notes = archive.notes.filter(n => QUIZ_BLOCK_RE.test(n.content));
+		if (archive.notes.length === 0) { host.ui.notice(t("dashboard.quizzes.importEmpty")); return null; }
+		return archive;
+	} catch (e) {
+		host.ui.notice(t(e instanceof ZipReadError && e.code !== "invalid" ? "dashboard.quizzes.importTooLarge" : "dashboard.quizzes.importUnreadable"));
+		return null;
+	}
+}
+
+/** Writes what a received archive carries into `folder`: every note under a
+    FREE name (`freeNotePath`), every image under its own name, since quizzes
+    cite it by name (`![[schema.png]]`). An image whose name is taken keeps
+    the file already there when the bytes are the same, and is otherwise left
+    out and counted: overwriting a file of the user's from a third party's
+    archive is never acceptable. Returns what was written. */
+async function ecrireArchive(folder: string, archive: ImportedArchive): Promise<{ notes: number; images: number; imagesKept: number }> {
+	const fs = currentHost().fs;
+	for (const n of archive.notes) {
+		/* Flattened and `.md` only (`nomNoteImportee`, 2026-09-25): the archive
+		   comes from a third party, and an `.exe`, a `.lnk` or a hidden file has
+		   no place in a course folder. The same de-duplication as the other
+		   imports: two entries from different sub-folders flatten to the same
+		   name, and `fs.write` REPLACES. */
+		await fs.write(await freeNotePath(folder, n.name.replace(/\.md$/i, "")), n.content);
+	}
+	let images = 0;
+	let imagesKept = 0;
+	for (const img of archive.images) {
+		const path = `${folder}/${img.name}`;
+		if (await fs.exists(path)) {
+			const existing = await fs.readBinary(path).catch(() => null);
+			if (existing && existing.length === img.bytes.length && existing.every((b, i) => b === img.bytes[i])) continue;
+			imagesKept++;
+			continue;
+		}
+		await fs.writeBinary(path, img.bytes);
+		images++;
+	}
+	return { notes: archive.notes.length, images, imagesKept };
 }
 
 export async function importSharedFolder(
@@ -100,12 +152,9 @@ export async function importSharedFolder(
 ): Promise<void> {
 	const picked = await pickFile(".zip,application/zip");
 	if (!picked) return;
-	// Seules les notes `.md` au nom sûr entrent (voir `nomNoteImportee`).
-	const entries = parseZip(picked.bytes).filter(e => nomNoteImportee(e.name) !== null);
-	if (entries.length === 0) {
-		currentHost().ui.notice(t("dashboard.quizzes.importEmpty"));
-		return;
-	}
+	// Only `.md` notes with a safe name and raster images enter (`classerArchive`).
+	const archive = await lireArchiveRecue(picked.bytes, false);
+	if (!archive) return;
 	// Dossier cible : base du zip, assainie, sous le parent commun des modules ;
 	// suffixe (2), (3)… si un dossier du même nom existe déjà.
 	const base = picked.name.replace(/\.zip$/i, "").replace(/[\\/:*?"<>|]/g, "-").trim() || "Import";
@@ -118,22 +167,10 @@ export async function importSharedFolder(
 	   du même nom se retrouveraient fondus en silence. */
 	for (let n = 2; await currentHost().fs.exists(folderPath); n++) folderPath = `${root} (${n})`;
 
+	let written: { notes: number; images: number; imagesKept: number };
 	try {
 		await currentHost().fs.mkdirs(folderPath);
-		for (const e of entries) {
-			/* Aplatir : on n'écrit que le nom de note, jamais un sous-chemin
-			   d'archive, et SEULEMENT une note `.md` (`nomNoteImportee`,
-			   2026-09-25) : l'archive vient d'un tiers, et un `.exe`, un `.lnk`
-			   ou un fichier caché n'ont rien à faire dans un dossier de cours. */
-			const noteName = nomNoteImportee(e.name);
-			if (!noteName) continue;
-			/* Le MÊME dédoublonnage que les autres imports, et pour une raison
-			   neuve : deux entrées venues de sous-dossiers différents s'aplatissent
-			   parfois sur le même nom, et `fs.write` REMPLACE là où `vault.create`
-			   rejetait — la première note disparaissait sans un mot, là où
-			   l'utilisateur voyait autrefois une erreur d'import. */
-			await currentHost().fs.write(await freeNotePath(folderPath, noteName), e.content);
-		}
+		written = await ecrireArchive(folderPath, archive);
 	} catch {
 		currentHost().ui.notice(t("dashboard.quizzes.importError"));
 		return;
@@ -142,11 +179,21 @@ export async function importSharedFolder(
 	// Déclaré en override : la carte du module apparaît tout de suite.
 	const folderKey = folderPath.split("/").pop() as string;
 	const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-	if (!overrides[folderKey]) overrides[folderKey] = { name: base };
+	/* The card carries the FOLDER name, suffix included: two imports of the
+	   same archive must not give two cards both called "Demo". */
+	if (!overrides[folderKey]) overrides[folderKey] = { name: folderKey };
 	ctx.settings.quizzesModuleOverrides = overrides;
 	ctx.saveSettings().catch(() => {});
-	currentHost().ui.notice(t("dashboard.quizzes.importDone", { name: base, count: entries.length }));
+	annoncerImport(folderKey, written);
 	onDone();
+}
+
+function annoncerImport(name: string, w: { notes: number; images: number; imagesKept: number }): void {
+	const host = currentHost();
+	host.ui.notice(w.images > 0
+		? t("dashboard.quizzes.importDoneImages", { name, count: w.notes, images: w.images })
+		: t("dashboard.quizzes.importDone", { name, count: w.notes }));
+	if (w.imagesKept > 0) host.ui.notice(t("dashboard.quizzes.importImagesKept", { count: w.imagesKept }));
 }
 
 /* ── Drill-down d'un dossier : créer un quiz dedans / y importer un quiz reçu.
@@ -212,13 +259,11 @@ export async function importFileIntoFolder(folder: string, picked: { name: strin
 	try {
 		await ensureFolder(folder);
 		if (/\.zip$/i.test(picked.name)) {
-			const entries = parseZip(picked.bytes).filter(e => nomNoteImportee(e.name) !== null && QUIZ_BLOCK_RE.test(e.content));
-			if (entries.length === 0) { currentHost().ui.notice(t("dashboard.quizzes.importEmpty")); return; }
-			for (const e of entries) {
-				await currentHost().fs.write(await freeNotePath(folder, nomNoteImportee(e.name) as string), e.content);
-			}
-			currentHost().ui.notice(t("dashboard.quizzes.importDone", { name: folder.split("/").pop() || folder, count: entries.length }));
+			const archive = await lireArchiveRecue(picked.bytes, true);
+			if (!archive) return;
+			annoncerImport(folder.split("/").pop() || folder, await ecrireArchive(folder, archive));
 		} else {
+			if (picked.bytes.length > IMPORT_LIMITS.entry) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); return; }
 			const content = new TextDecoder().decode(picked.bytes);
 			if (!QUIZ_BLOCK_RE.test(content)) { currentHost().ui.notice(t("dashboard.quizzes.importNoQuiz")); return; }
 			// Le nom venu du sélecteur, assaini comme une entrée d'archive.

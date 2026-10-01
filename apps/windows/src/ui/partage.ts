@@ -1,8 +1,8 @@
 import { ajouter } from "../../../../src/dom";
 import { t } from "../../../../src/i18n";
 import { currentHost, requireHost } from "../../../../src/host/current";
-import { buildZip } from "../../../../src/dashboard/zip";
-import type { ZipEntry } from "../../../../src/dashboard/zip";
+import { embedTargets, isShareableImage, packShare } from "../../../../src/dashboard/share-pack";
+import type { ZipEntry, ZipFile } from "../../../../src/dashboard/zip";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
@@ -26,29 +26,76 @@ const DISCORD_PATH = "M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.074
 
 export type CiblePartage = { quiz: QuizIndexEntry } | { group: ModuleGroup };
 
-interface Fichier { nom: string; octets: Uint8Array }
+interface Fichier { nom: string; octets: Uint8Array; imagesLaissees: number }
 
 function nomSur(nom: string, repli: string): string {
 	return (nom || repli).replace(/[\\/:*?"<>|]/g, "-").trim() || repli;
 }
 
-/** Le fichier à partager, ou `null` (et un message) si rien n'est lisible. */
+/** The images the given notes embed, as files of the share: each one resolved
+    from its note the way the quiz resolves it, read as bytes, once. An image
+    that cannot be read counts as left out (the share still goes). */
+async function imagesDes(notes: { chemin: string; contenu: string }[]): Promise<{ images: ZipFile[]; perdues: number }> {
+	const host = currentHost();
+	const vues = new Map<string, ZipFile | null>();
+	const images: ZipFile[] = [];
+	let perdues = 0;
+	for (const n of notes) {
+		for (const cible of embedTargets(n.contenu)) {
+			const fichier = host.links.resolve(cible, n.chemin);
+			if (!fichier || !isShareableImage(fichier.name) || vues.has(fichier.path)) continue;
+			try {
+				const entree = { name: fichier.name, bytes: await host.fs.readBinary(fichier.path) };
+				vues.set(fichier.path, entree);
+				images.push(entree);
+			} catch {
+				vues.set(fichier.path, null);
+				perdues++;
+			}
+		}
+	}
+	return { images, perdues };
+}
+
+/** The file to share, or `null` (and a message) when nothing is readable or
+    the notes alone are over the bound. A folder is a .zip of its quizzes and
+    the images they embed; a quiz is its block as a .md, or, when it embeds
+    images, a .zip with them (a .md cannot carry them). */
 async function construire(cible: CiblePartage): Promise<Fichier | null> {
-	const fs = currentHost().fs;
+	const host = currentHost();
+	const fs = host.fs;
+	const maintenant = new Date();
 	if ("quiz" in cible) {
 		const contenu = await fs.read(cible.quiz.path);
 		const bloc = contenu.match(QUIZ_BLOCK_RE);
-		if (!bloc) { currentHost().ui.notice(t("dashboard.detail.noBlockInNote")); return null; }
-		return { nom: `${nomSur(cible.quiz.title, "quiz")}.md`, octets: new TextEncoder().encode(bloc[0].replace(/\r\n/g, "\n") + "\n") };
+		if (!bloc) { host.ui.notice(t("dashboard.detail.noBlockInNote")); return null; }
+		const texte = bloc[0].replace(/\r\n/g, "\n") + "\n";
+		const nom = nomSur(cible.quiz.title, "quiz");
+		const { images, perdues } = await imagesDes([{ chemin: cible.quiz.path, contenu: texte }]);
+		if (images.length === 0) return { nom: `${nom}.md`, octets: new TextEncoder().encode(texte), imagesLaissees: perdues };
+		const paquet = packShare([{ name: `${nom}.md`, content: texte }], images, maintenant);
+		if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }
+		return { nom: `${nom}.zip`, octets: paquet.bytes, imagesLaissees: paquet.imagesOut + perdues };
 	}
 	const entrees: ZipEntry[] = [];
+	const lus: { chemin: string; contenu: string }[] = [];
 	for (const q of cible.group.quizzes) {
 		try {
-			entrees.push({ name: q.path.split("/").pop() as string, content: await fs.read(q.path) });
+			const contenu = await fs.read(q.path);
+			entrees.push({ name: q.path.split("/").pop() as string, content: contenu });
+			lus.push({ chemin: q.path, contenu });
 		} catch { /* un quiz disparu entre le scan et le clic : on partage le reste */ }
 	}
-	if (entrees.length === 0) { currentHost().ui.notice(t("dashboard.detail.fileNotFound")); return null; }
-	return { nom: `${nomSur(cible.group.name, "quizzes")}.zip`, octets: buildZip(entrees) };
+	if (entrees.length === 0) { host.ui.notice(t("dashboard.detail.fileNotFound")); return null; }
+	const { images, perdues } = await imagesDes(lus);
+	const paquet = packShare(entrees, images, maintenant);
+	if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }
+	return { nom: `${nomSur(cible.group.name, "quizzes")}.zip`, octets: paquet.bytes, imagesLaissees: paquet.imagesOut + perdues };
+}
+
+/** One line on what a share left out, or nothing when it carried everything. */
+function noterLaissees(fichier: Fichier): void {
+	if (fichier.imagesLaissees > 0) currentHost().ui.notice(t("dashboard.quizzes.shareImagesLeftOut", { count: fichier.imagesLaissees }));
 }
 
 export function ouvrirPartage(cible: CiblePartage): void {
@@ -92,6 +139,7 @@ export function ouvrirPartage(cible: CiblePartage): void {
 							currentHost().ui.setIcon(ajouter(retour, "span", "qbd-share-feedback-icon"), "check");
 							ajouter(retour, "span", undefined, t("dashboard.quizzes.shareCopiedToast"));
 							retour.classList.add("is-visible");
+							noterLaissees(fichier);
 							window.setTimeout(() => m.close(), 2600);
 						} catch (e) {
 							signalerEchec(e, "partage Discord impossible");
@@ -106,7 +154,11 @@ export function ouvrirPartage(cible: CiblePartage): void {
 			const enregistrer = ajouter(rangee, "button", "qbd-share-app");
 			enregistrer.type = "button";
 			currentHost().ui.setIcon(ajouter(enregistrer, "div", "qbd-share-app-icon"), "download");
-			ajouter(enregistrer, "span", "qbd-share-app-label", t("dashboard.quizzes.shareSave"));
+			/* On a phone there is no "save as" dialog: the file goes to the system share
+			   sheet (Files, Drive, Discord, mail...), and the notice of a saved PATH would
+			   be wrong. */
+			const telephone = navigator.userAgent.includes("Android");
+			ajouter(enregistrer, "span", "qbd-share-app-label", t(telephone ? "dashboard.quizzes.shareSheet" : "dashboard.quizzes.shareSave"));
 			enregistrer.addEventListener("click", () => {
 				m.close();
 				void (async () => {
@@ -114,7 +166,8 @@ export function ouvrirPartage(cible: CiblePartage): void {
 						const fichier = await construire(cible);
 						if (!fichier) return;
 						const chemin = await pont().partage.enregistrer(fichier.nom, fichier.octets);
-						if (chemin) currentHost().ui.notice(t("dashboard.quizzes.fileSaved", { path: chemin }));
+						if (chemin && !telephone) currentHost().ui.notice(t("dashboard.quizzes.fileSaved", { path: chemin }));
+						if (chemin) noterLaissees(fichier);
 					} catch (e) {
 						signalerEchec(e, "enregistrement du partage impossible");
 					}

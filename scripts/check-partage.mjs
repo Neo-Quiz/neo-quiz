@@ -37,6 +37,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 	r.check("vide, refusé", octetsPartage(new Uint8Array(0)), null);
 	r.check("au-delà de la borne, refusé", octetsPartage(new Uint8Array(TAILLE_MAX_PARTAGE + 1)), null);
 	r.check("un tableau ordinaire n'est pas un contenu", octetsPartage([1, 2]), null);
+	r.check("the main process bound is the window's bound (16 MB, `SHARE_MAX_BYTES`)", TAILLE_MAX_PARTAGE, 16 * 1024 * 1024);
 
 	const s = scriptDiscord();
 	r.check("le script lit le chemin dans la variable d'environnement",
@@ -131,6 +132,97 @@ await withSrcModule("src/dashboard/zip.ts", ({ nomNoteImportee }) => {
 	r.check("un fichier caché perd son point", nomNoteImportee(".cache.md"), "cache");
 	r.check("un dossier d'archive (fin en /) est écarté", nomNoteImportee("cours/"), null);
 	r.check("l'extension compte en majuscules", nomNoteImportee("A.MD"), "A");
+	r.done();
+});
+
+/* THE SHARE'S CONTENT AND THE RECEIVING READER (2026-10-01). A shared folder
+   used to carry quiz notes only (every embedded image was dead on arrival) and
+   the reader skipped every archive it had not written itself (deflate: "empty"). */
+await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], async (zip, pack) => {
+	const { buildZip, buildZipFiles, readZip, classerArchive, nomImageImportee, ZipReadError, IMPORT_LIMITS, SHARE_MAX_BYTES } = zip;
+	const { embedTargets, packShare, isShareableImage } = pack;
+	const { deflateRawSync } = await import("node:zlib");
+	const r = makeReporter("Share content and archive reader");
+	const enc = new TextEncoder();
+	const dec = new TextDecoder();
+	const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 255, 128, 7]);
+	const crcOf = (b) => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1; } return ~c >>> 0; };
+	/** A hand-made archive, as Explorer or 7-Zip writes it: deflate, central sizes. */
+	const make = (entries, { flags = 0, method = 8, dropCrc = false } = {}) => {
+		const parts = []; const cd = []; let off = 0;
+		const w16 = (v) => { const b = Buffer.alloc(2); b.writeUInt16LE(v); return b; };
+		const w32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32LE(v >>> 0); return b; };
+		for (const e of entries) {
+			const name = Buffer.from(e.name, "utf8");
+			const raw = Buffer.from(e.bytes);
+			const m = e.method ?? method;
+			const body = m === 8 ? deflateRawSync(raw) : raw;
+			const crc = dropCrc ? 1 : crcOf(raw);
+			const local = Buffer.concat([w32(0x04034b50), w16(20), w16(flags), w16(m), w16(0), w16(0x21), w32(crc), w32(body.length), w32(raw.length), w16(name.length), w16(0), name, body]);
+			cd.push(Buffer.concat([w32(0x02014b50), w16(20), w16(20), w16(flags), w16(m), w16(0), w16(0x21), w32(crc), w32(body.length), w32(e.declared ?? raw.length), w16(name.length), w16(0), w16(0), w16(0), w16(0), w32(0), w32(off), name]));
+			parts.push(local); off += local.length;
+		}
+		const cdb = Buffer.concat(cd);
+		return new Uint8Array(Buffer.concat([...parts, cdb, w32(0x06054b50), w16(0), w16(0), w16(entries.length), w16(entries.length), w32(cdb.length), w32(off), w16(0)]));
+	};
+	const refus = (p) => p.then(() => "read", (e) => e instanceof ZipReadError && e.code);
+
+	// Round trip of our own writer, binary included.
+	const own = buildZipFiles([{ name: "a.md", bytes: enc.encode("```quiz-blocks\n[]\n```") }, { name: "img/x.png", bytes: PNG }]);
+	const back = await readZip(own);
+	r.check("our own archive reads back, images byte for byte", [back.files.map(f => f.name), Array.from(back.files[1].bytes), back.skipped], [["a.md", "img/x.png"], Array.from(PNG), 0]);
+	r.check("buildZip stays deterministic without a date (the pinned language pack)", Array.from(buildZip([{ name: "a.md", content: "x" }]).slice(10, 14)), [0, 0, 0, 0]);
+	const dated = buildZip([{ name: "a.md", content: "x" }], new Date(2026, 9, 1, 12, 30, 20));
+	const dv = new DataView(dated.buffer);
+	r.check("a shared archive carries a real DOS date, not month 0 day 0", [dv.getUint16(12, true) & 31, (dv.getUint16(12, true) >> 5) & 15, 1980 + (dv.getUint16(12, true) >> 9)], [1, 10, 2026]);
+
+	// An archive from another tool (deflate): the old reader found nothing.
+	const note = "```quiz-blocks\n[{prompt:'é'}]\n```\n" + "x".repeat(5000);
+	const defl = await readZip(make([{ name: "Cours/CM1 é.md", bytes: enc.encode(note) }, { name: "Cours/", bytes: [], method: 0 }]));
+	r.check("a DEFLATE archive (Explorer, 7-Zip, macOS) is read, accents kept", [defl.files.length, defl.files[0]?.name, dec.decode(defl.files[0]?.bytes ?? new Uint8Array()) === note], [1, "Cours/CM1 é.md", true]);
+
+	// Hostile archives.
+	const bomb = await readZip(make([{ name: "b.md", bytes: new Uint8Array(1000), declared: 10 }]));
+	r.check("an entry that inflates past its DECLARED size is dropped (zip bomb)", [bomb.files.length, bomb.skipped], [0, 1]);
+	const hugeDeclared = await readZip(make([{ name: "b.md", bytes: new Uint8Array(100), declared: IMPORT_LIMITS.entry + 1 }]));
+	r.check("an entry declared over the per-entry bound is dropped without inflating", [hugeDeclared.files.length, hugeDeclared.skipped], [0, 1]);
+	const badCrc = await readZip(make([{ name: "c.md", bytes: enc.encode("abc") }], { dropCrc: true }));
+	r.check("a bad checksum is dropped", [badCrc.files.length, badCrc.skipped], [0, 1]);
+	const enc1 = await readZip(make([{ name: "e.md", bytes: enc.encode("abc") }], { flags: 1 }));
+	r.check("an encrypted entry is dropped", [enc1.files.length, enc1.skipped], [0, 1]);
+	const m9 = await readZip(make([{ name: "e.md", bytes: enc.encode("abc"), method: 9 }]));
+	r.check("an unknown method is dropped", [m9.files.length, m9.skipped], [0, 1]);
+	const many = make(Array.from({ length: 5 }, (_, i) => ({ name: `n${i}.md`, bytes: enc.encode("x") })));
+	r.check("too many entries: refused whole", await refus(readZip(many, { ...IMPORT_LIMITS, entries: 4 })), "too-many");
+	r.check("an archive over the bound: refused whole", await refus(readZip(own, { ...IMPORT_LIMITS, archive: 10 })), "too-large");
+	r.check("not a zip: refused", await refus(readZip(enc.encode("hello, this is not a zip file at all"))), "invalid");
+	r.check("a truncated archive: refused", await refus(readZip(own.slice(0, own.length - 30))), "invalid");
+	const tot = await readZip(make([{ name: "a.md", bytes: enc.encode("x".repeat(60)) }, { name: "b.md", bytes: enc.encode("y".repeat(60)) }]), { ...IMPORT_LIMITS, total: 100 });
+	r.check("the total inflated size is bounded", [tot.files.length, tot.skipped], [1, 1]);
+
+	// What may be imported.
+	const cls = classerArchive([
+		{ name: "Cours/CM1.md", bytes: enc.encode("a") }, { name: String.raw`..\..\Startup\x.png`, bytes: PNG }, { name: "dessin.SVG", bytes: PNG },
+		{ name: "setup.exe", bytes: PNG }, { name: "cours.pdf", bytes: PNG }, { name: "gros.png", bytes: new Uint8Array(8 * 1024 * 1024 + 1) },
+	]);
+	r.check("notes and raster images are kept, flattened; svg, exe, pdf, oversize are ignored",
+		[cls.notes.map(n => n.name), cls.images.map(i => i.name), cls.ignored], [["CM1.md"], ["x.png"], 4]);
+	r.check("an image name: path flattened, hidden dots stripped, no extension refused", [nomImageImportee("a/b/c.PNG"), nomImageImportee("..png"), nomImageImportee("x"), nomImageImportee("x.png.bat")], ["c.png", null, null, null]);
+
+	// What a share carries.
+	r.check("embedded images are found: wikilink with size and heading, markdown, not URLs",
+		embedTargets("![[a.png|200]] ![[b c.jpg#x]] ![alt](d%20e.png) ![w](https://x/y.png) ![d](data:image/png;base64,AA) ![[Cours note]]"), ["a.png", "b c.jpg", "Cours note", "d e.png"]);
+	r.check("isShareableImage", [isShareableImage("a.PNG"), isShareableImage("a.svg"), isShareableImage("a.pdf")], [true, false, false]);
+	const notes = [{ name: "q.md", content: "x".repeat(1000) }];
+	const imgs = [{ name: "a.png", bytes: new Uint8Array(4000) }, { name: "b.png", bytes: new Uint8Array(4000) }, { name: "c.png", bytes: new Uint8Array(100) }];
+	const bound = 22 + 3 * 200 + 1000 + 4000 + 100;
+	const small = packShare(notes, imgs, new Date(), bound);
+	r.check("images that do not fit are LEFT OUT and counted, the rest goes in", [small.imagesIn, small.imagesOut, small.bytes !== null], [2, 1, true]);
+	r.check("the built archive stays under the bound it was given", small.bytes.length <= bound, true);
+	r.check("the archive reads back with the images that went in", (await readZip(small.bytes)).files.map(f => f.name), ["q.md", "a.png", "c.png"]);
+	r.check("notes alone over the bound: no archive", packShare([{ name: "q.md", content: "x".repeat(2000) }], [], new Date(), 1000).bytes, null);
+	r.check("a duplicate name is left out, not overwritten", packShare(notes, [{ name: "a.png", bytes: PNG }, { name: "A.png", bytes: PNG }], new Date()).imagesOut, 1);
+	r.check("the bound is the share bound", SHARE_MAX_BYTES, 16 * 1024 * 1024);
 	r.done();
 });
 

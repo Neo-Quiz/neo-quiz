@@ -16,6 +16,11 @@ release notes.
 ### Fixed
 - A follow-up message on the Generate page ("make it multiple choice") now carries the earlier requests, the attached documents and the quizzes already produced, instead of reaching the model alone.
 - A number of questions written in the request ("20 questions") is now honoured when no count is picked in the options.
+- Sharing a folder or a quiz now carries the images its quizzes embed (they used to arrive as broken links); what does not fit in the 16 MB limit is left out and counted in a message, and a quiz with images is shared as a .zip.
+- Importing a shared folder now reads archives zipped by Windows Explorer, 7-Zip or macOS (they used to import as "empty"), restores the images, never overwrites a different image already in the folder, and says so when an archive is too large or unreadable.
+- Importing the same shared folder twice no longer gives two cards with the same name: the second is called "Name (2)".
+- Shared archives carry a valid date instead of month 0, day 0.
+- Android: importing a shared .zip or .md now opens the system file picker, and sharing a folder or quiz opens the system share sheet.
 
 ## [1.20.18] - 2026-10-01
 

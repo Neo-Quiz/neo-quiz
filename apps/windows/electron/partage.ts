@@ -23,13 +23,16 @@ import { execFile } from "node:child_process";
 import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SHARE_MAX_BYTES } from "../../../src/dashboard/zip";
 
 /** Ce qu'un partage produit : le zip d'un dossier, le .md d'un quiz. */
 export const EXTENSIONS_PARTAGE = [".zip", ".md"] as const;
-/** Un partage ne porte que des NOTES (texte) : les neuf quiz d'un dossier de
-    cours pèsent quelques centaines de Ko. 16 Mo laissent une marge large ;
-    au-delà, c'est une fenêtre qui envoie n'importe quoi. */
-export const TAILLE_MAX_PARTAGE = 16 * 1024 * 1024;
+/** Un partage porte des NOTES (texte) et, depuis le 2026-10-01, les IMAGES
+    que ces notes intègrent : les neuf quiz d'un dossier de cours pèsent
+    quelques centaines de Ko. 16 Mo (la MÊME borne que côté fenêtre, qui
+    écarte les images en trop et le dit : `share-pack.ts`) ; au-delà, c'est
+    une fenêtre qui envoie n'importe quoi. */
+export const TAILLE_MAX_PARTAGE = SHARE_MAX_BYTES;
 
 /** Le nom de fichier assaini, ou `null` s'il n'est pas un partage : pas de
     séparateur de chemin (un nom, jamais un chemin), pas de caractère interdit
