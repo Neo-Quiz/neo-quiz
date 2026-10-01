@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.17] - 2026-10-01
+
 ### Fixed
 - Importing a shared folder (.zip) works again: its notes show up at once instead of an empty card until the next restart.
 
