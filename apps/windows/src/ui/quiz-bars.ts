@@ -81,6 +81,16 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		mirror(prev, ownPrev);
 		mirror(next, ownNext);
 
+		/* A beads row that scrolls sideways (phone, mobile.css) keeps the current
+		   bead centred. Set on the row itself: `scrollIntoView` would also move
+		   every scrollable ancestor. */
+		const nav = panel.querySelector<HTMLElement>(":scope .quiz-nav");
+		const current = nav?.querySelector<HTMLElement>(".quiz-tab.active");
+		if (nav && current && nav.scrollWidth > nav.clientWidth + 1) {
+			const left = current.offsetLeft - (nav.clientWidth - current.offsetWidth) / 2;
+			if (Math.abs(nav.scrollLeft - left) > 2) nav.scrollTo({ left, behavior: "smooth" });
+		}
+
 		const viewport = host.querySelector<HTMLElement>(".quiz-track-viewport");
 		if (!viewport) return;
 		/* From the top of the questions to the bottom of the panel's content

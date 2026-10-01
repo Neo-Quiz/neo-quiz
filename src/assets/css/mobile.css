@@ -700,3 +700,47 @@ html.nq-mobile body.is-mobile .modal-container > .nq-reglages-modal {
 .is-mobile .nq-set-volet {
 	overflow: visible;
 }
+
+/* ══════════════════════════════════════════════════════════
+   THE PLAYED QUIZ KEEPS A FIXED-HEIGHT PANEL ON A PHONE.
+   The document-scroller rules above give `#neo-quiz-root` a natural
+   height, which made the quiz's `height: 100%` column as tall as its
+   content: the bar of arrows and the answer fell below the screen and
+   nothing could scroll to them (night walkthrough, 2026-10-01). While a
+   quiz is played the root is the visible viewport again, and the slides
+   scroll in their own box (quiz-bars.css).
+   ══════════════════════════════════════════════════════════ */
+html.nq-mobile:has(#neo-quiz-root > .qbd-qz),
+html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
+	height: 100%;
+	overflow: hidden;
+}
+
+.is-mobile #neo-quiz-root:has(> .qbd-qz) {
+	height: 100vh;
+	height: 100dvh;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* THE BEADS ON A PHONE: one row that scrolls sideways instead of wrapping.
+   A 29-question Learn wrapped onto six lines and took 40 % of the screen
+   (night walkthrough, 2026-10-01); `ui/quiz-bars.ts` keeps the current bead
+   centred. The row's ends stay reachable: it starts at the left edge. */
+.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+	flex-wrap: nowrap;
+	justify-content: flex-start;
+	overflow-x: auto;
+	overflow-y: hidden;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	padding-inline: 16px;
+}
+
+.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav::-webkit-scrollbar {
+	display: none;
+}
+
+.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab {
+	flex: none;
+}
