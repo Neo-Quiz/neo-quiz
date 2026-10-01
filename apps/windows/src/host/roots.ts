@@ -1,5 +1,5 @@
 import type { HostRoot } from "../../../../src/host/types";
-import { REVIEW_DIR, REVIEW_LOG_NAME } from "../../../../src/review/paths";
+import { REVIEW_DIR, REVIEW_JOURNAL_DIR, REVIEW_LOG_NAME } from "../../../../src/review/paths";
 import { PLUGIN_ID } from "../../../../src/branding";
 
 /* ══════════════════════════════════════════════════════════
@@ -48,7 +48,10 @@ export interface CarteRacines {
 const nettoyer = (chemin: string): string =>
 	String(chemin ?? "").replace(/\\/g, "/").replace(/\/+$/, "");
 
-export function creerCarteRacines(racines: RacineOuverte[]): CarteRacines {
+/** `deviceId` is an INPUT, resolved once at startup before the map is built
+    (the map itself stays synchronous and pure): it names this device's own
+    review log file, see `src/review/journal-set.ts`. */
+export function creerCarteRacines(racines: RacineOuverte[], deviceId: string): CarteRacines {
 	const parId = new Map(racines.map(r => [r.id, r]));
 
 	const decouper = (cheminContrat: string): { racine: RacineOuverte; reste: string } | null => {
@@ -72,6 +75,10 @@ export function creerCarteRacines(racines: RacineOuverte[]): CarteRacines {
 				   `src/review/paths.ts` : une détection peut changer d'avis, un
 				   historique perdu ne revient pas. */
 				reviewLog: `${r.id}/${REVIEW_DIR}/${REVIEW_LOG_NAME}`,
+				/* One log file per device in this directory; `reviewLog` above is
+				   the legacy single log, now read only. */
+				reviewJournalDir: `${r.id}/${REVIEW_DIR}/${REVIEW_JOURNAL_DIR}`,
+				deviceId,
 				/* L'ancien journal du GREFFON, à son emplacement conventionnel.
 				   L'application le lit pour la même raison que le greffon : si
 				   elle est installée d'abord, elle démarrerait sinon sur un

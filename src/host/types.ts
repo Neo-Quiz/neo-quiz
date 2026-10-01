@@ -674,6 +674,11 @@ export interface HostRoot {
 	name: string;
 	/** Le journal de révision de cette racine, en chemin du CONTRAT. */
 	reviewLog: string;
+	/** The directory holding one review log per device
+	    (`<root>/.neo-quiz/journal`), in CONTRACT path. */
+	reviewJournalDir: string;
+	/** This device's identifier: names its own log file in `reviewJournalDir`. */
+	deviceId: string;
 	/** L'ANCIEN journal (celui que le greffon écrivait à côté de lui), en
 	    chemin du contrat, ou `null` quand l'hôte sait qu'il n'y en a pas.
 	    C'est l'hôte qui le sait : le greffon lit `manifest.dir`,

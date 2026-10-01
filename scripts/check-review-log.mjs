@@ -225,3 +225,114 @@ await withSrcModule("src/review/migration.ts", async ({ migrateReviewLog, SUFFIX
 
 	r.done();
 });
+
+/* ══════════════════════════════════════════════════════════
+   UN JOURNAL PAR APPAREIL (src/review/journal-set.ts)
+
+   Two devices appending to the same file make Syncthing park one version
+   as a `.sync-conflict-*` copy, and half the history disappears from view.
+   So each device writes its own `journal/<deviceId>.jsonl` and every device
+   reads all of them. What this protects: nothing is ever written to a file
+   another device writes, nothing is read twice, and a rename written on one
+   device still catches the answers written on another.
+══════════════════════════════════════════════════════════ */
+await withSrcModule(["src/review/journal-set.ts", "src/scheduler/index.ts"], async ({ createJournalSet }, { applyRenames }) => {
+	const r = makeReporter("Journal — un fichier par appareil");
+
+	/** In-memory disk with `list` (full paths of the direct children) and `remove`. */
+	function fsMemoire(initial = {}) {
+		const fs = fauxFs(initial);
+		fs.list = async (dir) => {
+			const prefixe = dir + "/";
+			const sorties = [...fs.fichiers.keys()].filter(p => p.startsWith(prefixe) && !p.slice(prefixe.length).includes("/"));
+			if (!sorties.length) throw new Error("ENOENT " + dir);
+			return sorties;
+		};
+		fs.remove = async (p) => { fs.fichiers.delete(p); };
+		return fs;
+	}
+	const attendreEcritures = () => new Promise(res => setTimeout(res, 20));
+	const ancien = ".neo-quiz/review-log.jsonl";
+	const DIR = ".neo-quiz/journal";
+	const creer = (fs, deviceId = "A") => createJournalSet({ fs, legacyPath: ancien, dir: DIR, deviceId });
+
+	async function essayer(nom, fn) {
+		try { await fn(); } catch (e) { r.check(nom, "exception : " + e.message, "aucune exception"); }
+	}
+
+	await essayer("cas 1 (fusion triée par date)", async () => {
+		const fs = fsMemoire({
+			[ancien]: ligne("a.md::q1", 4) + ligne("a.md::q2", 1),
+			[`${DIR}/A.jsonl`]: ligne("a.md::q3", 3),
+			[`${DIR}/B.jsonl`]: ligne("a.md::q4", 2),
+		});
+		const set = creer(fs);
+		r.check("pas chargé avant load()", set.loaded(), false);
+		await set.load();
+		r.check("chargé après load()", set.loaded(), true);
+		r.check("quatre lignes triées par `at`", set.lines().map(l => l.at), [1, 2, 3, 4]);
+		set.destroy();
+	});
+
+	await essayer("cas 1b (dossier absent = vide ; égalité d'`at` = ordre des fichiers)", async () => {
+		const set = creer(fsMemoire({ [ancien]: ligne("a.md::q1", 5) + ligne("a.md::q2", 5) }));
+		await set.load();
+		r.check("dossier manquant : seul l'ancien est lu", set.lines().map(l => l.q), ["a.md::q1", "a.md::q2"]);
+		set.destroy();
+	});
+
+	await essayer("cas 2 (copie de conflit ignorée)", async () => {
+		const fs = fsMemoire({
+			[`${DIR}/A.jsonl`]: ligne("a.md::q1", 1),
+			[`${DIR}/A.sync-conflict-20261001-120000-XYZ.jsonl`]: ligne("a.md::fantome", 2),
+		});
+		const set = creer(fs);
+		await set.load();
+		r.check("la copie de conflit n'est pas lue", set.lines().map(l => l.q), ["a.md::q1"]);
+		r.check("la copie de conflit n'est pas supprimée", fs.fichiers.has(`${DIR}/A.sync-conflict-20261001-120000-XYZ.jsonl`), true);
+		set.destroy();
+	});
+
+	await essayer("cas 3 (on n'écrit que dans son fichier)", async () => {
+		const fs = fsMemoire({
+			[ancien]: ligne("a.md::q1", 1),
+			[`${DIR}/B.jsonl`]: ligne("a.md::q2", 2),
+		});
+		const set = creer(fs, "A");
+		await set.load();
+		set.append([{ t: "answer", q: "a.md::q9", at: 9, grade: "correct" }]);
+		r.check("visible tout de suite en mémoire", set.lines().map(l => l.at), [1, 2, 9]);
+		set.destroy();
+		await attendreEcritures();
+		r.check("journal/A.jsonl a grandi", fs.fichiers.get(`${DIR}/A.jsonl`), ligne("a.md::q9", 9));
+		r.check("l'ancien est intact", fs.fichiers.get(ancien), ligne("a.md::q1", 1));
+		r.check("B est intact", fs.fichiers.get(`${DIR}/B.jsonl`), ligne("a.md::q2", 2));
+		r.check("le dossier est créé avant l'ajout",
+			fs.trace.filter(([op]) => op === "mkdirs" || op === "append").map(([op]) => op), ["mkdirs", "append"]);
+	});
+
+	await essayer("cas 4 (un renommage d'un appareil rattrape l'historique d'un autre)", async () => {
+		const fs = fsMemoire({
+			[`${DIR}/A.jsonl`]: ligne("old.md::q1", 5) + ligne("new.md::q1", 15) + ligne("old.md::q2", 15),
+			[`${DIR}/B.jsonl`]: JSON.stringify({ t: "rename", from: "old.md", to: "new.md", at: 10 }) + "\n",
+		});
+		const set = creer(fs, "B");
+		await set.load();
+		r.check("avant le renommage : nouvelle clé ; après, sous l'ancienne : ancienne clé",
+			applyRenames(set.lines()).map(e => e.q), ["new.md::q1", "new.md::q1", "old.md::q2"]);
+		set.destroy();
+	});
+
+	await essayer("cas 5 (jamais de copie de l'ancien vers un fichier d'appareil)", async () => {
+		const fs = fsMemoire({ [ancien]: ligne("a.md::q1", 1) + ligne("a.md::q2", 2) });
+		const set = creer(fs);
+		await set.load();
+		set.append([{ t: "answer", q: "a.md::q3", at: 3, grade: "correct" }]);
+		set.destroy();
+		await attendreEcritures();
+		r.check("le fichier d'appareil ne porte que la nouvelle ligne", fs.fichiers.get(`${DIR}/A.jsonl`), ligne("a.md::q3", 3));
+		r.check("l'ancien n'a pas bougé", fs.fichiers.get(ancien), ligne("a.md::q1", 1) + ligne("a.md::q2", 2));
+	});
+
+	r.done();
+});

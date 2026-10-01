@@ -6,7 +6,8 @@ import {
 	type DayOutcome, type LogLine, type Plan, type ReviewEvent, type ReviewGrade, type ScheduledItem, type SchedulerParams,
 } from "../scheduler";
 import type { QuestionRole } from "../types/quiz";
-import { createLogFile, type LogFile } from "./log-file";
+import type { LogFile } from "./log-file";
+import { createJournalSet } from "./journal-set";
 import { transposerLignes } from "./transpose";
 import { LOG_PREFIX } from "../branding";
 
@@ -91,7 +92,7 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 	   déjà en rechargeant sa fenêtre (l'hôte est un singleton). */
 	const journaux = new Map<string, { root: HostRoot; fichier: LogFile }>();
 	for (const root of deps.paths.roots()) {
-		journaux.set(root.id, { root, fichier: createLogFile({ fs: deps.fs, path: root.reviewLog }) });
+		journaux.set(root.id, { root, fichier: createJournalSet({ fs: deps.fs, legacyPath: root.reviewLog, dir: root.reviewJournalDir, deviceId: root.deviceId }) });
 	}
 
 	/** La clé LOCALE (ce qui est écrit) d'une clé du contrat, avec sa racine. */

@@ -309,8 +309,8 @@ function fauxHote(options = {}) {
 	const abonnesFichier = new Set();
 	const abonnesDossier = new Set();
 	const racines = [
-		{ id: "A", name: "A", reviewLog: "A/.neo-quiz/review-log.jsonl", legacyReviewLog: null, vault: false },
-		{ id: "B", name: "B", reviewLog: "B/.neo-quiz/review-log.jsonl", legacyReviewLog: null, vault: false },
+		{ id: "A", name: "A", reviewLog: "A/.neo-quiz/review-log.jsonl", reviewJournalDir: "A/.neo-quiz/journal", deviceId: "dev", legacyReviewLog: null, vault: false },
+		{ id: "B", name: "B", reviewLog: "B/.neo-quiz/review-log.jsonl", reviewJournalDir: "B/.neo-quiz/journal", deviceId: "dev", legacyReviewLog: null, vault: false },
 	];
 	const teteDe = (p) => String(p ?? "").split("/")[0];
 	const host = {
@@ -731,7 +731,7 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
 		   sain : les réponses seraient bien là, dans le mauvais fichier, et le
 		   greffon ne les retrouverait jamais. */
 		r.check("une réponse est écrite dans le journal de SA racine",
-			ecritures.map(([p]) => p), ["B/.neo-quiz/review-log.jsonl"]);
+			ecritures.map(([p]) => p), ["B/.neo-quiz/journal/dev.jsonl"]);
 		/* La clé écrite est LOCALE : c'est elle que le greffon lira sur le même
 		   dossier. Une clé préfixée serait invisible depuis Obsidian. */
 		/* `?.` et non `ecritures[0][1]` : si rien n'était écrit du tout, l'accès
@@ -834,7 +834,7 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
 		/* Seule la ligne du dossier déplacé rejoint le journal cible : celle
 		   de « Autre » ne doit jamais traverser. */
 		r.check("le journal cible reçoit la ligne transposée du dossier déplacé",
-			ecritures.map(([p]) => p), ["A/.neo-quiz/review-log.jsonl"]);
+			ecritures.map(([p]) => p), ["A/.neo-quiz/journal/dev.jsonl"]);
 		r.check("la clé écrite dans le journal cible est locale à SA racine",
 			JSON.parse(ecritures[0]?.[1] ?? "{}").q, "Cours/reseau.md::q1");
 		/* Le journal SOURCE n'est jamais réécrit : ajout seul, la ligne
@@ -848,7 +848,7 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
 		   n'applique pas `append` au fichier lu par `load()` : on rejoue la
 		   ligne transposée dans le journal de A à la main, comme le disque
 		   l'aurait. */
-		fichiers.set("A/.neo-quiz/review-log.jsonl", ecritures[0][1]);
+		fichiers.set("A/.neo-quiz/journal/dev.jsonl", ecritures[0][1]);
 		const avant = ecritures.length;
 		await store.moved("A/Cours", "B/Cours");
 		clock.runNext();
@@ -877,7 +877,7 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
 		r.check("un déplacement dans la même racine écrit un renommage, pas une transposition",
 			derniereLigne()?.t, "rename");
 		r.check("dans le seul journal de cette racine",
-			ecritures.map(([p]) => p), ["B/.neo-quiz/review-log.jsonl"]);
+			ecritures.map(([p]) => p), ["B/.neo-quiz/journal/dev.jsonl"]);
 		store.destroy();
 	});
 	r.done();

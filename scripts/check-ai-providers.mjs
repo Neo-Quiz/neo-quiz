@@ -60,7 +60,7 @@ function fauxHote({ reponses = {}, caches = {}, runs = {}, comptes = [], comptes
 			math: { ready: async () => {}, render: () => null, flush: () => {} },
 			shell: { openExternal: async () => false, revealInHost: async () => false, openUrl: async () => false },
 			platform: { isMobile: false, isMacOS: false, isWindows: true, isDesktopApp: true, uiLanguage: "en" },
-			paths: { resultsDirFor: () => ".results", attachmentPathFor: async (n) => n, roots: () => [], defaultRoot: () => ({ id: "", name: "", reviewLog: "", legacyReviewLog: null, vault: false }), rootOf: () => null, localPath: (p) => p, contractPath: (_r, p) => p },
+			paths: { resultsDirFor: () => ".results", attachmentPathFor: async (n) => n, roots: () => [], defaultRoot: () => ({ id: "", name: "", reviewLog: "", reviewJournalDir: "", deviceId: "test-device", legacyReviewLog: null, vault: false }), rootOf: () => null, localPath: (p) => p, contractPath: (_r, p) => p },
 			modals: { open: () => ({ panelEl: null, contentEl: null, close: () => {} }) },
 			net: {
 				async fetchJson(req) {

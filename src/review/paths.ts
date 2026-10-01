@@ -21,3 +21,10 @@
 
 export const REVIEW_DIR = ".neo-quiz";
 export const REVIEW_LOG_NAME = "review-log.jsonl";
+
+/** One file per device lives here: `<root>/.neo-quiz/journal/<deviceId>.jsonl`.
+    The single legacy `review-log.jsonl` stays where it is, read only. */
+export const REVIEW_JOURNAL_DIR = "journal";
+export const deviceLogName = (deviceId: string): string => `${deviceId}.jsonl`;
+/** A Syncthing conflict copy (`A.sync-conflict-20261001-120000-XYZ.jsonl`). */
+export const isConflictCopy = (name: string): boolean => name.includes(".sync-conflict-");

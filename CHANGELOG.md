@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Review history is written per device so two synced devices never conflict.
+
 ### Fixed
 - Moving a folder keeps its exams, attempts and saved sessions.
 

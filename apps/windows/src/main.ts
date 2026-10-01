@@ -15,6 +15,7 @@ import { createScanner } from "../../../src/dashboard/scanner";
 import type { QuizIndexEntry, Scanner } from "../../../src/dashboard/scanner";
 import { currentHost, installHost, requireHost } from "../../../src/host/current";
 import type { HostModalHandle } from "../../../src/host/types";
+import { deviceId } from "./host/device";
 import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host";
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
@@ -523,7 +524,7 @@ async function demarrer(): Promise<void> {
 		   être vide qu'un instant entre la suppression du disque du dossier
 		   par défaut et son prochain démarrage, un cas qu'aucun écran ne
 		   protège mieux qu'une coquille simplement vide. */
-		const carte = creerCarteRacines(ouvertes);
+		const carte = creerCarteRacines(ouvertes, await deviceId());
 		carteCourante = carte;
 		const index = await createWindowsIndex(carte);
 		/* Retenue pour `.finally()` plus bas, qui démarre la surveillance
