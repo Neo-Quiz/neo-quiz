@@ -25,6 +25,12 @@ class QrScanner(activity: ComponentActivity) {
         pending = null
     }
 
+    /** The activity goes away: a scan still waiting answers "gave up" instead of staying pending forever. */
+    fun detach() {
+        pending?.complete(null)
+        pending = null
+    }
+
     suspend fun scan(): String? = withContext(Dispatchers.Main) {
         if (pending != null) return@withContext null
         val answer = CompletableDeferred<String?>()

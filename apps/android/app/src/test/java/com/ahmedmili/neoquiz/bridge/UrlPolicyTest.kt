@@ -27,4 +27,17 @@ class UrlPolicyTest {
     @Test fun userinfoCannotSpoofTheHost() {
         assertEquals(UrlDecision.EXTERNAL, UrlPolicy.decide("https://appassets.androidplatform.net@evil.com/assets/x"))
     }
+
+    @Test fun aSubresourceMayOnlyComeFromTheAppOrBeInline() {
+        for (u in listOf("https://appassets.androidplatform.net/assets/web/index.html", "https://appassets.androidplatform.net/assets/web/a.js?x=1", "data:image/png;base64,AAAA", "blob:https://appassets.androidplatform.net/1b2c-3d")) {
+            assertEquals(u, true, UrlPolicy.mayLoad(u))
+        }
+        for (u in listOf(
+            "http://127.0.0.1:37113/rest/system/ping", "http://localhost:22100/", "https://example.com/x.png", "http://appassets.androidplatform.net/assets/x",
+            "https://appassets.androidplatform.net:8443/assets/x", "https://appassets.androidplatform.net.evil.com/assets/x", "https://appassets.androidplatform.net@evil.com/assets/x",
+            "blob:https://evil.com/1", "ws://127.0.0.1:1/", "file:///sdcard/x", "ftp://x/y", "", "not a url",
+        )) {
+            assertEquals(u, false, UrlPolicy.mayLoad(u))
+        }
+    }
 }

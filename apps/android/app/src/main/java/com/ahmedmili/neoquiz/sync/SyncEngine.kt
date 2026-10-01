@@ -1,6 +1,5 @@
 package com.ahmedmili.neoquiz.sync
 
-import android.util.Log
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -112,7 +111,7 @@ class SyncEngine(
                     current = next
                     watch(next)
                 } catch (e: Exception) {
-                    Log.w(TAG, "restart failed: ${e.message}")
+                    SyncLog.warn(TAG, "restart failed", e)
                     dead = true
                 }
                 last = ""
@@ -193,7 +192,7 @@ class SyncEngine(
             push()
             if (received) onReceived?.invoke()
         } catch (e: Exception) {
-            if (!stopped) Log.w(TAG, "poll failed: ${e.message}")
+            if (!stopped) SyncLog.warn(TAG, "poll failed", e)
         } finally {
             tickLock.unlock()
         }
@@ -221,7 +220,7 @@ class SyncEngine(
             push()
             PairResult.OK
         } catch (e: Exception) {
-            Log.w(TAG, "pairing failed: ${e.message}")
+            SyncLog.warn(TAG, "pairing failed", e)
             PairResult.UNAVAILABLE
         }
     }

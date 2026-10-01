@@ -21,10 +21,12 @@ class AppBridge(
     private val scope: CoroutineScope,
     private val code: CodeSandbox,
     private val sync: SyncHub,
+    private val qr: QrScanner,
 ) {
     /** Releases what the bridge holds besides coroutines: the hidden code WebView, and the page's hold on the sync. */
     fun shutdown() {
         sync.detach()
+        qr.detach()
         code.shutdown()
     }
 
@@ -78,7 +80,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val pairDialog = PairConfirmDialog(activity)
     val qr = QrScanner(activity as ComponentActivity)
     hub.confirmer = { id, name -> pairDialog.ask(id, name) }
-    hub.allowRoot = allowed::allow
+    hub.attach(allowed::allow)
     hub.stateListener = { state -> bridge?.emit("sync.etat", state) }
     hub.receivedListener = {
         // Changes of another device landed: scan the folder (file events), then tell the page to reload its journals.
@@ -91,9 +93,9 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
 
     val created = Bridge(
         scope,
-        Unavailable.handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
+        Unavailable.handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
             settings.handlers() + system.handlers() + syncChannel.handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox, hub)
+    return AppBridge(created, scan, scope, codeSandbox, hub, qr)
 }

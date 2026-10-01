@@ -1,5 +1,8 @@
 package com.ahmedmili.neoquiz
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -32,16 +35,29 @@ class MainActivity : ComponentActivity() {
             }
         }
         granted = hasAllFilesAccess()
+        askForNotifications()
         setContent {
             if (granted) AndroidView(factory = { appWebView }) else AndroidView(factory = { FirstRunScreen(it) })
         }
         loadWhenGranted()
     }
 
+    /** Android 13+: asked once, at first run, so the sync service's notification shows. Never blocks anything. */
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        val prefs = getSharedPreferences("sync", MODE_PRIVATE)
+        if (prefs.getBoolean("notifications_asked", false)) return
+        prefs.edit().putBoolean("notifications_asked", true).apply()
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+    }
+
     /** The app is visible again: files may have changed (sync, another app). Silent until the page has hydrated. */
     override fun onStart() {
         super.onStart()
-        SyncHub.get(this).foreground = true
+        SyncHub.get(this).apply {
+            foreground = true
+            resume()
+        }
         appWebView.rescan()
     }
 

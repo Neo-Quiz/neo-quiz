@@ -49,6 +49,9 @@ object ShareRules {
     /** The shared folder: `Documents/Neo Quiz`, whatever an offer or the page says. */
     fun sharedRoot(documents: File): File = File(documents, "Neo Quiz")
 
+    /** True when [real] (resolved on the disk) is exactly `Neo Quiz` directly under the resolved [documents]: a symlink pointing elsewhere is not. */
+    fun isCanonicalSharedRoot(real: File, documents: File): Boolean = real == sharedRoot(documents)
+
     /** `\A`..`\z`-style match: Kotlin's `matches` is anchored at both ends, so a trailing newline fails. */
     fun isDeviceId(s: Any?): Boolean = s is String && ID_FORMAT.matches(s)
 

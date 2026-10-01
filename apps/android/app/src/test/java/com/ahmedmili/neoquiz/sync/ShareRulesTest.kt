@@ -68,6 +68,16 @@ class ShareRulesTest {
         assertTrue(cfg.getBoolean("ignorePerms"))
     }
 
+    @Test fun theCanonicalRootMustBeDocumentsNeoQuizItself() {
+        val documents = File("/storage/emulated/0/Documents")
+        assertTrue(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz"), documents))
+        // A symlink Neo Quiz -> elsewhere resolves to somewhere else: sync refuses to start.
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Download/other"), documents))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents"), documents))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz/sub"), documents))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz2"), documents))
+    }
+
     @Test fun launchArgsIsExactlyTheVerifiedFlagList() {
         assertEquals(
             listOf("serve", "--home=/data/h", "--no-browser", "--no-restart", "--no-upgrade", "--gui-address=127.0.0.1:8384", "--gui-apikey=$key"),

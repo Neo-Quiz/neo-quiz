@@ -51,12 +51,45 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 
     /** The native pairing confirmation (set by the bridge, which owns the activity); no confirmer = no pairing. */
     @Volatile var confirmer: (suspend (deviceId: String, name: String) -> Boolean)? = null
-    @Volatile var allowRoot: ((File) -> Unit)? = null
+    @Volatile private var allowRoot: ((File) -> Unit)? = null
     @Volatile var stateListener: ((Map<String, Any?>) -> Unit)? = null
     @Volatile var receivedListener: (() -> Unit)? = null
     /** True while an activity is on screen; a reception while away is remembered, see [takePendingReception]. */
     @Volatile var foreground = false
     @Volatile private var pendingReception = false
+
+    /**
+     * Android refused or ended the foreground service (the 6 h/day dataSync budget of Android 15,
+     * or a start from the background). Relaunching on every page request would loop (start,
+     * refused, stop, kill); sync stays paused, and the state says so, until the app is opened again.
+     */
+    @Volatile private var paused = false
+
+    fun markPaused() { paused = true }
+
+    /** The app came to the screen: a new foreground start is allowed again. */
+    fun resume() { paused = false }
+
+    /** The bridge attaches: it admits the shared folder to its perimeter (now if the engine already runs, e.g. after a service-only start). */
+    fun attach(allow: (File) -> Unit) {
+        allowRoot = allow
+        if (engine != null) admitRoot()
+    }
+
+    /**
+     * Resolves `Documents/Neo Quiz` on the disk and admits it to the perimeter. `null` (sync must not
+     * start) when it cannot be resolved or resolves anywhere else than `Documents/Neo Quiz` (a symlink).
+     */
+    private fun admitRoot(): File? {
+        val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val shared = ShareRules.sharedRoot(documents)
+        shared.mkdirs()
+        val real = resolveReal(shared) ?: return null
+        val realDocuments = resolveReal(documents) ?: return null
+        if (!ShareRules.isCanonicalSharedRoot(real, realDocuments)) return null
+        allowRoot?.invoke(real)
+        return real
+    }
 
     fun detach() {
         confirmer = null
@@ -81,18 +114,18 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         try {
             ContextCompat.startForegroundService(appContext, Intent(appContext, SyncService::class.java))
         } catch (e: Exception) {
-            Log.w(TAG, "cannot start the sync service: ${e.message}")
+            SyncLog.warn(TAG, "cannot start the sync service", e)
         }
     }
 
     /** Creates and starts the engine once; `null` when Syncthing cannot run (the next call retries). */
     suspend fun launchEngine(): SyncEngine? = lock.withLock {
         engine?.let { return it }
-        val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val shared = ShareRules.sharedRoot(documents)
-        shared.mkdirs()
-        val root = resolveReal(shared) ?: shared
-        allowRoot?.invoke(root)
+        val root = admitRoot()
+        if (root == null) {
+            Log.w(TAG, "Documents/Neo Quiz cannot be resolved to itself: sync not started")
+            return null
+        }
         val home = File(appContext.filesDir, "syncthing")
         val process = SyncthingProcess(File(appContext.applicationInfo.nativeLibraryDir, ProcTable.BINARY_NAME), home, File(appContext.cacheDir, "syncthing-tmp"))
         val created = SyncEngine(
@@ -111,7 +144,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             engine = created
             created
         } catch (e: Exception) {
-            Log.w(TAG, "syncthing unavailable: ${e.message}")
+            SyncLog.warn(TAG, "syncthing unavailable", e)
             null
         }
     }
@@ -124,7 +157,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     }
 
     private suspend fun ensure(): SyncEngine? {
-        engine?.let { return it }
+        if (paused) return null
+        engine?.let { admitRoot(); return it }
         startService()
         // First start can take a while (key generation); the page waits for its id. Only the WAIT times out:
         // cancelling the launch itself would leave a half-started process without an owner.
@@ -145,7 +179,10 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         @Volatile private var instance: SyncHub? = null
 
         fun get(context: Context): SyncHub = instance ?: synchronized(this) {
-            instance ?: SyncHub(context.applicationContext).also { instance = it }
+            instance ?: SyncHub(context.applicationContext).also {
+                SyncLog.verbose = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+                instance = it
+            }
         }
 
         fun peek(): SyncHub? = instance
@@ -170,7 +207,8 @@ class SyncService : Service() {
             startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } catch (e: Exception) {
             // The system refused a foreground start (app in the background): nothing to keep alive.
-            Log.w(TAG, "foreground start refused: ${e.message}")
+            SyncLog.warn(TAG, "foreground start refused", e)
+            hub.markPaused()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -185,6 +223,7 @@ class SyncService : Service() {
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         Log.w(TAG, "dataSync time budget exhausted: stopping")
+        SyncHub.get(this).markPaused()
         stopSelf()
     }
 

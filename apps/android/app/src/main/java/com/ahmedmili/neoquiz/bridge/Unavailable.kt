@@ -15,7 +15,6 @@ object Unavailable {
     private val value: Map<String, () -> Any?> = mapOf(
         "partage.enregistrer" to { null },
         "partage.discord" to { false },
-        "systeme.copierTexte" to { null },
         "systeme.vaultsObsidian" to { emptyList<Any>() },
         "systeme.choisirFichiers" to { emptyList<Any>() },
         "systeme.relancer" to { null },

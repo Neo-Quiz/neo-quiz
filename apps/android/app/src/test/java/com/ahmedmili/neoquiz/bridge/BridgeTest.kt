@@ -21,6 +21,7 @@ class BridgeTest {
         return FilesChannel(perimeter, allowed).handlers() +
             ScanChannel(perimeter) { }.handlers() +
             SystemChannel(perimeter, allowed, settings, { null }, { true }).handlers() +
+            ClipboardChannel { }.handlers() +
             settings.handlers() +
             CodeChannel(object : com.ahmedmili.neoquiz.code.CodeEngine {
                 override suspend fun run(job: Any?) = JSONObject()

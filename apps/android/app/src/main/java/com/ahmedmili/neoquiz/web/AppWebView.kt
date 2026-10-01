@@ -52,7 +52,16 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
-            ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+            ): WebResourceResponse? {
+                // The app holds INTERNET for Syncthing: the page may reach nothing but its own assets
+                // (no Internet host, no http://127.0.0.1:<REST port>).
+                if (!UrlPolicy.mayLoad(request.url.toString())) {
+                    return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", mapOf("Content-Security-Policy" to UrlPolicy.CSP), java.io.ByteArrayInputStream(ByteArray(0)))
+                }
+                val response = assetLoader.shouldInterceptRequest(request.url) ?: return null
+                response.responseHeaders = (response.responseHeaders ?: emptyMap()) + ("Content-Security-Policy" to UrlPolicy.CSP)
+                return response
+            }
 
             // The page holds the bridge: only the app's assets load here, a link tapped by the
             // user goes to the system browser, everything else is dropped.
