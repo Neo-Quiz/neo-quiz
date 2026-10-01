@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.13] - 2026-10-01
+
 ### Changed
 - Generating one quiz per document now reads all the documents first, in a single generation.
 
