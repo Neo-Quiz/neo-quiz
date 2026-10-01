@@ -280,13 +280,24 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	text-align: center;
 	white-space: normal;
 	pointer-events: none;
+	/* HIDDEN WITH `visibility` AS WELL AS `opacity: 0` (2026-10-01). Alone,
+	   `opacity: 0` on this label, which sticks out of its bead by about 80 px
+	   to the left and 40 px up, broke the painting of the row in the Android
+	   WebView (Chromium 151): each reading bead lost its book, which was drawn
+	   half-size next to it, and the bead after it shrank to a pill. Found by
+	   deleting the nine `.is-lecture` rules, then restoring this one;
+	   `opacity: 0.01`, `visibility: hidden` or `content: none` each cure it,
+	   so it is the fully transparent box that is at fault. The visible state
+	   flips at once after the delay; the hidden one waits for the fade. */
 	opacity: 0;
+	visibility: hidden;
 	transform: translate(-50%, 4px);
-	transition: opacity 0.15s ease, transform 0.15s ease;
+	transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
 }
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:hover::after,
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:focus-visible::after {
 	opacity: 1;
+	visibility: visible;
 	transform: translate(-50%, 0);
 	transition-delay: 0.25s;
 }
