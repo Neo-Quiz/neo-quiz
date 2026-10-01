@@ -111,7 +111,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val created = Bridge(
         scope,
         Unavailable.handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar).handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar::apply).handlers(),
     )
     bridge = created
     return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar)
