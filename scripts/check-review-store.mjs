@@ -892,7 +892,7 @@ await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) 
    partagé), avec un faux `window.neo` qui ne sert que les réglages.
 ══════════════════════════════════════════════════════════ */
 
-await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/folder.ts"], async ({ creerJournalApp }, { chargerExamens, enregistrerExamen }) => {
+await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/folder.ts", "apps/windows/src/host/shared-state.ts"], async ({ creerJournalApp }, { enregistrerExamen }, { createSharedState, installSharedState }) => {
 	const r = makeReporter("Application — pas d'examen, pas de révision (catalogue)");
 	const reglages = new Map();
 	const fenetreAvant = globalThis.window;
@@ -912,7 +912,20 @@ await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/
 				{ path: "A/Loisirs/Tout.md", items: items(300) },
 				{ path: "B/Reseaux/CM1.md", items: items(30) },
 			];
-			await chargerExamens();
+			// Exams live in the per-device files of each root: an in-memory fs.
+			const fichiers = new Map();
+			const sous = (d) => [...fichiers.keys()].filter(k => k.startsWith(d + "/") && !k.slice(d.length + 1).includes("/"));
+			const etat = createSharedState({
+				roots: () => ["A", "B"], deviceId: "dev",
+				fs: {
+					exists: async (p) => fichiers.has(p), read: async (p) => fichiers.get(p), write: async (p, d) => { fichiers.set(p, d); },
+					append: async (p, d) => { fichiers.set(p, (fichiers.get(p) ?? "") + d); }, list: async (d) => sous(d),
+					remove: async (p) => { fichiers.delete(p); }, mkdirs: async () => {},
+					rename: async (a, b) => { fichiers.set(b, fichiers.get(a)); fichiers.delete(a); },
+				},
+			});
+			await etat.load();
+			installSharedState(etat);
 			const store = await creerJournalApp(host, { getQuizzes: () => quizzes });
 			r.check("sans examen : rien à réviser aujourd'hui", store.plan(Date.now()).today, []);
 			await enregistrerExamen("B/Reseaux", { id: "e1", nom: "", date: "2099-06-01" });

@@ -2,10 +2,10 @@ import { t } from "../i18n";
 import type { StatsRecord } from "../types/quiz";
 
 /* ══════════════════════════════════════════════════════════
-   STATS STORE — Stockage persistant des scores et progression
-   Persistance déléguée à l'hôte (StatsStoreHost) : `settings.quizStats`
-   côté greffon, les réglages de l'application côté Windows.
-   Mises à jour en mémoire synchrones, sauvegarde debouncée.
+   STATS STORE: persistent scores and progress.
+   Persistence is delegated to the host (StatsStoreHost): on Windows, the
+   per-device attempt files of the synced folder (`.neo-quiz/attempts/`).
+   In-memory updates are synchronous, the save is debounced.
 ══════════════════════════════════════════════════════════ */
 
 /** Une arrivée au score (2026-09-26) : ce que l'onglet Progression liste et
@@ -89,7 +89,7 @@ export function tentativesDe(r: QuizStatRecord | null | undefined): Tentative[] 
 }
 
 /** Meilleur score et nombre de tentatives, DÉRIVÉS de la liste. */
-function recalculer(r: QuizStatRecord, liste: Tentative[]): QuizStatRecord {
+export function recalculer(r: QuizStatRecord, liste: Tentative[]): QuizStatRecord {
 	const pcts = liste.map(x => x.pct).filter((p): p is number => typeof p === "number");
 	return {
 		...r,

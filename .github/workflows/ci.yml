@@ -199,6 +199,12 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # EXAMS AND ATTEMPTS PER DEVICE in the synced folder: the merge (newest
+      # edit, tombstones, delete-before-add), the one-time migration, conflict
+      # copies, and a folder move between roots.
+      - name: Shared state
+        run: npm run check:shared-state
+
       # THE HOME PAGE: a folder's tasks in order (review, Learn, Test),
       # mastered quizzes left out, folders by nearest exam then latest work,
       # the week from Monday, local midnights across daylight saving.

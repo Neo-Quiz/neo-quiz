@@ -1,40 +1,32 @@
 import { LOG_PREFIX } from "../../../../src/branding";
-import { createStatsStore, type StatsStore, type QuizStatRecord } from "../../../../src/dashboard/stats-store";
-import { ecrireReglage, lireReglage } from "../host/folder";
+import { createStatsStore, type StatsStore } from "../../../../src/dashboard/stats-store";
+import type { SharedState } from "../host/shared-state";
 
 /* ══════════════════════════════════════════════════════════
-   LES STATISTIQUES PAR QUIZ, CÔTÉ APPLICATION
+   PER-QUIZ STATS, APPLICATION SIDE
 
-   Distinctes du JOURNAL de révision, et à ne pas fusionner avec lui : le
-   journal répond à « quelles questions sont dues aujourd'hui », les stats à
-   « où en suis-je sur ce quiz ». La spec de l'ordonnanceur (§9.1) le dit
-   sans ambiguïté — deux systèmes, deux questions.
+   Distinct from the review JOURNAL and not to be merged with it: the journal
+   answers "which questions are due today", the stats "where am I on this
+   quiz" (scheduler spec, section 9.1: two systems, two questions).
 
-   Elles vivent dans les RÉGLAGES de l'application, pas dans le dossier de
-   quiz, et c'est délibéré : contrairement au journal, elles ne se partagent
-   pas avec le greffon. Les partager demanderait de fusionner deux tables
-   écrites par deux processus sans arbitre, pour un affichage — le journal,
-   lui, le mérite et paie ce prix avec son format en ajout seul.
+   Since 2026-10-01 they live in the synced folder, one attempts file per
+   device and root (`host/shared-state.ts`), not in the app settings: another
+   device syncing the same folder sees the attempts. The store keeps working on
+   a whole table in memory; each debounced save is turned into add/delete
+   events by comparing it with what the store held before. The old `quizStats`
+   setting is only read, once, by the migration.
 ══════════════════════════════════════════════════════════ */
 
-const CLE_STATS = "quizStats";
-
-export async function creerStatsApp(): Promise<StatsStore> {
-	let cache: Record<string, QuizStatRecord> = {};
-	try {
-		const brut = await lireReglage<Record<string, QuizStatRecord>>(CLE_STATS);
-		if (brut && typeof brut === "object") cache = brut;
-	} catch (e) {
-		// Réglages illisibles : on repart de stats vides plutôt que d'empêcher
-		// le démarrage. Une progression perdue se recalcule en rejouant ;
-		// une fenêtre qui ne s'ouvre pas, non.
-		console.warn(LOG_PREFIX, "statistiques illisibles:", e);
-	}
+export async function creerStatsApp(state: SharedState): Promise<StatsStore> {
 	const stats = createStatsStore({
-		getStats: () => cache,
+		getStats: () => state.stats(),
 		saveStats: async (data) => {
-			cache = data;
-			await ecrireReglage(CLE_STATS, data);
+			try {
+				await state.syncStats(data);
+			} catch (e) {
+				// The in-memory table stays; the next save retries what failed.
+				console.warn(LOG_PREFIX, "attempts not saved:", e);
+			}
 		},
 	});
 	stats.load();

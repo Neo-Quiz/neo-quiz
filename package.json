@@ -76,6 +76,7 @@
     "check:reprise": "node scripts/check-reprise.mjs",
     "check:historique-nav": "node scripts/check-historique-nav.mjs",
     "check:langue": "node scripts/check-langue.mjs",
+    "check:shared-state": "node scripts/check-shared-state.mjs",
     "check:stats": "node scripts/check-stats.mjs",
     "check:home": "node scripts/check-home.mjs",
     "check:gestes": "node scripts/check-gestes.mjs",

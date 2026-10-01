@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 - Review history is written per device so two synced devices never conflict.
+- Exams and attempts move from the app settings into each folder's `.neo-quiz/` (one file per device, merged on read), so another device syncing the folder sees them. Existing exams and attempts are copied over once at the first start; the old settings are left untouched.
 
 ### Fixed
 - Moving a folder keeps its exams, attempts and saved sessions.

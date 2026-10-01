@@ -564,14 +564,15 @@ export async function estVaultObsidian(racine: string): Promise<boolean> {
    `examDates()` lit le réglage EN MÉMOIRE plutôt que le pont à chaque appel :
    le plan de l'ordonnanceur est recalculé souvent (chaque réponse jouée), et
    un aller-retour IPC à chaque calcul serait payé pour rien — le cache est
-   `tableExamens`, chargé une fois au démarrage par `chargerExamens()`
-   ci-dessous.
+   `tableExamens`, branché au démarrage par `brancherExamens()` (voir plus
+   bas) sur les fichiers par appareil du dossier synchronisé.
 
    `chargerExamDates`/`datesExamen`/`setExamDate`/`appliquerExamDate` (une
    seule date par module) sont partis à la tâche 4 (« plusieurs examens par
    dossier », 2026-09-26) : plus aucun appelant depuis que l'onglet Planning
    remplace le champ de « Modifier dossier ». `CLE_EXAM_DATES` reste : c'est
-   la clé de la MIGRATION lue par `chargerExamens` (`lireExamens`, plus bas).
+   la clé de la MIGRATION lue par `lireExamens`, plus bas (rejouée une fois
+   vers les fichiers du dossier, `host/shared-state.ts`).
 ══════════════════════════════════════════════════════════ */
 
 const CLE_EXAM_DATES = "examDates";
@@ -607,7 +608,6 @@ export function examDates(): Record<string, string> {
 
 export type Examen = ExamenDossier;
 
-const CLE_EXAMENS = "examens";
 const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** La table des examens par module (cache mémoire, comme `datesExamen`). */
@@ -631,7 +631,7 @@ function readSeances(brut: unknown): string[] | undefined {
  * MIGRE, tant que le réglage neuf n'a jamais été écrit (`brut` absent),
  * chaque date de `anciennes` (l'ancien réglage `examDates`) en un examen
  * `{ id: "migre-" + module, nom: "", date }`. PURE
- * : c'est cette fonction, et non `chargerExamens`, que `check:folders`
+ * : c'est cette fonction, et non le magasin branché, que `check:folders`
  * éprouve.
  */
 export function lireExamens(brut: unknown, anciennes: unknown): Record<string, Examen[]> {
@@ -698,29 +698,36 @@ export function aujourdhuiIso(now: number): string {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export async function chargerExamens(): Promise<void> {
-	let brutExamens: unknown;
-	let brutAnciennes: unknown;
-	try {
-		brutExamens = await pont().reglages.lire(CLE_EXAMENS);
-	} catch (e) {
-		console.warn(LOG_PREFIX, "examens illisibles:", e);
-		brutExamens = undefined;
-	}
-	try {
-		brutAnciennes = await pont().reglages.lire(CLE_EXAM_DATES);
-	} catch (e) {
-		console.warn(LOG_PREFIX, "anciennes dates d'examen illisibles:", e);
-		brutAnciennes = undefined;
-	}
-	// Pas de réécriture ici : la migration ne se matérialise qu'à la
-	// première écriture (`enregistrerExamen`/`retirerExamen`).
-	tableExamens = lireExamens(brutExamens, brutAnciennes);
+/** Where the exams live: the per-device files of the synced folder
+    (`host/shared-state.ts`), connected at startup by `brancherExamens`. This
+    module keeps the MERGED table in memory (`tableExamens`), because the review
+    plan reads it on every answer and a disk round trip each time would be
+    paid for nothing. */
+export interface ExamStore {
+	exams(): Record<string, Examen[]>;
+	save(module: string, e: Examen): Promise<void>;
+	remove(module: string, id: string): Promise<void>;
+	move(pairs: ReadonlyArray<readonly [string, string, boolean?]>): Promise<void>;
 }
 
+let magasinExamens: ExamStore | null = null;
+
+export function brancherExamens(magasin: ExamStore): void {
+	magasinExamens = magasin;
+	tableExamens = magasin.exams();
+}
+
+function magasin(): ExamStore {
+	if (!magasinExamens) throw new Error("exam store not connected");
+	return magasinExamens;
+}
+
+/** Saves one exam. The cache is updated first (the UI reads it at once), then
+    replaced by the merged view once the file is written. */
 export async function enregistrerExamen(module: string, e: Examen): Promise<void> {
 	tableExamens = enregistrerExamenDans(tableExamens, module, e);
-	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
+	await magasin().save(module, e);
+	tableExamens = magasin().exams();
 }
 
 /** Moves the exam lists of the module keys `paires` (`[old, new]`) to their
@@ -746,15 +753,15 @@ export function deplacerCleExamens(t: Record<string, Examen[]>, paires: Readonly
 }
 
 export async function renommerExamens(paires: ReadonlyArray<readonly [string, string, boolean?]>): Promise<void> {
-	const suivant = deplacerCleExamens(tableExamens, paires);
-	if (suivant === tableExamens) return;
-	tableExamens = suivant;
-	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
+	if (deplacerCleExamens(tableExamens, paires) === tableExamens) return;
+	await magasin().move(paires);
+	tableExamens = magasin().exams();
 }
 
 export async function retirerExamen(module: string, id: string): Promise<void> {
 	tableExamens = retirerExamenDe(tableExamens, module, id);
-	await pont().reglages.ecrire(CLE_EXAMENS, tableExamens);
+	await magasin().remove(module, id);
+	tableExamens = magasin().exams();
 }
 
 /* ══════════════════════════════════════════════════════════

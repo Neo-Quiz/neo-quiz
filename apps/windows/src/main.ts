@@ -20,10 +20,11 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
-import { chargerExamens, estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
+import { estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
+import { loadSharedState, sharedState } from "./host/shared-state";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
 import type { SessionsApp } from "./review/sessions";
@@ -524,7 +525,8 @@ async function demarrer(): Promise<void> {
 		   être vide qu'un instant entre la suppression du disque du dossier
 		   par défaut et son prochain démarrage, un cas qu'aucun écran ne
 		   protège mieux qu'une coquille simplement vide. */
-		const carte = creerCarteRacines(ouvertes, await deviceId());
+		const idAppareil = await deviceId();
+		const carte = creerCarteRacines(ouvertes, idAppareil);
 		carteCourante = carte;
 		const index = await createWindowsIndex(carte);
 		/* Retenue pour `.finally()` plus bas, qui démarre la surveillance
@@ -538,18 +540,17 @@ async function demarrer(): Promise<void> {
 		   fichiers modifiés pendant le premier balayage. */
 		const scanner = createScanner(currentHost());
 		await scanner.init();
-		/* MIGRER D'ABORD, CHARGER ENSUITE (voir `review/store.ts`) : les dates
-		   d'examen, elles, n'ont pas cet ordre à respecter — mais les charger
-		   avant de monter évite un premier plan calculé sans l'horizon d'une
-		   matière déjà saisie lors d'une session précédente. */
-		await chargerExamens();
-		/* Même raison que `chargerExamDates` ci-dessus : sans ce chargement,
-		   le tout premier montage de la coquille (plus bas) verrait des
-		   réglages de page vides (aucun dossier déplié, axe par défaut) au
-		   lieu de ceux de la session précédente. */
+		/* Exams and attempts live per device in each root's `.neo-quiz/`
+		   (`host/shared-state.ts`); the one-time migration of the old settings
+		   runs inside, before anything reads them. Loaded before the shell is
+		   mounted so the first review plan already sees the exam horizon. */
+		await loadSharedState(ouvertes.map(r => r.id), idAppareil);
+		/* Without this load, the very first mount of the shell (below) would see
+		   empty page settings (no folder expanded, default axis) instead of
+		   those of the previous session. */
 		await chargerReglagesPages();
-		/* Idem pour les réglages IA : la page « Générer » lit le fournisseur et
-		   le modèle de la session précédente dès son premier rendu. */
+		/* Same for the AI settings: the "Generate" page reads the provider and
+		   model of the previous session on its first render. */
 		await chargerReglagesIa();
 		const store = await creerJournalApp(currentHost(), scanner);
 		/* Les STATISTIQUES par quiz : à côté du journal, mais un système
@@ -557,7 +558,7 @@ async function demarrer(): Promise<void> {
 		   Construit ici et non dans `creerJournalApp` : les deux stores
 		   n'ont rien en commun, mélanger leur construction les lierait pour
 		   rien. */
-		const stats = await creerStatsApp();
+		const stats = await creerStatsApp(sharedState());
 		/* LES SESSIONS en cours (2026-09-26) : reprendre un quiz là où on
 		   s'était arrêté. À côté du journal et des stats, un troisième
 		   système distinct (voir `review/sessions.ts`). */

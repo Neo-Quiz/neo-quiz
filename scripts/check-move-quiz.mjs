@@ -45,8 +45,8 @@ async function appeler(qm, hote, ctx, quiz, targetFolder, targetName, { existant
 }
 
 await withSrcModule(
-	["src/dashboard/quiz-menu.ts", "src/host/current.ts", "apps/windows/src/review/folder-move.ts", "apps/windows/src/host/folder.ts", "src/dashboard/stats-store.ts"],
-	async (qm, hote, fm, fo, ss) => {
+	["src/dashboard/quiz-menu.ts", "src/host/current.ts", "apps/windows/src/review/folder-move.ts", "apps/windows/src/host/folder.ts", "src/dashboard/stats-store.ts", "apps/windows/src/host/shared-state.ts"],
+	async (qm, hote, fm, fo, ss, sh) => {
 	const r = makeReporter("« Déplacer vers » d'un quiz");
 
 	const quiz = { path: "DossierA/Quiz de test.md", basename: "Quiz de test" };
@@ -244,6 +244,43 @@ await withSrcModule(
 			})("Efrei/A", "Efrei/B");
 		} catch (e) { leve = e; } finally { console.warn = warn; }
 		r.check("7. exams and sessions fail: nothing thrown, setups still carried", [leve, setups], [null, 1]);
+	}
+
+	/* ── 8. After the move to the synced folder: a move BETWEEN ROOTS carries the
+	   exams from the source root's files to the target root's (as this
+	   device's entries), through the real `renommerExamens` ── */
+	{
+		const files = new Map();
+		const fs = {
+			exists: async (p) => files.has(p), read: async (p) => files.get(p), write: async (p, d) => { files.set(p, d); },
+			append: async (p, d) => { files.set(p, (files.get(p) ?? "") + d); },
+			list: async (d) => [...files.keys()].filter(k => k.startsWith(d + "/") && !k.slice(d.length + 1).includes("/")),
+			remove: async (p) => { files.delete(p); }, mkdirs: async () => {},
+			rename: async (a, b) => { files.set(b, files.get(a)); files.delete(a); },
+		};
+		const roots = [{ id: "Efrei", name: "Efrei" }, { id: "NeoQuiz", name: "Neo Quiz" }];
+		const paths = { roots: () => roots, rootOf: (p) => roots.find(x => p === x.id || p.startsWith(x.id + "/")), localPath: (p) => p.split("/").slice(1).join("/"), contractPath: (id, l) => id + "/" + l };
+		const etat = sh.createSharedState({ fs, roots: () => ["Efrei", "NeoQuiz"], deviceId: "dev" });
+		await etat.load();
+		sh.installSharedState(etat);
+		await fo.enregistrerExamen("Efrei/Reseaux", { id: "f", nom: "Final", date: "2026-12-01" });
+		await fo.enregistrerExamen("Efrei/TD", { id: "td", nom: "TD", date: "2026-11-01" });
+		await fm.createMovedPrefix({
+			paths: () => paths,
+			quizPaths: () => ["Efrei/S3/Reseaux/cm.md", "Efrei/S3/Reseaux/TD/q.md"],
+			renameExams: fo.renommerExamens,
+			testSetups: async () => ({ renamed() {} }),
+			pageSettings: () => ({}), savePageSettings: async () => {},
+		})("Efrei/S3/Reseaux", "NeoQuiz/Reseaux");
+		const after = JSON.parse(files.get("NeoQuiz/.neo-quiz/exams/dev.json"));
+		const gone = JSON.parse(files.get("Efrei/.neo-quiz/exams/dev.json"));
+		r.check("8. cross-root move: the target root's file holds both exams, as live entries",
+			[Object.keys(after).sort(), after["NeoQuiz/Reseaux"][0].id, after["NeoQuiz/TD"][0].id, typeof after["NeoQuiz/TD"][0].modifiedAt], [["NeoQuiz/Reseaux", "NeoQuiz/TD"], "f", "td", "number"]);
+		r.check("8. the source root's file keeps tombstones, and the merged view has only the new keys",
+			[gone["Efrei/Reseaux"][0].deleted, gone["Efrei/TD"][0].deleted, Object.keys(fo.examens()).sort()], [true, true, ["NeoQuiz/Reseaux", "NeoQuiz/TD"]]);
+		const restart = sh.createSharedState({ fs, roots: () => ["Efrei", "NeoQuiz"], deviceId: "dev" });
+		await restart.load();
+		r.check("8. and after a restart", Object.keys(restart.exams()).sort(), ["NeoQuiz/Reseaux", "NeoQuiz/TD"]);
 	}
 
 	r.done();
