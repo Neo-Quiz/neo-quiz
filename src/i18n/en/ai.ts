@@ -466,6 +466,11 @@ export const EN_AI = {
 	"ai.transcript.writingLiveCount": "Writing · {count} lines",
 	"ai.transcript.wroteOne": "Wrote 1 line",
 	"ai.transcript.wroteOther": "Wrote {count} lines",
+	"ai.transcript.progressQuestionOf": "Question {n} of {total}",
+	"ai.transcript.progressQuestion": "Question {n}",
+	"ai.transcript.progressQuizOf": "Quiz {n} of {total}",
+	"ai.transcript.progressLinesOther": "{count} lines",
+	"ai.transcript.progressLinesOne": "1 line",
 	"ai.transcript.toLatest": "Back to the latest message",
 	/* Une pièce jointe encore en lecture : l'envoi attend. */
 	"ai.attach.remove": "Remove {name}",

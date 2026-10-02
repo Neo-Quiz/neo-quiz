@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+- While a quiz is being written, the live transcript shows which question the model is at ("Question 12 / 20", or "Quiz 2 / 3" too for a one-pass series; no total when the count is Auto).
+
+### Fixed
+- The Thinking and Writing lines of the live transcript can be clicked while a generation runs: they were rebuilt at every streamed chunk, so the click never completed.
+
 ## [1.20.20] - 2026-10-02
 
 ### Changed

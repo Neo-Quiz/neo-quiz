@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -69,6 +69,33 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	const t = transcriptVide();
 	for (let i = 0; i < 30; i++) appliquer(t, { kind: "text", text: "x".repeat(10_000) + i });
 	r.check("a runaway stream is bounded and keeps its end", [t.text.length <= 200_000, t.text.endsWith("29")], [true, true]);
+
+	// PROGRESS: which question the model is at, read off partial JSON5.
+	const qp = (text, batch = false) => quizProgress(text, { batch });
+	r.check("progress: nothing written yet", qp(""), { quiz: null, question: 0 });
+	r.check("progress: prose with an apostrophe before the array is skipped", qp("Here's the quiz:\n[\n{ prompt: 'a' }").question, 1);
+	r.check("progress: unquoted keys, cut mid-object",
+		qp("[\n{ type: 'single', prompt: 'A?', options: ['x', 'y'], correctIndex: 0 },\n{ type: 'single', prompt: 'B?', opt").question, 2);
+	r.check("progress: quoted keys, double and single quotes",
+		qp(`[{"prompt": "A", "options": ["x"]}, {'prompt': 'B'}, {"prompt"`).question, 2);
+	r.check("progress: a prompt key cut before its colon is not counted yet", qp("[{ prompt: 'A' }, { prompt").question, 1);
+	r.check("progress: a cut string value does not break the count", qp("[{ prompt: 'A' }, { prompt: 'B is it").question, 2);
+	r.check("progress: the word prompt inside a string value does not count",
+		qp(`[{ prompt: 'A', explain: 'the prompt: is shown', "hint": "prompt: x" }, { prompt: 'B' }]`).question, 2);
+	r.check("progress: a string 'prompt' in an array is a value, not a key", qp("[{ prompt: 'A', tags: ['x', 'prompt', 'y'] }]").question, 1);
+	r.check("progress: a reading after its prompt is not a question",
+		qp("[{ prompt: 'A' }, { prompt: 'Read this', role: 'read' }, { prompt: 'B' }]").question, 2);
+	r.check("progress: a reading before its prompt is not a question",
+		qp(`[{ role: "read", prompt: 'Read this' }, { prompt: 'B' }, { prompt: 'C' }`).question, 2);
+	r.check("progress: a reading cut right after its prompt counts until its role arrives",
+		[qp("[{ prompt: 'A' }, { prompt: 'R'").question, qp("[{ prompt: 'A' }, { prompt: 'R', role: 'read'").question], [2, 1]);
+	r.check("progress: the final configuration object adds nothing",
+		qp("[{ prompt: 'A' }, { prompt: 'B' }, { mode: 'exam', glossary: [{ term: 'x', definition: 'prompt' }] }]").question, 2);
+	r.check("progress: comments with quotes are skipped", qp("[ // it's here\n{ prompt: 'A' }, /* don't */ { prompt: 'B' }").question, 2);
+	const lot = "[{ document: 'a.md', title: 'A', quiz: [{ prompt: '1' }, { prompt: '2' }] }, { document: 'b.md', title: 'B', quiz: [{ prompt: '1' }] }, { document: 'c.md', title: 'C', quiz: [{ prompt: '1' }, { prompt: '2' }, { prompt: '3'";
+	r.check("progress: a lot of 3 documents, third quiz at question 3", qp(lot, true), { quiz: 3, question: 3 });
+	r.check("progress: a lot cut inside the first document", qp("[{ document: 'a.md', title: 'A', quiz: [{ prompt: '1' }, { prompt: '2'", true), { quiz: 1, question: 2 });
+	r.check("progress: a `document` key is ignored outside a lot", qp("[{ document: 'x', prompt: 'A' }, { prompt: 'B' }]"), { quiz: null, question: 2 });
 
 	r.done();
 });

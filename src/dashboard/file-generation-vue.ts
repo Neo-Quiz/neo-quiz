@@ -32,6 +32,7 @@ import type { TransKey } from "../i18n";
 import { t } from "../i18n";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
+import { quizProgress } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { mathifyElement } from "../engine/mathjax";
 
@@ -298,59 +299,176 @@ export function creerVueFile(opts: {
 	/** Lines just unfolded by a click: their detail slides in once. */
 	const ouvertures = new Set<string>();
 
-	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean, id: number): void {
-		const ancien = bloc.querySelector<HTMLElement>(".qbd-ai-transcript-texte");
+	/** One summary line of a transcript block and, when unfolded, its detail:
+	    created ONCE and then updated in place (see `remplirTranscript`). */
+	interface LigneTranscript {
+		bouton: HTMLElement;
+		libelle: HTMLElement;
+		chevron: HTMLElement;
+		detail: HTMLElement | null;
+		ouvert: boolean;
+		chevronNom: string;
+	}
+	/** What a block shows now — read by the click handlers, never captured:
+	    the transcript object, the live flag and the request change at every chunk. */
+	interface BlocTranscript {
+		lignes: Map<string, LigneTranscript>;
+		tr: Transcript;
+		vivant: boolean;
+		ligne: LigneGeneration;
+		prose: boolean;
+	}
+	const blocs = new WeakMap<HTMLElement, BlocTranscript>();
+
+	/** "Question 12 of 20 · 214 lines" while a quiz is being written (null when
+	    there is nothing to say: a plan, no question begun yet). */
+	function libelleProgres(l: LigneGeneration, texte: string, lignes: number): string | null {
+		if (l.demande.planifier) return null;
+		const lot = !!l.demande.parDocument && l.demande.notes.length >= 2;
+		const p = quizProgress(texte, { batch: lot });
+		if (p.question === 0 && p.quiz === null) return null;
+		const parts: string[] = [];
+		if (p.quiz !== null) parts.push(t("ai.transcript.progressQuizOf", { n: p.quiz, total: l.demande.notes.length }));
+		const total = l.demande.count;
+		parts.push(total ? t("ai.transcript.progressQuestionOf", { n: p.question, total }) : t("ai.transcript.progressQuestion", { n: p.question }));
+		parts.push(t(lignes === 1 ? "ai.transcript.progressLinesOne" : "ai.transcript.progressLinesOther", { count: lignes }));
+		return parts.join(" · ");
+	}
+
+	/**
+	 * Brings a transcript block up to date IN PLACE. It used to empty the block
+	 * and rebuild every summary button at each chunk (several a second): the
+	 * button pressed on mouse-down was gone by mouse-up, so the browser never
+	 * fired `click` and the lines did nothing while the model was writing. Now
+	 * each line's button exists once for the life of the block; a chunk only
+	 * changes its label, its chevron and its detail's text.
+	 */
+	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean, l: LigneGeneration, prose: boolean): void {
+		let etat = blocs.get(bloc);
+		if (!etat) { etat = { lignes: new Map(), tr, vivant, ligne: l, prose }; blocs.set(bloc, etat); }
+		else { etat.tr = tr; etat.vivant = vivant; etat.ligne = l; etat.prose = prose; }
+		synchroniserTranscript(bloc, etat);
+	}
+
+	interface SpecLigne {
+		cle: string;
+		icone: string;
+		libelle: string;
+		ouvertParDefaut: boolean;
+		/** Fills (or refreshes) the detail box of an unfolded line. */
+		detail: (corps: HTMLElement) => void;
+	}
+
+	function synchroniserTranscript(bloc: HTMLElement, etat: BlocTranscript): void {
+		const { tr, vivant, ligne: l } = etat;
+		const id = l.id;
+		// A chat answer IS its text, shown as prose: only reasoning and tools here.
+		const texte = etat.prose ? "" : tr.text;
+		// The writing box as it is now, to keep following the end of the text.
+		const ancien = etat.lignes.get("writing")?.detail?.querySelector<HTMLElement>(".qbd-ai-transcript-texte") ?? null;
 		const hautAncien = ancien ? ancien.scrollTop : 0;
 		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
-		bloc.replaceChildren();
+
+		const specs: SpecLigne[] = [];
 		// Nothing said yet: the working line above already shows the model at work.
-		if (!tr.thinking && !tr.text && tr.tools.length === 0) return;
-		/** A summary line and, when unfolded, its detail. Live lines start
-		    unfolded for the part being written. */
-		const ligne = (cle: string, icone: string, libelle: string, ouvertParDefaut: boolean, detail: (corps: HTMLElement) => void): void => {
-			const k = id + ":" + cle;
-			const ouvert = deplies.has(k) || (ouvertParDefaut && !replies.has(k));
-			const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
-			b.type = "button";
-			b.setAttribute("aria-expanded", String(ouvert));
-			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), icone);
-			ajouter(b, "span", "qbd-ai-transcript-ligne-texte", libelle);
-			host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-chevron"), ouvert ? "chevron-down" : "chevron-right");
-			b.addEventListener("click", () => {
-				if (ouvert) { deplies.delete(k); replies.add(k); } else { deplies.add(k); replies.delete(k); ouvertures.add(k); }
-				remplirTranscript(bloc, tr, vivant, id);
-			});
-			/* The unfolding slides in only when a click opened it: the block is
-			   rebuilt at every chunk of a live answer, which would replay it. */
-			const anime = ouvertures.delete(k);
-			if (ouvert) detail(ajouter(bloc, "div", "qbd-ai-transcript-detail" + (anime ? " qbd-ai-transcript-detail--anime" : "")));
-		};
-		const ecrit = !!tr.text;
-		if (tr.thinking) {
-			ligne("thinking", "brain", t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), vivant && !ecrit, corps => {
-				// `textContent` (through `ajouter`): the model's text is never HTML here.
-				ajouter(corps, "div", "qbd-ai-transcript-reflexion", tr.thinking.trim());
-			});
+		if (tr.thinking || texte || tr.tools.length > 0) {
+			const ecrit = !!texte;
+			if (tr.thinking) {
+				specs.push({
+					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), ouvertParDefaut: vivant && !ecrit,
+					// `textContent` (through `ajouter`): the model's text is never HTML here.
+					detail: corps => {
+						const el = (corps.firstElementChild as HTMLElement | null) ?? ajouter(corps, "div", "qbd-ai-transcript-reflexion");
+						const v = tr.thinking.trim();
+						if (el.textContent !== v) el.textContent = v;
+					},
+				});
+			}
+			if (tr.tools.length) {
+				specs.push({
+					cle: "tools", icone: "wrench", libelle: t(tr.tools.length === 1 ? "ai.transcript.toolsOne" : "ai.transcript.toolsOther", { count: tr.tools.length }), ouvertParDefaut: false,
+					detail: corps => {
+						if (corps.childElementCount === tr.tools.length) return;
+						corps.replaceChildren();
+						for (const nom of tr.tools) ajouter(corps, "div", "qbd-ai-transcript-outil", nom);
+					},
+				});
+			}
+			if (ecrit) {
+				const lignes = texte.split("\n").length;
+				/* The WRITING folds by itself past `LIGNES_AVANT_REPLI` lines (a
+				   whole quiz in JSON5 buried the conversation); the heading keeps
+				   counting while it is folded, and a click opens it for good. */
+				const long = lignes > LIGNES_AVANT_REPLI;
+				const progres = vivant ? libelleProgres(l, texte, lignes) : null;
+				const libelle = !vivant
+					? t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes })
+					: progres ?? (long ? t("ai.transcript.writingLiveCount", { count: lignes }) : t("ai.transcript.writingLive"));
+				specs.push({
+					cle: "writing", icone: "pen-line", libelle, ouvertParDefaut: !long,
+					detail: corps => {
+						let pre = corps.firstElementChild as HTMLElement | null;
+						const premier = !pre;
+						if (!pre) pre = ajouter(corps, "pre", "qbd-ai-transcript-texte");
+						if (pre.textContent !== texte) pre.textContent = texte;
+						// Follows the writing, unless the user scrolled up to read.
+						pre.scrollTop = premier || suivait ? pre.scrollHeight : hautAncien;
+					},
+				});
+			}
 		}
-		if (tr.tools.length) {
-			ligne("tools", "wrench", t(tr.tools.length === 1 ? "ai.transcript.toolsOne" : "ai.transcript.toolsOther", { count: tr.tools.length }), false, corps => {
-				for (const nom of tr.tools) ajouter(corps, "div", "qbd-ai-transcript-outil", nom);
-			});
+
+		const gardees = new Set(specs.map(s => s.cle));
+		for (const [cle, v] of etat.lignes) {
+			if (gardees.has(cle)) continue;
+			v.bouton.remove();
+			v.detail?.remove();
+			etat.lignes.delete(cle);
 		}
-		if (ecrit) {
-			const lignes = tr.text.split("\n").length;
-			/* The WRITING folds by itself past `LIGNES_AVANT_REPLI` lines (a
-			   whole quiz in JSON5 buried the conversation); the heading keeps
-			   counting while it is folded, and a click opens it for good. */
-			const long = lignes > LIGNES_AVANT_REPLI;
-			const libelle = !vivant
-				? t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes })
-				: long ? t("ai.transcript.writingLiveCount", { count: lignes }) : t("ai.transcript.writingLive");
-			ligne("writing", "pen-line", libelle, !long, corps => {
-				const texte = ajouter(corps, "pre", "qbd-ai-transcript-texte", tr.text);
-				// Follows the writing, unless the user scrolled up to read.
-				texte.scrollTop = suivait ? texte.scrollHeight : hautAncien;
-			});
+		let rang = 0;
+		for (const s of specs) {
+			const k = id + ":" + s.cle;
+			const ouvert = deplies.has(k) || (s.ouvertParDefaut && !replies.has(k));
+			let v = etat.lignes.get(s.cle);
+			if (!v) {
+				const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
+				b.type = "button";
+				host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), s.icone);
+				const libelle = ajouter(b, "span", "qbd-ai-transcript-ligne-texte");
+				const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
+				const neuve: LigneTranscript = { bouton: b, libelle, chevron, detail: null, ouvert, chevronNom: "" };
+				v = neuve;
+				etat.lignes.set(s.cle, neuve);
+				// Reads the CURRENT state of the block: a click toggles what is shown now.
+				b.addEventListener("click", () => {
+					const courant = blocs.get(bloc);
+					const ligneCourante = courant?.lignes.get(s.cle);
+					if (!courant || !ligneCourante) return;
+					if (ligneCourante.ouvert) { deplies.delete(k); replies.add(k); } else { deplies.add(k); replies.delete(k); ouvertures.add(k); }
+					synchroniserTranscript(bloc, courant);
+				});
+			}
+			if (v.libelle.textContent !== s.libelle) v.libelle.textContent = s.libelle;
+			if (v.bouton.getAttribute("aria-expanded") !== String(ouvert)) v.bouton.setAttribute("aria-expanded", String(ouvert));
+			const chevronNom = ouvert ? "chevron-down" : "chevron-right";
+			if (v.chevronNom !== chevronNom) { host.ui.setIcon(v.chevron, chevronNom); v.chevronNom = chevronNom; }
+			v.ouvert = ouvert;
+			if (!ouvert && v.detail) { v.detail.remove(); v.detail = null; }
+			if (ouvert && !v.detail) {
+				/* The unfolding slides in only when a click opened it. */
+				const anime = ouvertures.delete(k);
+				v.detail = document.createElement("div");
+				v.detail.className = "qbd-ai-transcript-detail" + (anime ? " qbd-ai-transcript-detail--anime" : "");
+				v.bouton.after(v.detail);
+			}
+			if (v.detail) s.detail(v.detail);
+			// Keep the DOM order (thinking, tools, writing) by moving only what is out of place.
+			if (bloc.children[rang] !== v.bouton) bloc.insertBefore(v.bouton, bloc.children[rang] ?? null);
+			rang++;
+			if (v.detail) {
+				if (bloc.children[rang] !== v.detail) bloc.insertBefore(v.detail, bloc.children[rang] ?? null);
+				rang++;
+			}
 		}
 	}
 
@@ -368,7 +486,7 @@ export function creerVueFile(opts: {
 		if (prose) bloc.dataset.chat = "1";
 		bloc.setAttribute("role", "log");
 		bloc.setAttribute("aria-label", t("ai.transcript.label"));
-		remplirTranscript(bloc, prose ? { ...tr, text: "" } : tr, vivant, l.id);
+		remplirTranscript(bloc, tr, vivant, l, prose);
 	}
 
 	/** Follows the end of the conversation smoothly, as MonoCode does while
@@ -387,7 +505,7 @@ export function creerVueFile(opts: {
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
 		// First chunk of a run painted before its transcript existed: one repaint.
 		if (!bloc) { if (enCours(l)) peindre(); return; }
-		remplirTranscript(bloc, tr, enCours(l), id);
+		remplirTranscript(bloc, tr, enCours(l), l, enProse(l));
 		suivre(fil, enBas);
 	}
 

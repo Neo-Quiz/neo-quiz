@@ -180,3 +180,85 @@ export function claudeResultDuFlux(stdout: string): Rec | null {
 	}
 	return null;
 }
+
+/* ── PROGRESS OF A QUIZ BEING WRITTEN (2026-10-02) ──
+   Which question the model is at, read off the streamed JSON5 itself, which is
+   almost always CUT mid-object. A single scan keeps just enough state — the
+   string/comment state and a stack of open objects — to tell a KEY from a value:
+   a `prompt` word inside a string value ("explain": "the prompt: …") is never a
+   key, so it never counts. */
+
+export interface QuizProgress {
+	/** One-pass multi-document answer only: the quiz being written (1-based), else null. */
+	quiz: number | null;
+	/** Questions begun so far in that quiz (the current one included). */
+	question: number;
+}
+
+interface ScanFrame { object: boolean; counted: boolean; reading: boolean }
+
+/**
+ * Counts the question objects begun in `text`: those with a `prompt` key at key
+ * position, quoted or not. A Learn reading card (`role: "read"`, before or
+ * after its `prompt`) is not a question, and the closing configuration object
+ * has no `prompt`. With `batch` (one pass over several documents, the answer is
+ * an array of `{ document, title, quiz: [...] }`), each `document` key starts the
+ * next quiz and resets the question count.
+ */
+export function quizProgress(text: string, opts: { batch?: boolean } = {}): QuizProgress {
+	const n = text.length;
+	let i = 0;
+	// Prose before the JSON (an apostrophe in it would open a "string") is skipped.
+	while (i < n && text[i] !== "[" && text[i] !== "{") i++;
+	const stack: ScanFrame[] = [];
+	let expectKey = false;
+	let questions = 0;
+	let docs = 0;
+	while (i < n) {
+		const c = text[i];
+		if (c === "/" && text[i + 1] === "/") {
+			const end = text.indexOf("\n", i);
+			if (end < 0) break;
+			i = end + 1;
+			continue;
+		}
+		if (c === "/" && text[i + 1] === "*") {
+			const end = text.indexOf("*/", i + 2);
+			if (end < 0) break;
+			i = end + 2;
+			continue;
+		}
+		let key: string | null = null;
+		if (c === '"' || c === "'" || c === "`") {
+			let j = i + 1;
+			while (j < n && text[j] !== c) j += text[j] === "\\" ? 2 : 1;
+			// Unterminated: the string is still being written, nothing after it exists yet.
+			if (j >= n) break;
+			if (expectKey && c !== "`") key = text.slice(i + 1, j);
+			i = j + 1;
+		} else if (expectKey && /[A-Za-z_$]/.test(c)) {
+			let j = i + 1;
+			while (j < n && /[\w$]/.test(text[j])) j++;
+			key = text.slice(i, j);
+			i = j;
+		} else {
+			if (c === "{") { stack.push({ object: true, counted: false, reading: false }); expectKey = true; }
+			else if (c === "[") { stack.push({ object: false, counted: false, reading: false }); expectKey = false; }
+			else if (c === "}" || c === "]") { stack.pop(); expectKey = false; }
+			else if (c === "," && stack.length && stack[stack.length - 1].object) expectKey = true;
+			i++;
+			continue;
+		}
+		if (key === null) continue;
+		expectKey = false;
+		const frame = stack[stack.length - 1];
+		const colon = /^\s*:/.exec(text.slice(i, i + 40));
+		if (!frame || !colon) continue;
+		if (key === "prompt" && !frame.counted && !frame.reading) { frame.counted = true; questions++; }
+		else if (key === "role" && /^\s*:\s*(["'])read\1/.test(text.slice(i, i + 40))) {
+			frame.reading = true;
+			if (frame.counted) { frame.counted = false; questions--; }
+		} else if (key === "document" && opts.batch) { docs++; questions = 0; }
+	}
+	return { quiz: opts.batch && docs > 0 ? docs : null, question: Math.max(0, questions) };
+}
