@@ -73,6 +73,20 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("lines saved before chats land in ONE fixed chat, one request each, no crash", [legacy.chats.map(c => c.id), legacy.chats[0].requests.map(q => [q.id, q.at])], [[C.LEGACY_CHAT_ID], [["line-7", 5000], ["line-8", 5000]]]);
 	r.check("a legacy line is never closable while its chat is on screen", R.closableLines([line(7, "prete", old, quiz("A", "a.md"))], C.LEGACY_CHAT_ID, rien0).map(l => l.id), []);
 
+	// A line that left the queue carried the documents, the text and the failure: they stay recorded.
+	const full = R.reconcileChats([], g(
+		line(1, "prete", { text: "from A", mode: "learn", notes: [{ name: "CM1.pdf", path: "Cours/CM1.pdf" }] }, quiz("A", "a.md")),
+		line(2, "echouee", { text: "from B", notes: [{ name: "CM2.pdf" }] })), dev, 5000);
+	const rest = R.reconcileChats(full.chats, g(line(3, "prete", { requestId: "r1", text: "other", mode: "practice", notes: [{ name: "CM3.pdf" }] }, quiz("C", "c.md"))), dev, 9000);
+	const q0 = rest.chats[0].requests[0];
+	r.check("closed lines: text, mode, documents, state and results survive the lines that remain", [q0.text, q0.mode, q0.documents.map(d => d.name), q0.state, q0.results.map(x => x.title)], ["from A", "learn", ["CM1.pdf", "CM2.pdf", "CM3.pdf"], "failed", ["A", "C"]]);
+	const withErr = R.reconcileChats([], R.groupLines([{ ...line(1, "echouee"), erreur: "boom" }]), dev, 5000);
+	const afterErr = R.reconcileChats(withErr.chats, g(line(2, "prete", { requestId: "r1" }, quiz("C", "c.md"))), dev, 9000);
+	r.check("a closed failed line: the error stays and the request is not softened to done", [afterErr.chats[0].requests[0].state, afterErr.chats[0].requests[0].error], ["failed", "boom"]);
+	const stopped = R.reconcileChats([], g(line(1, "arret"), line(2, "prete", {}, quiz("A", "a.md"))), dev, 5000);
+	const afterStop = R.reconcileChats(stopped.chats, g(line(2, "prete", {}, quiz("A", "a.md"))), dev, 9000);
+	r.check("a closed stopped line: the request stays stopped", afterStop.chats[0].requests[0].state, "stopped");
+
 	// closableLines: a finished reply leaves the queue only when its WHOLE request is finished,
 	// is already in the record, and its chat is not on screen.
 	const rien = () => true;

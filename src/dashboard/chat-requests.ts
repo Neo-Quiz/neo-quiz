@@ -61,6 +61,13 @@ function documentsOf(g: RequestGroup): ChatDocument[] {
 	return [...byName.values()];
 }
 
+const STATE_RANK: Record<RequestState, number> = { done: 0, stopped: 1, failed: 2 };
+
+function unionDocuments(old: readonly ChatDocument[], now: readonly ChatDocument[]): ChatDocument[] {
+	const names = new Set(old.map(d => d.name));
+	return [...old, ...now.filter(d => !names.has(d.name))];
+}
+
 /** The request a group stands for, or `null` while no line of it has ended.
     `old` is what was recorded before: its time and author stay, its results
     are kept. A request with an answer in and a sibling still working is
@@ -71,18 +78,25 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	if (terminal.length === 0) return null;
 	const first = g.lines[0].demande;
 	const failed = terminal.find(l => l.etat === "echouee");
-	const state: RequestState = failed ? "failed" : g.lines.some(isLive) || terminal.some(l => l.etat === "arret") ? "stopped" : "done";
+	const interrupted = g.lines.some(isLive) || terminal.some(l => l.etat === "arret");
+	let state: RequestState = failed ? "failed" : interrupted ? "stopped" : "done";
+	// Lines that left the queue no longer speak: a recorded failure or
+	// interruption is never softened to "done" by the lines that remain.
+	if (old && STATE_RANK[old.state] > STATE_RANK[state]) state = old.state;
 	const req: ChatRequest = {
 		id: g.key,
 		at: old?.at ?? first.sentAt ?? now,
 		from: old?.from ?? device,
-		text: first.text,
-		mode: (first.mode === "learn" ? "learn" : "practice") as ChatMode,
-		documents: documentsOf(g),
+		// What the user sent is fixed once recorded; the remaining lines may be
+		// only a part of the send.
+		text: old?.text ?? first.text,
+		mode: old?.mode ?? ((first.mode === "learn" ? "learn" : "practice") as ChatMode),
+		documents: unionDocuments(old?.documents ?? [], documentsOf(g)),
 		results: mergeResults(old?.results ?? [], terminal.flatMap(resultsOfLine)),
 		state,
 	};
-	if (failed?.erreur) req.error = failed.erreur;
+	const error = failed?.erreur ?? old?.error;
+	if (error && state === "failed") req.error = error;
 	return req;
 }
 
