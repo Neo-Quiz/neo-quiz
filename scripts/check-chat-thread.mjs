@@ -98,6 +98,12 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("a request with a sibling still running keeps ALL its replies", R.closableLines([line(1, "prete", {}, quiz("A", "a.md")), line(2, "cours")], "c2", rien).map(l => l.id), []);
 	r.check("a reply not yet in the record stays", R.closableLines(fin, "c2", () => false).map(l => l.id), []);
 	r.check("a failed line stays (its Try again is live)", R.closableLines([line(1, "echouee")], "c2", rien).map(l => l.id), []);
+	// A deleted chat: nothing to show or retry, so its ended lines (failed and stopped too) go; a running one never.
+	const gone = id => id === "c1";
+	r.check("a deleted chat's finished lines leave the queue even unrecorded", R.closableLines(fin, "c2", () => false, gone).map(l => l.id), [1, 2]);
+	r.check("a deleted chat's failed and stopped lines leave too", R.closableLines([line(1, "echouee"), line(2, "arret")], "c2", () => false, gone).map(l => l.id), [1, 2]);
+	r.check("a deleted chat's request with a line still running is never touched", R.closableLines([line(1, "prete", {}, quiz("A", "a.md")), line(2, "cours")], "c2", () => false, gone).map(l => l.id), []);
+	r.check("another chat's failed line still stays", R.closableLines([line(1, "echouee", { chatId: "c3" })], "c2", rien, gone).map(l => l.id), []);
 	r.done();
 });
 
@@ -131,6 +137,9 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 	], "c1"));
 	r.check("two lines of one send: ONE tour, both documents with their content, both quizzes with their questions",
 		[liveTours.length, liveTours[0].notes.map(n => n.name + ":" + n.content), liveTours[0].quizzes.map(q => q.title + ":" + q.questions.length)], [1, ["A.pdf:AAA", "B.pdf:BBB"], ["QA:1", "QB:1"]]);
+	const manyRec = rec("cm", 1, Array.from({ length: T.MAX_CONTEXT_REQUESTS + 5 }, (_, i) => req("q" + i, i + 1)));
+	const manyTours = T.toursOfThread(T.threadItems(manyRec, [], "cm"));
+	r.check("a follow-up carries only the last requests of a long chat", [manyTours.length, manyTours[0].text, manyTours[manyTours.length - 1].text], [T.MAX_CONTEXT_REQUESTS, "tq5", "tq" + (T.MAX_CONTEXT_REQUESTS + 4)]);
 	r.check("a planning line is not a quiz tour of its own", T.toursOfThread(T.threadItems(null, [line(1, "prete", { planifier: true, produit: undefined }, { titre: "", chemin: "", texte: "plan" })], "c1"))[0].quizzes, []);
 
 	// Sidebar list.

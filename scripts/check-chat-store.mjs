@@ -20,6 +20,7 @@ const memory = (limit = Infinity) => {
 		setItem: (k, v) => { if (v.length > limit) throw new Error("QuotaExceededError"); m.set(k, v); },
 	};
 };
+const legacy0 = JSON.stringify([{ id: "o", date: 7, title: "O", turns: [{ role: "user", text: "q" }, { role: "assistant", text: "a" }] }]);
 const req = (id, at, text = "t") => ({ id, at, from: "d1", text, mode: "practice", documents: [], results: [], state: "done" });
 const chat = (id, updatedAt, text = "t") => ({ id, origin: "d1", createdAt: 1, updatedAt, requests: [req("r1", 1, text)] });
 
@@ -45,6 +46,19 @@ await withSrcModule("src/dashboard/chat-store.ts", (S) => {
 	const onDisk = JSON.parse(s.m.get("neo-quiz.chats") ?? '{"chats":[]}').chats;
 	r.check("on disk, fewer chats, and the newest stayed", [onDisk.length > 0, onDisk.length < 40, onDisk.some(c => c.id === "p39")], [true, true, true]);
 
+	{
+		// Oldest live chat goes first, one at a time; tombstones stay; nothing fits -> false.
+		const m = memory(1100);
+		const three = [chat("old", 1, "x".repeat(300)), chat("mid", 2, "x".repeat(300)), chat("new", 3, "x".repeat(300)), { id: "gone", origin: "d1", createdAt: 1, updatedAt: 0, deleted: true, requests: [] }];
+		const ok = S.setChats(three, m);
+		const ids = JSON.parse(m.m.get("neo-quiz.chats")).chats.map(c => c.id).sort();
+		r.check("full storage drops the oldest one at a time, keeps the tombstone", [ok, ids.includes("new"), ids.includes("old"), ids.includes("gone"), ids.length < 4], [true, true, false, true, true]);
+		const tiny = memory(5);
+		r.check("nothing fits: false, and the session still has the chats", [S.setChats([chat("a", 1)], tiny), S.getChats(tiny).length], [false, 1]);
+		const flagS = memory(5);
+		flagS.m.set("neo-quiz.archived-chats", legacy0);
+		r.check("an import that cannot fit does not record success", [S.importLegacyOnce("dev", flagS), flagS.m.has("neo-quiz.chats-imported")], [0, false]);
+	}
 	const refused = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); } };
 	r.check("a refused storage never throws, and keeps the session", [S.getChats(refused), S.setChats([chat("z", 1)], refused), S.getChats(refused).map(c => c.id)], [[], false, ["z"]]);
 
