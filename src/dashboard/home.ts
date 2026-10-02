@@ -5,7 +5,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { isFolderArchived } from "./folder-archive";
-import { moduleForQuiz, applyModuleOverrides, buildModuleGroups } from "./quiz-modules";
+import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, estLeSas } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { moduleIcon } from "./module-icons";
@@ -133,7 +133,9 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const now = Date.now();
 		const todayStart = startOfDay(now);
 		const todayIso = isoLocal(now);
-		const groups = buildModuleGroups(quizzes, stats, map);
+		// The generated-quizzes folder is a holding area, not a course: never a
+		// folder card on the home page (its quizzes can still be resumed).
+		const groups = buildModuleGroups(quizzes, stats, map).filter(g => !estLeSas(g, ctx.generatedFolder?.()));
 		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
 		// Every upcoming exam of every folder — a folder with nothing to do
 		// today can still have its exam this week.

@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- The "Generated" folder no longer shows as a folder card on the home page.
+
 ## [1.20.21] - 2026-10-02
 
 ### Added
