@@ -477,6 +477,8 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 			: "the mix of question types that best fits a written exam on this subject: single choice, multiple choice, free text, numeric, ordering, matching, code output")
 		: (types.length === 1 ? "" : "ONLY these question types, in a balanced mix: ")
 			+ types.map(x => TYPE_SENTENCES[x] ?? x).join("; ")
+			// Comprehension alone keeps its own mix of answer types, as before.
+			+ (types.length === 1 && types[0] === "Compréhension" ? ". Mix single-choice, multiple-choice and free-text among them" : "")
 			+ (types.length > 1 ? (learn ? ". In the learning path these types apply to the pre, explain and recall questions; read cards are unchanged" : "") + ". Use no other question type" : "");
 
 	/* A preparation keeps the usual QUANTITY of one quiz (2026-09-30): an
