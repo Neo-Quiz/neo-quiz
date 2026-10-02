@@ -8,8 +8,8 @@
     <string name="first_run_files_done">Accès autorisé</string>
     <string name="first_run_sync_title">Synchro en arrière-plan</string>
     <string name="first_run_optional">Facultatif</string>
-    <string name="first_run_sync_body">Tes révisions arrivent sur ton ordinateur même quand l\'app est fermée. Dans la liste qui s\'ouvre, retire Neo Quiz de l\'optimisation de la batterie.</string>
-    <string name="first_run_sync_button">Ouvrir le réglage</string>
+    <string name="first_run_sync_body">Tes révisions arrivent sur ton ordinateur même quand l\'app est fermée.</string>
+    <string name="first_run_sync_button">Autoriser</string>
     <string name="first_run_sync_done">Synchro autorisée</string>
     <string name="first_run_start">Commencer</string>
     <string name="picker_use">Utiliser ce dossier</string>

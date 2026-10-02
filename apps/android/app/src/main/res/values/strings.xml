@@ -8,8 +8,8 @@
     <string name="first_run_files_done">Access allowed</string>
     <string name="first_run_sync_title">Background sync</string>
     <string name="first_run_optional">Optional</string>
-    <string name="first_run_sync_body">Your reviews reach your computer even while the app is closed. In the list that opens, take Neo Quiz out of battery optimization.</string>
-    <string name="first_run_sync_button">Open the setting</string>
+    <string name="first_run_sync_body">Your reviews reach your computer even while the app is closed.</string>
+    <string name="first_run_sync_button">Allow</string>
     <string name="first_run_sync_done">Background sync allowed</string>
     <string name="first_run_start">Get started</string>
     <string name="picker_use">Use this folder</string>

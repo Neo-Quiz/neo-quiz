@@ -105,7 +105,15 @@ class FirstRunScreen(context: Context, private val onStart: () -> Unit) : Scroll
         column.addView(files.root)
 
         val sync = step(2, R.string.first_run_sync_title, R.string.first_run_optional, R.string.first_run_sync_body, R.string.first_run_sync_button, R.string.first_run_sync_done, false) {
-            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            // The one-tap system dialog for THIS app; the generic list made the user hunt for it
+            // among every installed app. Falls back to the app's own settings page if a vendor
+            // build does not handle the request.
+            val pkg = Uri.parse("package:${context.packageName}")
+            try {
+                context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg))
+            } catch (_: android.content.ActivityNotFoundException) {
+                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))
+            }
         }
         syncBadge = sync.badge; syncNumber = sync.number; syncButton = sync.button; syncDone = sync.done
         column.addView(sync.root, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(24) })
