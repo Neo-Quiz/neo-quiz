@@ -452,7 +452,7 @@ const QCM_EXPLAIN_RULE = 'EVERY question has "explain": SHORT, 1 to 3 sentences 
 const QCM_FORMAT_BLOCK = `WRITTEN MCQ EXAM FORMAT: write the quiz as the written MCQ (QCM) of an engineering-school exam.
 	- Every question has a SHORT "title" naming the notion tested (e.g. "Same IP network membership"), a statement in "prompt", and 3 or 4 options.
 	- Most questions have exactly ONE correct answer. About one question in four has SEVERAL correct answers ("multiSelect": true with "correctIndices"). The statement never says HOW MANY answers are correct; at most it says to check all those that apply.
-	- Mix concept questions (compare two models, the role of a mechanism), SHORT CALCULATIONS on a concrete given case (is this address in that network, which subnet fits 500 hosts), and SERIES of linked questions that share ONE scenario stated in each of their prompts (same network, same figures, a different question each time).
+	- Mix concept questions (compare two models, the role of a mechanism), SHORT CALCULATIONS on a concrete given case (is this address in that network, which subnet fits 500 hosts), and SERIES of linked questions that share ONE scenario stated in each of their prompts (same network, same figures, a different question each time). Include AT LEAST ONE such series of 2 or 3 questions whenever the source teaches something that can be applied to a concrete case (a calculation, a program, a configuration).
 	- Distractors are PLAUSIBLE: the common confusions and classic mistakes. NEVER an "all of the above" or "none of the above" option.
 	- Use only single-choice and multiple-choice questions.`;
 
@@ -562,6 +562,7 @@ ${hintFields}	- mathInput: true for a text question whose answer is a mathematic
 	${blocMode}
 ${hintsBlock}
 	EXPLANATIONS: in every "explain", put the two or three KEY WORDS in **bold** — no more; the reader colors them.
+	ANSWER KEYS: work out every answer (count the items, run the code in your head, do the calculation) BEFORE writing its correctIndex, correctIndices, answer or acceptedAnswers. An "explain" states the result, it never recounts nor corrects itself ("on recounting…", "actually…"): if you find a mistake while writing it, fix the answer key so the two agree.
 
 	GLOSSARY: the configuration object at the end of the array (see above) carries a "glossary" of 5 to 15 KEY TERMS of the source — the technical notions a student must know, never everyday words. Each entry is { "term": "...", "definition": "..." }, plus an optional "aliases": ["..."] for another form of the SAME term used in the text (an acronym, an abbreviation, e.g. "LIFO" for "stack"). Write "term" EXACTLY as it appears in the readings and explanations — same spelling, same form; a term written differently is never matched and never underlined. Write "term" in PLAIN TEXT, NEVER between backticks, even for a keyword or a function of the language: the bare name is the term (e.g. "yield", not \`yield\`) — it is still recognized wherever that name appears inside inline \`code\`. "definition" is ONE OR TWO SENTENCES in markdown (**bold**, \`code\`, a $formula$), understandable on its own WITHOUT the course, and NEVER a copy of a question's answer or explanation. No duplicate term, no filler word.
 ${categorieBloc}
