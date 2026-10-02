@@ -129,6 +129,17 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
 	r.check("restaurer: a line being stopped is gone", rest.lignes.map(l => l.id), [2, 3]);
 	r.check("restaurer: new ids never reuse an old one", F.ajouter(F.restaurer({ lignes: h.lignes, prochainId: 1 }, aProduit), { texte: "D" }).id, 4);
 
+	// Chats (2026-10-02): a restored line keeps the chat and the request it was sent in;
+	// a line saved before chats carries none and stays valid.
+	{
+		let q = F.fileVide();
+		q = F.ajouter(q, { text: "a", chatId: "c1", requestId: "r1", sentAt: 5 }).file;
+		q = F.ajouter(q, { text: "old" }).file;
+		const re = F.restaurer(JSON.parse(JSON.stringify(q)), () => false);
+		r.check("a restored line keeps its chat, its request and its send time", [re.lignes[0].demande.chatId, re.lignes[0].demande.requestId, re.lignes[0].demande.sentAt], ["c1", "r1", 5]);
+		r.check("a line saved before chats is restored with none of them", [re.lignes[1].demande.chatId, re.lignes[1].demande.requestId], [undefined, undefined]);
+	}
+
 	r.done();
 });
 

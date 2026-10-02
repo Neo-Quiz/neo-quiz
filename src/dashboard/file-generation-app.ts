@@ -79,6 +79,15 @@ export interface DemandeFile extends DemandeTexte {
 	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
 	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
 	produit?: ProduitGeneration;
+	/** The chat this request belongs to (`chat-record.ts`). A line saved before
+	    chats existed has none: it belongs to `LEGACY_CHAT_ID`. */
+	chatId?: string;
+	/** ONE id per SEND: every line born from one send (a line per document on
+	    Ollama, an "/exam" plan and its steps) shares it, so that the thread
+	    shows ONE bubble and the record ONE request. */
+	requestId?: string;
+	/** Epoch ms of the send. */
+	sentAt?: number;
 }
 
 /** Ce qu'une génération a rapporté, de quoi écrire la note sans le modèle. */

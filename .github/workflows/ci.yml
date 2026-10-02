@@ -263,6 +263,11 @@ jobs:
       # once, and a reload keeps the active chat.
       - name: Chat store
         run: npm run check:chat-store
+      # THE CHATS, pure cores: lines grouped into requests (one bubble per
+      # send), reconciled into records without erasing an answer, the thread
+      # and the list derived from record + live lines, the follow-up context.
+      - name: Chat thread and list
+        run: npm run check:chat-thread
 
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is
