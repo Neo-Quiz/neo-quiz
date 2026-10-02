@@ -1666,10 +1666,8 @@ label.nq-set-ligne {
 /* The menu of the bar does not zoom either (`--nq-zoom`, see the bar):
    ui/menu-app.ts places its panels in screen pixels. */
 .nq-menu-couche { position: fixed; inset: 0; z-index: 10002; zoom: calc(1 / var(--nq-zoom, 1)); }
-.nq-menu-panneau { position: fixed; min-width: 143px; padding: 12px 0; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); box-shadow: 0 18px 36px -8px rgba(0,0,0,.45), 0 3px 8px -2px rgba(0,0,0,.24); display: flex; flex-direction: column; }
-.nq-menu-ligne { display: flex; align-items: center; width: 100%; height: 28px; padding: 0 10px 0 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
-.nq-menu-coche { display: flex; align-items: center; justify-content: center; width: 28px; height: 100%; color: var(--text-muted); }
-.nq-menu-coche svg { width: 14px; height: 14px; }
+.nq-menu-panneau { position: fixed; min-width: 143px; padding: 6px 0; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); box-shadow: 0 18px 36px -8px rgba(0,0,0,.45), 0 3px 8px -2px rgba(0,0,0,.24); display: flex; flex-direction: column; }
+.nq-menu-ligne { display: flex; align-items: center; width: 100%; height: 28px; padding: 0 10px 0 12px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
 .nq-menu-libelle { flex: 1 1 auto; }
 .nq-menu-raccourci { flex: none; margin-left: 24px; color: var(--text-faint); font-size: 12px; }
 .nq-menu-chevron { display: flex; flex: none; margin-left: 24px; color: var(--text-muted); }
@@ -1682,11 +1680,40 @@ label.nq-set-ligne {
 .nq-menu-separateur { height: 1px; margin: 6px 0; background: var(--background-modifier-border); }
 /* The top row (2026-09-29): the version, "Check for updates" and the GitHub
    mark, aligned on the labels of the rows below (28 px, the check column). */
-.nq-menu-apropos { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 6px 0 28px; font-size: 13px; }
+.nq-menu-apropos { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 6px 0 12px; font-size: 13px; }
 .nq-menu-apropos-version { flex: none; padding-right: 4px; color: var(--text-faint); cursor: default; }
 .nq-menu-apropos-verifier { flex: 1 1 auto; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer; }
 .nq-menu-apropos-github { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .nq-menu-apropos-github svg { width: 16px; height: 16px; }
+
+/* "Check for updates" shows its own cycle: spinner + "Checking...", then the
+   outcome, in place. The width is held by hidden sizers (one per text). */
+.nq-menu-apropos-verifier { display: flex; align-items: center; position: relative; overflow: hidden; }
+.nq-menu-verifier-icone { display: none; position: absolute; left: 8px; top: 50%; margin-top: -7px; width: 14px; height: 14px; }
+.nq-menu-verifier-icone svg { width: 14px; height: 14px; }
+.nq-menu-apropos-verifier[data-etat] .nq-menu-verifier-icone { display: inline-flex; }
+.nq-menu-apropos-verifier[data-etat] .nq-menu-verifier-libelle { padding-left: 20px; }
+.nq-menu-verifier-texte { display: inline-grid; min-width: 0; }
+.nq-menu-verifier-texte > * { grid-area: 1 / 1; }
+.nq-menu-verifier-mesure { visibility: hidden; padding-left: 20px; /* the icon slot, so the width never changes */ height: 0; overflow: hidden; pointer-events: none; }
+.nq-menu-verifier-libelle { transition: opacity 200ms ease-out; }
+.nq-menu-apropos-verifier[data-etat="retour"] .nq-menu-verifier-libelle,
+.nq-menu-apropos-verifier[data-etat="retour"] .nq-menu-verifier-icone { opacity: 0; transition: opacity 200ms ease-out; }
+.nq-menu-apropos-verifier:disabled { cursor: default; color: inherit; }
+.nq-menu-apropos-verifier[data-etat="verification"] .nq-menu-verifier-icone svg { animation: nq-verifier-tour 900ms linear infinite; }
+.nq-menu-apropos-verifier[data-etat="verification"]::after {
+	content: ""; position: absolute; inset: 0; pointer-events: none;
+	background: linear-gradient(100deg, transparent 30%, var(--background-modifier-hover) 50%, transparent 70%);
+	transform: translateX(-100%); animation: nq-verifier-balayage 1400ms ease-in-out infinite;
+}
+@keyframes nq-verifier-tour { to { transform: rotate(360deg); } }
+@keyframes nq-verifier-balayage { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+	.nq-menu-apropos-verifier[data-etat="verification"] .nq-menu-verifier-icone svg,
+	.nq-menu-apropos-verifier[data-etat="verification"]::after { animation: none; }
+	.nq-menu-apropos-verifier[data-etat="verification"]::after { display: none; }
+	.nq-menu-verifier-libelle { transition: none; }
+}
 /* One highlighted target at a time: the one marked `data-actif` (menu-app.ts),
    exactly as the menu's lines. */
 .nq-menu-apropos-verifier, .nq-menu-apropos-github { outline: none; transition: background-color 80ms ease-out, color 80ms ease-out; }

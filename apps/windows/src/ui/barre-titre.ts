@@ -50,6 +50,7 @@ export function basculerMenuApp(ancre: HTMLElement): void {
 export function monterBarreTitre(root: HTMLElement, deps: {
 	ouvrirReglages(): void;
 	fondSuivant(): void;
+	choisirFond(): void;
 }): () => void {
 	const barre = document.createElement("div");
 	barre.className = "nq-barre";
@@ -188,13 +189,9 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 		observateurMenu.observe(ancre, { attributes: true, attributeFilter: ["data-open"] });
 		fermerMenu = ouvrirMenuApp(ancre, {
 			version: application.version,
+			verifier: verifierMaintenant,
 			executer(id) {
-				if (id === "check-updates") {
-					/* It used to open Settings as well, where an update section
-					   showed the result; that section left on 2026-09-17, and the
-					   click only landed on Settings with nothing to say. */
-					void verifierMaintenant();
-				} else if (id === "repo") {
+				if (id === "repo") {
 					/* `window.open` et non une navigation : le principal REFUSE
 					   toute navigation de premier niveau vers une autre origine
 					   (elle donnerait `window.neo` à la page distante) et remet
@@ -203,8 +200,8 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					   le `<a target="_blank">` de l'ancienne section
 					   « À propos ». */
 					window.open(URL_DEPOT, "_blank", "noopener");
-				} else if (id === "next-wallpaper") {
-					deps.fondSuivant();
+				} else if (id === "change-wallpaper") {
+					deps.choisirFond();
 				} else if (id === "reload") {
 					void pont().affichage.recharger();
 				} else if (id === "fullscreen") {

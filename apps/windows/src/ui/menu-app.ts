@@ -16,11 +16,20 @@ import { ajouter } from "../../../../src/dom";
 import { buildMenu } from "./menu-app-arbre";
 import type { EntreeMenu } from "./menu-app-arbre";
 import { poserIcone } from "../host/ui";
+import { t } from "../../../../src/i18n";
+import type { ResultatVerification } from "./mise-a-jour";
 
 export interface ActionsMenu {
 	version: string;
 	executer(id: string): void;
+	/** A manual update check; its outcome is shown in the menu's button. */
+	verifier(): Promise<ResultatVerification>;
 }
+
+/** How long an outcome stays in the button before it fades back. */
+const DUREE_RESULTAT_MS = 5000;
+/** The least time "Checking..." stays on screen, so the cycle can be seen. */
+const DUREE_MIN_VERIFICATION_MS = 700;
 
 /** Un niveau ouvert de la cascade : le panneau posé à l'écran et l'index de
     la ligne active au clavier (-1 : rien de survolé/focalisé). */
@@ -56,7 +65,12 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	const zoom = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nq-zoom")) || 1;
 	const ecran = (px: number): number => px * zoom;
 
+	let minuteurResultat: number | undefined;
+	let fermee = false;
+
 	function fermer(): void {
+		fermee = true;
+		window.clearTimeout(minuteurResultat);
 		window.clearTimeout(minuteurSortie);
 		document.removeEventListener("keydown", surClavier, true);
 		window.removeEventListener("blur", fermer);
@@ -111,8 +125,21 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				const verifier = document.createElement("button");
 				verifier.type = "button";
 				verifier.className = "nq-menu-apropos-verifier";
-				verifier.textContent = entree.checkLabel;
-				verifier.addEventListener("click", () => activer(entree, verifier));
+				const verifierIcone = ajouter(verifier, "span", "nq-menu-verifier-icone");
+				verifierIcone.setAttribute("aria-hidden", "true");
+				const verifierTexte = ajouter(verifier, "span", "nq-menu-verifier-texte");
+				// The visible label, announced politely when it changes.
+				const verifierLibelle = ajouter(verifierTexte, "span", "nq-menu-verifier-libelle", entree.checkLabel);
+				verifierLibelle.setAttribute("aria-live", "polite");
+				/* Hidden sizers: the button is as wide as the widest text it will
+				   ever show, so the row never jumps during the cycle. */
+				for (const texte of [
+					t("app.update.btn.checking"), t("app.update.btn.upToDate"), t("app.update.btn.failed"), t("app.update.btn.devBuild"),
+					t("app.update.btn.downloading", { version: deps.version }), t("app.update.btn.ready", { version: deps.version }),
+				]) ajouter(verifierTexte, "span", "nq-menu-verifier-mesure", texte).setAttribute("aria-hidden", "true");
+				verifier.addEventListener("click", () => {
+					void verifierMiseAJour(entree.checkLabel, verifier, verifierIcone, verifierLibelle);
+				});
 				verifier.addEventListener("mouseenter", () => {
 					allumer(niveau, verifier);
 					fermerDepuis(niveau + 1);
@@ -140,8 +167,6 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			const ligne = document.createElement("button");
 			ligne.type = "button";
 			ligne.className = "nq-menu-ligne";
-
-			ajouter(ligne, "span", "nq-menu-coche");
 
 			ajouter(ligne, "span", "nq-menu-libelle", entree.label);
 
@@ -216,13 +241,56 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			return;
 		}
 		if (entree.kind === "action" && entree.disabled) return;
-		if (entree.kind === "about") {
-			deps.executer("check-updates");
-			fermer();
-		} else if (entree.kind === "action") {
+		// "about": Enter on the check button (its own click does the work).
+		if (entree.kind === "about") { (ligneEl as HTMLButtonElement).click(); return; }
+		if (entree.kind === "action") {
 			deps.executer(entree.id);
 			fermer();
 		}
+	}
+
+	/** The check, shown IN the button: spinner and "Checking...", then the
+	    outcome for a few seconds, then the label comes back. The button keeps
+	    its size (hidden sizers hold the widest text) and takes no second click
+	    while it works. A closed menu is left alone: no error, no notice. */
+	async function verifierMiseAJour(libelleRepos: string, bouton: HTMLButtonElement, icone: HTMLElement, libelle: HTMLElement): Promise<void> {
+		if (bouton.disabled) return;
+		const montrer = (texte: string, nomIcone: string | null, etat: string): void => {
+			bouton.dataset.etat = etat;
+			libelle.textContent = texte;
+			icone.replaceChildren();
+			if (nomIcone) poserIcone(icone, nomIcone);
+		};
+		bouton.disabled = true;
+		montrer(t("app.update.btn.checking"), "refresh-cw", "verification");
+		let resultat: ResultatVerification;
+		try {
+			// A check that answers at once would flash the spinner: hold it a moment.
+			[resultat] = await Promise.all([deps.verifier(), new Promise(r => window.setTimeout(r, DUREE_MIN_VERIFICATION_MS))]);
+		} catch (erreur) {
+			resultat = { kind: "failed", message: String(erreur) };
+		}
+		if (fermee || !bouton.isConnected) return;
+		if (resultat.kind === "up-to-date") montrer(t("app.update.btn.upToDate"), "check", "resultat");
+		else if (resultat.kind === "downloading") montrer(t("app.update.btn.downloading", { version: resultat.version }), "download", "resultat");
+		else if (resultat.kind === "ready") montrer(t("app.update.btn.ready", { version: resultat.version }), "circle-arrow-up", "resultat");
+		else if (resultat.kind === "dev-build") montrer(t("app.update.btn.devBuild"), "info", "resultat");
+		else {
+			// The full message is for a screen reader and the console, never a native tooltip.
+			console.warn("[update check]", resultat.message);
+			bouton.setAttribute("aria-description", resultat.message);
+			montrer(t("app.update.btn.failed"), "circle-alert", "resultat");
+		}
+		minuteurResultat = window.setTimeout(() => {
+			if (fermee || !bouton.isConnected) return;
+			bouton.dataset.etat = "retour"; // fades the outcome out
+			minuteurResultat = window.setTimeout(() => {
+				if (fermee || !bouton.isConnected) return;
+				bouton.removeAttribute("aria-description");
+				montrer(libelleRepos, null, "");
+				bouton.disabled = false;
+			}, 220);
+		}, DUREE_RESULTAT_MS);
 	}
 
 	function surClavier(e: KeyboardEvent): void {

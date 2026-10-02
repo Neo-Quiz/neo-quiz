@@ -56,7 +56,9 @@ export function buildMenu(ctx: { version: string }): EntreeMenu[] {
 		{ kind: "submenu", id: "view", label: t("app.menu.view"), items: [
 			/* No "Interface scale" submenu since 2026-09-29: the zoom is
 			   reached by Ctrl + wheel and its bubble (`palierZoomVoisin`). */
-			{ kind: "action", id: "next-wallpaper", label: t("app.menu.nextWallpaper"), shortcut: "Ctrl+Shift+B" },
+			/* Opens the wallpaper picker. Ctrl+Shift+B still cycles to the next
+			   wallpaper (`barre-titre.ts`), so it is not shown on this line. */
+			{ kind: "action", id: "change-wallpaper", label: t("app.menu.changeWallpaper") },
 			{ kind: "separator", id: "view-sep" },
 			{ kind: "action", id: "reload", label: t("app.menu.reload"), shortcut: "Ctrl+R" },
 			{ kind: "action", id: "fullscreen", label: t("app.menu.fullscreen"), shortcut: "F11" },

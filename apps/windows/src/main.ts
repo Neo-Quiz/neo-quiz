@@ -50,7 +50,7 @@ import { installOverscrollStretch } from "./ui/overscroll-stretch";
 import { installKeyboardState } from "./ui/clavier";
 import { retourAndroid } from "./ui/retour-android";
 import { armerCalendrier } from "./ui/calendrier-android";
-import { appliquerEffetsFond, appliquerFond, fondSuivant } from "./ui/fond";
+import { appliquerEffetsFond, appliquerFond, choisirFond, fondSuivant } from "./ui/fond";
 
 /*
  * Démarrage de l'application.
@@ -506,6 +506,7 @@ async function demarrer(): Promise<void> {
 		   chaque montage. */
 		ouvrirReglages,
 		fondSuivant: () => { void fondSuivant(); },
+		choisirFond: () => { void choisirFond(); },
 	});
 	/* Le dossier du fond est DÉJÀ admis au périmètre par le principal
 	   (`perimetreInitial`, avant l'ouverture de la fenêtre) : le rendu n'a

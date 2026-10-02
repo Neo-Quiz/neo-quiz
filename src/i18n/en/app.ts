@@ -54,13 +54,13 @@ export const EN_APP = {
 	"app.update.size": "{done} MB / {total} MB",
 	"app.update.install": "Update",
 	"app.update.installing": "Installing…",
-	/* What "Check for updates…" of the application menu answers. */
-	"app.update.checking": "Checking for updates…",
-	"app.update.upToDate": "Neo Quiz is up to date (v{version}).",
-	"app.update.available": "Version {version} is downloading; an Update button will appear in the sidebar.",
-	"app.update.ready": "Version {version} is ready: click Update in the sidebar to install it.",
-	"app.update.failed": "Could not check for updates: {message}",
-	"app.update.devBuild": "Updates are only checked in the installed app.",
+	/* Outcome of "Check for updates" shown IN the menu button. */
+	"app.update.btn.checking": "Checking…",
+	"app.update.btn.upToDate": "Up to date",
+	"app.update.btn.downloading": "v{version} downloading",
+	"app.update.btn.ready": "v{version} ready",
+	"app.update.btn.failed": "Check failed",
+	"app.update.btn.devBuild": "Dev build",
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée
 	   depuis un reflet de l'installation (`electron/fenetre-maj.ts`). */
 	"app.update.window.title": "Updating Neo Quiz",
@@ -79,7 +79,7 @@ export const EN_APP = {
 	"app.menu.reload": "Reload",
 	"app.menu.fullscreen": "Toggle full screen",
 	"app.menu.devtools": "Show developer tools",
-	"app.menu.nextWallpaper": "Next wallpaper",
+	"app.menu.changeWallpaper": "Change wallpaper…",
 	"app.zoom.in": "Zoom in",
 	"app.zoom.out": "Zoom out",
 	"app.zoom.reset": "Reset",

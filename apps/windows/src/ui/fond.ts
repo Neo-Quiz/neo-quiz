@@ -288,6 +288,11 @@ function ouvrirChoixFond(reglage: ReglageFond | null, onFini: () => void): void 
 	});
 }
 
+/** The same picker, opened from the application menu. */
+export async function choisirFond(): Promise<void> {
+	ouvrirChoixFond(validerReglage(await pont().reglages.lire(CLE_REGLAGES_FOND)), () => {});
+}
+
 /**
  * La section « Fond d'écran » des Réglages : UNE RANGÉE, et rien d'autre.
  *

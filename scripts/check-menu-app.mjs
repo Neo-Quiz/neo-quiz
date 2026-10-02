@@ -30,7 +30,7 @@ await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/elec
 	r.check("the scale steps are sorted, each one larger than the last",
 		PALIERS_ZOOM.every((p, i) => i === 0 || p > PALIERS_ZOOM[i - 1]), true);
 	r.check("the Display submenu no longer carries an interface scale",
-		menu[2].items.map(e => e.id), ["next-wallpaper", "view-sep", "reload", "fullscreen", "devtools"]);
+		menu[2].items.map(e => e.id), ["change-wallpaper", "view-sep", "reload", "fullscreen", "devtools"]);
 
 	/* ─── THE NEIGHBOUR STEP (Ctrl + wheel) ───
 	   What it prevents: a wheel notch that changes nothing because the
