@@ -47,8 +47,9 @@ export function getChats(storage: Store | null = safeStorage()): ChatRecord[] {
 	return [...cache.list];
 }
 
-/** Writes the list; a full storage drops the oldest half of the live chats
-    until it fits (tombstones stay). */
+/** Writes the list; a full storage drops the OLDEST live chat, one at a time,
+    until it fits (tombstones are never dropped: they stop a deleted chat from
+    coming back). Returns false when nothing fits or storage is refused. */
 function write(list: readonly ChatRecord[], storage: Store | null): boolean {
 	let kept = boundChats(list);
 	while (true) {
@@ -57,9 +58,9 @@ function write(list: readonly ChatRecord[], storage: Store | null): boolean {
 			return !!storage;
 		} catch {
 			const live = kept.filter(c => !c.deleted);
-			if (live.length <= 1) return false;
-			const keep = new Set(live.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, Math.ceil(live.length / 2)).map(c => c.id));
-			kept = kept.filter(c => c.deleted || keep.has(c.id));
+			if (live.length === 0) return false;
+			const oldest = live.reduce((a, b) => (b.updatedAt < a.updatedAt ? b : a));
+			kept = kept.filter(c => c !== oldest);
 		}
 	}
 }
