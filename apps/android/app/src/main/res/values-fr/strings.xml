@@ -4,11 +4,11 @@
     <string name="first_run_intro">Deux réglages et tes quiz sont prêts sur ce téléphone.</string>
     <string name="first_run_files_title">Accès à tes quiz</string>
     <string name="first_run_files_body">Tes quiz sont de simples fichiers, rangés dans Documents/Neo Quiz. Android te demande ton accord pour que Neo Quiz puisse les lire et les enregistrer.</string>
-    <string name="first_run_files_button">Autoriser l'accès</string>
+    <string name="first_run_files_button">Autoriser l\'accès</string>
     <string name="first_run_files_done">Accès autorisé</string>
     <string name="first_run_sync_title">Synchro en arrière-plan</string>
     <string name="first_run_optional">Facultatif</string>
-    <string name="first_run_sync_body">Tes révisions arrivent sur ton ordinateur même quand l'app est fermée. Dans la liste qui s'ouvre, retire Neo Quiz de l'optimisation de la batterie.</string>
+    <string name="first_run_sync_body">Tes révisions arrivent sur ton ordinateur même quand l\'app est fermée. Dans la liste qui s\'ouvre, retire Neo Quiz de l\'optimisation de la batterie.</string>
     <string name="first_run_sync_button">Ouvrir le réglage</string>
     <string name="first_run_sync_done">Synchro autorisée</string>
     <string name="first_run_start">Commencer</string>
