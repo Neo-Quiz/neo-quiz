@@ -73,6 +73,8 @@ class FirstRunScreen(context: Context, private val onStart: () -> Unit) : Scroll
     private val startButton: TextView
 
     init {
+        // AndroidView sizes a view by its layout params: without them the screen wrapped to 144 px wide.
+        layoutParams = android.view.ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         isFillViewport = true
         overScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS
         val column = LinearLayout(context).apply {
