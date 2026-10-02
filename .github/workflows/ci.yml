@@ -258,6 +258,11 @@ jobs:
       # a tombstone survives the bound.
       - name: Chat record
         run: npm run check:chat-record
+      # THE CHAT STORE: a full or refused storage never loses the chat on
+      # screen, a deleted chat stays deleted, the legacy archive is imported
+      # once, and a reload keeps the active chat.
+      - name: Chat store
+        run: npm run check:chat-store
 
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is
