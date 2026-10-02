@@ -92,6 +92,13 @@ export const EN_AI = {
 	"ai.type.multiple": "Multiple choice",
 	"ai.type.text": "Free text",
 	"ai.type.comprehension": "Comprehension",
+	"ai.type.numeric": "Numeric answer",
+	"ai.type.cloze": "Fill in the blanks",
+	"ai.type.ordering": "Ordering",
+	"ai.type.matching": "Matching",
+	"ai.type.codeOutput": "Code output",
+	"ai.type.mcq": "MCQ",
+	"ai.type.count": "{count} types",
 
 	/* ── Quiz type: Learn / Test (composer) ── */
 	"ai.type.learnGenerateTip": "Generate a quiz optimised for learning: short readings, a question before each one and instant feedback, until it sticks.",

@@ -333,7 +333,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		oneQuizBtn.setAttribute("aria-pressed", String(oneQuiz));
 		oneQuizBtn.classList.toggle("is-on", oneQuiz);
 	};
-	let questionType = "Mixte";
+	/** The checked question types (canonical values); `null` = untouched, i.e.
+	    the default of the current mode (`effectiveTypes`). */
+	let questionTypes: string[] | null = null;
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
 	   par défaut. Comme le nombre et le type, elle vaut pour la SESSION de la
 	   page et n'est pas persistée — rouvrir « Générer » repart du défaut,
@@ -685,8 +687,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	// « Mixte »/« Choix unique »… pour construire le prompt), et un LIBELLÉ
 	// traduit, seul affiché. Traduire la valeur casserait la génération dès que
 	// l'UI passe en anglais. Les deux listes restent parallèles (même ordre).
-	const TYPE_VALUES = ["Mixte", "Choix unique", "Choix multiple", "Texte libre", "Compréhension"];
-	const TYPE_KEYS: TransKey[] = ["ai.type.mixed", "ai.type.single", "ai.type.multiple", "ai.type.text", "ai.type.comprehension"];
+	const TYPE_VALUES = ["Mixte", "Choix unique", "Choix multiple", "Texte libre", "Réponse numérique", "Texte à trous", "Classement", "Association", "Sortie de code", "Compréhension"];
+	const TYPE_KEYS: TransKey[] = ["ai.type.mixed", "ai.type.single", "ai.type.multiple", "ai.type.text", "ai.type.numeric", "ai.type.cloze", "ai.type.ordering", "ai.type.matching", "ai.type.codeOutput", "ai.type.comprehension"];
+	/** What an untouched selection means: a Test is a written MCQ, a Learn
+	    lets its roles pick the types. Choosing Auto explicitly is Auto in both. */
+	const effectiveTypes = (): string[] => questionTypes ?? (modeGeneration === "learn" ? [TYPE_VALUES[0]] : [TYPE_VALUES[1], TYPE_VALUES[2]]);
+	/** The grey value of the Type row and of the options tip. */
+	const typesResume = (values: string[]): string => {
+		const v = values.length ? values : [TYPE_VALUES[0]];
+		if (v.length === 1) return v[0] === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(v[0]);
+		if (v.length === 2 && v.includes(TYPE_VALUES[1]) && v.includes(TYPE_VALUES[2])) return t("ai.type.mcq");
+		return t("ai.type.count", { count: v.length });
+	};
 	// Libellés recalculés à chaque usage (menu, tooltip) : jamais figés dans la
 	// langue du chargement.
 	const typeLabels = (): string[] => TYPE_KEYS.map(k => t(k));
@@ -1991,10 +2003,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			openOptionsMenu(optsBtn, {
 				count: questionCount ?? 10,
 				countAuto: questionCount === null, onCountAuto: () => { questionCount = null; },
-				typeAuto: questionType === TYPE_VALUES[0], onTypeAuto: () => { questionType = TYPE_VALUES[0]; },
-				type: typeLabel(questionType), types: typeLabels().slice(1),
+				type: "", types: typeLabels().slice(1),
+				typesActifs: effectiveTypes().filter(v => v !== TYPE_VALUES[0]).map(typeLabel),
+				// An empty selection is Auto, chosen explicitly (not the mode's default).
+				onTypes: (labels) => { questionTypes = labels.length ? labels.map(typeValue) : [TYPE_VALUES[0]]; },
+				typesResume: (labels) => typesResume(labels.map(typeValue)),
 				onCount: (n) => { questionCount = n; },
-				onType: (label) => { questionType = typeValue(label); },
 				/* The subject: Automatic says what it detects, otherwise the
 				   choice forces the prompt's (feedback #7). A value that is not
 				   a known subject (a group row) is never kept. */
@@ -2012,7 +2026,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// here: the composer's own row always does.
 		attachHoverTip(optsBtn, (tip) => {
 			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
-			const ty = questionType === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(questionType);
+			const ty = typesResume(effectiveTypes());
 			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
 		});
 
@@ -4061,7 +4075,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const d: DemandeTexte = { ...envoi, text: texte };
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
 			const examen = examCible ?? undefined;
-			const base = { count: null, type: questionType, destination, reglages, categorie };
+			const base = { count: null, type: effectiveTypes(), destination, reglages, categorie };
 			/* THE RIGHT NUMBER OF QUIZZES: one Learn per document (CM1, CM2, CM3
 			   each get their path), then the Tests of rising difficulty over
 			   all of them together. One `lot`: the queue shows the request once
@@ -4083,7 +4097,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
 			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
-			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: questionType, destination, reglages, categorie });
+			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: effectiveTypes(), destination, reglages, categorie });
 		}
 		viderComposer();
 		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
@@ -4161,7 +4175,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				return l.plan || l.note ? l : undefined;
 			}));
 		}
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: questionType, mode: modeGeneration, source, planTranches, categorie, documents, plansParDocument: lotWebLiens?.map(l => l?.plan) }), jeton);
+		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: effectiveTypes(), mode: modeGeneration, source, planTranches, categorie, documents, plansParDocument: lotWebLiens?.map(l => l?.plan) }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;

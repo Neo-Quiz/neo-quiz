@@ -1812,6 +1812,13 @@ export interface OpenOptionsMenuOptions {
 	onCountAuto?: () => void;
 	typeAuto?: boolean;
 	onTypeAuto?: () => void;
+	/** MULTI-SELECT variant of the Type row: when `onTypes` is given, the
+	    types are checkboxes. `typesActifs` are the checked labels (empty =
+	    Auto, which is exclusive), `onTypes` gets the new checked labels,
+	    `typesResume` writes the grey value of the row. */
+	typesActifs?: string[];
+	onTypes?: (labels: string[]) => void;
+	typesResume?: (labels: string[]) => string;
 	/**
 	 * CATÉGORIE du quiz (retour #7, 2026-09-26) : « Automatique » en tête,
 	 * dont l'indice dit ce qui est détecté, puis la liste. Absente = pas de
@@ -1885,6 +1892,8 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	    second flyout with its own search (`filtreEnfants`); a search in the
 	    first flyout reaches them too. */
 	interface Choix {
+		/** A checkbox (several can be checked) rather than a radio. */
+		multi?: boolean;
 		label: string; hint?: string; icon?: string; renderIcon?: (el: HTMLElement) => void; color?: string; sub?: string; section?: string;
 		actif: boolean; choisir(): void;
 		enfants?: Choix[]; filtreEnfants?: { placeholder: string; vide: string };
@@ -1895,7 +1904,7 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	const dessinerChoix = (liste: HTMLElement, c: Choix, apres: () => void): HTMLButtonElement => {
 		const b = ajouter(liste, "button", "qbd-select-option");
 		b.type = "button";
-		b.setAttribute("role", "menuitemradio");
+		b.setAttribute("role", c.multi ? "menuitemcheckbox" : "menuitemradio");
 		b.setAttribute("aria-checked", String(c.actif));
 		if (c.icon || c.renderIcon) {
 			const i = ajouter(b, "span", "qbd-opts-dd-icon");
@@ -2190,7 +2199,21 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	/* ── Type ── */
 	let type = opts.type;
 	let typeAuto = !!opts.typeAuto;
-	ligne("shapes", t("dashboard.select.optionsType"),
+	if (opts.onTypes) {
+		/* Auto is EXCLUSIVE: picking it clears the types, picking a type
+		   clears it, and unchecking the last type falls back to Auto. */
+		let actifs = [...(opts.typesActifs ?? [])];
+		const pousser = (): void => { opts.onTypes?.([...actifs]); };
+		ligne("shapes", t("dashboard.select.optionsType"),
+			() => (opts.typesResume ?? ((l: string[]) => l.join(", ")))(actifs),
+			() => [
+				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), multi: true, actif: actifs.length === 0, choisir: () => { actifs = []; pousser(); } },
+				...opts.types.map(x => ({
+					label: x, multi: true, actif: actifs.includes(x),
+					choisir: () => { actifs = actifs.includes(x) ? actifs.filter(y => y !== x) : [...actifs, x]; pousser(); },
+				})),
+			]);
+	} else ligne("shapes", t("dashboard.select.optionsType"),
 		() => typeAuto ? t("ai.options.auto") : type,
 		() => [
 			{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: typeAuto, choisir: () => { typeAuto = true; if (opts.onTypeAuto) opts.onTypeAuto(); } },

@@ -73,6 +73,13 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.type.multiple": "Choix multiple",
 	"ai.type.text": "Texte libre",
 	"ai.type.comprehension": "Compréhension",
+	"ai.type.numeric": "Réponse numérique",
+	"ai.type.cloze": "Texte à trous",
+	"ai.type.ordering": "Classement",
+	"ai.type.matching": "Association",
+	"ai.type.codeOutput": "Sortie de code",
+	"ai.type.mcq": "QCM",
+	"ai.type.count": "{count} types",
 
 	/* ── Type de quiz : Learn / Test (composer) ── */
 	"ai.type.learnGenerateTip": "Générer un quiz optimisé pour apprendre : de courtes lectures, une question avant chacune et la correction aussitôt, jusqu'à ce que ça tienne.",

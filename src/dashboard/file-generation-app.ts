@@ -59,7 +59,9 @@ export function figerReglages(s: AiSettings): ReglagesFiges {
 export interface DemandeFile extends DemandeTexte {
 	mode: ModeGeneration;
 	count: number | null;
-	type: string;
+	/** Canonical type values; a request saved by an older version carries ONE
+	    string (see `normalizeTypes`). */
+	type: string | string[];
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
 	destination: string;
 	reglages: ReglagesFiges;
