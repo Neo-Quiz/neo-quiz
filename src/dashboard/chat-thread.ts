@@ -32,12 +32,16 @@ export function threadItems(chat: ChatRecord | null, lines: readonly LigneGenera
 	return items.sort((a, b) => a.at - b.at);
 }
 
+/** How many earlier requests a follow-up carries: chats persist across
+    sessions, so the context must not grow with them. */
+export const MAX_CONTEXT_REQUESTS = 12;
+
 /** The earlier requests of a chat as the context of a follow-up. A live
     request carries what the queue still has (documents' text, the questions
     of the quizzes); a recorded one only what the record keeps (document
     names, quiz titles and files, written answers). */
 export function toursOfThread(items: readonly ThreadItem[]): TourPrecedent[] {
-	return items.map((item): TourPrecedent => {
+	return items.slice(-MAX_CONTEXT_REQUESTS).map((item): TourPrecedent => {
 		if (item.kind === "record") {
 			const q = item.request;
 			return {
