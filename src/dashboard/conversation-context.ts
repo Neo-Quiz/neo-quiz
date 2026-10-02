@@ -10,11 +10,14 @@ export interface TourPrecedent {
 	/** Documents attached to that request, already read. */
 	notes: { name: string; content: string }[];
 	/** The quizzes it produced (one entry per quiz): title and raw questions. */
-	quizzes: { title?: string; questions: unknown[] }[];
+	quizzes: { title?: string; questions: unknown[]; path?: string }[];
+	/** Written answers of that request, as text. */
+	answers?: string[];
 }
 
 const MAX_PROMPT_CHARS = 140;
 const MAX_QUESTIONS_LISTED = 12;
+const MAX_ANSWER_CHARS = 600;
 
 function promptOf(q: unknown): string {
 	if (!q || typeof q !== "object") return "";
@@ -39,9 +42,18 @@ export function contexteConversation(tours: readonly TourPrecedent[]): string {
 		if (tour.notes.length) lignes.push("Documents attached: " + tour.notes.map(n => n.name).join(", "));
 		for (const q of tour.quizzes) {
 			const prompts = q.questions.map(promptOf).filter(Boolean);
+			// A quiz read back from a chat record: its questions are not kept, its file is.
+			if (!prompts.length && q.path) {
+				lignes.push("Quiz produced" + (q.title ? " \"" + q.title + "\"" : "") + " (file: " + q.path + ")");
+				continue;
+			}
 			lignes.push("Quiz produced" + (q.title ? " \"" + q.title + "\"" : "") + " (" + prompts.length + " questions)" + (prompts.length ? ":" : ""));
 			for (const p of prompts.slice(0, MAX_QUESTIONS_LISTED)) lignes.push("- " + (p.length > MAX_PROMPT_CHARS ? p.slice(0, MAX_PROMPT_CHARS) + "…" : p));
 			if (prompts.length > MAX_QUESTIONS_LISTED) lignes.push("- … (" + (prompts.length - MAX_QUESTIONS_LISTED) + " more)");
+		}
+		for (const a of tour.answers ?? []) {
+			const flat = a.replace(/\s+/g, " ").trim();
+			if (flat) lignes.push("Answer written: " + (flat.length > MAX_ANSWER_CHARS ? flat.slice(0, MAX_ANSWER_CHARS) + "…" : flat));
 		}
 		return lignes.join("\n");
 	});

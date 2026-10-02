@@ -38,3 +38,17 @@ await withSrcModule("src/dashboard/generation-demande.ts", (D) => {
 		[p.startsWith("CONVERSATION SO FAR: earlier"), p.includes("NEW REQUEST:\nmake it multiple choice"), p.includes("COURSE")], [true, true, true]);
 	r.done();
 });
+
+await withSrcModule("src/dashboard/conversation-context.ts", (C) => {
+	const r = makeReporter("Conversation context from a chat record");
+	const c = C.contexteConversation([{
+		text: "from the PDFs", notes: [{ name: "CM1.pdf", content: "" }],
+		quizzes: [{ title: "CM1 Intro", questions: [], path: "Cours/CM1.md" }],
+		answers: ["A written answer"],
+	}]);
+	r.check("a quiz known only by title and path is named with its file, not as '0 questions'", [c.includes("\"CM1 Intro\" (file: Cours/CM1.md)"), c.includes("0 questions")], [true, false]);
+	r.check("a written answer travels", c.includes("Answer written: A written answer"), true);
+	const long = C.contexteConversation([{ text: "t", notes: [], quizzes: [], answers: ["x".repeat(5000)] }]);
+	r.check("a long answer is cut", long.length < 1200, true);
+	r.done();
+});

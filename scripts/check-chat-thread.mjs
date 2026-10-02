@@ -98,3 +98,65 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("a failed line stays (its Try again is live)", R.closableLines([line(1, "echouee")], "c2", rien).map(l => l.id), []);
 	r.done();
 });
+
+await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts", "src/dashboard/chat-record.ts"], (T, L, C) => {
+	const r = makeReporter("Thread and list");
+	const req = (id, at, over = {}) => ({ id, at, from: "d1", text: "t" + id, mode: "practice", documents: [], results: [], state: "done", ...over });
+	const rec = (id, updatedAt, requests, over = {}) => ({ id, origin: "d1", createdAt: 1, updatedAt, requests, ...over });
+	const keys = (items) => items.map(i => i.kind + ":" + i.key);
+
+	// Thread: record requests + live groups of the chat on screen, in order of sending.
+	const chat = rec("c1", 9, [req("r1", 100), req("r2", 200)]);
+	r.check("a chat from the record: its requests, oldest first", keys(T.threadItems(chat, [], "c1")), ["record:r1", "record:r2"]);
+	r.check("no chat yet and no line: an empty thread", T.threadItems(null, [], "c1"), []);
+	const live = [line(1, "cours", { requestId: "r3", sentAt: 300 })];
+	r.check("a live request comes after the recorded ones", keys(T.threadItems(chat, live, "c1")), ["record:r1", "record:r2", "live:r3"]);
+	r.check("a request in the record AND in the queue is shown once, from the live lines", keys(T.threadItems(chat, [line(1, "prete", { requestId: "r2", sentAt: 200 }, quiz("A", "a.md"))], "c1")), ["record:r1", "live:r2"]);
+	r.check("lines of another chat never show", keys(T.threadItems(chat, [line(1, "cours", { chatId: "c2", requestId: "x" })], "c1")), ["record:r1", "record:r2"]);
+	r.check("a stopped line (arret) is not shown live: the record's 'stopped' request takes over",
+		keys(T.threadItems(rec("c1", 9, [req("r1", 100, { state: "stopped" })]), [line(1, "arret", { requestId: "r1", sentAt: 100 })], "c1")), ["record:r1"]);
+	r.check("a deleted chat shows nothing", T.threadItems({ ...chat, deleted: true, requests: [] }, [], "c1"), []);
+	r.check("a line saved before chats shows in the legacy chat, after the recorded ones",
+		keys(T.threadItems(null, [line(4, "prete", { chatId: undefined, requestId: undefined, sentAt: undefined }, quiz("A", "a.md"))], C.LEGACY_CHAT_ID)), ["live:line-4"]);
+
+	// Context tours.
+	const chatDocs = rec("c1", 9, [req("r1", 100, { text: "from the PDFs", documents: [{ name: "CM1.pdf" }], results: [{ kind: "quiz", title: "CM1 Intro", path: "Cours/CM1.md" }, { kind: "text", text: "A written answer" }] })]);
+	const tours = T.toursOfThread(T.threadItems(chatDocs, [], "c1"));
+	r.check("a recorded request becomes a tour: text, documents by name, quiz by title and path, answers", [tours.length, tours[0].text, tours[0].notes.map(n => n.name), tours[0].quizzes, tours[0].answers], [1, "from the PDFs", ["CM1.pdf"], [{ title: "CM1 Intro", questions: [], path: "Cours/CM1.md" }], ["A written answer"]]);
+	const liveTours = T.toursOfThread(T.threadItems(null, [
+		line(1, "prete", { notes: [{ name: "A.pdf", content: "AAA" }], produit: { questions: [{ prompt: "q1" }], titre: "QA" } }, quiz("QA", "qa.md")),
+		line(2, "prete", { notes: [{ name: "B.pdf", content: "BBB" }], produit: { questions: [{ prompt: "q2" }], titre: "QB" } }, quiz("QB", "qb.md")),
+	], "c1"));
+	r.check("two lines of one send: ONE tour, both documents with their content, both quizzes with their questions",
+		[liveTours.length, liveTours[0].notes.map(n => n.name + ":" + n.content), liveTours[0].quizzes.map(q => q.title + ":" + q.questions.length)], [1, ["A.pdf:AAA", "B.pdf:BBB"], ["QA:1", "QB:1"]]);
+	r.check("a planning line is not a quiz tour of its own", T.toursOfThread(T.threadItems(null, [line(1, "prete", { planifier: true, produit: undefined }, { titre: "", chemin: "", texte: "plan" })], "c1"))[0].quizzes, []);
+
+	// Sidebar list.
+	const now = new Date(2026, 8, 30, 15, 0).getTime();
+	const list = L.chatListItems([rec("a", 50, [req("r", 1, { text: "Alpha" })]), rec("dead", 99, [], { deleted: true })], [], now);
+	r.check("the list: record chats, tombstones hidden", list.map(i => [i.id, i.title, i.date, i.running]), [["a", "Alpha", 50, false]]);
+	const run = L.chatListItems([rec("a", 50, [req("r", 1, { text: "Alpha" })])], [line(1, "cours", { chatId: "a", requestId: "r9", sentAt: 70 })], now);
+	r.check("a chat with a running request is flagged, and dated from the latest activity", [run[0].running, run[0].date], [true, 70]);
+	const vif = L.chatListItems([], [line(1, "cours", { chatId: "fresh", text: "Brand new\nsecond line", sentAt: 80 })], now);
+	r.check("a chat that only exists in the queue is listed, running, titled by its request", vif.map(i => [i.id, i.title, i.running, i.date]), [["fresh", "Brand new", true, 80]]);
+	r.check("a waiting line counts as running", L.chatListItems([], [line(1, "attente", { chatId: "w" })], now)[0].running, true);
+	r.check("a finished line is not running", L.chatListItems([], [line(1, "prete", { chatId: "w" }, quiz("A", "a.md"))], now)[0].running, false);
+	r.check("newest first", L.chatListItems([rec("a", 10, [req("r", 1)]), rec("b", 30, [req("r", 1)]), rec("c", 20, [req("r", 1)])], [], now).map(i => i.id), ["b", "c", "a"]);
+
+	// Days, in LOCAL time.
+	const at = (d, h, m = 0) => new Date(2026, 8, d, h, m).getTime();
+	const it = (id, date) => ({ id, title: id, date, running: false });
+	const jours = L.groupItemsByDay([it("a", at(30, 0, 10)), it("b", at(29, 23, 50)), it("c", at(29, 8)), it("d", at(28, 12)), it("e", new Date(2026, 7, 20, 12).getTime())], now, 30);
+	r.check("today, yesterday, a date, each day once",
+		jours.map(j => [j.kind, j.chats.map(c => c.id).join(""), j.old]),
+		[["today", "a", false], ["yesterday", "bc", false], ["day", "d", false], ["day", "e", true]]);
+
+	// One request that made several quizzes: ONE item, every result, once in the context.
+	const multi = [line(1, "prete", { requestId: "r5", sentAt: 500 }, quiz("A", "a.md")), line(2, "prete", { requestId: "r5", sentAt: 500 }, quiz("B", "b.md"))];
+	const multiRec = rec("c1", 9, [req("r5", 500, { results: [{ kind: "quiz", title: "A", path: "a.md" }, { kind: "quiz", title: "B", path: "b.md" }] })]);
+	r.check("several quizzes of one request: ONE live item with both lines", T.threadItems(null, multi, "c1").map(i => [i.kind, i.key, i.lines.length]), [["live", "r5", 2]]);
+	r.check("several quizzes of one request: ONE record item with both results", T.threadItems(multiRec, [], "c1").map(i => [i.kind, i.request.results.length]), [["record", 2]]);
+	const both = T.toursOfThread(T.threadItems(multiRec, multi, "c1"));
+	r.check("in the record AND live: the context lists the request once", both.length, 1);
+	r.done();
+});

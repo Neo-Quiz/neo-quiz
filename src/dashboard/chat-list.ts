@@ -1,0 +1,78 @@
+/* ══════════════════════════════════════════════════════════
+   THE LIST of chats in the sidebar — pure
+
+   Every chat of the record, plus the chats that exist only in the queue (a
+   request sent in a chat that has not answered yet), newest activity first.
+   A chat with a request waiting or running is flagged `running`: that is the
+   indicator the sidebar shows, and the reason why switching chats is safe.
+══════════════════════════════════════════════════════════ */
+
+import type { LigneGeneration } from "./file-generation-app";
+import type { ChatRecord } from "./chat-record";
+import { chatTitle, firstLineOf } from "./chat-record";
+import { chatOfLine, isLive } from "./chat-requests";
+
+export interface ChatListItem {
+	id: string;
+	title: string;
+	/** The latest activity: the day it is listed under. */
+	date: number;
+	running: boolean;
+}
+
+export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number): ChatListItem[] {
+	const items = new Map<string, ChatListItem>();
+	for (const c of chats) {
+		if (!c.deleted) items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false });
+	}
+	const tombstones = new Set(chats.filter(c => c.deleted).map(c => c.id));
+	for (const l of lines) {
+		if (l.etat === "arret") continue;
+		const id = chatOfLine(l);
+		if (tombstones.has(id)) continue;
+		let item = items.get(id);
+		if (!item) {
+			const d = l.demande;
+			item = { id, title: firstLineOf(d.text) || d.notes[0]?.name || "", date: d.sentAt ?? now, running: false };
+			items.set(id, item);
+		}
+		if (isLive(l)) item.running = true;
+		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
+	}
+	return [...items.values()].sort((a, b) => b.date - a.date);
+}
+
+/** A day of the sidebar: "Today", "Yesterday", or a date. `old` days are past
+    `recentDays` and go in the folded section. */
+export interface ChatDay {
+	kind: "today" | "yesterday" | "day";
+	/** Local midnight of the day, in epoch milliseconds. */
+	day: number;
+	old: boolean;
+	chats: ChatListItem[];
+}
+
+/** Local midnight of the day holding `ms` (the calendar day, DST included). */
+function midnight(ms: number): number {
+	const d = new Date(ms);
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** The chats (newest first) grouped by LOCAL day, newest day first. */
+export function groupItemsByDay(items: readonly ChatListItem[], now: number, recentDays = 30): ChatDay[] {
+	const today = midnight(now);
+	const n = new Date(today);
+	const yesterday = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1).getTime();
+	const limit = new Date(n.getFullYear(), n.getMonth(), n.getDate() - recentDays).getTime();
+	const days: ChatDay[] = [];
+	for (const chat of [...items].sort((a, b) => b.date - a.date)) {
+		const day = midnight(chat.date);
+		let group = days[days.length - 1];
+		if (!group || group.day !== day) {
+			group = { kind: day >= today ? "today" : day === yesterday ? "yesterday" : "day", day, old: day < limit, chats: [] };
+			days.push(group);
+		}
+		group.chats.push(chat);
+	}
+	return days;
+}
