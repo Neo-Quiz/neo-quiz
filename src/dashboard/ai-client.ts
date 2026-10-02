@@ -64,7 +64,9 @@ export interface ImagePayload {
 export interface GenerateOptions {
 	/** `null` : « Auto », le nombre suit la source (bornes du mode). */
 	count?: number | null;
-	type?: string;
+	/** Canonical type VALUES: a list, or one string (a request saved by an
+	    earlier version of the queue); see `normalizeTypes`. */
+	type?: string | string[];
 	source?: string;
 	images?: ImagePayload[];
 	/** Absent: Test (`"practice"`), like a block without a mode object. */
@@ -419,26 +421,63 @@ function blocPreparation(p: PreparationExamen | undefined, learn: boolean): stri
 	`;
 }
 
+/** The canonical value of "Auto" (the AI chooses). */
+export const TYPE_AUTO = "Mixte";
+
+/** Any shape of the `type` option (a list, a legacy single string from a
+    restored queue entry, nothing) as a non-empty list of canonical values. */
+export function normalizeTypes(type?: string | string[] | null): string[] {
+	const l = (Array.isArray(type) ? type : [type]).filter((x): x is string => typeof x === "string" && x.trim() !== "");
+	return l.length ? [...new Set(l)] : [TYPE_AUTO];
+}
+
+/** One sentence per canonical type, for a prompt that names its types. */
+const TYPE_SENTENCES: Record<string, string> = {
+	"Choix unique": "single-choice questions (exactly one correct answer)",
+	"Choix multiple": "multiple-choice questions (several correct answers)",
+	"Texte libre": "free-text questions",
+	"Réponse numérique": 'numeric-answer questions ("numeric": true, with a tolerance when the result is rounded)',
+	"Texte à trous": 'fill-in-the-blanks questions (the "cloze" field)',
+	"Classement": 'ordering questions ("ordering": true)',
+	"Association": 'matching questions ("matching": true)',
+	"Sortie de code": 'code-output questions (a text question with "terminalVariant", asking what a program prints)',
+	"Compréhension": `COMPREHENSION questions, ALL of them based on ONE source document that you write yourself.
+	Write a substantial passage (250-450 words: an article extract, a case study, a scenario, a piece of code — whatever suits the topic) and put it in the "passage" field of the FIRST question, together with "passageId": "doc1" and a "passageTitle" naming the document.
+	EVERY other question repeats ONLY "passageId": "doc1" (no "passage", no "passageTitle" — the engine shares the document automatically).
+	The questions must be ANSWERABLE FROM THE DOCUMENT ALONE and test understanding — main idea, inference, meaning in context, cause and effect, the author's intent, what can or cannot be concluded — NOT recall of outside knowledge`,
+};
+
+const QCM_EXPLAIN_RULE = 'EVERY question has "explain": SHORT, 1 to 3 sentences saying why the right answer is right and naming the trap. NO step-by-step correction and NO paragraph per wrong option.';
+
+const QCM_FORMAT_BLOCK = `WRITTEN MCQ EXAM FORMAT: write the quiz as the written MCQ (QCM) of an engineering-school exam.
+	- Every question has a SHORT "title" naming the notion tested (e.g. "Same IP network membership"), a statement in "prompt", and 3 or 4 options.
+	- Most questions have exactly ONE correct answer. About one question in four has SEVERAL correct answers ("multiSelect": true with "correctIndices"). The statement never says HOW MANY answers are correct; at most it says to check all those that apply.
+	- Mix concept questions (compare two models, the role of a mechanism), SHORT CALCULATIONS on a concrete given case (is this address in that network, which subnet fits 500 hosts), and SERIES of linked questions that share ONE scenario stated in each of their prompts (same network, same figures, a different question each time).
+	- Distractors are PLAUSIBLE: the common confusions and classic mistakes. NEVER an "all of the above" or "none of the above" option.
+	- Use only single-choice and multiple-choice questions.`;
+
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
-	const { count = null, type = "Mixte", source = "topic", mode = "practice", planTranches, categorie, preparation } = options;
+	const { count = null, source = "topic", mode = "practice", planTranches, categorie, preparation } = options;
+	const types = normalizeTypes(options.type);
 	const documents = (options.documents?.length ?? 0) >= 2 ? options.documents as string[] : null;
 	const learn = mode === "learn";
 
+	/* The written MCQ exam format: exactly {single, multiple} asked for in a
+	   Test, or a request that mentions a QCM/MCQ while the types are Auto. */
+	const auto = types.includes(TYPE_AUTO);
+	const isQcmList = types.length === 2 && types.includes("Choix unique") && types.includes("Choix multiple");
+	const qcm = !learn && (isQcmList || (auto && /\b(qcm|mcq)s?\b/i.test(prompt)));
+
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
-	const typeInstruction = type === "Mixte"
+	const typeInstruction = qcm
+		? "a WRITTEN MCQ EXAM (see the WRITTEN MCQ EXAM FORMAT above)"
+		: auto
 		? (learn
 			? "the question types each role above calls for"
 			: "the mix of question types that best fits a written exam on this subject: single choice, multiple choice, free text, numeric, ordering, matching, code output")
-		: type === "Choix unique"
-		? "single-choice questions (exactly one correct answer)"
-		: type === "Choix multiple"
-		? "multiple-choice questions (several correct answers)"
-		: type === "Compréhension"
-		? `COMPREHENSION questions, ALL of them based on ONE source document that you write yourself.
-	Write a substantial passage (250-450 words: an article extract, a case study, a scenario, a piece of code — whatever suits the topic) and put it in the "passage" field of the FIRST question, together with "passageId": "doc1" and a "passageTitle" naming the document.
-	EVERY other question repeats ONLY "passageId": "doc1" (no "passage", no "passageTitle" — the engine shares the document automatically).
-	The questions must be ANSWERABLE FROM THE DOCUMENT ALONE and test understanding — main idea, inference, meaning in context, cause and effect, the author's intent, what can or cannot be concluded — NOT recall of outside knowledge. Mix single-choice, multiple-choice and free-text among them`
-		: "free-text questions";
+		: (types.length === 1 ? "" : "ONLY these question types, in a balanced mix: ")
+			+ types.map(x => TYPE_SENTENCES[x] ?? x).join("; ")
+			+ (types.length > 1 ? (learn ? ". In the learning path these types apply to the pre, explain and recall questions; read cards are unchanged" : "") + ". Use no other question type" : "");
 
 	/* A preparation keeps the usual QUANTITY of one quiz (2026-09-30): an
 	   uncapped one gave eight Learns of 52 to 113 questions — some 600 in
@@ -468,9 +507,9 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	The LAST element of the array is the configuration object, with no prompt field: { mode: "learn", "objectives": ["...", "..."], "glossary": [{ "term": "...", "definition": "..." }, ...] } — 3 to 6 learning objectives of the source, each starting with a verb, and the glossary described under GLOSSARY below.`
 	: `MODE: PRACTICE. You are writing an exam-preparation bank on the source, in the FORMAT OF A UNIVERSITY EXAM on it.
 	Write APPLICATION questions (use a notion in a new case), DISCRIMINATION questions (tell apart two notions that are easily confused) and MULTI-STEP PROBLEMS — not definitions to recite. Calibrate the difficulty UP: a question a student answers without having studied is useless.
-	EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.
+	${qcm ? QCM_EXPLAIN_RULE : 'EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.'}
 	"hint": optional — add one when a question deserves it (see HINTS below), and leave it out otherwise.
-	"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
+	${qcm ? QCM_FORMAT_BLOCK + "\n\t" : ""}"topic": a short label of the family of notions the question tests; questions on notions that are easily confused share the same "topic".
 	"slice": when a SLICE PLAN of the learning path is given in the request, the number of the slice that teaches what the question tests; otherwise omit it.
 	The LAST element of the array is a configuration object, with no prompt field: { mode: "quiz", "glossary": [{ "term": "...", "definition": "..." }, ...] } — the glossary described under GLOSSARY below.`;
 

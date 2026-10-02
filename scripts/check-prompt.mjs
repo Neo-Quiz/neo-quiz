@@ -130,6 +130,40 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.done();
 });
 
+/* Written MCQ exam format and multi-type selection (2026-10-02). */
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, normalizeTypes }, { MOTS_INTERDITS }) => {
+	const r = makeReporter("Prompts - MCQ exam format and type lists");
+	const QCM = "WRITTEN MCQ EXAM FORMAT";
+	const PER_OPTION = "for EACH wrong option, one short sentence";
+	const SHORT = "SHORT, 1 to 3 sentences";
+	const sys = (o) => composerPrompts(o.prompt ?? "Réseaux", { count: null, ...o }).systemPrompt;
+	const qcm = sys({ mode: "practice", type: ["Choix unique", "Choix multiple"] });
+	r.check("Test with exactly single + multiple: MCQ block, short explain, no per-option explain",
+		[qcm.includes(QCM), qcm.includes(SHORT), qcm.includes(PER_OPTION), qcm.includes("never an") || qcm.includes('NEVER an "all of the above"'), qcm.includes("KEY WORDS in **bold**")], [true, true, false, true, true]);
+	r.check("the MCQ prompt keeps every forbidden word out", MOTS_INTERDITS.practice.filter(re => re.test(qcm)).map(String), []);
+	r.check("legacy single string 'Choix unique' (restored queue entry) still works and names single choice only",
+		(() => { const p = sys({ mode: "practice", type: "Choix unique" }); return [p.includes(QCM), p.includes("single-choice questions"), p.includes("multiple-choice questions (several")]; })(), [false, true, false]);
+	r.check("normalizeTypes: undefined, empty, legacy string, list, duplicates",
+		[normalizeTypes(undefined), normalizeTypes([]), normalizeTypes("Choix unique"), normalizeTypes(["a", "a", "b"])], [["Mixte"], ["Mixte"], ["Choix unique"], ["a", "b"]]);
+	const learnAuto = sys({ mode: "learn", type: "Mixte" });
+	r.check("Learn Auto: unchanged by the type list (no MCQ block, no types list)", [learnAuto.includes(QCM), learnAuto.includes("ONLY these question types")], [false, false]);
+	r.check("Learn Auto: same as no type at all", learnAuto, sys({ mode: "learn" }));
+	const learnList = sys({ mode: "learn", type: ["Classement", "Association"] });
+	r.check("Learn with an explicit list: only those types named, read cards unchanged",
+		[learnList.includes("ONLY these question types"), learnList.includes('"ordering": true)'), learnList.includes('"matching": true)'), learnList.includes("free-text questions"), learnList.includes("read cards are unchanged"), learnList.includes(QCM)], [true, true, true, false, true, false]);
+	const list = sys({ mode: "practice", type: ["Texte libre", "Sortie de code", "Réponse numérique"] });
+	r.check("Test with another list: exactly those types, no MCQ block, the per-option explain rule stays",
+		[list.includes("free-text questions"), list.includes("code-output questions"), list.includes("numeric-answer questions"), list.includes("single-choice questions (exactly"), list.includes(QCM), list.includes(PER_OPTION)], [true, true, true, false, false, true]);
+	r.check("Test with Comprehension in a list keeps its passage rules", sys({ mode: "practice", type: ["Compréhension", "Choix unique"] }).includes('"passageId": "doc1"'), true);
+	r.check("Auto + a request that mentions a QCM, in a Test: MCQ block",
+		[sys({ mode: "practice", type: "Mixte", prompt: "fais-moi un QCM sur les réseaux" }).includes(QCM), sys({ mode: "practice", type: ["Mixte"], prompt: "10 MCQs on TCP" }).includes(QCM)], [true, true]);
+	r.check("Auto without a QCM word, or a QCM word in a Learn, or inside another word: no MCQ block",
+		[sys({ mode: "practice", type: "Mixte", prompt: "les réseaux" }).includes(QCM), sys({ mode: "learn", type: "Mixte", prompt: "un QCM" }).includes(QCM), sys({ mode: "practice", type: "Mixte", prompt: "qcmx" }).includes(QCM)], [false, false, false]);
+	r.check("every variant stays free of the forbidden words",
+		["learn", "practice"].map(m => [["Mixte"], ["Choix unique", "Choix multiple"], ["Classement", "Association"], ["Compréhension"]].filter(t => MOTS_INTERDITS[m].some(re => re.test(sys({ mode: m, type: t })))).length), [0, 0]);
+	r.done();
+});
+
 /* LA CATÉGORIE (retour #7) : chaque complément part dans le prompt système
    des deux modes, une seule fois, et `general` n'ajoute rien. */
 await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prompt.ts", "src/dashboard/categorie-quiz.ts", "src/quiz-format.ts"], ({ composerPrompts }, { complementCategorie }, { CATEGORIES }, { MOTS_INTERDITS: MOTS_INTERDITS_PAR_MODE }) => {
