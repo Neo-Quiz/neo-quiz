@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.23] - 2026-10-02
+
 ### Changed
 - "Check for updates" in the application menu now shows its progress and a short outcome in the button itself instead of a notice, "Change wallpaper" opens the picker, and the Display row lost its empty margin.
 
