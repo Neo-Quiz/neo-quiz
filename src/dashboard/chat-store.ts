@@ -44,7 +44,7 @@ function parse(storage: Store | null): ChatRecord[] {
 /** Every chat, tombstones included, from memory after the first read. */
 export function getChats(storage: Store | null = safeStorage()): ChatRecord[] {
 	if (!cache || cache.storage !== storage) cache = { storage, list: parse(storage) };
-	return cache.list;
+	return [...cache.list];
 }
 
 /** Writes the list; a full storage drops the oldest half of the live chats
@@ -88,8 +88,12 @@ export function importLegacyOnce(origin: string, storage: Store | null = safeSto
 	try {
 		if (!storage || storage.getItem(FLAG)) return 0;
 		const known = new Set(getChats(storage).map(c => c.id));
-		const fresh = chatsFromArchive(readArchivedChats(storage), origin).filter(c => !known.has(c.id));
-		if (fresh.length && !setChats([...getChats(storage), ...fresh], storage)) return 0;
+		const archived = chatsFromArchive(readArchivedChats(storage), origin);
+		const fresh = archived.filter(c => !known.has(c.id));
+		// Write whenever there is anything to keep, even when every chat is already in
+		// memory: after a refused first write the memory copy is NOT on disk, and the
+		// flag must only be set once the chats really are.
+		if (archived.length && !setChats([...getChats(storage), ...fresh], storage)) return 0;
 		storage.setItem(FLAG, "1");
 		return fresh.length;
 	} catch {

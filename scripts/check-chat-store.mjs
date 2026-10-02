@@ -27,6 +27,8 @@ await withSrcModule("src/dashboard/chat-store.ts", (S) => {
 	const r = makeReporter("Chat store");
 	let s = memory();
 	r.check("empty storage: no chats", S.getChats(s), []);
+	S.getChats(s).push(chat("x", 1));
+	r.check("getChats hands out a copy", S.getChats(s), []);
 	r.check("set then get round-trips", [S.setChats([chat("a", 5), chat("b", 9)], s), S.getChats(s).map(c => c.id).sort()], [true, ["a", "b"]]);
 	r.check("stored in the record shape", JSON.parse(s.m.get("neo-quiz.chats")).v, 1);
 
@@ -77,6 +79,18 @@ await withSrcModule("src/dashboard/chat-store.ts", (S) => {
 	s.m.set("neo-quiz.archived-chats", legacy);
 	S.importLegacyOnce("dev", s);
 	r.check("an import whose write failed is retried next time (flag not set)", s.m.has("neo-quiz.chats-imported"), false);
+	{
+		// First write refused, second call in the same session with a storage that now accepts.
+		let refuse = true;
+		const m = memory();
+		const flaky = { getItem: k => m.getItem(k), setItem: (k, v) => { if (refuse && k === "neo-quiz.chats") throw new Error("denied"); m.setItem(k, v); } };
+		m.setItem("neo-quiz.archived-chats", legacy);
+		S.importLegacyOnce("dev", flaky);
+		r.check("refused first import: flag not set", m.m.has("neo-quiz.chats-imported"), false);
+		refuse = false;
+		S.importLegacyOnce("dev", flaky);
+		r.check("retry in the same session: flag set only once the chats are on disk", [m.m.has("neo-quiz.chats-imported"), JSON.parse(m.m.get("neo-quiz.chats") ?? '{"chats":[]}').chats.map(c => c.id)], [true, ["old"]]);
+	}
 	r.check("nothing to import: still no throw, flag set", (() => { const m = memory(); S.importLegacyOnce("dev", m); return m.m.has("neo-quiz.chats-imported"); })(), true);
 	r.done();
 });
