@@ -16,6 +16,9 @@ release notes.
 ### Changed
 - Generated tests now default to a written MCQ exam format (short titles, 3 or 4 options, some multi-answer questions, linked series, short explanations), and the Type option accepts several question types, including numeric, fill in the blanks, ordering, matching and code output.
 
+### Fixed
+- The arrow keys keep working after you answer a single-choice question in Learn: the card repainted twice in a row and the second repaint dropped the keyboard focus.
+
 ## [1.20.19] - 2026-10-01
 
 ### Fixed

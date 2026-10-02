@@ -3,8 +3,8 @@ import type { EngineCtx } from "../types/engine-ctx";
 interface QuestionFocusDescriptor {
 	/** Empty when focus was on a control without a stable selector. */
 	selector: string;
-	/** Les cibles de REPLI, dans l'ordre, quand `selector` a disparu du
-	    nouveau rendu (le bouton d'indice après son dernier niveau). */
+	/** FALLBACK targets, in order, for when `selector` is gone from the new
+	    render (the hint button after its last level). */
 	fallbacks?: string[];
 	scrollX: number;
 	scrollY: number;
@@ -29,9 +29,28 @@ export interface FocusHandlers {
 }
 
 export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
+	/* Focus restorations still waiting for their animation frame, by question
+	   index. One answer can repaint a card TWICE in a row (a click repaints,
+	   then Learn checks the answer and repaints again, all in one task): the
+	   second repaint then finds focus on <body> (the first one detached the
+	   pressed option and its restoration has not run yet), would capture
+	   nothing, and the first restoration would aim at a card already replaced.
+	   The keyboard (bound on the quiz container) was dead until the next Tab.
+	   The intent is therefore carried from one repaint to the next, and the
+	   restoration always looks the card up when it runs. */
+	const pendingRestores = new Map<string, QuestionFocusDescriptor>();
+
 	function getQuestionFocusDescriptor(rootEl: Element | null | undefined): QuestionFocusDescriptor | null {
 		const active = document.activeElement;
-		if (!rootEl || !active || !rootEl.contains(active)) return null;
+		if (!rootEl) return null;
+		const key = (rootEl as HTMLElement).dataset?.qi ?? "";
+		if (!active || !rootEl.contains(active)) {
+			// Focus fell to <body> because of a repaint whose restoration is
+			// still pending: carry that intent over. Never when the user moved
+			// focus to another element.
+			if (key && (!active || active === document.body)) return pendingRestores.get(key) ?? null;
+			return null;
+		}
 
 		const descriptor: { selector: string | null; fallbacks?: string[]; scrollX: number; scrollY: number } = {
 			selector: null,
@@ -105,11 +124,21 @@ export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
 
 	function restoreQuestionFocus(rootEl: Element | null | undefined, descriptor: QuestionFocusDescriptor | null | undefined): void {
 		if (!rootEl || !descriptor) return;
+		let root: Element = rootEl;
+		const key = (rootEl as HTMLElement).dataset?.qi ?? "";
+		if (key) pendingRestores.set(key, descriptor);
 		requestAnimationFrame(() => {
 			if (ctx.__quizDestroyed) return;
+			// A later repaint took over this restoration: it will run its own.
+			if (key) {
+				if (pendingRestores.get(key) !== descriptor) return;
+				pendingRestores.delete(key);
+				// The card captured at repaint time may have been replaced since.
+				root = ctx.container.querySelector<HTMLElement>(`.quiz-track-item[data-slide-kind="question"][data-qi="${key}"]`) ?? root;
+			}
 			let target = [descriptor.selector, ...(descriptor.fallbacks ?? [])]
 				.filter(Boolean)
-				.map(s => rootEl.querySelector<HTMLElement>(s))
+				.map(s => root.querySelector<HTMLElement>(s))
 				.find((el): el is HTMLElement => !!el) ?? null;
 			if (!target) {
 				// The focused control is gone. Keep the keyboard alive (the arrow
@@ -118,15 +147,29 @@ export function createFocusHandlers(ctx: EngineCtx): FocusHandlers {
 				// it from an element the user moved to outside the quiz.
 				const active = document.activeElement;
 				if (active && active !== document.body) return;
-				if (!rootEl.isConnected || !(rootEl instanceof HTMLElement)) return;
-				if (!rootEl.hasAttribute("tabindex")) rootEl.setAttribute("tabindex", "-1");
-				rootEl.style.outline = "none";
-				target = rootEl;
+				target = focusableCard(root);
+				if (!target) return;
 			}
 			if (typeof target.focus !== "function") return;
 			try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (_) {} }
+			// The selector matched but the element cannot take focus (a locked
+			// option, a disabled button): focus() did nothing and the keyboard
+			// would be lost on <body>. Hand it to the card instead.
+			if (document.activeElement === document.body) {
+				const card = focusableCard(root);
+				if (card) { try { card.focus({ preventScroll: true }); } catch (_) {} }
+			}
 			try { window.scrollTo(descriptor.scrollX ?? 0, descriptor.scrollY ?? 0); } catch (_) {}
 		});
+	}
+
+	/** The card itself as a focus target (the arrow keys are bound on the quiz
+	    container, so any focus inside it keeps them alive). */
+	function focusableCard(root: Element): HTMLElement | null {
+		if (!root.isConnected || !(root instanceof HTMLElement)) return null;
+		if (!root.hasAttribute("tabindex")) root.setAttribute("tabindex", "-1");
+		root.style.outline = "none";
+		return root;
 	}
 
 	function waitForManagedTransitions(entries: ManagedTransitionInput[] | null | undefined, fallbackMs: number, epoch: number = ctx.currentAsyncEpoch()): Promise<boolean> {
