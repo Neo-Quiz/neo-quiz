@@ -253,6 +253,11 @@ jobs:
         run: npm run check:file-generation
       - name: Conversation context
         run: npm run check:conversation-context
+      # THE CHAT RECORD: the shape chats are kept in; a corrupt value never
+      # breaks the page, a request saved again loses and doubles nothing,
+      # a tombstone survives the bound.
+      - name: Chat record
+        run: npm run check:chat-record
 
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is

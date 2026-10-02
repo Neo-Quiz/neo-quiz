@@ -32,6 +32,7 @@
     "check:categorie": "node scripts/check-categorie.mjs",
     "check:transcript": "node scripts/check-transcript.mjs",
     "check:chat-archives": "node scripts/check-chat-archives.mjs",
+    "check:chat-record": "node scripts/check-chat-record.mjs",
     "check:explain": "node scripts/check-explain.mjs",
     "check:web-channel": "node scripts/check-web-channel.mjs",
     "check:dashboard-dom": "node scripts/check-dashboard-dom.mjs",
