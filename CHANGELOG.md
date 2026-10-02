@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.20] - 2026-10-02
+
 ### Changed
 - Generated tests now default to a written MCQ exam format (short titles, 3 or 4 options, some multi-answer questions, linked series, short explanations), and the Type option accepts several question types, including numeric, fill in the blanks, ordering, matching and code output.
 
