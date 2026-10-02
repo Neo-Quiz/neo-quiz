@@ -137,9 +137,20 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const zonePartage = ajouter(moiTexte, "div", "qbd-sync-menu-zone");
 	const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"));
 
-	/* ── The one primary action ── */
-	const ajout = ajouter(racine, "section", "qbd-sync-section");
-	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-principal");
+	/* ── Requests from devices that added this one ── */
+	const demandesSection = ajouter(racine, "section", "qbd-sync-section");
+	demandesSection.hidden = true;
+	titre(demandesSection, t("settings.sync.requests"));
+	const demandesCarte = ajouter(demandesSection, "div", "qbd-sync-carte");
+
+	/* ── Paired devices ── */
+	const appareilsSection = ajouter(racine, "section", "qbd-sync-section");
+	titre(appareilsSection, t("settings.sync.devices"));
+	const appareilsCarte = ajouter(appareilsSection, "div", "qbd-sync-carte");
+
+	/* ── Adding a device lives in the devices section, under the list it extends ── */
+	const ajout = ajouter(appareilsSection, "div", "qbd-sync-ajout");
+	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-ajout");
 	ajouterBouton.setAttribute("aria-expanded", "false");
 	const panneau = ajouter(ajout, "div", "qbd-sync-panneau");
 	panneau.hidden = true;
@@ -157,17 +168,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const message = ajouter(panneau, "p", "qbd-sync-message");
 	message.setAttribute("role", "status");
 	message.setAttribute("aria-live", "polite");
-
-	/* ── Requests from devices that added this one ── */
-	const demandesSection = ajouter(racine, "section", "qbd-sync-section");
-	demandesSection.hidden = true;
-	titre(demandesSection, t("settings.sync.requests"));
-	const demandesCarte = ajouter(demandesSection, "div", "qbd-sync-carte");
-
-	/* ── Paired devices ── */
-	const appareilsSection = ajouter(racine, "section", "qbd-sync-section");
-	titre(appareilsSection, t("settings.sync.devices"));
-	const appareilsCarte = ajouter(appareilsSection, "div", "qbd-sync-carte");
 
 	let demonte = false;
 	let idCourant: string | null = null;

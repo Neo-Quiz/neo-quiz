@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- "Add a device" now sits in the "Your devices" section, under the list, as a smaller button.
+
 ## [1.20.23] - 2026-10-02
 
 ### Changed

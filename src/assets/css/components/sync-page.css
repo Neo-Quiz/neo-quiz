@@ -150,6 +150,27 @@
 }
 
 /* The add-a-device flow: plain steps and one field, under the button. */
+/* Adding a device: inside the devices section, under the list it extends. */
+.qbd-sync-ajout {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* A secondary, text-sized action: the list is the content, not the button. */
+.qbd-sync .qbd-sync-ajout > .qbd-sync-bouton-ajout {
+	align-self: flex-start;
+	flex: none;
+	padding: 4px 8px;
+	border-color: transparent;
+	color: var(--text-accent);
+}
+
+.qbd-sync .qbd-sync-ajout > .qbd-sync-bouton-ajout:hover:not(:disabled) {
+	border-color: transparent;
+	background: var(--background-modifier-hover);
+}
+
 .qbd-sync-panneau {
 	display: flex;
 	flex-direction: column;
