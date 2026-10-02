@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.22] - 2026-10-02
+
 ### Added
 - Chats on the Generate page now work like claude.ai's: click one in the sidebar and it becomes the conversation on screen, with its documents, its quiz cards and its answers, and you can carry on from it, an earlier session's chat included. "New" opens an empty chat while the previous one keeps generating in the background, marked in the sidebar. A request that made several quizzes now shows once, as one message with all its quizzes.
 
