@@ -79,6 +79,13 @@ export interface LessonHandlers {
 	lessonSlices(): ReadonlyArray<LessonSlice>;
 	sliceOfQuestion(qi: number): number | null;
 	roleOfQuestion(qi: number): QuestionRole;
+	/** THE predicate "this card is a reading, not a question": a card with
+	    `role: "read"` in ANY quiz (a Test too: it has nothing to answer, so
+	    counting it made 100 % impossible), or a reading absorbed by its
+	    step (never in a Learn block without a valid slice, played as an
+	    ordinary quiz). Everything that counts, lists, scores or logs questions asks
+	    this and nothing else, so they cannot disagree. */
+	isReadingCard(qi: number): boolean;
 }
 
 /**
@@ -101,6 +108,15 @@ export function createLessonHandlers(ctx: EngineCtx): LessonHandlers {
 		isLessonMode: () => model().isLesson,
 		lessonSlices: () => model().slices,
 		sliceOfQuestion: qi => model().sliceOf(qi),
-		roleOfQuestion: qi => model().roleOf(qi)
+		roleOfQuestion: qi => model().roleOf(qi),
+		isReadingCard: qi => {
+			if (ctx.lecturesAbsorbees?.has(qi)) return true;
+			const m = model();
+			// A Learn block WITHOUT a valid slice is played as an ordinary
+			// quiz: its "read" cards stay ordinary questions there (decision
+			// of the Learn work, pinned by check:engine-review).
+			if (ctx.quizMode === "lesson" && !m.isLesson) return false;
+			return m.roleOf(qi) === "read";
+		}
 	};
 }

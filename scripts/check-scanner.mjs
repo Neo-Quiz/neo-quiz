@@ -161,8 +161,8 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 		[scanner.getQuiz(examen.path)?.mode, scanner.getQuiz(examen.path)?.title, scanner.getQuiz(examen.path)?.questions], ["exam", "Réseaux", 1]);
 	content = "```quiz-blocks\n[\n  { title: 'Avant', prompt: '?', role: 'pre', slice: 1 },\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'lesson', source: '[[CM1]]' },\n]\n```\n";
 	await scanner.scanFile(fichierHote);
-	r.check("the retired mode: 'lesson' is a Practice, its reading counted",
-		[scanner.getQuiz(fichierHote.path)?.mode, scanner.getQuiz(fichierHote.path)?.lecon, scanner.getQuiz(fichierHote.path)?.questions], ["practice", false, 2]);
+	r.check("the retired mode: 'lesson' is a Practice, its reading is not a question",
+		[scanner.getQuiz(fichierHote.path)?.mode, scanner.getQuiz(fichierHote.path)?.lecon, scanner.getQuiz(fichierHote.path)?.questions], ["practice", false, 1]);
 	content = "```quiz-blocks\n[\n  { title: 'Lire', prompt: 'Passage', role: 'read', slice: 1 },\n  { mode: 'learn', objectives: ['Lire'] },\n]\n```\n";
 	await scanner.scanFile(fichierHote);
 	r.check("un bloc { mode: 'learn' } est un Learn", scanner.getQuiz(fichierHote.path)?.mode, "learn");
@@ -177,10 +177,10 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	await scanner.scanFile(fichierHote);
 	r.check("une lecture absorbée n'est pas comptée, mais reste au catalogue",
 		[scanner.getQuiz(fichierHote.path)?.questions, scanner.getQuiz(fichierHote.path)?.items?.length], [2, 3]);
-	// Hors Learn, le moteur joue la lecture comme un écran : elle est comptée.
+	// Outside a Learn too (2026-10-02): a reading has nothing to answer, a Test never counts it.
 	content = content.replace("{ mode: 'learn' }", "{ mode: 'quiz' }");
 	await scanner.scanFile(fichierHote);
-	r.check("hors Learn, une lecture à étape reste une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 3);
+	r.check("hors Learn, une lecture n'est jamais une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 2);
 
 	/* NON-RÉGRESSION — GLOSSAIRE (lot D, revue du 2026-09-27) : ajouter un
 	   glossaire à la configuration finale ne doit CHANGER ni le compte de

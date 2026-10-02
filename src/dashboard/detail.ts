@@ -763,7 +763,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		// Les lectures absorbées n'ont pas de carte : leur cours s'édite
 		// au-dessus de chaque question de leur étape.
 		const vis = visibles();
-		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.length }));
+		ajouter(head, "span", "qbd-qz-list-title", t("dashboard.quiz.questionsTitle", { n: vis.filter(i => numeroDe(i) > 0).length }));
 		/* Phone: while editing, the list is a bottom sheet over the page. */
 		if (editing) mountListSheet(listCol, vis.length);
 

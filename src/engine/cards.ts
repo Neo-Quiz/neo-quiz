@@ -442,7 +442,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   fonction pour les trois écrans (QCM, auto-évaluation, réponse libre en
 	   examen) : il n'y a qu'UNE notion de "question à revoir" sur cette carte. */
 	function reviewableIndices(): number[] {
-		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i) && !(ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read"));
+		return ctx.quiz.map((_, i) => i).filter(i => !ctx.isReadingCard(i));
 	}
 
 	/* THE END SCREEN, before the score (redesigned 2026-09-27: it dated from
@@ -647,7 +647,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// répondre. `isLessonMode()` garde cette branche fermée sur les quiz
 		// ordinaires (roleOfQuestion lit `q.role` sans condition de mode, donc
 		// resterait exploitable même hors Leçon si un champ `role` traînait).
-		const isRead = ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "read";
+		const isRead = ctx.isReadingCard(qi);
 		// Décision PAR QUESTION : une tranche de Leçon mélange des rôles ("test"
 		// en QCM à côté de "recall" en réponse libre) — jamais un bascule globale.
 		const isTextOnly = !isRead && ctx.textOnly?.isTextOnlyFor?.(qi);

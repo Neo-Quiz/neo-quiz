@@ -75,7 +75,7 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 	}
 
 	function isReading(qi: number): boolean {
-		return !!ctx.lecturesAbsorbees?.has(qi) || (ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "read");
+		return ctx.isReadingCard(qi);
 	}
 
 	function isCheckable(qi: number): boolean {

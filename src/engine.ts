@@ -303,6 +303,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		lessonSlices: lesson.lessonSlices,
 		sliceOfQuestion: lesson.sliceOfQuestion,
 		roleOfQuestion: lesson.roleOfQuestion,
+		isReadingCard: lesson.isReadingCard,
 		// Fonctions exposées directement
 		escapeHtmlText: sanitizer.escapeHtmlText,
 		escapeHtmlAttr: sanitizer.escapeHtmlAttr,

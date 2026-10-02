@@ -82,7 +82,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	    ABSORBED by its step (2026-09-26), which does not even have a slide —
 	    it never counts as a question that cannot be reached. */
 	function sansReponse(i: number): boolean {
-		return !!ctx.lecturesAbsorbees?.has(i) || (ctx.isLessonMode() && ctx.roleOfQuestion(i) === "read");
+		return ctx.isReadingCard(i);
 	}
 
 	function isComplete(i: number): boolean {
@@ -696,7 +696,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				if (ctx.textOnly?.isTextOnlyFor?.(i) && !ctx.isFlashcardQuestion(ctx.quiz[i]) && !ctx.textOnly.isRated(i)
 					&& (ctx.quizMode === "lesson" || ctx.textOnly.hasAnyAnswer(i))) continue;
 				let grade: ReviewGrade;
-				if (ctx.isLessonMode() && role === "read") grade = "seen";
+				if (ctx.isReadingCard(i)) grade = "seen";
 				else if (ctx.quizState.lessonPreSkipped[i]) grade = "skipped";
 				/* Unanswered: nothing happened in a Learn; in a TEST, the question
 				   was handed in blank — failed (spec 2026-09-29 §2.4). */

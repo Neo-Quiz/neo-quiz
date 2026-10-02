@@ -385,6 +385,7 @@ export interface EngineCtx {
 	lessonSlices: LessonHandlers["lessonSlices"];
 	sliceOfQuestion: LessonHandlers["sliceOfQuestion"];
 	roleOfQuestion: LessonHandlers["roleOfQuestion"];
+	isReadingCard: LessonHandlers["isReadingCard"];
 
 	/* ════════════════════════════════════════════════
 	   ACCESSORS de closure (2e Object.assign, engine.js:424-428) — état VIVANT.

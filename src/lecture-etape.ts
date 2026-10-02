@@ -126,9 +126,9 @@ export function questionsVisibles(items: readonly unknown[], estLecon: boolean):
 
 /** Le NUMÉRO affiché de chaque index (à partir de 1) ; 0 pour une lecture
     de Learn, qui n'en a pas. Hors Learn, tout est numéroté. */
-export function numerosAffiches(items: readonly unknown[], estLecon: boolean): number[] {
+export function numerosAffiches(items: readonly unknown[], _estLecon: boolean): number[] {
 	let n = 0;
-	return items.map(it => (estLecon && roleDe(it) === "read" ? 0 : ++n));
+	return items.map(it => (roleDe(it) === "read" ? 0 : ++n));
 }
 
 /** Le numéro AFFICHÉ de l'index `i`, 0 pour une lecture de Learn (elle
@@ -167,7 +167,6 @@ export function nombreDeQuestions(items: readonly unknown[], estLecon: boolean):
     lecture y est jouée comme une question ordinaire, déjà comptée par
     `nombreDeQuestions` (revue du 2026-09-26, compteur d'une fiche). */
 export function nombreDeLectures(items: readonly unknown[], estLecon: boolean): number {
-	if (!estLecon) return 0;
 	const courtes = lecturesCourtes(items, estLecon);
 	let n = 0;
 	items.forEach((it, i) => { if (roleDe(it) === "read" && !courtes.has(i)) n++; });

@@ -24,8 +24,8 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(
-	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts"],
-	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }) => {
+	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts", "src/engine/lesson.ts"],
+	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }, { createLessonHandlers }) => {
 	/**
 	 * Construit un ctx minimal, avec le câblage croisé réel des méthodes
 	 * aplaties (même pattern qu'engine.ts).
@@ -54,6 +54,7 @@ await withSrcModule(
 		   say it is past the hand-in. */
 		handedIn = false,
 		hintSeen = [],
+		realLesson = false,
 	}) {
 		const appels = [];
 		const sink = sinkOverride === undefined
@@ -125,6 +126,13 @@ await withSrcModule(
 			matchPick: quiz.map(() => null),
 			...emptyLearnState(quiz.length),
 		};
+		/* "Is this card a reading": by default driven by the `roles` array and
+		   the `isLessonMode` flag of the harness (same rule as engine/lesson.ts);
+		   `realLesson` loads the engine's REAL handler instead, which reads
+		   `role`/`slice` off the quiz items. */
+		ctx.isReadingCard = realLesson
+			? createLessonHandlers(ctx).isReadingCard
+			: (i) => !!ctx.lecturesAbsorbees?.has(i) || (roles[i] === "read" && !(ctx.quizMode === "lesson" && !isLessonMode));
 		// The REAL Learn handlers, lazy like in engine.ts.
 		ctx.learn = createLearnHandlers(ctx);
 		ctx.isRevealed = ctx.learn.isRevealed;
@@ -374,6 +382,30 @@ await withSrcModule(
 			appels.find(a => a.q.endsWith("::pre1")), { q: "Cours/ch1.md::pre1", grade: "correct", role: "pre" });
 		r.check("the answered 'read' keeps role:'read' but is NOT forced to 'seen'",
 			appels.find(a => a.q.endsWith("::read1")), { q: "Cours/ch1.md::read1", grade: "wrong", role: "read" });
+		r.done();
+	}
+
+	{
+		/* A READING IN A TEST (2026-10-02): a card with `role: "read"` has
+		   nothing to answer. It used to count as a question outside a Learn,
+		   so a Test could never reach 100 % and the hand-in window listed it
+		   as unanswered. Real `isReadingCard` (engine/lesson.ts), real state. */
+		const r = makeReporter("a reading in a Test is not a question");
+		const quiz = [
+			{ id: "q1", title: "A", options: ["a", "b"], correctIndex: 0, slice: 1, role: "pre" },
+			{ id: "read1", title: "Support", slice: 1, role: "read" },
+			{ id: "q2", title: "B", options: ["a", "b"], correctIndex: 1, slice: 1, role: "test" },
+		];
+		const { ctx, appels } = makeCtx({ quiz, selections: [0, null, 1], quizMode: "quiz", realLesson: true });
+		r.check("the reading is a reading, the questions are not", [0, 1, 2].map(i => ctx.isReadingCard(i)), [false, true, false]);
+		r.check("score: the reading is out of the denominator (100 % is reachable)",
+			ctx.computeScorePercent(), { pct: 100, correct: 2, total: 2, pendingWritten: 0 });
+		r.check("hand-in: nothing is missing", [0, 1, 2].filter(i => !ctx.isComplete(i)), []);
+		r.check("a question left blank is the only one missing",
+			(c => [0, 1, 2].filter(i => !c.isComplete(i)))(makeCtx({ quiz, selections: [0, null, null], quizMode: "quiz", realLesson: true }).ctx), [2]);
+		ctx.goToResults();
+		r.check("the reading is logged seen, never right or wrong",
+			appels.find(a => a.q.endsWith("::read1"))?.grade, "seen");
 		r.done();
 	}
 
