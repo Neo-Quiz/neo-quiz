@@ -28,6 +28,13 @@ await withSrcModule("src/dashboard/home-tasks.ts", (H) => {
 	const enCours = { "L1.md": { questionsDone: 4, totalQuestions: 10, bestScore: 0, attempts: 0, lastPlayed: 1 } };
 	r.check("a quiz in progress stays a task", kinds(H.folderTasks([L1], sans, enCours)), ["learn:L1.md"]);
 	r.check("the Resume card's quiz is left out", kinds(H.folderTasks([L1, P1], sans, enCours, "L1.md")), ["test:P1.md"]);
+	// Resume card: a handed-in Test with a blank answer keeps questionsDone under
+	// the total in the stats, but its session is cleared: never offered.
+	const sessions = new Set(["L1.md"]);
+	r.check("only a quiz with a live session can be resumed",
+		H.resumableQuizzes(ordre, p => sessions.has(p)).map(x => x.path), ["L1.md"]);
+	r.check("a handed-in test (stats under the total, no session) is not resumable",
+		H.resumableQuizzes([P1], () => false).length, 0);
 
 	const f = (name, tasks, nextExam, lastPlayed = 0) => ({ group: name, name, tasks: Array.from({ length: tasks }, () => ({})), nextExam: nextExam ? { nom: "", date: nextExam } : null, lastPlayed });
 	const names = (list) => H.homeFolders(list).map(x => x.name);
@@ -125,6 +132,8 @@ await withSrcModule(["src/dashboard/home.ts", "src/host/current.ts"], async (Hom
 	const ctx = {
 		scanner,
 		statsStore: { getAll: () => stats },
+		// The Resume card reads live sessions, not the stats.
+		sessionOf: (path) => (stats[path] ? { question: 1, total: 10, ecrite: 1 } : null),
 		settings: {},
 		saveSettings: async () => {},
 		navigate: () => {},

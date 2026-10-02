@@ -14,7 +14,7 @@ import { poserBouton3d } from "./cta3d";
 import { lireModuleMap } from "./module-map-note";
 import { createOptionCard, importSharedFolder } from "./folder-create";
 import { openNewFolderModal } from "./module-edit";
-import { isoLocal, startOfDay, upcomingExams } from "./home-tasks";
+import { isoLocal, resumableQuizzes, startOfDay, upcomingExams } from "./home-tasks";
 import { collectHomeFolders, renderHomeFolder } from "./home-folders";
 import { renderHomeSide, type HomeExam } from "./home-week";
 
@@ -104,10 +104,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		}
 
 		// The quizzes in progress: the Resume card offers the latest one.
-		const inProgress = quizzes.filter(q => {
-			const s = stats[q.path];
-			return s && s.questionsDone > 0 && s.questionsDone < q.questions;
-		});
+		const inProgress = resumableQuizzes(quizzes, path => !!ctx.sessionOf?.(path));
 
 		/* The page is ONE wrapper: `.qbd-content > *` centres it. No blue
 		   glow behind the top of the page any more (2026-09-29): cut by the

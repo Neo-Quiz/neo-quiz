@@ -130,3 +130,16 @@ export function successOf(quizzes: readonly QuizIndexEntry[], stats: Record<stri
 	const played = quizzes.map(q => stats[q.path]).filter((s): s is QuizStatRecord => !!s && s.attempts > 0);
 	return played.length ? Math.round(played.reduce((n, s) => n + s.bestScore, 0) / played.length) : 0;
 }
+
+/** The quizzes the Resume card may offer: those with a live SESSION
+    snapshot, nothing else. It used to read the stats (`questionsDone <
+    questions`), which never says "handed in": a Test handed in with a
+    question left blank (or counting a reading as a question) kept
+    `questionsDone` under the total for ever, so the card offered a finished
+    test and a click opened the launch window instead of resuming it. A
+    session is cleared on hand-in and never taken once handed in
+    (engine/session.ts `canSnapshot`), so it is the one source that cannot
+    disagree with the engine. PURE. */
+export function resumableQuizzes<T extends { path: string }>(quizzes: readonly T[], hasSession: (path: string) => boolean): T[] {
+	return quizzes.filter(q => hasSession(q.path));
+}

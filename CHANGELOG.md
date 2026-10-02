@@ -18,6 +18,7 @@ release notes.
 
 ### Fixed
 - The arrow keys keep working after you answer a single-choice question in Learn: the card repainted twice in a row and the second repaint dropped the keyboard focus.
+- A reading no longer counts as a question in a Test (hand-in list, score, question counts), and the home Resume card no longer offers a Test that was already handed in.
 
 ## [1.20.19] - 2026-10-01
 
