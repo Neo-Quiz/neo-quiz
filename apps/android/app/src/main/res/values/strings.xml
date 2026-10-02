@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="first_run_title">All files access</string>
-    <string name="first_run_body">Neo Quiz keeps your quizzes as plain files in Documents/Neo Quiz so they can sync with your computer. Android asks you to allow \"All files access\" for that.</string>
-    <string name="first_run_button">Open the setting</string>
+    <string name="first_run_title">Welcome</string>
+    <string name="first_run_intro">Two settings and your quizzes are ready on this phone.</string>
+    <string name="first_run_files_title">Access to your quizzes</string>
+    <string name="first_run_files_body">Your quizzes are plain files, kept in Documents/Neo Quiz. Android asks for your approval so Neo Quiz can read and save them.</string>
+    <string name="first_run_files_button">Allow access</string>
+    <string name="first_run_files_done">Access allowed</string>
+    <string name="first_run_sync_title">Background sync</string>
+    <string name="first_run_optional">Optional</string>
+    <string name="first_run_sync_body">Your reviews reach your computer even while the app is closed. In the list that opens, take Neo Quiz out of battery optimization.</string>
+    <string name="first_run_sync_button">Open the setting</string>
+    <string name="first_run_sync_done">Background sync allowed</string>
+    <string name="first_run_start">Get started</string>
     <string name="picker_use">Use this folder</string>
     <string name="picker_cancel">Cancel</string>
     <string name="picker_up">.. (parent folder)</string>
     <string name="picker_suggested">%1$s (suggested)</string>
-    <string name="first_run_battery_body">To keep syncing with your computer while the app is closed, allow it to run in the background (no battery restriction).</string>
-    <string name="first_run_battery_button">Allow background sync</string>
     <string name="sync_channel_name">Sync</string>
     <string name="sync_notification_title">Neo Quiz is syncing</string>
     <string name="sync_share_subject">My Neo Quiz device ID</string>

@@ -16,6 +16,7 @@ import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,13 +25,21 @@ import android.content.Intent
 import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.notify.ReviewOpenRequest
 import com.ahmedmili.neoquiz.sync.SyncHub
+import com.ahmedmili.neoquiz.ui.FirstRunBackdrop
 import com.ahmedmili.neoquiz.ui.FirstRunScreen
+import com.ahmedmili.neoquiz.ui.hasBackgroundSync
+import com.ahmedmili.neoquiz.ui.isFirstRunDone
 import com.ahmedmili.neoquiz.ui.hasAllFilesAccess
 import com.ahmedmili.neoquiz.web.AppWebView
 
 class MainActivity : ComponentActivity() {
     private lateinit var appWebView: AppWebView
     private var granted by mutableStateOf(false)
+    private var backgroundSync by mutableStateOf(false)
+    private var firstRunDone by mutableStateOf(false)
+
+    /** The app shows once files are reachable and the first-run screen was left (or had nothing left to ask). */
+    private val showApp get() = granted && (firstRunDone || backgroundSync)
     private var loaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,12 +49,28 @@ class MainActivity : ComponentActivity() {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
         granted = hasAllFilesAccess()
+        backgroundSync = hasBackgroundSync(this)
+        firstRunDone = isFirstRunDone(this)
         askForNotifications()
         // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
         setContent {
-            if (granted) AndroidView(factory = { withNavBar() }) else AndroidView(factory = { FirstRunScreen(it) })
+            val app = showApp
+            // The first-run screen sits on the installer's backdrop, drawn as the window background so it
+            // also fills the system-bar areas; the app gets its plain page colour back.
+            SideEffect {
+                if (app) window.setBackgroundDrawableResource(R.color.window_background)
+                else if (window.decorView.background !is FirstRunBackdrop) window.setBackgroundDrawable(FirstRunBackdrop(this))
+            }
+            if (app) {
+                AndroidView(factory = { withNavBar() })
+            } else {
+                AndroidView(
+                    factory = { FirstRunScreen(it) { firstRunDone = true } },
+                    update = { it.refresh(files = granted, sync = backgroundSync) },
+                )
+            }
         }
         // Edge-to-edge is enforced from targetSdk 35. The insets are applied once, as padding of the
         // activity's content view (a listener on the WebView itself never fires: Compose's AndroidView
@@ -142,10 +167,11 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    /** Coming back from the "All files access" setting. */
+    /** Coming back from the "All files access" or battery setting. */
     override fun onResume() {
         super.onResume()
         granted = hasAllFilesAccess()
+        backgroundSync = hasBackgroundSync(this)
         loadWhenGranted()
     }
 
