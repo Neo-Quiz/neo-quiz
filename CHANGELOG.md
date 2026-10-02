@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.21] - 2026-10-02
+
 ### Added
 - While a quiz is being written, the live transcript shows which question the model is at ("Question 12 / 20", or "Quiz 2 / 3" too for a one-pass series; no total when the count is Auto).
 
