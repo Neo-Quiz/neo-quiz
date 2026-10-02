@@ -45,7 +45,7 @@ function synchroniser(file: FileGenerationApp): void {
 	const { chats, changed } = reconcileChats(getChats(), groupLines(file.lignes()), chatDevice(), Date.now());
 	if (changed) { setChats(chats); notifyChatsChanged(); return; }
 	const recorded = (chatId: string, key: string): boolean => !!getChats().find(c => c.id === chatId)?.requests.some(q => q.id === key);
-	const partantes = closableLines(file.lignes(), activeChatId(), recorded);
+	const partantes = closableLines(file.lignes(), activeChatId(), recorded, id => !!getChats().find(c => c.id === id)?.deleted);
 	for (const l of partantes) file.fermer(l.id);
 	repeindre();
 }

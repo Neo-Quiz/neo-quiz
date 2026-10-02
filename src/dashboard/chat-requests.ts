@@ -133,11 +133,17 @@ export function reconcileChats(chats: readonly ChatRecord[], groups: readonly Re
     carry): those of a chat NOT on screen, whose whole request has ended with
     every line ready, and which the record already holds. A failed line stays
     (its "Try again" is live); a request with a sibling still working keeps
-    all its replies, or the thread would show a hole. */
-export function closableLines(lines: readonly LigneGeneration[], activeChatId: string, recorded: (chatId: string, requestKey: string) => boolean): LigneGeneration[] {
+    all its replies, or the thread would show a hole. A DELETED chat has
+    nothing to show or retry: every line of it that has ended (ready, failed
+    or stopped) can go, but a request still working is never touched. */
+export function closableLines(lines: readonly LigneGeneration[], activeChatId: string, recorded: (chatId: string, requestKey: string) => boolean, isDeleted: (chatId: string) => boolean = () => false): LigneGeneration[] {
 	const out: LigneGeneration[] = [];
 	for (const g of groupLines(lines)) {
 		if (g.chatId === activeChatId) continue;
+		if (isDeleted(g.chatId)) {
+			if (g.lines.every(isTerminal)) out.push(...g.lines);
+			continue;
+		}
 		if (!g.lines.every(l => l.etat === "prete")) continue;
 		if (!recorded(g.chatId, g.key)) continue;
 		out.push(...g.lines);
