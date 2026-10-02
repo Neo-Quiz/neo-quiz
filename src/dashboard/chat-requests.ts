@@ -17,6 +17,11 @@ import { LEGACY_CHAT_ID, deriveTitle, mergeResults } from "./chat-record";
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
 export const isTerminal = (l: LigneGeneration): boolean => l.etat === "prete" || l.etat === "echouee" || l.etat === "arret";
 export const chatOfLine = (l: LigneGeneration): string => l.demande.chatId ?? LEGACY_CHAT_ID;
+
+/** The running line of a chat, if any: what the composer's Stop button of
+    that chat stops. A run of another chat is never its business. */
+export const runningLineOfChat = (lines: readonly LigneGeneration[], chatId: string): LigneGeneration | undefined =>
+	lines.find(l => l.etat === "cours" && chatOfLine(l) === chatId);
 export const requestKeyOfLine = (l: LigneGeneration): string => l.demande.requestId ?? "line-" + l.id;
 
 export function newRequestId(): string {

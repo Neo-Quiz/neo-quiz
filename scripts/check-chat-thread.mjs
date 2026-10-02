@@ -26,6 +26,8 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	const g = (...lines) => R.groupLines(lines);
 
 	r.check("two lines of one send are ONE request group", g(line(1, "prete", {}, quiz("A", "a.md")), line(2, "prete", {}, quiz("B", "b.md"))).map(x => [x.key, x.lines.length]), [["r1", 2]]);
+	r.check("Stop follows the active chat: another chat's run is not its run",
+		[R.runningLineOfChat([line(1, "cours", { chatId: "a" })], "b")?.id ?? null, R.runningLineOfChat([line(1, "cours", { chatId: "a" }), line(2, "attente", { chatId: "b" })], "b")?.id ?? null, R.runningLineOfChat([line(1, "cours", { chatId: "a" })], "a")?.id], [null, null, 1]);
 	r.check("two sends are two groups, in order", g(line(1, "prete", { requestId: "r1" }), line(2, "prete", { requestId: "r2" })).map(x => x.key), ["r1", "r2"]);
 	r.check("a line saved before chats: the legacy chat, its own request", g(line(7, "prete", { chatId: undefined, requestId: undefined, sentAt: undefined })).map(x => [x.chatId, x.key]), [[C.LEGACY_CHAT_ID, "line-7"]]);
 

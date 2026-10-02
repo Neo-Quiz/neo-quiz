@@ -38,7 +38,7 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { chatOfLine, newRequestId } from "./chat-requests";
+import { chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
@@ -401,6 +401,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	const desabonnerChats = onChatsChanged(() => {
 		if (!stageRef || !stageRef.isConnected) return;
 		if ((phase === "idle" || phase === "error") && chatAContenu() !== modeConversation) { void render(containerRef); return; }
+		updateGenerateBtn(boutonEnvoi);
 		majNouvelle();
 	});
 
@@ -2104,7 +2105,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				/* Le ■ de claude.ai : composer vide pendant une génération, le
 				   bouton ARRÊTE celle qui tourne (`updateGenerateBtn`). */
 				if (sendBtn.classList.contains("qbd-ai-composer-send--stop")) {
-					const enCours = fileGen.lignes().find(l => l.etat === "cours");
+					const enCours = runningLineOfChat(fileGen.lignes(), activeChatId());
 					if (enCours) fileGen.annuler(enCours.id);
 					return;
 				}
@@ -3868,7 +3869,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   ■ de claude.ai, qui l'arrête. Avec du contenu, la flèche envoie dans
 		   la file, derrière elle. Pas sur le bouton « Ouvrir » d'un site. */
 		const arret = !hasContent && !btn.classList.contains("qbd-ai-composer-send--wide")
-			&& fileGen.lignes().some(l => l.etat === "cours");
+			&& !!runningLineOfChat(fileGen.lignes(), activeChatId());
 		if (btn.classList.contains("qbd-ai-composer-send--stop") !== arret) {
 			btn.classList.toggle("qbd-ai-composer-send--stop", arret);
 			const icone = btn.querySelector<HTMLElement>(".qbd-ai-composer-send-icon");
