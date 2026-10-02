@@ -476,7 +476,8 @@ async function ship(args) {
 	const commitWork = worksToCommit(message, dirty);
 
 	let version;
-	const changelog = await readFile(path.join(repositoryRoot, FICHIER), "utf8");
+	// With core.autocrlf the working copy may be CRLF; the parser expects LF.
+	const changelog = (await readFile(path.join(repositoryRoot, FICHIER), "utf8")).replace(/\r\n/g, "\n");
 	({ version } = versionDepuisChangelog(changelog, await currentVersion(), request));
 	guard(version);
 

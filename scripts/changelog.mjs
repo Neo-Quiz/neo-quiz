@@ -98,7 +98,7 @@ if (lanceDirect) {
 	} else {
 		const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 		try {
-			process.stdout.write(extraire(await readFile(path.join(racine, FICHIER), "utf8"), version) + "\n");
+			process.stdout.write(extraire((await readFile(path.join(racine, FICHIER), "utf8")).replace(/\r\n/g, "\n"), version) + "\n");
 		} catch (e) {
 			console.error(e.message);
 			process.exitCode = 1;
