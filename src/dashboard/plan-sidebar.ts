@@ -11,6 +11,8 @@
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
+import { chatOfLine } from "./chat-requests";
+import { onChatsChanged } from "./chat-session";
 import type { FileGenerationApp, LigneGeneration } from "./file-generation-app";
 
 /** The plan of the latest preparation of the queue: its planning line and its quizzes. */
@@ -21,15 +23,16 @@ function dernierPlan(lignes: readonly LigneGeneration[]): { plan: LigneGeneratio
 	return { plan, etapes: lignes.filter(l => l.demande.preparation?.lot === lot && !l.demande.planifier && l.etat !== "arret") };
 }
 
-export function poserPlan(parent: HTMLElement, file: FileGenerationApp, ouvrir: (chemin: string) => void): void {
+export function poserPlan(parent: HTMLElement, file: FileGenerationApp, ouvrir: (chemin: string) => void, chatId: () => string): void {
 	const host = currentHost();
 	const zone = ajouter(parent, "div", "qbd-ai-plan");
 	let desabonner: (() => void) | null = null;
+	let desabonnerChats: (() => void) | null = null;
 
 	const peindre = (): void => {
-		if (!zone.isConnected && desabonner) { desabonner(); desabonner = null; return; }
+		if (!zone.isConnected && desabonner) { desabonner(); desabonner = null; desabonnerChats?.(); desabonnerChats = null; return; }
 		zone.replaceChildren();
-		const courant = dernierPlan(file.lignes());
+		const courant = dernierPlan(file.lignes().filter(l => chatOfLine(l) === chatId()));
 		zone.hidden = !courant;
 		if (!courant) return;
 		const titre = ajouter(zone, "div", "qbd-ai-plan-titre");
@@ -58,5 +61,6 @@ export function poserPlan(parent: HTMLElement, file: FileGenerationApp, ouvrir: 
 		}
 	};
 	desabonner = file.abonner(peindre, () => false);
+	desabonnerChats = onChatsChanged(peindre);
 	peindre();
 }

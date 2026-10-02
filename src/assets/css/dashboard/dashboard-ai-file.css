@@ -859,7 +859,7 @@
 	cursor: pointer;
 }
 .qbd-ai-chat-item.is-active .qbd-ai-chat-ouvrir {
-	cursor: default;
+	cursor: pointer;
 }
 /* Delete: shown on the chat under the mouse or the keyboard only. */
 .qbd-ai-chat-suppr {
@@ -885,6 +885,23 @@
 .qbd-ai-chat-suppr svg {
 	width: 15px;
 	height: 15px;
+}
+/* A request is waiting or running in this chat: a turning mark (the plan's
+   own animation), where the delete button would be. */
+.qbd-ai-chat-actif {
+	display: inline-flex;
+	flex: none;
+	padding: 6px;
+	margin-right: 2px;
+	color: var(--interactive-accent);
+}
+.qbd-ai-chat-actif svg {
+	width: 15px;
+	height: 15px;
+	animation: qbd-ai-plan-tourne 1.1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-chat-actif svg { animation: none; }
 }
 /* "Older": the folded section of what is past thirty days. */
 .qbd-ai-chats-ancien {

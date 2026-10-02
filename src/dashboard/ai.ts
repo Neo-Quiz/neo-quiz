@@ -35,11 +35,11 @@ import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categor
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
-import { activeChatId, onChatsChanged } from "./chat-session";
+import { activeChatId, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
 import { chatOfLine, newRequestId } from "./chat-requests";
-import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
+import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
 import { ouvrirDocumentsExam } from "./exam-documents";
@@ -1017,7 +1017,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				if (quiz) deps.navigate("detail", { quiz });
 				else host.ui.notice(t("ai.queue.missing"));
 			},
-			ouvrirSession: (chat) => ouvrirChat(chat),
+			ouvrirSession: (id) => setActiveChat(id),
 		}));
 		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
 		if (deps.openGenerated) {
@@ -1032,7 +1032,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const quiz = deps.scanner.getQuiz(chemin);
 			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
 			else host.ui.notice(t("ai.queue.missing"));
-		});
+		}, () => activeChatId());
 		poserListeChats(lateral);
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;

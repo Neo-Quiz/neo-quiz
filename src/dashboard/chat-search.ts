@@ -13,9 +13,8 @@ import { ajouter } from "../dom";
 import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
-import type { ArchivedChat } from "./chat-archives";
-import { readArchivedChats } from "./chat-archives";
-import { searchItems } from "./search-items";
+import { getChats } from "./chat-store";
+import { chatsForSearch, searchItems } from "./search-items";
 import type { SearchItem, SearchQuiz, SearchTab } from "./search-items";
 
 const ONGLETS: Array<{ id: SearchTab; label: TransKey }> = [
@@ -29,7 +28,7 @@ export function ouvrirRecherche(opts: {
 	/** The icon of a quiz of the catalogue (its type). */
 	iconeQuiz(path: string): string;
 	ouvrirQuiz(path: string): void;
-	ouvrirSession(chat: ArchivedChat): void;
+	ouvrirSession(id: string): void;
 }): void {
 	const host = currentHost();
 	let onglet: SearchTab = "all";
@@ -51,7 +50,7 @@ export function ouvrirRecherche(opts: {
 				if (!item) return;
 				modal.close();
 				if (item.kind === "quiz") opts.ouvrirQuiz(item.path);
-				else opts.ouvrirSession(item.chat);
+				else opts.ouvrirSession(item.id);
 			};
 			const peindreOnglets = (): void => {
 				onglets.replaceChildren();
@@ -65,7 +64,7 @@ export function ouvrirRecherche(opts: {
 			};
 			const peindreListe = (): void => {
 				const requete = champ.value.trim();
-				items = searchItems(requete, onglet, opts.quizzes(), readArchivedChats(), requete ? 30 : 10);
+				items = searchItems(requete, onglet, opts.quizzes(), chatsForSearch(getChats()), requete ? 30 : 10);
 				choisi = Math.min(choisi, Math.max(0, items.length - 1));
 				liste.replaceChildren();
 				if (items.length === 0) {

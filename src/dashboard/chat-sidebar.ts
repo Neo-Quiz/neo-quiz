@@ -1,86 +1,67 @@
 /* ══════════════════════════════════════════════════════════
-   THE CHATS IN THE SIDEBAR of the Generate page (2026-09-30)
+   THE CHATS IN THE SIDEBAR of the Generate page (2026-09-30; switchable
+   chats 2026-10-02)
 
    Like claude.ai's: every conversation, grouped by day ("Today",
-   "Yesterday", "28 Sept"), newest first, in a list that scrolls on its own.
-   What is older than `JOURS_RECENTS` days waits in a folded "Older" section,
-   so that the list never becomes something to scroll through forever.
+   "Yesterday", "28 Sept"), newest first, in a list that scrolls on its own;
+   what is older than `JOURS_RECENTS` days waits in a folded "Older" section.
+   A CLICK puts the chat on screen (no modal): its bubbles, documents, quiz
+   cards and answers come back from the record, and it can be continued. The
+   chat on screen is highlighted; a chat with a request waiting or running
+   shows a turning mark, and switching away never stops it.
 
-   The conversation ON SCREEN is saved as it goes — each answered request —
-   so it is listed too (highlighted), and closing the app loses nothing of
-   it. It ends when the queue empties ("New", or the last answer closed):
-   the next request starts another one. The state lives at the MODULE level,
-   like the queue it follows: the page is rebuilt, the conversation is not.
+   The record follows the queue (`reconcileChats`): every answered request is
+   saved even while the Generate page is not on screen, so closing the app
+   loses nothing of what was answered. The state lives at the MODULE level,
+   like the queue it follows: the page is rebuilt, the chats are not.
 ══════════════════════════════════════════════════════════ */
 
 import { ajouter } from "../dom";
-import { currentHost, requireHost } from "../host/current";
+import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
-import { renderMarkdownPreview } from "../markdown-preview";
-import { mathifyElement } from "../engine/mathjax";
-import type { FileGenerationApp, LigneGeneration } from "./file-generation-app";
-import { deleteArchivedChat, groupChatsByDay, readArchivedChats, saveChat } from "./chat-archives";
-import type { ArchivedChat, ArchivedTurn } from "./chat-archives";
+import type { FileGenerationApp } from "./file-generation-app";
+import { chatListItems, groupItemsByDay } from "./chat-list";
+import type { ChatListItem } from "./chat-list";
+import { closableLines, groupLines, reconcileChats } from "./chat-requests";
+import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
+import { getChats, importLegacyOnce, removeChat, setChats } from "./chat-store";
 
 /** Days listed by date; anything older is in the folded section. */
 const JOURS_RECENTS = 30;
 
-interface ConversationEnCours {
-	id: string;
-	/** Per queue line (its id gives the order): the request and what came back. */
-	tours: Map<number, { titre: string; tours: ArchivedTurn[] }>;
-}
-
-let enCours: ConversationEnCours | null = null;
 let fileSuivie: FileGenerationApp | null = null;
 /** The folded section, opened by a click: for the session of the window. */
 let ancienOuvert = false;
-/** The lists on screen, repainted when a chat is saved. */
+/** The lists on screen, repainted when the chats or the queue change. */
 const listes = new Set<() => void>();
-
-/** What the sidebar calls a request: its first line, else its first attached
-    document, else the quiz it made. */
-function titreDe(l: LigneGeneration): string {
-	const ligne = l.demande.text.split("\n").map(s => s.trim()).find(Boolean);
-	return ligne || l.demande.notes[0]?.name || l.resultat?.titre || "";
-}
 
 function repeindre(): void {
 	for (const peindre of [...listes]) peindre();
 }
 
-/** Saves the conversation on screen with every answered request. */
-function enregistrer(file: FileGenerationApp): void {
-	const lignes = file.lignes();
-	if (!lignes.some(l => l.etat !== "arret")) {
-		if (enCours) { enCours = null; repeindre(); }
-		return;
-	}
-	let change = false;
-	for (const l of lignes) {
-		if (l.etat !== "prete" || !l.resultat) continue;
-		enCours ??= { id: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7), tours: new Map() };
-		if (enCours.tours.has(l.id)) continue;
-		const reponse = l.resultat.texte ?? t("ai.side.quizMade", { title: l.resultat.titre });
-		// A quiz of an "/exam" plan repeats the request of its plan: only what it made is kept.
-		const etapeDePlan = !!l.demande.preparation?.lot && !l.demande.planifier;
-		enCours.tours.set(l.id, { titre: etapeDePlan ? "" : titreDe(l), tours: etapeDePlan ? [{ role: "assistant", text: reponse }] : [{ role: "user", text: l.demande.text }, { role: "assistant", text: reponse }] });
-		change = true;
-	}
-	if (!change || !enCours) return;
-	const ordre = [...enCours.tours.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
-	saveChat({ id: enCours.id, date: Date.now(), title: ordre.find(o => o.titre)?.titre, turns: ordre.flatMap(o => o.tours) });
+/** Brings the record up to date from the queue, lets the finished replies of
+    other chats leave the queue, and tells whoever shows chats. */
+function synchroniser(file: FileGenerationApp): void {
+	const { chats, changed } = reconcileChats(getChats(), groupLines(file.lignes()), chatDevice(), Date.now());
+	if (changed) { setChats(chats); notifyChatsChanged(); return; }
+	const recorded = (chatId: string, key: string): boolean => !!getChats().find(c => c.id === chatId)?.requests.some(q => q.id === key);
+	const partantes = closableLines(file.lignes(), activeChatId(), recorded);
+	for (const l of partantes) file.fermer(l.id);
 	repeindre();
 }
 
-/** Follows the queue of the window, once: every answered request is saved
-    even while the Generate page is not on screen. */
+/** Follows the queue of the window, once: the record is kept up to date even
+    while the Generate page is not on screen. Also imports the old text-only
+    archive, once. */
 export function suivreConversations(file: FileGenerationApp): void {
 	if (fileSuivie === file) return;
 	fileSuivie = file;
+	importLegacyOnce(chatDevice());
 	// `false`: this subscriber shows nothing, a ready quiz is still announced.
-	file.abonner(() => enregistrer(file), () => false);
-	enregistrer(file);
+	file.abonner(() => synchroniser(file), () => false);
+	// A chat switch lets the replies of the chat just left go, and repaints.
+	onChatsChanged(() => synchroniser(file));
+	synchroniser(file);
 }
 
 /** "Today", "Yesterday", or the date ("28 Sept", with the year when it is not this one). */
@@ -92,51 +73,43 @@ function libelleJour(kind: "today" | "yesterday" | "day", jour: number): string 
 	return new Intl.DateTimeFormat(currentLang(), memeAnnee ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }).format(d);
 }
 
-/** A saved chat read back, read-only. The conversation on screen is
-    already open: nothing to show. */
-export function ouvrirChat(chat: ArchivedChat): void {
-	if (chat.id === enCours?.id) return;
-	requireHost("modals").open({
-		className: "qbd-archives-modal",
-		title: chat.title || t("ai.side.untitled"),
-		onOpen: (m) => {
-			const fil = ajouter(m.contentEl, "div", "qbd-archives-fil");
-			for (const tour of chat.turns) {
-				if (tour.role === "user") { ajouter(fil, "div", "qbd-ai-bulle", tour.text); continue; }
-				const prose = ajouter(fil, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-				// The only HTML written here, every text through the sanitizer's first gate.
-				prose.innerHTML = renderMarkdownPreview(tour.text);
-				if (tour.text.includes("$")) void mathifyElement(prose);
-			}
-		},
-	});
-}
-
 /** The list of chats, at the bottom of the sidebar. Repaints itself when a
-    chat is saved, and lets go once it has left the document. */
+    chat or the queue changes, and lets go once it has left the document. */
 export function poserListeChats(parent: HTMLElement): void {
 	const host = currentHost();
 	const liste = ajouter(parent, "div", "qbd-ai-chats");
 	liste.setAttribute("aria-label", t("ai.side.chats"));
 
-	const poserChat = (zone: HTMLElement, chat: ArchivedChat): void => {
-		const actif = chat.id === enCours?.id;
-		const item = ajouter(zone, "div", "qbd-ai-chat-item" + (actif ? " is-active" : ""));
+	const poserChat = (zone: HTMLElement, chat: ChatListItem): void => {
+		const actif = chat.id === activeChatId();
+		const item = ajouter(zone, "div", "qbd-ai-chat-item" + (actif ? " is-active" : "") + (chat.running ? " is-running" : ""));
 		const ouvrir = ajouter(item, "button", "qbd-ai-chat-ouvrir", chat.title || t("ai.side.untitled"));
 		ouvrir.type = "button";
 		ouvrir.title = chat.title || "";
-		// The conversation on screen is already open: its line only shows where it is.
-		if (actif) { ouvrir.setAttribute("aria-current", "true"); return; }
-		ouvrir.addEventListener("click", () => ouvrirChat(chat));
+		if (actif) ouvrir.setAttribute("aria-current", "true");
+		ouvrir.addEventListener("click", () => setActiveChat(chat.id));
+		if (chat.running) {
+			// A request is waiting or running in this chat: it goes on whatever is on screen.
+			const marque = ajouter(item, "span", "qbd-ai-chat-actif");
+			marque.title = t("ai.side.running");
+			marque.setAttribute("role", "img");
+			marque.setAttribute("aria-label", t("ai.side.running"));
+			host.ui.setIcon(marque, "loader");
+			return;
+		}
 		const suppr = ajouter(item, "button", "qbd-ai-chat-suppr");
 		suppr.type = "button";
 		suppr.title = t("ai.side.delete");
 		suppr.setAttribute("aria-label", t("ai.side.delete"));
 		host.ui.setIcon(suppr, "trash-2");
-		suppr.addEventListener("click", () => { deleteArchivedChat(chat.id); peindre(); });
+		suppr.addEventListener("click", () => {
+			removeChat(chat.id, Date.now());
+			// The chat on screen was deleted: an empty one takes its place.
+			if (actif) startNewChat(); else notifyChatsChanged();
+		});
 	};
 
-	const poserJour = (zone: HTMLElement, kind: "today" | "yesterday" | "day", jour: number, chats: ArchivedChat[]): void => {
+	const poserJour = (zone: HTMLElement, kind: "today" | "yesterday" | "day", jour: number, chats: ChatListItem[]): void => {
 		ajouter(zone, "div", "qbd-ai-chats-jour", libelleJour(kind, jour));
 		for (const chat of chats) poserChat(zone, chat);
 	};
@@ -145,7 +118,8 @@ export function poserListeChats(parent: HTMLElement): void {
 		if (!liste.isConnected) { listes.delete(peindre); return; }
 		const haut = liste.scrollTop;
 		liste.replaceChildren();
-		const jours = groupChatsByDay(readArchivedChats(), Date.now(), JOURS_RECENTS);
+		const maintenant = Date.now();
+		const jours = groupItemsByDay(chatListItems(getChats(), fileSuivie?.lignes() ?? [], maintenant), maintenant, JOURS_RECENTS);
 		for (const j of jours.filter(j => !j.old)) poserJour(liste, j.kind, j.day, j.chats);
 		const anciens = jours.filter(j => j.old);
 		if (anciens.length) {
