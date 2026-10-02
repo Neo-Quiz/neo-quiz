@@ -26,7 +26,10 @@
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
-import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
+import { threadItems } from "./chat-thread";
+import type { ChatRecord } from "./chat-record";
+import { peindrePieces, peindreTourEnregistre } from "./chat-record-vue";
+import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
 import { t } from "../i18n";
@@ -72,14 +75,17 @@ export function creerVueFile(opts: {
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
 	/** Copies a chat answer (the host's clipboard). */
 	copier?: (texte: string) => Promise<boolean>;
+	/** The chat on screen and its record (null until something is recorded). */
+	chat: () => { id: string; record: ChatRecord | null };
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
 	let desabonner: (() => void) | null = null;
 	let horloge: number | null = null;
 	let desabonnerTranscript: (() => void) | null = null;
-	/** L'identifiant du dernier tour peint ; -1 force le retour en bas. */
-	let dernierPeint = -1;
+	/** The key of the last item painted; "" forces the return to the bottom. */
+	let dernierPeint = "";
+	let desabonnerChats: (() => void) | null = null;
 
 	const affichee = (): boolean => !!zone?.isConnected;
 
@@ -92,6 +98,8 @@ export function creerVueFile(opts: {
 		desabonner = null;
 		desabonnerTranscript?.();
 		desabonnerTranscript = null;
+		desabonnerChats?.();
+		desabonnerChats = null;
 		arreterHorloge();
 		zone = null;
 	}
@@ -129,35 +137,24 @@ export function creerVueFile(opts: {
 	}
 
 	/** Le message de l'utilisateur : vignettes, bulle, mode et modèle. */
-	function peindreMessage(parent: HTMLElement, l: LigneGeneration): void {
+	function peindreMessage(parent: HTMLElement, l: LigneGeneration, lignes: readonly LigneGeneration[] = [l]): void {
 		const d = l.demande;
+		const imgs = lignes.flatMap(x => x.demande.images);
+		// Every document of the request, once (a send over several documents
+		// can be several lines of the queue).
+		const vus = new Set<string>();
+		const notes = lignes.flatMap(x => x.demande.notes).filter(n => !vus.has(n.name) && !!vus.add(n.name));
 		const message = ajouter(parent, "div", "qbd-ai-message");
-		if (d.notes.length || d.images.length) {
+		if (notes.length || imgs.length) {
 			const pieces = ajouter(message, "div", "qbd-ai-message-pieces");
-			for (const img of d.images) {
+			for (const img of imgs) {
 				const p = ajouter(pieces, "div", "qbd-ai-message-piece qbd-ai-message-piece--image");
 				p.title = img.file.name;
 				const el = ajouter(p, "img");
 				el.src = urlImage(img.file);
 				el.alt = img.file.name;
 			}
-			for (const n of d.notes) {
-				const p = ajouter(pieces, "div", "qbd-ai-message-piece");
-				p.title = n.path || n.name;
-				if (n.thumb) {
-					p.classList.add("qbd-ai-message-piece--image");
-					const el = ajouter(p, "img");
-					el.src = n.thumb;
-					el.alt = n.name;
-					continue;
-				}
-				// Le nom coupé AU MILIEU : l'extension reste toujours visible.
-				const { tete, queue } = couperNomAuMilieu(n.name);
-				const nom = ajouter(p, "span", "qbd-ai-message-piece-nom");
-				ajouter(nom, "span", "qbd-ai-message-piece-tete", tete);
-				if (queue) ajouter(nom, "span", "qbd-ai-message-piece-queue", queue);
-				ajouter(p, "span", "qbd-ai-note-chip-badge", badgeDeFichier(n.name));
-			}
+			peindrePieces(pieces, notes);
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
 		/* No "Learn · Opus 5.5" under the request any more (2026-09-30): the
@@ -203,7 +200,6 @@ export function creerVueFile(opts: {
 					void opts.copier?.(texte).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed")));
 				});
 			}
-			boutonIcone(pied, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
 		}
 	}
 
@@ -260,7 +256,6 @@ export function creerVueFile(opts: {
 				ajouter(corps, "div", "qbd-ai-resultat-titre", q.titre);
 				if (q.questions) ajouter(corps, "div", "qbd-ai-resultat-sous", t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
 				bouton(carte, t("ai.queue.open"), () => opts.ouvrir(q.chemin));
-				if (i === quiz.length - 1) boutonIcone(carte, "x", t("ai.queue.close"), () => opts.file.fermer(l.id));
 			});
 			return;
 		}
@@ -522,28 +517,35 @@ export function creerVueFile(opts: {
 		zone.replaceChildren();
 		// Always full width (2026-09-30): no chat layout any more.
 		zone.classList.add("qbd-ai-file--full");
-		// L'état `arret` ne se montre pas : pour l'utilisateur, la ligne est annulée.
-		const visibles = opts.file.lignes().filter(l => l.etat !== "arret");
-		for (const l of visibles) {
-			const lot = l.demande.preparation?.lot;
-			// The quizzes of a plan live in the sidebar, not in the conversation.
-			if (lot && !l.demande.planifier) continue;
+		const { id: chatId, record } = opts.chat();
+		const items = threadItems(record, opts.file.lignes(), chatId);
+		for (const item of items) {
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier }); continue; }
+			// The `arret` state is not shown (for the user the line is cancelled); the
+			// quizzes of a plan live in the sidebar, not in the conversation.
+			const lignes = item.lines.filter(l => l.etat !== "arret");
+			const montrees = lignes.filter(l => !(l.demande.preparation?.lot && !l.demande.planifier));
+			if (montrees.length === 0) continue;
+			// ONE bubble per request, whatever the number of lines it made.
 			const tour = ajouter(zone, "div", "qbd-ai-tour");
 			tour.setAttribute("role", "listitem");
-			peindreMessage(tour, l);
-			/* As MonoCode: while the model works, its status line then its
-			   activity; once done, the activity summary then the answer. */
-			if (l.etat === "cours" || l.etat === "enregistrement") { peindreReponse(tour, l); peindreTranscript(tour, l); }
-			else { peindreTranscript(tour, l); peindreReponse(tour, l); }
-			if (lot) peindreAvancement(tour, lot, visibles);
+			peindreMessage(tour, montrees[0], lignes);
+			for (const l of montrees) {
+				/* As MonoCode: while the model works, its status line then its
+				   activity; once done, the activity summary then the answer. */
+				if (l.etat === "cours" || l.etat === "enregistrement") { peindreReponse(tour, l); peindreTranscript(tour, l); }
+				else { peindreTranscript(tour, l); peindreReponse(tour, l); }
+			}
+			const lot = montrees[0].demande.preparation?.lot;
+			if (lot) peindreAvancement(tour, lot, lignes);
 		}
-		/* Un tour NOUVEAU se lit à l'identifiant du dernier, pas au nombre de
-		   tours : une réponse fermée pendant qu'une demande part laisse le
-		   nombre inchangé. */
-		const dernier = visibles.length ? visibles[visibles.length - 1].id : 0;
+		/* A NEW item is read from the key of the last one, not from the count: a
+		   reply closed while a request goes out leaves the count unchanged. */
+		const dernier = items.length ? items[items.length - 1].key : "";
 		const nouveau = dernier !== dernierPeint;
 		dernierPeint = dernier;
 		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
+		const visibles = items.flatMap(i => (i.kind === "live" ? i.lines.filter(l => l.etat !== "arret") : []));
 		const enCours = visibles.some(l => l.etat === "cours");
 		if (enCours && horloge === null) {
 			horloge = window.setInterval(() => {
@@ -575,7 +577,8 @@ export function creerVueFile(opts: {
 			zone.setAttribute("aria-live", "polite");
 			if (!desabonner) desabonner = opts.file.abonner(peindre, affichee);
 			if (!desabonnerTranscript) desabonnerTranscript = opts.file.abonnerTranscript(surTranscript);
-			dernierPeint = -1; // un rendu neuf de la page : on se cale en bas
+			if (!desabonnerChats) desabonnerChats = onChatsChanged(peindre);
+			dernierPeint = ""; // un rendu neuf de la page : on se cale en bas
 			peindre();
 		},
 		liberer,

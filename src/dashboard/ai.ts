@@ -33,9 +33,12 @@ import { categorieChoisie, detecterCategorie, estCategorie } from "./categorie-q
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
-import { enConversation, poserNouvelleDemande } from "./conversation-mode";
+import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
-import type { TourPrecedent } from "./conversation-context";
+import { activeChatId, onChatsChanged } from "./chat-session";
+import { getChats } from "./chat-store";
+import { threadItems, toursOfThread } from "./chat-thread";
+import { chatOfLine, newRequestId } from "./chat-requests";
 import { ouvrirChat, poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
@@ -363,6 +366,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	});
 	// Every conversation is saved as it goes, for the sidebar's list of chats.
 	suivreConversations(fileGen);
+	/** The chat on screen as the thread shows it: recorded requests + live lines. */
+	const chatSurEcran = () => {
+		const id = activeChatId();
+		return { id, record: getChats().find(c => c.id === id) ?? null };
+	};
+	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id); };
+	const chatAContenu = (): boolean => filDuChat().length > 0;
 	const vueFile = creerVueFile({
 		file: fileGen,
 		ouvrir: (chemin) => {
@@ -372,6 +382,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 		copier: deps.copyText,
+		chat: chatSurEcran,
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -382,10 +393,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let majNouvelle: () => void = () => {};
 	const desabonnerPage = fileGen.abonner(() => {
 		if (!stageRef || !stageRef.isConnected) return;
-		if ((phase === "idle" || phase === "error") && enConversation(fileGen) !== modeConversation) { void render(containerRef); return; }
+		if ((phase === "idle" || phase === "error") && chatAContenu() !== modeConversation) { void render(containerRef); return; }
 		updateGenerateBtn(boutonEnvoi);
 		majNouvelle();
 	}, () => !!stageRef?.isConnected);
+	/* Switching or starting a chat: the page follows (conversation <-> home). */
+	const desabonnerChats = onChatsChanged(() => {
+		if (!stageRef || !stageRef.isConnected) return;
+		if ((phase === "idle" || phase === "error") && chatAContenu() !== modeConversation) { void render(containerRef); return; }
+		majNouvelle();
+	});
 
 	/** « Ouvrir sans enregistrer » : le quiz d'une ligne dont seule la note a
 	    échoué s'affiche dans la page résultat (la même que pour un site), avec
@@ -977,7 +994,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   titre s'efface, les tours s'empilent dans un fil qui défile, et le
 		   composer se range en bas. On en sort par « Nouvelle demande », ou
 		   quand la liste se vide. */
-		const conversation = (phase === "idle" || phase === "error") && enConversation(fileGen);
+		const conversation = (phase === "idle" || phase === "error") && chatAContenu();
 		modeConversation = conversation;
 		/* THE SIDEBAR, on the left of the page like claude.ai's: a new chat, the
 		   quizzes generated so far (the folder they are written to), and every
@@ -1002,7 +1019,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			},
 			ouvrirSession: (chat) => ouvrirChat(chat),
 		}));
-		majNouvelle = poserNouvelleDemande(lateral, fileGen);
+		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
 		if (deps.openGenerated) {
 			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");
 			genere.type = "button";
@@ -4033,24 +4050,26 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    pendant que celle-ci tourne. */
 	function envoyerDansLaFile(jointesVideo: NoteAttachment[]): void {
 		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
-		/* A FOLLOW-UP carries the conversation: earlier requests, their
-		   documents (kept when this one attaches none) and what the quizzes
-		   produced contain. Without it the model got the bare sentence. */
-		const tours: TourPrecedent[] = fileGen.lignes().filter(l => l.etat !== "arret" && !l.demande.planifier).map(l => ({
-			text: l.demande.text,
-			notes: l.demande.notes.map(n => ({ name: n.name, content: n.content })),
-			quizzes: l.demande.produit?.lot
-				? l.demande.produit.lot.map(q => ({ title: q.titre, questions: q.questions }))
-				: l.demande.produit ? [{ title: l.demande.produit.titre, questions: l.demande.produit.questions }] : [],
-		}));
+		/* A FOLLOW-UP carries the chat's history: the earlier requests of the
+		   chat on screen (live or read back from its record), their documents
+		   (kept when this one attaches none) and what the quizzes produced
+		   contain. A chat of an earlier session only has what its record keeps:
+		   the names of the documents, the titles and files of the quizzes, the
+		   written answers. */
+		const chatId = activeChatId();
+		const tours = toursOfThread(filDuChat());
 		if (tours.length) {
 			envoi.contexte = contexteConversation(tours);
 			if (!envoi.notes.length && !envoi.images.length) {
 				const herites = documentsHeritiers(tours);
-				const parNom = new Map(fileGen.lignes().flatMap(l => l.demande.notes).map(n => [n.name, n] as const));
+				// Only documents the queue still holds can be attached again (their text).
+				const parNom = new Map(fileGen.lignes().filter(l => chatOfLine(l) === chatId).flatMap(l => l.demande.notes).map(n => [n.name, n] as const));
 				envoi.notes = herites.map(h => parNom.get(h.name)).filter((n): n is NoteAttachment => !!n);
 			}
 		}
+		/* THE IDENTITY of the send: the chat on screen, ONE request id for every
+		   line it makes, and the time. */
+		const identite = { chatId, requestId: newRequestId(), sentAt: Date.now() };
 		const reglages = figerReglages(settings());
 		/* "/exam": a whole PREPARATION over every document at once — a Learn
 		   over everything that can come up, then Tests of rising difficulty,
@@ -4084,7 +4103,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   then chooses the quizzes; each comes behind it in the queue, and
 			   the sidebar shows the plan as it goes. Learn | Test decides the
 			   kind of quizzes planned. */
-			fileGen.envoyer({ ...d, ...base, mode: modeGeneration, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
+			fileGen.envoyer({ ...d, ...base, ...identite, mode: modeGeneration, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
 			examCible = null;
 			viderComposer();
 			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
@@ -4097,7 +4116,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
 			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
-			fileGen.envoyer({ ...d, mode: modeGeneration, count: questionCount, type: effectiveTypes(), destination, reglages, categorie });
+			fileGen.envoyer({ ...d, ...identite, mode: modeGeneration, count: questionCount, type: effectiveTypes(), destination, reglages, categorie });
 		}
 		viderComposer();
 		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
@@ -4471,6 +4490,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		disposed = true;
 		vueFile.liberer();
 		desabonnerPage();
+		desabonnerChats();
 		if (ollamaPoll) { window.clearInterval(ollamaPoll); ollamaPoll = null; }
 		couperSondeConnexion();
 		arreterAttenteWeb();
