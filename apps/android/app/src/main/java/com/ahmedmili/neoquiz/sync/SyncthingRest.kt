@@ -59,6 +59,8 @@ class SyncthingRest(private val port: Int, private val apiKey: String) {
 
     fun putFolder(f: JSONObject) { call("PUT", "/rest/config/folders/${segment(f.optString("id"))}", f) }
 
+    fun patchFolder(id: String, partial: JSONObject) { call("PATCH", "/rest/config/folders/${segment(id)}", partial) }
+
     fun patchOptions(partial: JSONObject) { call("PATCH", "/rest/config/options", partial) }
 
     fun setIgnores(folderId: String, lines: List<String>) {

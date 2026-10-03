@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Android 13+: without it the foreground-service notification is hidden. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -45,7 +45,19 @@
         <service
             android:name=".sync.SyncService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Neo Quiz embeds Syncthing, a continuous file synchronization engine. Once the user pairs a device, it runs in the background to send and receive the user's quiz notes between the user's own devices as they change." />
+        </service>
+
+        <!-- Sync starts again with the phone and after an update, once it was switched on (a first pairing). -->
+        <receiver android:name=".sync.SyncBootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- The daily review alarm and its two re-arm moments. Not reachable by other apps (boot and
              package-replaced are protected system broadcasts, which an unexported receiver still gets). -->

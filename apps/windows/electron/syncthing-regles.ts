@@ -192,6 +192,7 @@ export interface FolderConfig {
 	devices: Array<{ deviceID: string; introducedBy: string; encryptionPassword: string }>;
 	fsWatcherEnabled: boolean;
 	fsWatcherDelayS: number;
+	fsWatcherTimeoutS: number;
 	pullerDelayS: number;
 	ignorePerms: boolean;
 	[cle: string]: unknown;
@@ -215,6 +216,10 @@ export function folderConfig(root: string, ownId: string, paired: readonly strin
 		   moment it is written (`signalerEcriture`). Re-put at every start, so
 		   an existing folder gets them too. */
 		fsWatcherDelayS: 1,
+		/* A deletion is held back fsWatcherTimeoutS (6 x the delay by default):
+		   an old note deleted outside the app took 6.1 s, 1.1 s with this
+		   (measured by Neo Calendar, 2026-10-03). */
+		fsWatcherTimeoutS: 1,
 		pullerDelayS: 0,
 		/* Permission bits mean nothing between Windows and Android. */
 		ignorePerms: true,

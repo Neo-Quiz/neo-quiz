@@ -197,7 +197,7 @@ await withSrcModule(
 			const { cheminAScanner, folderConfig } = regles;
 			const racine = String.raw`C:\Neo Quiz`;
 			const f = folderConfig(racine, ID, []);
-			r.check("the folder sees outside changes after 1 s and pulls at once", [f.fsWatcherDelayS, f.pullerDelayS], [1, 0]);
+			r.check("the folder sees outside changes and deletions after 1 s and pulls at once", [f.fsWatcherDelayS, f.fsWatcherTimeoutS, f.pullerDelayS], [1, 1, 0]);
 			r.check("a written path under the folder is scanned by its relative path", cheminAScanner(racine, String.raw`C:\Neo Quiz\XTI301\Cours.md`), "XTI301/Cours.md");
 			r.check("Windows paths compare without case, and forward slashes work", cheminAScanner(racine, "c:/neo quiz/.neo-quiz/journal/a.jsonl"), ".neo-quiz/journal/a.jsonl");
 			r.check("outside the folder, a sibling with the same prefix, or the folder itself: nothing",

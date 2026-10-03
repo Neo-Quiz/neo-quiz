@@ -203,11 +203,12 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 }
 
 /**
- * Foreground service (type `dataSync`) that keeps the embedded Syncthing
- * alive while the app is in the background, so the phone and the tablet stay
- * in step with the PCs. Android 15 limits a `dataSync` service to 6 hours per
- * day and calls [onTimeout]: the service then stops cleanly and sync resumes
- * the next time the app is opened.
+ * Foreground service (type `specialUse` since 2026-10-03, `dataSync` before)
+ * that keeps the embedded Syncthing alive while the app is in the background,
+ * so the phone and the tablet stay in step with the PCs. It starts again at
+ * boot and after an update (`SyncBootReceiver`), which Android 15+ refuses for
+ * a `dataSync` service; [onTimeout] only concerned the 6 h/day budget of that
+ * former type and is kept as a clean stop.
  */
 class SyncService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -217,7 +218,9 @@ class SyncService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val hub = SyncHub.get(this)
         try {
-            startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            // "specialUse", not "dataSync" (2026-10-03, same as Neo Calendar): Android 15+ refuses to start a dataSync
+            // service at boot, and caps it at 6 h a day; sync must restart with the phone and run as long as needed.
+            startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } catch (e: Exception) {
             // The system refused a foreground start (app in the background): nothing to keep alive.
             SyncLog.warn(TAG, "foreground start refused", e)

@@ -143,9 +143,22 @@ object ShareRules {
             // is seen after 1 s instead of 10 s, and the receiving side pulls at once. A change made BY the
             // app is scanned the moment it is written (SyncEngine.signalWrite).
             .put("fsWatcherDelayS", 1)
+            // A deletion is held back this long (6 x the delay by default): 6.1 s -> 1.1 s (Neo Calendar, 2026-10-03).
+            .put("fsWatcherTimeoutS", 1)
             .put("pullerDelayS", 0)
             // Permission bits mean nothing between Windows and Android.
             .put("ignorePerms", true)
+    }
+
+    /**
+     * A folder was just created HERE by sync (received from another device). On Android the engine's file watcher
+     * does not follow a folder it created itself, so a file put in it later outside the app would only be seen at the
+     * hourly scan; restarting the watcher fixes it (Neo Calendar, 2026-10-03). A folder made on the phone is followed.
+     */
+    fun isNewRemoteDir(ev: JSONObject): Boolean {
+        if (ev.optString("type") != "ItemFinished") return false
+        val d = ev.optJSONObject("data") ?: return false
+        return d.optString("folder") == FOLDER_ID && d.isNull("error") && d.optString("type") == "dir" && d.optString("action") == "update"
     }
 
     /** The path to scan for a file the app just wrote: relative to [root] with '/', or null when it is not under it. */

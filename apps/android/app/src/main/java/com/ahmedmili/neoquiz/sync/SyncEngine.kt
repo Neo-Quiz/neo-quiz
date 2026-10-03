@@ -56,6 +56,23 @@ class SyncEngine(
     /* Writes of the app, scanned at once, gathered over 150 ms so a burst (a note and its journal line) is one call. */
     private val toScan = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     @Volatile private var scanPending = false
+    @Volatile private var watcherRestartPending = false
+    private var lastPush = 0L
+
+    /** Restarts the folder's file watcher, 1 s after the last folder received (a burst is one restart). */
+    private fun restartWatcherSoon() {
+        if (watcherRestartPending) return
+        watcherRestartPending = true
+        scope.launch(Dispatchers.IO) {
+            delay(1_000)
+            watcherRestartPending = false
+            val rest = current?.instance?.rest ?: return@launch
+            try {
+                rest.patchFolder(ShareRules.FOLDER_ID, JSONObject().put("fsWatcherEnabled", false))
+                rest.patchFolder(ShareRules.FOLDER_ID, JSONObject().put("fsWatcherEnabled", true))
+            } catch (_: Exception) { /* the engine stops: it watches everything again at its next start */ }
+        }
+    }
 
     /** The app just wrote [abs]: if it lies in the shared folder, have Syncthing scan it now. */
     fun signalWrite(abs: String) {
@@ -203,6 +220,7 @@ class SyncEngine(
                 val ev = events.getJSONObject(i)
                 if (ev.optLong("id") > since) since = ev.optLong("id")
                 if (detector.observe(ev)) received = true
+                if (ShareRules.isNewRemoteDir(ev)) restartWatcherSoon()
                 // The name Syncthing reports for a device that connected, kept when we have none yet (a device paired by id has no name).
                 val data = ev.optJSONObject("data")
                 if (ev.optString("type") == "DeviceConnected" && data != null && data.optString("deviceName").isNotBlank()) {
@@ -223,7 +241,10 @@ class SyncEngine(
                 for (deviceId in by.keys()) if (ShareRules.acceptOffer(folderId, deviceId, paired)) realign = true
             }
             if (realign) align(r, paired)
-            push()
+            // The state is reread only when something happened, or every 10 s: rereading it on every turn of the
+            // event loop would delay the next event (Neo Calendar, 2026-10-03).
+            val now = System.currentTimeMillis()
+            if (events.length() > 0 || realign || now - lastPush > 10_000) { lastPush = now; push() }
             if (received) onReceived?.invoke()
         } catch (e: Exception) {
             if (!stopped) SyncLog.warn(TAG, "poll failed", e)

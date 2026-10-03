@@ -443,7 +443,9 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			}
 			if (ev.type === "StateChanged" || ev.type === "DeviceConnected") change = true;
 		}
-		if (change || recu) await diffuser();
+		/* Not awaited: rereading the state is five REST calls, and the loop
+		   must go back to listening at once (an event behind would wait). */
+		if (change || recu) void diffuser().catch(() => undefined);
 		return recu;
 	}
 	void (async () => {

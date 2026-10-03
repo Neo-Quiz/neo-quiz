@@ -182,9 +182,21 @@ class ShareRulesTest {
         assertTrue(d.observe(ev("StateChanged", folder, "to" to "idle")))
     }
 
+    @Test fun aFolderReceivedFromAnotherDeviceRestartsTheWatcher() {
+        fun ev(type: String, data: JSONObject) = JSONObject().put("type", type).put("data", data)
+        val dir = JSONObject().put("folder", ShareRules.FOLDER_ID).put("type", "dir").put("action", "update").put("error", JSONObject.NULL)
+        assertTrue(ShareRules.isNewRemoteDir(ev("ItemFinished", dir)))
+        assertFalse("a file", ShareRules.isNewRemoteDir(ev("ItemFinished", JSONObject(dir.toString()).put("type", "file"))))
+        assertFalse("a deletion", ShareRules.isNewRemoteDir(ev("ItemFinished", JSONObject(dir.toString()).put("action", "delete"))))
+        assertFalse("an error", ShareRules.isNewRemoteDir(ev("ItemFinished", JSONObject(dir.toString()).put("error", "x"))))
+        assertFalse("another folder", ShareRules.isNewRemoteDir(ev("ItemFinished", JSONObject(dir.toString()).put("folder", "other"))))
+        assertFalse("another event", ShareRules.isNewRemoteDir(ev("ItemStarted", dir)))
+    }
+
     @Test fun realTimeSettingsAndPathToScan() {
         val cfg = ShareRules.folderConfig("/storage/emulated/0/Documents/Neo Quiz", "A", emptyList())
         assertEquals(1, cfg.getInt("fsWatcherDelayS"))
+        assertEquals(1, cfg.getInt("fsWatcherTimeoutS"))
         assertEquals(0, cfg.getInt("pullerDelayS"))
         val root = "/storage/emulated/0/Documents/Neo Quiz"
         assertEquals("XTI301/Cours.md", ShareRules.pathToScan(root, "$root/XTI301/Cours.md"))
