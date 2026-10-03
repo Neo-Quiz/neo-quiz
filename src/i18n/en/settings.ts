@@ -37,7 +37,6 @@ export const EN_SETTINGS = {
 	"settings.sync.showId": "Show my ID",
 	"settings.sync.idModalTitle": "Device ID - {name}",
 	"settings.sync.idModalTitleBare": "Device ID",
-	"settings.sync.idScanHint": "Scan this QR code with Neo Quiz on your other device.",
 	"settings.sync.qrAlt": "QR code of this device's ID",
 	"settings.sync.share": "Share",
 	"settings.sync.copy": "Copy",

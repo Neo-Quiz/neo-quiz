@@ -319,7 +319,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const zonePartage = ajouter(droite, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
 				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
-				ajouter(droite, "p", "qbd-sync-aide", t("settings.sync.idScanHint"));
 
 				let ferme = false;
 				let idCourant: string | null = null;
