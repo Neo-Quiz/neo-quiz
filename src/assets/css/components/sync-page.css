@@ -586,3 +586,13 @@
 	padding: 12px 18px;
 	font-size: 15px;
 }
+
+/* The ID in JetBrains Mono, the font the app already bundles for code
+   ("Neo Quiz Mono", `quiz-card.css`), and its copy icon always shown. */
+.qbd-sync-code code {
+	font-family: "Neo Quiz Mono", var(--font-monospace);
+}
+
+.qbd-sync-code .qbd-install-copy {
+	opacity: 1;
+}
