@@ -448,33 +448,40 @@
 	display: none;
 }
 
-/* "Show my ID": landscape, the QR code on the left, the rest on the right. */
+/* "Device ID", top to bottom and centred: the ID on one line, the QR code
+   with its bar, then Share. */
 .modal.qbd-sync-modal-id {
-	width: min(680px, calc(100vw - 32px));
+	width: min(640px, calc(100vw - 32px));
 }
 
 .qbd-sync-dialogue-id {
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	gap: 24px;
+	gap: 16px;
+}
+
+.qbd-sync-dialogue-id > .qbd-sync-code {
+	align-self: stretch;
+	margin: 0;
+}
+
+.qbd-sync-dialogue-id > .qbd-sync-code pre {
+	padding: 10px 44px;
+	text-align: center;
+	font-size: 13px;
 }
 
 .qbd-sync-dialogue-qr {
-	flex: none;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
-	width: 240px;
+	width: 260px;
 }
 
 .qbd-sync-dialogue-qr .qbd-sync-qr {
-	width: 240px;
-	height: 240px;
-}
-
-.qbd-sync-dialogue-id > .qbd-sync-dialogue {
-	flex: 1;
-	min-width: 0;
+	width: 260px;
+	height: 260px;
 }
 
 /* The countdown to the next code: a bar that fills up. */
@@ -493,17 +500,6 @@
 
 .qbd-sync-compte[hidden] {
 	display: none;
-}
-
-@media (max-width: 600px) {
-	.qbd-sync-dialogue-id {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	.qbd-sync-dialogue-qr {
-		align-self: center;
-	}
 }
 
 /* "Recent changes": a full-width outlined button, like Syncthing's. */
@@ -525,17 +521,6 @@
 
 .qbd-sync-carte-changements {
 	align-self: stretch;
-}
-
-/* The ID in its code block: full width, room on the right for the copy icon. */
-.qbd-sync-dialogue .qbd-sync-code {
-	align-self: stretch;
-	margin: 0;
-}
-
-.qbd-sync-dialogue .qbd-sync-code pre {
-	padding-right: 44px;
-	font-size: 13px;
 }
 
 /* The copy icon of the ID block: no frame, no fill, just the icon; a soft

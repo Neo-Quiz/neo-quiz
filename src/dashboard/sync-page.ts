@@ -297,26 +297,27 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			title: dernierEtat.nom ? t("settings.sync.idModalTitle", { name: dernierEtat.nom }) : t("settings.sync.idModalTitleBare"),
 			titleIcon: el => { currentHost().ui.setIcon(el, mobile ? "smartphone" : "monitor"); },
 			onOpen: handle => {
+				/* Top to bottom, like Syncthing's own dialog: the ID on one line,
+				   the QR code in the middle with its bar, Share under it. */
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue-id");
-				const gauche = ajouter(corps, "div", "qbd-sync-dialogue-qr");
-				const qr = ajouter(gauche, "img", "qbd-sync-qr");
-				qr.alt = t("settings.sync.qrAlt");
-				qr.hidden = true;
-				const barre = ajouter(gauche, "div", "qbd-sync-compte");
-				barre.hidden = !qrHote;
-				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
-				const droite = ajouter(corps, "div", "qbd-sync-dialogue");
 				/* The ID in the code block of the install dialog (`ai-install-modal.ts`):
 				   the copy button is an icon INSIDE it, top right, its label off
 				   screen, and it turns into a check for a moment once copied. */
-				const blocId = ajouter(droite, "div", "qbd-install-code qbd-sync-code markdown-rendered markdown-preview-view");
+				const blocId = ajouter(corps, "div", "qbd-install-code qbd-sync-code markdown-rendered markdown-preview-view");
 				const idTexte = ajouter(ajouter(blocId, "pre"), "code");
 				const copierBtn = ajouter(blocId, "button", "qbd-btn qbd-install-copy");
 				copierBtn.type = "button";
 				const copierIcone = ajouter(copierBtn, "span", "qbd-btn-icon qbd-btn-icon--sm");
 				currentHost().ui.setIcon(copierIcone, "copy");
 				const copierTexte = ajouter(copierBtn, "span", "qbd-sr-only", t("settings.sync.copy"));
-				const zonePartage = ajouter(droite, "div", "qbd-sync-menu-zone");
+				const centre = ajouter(corps, "div", "qbd-sync-dialogue-qr");
+				const qr = ajouter(centre, "img", "qbd-sync-qr");
+				qr.alt = t("settings.sync.qrAlt");
+				qr.hidden = true;
+				const barre = ajouter(centre, "div", "qbd-sync-compte");
+				barre.hidden = !qrHote;
+				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
+				const zonePartage = ajouter(corps, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
 				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
 
