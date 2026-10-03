@@ -29,8 +29,11 @@ export function estImageDeFond(nom: string): boolean {
  * Ils agissent sur l'IMAGE seule (`shell.css`, `body::before`) : la lueur et
  * le panneau se posent par-dessus, inchangés.
  *
- * Défauts plus clairs que ceux de Neo Calendar (0,7 et 5 px) : la première
- * version du panneau central a été jugée « trop sombre ».
+ * Defaults lighter than Neo Calendar's (0.7 and 5 px): the first version of
+ * the central panel was judged too dark. No blur by default (2026-10-03): the
+ * image stays sharp and only the central panel blurs what is behind it, as
+ * the owner's own settings had it; a 4 px blur over the whole image was
+ * judged too strong.
  */
 export interface EffetsFond {
 	/** Facteur de `brightness()`, de 0 (noir) à 1 (l'image telle quelle). */
@@ -39,7 +42,7 @@ export interface EffetsFond {
 	flou: number;
 }
 
-export const EFFETS_FOND_DEFAUT: Readonly<EffetsFond> = { luminosite: 0.85, flou: 4 };
+export const EFFETS_FOND_DEFAUT: Readonly<EffetsFond> = { luminosite: 0.85, flou: 0 };
 
 export const BORNES_EFFETS_FOND: Readonly<Record<keyof EffetsFond, { min: number; max: number }>> = {
 	luminosite: { min: 0, max: 1 },

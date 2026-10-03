@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- The wallpaper is no longer blurred by default: only the central panel blurs what is behind it.
 - "Add a device" now sits in the "Your devices" section, under the list, as a smaller button, and opens a dialog to paste or scan the other device’s ID.
 - The Sync page is simpler: one big "Show my ID" button opens a dialog with the full ID, Copy, Share and its QR code, and a footer names Syncthing with a "Learn more" link.
 - The Sync page lists today’s recent changes as plain sentences (“DESKTOP just modified Neo Quiz.md”), which update as time passes; older ones are one click away.

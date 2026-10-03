@@ -49,7 +49,7 @@ await withSrcModule("apps/windows/src/ui/fond-pur.ts", ({ normaliserEffetsFond, 
 	const r = makeReporter("Fond d'écran — luminosité et flou");
 	const defaut = { ...EFFETS_FOND_DEFAUT };
 
-	r.check("défauts : 0,85 et 4 px", defaut, { luminosite: 0.85, flou: 4 });
+	r.check("defaults: 0.85 and no blur", defaut, { luminosite: 0.85, flou: 0 });
 	r.check("absent : les défauts", normaliserEffetsFond(undefined), defaut);
 	r.check("null : les défauts", normaliserEffetsFond(null), defaut);
 	r.check("pas un objet : les défauts", normaliserEffetsFond("clair"), defaut);
@@ -59,7 +59,7 @@ await withSrcModule("apps/windows/src/ui/fond-pur.ts", ({ normaliserEffetsFond, 
 	r.check("en deçà : ramenées aux bornes", normaliserEffetsFond({ luminosite: -1, flou: -5 }), { luminosite: 0, flou: 0 });
 	r.check("chaîne : le défaut, pas une conversion", normaliserEffetsFond({ luminosite: "0.2", flou: "8" }), defaut);
 	r.check("NaN et Infinity : le défaut", normaliserEffetsFond({ luminosite: NaN, flou: Infinity }), defaut);
-	r.check("un seul champ trafiqué : l'autre est gardé", normaliserEffetsFond({ luminosite: 0.4, flou: "x" }), { luminosite: 0.4, flou: 4 });
+	r.check("un seul champ trafiqué : l'autre est gardé", normaliserEffetsFond({ luminosite: 0.4, flou: "x" }), { luminosite: 0.4, flou: 0 });
 
 	r.done();
 });
