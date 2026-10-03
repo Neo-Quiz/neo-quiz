@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.24] - 2026-10-03
+
 ### Changed
 - When Claude Code or Codex has a newer version, Generate and Settings > AI show it with an Update button, so new models appear without manual steps.
 - Sync is near real time: a quiz or a review saved in the app leaves at once, a file changed outside the app is seen within a second, and what arrives from another device shows without waiting.
