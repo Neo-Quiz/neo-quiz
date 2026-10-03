@@ -326,9 +326,37 @@
 	color: var(--text-error);
 }
 
-/* A request: the sentence, then Ignore and Accept. */
+/* A request: a NOTIFICATION, not a settings row (2026-10-03, same values as
+   Neo Calendar): an amber callout (the theme has no warning token), its
+   icon, the sentence, and Ignore / Accept inside it. */
+.qbd-sync-demandes {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
 .qbd-sync-demande {
+	--qbd-sync-warn: #f0a23b;
+	display: flex;
+	align-items: center;
 	flex-wrap: wrap;
+	gap: 12px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--qbd-sync-warn) 45%, transparent);
+	border-left: 4px solid var(--qbd-sync-warn);
+	border-radius: var(--radius-m);
+	background: color-mix(in srgb, var(--qbd-sync-warn) 12%, transparent);
+}
+
+.qbd-sync-demande-icone {
+	display: inline-flex;
+	flex: none;
+	color: var(--qbd-sync-warn);
+}
+
+.qbd-sync-demande-icone svg {
+	width: 20px;
+	height: 20px;
 }
 
 .qbd-sync-demande-texte {
@@ -338,6 +366,30 @@
 	line-height: 1.4;
 	color: var(--text-normal);
 	overflow-wrap: anywhere;
+}
+
+.qbd-sync .qbd-sync-bouton-accepter {
+	border-color: var(--qbd-sync-warn);
+	background: var(--qbd-sync-warn);
+	color: #1b1300;
+	font-weight: 600;
+}
+
+.qbd-sync .qbd-sync-bouton-accepter:hover:not(:disabled) {
+	border-color: var(--qbd-sync-warn);
+	filter: brightness(1.1);
+}
+
+.qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
+	border-color: var(--background-modifier-border);
+	background: var(--background-modifier-hover);
+}
+
+@media (max-width: 520px) {
+	.qbd-sync-demande .qbd-sync-actions {
+		flex-basis: 100%;
+		justify-content: flex-end;
+	}
 }
 
 .qbd-sync-actions {

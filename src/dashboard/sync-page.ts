@@ -199,7 +199,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const demandesSection = ajouter(racine, "section", "qbd-sync-section");
 	demandesSection.hidden = true;
 	titre(demandesSection, t("settings.sync.requests"));
-	const demandesCarte = ajouter(demandesSection, "div", "qbd-sync-carte");
+	/* Each request is a NOTIFICATION, not a settings row: an amber callout
+	   with its two buttons inside (same as Neo Calendar, 2026-10-03). */
+	const demandesCarte = ajouter(demandesSection, "div", "qbd-sync-demandes");
 
 	/* ── Paired devices ── */
 	const appareilsSection = ajouter(racine, "section", "qbd-sync-section");
@@ -497,11 +499,13 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		demandesSection.hidden = visibles.length === 0;
 		demandesCarte.replaceChildren();
 		for (const d of visibles) {
-			const l = ajouter(demandesCarte, "div", "qbd-sync-ligne qbd-sync-demande");
+			const l = ajouter(demandesCarte, "div", "qbd-sync-demande");
+			l.setAttribute("role", "alert");
+			icone(l, "smartphone", "qbd-sync-demande-icone");
 			ajouter(l, "span", "qbd-sync-demande-texte", t("settings.sync.requestText", { name: d.nom }));
 			const actions = ajouter(l, "div", "qbd-sync-actions");
 			const ignorer = bouton(actions, "x", t("settings.sync.ignore"));
-			const accepter = bouton(actions, "check", t("settings.sync.accept"), "qbd-sync-bouton qbd-sync-bouton-principal");
+			const accepter = bouton(actions, "check", t("settings.sync.accept"), "qbd-sync-bouton qbd-sync-bouton-accepter");
 			ignorer.addEventListener("click", () => {
 				ignorees.add(d.id);
 				l.remove();
@@ -520,7 +524,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			});
 		}
 		if (visibles.length > 0 && e.demandesPlus > 0) {
-			ajouter(ajouter(demandesCarte, "div", "qbd-sync-ligne"), "span", "qbd-sync-vide", t("settings.sync.requestsMore", { n: e.demandesPlus }));
+			ajouter(demandesCarte, "span", "qbd-sync-vide", t("settings.sync.requestsMore", { n: e.demandesPlus }));
 		}
 	}
 
