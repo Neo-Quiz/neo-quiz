@@ -596,3 +596,29 @@
 .qbd-sync-code .qbd-install-copy {
 	opacity: 1;
 }
+
+/* Copy -> check -> copy: each icon fades and grows in, the colour follows. */
+.qbd-sync-code .qbd-install-copy {
+	transition: color 160ms ease, background 160ms ease;
+}
+
+.qbd-sync-icone-entre {
+	animation: qbd-sync-icone-entre 180ms ease-out;
+}
+
+@keyframes qbd-sync-icone-entre {
+	from {
+		opacity: 0;
+		transform: scale(0.6);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-sync-icone-entre {
+		animation: none;
+	}
+}

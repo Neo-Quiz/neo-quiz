@@ -361,19 +361,26 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				}
 
 				let retourCopie: ReturnType<typeof setTimeout> | null = null;
+				/* Swaps the icon with a short fade-in (`qbd-sync-icone-entre`), so
+				   copy -> check -> copy reads as one gesture, not two jumps. */
+				const poserIconeCopie = (nomIcone: string): void => {
+					copierIcone.replaceChildren();
+					currentHost().ui.setIcon(copierIcone, nomIcone);
+					copierIcone.classList.remove("qbd-sync-icone-entre");
+					void copierIcone.offsetWidth;
+					copierIcone.classList.add("qbd-sync-icone-entre");
+				};
 				copierBtn.addEventListener("click", () => {
 					if (!idCourant) return;
 					void deps.copier(idCourant).then(ok => {
 						if (demonte || ferme) return;
 						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
-						copierIcone.replaceChildren();
-						currentHost().ui.setIcon(copierIcone, "check");
+						poserIconeCopie("check");
 						copierTexte.textContent = t("settings.sync.copied");
 						copierBtn.dataset.copie = "1";
 						if (retourCopie) clearTimeout(retourCopie);
 						retourCopie = setTimeout(() => {
-							copierIcone.replaceChildren();
-							currentHost().ui.setIcon(copierIcone, "copy");
+							poserIconeCopie("copy");
 							copierTexte.textContent = t("settings.sync.copy");
 							delete copierBtn.dataset.copie;
 						}, 1500);
