@@ -36,8 +36,8 @@ const AUTRE_ID = "XJ6SOIF-RNGCUTX-2KULCG5-CEH4D3K-YNQRMY6-JT7O5CR-XXML5WU-J5ZVOA
 const CLE = "ab".repeat(32);
 
 await withSrcModule(
-	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts"],
-	async (regles, rest, sync) => {
+	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts", "apps/windows/electron/appairage-qr.ts"],
+	async (regles, rest, sync, qrMod) => {
 		const r = makeReporter("Electron: Syncthing");
 
 		/* ───────── pure rules ───────── */
@@ -306,6 +306,83 @@ await withSrcModule(
 			await g2.etat();
 			r.check("changing the default folder afterwards does not move the shared folder", [memoire.root, demarres[1]], [join(tmpO, "A"), join(tmpO, "A")]);
 			await g2.arreter();
+		});
+
+		/* ───────── the pairing QR code that changes ───────── */
+		await cas(r, "pairing QR code (pure)", async () => {
+			const { creerFenetreAppairage, codeDansNom, sansCode, texteQr, nouveauCode, VALIDITE_MS, ESSAIS_MAX } = qrMod;
+			let horloge = 1_000_000;
+			let graine = 0;
+			const alea = n => Uint8Array.from({ length: n }, () => (graine = (graine + 1) % 256));
+			const f = creerFenetreAppairage(alea, () => horloge);
+			r.check("closed until a code is drawn", f.ouverte(), false);
+			const c1 = f.tourner();
+			r.check("a code is 10 characters without 0, O, 1 or I", /^[A-HJ-NP-Z2-9]{10}$/.test(c1), true);
+			r.check("the QR text carries the id and the code", texteQr(ID, c1), "neo-quiz://pair?device=" + ID + "&code=" + c1);
+			horloge += 2_000;
+			const c2 = f.tourner();
+			r.check("a new code each turn", c1 !== c2, true);
+			r.check("an unknown code is refused", f.verifier("AAAAAAAAAA"), false);
+			horloge += VALIDITE_MS - 2_001;
+			r.check("an older code shown less than VALIDITE_MS ago is still accepted", f.verifier(c1), true);
+			r.check("a match closes the window: every code dies", [f.ouverte(), f.verifier(c2)], [false, false]);
+			const c3 = f.tourner();
+			horloge += VALIDITE_MS;
+			r.check("a code shown VALIDITE_MS ago is refused", f.verifier(c3), false);
+			const c4 = f.tourner();
+			for (let i = 0; i < ESSAIS_MAX; i++) f.echec();
+			r.check("ESSAIS_MAX wrong codes close the window", [f.ouverte(), f.verifier(c4)], [false, false]);
+			f.tourner(); f.fermer();
+			r.check("fermer closes it", f.ouverte(), false);
+			r.check("the code at the end of a name is read, the name without it kept",
+				[codeDansNom("Xiaomi 13T Pro [NQ:K7Q2M9XPAB]"), sansCode("Xiaomi 13T Pro [NQ:K7Q2M9XPAB]")], ["K7Q2M9XPAB", "Xiaomi 13T Pro"]);
+			r.check("no code: in the middle, wrong alphabet, wrong length, not a string",
+				[codeDansNom("[NQ:K7Q2M9XPAB] Xiaomi"), codeDansNom("x [NQ:K7Q2M9XPA0]"), codeDansNom("x [NQ:K7Q2M9XPA]"), codeDansNom(42)], [null, null, null, null]);
+			r.check("bytes 0..31 give the 32 characters once each, and b and b + 32 the same one",
+				[new Set([0, 10, 20, 22].flatMap(k => [...nouveauCode(Uint8Array.from({ length: 10 }, (_, j) => k + j))])).size, nouveauCode(Uint8Array.from({ length: 10 }, (_, j) => j)) === nouveauCode(Uint8Array.from({ length: 10 }, (_, j) => j + 224))], [32, true]);
+		});
+
+		await cas(r, "pairing QR code (wired)", async () => {
+			const confirmations = [];
+			const appaires = [];
+			let compteurAlea = 0;
+			let demandes = [];
+			const faussaire = async () => ({
+				etat: async () => ({ actif: true }), idPropre: () => ID, demandesBrutes: async () => demandes,
+				appairer: async (id, viaQr) => { appaires.push([id, viaQr]); confirmations.push(viaQr); return "ok"; },
+				oublier: async () => {}, ignorer: async () => {}, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {},
+			});
+			const g = sync.creerGestionSync({
+				exe: "x", home: "h", racineParDefaut: () => join(tmpO, "Q"), lireRoot: async () => null, poserRoot: async () => {},
+				lireActif: async () => true, poserActif: async () => {}, confirmer: async () => true,
+				alea: n => Uint8Array.from({ length: n }, () => (compteurAlea = (compteurAlea + 1) % 256)),
+			}, faussaire);
+			const q1 = await g.qrSuivant();
+			const code = new URLSearchParams(q1.texte.split("?")[1]).get("code");
+			r.check("qrSuivant gives our id and a 2 s period", [q1.texte.startsWith("neo-quiz://pair?device=" + ID + "&code="), q1.periodeMs], [true, 2000]);
+			demandes = [{ id: AUTRE_ID, nom: "Phone [NQ:AAAAAAAAAA]" }];
+			await g.qrSuivant();
+			r.check("a request with a wrong code is never paired nor shown", appaires, []);
+			demandes = [{ id: AUTRE_ID, nom: "Phone [NQ:" + code + "]" }];
+			await g.qrSuivant();
+			r.check("a code of this window is not taken for the wrong one judged before", appaires.length, 1);
+			appaires.length = 0;
+			demandes = [];
+			g.qrFermer();
+			const q2 = await g.qrSuivant();
+			const code2 = new URLSearchParams(q2.texte.split("?")[1]).get("code");
+			demandes = [{ id: AUTRE_ID, nom: "Phone [NQ:" + code2 + "]" }];
+			await g.qrSuivant();
+			await new Promise(ok => setTimeout(ok, 10));
+			r.check("a request with a live code goes to the pairing, marked viaQr (the native confirmation still decides)", appaires, [[AUTRE_ID, true]]);
+			demandes = [{ id: ID.replace("CJXCUH3", "CJXCUH4"), nom: "Other [NQ:" + code2 + "]" }];
+			await g.qrSuivant();
+			await new Promise(ok => setTimeout(ok, 10));
+			r.check("a code that served once is dead", appaires.length, 1);
+			demandes = [{ id: AUTRE_ID, nom: "Phone [NQ:" + code2 + "]" }];
+			g.qrFermer();
+			r.check("after qrFermer no request is looked at", appaires.length, 1);
+			await g.arreter();
 		});
 
 		/* ───────── REST client, against a fake server ───────── */

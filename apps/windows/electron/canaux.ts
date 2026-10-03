@@ -1507,6 +1507,17 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			}
 			return true;
 		};
+		/* The QR code: no argument crosses. A window that asks faster than
+		   every 500 ms gets the last answer again, so it cannot turn the
+		   2 s rotation into a flood of codes and REST calls. */
+		let dernierQr: { t: number; r: Promise<{ texte: string; periodeMs: number } | null> } | null = null;
+		ipcMain.handle(CANAUX.syncQrSuivant, () => {
+			const t = Date.now();
+			if (dernierQr && t - dernierQr.t < 500) return dernierQr.r;
+			dernierQr = { t, r: sync.qrSuivant() };
+			return dernierQr.r;
+		});
+		ipcMain.handle(CANAUX.syncQrFermer, () => { dernierQr = null; sync.qrFermer(); });
 		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
 		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));
 	}

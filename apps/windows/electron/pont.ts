@@ -423,6 +423,15 @@ export interface Pont {
 		    text of the QR code read (a candidate device id, validated by
 		    `appairer`), or `null` if the user gave up. Absent on Windows. */
 		scanner?(): Promise<string | null>;
+		/** The pairing QR code that changes (`appairage-qr.ts`). Windows
+		    only for now: the "Show my ID" dialog asks for the next code every
+		    `periodeMs` while it is open (`null` when sync cannot start), and
+		    closes the window when it closes. The window receives the text of
+		    the QR code, never a code it could choose. */
+		qr?: {
+			suivant(): Promise<{ texte: string; periodeMs: number } | null>;
+			fermer(): Promise<void>;
+		};
 	};
 
 	systeme: {
@@ -837,6 +846,8 @@ export const CANAUX = {
 	syncOublier: "neo:sync/oublier",
 	syncIgnorer: "neo:sync/ignorer",
 	syncPartagerId: "neo:sync/partager-id",
+	syncQrSuivant: "neo:sync/qr-suivant",
+	syncQrFermer: "neo:sync/qr-fermer",
 	/* Pushed to the window: the state, and "other devices' changes landed". */
 	syncEtat: "neo:sync/etat",
 	syncDonneesRecues: "neo:sync/donnees-recues",

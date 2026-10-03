@@ -460,3 +460,74 @@
 .qbd-sync-lien-bouton[hidden] {
 	display: none;
 }
+
+/* "Show my ID": landscape, the QR code on the left, the rest on the right. */
+.modal.qbd-sync-modal-id {
+	width: min(680px, calc(100vw - 32px));
+}
+
+.qbd-sync-dialogue-id {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+}
+
+.qbd-sync-dialogue-qr {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 240px;
+}
+
+.qbd-sync-dialogue-qr .qbd-sync-qr {
+	width: 240px;
+	height: 240px;
+}
+
+.qbd-sync-dialogue-id > .qbd-sync-dialogue {
+	flex: 1;
+	min-width: 0;
+}
+
+.qbd-sync-dialogue-id .qbd-sync-dialogue-nom {
+	font-size: 16px;
+}
+
+/* The countdown to the next code: a bar that drains, and the seconds left. */
+.qbd-sync-compte {
+	height: 4px;
+	border-radius: 2px;
+	background: var(--background-modifier-border);
+	overflow: hidden;
+}
+
+.qbd-sync-compte-jauge {
+	height: 100%;
+	background: var(--interactive-accent);
+	transform-origin: left center;
+}
+
+.qbd-sync-compte[hidden],
+.qbd-sync-compte-texte[hidden] {
+	display: none;
+}
+
+.qbd-sync-compte-texte {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-accent);
+	font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+	.qbd-sync-dialogue-id {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.qbd-sync-dialogue-qr {
+		align-self: center;
+	}
+}

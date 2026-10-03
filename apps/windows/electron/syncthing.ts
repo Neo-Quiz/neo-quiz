@@ -34,6 +34,7 @@ import { createServer } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Changement, EtatSync } from "../../../src/dashboard/sync-etat";
+import { creerFenetreAppairage, codeDansNom, PERIODE_MS, sansCode, texteQr } from "./appairage-qr";
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
 import {
@@ -64,7 +65,14 @@ export type ResultatAppairage = "ok" | "invalide" | "indisponible" | "annule";
 
 export interface SyncHandle {
 	etat(): Promise<EtatSync>;
-	appairer(deviceId: string): Promise<ResultatAppairage>;
+	/** `viaQr`: the request carried a valid code of the pairing QR code
+	    (`appairage-qr.ts`); the confirmation says so, and is still shown. */
+	appairer(deviceId: string, viaQr?: boolean): Promise<ResultatAppairage>;
+	/** Our own device id. */
+	idPropre(): string;
+	/** The devices asking to pair, with the name they announce (raw, may end
+	    with a pairing code). Never throws: no request when unreadable. */
+	demandesBrutes(): Promise<Array<{ id: string; nom: string }>>;
 	oublier(deviceId: string): Promise<void>;
 	/** The owner chose Ignore on a pairing request: forget that request. */
 	ignorer(deviceId: string): Promise<void>;
@@ -83,7 +91,7 @@ export interface StartOpts {
 	    dialog with the device id and, if known, its name; default answer
 	    Cancel). Injected by `main.ts`; the window can never answer it. A
 	    rejection counts as a refusal. */
-	confirmer(deviceId: string, nom: string): Promise<boolean>;
+	confirmer(deviceId: string, nom: string, viaQr?: boolean): Promise<boolean>;
 	/** The process table, injectable for checks. */
 	sys?: SysSync;
 	/** Poll period of the loop. 10 s in the app; shorter only in checks. */
@@ -428,7 +436,16 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	return {
 		etat: calculerEtat,
 
-		async appairer(brut) {
+		idPropre: () => courant.ownId,
+
+		async demandesBrutes() {
+			if (mort) return [];
+			let attente: Awaited<ReturnType<Rest["pendingDevices"]>> = {};
+			try { attente = await courant.rest.pendingDevices(); } catch { return []; }
+			return Object.entries(attente).filter(([id]) => isDeviceId(id)).map(([id, d]) => ({ id, nom: typeof d?.name === "string" ? d.name : "" }));
+		},
+
+		async appairer(brut, viaQr = false) {
 			const id = typeof brut === "string" ? brut.trim() : "";
 			if (!isDeviceId(id) || !hasValidCheckDigits(id) || id === courant.ownId || mort) return "invalide";
 			try {
@@ -436,11 +453,13 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				if (paires.includes(id)) return "ok";
 				if (paires.length >= MAX_APPAREILS) return "invalide";
 				const attente = (await courant.rest.pendingDevices())[id];
-				const nom = nomSur(attente?.name);
+				/* A pairing code at the end of the announced name is not part of
+				   the name: never shown, never kept in the config. */
+				const nom = nomSur(sansCode(typeof attente?.name === "string" ? attente.name : ""));
 				/* Nothing is paired without the owner's say: a native dialog,
 				   decided in the main process, that the window cannot answer. */
 				let accord = false;
-				try { accord = await opts.confirmer(id, nom); } catch { accord = false; }
+				try { accord = await opts.confirmer(id, nom, viaQr); } catch { accord = false; }
 				if (!accord) return "annule";
 				await courant.rest.putDevice({
 					deviceID: id,
@@ -505,6 +524,12 @@ export interface GestionSync {
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	surDonneesRecues(rappel: () => void): () => void;
+	/** The "Show my ID" dialog asks for the next QR code every `periodeMs`;
+	    each call also looks for a request that carries a live code. `null`
+	    when sync cannot start. */
+	qrSuivant(): Promise<{ texte: string; periodeMs: number } | null>;
+	/** The dialog closed: every code dies at once. */
+	qrFermer(): void;
 	/** At launch: starts the instance if sync was switched on. */
 	demarrerSiActif(): Promise<void>;
 	arreter(): Promise<void>;
@@ -520,7 +545,9 @@ export interface OptionsGestion {
 	/** The pinned shared folder (`syncRoot`), `null` until the first start. */
 	lireRoot(): Promise<string | null>;
 	poserRoot(root: string): Promise<void>;
-	confirmer(deviceId: string, nom: string): Promise<boolean>;
+	confirmer(deviceId: string, nom: string, viaQr?: boolean): Promise<boolean>;
+	/** Random bytes for the pairing codes (`crypto.randomBytes` in the app). */
+	alea(n: number): Uint8Array;
 	sys?: SysSync;
 	lireActif(): Promise<boolean>;
 	/** Called after a first successful pairing: sync stays on from then. */
@@ -534,6 +561,40 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 	let appairageEnCours = false;
 	const abonnesEtat = new Set<(e: EtatSync) => void>();
 	const abonnesDonnees = new Set<() => void>();
+	const fenetreQr = creerFenetreAppairage(n => o.alea(n), () => Date.now());
+	/** Device + code pairs already judged in this window: a wrong code is
+	    counted once, not at every 2 s call, and a phone that scans again
+	    (a new code in its name) is judged again. Emptied when the window closes. */
+	const jugesQr = new Set<string>();
+
+	/** One pairing at a time, whoever asks (the page, or a scanned QR code). */
+	async function appairerUnSeul(h: SyncHandle, id: string, viaQr: boolean): Promise<ResultatAppairage> {
+		if (appairageEnCours) return "annule";
+		appairageEnCours = true;
+		try {
+			const res = await h.appairer(id, viaQr);
+			if (res === "ok") { try { await o.poserActif(); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
+			return res;
+		} finally {
+			appairageEnCours = false;
+		}
+	}
+
+	/** A request that carries a live code opens the native confirmation; a
+	    wrong code counts against the window and is never shown. */
+	async function verifierDemandesQr(h: SyncHandle): Promise<void> {
+		if (!fenetreQr.ouverte() || appairageEnCours) return;
+		for (const d of await h.demandesBrutes()) {
+			const code = codeDansNom(d.nom);
+			const cle = d.id + "|" + code;
+			if (!code || jugesQr.has(cle)) continue;
+			jugesQr.add(cle);
+			if (!fenetreQr.verifier(code)) { fenetreQr.echec(); continue; }
+			jugesQr.clear();
+			void appairerUnSeul(h, d.id, true);
+			return;
+		}
+	}
 
 	function obtenir(): Promise<SyncHandle | null> {
 		if (handle) return Promise.resolve(handle);
@@ -564,21 +625,22 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			/* One native dialog at a time (like `partage.ts`): a second call while
 			   one is open is dropped, so a window cannot stack dialogs. */
 			if (appairageEnCours) return "annule";
-			appairageEnCours = true;
-			try {
-				const h = await obtenir();
-				if (!h) return "indisponible";
-				const res = await h.appairer(id);
-				if (res === "ok") { try { await o.poserActif(); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
-				return res;
-			} finally {
-				appairageEnCours = false;
-			}
+			const h = await obtenir();
+			if (!h) return "indisponible";
+			return appairerUnSeul(h, id, false);
 		},
 		async oublier(id) { await (await obtenir())?.oublier(id); },
 		async ignorer(id) { await (await obtenir())?.ignorer(id); },
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },
+		async qrSuivant() {
+			const h = await obtenir();
+			if (!h) return null;
+			const code = fenetreQr.tourner();
+			try { await verifierDemandesQr(h); } catch { /* the next call looks again */ }
+			return { texte: texteQr(h.idPropre(), code), periodeMs: PERIODE_MS };
+		},
+		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
 		async demarrerSiActif() { if (await o.lireActif()) await obtenir(); },
 		async arreter() {
 			fin = true;

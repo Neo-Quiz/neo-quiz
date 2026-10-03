@@ -28,6 +28,7 @@ import { BrowserWindow, Menu, app, dialog, net, protocol, shell } from "electron
 import * as fs from "node:fs/promises";
 // Le SEUL usage synchrone du disque dans ce fichier — voir `poserLocaleChromium`.
 import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -746,11 +747,15 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				poserRoot: root => reglagesOuErreur().ecrire(CLE_SYNC_ROOT, root),
 				/* Native, modal on the window, default Cancel: same pattern as the
 				   Ollama host guard (`canaux.ts`, `garderReglagesIa`). */
-				confirmer: async (id, nom) => {
+				/* The pairing codes of the QR code (`appairage-qr.ts`). */
+				alea: n => randomBytes(n),
+				confirmer: async (id, nom, viaQr) => {
 					const options = {
 						type: "warning" as const,
 						title: t("app.syncPair.title"),
-						message: t("app.syncPair.message"),
+						/* A request that came with a valid code of our QR code says so:
+						   the owner just watched the phone scan it. Still a question. */
+						message: viaQr && nom ? t("app.syncPair.messageQr", { name: nomSur(nom) }) + "\n" + t("app.syncPair.message") : t("app.syncPair.message"),
 						/* The ID FIRST on its own labelled line, the announced name LAST with
 						   its label: the name is the other device's and must never read as
 						   part of the ID line (`nomSur` also strips line breaks from it). */

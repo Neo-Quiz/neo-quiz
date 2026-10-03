@@ -36,6 +36,7 @@ export const EN_APP = {
 	"app.aiSettings.refused": "Could not save the AI settings: {error}",
 	"app.syncPair.title": "Pair this device?",
 	"app.syncPair.message": "This device will be able to read and change every file of your Neo Quiz folder.",
+	"app.syncPair.messageQr": "“{name}” scanned your QR code.",
 	"app.syncPair.detail": "Device ID: {id}",
 	"app.syncPair.detailName": "Announced name: {name}",
 	"app.syncPair.allow": "Pair",

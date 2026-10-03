@@ -14,6 +14,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.aiSettings.refused": "Impossible d'enregistrer les réglages IA : {error}",
 	"app.syncPair.title": "Appairer cet appareil ?",
 	"app.syncPair.message": "Cet appareil pourra lire et modifier tous les fichiers de ton dossier Neo Quiz.",
+	"app.syncPair.messageQr": "« {name} » a scanné ton QR code.",
 	"app.syncPair.detail": "Identifiant : {id}",
 	"app.syncPair.detailName": "Nom annoncé : {name}",
 	"app.syncPair.allow": "Appairer",

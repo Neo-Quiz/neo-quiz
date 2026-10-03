@@ -48,12 +48,23 @@ export interface SyncPageDeps {
 	/** Only where there is a camera: resolves with the scanned device code, or
 	    `null` if the user gave up. */
 	scanner?(): Promise<string | null>;
+	/** The pairing QR code that changes, where the host has it (Windows): the
+	    "Show my ID" dialog shows `texte` and asks again every `periodeMs`,
+	    then calls `fermer`. Without it the QR code is the plain ID. */
+	qr?: {
+		suivant(): Promise<{ texte: string; periodeMs: number } | null>;
+		fermer(): Promise<void>;
+	};
 }
 
 /** What the user typed or pasted → the canonical `AAAAAAA-…` form: spaces and
     dashes dropped, upper case, regrouped by 7 when it is 56 characters long.
     Anything else is left for the host to refuse as invalid. */
 export function normaliserCode(brut: string): string {
+	/* A scanned pairing QR code (`neo-quiz://pair?device=…&code=…`): only the
+	   device id is taken here; the host still validates it. */
+	const qr = /^neo-quiz:\/\/pair\?(.*)$/i.exec(brut.trim());
+	if (qr) brut = new URLSearchParams(qr[1]).get("device") ?? "";
 	const nu = brut.replace(/[\s-]+/g, "").toUpperCase();
 	return nu.length === 56 ? (nu.match(/.{7}/g) ?? []).join("-") : brut.trim().toUpperCase();
 }
@@ -228,7 +239,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	let fermerMenu: () => void = () => undefined;
 	/** The open "Show my ID" dialog, repainted on each state, closed when
 	    sync stops. */
-	let dialogueId: { fermer(): void; peindre(e: EtatSync): void } | null = null;
+	let dialogueId: { fermer(): void; arreter(): void; peindre(e: EtatSync): void } | null = null;
 	let fermerAjout: () => void = () => undefined;
 
 	/* ── A small menu under its button, closed by a click elsewhere or Escape ── */
@@ -272,27 +283,81 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		else if (canal === "discord") currentHost().ui.notice(t("settings.sync.copiedDiscord"), 6000);
 	}
 
-	/* ── "Show my ID": the name, the full ID, Copy and Share, then the QR ── */
+	/* ── "Show my ID": a landscape dialog, the QR code on the left; on the
+	   right the name, the full ID, Copy and Share, and the countdown to the
+	   next code when the host rotates it ── */
 	function ouvrirId(): void {
 		if (dialogueId || !dernierEtat?.appareil) return;
+		const qrHote = deps.qr;
 		requireHost("modals").open({
-			className: "qbd-sync-modal",
+			className: "qbd-sync-modal qbd-sync-modal-id",
 			title: t("settings.sync.idModalTitle"),
 			onOpen: handle => {
-				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
-				const nom = ajouter(corps, "p", "qbd-sync-dialogue-nom");
-				const idTexte = ajouter(corps, "code", "qbd-sync-id qbd-sync-id-grand");
-				const actions = ajouter(corps, "div", "qbd-sync-actions");
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue-id");
+				const gauche = ajouter(corps, "div", "qbd-sync-dialogue-qr");
+				const qr = ajouter(gauche, "img", "qbd-sync-qr");
+				qr.alt = t("settings.sync.qrAlt");
+				qr.hidden = true;
+				const barre = ajouter(gauche, "div", "qbd-sync-compte");
+				barre.hidden = !qrHote;
+				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
+				const droite = ajouter(corps, "div", "qbd-sync-dialogue");
+				const nom = ajouter(droite, "p", "qbd-sync-dialogue-nom");
+				const idTexte = ajouter(droite, "code", "qbd-sync-id qbd-sync-id-grand");
+				const actions = ajouter(droite, "div", "qbd-sync-actions");
 				const copierBtn = bouton(actions, "copy", t("settings.sync.copy"));
 				const zonePartage = ajouter(actions, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"));
 				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
-				const qr = ajouter(corps, "img", "qbd-sync-qr");
-				qr.alt = t("settings.sync.qrAlt");
-				qr.hidden = true;
-				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.idScanHint"));
+				const compte = ajouter(droite, "p", "qbd-sync-compte-texte");
+				compte.hidden = !qrHote;
+				ajouter(droite, "p", "qbd-sync-aide", t("settings.sync.idScanHint"));
 
+				let ferme = false;
 				let idCourant: string | null = null;
+				let texteQr: string | null = null;
+				const appareilsAvant = dernierEtat?.appareils.length ?? 0;
+				let minuteur: ReturnType<typeof setTimeout> | null = null;
+				let decompte: ReturnType<typeof setInterval> | null = null;
+
+				function poserQr(texte: string): void {
+					if (texte === texteQr) return;
+					texteQr = texte;
+					void QRCode.toDataURL(texte, { margin: 2, width: 240, errorCorrectionLevel: "M" })
+						.then(url => { if (!ferme && texteQr === texte) { qr.src = url; qr.hidden = false; } })
+						.catch(() => { qr.hidden = true; });
+				}
+				/* The countdown: a bar that drains over the period, and the seconds
+				   left, both restarted at each new code. */
+				function lancerDecompte(periodeMs: number): void {
+					const fin = Date.now() + periodeMs;
+					jauge.style.transition = "none";
+					jauge.style.transform = "scaleX(1)";
+					void jauge.offsetWidth;
+					jauge.style.transition = `transform ${periodeMs}ms linear`;
+					jauge.style.transform = "scaleX(0)";
+					const dire = (): void => { compte.textContent = t("settings.sync.qrNext", { n: Math.max(1, Math.ceil((fin - Date.now()) / 1000)) }); };
+					dire();
+					if (decompte) clearInterval(decompte);
+					decompte = setInterval(dire, 250);
+				}
+				async function tourner(): Promise<void> {
+					if (ferme || !qrHote) return;
+					let r: Awaited<ReturnType<NonNullable<SyncPageDeps["qr"]>["suivant"]>> = null;
+					try { r = await qrHote.suivant(); } catch { r = null; }
+					if (ferme) return;
+					if (!r) {
+						/* No code: the plain ID instead, and no countdown. */
+						if (idCourant) poserQr(idCourant);
+						barre.hidden = compte.hidden = true;
+						return;
+					}
+					poserQr(r.texte);
+					barre.hidden = compte.hidden = false;
+					lancerDecompte(r.periodeMs);
+					minuteur = setTimeout(() => { void tourner(); }, r.periodeMs);
+				}
+
 				copierBtn.addEventListener("click", () => {
 					if (!idCourant) return;
 					void deps.copier(idCourant).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); });
@@ -307,23 +372,34 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				});
 				dialogueId = {
 					fermer: () => handle.close(),
+					arreter: () => {
+						ferme = true;
+						if (minuteur) clearTimeout(minuteur);
+						if (decompte) clearInterval(decompte);
+						if (qrHote) void qrHote.fermer().catch(() => undefined);
+					},
 					peindre: e => {
 						if (!e.actif || !e.appareil) { handle.close(); return; }
+						/* A device was just paired (a phone scanned the code and the
+						   owner said yes): the dialog has done its job. */
+						if (e.appareils.length > appareilsAvant) {
+							handle.close();
+							currentHost().ui.notice(t("settings.sync.added"), 6000);
+							return;
+						}
 						nom.textContent = e.nom;
 						nom.hidden = !e.nom;
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
 						idTexte.textContent = e.appareil;
-						const id = e.appareil;
-						void QRCode.toDataURL(id, { margin: 2, width: 220, errorCorrectionLevel: "M" })
-							.then(url => { if (!demonte && idCourant === id) { qr.src = url; qr.hidden = false; } })
-							.catch(() => { qr.hidden = true; });
+						if (!qrHote) poserQr(e.appareil);
 					},
 				};
 				if (dernierEtat) dialogueId.peindre(dernierEtat);
+				void tourner();
 				copierBtn.focus();
 			},
-			onClose: () => { fermerMenu(); dialogueId = null; },
+			onClose: () => { fermerMenu(); dialogueId?.arreter(); dialogueId = null; },
 		});
 	}
 
