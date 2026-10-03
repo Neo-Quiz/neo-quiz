@@ -592,3 +592,12 @@
 		transform: none;
 	}
 }
+
+/* "Scan a QR code" in "Add a device" (phones): the big blue button of the
+   dialog, full width, like "Show my ID" on the page. */
+.qbd-sync-dialogue > .qbd-sync-bouton-grand {
+	align-self: stretch;
+	justify-content: center;
+	padding: 12px 18px;
+	font-size: 15px;
+}

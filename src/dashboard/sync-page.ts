@@ -427,6 +427,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			onOpen: handle => {
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
 				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.addHint"));
+				/* Where there is a camera, scanning is THE gesture: one big blue
+				   button first, typing the ID comes after as the fallback. */
+				const scannerBtn = deps.scanner
+					? bouton(corps, "scan-line", t("settings.sync.scanQr"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand")
+					: null;
+				if (scannerBtn) ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.orPaste"));
 				const champ = ajouter(corps, "input", "qbd-sync-champ");
 				champ.type = "text";
 				champ.spellcheck = false;
@@ -436,10 +442,10 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const message = ajouter(corps, "p", "qbd-sync-message qbd-sync-message-erreur");
 				message.setAttribute("role", "alert");
 				const piedDialogue = ajouter(corps, "div", "qbd-sync-dialogue-pied");
-				const scannerBtn = deps.scanner ? bouton(piedDialogue, "scan-line", t("settings.sync.scan")) : null;
 				ajouter(piedDialogue, "span", "qbd-sync-espace");
 				const annulerBtn = bouton(piedDialogue, "x", t("settings.sync.cancel"));
-				const validerBtn = bouton(piedDialogue, "check", t("settings.sync.add"), "qbd-sync-bouton qbd-sync-bouton-principal");
+				/* Only one blue button per dialog: "Add" steps back when scanning leads. */
+				const validerBtn = bouton(piedDialogue, "check", t("settings.sync.add"), scannerBtn ? "qbd-sync-bouton" : "qbd-sync-bouton qbd-sync-bouton-principal");
 
 				let ferme = false;
 				async function soumettre(brut: string): Promise<void> {
