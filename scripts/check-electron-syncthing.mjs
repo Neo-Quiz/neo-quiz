@@ -114,22 +114,6 @@ await withSrcModule(
 
 		/* Sharing this device's id: the window names a CHANNEL from a closed set;
 		   the URL and the text are built here, from the validated own id. */
-		await cas(r, "planPartage", async () => {
-			const { planPartage } = regles;
-			const textes = { sujet: "My code & more", corps: "Code: " + ID };
-			const mail = planPartage("courriel", ID, textes);
-			r.check("courriel is a mailto with encoded subject and body, nothing copied",
-				mail, { url: "mailto:?subject=" + encodeURIComponent(textes.sujet) + "&body=" + encodeURIComponent(textes.corps), copier: null });
-			r.check("discord copies the text and opens only discord://", planPartage("discord", ID, textes), { url: "discord://", copier: textes.corps });
-			r.check("a channel outside the closed set gives nothing, whatever it carries",
-				["https://evil.example", "file:///c:/x.bat", "systeme", "", undefined, 3, { toString: () => "courriel" }].map(c => planPartage(c, ID, textes)), Array(7).fill(null));
-			r.check("an id that is not a device id is refused (nothing from the window is ever spliced)",
-				[planPartage("courriel", "javascript:alert(1)", textes), planPartage("courriel", null, textes)], [null, null]);
-			const tous = [planPartage("courriel", ID, { sujet: "\r\nBcc: x", corps: "%0d%0a" }), planPartage("discord", ID, textes)];
-			r.check("only the two fixed schemes ever reach openExternal", tous.every(p => p && /^(mailto:\?|discord:\/\/$)/.test(p.url)), true);
-			r.check("a subject with a line break stays encoded in one URL", tous[0].url.includes("\n") || tous[0].url.includes("\r"), false);
-		});
-
 		await cas(r, "launchArgs / launchEnv", async () => {
 			const { launchArgs, launchEnv } = regles;
 			r.check("launchArgs is exactly the verified flag list",

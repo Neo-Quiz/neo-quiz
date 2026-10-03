@@ -99,8 +99,4 @@ class ShareChannelTest {
         assertTrue(sent[1].first.exists())
     }
 
-    @Test fun theDiscordChannelStaysUnavailable() {
-        assertTrue("partage.discord" in Unavailable.names)
-        assertFalse("partage.enregistrer" in Unavailable.names)
-    }
 }

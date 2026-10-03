@@ -41,7 +41,6 @@ export const EN_APP = {
 	"app.syncPair.detailName": "Announced name: {name}",
 	"app.syncPair.allow": "Pair",
 	"app.syncPair.deny": "Cancel",
-	"app.syncShare.subject": "My Neo Quiz device ID",
 	"app.syncShare.body": "To sync with my device in Neo Quiz, open Settings, then Sync, and add this device ID:\n\n{id}",
 	"app.aiHost.title": "Allow this Ollama server?",
 	"app.aiHost.message": "Neo Quiz will send your requests and the notes you attach to {host}.",

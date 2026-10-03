@@ -18,7 +18,7 @@
 import { execFileSync } from "node:child_process";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptDiscord, scriptPartageNatif, VARIABLES_NATIF, creerVerrou, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
+await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptPartageNatif, VARIABLES_NATIF, creerVerrou, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
 	const r = makeReporter("Partage — noms, contenus, script, verrou");
 	r.check("un nom de zip ordinaire passe tel quel", nomPartage("XTI301 - Écosystème Python.zip"), "XTI301 - Écosystème Python.zip");
 	r.check("un .md passe", nomPartage("CM1.md"), "CM1.md");
@@ -39,13 +39,8 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 	r.check("un tableau ordinaire n'est pas un contenu", octetsPartage([1, 2]), null);
 	r.check("the main process bound is the window's bound (16 MB, `SHARE_MAX_BYTES`)", TAILLE_MAX_PARTAGE, 16 * 1024 * 1024);
 
-	const s = scriptDiscord();
-	r.check("le script lit le chemin dans la variable d'environnement",
-		s.includes(`Set-Clipboard -LiteralPath $env:${VARIABLE_FICHIER}`), true);
-	r.check("le script est constant : il ne prend aucun argument", scriptDiscord.length, 0);
-
-	/* The native Share panel: same rules. Constant, every input read from the
-	   environment, and never a value spliced in. */
+	/* The native Share panel (the only script of the share): constant, every
+	   input read from the environment, and never a value spliced in. */
 	const n = scriptPartageNatif();
 	r.check("native share: the script takes no argument", scriptPartageNatif.length, 0);
 	r.check("native share: title, text, file and point are read from the environment",

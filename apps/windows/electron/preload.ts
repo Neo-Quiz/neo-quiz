@@ -102,7 +102,6 @@ const pont: Pont = {
 
 	partage: {
 		enregistrer: (nom, octets) => ipcRenderer.invoke(CANAUX.partageEnregistrer, nom, octets),
-		discord: (nom, octets) => ipcRenderer.invoke(CANAUX.partageDiscord, nom, octets),
 	},
 	partageNatif: process.platform !== "win32" ? undefined : {
 		fichier: (nom, octets) => ipcRenderer.invoke(CANAUX.partageNatif, nom, octets),

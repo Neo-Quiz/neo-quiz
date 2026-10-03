@@ -8,14 +8,15 @@
 
    - « Enregistrer » : l'EMPLACEMENT vient du dialogue natif, donc de
      l'utilisateur, jamais du rendu ; l'extension est imposée.
-   - « Discord » : le fichier va dans un dossier temporaire tiré au sort, et
-     le script PowerShell n'a qu'un paramètre, ce chemin que le principal a
-     lui-même composé. Le nom venu du rendu est assaini AVANT (`nomPartage`),
-     et le chemin n'est JAMAIS écrit dans le script : PowerShell le lit dans
-     une variable d'environnement (`VARIABLE_FICHIER`). Aucune citation,
-     donc aucune apostrophe — ASCII ou typographique — pour en sortir.
+   - The Windows Share panel (since 2026-10-03, replacing the Discord
+     script): the file goes to a random temporary folder, and the PowerShell
+     that opens the panel only reads that path, which this process composed
+     itself, from an environment variable (`VARIABLE_FICHIER`). The name from
+     the window is sanitised FIRST (`nomPartage`), and the path is NEVER
+     written into the script: no quoting, so no apostrophe, ASCII or
+     typographic, to break out of.
 
-   `nomPartage`, `octetsPartage` et `scriptDiscord` sont PURS :
+   `nomPartage`, `octetsPartage` and `scriptPartageNatif` are PURE:
    `npm run check:partage` les éprouve sans rien lancer.
 ══════════════════════════════════════════════════════════ */
 
@@ -87,13 +88,10 @@ export function creerVerrou(delaiMax: number, intervalleMin = 0, maintenant: () 
 	};
 }
 
-/** Un verrou PAR BOUTON : un dialogue « Enregistrer sous » ouvert ne doit
-    pas empêcher Discord, ni l'inverse (seconde revue du 2026-09-25).
-    - Enregistrer : un dialogue à la fois ; il peut rester ouvert longtemps.
-    - Discord : le script attend la fenêtre jusqu'à 20 s, plus 1,2 s de
-      signal, d'où 30 s ; et deux secondes au moins entre deux lancements. */
+/** One lock PER ACTION: an open "Save as" dialog must not block the share
+    panel, nor the reverse (second review of 2026-09-25). Saving: one dialog
+    at a time; it may stay open a long time. */
 export const verrouEnregistrer = creerVerrou(10 * 60_000);
-export const verrouDiscord = creerVerrou(30_000, 2_000);
 
 const PREFIXE_TEMPORAIRE = "neo-quiz-partage-";
 /** Âge au-delà duquel un fichier partagé vers Discord est effacé : le temps
@@ -142,148 +140,6 @@ export async function ecrireTemporaire(nom: string, octets: Uint8Array): Promise
 	return dest;
 }
 
-/* ── Activation de Discord (Windows), reprise du greffon, où chaque couche a
-   été MESURÉE le 2026-07-19 :
-   1. SIGNAL single-instance (raccourci du menu Démarrer, sinon Update.exe) :
-      quand Discord tourne, c'est la seule voie qui lui fait faire son propre
-      raise + focus + REPAINT ; une activation externe seule le laissait au
-      premier plan mais NOIR (rendu suspendu).
-   2. RESTAURATION seulement si la fenêtre est cachée ou iconique : un
-      SW_RESTORE sur une fenêtre visible la dé-maximiserait.
-   3. ESCALADE de focus en filet (direct → Alt simulé → AttachThreadInput →
-      SwitchToThisWindow), si le signal n'a pas suffi.
-   Discord fermé : le signal le lance, et la boucle attrape la fenêtre
-   principale en écartant le splash « Discord Updater » (même classe, ~300 px).
-   Script passé en -EncodedCommand : aucun échappement de shell. Il est
-   CONSTANT : rien de ce que la fenêtre envoie n'y entre. */
-export function scriptDiscord(): string {
-	return `$ErrorActionPreference = 'SilentlyContinue'
-Set-Clipboard -LiteralPath $env:${VARIABLE_FICHIER}
-$lnk = Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk'
-$up = Join-Path $env:LOCALAPPDATA 'Discord\\Update.exe'
-function Send-DiscordSignal {
-	if (Test-Path $lnk) { Invoke-Item $lnk }
-	elseif (Test-Path $up) { Start-Process $up -ArgumentList '--processStart','Discord.exe' }
-	else { try { Start-Process 'discord://' } catch { Start-Process 'https://discord.com/channels/@me' } }
-}
-$wasRunning = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
-if (-not $wasRunning) { Send-DiscordSignal }
-Add-Type -TypeDefinition @'
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text;
-namespace NeoQuiz {
-	public static class DiscordFocus {
-		delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
-		[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
-		[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
-		[DllImport("user32.dll")] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
-		[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
-		[DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
-		[DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
-		[DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
-		[DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-		[DllImport("user32.dll")] static extern void SwitchToThisWindow(IntPtr h, bool alt);
-		[DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
-		[DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
-		[DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
-		[DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(uint pid);
-		[DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
-		[StructLayout(LayoutKind.Sequential)] struct RECT { public int L; public int T; public int R; public int B; }
-		[DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
-		public static IntPtr FindMain() {
-			var pids = new System.Collections.Generic.HashSet<int>();
-			foreach (var p in Process.GetProcessesByName("Discord")) pids.Add(p.Id);
-			if (pids.Count == 0) return IntPtr.Zero;
-			IntPtr found = IntPtr.Zero;
-			EnumWindows(delegate(IntPtr h, IntPtr l) {
-				uint pid; GetWindowThreadProcessId(h, out pid);
-				if (!pids.Contains((int)pid)) return true;
-				var c = new StringBuilder(64); GetClassName(h, c, 64);
-				if (c.ToString() != "Chrome_WidgetWin_1") return true;
-				if (!IsIconic(h)) {
-					RECT r; GetWindowRect(h, out r);
-					if (r.R - r.L < 500) return true;
-				}
-				found = h; return false;
-			}, IntPtr.Zero);
-			return found;
-		}
-		public static void AllowFor(IntPtr h) {
-			uint pid; GetWindowThreadProcessId(h, out pid);
-			if (pid != 0) AllowSetForegroundWindow(pid);
-		}
-		public static void RestoreIfHidden(IntPtr h) {
-			if (IsIconic(h)) ShowWindow(h, 9);
-			else if (!IsWindowVisible(h)) ShowWindow(h, 5);
-		}
-		public static void EnsureFront(IntPtr h) {
-			if (Try(h)) return;
-			keybd_event(0x12, 0, 0, UIntPtr.Zero);
-			keybd_event(0x12, 0, 2, UIntPtr.Zero);
-			if (Try(h)) return;
-			IntPtr fg = GetForegroundWindow();
-			if (fg != IntPtr.Zero) {
-				uint pid; uint fgT = GetWindowThreadProcessId(fg, out pid);
-				uint curT = GetCurrentThreadId();
-				if (fgT != 0 && fgT != curT) {
-					AttachThreadInput(curT, fgT, true);
-					BringWindowToTop(h);
-					SetForegroundWindow(h);
-					AttachThreadInput(curT, fgT, false);
-					System.Threading.Thread.Sleep(60);
-					if (GetForegroundWindow() == h) return;
-				}
-			}
-			SwitchToThisWindow(h, true);
-		}
-		static bool Try(IntPtr h) {
-			SetForegroundWindow(h);
-			System.Threading.Thread.Sleep(60);
-			return GetForegroundWindow() == h;
-		}
-	}
-}
-'@
-$deadline = (Get-Date).AddSeconds(20)
-$h = [IntPtr]::Zero
-while ((Get-Date) -lt $deadline) {
-	$h = [NeoQuiz.DiscordFocus]::FindMain()
-	if ($h -ne [IntPtr]::Zero) { break }
-	Start-Sleep -Milliseconds 150
-}
-if ($h -ne [IntPtr]::Zero) {
-	[NeoQuiz.DiscordFocus]::AllowFor($h)
-	[NeoQuiz.DiscordFocus]::RestoreIfHidden($h)
-	if ($wasRunning) { Send-DiscordSignal; Start-Sleep -Milliseconds 1200 }
-	[NeoQuiz.DiscordFocus]::EnsureFront($h)
-}
-`;
-}
-
-/** Lance le script, caché. Rend `true` une fois PowerShell LANCÉ, pas à sa
-    fin : le script active Discord avec ses propres attentes, et attendre sa
-    sortie retarderait la confirmation de plusieurs secondes. Un échec de
-    lancement (`ENOENT`) arrive, lui, tout de suite. `fin` est appelé quand
-    PowerShell rend la main (ou ne se lance pas) : c'est là que le verrou du
-    partage retombe. */
-export function lancerDiscord(dest: string, fin: () => void): Promise<boolean> {
-	return new Promise((resolve) => {
-		try {
-			const encode = Buffer.from(scriptDiscord(), "utf16le").toString("base64");
-			const enfant = execFile("powershell.exe",
-				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
-				{ windowsHide: true, env: { ...process.env, [VARIABLE_FICHIER]: dest } }, () => fin());
-			enfant.once("error", () => { fin(); resolve(false); });
-			setTimeout(() => resolve(true), 300);
-		} catch {
-			fin();
-			resolve(false);
-		}
-	});
-}
-
 /* ── THE NATIVE WINDOWS SHARE PANEL (2026-10-03) ──
    What Neo Calendar gets from `navigator.share` in WebView2, which Electron
    does not provide: Windows' own "Share" panel (Discord, WhatsApp, Outlook,
@@ -293,7 +149,7 @@ export function lancerDiscord(dest: string, fin: () => void): Promise<boolean> {
    has no API for it, so a hidden PowerShell process creates a 1-pixel
    window of its own, centred on the app, and opens the panel on it.
 
-   Same rules as `scriptDiscord`: the script is CONSTANT, and everything it
+   The script is CONSTANT, and everything it
    needs travels in environment variables it reads itself (the title, the
    text, the absolute path of a temporary file this module wrote, the point
    to centre on). Nothing from the window is ever spliced into the script.

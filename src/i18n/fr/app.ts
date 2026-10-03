@@ -19,7 +19,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.syncPair.detailName": "Nom annoncé : {name}",
 	"app.syncPair.allow": "Appairer",
 	"app.syncPair.deny": "Annuler",
-	"app.syncShare.subject": "Mon identifiant d'appareil Neo Quiz",
 	"app.syncShare.body": "Pour te synchroniser avec mon appareil dans Neo Quiz, ouvre Réglages, puis Synchronisation, et ajoute cet identifiant d'appareil :\n\n{id}",
 	"app.aiHost.title": "Autoriser ce serveur Ollama ?",
 	"app.aiHost.message": "Neo Quiz enverra vos demandes et les notes que vous joignez à {host}.",

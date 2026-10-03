@@ -38,7 +38,6 @@ object Channels {
         "reglages.ecrire",
         "reglages.supprimer",
         "partage.enregistrer",
-        "partage.discord",
         "systeme.ouvrir",
         "systeme.copierTexte",
         "systeme.vaultsObsidian",

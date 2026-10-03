@@ -363,19 +363,3 @@ export function dernierVu(texte: unknown): number | null {
 	return Number.isFinite(ms) && ms > Date.UTC(2000, 0, 1) ? ms : null;
 }
 
-export type CanalPartage = "courriel" | "discord";
-
-/**
- * What sharing this device's id does, decided HERE from a closed set of
- * channels and the validated own id: the window never names a URL or a
- * command. `courriel` opens a `mailto:` carrying the text; `discord` copies the
- * text and opens the Discord app by its protocol. Anything else gives `null`.
- */
-export function planPartage(canal: unknown, id: unknown, textes: { sujet: string; corps: string }): { url: string; copier: string | null } | null {
-	if (!isDeviceId(id)) return null;
-	if (canal === "courriel") {
-		return { url: "mailto:?subject=" + encodeURIComponent(textes.sujet) + "&body=" + encodeURIComponent(textes.corps), copier: null };
-	}
-	if (canal === "discord") return { url: "discord://", copier: textes.corps };
-	return null;
-}

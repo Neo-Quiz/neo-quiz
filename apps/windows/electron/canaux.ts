@@ -81,7 +81,7 @@ function empreinteAppel(tool: string, args: readonly string[], stdin: string, ma
 	const sans = (x: string): string => (marqueur ? x.split(marqueur).join("") : x);
 	return createHash("sha256").update(JSON.stringify([tool, args.map(sans), sans(stdin)])).digest("hex");
 }
-import { ecrireTemporaire, lancerDiscord, lancerPartageNatif, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer, verrouNatif } from "./partage";
+import { ecrireTemporaire, lancerPartageNatif, nomPartage, octetsPartage, verrouEnregistrer, verrouNatif } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
@@ -112,7 +112,7 @@ import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langa
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
-import { isDeviceId, planPartage, reglageReserve } from "./syncthing-regles";
+import { isDeviceId, reglageReserve } from "./syncthing-regles";
 
 /** Ce que les canaux demandent à `main.ts`. */
 export interface DependancesCanaux {
@@ -689,23 +689,6 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			return dest;
 		} finally {
 			verrouEnregistrer.rendre(jeton);
-		}
-	});
-
-	ipcMain.handle(CANAUX.partageDiscord, async (_e, nom: unknown, octets: unknown) => {
-		const propre = nomPartage(nom);
-		const contenu = octetsPartage(octets);
-		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
-		// Le presse-papiers de FICHIERS et le script ne valent que sous Windows.
-		if (process.platform !== "win32") return false;
-		// Un PowerShell à la fois, rendu à sa sortie (voir `verrouDiscord`).
-		const jeton = verrouDiscord.prendre();
-		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
-		try {
-			return await lancerDiscord(await ecrireTemporaire(propre, contenu), () => verrouDiscord.rendre(jeton));
-		} catch (e) {
-			verrouDiscord.rendre(jeton);
-			throw e;
 		}
 	});
 
@@ -1503,10 +1486,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		ipcMain.handle(CANAUX.syncIgnorer, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.ignorer(id);
 		});
-		/* Sharing the id: the window sends a channel name, nothing else. The id
-		   is OURS (read from the running instance, validated), and `planPartage`
-		   builds the only two URLs that can ever be opened (`mailto:` and
-		   `discord://`) from it; any other channel gets `null` and does nothing. */
+		/* Sharing the id: the window sends a channel name, nothing else, and
+		   only `systeme` does anything. The id is OURS (read from the running
+		   instance, validated); the text is built here. */
 		let partageSyncEnCours = false;
 		ipcMain.handle(CANAUX.syncPartagerId, async (_e, canal: unknown) => {
 			/* Single flight, like `partage.ts`: a second call while one is open is dropped. */
@@ -1529,17 +1511,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				if (jeton === null) return false;
 				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { id }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
 			}
-			const plan = planPartage(canal, id, { sujet: t("app.syncShare.subject"), corps: t("app.syncShare.body", { id }) });
-			if (!plan) return false;
-			if (plan.copier !== null) { dernierTexteEcritParLapp = plan.copier; clipboard.writeText(plan.copier); }
-			try {
-				await shell.openExternal(plan.url);
-			} catch {
-				/* Discord's protocol is not registered: its web app instead. */
-				if (canal !== "discord") return false;
-				try { await shell.openExternal("https://discord.com/app"); } catch { return false; }
-			}
-			return true;
+			return false;
 		};
 		/* The QR code: no argument crosses. A window that asks faster than
 		   every 500 ms gets the last answer again, so it cannot turn the

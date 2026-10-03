@@ -30,7 +30,7 @@ import { ajouter } from "../dom";
 import { currentLang, hourOptions, t } from "../i18n";
 import type { Changement, EtatSync } from "./sync-etat";
 
-export type CanalPartage = "courriel" | "discord" | "systeme";
+export type CanalPartage = "systeme";
 
 export interface SyncPageDeps {
 	etat(): Promise<EtatSync>;
@@ -281,7 +281,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		try { ok = await deps.partager(canal); } catch { ok = false; }
 		if (demonte) return;
 		if (!ok) currentHost().ui.notice(t("settings.sync.shareFailed"));
-		else if (canal === "discord") currentHost().ui.notice(t("settings.sync.copiedDiscord"), 6000);
 	}
 
 	/* ── "Show my ID": a landscape dialog, the QR code on the left; on the

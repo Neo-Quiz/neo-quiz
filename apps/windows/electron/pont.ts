@@ -371,9 +371,6 @@ export interface Pont {
 		    le fichier montré dans l'explorateur. Rend son chemin, `null` si
 		    l'utilisateur a annulé. */
 		enregistrer(nom: string, octets: Uint8Array): Promise<string | null>;
-		/** Windows : le FICHIER copié dans le presse-papiers, Discord au
-		    premier plan (l'utilisateur colle). `false` si rien n'est parti. */
-		discord(nom: string, octets: Uint8Array): Promise<boolean>;
 	};
 
 	/** Windows only: the file in Windows' own Share panel (Discord, WhatsApp,
@@ -422,7 +419,7 @@ export interface Pont {
 		    copies the text and opens Discord. `systeme` opens the system share
 		    panel (Android's share sheet, Windows' Share panel). Any other channel is refused. `false` if it
 		    could not be done. */
-		partagerId(canal: "courriel" | "discord" | "systeme"): Promise<boolean>;
+		partagerId(canal: "systeme"): Promise<boolean>;
 		surEtat(rappel: (etat: EtatSync) => void): () => void;
 		/** Another device's changes to the folder have landed (idle after
 		    remote items): time to reload what is read from the folder. */
@@ -848,7 +845,6 @@ export const CANAUX = {
 	systemeChoisirDossierDefaut: "neo:systeme/choisir-dossier-defaut",
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",
-	partageDiscord: "neo:partage/discord",
 	partageNatif: "neo:partage/natif",
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",

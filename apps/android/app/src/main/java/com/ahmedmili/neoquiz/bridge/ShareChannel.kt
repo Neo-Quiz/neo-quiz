@@ -54,8 +54,7 @@ object FileShare {
  * mail...). It is written under [dir] (a folder of the app's cache that the
  * FileProvider exposes and nothing else), in a fresh sub-folder per share, and
  * older ones are removed. One share at a time, and two seconds at least between
- * two (a page cannot stack share sheets). `partage.discord` stays unavailable:
- * the clipboard-and-focus script is Windows only.
+ * two (a page cannot stack share sheets).
  */
 class ShareChannel(
     private val dir: File,
