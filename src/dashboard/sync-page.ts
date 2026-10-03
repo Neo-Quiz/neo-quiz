@@ -8,11 +8,14 @@
    so the shape of the state is `sync-etat.ts`, which the Windows bridge also
    imports.
 
-   What it shows, top to bottom: a status line; this device's ID with its QR
-   code and ONE share button; ONE primary action, "Add a device" (type or scan
-   the other device's ID); the requests of devices that added this one, each
-   with Accept / Ignore; the paired devices. Pairing needs the ID on ONE side
-   only: the other side just accepts. Accepting goes through the same
+   What it shows, top to bottom (redesigned on 2026-10-03 to match Neo
+   Calendar's page): a status line and one short sentence; ONE big button,
+   "Show my ID", that opens a dialog with the full ID, Copy / Share and its QR
+   code; the requests of devices that added this one, each with Accept /
+   Ignore; the paired devices, with "Add a device" under the list, which opens
+   a dialog to type (or scan) the other device's ID; and a footer that names
+   Syncthing with a "Learn more" link. Pairing needs the ID on ONE side only:
+   the other side just accepts. Accepting goes through the same
    `appairer` as typing an ID, which the host confirms in a NATIVE dialog the
    page cannot answer: nothing is paired without it, and nothing is accepted
    on its own.
@@ -22,7 +25,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import QRCode from "qrcode";
-import { currentHost } from "../host/current";
+import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { EtatSync } from "./sync-etat";
@@ -110,6 +113,24 @@ interface EntreeMenu {
 	agir(): void;
 }
 
+/** The Syncthing logo (Simple Icons, CC0), drawn in place: nothing to load,
+    so nothing missing offline. Same mark as Neo Calendar's sync page. */
+const SYNCTHING_PATH = "M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm0 2.412c3.115 0 5.885 1.5 7.629 3.815a1.834 1.834 0 0 1 1.564 3.162c.23.818.354 1.68.354 2.57a9.504 9.504 0 0 1-2.166 6.05c.128.281.189.595.162.92a1.854 1.854 0 0 1-2.004 1.678 1.86 1.86 0 0 1-.877-.322A9.486 9.486 0 0 1 12 21.505c-3.84 0-7.154-2.277-8.668-5.552-.3-.01-.601-.092-.879-.254-.858-.51-1.144-1.634-.633-2.513.164-.276.39-.493.653-.643a9.62 9.62 0 0 1-.02-.584c0-5.265 4.282-9.547 9.547-9.547zm0 1.227a8.311 8.311 0 0 0-8.31 8.683c.22.036.439.111.644.23.323.2.564.484.713.805l6.984-.644a1.78 1.78 0 0 1 .787-1.08c.288-.19.612-.286.936-.295.34-.01.68.08.978.254l3.51-2.914a1.82 1.82 0 0 1 .317-1.84A8.3 8.3 0 0 0 12 3.638zm7.027 5.98-3.502 2.91a1.829 1.829 0 0 1-.23 1.719l1.904 2.744c.212-.06.436-.085.668-.066.238.024.46.092.66.193a8.285 8.285 0 0 0 1.793-5.16 8.38 8.38 0 0 0-.265-2.092 1.835 1.835 0 0 1-1.028-.248zm-6.886 4.315-6.975.644a1.8 1.8 0 0 1-.66 1.004A8.312 8.312 0 0 0 12 20.279a8.294 8.294 0 0 0 3.938-.986 1.845 1.845 0 0 1-.075-.69c.028-.341.148-.65.332-.908L14.29 14.95a1.839 1.839 0 0 1-2.148-1.015z";
+const SYNCTHING_URL = "https://syncthing.net";
+
+function logoSyncthing(parent: HTMLElement): void {
+	const ns = "http://www.w3.org/2000/svg";
+	const svg = document.createElementNS(ns, "svg");
+	svg.setAttribute("class", "qbd-sync-logo");
+	svg.setAttribute("viewBox", "0 0 24 24");
+	svg.setAttribute("aria-hidden", "true");
+	svg.setAttribute("focusable", "false");
+	const path = document.createElementNS(ns, "path");
+	path.setAttribute("d", SYNCTHING_PATH);
+	svg.appendChild(path);
+	parent.appendChild(svg);
+}
+
 /** Mounts the page into `parent`; the returned function unmounts it. */
 export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void {
 	const mobile = currentHost().platform.isMobile;
@@ -122,20 +143,13 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	statut.setAttribute("aria-live", "polite");
 	ajouter(statut, "span", "qbd-sync-point").setAttribute("aria-hidden", "true");
 	const statutTexte = ajouter(statut, "span", undefined, t("settings.sync.starting"));
-	ajouter(entete, "p", "qbd-sync-aide", t(mobile ? "settings.sync.hintMobile" : "settings.sync.hint"));
+	ajouter(entete, "p", "qbd-sync-aide", t("settings.sync.hint"));
 
-	/* ── This device: its ID, its QR code and ONE share button, nothing else ── */
+	/* ── This device: ONE big button; the ID, its QR and sharing live in its dialog ── */
 	const moi = ajouter(racine, "section", "qbd-sync-section");
 	moi.hidden = true;
-	const moiTitre = titre(moi, t("settings.sync.idTitleBare"));
-	const moiCorps = ajouter(moi, "div", "qbd-sync-moi");
-	const qr = ajouter(moiCorps, "img", "qbd-sync-qr");
-	qr.alt = t("settings.sync.qrAlt");
-	qr.hidden = true;
-	const moiTexte = ajouter(moiCorps, "div", "qbd-sync-moi-texte");
-	const idTexte = ajouter(moiTexte, "code", "qbd-sync-id");
-	const zonePartage = ajouter(moiTexte, "div", "qbd-sync-menu-zone");
-	const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"));
+	const afficherIdBtn = bouton(moi, "qr-code", t("settings.sync.showId"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
+	afficherIdBtn.setAttribute("aria-haspopup", "dialog");
 
 	/* ── Requests from devices that added this one ── */
 	const demandesSection = ajouter(racine, "section", "qbd-sync-section");
@@ -151,29 +165,28 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	/* ── Adding a device lives in the devices section, under the list it extends ── */
 	const ajout = ajouter(appareilsSection, "div", "qbd-sync-ajout");
 	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-ajout");
-	ajouterBouton.setAttribute("aria-expanded", "false");
-	const panneau = ajouter(ajout, "div", "qbd-sync-panneau");
-	panneau.hidden = true;
-	const etapes = ajouter(panneau, "ol", "qbd-sync-etapes");
-	for (const cle of ["settings.sync.addStep1", "settings.sync.addStep2", "settings.sync.addStep3"] as const) ajouter(etapes, "li", undefined, t(cle));
-	const ligneAjout = ajouter(panneau, "div", "qbd-sync-ligne-champ");
-	const champ = ajouter(ligneAjout, "input", "qbd-sync-champ");
-	champ.type = "text";
-	champ.spellcheck = false;
-	champ.autocomplete = "off";
-	champ.placeholder = t("settings.sync.addPlaceholder");
-	champ.setAttribute("aria-label", t("settings.sync.addPlaceholder"));
-	const validerBtn = bouton(ligneAjout, "check", t("settings.sync.add"));
-	const scannerBtn = deps.scanner ? bouton(ligneAjout, "scan-line", t("settings.sync.scan")) : null;
-	const message = ajouter(panneau, "p", "qbd-sync-message");
-	message.setAttribute("role", "status");
-	message.setAttribute("aria-live", "polite");
+	ajouterBouton.setAttribute("aria-haspopup", "dialog");
+
+	/* ── Footer: what sync runs on, for whoever has never heard of it ── */
+	const pied = ajouter(racine, "footer", "qbd-sync-pied");
+	logoSyncthing(pied);
+	ajouter(pied, "span", "qbd-sync-pied-nom", "Syncthing");
+	ajouter(pied, "span", "qbd-sync-pied-sep", "·").setAttribute("aria-hidden", "true");
+	const enSavoirPlus = ajouter(pied, "a", "qbd-sync-lien", t("settings.sync.learnMore"));
+	enSavoirPlus.href = SYNCTHING_URL;
+	enSavoirPlus.addEventListener("click", ev => {
+		ev.preventDefault();
+		void currentHost().shell.openUrl(SYNCTHING_URL).catch(() => false);
+	});
 
 	let demonte = false;
-	let idCourant: string | null = null;
 	let dernierEtat: EtatSync | null = null;
 	const ignorees = new Set<string>();
 	let fermerMenu: () => void = () => undefined;
+	/** The open "Show my ID" dialog, repainted on each state, closed when
+	    sync stops. */
+	let dialogueId: { fermer(): void; peindre(e: EtatSync): void } | null = null;
+	let fermerAjout: () => void = () => undefined;
 
 	/* ── A small menu under its button, closed by a click elsewhere or Escape ── */
 	function menu(ancre: HTMLElement, zone: HTMLElement, entrees: EntreeMenu[]): void {
@@ -189,12 +202,14 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			b.addEventListener("click", () => { fermerMenu(); e.agir(); });
 		}
 		const dehors = (ev: Event): void => { if (!zone.contains(ev.target as Node)) fermerMenu(); };
-		const echap = (ev: KeyboardEvent): void => { if (ev.key === "Escape") { fermerMenu(); ancre.focus(); } };
+		/* Escape closes the menu only (captured and stopped here), so the
+		   dialog around it stays open. */
+		const echap = (ev: KeyboardEvent): void => { if (ev.key === "Escape") { ev.stopPropagation(); fermerMenu(); ancre.focus(); } };
 		document.addEventListener("pointerdown", dehors, true);
-		document.addEventListener("keydown", echap);
+		document.addEventListener("keydown", echap, true);
 		fermerMenu = () => {
 			document.removeEventListener("pointerdown", dehors, true);
-			document.removeEventListener("keydown", echap);
+			document.removeEventListener("keydown", echap, true);
 			m.remove();
 			ancre.setAttribute("aria-expanded", "false");
 			fermerMenu = () => undefined;
@@ -202,36 +217,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		m.querySelector<HTMLElement>(".qbd-sync-menu-item")?.focus();
 	}
 
-	function dire(texte: string, erreur: boolean): void {
-		message.textContent = texte;
-		message.classList.toggle("qbd-sync-message-erreur", erreur);
-	}
-
 	async function rafraichir(): Promise<void> {
 		try { const e = await deps.etat(); if (!demonte) peindre(e); } catch { /* the push will follow */ }
-	}
-
-	async function soumettre(brut: string): Promise<void> {
-		const code = normaliserCode(brut);
-		if (!code) return;
-		validerBtn.disabled = true;
-		try {
-			const res = await deps.appairer(code);
-			if (demonte) return;
-			if (res === "ok") {
-				champ.value = "";
-				dire(t("settings.sync.added"), false);
-			} else if (res === "annule") {
-				dire("", false); // the owner declined the native dialog: nothing to report
-			} else {
-				dire(t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable"), true);
-			}
-		} catch {
-			if (!demonte) dire(t("settings.sync.unavailable"), true);
-		} finally {
-			validerBtn.disabled = false;
-		}
-		await rafraichir();
 	}
 
 	async function partagerId(canal: CanalPartage): Promise<void> {
@@ -240,6 +227,122 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		if (demonte) return;
 		if (!ok) currentHost().ui.notice(t("settings.sync.shareFailed"));
 		else if (canal === "discord") currentHost().ui.notice(t("settings.sync.copiedDiscord"), 6000);
+	}
+
+	/* ── "Show my ID": the name, the full ID, Copy and Share, then the QR ── */
+	function ouvrirId(): void {
+		if (dialogueId || !dernierEtat?.appareil) return;
+		requireHost("modals").open({
+			className: "qbd-sync-modal",
+			title: t("settings.sync.idModalTitle"),
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				const nom = ajouter(corps, "p", "qbd-sync-dialogue-nom");
+				const idTexte = ajouter(corps, "code", "qbd-sync-id qbd-sync-id-grand");
+				const actions = ajouter(corps, "div", "qbd-sync-actions");
+				const copierBtn = bouton(actions, "copy", t("settings.sync.copy"));
+				const zonePartage = ajouter(actions, "div", "qbd-sync-menu-zone");
+				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"));
+				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
+				const qr = ajouter(corps, "img", "qbd-sync-qr");
+				qr.alt = t("settings.sync.qrAlt");
+				qr.hidden = true;
+				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.idScanHint"));
+
+				let idCourant: string | null = null;
+				copierBtn.addEventListener("click", () => {
+					if (!idCourant) return;
+					void deps.copier(idCourant).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); });
+				});
+				partagerBtn.addEventListener("click", () => {
+					if (!idCourant) return;
+					if (mobile) { void partagerId("systeme"); return; }
+					menu(partagerBtn, zonePartage, [
+						{ icone: "mail", texte: t("settings.sync.shareMail"), agir: () => { void partagerId("courriel"); } },
+						{ icone: "message-circle", texte: t("settings.sync.shareDiscord"), agir: () => { void partagerId("discord"); } },
+					]);
+				});
+				dialogueId = {
+					fermer: () => handle.close(),
+					peindre: e => {
+						if (!e.actif || !e.appareil) { handle.close(); return; }
+						nom.textContent = e.nom;
+						nom.hidden = !e.nom;
+						if (e.appareil === idCourant) return;
+						idCourant = e.appareil;
+						idTexte.textContent = e.appareil;
+						const id = e.appareil;
+						void QRCode.toDataURL(id, { margin: 2, width: 220, errorCorrectionLevel: "M" })
+							.then(url => { if (!demonte && idCourant === id) { qr.src = url; qr.hidden = false; } })
+							.catch(() => { qr.hidden = true; });
+					},
+				};
+				if (dernierEtat) dialogueId.peindre(dernierEtat);
+				copierBtn.focus();
+			},
+			onClose: () => { fermerMenu(); dialogueId = null; },
+		});
+	}
+
+	/* ── "Add a device": type, paste or scan the other device's ID ── */
+	function ouvrirAjout(): void {
+		if (!dernierEtat?.actif) return;
+		requireHost("modals").open({
+			className: "qbd-sync-modal",
+			title: t("settings.sync.addButton"),
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.addHint"));
+				const champ = ajouter(corps, "input", "qbd-sync-champ");
+				champ.type = "text";
+				champ.spellcheck = false;
+				champ.autocomplete = "off";
+				champ.placeholder = t("settings.sync.addPlaceholder");
+				champ.setAttribute("aria-label", t("settings.sync.addPlaceholder"));
+				const message = ajouter(corps, "p", "qbd-sync-message qbd-sync-message-erreur");
+				message.setAttribute("role", "alert");
+				const piedDialogue = ajouter(corps, "div", "qbd-sync-dialogue-pied");
+				const scannerBtn = deps.scanner ? bouton(piedDialogue, "scan-line", t("settings.sync.scan")) : null;
+				ajouter(piedDialogue, "span", "qbd-sync-espace");
+				const annulerBtn = bouton(piedDialogue, "x", t("settings.sync.cancel"));
+				const validerBtn = bouton(piedDialogue, "check", t("settings.sync.add"), "qbd-sync-bouton qbd-sync-bouton-principal");
+
+				let ferme = false;
+				async function soumettre(brut: string): Promise<void> {
+					const code = normaliserCode(brut);
+					if (!code) { champ.focus(); return; }
+					validerBtn.disabled = true;
+					message.textContent = "";
+					try {
+						const res = await deps.appairer(code);
+						if (demonte || ferme) return;
+						if (res === "ok") {
+							handle.close();
+							currentHost().ui.notice(t("settings.sync.added"), 6000);
+						} else if (res !== "annule") {
+							/* "annule": the owner declined the native dialog, nothing to report. */
+							message.textContent = t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable");
+						}
+					} catch {
+						if (!demonte && !ferme) message.textContent = t("settings.sync.unavailable");
+					} finally {
+						validerBtn.disabled = false;
+					}
+					await rafraichir();
+				}
+				validerBtn.addEventListener("click", () => { void soumettre(champ.value); });
+				annulerBtn.addEventListener("click", () => handle.close());
+				champ.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); void soumettre(champ.value); } });
+				scannerBtn?.addEventListener("click", () => {
+					void deps.scanner!().then(code => {
+						if (code && !demonte && !ferme) { champ.value = code; void soumettre(code); }
+					}).catch(() => undefined);
+				});
+				fermerAjout = () => { if (!ferme) { ferme = true; handle.close(); } };
+				champ.focus();
+			},
+			onClose: () => { fermerAjout = () => undefined; },
+		});
 	}
 
 	function peindreDemandes(e: EtatSync): void {
@@ -317,54 +420,16 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		const s = statutGlobal(e);
 		statutTexte.textContent = s.texte;
 		statut.dataset.ton = s.ton;
-
-		if (!e.actif || !e.appareil) {
-			moi.hidden = true;
-			idCourant = null;
-		} else {
-			moi.hidden = false;
-			moiTitre.textContent = e.nom ? t("settings.sync.idTitle", { name: e.nom }) : t("settings.sync.idTitleBare");
-			if (e.appareil !== idCourant) {
-				idCourant = e.appareil;
-				idTexte.textContent = e.appareil;
-				void QRCode.toDataURL(e.appareil, { margin: 2, width: 176, errorCorrectionLevel: "M" })
-					.then(url => { if (!demonte && idCourant === e.appareil) { qr.src = url; qr.hidden = false; } })
-					.catch(() => { qr.hidden = true; });
-			}
-		}
+		moi.hidden = !e.actif || !e.appareil;
+		dialogueId?.peindre(e);
 		ajouterBouton.disabled = !e.actif;
-		validerBtn.disabled = !e.actif;
+		if (!e.actif) fermerAjout();
 		peindreDemandes(e);
 		peindreAppareils(e);
 	}
 
-	partagerBtn.addEventListener("click", () => {
-		if (!idCourant) return;
-		const id = idCourant;
-		if (mobile) { void partagerId("systeme"); return; }
-		menu(partagerBtn, zonePartage, [
-			{
-				icone: "copy",
-				texte: t("settings.sync.copy"),
-				agir: () => { void deps.copier(id).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); }); },
-			},
-			{ icone: "mail", texte: t("settings.sync.shareMail"), agir: () => { void partagerId("courriel"); } },
-			{ icone: "message-circle", texte: t("settings.sync.shareDiscord"), agir: () => { void partagerId("discord"); } },
-		]);
-	});
-	partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
-	ajouterBouton.addEventListener("click", () => {
-		panneau.hidden = !panneau.hidden;
-		ajouterBouton.setAttribute("aria-expanded", String(!panneau.hidden));
-		if (!panneau.hidden) champ.focus();
-	});
-	validerBtn.addEventListener("click", () => { void soumettre(champ.value); });
-	champ.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); void soumettre(champ.value); } });
-	scannerBtn?.addEventListener("click", () => {
-		void deps.scanner!().then(code => {
-			if (code && !demonte) { champ.value = code; void soumettre(code); }
-		}).catch(() => undefined);
-	});
+	afficherIdBtn.addEventListener("click", ouvrirId);
+	ajouterBouton.addEventListener("click", ouvrirAjout);
 
 	/* Last-seen times age without any push: repaint the list now and then. */
 	const horloge = setInterval(() => { if (dernierEtat && !demonte) peindreAppareils(dernierEtat); }, 60_000);
@@ -381,6 +446,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		demonte = true;
 		clearInterval(horloge);
 		fermerMenu();
+		dialogueId?.fermer();
+		fermerAjout();
 		desabonner();
 		racine.remove();
 	};
