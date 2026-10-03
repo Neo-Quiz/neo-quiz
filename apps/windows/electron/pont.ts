@@ -376,6 +376,14 @@ export interface Pont {
 		discord(nom: string, octets: Uint8Array): Promise<boolean>;
 	};
 
+	/** Windows only: the file in Windows' own Share panel (Discord, WhatsApp,
+	    Outlook, Nearby Share…), opened by the main process
+	    (`partage.ts`, `lancerPartageNatif`). Same inputs as `partage`: a
+	    name and bytes. `false` if the panel could not be opened. */
+	partageNatif?: {
+		fichier(nom: string, octets: Uint8Array): Promise<boolean>;
+	};
+
 	/**
 	 * Android only (absent on Windows, which has no background alarm). The daily
 	 * review notification: no JavaScript ever runs in the background, so the page
@@ -411,8 +419,8 @@ export interface Pont {
 		/** Shares THIS device's id. The window names a channel and nothing
 		    else: the main process builds the URL and the text itself from its
 		    own device id. Windows: `courriel` opens a `mailto:`, `discord`
-		    copies the text and opens Discord. Android: `systeme` opens the
-		    system share sheet. Any other channel is refused. `false` if it
+		    copies the text and opens Discord. `systeme` opens the system share
+		    panel (Android's share sheet, Windows' Share panel). Any other channel is refused. `false` if it
 		    could not be done. */
 		partagerId(canal: "courriel" | "discord" | "systeme"): Promise<boolean>;
 		surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -841,6 +849,7 @@ export const CANAUX = {
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",
 	partageDiscord: "neo:partage/discord",
+	partageNatif: "neo:partage/natif",
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
 	syncOublier: "neo:sync/oublier",

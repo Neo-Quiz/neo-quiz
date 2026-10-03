@@ -230,7 +230,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   (`apps/windows/electron/partage.ts`), la fenêtre ne donne qu'un nom et des
   octets : un nom qui serait un CHEMIN, une extension hors de `.zip`/`.md`, un
   contenu vide ou au-delà de 16 Mo sont refusés ; le script Discord est
-  CONSTANT (le chemin passe par une variable d'environnement) ; un verrou
+  CONSTANT (le chemin passe par une variable d'environnement), comme celui du
+  panneau de partage natif de Windows (`scriptPartageNatif`, depuis le
+  2026-10-03 : titre, texte, fichier et point de centrage lus dans
+  l'environnement, jamais insérés) ; un verrou
   limite à un partage à la fois, deux secondes au moins entre deux, et les
   fichiers temporaires de plus de dix minutes sont effacés. À l'autre bout,
   l'import d'une archive REÇUE (`nomNoteImportee`, `zip.ts`) n'écrit que des

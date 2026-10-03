@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Share now opens the Windows Share panel (Discord, WhatsApp, Outlook, Teams, Nearby Share and more), for the sync ID as for a quiz or a folder; the old Discord / Save dialog is gone.
 - The wallpaper is no longer blurred by default: only the central panel blurs what is behind it.
 - "Add a device" now sits in the "My devices" section (formerly "Your devices"), under the list, as a smaller button, and opens a dialog to paste or scan the other device’s ID.
 - The Sync page is simpler: one big "Show my ID" button opens a dialog with the full ID, Copy, Share and its QR code, and a footer names Syncthing with a "Learn more" link.

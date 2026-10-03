@@ -283,3 +283,127 @@ export function lancerDiscord(dest: string, fin: () => void): Promise<boolean> {
 		}
 	});
 }
+
+/* ── THE NATIVE WINDOWS SHARE PANEL (2026-10-03) ──
+   What Neo Calendar gets from `navigator.share` in WebView2, which Electron
+   does not provide: Windows' own "Share" panel (Discord, WhatsApp, Outlook,
+   Teams, Nearby Share…), for a text (the sync ID) or a file (a quiz .md, a
+   folder .zip). The panel belongs to a window, and only a WinRT interop
+   (`IDataTransferManagerInterop`) opens it from a desktop process: Electron
+   has no API for it, so a hidden PowerShell process creates a 1-pixel
+   window of its own, centred on the app, and opens the panel on it.
+
+   Same rules as `scriptDiscord`: the script is CONSTANT, and everything it
+   needs travels in environment variables it reads itself (the title, the
+   text, the absolute path of a temporary file this module wrote, the point
+   to centre on). Nothing from the window is ever spliced into the script.
+   The process ends when the panel is cancelled, 15 s after an app was
+   chosen (the target reads the file by then), or after five minutes. */
+
+export const VARIABLES_NATIF = {
+	titre: "NEO_QUIZ_PARTAGE_TITRE",
+	texte: "NEO_QUIZ_PARTAGE_TEXTE",
+	fichier: VARIABLE_FICHIER,
+	x: "NEO_QUIZ_PARTAGE_X",
+	y: "NEO_QUIZ_PARTAGE_Y",
+} as const;
+
+/** One native panel at a time, two seconds at least between two. */
+export const verrouNatif = creerVerrou(6 * 60_000, 2_000);
+
+export function scriptPartageNatif(): string {
+	return `$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$dtmType = [Windows.ApplicationModel.DataTransfer.DataTransferManager, Windows.ApplicationModel.DataTransfer, ContentType = WindowsRuntime]
+$null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
+Add-Type -ReferencedAssemblies System.Runtime.WindowsRuntime -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
+namespace NeoQuiz {
+	public static class NativeShare {
+		[ComImport, Guid("3A3DCD6C-3EAB-43DC-BCDE-45671CE800C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+		interface IDataTransferManagerInterop {
+			IntPtr GetForWindow(IntPtr appWindow, [In] ref Guid riid);
+			void ShowShareUIForWindow(IntPtr appWindow);
+		}
+		static IDataTransferManagerInterop Interop(Type dtm) { return (IDataTransferManagerInterop)WindowsRuntimeMarshal.GetActivationFactory(dtm); }
+		public static object ForWindow(Type dtm, IntPtr hwnd) {
+			Guid iid = new Guid("A5CAEE9B-8708-49D1-8D36-67D25A8DA00C");
+			return Marshal.GetObjectForIUnknown(Interop(dtm).GetForWindow(hwnd, ref iid));
+		}
+		public static void Show(Type dtm, IntPtr hwnd) { Interop(dtm).ShowShareUIForWindow(hwnd); }
+	}
+}
+'@
+$titre = $env:${VARIABLES_NATIF.titre}
+$texte = $env:${VARIABLES_NATIF.texte}
+$chemin = $env:${VARIABLES_NATIF.fichier}
+$script:fichier = $null
+if ($chemin) {
+	$asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' } | Select-Object -First 1
+	$tache = $asTask.MakeGenericMethod([Windows.Storage.StorageFile]).Invoke($null, @([Windows.Storage.StorageFile]::GetFileFromPathAsync($chemin)))
+	$null = $tache.Wait(-1)
+	$script:fichier = $tache.Result
+}
+$f = New-Object System.Windows.Forms.Form
+$f.FormBorderStyle = 'None'; $f.ShowInTaskbar = $false; $f.Width = 1; $f.Height = 1; $f.Opacity = 0.01
+$x = 0; $y = 0
+if ([int]::TryParse($env:${VARIABLES_NATIF.x}, [ref]$x) -and [int]::TryParse($env:${VARIABLES_NATIF.y}, [ref]$y)) {
+	$f.StartPosition = 'Manual'; $f.Location = New-Object System.Drawing.Point $x, $y
+} else { $f.StartPosition = 'CenterScreen' }
+$fin = New-Object System.Windows.Forms.Timer; $fin.Interval = 300000; $fin.Add_Tick({ $f.Close() }); $fin.Start()
+$f.Add_Shown({
+	try {
+		$script:dtm = [NeoQuiz.NativeShare]::ForWindow($dtmType, $f.Handle)
+		$script:dtm.add_DataRequested({ param($s, $e)
+			$e.Request.Data.Properties.Title = $titre
+			if ($script:fichier) { $e.Request.Data.SetStorageItems([Windows.Storage.IStorageItem[]]@($script:fichier)) }
+			elseif ($texte) { $e.Request.Data.SetText($texte) }
+		})
+		$script:dtm.add_TargetApplicationChosen({ param($s, $e) $fin.Stop(); $fin.Interval = 15000; $fin.Start() })
+		try { $script:dtm.add_ShareCanceled({ param($s, $e) $f.Close() }) } catch { }
+		[NeoQuiz.NativeShare]::Show($dtmType, $f.Handle)
+	} catch { [Console]::Error.WriteLine($_.Exception.Message); $f.Close() }
+})
+[System.Windows.Forms.Application]::Run($f)
+`;
+}
+
+export interface PartageNatif {
+	titre: string;
+	/** A text to share, or… */
+	texte?: string;
+	/** …the absolute path of a file this module wrote (`ecrireTemporaire`). */
+	fichier?: string;
+	/** Where to centre the panel: the middle of the app window, in screen pixels. */
+	centre?: { x: number; y: number };
+}
+
+/** Starts the hidden PowerShell that opens the panel. Resolves `true` once
+    it is LAUNCHED (the panel waits for the user, sometimes minutes); `fin`
+    is called when PowerShell exits, which is when the lock is released. */
+export function lancerPartageNatif(p: PartageNatif, fin: () => void): Promise<boolean> {
+	return new Promise((resolve) => {
+		try {
+			const encode = Buffer.from(scriptPartageNatif(), "utf16le").toString("base64");
+			const env: NodeJS.ProcessEnv = { ...process.env, [VARIABLES_NATIF.titre]: p.titre.slice(0, 200) };
+			if (p.fichier) env[VARIABLES_NATIF.fichier] = p.fichier;
+			else if (p.texte) env[VARIABLES_NATIF.texte] = p.texte.slice(0, 4000);
+			if (p.centre && Number.isFinite(p.centre.x) && Number.isFinite(p.centre.y)) {
+				env[VARIABLES_NATIF.x] = String(Math.round(p.centre.x));
+				env[VARIABLES_NATIF.y] = String(Math.round(p.centre.y));
+			}
+			const enfant = execFile("powershell.exe",
+				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
+				{ windowsHide: true, env }, () => fin());
+			enfant.once("error", () => { fin(); resolve(false); });
+			setTimeout(() => resolve(true), 300);
+		} catch {
+			fin();
+			resolve(false);
+		}
+	});
+}

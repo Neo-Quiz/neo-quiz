@@ -81,7 +81,7 @@ function empreinteAppel(tool: string, args: readonly string[], stdin: string, ma
 	const sans = (x: string): string => (marqueur ? x.split(marqueur).join("") : x);
 	return createHash("sha256").update(JSON.stringify([tool, args.map(sans), sans(stdin)])).digest("hex");
 }
-import { ecrireTemporaire, lancerDiscord, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer } from "./partage";
+import { ecrireTemporaire, lancerDiscord, lancerPartageNatif, nomPartage, octetsPartage, verrouDiscord, verrouEnregistrer, verrouNatif } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
@@ -708,6 +708,32 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			throw e;
 		}
 	});
+
+	/* THE NATIVE SHARE PANEL: the file is written by THIS process to a fresh
+	   temporary folder, its path never leaves the main process, and the
+	   PowerShell that opens the panel is constant (`scriptPartageNatif`). */
+	ipcMain.handle(CANAUX.partageNatif, async (_e, nom: unknown, octets: unknown) => {
+		const propre = nomPartage(nom);
+		const contenu = octetsPartage(octets);
+		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
+		if (process.platform !== "win32") return false;
+		const jeton = verrouNatif.prendre();
+		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
+		try {
+			const fichier = await ecrireTemporaire(propre, contenu);
+			return await lancerPartageNatif({ titre: propre, fichier, centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
+		} catch (e) {
+			verrouNatif.rendre(jeton);
+			throw e;
+		}
+	});
+	/** The middle of the app window, where the native panel is centred. */
+	const centreFenetre = (): { x: number; y: number } | undefined => {
+		const f = deps.fenetreCourante();
+		if (!f || f.isDestroyed()) return undefined;
+		const b = f.getBounds();
+		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+	};
 
 	ipcMain.handle(CANAUX.systemeCopierTexte, (_e, texte: unknown) => {
 		if (typeof texte !== "string" || texte.length > 524288) throw new Error("copie refusée : le presse-papiers ne prend qu'un texte borné");
@@ -1495,6 +1521,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const partagerIdSync = async (canal: unknown): Promise<boolean> => {
 			const id = (await sync.etat()).appareil;
 			if (!isDeviceId(id)) return false;
+			/* `systeme`: Windows' Share panel, with a text this process built
+			   from its own validated id. */
+			if (canal === "systeme") {
+				if (process.platform !== "win32") return false;
+				const jeton = verrouNatif.prendre();
+				if (jeton === null) return false;
+				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { id }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
+			}
 			const plan = planPartage(canal, id, { sujet: t("app.syncShare.subject"), corps: t("app.syncShare.body", { id }) });
 			if (!plan) return false;
 			if (plan.copier !== null) { dernierTexteEcritParLapp = plan.copier; clipboard.writeText(plan.copier); }

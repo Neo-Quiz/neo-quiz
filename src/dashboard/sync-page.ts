@@ -319,7 +319,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
 				const zonePartage = ajouter(corps, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
-				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
 
 				let ferme = false;
 				let idCourant: string | null = null;
@@ -386,13 +385,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						}, 1500);
 					});
 				});
+				/* The system's own share panel, on both platforms (Android's share
+				   sheet, Windows' Share panel): every app it knows, nothing to keep
+				   up to date here. */
 				partagerBtn.addEventListener("click", () => {
 					if (!idCourant) return;
-					if (mobile) { void partagerId("systeme"); return; }
-					menu(partagerBtn, zonePartage, [
-						{ icone: "mail", texte: t("settings.sync.shareMail"), agir: () => { void partagerId("courriel"); } },
-						{ icone: "message-circle", texte: t("settings.sync.shareDiscord"), agir: () => { void partagerId("discord"); } },
-					]);
+					void partagerId("systeme");
 				});
 				dialogueId = {
 					fermer: () => handle.close(),

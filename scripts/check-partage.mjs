@@ -18,7 +18,7 @@
 import { execFileSync } from "node:child_process";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptDiscord, creerVerrou, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
+await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptDiscord, scriptPartageNatif, VARIABLES_NATIF, creerVerrou, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
 	const r = makeReporter("Partage — noms, contenus, script, verrou");
 	r.check("un nom de zip ordinaire passe tel quel", nomPartage("XTI301 - Écosystème Python.zip"), "XTI301 - Écosystème Python.zip");
 	r.check("un .md passe", nomPartage("CM1.md"), "CM1.md");
@@ -43,6 +43,17 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 	r.check("le script lit le chemin dans la variable d'environnement",
 		s.includes(`Set-Clipboard -LiteralPath $env:${VARIABLE_FICHIER}`), true);
 	r.check("le script est constant : il ne prend aucun argument", scriptDiscord.length, 0);
+
+	/* The native Share panel: same rules. Constant, every input read from the
+	   environment, and never a value spliced in. */
+	const n = scriptPartageNatif();
+	r.check("native share: the script takes no argument", scriptPartageNatif.length, 0);
+	r.check("native share: title, text, file and point are read from the environment",
+		Object.values(VARIABLES_NATIF).every(v => n.includes("$env:" + v)), true);
+	r.check("native share: the file variable is the one the main process sets for Discord", VARIABLES_NATIF.fichier, VARIABLE_FICHIER);
+	r.check("native share: two calls give the same script (nothing per share inside)", scriptPartageNatif() === n, true);
+	r.check("native share: the point is parsed as integers, never run", n.includes("TryParse($env:NEO_QUIZ_PARTAGE_X") && n.includes("TryParse($env:NEO_QUIZ_PARTAGE_Y"), true);
+	r.check("native share: no Invoke-Expression, no Start-Process, no iex", /Invoke-Expression|Start-Process|iex/i.test(n), false);
 
 	let t = 0;
 	const v = creerVerrou(1000, 0, () => t);
