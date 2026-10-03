@@ -83,7 +83,7 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 
 	/* Revue du 2026-09-26 : `||` sur un 0 légitime fabriquait un numéro. */
 	r.check("numéro affiché d'une lecture : 0, jamais l'index + 1 ; d'une question : son numéro",
-		[le.numeroAffiche(quiz, true, 5), le.numeroAffiche(quiz, true, 1), le.numeroAffiche(quiz, true, 6), le.numeroAffiche(quiz, false, 5)], [0, 0, 5, 6]);
+		[le.numeroAffiche(quiz, true, 5), le.numeroAffiche(quiz, true, 1), le.numeroAffiche(quiz, true, 6), le.numeroAffiche(quiz, false, 5)], [0, 0, 5, 0]);
 	r.check("reprise : une question garde son numéro ; une lecture sans écran, celui de son hôte",
 		[le.numeroDeReprise(quiz, true, 6), le.numeroDeReprise(quiz, true, 1)], [5, 2]);
 	r.check("reprise sur un écran de lecture : le numéro de la question qui suit (jamais l'index + 1)",
@@ -92,10 +92,15 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 		le.numeroDeReprise([{ slice: 1, role: "test" }, { slice: 2, role: "read" }], true, 1), 1);
 	r.check("tranche valide : entier ≥ 1 seulement", [1, 3, 0, -1, 1.5, "2", null].map(le.trancheValide), [1, 3, null, null, null, null, null]);
 
-	/* HORS LEARN : rien sans écran, tout est numéroté. */
+	/* OUTSIDE A LEARN: no reading without a screen, and since 2026-10-02
+	   (9a1599f4, "Exclude readings from Test questions and score") a reading is
+	   never a question in ANY quiz: it has nothing to answer, and counting it
+	   made 100 % impossible in a Test. So it gets 0, the questions are
+	   numbered continuously around it, and it is counted as a reading. */
+	let n = 0;
 	r.check("Practice : aucune lecture sans écran", le.lecturesCourtes(quiz, false).size, 0);
-	r.check("Practice : numéros continus, lectures comprises", le.numerosAffiches(quiz, false), quiz.map((_, i) => i + 1));
-	r.check("Practice : « N lectures » vaut 0", le.nombreDeLectures(quiz, false), 0);
+	r.check("Practice: readings get 0, questions are numbered continuously", le.numerosAffiches(quiz, false), quiz.map(q => (q.role === "read" ? 0 : ++n)));
+	r.check("Practice: \"N readings\" counts its readings", le.nombreDeLectures(quiz, false), quiz.filter(q => q.role === "read").length);
 	r.done();
 });
 

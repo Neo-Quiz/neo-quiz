@@ -108,7 +108,9 @@ await withSrcModule("apps/windows/electron/reseau.ts", async ({ HOTES_AUTORISES,
 		   quatre des vidéos YouTube (spec
 		   docs/superpowers/specs/2026-09-22-videos-youtube-design.md, §3.2) :
 		   `i.ytimg.com` pour la miniature, les trois sous GitHub pour le
-		   téléchargement de yt-dlp. */
+		   téléchargement de yt-dlp. Plus, since 2026-10-03, `registry.npmjs.org`
+		   for the latest version of Claude Code and Codex (the "update
+		   available" banner, `dashboard/cli-updates.ts`). */
 		r.check("la liste d'hôtes est exactement celle de la conception",
 			[...HOTES_AUTORISES].sort(),
 			[
@@ -119,6 +121,7 @@ await withSrcModule("apps/windows/electron/reseau.ts", async ({ HOTES_AUTORISES,
 				"localhost",
 				"objects.githubusercontent.com",
 				"ollama.com",
+				"registry.npmjs.org",
 				"release-assets.githubusercontent.com",
 			]);
 

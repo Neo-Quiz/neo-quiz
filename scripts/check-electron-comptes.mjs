@@ -16,6 +16,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
+/* The probe logs ALREADY in the system temporary folder before this check
+   (left by the installed app, or by an earlier run): the check only judges
+   the ones its own probes create. */
+const JOURNAL_AGY = /^neo-quiz-agy-\d+-\d+\.log$/;
+const journauxAvant = new Set((await readdir(tmpdir())).filter(f => JOURNAL_AGY.test(f)));
+
 /** Un id_token fabriqué : trois segments base64url, le second porte les claims. */
 function idToken(claims) {
 	const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -321,7 +327,7 @@ await withSrcModule("apps/windows/electron/comptes.ts", async ({ etatComptes }) 
 		/* Le journal de sonde ne survit à aucune issue : après les deux sondes
 		   (l'une aboutie, l'autre expirée), aucun `neo-quiz-agy-<pid>-<date>.log` ne reste
 		   dans le dossier temporaire du système. */
-		const restes = (await readdir(tmpdir())).filter(f => /^neo-quiz-agy-\d+-\d+\.log$/.test(f));
+		const restes = (await readdir(tmpdir())).filter(f => JOURNAL_AGY.test(f) && !journauxAvant.has(f));
 		r.check("aucun journal de sonde agy ne reste dans le dossier temporaire", restes, []);
 	} finally {
 		await rm(racine, { recursive: true, force: true });
