@@ -295,6 +295,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			/* The device's name lives in the title, said once: "Device ID -
 			   DESKTOP-1U89520", the wording of the former ID section. */
 			title: dernierEtat.nom ? t("settings.sync.idModalTitle", { name: dernierEtat.nom }) : t("settings.sync.idModalTitleBare"),
+			titleIcon: el => { currentHost().ui.setIcon(el, mobile ? "smartphone" : "monitor"); },
 			onOpen: handle => {
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue-id");
 				const gauche = ajouter(corps, "div", "qbd-sync-dialogue-qr");
