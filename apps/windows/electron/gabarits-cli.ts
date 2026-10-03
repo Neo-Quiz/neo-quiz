@@ -45,6 +45,10 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 	const a = args as string[];
 	// La sonde de version, commune aux quatre outils.
 	if (correspond(a, ["--version"])) return true;
+	/* The CLI's own update, for Claude Code and Codex only (2026-10-03, the
+	   "update available" banner, `dashboard/cli-updates.ts`): one word, the
+	   official command of each tool, nothing variable. */
+	if ((tool === "claude" || tool === "codex") && correspond(a, ["update"])) return true;
 
 	const m = typeof marqueur === "string" && MARQUEUR.test(marqueur) ? marqueur : null;
 	const jeton = (nom: string): string => "{{nq-" + m + ":" + nom + "}}";

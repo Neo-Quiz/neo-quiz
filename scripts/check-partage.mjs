@@ -102,6 +102,8 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 
 	r.check("les sondes de version passent", ["claude", "codex", "agy"].map(o => argumentsAutorises(o, ["--version"], undefined)), [true, true, true]);
 	r.check("agy models passe", argumentsAutorises("agy", ["models"], undefined), true);
+	r.check("the update of Claude Code and Codex passes, as the bare word", [argumentsAutorises("claude", ["update"], undefined), argumentsAutorises("codex", ["update"], undefined)], [true, true]);
+	r.check("no update for agy, and no update with anything added", [argumentsAutorises("agy", ["update"], undefined), argumentsAutorises("claude", ["update", "--force"], undefined), argumentsAutorises("codex", ["update", "-c", "x=1"], undefined), argumentsAutorises("claude", ["upgrade"], undefined)], [false, false, false, false]);
 	r.check("agy génération, sans et avec modèle", [argumentsAutorises("agy", agy, m), argumentsAutorises("agy", [...agy, "--model", "gemini-2.5-pro"], m)], [true, true]);
 	r.check("claude sans outil, et avec Read pour les images", [argumentsAutorises("claude", claude("claude-opus-4-1", ""), m), argumentsAutorises("claude", claude("opus[1m]", "Read"), m)], [true, true]);
 	r.check("codex, rapide ou non, avec 0 à 3 images", [argumentsAutorises("codex", codex(false, 0), m), argumentsAutorises("codex", codex(true, 1), m), argumentsAutorises("codex", codex(false, 3), m)], [true, true, true]);

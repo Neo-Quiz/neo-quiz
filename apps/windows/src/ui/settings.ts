@@ -36,6 +36,7 @@ import { mountLanguagePackSettings } from "./language-packs";
 import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
+import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
 
 type Category = "general" | "folders" | "sync" | "ai" | "appearance" | "languages";
 
@@ -390,6 +391,9 @@ export function renderSettings(
 	   detached node so that the prompt sections below keep their handles, and
 	   the accounts (which talk to the CLIs) are not started. */
 	const aiPage = pages.get("ai") ?? document.createElement("div");
+	/* "Update available" for Claude Code and Codex, always shown here while it
+	   applies (the Generate page lets it be hidden). */
+	const demonterMaj = mobile ? () => {} : monterBandeauMaj(aiPage, () => undefined, { fermable: false });
 	const demonterComptes = mobile ? () => {} : monterReglagesComptes(section(aiPage, t("app.settings.accounts")));
 
 	/* Paid assistants: one switch per channel that needs a subscription
@@ -511,5 +515,5 @@ export function renderSettings(
 	   2026-09-17, and the only subscription left is the rail's, which lives
 	   as long as the shell. One is returned anyway because EVERY screen
 	   returns one. */
-	return () => { demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
+	return () => { demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
 }

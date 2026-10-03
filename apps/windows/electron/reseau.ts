@@ -74,6 +74,9 @@ export const HOTES_AUTORISES = new Set([
 	"objects.githubusercontent.com",
 	"release-assets.githubusercontent.com",
 	"i.ytimg.com",
+	/* The latest version of Claude Code and Codex (`dashboard/cli-updates.ts`,
+	   2026-10-03): `/<package>/latest`, read-only, no account. */
+	"registry.npmjs.org",
 ]);
 
 /** L'hôte d'`aiOllamaUrl` s'ajoute ici par DEUX chemins, et aucun des deux

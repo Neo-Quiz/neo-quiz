@@ -4640,3 +4640,52 @@
   padding-top: 18px;
   border-top: 1px solid var(--background-modifier-border);
 }
+
+/* "Update available" (`dashboard/cli-updates.ts`), after MonoCode's: a small
+   panel, one row per CLI (name, installed -> latest, Update), the reason
+   under it, a close cross. */
+.qbd-cli-maj {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l, 10px);
+	background: var(--background-secondary);
+}
+.qbd-cli-maj[hidden] { display: none; }
+.qbd-cli-maj-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qbd-cli-maj-titre { font-size: 13px; font-weight: 650; color: var(--text-normal); }
+.qbd-cli-maj-fermer {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px;
+	background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.qbd-cli-maj-fermer:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.qbd-cli-maj-fermer svg { width: 15px; height: 15px; }
+.qbd-cli-maj-ligne { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qbd-cli-maj-nom { font-size: 13px; font-weight: 600; color: var(--text-normal); }
+.qbd-cli-maj-versions {
+	flex: 1 1 auto;
+	font-family: "Neo Quiz Mono", var(--font-monospace);
+	font-size: 12px;
+	color: var(--text-muted);
+	text-align: right;
+}
+.qbd-cli-maj-bouton {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 6px 12px; border: 1px solid var(--background-modifier-border); border-radius: 8px;
+	background: transparent; color: var(--text-normal); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.qbd-cli-maj-bouton:hover:not(:disabled) { border-color: var(--interactive-accent); }
+.qbd-cli-maj-bouton:focus-visible, .qbd-cli-maj-fermer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.qbd-cli-maj-bouton:disabled { cursor: default; opacity: 0.85; }
+.qbd-cli-maj-bouton-icone { display: inline-flex; }
+.qbd-cli-maj-bouton-icone svg { width: 14px; height: 14px; }
+.qbd-cli-maj-bouton.is-loading .qbd-cli-maj-bouton-icone svg { animation: qbd-cli-maj-tourne 0.9s linear infinite; }
+@keyframes qbd-cli-maj-tourne { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+	.qbd-cli-maj-bouton.is-loading .qbd-cli-maj-bouton-icone svg { animation: none; }
+}
+.qbd-cli-maj-pied { margin: 0; font-size: 12px; color: var(--text-muted); }

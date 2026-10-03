@@ -17,6 +17,7 @@ import { attachHoverTip } from "./hover-tip";
 import { openConfirmModal } from "../editor/modals";
 import { LOG_PREFIX } from "../branding";
 import * as aiProviders from "./ai-providers";
+import { monterBandeauMaj } from "./cli-updates";
 import { demarrerConnexionCli, poserCroixAnnuler } from "./connexion-cli";
 import { composerPrompts, parseReponseLot, parseReponseQuiz } from "./ai-client";
 import { nouveauJeton, texteWeb, preparerOuverture } from "./ai-web";
@@ -2229,6 +2230,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// sous le composer depuis la suppression de la carte « Modèle IA ».
 		// :empty → masqué ; rempli par refreshProviderStatuses/renderHint.
 		if (provider) hintZone = ajouter(formCol, "div", "qbd-ai-model-hint");
+
+		/* "Update available" for Claude Code and Codex (`cli-updates.ts`):
+		   after an update, the providers and their models are read again. */
+		if (provider) monterBandeauMaj(formCol, () => refreshProviderStatuses({ providerSelect, hintZone, provider, currentModel, modelSelect, ollamaCtl, buildOllamaList, force: true }));
 
 		/* Hors conversation (un site ou une connexion tient la page), les tours
 		   de la file restent sous le composer ; la page d'un quiz ouvert
