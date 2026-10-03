@@ -1538,7 +1538,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			dernierQr = { t, r: sync.qrSuivant() };
 			return dernierQr.r;
 		});
-		ipcMain.handle(CANAUX.syncQrFermer, () => { dernierQr = null; sync.qrFermer(); });
+		/* Closing does NOT reset the throttle: closing then asking again would
+		   otherwise skip it (security review, 2026-10-03). A dialog reopened
+		   within 500 ms shows the last code once, then the next one. */
+		ipcMain.handle(CANAUX.syncQrFermer, () => { sync.qrFermer(); });
 		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
 		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));
 	}
