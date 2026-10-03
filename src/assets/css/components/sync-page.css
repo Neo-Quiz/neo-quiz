@@ -494,7 +494,7 @@
 	font-size: 16px;
 }
 
-/* The countdown to the next code: a bar that drains, and the seconds left. */
+/* The countdown to the next code: a bar that fills up, and the seconds left. */
 .qbd-sync-compte {
 	height: 4px;
 	border-radius: 2px;

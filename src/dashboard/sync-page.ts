@@ -327,15 +327,15 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						.then(url => { if (!ferme && texteQr === texte) { qr.src = url; qr.hidden = false; } })
 						.catch(() => { qr.hidden = true; });
 				}
-				/* The countdown: a bar that drains over the period, and the seconds
+				/* The countdown: a bar that fills up over the period, and the seconds
 				   left, both restarted at each new code. */
 				function lancerDecompte(periodeMs: number): void {
 					const fin = Date.now() + periodeMs;
 					jauge.style.transition = "none";
-					jauge.style.transform = "scaleX(1)";
+					jauge.style.transform = "scaleX(0)";
 					void jauge.offsetWidth;
 					jauge.style.transition = `transform ${periodeMs}ms linear`;
-					jauge.style.transform = "scaleX(0)";
+					jauge.style.transform = "scaleX(1)";
 					const dire = (): void => { compte.textContent = t("settings.sync.qrNext", { n: Math.max(1, Math.ceil((fin - Date.now()) / 1000)) }); };
 					dire();
 					if (decompte) clearInterval(decompte);
