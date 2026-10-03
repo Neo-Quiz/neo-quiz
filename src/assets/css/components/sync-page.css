@@ -86,18 +86,6 @@
 	gap: 12px;
 }
 
-.qbd-sync-dialogue-nom {
-	margin: 0;
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--text-normal);
-	overflow-wrap: anywhere;
-}
-
-.qbd-sync-dialogue-nom[hidden] {
-	display: none;
-}
-
 .qbd-sync-id-grand {
 	font-size: 13px;
 	color: var(--text-normal);
@@ -489,10 +477,6 @@
 	min-width: 0;
 }
 
-.qbd-sync-dialogue-id .qbd-sync-dialogue-nom {
-	font-size: 16px;
-}
-
 /* The countdown to the next code: a bar that fills up. */
 .qbd-sync-compte {
 	height: 4px;
@@ -541,23 +525,6 @@
 
 .qbd-sync-carte-changements {
 	align-self: stretch;
-}
-
-/* The device name of "Show my ID", with its icon. */
-.qbd-sync-dialogue-nom {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.qbd-sync-dialogue-nom-icone {
-	display: inline-flex;
-	color: var(--text-muted);
-}
-
-.qbd-sync-dialogue-nom-icone svg {
-	width: 16px;
-	height: 16px;
 }
 
 /* The ID in its code block: full width, room on the right for the copy icon. */

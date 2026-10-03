@@ -292,7 +292,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		const qrHote = deps.qr;
 		requireHost("modals").open({
 			className: "qbd-sync-modal qbd-sync-modal-id",
-			title: t("settings.sync.idModalTitle"),
+			/* The device's name lives in the title, said once: "Device ID -
+			   DESKTOP-1U89520", the wording of the former ID section. */
+			title: dernierEtat.nom ? t("settings.sync.idModalTitle", { name: dernierEtat.nom }) : t("settings.sync.idModalTitleBare"),
 			onOpen: handle => {
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue-id");
 				const gauche = ajouter(corps, "div", "qbd-sync-dialogue-qr");
@@ -303,9 +305,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				barre.hidden = !qrHote;
 				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
 				const droite = ajouter(corps, "div", "qbd-sync-dialogue");
-				const nom = ajouter(droite, "p", "qbd-sync-dialogue-nom");
-				icone(nom, mobile ? "smartphone" : "monitor", "qbd-sync-dialogue-nom-icone");
-				const nomTexte = ajouter(nom, "span");
 				/* The ID in the code block of the install dialog (`ai-install-modal.ts`):
 				   the copy button is an icon INSIDE it, top right, its label off
 				   screen, and it turns into a check for a moment once copied. */
@@ -404,8 +403,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 							currentHost().ui.notice(t("settings.sync.added"), 6000);
 							return;
 						}
-						nomTexte.textContent = e.nom;
-						nom.hidden = !e.nom;
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
 						idTexte.textContent = e.appareil;
