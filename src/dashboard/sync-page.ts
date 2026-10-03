@@ -211,15 +211,16 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-ajout");
 	ajouterBouton.setAttribute("aria-haspopup", "dialog");
 
-	/* ── Recent changes: today by default, the older ones behind a link ── */
+	/* ── Recent changes: ONE full-width button (like Syncthing's "Recent
+	   Changes"), which opens a dialog: today by default, the older ones
+	   behind a link ── */
 	const changementsSection = ajouter(racine, "section", "qbd-sync-section");
 	changementsSection.hidden = true;
-	titre(changementsSection, t("settings.sync.changes"));
-	const changementsCarte = ajouter(changementsSection, "div", "qbd-sync-carte");
-	const plusAnciens = ajouter(changementsSection, "button", "qbd-sync-lien qbd-sync-lien-bouton");
-	plusAnciens.type = "button";
+	const changementsBtn = bouton(changementsSection, "info", t("settings.sync.changes"), "qbd-sync-bouton qbd-sync-bouton-large");
+	changementsBtn.setAttribute("aria-haspopup", "dialog");
+	/** The open dialog's list, repainted on each state and every 5 s. */
+	let dialogueChangements: { carte: HTMLElement; plusAnciens: HTMLButtonElement; fermer(): void } | null = null;
 	let voirAnciens = false;
-	plusAnciens.addEventListener("click", () => { voirAnciens = !voirAnciens; if (dernierEtat) peindreChangements(dernierEtat); });
 
 	/* ── Footer: what sync runs on, for whoever has never heard of it ── */
 	const pied = ajouter(racine, "footer", "qbd-sync-pied");
@@ -303,14 +304,21 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
 				const droite = ajouter(corps, "div", "qbd-sync-dialogue");
 				const nom = ajouter(droite, "p", "qbd-sync-dialogue-nom");
-				const idTexte = ajouter(droite, "code", "qbd-sync-id qbd-sync-id-grand");
-				const actions = ajouter(droite, "div", "qbd-sync-actions");
-				const copierBtn = bouton(actions, "copy", t("settings.sync.copy"));
-				const zonePartage = ajouter(actions, "div", "qbd-sync-menu-zone");
-				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"));
+				icone(nom, mobile ? "smartphone" : "monitor", "qbd-sync-dialogue-nom-icone");
+				const nomTexte = ajouter(nom, "span");
+				/* The ID in the code block of the install dialog (`ai-install-modal.ts`):
+				   the copy button is an icon INSIDE it, top right, its label off
+				   screen, and it turns into a check for a moment once copied. */
+				const blocId = ajouter(droite, "div", "qbd-install-code qbd-sync-code markdown-rendered markdown-preview-view");
+				const idTexte = ajouter(ajouter(blocId, "pre"), "code");
+				const copierBtn = ajouter(blocId, "button", "qbd-btn qbd-install-copy");
+				copierBtn.type = "button";
+				const copierIcone = ajouter(copierBtn, "span", "qbd-btn-icon qbd-btn-icon--sm");
+				currentHost().ui.setIcon(copierIcone, "copy");
+				const copierTexte = ajouter(copierBtn, "span", "qbd-sr-only", t("settings.sync.copy"));
+				const zonePartage = ajouter(droite, "div", "qbd-sync-menu-zone");
+				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
 				partagerBtn.setAttribute("aria-haspopup", mobile ? "false" : "menu");
-				const compte = ajouter(droite, "p", "qbd-sync-compte-texte");
-				compte.hidden = !qrHote;
 				ajouter(droite, "p", "qbd-sync-aide", t("settings.sync.idScanHint"));
 
 				let ferme = false;
@@ -318,7 +326,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				let texteQr: string | null = null;
 				const appareilsAvant = dernierEtat?.appareils.length ?? 0;
 				let minuteur: ReturnType<typeof setTimeout> | null = null;
-				let decompte: ReturnType<typeof setInterval> | null = null;
 
 				function poserQr(texte: string): void {
 					if (texte === texteQr) return;
@@ -327,19 +334,14 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						.then(url => { if (!ferme && texteQr === texte) { qr.src = url; qr.hidden = false; } })
 						.catch(() => { qr.hidden = true; });
 				}
-				/* The countdown: a bar that fills up over the period, and the seconds
-				   left, both restarted at each new code. */
+				/* The countdown: a bar that fills up over the period, restarted at
+				   each new code (no seconds written: with 2 s they said nothing). */
 				function lancerDecompte(periodeMs: number): void {
-					const fin = Date.now() + periodeMs;
 					jauge.style.transition = "none";
 					jauge.style.transform = "scaleX(0)";
 					void jauge.offsetWidth;
 					jauge.style.transition = `transform ${periodeMs}ms linear`;
 					jauge.style.transform = "scaleX(1)";
-					const dire = (): void => { compte.textContent = t("settings.sync.qrNext", { n: Math.max(1, Math.ceil((fin - Date.now()) / 1000)) }); };
-					dire();
-					if (decompte) clearInterval(decompte);
-					decompte = setInterval(dire, 250);
 				}
 				async function tourner(): Promise<void> {
 					if (ferme || !qrHote) return;
@@ -349,18 +351,33 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					if (!r) {
 						/* No code: the plain ID instead, and no countdown. */
 						if (idCourant) poserQr(idCourant);
-						barre.hidden = compte.hidden = true;
+						barre.hidden = true;
 						return;
 					}
 					poserQr(r.texte);
-					barre.hidden = compte.hidden = false;
+					barre.hidden = false;
 					lancerDecompte(r.periodeMs);
 					minuteur = setTimeout(() => { void tourner(); }, r.periodeMs);
 				}
 
+				let retourCopie: ReturnType<typeof setTimeout> | null = null;
 				copierBtn.addEventListener("click", () => {
 					if (!idCourant) return;
-					void deps.copier(idCourant).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); });
+					void deps.copier(idCourant).then(ok => {
+						if (demonte || ferme) return;
+						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
+						copierIcone.replaceChildren();
+						currentHost().ui.setIcon(copierIcone, "check");
+						copierTexte.textContent = t("settings.sync.copied");
+						copierBtn.dataset.copie = "1";
+						if (retourCopie) clearTimeout(retourCopie);
+						retourCopie = setTimeout(() => {
+							copierIcone.replaceChildren();
+							currentHost().ui.setIcon(copierIcone, "copy");
+							copierTexte.textContent = t("settings.sync.copy");
+							delete copierBtn.dataset.copie;
+						}, 1500);
+					});
 				});
 				partagerBtn.addEventListener("click", () => {
 					if (!idCourant) return;
@@ -375,7 +392,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					arreter: () => {
 						ferme = true;
 						if (minuteur) clearTimeout(minuteur);
-						if (decompte) clearInterval(decompte);
+						if (retourCopie) clearTimeout(retourCopie);
 						if (qrHote) void qrHote.fermer().catch(() => undefined);
 					},
 					peindre: e => {
@@ -387,7 +404,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 							currentHost().ui.notice(t("settings.sync.added"), 6000);
 							return;
 						}
-						nom.textContent = e.nom;
+						nomTexte.textContent = e.nom;
 						nom.hidden = !e.nom;
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
@@ -397,7 +414,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				};
 				if (dernierEtat) dialogueId.peindre(dernierEtat);
 				void tourner();
-				copierBtn.focus();
+				partagerBtn.focus();
 			},
 			onClose: () => { fermerMenu(); dialogueId?.arreter(); dialogueId = null; },
 		});
@@ -533,10 +550,32 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
+	function ouvrirChangements(): void {
+		if (dialogueChangements) return;
+		voirAnciens = false;
+		requireHost("modals").open({
+			className: "qbd-sync-modal qbd-sync-modal-changements",
+			title: t("settings.sync.changes"),
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				const carte = ajouter(corps, "div", "qbd-sync-carte qbd-sync-carte-changements");
+				const plusAnciens = ajouter(corps, "button", "qbd-sync-lien qbd-sync-lien-bouton");
+				plusAnciens.type = "button";
+				plusAnciens.addEventListener("click", () => { voirAnciens = !voirAnciens; if (dernierEtat) peindreChangements(dernierEtat); });
+				dialogueChangements = { carte, plusAnciens, fermer: () => handle.close() };
+				if (dernierEtat) peindreChangements(dernierEtat);
+			},
+			onClose: () => { dialogueChangements = null; },
+		});
+	}
+	changementsBtn.addEventListener("click", ouvrirChangements);
+
 	function peindreChangements(e: EtatSync): void {
 		const liste = e.changements;
 		changementsSection.hidden = !e.actif || liste === undefined;
-		if (changementsSection.hidden || !liste) return;
+		if (changementsSection.hidden || !liste) { dialogueChangements?.fermer(); return; }
+		if (!dialogueChangements) return;
+		const { carte: changementsCarte, plusAnciens } = dialogueChangements;
 		const maintenant = Date.now();
 		const jour = debutDuJour(maintenant);
 		const anciens = liste.filter(c => c.quand < jour).length;
@@ -593,6 +632,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		clearInterval(horlogeChangements);
 		fermerMenu();
 		dialogueId?.fermer();
+		dialogueChangements?.fermer();
 		fermerAjout();
 		desabonner();
 		racine.remove();

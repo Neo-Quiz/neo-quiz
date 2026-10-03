@@ -65,7 +65,6 @@
 .qbd-sync .qbd-sync-bouton-grand {
 	align-self: stretch;
 	justify-content: center;
-	max-width: 360px;
 	padding: 12px 18px;
 	font-size: 15px;
 }
@@ -494,7 +493,7 @@
 	font-size: 16px;
 }
 
-/* The countdown to the next code: a bar that fills up, and the seconds left. */
+/* The countdown to the next code: a bar that fills up. */
 .qbd-sync-compte {
 	height: 4px;
 	border-radius: 2px;
@@ -508,17 +507,8 @@
 	transform-origin: left center;
 }
 
-.qbd-sync-compte[hidden],
-.qbd-sync-compte-texte[hidden] {
+.qbd-sync-compte[hidden] {
 	display: none;
-}
-
-.qbd-sync-compte-texte {
-	margin: 0;
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--text-accent);
-	font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 600px) {
@@ -530,4 +520,53 @@
 	.qbd-sync-dialogue-qr {
 		align-self: center;
 	}
+}
+
+/* "Recent changes": a full-width outlined button, like Syncthing's. */
+.qbd-sync .qbd-sync-bouton-large {
+	align-self: stretch;
+	justify-content: center;
+	padding: 10px 16px;
+	font-weight: 600;
+}
+
+.qbd-sync .qbd-sync-bouton-large .qbd-sync-bouton-icone svg {
+	width: 16px;
+	height: 16px;
+}
+
+.modal.qbd-sync-modal-changements {
+	width: min(560px, calc(100vw - 32px));
+}
+
+.qbd-sync-carte-changements {
+	align-self: stretch;
+}
+
+/* The device name of "Show my ID", with its icon. */
+.qbd-sync-dialogue-nom {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.qbd-sync-dialogue-nom-icone {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.qbd-sync-dialogue-nom-icone svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* The ID in its code block: full width, room on the right for the copy icon. */
+.qbd-sync-dialogue .qbd-sync-code {
+	align-self: stretch;
+	margin: 0;
+}
+
+.qbd-sync-dialogue .qbd-sync-code pre {
+	padding-right: 44px;
+	font-size: 13px;
 }
