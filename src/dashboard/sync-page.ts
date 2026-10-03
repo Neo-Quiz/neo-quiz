@@ -15,10 +15,11 @@
    Ignore; the paired devices, with "Add a device" under the list, which opens
    a dialog to type (or scan) the other device's ID; and a footer that names
    Syncthing with a "Learn more" link. Pairing needs the ID on ONE side only:
-   the other side just accepts. Accepting goes through the same
-   `appairer` as typing an ID, which the host confirms in a NATIVE dialog the
-   page cannot answer: nothing is paired without it, and nothing is accepted
-   on its own.
+   the other side just accepts. Accepting goes through the same `appairer`
+   as typing an ID. The host decides what needs a NATIVE dialog the page
+   cannot answer (`confirmationRequise`): a typed ID and a QR request do; on
+   Windows, a request accepted from its notification does not (the click is
+   the answer, 2026-10-03). Nothing is ever accepted on its own.
 
    The page never sees a path, a port or a key, only device ids and names. A
    name is the remote's: it is only ever put in `textContent`.

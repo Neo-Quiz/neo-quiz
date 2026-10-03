@@ -193,6 +193,13 @@ await withSrcModule(
 				[d.observer(ev("ItemFinished", { folder: "neo-quiz", item: "a.md" })), d.observer(idle), d.observer(ev("LocalIndexUpdated", { folder: "neo-quiz" })), d.observer(idle)], [false, true, false, false]);
 		});
 
+		await cas(r, "confirmationRequise", async () => {
+			const { confirmationRequise } = regles;
+			r.check("a pending device accepted from the page: no native dialog", confirmationRequise(true, false), false);
+			r.check("an id typed in Add a device (nothing pending): native dialog", confirmationRequise(false, false), true);
+			r.check("a request that came by the QR code: native dialog, pending or not", [confirmationRequise(true, true), confirmationRequise(false, true)], [true, true]);
+		});
+
 		await cas(r, "recent changes", async () => {
 			const { changementDepuis, ajouterChangement } = regles;
 			const nomDe = court => (court === "CJXCUH3" ? "DESKTOP" : "?");

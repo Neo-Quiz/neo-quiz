@@ -237,6 +237,16 @@ export interface EvenementSync {
 	data?: Record<string, unknown>;
 }
 
+/** Whether pairing `id` must first be confirmed by a native dialog. NOT when
+    the device asked (it is pending) and the owner accepts it from the page's
+    request notification: that click is the answer (owner's decision,
+    2026-10-03). Always when nothing asked for it (an id typed in "Add a
+    device"), and always for a request that came by the QR code (code +
+    confirmation, the owner's choice for that flow). */
+export function confirmationRequise(enAttente: boolean, viaQr: boolean): boolean {
+	return viaQr || !enAttente;
+}
+
 /** The two events behind Syncthing's "Recent changes": a change found on
     this device's disk, and one applied from another device. */
 export const EVENEMENTS_CHANGEMENT = ["LocalChangeDetected", "RemoteChangeDetected"] as const;

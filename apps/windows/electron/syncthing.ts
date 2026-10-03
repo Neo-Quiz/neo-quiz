@@ -38,6 +38,7 @@ import { creerFenetreAppairage, codeDansNom, PERIODE_MS, sansCode, texteQr } fro
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
 import {
+	confirmationRequise,
 	EVENEMENTS_CHANGEMENT,
 	ajouterChangement,
 	changementDepuis,
@@ -456,11 +457,19 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				/* A pairing code at the end of the announced name is not part of
 				   the name: never shown, never kept in the config. */
 				const nom = nomSur(sansCode(typeof attente?.name === "string" ? attente.name : ""));
-				/* Nothing is paired without the owner's say: a native dialog,
-				   decided in the main process, that the window cannot answer. */
-				let accord = false;
-				try { accord = await opts.confirmer(id, nom, viaQr); } catch { accord = false; }
-				if (!accord) return "annule";
+				/* The owner's say. A device that ASKED (it is pending) and is
+				   accepted from the page's request notification needs no second
+				   question: the click on Accept is it (owner's decision,
+				   2026-10-03, "on ne la garde pas"). Everything else still goes
+				   through a native dialog, decided in the main process, that the
+				   window cannot answer: an id typed in "Add a device" (nothing
+				   asked for it), and a request that came by the QR code (the
+				   owner's choice for the QR flow: code + confirmation). */
+				if (confirmationRequise(attente !== undefined, viaQr)) {
+					let accord = false;
+					try { accord = await opts.confirmer(id, nom, viaQr); } catch { accord = false; }
+					if (!accord) return "annule";
+				}
 				await courant.rest.putDevice({
 					deviceID: id,
 					name: nom,
