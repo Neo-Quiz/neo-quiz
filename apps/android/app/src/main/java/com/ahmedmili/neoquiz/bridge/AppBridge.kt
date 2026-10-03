@@ -125,7 +125,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
-        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed).handlers() + scan.handlers() +
+        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox).handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it) }.handlers() + scan.handlers() +
             settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar::apply).handlers(),
     )
     bridge = created

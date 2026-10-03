@@ -20,7 +20,12 @@ import org.json.JSONArray
  * Error messages and return values are those of the Electron handlers: the
  * shared renderer matches some of them as text.
  */
-class FilesChannel(private val perimeter: Perimeter, private val allowed: AllowedRoots) {
+class FilesChannel(
+    private val perimeter: Perimeter,
+    private val allowed: AllowedRoots,
+    /** Told about every path the page wrote, moved or removed (real-time sync, 2026-10-03). */
+    private val onWrite: (String) -> Unit = {},
+) {
     private val locks = ConcurrentHashMap<String, Mutex>()
 
     internal fun lockOf(f: File): Mutex = locks.getOrPut(f.path) { Mutex() }
@@ -153,17 +158,17 @@ class FilesChannel(private val perimeter: Perimeter, private val allowed: Allowe
         "fichiers.read" to { a -> read(a.path(0)) },
         "fichiers.readCached" to { a -> read(a.path(0)) },
         "fichiers.readBinary" to { a -> readBinary(a.path(0)) },
-        "fichiers.write" to { a -> write(a.path(0), a.text(1)) },
-        "fichiers.writeBinary" to { a -> writeBinary(a.path(0), a.text(1)) },
-        "fichiers.append" to { a -> append(a.path(0), a.text(1)) },
+        "fichiers.write" to { a -> write(a.path(0), a.text(1)).also { onWrite(a.path(0)) } },
+        "fichiers.writeBinary" to { a -> writeBinary(a.path(0), a.text(1)).also { onWrite(a.path(0)) } },
+        "fichiers.append" to { a -> append(a.path(0), a.text(1)).also { onWrite(a.path(0)) } },
         "fichiers.lirePourEcriture" to { a -> lirePourEcriture(a.path(0)) },
-        "fichiers.ecrireSiInchange" to { a -> ecrireSiInchange(a.path(0), a.text(1), a.text(2)) },
+        "fichiers.ecrireSiInchange" to { a -> ecrireSiInchange(a.path(0), a.text(1), a.text(2)).also { if (it != null) onWrite(a.path(0)) } },
         "fichiers.exists" to { a -> exists(a.path(0)) },
         "fichiers.mkdirs" to { a -> mkdirs(a.path(0)) },
-        "fichiers.trash" to { a -> trash(a.path(0), a.path(1)) },
+        "fichiers.trash" to { a -> trash(a.path(0), a.path(1)).also { onWrite(a.path(0)) } },
         "fichiers.list" to { a -> list(a.path(0)) },
-        "fichiers.remove" to { a -> remove(a.path(0)) },
-        "fichiers.rename" to { a -> rename(a.path(0), a.path(1)) },
+        "fichiers.remove" to { a -> remove(a.path(0)).also { onWrite(a.path(0)) } },
+        "fichiers.rename" to { a -> rename(a.path(0), a.path(1)).also { onWrite(a.path(0)); onWrite(a.path(1)) } },
         "fichiers.stat" to { a -> stat(a.path(0)) },
         "fichiers.statEntree" to { a -> statEntree(a.path(0)) },
         "fichiers.listerDossier" to { a -> listerDossier(a.path(0)) },

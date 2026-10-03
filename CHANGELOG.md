@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Sync is near real time: a quiz or a review saved in the app leaves at once, a file changed outside the app is seen within a second, and what arrives from another device shows without waiting.
 - A device asking to sync now shows as an amber notification on the Sync page, with Accept and Ignore inside it. Accepting it no longer asks a second time, on Windows as on Android.
 - Share now opens the Windows Share panel (Discord, WhatsApp, Outlook, Teams, Nearby Share and more), for the sync ID as for a quiz or a folder; the old Discord / Save dialog is gone.
 - The wallpaper is no longer blurred by default: only the central panel blurs what is behind it.

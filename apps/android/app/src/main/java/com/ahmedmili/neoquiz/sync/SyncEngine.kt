@@ -52,6 +52,26 @@ class SyncEngine(
     @Volatile var onPaired: (() -> Unit)? = null
 
     @Volatile private var current: Running? = null
+
+    /* Writes of the app, scanned at once, gathered over 150 ms so a burst (a note and its journal line) is one call. */
+    private val toScan = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var scanPending = false
+
+    /** The app just wrote [abs]: if it lies in the shared folder, have Syncthing scan it now. */
+    fun signalWrite(abs: String) {
+        if (stopped || dead) return
+        val rel = ShareRules.pathToScan(root.path, abs) ?: return
+        toScan.add(rel)
+        if (scanPending) return
+        scanPending = true
+        scope.launch(Dispatchers.IO) {
+            delay(150)
+            scanPending = false
+            val subs = toScan.toList()
+            toScan.removeAll(subs.toSet())
+            try { current?.instance?.rest?.scan(ShareRules.FOLDER_ID, subs) } catch (_: Exception) { /* the watcher catches it a second later */ }
+        }
+    }
     @Volatile private var stopped = false
     @Volatile private var dead = false
     private var restarted = false
@@ -64,9 +84,11 @@ class SyncEngine(
     suspend fun start() {
         withContext(Dispatchers.IO) { current = launchAndConfigure() }
         watch(current!!)
+        // Real time (2026-10-03): the tick long-polls the events (up to 10 s), so it returns as soon as
+        // Syncthing has something; a short pause between two ticks keeps a failing engine from spinning.
         loop = scope.launch(Dispatchers.IO) {
             while (isActive && !stopped) {
-                delay(intervalMs)
+                delay(minOf(intervalMs, 200L))
                 tick()
             }
         }
@@ -176,7 +198,7 @@ class SyncEngine(
             val r = current ?: return
             val rest = r.instance.rest
             var received = false
-            val events = rest.events(since, EVENTS)
+            val events = rest.events(since, EVENTS, 10)
             for (i in 0 until events.length()) {
                 val ev = events.getJSONObject(i)
                 if (ev.optLong("id") > since) since = ev.optLong("id")

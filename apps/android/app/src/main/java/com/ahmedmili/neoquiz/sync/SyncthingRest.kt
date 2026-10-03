@@ -69,10 +69,16 @@ class SyncthingRest(private val port: Int, private val apiKey: String) {
 
     fun pendingDevices(): JSONObject = obj("GET", "/rest/cluster/pending/devices")
 
-    /** Events after [since], long-polling at most one second. */
-    fun events(since: Long, types: List<String> = emptyList()): JSONArray {
+    /** Events after [since], long-polling at most [waitS] seconds (bounded to 1..10). */
+    fun events(since: Long, types: List<String> = emptyList(), waitS: Int = 1): JSONArray {
         val filter = if (types.isEmpty()) "" else "&events=" + URLEncoder.encode(types.joinToString(","), "UTF-8")
-        return arr("GET", "/rest/events?since=${maxOf(0, since)}&timeout=1$filter")
+        return arr("GET", "/rest/events?since=${maxOf(0, since)}&timeout=${waitS.coerceIn(1, 10)}$filter")
+    }
+
+    /** Scans these paths of the folder NOW (relative, '/'): what makes a change of the app leave at once. */
+    fun scan(folderId: String, subs: List<String>) {
+        val q = subs.take(50).joinToString("") { "&sub=" + URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
+        call("POST", "/rest/db/scan?folder=${segment(folderId)}$q")
     }
 
     fun folderStatus(id: String): JSONObject = obj("GET", "/rest/db/status?folder=${segment(id)}")

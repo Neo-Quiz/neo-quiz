@@ -181,4 +181,16 @@ class ShareRulesTest {
         assertFalse("not idle yet", d.observe(ev("StateChanged", folder, "to" to "syncing")))
         assertTrue(d.observe(ev("StateChanged", folder, "to" to "idle")))
     }
+
+    @Test fun realTimeSettingsAndPathToScan() {
+        val cfg = ShareRules.folderConfig("/storage/emulated/0/Documents/Neo Quiz", "A", emptyList())
+        assertEquals(1, cfg.getInt("fsWatcherDelayS"))
+        assertEquals(0, cfg.getInt("pullerDelayS"))
+        val root = "/storage/emulated/0/Documents/Neo Quiz"
+        assertEquals("XTI301/Cours.md", ShareRules.pathToScan(root, "$root/XTI301/Cours.md"))
+        assertEquals(".neo-quiz/journal/a.jsonl", ShareRules.pathToScan("$root/", "$root/.neo-quiz/journal/a.jsonl"))
+        for (p in listOf("/storage/emulated/0/Other/x.md", "$root 2/x.md", root, "$root/a/../../x.md", "$root//x.md")) {
+            assertEquals(p, null, ShareRules.pathToScan(root, p))
+        }
+    }
 }

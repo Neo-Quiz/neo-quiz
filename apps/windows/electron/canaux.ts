@@ -372,9 +372,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.read, async (_e, abs: unknown) => fichiers.read(await perimetre.borner(abs)));
 	ipcMain.handle(CANAUX.readCached, async (_e, abs: unknown) => fichiers.readCached(await perimetre.borner(abs)));
 
+	/* Every write of the app is announced to the sync, which scans it at once
+	   when it lies in the shared folder (real time, 2026-10-03). */
+	const ecrit = (a: string): void => { deps.sync?.signalerEcriture(a); };
+
 	ipcMain.handle(CANAUX.write, async (_e, abs: unknown, contenu: string) => {
 		const a = await perimetre.bornerEcriture(abs);
 		await ecrireTexte(etat, a, String(contenu));
+		ecrit(a);
 		return await fraicheur(a);
 	});
 
@@ -397,18 +402,21 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const actuel = await fichiers.read(a);
 		if (actuel !== lu) return null;
 		await ecrireTexte(etat, a, String(contenu));
+		ecrit(a);
 		return await fraicheur(a);
 	});
 
 	ipcMain.handle(CANAUX.writeBinary, async (_e, abs: unknown, data: Uint8Array) => {
 		const a = await perimetre.bornerEcriture(abs);
 		await fichiers.writeBinary(a, data);
+		ecrit(a);
 		return await fraicheur(a);
 	});
 
 	ipcMain.handle(CANAUX.append, async (_e, abs: unknown, contenu: string) => {
 		const a = await perimetre.bornerEcriture(abs);
 		await fichiers.append(a, String(contenu));
+		ecrit(a);
 		return await fraicheur(a);
 	});
 
@@ -426,13 +434,18 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const r = normaliser(path.resolve(racine));
 		if (contratDepuisAbsolu([r], a) === null) throw new Error("trash : " + a + " n'est pas sous " + r);
 		await fichiers.trash(a, r);
+		ecrit(a);
 	});
 	/* NORMALISÉE : `fichiers.list` compose ses chemins avec `path.join`, donc
 	   avec des `\` sous Windows. Tout ce qui franchit le pont doit avoir la même
 	   forme, sinon le miroir du rendu tiendrait deux clés pour un seul fichier. */
 	ipcMain.handle(CANAUX.list, async (_e, dossier: unknown) =>
 		(await fichiers.list(await perimetre.borner(dossier))).map(normaliser));
-	ipcMain.handle(CANAUX.remove, async (_e, abs: unknown) => fichiers.remove(await perimetre.bornerEcriture(abs)));
+	ipcMain.handle(CANAUX.remove, async (_e, abs: unknown) => {
+		const a = await perimetre.bornerEcriture(abs);
+		await fichiers.remove(a);
+		ecrit(a);
+	});
 	/* A DIRECTORY (or junction) rename runs with the file watcher closed:
 	   chokidar holds one OS handle per watched directory and Windows refuses
 	   (EPERM) to rename a directory with an open handle on it or below it. The
@@ -444,8 +457,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const cible = await perimetre.bornerEcriture(vers);
 		const info = await fsp.lstat(source).catch(() => null);
 		const dossier = !!info && (info.isDirectory() || info.isSymbolicLink());
-		if (dossier && etat.index) return etat.index.suspendre(() => fichiers.rename(source, cible));
-		return fichiers.rename(source, cible);
+		if (dossier && etat.index) await etat.index.suspendre(() => fichiers.rename(source, cible));
+		else await fichiers.rename(source, cible);
+		ecrit(source);
+		ecrit(cible);
 	});
 	ipcMain.handle(CANAUX.stat, async (_e, abs: unknown) => stat(await perimetre.borner(abs)));
 	/* Les trois canaux des RACINES EXTERNES du sélecteur « @ » (`HostFs.externe`,

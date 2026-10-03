@@ -193,6 +193,17 @@ await withSrcModule(
 				[d.observer(ev("ItemFinished", { folder: "neo-quiz", item: "a.md" })), d.observer(idle), d.observer(ev("LocalIndexUpdated", { folder: "neo-quiz" })), d.observer(idle)], [false, true, false, false]);
 		});
 
+		await cas(r, "real time", async () => {
+			const { cheminAScanner, folderConfig } = regles;
+			const racine = String.raw`C:\Neo Quiz`;
+			const f = folderConfig(racine, ID, []);
+			r.check("the folder sees outside changes after 1 s and pulls at once", [f.fsWatcherDelayS, f.pullerDelayS], [1, 0]);
+			r.check("a written path under the folder is scanned by its relative path", cheminAScanner(racine, String.raw`C:\Neo Quiz\XTI301\Cours.md`), "XTI301/Cours.md");
+			r.check("Windows paths compare without case, and forward slashes work", cheminAScanner(racine, "c:/neo quiz/.neo-quiz/journal/a.jsonl"), ".neo-quiz/journal/a.jsonl");
+			r.check("outside the folder, a sibling with the same prefix, or the folder itself: nothing",
+				[String.raw`C:\Other\x.md`, String.raw`C:\Neo Quiz 2\x.md`, racine, String.raw`C:\Neo Quiz\a\..\..\x.md`].map(p => cheminAScanner(racine, p)), [null, null, null, null]);
+		});
+
 		await cas(r, "confirmationRequise", async () => {
 			const { confirmationRequise } = regles;
 			r.check("a pending device accepted from the page: no native dialog", confirmationRequise(true, false), false);

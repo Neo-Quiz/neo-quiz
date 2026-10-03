@@ -37,7 +37,9 @@ import type { Changement, EtatSync } from "../../../src/dashboard/sync-etat";
 import { creerFenetreAppairage, codeDansNom, PERIODE_MS, sansCode, texteQr } from "./appairage-qr";
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
+import type { EvenementSync } from "./syncthing-regles";
 import {
+	cheminAScanner,
 	confirmationRequise,
 	EVENEMENTS_CHANGEMENT,
 	ajouterChangement,
@@ -81,6 +83,9 @@ export interface SyncHandle {
 	/** Fired once when another device's changes have landed (see
 	    `creerDetecteurReception`). */
 	surDonneesRecues(rappel: () => void): () => void;
+	/** The app just wrote `abs`: if it is under the shared folder, have
+	    Syncthing scan it now (gathered over `DELAI_SCAN_MS`). */
+	signalerEcriture(abs: string): void;
 	stop(): Promise<void>;
 }
 
@@ -99,6 +104,8 @@ export interface StartOpts {
 	intervalMs?: number;
 }
 
+/** How long writes of the app are gathered before one scan call. */
+const DELAI_SCAN_MS = 150;
 const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected", ...EVENEMENTS_CHANGEMENT] as const;
 const MAX_APPAREILS = 16;
 const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], demandesPlus: 0, dossier: { etat: "absent", pourcentage: null } };
@@ -358,32 +365,6 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		enTick = true;
 		try {
 			const { rest } = courant;
-			let recu = false;
-			/* Names by short id (the first group of a device id, what `modifiedBy`
-			   carries), read at most once per tick and only when a change came. */
-			let noms: Map<string, string> | null = null;
-			const nomDe = (court: string): string => {
-				if (court && courant.ownId.startsWith(court)) return os.hostname().slice(0, 64);
-				for (const [id, nom] of noms ?? []) if (court && id.startsWith(court)) return nom || id.slice(0, 7);
-				return court || "?";
-			};
-			for (const ev of await rest.events(since, EVENEMENTS)) {
-				if (typeof ev.id === "number" && ev.id > since) since = ev.id;
-				if (detecteur.observer(ev)) recu = true;
-				if ((EVENEMENTS_CHANGEMENT as readonly string[]).includes(ev.type)) {
-					if (!noms) {
-						try { noms = new Map((await rest.devices()).map(d => [d.deviceID, d.name])); } catch { noms = new Map(); }
-					}
-					const c = changementDepuis(ev, nomDe);
-					if (c) changements = ajouterChangement(changements, c);
-				}
-				/* The name Syncthing reports for a device that connected, kept
-				   when we have none yet (a device paired by id has no name). */
-				if (ev.type === "DeviceConnected" && typeof ev.data?.id === "string" && typeof ev.data.deviceName === "string" && ev.data.deviceName.trim()) {
-					const cfg = (await rest.devices()).find(d => d.deviceID === ev.data!.id);
-					if (cfg && !cfg.name) await rest.putDevice({ ...cfg, name: ev.data.deviceName.trim().slice(0, 64) });
-				}
-			}
 			/* Offers: accepted only for our folder, from a paired device. The
 			   folder is already shared with every paired device, so an offer that
 			   is still pending means it was not (a device paired a moment ago):
@@ -399,7 +380,6 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			}
 			if (reAligner) await aligner(paires);
 			await diffuser();
-			if (recu) for (const a of abonnesDonnees) a();
 		} catch (e) {
 			if (arrete) return; // the shutdown cut the call: expected
 			console.warn("[syncthing] poll failed:", e instanceof Error ? e.message : String(e));
@@ -434,10 +414,74 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	const minuteur = setInterval(() => { void tick(); }, intervalle);
 	minuteur.unref();
 
+	/* THE EVENT LOOP, continuous (2026-10-03, real time): a long poll that
+	   returns as soon as Syncthing has something, so a change from another
+	   device reaches the window at once, not at the next 10 s tick. */
+	async function traiterEvenements(evs: EvenementSync[]): Promise<boolean> {
+		let recu = false;
+		let change = false;
+		let noms: Map<string, string> | null = null;
+		const nomDe = (court: string): string => {
+			if (court && courant.ownId.startsWith(court)) return os.hostname().slice(0, 64);
+			for (const [id, nom] of noms ?? []) if (court && id.startsWith(court)) return nom || id.slice(0, 7);
+			return court || "?";
+		};
+		const { rest } = courant;
+		for (const ev of evs) {
+			if (typeof ev.id === "number" && ev.id > since) since = ev.id;
+			if (detecteur.observer(ev)) recu = true;
+			if (ev.type === "DeviceConnected" && typeof ev.data?.id === "string" && typeof ev.data.deviceName === "string" && ev.data.deviceName.trim()) {
+				const cfg = (await rest.devices()).find(d => d.deviceID === ev.data!.id);
+				if (cfg && !cfg.name) await rest.putDevice({ ...cfg, name: ev.data.deviceName.trim().slice(0, 64) });
+			}
+			if ((EVENEMENTS_CHANGEMENT as readonly string[]).includes(ev.type)) {
+				if (!noms) {
+					try { noms = new Map((await rest.devices()).map(d => [d.deviceID, d.name])); } catch { noms = new Map(); }
+				}
+				const c = changementDepuis(ev, nomDe);
+				if (c) { changements = ajouterChangement(changements, c); change = true; }
+			}
+			if (ev.type === "StateChanged" || ev.type === "DeviceConnected") change = true;
+		}
+		if (change || recu) await diffuser();
+		return recu;
+	}
+	void (async () => {
+		while (!arrete && !mort) {
+			try {
+				const evs = await courant.rest.events(since, EVENEMENTS, 10);
+				if (arrete) break;
+				if (await traiterEvenements(evs)) for (const a of abonnesDonnees) a();
+			} catch {
+				if (arrete) break;
+				await pause(1000); // the engine restarts, or a call failed: try again shortly
+			}
+		}
+	})();
+
+	/* Writes of the app, scanned at once: gathered for `DELAI_SCAN_MS` so a
+	   burst (a note and its journal line) is one call. */
+	const aScanner = new Set<string>();
+	let minuteurScan: ReturnType<typeof setTimeout> | null = null;
+	function signalerEcriture(abs: string): void {
+		if (arrete || mort) return;
+		const rel = cheminAScanner(opts.root, abs);
+		if (!rel) return;
+		aScanner.add(rel);
+		if (minuteurScan) return;
+		minuteurScan = setTimeout(() => {
+			minuteurScan = null;
+			const subs = [...aScanner];
+			aScanner.clear();
+			void courant.rest.scan(FOLDER_ID, subs).catch(() => undefined); // the watcher catches it a second later
+		}, DELAI_SCAN_MS);
+	}
+
 	return {
 		etat: calculerEtat,
 
 		idPropre: () => courant.ownId,
+		signalerEcriture,
 
 		async demandesBrutes() {
 			if (mort) return [];
@@ -512,6 +556,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			if (arrete) return;
 			arrete = true;
 			clearInterval(minuteur);
+			if (minuteurScan) clearTimeout(minuteurScan);
 			const { rest, child, fini } = courant;
 			try { await rest.shutdown(); } catch { /* it may already be gone */ }
 			const parti = await Promise.race([fini.then(() => true), pause(5000).then(() => false)]);
@@ -539,6 +584,9 @@ export interface GestionSync {
 	qrSuivant(): Promise<{ texte: string; periodeMs: number } | null>;
 	/** The dialog closed: every code dies at once. */
 	qrFermer(): void;
+	/** The app wrote `abs` (see `SyncHandle.signalerEcriture`). Never starts
+	    the instance: when sync is not running there is nothing to send. */
+	signalerEcriture(abs: string): void;
 	/** At launch: starts the instance if sync was switched on. */
 	demarrerSiActif(): Promise<void>;
 	arreter(): Promise<void>;
@@ -650,6 +698,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			return { texte: texteQr(h.idPropre(), code), periodeMs: PERIODE_MS };
 		},
 		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
+		signalerEcriture(abs) { handle?.signalerEcriture(abs); },
 		async demarrerSiActif() { if (await o.lireActif()) await obtenir(); },
 		async arreter() {
 			fin = true;

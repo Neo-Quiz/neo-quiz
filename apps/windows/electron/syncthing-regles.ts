@@ -191,6 +191,8 @@ export interface FolderConfig {
 	type: "sendreceive";
 	devices: Array<{ deviceID: string; introducedBy: string; encryptionPassword: string }>;
 	fsWatcherEnabled: boolean;
+	fsWatcherDelayS: number;
+	pullerDelayS: number;
 	ignorePerms: boolean;
 	[cle: string]: unknown;
 }
@@ -205,9 +207,34 @@ export function folderConfig(root: string, ownId: string, paired: readonly strin
 		type: "sendreceive",
 		devices: ids.map(deviceID => ({ deviceID, introducedBy: "", encryptionPassword: "" })),
 		fsWatcherEnabled: true,
+		/* Real time (2026-10-03, same values as Neo Calendar 1.91.5, measured
+		   there between two real engines): a change made OUTSIDE the app is
+		   seen after 1 s instead of Syncthing's 10 s, and the receiving side
+		   pulls at once instead of waiting 1 s in `sync-waiting`. A change made
+		   BY the app does not wait for the watcher at all: it is scanned the
+		   moment it is written (`signalerEcriture`). Re-put at every start, so
+		   an existing folder gets them too. */
+		fsWatcherDelayS: 1,
+		pullerDelayS: 0,
 		/* Permission bits mean nothing between Windows and Android. */
 		ignorePerms: true,
 	};
+}
+
+/** The path to scan for an absolute path the app just wrote: relative to the
+    shared folder, with `/`, or `null` when it is not under it (another
+    root, the folder itself). Windows paths compare case-insensitively. */
+export function cheminAScanner(root: string, abs: string): string | null {
+	const norm = (p: string): string => p.replace(/\\/g, "/").replace(/\/+$/, "");
+	const r = norm(root);
+	const a = norm(abs);
+	const memeCasse = /^[A-Za-z]:\//.test(r);
+	const rr = memeCasse ? r.toLowerCase() : r;
+	const aa = memeCasse ? a.toLowerCase() : a;
+	if (!aa.startsWith(rr + "/")) return null;
+	const rel = a.slice(r.length + 1);
+	if (!rel || rel.split("/").some(s => s === "" || s === "." || s === "..")) return null;
+	return rel;
 }
 
 export interface EtatDossier {

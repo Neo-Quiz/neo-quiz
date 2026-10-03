@@ -139,8 +139,22 @@ object ShareRules {
             .put("type", "sendreceive")
             .put("devices", devices)
             .put("fsWatcherEnabled", true)
+            // Real time (2026-10-03, same values as Windows and as Neo Calendar 1.91.5): an outside change
+            // is seen after 1 s instead of 10 s, and the receiving side pulls at once. A change made BY the
+            // app is scanned the moment it is written (SyncEngine.signalWrite).
+            .put("fsWatcherDelayS", 1)
+            .put("pullerDelayS", 0)
             // Permission bits mean nothing between Windows and Android.
             .put("ignorePerms", true)
+    }
+
+    /** The path to scan for a file the app just wrote: relative to [root] with '/', or null when it is not under it. */
+    fun pathToScan(root: String, abs: String): String? {
+        val r = root.trimEnd('/')
+        if (!abs.startsWith("$r/")) return null
+        val rel = abs.substring(r.length + 1)
+        if (rel.isEmpty() || rel.split('/').any { it.isEmpty() || it == "." || it == ".." }) return null
+        return rel
     }
 
     /** At most this many pending requests are shown. */

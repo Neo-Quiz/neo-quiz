@@ -68,6 +68,9 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 
     fun markPaused() { paused = true }
 
+    /** The app wrote [abs]: scanned at once when sync runs (never starts it). */
+    fun signalWrite(abs: String) { engine?.signalWrite(abs) }
+
     /** The app came to the screen: a new foreground start is allowed again. */
     fun resume() { paused = false }
 

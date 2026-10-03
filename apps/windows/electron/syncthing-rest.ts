@@ -105,9 +105,16 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 		},
 		pendingFolders: () => json<PendingFolders>("GET", "/rest/cluster/pending/folders"),
 		pendingDevices: () => json<PendingDevices>("GET", "/rest/cluster/pending/devices"),
-		/** Events after `since`, long-polling at most one second. */
-		events: (since: number, types?: readonly string[]) =>
-			json<EvenementSync[]>("GET", `/rest/events?since=${Math.max(0, Math.floor(since))}&timeout=1${types?.length ? "&events=" + encodeURIComponent(types.join(",")) : ""}`),
+		/** Events after `since`, long-polling at most `attenteS` seconds (1 by
+		    default; the event loop waits longer, bounded under the HTTP timeout). */
+		events: (since: number, types?: readonly string[], attenteS = 1) =>
+			json<EvenementSync[]>("GET", `/rest/events?since=${Math.max(0, Math.floor(since))}&timeout=${Math.min(10, Math.max(1, Math.floor(attenteS)))}${types?.length ? "&events=" + encodeURIComponent(types.join(",")) : ""}`),
+		/** Scans these paths of the folder NOW (relative, `/`), instead of
+		    waiting for the watcher: what makes a change of the app leave at once. */
+		async scan(folderId: string, subs: readonly string[]): Promise<void> {
+			const q = subs.slice(0, 50).map(s => "&sub=" + encodeURIComponent(s)).join("");
+			await appeler("POST", `/rest/db/scan?folder=${segment(folderId)}${q}`);
+		},
 		folderStatus: (id: string) => json<FolderStatus>("GET", `/rest/db/status?folder=${segment(id)}`),
 		/** Dismisses ONE pending device (the owner chose Ignore); it may come back the next time that device tries. */
 		async dismissPendingDevice(id: string): Promise<void> { await appeler("DELETE", `/rest/cluster/pending/devices?device=${segment(id)}`); },
