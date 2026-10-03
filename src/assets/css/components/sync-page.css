@@ -570,3 +570,22 @@
 	padding-right: 44px;
 	font-size: 13px;
 }
+
+/* The copy icon of the ID block: no frame, no fill, just the icon; a soft
+   wash on hover, green once copied. */
+.qbd-sync-code .qbd-install-copy {
+	border-color: transparent;
+	background: transparent;
+	color: var(--text-faint, var(--text-muted));
+}
+
+.qbd-sync-code .qbd-install-copy:hover {
+	border-color: transparent;
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-sync-code .qbd-install-copy[data-copie] {
+	border-color: transparent;
+	color: var(--color-green, #4ade80);
+}
