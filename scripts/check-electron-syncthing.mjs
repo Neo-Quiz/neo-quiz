@@ -209,6 +209,33 @@ await withSrcModule(
 				[d.observer(ev("ItemFinished", { folder: "neo-quiz", item: "a.md" })), d.observer(idle), d.observer(ev("LocalIndexUpdated", { folder: "neo-quiz" })), d.observer(idle)], [false, true, false, false]);
 		});
 
+		await cas(r, "recent changes", async () => {
+			const { changementDepuis, ajouterChangement } = regles;
+			const nomDe = court => (court === "CJXCUH3" ? "DESKTOP" : "?");
+			const ev = (data, type = "RemoteChangeDetected", time = "2026-10-03T16:30:15+02:00") =>
+				({ id: 1, type, time, data: { folder: "neo-quiz", action: "modified", type: "file", path: "Cours\\Neo Quiz.md", modifiedBy: "CJXCUH3", ...data } });
+			r.check("a remote change becomes a line, with / separators and the device name", changementDepuis(ev({}), nomDe),
+				{ appareil: "DESKTOP", action: "modifie", dossier: false, chemin: "Cours/Neo Quiz.md", quand: Date.parse("2026-10-03T16:30:15+02:00") });
+			r.check("a local change too, and a directory is a folder", changementDepuis(ev({ action: "added", type: "dir", path: "XTI301" }, "LocalChangeDetected"), nomDe)?.dossier, true);
+			r.check("deleted maps to supprime", changementDepuis(ev({ action: "deleted" }), nomDe)?.action, "supprime");
+			r.check("another folder is ignored", changementDepuis(ev({ folder: "Personal" }), nomDe), null);
+			r.check("another event type is ignored", changementDepuis(ev({}, "ItemFinished"), nomDe), null);
+			r.check("an unknown action is ignored", changementDepuis(ev({ action: "renamed" }), nomDe), null);
+			r.check("hidden paths are ignored (journal, trash, Syncthing files)",
+				[".neo-quiz/journal/a.jsonl", "a/.trash/x.md", ".stfolder", "a/.syncthing.x.md.tmp"].map(path => changementDepuis(ev({ path }), nomDe)), [null, null, null, null]);
+			r.check("a path that is not relative is ignored",
+				["/etc/passwd", "C:\\x.md", "a/../b.md", "a//b.md", "x".repeat(513)].map(path => changementDepuis(ev({ path }), nomDe)), [null, null, null, null, null]);
+			r.check("an event without a readable time is ignored", changementDepuis(ev({}, "RemoteChangeDetected", "never"), nomDe), null);
+			const a = { appareil: "DESKTOP", action: "modifie", dossier: false, chemin: "a.md", quand: 1000 };
+			const b = { ...a, chemin: "b.md", quand: 2000 };
+			let l = ajouterChangement(ajouterChangement([], a), b);
+			r.check("newest first", l.map(c => c.chemin), ["b.md", "a.md"]);
+			l = ajouterChangement(l, { ...a, quand: 3000 });
+			r.check("the same change again replaces the older line", l.map(c => `${c.chemin}@${c.quand}`), ["a.md@3000", "b.md@2000"]);
+			r.check("another action on the same path is its own line", ajouterChangement(l, { ...a, action: "supprime", quand: 4000 }).length, 3);
+			r.check("the list is bounded", ajouterChangement(Array.from({ length: 5 }, (_, i) => ({ ...a, chemin: i + ".md", quand: i })), b, 3).length, 3);
+		});
+
 		await cas(r, "main-only settings", async () => {
 			const { reglageReserve } = regles;
 			r.check("syncActif and syncRoot cannot be written from the window; others can",

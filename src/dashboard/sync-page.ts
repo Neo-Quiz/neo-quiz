@@ -27,8 +27,8 @@
 import QRCode from "qrcode";
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
-import { t } from "../i18n";
-import type { EtatSync } from "./sync-etat";
+import { currentLang, hourOptions, t } from "../i18n";
+import type { Changement, EtatSync } from "./sync-etat";
 
 export type CanalPartage = "courriel" | "discord" | "systeme";
 
@@ -86,6 +86,39 @@ export function ilYA(ms: number, maintenant: number = Date.now()): string {
 	if (min < 60) return t("settings.sync.whenMinutes", { n: min });
 	if (min < 60 * 24) return t("settings.sync.whenHours", { n: Math.floor(min / 60) });
 	return t("settings.sync.whenDays", { n: Math.floor(min / (60 * 24)) });
+}
+
+/** Midnight, local time, of the day of `ms`. */
+function debutDuJour(ms: number): number {
+	const d = new Date(ms);
+	d.setHours(0, 0, 0, 0);
+	return d.getTime();
+}
+
+const PHRASE_NOW = { ajoute: "settings.sync.changeNowAdded", modifie: "settings.sync.changeNowModified", supprime: "settings.sync.changeNowDeleted" } as const;
+const PHRASE_PAST = { ajoute: "settings.sync.changePastAdded", modifie: "settings.sync.changePastModified", supprime: "settings.sync.changePastDeleted" } as const;
+
+/** One change as a sentence that ages with the clock: "DESKTOP just modified
+    Neo Quiz.md" in its first minute, then "… 5 min ago", "… at 16:30:15"
+    today, "… yesterday at 16:30", "… on 1 Oct at 16:30". Only the file or
+    folder NAME is in the sentence; its folder is shown apart. */
+export function phraseChangement(c: Changement, maintenant: number = Date.now()): string {
+	const nom = c.chemin.split("/").pop() || c.chemin;
+	const quoi = c.dossier ? t("settings.sync.changeFolder", { name: nom }) : nom;
+	const age = maintenant - c.quand;
+	if (age < 60_000) return t(PHRASE_NOW[c.action], { device: c.appareil, what: quoi });
+	const heure = (secondes: boolean): string => new Intl.DateTimeFormat(currentLang(), { ...hourOptions(), minute: "2-digit", ...(secondes ? { second: "2-digit" } : {}) }).format(c.quand);
+	const jour = debutDuJour(maintenant);
+	let quand: string;
+	if (age < 60 * 60_000) quand = t("settings.sync.whenMinutes", { n: Math.floor(age / 60_000) });
+	else if (c.quand >= jour) quand = t("settings.sync.changeAt", { time: heure(true) });
+	else if (c.quand >= debutDuJour(jour - 1)) quand = t("settings.sync.changeYesterday", { time: heure(false) });
+	else {
+		const memeAnnee = new Date(c.quand).getFullYear() === new Date(maintenant).getFullYear();
+		const date = new Intl.DateTimeFormat(currentLang(), memeAnnee ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }).format(c.quand);
+		quand = t("settings.sync.changeOn", { date, time: heure(false) });
+	}
+	return t(PHRASE_PAST[c.action], { device: c.appareil, what: quoi, when: quand });
 }
 
 function icone(parent: HTMLElement, nom: string, classe: string): HTMLElement {
@@ -166,6 +199,16 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const ajout = ajouter(appareilsSection, "div", "qbd-sync-ajout");
 	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-ajout");
 	ajouterBouton.setAttribute("aria-haspopup", "dialog");
+
+	/* ── Recent changes: today by default, the older ones behind a link ── */
+	const changementsSection = ajouter(racine, "section", "qbd-sync-section");
+	changementsSection.hidden = true;
+	titre(changementsSection, t("settings.sync.changes"));
+	const changementsCarte = ajouter(changementsSection, "div", "qbd-sync-carte");
+	const plusAnciens = ajouter(changementsSection, "button", "qbd-sync-lien qbd-sync-lien-bouton");
+	plusAnciens.type = "button";
+	let voirAnciens = false;
+	plusAnciens.addEventListener("click", () => { voirAnciens = !voirAnciens; if (dernierEtat) peindreChangements(dernierEtat); });
 
 	/* ── Footer: what sync runs on, for whoever has never heard of it ── */
 	const pied = ajouter(racine, "footer", "qbd-sync-pied");
@@ -414,6 +457,29 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
+	function peindreChangements(e: EtatSync): void {
+		const liste = e.changements;
+		changementsSection.hidden = !e.actif || liste === undefined;
+		if (changementsSection.hidden || !liste) return;
+		const maintenant = Date.now();
+		const jour = debutDuJour(maintenant);
+		const anciens = liste.filter(c => c.quand < jour).length;
+		const visibles = voirAnciens ? liste : liste.filter(c => c.quand >= jour);
+		changementsCarte.replaceChildren();
+		if (visibles.length === 0) {
+			ajouter(ajouter(changementsCarte, "div", "qbd-sync-ligne"), "span", "qbd-sync-vide", t("settings.sync.changesNoneToday"));
+		}
+		for (const c of visibles) {
+			const l = ajouter(changementsCarte, "div", "qbd-sync-ligne");
+			const bloc = ajouter(l, "div", "qbd-sync-id-bloc");
+			ajouter(bloc, "span", "qbd-sync-changement", phraseChangement(c, maintenant));
+			const parent = c.chemin.includes("/") ? c.chemin.slice(0, c.chemin.lastIndexOf("/")) : "";
+			if (parent) ajouter(bloc, "span", "qbd-sync-sous", parent);
+		}
+		plusAnciens.hidden = anciens === 0;
+		plusAnciens.textContent = t(voirAnciens ? "settings.sync.changesHideOlder" : "settings.sync.changesShowOlder", { n: anciens });
+	}
+
 	function peindre(e: EtatSync): void {
 		if (demonte) return;
 		dernierEtat = e;
@@ -426,6 +492,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		if (!e.actif) fermerAjout();
 		peindreDemandes(e);
 		peindreAppareils(e);
+		peindreChangements(e);
 	}
 
 	afficherIdBtn.addEventListener("click", ouvrirId);
@@ -433,6 +500,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 
 	/* Last-seen times age without any push: repaint the list now and then. */
 	const horloge = setInterval(() => { if (dernierEtat && !demonte) peindreAppareils(dernierEtat); }, 60_000);
+	/* The change sentences age faster ("just" lasts a minute): every 5 s. */
+	const horlogeChangements = setInterval(() => { if (dernierEtat && !demonte) peindreChangements(dernierEtat); }, 5_000);
 
 	/* Subscribe BEFORE the first read, and let a pushed state win over a read
 	   that was already in flight: it is the more recent. */
@@ -445,6 +514,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	return () => {
 		demonte = true;
 		clearInterval(horloge);
+		clearInterval(horlogeChangements);
 		fermerMenu();
 		dialogueId?.fermer();
 		fermerAjout();

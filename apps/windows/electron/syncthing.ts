@@ -33,10 +33,13 @@ import * as fs from "node:fs/promises";
 import { createServer } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { EtatSync } from "../../../src/dashboard/sync-etat";
+import type { Changement, EtatSync } from "../../../src/dashboard/sync-etat";
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
 import {
+	EVENEMENTS_CHANGEMENT,
+	ajouterChangement,
+	changementDepuis,
 	FOLDER_ID,
 	IGNORES,
 	LISTEN_PORT,
@@ -87,7 +90,7 @@ export interface StartOpts {
 	intervalMs?: number;
 }
 
-const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected"] as const;
+const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected", ...EVENEMENTS_CHANGEMENT] as const;
 const MAX_APPAREILS = 16;
 const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], demandesPlus: 0, dossier: { etat: "absent", pourcentage: null } };
 
@@ -288,6 +291,9 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	let enTick = false;
 	const abonnesEtat = new Set<(e: EtatSync) => void>();
 	const abonnesDonnees = new Set<() => void>();
+	/** The "Recent changes" of the Sync page, in memory only: Syncthing keeps
+	    no history across restarts either. */
+	let changements: Changement[] = [];
 
 	/** Devices of the config that are not us. */
 	async function pairesCourants(): Promise<string[]> {
@@ -326,6 +332,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			demandes: demandesDepuis(attente, paires, ownId),
 			demandesPlus: plusDemandes(attente, paires, ownId),
 			dossier: folderEtat(statut),
+			changements,
 		};
 	}
 
@@ -343,9 +350,24 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		try {
 			const { rest } = courant;
 			let recu = false;
+			/* Names by short id (the first group of a device id, what `modifiedBy`
+			   carries), read at most once per tick and only when a change came. */
+			let noms: Map<string, string> | null = null;
+			const nomDe = (court: string): string => {
+				if (court && courant.ownId.startsWith(court)) return os.hostname().slice(0, 64);
+				for (const [id, nom] of noms ?? []) if (court && id.startsWith(court)) return nom || id.slice(0, 7);
+				return court || "?";
+			};
 			for (const ev of await rest.events(since, EVENEMENTS)) {
 				if (typeof ev.id === "number" && ev.id > since) since = ev.id;
 				if (detecteur.observer(ev)) recu = true;
+				if ((EVENEMENTS_CHANGEMENT as readonly string[]).includes(ev.type)) {
+					if (!noms) {
+						try { noms = new Map((await rest.devices()).map(d => [d.deviceID, d.name])); } catch { noms = new Map(); }
+					}
+					const c = changementDepuis(ev, nomDe);
+					if (c) changements = ajouterChangement(changements, c);
+				}
 				/* The name Syncthing reports for a device that connected, kept
 				   when we have none yet (a device paired by id has no name). */
 				if (ev.type === "DeviceConnected" && typeof ev.data?.id === "string" && typeof ev.data.deviceName === "string" && ev.data.deviceName.trim()) {

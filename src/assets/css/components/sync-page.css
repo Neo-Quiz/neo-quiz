@@ -436,3 +436,27 @@
 	width: 18px;
 	height: 18px;
 }
+
+/* Recent changes: one sentence per line, its folder under it. */
+.qbd-sync-changement {
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+
+/* "Show older changes": an underlined text, not a button. */
+.qbd-sync-lien-bouton {
+	align-self: flex-start;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	font-size: 12px;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.qbd-sync-lien-bouton[hidden] {
+	display: none;
+}

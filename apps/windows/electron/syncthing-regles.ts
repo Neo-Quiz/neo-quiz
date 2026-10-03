@@ -26,6 +26,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { CLE_SYNC_ACTIF, CLE_SYNC_ROOT } from "./pont";
+import { MAX_CHANGEMENTS, type Changement } from "../../../src/dashboard/sync-etat";
 
 export const FOLDER_ID = "neo-quiz";
 
@@ -231,7 +232,49 @@ export function folderEtat(s: { state?: string; globalBytes?: number; inSyncByte
 export interface EvenementSync {
 	id?: number;
 	type: string;
+	/** RFC 3339, as Syncthing writes it. */
+	time?: string;
 	data?: Record<string, unknown>;
+}
+
+/** The two events behind Syncthing's "Recent changes": a change found on
+    this device's disk, and one applied from another device. */
+export const EVENEMENTS_CHANGEMENT = ["LocalChangeDetected", "RemoteChangeDetected"] as const;
+
+const ACTIONS: Readonly<Record<string, Changement["action"]>> = { added: "ajoute", modified: "modifie", deleted: "supprime" };
+
+/**
+ * One "Recent changes" event → what the Sync page shows, or `null` for
+ * anything it must not: another folder, an unknown action, a path that is
+ * not a plain relative one (bounded at 512 characters), or a HIDDEN path
+ * (a segment starting with `.`: `.neo-quiz/` journals, `.stfolder`,
+ * `.trash`, Syncthing's temporary files), which would bury the user's own
+ * notes under the app's bookkeeping. `nomDe` turns the short device id of
+ * `modifiedBy` into a name.
+ */
+export function changementDepuis(ev: EvenementSync, nomDe: (idCourt: string) => string): Changement | null {
+	if (!(EVENEMENTS_CHANGEMENT as readonly string[]).includes(ev.type)) return null;
+	const d = ev.data ?? {};
+	if (d.folder !== FOLDER_ID) return null;
+	const action = typeof d.action === "string" ? ACTIONS[d.action] : undefined;
+	if (!action) return null;
+	if (typeof d.path !== "string" || !d.path || d.path.length > 512) return null;
+	const chemin = d.path.replace(/\\/g, "/");
+	const segments = chemin.split("/");
+	if (chemin.startsWith("/") || /^[A-Za-z]:/.test(chemin) || segments.some(s => s === "" || s === ".." || s.startsWith("."))) return null;
+	const quand = typeof ev.time === "string" ? Date.parse(ev.time) : NaN;
+	if (!Number.isFinite(quand)) return null;
+	const court = typeof d.modifiedBy === "string" ? d.modifiedBy : "";
+	return { appareil: nomDe(court).slice(0, 64), action, dossier: d.type === "dir", chemin, quand };
+}
+
+/** Adds a change in front, newest first. The same device doing the same thing
+    to the same path again REPLACES the older line (an editor that saves
+    three times in a row is one change, at its last time), and the list is
+    bounded at `max`. */
+export function ajouterChangement(liste: readonly Changement[], c: Changement, max: number = MAX_CHANGEMENTS): Changement[] {
+	const reste = liste.filter(x => !(x.appareil === c.appareil && x.action === c.action && x.chemin === c.chemin));
+	return [c, ...reste].sort((a, b) => b.quand - a.quand).slice(0, max);
 }
 
 /**

@@ -1,5 +1,5 @@
 /** What the Sync page shows, and what the bridge (`Pont.sync`) hands over.
-    Types only: the page lives in the shared code and must not import from
+    Types (and one bound) only: the page lives in the shared code and must not import from
     `apps/`, so the shape is defined here and both sides import it. */
 export interface EtatSync {
 	/** The embedded Syncthing is running. */
@@ -18,4 +18,23 @@ export interface EtatSync {
 	/** How many more requests exist than `demandes` lists (the page shows "+N"). */
 	demandesPlus: number;
 	dossier: { etat: "idle" | "syncing" | "error" | "absent"; pourcentage: number | null };
+	/** The recent changes to the synced folder, newest first, at most
+	    `MAX_CHANGEMENTS`. Optional: a host that does not collect them (the
+	    Android app, for now) leaves it out and the page hides the section. */
+	changements?: Changement[];
 }
+
+/** One change to the synced folder, by this device or another. `appareil` is
+    a device NAME (the remote's own, at most 64 characters: render as text
+    only), `chemin` a path relative to the folder with `/` separators, and
+    `quand` milliseconds since the epoch. */
+export interface Changement {
+	appareil: string;
+	action: "ajoute" | "modifie" | "supprime";
+	dossier: boolean;
+	chemin: string;
+	quand: number;
+}
+
+/** How many changes a host keeps and hands over. */
+export const MAX_CHANGEMENTS = 200;
