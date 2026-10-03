@@ -14,7 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
-- A device asking to sync now shows as an amber notification on the Sync page, with Accept and Ignore inside it. Accepting it no longer asks a second time in a Windows dialog.
+- A device asking to sync now shows as an amber notification on the Sync page, with Accept and Ignore inside it. Accepting it no longer asks a second time, on Windows as on Android.
 - Share now opens the Windows Share panel (Discord, WhatsApp, Outlook, Teams, Nearby Share and more), for the sync ID as for a quiz or a folder; the old Discord / Save dialog is gone.
 - The wallpaper is no longer blurred by default: only the central panel blurs what is behind it.
 - "Add a device" now sits in the "My devices" section (formerly "Your devices"), under the list, as a smaller button, and opens a dialog to paste or scan the other device’s ID.

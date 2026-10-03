@@ -220,9 +220,14 @@ class SyncEngine(
             if (paired.size >= MAX_DEVICES) return@withContext PairResult.INVALID
             val waiting = r.instance.rest.pendingDevices().optJSONObject(id)
             val name = ShareRules.cleanName(waiting?.optString("name"))
-            // Nothing is paired without the owner's say: a native dialog the page cannot answer.
-            val agreed = try { confirm(id, name) } catch (_: Exception) { false }
-            if (!agreed) return@withContext PairResult.CANCELLED
+            // The owner's say. A device that ASKED (it is pending) and is accepted from the page's
+            // request notification needs no second question: the tap on Accept is it (owner's
+            // decision, 2026-10-03, same as Windows). An id typed or scanned in "Add a device"
+            // (nothing asked for it) still goes through a native dialog the page cannot answer.
+            if (waiting == null) {
+                val agreed = try { confirm(id, name) } catch (_: Exception) { false }
+                if (!agreed) return@withContext PairResult.CANCELLED
+            }
             r.instance.rest.putDevice(
                 JSONObject().put("deviceID", id).put("name", name).put("addresses", org.json.JSONArray(listOf("dynamic")))
                     .put("introducer", false).put("autoAcceptFolders", false).put("paused", false),
