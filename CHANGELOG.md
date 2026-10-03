@@ -22,7 +22,7 @@ release notes.
 - "Add a device" now sits in the "My devices" section (formerly "Your devices"), under the list, as a smaller button, and opens a dialog to paste or scan the other device’s ID.
 - The Sync page is simpler: one big "Show my ID" button opens a dialog with the full ID, Copy, Share and its QR code, and a footer names Syncthing with a "Learn more" link.
 - “Recent changes”, a full-width button on the Sync page, lists today’s changes as plain sentences (“DESKTOP just modified Neo Quiz.md”) that update as time passes; older ones are one click away.
-- “Show my ID” opens a wide dialog: its QR code changes every 2 seconds (a bar fills up until the next one), the ID sits in a code block with a copy icon, and Share is a blue button; a phone that scans the code is still confirmed by a Windows dialog.
+- “Show my ID” opens “Device ID - <your PC>”: the ID on one line in a code block with a copy icon, its QR code in the middle (it changes every 2 seconds, a bar fills up until the next one), and a blue Share button; a phone that scans the code is still confirmed by a dialog.
 
 ## [1.20.23] - 2026-10-02
 
