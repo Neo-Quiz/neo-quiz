@@ -257,45 +257,105 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	grid-template-rows: auto minmax(0, 1fr);
 }
 
-/* SETTINGS ON A PHONE (2026-10-04): the Android way. First a LIST of the
-   categories (icon, name, chevron), then the chosen page alone under a
-   "<- Title" header; the arrow and the phone's back key go back to the list. */
+/* SETTINGS ON A PHONE (2026-10-04), copied from Neo Calendar's Android
+   settings: a top bar "<- Settings" with a hairline under it, ONE page with
+   every category under a grey section title, rows as tiles (a few pixels
+   apart, the group rounded at both ends). Only Sync opens a page of its own,
+   and the bar then reads "<- Sync". */
+.is-mobile .nq-reglages-modal .modal-title,
+.is-mobile .nq-reglages-modal .modal-close-button,
 .is-mobile .nq-set-nav {
-	flex-direction: column;
-	flex-wrap: nowrap;
-	gap: 0;
-	/* 52 px at the top: the modal's title and close cross sit there. */
-	padding: 52px 0 8px;
-	border-right: 0;
-	border-bottom: 0;
-}
-
-.is-mobile .nq-set-onglet {
-	width: 100%;
-	height: 56px;
-	padding: 0 18px;
-	justify-content: flex-start;
-	gap: 14px;
-	border-radius: 0;
-	font-size: 16px;
-}
-
-.is-mobile .nq-set-onglet + .nq-set-onglet {
-	border-top: 1px solid var(--background-modifier-border);
-}
-
-.is-mobile .nq-set-onglet::before {
 	display: none;
 }
 
-.is-mobile .nq-set-onglet[aria-selected="true"] {
+.is-mobile .nq-set-barre {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 64px;
+	padding: 0 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.is-mobile .nq-set-barre-titre {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 400;
+	color: var(--text-normal);
+}
+
+.is-mobile .nq-set.is-principal .nq-set-page[data-cache-principal],
+.is-mobile .nq-set.is-categorie .nq-set-entree,
+.is-mobile .nq-set.is-categorie .nq-set-page-titre {
+	display: none;
+}
+
+/* The section titles: grey, regular, like Neo Calendar's. */
+.is-mobile .nq-set-page-titre,
+.is-mobile .nq-set .nq-reglages-titre {
+	margin: 22px 4px 8px;
+	font-size: 15px;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+/* Rows as tiles: no border around the group, a gap between rows, the group
+   rounded at both ends. */
+.is-mobile .nq-set-carte,
+.is-mobile .nq-set .nq-reglages-liste,
+.is-mobile .nq-set .nq-comptes-liste {
+	gap: 3px;
+	border: 0;
+	border-radius: 16px;
 	background: transparent;
 }
 
+.is-mobile .nq-set-carte > *,
+.is-mobile .nq-set .nq-reglages-liste > * {
+	background: var(--background-secondary);
+	border-radius: 4px;
+}
+
+.is-mobile .nq-set-carte > * + *,
+.is-mobile .nq-set .nq-reglages-liste > * + * {
+	border-top: 0;
+}
+
+.is-mobile .nq-set-ligne {
+	min-height: 60px;
+	padding: 12px 18px;
+}
+
+.is-mobile .nq-set .nq-reglages-nom,
+.is-mobile .nq-set-ligne-libelle {
+	font-size: 16px;
+	color: var(--text-normal);
+}
+
+.is-mobile .nq-set-ligne-lien {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	width: 100%;
+	border: 0;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.is-mobile .nq-set-ligne-lien .nq-set-ligne-libelle {
+	flex: 1;
+}
+
+.is-mobile .nq-set-ligne-icone,
 .is-mobile .nq-set-onglet-chevron {
 	display: inline-flex;
-	margin-left: auto;
-	color: var(--text-faint, var(--text-muted));
+	color: var(--text-muted);
+}
+
+.is-mobile .nq-set-ligne-icone svg {
+	width: 22px;
+	height: 22px;
 }
 
 .is-mobile .nq-set-onglet-chevron svg {
@@ -303,30 +363,13 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	height: 18px;
 }
 
-.is-mobile .nq-set.is-liste .nq-set-volet,
-.is-mobile .nq-set.is-categorie .nq-set-nav {
-	display: none;
-}
-
-.is-mobile .nq-set-page-entete {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	/* Under the modal's title and close cross, like the list. */
-	margin: 38px 0 12px -6px;
-}
-
-.is-mobile .nq-set-page-entete .nq-set-page-titre {
-	margin: 0;
-}
-
 .nq-set-retour {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	flex: none;
-	width: 44px;
-	height: 44px;
+	width: 48px;
+	height: 48px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
@@ -340,8 +383,8 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 }
 
 .nq-set-retour svg {
-	width: 22px;
-	height: 22px;
+	width: 24px;
+	height: 24px;
 }
 
 .is-mobile .nq-set-volet {
@@ -868,25 +911,5 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
    in the slide itself, and the arrows return when the keyboard closes; sitting
    above the keyboard they would still cost a fifth of the room that is left. */
 html.nq-keyboard #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
-	display: none;
-}
-
-/* Settings on a phone, in Neo Calendar's Android style (2026-10-04): the
-   categories grouped in ONE rounded card with side margins, thin lines
-   between rows; no close cross (Settings is a tab of the bottom bar, and the
-   back key closes it: `retour-android.ts` clicks the hidden cross). */
-.is-mobile .nq-set.is-liste .nq-set-nav {
-	margin: 52px 16px 8px;
-	padding: 0;
-	border-radius: 16px;
-	overflow: hidden;
-	background: var(--background-secondary);
-}
-
-.is-mobile .nq-set.is-liste .nq-set-onglet {
-	background: transparent;
-}
-
-.is-mobile .nq-reglages-modal .modal-close-button {
 	display: none;
 }

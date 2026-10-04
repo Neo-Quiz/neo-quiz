@@ -36,9 +36,9 @@ export function prendreRetour(e: Event): boolean {
 export function retourAndroid(): boolean {
 	const modales = document.querySelectorAll<HTMLElement>(".modal-container:not(.qbd-closing) .modal-close-button");
 	const derniere = modales[modales.length - 1];
-	/* Inside Settings, an open category goes back to the list first (the
-	   phone's list of categories, 2026-10-04), as its own arrow does. */
-	const retourReglages = derniere?.closest(".modal")?.querySelector<HTMLElement>(".nq-set.is-categorie .nq-set-page:not([hidden]) .nq-set-retour");
+	/* Inside Settings, the Sync page goes back to the settings page first
+	   (the phone's one-page settings, 2026-10-04), as its own arrow does. */
+	const retourReglages = derniere?.closest(".modal")?.querySelector<HTMLElement>(".nq-set.is-categorie .nq-set-barre .nq-set-retour");
 	if (retourReglages) {
 		retourReglages.click();
 		return true;

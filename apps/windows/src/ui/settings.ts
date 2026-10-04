@@ -161,45 +161,66 @@ export function renderSettings(
 		tab.setAttribute("aria-controls", `nq-set-page-${c.id}`);
 		currentHost().ui.setIcon(ajouter(tab, "span", "nq-set-onglet-icone"), c.icon);
 		ajouter(tab, "span", undefined, t(c.label));
-		/* A phone shows the categories as a LIST, the Android way (2026-10-04):
-		   each row ends with a chevron and opens its page. */
-		if (mobile) currentHost().ui.setIcon(ajouter(tab, "span", "nq-set-onglet-chevron"), "chevron-right");
 		tab.addEventListener("click", () => show(c.id));
 		tabs.set(c.id, tab);
 		const page = ajouter(pane, "div", "nq-set-page");
 		page.id = `nq-set-page-${c.id}`;
 		page.setAttribute("role", "tabpanel");
 		page.setAttribute("aria-labelledby", tab.id);
-		if (mobile) {
-			/* The page's header on a phone: a back arrow to the list, then its title. */
-			const entete = ajouter(page, "div", "nq-set-page-entete");
-			const retour = ajouter(entete, "button", "nq-set-retour");
-			retour.type = "button";
-			retour.setAttribute("aria-label", t("app.settings.back"));
-			currentHost().ui.setIcon(retour, "arrow-left");
-			retour.addEventListener("click", () => montrerListe());
-			ajouter(entete, "h2", "nq-set-page-titre", t(c.label));
-		} else {
-			ajouter(page, "h2", "nq-set-page-titre", t(c.label));
-		}
+		ajouter(page, "h2", "nq-set-page-titre", t(c.label));
 		pages.set(c.id, page);
 	}
 
-	/** Phone only: back to the list of categories. */
-	function montrerListe(): void {
-		shell.classList.add("is-liste");
-		shell.classList.remove("is-categorie");
-		for (const [c, tab] of tabs) {
-			tab.setAttribute("aria-selected", "false");
-			pages.get(c)!.hidden = true;
+	/* ON A PHONE, Neo Calendar's Android settings (2026-10-04): ONE page,
+	   "<- Settings" at the top, every category one after the other under a
+	   grey section title, rows as tiles. Only Sync opens a page of its own,
+	   from a "Sync >" row, with "<- Sync" at the top. The tab list is not
+	   shown; the arrow (and the phone's back key, `retour-android.ts`) goes
+	   back from Sync to the page, and from the page closes Settings. */
+	let barreTitre: HTMLElement | null = null;
+	if (mobile) {
+		const barre = document.createElement("div");
+		barre.className = "nq-set-barre";
+		shell.prepend(barre);
+		const retour = ajouter(barre, "button", "nq-set-retour");
+		retour.type = "button";
+		retour.setAttribute("aria-label", t("app.settings.back"));
+		currentHost().ui.setIcon(retour, "arrow-left");
+		retour.addEventListener("click", () => {
+			if (shell.classList.contains("is-categorie")) montrerPrincipal();
+			else root.closest(".modal")?.querySelector<HTMLElement>(".modal-close-button")?.click();
+		});
+		barreTitre = ajouter(barre, "h1", "nq-set-barre-titre", t("review.settings.title"));
+		const pageSync = pages.get("sync");
+		if (pageSync) {
+			const entree = ajouter(pane, "section", "nq-set-entree");
+			pane.insertBefore(entree, pageSync);
+			ajouter(entree, "h2", "nq-set-page-titre", t("settings.sync.title"));
+			const carte = ajouter(entree, "div", "nq-set-carte");
+			const ligne = ajouter(carte, "button", "nq-set-ligne nq-set-ligne-lien");
+			ligne.type = "button";
+			currentHost().ui.setIcon(ajouter(ligne, "span", "nq-set-ligne-icone"), "refresh-cw");
+			ajouter(ligne, "span", "nq-set-ligne-libelle", t("settings.sync.title"));
+			currentHost().ui.setIcon(ajouter(ligne, "span", "nq-set-onglet-chevron"), "chevron-right");
+			ligne.addEventListener("click", () => show("sync"));
 		}
-		tabs.get(lastCategory)?.focus();
+	}
+
+	/** Phone only: the one page with every category, Sync as a row. */
+	function montrerPrincipal(): void {
+		shell.classList.remove("is-categorie");
+		shell.classList.add("is-principal");
+		for (const [c] of tabs) pages.get(c)!.hidden = c === "sync";
+		if (barreTitre) barreTitre.textContent = t("review.settings.title");
+		window.scrollTo(0, 0);
 	}
 
 	function show(id: Category): void {
 		if (mobile) {
-			shell.classList.remove("is-liste");
+			shell.classList.remove("is-principal");
 			shell.classList.add("is-categorie");
+			if (barreTitre) barreTitre.textContent = t(categories.find(c => c.id === id)!.label);
+			window.scrollTo(0, 0);
 		}
 		lastCategory = id;
 		for (const [c, tab] of tabs) {
@@ -533,7 +554,7 @@ export function renderSettings(
 	const languagesPage = pages.get("languages")!;
 	const demonterLangages = mountLanguagePackSettings(section(languagesPage, null, t("settings.languages.hint")));
 
-	if (mobile) montrerListe();
+	if (mobile) montrerPrincipal();
 	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
 		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];
