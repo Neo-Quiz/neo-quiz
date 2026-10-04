@@ -310,6 +310,17 @@ class SyncEngine(
         push()
     }
 
+    suspend fun rename(raw: String, rawName: String) = withContext(Dispatchers.IO) {
+        val id = raw.trim()
+        val name = ShareRules.cleanName(rawName)
+        val r = current
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead || name.isEmpty()) return@withContext
+        val devices = r.instance.rest.devices()
+        val d = (0 until devices.length()).map { devices.getJSONObject(it) }.firstOrNull { it.optString("deviceID") == id } ?: return@withContext
+        r.instance.rest.putDevice(d.put("name", name))
+        push()
+    }
+
     suspend fun stop() {
         if (stopped) return
         stopped = true

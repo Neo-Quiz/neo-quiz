@@ -255,6 +255,7 @@ const pont: Pont = {
 		etat: () => appeler("sync.etat"),
 		appairer: (deviceId, nom) => appeler("sync.appairer", nom ? [deviceId, String(nom)] : [deviceId]),
 		oublier: (deviceId) => appeler("sync.oublier", [deviceId]),
+		renommer: (deviceId, nom) => appeler("sync.renommer", [deviceId, String(nom)]),
 		ignorer: (deviceId) => appeler("sync.ignorer", [deviceId]),
 		partagerId: (canal) => appeler("sync.partagerId", [canal]),
 		surEtat: (rappel) => abonner<EtatSync>("sync.etat", rappel),

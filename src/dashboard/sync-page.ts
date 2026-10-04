@@ -39,6 +39,7 @@ export interface SyncPageDeps {
 	    in its confirmation); ignored where nothing is scanned. */
 	appairer(deviceId: string, nom?: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 	oublier(deviceId: string): Promise<void>;
+	renommer(deviceId: string, nom: string): Promise<void>;
 	/** Ignore on a pairing request. */
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -590,7 +591,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			const l = ajouter(demandesCarte, "div", "qbd-sync-demande");
 			l.setAttribute("role", "alert");
 			icone(l, "smartphone", "qbd-sync-demande-icone");
-			ajouter(l, "span", "qbd-sync-demande-texte", t("settings.sync.requestText", { name: d.nom }));
+			/* The name in the request's amber, without quotes (2026-10-04). */
+			const texte = ajouter(l, "span", "qbd-sync-demande-texte");
+			const [avant, apres = ""] = t("settings.sync.requestText", { name: "\u0000" }).split("\u0000");
+			texte.append(avant ?? "");
+			ajouter(texte, "strong", "qbd-sync-demande-nom", d.nom);
+			texte.append(apres);
 			const actions = ajouter(l, "div", "qbd-sync-actions");
 			const ignorer = bouton(actions, "x", t("settings.sync.ignore"));
 			const accepter = bouton(actions, "check", t("settings.sync.accept"), "qbd-sync-bouton qbd-sync-bouton-accepter");
@@ -631,23 +637,55 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				? t("settings.sync.connected")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
 			ajouter(texte, "span", a.connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
-			const zone = ajouter(l, "div", "qbd-sync-menu-zone");
-			const plus = ajouter(zone, "button", "qbd-sync-plus");
-			plus.type = "button";
-			currentHost().ui.setIcon(plus, "ellipsis");
-			plus.setAttribute("aria-label", t("settings.sync.moreLabel", { name: a.nom }));
-			plus.setAttribute("aria-haspopup", "menu");
-			plus.setAttribute("aria-expanded", "false");
-			plus.addEventListener("click", () => menu(plus, zone, [{
-				icone: "trash-2",
-				texte: t("settings.sync.remove"),
-				agir: () => {
-					void deps.oublier(a.id)
-						.catch(() => undefined)
-						.then(() => rafraichir());
-				},
-			}]));
+			/* Two plain actions, no menu (2026-10-04): rename what THIS device
+			   shows for it, and remove it (red bin). */
+			const actions = ajouter(l, "div", "qbd-sync-appareil-actions");
+			const modifier = ajouter(actions, "button", "qbd-sync-action");
+			modifier.type = "button";
+			currentHost().ui.setIcon(modifier, "pencil");
+			modifier.setAttribute("aria-label", t("settings.sync.renameLabel", { name: a.nom }));
+			modifier.addEventListener("click", () => ouvrirRenommer(a.id, a.nom));
+			const supprimer = ajouter(actions, "button", "qbd-sync-action qbd-sync-action-danger");
+			supprimer.type = "button";
+			currentHost().ui.setIcon(supprimer, "trash-2");
+			supprimer.setAttribute("aria-label", t("settings.sync.removeLabel", { name: a.nom }));
+			supprimer.addEventListener("click", () => {
+				supprimer.disabled = true;
+				void deps.oublier(a.id)
+					.catch(() => undefined)
+					.then(() => rafraichir());
+			});
 		}
+	}
+
+	function ouvrirRenommer(id: string, nom: string): void {
+		requireHost("modals").open({
+			className: "qbd-sync-modal",
+			title: t("settings.sync.renameTitle"),
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				const champ = ajouter(corps, "input", "qbd-sync-champ");
+				champ.type = "text";
+				champ.maxLength = 64;
+				champ.value = nom;
+				champ.setAttribute("aria-label", t("settings.sync.renameTitle"));
+				const pied = ajouter(corps, "div", "qbd-sync-dialogue-pied");
+				ajouter(pied, "span", "qbd-sync-espace");
+				const annuler = bouton(pied, "x", t("settings.sync.cancel"));
+				const valider = bouton(pied, "check", t("settings.sync.save"), "qbd-sync-bouton qbd-sync-bouton-principal");
+				const envoyer = (): void => {
+					const nouveau = champ.value.trim();
+					if (!nouveau || nouveau === nom) { handle.close(); return; }
+					valider.disabled = true;
+					void deps.renommer(id, nouveau).catch(() => undefined).then(() => { handle.close(); return rafraichir(); });
+				};
+				annuler.addEventListener("click", () => handle.close());
+				valider.addEventListener("click", envoyer);
+				champ.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); envoyer(); } });
+				champ.focus();
+				champ.select();
+			},
+		});
 	}
 
 	function ouvrirChangements(): void {

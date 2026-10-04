@@ -738,3 +738,97 @@
 .qbd-sync-carte > * + .qbd-sync-ligne-action {
 	border-top: 1px solid var(--background-modifier-border);
 }
+
+/* A paired device's two actions: rename, remove (red). */
+.qbd-sync-appareil-actions {
+	display: flex;
+	flex: none;
+	gap: 4px;
+}
+
+.qbd-sync-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.qbd-sync-action:hover,
+.qbd-sync-action:active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-sync-action-danger,
+.qbd-sync-action-danger:hover,
+.qbd-sync-action-danger:active {
+	color: var(--text-error, #e5484d);
+}
+
+.qbd-sync-action svg {
+	width: 20px;
+	height: 20px;
+}
+
+/* ON A PHONE the Sync page wears the settings page's tiles (2026-10-04):
+   grey section titles, rows a few pixels apart, the group rounded at both
+   ends, like the page just before it. */
+.is-mobile .nq-set .qbd-sync-titre {
+	margin: 22px 4px 8px;
+	font-size: 15px;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+.is-mobile .nq-set .qbd-sync-carte {
+	gap: 3px;
+	border: 0;
+	border-radius: 16px;
+	background: transparent;
+	overflow: hidden;
+}
+
+.is-mobile .nq-set .qbd-sync-carte > * {
+	min-height: 60px;
+	padding: 12px 18px;
+	border-radius: 4px;
+	background: var(--background-secondary);
+}
+
+.is-mobile .nq-set .qbd-sync-carte > * + * {
+	border-top: 0;
+}
+
+.qbd-sync-demande-nom {
+	font-weight: 600;
+	color: #f0a23b;
+}
+
+
+/* The request's two buttons (2026-10-04): the same height and shape, Ignore
+   a quiet outline in the request's amber, Accept the solid one. Accept stays
+   LAST, where the eye ends and the thumb rests. */
+.qbd-sync-demande .qbd-sync-actions .qbd-sync-bouton {
+	min-height: 34px;
+	padding: 0 14px;
+	border-radius: 8px;
+	font-size: 13px;
+}
+
+.qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter) {
+	border: 1px solid color-mix(in srgb, var(--qbd-sync-warn) 40%, transparent);
+	background: transparent;
+	color: var(--text-normal);
+}
+
+.qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--qbd-sync-warn) 70%, transparent);
+	background: color-mix(in srgb, var(--qbd-sync-warn) 10%, transparent);
+}

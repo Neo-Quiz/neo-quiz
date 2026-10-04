@@ -34,6 +34,8 @@ interface SyncBackend {
     /** Pairs an id the camera just read (never one from the page): no native dialog, the scan is the answer. */
     suspend fun pairScanned(id: String, name: String): String
     suspend fun forget(id: String)
+    /** The name this device shows for a paired one (cleaned, at most 64). */
+    suspend fun rename(id: String, name: String)
     suspend fun ignore(id: String)
 }
 
@@ -192,6 +194,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name, scanned = true) ?: PairResult.UNAVAILABLE }
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
+
+    override suspend fun rename(id: String, name: String) { ensure()?.rename(id, name) }
 
     override suspend fun ignore(id: String) { ensure()?.ignore(id) }
 

@@ -77,6 +77,8 @@ export interface SyncHandle {
 	    with a pairing code). Never throws: no request when unreadable. */
 	demandesBrutes(): Promise<Array<{ id: string; nom: string }>>;
 	oublier(deviceId: string): Promise<void>;
+	/** The name THIS device shows for a paired one (cleaned, at most 64). */
+	renommer(deviceId: string, nom: string): Promise<void>;
 	/** The owner chose Ignore on a pairing request: forget that request. */
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -544,6 +546,16 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			void diffuser().catch(() => undefined);
 		},
 
+		async renommer(brut, nomBrut) {
+			const id = typeof brut === "string" ? brut.trim() : "";
+			const nom = nomSur(nomBrut);
+			if (!isDeviceId(id) || id === courant.ownId || mort || !nom) return;
+			const d = (await courant.rest.devices()).find(x => x.deviceID === id);
+			if (!d) return;
+			await courant.rest.putDevice({ ...d, name: nom });
+			void diffuser().catch(() => undefined);
+		},
+
 		async ignorer(brut) {
 			const id = typeof brut === "string" ? brut.trim() : "";
 			if (!isDeviceId(id) || id === courant.ownId || mort) return;
@@ -577,6 +589,8 @@ export interface GestionSync {
 	etat(): Promise<EtatSync>;
 	appairer(deviceId: string): Promise<ResultatAppairage>;
 	oublier(deviceId: string): Promise<void>;
+	/** The name THIS device shows for a paired one (cleaned, at most 64). */
+	renommer(deviceId: string, nom: string): Promise<void>;
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	surDonneesRecues(rappel: () => void): () => void;
@@ -689,6 +703,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			return appairerUnSeul(h, id, false);
 		},
 		async oublier(id) { await (await obtenir())?.oublier(id); },
+		async renommer(id, nom) { await (await obtenir())?.renommer(id, nom); },
 		async ignorer(id) { await (await obtenir())?.ignorer(id); },
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },

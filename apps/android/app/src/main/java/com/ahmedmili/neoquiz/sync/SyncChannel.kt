@@ -24,6 +24,7 @@ class SyncChannel(
         "sync.etat" to { _ -> backend.state() },
         "sync.appairer" to { a -> backend.pair(a.text(0), a.opt(1) as? String) },
         "sync.oublier" to { a -> backend.forget(a.text(0)) },
+        "sync.renommer" to { a -> backend.rename(a.text(0), a.text(1)) },
         "sync.ignorer" to { a -> backend.ignore(a.text(0)) },
         // The page names a channel and nothing else; the id is OURS, read from the engine, and must be a device id.
         "sync.partagerId" to { a ->

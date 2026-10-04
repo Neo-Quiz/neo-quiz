@@ -411,6 +411,8 @@ export interface Pont {
 		/** `nom`: announced by a scanned QR code (Android only; Windows ignores it). */
 		appairer(deviceId: string, nom?: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 		oublier(deviceId: string): Promise<void>;
+		/** The name shown for a paired device (cleaned by the host). */
+		renommer(deviceId: string, nom: string): Promise<void>;
 		/** Ignore on a pairing request: the main process forgets the pending
 		    device (it may ask again later). Pairs nothing. */
 		ignorer(deviceId: string): Promise<void>;
@@ -853,6 +855,7 @@ export const CANAUX = {
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
 	syncOublier: "neo:sync/oublier",
+	syncRenommer: "neo:sync/renommer",
 	syncIgnorer: "neo:sync/ignorer",
 	syncPartagerId: "neo:sync/partager-id",
 	syncQrSuivant: "neo:sync/qr-suivant",
