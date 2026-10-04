@@ -337,12 +337,19 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	   submenu, or graze the layer on the way, without losing the cascade.
 	   The root panel stays: only a click outside or Escape closes the menu. */
 	let minuteurSortie: number | undefined;
+	/* The same goes for a panel's own empty edges (its padding, a separator):
+	   on them, "Display" stayed lit with its submenu open (2026-10-04), the
+	   pointer being neither on a row nor on the layer. */
 	couche.addEventListener("mouseover", (e) => {
 		window.clearTimeout(minuteurSortie);
-		if (e.target !== couche || panneaux.length < 2) return;
+		const cible = e.target as HTMLElement;
+		let niveau = -1;
+		if (cible === couche) niveau = 0;
+		else if (!cible.closest("button, a, [role='menuitem']")) niveau = panneaux.findIndex(p => p.el.contains(cible));
+		if (niveau < 0 || panneaux.length < niveau + 2) return;
 		minuteurSortie = window.setTimeout(() => {
-			fermerDepuis(1);
-			panneaux[0]?.lignes.forEach(l => l.removeAttribute("aria-expanded"));
+			fermerDepuis(niveau + 1);
+			panneaux[niveau]?.lignes.forEach(l => l.removeAttribute("aria-expanded"));
 		}, 250);
 	});
 	document.addEventListener("keydown", surClavier, true);
