@@ -139,7 +139,7 @@ export function renderSettings(
 		syncMonte = true;
 		demonterSync = monterSync(pages.get("sync")!, {
 			etat: () => sync.etat(),
-			appairer: id => sync.appairer(id),
+			appairer: (id, nom) => sync.appairer(id, nom),
 			oublier: id => sync.oublier(id),
 			ignorer: id => sync.ignorer(id),
 			partager: canal => sync.partagerId(canal),
