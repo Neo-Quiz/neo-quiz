@@ -42,7 +42,7 @@ export const EN_SETTINGS = {
 	"settings.sync.hideQr": "Hide the QR code",
 	"settings.sync.copyId": "Copy the ID",
 	"settings.sync.pairWithPc": "Pair with a PC",
-	"settings.sync.scanPc": "Scan the PC's QR code",
+	"settings.sync.scanPc": "Scan a QR code",
 	"settings.sync.scanSent": "Request sent: accept it on the PC.",
 	"settings.sync.idModalTitle": "Device ID - {name}",
 	"settings.sync.idModalTitleBare": "Device ID",

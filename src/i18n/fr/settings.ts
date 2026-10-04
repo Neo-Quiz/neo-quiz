@@ -42,7 +42,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.hideQr": "Masquer le QR code",
 	"settings.sync.copyId": "Copier l'identifiant",
 	"settings.sync.pairWithPc": "Appairer avec un PC",
-	"settings.sync.scanPc": "Scanner le QR code du PC",
+	"settings.sync.scanPc": "Scanner le QR code",
 	"settings.sync.scanSent": "Demande envoyée : accepte-la sur le PC.",
 	"settings.sync.idModalTitle": "Identifiant de l'appareil - {name}",
 	"settings.sync.idModalTitleBare": "Identifiant de l'appareil",

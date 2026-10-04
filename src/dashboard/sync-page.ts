@@ -168,19 +168,43 @@ interface EntreeMenu {
 
 /** The Syncthing logo (Simple Icons, CC0), drawn in place: nothing to load,
     so nothing missing offline. Same mark as Neo Calendar's sync page. */
-const SYNCTHING_PATH = "M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm0 2.412c3.115 0 5.885 1.5 7.629 3.815a1.834 1.834 0 0 1 1.564 3.162c.23.818.354 1.68.354 2.57a9.504 9.504 0 0 1-2.166 6.05c.128.281.189.595.162.92a1.854 1.854 0 0 1-2.004 1.678 1.86 1.86 0 0 1-.877-.322A9.486 9.486 0 0 1 12 21.505c-3.84 0-7.154-2.277-8.668-5.552-.3-.01-.601-.092-.879-.254-.858-.51-1.144-1.634-.633-2.513.164-.276.39-.493.653-.643a9.62 9.62 0 0 1-.02-.584c0-5.265 4.282-9.547 9.547-9.547zm0 1.227a8.311 8.311 0 0 0-8.31 8.683c.22.036.439.111.644.23.323.2.564.484.713.805l6.984-.644a1.78 1.78 0 0 1 .787-1.08c.288-.19.612-.286.936-.295.34-.01.68.08.978.254l3.51-2.914a1.82 1.82 0 0 1 .317-1.84A8.3 8.3 0 0 0 12 3.638zm7.027 5.98-3.502 2.91a1.829 1.829 0 0 1-.23 1.719l1.904 2.744c.212-.06.436-.085.668-.066.238.024.46.092.66.193a8.285 8.285 0 0 0 1.793-5.16 8.38 8.38 0 0 0-.265-2.092 1.835 1.835 0 0 1-1.028-.248zm-6.886 4.315-6.975.644a1.8 1.8 0 0 1-.66 1.004A8.312 8.312 0 0 0 12 20.279a8.294 8.294 0 0 0 3.938-.986 1.845 1.845 0 0 1-.075-.69c.028-.341.148-.65.332-.908L14.29 14.95a1.839 1.839 0 0 1-2.148-1.015z";
+/* Syncthing's own logo (`assets/logo-only.svg` of the Syncthing sources,
+   2026-10-04): the blue gradient disc and its white network, instead of a
+   one-colour silhouette. Drawn from these shapes, never from markup. */
+const LOGO_CHEMINS = [
+	"M94.7,47.8c4.7,1.6,9.8-0.9,11.4-5.6c1.6-4.7-0.9-9.8-5.6-11.4c-4.7-1.6-9.8,0.9-11.4,5.6C87.5,41.1,90,46.2,94.7,47.8z",
+	"M77.6,91c-0.4,4.9,3.2,9.3,8.2,9.8c5,0.4,9.3-3.2,9.8-8.2c0.4-4.9-3.2-9.3-8.2-9.8C82.4,82.4,78,86,77.6,91z",
+	"M60,69.3c2.7,4.2,8.3,5.4,12.4,2.7c4.2-2.7,5.4-8.3,2.7-12.4c-2.7-4.2-8.3-5.4-12.4-2.7C58.5,59.5,57.3,65.1,60,69.3z",
+	"M21.2,61.4c-4.3-2.5-9.8-1.1-12.3,3.1c-2.5,4.3-1.1,9.8,3.1,12.3c4.3,2.5,9.8,1.1,12.3-3.1C26.8,69.5,25.4,64,21.2,61.4z",
+];
+const LOGO_TRAITS: ReadonlyArray<readonly [number, number, number, number]> = [
+	[97.6, 39.4, 67.5, 64.4], [86.5, 91.8, 67.5, 64.4], [16.6, 69.1, 67.5, 64.4],
+];
+let logoNumero = 0;
 const SYNCTHING_URL = "https://syncthing.net";
 
 function logoSyncthing(parent: HTMLElement): void {
 	const ns = "http://www.w3.org/2000/svg";
+	const el = (nom: string, attrs: Record<string, string | number>, dans: Element): Element => {
+		const e = document.createElementNS(ns, nom);
+		for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+		dans.appendChild(e);
+		return e;
+	};
 	const svg = document.createElementNS(ns, "svg");
 	svg.setAttribute("class", "qbd-sync-logo");
-	svg.setAttribute("viewBox", "0 0 24 24");
+	svg.setAttribute("viewBox", "0 0 117.3 117.3");
 	svg.setAttribute("aria-hidden", "true");
 	svg.setAttribute("focusable", "false");
-	const path = document.createElementNS(ns, "path");
-	path.setAttribute("d", SYNCTHING_PATH);
-	svg.appendChild(path);
+	/* One gradient id per drawn logo: two logos on a page must not share one. */
+	const id = `qbd-sync-logo-degrade-${++logoNumero}`;
+	const degrade = el("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1: 58.666, y1: 117.332, x2: 58.666, y2: 0 }, el("defs", {}, svg));
+	el("stop", { offset: 0, "stop-color": "#0882C8" }, degrade);
+	el("stop", { offset: 1, "stop-color": "#26B6DB" }, degrade);
+	el("circle", { cx: 58.7, cy: 58.7, r: 58.7, fill: `url(#${id})` }, svg);
+	el("circle", { cx: 58.7, cy: 58.5, r: 43.7, fill: "none", stroke: "#FFFFFF", "stroke-width": 6 }, svg);
+	for (const [x1, y1, x2, y2] of LOGO_TRAITS) el("line", { x1, y1, x2, y2, stroke: "#FFFFFF", "stroke-width": 6 }, svg);
+	for (const d of LOGO_CHEMINS) el("path", { d, fill: "#FFFFFF" }, svg);
 	parent.appendChild(svg);
 }
 
@@ -217,7 +241,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 
 		if (deps.scannerAppairer) {
 			const appairer = ajouter(racine, "section", "qbd-sync-section");
-			titre(appairer, t("settings.sync.pairWithPc"));
 			const scanBtn = bouton(appairer, "scan-line", t("settings.sync.scanPc"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
 			scanBtn.addEventListener("click", () => {
 				void deps.scannerAppairer!().then(async res => {
