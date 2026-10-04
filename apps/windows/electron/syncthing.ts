@@ -78,6 +78,8 @@ export interface SyncHandle {
 	oublier(deviceId: string): Promise<void>;
 	/** The name THIS device shows for a paired one (cleaned, at most 64). */
 	renommer(deviceId: string, nom: string): Promise<void>;
+	/** Empties the ignore list (the owner opened "Show my ID": pairing is what they want now). */
+	pardonnerIgnores(): Promise<void>;
 	/** The owner chose Ignore on a pairing request: forget that request. */
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -560,6 +562,14 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			void diffuser().catch(() => undefined);
 		},
 
+		async pardonnerIgnores() {
+			if (mort) return;
+			const cfg = await courant.rest.config();
+			if (Array.isArray(cfg.remoteIgnoredDevices) && cfg.remoteIgnoredDevices.length > 0) {
+				await courant.rest.putConfig({ ...cfg, remoteIgnoredDevices: [] });
+			}
+		},
+
 		async ignorer(brut) {
 			const id = typeof brut === "string" ? brut.trim() : "";
 			if (!isDeviceId(id) || id === courant.ownId || mort) return;
@@ -721,6 +731,10 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		async qrSuivant() {
 			const h = await obtenir();
 			if (!h) return null;
+			/* A device ignored earlier could never ask again: showing the ID is
+			   the owner saying "pair now", so the ignore list is emptied once per
+			   opening (every request still needs the owner's Accept). */
+			if (!fenetreQr.ouverte()) { try { await h.pardonnerIgnores(); } catch { /* best effort */ } }
 			const code = fenetreQr.tourner();
 			try { await verifierDemandesQr(h); } catch { /* the next call looks again */ }
 			return { texte: texteQr(h.idPropre(), code, os.hostname().slice(0, 64)), periodeMs: PERIODE_MS };

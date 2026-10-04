@@ -308,7 +308,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	/* ── Footer: what sync runs on, for whoever has never heard of it ── */
 	const pied = ajouter(racine, "footer", "qbd-sync-pied");
 	logoSyncthing(pied);
-	ajouter(pied, "span", "qbd-sync-pied-nom", "Syncthing");
+	ajouter(pied, "span", "qbd-sync-pied-nom", t("settings.sync.poweredBy"));
 	ajouter(pied, "span", "qbd-sync-pied-sep", "·").setAttribute("aria-hidden", "true");
 	const enSavoirPlus = ajouter(pied, "a", "qbd-sync-lien", t("settings.sync.learnMore"));
 	enSavoirPlus.href = SYNCTHING_URL;

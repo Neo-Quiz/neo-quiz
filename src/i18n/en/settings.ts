@@ -95,4 +95,5 @@ export const EN_SETTINGS = {
 	"settings.sync.changeYesterday": "yesterday at {time}",
 	"settings.sync.changeOn": "on {date} at {time}",
 	"settings.sync.learnMore": "Learn more",
+	"settings.sync.poweredBy": "Powered by Syncthing",
 } as const;
