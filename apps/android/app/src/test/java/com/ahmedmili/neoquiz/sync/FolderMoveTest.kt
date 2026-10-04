@@ -8,6 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FolderMoveTest {
+    init { FolderMove.log = {} }
+
     private fun tmp(): File = Files.createTempDirectory("folder-move").toFile()
 
     @Test fun theOldFolderMovesWholeToTheRoot() {

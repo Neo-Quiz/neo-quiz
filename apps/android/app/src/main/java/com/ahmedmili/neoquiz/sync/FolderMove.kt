@@ -17,6 +17,9 @@ import java.io.File
 object FolderMove {
     private const val TAG = "FolderMove"
 
+    /** Where a refused move is told; JVM tests replace it (android.util.Log is not there). */
+    var log: (String) -> Unit = { Log.w(TAG, it) }
+
     /** The folder of the versions before 2026-10-04. */
     fun legacyRoot(documents: File): File = File(documents, "Neo Quiz")
 
@@ -25,14 +28,14 @@ object FolderMove {
         if (!legacy.isDirectory) return
         val targetEmpty = !target.exists() || (target.isDirectory && target.list()?.isEmpty() == true)
         if (!targetEmpty) {
-            Log.w(TAG, "both the old and the new folder hold files: the old one is left in place")
+            log("both the old and the new folder hold files: the old one is left in place")
             return
         }
         if (target.isDirectory && !target.delete()) {
-            Log.w(TAG, "the empty new folder cannot be replaced")
+            log("the empty new folder cannot be replaced")
             return
         }
-        if (!legacy.renameTo(target)) Log.w(TAG, "the old folder cannot be moved to the root")
+        if (!legacy.renameTo(target)) log("the old folder cannot be moved to the root")
     }
 
     /** True while the old folder still holds files: the move did not happen, sync must not start. */
