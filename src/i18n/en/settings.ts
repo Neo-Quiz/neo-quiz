@@ -71,7 +71,7 @@ export const EN_SETTINGS = {
 	"settings.sync.connected": "Connected",
 	"settings.sync.offline": "Disconnected",
 	"settings.sync.offlineSeen": "Disconnected, seen {when}",
-	"settings.sync.waitingAccept": "Request sent",
+	"settings.sync.waitingAccept": "Sharing request sent",
 	"settings.sync.whenNow": "just now",
 	"settings.sync.whenMinutes": "{n} min ago",
 	"settings.sync.whenHours": "{n} h ago",
