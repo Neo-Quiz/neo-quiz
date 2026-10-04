@@ -348,9 +348,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const qr = ajouter(centre, "img", "qbd-sync-qr");
 				qr.alt = t("settings.sync.qrAlt");
 				qr.hidden = true;
-				const barre = ajouter(centre, "div", "qbd-sync-compte");
-				barre.hidden = !qrHote;
-				const jauge = ajouter(barre, "div", "qbd-sync-compte-jauge");
 				const zonePartage = ajouter(corps, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
 
@@ -358,7 +355,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				let idCourant: string | null = null;
 				let texteQr: string | null = null;
 				const appareilsAvant = dernierEtat?.appareils.length ?? 0;
-				let minuteur: ReturnType<typeof setTimeout> | null = null;
 
 				function poserQr(texte: string): void {
 					if (texte === texteQr) return;
@@ -367,30 +363,13 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						.then(url => { if (!ferme && texteQr === texte) { qr.src = url; qr.hidden = false; } })
 						.catch(() => { qr.hidden = true; });
 				}
-				/* The countdown: a bar that fills up over the period, restarted at
-				   each new code (no seconds written: with 2 s they said nothing). */
-				function lancerDecompte(periodeMs: number): void {
-					jauge.style.transition = "none";
-					jauge.style.transform = "scaleX(0)";
-					void jauge.offsetWidth;
-					jauge.style.transition = `transform ${periodeMs}ms linear`;
-					jauge.style.transform = "scaleX(1)";
-				}
+				/* The QR code is FIXED (id + name), like Syncthing's (2026-10-04):
+				   a code changing every 2 s added little, every request needing the
+				   owner's Accept anyway. The host is still told once that the
+				   dialog opened: that lets a device ignored earlier ask again. */
 				async function tourner(): Promise<void> {
 					if (ferme || !qrHote) return;
-					let r: Awaited<ReturnType<NonNullable<SyncPageDeps["qr"]>["suivant"]>> = null;
-					try { r = await qrHote.suivant(); } catch { r = null; }
-					if (ferme) return;
-					if (!r) {
-						/* No code: the plain ID instead, and no countdown. */
-						if (idCourant) poserQr(idCourant);
-						barre.hidden = true;
-						return;
-					}
-					poserQr(r.texte);
-					barre.hidden = false;
-					lancerDecompte(r.periodeMs);
-					minuteur = setTimeout(() => { void tourner(); }, r.periodeMs);
+					try { await qrHote.suivant(); } catch { /* nothing to show from it */ }
 				}
 
 				let retourCopie: ReturnType<typeof setTimeout> | null = null;
@@ -430,7 +409,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					fermer: () => handle.close(),
 					arreter: () => {
 						ferme = true;
-						if (minuteur) clearTimeout(minuteur);
 						if (retourCopie) clearTimeout(retourCopie);
 						if (qrHote) void qrHote.fermer().catch(() => undefined);
 					},
@@ -447,7 +425,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
 						idTexte.textContent = e.appareil;
-						if (!qrHote) poserQr(`neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`);
+						poserQr(`neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`);
 					},
 				};
 				if (dernierEtat) dialogueId.peindre(dernierEtat);

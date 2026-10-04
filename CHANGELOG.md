@@ -21,6 +21,7 @@ release notes.
 ### Fixed
 - The wallpaper is no longer blurred for an instant when the app opens.
 - "Show my ID" shows at once on the Sync page instead of after the sync engine has started.
+- A pairing request you ignored no longer comes back at the next connection attempt.
 
 ## [1.20.24] - 2026-10-03
 
