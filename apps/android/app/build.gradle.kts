@@ -66,8 +66,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.webkit)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.zxing.embedded)
-    implementation(libs.zxing.core)
+    implementation(libs.play.services.code.scanner)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
 }

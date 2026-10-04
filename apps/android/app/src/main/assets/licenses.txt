@@ -12,9 +12,9 @@ Syncthing 2.1.5 (libsyncthingnative.so)
   Neo Quiz starts Syncthing as a separate process and talks to it over its REST API;
   it does not modify or link against its code.
 
-ZXing and zxing-android-embedded (QR code scan)
-  Licence: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
-  https://github.com/zxing/zxing, https://github.com/journeyapps/zxing-android-embedded
+Google code scanner, play-services-code-scanner (QR code scan)
+  Licence: Android Software Development Kit License (https://developer.android.com/studio/terms)
+  https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner
 
 Material Symbols Rounded (bottom bar icons: home, folder, auto_awesome, settings)
   Licence: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)

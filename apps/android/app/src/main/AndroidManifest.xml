@@ -6,20 +6,26 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- The embedded Syncthing: it runs as a foreground service (type dataSync), talks to the
-         network, and the Sync page scans the QR code of another device with the camera. -->
+         network. The Sync page scans the QR code of another device with the phone's own scanner
+         or Google's: no camera permission here. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Android 13+: without it the foreground-service notification is hidden. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- First run: the one-tap "let Neo Quiz run in the background" dialog, so the embedded sync is not cut short. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Daily review notification: an inexact alarm (no exact-alarm permission), re-armed after boot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- The phone's own QR code scanner (Xiaomi / HyperOS), looked up before Google's. -->
+    <queries>
+        <intent>
+            <action android:name="miui.intent.action.scanbarcode" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -30,6 +36,8 @@
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true">
+        <!-- Google's code scanner module, downloaded by Google Play services at install. -->
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
