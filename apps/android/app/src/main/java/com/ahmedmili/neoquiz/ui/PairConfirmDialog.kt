@@ -15,17 +15,18 @@ import kotlinx.coroutines.withContext
  * Syncthing knows it, the name, offers "Pair" and "Cancel", and Cancel is the
  * default (the focused button, and what a tap outside or Back answers). The page
  * can neither answer it nor draw it: it is an Android dialog of the activity.
+ * `folder` is the synced folder as the owner sees it in the file manager (`Documents/Neo Quiz`).
  */
-class PairConfirmDialog(private val activity: Activity) {
+class PairConfirmDialog(private val activity: Activity, private val folder: String) {
     suspend fun ask(deviceId: String, name: String): Boolean = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
             // The name in the TITLE ("Pair DESKTOP-1U89520?", 2026-10-04: an id alone said nothing),
-            // the id under one short sentence. The name is the other device's, so it is cleaned
-            // again here (no forged line, no reordered text).
+            // then "The folder Documents/Neo Quiz will be synced with this device" and the id. The name
+            // is the other device's, so it is cleaned again here (no forged line, no reordered text).
             val clean = ShareRules.cleanName(name)
-            val dialog = AlertDialog.Builder(activity)
+            val dialog = AlertDialog.Builder(activity, R.style.Theme_NeoQuiz_Dialog)
                 .setTitle(if (clean.isEmpty()) activity.getString(R.string.pair_title) else activity.getString(R.string.pair_title_named, clean))
-                .setMessage(activity.getString(R.string.pair_message, activity.getString(R.string.pair_id_line, deviceId)))
+                .setMessage(activity.getString(R.string.pair_message, folder, activity.getString(R.string.pair_id_line, deviceId)))
                 .setPositiveButton(R.string.pair_confirm) { _, _ -> if (cont.isActive) cont.resume(true) }
                 .setNegativeButton(R.string.pair_cancel) { _, _ -> if (cont.isActive) cont.resume(false) }
                 .setOnCancelListener { if (cont.isActive) cont.resume(false) }

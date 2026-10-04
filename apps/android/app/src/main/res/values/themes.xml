@@ -11,4 +11,12 @@
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:enforceStatusBarContrast">false</item>
     </style>
+    <!-- Native dialogs in the app's colours (FirstRunScreen's text, muted text and accent). -->
+    <style name="Theme.NeoQuiz.Dialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:colorAccent">#FF5B9DFF</item>
+        <item name="android:textColorPrimary">#FFF5F7FF</item>
+        <item name="android:textColorSecondary">#FFAAB6D3</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+    </style>
 </resources>

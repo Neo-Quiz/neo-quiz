@@ -23,7 +23,7 @@
     <string name="review_channel_name">Daily review</string>
     <string name="pair_title">Pair this device?</string>
     <string name="pair_title_named">Pair %1$s?</string>
-    <string name="pair_message">Your quizzes and review history will be shared with it.\n\n%1$s</string>
+    <string name="pair_message">The folder %1$s will be synced with this device.\n\n%2$s</string>
     <string name="pair_id_line">Device ID: %1$s</string>
     <string name="pair_confirm">Pair</string>
     <string name="pair_cancel">Cancel</string>

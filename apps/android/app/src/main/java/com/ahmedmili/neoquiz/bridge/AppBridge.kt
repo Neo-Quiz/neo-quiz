@@ -95,7 +95,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
     // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
     val hub = SyncHub.get(activity)
-    val pairDialog = PairConfirmDialog(activity)
+    val pairDialog = PairConfirmDialog(activity, documents.relativeTo(Environment.getExternalStorageDirectory()).path)
     val qr = QrScanner(activity as ComponentActivity)
     hub.confirmer = { id, name -> pairDialog.ask(id, name) }
     hub.attach(allowed::allow)

@@ -34,7 +34,7 @@ class FolderPickerDialog(private val activity: Activity, private val suggested: 
             val rows = ArrayList<Row>()
             val adapter = ArrayAdapter<String>(activity, android.R.layout.simple_list_item_1)
             val list = ListView(activity).apply { this.adapter = adapter }
-            val dialog = AlertDialog.Builder(activity)
+            val dialog = AlertDialog.Builder(activity, R.style.Theme_NeoQuiz_Dialog)
                 .setView(list)
                 .setPositiveButton(R.string.picker_use) { _, _ -> if (cont.isActive) cont.resume(current) }
                 .setNegativeButton(R.string.picker_cancel) { _, _ -> if (cont.isActive) cont.resume(null) }
