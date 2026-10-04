@@ -759,7 +759,8 @@ body.is-mobile .modal-container:has(> .nq-reglages-modal) {
 	padding: var(--nq-inset-haut, 0px) 0 0;
 	box-sizing: border-box;
 	align-items: stretch;
-	background: transparent;
+	/* Opaque below the status bar strip only. */
+	background: linear-gradient(to bottom, transparent var(--nq-inset-haut, 0px), var(--nq-bottom-bar-bg) var(--nq-inset-haut, 0px));
 }
 
 .is-mobile .modal-container:has(> .nq-reglages-modal) > .modal-bg {
