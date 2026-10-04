@@ -65,6 +65,9 @@ export interface SyncPageDeps {
 	/** Where there is a camera: scans AND pairs natively, the id never
 	    passing through this page (hence no confirmation dialog). */
 	scannerAppairer?(): Promise<"ok" | "invalide" | "indisponible" | "annule">;
+	/** THE folder Neo Quiz reads its quizzes from, the synced one (one folder
+	    only since 2026-10-04): its path, and how to open it where the host can. */
+	dossier?(): Promise<{ chemin: string; ouvrir?: () => void } | null>;
 	/** The pairing QR code that changes, where the host has it (Windows): the
 	    "Show my ID" dialog shows `texte` and asks again every `periodeMs`,
 	    then calls `fermer`. Without it the QR code is the plain ID. */
@@ -300,6 +303,28 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	   sync off or on, and the log of the embedded Syncthing ── */
 	const bas = ajouter(racine, "section", "qbd-sync-section");
 	const basCarte = ajouter(bas, "div", "qbd-sync-carte");
+	/* The data folder first (Neo Calendar's "Data folder"): fixed, shown with
+	   its path, opened in the file manager where the host can. */
+	if (deps.dossier) {
+		const dossierLigne = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
+		dossierLigne.type = "button";
+		icone(dossierLigne, "folder-open", "qbd-sync-ligne-icone");
+		ajouter(dossierLigne, "span", "qbd-sync-ligne-libelle", t("settings.sync.dataFolder"));
+		const dossierValeur = ajouter(dossierLigne, "span", "qbd-sync-ligne-valeur");
+		let ouvrirDossier: (() => void) | undefined;
+		dossierLigne.disabled = true;
+		void deps.dossier().then(d => {
+			if (!d || demonte) return;
+			dossierValeur.textContent = d.chemin;
+			dossierLigne.title = d.chemin;
+			ouvrirDossier = d.ouvrir;
+			if (ouvrirDossier) {
+				dossierLigne.disabled = false;
+				icone(dossierLigne, "chevron-right", "qbd-sync-ligne-chevron");
+			}
+		}).catch(() => undefined);
+		dossierLigne.addEventListener("click", () => ouvrirDossier?.());
+	}
 	const basculeBtn = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
 	basculeBtn.type = "button";
 	icone(basculeBtn, "power", "qbd-sync-ligne-icone");

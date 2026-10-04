@@ -234,7 +234,12 @@ export async function savedFolders(): Promise<DossierQuiz[]> {
 			await reglages.ecrire(CLE_DOSSIERS, liste);
 			await reglages.supprimer(CLE_DOSSIER_LEGACY);
 		}
-		return defaut ? [defaut, ...liste] : liste;
+		/* ONE folder since 2026-10-04: the default one, the synced folder. The
+		   additional locations (and the Obsidian vaults opened by themselves)
+		   are gone; a list kept from before is emptied once, so it stops
+		   widening the perimeter at the next start. */
+		if (liste.length > 0) await reglages.ecrire(CLE_DOSSIERS, []);
+		return defaut ? [defaut] : [];
 	} catch (e) {
 		// Réglages illisibles : le défaut reste utilisable, seuls les
 		// emplacements supplémentaires manquent à l'appel.

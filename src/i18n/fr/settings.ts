@@ -108,4 +108,5 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.changeOn": "le {date} à {time}",
 	"settings.sync.learnMore": "En savoir plus",
 	"settings.sync.poweredBy": "Propulsé par Syncthing",
+	"settings.sync.dataFolder": "Dossier de données",
 };

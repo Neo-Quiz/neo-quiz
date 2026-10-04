@@ -21,7 +21,7 @@ import { currentHost } from "../../../../src/host/current";
 import { t, currentLang, currentHourCycle, hourOptions, setHourCycle } from "../../../../src/i18n";
 import type { HourCycle, TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
-import { MAX_DOSSIERS, addFolder, estVaultObsidian, lienAvecRacines, pickFolder, removeFolder, savedFolders, setDefaultFolder } from "../host/folder";
+import { savedFolders } from "../host/folder";
 import { poserLogoObsidian } from "./marques";
 import { chargerLangue, lireLangue, reglerLangue } from "./langue";
 import { lireFormatHeure, reglerFormatHeure } from "./format-heure";
@@ -37,11 +37,10 @@ import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
 import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
 
-type Category = "general" | "folders" | "sync" | "ai" | "appearance" | "languages";
+type Category = "general" | "sync" | "ai" | "appearance" | "languages";
 
 const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
 	{ id: "general", icon: "sliders-horizontal", label: "app.settings.general" },
-	{ id: "folders", icon: "folder", label: "app.settings.navFolders" },
 	/* Only where the bridge has the embedded Syncthing (Windows). */
 	{ id: "sync", icon: "refresh-cw", label: "settings.sync.title" },
 	{ id: "ai", icon: "sparkles", label: "app.settings.navAi" },
@@ -151,6 +150,12 @@ export function renderSettings(
 			scanner: sync.scanner ? () => sync.scanner!() : undefined,
 			scannerAppairer: sync.scannerAppairer ? () => sync.scannerAppairer!() : undefined,
 			qr: sync.qr ? { suivant: () => sync.qr!.suivant(), fermer: () => sync.qr!.fermer() } : undefined,
+			/* The one quiz folder: opened in the Explorer on a PC; a phone shows its path only. */
+			dossier: async () => {
+				const d = (await savedFolders())[0];
+				if (!d) return null;
+				return { chemin: d.path, ouvrir: mobile ? undefined : () => { void pont().systeme.ouvrir(d.path).catch(() => undefined); } };
+			},
 			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
 		});
 	}
@@ -303,137 +308,6 @@ export function renderSettings(
 			void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
 		},
 	});
-
-	/* ═══ FOLDERS ═══ */
-	const foldersPage = pages.get("folders")!;
-
-	/* The DEFAULT quiz folder (slice 9). No cross — it is not REMOVED, there
-	   would be nowhere left to create a quiz — but it is CHANGED: the
-	   computed path (`C:\Neo Quiz`) is a starting point, not a constraint.
-	   The button goes through the NATIVE dialog, the only way a folder
-	   enters the perimeter. */
-	const sectionDefaut = section(foldersPage, t("app.settings.defaultFolder"), t("app.settings.defaultFolderHint"));
-	const ligneDefaut = ajouter(ajouter(sectionDefaut, "div", "nq-reglages-liste"), "div", "nq-reglages-dossier");
-	currentHost().ui.setIcon(ajouter(ligneDefaut, "span", "nq-reglages-icone"), "folder");
-	const texteDefaut = ajouter(ligneDefaut, "div", "nq-reglages-texte");
-	/* The row is named after the folder itself ("Neo Quiz"), not after the
-	   section's title again; the title stands until the path is read. */
-	const nomDefaut = ajouter(texteDefaut, "span", "nq-reglages-nom", t("app.settings.defaultFolder"));
-	const cheminDefaut = ajouter(texteDefaut, "span", "nq-reglages-chemin");
-	// `textContent` (through `ajouter`): this path comes from the disk.
-	void savedFolders().then(dossiers => {
-		const defaut = dossiers.find(d => d.parDefaut);
-		if (!defaut) return;
-		ajouter(cheminDefaut, "span", undefined, defaut.path);
-		const base = defaut.path.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
-		if (base) nomDefaut.textContent = base;
-	});
-	const changer = ajouter(ligneDefaut, "button", "nq-reglages-changer", t("app.settings.changeDefaultFolder"));
-	changer.type = "button";
-	changer.addEventListener("click", () => {
-		void (async () => {
-			/* DISARMED DURING THE DIALOG: it is modal to the window, but the
-			   keyboard can trigger it twice before it shows, and two stacked
-			   dialogs would let the second write over the first one's choice. */
-			changer.disabled = true;
-			try {
-				const choisi = await setDefaultFolder();
-				// Cancelled: the answer "no", nothing to do or say.
-				if (!choisi) return;
-				/* The same reload as for an additional location, for the same
-				   reason: the host's roots change, and the host is installed
-				   only once. */
-				deps.onFoldersChanged();
-			} catch (e) {
-				/* The main process refused (folder that cannot be created,
-				   protected disk): the old folder stays — say so, rather than
-				   leave a button with no visible effect. */
-				currentHost().ui.notice(t("app.error.startup", {
-					error: e instanceof Error ? e.message : String(e),
-				}));
-			} finally {
-				changer.disabled = false;
-			}
-		})();
-	});
-
-	/* The ADDITIONAL locations. Every open folder, with its cross: those
-	   chosen by hand, and the Obsidian vaults that startup opened by itself
-	   (`ouvrirVaultsDetectes`). No "suggested" row with a "+" since
-	   2026-09-17 — there is nothing left to suggest, every vault of the
-	   machine is already there. The cross dismisses it DURABLY: that is what
-	   keeps the next startup from reopening it. */
-	const sectionExtra = section(foldersPage, t("app.settings.extraFolders"), t(mobile ? "app.settings.extraFoldersHintMobile" : "app.settings.extraFoldersHint"));
-	const liste = ajouter(sectionExtra, "div", "nq-reglages-liste");
-	const actions = ajouter(sectionExtra, "div", "nq-reglages-actions");
-
-	async function dessiner(): Promise<void> {
-		// The default folder is never in this list — it has its own section.
-		const dossiers = (await savedFolders()).filter(d => !d.parDefaut);
-		liste.replaceChildren();
-		liste.hidden = dossiers.length === 0;
-		for (const d of dossiers) {
-			const ligne = ajouter(liste, "div", "nq-reglages-dossier");
-			/* Obsidian's LOGO when it is a vault: what that image carries is
-			   "this is a vault", which a folder icon would not say. The
-			   detection is asynchronous — hence the generic icon first,
-			   replaced if need be. */
-			const icone = ajouter(ligne, "span", "nq-reglages-icone");
-			currentHost().ui.setIcon(icone, "folder");
-			void estVaultObsidian(d.path).then(v => { if (v) { icone.replaceChildren(); poserLogoObsidian(icone); } });
-			const texte = ajouter(ligne, "div", "nq-reglages-texte");
-			// `textContent` (through `ajouter`): these strings come from the disk.
-			ajouter(texte, "span", "nq-reglages-nom", d.name);
-			ajouter(texte, "span", "nq-reglages-chemin", d.path);
-			const retirer = ajouter(ligne, "button", "nq-reglages-retirer");
-			retirer.type = "button";
-			retirer.setAttribute("aria-label", t("review.settings.removeFolder"));
-			currentHost().ui.setIcon(retirer, "x");
-			retirer.addEventListener("click", () => {
-				void (async () => {
-					await removeFolder(d.id);
-					deps.onFoldersChanged();
-				})();
-			});
-		}
-
-		actions.replaceChildren();
-		const ajout = ajouter(actions, "button", "qbd-btn--create");
-		ajout.type = "button";
-		currentHost().ui.setIcon(ajouter(ajout, "span", "qbd-btn-icon"), "folder-plus");
-		ajouter(ajout, "span", undefined, t("review.settings.addFolder"));
-		/* The limit of spec §6 is SAID, not suffered: a button that does
-		   nothing would be taken for a failure. It counts the ADDITIONAL
-		   locations: the default one comes on top (spec §2.1). */
-		if (dossiers.length >= MAX_DOSSIERS) {
-			ajout.disabled = true;
-			ajouter(actions, "p", "nq-reglages-aide", t("review.settings.full", { count: MAX_DOSSIERS }));
-		}
-		ajout.addEventListener("click", () => {
-			void (async () => {
-				const choix = await pickFolder();
-				// Cancelled: not an error, the answer "no".
-				if (!choix) return;
-				/* The refusal is SAID (2026-09-17). `addFolder` returned the
-				   list unchanged without a word when the folder overlapped an
-				   open root: the dialog closed, nothing appeared, and nothing
-				   explained why. A folder UNDER an open root is not a user
-				   error — it is declared elsewhere (Folders → New folder → Open
-				   an existing folder), and the message says so. */
-				const lien = lienAvecRacines(choix, await savedFolders());
-				if (lien !== "libre") {
-					currentHost().ui.notice(t(lien === "doublon" ? "app.settings.folderAlreadyOpen"
-						: lien === "dedans" ? "app.settings.folderInsideOpen"
-							: "app.settings.folderContainsOpen"));
-					return;
-				}
-				await addFolder(choix);
-				deps.onFoldersChanged();
-			})();
-		});
-	}
-
-	void dessiner();
 
 	/* ═══ AI ═══ */
 	/* On mobile the page is never attached (no category): it is built into a

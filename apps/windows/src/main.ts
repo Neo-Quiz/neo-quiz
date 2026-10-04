@@ -20,7 +20,7 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
-import { estVaultObsidian, ouvrirVaultsDetectes, savedFolders } from "./host/folder";
+import { estVaultObsidian, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
@@ -515,13 +515,8 @@ async function demarrer(): Promise<void> {
 	// Luminosité et flou de l'image : lus en même temps que l'image elle-même.
 	await appliquerEffetsFond();
 	try {
-		/* AVANT de lire les dossiers : tout vault Obsidian de la machine qui
-		   n'est ni ouvert ni écarté est ouvert ici, sans un clic (voir
-		   `ouvrirVaultsDetectes`). Au démarrage et nulle part ailleurs — c'est
-		   le seul moment où les racines de l'hôte ne sont pas encore
-		   calculées ; le faire depuis les Réglages forcerait un rechargement
-		   de la fenêtre à leur ouverture. */
-		await ouvrirVaultsDetectes();
+		/* No Obsidian vault is opened by itself any more (2026-10-04): Neo Quiz
+		   reads ONE folder, the synced one (`savedFolders`). */
 		const dossiers = await savedFolders();
 		/* `dossiers` contient TOUJOURS au moins le dossier par défaut
 		   (tranche 9) : `savedFolders()` le pose devant à chaque lecture. Il
