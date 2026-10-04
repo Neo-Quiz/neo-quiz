@@ -728,3 +728,13 @@
 .qbd-sync-ligne-qr[hidden] {
 	display: none;
 }
+
+/* `hidden` beats the button's own display (the phone hides "Show my ID"). */
+.qbd-sync-bouton[hidden] {
+	display: none;
+}
+
+/* The action rows keep the card's line between rows. */
+.qbd-sync-carte > * + .qbd-sync-ligne-action {
+	border-top: 1px solid var(--background-modifier-border);
+}
