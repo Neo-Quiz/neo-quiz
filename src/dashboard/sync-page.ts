@@ -629,12 +629,15 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			/* A request this device sent: still shown on the other side, or
 			   expired, with "Send again" (2026-10-04). Told by the host, which
 			   knows when the other side accepted. */
-			const sous = a.connecte
-				? t("settings.sync.connected")
-				: a.demande === "envoyee" ? t("settings.sync.waitingAccept")
+			/* The request first: until the other side accepts, it opens the
+			   connection and closes it at once, and that blink read "Connected"
+			   (2026-10-04). The host clears `demande` once it is accepted. */
+			const connecte = a.connecte && !a.demande;
+			const sous = a.demande === "envoyee" ? t("settings.sync.waitingAccept")
 				: a.demande === "expiree" ? t("settings.sync.requestExpired")
+				: connecte ? t("settings.sync.connected")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
-			ajouter(texte, "span", a.connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
+			ajouter(texte, "span", connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
 			/* Two plain actions, no menu (2026-10-04): rename what THIS device
 			   shows for it, and remove it (red bin). */
 			const actions = ajouter(l, "div", "qbd-sync-appareil-actions");
