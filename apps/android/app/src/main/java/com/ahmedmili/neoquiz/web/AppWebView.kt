@@ -58,6 +58,9 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         // at the document's top and bottom edge, which WebView draws for the root scroller only.
         setLayerType(LAYER_TYPE_NONE, null)
         overScrollMode = OVER_SCROLL_ALWAYS
+        // No scrollbar on the right while scrolling (2026-10-04): the WebView draws its own, which CSS cannot hide.
+        isVerticalScrollBarEnabled = false
+        isHorizontalScrollBarEnabled = false
 
         webViewClient = object : WebViewClient() {
             // A new document (first load, reload) gets the status bar height again.
