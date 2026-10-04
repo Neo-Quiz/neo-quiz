@@ -380,6 +380,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				let idCourant: string | null = null;
 				let texteQr: string | null = null;
 				const appareilsAvant = dernierEtat?.appareils.length ?? 0;
+				const demandesAvant = dernierEtat?.demandes.length ?? 0;
 
 				function poserQr(texte: string): void {
 					if (texte === texteQr) return;
@@ -445,6 +446,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						if (e.appareils.length > appareilsAvant) {
 							handle.close();
 							currentHost().ui.notice(t("settings.sync.added"), 6000);
+							return;
+						}
+						/* A device scanned the code and its request just arrived: the
+						   dialog steps aside so its Accept is right there (2026-10-04). */
+						if (e.demandes.length > demandesAvant) {
+							handle.close();
 							return;
 						}
 						if (e.appareil === idCourant) return;
@@ -577,6 +584,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
+	/** Devices seen connected while this page was open. */
+	const dejaConnectes = new Set<string>();
+
 	function peindreAppareils(e: EtatSync): void {
 		fermerMenu();
 		appareilsCarte.replaceChildren();
@@ -588,8 +598,14 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			const l = ajouter(appareilsCarte, "div", "qbd-sync-ligne");
 			const texte = ajouter(l, "div", "qbd-sync-id-bloc");
 			ajouter(texte, "span", "qbd-sync-nom", a.nom);
+			if (a.connecte) dejaConnectes.add(a.id);
+			/* Seen in the last two minutes but never connected while this page was
+			   open: the other side keeps closing the door, it has not said yes yet
+			   (2026-10-04: "Disconnected, seen just now" read as a fault). */
+			const enAttente = !a.connecte && a.vuLe !== null && Date.now() - a.vuLe < 120_000 && !dejaConnectes.has(a.id);
 			const sous = a.connecte
 				? t("settings.sync.connected")
+				: enAttente ? t("settings.sync.waitingAccept")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
 			ajouter(texte, "span", a.connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
 			/* Two plain actions, no menu (2026-10-04): rename what THIS device
