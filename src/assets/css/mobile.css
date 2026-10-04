@@ -754,9 +754,12 @@ body.is-mobile .modal-container:has(> .nq-reglages-modal) {
 	position: absolute;
 	inset: 0 0 auto 0;
 	min-height: 100vh;
-	padding: 0;
+	/* Under the status bar, the wallpaper shows (2026-10-04): the panel starts
+	   below it, on its own opaque background. */
+	padding: var(--nq-inset-haut, 0px) 0 0;
+	box-sizing: border-box;
 	align-items: stretch;
-	background: var(--nq-bottom-bar-bg);
+	background: transparent;
 }
 
 .is-mobile .modal-container:has(> .nq-reglages-modal) > .modal-bg {
@@ -769,8 +772,9 @@ html.nq-mobile body.is-mobile .modal-container > .nq-reglages-modal {
 	max-width: none;
 	width: 100%;
 	height: auto;
-	min-height: 100vh;
+	min-height: calc(100vh - var(--nq-inset-haut, 0px));
 	max-height: none;
+	background: var(--nq-bottom-bar-bg);
 	border: 0;
 	border-radius: 0;
 	box-shadow: none;
