@@ -947,3 +947,117 @@ html.nq-mobile ::-webkit-scrollbar {
 	width: 0;
 	height: 0;
 }
+
+/* ON A PHONE, every settings row as a Neo Calendar tile (2026-10-04): a
+   choice shows its value and a chevron and opens a list; notes sit under
+   their group; the wallpaper and language-pack rows are tiles too. */
+.is-mobile .nq-set-ligne-valeur {
+	flex: none;
+	max-width: 45%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 15px;
+	color: var(--text-muted);
+}
+
+.is-mobile .nq-set-note,
+.is-mobile .nq-set .nq-reglages-aide {
+	order: 99;
+	margin: 8px 4px 0;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.is-mobile .nq-set .nq-reglages-section {
+	display: flex;
+	flex-direction: column;
+}
+
+/* One title per group: the category's, not a second one inside it. */
+.is-mobile .nq-set .nq-reglages-section > .nq-reglages-titre {
+	display: none;
+}
+
+.is-mobile .nq-set .nq-reglages-dossier,
+.is-mobile .nq-set .nq-fond-rangee {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-height: 60px;
+	padding: 12px 18px;
+	border: 0;
+	border-radius: 16px;
+	background: var(--background-secondary);
+}
+
+.is-mobile .nq-set .nq-reglages-dossier .nq-reglages-nom,
+.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
+	font-size: 16px;
+	font-weight: 400;
+	color: var(--text-normal);
+}
+
+.is-mobile .nq-set .nq-reglages-chemin {
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+.is-mobile .nq-set .nq-reglages-actions {
+	margin-top: 8px;
+}
+
+.is-mobile .nq-set .nq-reglages-actions .qbd-btn--create {
+	min-height: 40px;
+	padding: 0 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: 14px;
+}
+
+/* The list a choice row opens. */
+.nq-choix-modal .nq-choix-liste {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	border-radius: 16px;
+	overflow: hidden;
+}
+
+.nq-choix-option {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 56px;
+	padding: 0 18px;
+	border: 0;
+	border-radius: 4px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 16px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.nq-choix-option:active {
+	background: var(--background-modifier-hover);
+}
+
+.nq-choix-libelle {
+	flex: 1;
+}
+
+.nq-choix-coche {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.nq-choix-coche svg {
+	width: 20px;
+	height: 20px;
+}

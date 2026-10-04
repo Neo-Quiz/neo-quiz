@@ -17,12 +17,11 @@
    harness has no loader.
 ══════════════════════════════════════════════════════════ */
 
-import { currentHost } from "../../../../src/host/current";
+import { currentHost, requireHost } from "../../../../src/host/current";
 import { t, currentLang, currentHourCycle, hourOptions, setHourCycle } from "../../../../src/i18n";
 import type { HourCycle, TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { savedFolders } from "../host/folder";
-import { poserLogoObsidian } from "./marques";
 import { chargerLangue, lireLangue, reglerLangue } from "./langue";
 import { lireFormatHeure, reglerFormatHeure } from "./format-heure";
 import { pont } from "../host/pont";
@@ -86,6 +85,51 @@ function row(parent: HTMLElement, name: string, help?: string, tag: "div" | "lab
 	ajouter(text, "span", "nq-reglages-nom", name);
 	if (help) ajouter(text, "span", "nq-set-ligne-aide", help);
 	return ajouter(r, "div", "nq-set-ligne-controle");
+}
+
+/** PHONE: a choice the way Neo Calendar shows one (2026-10-04): a row with
+    its icon, its label, the current value and a chevron; a tap opens the
+    list of choices, the current one ticked. Replaces a dropdown there. */
+function ligneChoix(
+	parent: HTMLElement,
+	nomIcone: string,
+	libelle: string,
+	options: ReadonlyArray<{ value: string; label: string }>,
+	valeur: string,
+	surChoix: (valeur: string) => void,
+): { setValue(valeur: string): void } {
+	const ligne = ajouter(parent, "button", "nq-set-ligne nq-set-ligne-lien");
+	ligne.type = "button";
+	currentHost().ui.setIcon(ajouter(ligne, "span", "nq-set-ligne-icone"), nomIcone);
+	ajouter(ligne, "span", "nq-set-ligne-libelle", libelle);
+	const affichee = ajouter(ligne, "span", "nq-set-ligne-valeur");
+	currentHost().ui.setIcon(ajouter(ligne, "span", "nq-set-onglet-chevron"), "chevron-right");
+	let courante = valeur;
+	const peindre = (): void => { affichee.textContent = options.find(o => o.value === courante)?.label ?? ""; };
+	peindre();
+	ligne.addEventListener("click", () => {
+		requireHost("modals").open({
+			className: "nq-choix-modal",
+			title: libelle,
+			onOpen: handle => {
+				const liste = ajouter(handle.contentEl, "div", "nq-choix-liste");
+				for (const o of options) {
+					const choix = ajouter(liste, "button", "nq-choix-option" + (o.value === courante ? " is-active" : ""));
+					choix.type = "button";
+					ajouter(choix, "span", "nq-choix-libelle", o.label);
+					if (o.value === courante) currentHost().ui.setIcon(ajouter(choix, "span", "nq-choix-coche"), "check");
+					choix.addEventListener("click", () => {
+						handle.close();
+						if (o.value === courante) return;
+						courante = o.value;
+						peindre();
+						surChoix(o.value);
+					});
+				}
+			},
+		});
+	});
+	return { setValue: v => { courante = v; peindre(); } };
 }
 
 /** A checkbox drawn as a switch: still a native checkbox (keyboard, form
@@ -272,18 +316,16 @@ export function renderSettings(
 	   (`electron/main.ts`, `poserLocaleChromium`). A reload retranslated every
 	   label and left the date fields in the old locale. The restart costs a
 	   second more than a reload — which already lost the window's state. */
-	const langueSelect = createSelect(row(general, t("settings.language.name"), t(currentHost().platform.isMobile ? "app.settings.languageHintMobile" : "app.settings.languageHint")), {
-		value: "auto",
-		options: [
-			{ value: "auto", label: t("app.settings.languageAuto") },
-			{ value: "en", label: t("settings.language.en") },
-			{ value: "fr", label: t("settings.language.fr") },
-		],
-		onChange: valeur => {
-			// The restart never returns: nothing to chain after it.
-			void reglerLangue(lireLangue(valeur)).then(() => pont().systeme.relancer());
-		},
-	});
+	const langues = [
+		{ value: "auto", label: t("app.settings.languageAuto") },
+		{ value: "en", label: t("settings.language.en") },
+		{ value: "fr", label: t("settings.language.fr") },
+	];
+	// The restart never returns: nothing to chain after it.
+	const changerLangue = (valeur: string): void => { void reglerLangue(lireLangue(valeur)).then(() => pont().systeme.relancer()); };
+	const langueSelect = mobile
+		? ligneChoix(general, "languages", t("settings.language.name"), langues, "auto", changerLangue)
+		: createSelect(row(general, t("settings.language.name"), t("app.settings.languageHint")), { value: "auto", options: langues, onChange: changerLangue });
 	void chargerLangue().then(l => langueSelect.setValue(l));
 
 	/* The TIME FORMAT: 24-hour by default, 12-hour on request, whatever the
@@ -295,19 +337,23 @@ export function renderSettings(
 	const exemple = (cycle: HourCycle): string =>
 		new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { minute: "2-digit", ...hourOptions(cycle) })
 			.format(new Date(2026, 0, 1, 18, 35));
-	createSelect(row(general, t("app.settings.timeFormat")), {
-		value: currentHourCycle(),
-		options: [
-			{ value: "24h", label: t("app.settings.timeFormat24", { example: exemple("24h") }) },
-			{ value: "12h", label: t("app.settings.timeFormat12", { example: exemple("12h") }) },
-		],
-		onChange: valeur => {
-			const format = lireFormatHeure(valeur);
-			if (format === currentHourCycle()) return;
-			setHourCycle(format);
-			void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
-		},
-	});
+	const formats = [
+		{ value: "24h", label: t("app.settings.timeFormat24", { example: exemple("24h") }) },
+		{ value: "12h", label: t("app.settings.timeFormat12", { example: exemple("12h") }) },
+	];
+	const changerFormat = (valeur: string): void => {
+		const format = lireFormatHeure(valeur);
+		if (format === currentHourCycle()) return;
+		setHourCycle(format);
+		void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
+	};
+	if (mobile) {
+		ligneChoix(general, "clock", t("app.settings.timeFormat"), formats, currentHourCycle(), changerFormat);
+		/* The help under the group, as Neo Calendar writes its notes. */
+		ajouter(pages.get("general")!, "p", "nq-set-note", t("app.settings.languageHintMobile"));
+	} else {
+		createSelect(row(general, t("app.settings.timeFormat")), { value: currentHourCycle(), options: formats, onChange: changerFormat });
+	}
 
 	/* ═══ AI ═══ */
 	/* On mobile the page is never attached (no category): it is built into a

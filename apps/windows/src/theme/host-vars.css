@@ -24,6 +24,9 @@
    ========================================================= */
 
 :root {
+	/* The status bar height on Android, set by the app at run time
+	   (AppWebView, `setTopInset`); 0 everywhere else. */
+	--nq-inset-haut: 0px;
 	--background-modifier-border: rgb(49, 50, 68);
 	--background-modifier-border-hover: rgb(67, 70, 90);
 	--background-modifier-form-field: rgba(17, 17, 27, 0.3);
