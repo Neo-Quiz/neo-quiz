@@ -1069,9 +1069,15 @@ html.nq-mobile ::-webkit-scrollbar {
 	flex: 1;
 	min-width: 0;
 	display: flex;
+	flex-direction: row;
+	text-align: left;
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
+}
+
+.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
+	flex: 1;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
