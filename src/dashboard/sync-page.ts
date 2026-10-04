@@ -35,7 +35,9 @@ export type CanalPartage = "systeme";
 
 export interface SyncPageDeps {
 	etat(): Promise<EtatSync>;
-	appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
+	/** `nom`: the name a scanned pairing QR code announced (Android shows it
+	    in its confirmation); ignored where nothing is scanned. */
+	appairer(deviceId: string, nom?: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 	oublier(deviceId: string): Promise<void>;
 	/** Ignore on a pairing request. */
 	ignorer(deviceId: string): Promise<void>;
@@ -68,6 +70,13 @@ export function normaliserCode(brut: string): string {
 	if (qr) brut = new URLSearchParams(qr[1]).get("device") ?? "";
 	const nu = brut.replace(/[\s-]+/g, "").toUpperCase();
 	return nu.length === 56 ? (nu.match(/.{7}/g) ?? []).join("-") : brut.trim().toUpperCase();
+}
+
+/** The PC name a scanned pairing QR code announces (`&name=`), or "". A
+    candidate only: the host cleans it and shows it next to the id. */
+export function nomDansQr(brut: string): string {
+	const qr = /^neo-quiz:\/\/pair\?(.*)$/i.exec(brut.trim());
+	return qr ? (new URLSearchParams(qr[1]).get("name") ?? "").slice(0, 64) : "";
 }
 
 export type TonStatut = "ok" | "neutre" | "erreur";
@@ -257,7 +266,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			scanBtn.addEventListener("click", () => {
 				void deps.scanner!().then(async code => {
 					if (!code || demonte) return;
-					const res = await deps.appairer(normaliserCode(code));
+					const res = await deps.appairer(normaliserCode(code), nomDansQr(code) || undefined);
 					if (demonte) return;
 					if (res === "ok") currentHost().ui.notice(t("settings.sync.scanSent"), 6000);
 					else if (res !== "annule") currentHost().ui.notice(t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable"));

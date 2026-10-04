@@ -253,7 +253,7 @@ class SyncEngine(
         }
     }
 
-    suspend fun pair(raw: String): String = withContext(Dispatchers.IO) {
+    suspend fun pair(raw: String, scannedName: String? = null): String = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
         if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || dead) return@withContext PairResult.INVALID
@@ -262,7 +262,8 @@ class SyncEngine(
             if (id in paired) return@withContext PairResult.OK
             if (paired.size >= MAX_DEVICES) return@withContext PairResult.INVALID
             val waiting = r.instance.rest.pendingDevices().optJSONObject(id)
-            val name = ShareRules.cleanName(waiting?.optString("name"))
+            // The name the device announced (pending), else the one its scanned QR code carried.
+            val name = ShareRules.cleanName(waiting?.optString("name")).ifEmpty { ShareRules.cleanName(scannedName) }
             // The owner's say. A device that ASKED (it is pending) and is accepted from the page's
             // request notification needs no second question: the tap on Accept is it (owner's
             // decision, 2026-10-03, same as Windows). An id typed or scanned in "Add a device"

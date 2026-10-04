@@ -321,6 +321,7 @@ await withSrcModule(
 			const c1 = f.tourner();
 			r.check("a code is 10 characters without 0, O, 1 or I", /^[A-HJ-NP-Z2-9]{10}$/.test(c1), true);
 			r.check("the QR text carries the id and the code", texteQr(ID, c1), "neo-quiz://pair?device=" + ID + "&code=" + c1);
+			r.check("the QR text carries the PC's name, encoded", texteQr(ID, c1, "PC d'Ahmed&x"), "neo-quiz://pair?device=" + ID + "&code=" + c1 + "&name=PC%20d'Ahmed%26x");
 			horloge += 2_000;
 			const c2 = f.tourner();
 			r.check("a new code each turn", c1 !== c2, true);

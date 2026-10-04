@@ -31,7 +31,7 @@ class BridgeTest {
             }).handlers() +
             com.ahmedmili.neoquiz.sync.SyncChannel(object : com.ahmedmili.neoquiz.sync.SyncBackend {
                 override suspend fun state() = emptyMap<String, Any?>()
-                override suspend fun pair(id: String) = "indisponible"
+                override suspend fun pair(id: String, name: String?) = "indisponible"
                 override suspend fun forget(id: String) {}
                 override suspend fun ignore(id: String) {}
             }, { null }).handlers() +

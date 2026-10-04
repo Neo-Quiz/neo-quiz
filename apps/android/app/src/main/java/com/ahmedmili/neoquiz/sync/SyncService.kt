@@ -29,7 +29,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** What the `sync.*` bridge channels need; implemented by [SyncHub], faked in the bridge test. */
 interface SyncBackend {
     suspend fun state(): Map<String, Any?>
-    suspend fun pair(id: String): String
+    /** `name`: announced by a scanned pairing QR code, shown in the confirmation; null when typed. */
+    suspend fun pair(id: String, name: String?): String
     suspend fun forget(id: String)
     suspend fun ignore(id: String)
 }
@@ -179,7 +180,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     // One native dialog at a time: a second pairing while one is open is dropped, so a page cannot stack dialogs.
     private val pairing = SingleFlight()
 
-    override suspend fun pair(id: String): String = pairing.run(PairResult.CANCELLED) { ensure()?.pair(id) ?: PairResult.UNAVAILABLE }
+    override suspend fun pair(id: String, name: String?): String = pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name) ?: PairResult.UNAVAILABLE }
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
 

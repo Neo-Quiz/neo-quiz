@@ -48,9 +48,13 @@ export function nouveauCode(octets: Uint8Array): string {
 	return s;
 }
 
-/** What the QR code carries. `deviceId` is ours, already validated. */
-export function texteQr(deviceId: string, code: string): string {
-	return `neo-quiz://pair?device=${deviceId}&code=${code}`;
+/** What the QR code carries. `deviceId` is ours, already validated. `nom`,
+    this PC's name, lets the phone's confirmation say WHICH device it pairs
+    ("Pair DESKTOP-1U89520?") instead of an id alone (2026-10-04); the phone
+    treats it as an announced name and cleans it. */
+export function texteQr(deviceId: string, code: string, nom?: string): string {
+	const base = `neo-quiz://pair?device=${deviceId}&code=${code}`;
+	return nom ? base + "&name=" + encodeURIComponent(nom) : base;
 }
 
 /** The code a device announced at the end of its name, or `null`. */

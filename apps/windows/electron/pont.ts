@@ -408,7 +408,8 @@ export interface Pont {
 		/** Pairs a device by its id. `invalide`: not an id (format or check
 		    characters), or our own. `indisponible`: Syncthing is not running.
 		    `annule`: the owner declined the native confirmation shown first. */
-		appairer(deviceId: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
+		/** `nom`: announced by a scanned QR code (Android only; Windows ignores it). */
+		appairer(deviceId: string, nom?: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 		oublier(deviceId: string): Promise<void>;
 		/** Ignore on a pairing request: the main process forgets the pending
 		    device (it may ask again later). Pairs nothing. */

@@ -697,7 +697,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			if (!h) return null;
 			const code = fenetreQr.tourner();
 			try { await verifierDemandesQr(h); } catch { /* the next call looks again */ }
-			return { texte: texteQr(h.idPropre(), code), periodeMs: PERIODE_MS };
+			return { texte: texteQr(h.idPropre(), code, os.hostname().slice(0, 64)), periodeMs: PERIODE_MS };
 		},
 		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
 		signalerEcriture(abs) { handle?.signalerEcriture(abs); },

@@ -253,7 +253,7 @@ const pont: Pont = {
 
 	sync: {
 		etat: () => appeler("sync.etat"),
-		appairer: (deviceId) => appeler("sync.appairer", [deviceId]),
+		appairer: (deviceId, nom) => appeler("sync.appairer", nom ? [deviceId, String(nom)] : [deviceId]),
 		oublier: (deviceId) => appeler("sync.oublier", [deviceId]),
 		ignorer: (deviceId) => appeler("sync.ignorer", [deviceId]),
 		partagerId: (canal) => appeler("sync.partagerId", [canal]),

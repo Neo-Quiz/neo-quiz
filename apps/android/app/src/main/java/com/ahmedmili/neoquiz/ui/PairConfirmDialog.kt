@@ -19,14 +19,13 @@ import kotlinx.coroutines.withContext
 class PairConfirmDialog(private val activity: Activity) {
     suspend fun ask(deviceId: String, name: String): Boolean = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
-            // The id FIRST on its own labelled line, the announced name LAST with its label; the name is
-            // the other device's, so it is cleaned again here (no forged line, no reordered text).
+            // The name in the TITLE ("Pair DESKTOP-1U89520?", 2026-10-04: an id alone said nothing),
+            // the id under one short sentence. The name is the other device's, so it is cleaned
+            // again here (no forged line, no reordered text).
             val clean = ShareRules.cleanName(name)
-            val shown = activity.getString(R.string.pair_id_line, deviceId) +
-                if (clean.isEmpty()) "" else "\n" + activity.getString(R.string.pair_name_line, clean)
             val dialog = AlertDialog.Builder(activity)
-                .setTitle(R.string.pair_title)
-                .setMessage(activity.getString(R.string.pair_message, shown))
+                .setTitle(if (clean.isEmpty()) activity.getString(R.string.pair_title) else activity.getString(R.string.pair_title_named, clean))
+                .setMessage(activity.getString(R.string.pair_message, activity.getString(R.string.pair_id_line, deviceId)))
                 .setPositiveButton(R.string.pair_confirm) { _, _ -> if (cont.isActive) cont.resume(true) }
                 .setNegativeButton(R.string.pair_cancel) { _, _ -> if (cont.isActive) cont.resume(false) }
                 .setOnCancelListener { if (cont.isActive) cont.resume(false) }
