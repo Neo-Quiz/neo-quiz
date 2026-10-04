@@ -205,61 +205,13 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const afficherIdBtn = bouton(moi, "qr-code", t("settings.sync.showId"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
 	afficherIdBtn.setAttribute("aria-haspopup", "dialog");
 
-	/* ── ON A PHONE, Neo Calendar's Android layout (2026-10-04): "This device"
-	   as rows (its name, its ID, show the QR code, copy, share), then "Pair
-	   with a PC" with ONE big button that scans the PC's QR code. The big
-	   "Show my ID" button is the PC's way, hidden here. ── */
-	let peindreAppareilMobile: (e: EtatSync) => void = () => undefined;
+	/* ── ON A PHONE (2026-10-04): the PC's "Show my ID" button and dialog
+	   (ID, QR code, share), then "Pair with a PC" with ONE big button that
+	   scans the PC's QR code. Scanning is the phone's main gesture, so Show my
+	   ID steps back from blue there. ── */
+	const peindreAppareilMobile: (e: EtatSync) => void = () => undefined;
 	if (mobile) {
-		afficherIdBtn.hidden = true;
-		titre(moi, t("settings.sync.thisDevice"));
-		const carteMoi = ajouter(moi, "div", "qbd-sync-carte");
-		const ligneInfo = (icone_: string, libelle: string): HTMLElement => {
-			const l = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-info");
-			icone(l, icone_, "qbd-sync-ligne-icone");
-			ajouter(l, "span", "qbd-sync-ligne-libelle", libelle);
-			return ajouter(l, "span", "qbd-sync-ligne-valeur");
-		};
-		const ligneAction = (icone_: string, libelle: string, agir: () => void): HTMLButtonElement => {
-			const b = ajouter(carteMoi, "button", "qbd-sync-ligne qbd-sync-ligne-action");
-			b.type = "button";
-			icone(b, icone_, "qbd-sync-ligne-icone");
-			ajouter(b, "span", "qbd-sync-ligne-libelle", libelle);
-			b.addEventListener("click", agir);
-			return b;
-		};
-		const valeurNom = ligneInfo("smartphone", t("settings.sync.deviceName"));
-		const ligneId = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-id");
-		const idTexte = ajouter(ligneId, "code", "qbd-sync-id", t("settings.sync.starting"));
-		const zoneQr = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-qr");
-		zoneQr.hidden = true;
-		const qr = ajouter(zoneQr, "img", "qbd-sync-qr");
-		qr.alt = t("settings.sync.qrAlt");
-		let idMobile: string | null = null;
-		let texteMobile: string | null = null;
-		const qrBtn = ligneAction("qr-code", t("settings.sync.showQr"), () => {
-			zoneQr.hidden = !zoneQr.hidden;
-			(qrBtn.querySelector(".qbd-sync-ligne-libelle") as HTMLElement).textContent = t(zoneQr.hidden ? "settings.sync.showQr" : "settings.sync.hideQr");
-		});
-		ligneAction("copy", t("settings.sync.copyId"), () => {
-			if (!idMobile) return;
-			void deps.copier(idMobile).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); });
-		});
-		ligneAction("share-2", t("settings.sync.share"), () => { if (idMobile) void partagerId("systeme"); });
-		peindreAppareilMobile = e => {
-			valeurNom.textContent = e.nom;
-			/* The QR code carries this device's NAME next to its id (the PC's
-			   scheme, without a code): whoever scans it, a phone or a tablet,
-			   sees "Pair Xiaomi 13T Pro?" and not an id alone (2026-10-04). */
-			const texte = e.appareil ? `neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}` : null;
-			if (!e.appareil || !texte || texte === texteMobile) return;
-			idMobile = e.appareil;
-			texteMobile = texte;
-			idTexte.textContent = e.appareil;
-			void QRCode.toDataURL(texte, { margin: 2, width: 220, errorCorrectionLevel: "M" })
-				.then(url => { if (!demonte && texteMobile === texte) qr.src = url; })
-				.catch(() => undefined);
-		};
+		afficherIdBtn.classList.remove("qbd-sync-bouton-principal");
 
 		if (deps.scannerAppairer) {
 			const appairer = ajouter(racine, "section", "qbd-sync-section");
