@@ -16,11 +16,13 @@ release notes.
 ### Changed
 - The pairing QR code no longer changes every 2 seconds: it shows this PC's ID and name.
 - A paired device has its own Rename and Remove buttons.
+- Removing a device removes you from it too, and an expired request can be sent again.
+- The Sync page has a Log and a switch to turn sync off and on.
 - The sync page footer reads "Powered by Syncthing".
 
 ### Fixed
 - A pairing request you ignored no longer comes back at the next connection attempt.
-- A pairing request left unanswered for one minute is ignored on its own; "Show my ID" lets the device ask again.
+- A pairing request left unanswered for one minute goes away on its own.
 - In the app menu, "Display" no longer stays highlighted while the pointer rests on the menu's empty edges.
 
 ## [1.20.25] - 2026-10-04

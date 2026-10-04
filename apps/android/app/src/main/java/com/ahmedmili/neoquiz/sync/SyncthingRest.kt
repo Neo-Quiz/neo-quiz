@@ -100,6 +100,9 @@ class SyncthingRest(private val port: Int, private val apiKey: String) {
 
     fun connections(): JSONObject = obj("GET", "/rest/system/connections")
 
+    /** The engine's log: `{messages:[{when,message,level}]}`, `when` an RFC 3339 string. */
+    fun log(): JSONObject = obj("GET", "/rest/system/log")
+
     fun shutdown() { call("POST", "/rest/system/shutdown") }
 
     private companion object {

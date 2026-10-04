@@ -768,8 +768,16 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 					const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
 					return response === 0;
 				},
-				lireActif: async () => (await reglagesOuErreur().lire(CLE_SYNC_ACTIF)) === true,
-				poserActif: () => reglagesOuErreur().ecrire(CLE_SYNC_ACTIF, true),
+				/* THREE states (see `OptionsGestion.lireActif`): the key says
+				   `true` (on, started at launch), `false` (switched off in the
+				   Sync page, never restarted), absent (`null`: never paired,
+				   started on demand). Written by `desactiver` / `activer` and
+				   by a first pairing alone — the window cannot write it. */
+				lireActif: async () => {
+					const v = await reglagesOuErreur().lire(CLE_SYNC_ACTIF);
+					return typeof v === "boolean" ? v : null;
+				},
+				poserActif: actif => reglagesOuErreur().ecrire(CLE_SYNC_ACTIF, actif),
 			});
 		}
 		const canaux = enregistrerCanaux({

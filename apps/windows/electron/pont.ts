@@ -49,7 +49,7 @@
 import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun } from "../../../src/host/types";
 import type { CodeLanguage } from "../../../src/code-languages";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
-import type { EtatSync } from "../../../src/dashboard/sync-etat";
+import type { EtatSync, LigneJournal } from "../../../src/dashboard/sync-etat";
 export type { EtatSync } from "../../../src/dashboard/sync-etat";
 export type { EtatMiseAJour, PhaseMiseAJour } from "./mise-a-jour-etat";
 import type { EtatMiseAJour } from "./mise-a-jour-etat";
@@ -415,6 +415,17 @@ export interface Pont {
 		renommer(deviceId: string, nom: string): Promise<void>;
 		/** Sends again a request that expired. */
 		renvoyer(deviceId: string): Promise<void>;
+		/** The engine's log, newest first, at most `MAX_JOURNAL` lines. `null`
+		    when sync is not running (switched off, or the engine unavailable).
+		    Text only: rendered in `textContent` by the page, never markup. */
+		journal(): Promise<LigneJournal[] | null>;
+		/** Switches sync OFF: the engine stops and stays stopped (the page
+		    reading its state again gets `actif: false`), the choice is kept in
+		    the `syncActif` setting. No argument: the window names the verb only,
+		    the main process owns the setting. */
+		desactiver(): Promise<void>;
+		/** Switches sync back ON: the setting goes up, the engine starts. */
+		activer(): Promise<void>;
 		/** Ignore on a pairing request: the main process forgets the pending
 		    device (it may ask again later). Pairs nothing. */
 		ignorer(deviceId: string): Promise<void>;
@@ -859,6 +870,9 @@ export const CANAUX = {
 	syncOublier: "neo:sync/oublier",
 	syncRenommer: "neo:sync/renommer",
 	syncRenvoyer: "neo:sync/renvoyer",
+	syncJournal: "neo:sync/journal",
+	syncDesactiver: "neo:sync/desactiver",
+	syncActiver: "neo:sync/activer",
 	syncIgnorer: "neo:sync/ignorer",
 	syncPartagerId: "neo:sync/partager-id",
 	syncQrSuivant: "neo:sync/qr-suivant",

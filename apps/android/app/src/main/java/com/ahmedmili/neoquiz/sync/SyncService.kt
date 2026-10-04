@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONArray
 
 /** What the `sync.*` bridge channels need; implemented by [SyncHub], faked in the bridge test. */
 interface SyncBackend {
@@ -38,6 +39,15 @@ interface SyncBackend {
     suspend fun rename(id: String, name: String)
     /** Sends again a request that expired (the device was paused). */
     suspend fun sendAgain(id: String)
+    /** The last lines of Syncthing's log, newest first (`lignes` of `LigneJournal`,
+        at most 200); null when sync is not running (switched off, unavailable). */
+    suspend fun logLines(): JSONArray?
+    /** The owner switched sync OFF: remember it ([KEY_ACTIVE] at `false`) and stop
+        the engine. Nothing starts it again until [activate], not even the page
+        asking for the state ([ensure] refuses). */
+    suspend fun deactivate()
+    /** The owner switched sync back ON: the flag goes up, the engine starts. */
+    suspend fun activate()
     suspend fun ignore(id: String)
 }
 
@@ -113,7 +123,16 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         receivedListener = null
     }
 
-    /** Sync stays on from the first pairing (a flag only this process writes, never the page). */
+    /**
+     * The owner's choice, THREE states (mirror of the Windows `syncActif`):
+     * `null` (the key is absent: never paired, the engine starts on demand the
+     * first time the page asks), `true` (switched on: started at boot too),
+     * `false` (switched off in the Sync page: [ensure] never starts it).
+     */
+    private fun activeFlag(): Boolean? = if (prefs.contains(KEY_ACTIVE)) prefs.getBoolean(KEY_ACTIVE, false) else null
+
+    /** True once sync was switched on (a first pairing, or [activate]): the
+        service restarts at boot in that case only. */
     fun isActive(): Boolean = prefs.getBoolean(KEY_ACTIVE, false)
 
     fun received() {
@@ -177,6 +196,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 
     private suspend fun ensure(): SyncEngine? {
         if (paused) return null
+        // Switched off in the Sync page: NOTHING starts the engine, not even the page asking for the state.
+        if (activeFlag() == false) return null
         engine?.let { admitRoot(); return it }
         startService()
         // First start can take a while (key generation); the page waits for its id. Only the WAIT times out:
@@ -200,6 +221,25 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     override suspend fun rename(id: String, name: String) { ensure()?.rename(id, name) }
 
     override suspend fun sendAgain(id: String) { ensure()?.sendAgain(id) }
+
+    override suspend fun logLines(): JSONArray? {
+        val e = ensure() ?: return null
+        return try { e.logLines() } catch (_: Exception) { null }
+    }
+
+    override suspend fun deactivate() {
+        prefs.edit().putBoolean(KEY_ACTIVE, false).apply()
+        // The service only exists to keep the engine alive: it goes with it.
+        appContext.stopService(Intent(appContext, SyncService::class.java))
+        shutdown()
+    }
+
+    override suspend fun activate() {
+        prefs.edit().putBoolean(KEY_ACTIVE, true).apply()
+        // A refusal earlier in the app's life must not swallow the owner's press.
+        paused = false
+        startService()
+    }
 
     override suspend fun ignore(id: String) { ensure()?.ignore(id) }
 

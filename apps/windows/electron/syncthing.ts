@@ -34,6 +34,7 @@ import { createServer } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Changement, EtatSync } from "../../../src/dashboard/sync-etat";
+import { MAX_JOURNAL, type LigneJournal } from "../../../src/dashboard/sync-etat";
 import { creerFenetreAppairage, codeDansNom, PERIODE_MS, sansCode, texteQr } from "./appairage-qr";
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
@@ -80,6 +81,9 @@ export interface SyncHandle {
 	renommer(deviceId: string, nom: string): Promise<void>;
 	/** Sends again a request that expired (the device was paused). */
 	renvoyer(deviceId: string): Promise<void>;
+	/** The engine's log, newest first, at most `MAX_JOURNAL` lines;
+	    `null` when sync is not running (switched off, unavailable). */
+	journal(): Promise<LigneJournal[] | null>;
 	/** Empties the ignore list (the owner opened "Show my ID": pairing is what they want now). */
 	pardonnerIgnores(): Promise<void>;
 	/** The owner chose Ignore on a pairing request: forget that request. */
@@ -555,11 +559,32 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		}, DELAI_SCAN_MS);
 	}
 
+	/** The engine's log, newest first, at most `MAX_JOURNAL` lines. Syncthing
+	    returns `{messages:[{when,message,level}]}` with `when` an RFC 3339
+	    string, oldest line first: read `MAX_JOURNAL` of them, reversed, `when`
+	    parsed to milliseconds (`0` when unreadable). Never throws: a log that
+	    cannot be read leaves the dialog empty, it does not report an error. */
+	async function journal(): Promise<LigneJournal[] | null> {
+		if (mort) return null;
+		try {
+			const rep = await courant.rest.log();
+			const messages = Array.isArray(rep.messages) ? rep.messages : [];
+			return messages.slice(-MAX_JOURNAL).reverse().map(m => ({
+				quand: typeof m.when === "string" ? (Number.isNaN(Date.parse(m.when)) ? 0 : Date.parse(m.when)) : 0,
+				niveau: typeof m.level === "string" ? m.level : "",
+				message: typeof m.message === "string" ? m.message : "",
+			}));
+		} catch {
+			return null;
+		}
+	}
+
 	return {
 		etat: calculerEtat,
 
 		idPropre: () => courant.ownId,
 		signalerEcriture,
+		journal,
 
 		async demandesBrutes() {
 			if (mort) return [];
@@ -703,6 +728,15 @@ export interface GestionSync {
 	renommer(deviceId: string, nom: string): Promise<void>;
 	/** Sends again a request that expired (the device was paused). */
 	renvoyer(deviceId: string): Promise<void>;
+	/** The engine's log, newest first (see `SyncHandle.journal`). */
+	journal(): Promise<LigneJournal[] | null>;
+	/** The owner switched sync off: remember it (the `syncActif` setting, only
+	    the main process writes it) and stop the engine. Until switched back on,
+	    nothing relaunches it: `obtenir` refuses, so the page reading its state
+	    again gets `ETAT_ABSENT` and shows sync as off. */
+	desactiver(): Promise<void>;
+	/** The owner switched sync back on: the setting goes up and the engine starts. */
+	activer(): Promise<void>;
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	surDonneesRecues(rappel: () => void): () => void;
@@ -734,9 +768,14 @@ export interface OptionsGestion {
 	/** Random bytes for the pairing codes (`crypto.randomBytes` in the app). */
 	alea(n: number): Uint8Array;
 	sys?: SysSync;
-	lireActif(): Promise<boolean>;
-	/** Called after a first successful pairing: sync stays on from then. */
-	poserActif(): Promise<void>;
+	/** The owner's choice, THREE states: `true` (switched on, or a first
+	    pairing succeeded), `false` (switched off in the Sync page: the engine
+	    never starts), `null` (the key is absent: never paired, sync starts on
+	    demand the first time the page asks — the state a fresh install is in). */
+	lireActif(): Promise<boolean | null>;
+	/** Writes the owner's choice (`desactiver` / `activer` / a first pairing
+	    that pairs on its own). Only the main process writes it. */
+	poserActif(actif: boolean): Promise<void>;
 }
 
 export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync = startSync): GestionSync {
@@ -758,7 +797,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		appairageEnCours = true;
 		try {
 			const res = await h.appairer(id, viaQr);
-			if (res === "ok") { try { await o.poserActif(); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
+			if (res === "ok") { try { await o.poserActif(true); } catch (e) { console.warn("[syncthing] setting not saved:", e); } }
 			return res;
 		} finally {
 			appairageEnCours = false;
@@ -781,8 +820,13 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		}
 	}
 
-	function obtenir(): Promise<SyncHandle | null> {
+	async function obtenir(): Promise<SyncHandle | null> {
 		if (handle) return Promise.resolve(handle);
+		/* Switched off in the Sync page (`desactiver`, the `syncActif` setting
+		   at `false`): NOTHING relaunches the engine, not even the page asking
+		   for its state — it reads `ETAT_ABSENT` and shows sync as off. The
+		   other two states start on demand: `null` (never paired) and `true`. */
+		if ((await o.lireActif()) === false) return null;
 		return demarrage ??= (async () => {
 			try {
 				let root = await o.lireRoot();
@@ -817,6 +861,26 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		async oublier(id) { await (await obtenir())?.oublier(id); },
 		async renommer(id, nom) { await (await obtenir())?.renommer(id, nom); },
 		async renvoyer(id) { await (await obtenir())?.renvoyer(id); },
+		async journal() { return (await obtenir())?.journal() ?? null; },
+		async desactiver() {
+			try { await o.poserActif(false); } catch (e) { console.warn("[syncthing] setting not saved:", e instanceof Error ? e.message : String(e)); }
+			/* Even a start in flight is awaited and stopped: the engine must be
+			   gone when this returns, or it would keep holding the folder while
+			   the page already shows sync as off. */
+			const enCours = demarrage;
+			demarrage = null;
+			const h = handle ?? (enCours ? await enCours : null);
+			handle = null;
+			await h?.stop();
+			for (const a of abonnesEtat) a(ETAT_ABSENT);
+		},
+		async activer() {
+			try { await o.poserActif(true); } catch (e) { console.warn("[syncthing] setting not saved:", e instanceof Error ? e.message : String(e)); }
+			/* Started here, not by the next read of the state: the enable press
+			   is what the owner asked for (the page then refreshes and shows the
+			   engine answering). */
+			await obtenir();
+		},
 		async ignorer(id) { await (await obtenir())?.ignorer(id); },
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },
@@ -833,7 +897,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		},
 		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
 		signalerEcriture(abs) { handle?.signalerEcriture(abs); },
-		async demarrerSiActif() { if (await o.lireActif()) await obtenir(); },
+		async demarrerSiActif() { if ((await o.lireActif()) === true) await obtenir(); },
 		async arreter() {
 			fin = true;
 			const h = handle ?? (demarrage ? await demarrage : null);

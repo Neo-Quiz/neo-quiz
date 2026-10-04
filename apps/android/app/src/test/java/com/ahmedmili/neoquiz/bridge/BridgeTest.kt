@@ -36,6 +36,9 @@ class BridgeTest {
                 override suspend fun forget(id: String) {}
                 override suspend fun rename(id: String, name: String) {}
                 override suspend fun sendAgain(id: String) {}
+                override suspend fun logLines(): org.json.JSONArray? = null
+                override suspend fun deactivate() {}
+                override suspend fun activate() {}
                 override suspend fun ignore(id: String) {}
             }, { null }).handlers() +
             BackChannel { }.handlers() +

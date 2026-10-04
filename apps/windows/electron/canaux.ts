@@ -1504,6 +1504,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		ipcMain.handle(CANAUX.syncRenvoyer, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.renvoyer(id);
 		});
+		/* The three verbs of the bottom rows of the page (2026-10-04): the log
+		   of the engine, and switching sync off and on. NONE of them takes an
+		   argument: the page names a verb, the main process reads the switch
+		   and the log itself (the `syncActif` setting is the main process's). */
+		ipcMain.handle(CANAUX.syncJournal, async () => await sync.journal());
+		ipcMain.handle(CANAUX.syncDesactiver, async () => { await sync.desactiver(); });
+		ipcMain.handle(CANAUX.syncActiver, async () => { await sync.activer(); });
 		ipcMain.handle(CANAUX.syncIgnorer, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.ignorer(id);
 		});

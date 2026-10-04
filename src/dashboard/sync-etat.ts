@@ -38,5 +38,18 @@ export interface Changement {
 	quand: number;
 }
 
+/** One line of the embedded Syncthing's log (`/rest/system/log`), as the
+    "Log" row of the Sync page shows it (2026-10-04, same rows as Neo
+    Calendar's page). `quand` is milliseconds (`0` when the time could not be
+    read), `niveau` and `message` are Syncthing's own strings. */
+export interface LigneJournal {
+	quand: number;
+	niveau: string;
+	message: string;
+}
+
+/** How many lines a host hands over, newest first (`/rest/system/log`, sliced client side). */
+export const MAX_JOURNAL = 200;
+
 /** How many changes a host keeps and hands over. */
 export const MAX_CHANGEMENTS = 200;

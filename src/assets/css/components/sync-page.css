@@ -714,6 +714,15 @@
 	background: var(--background-modifier-hover);
 }
 
+.qbd-sync-ligne-action:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+}
+
+.qbd-sync-ligne-action:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
 .qbd-sync-ligne-id .qbd-sync-id {
 	font-family: "Neo Quiz Mono", var(--font-monospace);
 	font-size: 13px;
@@ -810,6 +819,76 @@
 	color: #f0a23b;
 }
 
+
+/* ── TWO ROWS AT THE BOTTOM (like Neo Calendar's page, 2026-10-04): the
+   switch of the sync and the engine's log. Plain rows of one card, an icon at
+   the left, a chevron at the right of the log only. ── */
+.qbd-sync-ligne-chevron {
+	display: inline-flex;
+	flex: none;
+	color: var(--text-faint, var(--text-muted));
+}
+
+.qbd-sync-ligne-chevron svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* "Log": the lines, newest first, monospace, one row per line.
+   NOT a `qbd-sync-carte`: the phone turns that class's children into tiles
+   one by one, and a log line must stay a line. The card scrolls inside the
+   dialog (200 lines cannot fit); the Copy button sits outside it. */
+.modal.qbd-sync-modal-journal {
+	width: min(640px, calc(100vw - 32px));
+}
+
+.qbd-sync-journal {
+	align-self: stretch;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 55vh;
+	overflow: auto;
+	padding: 10px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	background: var(--background-secondary);
+}
+
+.qbd-sync-journal-ligne {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	font-family: "Neo Quiz Mono", var(--font-monospace);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.qbd-sync-journal-quand {
+	flex: none;
+	color: var(--text-muted);
+}
+
+.qbd-sync-journal-niveau {
+	flex: none;
+	min-width: 64px;
+	color: var(--text-muted);
+}
+
+.qbd-sync-journal-niveau[data-niv="WARNING"] {
+	color: #f0a23b;
+}
+
+.qbd-sync-journal-niveau[data-niv="ERROR"] {
+	color: var(--text-error);
+}
+
+.qbd-sync-journal-message {
+	flex: 1;
+	min-width: 0;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
 
 /* The request's two buttons (2026-10-04): the same height and shape, Ignore
    a quiet outline in the request's amber, Accept the solid one. Accept stays

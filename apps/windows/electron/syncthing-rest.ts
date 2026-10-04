@@ -125,6 +125,8 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 		/* `remoteState`: "valid" (it shares the folder with us), "notSharing", "paused", "unknown". */
 		completion: (folder: string, device: string) =>
 			json<{ remoteState?: unknown }>("GET", `/rest/db/completion?folder=${segment(folder)}&device=${segment(device)}`),
+		/** The engine's log: `{messages:[{when,message,level}]}`, `when` an RFC 3339 string. */
+		log: () => json<{ messages?: Array<{ when?: unknown; message?: unknown; level?: unknown }> }>("GET", "/rest/system/log"),
 		connections: () => json<Connections>("GET", "/rest/system/connections"),
 		async shutdown(): Promise<void> { await appeler("POST", "/rest/system/shutdown"); },
 	};

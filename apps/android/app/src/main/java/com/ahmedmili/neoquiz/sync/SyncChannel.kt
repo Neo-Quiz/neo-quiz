@@ -26,6 +26,11 @@ class SyncChannel(
         "sync.oublier" to { a -> backend.forget(a.text(0)) },
         "sync.renommer" to { a -> backend.rename(a.text(0), a.text(1)) },
         "sync.renvoyer" to { a -> backend.sendAgain(a.text(0)) },
+        // The three verbs of the page's bottom rows (2026-10-04): the engine's log, and the switch.
+        "sync.journal" to { _ -> backend.logLines() },
+        // No argument: the page names a verb, the choice stays the hub's (KEY_ACTIVE).
+        "sync.desactiver" to { _ -> backend.deactivate() },
+        "sync.activer" to { _ -> backend.activate() },
         "sync.ignorer" to { a -> backend.ignore(a.text(0)) },
         // The page names a channel and nothing else; the id is OURS, read from the engine, and must be a device id.
         "sync.partagerId" to { a ->

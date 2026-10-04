@@ -30,6 +30,7 @@ import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { currentLang, hourOptions, t } from "../i18n";
 import type { Changement, EtatSync } from "./sync-etat";
+import type { LigneJournal } from "./sync-etat";
 
 export type CanalPartage = "systeme";
 
@@ -41,6 +42,14 @@ export interface SyncPageDeps {
 	oublier(deviceId: string): Promise<void>;
 	renommer(deviceId: string, nom: string): Promise<void>;
 	renvoyer(deviceId: string): Promise<void>;
+	/** The last lines of the embedded Syncthing's log, newest first (the "Log"
+	    row, at most `MAX_JOURNAL`); `null` when sync is not running. */
+	journal(): Promise<LigneJournal[] | null>;
+	/** Switches sync OFF: the host stops the engine and remembers the choice;
+	    nothing starts it again until `activer`, including reading the state. */
+	desactiver(): Promise<void>;
+	/** Switches sync back ON: the engine starts. */
+	activer(): Promise<void>;
 	/** Ignore on a pairing request. */
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -282,6 +291,27 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	/** The open dialog's list, repainted on each state and every 5 s. */
 	let dialogueChangements: { carte: HTMLElement; plusAnciens: HTMLButtonElement; fermer(): void } | null = null;
 	let voirAnciens = false;
+	/** The open "Log" dialog, and the pending copy feedback timeout inside it
+	    (cleared when it closes, `ferme` freezes its work). */
+	let dialogueJournal: { fermer(): void } | null = null;
+	let retourCopieJournal: ReturnType<typeof setTimeout> | null = null;
+
+	/* ── Two rows at the bottom (Neo Calendar's page, 2026-10-04): switching
+	   sync off or on, and the log of the embedded Syncthing ── */
+	const bas = ajouter(racine, "section", "qbd-sync-section");
+	const basCarte = ajouter(bas, "div", "qbd-sync-carte");
+	const basculeBtn = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
+	basculeBtn.type = "button";
+	icone(basculeBtn, "power", "qbd-sync-ligne-icone");
+	const basculeLbl = ajouter(basculeBtn, "span", "qbd-sync-ligne-libelle", t("settings.sync.disable"));
+	const journalBtn = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
+	journalBtn.type = "button";
+	icone(journalBtn, "file-text", "qbd-sync-ligne-icone");
+	ajouter(journalBtn, "span", "qbd-sync-ligne-libelle", t("settings.sync.log"));
+	const chevron = ajouter(journalBtn, "span", "qbd-sync-ligne-chevron");
+	chevron.setAttribute("aria-hidden", "true");
+	currentHost().ui.setIcon(chevron, "chevron-right");
+	journalBtn.setAttribute("aria-haspopup", "dialog");
 
 	/* ── Footer: what sync runs on, for whoever has never heard of it ── */
 	const pied = ajouter(racine, "footer", "qbd-sync-pied");
@@ -687,6 +717,77 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	}
 	changementsBtn.addEventListener("click", ouvrirChangements);
 
+	/* ── "Log": the last lines of the embedded Syncthing's log, newest first.
+	   Text only: each line is spans filled with `textContent`, never markup —
+	   a log line can hold anything the engine printed. ── */
+	function ouvrirJournal(): void {
+		if (dialogueJournal) return;
+		let ferme = false;
+		let texte = "";
+		requireHost("modals").open({
+			className: "qbd-sync-modal qbd-sync-modal-journal",
+			title: t("settings.sync.logTitle"),
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				const carte = ajouter(corps, "div", "qbd-sync-journal");
+				ajouter(carte, "span", "qbd-sync-vide", t("settings.sync.starting"));
+				const piedDialogue = ajouter(corps, "div", "qbd-sync-dialogue-pied");
+				ajouter(piedDialogue, "span", "qbd-sync-espace");
+				const copierBtn = bouton(piedDialogue, "copy", t("settings.sync.copy"));
+				copierBtn.disabled = true;
+				const copierLbl = copierBtn.querySelector<HTMLElement>("span:last-of-type");
+				const heure = new Intl.DateTimeFormat(currentLang(), { ...hourOptions(), minute: "2-digit", second: "2-digit", day: "2-digit", month: "short" });
+				dialogueJournal = { fermer: () => handle.close() };
+				void (async () => {
+					let lignes: LigneJournal[] | null = null;
+					try { lignes = await deps.journal(); } catch { /* the empty message stands */ }
+					if (ferme) return;
+					carte.replaceChildren();
+					if (!lignes || lignes.length === 0) {
+						copierBtn.disabled = true;
+						ajouter(carte, "span", "qbd-sync-vide", t("settings.sync.logEmpty"));
+						return;
+					}
+					texte = lignes.map(l => `${l.quand > 0 ? heure.format(l.quand) : ""}\t${l.niveau}\t${l.message}`).join("\n");
+					copierBtn.disabled = false;
+					for (const l of lignes) {
+						const r = ajouter(carte, "div", "qbd-sync-journal-ligne");
+						ajouter(r, "span", "qbd-sync-journal-quand", l.quand > 0 ? heure.format(l.quand) : "");
+						const niveau = ajouter(r, "span", "qbd-sync-journal-niveau", l.niveau);
+						niveau.dataset.niv = l.niveau;
+						ajouter(r, "span", "qbd-sync-journal-message", l.message);
+					}
+				})();
+				copierBtn.addEventListener("click", () => {
+					if (!texte) return;
+					void deps.copier(texte).then(ok => {
+						if (ferme || !copierLbl) return;
+						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
+						copierLbl.textContent = t("settings.sync.logCopied");
+						copierBtn.disabled = true;
+						if (retourCopieJournal) clearTimeout(retourCopieJournal);
+						retourCopieJournal = setTimeout(() => {
+							copierLbl.textContent = t("settings.sync.copy");
+							copierBtn.disabled = false;
+						}, 1500);
+					});
+				});
+			},
+			onClose: () => { ferme = true; if (retourCopieJournal) clearTimeout(retourCopieJournal); dialogueJournal = null; },
+		});
+	}
+	journalBtn.addEventListener("click", ouvrirJournal);
+
+	/* Switching sync off and on: no confirmation dialog on either side — the
+	   press is the answer, and the row itself says what it will do. */
+	basculeBtn.addEventListener("click", () => {
+		if (!dernierEtat) return;
+		basculeBtn.disabled = true;
+		void (dernierEtat.actif ? deps.desactiver() : deps.activer())
+			.catch(() => undefined)
+			.then(() => { basculeBtn.disabled = false; return rafraichir(); });
+	});
+
 	function peindreChangements(e: EtatSync): void {
 		const liste = e.changements;
 		changementsSection.hidden = !e.actif || liste === undefined;
@@ -712,6 +813,15 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		plusAnciens.textContent = t(voirAnciens ? "settings.sync.changesHideOlder" : "settings.sync.changesShowOlder", { n: anciens });
 	}
 
+	/* The two bottom rows: the switch says what it does next ("Disable" while
+	   sync is on, "Enable" once it is off), and the log stays reachable only
+	   while an engine is running. */
+	function peindreBas(e: EtatSync): void {
+		basculeLbl.textContent = t(e.actif ? "settings.sync.disable" : "settings.sync.enable");
+		journalBtn.disabled = !e.actif;
+		if (!e.actif) dialogueJournal?.fermer();
+	}
+
 	function peindre(e: EtatSync): void {
 		if (demonte) return;
 		dernierEtat = e;
@@ -728,6 +838,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		peindreDemandes(e);
 		peindreAppareils(e);
 		peindreChangements(e);
+		peindreBas(e);
 	}
 
 	afficherIdBtn.addEventListener("click", ouvrirId);
@@ -753,6 +864,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		fermerMenu();
 		dialogueId?.fermer();
 		dialogueChangements?.fermer();
+		dialogueJournal?.fermer();
 		fermerAjout();
 		desabonner();
 		racine.remove();

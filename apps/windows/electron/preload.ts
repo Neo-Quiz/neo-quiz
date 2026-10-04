@@ -199,6 +199,9 @@ const pont: Pont = {
 		oublier: deviceId => ipcRenderer.invoke(CANAUX.syncOublier, String(deviceId)),
 		renommer: (deviceId, nom) => ipcRenderer.invoke(CANAUX.syncRenommer, String(deviceId), String(nom)),
 		renvoyer: deviceId => ipcRenderer.invoke(CANAUX.syncRenvoyer, String(deviceId)),
+		journal: () => ipcRenderer.invoke(CANAUX.syncJournal),
+		desactiver: () => ipcRenderer.invoke(CANAUX.syncDesactiver),
+		activer: () => ipcRenderer.invoke(CANAUX.syncActiver),
 		ignorer: deviceId => ipcRenderer.invoke(CANAUX.syncIgnorer, String(deviceId)),
 		partagerId: canal => ipcRenderer.invoke(CANAUX.syncPartagerId, String(canal)),
 		qr: {

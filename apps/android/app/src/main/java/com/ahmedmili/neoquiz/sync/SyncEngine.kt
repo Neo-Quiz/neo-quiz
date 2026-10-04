@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** The answers of `sync.appairer`, as the page reads them (`pont.ts`). */
@@ -404,6 +405,29 @@ class SyncEngine(
         push()
     }
 
+    /**
+     * The engine's log, newest first, at most [MAX_LOG_LINES] (mirror of the
+     * Windows `journal`): Syncthing returns `{messages:[{when,message,level}]}`
+     * oldest first, `when` an RFC 3339 string parsed to milliseconds (`0` when
+     * unreadable). `null` when no engine is running or the call failed: the
+     * dialog shows it as empty, it does not report an error.
+     */
+    suspend fun logLines(): JSONArray? = withContext(Dispatchers.IO) {
+        val rest = current?.instance?.rest ?: return@withContext null
+        try {
+            val messages = rest.log().optJSONArray("messages") ?: return@withContext null
+            val all = (0 until messages.length()).map { i -> messages.getJSONObject(i) }
+            val out = JSONArray()
+            for (m in all.takeLast(MAX_LOG_LINES).asReversed()) {
+                val whenMs = try { java.time.OffsetDateTime.parse(m.optString("when")).toInstant().toEpochMilli() } catch (_: Exception) { 0L }
+                out.put(JSONObject().put("quand", whenMs).put("niveau", m.optString("level")).put("message", m.optString("message")))
+            }
+            out
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     suspend fun stop() {
         if (stopped) return
         stopped = true
@@ -415,6 +439,8 @@ class SyncEngine(
     companion object {
         private const val TAG = "NeoSync"
         private const val MAX_DEVICES = 16
+        /** How many log lines the Sync page's "Log" dialog shows (2026-10-04). */
+        const val MAX_LOG_LINES = 200
         // A request or a closed door reaches the page at once, not at the next periodic push (2026-10-04).
         private val EVENTS = listOf("StateChanged", "ItemFinished", "DeviceConnected", "DeviceDisconnected", "PendingDevicesChanged")
         val ABSENT: Map<String, Any?> = mapOf(
