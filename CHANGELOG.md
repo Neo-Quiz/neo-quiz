@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- The pairing QR code carries this PC's name, so a phone that scans it says which device it pairs.
+
 ### Fixed
 - The wallpaper is no longer blurred for an instant when the app opens.
 - "Show my ID" shows at once on the Sync page instead of after the sync engine has started.
