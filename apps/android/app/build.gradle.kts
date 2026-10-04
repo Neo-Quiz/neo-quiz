@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.androidx.webkit)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.play.services.code.scanner)
+    implementation(libs.androidx.fragment)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
 }
