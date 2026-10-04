@@ -71,7 +71,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.connected": "Connecté",
 	"settings.sync.offline": "Déconnecté",
 	"settings.sync.offlineSeen": "Déconnecté, vu {when}",
-	"settings.sync.waitingAccept": "En attente de son accord",
+	"settings.sync.waitingAccept": "Demande envoyée",
 	"settings.sync.whenNow": "à l'instant",
 	"settings.sync.whenMinutes": "il y a {n} min",
 	"settings.sync.whenHours": "il y a {n} h",
