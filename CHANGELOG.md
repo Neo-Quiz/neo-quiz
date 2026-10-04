@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.25] - 2026-10-04
+
 ### Changed
 - The pairing QR code carries this PC's name, so a phone that scans it says which device it pairs.
 
