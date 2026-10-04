@@ -308,6 +308,8 @@ class SyncEngine(
         val id = raw.trim()
         val r = current
         if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || dead) return@withContext PairResult.INVALID
+        // Paired again right after a removal: the pending deletion is called off.
+        removing.remove(id)
         try {
             val paired = pairedIds(r)
             if (id in paired) return@withContext PairResult.OK
@@ -377,9 +379,11 @@ class SyncEngine(
         push()
         scope.launch {
             kotlinx.coroutines.delay(ShareRules.REMOVE_DELAY_MS)
-            try { r.instance.rest.deleteDevice(id) } catch (_: Exception) { /* already gone */ }
-            removing.remove(id)
-            push()
+            // Paired again meanwhile (pair took it out of removing): keep it.
+            if (removing.remove(id)) {
+                try { r.instance.rest.deleteDevice(id) } catch (_: Exception) { /* already gone */ }
+                push()
+            }
         }
     }
 

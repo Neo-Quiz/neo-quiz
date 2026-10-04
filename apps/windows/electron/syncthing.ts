@@ -596,6 +596,8 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		async appairer(brut, viaQr = false) {
 			const id = typeof brut === "string" ? brut.trim() : "";
 			if (!isDeviceId(id) || !hasValidCheckDigits(id) || id === courant.ownId || mort) return "invalide";
+			/* Paired again right after a removal: the pending deletion is called off. */
+			retraits.delete(id);
 			try {
 				const paires = await pairesCourants();
 				if (paires.includes(id)) return "ok";
@@ -656,8 +658,9 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			void diffuser().catch(() => undefined);
 			setTimeout(() => {
 				void (async () => {
+					/* Paired again meanwhile (`appairer` took it out of `retraits`): keep it. */
+					if (!retraits.delete(id)) return;
 					try { await courant.rest.deleteDevice(id); } catch { /* already gone */ }
-					retraits.delete(id);
 					void diffuser().catch(() => undefined);
 				})();
 			}, RETRAIT_DELAI_MS);
