@@ -910,3 +910,7 @@
 	border-color: color-mix(in srgb, var(--qbd-sync-warn) 70%, transparent);
 	background: color-mix(in srgb, var(--qbd-sync-warn) 10%, transparent);
 }
+
+.qbd-sync-action[hidden] {
+	display: none;
+}
