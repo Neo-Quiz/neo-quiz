@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Fixed
+- The wallpaper is no longer blurred for an instant when the app opens.
 - "Show my ID" shows at once on the Sync page instead of after the sync engine has started.
 
 ## [1.20.24] - 2026-10-03

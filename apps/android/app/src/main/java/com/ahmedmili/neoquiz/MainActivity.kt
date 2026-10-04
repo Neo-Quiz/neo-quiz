@@ -1,6 +1,7 @@
 package com.ahmedmili.neoquiz
 
 import android.Manifest
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -44,6 +45,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A phone stays in portrait; only a tablet (smallest width of 600 dp and more) turns with the screen
+        // (owner's rule, 2026-10-04: the landscape layout is for tablets).
+        requestedOrientation = if (resources.configuration.smallestScreenWidthDp >= 600) {
+            ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+        }
         appWebView = AppWebView(this).apply {
             // AndroidView sizes a view by its layout params: wrap_content left the page 118 px tall.
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)

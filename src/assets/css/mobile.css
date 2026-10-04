@@ -247,18 +247,30 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	grid-template-rows: auto minmax(0, 1fr);
 }
 
+/* SETTINGS ON A PHONE (2026-10-04): the Android way. First a LIST of the
+   categories (icon, name, chevron), then the chosen page alone under a
+   "<- Title" header; the arrow and the phone's back key go back to the list. */
 .is-mobile .nq-set-nav {
-	flex-direction: row;
-	flex-wrap: wrap;
-	gap: 6px;
-	padding: 52px 12px 10px;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	gap: 0;
+	padding: 8px 0;
 	border-right: 0;
-	border-bottom: 1px solid var(--background-modifier-border);
+	border-bottom: 0;
 }
 
 .is-mobile .nq-set-onglet {
-	height: 44px;
-	padding: 0 12px;
+	width: 100%;
+	height: 56px;
+	padding: 0 18px;
+	justify-content: flex-start;
+	gap: 14px;
+	border-radius: 0;
+	font-size: 16px;
+}
+
+.is-mobile .nq-set-onglet + .nq-set-onglet {
+	border-top: 1px solid var(--background-modifier-border);
 }
 
 .is-mobile .nq-set-onglet::before {
@@ -266,7 +278,58 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 }
 
 .is-mobile .nq-set-onglet[aria-selected="true"] {
+	background: transparent;
+}
+
+.is-mobile .nq-set-onglet-chevron {
+	display: inline-flex;
+	margin-left: auto;
+	color: var(--text-faint, var(--text-muted));
+}
+
+.is-mobile .nq-set-onglet-chevron svg {
+	width: 18px;
+	height: 18px;
+}
+
+.is-mobile .nq-set.is-liste .nq-set-volet,
+.is-mobile .nq-set.is-categorie .nq-set-nav {
+	display: none;
+}
+
+.is-mobile .nq-set-page-entete {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 12px -6px;
+}
+
+.is-mobile .nq-set-page-entete .nq-set-page-titre {
+	margin: 0;
+}
+
+.nq-set-retour {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.nq-set-retour:active {
 	background: var(--background-modifier-hover);
+}
+
+.nq-set-retour svg {
+	width: 22px;
+	height: 22px;
 }
 
 .is-mobile .nq-set-volet {

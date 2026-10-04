@@ -161,17 +161,46 @@ export function renderSettings(
 		tab.setAttribute("aria-controls", `nq-set-page-${c.id}`);
 		currentHost().ui.setIcon(ajouter(tab, "span", "nq-set-onglet-icone"), c.icon);
 		ajouter(tab, "span", undefined, t(c.label));
+		/* A phone shows the categories as a LIST, the Android way (2026-10-04):
+		   each row ends with a chevron and opens its page. */
+		if (mobile) currentHost().ui.setIcon(ajouter(tab, "span", "nq-set-onglet-chevron"), "chevron-right");
 		tab.addEventListener("click", () => show(c.id));
 		tabs.set(c.id, tab);
 		const page = ajouter(pane, "div", "nq-set-page");
 		page.id = `nq-set-page-${c.id}`;
 		page.setAttribute("role", "tabpanel");
 		page.setAttribute("aria-labelledby", tab.id);
-		ajouter(page, "h2", "nq-set-page-titre", t(c.label));
+		if (mobile) {
+			/* The page's header on a phone: a back arrow to the list, then its title. */
+			const entete = ajouter(page, "div", "nq-set-page-entete");
+			const retour = ajouter(entete, "button", "nq-set-retour");
+			retour.type = "button";
+			retour.setAttribute("aria-label", t("app.settings.back"));
+			currentHost().ui.setIcon(retour, "arrow-left");
+			retour.addEventListener("click", () => montrerListe());
+			ajouter(entete, "h2", "nq-set-page-titre", t(c.label));
+		} else {
+			ajouter(page, "h2", "nq-set-page-titre", t(c.label));
+		}
 		pages.set(c.id, page);
 	}
 
+	/** Phone only: back to the list of categories. */
+	function montrerListe(): void {
+		shell.classList.add("is-liste");
+		shell.classList.remove("is-categorie");
+		for (const [c, tab] of tabs) {
+			tab.setAttribute("aria-selected", "false");
+			pages.get(c)!.hidden = true;
+		}
+		tabs.get(lastCategory)?.focus();
+	}
+
 	function show(id: Category): void {
+		if (mobile) {
+			shell.classList.remove("is-liste");
+			shell.classList.add("is-categorie");
+		}
 		lastCategory = id;
 		for (const [c, tab] of tabs) {
 			const on = c === id;
@@ -504,7 +533,8 @@ export function renderSettings(
 	const languagesPage = pages.get("languages")!;
 	const demonterLangages = mountLanguagePackSettings(section(languagesPage, null, t("settings.languages.hint")));
 
-	show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
+	if (mobile) montrerListe();
+	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
 		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];
 		viserPrompt = null;
