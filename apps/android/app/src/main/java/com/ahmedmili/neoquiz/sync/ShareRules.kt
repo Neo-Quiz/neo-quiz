@@ -95,7 +95,7 @@ object ShareRules {
     }
 
     /** How long a pairing request waits for Accept before it is ignored on its own (2026-10-04). */
-    const val REQUEST_TIMEOUT_MS = 2 * 60_000L
+    const val REQUEST_TIMEOUT_MS = 60_000L
 
     /**
      * Keeps [firstSeen] (device id -> first time its request was seen) in step with [pending] and

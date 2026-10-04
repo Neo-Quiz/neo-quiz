@@ -422,7 +422,7 @@ export function estIgnore(liste: unknown, id: string): boolean {
 
 /** How long a pairing request waits for Accept before it is ignored on its
     own (2026-10-04): a request left there forever kept the page asking. */
-export const DEMANDE_DUREE_MS = 2 * 60_000;
+export const DEMANDE_DUREE_MS = 60_000;
 
 /** Keeps `premieres` (device id -> first time its request was seen) in step
     with the pending requests `attente` and returns the ids whose request has

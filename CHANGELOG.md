@@ -20,7 +20,7 @@ release notes.
 
 ### Fixed
 - A pairing request you ignored no longer comes back at the next connection attempt.
-- A pairing request left unanswered for two minutes is ignored on its own; "Show my ID" lets the device ask again.
+- A pairing request left unanswered for one minute is ignored on its own; "Show my ID" lets the device ask again.
 - In the app menu, "Display" no longer stays highlighted while the pointer rests on the menu's empty edges.
 
 ## [1.20.25] - 2026-10-04
