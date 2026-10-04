@@ -254,7 +254,8 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	flex-direction: column;
 	flex-wrap: nowrap;
 	gap: 0;
-	padding: 8px 0;
+	/* 52 px at the top: the modal's title and close cross sit there. */
+	padding: 52px 0 8px;
 	border-right: 0;
 	border-bottom: 0;
 }
@@ -301,7 +302,8 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	margin: 0 0 12px -6px;
+	/* Under the modal's title and close cross, like the list. */
+	margin: 38px 0 12px -6px;
 }
 
 .is-mobile .nq-set-page-entete .nq-set-page-titre {
