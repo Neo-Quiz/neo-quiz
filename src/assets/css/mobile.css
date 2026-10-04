@@ -754,13 +754,13 @@ body.is-mobile .modal-container:has(> .nq-reglages-modal) {
 	position: absolute;
 	inset: 0 0 auto 0;
 	min-height: 100vh;
-	/* Under the status bar, the wallpaper shows (2026-10-04): the panel starts
-	   below it, on its own opaque background. */
+	/* The panel starts below the status bar. */
 	padding: var(--nq-inset-haut, 0px) 0 0;
 	box-sizing: border-box;
 	align-items: stretch;
-	/* Opaque below the status bar strip only. */
-	background: linear-gradient(to bottom, transparent var(--nq-inset-haut, 0px), var(--nq-bottom-bar-bg) var(--nq-inset-haut, 0px));
+	/* The panel's own colour, up under the status bar too: on this opaque
+	   page the wallpaper in that strip looked out of place (2026-10-04). */
+	background: var(--background-primary);
 }
 
 .is-mobile .modal-container:has(> .nq-reglages-modal) > .modal-bg {
