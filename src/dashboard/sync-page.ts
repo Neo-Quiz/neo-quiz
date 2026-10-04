@@ -84,7 +84,9 @@ export type TonStatut = "ok" | "neutre" | "erreur";
 export function statutGlobal(e: EtatSync): { texte: string; ton: TonStatut } {
 	if (!e.actif) return { texte: t("settings.sync.statusOff"), ton: "erreur" };
 	if (e.dossier.etat === "error") return { texte: t("settings.sync.statusError"), ton: "erreur" };
-	if (e.appareils.length === 0) return { texte: t("settings.sync.statusNone"), ton: "neutre" };
+	/* The engine runs but no other device is here: "Ready" in green, as
+	   Syncthing says it (2026-10-04: "Offline" read as if sync were broken). */
+	if (e.appareils.length === 0) return { texte: t("settings.sync.statusReady"), ton: "ok" };
 	if (e.dossier.etat === "syncing") {
 		return {
 			texte: e.dossier.pourcentage === null
@@ -93,7 +95,7 @@ export function statutGlobal(e: EtatSync): { texte: string; ton: TonStatut } {
 			ton: "ok",
 		};
 	}
-	if (!e.appareils.some(a => a.connecte)) return { texte: t("settings.sync.statusOffline"), ton: "neutre" };
+	if (!e.appareils.some(a => a.connecte)) return { texte: t("settings.sync.statusReady"), ton: "ok" };
 	return { texte: t("settings.sync.statusUpToDate"), ton: "ok" };
 }
 
