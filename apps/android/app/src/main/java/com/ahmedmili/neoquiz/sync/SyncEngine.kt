@@ -344,7 +344,8 @@ class SyncEngine(
     companion object {
         private const val TAG = "NeoSync"
         private const val MAX_DEVICES = 16
-        private val EVENTS = listOf("StateChanged", "ItemFinished", "DeviceConnected")
+        // A request or a closed door reaches the page at once, not at the next periodic push (2026-10-04).
+        private val EVENTS = listOf("StateChanged", "ItemFinished", "DeviceConnected", "DeviceDisconnected", "PendingDevicesChanged")
         val ABSENT: Map<String, Any?> = mapOf(
             "actif" to false, "appareil" to null, "nom" to "", "appareils" to emptyList<Any>(), "demandes" to emptyList<Any>(), "demandesPlus" to 0,
             "dossier" to mapOf("etat" to "absent", "pourcentage" to null),

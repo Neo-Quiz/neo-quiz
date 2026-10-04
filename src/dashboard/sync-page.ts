@@ -584,8 +584,11 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
-	/** Devices seen connected while this page was open. */
+	/** Devices seen connected while this page was open, on TWO paints in a
+	    row: the other side, until it accepts, opens the connection and closes
+	    it at once, and that blink alone counted as connected (2026-10-04). */
 	const dejaConnectes = new Set<string>();
+	const vusConnectes = new Map<string, number>();
 
 	function peindreAppareils(e: EtatSync): void {
 		fermerMenu();
@@ -598,7 +601,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			const l = ajouter(appareilsCarte, "div", "qbd-sync-ligne");
 			const texte = ajouter(l, "div", "qbd-sync-id-bloc");
 			ajouter(texte, "span", "qbd-sync-nom", a.nom);
-			if (a.connecte) dejaConnectes.add(a.id);
+			const suite = a.connecte ? (vusConnectes.get(a.id) ?? 0) + 1 : 0;
+			vusConnectes.set(a.id, suite);
+			if (suite >= 2) dejaConnectes.add(a.id);
 			/* Seen in the last two minutes but never connected while this page was
 			   open: the other side keeps closing the door, it has not said yes yet
 			   (2026-10-04: "Disconnected, seen just now" read as a fault). */

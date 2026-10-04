@@ -109,7 +109,10 @@ export interface StartOpts {
 
 /** How long writes of the app are gathered before one scan call. */
 const DELAI_SCAN_MS = 150;
-const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected", ...EVENEMENTS_CHANGEMENT] as const;
+/* PendingDevicesChanged and DeviceDisconnected: a request (or a closed door)
+   shows on the page at once, not at the next periodic refresh (2026-10-04:
+   "Show my ID" took seconds to step aside for a scanned request). */
+const EVENEMENTS = ["StateChanged", "ItemFinished", "DeviceConnected", "DeviceDisconnected", "PendingDevicesChanged", ...EVENEMENTS_CHANGEMENT] as const;
 const MAX_APPAREILS = 16;
 const ETAT_ABSENT: EtatSync = { actif: false, appareil: null, nom: "", appareils: [], demandes: [], demandesPlus: 0, dossier: { etat: "absent", pourcentage: null } };
 
@@ -444,7 +447,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				const c = changementDepuis(ev, nomDe);
 				if (c) { changements = ajouterChangement(changements, c); change = true; }
 			}
-			if (ev.type === "StateChanged" || ev.type === "DeviceConnected") change = true;
+			if (ev.type === "StateChanged" || ev.type === "DeviceConnected" || ev.type === "DeviceDisconnected" || ev.type === "PendingDevicesChanged") change = true;
 		}
 		/* Not awaited: rereading the state is five REST calls, and the loop
 		   must go back to listening at once (an event behind would wait). */
