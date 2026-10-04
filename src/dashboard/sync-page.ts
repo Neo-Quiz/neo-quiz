@@ -199,6 +199,74 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	const afficherIdBtn = bouton(moi, "qr-code", t("settings.sync.showId"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
 	afficherIdBtn.setAttribute("aria-haspopup", "dialog");
 
+	/* ── ON A PHONE, Neo Calendar's Android layout (2026-10-04): "This device"
+	   as rows (its name, its ID, show the QR code, copy, share), then "Pair
+	   with a PC" with ONE big button that scans the PC's QR code. The big
+	   "Show my ID" button is the PC's way, hidden here. ── */
+	let peindreAppareilMobile: (e: EtatSync) => void = () => undefined;
+	if (mobile) {
+		afficherIdBtn.hidden = true;
+		titre(moi, t("settings.sync.thisDevice"));
+		const carteMoi = ajouter(moi, "div", "qbd-sync-carte");
+		const ligneInfo = (icone_: string, libelle: string): HTMLElement => {
+			const l = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-info");
+			icone(l, icone_, "qbd-sync-ligne-icone");
+			ajouter(l, "span", "qbd-sync-ligne-libelle", libelle);
+			return ajouter(l, "span", "qbd-sync-ligne-valeur");
+		};
+		const ligneAction = (icone_: string, libelle: string, agir: () => void): HTMLButtonElement => {
+			const b = ajouter(carteMoi, "button", "qbd-sync-ligne qbd-sync-ligne-action");
+			b.type = "button";
+			icone(b, icone_, "qbd-sync-ligne-icone");
+			ajouter(b, "span", "qbd-sync-ligne-libelle", libelle);
+			b.addEventListener("click", agir);
+			return b;
+		};
+		const valeurNom = ligneInfo("smartphone", t("settings.sync.deviceName"));
+		const ligneId = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-id");
+		const idTexte = ajouter(ligneId, "code", "qbd-sync-id", t("settings.sync.starting"));
+		const zoneQr = ajouter(carteMoi, "div", "qbd-sync-ligne qbd-sync-ligne-qr");
+		zoneQr.hidden = true;
+		const qr = ajouter(zoneQr, "img", "qbd-sync-qr");
+		qr.alt = t("settings.sync.qrAlt");
+		let idMobile: string | null = null;
+		const qrBtn = ligneAction("qr-code", t("settings.sync.showQr"), () => {
+			zoneQr.hidden = !zoneQr.hidden;
+			(qrBtn.querySelector(".qbd-sync-ligne-libelle") as HTMLElement).textContent = t(zoneQr.hidden ? "settings.sync.showQr" : "settings.sync.hideQr");
+		});
+		ligneAction("copy", t("settings.sync.copyId"), () => {
+			if (!idMobile) return;
+			void deps.copier(idMobile).then(ok => { if (!demonte) currentHost().ui.notice(t(ok ? "settings.sync.copied" : "settings.sync.shareFailed")); });
+		});
+		ligneAction("share-2", t("settings.sync.share"), () => { if (idMobile) void partagerId("systeme"); });
+		peindreAppareilMobile = e => {
+			valeurNom.textContent = e.nom;
+			if (!e.appareil || e.appareil === idMobile) return;
+			idMobile = e.appareil;
+			idTexte.textContent = e.appareil;
+			const id = e.appareil;
+			void QRCode.toDataURL(id, { margin: 2, width: 220, errorCorrectionLevel: "M" })
+				.then(url => { if (!demonte && idMobile === id) qr.src = url; })
+				.catch(() => undefined);
+		};
+
+		if (deps.scanner) {
+			const appairer = ajouter(racine, "section", "qbd-sync-section");
+			titre(appairer, t("settings.sync.pairWithPc"));
+			const scanBtn = bouton(appairer, "scan-line", t("settings.sync.scanPc"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
+			scanBtn.addEventListener("click", () => {
+				void deps.scanner!().then(async code => {
+					if (!code || demonte) return;
+					const res = await deps.appairer(normaliserCode(code));
+					if (demonte) return;
+					if (res === "ok") currentHost().ui.notice(t("settings.sync.scanSent"), 6000);
+					else if (res !== "annule") currentHost().ui.notice(t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable"));
+					await rafraichir();
+				}).catch(() => undefined);
+			});
+		}
+	}
+
 	/* ── Requests from devices that added this one ── */
 	const demandesSection = ajouter(racine, "section", "qbd-sync-section");
 	demandesSection.hidden = true;
@@ -621,6 +689,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		/* Sync could not start: nothing to show. While it starts, the
 		   button stays usable (see above). */
 		afficherIdBtn.disabled = !e.actif;
+		peindreAppareilMobile(e);
 		dialogueId?.peindre(e);
 		ajouterBouton.disabled = !e.actif;
 		if (!e.actif) fermerAjout();

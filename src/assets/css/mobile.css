@@ -870,3 +870,23 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
 html.nq-keyboard #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
 	display: none;
 }
+
+/* Settings on a phone, in Neo Calendar's Android style (2026-10-04): the
+   categories grouped in ONE rounded card with side margins, thin lines
+   between rows; no close cross (Settings is a tab of the bottom bar, and the
+   back key closes it: `retour-android.ts` clicks the hidden cross). */
+.is-mobile .nq-set.is-liste .nq-set-nav {
+	margin: 52px 16px 8px;
+	padding: 0;
+	border-radius: 16px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.is-mobile .nq-set.is-liste .nq-set-onglet {
+	background: transparent;
+}
+
+.is-mobile .nq-reglages-modal .modal-close-button {
+	display: none;
+}

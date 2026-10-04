@@ -674,3 +674,57 @@
 		animation: none;
 	}
 }
+
+/* ON A PHONE (Neo Calendar's Android layout): "This device" as rows of a
+   card, the ID on its own row, the QR code shown on demand under it. */
+.qbd-sync-ligne-icone {
+	display: inline-flex;
+	flex: none;
+	color: var(--text-muted);
+}
+
+.qbd-sync-ligne-icone svg {
+	width: 20px;
+	height: 20px;
+}
+
+.qbd-sync-ligne-libelle {
+	flex: 1;
+	min-width: 0;
+	font-size: 15px;
+	color: var(--text-normal);
+}
+
+.qbd-sync-ligne-valeur {
+	font-size: 14px;
+	color: var(--text-muted);
+	text-align: right;
+	overflow-wrap: anywhere;
+}
+
+.qbd-sync-ligne-action {
+	width: 100%;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.qbd-sync-ligne-action:active {
+	background: var(--background-modifier-hover);
+}
+
+.qbd-sync-ligne-id .qbd-sync-id {
+	font-family: "Neo Quiz Mono", var(--font-monospace);
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.qbd-sync-ligne-qr {
+	justify-content: center;
+}
+
+.qbd-sync-ligne-qr[hidden] {
+	display: none;
+}
