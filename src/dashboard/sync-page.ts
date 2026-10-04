@@ -192,7 +192,10 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 
 	/* ── This device: ONE big button; the ID, its QR and sharing live in its dialog ── */
 	const moi = ajouter(racine, "section", "qbd-sync-section");
-	moi.hidden = true;
+	/* Shown AT ONCE (2026-10-03): the first read of the state is what starts
+	   the embedded Syncthing, a few seconds the first time, and the button
+	   must not wait for it. Clicked before the ID exists, the dialog opens
+	   with "Starting…" and fills in when the engine answers. */
 	const afficherIdBtn = bouton(moi, "qr-code", t("settings.sync.showId"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
 	afficherIdBtn.setAttribute("aria-haspopup", "dialog");
 
@@ -290,13 +293,13 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	   right the name, the full ID, Copy and Share, and the countdown to the
 	   next code when the host rotates it ── */
 	function ouvrirId(): void {
-		if (dialogueId || !dernierEtat?.appareil) return;
+		if (dialogueId || (dernierEtat && !dernierEtat.actif)) return;
 		const qrHote = deps.qr;
 		requireHost("modals").open({
 			className: "qbd-sync-modal qbd-sync-modal-id",
 			/* The device's name lives in the title, said once: "Device ID -
 			   DESKTOP-1U89520", the wording of the former ID section. */
-			title: dernierEtat.nom ? t("settings.sync.idModalTitle", { name: dernierEtat.nom }) : t("settings.sync.idModalTitleBare"),
+			title: dernierEtat?.nom ? t("settings.sync.idModalTitle", { name: dernierEtat.nom }) : t("settings.sync.idModalTitleBare"),
 			titleIcon: el => { currentHost().ui.setIcon(el, mobile ? "smartphone" : "monitor"); },
 			onOpen: handle => {
 				/* Top to bottom, like Syncthing's own dialog: the ID on one line,
@@ -306,7 +309,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				   the copy button is an icon INSIDE it, top right, its label off
 				   screen, and it turns into a check for a moment once copied. */
 				const blocId = ajouter(corps, "div", "qbd-install-code qbd-sync-code markdown-rendered markdown-preview-view");
-				const idTexte = ajouter(ajouter(blocId, "pre"), "code");
+				const idTexte = ajouter(ajouter(blocId, "pre"), "code", undefined, t("settings.sync.starting"));
 				const copierBtn = ajouter(blocId, "button", "qbd-btn qbd-install-copy");
 				copierBtn.type = "button";
 				const copierIcone = ajouter(copierBtn, "span", "qbd-btn-icon qbd-btn-icon--sm");
@@ -403,7 +406,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						if (qrHote) void qrHote.fermer().catch(() => undefined);
 					},
 					peindre: e => {
-						if (!e.actif || !e.appareil) { handle.close(); return; }
+						if (!e.actif) { handle.close(); return; }
+						if (!e.appareil) return; // still starting: the ID comes with a later state
 						/* A device was just paired (a phone scanned the code and the
 						   owner said yes): the dialog has done its job. */
 						if (e.appareils.length > appareilsAvant) {
@@ -614,7 +618,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		const s = statutGlobal(e);
 		statutTexte.textContent = s.texte;
 		statut.dataset.ton = s.ton;
-		moi.hidden = !e.actif || !e.appareil;
+		/* Sync could not start: nothing to show. While it starts, the
+		   button stays usable (see above). */
+		afficherIdBtn.disabled = !e.actif;
 		dialogueId?.peindre(e);
 		ajouterBouton.disabled = !e.actif;
 		if (!e.actif) fermerAjout();

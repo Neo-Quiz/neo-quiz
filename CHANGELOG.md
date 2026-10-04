@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- "Show my ID" shows at once on the Sync page instead of after the sync engine has started.
+
 ## [1.20.24] - 2026-10-03
 
 ### Changed
