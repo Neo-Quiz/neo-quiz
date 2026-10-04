@@ -188,8 +188,6 @@ export const EN_APP = {
 	"app.settings.nav": "Settings sections",
 	"app.settings.back": "Back to settings",
 	"app.settings.languageAuto": "Automatic (follow the system)",
-	"app.settings.languageHint": "Interface language. The installer sets it to the language of the download page; change it here at any time. Generated quizzes always follow the language of your prompt.",
-	"app.settings.languageHintMobile": "Interface language. Generated quizzes always follow the language of your prompt.",
 	"app.settings.timeFormat": "Time format",
 	"app.settings.timeFormat24": "24-hour ({example})",
 	"app.settings.timeFormat12": "12-hour ({example})",

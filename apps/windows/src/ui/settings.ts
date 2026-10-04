@@ -325,7 +325,7 @@ export function renderSettings(
 	const changerLangue = (valeur: string): void => { void reglerLangue(lireLangue(valeur)).then(() => pont().systeme.relancer()); };
 	const langueSelect = mobile
 		? ligneChoix(general, "languages", t("settings.language.name"), langues, "auto", changerLangue)
-		: createSelect(row(general, t("settings.language.name"), t("app.settings.languageHint")), { value: "auto", options: langues, onChange: changerLangue });
+		: createSelect(row(general, t("settings.language.name")), { value: "auto", options: langues, onChange: changerLangue });
 	void chargerLangue().then(l => langueSelect.setValue(l));
 
 	/* The TIME FORMAT: 24-hour by default, 12-hour on request, whatever the
@@ -349,8 +349,6 @@ export function renderSettings(
 	};
 	if (mobile) {
 		ligneChoix(general, "clock", t("app.settings.timeFormat"), formats, currentHourCycle(), changerFormat);
-		/* The help under the group, as Neo Calendar writes its notes. */
-		ajouter(pages.get("general")!, "p", "nq-set-note", t("app.settings.languageHintMobile"));
 	} else {
 		createSelect(row(general, t("app.settings.timeFormat")), { value: currentHourCycle(), options: formats, onChange: changerFormat });
 	}

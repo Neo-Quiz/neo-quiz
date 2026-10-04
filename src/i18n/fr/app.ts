@@ -129,8 +129,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.nav": "Sections des réglages",
 	"app.settings.back": "Retour aux réglages",
 	"app.settings.languageAuto": "Automatique (suivre le système)",
-	"app.settings.languageHint": "Langue de l'interface. L'installeur la règle sur la langue de la page de téléchargement ; changez-la ici à tout moment. Les quiz générés suivent toujours la langue de votre demande.",
-	"app.settings.languageHintMobile": "Langue de l'interface. Les quiz générés suivent toujours la langue de votre demande.",
 	"app.settings.timeFormat": "Format de l'heure",
 	"app.settings.timeFormat24": "24 heures ({example})",
 	"app.settings.timeFormat12": "12 heures ({example})",
