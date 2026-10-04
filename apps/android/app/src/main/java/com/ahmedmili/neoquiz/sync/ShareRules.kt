@@ -94,6 +94,25 @@ object ShareRules {
         return out
     }
 
+    /** How long a pairing request waits for Accept before it is ignored on its own (2026-10-04). */
+    const val REQUEST_TIMEOUT_MS = 2 * 60_000L
+
+    /**
+     * Keeps [firstSeen] (device id -> first time its request was seen) in step with [pending] and
+     * returns the ids whose request has waited [REQUEST_TIMEOUT_MS] or more. A request that went
+     * away is forgotten, so the same device asking again later gets the full time again.
+     */
+    fun expiredRequests(pending: JSONObject?, firstSeen: MutableMap<String, Long>, now: Long): List<String> {
+        val ids = pending?.keys()?.asSequence()?.toList() ?: emptyList()
+        firstSeen.keys.retainAll(ids.toSet())
+        val out = mutableListOf<String>()
+        for (id in ids) {
+            val start = firstSeen[id]
+            if (start == null) firstSeen[id] = now else if (now - start >= REQUEST_TIMEOUT_MS) out.add(id)
+        }
+        return out
+    }
+
     fun isIgnored(list: JSONArray?, id: String): Boolean =
         list != null && (0 until list.length()).any { list.optJSONObject(it)?.optString("deviceID") == id }
 

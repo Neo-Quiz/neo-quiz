@@ -168,6 +168,9 @@ class SyncEngine(
         r.instance.rest.putFolder(ShareRules.folderConfig(root.path, r.ownId, paired))
     }
 
+    /** First time each pending request was seen ([ShareRules.expiredRequests]). */
+    private val firstRequests = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     suspend fun state(): Map<String, Any?> = withContext(Dispatchers.IO) { computeState() }
 
     private fun computeState(): Map<String, Any?> {
@@ -181,6 +184,12 @@ class SyncEngine(
         // Both are extras: failing to read them must not hide the rest.
         val seen = try { rest.deviceStats() } catch (_: Exception) { JSONObject() }
         val pending = try { rest.pendingDevices() } catch (_: Exception) { null }
+        // A request nobody answered in time is ignored on its own, like a press on Ignore.
+        for (id in ShareRules.expiredRequests(pending, firstRequests, System.currentTimeMillis())) {
+            pending?.remove(id)
+            firstRequests.remove(id)
+            scope.launch { try { ignore(id) } catch (_: Exception) { /* next state retries */ } }
+        }
         val others = (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId }
         return mapOf(
             "actif" to true,

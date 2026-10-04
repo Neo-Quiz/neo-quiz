@@ -204,6 +204,16 @@ await withSrcModule(
 				[String.raw`C:\Other\x.md`, String.raw`C:\Neo Quiz 2\x.md`, racine, String.raw`C:\Neo Quiz\a\..\..\x.md`].map(p => cheminAScanner(racine, p)), [null, null, null, null]);
 		});
 
+		await cas(r, "demandesExpirees", async () => {
+			const { demandesExpirees, DEMANDE_DUREE_MS } = regles;
+			const m = new Map();
+			r.check("a new request is only timed, never expired at once", demandesExpirees({ A: {} }, m, 1000), []);
+			r.check("still within its time: kept", demandesExpirees({ A: {} }, m, 1000 + DEMANDE_DUREE_MS - 1), []);
+			r.check("its time is up: expired", demandesExpirees({ A: {} }, m, 1000 + DEMANDE_DUREE_MS), ["A"]);
+			demandesExpirees({}, m, 5000 + DEMANDE_DUREE_MS);
+			r.check("a request that went away is forgotten, and gets the full time again", demandesExpirees({ A: {} }, m, 9000 + DEMANDE_DUREE_MS), []);
+			r.check("junk instead of requests: nothing expires", demandesExpirees(null, new Map(), 0), []);
+		});
 		await cas(r, "avecIgnore", async () => {
 			const { avecIgnore, estIgnore } = regles;
 			const A = "A".repeat(7), B = "B".repeat(7);

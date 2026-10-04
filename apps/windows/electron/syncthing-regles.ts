@@ -419,3 +419,23 @@ export function avecIgnore(liste: unknown, id: string, ignorer: boolean, mainten
 export function estIgnore(liste: unknown, id: string): boolean {
 	return Array.isArray(liste) && liste.some(d => typeof d === "object" && d !== null && (d as { deviceID?: unknown }).deviceID === id);
 }
+
+/** How long a pairing request waits for Accept before it is ignored on its
+    own (2026-10-04): a request left there forever kept the page asking. */
+export const DEMANDE_DUREE_MS = 2 * 60_000;
+
+/** Keeps `premieres` (device id -> first time its request was seen) in step
+    with the pending requests `attente` and returns the ids whose request has
+    waited `DEMANDE_DUREE_MS` or more. A request that went away is forgotten,
+    so the same device asking again later gets the full time again. */
+export function demandesExpirees(attente: unknown, premieres: Map<string, number>, maintenant: number): string[] {
+	const ids = attente && typeof attente === "object" && !Array.isArray(attente) ? Object.keys(attente) : [];
+	for (const id of [...premieres.keys()]) if (!ids.includes(id)) premieres.delete(id);
+	const expirees: string[] = [];
+	for (const id of ids) {
+		const debut = premieres.get(id);
+		if (debut === undefined) premieres.set(id, maintenant);
+		else if (maintenant - debut >= DEMANDE_DUREE_MS) expirees.push(id);
+	}
+	return expirees;
+}
