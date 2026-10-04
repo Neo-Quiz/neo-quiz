@@ -405,3 +405,17 @@ export function dernierVu(texte: unknown): number | null {
 	return Number.isFinite(ms) && ms > Date.UTC(2000, 0, 1) ? ms : null;
 }
 
+/** The config's `remoteIgnoredDevices` with [id] added (Ignore on a request:
+    Syncthing then stops showing it, where dismissing the pending entry alone
+    let it come back at the next connection attempt, 2026-10-04) or removed
+    (the device is paired after all). Other entries are kept as they are. */
+export function avecIgnore(liste: unknown, id: string, ignorer: boolean, maintenant = new Date()): Array<Record<string, unknown>> {
+	const autres = (Array.isArray(liste) ? liste : []).filter((d): d is Record<string, unknown> =>
+		typeof d === "object" && d !== null && (d as { deviceID?: unknown }).deviceID !== id);
+	return ignorer ? [...autres, { deviceID: id, name: "", address: "", time: maintenant.toISOString() }] : autres;
+}
+
+/** True when [id] is in the config's `remoteIgnoredDevices`. */
+export function estIgnore(liste: unknown, id: string): boolean {
+	return Array.isArray(liste) && liste.some(d => typeof d === "object" && d !== null && (d as { deviceID?: unknown }).deviceID === id);
+}

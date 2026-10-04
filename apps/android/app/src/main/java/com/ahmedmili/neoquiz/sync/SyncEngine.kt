@@ -275,6 +275,11 @@ class SyncEngine(
                 val agreed = try { confirm(id, name) } catch (_: Exception) { false }
                 if (!agreed) return@withContext PairResult.CANCELLED
             }
+            // An ignored device that is paired after all leaves the ignore list.
+            val cfg = r.instance.rest.config()
+            if (ShareRules.isIgnored(cfg.optJSONArray("remoteIgnoredDevices"), id)) {
+                r.instance.rest.putConfig(cfg.put("remoteIgnoredDevices", ShareRules.withIgnored(cfg.optJSONArray("remoteIgnoredDevices"), id, false, "")))
+            }
             r.instance.rest.putDevice(
                 JSONObject().put("deviceID", id).put("name", name).put("addresses", org.json.JSONArray(listOf("dynamic")))
                     .put("introducer", false).put("autoAcceptFolders", false).put("paused", false),
@@ -295,6 +300,13 @@ class SyncEngine(
         val r = current
         if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead) return@withContext
         try { r.instance.rest.dismissPendingDevice(id) } catch (_: Exception) { /* nothing pending */ }
+        // Remembered, or it asks again at its next connection attempt.
+        try {
+            val cfg = r.instance.rest.config()
+            r.instance.rest.putConfig(cfg.put("remoteIgnoredDevices", ShareRules.withIgnored(cfg.optJSONArray("remoteIgnoredDevices"), id, true, java.time.Instant.now().toString())))
+        } catch (e: Exception) {
+            SyncLog.warn(TAG, "ignore not kept", e)
+        }
         push()
     }
 

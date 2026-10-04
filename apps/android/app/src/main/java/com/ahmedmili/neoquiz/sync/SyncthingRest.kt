@@ -53,6 +53,11 @@ class SyncthingRest(private val port: Int, private val apiKey: String) {
 
     fun devices(): JSONArray = arr("GET", "/rest/config/devices")
 
+    /** The whole config: `remoteIgnoredDevices` has no endpoint of its own. */
+    fun config(): JSONObject = obj("GET", "/rest/config")
+
+    fun putConfig(c: JSONObject) { call("PUT", "/rest/config", c) }
+
     fun putDevice(d: JSONObject) { call("PUT", "/rest/config/devices/${segment(d.optString("deviceID"))}", d) }
 
     fun deleteDevice(id: String) { call("DELETE", "/rest/config/devices/${segment(id)}") }

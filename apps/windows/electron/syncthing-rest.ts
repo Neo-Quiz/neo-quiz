@@ -91,6 +91,9 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 			return s.myID;
 		},
 		devices: () => json<DeviceConfig[]>("GET", "/rest/config/devices"),
+		/* The whole config: `remoteIgnoredDevices` has no endpoint of its own. */
+		config: () => json<Record<string, unknown>>("GET", "/rest/config"),
+		async putConfig(c: Record<string, unknown>): Promise<void> { await appeler("PUT", "/rest/config", c); },
 		async putDevice(d: { deviceID: string; [cle: string]: unknown }): Promise<void> {
 			await appeler("PUT", `/rest/config/devices/${segment(d.deviceID)}`, d);
 		},

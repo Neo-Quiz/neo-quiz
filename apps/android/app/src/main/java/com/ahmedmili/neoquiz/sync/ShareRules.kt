@@ -79,6 +79,24 @@ object ShareRules {
 
     private fun decodeParam(s: String): String = try { java.net.URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { "" }
 
+    /**
+     * The config's `remoteIgnoredDevices` with [id] added (Ignore on a request: Syncthing then stops
+     * showing it, where dismissing the pending entry alone let it come back at the next connection
+     * attempt, 2026-10-04) or removed (paired after all). Other entries are kept.
+     */
+    fun withIgnored(list: JSONArray?, id: String, ignore: Boolean, now: String): JSONArray {
+        val out = JSONArray()
+        if (list != null) for (i in 0 until list.length()) {
+            val d = list.optJSONObject(i) ?: continue
+            if (d.optString("deviceID") != id) out.put(d)
+        }
+        if (ignore) out.put(JSONObject().put("deviceID", id).put("name", "").put("address", "").put("time", now))
+        return out
+    }
+
+    fun isIgnored(list: JSONArray?, id: String): Boolean =
+        list != null && (0 until list.length()).any { list.optJSONObject(it)?.optString("deviceID") == id }
+
     /** `\A`..`\z`-style match: Kotlin's `matches` is anchored at both ends, so a trailing newline fails. */
     fun isDeviceId(s: Any?): Boolean = s is String && ID_FORMAT.matches(s)
 

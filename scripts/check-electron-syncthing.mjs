@@ -204,6 +204,17 @@ await withSrcModule(
 				[String.raw`C:\Other\x.md`, String.raw`C:\Neo Quiz 2\x.md`, racine, String.raw`C:\Neo Quiz\a\..\..\x.md`].map(p => cheminAScanner(racine, p)), [null, null, null, null]);
 		});
 
+		await cas(r, "avecIgnore", async () => {
+			const { avecIgnore, estIgnore } = regles;
+			const A = "A".repeat(7), B = "B".repeat(7);
+			const t0 = new Date("2026-10-04T10:00:00Z");
+			const un = avecIgnore([{ deviceID: B, name: "x" }], A, true, t0);
+			r.check("Ignore adds the device and keeps the others", un.map(d => d.deviceID), [B, A]);
+			r.check("an ignored device is known as such", estIgnore(un, A), true);
+			r.check("ignoring twice keeps one entry", avecIgnore(un, A, true, t0).filter(d => d.deviceID === A).length, 1);
+			r.check("pairing it after all takes it out", avecIgnore(un, A, false).map(d => d.deviceID), [B]);
+			r.check("junk in the list is dropped, never thrown on", avecIgnore([null, 3, "x"], A, false), []);
+		});
 		await cas(r, "confirmationRequise", async () => {
 			const { confirmationRequise } = regles;
 			r.check("a pending device accepted from the page: no native dialog", confirmationRequise(true, false), false);

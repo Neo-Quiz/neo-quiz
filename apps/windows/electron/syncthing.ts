@@ -60,8 +60,7 @@ import {
 	launchArgs,
 	configXmlSansEcoute,
 	launchEnv,
-	optionsFixees,
-} from "./syncthing-regles";
+	optionsFixees, avecIgnore, estIgnore } from "./syncthing-regles";
 
 /** `annule`: the owner declined the native confirmation. */
 export type ResultatAppairage = "ok" | "invalide" | "indisponible" | "annule";
@@ -518,6 +517,11 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 					try { accord = await opts.confirmer(id, nom, viaQr); } catch { accord = false; }
 					if (!accord) return "annule";
 				}
+				/* An ignored device that is paired after all leaves the ignore list. */
+				const cfgAvant = await courant.rest.config();
+				if (estIgnore(cfgAvant.remoteIgnoredDevices, id)) {
+					await courant.rest.putConfig({ ...cfgAvant, remoteIgnoredDevices: avecIgnore(cfgAvant.remoteIgnoredDevices, id, false) });
+				}
 				await courant.rest.putDevice({
 					deviceID: id,
 					name: nom,
@@ -560,6 +564,13 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			const id = typeof brut === "string" ? brut.trim() : "";
 			if (!isDeviceId(id) || id === courant.ownId || mort) return;
 			try { await courant.rest.dismissPendingDevice(id); } catch { /* nothing pending: nothing to dismiss */ }
+			/* Remembered, or it asks again at its next connection attempt. */
+			try {
+				const cfg = await courant.rest.config();
+				await courant.rest.putConfig({ ...cfg, remoteIgnoredDevices: avecIgnore(cfg.remoteIgnoredDevices, id, true) });
+			} catch (e) {
+				console.warn("[syncthing] ignore not kept:", e instanceof Error ? e.message : String(e));
+			}
 			void diffuser().catch(() => undefined);
 		},
 
