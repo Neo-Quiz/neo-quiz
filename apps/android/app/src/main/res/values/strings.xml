@@ -3,7 +3,7 @@
     <string name="first_run_title">Welcome</string>
     <string name="first_run_intro">Two settings and your quizzes are ready on this phone.</string>
     <string name="first_run_files_title">Access to your quizzes</string>
-    <string name="first_run_files_body">Your quizzes are plain files, kept in Documents/Neo Quiz. Android asks for your approval so Neo Quiz can read and save them.</string>
+    <string name="first_run_files_body">Your quizzes are plain files, kept in the Neo Quiz folder, at the root of the phone\'s storage. Android asks for your approval so Neo Quiz can read and save them.</string>
     <string name="first_run_files_button">Allow access</string>
     <string name="first_run_files_done">Access allowed</string>
     <string name="first_run_sync_title">Background sync</string>

@@ -12,7 +12,7 @@ data class FolderState(val state: String, val percent: Int?)
  * `apps/windows/electron/syncthing-regles.ts` (Task 6). Pure: no Android
  * class, so the JVM tests break each rule and watch it fail.
  *
- * - one folder only ([FOLDER_ID]), always at `Documents/Neo Quiz` ([sharedRoot]),
+ * - one folder only ([FOLDER_ID]), always at `/storage/emulated/0/Neo Quiz` ([sharedRoot]),
  *   never at a path that came from an offer or from the renderer;
  * - a device is a device the owner PAIRED: an offer from anybody else is ignored;
  * - a device id coming from the page is validated (format AND the Luhn check
@@ -46,11 +46,12 @@ object ShareRules {
     private val API_KEY = Regex("^[0-9a-f]{64}$")
     private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
-    /** The shared folder: `Documents/Neo Quiz`, whatever an offer or the page says. */
-    fun sharedRoot(documents: File): File = File(documents, "Neo Quiz")
+    /** The shared folder: `Neo Quiz` at the root of the shared [storage] (`/storage/emulated/0`, like
+        Neo Calendar's, 2026-10-04; `Documents/Neo Quiz` before, see [FolderMove]), whatever an offer or the page says. */
+    fun sharedRoot(storage: File): File = File(storage, "Neo Quiz")
 
-    /** True when [real] (resolved on the disk) is exactly `Neo Quiz` directly under the resolved [documents]: a symlink pointing elsewhere is not. */
-    fun isCanonicalSharedRoot(real: File, documents: File): Boolean = real == sharedRoot(documents)
+    /** True when [real] (resolved on the disk) is exactly `Neo Quiz` directly under the resolved [storage]: a symlink pointing elsewhere is not. */
+    fun isCanonicalSharedRoot(real: File, storage: File): Boolean = real == sharedRoot(storage)
 
     /** `\A`..`\z`-style match: Kotlin's `matches` is anchored at both ends, so a trailing newline fails. */
     fun isDeviceId(s: Any?): Boolean = s is String && ID_FORMAT.matches(s)

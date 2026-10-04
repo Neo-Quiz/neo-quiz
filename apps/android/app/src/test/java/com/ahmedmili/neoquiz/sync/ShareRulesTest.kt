@@ -99,9 +99,9 @@ class ShareRulesTest {
         assertEquals(null, ShareRules.lastSeen(null))
     }
 
-    @Test fun theSharedPathIsAlwaysDocumentsNeoQuiz() {
-        val documents = File("/storage/emulated/0/Documents")
-        assertEquals(File(documents, "Neo Quiz"), ShareRules.sharedRoot(documents))
+    @Test fun theSharedPathIsAlwaysNeoQuizAtTheStorageRoot() {
+        val storage = File("/storage/emulated/0")
+        assertEquals(File("/storage/emulated/0/Neo Quiz"), ShareRules.sharedRoot(storage))
         // The offer's own path never reaches the config: folderConfig takes the pinned root only.
         val cfg = ShareRules.folderConfig("/storage/emulated/0/Documents/Neo Quiz", id, listOf(other, id, other))
         assertEquals("neo-quiz", cfg.getString("id"))
@@ -111,14 +111,15 @@ class ShareRulesTest {
         assertTrue(cfg.getBoolean("ignorePerms"))
     }
 
-    @Test fun theCanonicalRootMustBeDocumentsNeoQuizItself() {
-        val documents = File("/storage/emulated/0/Documents")
-        assertTrue(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz"), documents))
+    @Test fun theCanonicalRootMustBeNeoQuizItself() {
+        val storage = File("/storage/emulated/0")
+        assertTrue(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Neo Quiz"), storage))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz"), storage))
         // A symlink Neo Quiz -> elsewhere resolves to somewhere else: sync refuses to start.
-        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Download/other"), documents))
-        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents"), documents))
-        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz/sub"), documents))
-        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Documents/Neo Quiz2"), documents))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Download/other"), storage))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0"), storage))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Neo Quiz/sub"), storage))
+        assertFalse(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Neo Quiz2"), storage))
     }
 
     @Test fun launchArgsIsExactlyTheVerifiedFlagList() {

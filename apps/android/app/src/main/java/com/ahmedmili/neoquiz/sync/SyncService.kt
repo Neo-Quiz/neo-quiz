@@ -41,7 +41,7 @@ interface SyncBackend {
  * through [SyncBackend]. The engine is created once, lazily, by whichever
  * comes first: the Sync page asking for its state, or the service.
  *
- * The shared folder is ALWAYS `Documents/Neo Quiz` ([ShareRules.sharedRoot]);
+ * The shared folder is ALWAYS `/storage/emulated/0/Neo Quiz` ([ShareRules.sharedRoot]);
  * once sync starts, that directory is admitted to the bridge's perimeter
  * ([allowRoot]) so it can be an app root.
  */
@@ -82,16 +82,20 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     }
 
     /**
-     * Resolves `Documents/Neo Quiz` on the disk and admits it to the perimeter. `null` (sync must not
-     * start) when it cannot be resolved or resolves anywhere else than `Documents/Neo Quiz` (a symlink).
+     * Resolves `/storage/emulated/0/Neo Quiz` on the disk and admits it to the perimeter. `null` (sync
+     * must not start) when it cannot be resolved, resolves anywhere else (a symlink), or the old
+     * `Documents/Neo Quiz` still holds files ([FolderMove]: moved first, never merged).
      */
     private fun admitRoot(): File? {
-        val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val shared = ShareRules.sharedRoot(documents)
+        val storage = Environment.getExternalStorageDirectory()
+        val shared = ShareRules.sharedRoot(storage)
+        val legacy = FolderMove.legacyRoot(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS))
+        FolderMove.move(legacy, shared)
+        if (FolderMove.blocked(legacy)) return null
         shared.mkdirs()
         val real = resolveReal(shared) ?: return null
-        val realDocuments = resolveReal(documents) ?: return null
-        if (!ShareRules.isCanonicalSharedRoot(real, realDocuments)) return null
+        val realStorage = resolveReal(storage) ?: return null
+        if (!ShareRules.isCanonicalSharedRoot(real, realStorage)) return null
         allowRoot?.invoke(real)
         return real
     }
@@ -128,7 +132,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         engine?.let { return it }
         val root = admitRoot()
         if (root == null) {
-            Log.w(TAG, "Documents/Neo Quiz cannot be resolved to itself: sync not started")
+            Log.w(TAG, "Neo Quiz cannot be resolved to itself, or its old folder was not moved: sync not started")
             return null
         }
         val home = File(appContext.filesDir, "syncthing")

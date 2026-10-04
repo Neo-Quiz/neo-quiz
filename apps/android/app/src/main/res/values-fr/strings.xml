@@ -3,7 +3,7 @@
     <string name="first_run_title">Bienvenue</string>
     <string name="first_run_intro">Deux réglages et tes quiz sont prêts sur ce téléphone.</string>
     <string name="first_run_files_title">Accès à tes quiz</string>
-    <string name="first_run_files_body">Tes quiz sont de simples fichiers, rangés dans Documents/Neo Quiz. Android te demande ton accord pour que Neo Quiz puisse les lire et les enregistrer.</string>
+    <string name="first_run_files_body">Tes quiz sont de simples fichiers, rangés dans le dossier Neo Quiz, à la racine du téléphone. Android te demande ton accord pour que Neo Quiz puisse les lire et les enregistrer.</string>
     <string name="first_run_files_button">Autoriser l\'accès</string>
     <string name="first_run_files_done">Accès autorisé</string>
     <string name="first_run_sync_title">Synchro en arrière-plan</string>

@@ -134,6 +134,25 @@ class SettingsChannel(
         else -> emptyList()
     }
 
+    /**
+     * The synced folder moved from [from] to [to] ([com.ahmedmili.neoquiz.sync.FolderMove]): every path
+     * the settings kept at or under [from] (quiz folders, default folder, wallpaper folder) now points
+     * under [to]. Run before [seedRoots]; idempotent.
+     */
+    suspend fun movePaths(from: String, to: String) = queue.withLock {
+        val all = readAll()
+        val before = all.toString()
+        val moved = rewrite(all, from, to) as JSONObject
+        if (moved.toString() != before) atomicWrite(file, moved.toString().toByteArray(Charsets.UTF_8))
+    }
+
+    private fun rewrite(v: Any?, from: String, to: String): Any? = when (v) {
+        is String -> com.ahmedmili.neoquiz.sync.FolderMove.movedPath(v, from, to)
+        is JSONObject -> JSONObject().also { o -> for (k in v.keys()) o.put(k, rewrite(v.opt(k), from, to)) }
+        is JSONArray -> JSONArray().also { a -> for (i in 0 until v.length()) a.put(rewrite(v.opt(i), from, to)) }
+        else -> v
+    }
+
     /** Admits the folders kept by a previous session, like `perimetreInitial`; a vanished folder is just absent. */
     suspend fun seedRoots() {
         for (key in listOf("folders", "folder")) folderPaths(lire(key)).forEach { allowed.allow(File(it)) }

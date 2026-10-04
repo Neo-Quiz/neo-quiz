@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import com.ahmedmili.neoquiz.notify.CalendarChannel
 import com.ahmedmili.neoquiz.notify.DueCalendar
 import com.ahmedmili.neoquiz.notify.ReviewAlarm
+import com.ahmedmili.neoquiz.sync.FolderMove
+import com.ahmedmili.neoquiz.sync.ShareRules
 import com.ahmedmili.neoquiz.sync.SyncChannel
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
@@ -75,7 +77,11 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val excluded = listOf(File(storage, "Android/data"), File(storage, "Android/obb")) +
         activity.getExternalFilesDirs(null).filterNotNull() + activity.externalCacheDirs.filterNotNull() + activity.obbDirs.filterNotNull()
     val perimeter = Perimeter(allowed::roots, privateDir) { excluded }
-    val documents = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Neo Quiz")
+    // The synced folder, at the root of the shared storage (2026-10-04). The old Documents/Neo Quiz
+    // is moved there first, and the paths kept in the settings follow it once it is gone.
+    val documents = ShareRules.sharedRoot(storage)
+    val legacy = FolderMove.legacyRoot(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS))
+    FolderMove.move(legacy, documents)
     val settings = SettingsChannel(
         file = File(privateDir, "settings.json"),
         perimeter = perimeter,
@@ -83,7 +89,10 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
         defaultDir = { documents },
     )
     // A tiny local file read, once, before the first call can arrive.
-    runBlocking { settings.seedRoots() }
+    runBlocking {
+        if (!legacy.exists()) settings.movePaths(legacy.path, documents.path)
+        settings.seedRoots()
+    }
 
     var bridge: Bridge? = null
     val scan = ScanChannel(perimeter) { event -> bridge?.emit("evenement", event) }
@@ -95,7 +104,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
     // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
     val hub = SyncHub.get(activity)
-    val pairDialog = PairConfirmDialog(activity, documents.relativeTo(Environment.getExternalStorageDirectory()).path)
+    val pairDialog = PairConfirmDialog(activity, documents.path)
     val qr = QrScanner(activity as ComponentActivity)
     hub.confirmer = { id, name -> pairDialog.ask(id, name) }
     hub.attach(allowed::allow)

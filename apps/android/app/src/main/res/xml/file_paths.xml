@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shared storage only (Documents/Neo Quiz and the other folders the user picked).
+<!-- Shared storage only (Neo Quiz and the other folders the user picked).
      Never the app's private data, never `/`. -->
 <paths>
     <external-path name="shared" path="." />
