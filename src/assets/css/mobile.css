@@ -1008,15 +1008,17 @@ html.nq-mobile ::-webkit-scrollbar {
 	margin-top: 8px;
 }
 
+/* !important: the base button forces its look with !important. */
 .is-mobile .nq-set .nq-reglages-actions .qbd-btn--create {
 	min-height: 40px;
-	padding: 0 16px;
-	border: 1px solid var(--background-modifier-border);
+	padding: 0 16px !important;
+	border: 1px solid var(--background-modifier-border) !important;
 	border-radius: 999px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-normal);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal) !important;
 	font-size: 14px;
+	font-weight: 500;
 }
 
 /* The list a choice row opens. */
@@ -1060,4 +1062,28 @@ html.nq-mobile ::-webkit-scrollbar {
 .nq-choix-coche svg {
 	width: 20px;
 	height: 20px;
+}
+
+/* The wallpaper row: "Wallpaper", the picture's name on the right, a chevron. */
+.is-mobile .nq-set .nq-fond-rangee .nq-reglages-texte {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
+	max-width: 50%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 15px;
+}
+
+.is-mobile .nq-set .nq-fond-rangee .nq-fond-apercu {
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
 }

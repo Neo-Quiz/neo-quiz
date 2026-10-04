@@ -215,6 +215,7 @@ export const EN_APP = {
 	"app.fond.cat.desert": "Desert",
 	"app.fond.cat.city": "City",
 	"app.fond.none": "Pick one below, or open a folder of your own.",
+	"app.fond.noneShort": "None",
 	"app.fond.choose": "Choose a folder",
 	"app.fond.change": "Change",
 	"app.fond.remove": "Remove",

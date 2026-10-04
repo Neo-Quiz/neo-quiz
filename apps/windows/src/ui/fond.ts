@@ -331,6 +331,18 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 	retirer.type = "button";
 	retirer.setAttribute("aria-label", t("app.fond.remove"));
 	currentHost().ui.setIcon(retirer, "x");
+	/* ON A PHONE, a Neo Calendar row (2026-10-04): "Wallpaper" as its label,
+	   the picture on the right, a chevron; no remove cross (the list offers "none"). */
+	const mobile = currentHost().platform.isMobile;
+	if (mobile) {
+		retirer.remove();
+		currentHost().ui.setIcon(ajouter(rangee, "span", "nq-set-onglet-chevron"), "chevron-right");
+	}
+	/** Name and detail as the row shows them: a phone puts the label first. */
+	const poser = (nom: string, info: string): void => {
+		if (mobile) { nomImage.textContent = t("app.settings.wallpaper"); detail.textContent = nom; }
+		else { nomImage.textContent = nom; detail.textContent = info; }
+	};
 
 	/** Le réglage tel que la rangée l'affiche — relu à chaque redessin, et
 	    gardé pour que la modale sache ce qui est coché sans relire le disque. */
@@ -340,13 +352,12 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 		const reglage = validerReglage(await pont().reglages.lire(CLE_REGLAGES_FOND));
 		if (detruit) return;
 		courant = reglage;
-		retirer.hidden = !reglage;
+		if (!mobile) retirer.hidden = !reglage;
 
 		if (!reglage) {
 			apercu.style.removeProperty("background-image");
 			apercu.hidden = true;
-			nomImage.textContent = t("app.fond.none");
-			detail.textContent = "";
+			poser(mobile ? t("app.fond.noneShort") : t("app.fond.none"), "");
 			return;
 		}
 		apercu.hidden = false;
@@ -355,12 +366,10 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 			const fond = fondEmbarque(reglage.embarque);
 			// Le nom de la photo est traduit une fois pour toutes dans le
 			// catalogue ; son AUTEUR ne l'est jamais.
-			nomImage.textContent = fond ? fond.libelle : reglage.embarque;
-			detail.textContent = fond ? t("app.fond.credit", { auteur: fond.auteur }) : "";
+			poser(fond ? fond.libelle : reglage.embarque, fond ? t("app.fond.credit", { auteur: fond.auteur }) : "");
 		} else {
 			// Nom de fichier et chemin viennent du DISQUE : jamais traduits.
-			nomImage.textContent = reglage.image;
-			detail.textContent = reglage.dossier;
+			poser(reglage.image, reglage.dossier);
 		}
 	}
 

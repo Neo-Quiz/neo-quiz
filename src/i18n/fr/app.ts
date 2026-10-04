@@ -149,6 +149,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.fond.cat.desert": "Désert",
 	"app.fond.cat.city": "Ville",
 	"app.fond.none": "Choisissez-en un ci-dessous, ou ouvrez votre propre dossier.",
+	"app.fond.noneShort": "Aucun",
 	"app.fond.choose": "Choisir un dossier",
 	"app.fond.change": "Changer",
 	"app.fond.remove": "Retirer",
