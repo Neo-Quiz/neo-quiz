@@ -39,11 +39,10 @@ export function collectHomeFolders(
 	todayIso: string,
 	resumePath: string | undefined,
 ): HomeFolderCard[] {
-	const groupModes = ctx.settings.quizzesGroupModes !== false;
 	return homeFolders(groups.map(group => {
 		// Card order, the Learn before the Test of a course — the order of
 		// the folder's own page (quizzes-render.ts `ordre`).
-		const ordre = regrouperParCours(group.quizzes, groupModes).flatMap(quizDeLaCarte);
+		const ordre = regrouperParCours(group.quizzes, true).flatMap(quizDeLaCarte);
 		return {
 			group,
 			name: group.name,

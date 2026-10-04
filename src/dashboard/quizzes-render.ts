@@ -249,7 +249,7 @@ export function renderModuleDrill(
 	const grid = ajouter(principal, "div", "qbd-home-grid qbd-quizzes-drill-grid");
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
-	const cartes = regrouperParCours(inModule, ctx.settings.quizzesGroupModes !== false);
+	const cartes = regrouperParCours(inModule, true);
 	/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture (« Ajouter du
 	   contenu ») veut un chemin du contrat (correctif 2026-09-17), et
 	   `renderFolderPlanning` en a besoin pour le même geste dans son propre

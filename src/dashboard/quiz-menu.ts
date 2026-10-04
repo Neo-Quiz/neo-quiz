@@ -537,8 +537,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 							   its files would split the course without a word
 							   (2026-09-27). The others only move once the first has;
 							   when one fails, `moveQuizTo` says so itself. */
-							const freres = ctx.settings.quizzesGroupModes === false ? []
-								: quizFreres(quiz, ctx.scanner.getQuizzes());
+							const freres = quizFreres(quiz, ctx.scanner.getQuizzes());
 							void (async () => {
 								const to = await moveQuizTo(ctx, quiz, g.path as string, g.name);
 								if (to) for (const f of freres) await moveQuizTo(ctx, f, g.path as string, g.name);
@@ -595,8 +594,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		   not tell whether the Learn, the Test or both would be removed. A
 		   submenu names each quiz by its type, then offers all of them. Every
 		   path still confirms, and goes through `deleteQuizCore`. */
-		const freres = ctx.settings.quizzesGroupModes === false ? []
-			: quizFreres(quiz, ctx.scanner.getQuizzes());
+		const freres = quizFreres(quiz, ctx.scanner.getQuizzes());
 		const confirmerUn = (q: QuizIndexEntry): void => {
 			openConfirm({
 				title: t("dashboard.quizzes.deleteConfirmTitle"),

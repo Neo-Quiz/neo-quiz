@@ -151,9 +151,6 @@ export interface DashboardPageSettings {
 	quizzesModuleOverrides?: Record<string, ModuleOverride>;
 	quizzesModuleMapNote?: string;
 	quizzesArchivedFolders?: string[];
-	/** Réunir le Learn et le Practice d'un même cours en une carte (défaut :
-	    oui ; seul `false` les sépare). Cf. course-pairs.ts. */
-	quizzesGroupModes?: boolean;
 }
 
 /** Ce qu'une page transmet à la suivante en naviguant. */

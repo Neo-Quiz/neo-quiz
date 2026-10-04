@@ -218,8 +218,7 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
 				ouverture: host.ouverture,
-				autresModes: ctx.settings.quizzesGroupModes === false ? undefined
-					: quizFreres(quiz, ctx.scanner.getQuizzes()).map(f => ({ quiz: f, open: () => ctx.navigate("detail", { quiz: f }) })),
+				autresModes: quizFreres(quiz, ctx.scanner.getQuizzes()).map(f => ({ quiz: f, open: () => ctx.navigate("detail", { quiz: f }) })),
 				/* The card's menu, with a repaint that re-reads the quiz: renamed,
 				   the page picks it up; deleted or moved out of the catalogue, we go
 				   back. */

@@ -111,23 +111,10 @@ export async function chargerReglagesPages(): Promise<DashboardPageSettings> {
 		quizzesModuleOverrides: (await lireReglage<Record<string, ModuleOverride>>("quizzesModuleOverrides")) ?? undefined,
 		quizzesModuleMapNote: (await lireReglage<string>("quizzesModuleMapNote")) ?? undefined,
 		quizzesArchivedFolders: (await lireReglage<string[]>("quizzesArchivedFolders")) ?? undefined,
-		quizzesGroupModes: (await lireReglage<boolean>("quizzesGroupModes")) ?? undefined,
 	};
 	return reglagesPagesCache;
 }
 
-/** Réunir Learn et Practice d'un même cours en une carte : oui par défaut.
-    Lu et écrit PAR LE CACHE des réglages de pages, jamais directement dans
-    le fichier : la page « Mes quiz » réécrit ce cache à chaque changement, et
-    une écriture à côté serait écrasée au suivant. */
-export function regroupementModes(): boolean {
-	return reglagesPagesCache.quizzesGroupModes !== false;
-}
-
-export async function reglerRegroupementModes(actif: boolean): Promise<void> {
-	reglagesPagesCache.quizzesGroupModes = actif;
-	await ecrireReglage("quizzesGroupModes", actif);
-}
 
 /** The key of a folder's exams: its root and its name (`cleModule`), read
     from the FOLDER's own path. It used to come from the folder's first quiz
@@ -154,7 +141,6 @@ async function enregistrerReglagesPages(): Promise<void> {
 	await ecrireReglage("quizzesModuleOverrides", reglagesPagesCache.quizzesModuleOverrides ?? {});
 	await ecrireReglage("quizzesModuleMapNote", reglagesPagesCache.quizzesModuleMapNote ?? null);
 	await ecrireReglage("quizzesArchivedFolders", reglagesPagesCache.quizzesArchivedFolders ?? []);
-	await ecrireReglage("quizzesGroupModes", reglagesPagesCache.quizzesGroupModes ?? null);
 }
 
 /* ══════════════════════════════════════════════════════════

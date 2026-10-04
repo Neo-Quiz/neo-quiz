@@ -132,8 +132,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.languageHint": "Langue de l'interface. L'installeur la règle sur la langue de la page de téléchargement ; changez-la ici à tout moment. Les quiz générés suivent toujours la langue de votre demande.",
 	"app.settings.languageHintMobile": "Langue de l'interface. Les quiz générés suivent toujours la langue de votre demande.",
 	"app.settings.timeFormat": "Format de l'heure",
-	"app.settings.groupModes": "Regrouper le Learn et le Test d'un même cours",
-	"app.settings.groupModesHint": "Dans la page Dossiers, un cours qui a un Learn et un Test s'affiche en une seule carte, avec un bouton pour chacun.",
 	"app.settings.timeFormat24": "24 heures ({example})",
 	"app.settings.timeFormat12": "12 heures ({example})",
 

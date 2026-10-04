@@ -33,7 +33,6 @@ import type { AiSettings } from "../../../../src/types/dashboard-ctx";
 import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
 import { mountLanguagePackSettings } from "./language-packs";
-import { regroupementModes, reglerRegroupementModes } from "./dashboard-shell";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
 import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
@@ -304,12 +303,6 @@ export function renderSettings(
 			void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
 		},
 	});
-
-	/* One course, one card: the Learn and the Test of a course gathered on
-	   the Folders page (course-pairs.ts). Off, they are two cards, as before
-	   2026-09-24. A `<label>` row: a click anywhere on it flips the switch. */
-	const coursCase = switchInput(row(general, t("app.settings.groupModes"), t("app.settings.groupModesHint"), "label"), regroupementModes());
-	coursCase.addEventListener("change", () => { void reglerRegroupementModes(coursCase.checked); });
 
 	/* ═══ FOLDERS ═══ */
 	const foldersPage = pages.get("folders")!;
