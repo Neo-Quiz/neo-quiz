@@ -775,7 +775,6 @@ html.nq-mobile body.is-mobile .modal-container > .nq-reglages-modal {
 	height: auto;
 	min-height: calc(100vh - var(--nq-inset-haut, 0px));
 	max-height: none;
-	background: var(--nq-bottom-bar-bg);
 	border: 0;
 	border-radius: 0;
 	box-shadow: none;
