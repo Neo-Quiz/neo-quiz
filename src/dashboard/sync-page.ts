@@ -615,8 +615,19 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
+	/** The request each device had at the last paint: one that goes away on
+	    a connected device was ACCEPTED, and the page says so before
+	    "Connected" (2026-10-04). */
+	const demandesVues = new Map<string, string>();
+
 	function peindreAppareils(e: EtatSync): void {
 		fermerMenu();
+		for (const a of e.appareils) {
+			if (demandesVues.get(a.id) && !a.demande && a.connecte) {
+				currentHost().ui.notice(t("settings.sync.requestAccepted", { name: a.nom }), 5000);
+			}
+			demandesVues.set(a.id, a.demande ?? "");
+		}
 		appareilsCarte.replaceChildren();
 		if (e.appareils.length === 0) {
 			ajouter(ajouter(appareilsCarte, "div", "qbd-sync-ligne"), "span", "qbd-sync-vide", t("settings.sync.noDevices"));

@@ -72,6 +72,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.offline": "Déconnecté",
 	"settings.sync.offlineSeen": "Déconnecté, vu {when}",
 	"settings.sync.waitingAccept": "Demande de partage envoyée",
+	"settings.sync.requestAccepted": "{name} a accepté la demande de partage",
 	"settings.sync.requestExpired": "Demande expirée",
 	"settings.sync.sendAgain": "Renvoyer",
 	"settings.sync.sendAgainLabel": "Renvoyer la demande à {name}",

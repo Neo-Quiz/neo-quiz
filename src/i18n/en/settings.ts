@@ -72,6 +72,7 @@ export const EN_SETTINGS = {
 	"settings.sync.offline": "Disconnected",
 	"settings.sync.offlineSeen": "Disconnected, seen {when}",
 	"settings.sync.waitingAccept": "Sharing request sent",
+	"settings.sync.requestAccepted": "{name} accepted the sharing request",
 	"settings.sync.requestExpired": "Request expired",
 	"settings.sync.sendAgain": "Send again",
 	"settings.sync.sendAgainLabel": "Send the request to {name} again",
