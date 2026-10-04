@@ -1501,6 +1501,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		ipcMain.handle(CANAUX.syncRenommer, async (_e, id: unknown, nom: unknown) => {
 			if (typeof id === "string" && id.length <= 80 && typeof nom === "string" && nom.length <= 200) await sync.renommer(id, nom);
 		});
+		ipcMain.handle(CANAUX.syncRenvoyer, async (_e, id: unknown) => {
+			if (typeof id === "string" && id.length <= 80) await sync.renvoyer(id);
+		});
 		ipcMain.handle(CANAUX.syncIgnorer, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.ignorer(id);
 		});

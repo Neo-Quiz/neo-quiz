@@ -19,6 +19,7 @@ class SyncChannelTest {
         override suspend fun pairScanned(id: String, name: String) = "ok"
         override suspend fun forget(id: String) {}
         override suspend fun rename(id: String, name: String) {}
+        override suspend fun sendAgain(id: String) {}
         override suspend fun ignore(id: String) { ignored.add(id) }
     }
 

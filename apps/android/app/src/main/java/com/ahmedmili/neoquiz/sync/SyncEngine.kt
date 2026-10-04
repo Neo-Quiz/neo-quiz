@@ -159,9 +159,32 @@ class SyncEngine(
         }.apply { isDaemon = true; start() }
     }
 
+    /** Devices being removed: hidden, and never shared with again ([forget], [removeByOther]). */
+    private val removing: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    /** When THIS device sent a request to each device it added ([ShareRules.requestState]). */
+    private val sentAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    /** First "notSharing" seen from each connected device ([ShareRules.removedByOther]). */
+    private val notSharingSince = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     private fun pairedIds(r: Running): List<String> {
         val devices = r.instance.rest.devices()
-        return (0 until devices.length()).map { devices.getJSONObject(it).getString("deviceID") }.filter { it != r.ownId }
+        return (0 until devices.length()).map { devices.getJSONObject(it).getString("deviceID") }.filter { it != r.ownId && it !in removing }
+    }
+
+    /** The other side removed us: we remove it too, at once (no ignore: it is gone). */
+    private fun removeByOther(r: Running, id: String) {
+        if (!removing.add(id)) return
+        try {
+            align(r, pairedIds(r))
+            r.instance.rest.deleteDevice(id)
+        } catch (e: Exception) {
+            SyncLog.warn(TAG, "removal by the other side not applied", e)
+        } finally {
+            removing.remove(id)
+            notSharingSince.remove(id)
+            sentAt.remove(id)
+            push()
+        }
     }
 
     private fun align(r: Running, paired: Collection<String>) {
@@ -188,9 +211,20 @@ class SyncEngine(
         for (id in ShareRules.expiredRequests(pending, firstRequests, System.currentTimeMillis())) {
             pending?.remove(id)
             firstRequests.remove(id)
-            scope.launch { try { ignore(id) } catch (_: Exception) { /* next state retries */ } }
+            // Dismissed, NOT ignored: the sender pauses on its own at the same time and may send it again.
+            scope.launch { try { rest.dismissPendingDevice(id) } catch (_: Exception) { /* next state retries */ } }
         }
-        val others = (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId }
+        val others = (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId && it.getString("deviceID") !in removing }
+        // What each connected device says of the folder: "valid" once it accepted us, "notSharing" kept up = it removed us.
+        val remote = mutableMapOf<String, String>()
+        for (d in others) {
+            val id = d.getString("deviceID")
+            if (connections.optJSONObject(id)?.optBoolean("connected") != true) continue
+            try { rest.completion(ShareRules.FOLDER_ID, id).optString("remoteState").takeIf { it.isNotEmpty() }?.let { remote[id] = it } } catch (_: Exception) { }
+        }
+        for ((id, st) in remote) if (st == "valid") sentAt.remove(id)
+        for (id in ShareRules.removedByOther(remote, notSharingSince, System.currentTimeMillis())) scope.launch { removeByOther(r, id) }
+        val nowMs = System.currentTimeMillis()
         return mapOf(
             "actif" to true,
             "appareil" to r.ownId,
@@ -202,6 +236,12 @@ class SyncEngine(
                     "nom" to d.optString("name").ifEmpty { id.take(7) },
                     "connecte" to (connections.optJSONObject(id)?.optBoolean("connected") == true),
                     "vuLe" to ShareRules.lastSeen(seen.optJSONObject(id)?.optString("lastSeen")),
+                    "demande" to ShareRules.requestState(sentAt[id], d.optBoolean("paused"), nowMs).also { st ->
+                        // Expired: paused, so it stops knocking at the other side.
+                        if (st == "expiree" && !d.optBoolean("paused")) scope.launch {
+                            try { rest.putDevice(JSONObject(d.toString()).put("paused", true)); push() } catch (_: Exception) { }
+                        }
+                    },
                 )
             },
             "demandes" to ShareRules.requests(pending, others.map { it.getString("deviceID") }, r.ownId),
@@ -294,6 +334,7 @@ class SyncEngine(
                     .put("introducer", false).put("autoAcceptFolders", false).put("paused", false),
             )
             align(r, paired + id)
+            if (waiting == null) sentAt[id] = System.currentTimeMillis()
             onPaired?.invoke()
             push()
             PairResult.OK
@@ -325,10 +366,20 @@ class SyncEngine(
         if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead) return@withContext
         val paired = pairedIds(r)
         if (id !in paired) return@withContext
-        // The folder first: a device still referenced by a folder cannot go.
+        // Like a friends list: the folder stops being shared with it at once (it sees "notSharing"
+        // and removes us in turn), its requests are ignored, and the device itself goes
+        // REMOVE_DELAY_MS later, leaving the link up long enough for it to notice.
+        removing.add(id)
+        sentAt.remove(id)
         align(r, paired.filter { it != id })
-        r.instance.rest.deleteDevice(id)
+        ignore(id)
         push()
+        scope.launch {
+            kotlinx.coroutines.delay(ShareRules.REMOVE_DELAY_MS)
+            try { r.instance.rest.deleteDevice(id) } catch (_: Exception) { /* already gone */ }
+            removing.remove(id)
+            push()
+        }
     }
 
     suspend fun rename(raw: String, rawName: String) = withContext(Dispatchers.IO) {
@@ -339,6 +390,17 @@ class SyncEngine(
         val devices = r.instance.rest.devices()
         val d = (0 until devices.length()).map { devices.getJSONObject(it) }.firstOrNull { it.optString("deviceID") == id } ?: return@withContext
         r.instance.rest.putDevice(d.put("name", name))
+        push()
+    }
+
+    suspend fun sendAgain(raw: String) = withContext(Dispatchers.IO) {
+        val id = raw.trim()
+        val r = current
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead || id in removing) return@withContext
+        val devices = r.instance.rest.devices()
+        val d = (0 until devices.length()).map { devices.getJSONObject(it) }.firstOrNull { it.optString("deviceID") == id } ?: return@withContext
+        sentAt[id] = System.currentTimeMillis()
+        if (d.optBoolean("paused")) r.instance.rest.putDevice(d.put("paused", false))
         push()
     }
 

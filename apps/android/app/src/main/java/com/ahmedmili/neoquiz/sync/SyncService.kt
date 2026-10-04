@@ -36,6 +36,8 @@ interface SyncBackend {
     suspend fun forget(id: String)
     /** The name this device shows for a paired one (cleaned, at most 64). */
     suspend fun rename(id: String, name: String)
+    /** Sends again a request that expired (the device was paused). */
+    suspend fun sendAgain(id: String)
     suspend fun ignore(id: String)
 }
 
@@ -196,6 +198,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     override suspend fun forget(id: String) { ensure()?.forget(id) }
 
     override suspend fun rename(id: String, name: String) { ensure()?.rename(id, name) }
+
+    override suspend fun sendAgain(id: String) { ensure()?.sendAgain(id) }
 
     override suspend fun ignore(id: String) { ensure()?.ignore(id) }
 

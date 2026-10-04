@@ -40,6 +40,7 @@ export interface SyncPageDeps {
 	appairer(deviceId: string, nom?: string): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 	oublier(deviceId: string): Promise<void>;
 	renommer(deviceId: string, nom: string): Promise<void>;
+	renvoyer(deviceId: string): Promise<void>;
 	/** Ignore on a pairing request. */
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
@@ -584,12 +585,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 	}
 
-	/** Devices seen connected while this page was open, on TWO paints in a
-	    row: the other side, until it accepts, opens the connection and closes
-	    it at once, and that blink alone counted as connected (2026-10-04). */
-	const dejaConnectes = new Set<string>();
-	const vusConnectes = new Map<string, number>();
-
 	function peindreAppareils(e: EtatSync): void {
 		fermerMenu();
 		appareilsCarte.replaceChildren();
@@ -601,21 +596,29 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			const l = ajouter(appareilsCarte, "div", "qbd-sync-ligne");
 			const texte = ajouter(l, "div", "qbd-sync-id-bloc");
 			ajouter(texte, "span", "qbd-sync-nom", a.nom);
-			const suite = a.connecte ? (vusConnectes.get(a.id) ?? 0) + 1 : 0;
-			vusConnectes.set(a.id, suite);
-			if (suite >= 2) dejaConnectes.add(a.id);
-			/* Seen in the last two minutes but never connected while this page was
-			   open: the other side keeps closing the door, it has not said yes yet
-			   (2026-10-04: "Disconnected, seen just now" read as a fault). */
-			const enAttente = !a.connecte && a.vuLe !== null && Date.now() - a.vuLe < 120_000 && !dejaConnectes.has(a.id);
+			/* A request this device sent: still shown on the other side, or
+			   expired, with "Send again" (2026-10-04). Told by the host, which
+			   knows when the other side accepted. */
 			const sous = a.connecte
 				? t("settings.sync.connected")
-				: enAttente ? t("settings.sync.waitingAccept")
+				: a.demande === "envoyee" ? t("settings.sync.waitingAccept")
+				: a.demande === "expiree" ? t("settings.sync.requestExpired")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
 			ajouter(texte, "span", a.connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
 			/* Two plain actions, no menu (2026-10-04): rename what THIS device
 			   shows for it, and remove it (red bin). */
 			const actions = ajouter(l, "div", "qbd-sync-appareil-actions");
+			if (a.demande === "expiree") {
+				const renvoyer = ajouter(actions, "button", "qbd-sync-action");
+				renvoyer.type = "button";
+				currentHost().ui.setIcon(renvoyer, "send");
+				renvoyer.setAttribute("aria-label", t("settings.sync.sendAgainLabel", { name: a.nom }));
+				renvoyer.title = t("settings.sync.sendAgain");
+				renvoyer.addEventListener("click", () => {
+					renvoyer.disabled = true;
+					void deps.renvoyer(a.id).catch(() => undefined).then(() => rafraichir());
+				});
+			}
 			const modifier = ajouter(actions, "button", "qbd-sync-action");
 			modifier.type = "button";
 			currentHost().ui.setIcon(modifier, "pencil");

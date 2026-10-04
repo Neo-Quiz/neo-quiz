@@ -113,6 +113,34 @@ object ShareRules {
         return out
     }
 
+    /*
+     * LIKE A FRIENDS LIST (2026-10-04): removing a device removes us from it too. The remover stops
+     * sharing the folder at once and deletes the device [REMOVE_DELAY_MS] later; the other side,
+     * still connected, sees "notSharing" and after [REMOVED_BY_OTHER_MS] of it removes the remover.
+     */
+    const val REMOVE_DELAY_MS = 30_000L
+    const val REMOVED_BY_OTHER_MS = 15_000L
+
+    /** Ids whose remote has said "notSharing" for [REMOVED_BY_OTHER_MS] or more; [since] is kept in step. */
+    fun removedByOther(states: Map<String, String>, since: MutableMap<String, Long>, now: Long): List<String> {
+        since.keys.retainAll(states.filterValues { it == "notSharing" }.keys)
+        val out = mutableListOf<String>()
+        for ((id, state) in states) {
+            if (state != "notSharing") continue
+            val start = since[id]
+            if (start == null) since[id] = now else if (now - start >= REMOVED_BY_OTHER_MS) out.add(id)
+        }
+        return out
+    }
+
+    /** "envoyee" for [REQUEST_TIMEOUT_MS] after a request was sent, then "expiree"; a paused device is always "expiree". */
+    fun requestState(sentAt: Long?, paused: Boolean, now: Long): String? = when {
+        paused -> "expiree"
+        sentAt == null -> null
+        now - sentAt < REQUEST_TIMEOUT_MS -> "envoyee"
+        else -> "expiree"
+    }
+
     fun isIgnored(list: JSONArray?, id: String): Boolean =
         list != null && (0 until list.length()).any { list.optJSONObject(it)?.optString("deviceID") == id }
 

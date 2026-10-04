@@ -60,7 +60,7 @@ import {
 	launchArgs,
 	configXmlSansEcoute,
 	launchEnv,
-	optionsFixees, avecIgnore, estIgnore, demandesExpirees } from "./syncthing-regles";
+	optionsFixees, avecIgnore, estIgnore, demandesExpirees, retraitsDistants, etatDemande, RETRAIT_DELAI_MS } from "./syncthing-regles";
 
 /** `annule`: the owner declined the native confirmation. */
 export type ResultatAppairage = "ok" | "invalide" | "indisponible" | "annule";
@@ -78,6 +78,8 @@ export interface SyncHandle {
 	oublier(deviceId: string): Promise<void>;
 	/** The name THIS device shows for a paired one (cleaned, at most 64). */
 	renommer(deviceId: string, nom: string): Promise<void>;
+	/** Sends again a request that expired (the device was paused). */
+	renvoyer(deviceId: string): Promise<void>;
 	/** Empties the ignore list (the owner opened "Show my ID": pairing is what they want now). */
 	pardonnerIgnores(): Promise<void>;
 	/** The owner chose Ignore on a pairing request: forget that request. */
@@ -318,8 +320,32 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	let changements: Changement[] = [];
 
 	/** Devices of the config that are not us. */
+	/** Devices being removed (`oublier`, `retirerDistant`): hidden, and never shared with again. */
+	const retraits = new Set<string>();
+	/** When THIS device sent a request to each device it added (`etatDemande`). */
+	const envois = new Map<string, number>();
+	/** First "notSharing" seen from each connected device (`retraitsDistants`). */
+	const depuisNonPartage = new Map<string, number>();
+
 	async function pairesCourants(): Promise<string[]> {
-		return (await courant.rest.devices()).filter(d => d.deviceID !== courant.ownId).map(d => d.deviceID);
+		return (await courant.rest.devices()).filter(d => d.deviceID !== courant.ownId && !retraits.has(d.deviceID)).map(d => d.deviceID);
+	}
+
+	/** The other side removed us: we remove it too, at once (no ignore: it is gone). */
+	async function retirerDistant(id: string): Promise<void> {
+		if (retraits.has(id)) return;
+		retraits.add(id);
+		try {
+			await aligner(await pairesCourants());
+			await courant.rest.deleteDevice(id);
+		} catch (e) {
+			console.warn("[syncthing] removal by the other side not applied:", e instanceof Error ? e.message : String(e));
+		} finally {
+			retraits.delete(id);
+			depuisNonPartage.delete(id);
+			envois.delete(id);
+			void diffuser().catch(() => undefined);
+		}
 	}
 
 	/** The folder shared with exactly ourselves and the paired devices. */
@@ -353,26 +379,48 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		try { vus = await rest.deviceStats(); } catch { /* no last-seen times */ }
 		let attente: unknown = {};
 		try { attente = await rest.pendingDevices(); } catch { /* no requests shown */ }
-		/* A request nobody answered in time is ignored on its own, like a
-		   press on Ignore (and "Show my ID" lets it ask again). */
+		/* A request nobody answered in time goes away on its own. */
 		for (const id of demandesExpirees(attente, premieresDemandes, Date.now())) {
 			delete (attente as Record<string, unknown>)[id];
 			premieresDemandes.delete(id);
-			void ignorerId(id).catch(() => undefined);
+			/* Dismissed, NOT ignored: the sender pauses on its own at the same
+			   time, and may send it again ("Send again"). */
+			void rest.dismissPendingDevice(id).catch(() => undefined);
 		}
-		const paires = devices.filter(d => d.deviceID !== ownId).map(d => d.deviceID);
+		const visibles = devices.filter(d => d.deviceID !== ownId && !retraits.has(d.deviceID));
+		const paires = visibles.map(d => d.deviceID);
+		/* What each connected device says of the folder: "valid" once it
+		   accepted us (a request we sent is answered), "notSharing" kept up
+		   means it removed us. */
+		const etatsDistants: Record<string, string> = {};
+		for (const d of visibles) {
+			if (connexions.connections?.[d.deviceID]?.connected !== true) continue;
+			try {
+				const c = await rest.completion(FOLDER_ID, d.deviceID);
+				if (typeof c.remoteState === "string") etatsDistants[d.deviceID] = c.remoteState;
+			} catch { /* unknown this time */ }
+		}
+		for (const [id, etat] of Object.entries(etatsDistants)) if (etat === "valid") envois.delete(id);
+		for (const id of retraitsDistants(etatsDistants, depuisNonPartage, Date.now())) void retirerDistant(id);
+		const maintenant = Date.now();
 		return {
 			actif: true,
 			appareil: ownId,
 			nom: os.hostname().slice(0, 64),
-			appareils: devices
-				.filter(d => d.deviceID !== ownId)
-				.map(d => ({
+			appareils: visibles.map(d => {
+				const demande = etatDemande(envois.get(d.deviceID), d.paused === true, maintenant);
+				/* Expired: paused, so it stops knocking at the other side. */
+				if (demande === "expiree" && d.paused !== true) {
+					void rest.putDevice({ ...d, paused: true }).then(() => diffuser()).catch(() => undefined);
+				}
+				return {
 					id: d.deviceID,
 					nom: d.name || d.deviceID.slice(0, 7),
 					connecte: connexions.connections?.[d.deviceID]?.connected === true,
 					vuLe: dernierVu(vus[d.deviceID]?.lastSeen),
-				})),
+					...(demande ? { demande } : {}),
+				};
+			}),
 			demandes: demandesDepuis(attente, paires, ownId),
 			demandesPlus: plusDemandes(attente, paires, ownId),
 			dossier: folderEtat(statut),
@@ -558,6 +606,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 					paused: false,
 				});
 				await aligner([...paires, id]);
+				if (attente === undefined) envois.set(id, Date.now());
 				void diffuser().catch(() => undefined);
 				return "ok";
 			} catch (e) {
@@ -571,10 +620,22 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			if (!isDeviceId(id) || id === courant.ownId || mort) return;
 			const paires = await pairesCourants();
 			if (!paires.includes(id)) return;
-			/* The folder first: a device still referenced by a folder cannot go. */
+			/* Like a friends list: the folder stops being shared with it at
+			   once (it sees "notSharing" and removes us in turn), its requests
+			   are ignored, and the device itself goes `RETRAIT_DELAI_MS` later,
+			   leaving the link up long enough for it to notice. */
+			retraits.add(id);
+			envois.delete(id);
 			await aligner(paires.filter(p => p !== id));
-			await courant.rest.deleteDevice(id);
+			await ignorerId(id);
 			void diffuser().catch(() => undefined);
+			setTimeout(() => {
+				void (async () => {
+					try { await courant.rest.deleteDevice(id); } catch { /* already gone */ }
+					retraits.delete(id);
+					void diffuser().catch(() => undefined);
+				})();
+			}, RETRAIT_DELAI_MS);
 		},
 
 		async renommer(brut, nomBrut) {
@@ -593,6 +654,16 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			if (Array.isArray(cfg.remoteIgnoredDevices) && cfg.remoteIgnoredDevices.length > 0) {
 				await courant.rest.putConfig({ ...cfg, remoteIgnoredDevices: [] });
 			}
+		},
+
+		async renvoyer(brut) {
+			const id = typeof brut === "string" ? brut.trim() : "";
+			if (!isDeviceId(id) || id === courant.ownId || mort || retraits.has(id)) return;
+			const d = (await courant.rest.devices()).find(x => x.deviceID === id);
+			if (!d) return;
+			envois.set(id, Date.now());
+			if (d.paused === true) await courant.rest.putDevice({ ...d, paused: false });
+			void diffuser().catch(() => undefined);
 		},
 
 		async ignorer(brut) {
@@ -630,6 +701,8 @@ export interface GestionSync {
 	oublier(deviceId: string): Promise<void>;
 	/** The name THIS device shows for a paired one (cleaned, at most 64). */
 	renommer(deviceId: string, nom: string): Promise<void>;
+	/** Sends again a request that expired (the device was paused). */
+	renvoyer(deviceId: string): Promise<void>;
 	ignorer(deviceId: string): Promise<void>;
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	surDonneesRecues(rappel: () => void): () => void;
@@ -743,6 +816,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		},
 		async oublier(id) { await (await obtenir())?.oublier(id); },
 		async renommer(id, nom) { await (await obtenir())?.renommer(id, nom); },
+		async renvoyer(id) { await (await obtenir())?.renvoyer(id); },
 		async ignorer(id) { await (await obtenir())?.ignorer(id); },
 		surEtat(rappel) { abonnesEtat.add(rappel); return () => { abonnesEtat.delete(rappel); }; },
 		surDonneesRecues(rappel) { abonnesDonnees.add(rappel); return () => { abonnesDonnees.delete(rappel); }; },

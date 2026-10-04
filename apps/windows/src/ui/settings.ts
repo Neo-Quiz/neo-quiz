@@ -142,6 +142,7 @@ export function renderSettings(
 			appairer: (id, nom) => sync.appairer(id, nom),
 			oublier: id => sync.oublier(id),
 			renommer: (id, nom) => sync.renommer(id, nom),
+			renvoyer: id => sync.renvoyer(id),
 			ignorer: id => sync.ignorer(id),
 			partager: canal => sync.partagerId(canal),
 			surEtat: rappel => sync.surEtat(rappel),

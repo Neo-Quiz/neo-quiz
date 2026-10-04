@@ -90,6 +90,9 @@ class SyncthingRest(private val port: Int, private val apiKey: String) {
 
     fun folderStatus(id: String): JSONObject = obj("GET", "/rest/db/status?folder=${segment(id)}")
 
+    /** `remoteState`: "valid" (it shares the folder with us), "notSharing", "paused", "unknown". */
+    fun completion(folder: String, device: String): JSONObject = obj("GET", "/rest/db/completion?folder=${segment(folder)}&device=${segment(device)}")
+
     /** Dismisses ONE pending device (the owner chose Ignore); it may come back the next time that device tries. */
     fun dismissPendingDevice(id: String) { call("DELETE", "/rest/cluster/pending/devices?device=${segment(id)}") }
 

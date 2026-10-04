@@ -96,6 +96,7 @@ object Channels {
         "sync.appairer",
         "sync.oublier",
         "sync.renommer",
+        "sync.renvoyer",
         "sync.ignorer",
         "sync.partagerId",
         "sync.scanner",

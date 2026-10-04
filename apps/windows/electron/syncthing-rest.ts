@@ -122,6 +122,9 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 		/** Dismisses ONE pending device (the owner chose Ignore); it may come back the next time that device tries. */
 		async dismissPendingDevice(id: string): Promise<void> { await appeler("DELETE", `/rest/cluster/pending/devices?device=${segment(id)}`); },
 		deviceStats: () => json<DeviceStats>("GET", "/rest/stats/device"),
+		/* `remoteState`: "valid" (it shares the folder with us), "notSharing", "paused", "unknown". */
+		completion: (folder: string, device: string) =>
+			json<{ remoteState?: unknown }>("GET", `/rest/db/completion?folder=${segment(folder)}&device=${segment(device)}`),
 		connections: () => json<Connections>("GET", "/rest/system/connections"),
 		async shutdown(): Promise<void> { await appeler("POST", "/rest/system/shutdown"); },
 	};

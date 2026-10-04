@@ -11,7 +11,9 @@ export interface EtatSync {
 	nom: string;
 	/** The paired devices, with the name Syncthing reports for them and when
 	    they were last seen (milliseconds, `null` = never). */
-	appareils: Array<{ id: string; nom: string; connecte: boolean; vuLe: number | null }>;
+	/** `demande`: a request THIS device sent, still shown on the other side
+	    ("envoyee") or expired ("expiree": it can be sent again). */
+	appareils: Array<{ id: string; nom: string; connecte: boolean; vuLe: number | null; demande?: "envoyee" | "expiree" }>;
 	/** Devices that added THIS one and are waiting to be accepted. Names are the
 	    remote's, at most 64 characters: render as text only. */
 	demandes: Array<{ id: string; nom: string }>;

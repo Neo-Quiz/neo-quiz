@@ -443,3 +443,38 @@ export function demandesExpirees(attente: unknown, premieres: Map<string, number
 	}
 	return expirees;
 }
+
+/* LIKE A FRIENDS LIST (2026-10-04): removing a device removes us from it too.
+   The remover stops sharing the folder with it at once and deletes it
+   `RETRAIT_DELAI_MS` later; meanwhile the other side, still connected, sees
+   the folder "notSharing" and, after `RETRAIT_DISTANT_MS` of it (the short
+   gap between an Accept and its folder share must not count), removes the
+   remover in turn. */
+export const RETRAIT_DELAI_MS = 30_000;
+export const RETRAIT_DISTANT_MS = 15_000;
+
+/** The ids whose remote has said "notSharing" for `RETRAIT_DISTANT_MS` or
+    more: they removed us. `etats` holds the remote state of the connected
+    devices just read; `depuis` (id -> first "notSharing") is kept in step. */
+export function retraitsDistants(etats: Record<string, string>, depuis: Map<string, number>, maintenant: number): string[] {
+	for (const id of [...depuis.keys()]) if (etats[id] !== "notSharing") depuis.delete(id);
+	const out: string[] = [];
+	for (const [id, etat] of Object.entries(etats)) {
+		if (etat !== "notSharing") continue;
+		const debut = depuis.get(id);
+		if (debut === undefined) depuis.set(id, maintenant);
+		else if (maintenant - debut >= RETRAIT_DISTANT_MS) out.push(id);
+	}
+	return out;
+}
+
+/** Where a request THIS device sent stands: "envoyee" for
+    `DEMANDE_DUREE_MS` after it was sent (the other side shows it that long),
+    then "expiree" (the device is paused so it stops knocking, and the page
+    offers to send it again). A paused device is always "expiree": only an
+    expired request pauses one. */
+export function etatDemande(envoyeLe: number | undefined, enPause: boolean, maintenant: number): "envoyee" | "expiree" | null {
+	if (enPause) return "expiree";
+	if (envoyeLe === undefined) return null;
+	return maintenant - envoyeLe < DEMANDE_DUREE_MS ? "envoyee" : "expiree";
+}
