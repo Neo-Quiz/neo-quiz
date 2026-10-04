@@ -189,6 +189,9 @@ object ShareRules {
         .put("autoUpgradeIntervalH", 0)
         .put("localAnnouncePort", LOCAL_ANNOUNCE_PORT)
         .put("localAnnounceMCAddr", "[ff12::8384]:$LOCAL_ANNOUNCE_PORT")
+        // Redial a disconnected device every 10 s, not Syncthing's 60: once the other side accepts
+        // a request, the link comes up within seconds (2026-10-04).
+        .put("reconnectionIntervalS", 10)
 
     /** THE folder, shared with ourselves and with every paired device, once each. */
     fun folderConfig(root: String, ownId: String, paired: Collection<String>): JSONObject {

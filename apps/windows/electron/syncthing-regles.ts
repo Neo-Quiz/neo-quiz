@@ -158,6 +158,10 @@ export function optionsFixees(portLibre: boolean, platform: string): Record<stri
 		   so they still find each other; the personal one is left alone. */
 		localAnnouncePort: PORT_ANNONCE_LAN,
 		localAnnounceMCAddr: `[ff12::8384]:${PORT_ANNONCE_LAN}`,
+		/* Redial a disconnected device every 10 s, not Syncthing's 60: once the
+		   other side accepts a request, the link comes up within seconds
+		   (2026-10-04: the phone took about a minute to see the Accept). */
+		reconnectionIntervalS: 10,
 	};
 }
 
