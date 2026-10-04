@@ -60,6 +60,11 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         overScrollMode = OVER_SCROLL_ALWAYS
 
         webViewClient = object : WebViewClient() {
+            // A new document (first load, reload) gets the status bar height again.
+            override fun onPageFinished(view: WebView, url: String?) {
+                applyTopInset()
+            }
+
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
@@ -206,6 +211,19 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
     }
 
     /** Asks the page to go back one step; `done(false)` when it has nowhere to go (called on the main thread). */
+    /** Height of the status bar in CSS pixels, given to the page as `--nq-inset-haut`. */
+    private var topInset = 0f
+
+    fun setTopInset(dp: Float) {
+        topInset = dp
+        applyTopInset()
+    }
+
+    private fun applyTopInset() {
+        // A number this class computed itself, never a string from outside: nothing to escape.
+        evaluateJavascript("document.documentElement.style.setProperty('--nq-inset-haut','" + String.format(java.util.Locale.ROOT, "%.1f", topInset) + "px')", null)
+    }
+
     fun askBack(done: (Boolean) -> Unit) {
         scope.launch {
             val handled = app.goBack()

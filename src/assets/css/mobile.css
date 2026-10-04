@@ -21,8 +21,18 @@
    layout does not move by a pixel. Nothing here is `:hover`-only.
    ══════════════════════════════════════════════════════════ */
 
+/* No title bar on a phone, but the page runs UNDER the status bar (the
+   wallpaper shows behind it, 2026-10-04): the space the desktop keeps for its
+   title bar is the status bar's height here, given by the app
+   (`--nq-inset-haut`, MainActivity). 0 elsewhere. */
 html.nq-mobile {
-	--nq-barre-ecran: 0px;
+	--nq-barre-ecran: var(--nq-inset-haut, 0px);
+}
+
+/* Modals cover the screen: they keep clear of the status bar too. */
+html.nq-mobile .modal-container {
+	padding-top: var(--nq-inset-haut, 0px);
+	box-sizing: border-box;
 }
 
 /* ── PHONE: the rail becomes a bottom bar, the panel runs edge to edge ── */

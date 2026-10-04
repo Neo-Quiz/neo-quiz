@@ -77,15 +77,21 @@ class NavBarView(context: Context) : LinearLayout(context) {
                 val id = item.optString("id")
                 val pair = ICONS[id]
                 if (pair != null) {
-                    val outlined = resources.getDrawable(pair.first, context.theme)
-                    val filled = resources.getDrawable(pair.second, context.theme)
-                    // Fade from the state the tab was in to the new one (<= 150 ms); no fade on a plain redraw.
-                    val changed = wasActive[id] != null && wasActive[id] != on
-                    val from = if (on) outlined else filled
+                    // mutate(): each tab gets its OWN copy; drawables of a resource share their state, and an
+                    // alpha set on one (the fade) showed on another (a filled icon on an inactive tab).
+                    val outlined = resources.getDrawable(pair.first, context.theme).mutate()
+                    val filled = resources.getDrawable(pair.second, context.theme).mutate()
                     val to = if (on) filled else outlined
-                    val fade = TransitionDrawable(arrayOf(if (changed) from else to, to))
-                    fade.startTransition(if (changed) FADE_MS else 0)
-                    setImageDrawable(fade)
+                    // Fade only when the tab really changed state (<= 150 ms). A plain redraw sets the icon
+                    // directly: a zero-length fade from a drawable to itself sometimes drew nothing.
+                    val changed = wasActive[id] != null && wasActive[id] != on
+                    if (changed) {
+                        val fade = TransitionDrawable(arrayOf(if (on) outlined else filled, to)).apply { isCrossFadeEnabled = true }
+                        setImageDrawable(fade)
+                        fade.startTransition(FADE_MS)
+                    } else {
+                        setImageDrawable(to)
+                    }
                     imageTintList = ColorStateList.valueOf(if (on) active else muted)
                 }
                 wasActive[id] = on

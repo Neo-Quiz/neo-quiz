@@ -94,7 +94,11 @@ class MainActivity : ComponentActivity() {
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime(),
             )
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            // The TOP is not padded (2026-10-04): the page runs under the status bar so the wallpaper
+            // shows behind it, and the page itself moves its content down by that height
+            // (`--nq-inset-haut`, mobile.css). The sides, the bottom bars and the keyboard stay padded.
+            v.setPadding(bars.left, 0, bars.right, bars.bottom)
+            appWebView.setTopInset(bars.top / resources.displayMetrics.density)
             WindowInsetsCompat.CONSUMED
         }
         loadWhenGranted()
