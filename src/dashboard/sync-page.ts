@@ -239,6 +239,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		const qr = ajouter(zoneQr, "img", "qbd-sync-qr");
 		qr.alt = t("settings.sync.qrAlt");
 		let idMobile: string | null = null;
+		let texteMobile: string | null = null;
 		const qrBtn = ligneAction("qr-code", t("settings.sync.showQr"), () => {
 			zoneQr.hidden = !zoneQr.hidden;
 			(qrBtn.querySelector(".qbd-sync-ligne-libelle") as HTMLElement).textContent = t(zoneQr.hidden ? "settings.sync.showQr" : "settings.sync.hideQr");
@@ -250,12 +251,16 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		ligneAction("share-2", t("settings.sync.share"), () => { if (idMobile) void partagerId("systeme"); });
 		peindreAppareilMobile = e => {
 			valeurNom.textContent = e.nom;
-			if (!e.appareil || e.appareil === idMobile) return;
+			/* The QR code carries this device's NAME next to its id (the PC's
+			   scheme, without a code): whoever scans it, a phone or a tablet,
+			   sees "Pair Xiaomi 13T Pro?" and not an id alone (2026-10-04). */
+			const texte = e.appareil ? `neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}` : null;
+			if (!e.appareil || !texte || texte === texteMobile) return;
 			idMobile = e.appareil;
+			texteMobile = texte;
 			idTexte.textContent = e.appareil;
-			const id = e.appareil;
-			void QRCode.toDataURL(id, { margin: 2, width: 220, errorCorrectionLevel: "M" })
-				.then(url => { if (!demonte && idMobile === id) qr.src = url; })
+			void QRCode.toDataURL(texte, { margin: 2, width: 220, errorCorrectionLevel: "M" })
+				.then(url => { if (!demonte && texteMobile === texte) qr.src = url; })
 				.catch(() => undefined);
 		};
 
@@ -495,7 +500,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
 						idTexte.textContent = e.appareil;
-						if (!qrHote) poserQr(e.appareil);
+						if (!qrHote) poserQr(`neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`);
 					},
 				};
 				if (dernierEtat) dialogueId.peindre(dernierEtat);
