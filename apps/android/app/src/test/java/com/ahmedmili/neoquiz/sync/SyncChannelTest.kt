@@ -16,6 +16,7 @@ class SyncChannelTest {
         val ignored = ArrayList<String>()
         override suspend fun state(): Map<String, Any?> = mapOf("appareil" to own)
         override suspend fun pair(id: String, name: String?) = "ok"
+        override suspend fun pairScanned(id: String, name: String) = "ok"
         override suspend fun forget(id: String) {}
         override suspend fun ignore(id: String) { ignored.add(id) }
     }

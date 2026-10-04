@@ -31,6 +31,8 @@ interface SyncBackend {
     suspend fun state(): Map<String, Any?>
     /** `name`: announced by a scanned pairing QR code, shown in the confirmation; null when typed. */
     suspend fun pair(id: String, name: String?): String
+    /** Pairs an id the camera just read (never one from the page): no native dialog, the scan is the answer. */
+    suspend fun pairScanned(id: String, name: String): String
     suspend fun forget(id: String)
     suspend fun ignore(id: String)
 }
@@ -185,6 +187,9 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     private val pairing = SingleFlight()
 
     override suspend fun pair(id: String, name: String?): String = pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name) ?: PairResult.UNAVAILABLE }
+
+    override suspend fun pairScanned(id: String, name: String): String =
+        pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name, scanned = true) ?: PairResult.UNAVAILABLE }
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
 

@@ -34,5 +34,12 @@ class SyncChannel(
             }
         },
         "sync.scanner" to { _ -> scanner() },
+        // Scan AND pair in one native step: the page asks for a scan and gets a result, it never
+        // hands over the id, so this pairing needs no confirmation (a typed id still does).
+        "sync.scannerAppairer" to { _ ->
+            val text = scanner()
+            if (text == null) PairResult.CANCELLED
+            else ShareRules.scannedPairing(text)?.let { (id, name) -> backend.pairScanned(id, name) } ?: PairResult.INVALID
+        },
     )
 }

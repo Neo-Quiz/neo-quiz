@@ -260,6 +260,7 @@ const pont: Pont = {
 		surEtat: (rappel) => abonner<EtatSync>("sync.etat", rappel),
 		surDonneesRecues: (rappel) => abonner<void>("sync.donneesRecues", () => rappel()),
 		scanner: () => appeler("sync.scanner"),
+		scannerAppairer: () => appeler("sync.scannerAppairer"),
 	},
 
 	android: {

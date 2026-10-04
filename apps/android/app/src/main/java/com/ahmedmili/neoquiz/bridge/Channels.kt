@@ -98,5 +98,6 @@ object Channels {
         "sync.ignorer",
         "sync.partagerId",
         "sync.scanner",
+        "sync.scannerAppairer",
     )
 }

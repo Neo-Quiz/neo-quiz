@@ -111,6 +111,16 @@ class ShareRulesTest {
         assertTrue(cfg.getBoolean("ignorePerms"))
     }
 
+    @Test fun aScannedQrGivesTheIdAndTheAnnouncedName() {
+        val bare = id.replace("-", "")
+        assertEquals(id to "DESKTOP-1U89520", ShareRules.scannedPairing("neo-quiz://pair?device=$id&code=K7Q2M9XPAB&name=DESKTOP-1U89520"))
+        assertEquals(id to "PC d'Alex&x", ShareRules.scannedPairing("neo-quiz://pair?device=$id&name=PC%20d'Alex%26x"))
+        assertEquals(id to "", ShareRules.scannedPairing(bare.lowercase()))
+        assertEquals(null, ShareRules.scannedPairing("neo-quiz://pair?name=x"))
+        assertEquals(null, ShareRules.scannedPairing("https://example.com"))
+        assertEquals(null, ShareRules.scannedPairing(null))
+    }
+
     @Test fun theCanonicalRootMustBeNeoQuizItself() {
         val storage = File("/storage/emulated/0")
         assertTrue(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Neo Quiz"), storage))

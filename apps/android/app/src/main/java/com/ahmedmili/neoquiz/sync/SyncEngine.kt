@@ -253,7 +253,8 @@ class SyncEngine(
         }
     }
 
-    suspend fun pair(raw: String, scannedName: String? = null): String = withContext(Dispatchers.IO) {
+    /** [scanned]: the id was read by the camera in THIS process (`sync.scannerAppairer`), never given by the page. */
+    suspend fun pair(raw: String, scannedName: String? = null, scanned: Boolean = false): String = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
         if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || dead) return@withContext PairResult.INVALID
@@ -268,7 +269,9 @@ class SyncEngine(
             // request notification needs no second question: the tap on Accept is it (owner's
             // decision, 2026-10-03, same as Windows). An id typed or scanned in "Add a device"
             // (nothing asked for it) still goes through a native dialog the page cannot answer.
-            if (waiting == null) {
+            // A SCANNED id needs none either (2026-10-04, like Syncthing's app): the camera read it in
+            // this process, the page only asked for a scan, so the owner's scan is the answer.
+            if (waiting == null && !scanned) {
                 val agreed = try { confirm(id, name) } catch (_: Exception) { false }
                 if (!agreed) return@withContext PairResult.CANCELLED
             }

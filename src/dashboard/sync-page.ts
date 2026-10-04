@@ -51,6 +51,9 @@ export interface SyncPageDeps {
 	/** Only where there is a camera: resolves with the scanned device code, or
 	    `null` if the user gave up. */
 	scanner?(): Promise<string | null>;
+	/** Where there is a camera: scans AND pairs natively, the id never
+	    passing through this page (hence no confirmation dialog). */
+	scannerAppairer?(): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 	/** The pairing QR code that changes, where the host has it (Windows): the
 	    "Show my ID" dialog shows `texte` and asks again every `periodeMs`,
 	    then calls `fermer`. Without it the QR code is the plain ID. */
@@ -70,13 +73,6 @@ export function normaliserCode(brut: string): string {
 	if (qr) brut = new URLSearchParams(qr[1]).get("device") ?? "";
 	const nu = brut.replace(/[\s-]+/g, "").toUpperCase();
 	return nu.length === 56 ? (nu.match(/.{7}/g) ?? []).join("-") : brut.trim().toUpperCase();
-}
-
-/** The PC name a scanned pairing QR code announces (`&name=`), or "". A
-    candidate only: the host cleans it and shows it next to the id. */
-export function nomDansQr(brut: string): string {
-	const qr = /^neo-quiz:\/\/pair\?(.*)$/i.exec(brut.trim());
-	return qr ? (new URLSearchParams(qr[1]).get("name") ?? "").slice(0, 64) : "";
 }
 
 export type TonStatut = "ok" | "neutre" | "erreur";
@@ -264,14 +260,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				.catch(() => undefined);
 		};
 
-		if (deps.scanner) {
+		if (deps.scannerAppairer) {
 			const appairer = ajouter(racine, "section", "qbd-sync-section");
 			titre(appairer, t("settings.sync.pairWithPc"));
 			const scanBtn = bouton(appairer, "scan-line", t("settings.sync.scanPc"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand");
 			scanBtn.addEventListener("click", () => {
-				void deps.scanner!().then(async code => {
-					if (!code || demonte) return;
-					const res = await deps.appairer(normaliserCode(code), nomDansQr(code) || undefined);
+				void deps.scannerAppairer!().then(async res => {
 					if (demonte) return;
 					if (res === "ok") currentHost().ui.notice(t("settings.sync.scanSent"), 6000);
 					else if (res !== "annule") currentHost().ui.notice(t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable"));
@@ -522,7 +516,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.addHint"));
 				/* Where there is a camera, scanning is THE gesture: one big blue
 				   button first, typing the ID comes after as the fallback. */
-				const scannerBtn = deps.scanner
+				const scannerBtn = deps.scannerAppairer
 					? bouton(corps, "scan-line", t("settings.sync.scanQr"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand")
 					: null;
 				if (scannerBtn) ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.orPaste"));
@@ -567,8 +561,15 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				annulerBtn.addEventListener("click", () => handle.close());
 				champ.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); void soumettre(champ.value); } });
 				scannerBtn?.addEventListener("click", () => {
-					void deps.scanner!().then(code => {
-						if (code && !demonte && !ferme) { champ.value = code; void soumettre(code); }
+					void deps.scannerAppairer!().then(async res => {
+						if (demonte || ferme) return;
+						if (res === "ok") {
+							handle.close();
+							currentHost().ui.notice(t("settings.sync.added"), 6000);
+						} else if (res !== "annule") {
+							message.textContent = t(res === "invalide" ? "settings.sync.invalid" : "settings.sync.unavailable");
+						}
+						await rafraichir();
 					}).catch(() => undefined);
 				});
 				fermerAjout = () => { if (!ferme) { ferme = true; handle.close(); } };

@@ -145,6 +145,7 @@ export function renderSettings(
 			partager: canal => sync.partagerId(canal),
 			surEtat: rappel => sync.surEtat(rappel),
 			scanner: sync.scanner ? () => sync.scanner!() : undefined,
+			scannerAppairer: sync.scannerAppairer ? () => sync.scannerAppairer!() : undefined,
 			qr: sync.qr ? { suivant: () => sync.qr!.suivant(), fermer: () => sync.qr!.fermer() } : undefined,
 			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
 		});

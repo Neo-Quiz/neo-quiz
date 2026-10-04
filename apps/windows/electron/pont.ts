@@ -429,6 +429,9 @@ export interface Pont {
 		    text of the QR code read (a candidate device id, validated by
 		    `appairer`), or `null` if the user gave up. Absent on Windows. */
 		scanner?(): Promise<string | null>;
+		/** Android only: scans AND pairs in one native step, with the id the
+		    camera read (the page never hands it over, so no confirmation). */
+		scannerAppairer?(): Promise<"ok" | "invalide" | "indisponible" | "annule">;
 		/** The pairing QR code that changes (`appairage-qr.ts`). Windows
 		    only for now: the "Show my ID" dialog asks for the next code every
 		    `periodeMs` while it is open (`null` when sync cannot start), and

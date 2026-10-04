@@ -53,6 +53,32 @@ object ShareRules {
     /** True when [real] (resolved on the disk) is exactly `Neo Quiz` directly under the resolved [storage]: a symlink pointing elsewhere is not. */
     fun isCanonicalSharedRoot(real: File, storage: File): Boolean = real == sharedRoot(storage)
 
+    /**
+     * The device id and announced name a SCANNED QR code carries: Neo Quiz's
+     * `neo-quiz://pair?device=<id>&name=<name>` (any `code` ignored here) or a bare id, in any
+     * grouping. `null` when the text holds no valid-looking id. The name is cleaned.
+     */
+    fun scannedPairing(text: String?): Pair<String, String>? {
+        val t = text?.trim() ?: return null
+        var raw = t
+        var name = ""
+        val link = PAIR_LINK.find(t)
+        if (link != null) {
+            val params = link.groupValues[1].split("&").mapNotNull { p ->
+                p.split("=", limit = 2).takeIf { it.size == 2 }?.let { decodeParam(it[0]) to decodeParam(it[1]) }
+            }.toMap()
+            raw = params["device"] ?: return null
+            name = cleanName(params["name"])
+        }
+        val bare = raw.replace(Regex("[\\s-]+"), "").uppercase()
+        val id = if (bare.length == 56) bare.chunked(7).joinToString("-") else raw.uppercase()
+        return if (isDeviceId(id)) id to name else null
+    }
+
+    private val PAIR_LINK = Regex("^neo-quiz://pair\\?(.*)$", RegexOption.IGNORE_CASE)
+
+    private fun decodeParam(s: String): String = try { java.net.URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { "" }
+
     /** `\A`..`\z`-style match: Kotlin's `matches` is anchored at both ends, so a trailing newline fails. */
     fun isDeviceId(s: Any?): Boolean = s is String && ID_FORMAT.matches(s)
 
