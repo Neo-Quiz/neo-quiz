@@ -1666,3 +1666,77 @@
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 2px;
 }
+
+/* PHONE (2026-10-05, StudySmarter's Library): the two filters on one row,
+   "Generated quizzes" floating at the bottom left, "New folder" a round +
+   at the bottom right. The app's bottom bar is native, under the WebView:
+   `bottom` measures from just above it. */
+.qbd-quizzes-group-selects {
+	min-width: 0;
+}
+
+.qbd-quizzes-fab {
+	position: fixed;
+	bottom: 18px;
+	z-index: 30;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	height: 52px;
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+	border-radius: 999px;
+	font: inherit;
+	font-weight: 600;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	-webkit-tap-highlight-color: transparent;
+	transition: transform 140ms ease, filter 140ms ease;
+}
+
+.qbd-quizzes-fab:active {
+	transform: scale(0.96);
+}
+
+.qbd-quizzes-fab svg {
+	width: 22px;
+	height: 22px;
+}
+
+/* New folder: a round white + (the white "create" of the desktop). */
+.qbd-quizzes-fab--droite {
+	right: 18px;
+	width: 56px;
+	height: 56px;
+	padding: 0;
+	border-color: transparent;
+	background: #f4f5fb;
+	color: #1e1e2e;
+}
+
+.qbd-quizzes-fab--droite svg {
+	width: 26px;
+	height: 26px;
+}
+
+/* Generated quizzes: the app's accent, its count in a badge. */
+.qbd-quizzes-fab--gauche {
+	left: 18px;
+	padding: 0 18px 0 16px;
+	background: var(--interactive-accent);
+	color: #fff;
+}
+
+.qbd-quizzes-fab--gauche .qbd-select-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.qbd-quizzes-fab--gauche .qbd-quizzes-node-badge {
+	background: rgba(255, 255, 255, 0.22);
+	color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-quizzes-fab { transition: none; }
+}

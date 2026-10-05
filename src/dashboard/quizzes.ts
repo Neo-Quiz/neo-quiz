@@ -290,12 +290,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   top bar opens it, with the number of quizzes it holds (0 while empty or
 	   not created yet). Opening goes through `openModule`, like a card did, so
 	   the same sheet transition plays. Recognised by its PATH. */
-	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
+	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, flottant = false): void {
 		const sas = ctx.generatedFolder?.();
 		if (!sas) return;
 		const groupe = modulesAffiches(quizzes, stats, effectiveMap(), [], [], sas).find(m => estLeSas(m, sas));
 		if (!groupe) return;
-		const btn = ajouter(parent, "button", "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
+		/* On a phone it floats at the bottom left, where StudySmarter puts its
+		   blue button (2026-10-05): the top keeps one row of filters. */
+		const btn = ajouter(parent, "button", flottant
+			? "qbd-quizzes-fab qbd-quizzes-fab--gauche"
+			: "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
 		btn.type = "button";
 		const label = ajouter(btn, "span", "qbd-select-label");
 		currentHost().ui.setIcon(ajouter(label, "span", "qbd-quizzes-subject-icon"), "sparkles");
@@ -500,13 +504,27 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// The Generated folder's own entry, after the two selects: it left the
 			// grid (9f6b0356), and was unreachable from Folders while this call
 			// was missing (night QA, 2026-10-01).
-			renderGeneratedButton(selects, quizzes, stats);
+			/* ON A PHONE (2026-10-05, StudySmarter's Library): the top keeps ONE
+			   row, the two filters; "Generated quizzes" floats at the bottom
+			   left and "New folder" is a round + at the bottom right. */
+			const mobile = currentHost().platform.isMobile;
+			renderGeneratedButton(mobile ? container : selects, quizzes, stats, mobile);
+
+			if (ctx.createFolder && mobile) {
+				const fab = ajouter(container, "button", "qbd-quizzes-fab qbd-quizzes-fab--droite");
+				fab.type = "button";
+				fab.setAttribute("aria-label", t("dashboard.quizzes.new"));
+				currentHost().ui.setIcon(fab, "plus");
+				fab.addEventListener("click", () => {
+					ctx.createFolder!(effectiveMap(), quizzes, () => { if (containerRef) render(containerRef); });
+				});
+			}
 
 			// « Nouveau dossier » sur la MÊME ligne que le chip UE/Recent, calé à
 			// droite, même pilule que « Nouveau quiz » du drill (demande Ahmed
 			// 2026-07-20 — le header racine a disparu avec lui). Absent côté
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
-			if (ctx.createFolder) {
+			if (ctx.createFolder && !mobile) {
 				const newBtn = ajouter(groupWrap, "button", "qbd-btn--create");
 				const newIcon = ajouter(newBtn, "span", "qbd-btn-icon");
 				currentHost().ui.setIcon(newIcon, "plus");
