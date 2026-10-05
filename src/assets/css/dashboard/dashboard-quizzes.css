@@ -1752,23 +1752,24 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 }
 
 /* "Import" beside "New folder" (and beside "New quiz" in a folder): the
-   same 3D pill, a dark face framed in violet with a violet edge, after the
-   library's level row (`card/level-row--framed-3d-press`). */
+   same 3D pill, a dark face framed in white with a light edge, after the
+   library's level row (`card/level-row--framed-3d-press`). White rather
+   than violet or blue: it sits by any folder colour (2026-10-05). */
 .qbd-btn--create.qbd-btn--import,
 .qbd-quizzes-group .qbd-btn--create.qbd-btn--import {
-	--qbd-create-edge: #7a45e6;
+	--qbd-create-edge: #c9cee0;
 	background: #161622 !important;
-	color: #f2ecff !important;
-	border: 2px solid #7a45e6 !important;
+	color: #f4f5fb !important;
+	border: 2px solid #e7ebf7 !important;
 }
 
 .qbd-btn--create.qbd-btn--import:hover,
 .qbd-quizzes-group .qbd-btn--create.qbd-btn--import:hover {
-	background: #1f1a33 !important;
+	background: #20202e !important;
 }
 
 .qbd-btn--create.qbd-btn--import .qbd-btn-icon {
-	color: #b48cff;
+	color: #f4f5fb;
 }
 
 .qbd-quizzes-group .qbd-quizzes-import {
@@ -1779,20 +1780,6 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 .qbd-btn--import .qbd-btn-ext {
 	font-size: 11.5px;
 	font-weight: 500;
-	color: #b48cff;
+	color: #a6adc8;
 }
 
-/* In a folder, Import (a quiz) is framed in blue. */
-.qbd-btn--create.qbd-btn--import.qbd-btn--import-bleu {
-	--qbd-create-edge: #3d6df2;
-	border-color: #3d6df2 !important;
-}
-
-.qbd-btn--create.qbd-btn--import.qbd-btn--import-bleu:hover {
-	background: #18203a !important;
-}
-
-.qbd-btn--import.qbd-btn--import-bleu .qbd-btn-icon,
-.qbd-btn--import.qbd-btn--import-bleu .qbd-btn-ext {
-	color: #8fb0ff;
-}

@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Import is framed in white, beside New folder and in a folder alike.
+
 ## [1.20.31] - 2026-10-05
 
 ### Changed

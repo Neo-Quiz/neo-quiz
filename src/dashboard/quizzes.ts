@@ -434,10 +434,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				const dossier = cheminOuvert ?? openModuleFolder;
 				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
 				/* "Import" a quiz received, beside "New quiz" (2026-10-05): the
-				   same violet-framed pill as the folders' Import. */
-				/* In a folder it is framed in BLUE (2026-10-05): violet imports a
-				   folder, blue a quiz. */
-				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import qbd-btn--import-bleu");
+				   same white-framed pill as the folders' Import. */
+				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import");
 				importer.type = "button";
 				currentHost().ui.setIcon(ajouter(importer, "span", "qbd-btn-icon"), "download");
 				ajouter(importer, "span", undefined, t("dashboard.quizzes.import"));
@@ -550,7 +548,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
 			/* "Import" beside "New folder" (2026-10-05): what was received has
 			   its own button, the modal only creates. The same 3D pill as "New
-			   folder", a dark face framed in violet (the library's level row,
+			   folder", a dark face framed in white (after the library's level row,
 			   `card/level-row--framed-3d-press`): a page action, never a modal one. */
 			if (ctx.createFolder && !mobile) {
 				const importBtn = ajouter(groupWrap, "button", "qbd-btn--create qbd-btn--import qbd-quizzes-import");
