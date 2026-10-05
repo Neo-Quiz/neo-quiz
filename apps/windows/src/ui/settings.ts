@@ -376,7 +376,11 @@ export function renderSettings(
 	const aiPage = pages.get("ai") ?? document.createElement("div");
 	/* "Update available" for Claude Code and Codex, always shown here while it
 	   applies (the Generate page lets it be hidden). */
-	const demonterMaj = mobile ? () => {} : monterBandeauMaj(aiPage, () => undefined, { fermable: false });
+	const demonterMaj = mobile ? () => {} : monterBandeauMaj(aiPage, () => undefined, {
+		fermable: false,
+		/* Through the bridge: `navigator.clipboard` is refused in the app window. */
+		copyText: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
+	});
 	const demonterComptes = mobile ? () => {} : monterReglagesComptes(section(aiPage, t("app.settings.accounts")));
 
 	/* Paid assistants: one switch per channel that needs a subscription

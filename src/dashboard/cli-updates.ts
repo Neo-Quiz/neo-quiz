@@ -130,7 +130,7 @@ function ignorer(m: MajCli): void {
  * CLI (logo, "Codex 0.159.0 → 0.160.0", Update) and a close button. Empty otherwise. `apres` runs after a successful update
  * (the page re-reads its providers and models). Returns the unmount.
  */
-export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: { fermable?: boolean } = {}): () => void {
+export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: { fermable?: boolean; copyText?(texte: string): Promise<boolean> } = {}): () => void {
 	const fermable = opts.fermable !== false;
 	let demonte = false;
 	const zone = ajouter(parent, "div", "qbd-cli-maj");
@@ -183,7 +183,45 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 						ajouter(erreur, "p", "qbd-cli-maj-erreur-titre", t("ai.update.failed", { name: NOMS[m.outil] }));
 						if (res.raison) ajouter(erreur, "p", "qbd-cli-maj-erreur-raison", res.raison);
 						ajouter(erreur, "p", "qbd-cli-maj-erreur-aide", t("ai.update.manual"));
-						ajouter(erreur, "code", "qbd-cli-maj-erreur-cmd", `npm install -g ${PAQUETS[m.outil]}@latest`);
+						/* The command with a Copy button, and "Open a terminal" (the
+						   same EMPTY window as the install dialog: the app runs
+						   nothing, the owner pastes). 2026-10-05. */
+						const commande = `npm install -g ${PAQUETS[m.outil]}@latest`;
+						const ligneCmd = ajouter(erreur, "div", "qbd-cli-maj-erreur-ligne");
+						ajouter(ligneCmd, "code", "qbd-cli-maj-erreur-cmd", commande);
+						const copier = ajouter(ligneCmd, "button", "qbd-cli-maj-erreur-btn");
+						copier.type = "button";
+						const copierIcone = ajouter(copier, "span", "qbd-cli-maj-bouton-icone");
+						currentHost().ui.setIcon(copierIcone, "copy");
+						const copierLbl = ajouter(copier, "span", undefined, t("ai.install.copy"));
+						copier.addEventListener("click", async () => {
+							const ok = opts.copyText
+								? await opts.copyText(commande)
+								: await navigator.clipboard.writeText(commande).then(() => true, () => false);
+							if (!ok) return;
+							copierIcone.replaceChildren();
+							currentHost().ui.setIcon(copierIcone, "check");
+							copierLbl.textContent = t("ai.install.copied");
+							window.setTimeout(() => {
+								copierIcone.replaceChildren();
+								currentHost().ui.setIcon(copierIcone, "copy");
+								copierLbl.textContent = t("ai.install.copy");
+							}, 1500);
+						});
+						const proc = currentHost().process;
+						if (proc && currentHost().platform.isWindows) {
+							const terminal = ajouter(ligneCmd, "button", "qbd-cli-maj-erreur-btn");
+							terminal.type = "button";
+							currentHost().ui.setIcon(ajouter(terminal, "span", "qbd-cli-maj-bouton-icone"), "terminal");
+							ajouter(terminal, "span", undefined, t("ai.install.openTerminal"));
+							terminal.addEventListener("click", async () => {
+								terminal.disabled = true;
+								let verdict: "lance" | "indisponible" = "indisponible";
+								try { verdict = await proc.openTerminal(); } catch { /* reported below */ }
+								terminal.disabled = false;
+								if (verdict !== "lance") currentHost().ui.notice(t("ai.install.terminalFailed"));
+							});
+						}
 						const lien = ajouter(erreur, "a", "qbd-cli-maj-erreur-lien", t("ai.update.packagePage"));
 						const url = `https://www.npmjs.com/package/${PAQUETS[m.outil]}`;
 						lien.href = url;

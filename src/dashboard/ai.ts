@@ -2233,7 +2233,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 
 		/* "Update available" for Claude Code and Codex (`cli-updates.ts`):
 		   after an update, the providers and their models are read again. */
-		if (provider) monterBandeauMaj(formCol, () => refreshProviderStatuses({ providerSelect, hintZone, provider, currentModel, modelSelect, ollamaCtl, buildOllamaList, force: true }));
+		if (provider) monterBandeauMaj(formCol, () => refreshProviderStatuses({ providerSelect, hintZone, provider, currentModel, modelSelect, ollamaCtl, buildOllamaList, force: true }), { copyText: deps.copyText });
 
 		/* Hors conversation (un site ou une connexion tient la page), les tours
 		   de la file restent sous le composer ; la page d'un quiz ouvert
