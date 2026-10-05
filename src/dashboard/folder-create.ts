@@ -61,14 +61,9 @@ export function openCreateFolderModal(
 			   first, its quizzes are generated from inside it. */
 			createOptionCard(m, c, "folder-plus", "#4573ff", t("dashboard.quizzes.createEmptyTitle"), t("dashboard.quizzes.createEmptyDesc"),
 				() => openNewFolderModal(ctx, map, quizzes, onDone));
-			/* MASQUÉE sous le greffon, comme la carte IA et pour une raison du
-			   même ordre : sous Obsidian, le vault EST le dossier ouvert, il n'y
-			   a aucun dossier à désigner. Les deux premières CRÉENT, celle-ci
-			   RATTACHE de l'existant, la dernière IMPORTE du reçu. */
-			if (ctx.openExistingFolder) {
-				createOptionCard(m, c, "folder-open", "#f5a524", t("dashboard.quizzes.createOpenTitle"), t("dashboard.quizzes.createOpenDesc"),
-					() => ctx.openExistingFolder!(onDone));
-			}
+			/* No "Open an existing folder" any more (2026-10-05): every quiz
+			   folder lives in the one Neo Quiz folder, the Obsidian plugin it
+			   was meant for is gone. Create, or import what was received. */
 			createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
 				() => void importSharedFolder(ctx, map, quizzes, onDone));
 		},

@@ -56,7 +56,7 @@ import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
-import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
+import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, renommerExamens, retirerExamen as retirerExamenReglage } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
@@ -427,7 +427,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
 		createFolder: (map, quizzes, done) => openCreateFolderModal(ctx, map, quizzes, done),
-		openExistingFolder: (done) => { void ouvrirDossierExistant(done); },
 		/* Le SAS des quiz générés : le MÊME calcul que `saveGeneratedQuiz`
 		   (ai.ts, `defaultDestination`) — racine par défaut + `aiOutputFolder`.
 		   Lu à chaque appel : le réglage peut changer sans remonter la coquille. */
@@ -688,48 +687,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		return [...vus.entries()].map(([path, name]) => decrire(path, name)).sort((a, b) => a.name.localeCompare(b.name));
 	}
 
-	/**
-	 * « Ouvrir un dossier existant » : le sélecteur natif, puis la DÉCLARATION
-	 * du dossier choisi.
-	 *
-	 * Ce n'est PAS `addFolder` (qui ouvre une RACINE), et la distinction est
-	 * tout l'intérêt : le dossier visé est presque toujours dans une racine
-	 * déjà ouverte — un dossier de cours dans un vault. L'ajouter comme
-	 * seconde racine donnerait deux chemins du contrat pour les mêmes fichiers,
-	 * donc deux historiques de révision pour les mêmes questions. Ici on ne
-	 * déclare qu'un DOSSIER DE QUIZ : une entrée dans les overrides, avec son
-	 * chemin, que « Nouveau quiz » et la page « Générer » savent viser.
-	 */
-	async function ouvrirDossierExistant(done: () => void): Promise<void> {
-		const choisi = await pickFolder();
-		// Annulation : ce n'est pas une erreur, c'est la réponse « non ».
-		if (!choisi) return;
-		const contrat = deps.cheminDuContrat(choisi);
-		if (!contrat) {
-			/* Hors racines : deux causes, deux messages. Un dossier qui CONTIENT
-			   une racine ouverte mérite le sien — répondre « il est dehors »
-			   quand on vient de désigner le parent de son vault ne dit pas quoi
-			   faire. Dans les deux cas on refuse : l'ouvrir ferait la racine
-			   gigogne que `depuisAbsolu` existe pour empêcher. */
-			const racines = await savedFolders();
-			const prefixe = choisi.toLowerCase() + "/";
-			const contient = racines.some(r => r.path.toLowerCase().startsWith(prefixe));
-			currentHost().ui.notice(t(contient
-				? "dashboard.quizzes.createOpenContains"
-				: "dashboard.quizzes.createOpenOutside"));
-			return;
-		}
-		/* La CLÉ reste un segment (c'est ce que lisent `moduleForQuiz` et les
-		   overrides), le CHEMIN est ce qui rend le dossier écrivable. Un nom
-		   déjà déclaré n'est pas écrasé : on ne fait que lui donner son chemin. */
-		const cle = contrat.split("/").pop() as string;
-		const overrides: Record<string, ModuleOverride> = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-		overrides[cle] = { ...(overrides[cle] || {}), name: overrides[cle]?.name || cle, path: contrat };
-		ctx.settings.quizzesModuleOverrides = overrides;
-		await ctx.saveSettings();
-		currentHost().ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }));
-		done();
-	}
 
 	/** Demande « ouvrir en édition » posée par `naviguer("detail", { edit })`
 	    et consommée par le prochain `peindre()` — une seule fois, le mode

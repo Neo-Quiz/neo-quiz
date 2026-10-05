@@ -328,13 +328,6 @@ export interface DashboardShellCtx {
 	    que `openCreateFolderModal` (l'import d'un .zip partagé cherche le parent
 	    commun des modules déjà résolus — folder-create.ts). */
 	createFolder?: (map: ModuleMap, quizzes: QuizIndexEntry[], done: () => void) => void;
-	/** DÉSIGNE un dossier qui existe déjà et le déclare comme dossier de quiz
-	    (carte « Ouvrir un dossier existant » du modal de création). Absent = la
-	    carte n'est pas rendue, et c'est le cas du GREFFON pour une raison de
-	    fond : sous Obsidian le vault EST le dossier, il n'y a rien à désigner.
-	    L'hôte ouvre son sélecteur natif, traduit le chemin absolu en chemin du
-	    contrat, et écrit l'override — lui seul connaît ses racines. */
-	openExistingFolder?: (done: () => void) => void;
 	/** Le chemin du CONTRAT du dossier où atterrissent les quiz générés
 	    (`<racine par défaut>/<aiOutputFolder>`). Ce dossier est un SAS, pas
 	    une matière : sa carte porte l'icône de l'IA et ni lui ni sa page
