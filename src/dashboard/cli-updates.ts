@@ -186,7 +186,12 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 						/* The command with a Copy button, and "Open a terminal" (the
 						   same EMPTY window as the install dialog: the app runs
 						   nothing, the owner pastes). 2026-10-05. */
-						const commande = `npm install -g ${PAQUETS[m.outil]}@latest`;
+						/* `npm.cmd` on Windows: plain `npm` there is `npm.ps1`, which
+						   PowerShell refuses under the default execution policy
+						   ("scripts are disabled on this system"); the .cmd is not
+						   a script it blocks. */
+						const npm = currentHost().platform.isWindows ? "npm.cmd" : "npm";
+						const commande = `${npm} install -g ${PAQUETS[m.outil]}@latest`;
 						const ligneCmd = ajouter(erreur, "div", "qbd-cli-maj-erreur-ligne");
 						ajouter(ligneCmd, "code", "qbd-cli-maj-erreur-cmd", commande);
 						const copier = ajouter(ligneCmd, "button", "qbd-cli-maj-erreur-btn");
