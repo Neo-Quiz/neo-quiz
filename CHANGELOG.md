@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.32] - 2026-10-05
+
 ### Changed
 - Import is a violet button beside New folder; a quiz is imported from New quiz in its folder.
 - In a folder, the Content, Progress and Review plan tabs sit beside the back arrow, wider.
