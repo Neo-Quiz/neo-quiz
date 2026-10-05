@@ -248,5 +248,21 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 	}
 
 	void majsDisponibles().then(peindre).catch(() => undefined);
-	return () => { demonte = true; zone.remove(); };
+	/* Updated BY HAND in a terminal (the failure block's command): when the
+	   window gets the focus back, the installed versions are asked again and
+	   the panel follows on its own, the new models with it (2026-10-05). */
+	const reverifier = (): void => {
+		if (demonte || !zone.querySelector(".qbd-cli-maj-erreur")) return;
+		void Promise.all([checkClaudeCode(true), checkCodex(true)])
+			.then(() => refreshCliCaches().catch(() => false))
+			.then(() => majsDisponibles())
+			.then(majs => {
+				if (demonte) return;
+				peindre(majs);
+				apres();
+			})
+			.catch(() => undefined);
+	};
+	window.addEventListener("focus", reverifier);
+	return () => { demonte = true; window.removeEventListener("focus", reverifier); zone.remove(); };
 }
