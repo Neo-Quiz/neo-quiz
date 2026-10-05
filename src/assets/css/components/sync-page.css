@@ -214,25 +214,70 @@
 	color: var(--text-muted);
 }
 
-/* Adding a device: inside the devices section, under the list it extends. */
-.qbd-sync-ajout {
+/* Under the list, Syncthing's row of three: left-aligned, wrapping, the
+   same rounded shape (`fx-buttons.css`), smaller than the library's
+   default. */
+.qbd-sync-actions {
 	display: flex;
-	flex-direction: column;
+	flex-wrap: wrap;
+	align-items: center;
 	gap: 8px;
+	margin-top: 10px;
 }
 
-/* A secondary, text-sized action: the list is the content, not the button. */
-.qbd-sync .qbd-sync-ajout > .qbd-sync-bouton-ajout {
-	align-self: flex-start;
+.qbd-sync-actions > .fx-btn-primary,
+.qbd-sync-actions > .fx-btn-ghost {
+	--fx-radius: 999px;
+	--fx-pad-y: 7px;
+	--fx-pad-x: 14px;
+	--fx-fs: 13px;
+	--fx-gap: 6px;
+	font-weight: 600;
+}
+
+.qbd-sync-actions > .fx-btn-primary {
+	--fx-accent-light: color-mix(in srgb, var(--interactive-accent) 70%, white);
+	--fx-accent: var(--interactive-accent);
+	--fx-accent-mid: color-mix(in srgb, var(--interactive-accent) 85%, #4a3df0);
+	--fx-accent-dark: color-mix(in srgb, var(--interactive-accent) 65%, #3b2fd0);
+}
+
+.qbd-sync-actions > .fx-btn-ghost {
+	--fx-text: var(--text-normal);
+}
+
+.qbd-sync-actions > [hidden] {
+	display: none;
+}
+
+.qbd-sync-actions-icone {
+	display: inline-flex;
+}
+
+.qbd-sync-actions-icone svg {
+	width: 15px;
+	height: 15px;
+}
+
+/* The device's icon at the start of its row, bare (no tile inside the
+   card); the colour of its status line: green while connected, muted
+   otherwise. */
+.qbd-sync-appareil-icone {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex: none;
-	padding: 4px 8px;
-	border-color: transparent;
-	color: var(--text-accent);
+	width: 24px;
+	color: var(--text-muted);
 }
 
-.qbd-sync .qbd-sync-ajout > .qbd-sync-bouton-ajout:hover:not(:disabled) {
-	border-color: transparent;
-	background: var(--background-modifier-hover);
+.qbd-sync-appareil-icone svg {
+	width: 22px;
+	height: 22px;
+}
+
+.qbd-sync-appareil-icone.is-connecte {
+	color: var(--text-success);
 }
 
 .qbd-sync-champ {
@@ -993,4 +1038,21 @@
 	justify-content: center;
 	flex-wrap: wrap;
 	gap: 8px;
+}
+
+/* "My devices": a plain background, no border (2026-10-05), one row per
+   device. No hover light: a row opens nothing, and a light would promise a
+   click (only its rename and remove buttons act). */
+.qbd-sync-liste {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px;
+	border-radius: var(--radius-l);
+	background: var(--background-secondary);
+}
+
+.qbd-sync-liste > .qbd-sync-ligne {
+	padding: 8px 12px;
+	border-radius: var(--radius-m, 8px);
 }

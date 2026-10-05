@@ -1,0 +1,130 @@
+/* Two buttons of the private ui-effects library, copied unchanged:
+   `fx-btn-primary` (blue-violet gradient, lifts and glows on hover, from
+   sas.meydeey.com) and `fx-btn-ghost` (transparent, its border brightens).
+   Tuned for the app in `sync-page.css` (`.qbd-sync-actions`). */
+
+/* fx-btn-primary : bouton dégradé bleu-violet lumineux. Survol : levée 2px, dégradé
+   plus clair, lueur élargie. Etats : focus, disabled, .is-loading. Origine : sas.meydeey.com (2026-09-24). */
+.fx-btn-primary {
+  --fx-accent-light: #8b9cff;
+  --fx-accent: #7084ff;
+  --fx-accent-mid: #5a6bf0;
+  --fx-accent-dark: #4a56d4;
+  --fx-on-accent: #ffffff;
+  --fx-radius: 0px;
+  --fx-pad-y: clamp(.625rem, .52rem + .45vw, .8125rem);
+  --fx-pad-x: clamp(1.125rem, .84rem + 1.25vw, 1.625rem);
+  --fx-fs: clamp(.875rem, .84rem + .15vw, .95rem);
+  --fx-gap: clamp(.375rem, .32rem + .24vw, .5rem);
+  --fx-lift: 2px;
+  --fx-dur: .2s;
+  --fx-ease: cubic-bezier(.25, .46, .45, .94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fx-gap);
+  box-sizing: border-box;
+  position: relative;
+  padding: var(--fx-pad-y) var(--fx-pad-x);
+  background: linear-gradient(135deg, var(--fx-accent) 0%, var(--fx-accent-mid) 50%, var(--fx-accent-dark) 100%);
+  color: var(--fx-on-accent);
+  font: inherit;
+  font-size: var(--fx-fs);
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--fx-accent-light) 30%, transparent);
+  border-radius: var(--fx-radius);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--fx-accent) 20%, transparent), inset 0 1px rgba(255, 255, 255, .1);
+  cursor: pointer;
+  transition: transform var(--fx-dur) var(--fx-ease), box-shadow var(--fx-dur) var(--fx-ease),
+    border-color var(--fx-dur) var(--fx-ease);
+}
+.fx-btn-primary:hover {
+  background: linear-gradient(135deg, var(--fx-accent-light) 0%, var(--fx-accent) 50%, var(--fx-accent-mid) 100%);
+  border-color: color-mix(in srgb, var(--fx-accent-light) 50%, transparent);
+  transform: translateY(calc(var(--fx-lift) * -1));
+  box-shadow: 0 0 30px color-mix(in srgb, var(--fx-accent) 30%, transparent),
+    0 0 60px color-mix(in srgb, var(--fx-accent) 10%, transparent), inset 0 1px rgba(255, 255, 255, .15);
+}
+.fx-btn-primary:focus-visible { outline: 2px solid var(--fx-accent-light); outline-offset: 2px; }
+.fx-btn-primary:disabled,
+.fx-btn-primary[aria-disabled="true"] { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.fx-btn-primary.is-loading,
+.fx-btn-primary.is-loading:hover { color: transparent; transform: none; pointer-events: none; }
+.fx-btn-primary.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -.5rem 0 0 -.5rem;
+  border: 2px solid var(--fx-on-accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: fx-btn-primary-spin .6s linear infinite;
+}
+@keyframes fx-btn-primary-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .fx-btn-primary { transition-duration: 1ms; }
+  .fx-btn-primary:hover { transform: none; }
+  .fx-btn-primary.is-loading::after { animation-duration: 1.5s; }
+}
+
+/* fx-btn-ghost : bouton neutre transparent à contour discret ; le contour s'éclaire
+   et un voile léger apparaît au survol. Origine : sas.meydeey.com (2026-09-24). */
+.fx-btn-ghost {
+  --fx-accent: #7084ff;
+  --fx-text: #f4f5fb;
+  --fx-radius: 0px;
+  --fx-pad-y: clamp(.625rem, .52rem + .45vw, .8125rem);
+  --fx-pad-x: clamp(1.125rem, .84rem + 1.25vw, 1.625rem);
+  --fx-fs: clamp(.875rem, .84rem + .15vw, .95rem);
+  --fx-gap: clamp(.375rem, .32rem + .24vw, .5rem);
+  --fx-dur: .15s;
+  --fx-ease: cubic-bezier(.25, .46, .45, .94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fx-gap);
+  box-sizing: border-box;
+  position: relative;
+  padding: var(--fx-pad-y) var(--fx-pad-x);
+  background: transparent;
+  color: var(--fx-text);
+  font: inherit;
+  font-size: var(--fx-fs);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--fx-accent) 12%, transparent);
+  border-radius: var(--fx-radius);
+  cursor: pointer;
+  transition: background var(--fx-dur) var(--fx-ease), border-color var(--fx-dur) var(--fx-ease);
+}
+.fx-btn-ghost:hover {
+  background: color-mix(in srgb, var(--fx-accent) 4%, transparent);
+  border-color: color-mix(in srgb, var(--fx-accent) 25%, transparent);
+}
+.fx-btn-ghost:focus-visible { outline: 2px solid var(--fx-accent); outline-offset: 2px; }
+.fx-btn-ghost:disabled,
+.fx-btn-ghost[aria-disabled="true"] { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.fx-btn-ghost.is-loading { color: transparent; pointer-events: none; }
+.fx-btn-ghost.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -.5rem 0 0 -.5rem;
+  border: 2px solid var(--fx-text);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: fx-btn-ghost-spin .6s linear infinite;
+}
+@keyframes fx-btn-ghost-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .fx-btn-ghost { transition-duration: 1ms; }
+  .fx-btn-ghost.is-loading::after { animation-duration: 1.5s; }
+}

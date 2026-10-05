@@ -108,6 +108,17 @@ export function normaliserCode(brut: string): string {
 	return nu.length === 56 ? (nu.match(/.{7}/g) ?? []).join("-") : brut.trim().toUpperCase();
 }
 
+/** The icon of a paired device, guessed from its name: Syncthing tells
+    nothing of the other side's platform. Windows names a PC `DESKTOP-…` or
+    `LAPTOP-…` by default, and the Android app announces the phone's model
+    (`Xiaomi 13T Pro`); anything else gets the neutral device pair. */
+export function iconeAppareil(nom: string): string {
+	if (/^laptop-/i.test(nom)) return "laptop";
+	if (/^(desktop|pc|win)-/i.test(nom) || /\b(pc|desktop|windows)\b/i.test(nom)) return "monitor";
+	if (/\b(xiaomi|redmi|poco|samsung|galaxy|pixel|oneplus|iphone|huawei|honor|oppo|vivo|motorola|moto|nothing|realme|sony|xperia|nokia|asus|zenfone|fairphone|phone|android)\b/i.test(nom)) return "smartphone";
+	return "monitor-smartphone";
+}
+
 export type TonStatut = "ok" | "neutre" | "erreur";
 
 /** The one line that says how sync is doing. Order matters: a failure beats a
@@ -296,20 +307,33 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	/* ── Paired devices ── */
 	const appareilsSection = ajouter(racine, "section", "qbd-sync-section");
 	titre(appareilsSection, t("settings.sync.devices"));
-	const appareilsCarte = ajouter(appareilsSection, "div", "qbd-sync-carte");
+	/* A FREE list, not a card (2026-10-05): one row per device, no frame. */
+	const appareilsCarte = ajouter(appareilsSection, "div", "qbd-sync-liste");
 
-	/* ── Adding a device lives in the devices section, under the list it extends ── */
-	const ajout = ajouter(appareilsSection, "div", "qbd-sync-ajout");
-	const ajouterBouton = bouton(ajout, "plus", t("settings.sync.addButton"), "qbd-sync-bouton qbd-sync-bouton-ajout");
+	/* ── Under the list, Syncthing's row of three (2026-10-05): switch sync
+	   off or on, Recent changes, Add a device, left-aligned, the same rounded
+	   shape; Add is the one blue button, and comes first. ── */
+	const actionsLigne = ajouter(appareilsSection, "div", "qbd-sync-actions");
+	const boutonFx = (nomIcone: string, texte: string, classe: string): { btn: HTMLButtonElement; lbl: HTMLElement } => {
+		const btn = ajouter(actionsLigne, "button", classe);
+		btn.type = "button";
+		icone(btn, nomIcone, "qbd-sync-actions-icone");
+		return { btn, lbl: ajouter(btn, "span", undefined, texte) };
+	};
+	/* The order (2026-10-05): Add first, the main action of a list, always
+	   in the same place; Recent changes, shown only when there are some, in
+	   the middle; Pause last, the one that changes how sync runs. */
+	const { btn: ajouterBouton } = boutonFx("plus", t("settings.sync.addButton"), "fx-btn-primary");
 	ajouterBouton.setAttribute("aria-haspopup", "dialog");
-
-	/* ── Recent changes: ONE full-width button (like Syncthing's "Recent
-	   Changes"), which opens a dialog: today by default, the older ones
-	   behind a link ── */
-	const changementsSection = ajouter(racine, "section", "qbd-sync-section");
-	changementsSection.hidden = true;
-	const changementsBtn = bouton(changementsSection, "info", t("settings.sync.changes"), "qbd-sync-bouton qbd-sync-bouton-large");
+	/* Recent changes opens a dialog: today by default, the older ones behind a link. */
+	const { btn: changementsBtn } = boutonFx("info", t("settings.sync.changes"), "fx-btn-ghost");
 	changementsBtn.setAttribute("aria-haspopup", "dialog");
+	const changementsSection = changementsBtn;
+	changementsSection.hidden = true;
+	/* "Pause" rather than "Disable" (2026-10-05): a frequent, harmless action;
+	   the engine stops and stays stopped until Resume, as before. */
+	const { btn: basculeBtn, lbl: basculeLbl } = boutonFx("pause", t("settings.sync.disable"), "fx-btn-ghost");
+	const basculeIcone = basculeBtn.querySelector<HTMLElement>(".qbd-sync-actions-icone");
 	/** The open dialog's list, repainted on each state and every 5 s. */
 	let dialogueChangements: { carte: HTMLElement; plusAnciens: HTMLButtonElement; fermer(): void } | null = null;
 	let voirAnciens = false;
@@ -318,8 +342,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	let dialogueJournal: { fermer(): void } | null = null;
 	let retourCopieJournal: ReturnType<typeof setTimeout> | null = null;
 
-	/* ── Two rows at the bottom (Neo Calendar's page, 2026-10-04): switching
-	   sync off or on, and the log of the embedded Syncthing ── */
+	/* ── Two rows at the bottom (Neo Calendar's page, 2026-10-04): the data
+	   folder and the log of the embedded Syncthing (switching sync off moved
+	   up into the row of three, 2026-10-05) ── */
 	const bas = ajouter(racine, "section", "qbd-sync-section");
 	const basCarte = ajouter(bas, "div", "qbd-sync-carte");
 	/* The data folder first (Neo Calendar's "Data folder"): fixed, shown with
@@ -344,10 +369,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}).catch(() => undefined);
 		dossierLigne.addEventListener("click", () => ouvrirDossier?.());
 	}
-	const basculeBtn = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
-	basculeBtn.type = "button";
-	icone(basculeBtn, "power", "qbd-sync-ligne-icone");
-	const basculeLbl = ajouter(basculeBtn, "span", "qbd-sync-ligne-libelle", t("settings.sync.disable"));
 	const journalBtn = ajouter(basCarte, "button", "qbd-sync-ligne qbd-sync-ligne-action");
 	journalBtn.type = "button";
 	icone(journalBtn, "file-text", "qbd-sync-ligne-icone");
@@ -689,6 +710,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		}
 		for (const a of e.appareils) {
 			const l = ajouter(appareilsCarte, "div", "qbd-sync-ligne");
+			const iconeL = ajouter(l, "span", "qbd-sync-appareil-icone");
+			currentHost().ui.setIcon(iconeL, iconeAppareil(a.nom));
 			const texte = ajouter(l, "div", "qbd-sync-id-bloc");
 			ajouter(texte, "span", "qbd-sync-nom", a.nom);
 			/* A request this device sent: still shown on the other side, or
@@ -703,6 +726,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				: connecte ? t("settings.sync.connected")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
 			ajouter(texte, "span", connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
+			iconeL.classList.toggle("is-connecte", connecte);
 			/* Two plain actions, no menu (2026-10-04): rename what THIS device
 			   shows for it, and remove it (red bin). */
 			const actions = ajouter(l, "div", "qbd-sync-appareil-actions");
@@ -887,6 +911,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	   while an engine is running. */
 	function peindreBas(e: EtatSync): void {
 		basculeLbl.textContent = t(e.actif ? "settings.sync.disable" : "settings.sync.enable");
+		if (basculeIcone) { basculeIcone.replaceChildren(); currentHost().ui.setIcon(basculeIcone, e.actif ? "pause" : "play"); }
 		journalBtn.disabled = !e.actif;
 		if (!e.actif) dialogueJournal?.fermer();
 	}
