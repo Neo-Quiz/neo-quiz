@@ -379,7 +379,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			/* Retour AU-DESSUS du titre (2026-09-25) : à sa gauche, la flèche
 			   décalait le titre et se lisait mal. Un seul bouton retour dans
 			   tout le dashboard. */
-			const back = ajouter(headerParent, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
+			/* The back arrow and, on its right, the Content | Progress | Review
+			   plan tabs, wider (2026-10-05): the title row keeps the name and
+			   the actions. */
+			const ligneHaut = ajouter(headerParent, "div", "qbd-quizzes-toprow");
+			const back = ajouter(ligneHaut, "button", "qbd-quizzes-crumb-back qbd-quizzes-header-back");
 			const header = ajouter(headerParent, "div", "qbd-quizzes-header");
 			back.type = "button";
 			back.setAttribute("aria-label", t("dashboard.quizzes.backToModules"));
@@ -412,7 +416,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// Progression, et « Ajouter du contenu » est à côté de l'étape
 			// suivante, au-dessus de la grille (quizzes-render.ts).
 			if (!sas) {
-				renderOngletsDossier(header, ongletDossier, (onglet) => {
+				renderOngletsDossier(ligneHaut, ongletDossier, (onglet) => {
 					ongletDossier = onglet;
 					if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
 				});

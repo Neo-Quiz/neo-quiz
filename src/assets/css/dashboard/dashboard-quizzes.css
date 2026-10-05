@@ -1777,3 +1777,29 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	color: rgba(255, 255, 255, 0.75);
 }
 
+
+/* In a folder: the back arrow, then the view tabs on its right, taking the
+   room (2026-10-05); each tab gets an equal share. */
+.qbd-quizzes-toprow {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 10px;
+}
+
+.qbd-root .qbd-quizzes-toprow .qbd-quizzes-header-back {
+	margin: 0 0 0 7px;
+	flex: none;
+}
+
+.qbd-quizzes-toprow .qbd-folder-view-tabs {
+	flex: 1 1 auto;
+	max-width: 620px;
+	margin-left: 0;
+}
+
+.qbd-root .qbd-quizzes-toprow .qbd-folder-view-tab {
+	flex: 1 1 0;
+	padding: 9px 20px;
+	font-size: 14px;
+}
