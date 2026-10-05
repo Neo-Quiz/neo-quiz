@@ -399,11 +399,17 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		   accepted us (a request we sent is answered), "notSharing" kept up
 		   means it removed us. */
 		const etatsDistants: Record<string, string> = {};
+		/* The same call says how much of the folder each one has: the page
+		   shows "Up to date" or "Syncing N %" per device (2026-10-05). */
+		const progressions: Record<string, number> = {};
 		for (const d of visibles) {
 			if (connexions.connections?.[d.deviceID]?.connected !== true) continue;
 			try {
 				const c = await rest.completion(FOLDER_ID, d.deviceID);
 				if (typeof c.remoteState === "string") etatsDistants[d.deviceID] = c.remoteState;
+				if (typeof c.completion === "number" && Number.isFinite(c.completion)) {
+					progressions[d.deviceID] = Math.floor(Math.min(100, Math.max(0, c.completion)));
+				}
 			} catch { /* unknown this time */ }
 		}
 		for (const [id, etat] of Object.entries(etatsDistants)) if (etat === "valid") envois.delete(id);
@@ -424,6 +430,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 					nom: d.name || d.deviceID.slice(0, 7),
 					connecte: connexions.connections?.[d.deviceID]?.connected === true,
 					vuLe: dernierVu(vus[d.deviceID]?.lastSeen),
+					...(progressions[d.deviceID] !== undefined ? { progression: progressions[d.deviceID] } : {}),
 					...(demande ? { demande } : {}),
 				};
 			}),

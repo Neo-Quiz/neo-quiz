@@ -263,7 +263,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	statut.setAttribute("aria-live", "polite");
 	ajouter(statut, "span", "qbd-sync-point").setAttribute("aria-hidden", "true");
 	const statutTexte = ajouter(statut, "span", undefined, t("settings.sync.starting"));
-	ajouter(entete, "p", "qbd-sync-aide", t("settings.sync.hint"));
+	/* No status line and no explanation while all is well (2026-10-05): each
+	   device says its own state, as in Syncthing. The line only shows what
+	   needs a look: starting, paused, an error. */
 
 	/* ── This device: ONE big button; the ID, its QR and sharing live in its dialog ── */
 	const moi = ajouter(racine, "section", "qbd-sync-section");
@@ -723,7 +725,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			const connecte = a.connecte && !a.demande;
 			const sous = a.demande === "envoyee" ? t("settings.sync.waitingAccept")
 				: a.demande === "expiree" ? t("settings.sync.requestExpired")
-				: connecte ? t("settings.sync.connected")
+				: connecte ? (a.progression !== undefined && a.progression < 100 ? t("settings.sync.deviceSyncing", { pct: a.progression }) : t("settings.sync.deviceUpToDate"))
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
 			ajouter(texte, "span", connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
 			iconeL.classList.toggle("is-connecte", connecte);
@@ -933,6 +935,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		const s = statutGlobal(e);
 		statutTexte.textContent = s.texte;
 		statut.dataset.ton = s.ton;
+		entete.hidden = s.ton === "ok";
 		/* Sync could not start: nothing to show. While it starts, the
 		   button stays usable (see above). */
 		afficherIdBtn.disabled = !e.actif;

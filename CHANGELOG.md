@@ -17,6 +17,7 @@ release notes.
 - My devices: an icon per device in the colour of its status, a plain list without border.
 - Add a device, Recent changes and Pause sync sit in one row under the list.
 - "Disable synchronization" becomes "Pause sync" and "Resume sync".
+- Each device says "Up to date" or "Syncing, N %"; the status line on top only shows when something needs a look.
 
 ## [1.20.28] - 2026-10-05
 

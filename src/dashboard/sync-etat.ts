@@ -13,7 +13,9 @@ export interface EtatSync {
 	    they were last seen (milliseconds, `null` = never). */
 	/** `demande`: a request THIS device sent, still shown on the other side
 	    ("envoyee") or expired ("expiree": it can be sent again). */
-	appareils: Array<{ id: string; nom: string; connecte: boolean; vuLe: number | null; demande?: "envoyee" | "expiree" }>;
+	/** `progression`: how much of the folder this connected device has, 0 to
+	    100 (Syncthing's completion), absent when unknown. */
+	appareils: Array<{ id: string; nom: string; connecte: boolean; vuLe: number | null; demande?: "envoyee" | "expiree"; progression?: number }>;
 	/** Devices that added THIS one and are waiting to be accepted. Names are the
 	    remote's, at most 64 characters: render as text only. */
 	demandes: Array<{ id: string; nom: string }>;

@@ -70,6 +70,8 @@ export const EN_SETTINGS = {
 	"settings.sync.devices": "My devices",
 	"settings.sync.noDevices": "No device added yet.",
 	"settings.sync.connected": "Connected",
+	"settings.sync.deviceUpToDate": "Up to date",
+	"settings.sync.deviceSyncing": "Syncing, {pct} %",
 	"settings.sync.offline": "Disconnected",
 	"settings.sync.offlineSeen": "Disconnected, seen {when}",
 	"settings.sync.waitingAccept": "Sharing request sent",
