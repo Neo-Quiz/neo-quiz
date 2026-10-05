@@ -14,7 +14,8 @@ release notes.
 ## [Unreleased]
 
 ### Changed
-- "Create a folder" drops "Open an existing folder": every quiz folder lives in the Neo Quiz folder.
+- "Create a folder" drops "Open an existing folder" and brings back "Create with AI".
+- Import has its own button beside New folder.
 - On phones, the active tab of the bottom bar is bright white, without a pill.
 
 ## [1.20.29] - 2026-10-05

@@ -1,0 +1,169 @@
+/* The 3D button of the private ui-effects library (Brilliant's "Continue
+   course"), its CSS copied unchanged. Used on a PAGE only, never in a
+   modal (owner, 2026-10-05). */
+.fx-cta3d {
+	/* Valeurs relevées sur brilliant.org (purple-primary / purple-600). */
+	--fx-face: #9d62ff;
+	--fx-edge: #874de5;
+	--fx-on-face: #fff;
+	--fx-depth: 4px;
+	--fx-radius: 60px;
+	--fx-pad-y: 14px;
+	--fx-pad-x: 24px;
+	--fx-fs: 16px;
+	--fx-dur: 100ms;
+	--fx-hover-opacity: 0.85;
+	--fx-shine: #f5efff;
+	--fx-shine-dur: 6400ms;
+	--fx-shine-ease: cubic-bezier(0.16, 1, 0.7, 1);
+	--fx-disabled-face: rgba(255, 255, 255, 0.05);
+	--fx-disabled-text: rgba(255, 255, 255, 0.2);
+	--fx-focus: #fff;
+
+	appearance: none;
+	position: relative;
+	display: inline-flex;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	border-radius: var(--fx-radius);
+	background: none;
+	color: var(--fx-on-face);
+	font: inherit;
+	cursor: pointer;
+	/* La face remonte de --fx-depth : on réserve la place de la tranche au-dessus. */
+	margin-top: var(--fx-depth);
+	transition: opacity var(--fx-dur) ease-out;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.fx-cta3d__face {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	padding: var(--fx-pad-y) var(--fx-pad-x);
+	border-radius: var(--fx-radius);
+	background: var(--fx-face);
+	font-size: var(--fx-fs);
+	font-weight: 500;
+	line-height: 20px;
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+	/* La face est SURÉLEVÉE : la tranche pleine dessous (sans flou) remplit
+	   exactement l'espace dont elle est montée. */
+	box-shadow: 0 var(--fx-depth) 0 0 var(--fx-edge);
+	transform: translateY(calc(-1 * var(--fx-depth)));
+	transition: transform var(--fx-dur) ease-out, box-shadow var(--fx-dur) ease-out;
+}
+
+.fx-cta3d:hover:not(:disabled):not([aria-disabled="true"]) {
+	opacity: var(--fx-hover-opacity);
+}
+
+/* La touche s'enfonce : la face redescend, la tranche disparaît. */
+.fx-cta3d:active:not(:disabled):not([aria-disabled="true"]) .fx-cta3d__face {
+	transform: none;
+	box-shadow: none;
+}
+
+.fx-cta3d:focus-visible {
+	outline: none;
+}
+.fx-cta3d:focus-visible .fx-cta3d__face {
+	outline: 2px solid var(--fx-focus);
+	outline-offset: 3px;
+}
+
+/* Le REFLET : un calque rogné à la forme du bouton, où un SVG de deux bandes
+   inclinées à 30° traverse de gauche à droite pendant le premier quart du
+   cycle, puis reste invisible ; la courbe démarre vite et freine longtemps. */
+.fx-cta3d__clip {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: inherit;
+	overflow: clip;
+	pointer-events: none;
+	/* La largeur du bouton devient l'unité `cqw` du reflet. */
+	container-type: inline-size;
+}
+.fx-cta3d__clip svg {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 100;
+	display: block;
+	overflow: hidden;
+	width: 150px;
+	height: 56px;
+	opacity: 0;
+	/* Même trajet et même courbe que Brilliant (qui anime `left` de -100 % à
+	   100 % de la largeur), mais en `transform` : le compositeur le déplace
+	   seul, sans passer par la mise en page à chaque image — le balayage
+	   reste fluide même quand la page a d'autres animations. */
+	will-change: transform, opacity;
+	animation: fx-cta3d-shimmer var(--fx-shine-dur) var(--fx-shine-ease) infinite;
+}
+.fx-cta3d__clip stop[data-fx-shine] {
+	stop-color: var(--fx-shine);
+}
+
+@keyframes fx-cta3d-shimmer {
+	0% { opacity: 1; transform: translateX(-100cqw); }
+	25% { opacity: 1; transform: translateX(100cqw); }
+	26% { opacity: 0; }
+	100% { opacity: 0; transform: translateX(100cqw); }
+}
+
+/* Variante SECONDAIRE (« Jump ahead » de Brilliant) : face translucide
+   (blanc 20 %), tranche à peine visible (blanc 5 %), sans reflet. */
+.fx-cta3d--ghost {
+	--fx-face: rgba(255, 255, 255, 0.2);
+	--fx-edge: rgba(255, 255, 255, 0.05);
+}
+
+/* Désactivé : à plat, gris, sans reflet (le « Check » inactif de Brilliant :
+   face blanc 5 %, texte blanc 20 %). */
+.fx-cta3d:disabled,
+.fx-cta3d[aria-disabled="true"] {
+	cursor: not-allowed;
+}
+.fx-cta3d:disabled .fx-cta3d__face,
+.fx-cta3d[aria-disabled="true"] .fx-cta3d__face {
+	background: var(--fx-disabled-face);
+	color: var(--fx-disabled-text);
+	text-shadow: none;
+	box-shadow: none;
+	transform: none;
+}
+.fx-cta3d:disabled .fx-cta3d__clip,
+.fx-cta3d[aria-disabled="true"] .fx-cta3d__clip {
+	display: none;
+}
+
+/* Chargement (visuel seulement : poser aussi aria-busy="true" et bloquer
+   l'action) : enfoncé, texte estompé, reflet en boucle rapide. */
+.fx-cta3d.is-loading {
+	cursor: progress;
+}
+.fx-cta3d.is-loading .fx-cta3d__face {
+	transform: none;
+	box-shadow: none;
+	color: color-mix(in srgb, var(--fx-on-face) 70%, transparent);
+}
+.fx-cta3d.is-loading .fx-cta3d__clip svg {
+	animation-duration: 1600ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fx-cta3d,
+	.fx-cta3d__face {
+		transition: none;
+	}
+	.fx-cta3d__clip {
+		display: none;
+	}
+}

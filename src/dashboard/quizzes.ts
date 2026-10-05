@@ -3,6 +3,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
+import { importSharedFolder } from "./folder-create";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
@@ -536,6 +537,19 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// droite, même pilule que « Nouveau quiz » du drill (demande Ahmed
 			// 2026-07-20 — le header racine a disparu avec lui). Absent côté
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
+			/* "Import" beside "New folder" (2026-10-05): what was received has
+			   its own button, the modal only creates. The library's 3D button,
+			   translucent: a page action, never a modal one. */
+			if (ctx.createFolder && !mobile) {
+				const importBtn = ajouter(groupWrap, "button", "fx-cta3d fx-cta3d--ghost qbd-quizzes-import");
+				importBtn.type = "button";
+				const face = ajouter(importBtn, "span", "fx-cta3d__face");
+				currentHost().ui.setIcon(ajouter(face, "span", "qbd-quizzes-import-icone"), "download");
+				ajouter(face, "span", undefined, t("dashboard.quizzes.import"));
+				importBtn.addEventListener("click", () => {
+					void importSharedFolder(ctx, effectiveMap(), quizzes, () => { if (containerRef) render(containerRef); });
+				});
+			}
 			if (ctx.createFolder && !mobile) {
 				const newBtn = ajouter(groupWrap, "button", "qbd-btn--create");
 				const newIcon = ajouter(newBtn, "span", "qbd-btn-icon");

@@ -61,11 +61,21 @@ export function openCreateFolderModal(
 			   first, its quizzes are generated from inside it. */
 			createOptionCard(m, c, "folder-plus", "#4573ff", t("dashboard.quizzes.createEmptyTitle"), t("dashboard.quizzes.createEmptyDesc"),
 				() => openNewFolderModal(ctx, map, quizzes, onDone));
+			/* "Create with AI" is back (2026-10-05): creating is this modal's
+			   one job, AI included; it opens the Generate page. */
+			if (ctx.canOpen("ai")) {
+				createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.quizzes.createAiTitle"), t("dashboard.quizzes.createAiDesc"),
+					() => ctx.navigate("ai"));
+			}
 			/* No "Open an existing folder" any more (2026-10-05): every quiz
 			   folder lives in the one Neo Quiz folder, the Obsidian plugin it
 			   was meant for is gone. Create, or import what was received. */
-			createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
-				() => void importSharedFolder(ctx, map, quizzes, onDone));
+			/* Import has its own button beside "New folder" on a PC; a phone
+			   has no room for a third floating button, so it stays here. */
+			if (currentHost().platform.isMobile) {
+				createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
+					() => void importSharedFolder(ctx, map, quizzes, onDone));
+			}
 		},
 	});
 }
