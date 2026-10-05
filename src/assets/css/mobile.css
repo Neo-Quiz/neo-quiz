@@ -76,10 +76,15 @@ html.nq-mobile .modal-container {
 	/* StudySmarter layout, Neo Quiz colours (owner, 2026-10-01). */
 	/* The app backdrop: shell.css `--nq-lueur-fond` and Android themes.xml
 	   `window_background` (src/ cannot read the shell variable). */
-	--nq-bottom-bar-bg: #070b14;
+	/* The cards' colour, not the near-black backdrop (2026-10-05): the bar
+	   reads as part of the app, like StudySmarter's. Android's
+	   `window_background` follows, so the system navigation area under it
+	   stays one block with it. */
+	--nq-bottom-bar-bg: rgb(24, 24, 37);
 	--nq-bottom-bar-line: var(--background-modifier-border);
 	--nq-bottom-bar-muted: var(--text-muted);
-	--nq-bottom-bar-active: var(--interactive-accent);
+	/* The active tab in bright white (the native bar adds a soft glow). */
+	--nq-bottom-bar-active: #ffffff;
 }
 
 .is-mobile .qbd-sidebar {

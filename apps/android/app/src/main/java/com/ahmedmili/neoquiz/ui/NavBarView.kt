@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.util.TypedValue
@@ -94,6 +95,12 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     }
                     imageTintList = ColorStateList.valueOf(if (on) active else muted)
                 }
+                // The active tab glows softly: a faint radial light behind its icon (2026-10-05).
+                background = if (on) GradientDrawable().apply {
+                    gradientType = GradientDrawable.RADIAL_GRADIENT
+                    gradientRadius = dp(16).toFloat()
+                    colors = intArrayOf(0x40FFFFFF, 0x00FFFFFF)
+                } else null
                 wasActive[id] = on
             }
             tab.addView(icon, LayoutParams(dp(25), dp(25)))
@@ -103,6 +110,8 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                     typeface = Typeface.create(Typeface.DEFAULT, 600, false)
                     setTextColor(if (on) active else muted)
+                    // Same soft light around the active label.
+                    if (on) setShadowLayer(dp(8).toFloat(), 0f, 0f, 0x99FFFFFF.toInt())
                     maxLines = 1
                     setPadding(0, dp(1), 0, 0)
                 },

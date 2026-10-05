@@ -1669,14 +1669,15 @@
 
 /* PHONE (2026-10-05, StudySmarter's Library): the two filters on one row,
    "Generated quizzes" floating at the bottom left, "New folder" a round +
-   at the bottom right, both above the fixed 57 px bottom bar (mobile.css). */
+   at the bottom right. The phone's bottom bar is NATIVE, under the WebView:
+   `bottom` already measures from just above it. */
 .qbd-quizzes-group-selects {
 	min-width: 0;
 }
 
 .qbd-quizzes-fab {
 	position: fixed;
-	bottom: calc(57px + 16px);
+	bottom: 16px;
 	z-index: 30;
 	display: inline-flex;
 	align-items: center;
