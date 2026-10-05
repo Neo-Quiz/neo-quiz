@@ -440,7 +440,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				const qr = ajouter(centre, "img", "qbd-sync-qr");
 				qr.alt = t("settings.sync.qrAlt");
 				qr.hidden = true;
-				const zonePartage = ajouter(corps, "div", "qbd-sync-menu-zone");
+				/* Share, and Copy link beside it: some apps of the Windows Share
+				   panel only copy the link anyway, so copying it directly is one
+				   step less. Both carry the same pairing link of the site. */
+				const actions = ajouter(corps, "div", "qbd-sync-actions-id");
+				const copierLienBtn = bouton(actions, "link", t("settings.sync.copyLink"), "qbd-sync-bouton");
+				const zonePartage = ajouter(actions, "div", "qbd-sync-menu-zone");
 				const partagerBtn = bouton(zonePartage, "share-2", t("settings.sync.share"), "qbd-sync-bouton qbd-sync-bouton-principal");
 
 				let ferme = false;
@@ -472,10 +477,24 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					if (!idCourant) return;
 					void partagerId("systeme");
 				});
+				let lienPage: string | null = null;
+				let retourCopie: ReturnType<typeof setTimeout> | null = null;
+				const copierLbl = copierLienBtn.querySelector<HTMLElement>("span:last-of-type");
+				copierLienBtn.addEventListener("click", () => {
+					if (!lienPage) return;
+					void deps.copier(lienPage).then(ok => {
+						if (demonte || ferme) return;
+						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
+						if (copierLbl) copierLbl.textContent = t("settings.sync.linkCopied");
+						if (retourCopie) clearTimeout(retourCopie);
+						retourCopie = setTimeout(() => { if (copierLbl) copierLbl.textContent = t("settings.sync.copyLink"); }, 1500);
+					});
+				});
 				dialogueId = {
 					fermer: () => handle.close(),
 					arreter: () => {
 						ferme = true;
+						if (retourCopie) clearTimeout(retourCopie);
 						if (qrHote) void qrHote.fermer().catch(() => undefined);
 					},
 					peindre: e => {
@@ -496,6 +515,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						}
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
+						/* The same page link as Share (`canaux.ts`): ID and name in the
+						   fragment, which no server receives. */
+						lienPage = `https://neo-quiz.github.io/pair/#device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`;
 						poserQr(`neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`);
 					},
 				};

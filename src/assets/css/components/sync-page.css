@@ -985,3 +985,12 @@
 	width: 16px;
 	height: 16px;
 }
+
+/* "Device ID": Copy link and Share side by side under the QR code. */
+.qbd-sync-actions-id {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
