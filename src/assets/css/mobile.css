@@ -607,6 +607,17 @@ html.nq-mobile .modal-container > .modal {
 	min-width: 0;
 }
 
+/* The line under the filters, like StudySmarter's Library (2026-10-05). */
+.is-mobile .qbd-quizzes-group {
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Room under the last card for the two floating buttons. */
+.is-mobile .qbd-quizzes-tree {
+	padding-bottom: 88px;
+}
+
 /* ══════════════════════════════════════════════════════════
    NATIVE FEEL (T13e, 2026-10-01) — Phone only.
 

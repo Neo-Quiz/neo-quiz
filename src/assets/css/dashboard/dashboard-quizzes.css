@@ -1669,15 +1669,14 @@
 
 /* PHONE (2026-10-05, StudySmarter's Library): the two filters on one row,
    "Generated quizzes" floating at the bottom left, "New folder" a round +
-   at the bottom right. The app's bottom bar is native, under the WebView:
-   `bottom` measures from just above it. */
+   at the bottom right, both above the fixed 57 px bottom bar (mobile.css). */
 .qbd-quizzes-group-selects {
 	min-width: 0;
 }
 
 .qbd-quizzes-fab {
 	position: fixed;
-	bottom: 18px;
+	bottom: calc(57px + 16px);
 	z-index: 30;
 	display: inline-flex;
 	align-items: center;
@@ -1721,6 +1720,9 @@
 /* Generated quizzes: the app's accent, its count in a badge. */
 .qbd-quizzes-fab--gauche {
 	left: 18px;
+	right: auto;
+	width: auto;
+	max-width: calc(100vw - 18px - 18px - 56px - 16px);
 	padding: 0 18px 0 16px;
 	background: var(--interactive-accent);
 	color: #fff;
