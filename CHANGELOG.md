@@ -17,7 +17,7 @@ release notes.
 
 ### Changed
 - Share sends a link that opens Neo Quiz on the other device, with "Add a device" filled in.
-- The "Show my ID" dialog drops the ID box and its Copy button: Share does it.
+- The "Show my ID" dialog drops the ID box: Share and Copy link send the same link.
 
 ## [1.20.27] - 2026-10-05
 
