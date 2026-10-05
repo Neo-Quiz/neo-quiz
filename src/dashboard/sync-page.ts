@@ -80,11 +80,25 @@ export interface SyncPageDeps {
 /** What the user typed or pasted → the canonical `AAAAAAA-…` form: spaces and
     dashes dropped, upper case, regrouped by 7 when it is 56 characters long.
     Anything else is left for the host to refuse as invalid. */
+/** The pairing link (`neo-quiz://pair?device=…&name=…`) anywhere in a text:
+    a scanned QR code, a copied ID, or the whole message of a shared one. */
+function lienAppairage(brut: string): URLSearchParams | null {
+	const m = /neo-quiz:\/\/pair\?(\S+)/i.exec(brut);
+	return m ? new URLSearchParams(m[1]) : null;
+}
+
+/** The device name a pairing link announces, cleaned for display ("" when
+    there is none). The host cleans it again before it reaches a config. */
+export function nomDuLien(brut: string): string {
+	// eslint-disable-next-line no-control-regex
+	return (lienAppairage(brut)?.get("name") ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 64);
+}
+
 export function normaliserCode(brut: string): string {
-	/* A scanned pairing QR code (`neo-quiz://pair?device=…&code=…`): only the
-	   device id is taken here; the host still validates it. */
-	const qr = /^neo-quiz:\/\/pair\?(.*)$/i.exec(brut.trim());
-	if (qr) brut = new URLSearchParams(qr[1]).get("device") ?? "";
+	/* A pairing link (scanned QR code, copied or shared ID): only the device
+	   id is taken here; the host still validates it. */
+	const lien = lienAppairage(brut);
+	if (lien) brut = lien.get("device") ?? "";
 	const nu = brut.replace(/[\s-]+/g, "").toUpperCase();
 	return nu.length === 56 ? (nu.match(/.{7}/g) ?? []).join("-") : brut.trim().toUpperCase();
 }
@@ -466,7 +480,9 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				};
 				copierBtn.addEventListener("click", () => {
 					if (!idCourant) return;
-					void deps.copier(idCourant).then(ok => {
+					/* The pairing link, not the bare ID: it carries this device's
+					   name, which "Add a device" on the other side shows at once. */
+					void deps.copier(texteQr ?? idCourant).then(ok => {
 						if (demonte || ferme) return;
 						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
 						poserIconeCopie("check");
@@ -530,6 +546,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		requireHost("modals").open({
 			className: "qbd-sync-modal",
 			title: t("settings.sync.addButton"),
+			titleIcon: el => { currentHost().ui.setIcon(el, "link"); },
 			onOpen: handle => {
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
 				ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.addHint"));
@@ -539,12 +556,31 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					? bouton(corps, "scan-line", t("settings.sync.scanQr"), "qbd-sync-bouton qbd-sync-bouton-principal qbd-sync-bouton-grand")
 					: null;
 				if (scannerBtn) ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.orPaste"));
-				const champ = ajouter(corps, "input", "qbd-sync-champ");
+				const champ = ajouter(corps, "input", "qbd-sync-champ qbd-sync-champ-id");
 				champ.type = "text";
 				champ.spellcheck = false;
 				champ.autocomplete = "off";
 				champ.placeholder = t("settings.sync.addPlaceholder");
 				champ.setAttribute("aria-label", t("settings.sync.addPlaceholder"));
+				/* The other device's name, as soon as it is known: carried by a
+				   copied or shared ID (its link), or announced by a request it
+				   already sent. A bare ID typed by hand has none. */
+				const nomDetecte = ajouter(corps, "p", "qbd-sync-nom-detecte");
+				nomDetecte.hidden = true;
+				const nomIcone = ajouter(nomDetecte, "span", "qbd-sync-nom-detecte-icone");
+				currentHost().ui.setIcon(nomIcone, "monitor-smartphone");
+				const nomTexte = ajouter(nomDetecte, "span");
+				const nomPour = (brut: string): string => {
+					const duLien = nomDuLien(brut);
+					if (duLien) return duLien;
+					const code = normaliserCode(brut);
+					return dernierEtat?.demandes.find(d => d.id === code)?.nom ?? "";
+				};
+				champ.addEventListener("input", () => {
+					const nom = nomPour(champ.value);
+					nomTexte.textContent = nom;
+					nomDetecte.hidden = !nom;
+				});
 				const message = ajouter(corps, "p", "qbd-sync-message qbd-sync-message-erreur");
 				message.setAttribute("role", "alert");
 				const piedDialogue = ajouter(corps, "div", "qbd-sync-dialogue-pied");
@@ -560,7 +596,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					validerBtn.disabled = true;
 					message.textContent = "";
 					try {
-						const res = await deps.appairer(code);
+						const res = await deps.appairer(code, nomDuLien(brut) || undefined);
 						if (demonte || ferme) return;
 						if (res === "ok") {
 							handle.close();
@@ -710,6 +746,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		requireHost("modals").open({
 			className: "qbd-sync-modal",
 			title: t("settings.sync.renameTitle"),
+			titleIcon: el => { currentHost().ui.setIcon(el, "pencil"); },
 			onOpen: handle => {
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
 				const champ = ajouter(corps, "input", "qbd-sync-champ");

@@ -38,6 +38,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, screen, shell } from "electron";
+import * as os from "node:os";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -1487,14 +1488,17 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	/* ─── THE SYNC (embedded Syncthing) ───
 	   THREE verbs and two pushes, nothing else. What comes from the window is
-	   one string, a device id, checked in the main process before it reaches a
-	   config (`syncthing.ts`); no path, port, folder id or REST call ever
-	   crosses, and neither does the API key. */
+	   a device id, and for a pairing the name its link announced, both checked
+	   in the main process before they reach a config (`syncthing.ts`); no
+	   path, port, folder id or REST call ever crosses, and neither does the
+	   API key. */
 	if (deps.sync) {
 		const sync = deps.sync;
 		ipcMain.handle(CANAUX.syncEtatLire, () => sync.etat());
-		ipcMain.handle(CANAUX.syncAppairer, (_e, id: unknown) =>
-			typeof id === "string" && id.length <= 80 ? sync.appairer(id) : "invalide");
+		ipcMain.handle(CANAUX.syncAppairer, (_e, id: unknown, nom: unknown) =>
+			typeof id === "string" && id.length <= 80
+				? sync.appairer(id, typeof nom === "string" && nom.length <= 256 ? nom : undefined)
+				: "invalide");
 		ipcMain.handle(CANAUX.syncOublier, async (_e, id: unknown) => {
 			if (typeof id === "string" && id.length <= 80) await sync.oublier(id);
 		});
@@ -1537,7 +1541,11 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				if (process.platform !== "win32") return false;
 				const jeton = verrouNatif.prendre();
 				if (jeton === null) return false;
-				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { id }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
+				/* The pairing link carries this device's name: pasted into "Add a
+				   device" on the other side, the name shows at once. */
+				const nom = os.hostname().slice(0, 64);
+				const lien = `neo-quiz://pair?device=${id}&name=${encodeURIComponent(nom)}`;
+				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { name: nom, link: lien }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
 			}
 			return false;
 		};

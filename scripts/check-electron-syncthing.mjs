@@ -228,7 +228,7 @@ await withSrcModule(
 		await cas(r, "confirmationRequise", async () => {
 			const { confirmationRequise } = regles;
 			r.check("a pending device accepted from the page: no native dialog", confirmationRequise(true, false), false);
-			r.check("an id typed in Add a device (nothing pending): native dialog", confirmationRequise(false, false), true);
+			r.check("an id typed in Add a device (nothing pending): no native dialog, the click on Add is the answer", confirmationRequise(false, false), false);
 			r.check("a request that came by the QR code: native dialog, pending or not", [confirmationRequise(true, true), confirmationRequise(false, true)], [true, true]);
 		});
 
@@ -531,9 +531,13 @@ await withSrcModule(
 						r.check("our own id is refused", await h.appairer(etat.appareil), "invalide");
 						r.check("an id with wrong check characters is refused", await h.appairer(ID.slice(0, 3) + (ID[3] === "A" ? "B" : "A") + ID.slice(4)), "invalide");
 						r.check("invalid ids never reach the confirmation dialog", demandes.length, 0);
-						r.check("a cancelled confirmation pairs nothing and says so", [await h.appairer(AUTRE_ID), (await h.etat()).appareils.length, demandes.map(d => d[0])], ["annule", 0, [AUTRE_ID]]);
-						reponse = true;
-						r.check("a confirmed pairing works", await h.appairer(AUTRE_ID), "ok");
+						/* The QR flow still asks: a cancelled confirmation pairs nothing. */
+						r.check("a cancelled confirmation pairs nothing and says so", [await h.appairer(AUTRE_ID, true), (await h.etat()).appareils.length, demandes.map(d => d[0])], ["annule", 0, [AUTRE_ID]]);
+						/* An id typed in "Add a device" pairs at once: the click on Add
+						   is the answer, no dialog is asked (2026-10-05). */
+						r.check("a typed id pairs without asking", [await h.appairer(AUTRE_ID, false, "Laptop‮"), demandes.length], ["ok", 1]);
+						/* The name of a pasted pairing link is kept, cleaned. */
+						r.check("the pasted link's name names the device", (await h.etat()).appareils.map(a => a.nom), ["Laptop"]);
 						const apres = await h.etat();
 						r.check("the paired device is listed, not connected", apres.appareils.map(a => [a.id, a.connecte]), [[AUTRE_ID, false]]);
 						await h.oublier(AUTRE_ID);

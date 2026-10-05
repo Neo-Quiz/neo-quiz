@@ -554,12 +554,13 @@ ce qu'il faut savoir avant de toucher.
   fusion à la lecture : `check:shared-state`).
 - **Syncthing** : identifiant de dossier `neo-quiz` (seul accepté) ; l'instance
   Windows n'ÉCOUTE JAMAIS (sortant + découverte globale + relais : pas
-  d'invite de pare-feu) ; Android écoute sur 22100/21028 ; un appairage sans
-  demande (ID saisi, QR scanné) est TOUJOURS confirmé nativement ; une demande
-  acceptée depuis sa notification ne l'est plus (le clic sur « Accepter » est
-  la réponse, décision d'Ahmed du 2026-10-03, PC et Android,
-  `confirmationRequise`) ; un nom d'appareil distant est assaini avant
-  d'atteindre la boîte de dialogue.
+  d'invite de pare-feu) ; Android écoute sur 22100/21028 ; seul un appairage
+  venu du QR code est confirmé nativement ; une demande acceptée depuis sa
+  notification ne l'est plus (le clic sur « Accepter » est la réponse,
+  décision d'Ahmed du 2026-10-03, PC et Android, `confirmationRequise`), ni un
+  ID saisi dans « Ajouter un appareil » (le clic sur « Ajouter » est la
+  réponse, décision d'Ahmed du 2026-10-05, PC ; Android à aligner) ; un nom
+  d'appareil distant est assaini avant d'atteindre la boîte de dialogue.
 
 ## Build
 

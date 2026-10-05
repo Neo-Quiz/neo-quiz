@@ -74,11 +74,6 @@
 	height: 18px;
 }
 
-/* The two dialogs ("Show my ID", "Add a device"). */
-.modal.qbd-sync-modal {
-	width: min(440px, calc(100vw - 32px));
-}
-
 .qbd-sync-dialogue {
 	display: flex;
 	flex-direction: column;
@@ -593,18 +588,6 @@
 	color: var(--color-green, #4ade80);
 }
 
-/* The device icon before "Device ID - <name>". */
-.qbd-sync-modal-id .modal-title-icon {
-	width: 20px;
-	height: 20px;
-	color: var(--text-muted);
-}
-
-.qbd-sync-modal-id .modal-title-icon svg {
-	width: 20px;
-	height: 20px;
-}
-
 /* Share, the one action of "Device ID": it lifts a pixel and glows in the
    accent colour on hover, and settles back when pressed. */
 .qbd-sync-modal-id .qbd-sync-bouton-principal {
@@ -913,4 +896,92 @@
 
 .qbd-sync-action[hidden] {
 	display: none;
+}
+
+/* EVERY dialog of the Sync page with a field ("Add a device", "Device
+   name"): one look, never one per dialog. A title icon in the accent colour,
+   a roomy field with a soft accent ring instead of the thick outline, the
+   text in the interface font (a device ID alone is typed in mono). */
+.modal:where(.qbd-sync-modal) {
+	width: min(480px, calc(100vw - 32px));
+}
+
+.qbd-sync-modal .modal-title-icon {
+	width: 20px;
+	height: 20px;
+	color: var(--interactive-accent);
+}
+
+.qbd-sync-modal .modal-title-icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.qbd-sync-modal .qbd-sync-dialogue {
+	gap: 14px;
+}
+
+.qbd-sync-modal .qbd-sync-aide {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.qbd-sync-modal .qbd-sync-champ {
+	height: 42px;
+	padding: 0 14px;
+	border-radius: var(--radius-l, 10px);
+	font-family: var(--font-interface, inherit);
+	font-size: 13px;
+	transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.qbd-sync-modal .qbd-sync-champ-id {
+	font-family: var(--font-monospace);
+	letter-spacing: 0.02em;
+}
+
+.qbd-sync-modal .qbd-sync-champ::placeholder {
+	font-family: var(--font-interface, inherit);
+	letter-spacing: 0;
+	color: var(--text-faint);
+}
+
+.qbd-sync-modal .qbd-sync-champ:focus,
+.qbd-sync-modal .qbd-sync-champ:focus-visible {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
+.qbd-sync-modal .qbd-sync-message:empty {
+	display: none;
+}
+
+.qbd-sync-modal .qbd-sync-dialogue-pied {
+	margin-top: 4px;
+}
+
+/* The other device's name under the ID field, once it is known. */
+.qbd-sync-nom-detecte {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: -4px 0 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.qbd-sync-nom-detecte[hidden] {
+	display: none;
+}
+
+.qbd-sync-nom-detecte-icone {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.qbd-sync-nom-detecte-icone svg {
+	width: 16px;
+	height: 16px;
 }

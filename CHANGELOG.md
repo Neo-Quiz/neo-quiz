@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- The CLI update panel shows the Claude and ChatGPT logos, without the line under it.
+- Adding a device by its ID no longer asks for a second confirmation.
+- Copy and Share of your device ID carry its name: pasted on the other device, the name shows at once.
+- The Sync dialogs share one look: title icon, roomier field, soft focus ring.
+
 ## [1.20.26] - 2026-10-05
 
 ### Changed

@@ -195,7 +195,7 @@ const pont: Pont = {
 	   registers the handlers only there). Nothing else of Syncthing crosses. */
 	sync: process.platform !== "win32" ? undefined : {
 		etat: () => ipcRenderer.invoke(CANAUX.syncEtatLire),
-		appairer: deviceId => ipcRenderer.invoke(CANAUX.syncAppairer, String(deviceId)),
+		appairer: (deviceId, nom) => ipcRenderer.invoke(CANAUX.syncAppairer, String(deviceId), nom === undefined ? undefined : String(nom)),
 		oublier: deviceId => ipcRenderer.invoke(CANAUX.syncOublier, String(deviceId)),
 		renommer: (deviceId, nom) => ipcRenderer.invoke(CANAUX.syncRenommer, String(deviceId), String(nom)),
 		renvoyer: deviceId => ipcRenderer.invoke(CANAUX.syncRenvoyer, String(deviceId)),
