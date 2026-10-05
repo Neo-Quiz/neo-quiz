@@ -265,6 +265,9 @@ const pont: Pont = {
 		partagerId: (canal) => appeler("sync.partagerId", [canal]),
 		surEtat: (rappel) => abonner<EtatSync>("sync.etat", rappel),
 		surDonneesRecues: (rappel) => abonner<void>("sync.donneesRecues", () => rappel()),
+		/* No `neo-quiz://` link handed to the app on Android yet. */
+		lienAppairage: async () => null,
+		surLienAppairage: () => () => undefined,
 		scanner: () => appeler("sync.scanner"),
 		scannerAppairer: () => appeler("sync.scannerAppairer"),
 	},

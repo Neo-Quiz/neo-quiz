@@ -64,6 +64,18 @@ export function viserPromptExam(): void {
 	viserPrompt = "exam";
 }
 
+/** A pairing link to put in "Add a device" (a `neo-quiz://pair` link clicked
+    in the browser): taken once by the Sync page, which opens the dialog with
+    it. The listeners are the open settings, so a link that arrives while
+    they are shown switches to Sync at once. */
+let ajoutEnAttente: string | null = null;
+const surAjoutEnAttente = new Set<() => void>();
+export function viserAjoutAppareil(lien: string): void {
+	lastCategory = "sync";
+	ajoutEnAttente = lien;
+	for (const rappel of [...surAjoutEnAttente]) rappel();
+}
+
 /** A titled block of a category: its heading, an optional help line. */
 function section(parent: HTMLElement, title: string | null, help?: string): HTMLElement {
 	const s = ajouter(parent, "section", "nq-reglages-section");
@@ -201,6 +213,10 @@ export function renderSettings(
 				return { chemin: d.path, ouvrir: mobile ? undefined : () => { void pont().systeme.ouvrir(d.path).catch(() => undefined); } };
 			},
 			copier: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
+			preRemplissage: {
+				prendre: () => { const lien = ajoutEnAttente; ajoutEnAttente = null; return lien; },
+				surNouveau: rappel => { surAjoutEnAttente.add(rappel); return () => { surAjoutEnAttente.delete(rappel); }; },
+			},
 		});
 	}
 	/* No AI category on a phone or tablet: generation and the Explain button are
@@ -483,5 +499,9 @@ export function renderSettings(
 	   2026-09-17, and the only subscription left is the rail's, which lives
 	   as long as the shell. One is returned anyway because EVERY screen
 	   returns one. */
-	return () => { demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
+	/* A pairing link that arrives while the settings are open switches to Sync
+	   (whose page then opens "Add a device" with it). */
+	const allerSync = (): void => { if (sync) show("sync"); };
+	surAjoutEnAttente.add(allerSync);
+	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
 }

@@ -55,6 +55,9 @@ export interface SyncPageDeps {
 	surEtat(rappel: (etat: EtatSync) => void): () => void;
 	/** Copies text to the clipboard through the host; `false` if it could not. */
 	copier(texte: string): Promise<boolean>;
+	/** A pairing link waiting to fill in "Add a device" (one clicked in the
+	    browser): taken once, and announced again when a new one arrives. */
+	preRemplissage?: { prendre(): string | null; surNouveau(rappel: () => void): () => void };
 	/** Shares this device's ID through a channel the host builds itself;
 	    `false` if it could not. A phone uses `systeme` (the share sheet), a PC
 	    offers `courriel` and `discord` in a menu. */
@@ -77,13 +80,12 @@ export interface SyncPageDeps {
 	};
 }
 
-/** What the user typed or pasted → the canonical `AAAAAAA-…` form: spaces and
-    dashes dropped, upper case, regrouped by 7 when it is 56 characters long.
-    Anything else is left for the host to refuse as invalid. */
-/** The pairing link (`neo-quiz://pair?device=…&name=…`) anywhere in a text:
-    a scanned QR code, a copied ID, or the whole message of a shared one. */
+/** The pairing link anywhere in a text: the app's own
+    (`neo-quiz://pair?device=…&name=…`, a scanned QR code) or the site's page
+    (`https://neo-quiz.github.io/pair/#device=…&name=…`, the whole message of
+    a shared ID). */
 function lienAppairage(brut: string): URLSearchParams | null {
-	const m = /neo-quiz:\/\/pair\?(\S+)/i.exec(brut);
+	const m = /(?:neo-quiz:\/\/pair\?|neo-quiz\.github\.io\/pair\/?#)(\S+)/i.exec(brut);
 	return m ? new URLSearchParams(m[1]) : null;
 }
 
@@ -94,6 +96,9 @@ export function nomDuLien(brut: string): string {
 	return (lienAppairage(brut)?.get("name") ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 64);
 }
 
+/** What the user typed or pasted → the canonical `AAAAAAA-…` form: spaces and
+    dashes dropped, upper case, regrouped by 7 when it is 56 characters long.
+    Anything else is left for the host to refuse as invalid. */
 export function normaliserCode(brut: string): string {
 	/* A pairing link (scanned QR code, copied or shared ID): only the device
 	   id is taken here; the host still validates it. */
@@ -429,16 +434,8 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				/* Top to bottom, like Syncthing's own dialog: the ID on one line,
 				   the QR code in the middle with its bar, Share under it. */
 				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue-id");
-				/* The ID in the code block of the install dialog (`ai-install-modal.ts`):
-				   the copy button is an icon INSIDE it, top right, its label off
-				   screen, and it turns into a check for a moment once copied. */
-				const blocId = ajouter(corps, "div", "qbd-install-code qbd-sync-code markdown-rendered markdown-preview-view");
-				const idTexte = ajouter(ajouter(blocId, "pre"), "code", undefined, t("settings.sync.starting"));
-				const copierBtn = ajouter(blocId, "button", "qbd-btn qbd-install-copy");
-				copierBtn.type = "button";
-				const copierIcone = ajouter(copierBtn, "span", "qbd-btn-icon qbd-btn-icon--sm");
-				currentHost().ui.setIcon(copierIcone, "copy");
-				const copierTexte = ajouter(copierBtn, "span", "qbd-sr-only", t("settings.sync.copy"));
+				/* No ID block with a Copy button any more (2026-10-05): Share sends
+				   the same pairing link, with the name, and a link opens the app. */
 				const centre = ajouter(corps, "div", "qbd-sync-dialogue-qr");
 				const qr = ajouter(centre, "img", "qbd-sync-qr");
 				qr.alt = t("settings.sync.qrAlt");
@@ -468,34 +465,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					try { await qrHote.suivant(); } catch { /* nothing to show from it */ }
 				}
 
-				let retourCopie: ReturnType<typeof setTimeout> | null = null;
-				/* Swaps the icon with a short fade-in (`qbd-sync-icone-entre`), so
-				   copy -> check -> copy reads as one gesture, not two jumps. */
-				const poserIconeCopie = (nomIcone: string): void => {
-					copierIcone.replaceChildren();
-					currentHost().ui.setIcon(copierIcone, nomIcone);
-					copierIcone.classList.remove("qbd-sync-icone-entre");
-					void copierIcone.offsetWidth;
-					copierIcone.classList.add("qbd-sync-icone-entre");
-				};
-				copierBtn.addEventListener("click", () => {
-					if (!idCourant) return;
-					/* The pairing link, not the bare ID: it carries this device's
-					   name, which "Add a device" on the other side shows at once. */
-					void deps.copier(texteQr ?? idCourant).then(ok => {
-						if (demonte || ferme) return;
-						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
-						poserIconeCopie("check");
-						copierTexte.textContent = t("settings.sync.copied");
-						copierBtn.dataset.copie = "1";
-						if (retourCopie) clearTimeout(retourCopie);
-						retourCopie = setTimeout(() => {
-							poserIconeCopie("copy");
-							copierTexte.textContent = t("settings.sync.copy");
-							delete copierBtn.dataset.copie;
-						}, 1500);
-					});
-				});
 				/* The system's own share panel, on both platforms (Android's share
 				   sheet, Windows' Share panel): every app it knows, nothing to keep
 				   up to date here. */
@@ -507,7 +476,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					fermer: () => handle.close(),
 					arreter: () => {
 						ferme = true;
-						if (retourCopie) clearTimeout(retourCopie);
 						if (qrHote) void qrHote.fermer().catch(() => undefined);
 					},
 					peindre: e => {
@@ -528,7 +496,6 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 						}
 						if (e.appareil === idCourant) return;
 						idCourant = e.appareil;
-						idTexte.textContent = e.appareil;
 						poserQr(`neo-quiz://pair?device=${e.appareil}${e.nom ? "&name=" + encodeURIComponent(e.nom) : ""}`);
 					},
 				};
@@ -541,7 +508,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	}
 
 	/* ── "Add a device": type, paste or scan the other device's ID ── */
-	function ouvrirAjout(): void {
+	function ouvrirAjout(valeur?: string): void {
 		if (!dernierEtat?.actif) return;
 		requireHost("modals").open({
 			className: "qbd-sync-modal",
@@ -628,6 +595,10 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					}).catch(() => undefined);
 				});
 				fermerAjout = () => { if (!ferme) { ferme = true; handle.close(); } };
+				if (valeur) {
+					champ.value = valeur;
+					champ.dispatchEvent(new Event("input"));
+				}
 				champ.focus();
 			},
 			onClose: () => { fermerAjout = () => undefined; },
@@ -898,6 +869,17 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		if (!e.actif) dialogueJournal?.fermer();
 	}
 
+	/* A pairing link from outside fills in "Add a device" once sync runs:
+	   the owner still clicks Add, nothing pairs on its own. */
+	function essayerPreRemplissage(): void {
+		if (demonte || !dernierEtat?.actif || !deps.preRemplissage) return;
+		const lien = deps.preRemplissage.prendre();
+		if (!lien) return;
+		fermerAjout();
+		ouvrirAjout(lien);
+	}
+	const desabonnerPreRemplissage = deps.preRemplissage?.surNouveau(essayerPreRemplissage);
+
 	function peindre(e: EtatSync): void {
 		if (demonte) return;
 		dernierEtat = e;
@@ -915,10 +897,11 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		peindreAppareils(e);
 		peindreChangements(e);
 		peindreBas(e);
+		essayerPreRemplissage();
 	}
 
 	afficherIdBtn.addEventListener("click", ouvrirId);
-	ajouterBouton.addEventListener("click", ouvrirAjout);
+	ajouterBouton.addEventListener("click", () => ouvrirAjout());
 
 	/* Last-seen times age without any push: repaint the list now and then. */
 	const horloge = setInterval(() => { if (dernierEtat && !demonte) peindreAppareils(dernierEtat); }, 60_000);
@@ -943,6 +926,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		dialogueJournal?.fermer();
 		fermerAjout();
 		desabonner();
+		desabonnerPreRemplissage?.();
 		racine.remove();
 	};
 }

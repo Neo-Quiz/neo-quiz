@@ -273,6 +273,32 @@ export interface EvenementSync {
 	data?: Record<string, unknown>;
 }
 
+/** A `neo-quiz://pair?device=…&name=…` link handed to the app by Windows (a
+    click in the browser, the pairing page of the site), or `null`. The link
+    comes from OUTSIDE: only a well-formed id with valid check characters
+    goes on, with a cleaned name, and the app only fills in "Add a device"
+    with it, never pairs on its own. Returned as the canonical link the page
+    already knows how to read (`normaliserCode`, `nomDuLien`). */
+export function lienAppairageExterne(brut: unknown): string | null {
+	if (typeof brut !== "string" || brut.length > 512) return null;
+	let url: URL;
+	try { url = new URL(brut); } catch { return null; }
+	if (url.protocol !== "neo-quiz:" || url.hostname !== "pair") return null;
+	const id = (url.searchParams.get("device") ?? "").trim().toUpperCase();
+	if (!isDeviceId(id) || !hasValidCheckDigits(id)) return null;
+	const nom = nomSur(url.searchParams.get("name") ?? "");
+	return `neo-quiz://pair?device=${id}` + (nom ? `&name=${encodeURIComponent(nom)}` : "");
+}
+
+/** The first pairing link among a process's arguments (a cold start, or the
+    `second-instance` event of a link clicked while the app runs). */
+export function lienDansArguments(argv: readonly string[]): string | null {
+	for (const a of argv) {
+		if (typeof a === "string" && /^neo-quiz:/i.test(a)) return lienAppairageExterne(a);
+	}
+	return null;
+}
+
 /** Whether pairing `id` must first be confirmed by a native dialog. Only
     for a request that came by the QR code (code + confirmation, the owner's
     choice for that flow). NOT when the device asked (it is pending) and the

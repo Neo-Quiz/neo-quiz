@@ -40,7 +40,7 @@ import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
 import type { SensEcran } from "./ui/transition-etat";
-import { renderSettings, viserPromptExpliquer } from "./ui/settings";
+import { renderSettings, viserAjoutAppareil, viserPromptExpliquer } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
 import { estMobile } from "./host/platform";
@@ -610,6 +610,18 @@ async function demarrer(): Promise<void> {
 			}
 		};
 		pont().sync?.surDonneesRecues(() => { void rechargerApresSync(); });
+		/* A `neo-quiz://pair` link clicked in the browser (the pairing page of
+		   the site): the settings open on Sync with "Add a device" filled in.
+		   Read once at start (a link that launched the app) and at each push
+		   (one clicked while it runs). The owner still clicks Add. */
+		const lireLienAppairage = async (): Promise<void> => {
+			const lien = await pont().sync?.lienAppairage().catch(() => null);
+			if (!lien) return;
+			viserAjoutAppareil(lien);
+			ouvrirReglages();
+		};
+		pont().sync?.surLienAppairage(() => { void lireLienAppairage(); });
+		void lireLienAppairage();
 		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Quatre écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
 		   `stats` (même débounce, `dashboard/stats-store.ts`), la page d'un

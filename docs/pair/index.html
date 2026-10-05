@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pair with Neo Quiz</title>
+<link rel="icon" href="../icon.png">
+<style>
+	/* Same tokens, wallpaper and glass as the download page (index.html). */
+	:root {
+		--fond: rgb(30, 30, 46);
+		--fond-secondaire: rgb(24, 24, 37);
+		--bordure: rgb(49, 50, 68);
+		--texte: rgb(198, 208, 245);
+		--texte-attenue: rgb(142, 149, 179);
+		--accent: rgb(101, 143, 242);
+	}
+	* { box-sizing: border-box; }
+	html, body { margin: 0; min-height: 100%; }
+	body {
+		font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui,
+			"Segoe UI", Roboto, "Inter", sans-serif;
+		color: var(--texte);
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 24px 16px;
+		background:
+			linear-gradient(
+				color-mix(in srgb, var(--fond) 78%, transparent),
+				color-mix(in srgb, var(--fond) 88%, transparent)
+			),
+			var(--fond) url("../wallpaper.jpg") center / cover no-repeat fixed;
+	}
+	a { color: var(--accent); }
+	.carte {
+		width: 100%;
+		max-width: 440px;
+		padding: 32px 28px 28px;
+		border-radius: 20px;
+		border: 1px solid var(--bordure);
+		background: color-mix(in srgb, var(--fond-secondaire) 55%, transparent);
+		backdrop-filter: blur(18px);
+		-webkit-backdrop-filter: blur(18px);
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+		text-align: center;
+	}
+	.logo { width: 56px; height: 56px; border-radius: 14px; }
+	h1 { font-size: 22px; margin: 18px 0 6px; line-height: 1.3; overflow-wrap: anywhere; }
+	.sous { margin: 0 0 24px; color: var(--texte-attenue); font-size: 14px; line-height: 1.5; }
+	.appareil {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 0 0 24px;
+		padding: 12px 14px;
+		border-radius: 12px;
+		border: 1px solid var(--bordure);
+		background: color-mix(in srgb, var(--fond) 60%, transparent);
+		text-align: left;
+	}
+	.appareil svg { flex: none; width: 20px; height: 20px; color: var(--accent); }
+	.appareil-nom { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+	.appareil-id {
+		font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+		font-size: 11px;
+		color: var(--texte-attenue);
+		overflow-wrap: anywhere;
+	}
+	.bouton {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		width: 100%;
+		padding: 13px 18px;
+		border-radius: 12px;
+		border: 1px solid var(--accent);
+		background: var(--accent);
+		color: #fff;
+		font: inherit;
+		font-size: 15px;
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.bouton:hover { filter: brightness(1.08); }
+	.bouton svg { width: 18px; height: 18px; }
+	.aide { margin: 18px 0 0; font-size: 13px; color: var(--texte-attenue); line-height: 1.5; }
+	[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+	<main class="carte">
+		<img class="logo" src="../icon.png" alt="" width="56" height="56">
+
+		<div id="valide" hidden>
+			<h1>Sync with <span id="titre-nom"></span></h1>
+			<p class="sous">Open Neo Quiz on this device: the device below is filled in, you only have to click Add.</p>
+			<div class="appareil">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-3.96 3.15"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></svg>
+				<div>
+					<div class="appareil-nom" id="carte-nom"></div>
+					<div class="appareil-id" id="carte-id"></div>
+				</div>
+			</div>
+			<a class="bouton" id="ouvrir" href="#">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+				Open in Neo Quiz
+			</a>
+			<p class="aide">Nothing happens? Neo Quiz 1.20.28 or later is needed. <a href="../">Download Neo Quiz</a></p>
+		</div>
+
+		<div id="invalide" hidden>
+			<h1>This pairing link is incomplete</h1>
+			<p class="sous">Ask for it again: in Neo Quiz, Settings, Sync, Show my ID, then Share.</p>
+			<a class="bouton" href="../">Download Neo Quiz</a>
+		</div>
+	</main>
+
+	<script>
+		/* The device ID and name travel in the FRAGMENT (#device=…&name=…):
+		   a fragment is never sent to a server, so this site never sees who
+		   pairs with whom. Only a well-formed Syncthing ID goes on to the app,
+		   which validates it again and never pairs on its own: it only fills
+		   in "Add a device". */
+		(function () {
+			var p = new URLSearchParams(location.hash.slice(1));
+			var id = (p.get("device") || "").trim().toUpperCase();
+			var nom = (p.get("name") || "").replace(/[\u0000-\u001f\u007f-\u009f  ‪-‮⁦-⁩]/g, "").trim().slice(0, 64);
+			if (!/^[A-Z2-7]{7}(-[A-Z2-7]{7}){7}$/.test(id)) {
+				document.getElementById("invalide").hidden = false;
+				return;
+			}
+			var affiche = nom || id.slice(0, 7);
+			document.getElementById("titre-nom").textContent = affiche;
+			document.getElementById("carte-nom").textContent = affiche;
+			document.getElementById("carte-id").textContent = id;
+			var lien = "neo-quiz://pair?device=" + id + (nom ? "&name=" + encodeURIComponent(nom) : "");
+			document.getElementById("ouvrir").href = lien;
+			document.getElementById("valide").hidden = false;
+			document.title = "Sync with " + affiche + " - Neo Quiz";
+		})();
+	</script>
+</body>
+</html>

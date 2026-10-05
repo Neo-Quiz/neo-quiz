@@ -218,6 +218,12 @@ const pont: Pont = {
 			ipcRenderer.on(CANAUX.syncDonneesRecues, ecouteur);
 			return () => { ipcRenderer.off(CANAUX.syncDonneesRecues, ecouteur); };
 		},
+		lienAppairage: () => ipcRenderer.invoke(CANAUX.syncLienAppairageLire),
+		surLienAppairage(rappel) {
+			const ecouteur = (): void => rappel();
+			ipcRenderer.on(CANAUX.syncLienAppairage, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.syncLienAppairage, ecouteur); };
+		},
 	},
 
 	miseAJour: {

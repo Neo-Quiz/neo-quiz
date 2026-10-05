@@ -39,6 +39,10 @@ export default async function () {
 		   2026-09-12. Sous Linux, c'est le nom du binaire dans l'AppImage et
 		   de l'entrée `.desktop`. */
 		executableName: "neo-quiz",
+		/* `neo-quiz://pair?device=…&name=…` opens the app (the pairing page of
+		   the site): NSIS registers the scheme at install, the app keeps it
+		   right at each start (`main.ts`, `setAsDefaultProtocolClient`). */
+		protocols: [{ name: "Neo Quiz", schemes: ["neo-quiz"] }],
 		extraMetadata: {
 			/* `Publisher` dans la clé de désinstallation (winget y corrèle le
 			   paquet) et `CompanyName` dans les métadonnées de l'exe — exigée

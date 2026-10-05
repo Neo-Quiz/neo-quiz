@@ -442,6 +442,12 @@ export interface Pont {
 		/** Another device's changes to the folder have landed (idle after
 		    remote items): time to reload what is read from the folder. */
 		surDonneesRecues(rappel: () => void): () => void;
+		/** The pairing link Windows handed to the app (a `neo-quiz://pair` link
+		    clicked in the browser), already validated by the main process, and
+		    forgotten once read; `null` when there is none. */
+		lienAppairage(): Promise<string | null>;
+		/** A pairing link just arrived: time to read it (`lienAppairage`). */
+		surLienAppairage(rappel: () => void): () => void;
 		/** Android only (a camera): opens the scanner and resolves with the
 		    text of the QR code read (a candidate device id, validated by
 		    `appairer`), or `null` if the user gave up. Absent on Windows. */
@@ -882,6 +888,8 @@ export const CANAUX = {
 	/* Pushed to the window: the state, and "other devices' changes landed". */
 	syncEtat: "neo:sync/etat",
 	syncDonneesRecues: "neo:sync/donnees-recues",
+	syncLienAppairage: "neo:sync/lien-appairage",
+	syncLienAppairageLire: "neo:sync/lien-appairage-lire",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",

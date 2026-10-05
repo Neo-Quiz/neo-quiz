@@ -167,6 +167,9 @@ export interface DependancesCanaux {
 	/** The embedded Syncthing, `null` where there is none (Linux): the `sync`
 	    channels are then not registered at all. */
 	sync: GestionSync | null;
+	/** The pairing link Windows handed to the app (`lienAppairageExterne`,
+	    already validated), forgotten once taken; `null` when there is none. */
+	prendreLienAppairage?: () => string | null;
 	/** Where the language packs live (`userData/languages`, the same
 	    directory `main.ts` gives the sandbox), fixed by `main.ts`: never a
 	    path from the renderer. */
@@ -1541,10 +1544,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				if (process.platform !== "win32") return false;
 				const jeton = verrouNatif.prendre();
 				if (jeton === null) return false;
-				/* The pairing link carries this device's name: pasted into "Add a
-				   device" on the other side, the name shows at once. */
+				/* The pairing PAGE of the site, a link every app makes clickable
+				   (a `neo-quiz://` one is not): it shows this device and opens Neo
+				   Quiz with "Add a device" filled in. ID and name ride in the
+				   fragment, which no server ever receives. Pasted whole into "Add
+				   a device", the message works too (`normaliserCode`). */
 				const nom = os.hostname().slice(0, 64);
-				const lien = `neo-quiz://pair?device=${id}&name=${encodeURIComponent(nom)}`;
+				const lien = `https://neo-quiz.github.io/pair/#device=${id}&name=${encodeURIComponent(nom)}`;
 				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { name: nom, link: lien }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
 			}
 			return false;
@@ -1565,6 +1571,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		ipcMain.handle(CANAUX.syncQrFermer, () => { sync.qrFermer(); });
 		sync.surEtat(etat => deps.envoyer(CANAUX.syncEtat, etat));
 		sync.surDonneesRecues(() => deps.envoyer(CANAUX.syncDonneesRecues, null));
+		ipcMain.handle(CANAUX.syncLienAppairageLire, () => deps.prendreLienAppairage?.() ?? null);
 	}
 
 	/* ─── LES VIDÉOS YOUTUBE (tâche 4) ───

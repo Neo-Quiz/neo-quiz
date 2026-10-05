@@ -52,7 +52,7 @@ import type { Perimetre } from "./perimetre";
 import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_SYNC_ROOT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
-import { nomSur } from "./syncthing-regles";
+import { lienDansArguments, nomSur } from "./syncthing-regles";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
 import type { MiseAJour } from "./mise-a-jour";
@@ -135,6 +135,15 @@ let miseAJour: MiseAJour | null = null;
 /** The embedded Syncthing (Windows only), stopped with the application. */
 let sync: GestionSync | null = null;
 let fermetureArmee = false;
+/** The last `neo-quiz://pair` link Windows handed over, validated, until the
+    page takes it (`prendreLienAppairage`). */
+let lienAppairage: string | null = null;
+function recevoirLienAppairage(argv: readonly string[]): void {
+	const lien = lienDansArguments(argv);
+	if (!lien) return;
+	lienAppairage = lien;
+	if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.syncLienAppairage, null);
+}
 let fermetureEnCours = false;
 let gardeFermeture: NodeJS.Timeout | null = null;
 /** Arrête l'attente d'une réponse copiée (voir `canaux.ts`) ; posée par
@@ -637,11 +646,22 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 } else if (!app.requestSingleInstanceLock()) {
 	app.quit();
 } else {
-	app.on("second-instance", () => {
+	app.on("second-instance", (_e, argv) => {
+		/* A `neo-quiz://pair` link clicked while the app runs: Windows starts
+		   a second instance with it, which stops at once (above); the link
+		   lands here. */
+		recevoirLienAppairage(argv);
 		if (!fenetre || fenetre.isDestroyed()) return;
 		if (fenetre.isMinimized()) fenetre.restore();
 		fenetre.focus();
 	});
+	/* A link that launched the app itself. */
+	recevoirLienAppairage(process.argv);
+	/* `neo-quiz://` opens this app (installed only: in development the
+	   registration would point Windows at a bare Electron, and take the links
+	   from the installed app). NSIS writes it at install (`protocols` of
+	   electron-builder); this call keeps it right after an update or a move. */
+	if (app.isPackaged) app.setAsDefaultProtocolClient("neo-quiz");
 
 	void app.whenReady().then(async () => {
 		/* La langue du PRINCIPAL, pour les seuls textes qu'il affiche lui-même :
@@ -800,6 +820,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			},
 			miseAJour,
 			sync,
+			prendreLienAppairage: () => { const lien = lienAppairage; lienAppairage = null; return lien; },
 			fermerPourInstaller: () => fenetre?.close(),
 			fenetre: {
 				prete: () => {

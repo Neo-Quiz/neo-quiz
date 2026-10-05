@@ -231,6 +231,23 @@ await withSrcModule(
 			r.check("an id typed in Add a device (nothing pending): no native dialog, the click on Add is the answer", confirmationRequise(false, false), false);
 			r.check("a request that came by the QR code: native dialog, pending or not", [confirmationRequise(true, true), confirmationRequise(false, true)], [true, true]);
 		});
+		/* A `neo-quiz://pair` link comes from OUTSIDE (a click in the browser):
+		   only a well-formed id with valid check characters goes on. */
+		await cas(r, "lienAppairageExterne", async () => {
+			const { lienAppairageExterne, lienDansArguments } = regles;
+			r.check("a valid link, its name cleaned and kept",
+				lienAppairageExterne(`neo-quiz://pair?device=${ID.toLowerCase()}&name=Laptop%E2%80%AE%0A`), `neo-quiz://pair?device=${ID}&name=Laptop`);
+			r.check("no name: the id alone", lienAppairageExterne(`neo-quiz://pair?device=${ID}`), `neo-quiz://pair?device=${ID}`);
+			r.check("wrong check characters are refused",
+				lienAppairageExterne(`neo-quiz://pair?device=${ID.slice(0, 3)}${ID[3] === "A" ? "B" : "A"}${ID.slice(4)}`), null);
+			r.check("another scheme or host is refused",
+				[lienAppairageExterne(`https://pair?device=${ID}`), lienAppairageExterne(`neo-quiz://open?device=${ID}`)], [null, null]);
+			r.check("junk is refused, never thrown on",
+				[lienAppairageExterne("neo-quiz:"), lienAppairageExterne(42), lienAppairageExterne(`neo-quiz://pair?device=${ID}&name=${"x".repeat(600)}`)], [null, null, null]);
+			r.check("found among the arguments of a second instance",
+				lienDansArguments(["C:\\neo-quiz.exe", "--flag", `neo-quiz://pair?device=${ID}&name=PC`]), `neo-quiz://pair?device=${ID}&name=PC`);
+			r.check("no link among the arguments", lienDansArguments(["C:\\neo-quiz.exe"]), null);
+		});
 
 		await cas(r, "recent changes", async () => {
 			const { changementDepuis, ajouterChangement } = regles;
