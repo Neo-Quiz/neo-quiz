@@ -17,7 +17,7 @@
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
-import { checkClaudeCode, checkCodex, refreshCliCaches } from "./ai-providers";
+import { checkClaudeCode, checkCodex, refreshCliCaches, setBrandLogo } from "./ai-providers";
 
 export type OutilMaj = "claude" | "codex";
 
@@ -29,6 +29,8 @@ export interface MajCli {
 
 const PAQUETS: Record<OutilMaj, string> = { claude: "@anthropic-ai/claude-code", codex: "@openai/codex" };
 const NOMS: Record<OutilMaj, string> = { claude: "Claude Code", codex: "Codex" };
+/** The brand logo shown before each name (`BRAND_LOGOS` keys). */
+const LOGOS: Record<OutilMaj, string> = { claude: "claude", codex: "openai" };
 /** The latest versions are asked again after six hours at most. */
 const TTL_MS = 6 * 60 * 60 * 1000;
 /** An update downloads a binary: five minutes before giving up. */
@@ -110,8 +112,7 @@ function ignorer(m: MajCli): void {
 
 /**
  * Mounts the banner into `parent` when an update is available: one row per
- * CLI ("Codex 0.159.0 → 0.160.0", Update), the line that says why, and a
- * close button. Empty otherwise. `apres` runs after a successful update
+ * CLI (logo, "Codex 0.159.0 → 0.160.0", Update) and a close button. Empty otherwise. `apres` runs after a successful update
  * (the page re-reads its providers and models). Returns the unmount.
  */
 export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: { fermable?: boolean } = {}): () => void {
@@ -138,7 +139,9 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 		}
 		for (const m of visibles) {
 			const l = ajouter(zone, "div", "qbd-cli-maj-ligne");
-			ajouter(l, "span", "qbd-cli-maj-nom", NOMS[m.outil]);
+			const nom = ajouter(l, "span", `qbd-cli-maj-nom is-${m.outil}`);
+			setBrandLogo(ajouter(nom, "span", "qbd-cli-maj-logo"), LOGOS[m.outil]);
+			ajouter(nom, "span", undefined, NOMS[m.outil]);
 			ajouter(l, "span", "qbd-cli-maj-versions", `${m.installee} → ${m.derniere}`);
 			const b = ajouter(l, "button", "qbd-cli-maj-bouton");
 			b.type = "button";
@@ -170,7 +173,6 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 				});
 			});
 		}
-		ajouter(zone, "p", "qbd-cli-maj-pied", t("ai.update.why"));
 	}
 
 	void majsDisponibles().then(peindre).catch(() => undefined);

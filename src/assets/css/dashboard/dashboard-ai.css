@@ -4642,8 +4642,8 @@
 }
 
 /* "Update available" (`dashboard/cli-updates.ts`), after MonoCode's: a small
-   panel, one row per CLI (name, installed -> latest, Update), the reason
-   under it, a close cross. */
+   panel, one row per CLI (logo and name, installed -> latest, Update), a close
+   cross. */
 .qbd-cli-maj {
 	display: flex;
 	flex-direction: column;
@@ -4665,7 +4665,11 @@
 .qbd-cli-maj-fermer:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .qbd-cli-maj-fermer svg { width: 15px; height: 15px; }
 .qbd-cli-maj-ligne { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.qbd-cli-maj-nom { font-size: 13px; font-weight: 600; color: var(--text-normal); }
+.qbd-cli-maj-nom { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-normal); }
+.qbd-cli-maj-logo { display: inline-flex; width: 16px; height: 16px; flex: none; }
+.qbd-cli-maj-logo svg { width: 100%; height: 100%; }
+/* Claude in its brand orange, as in the provider menu; ChatGPT follows the text. */
+.qbd-cli-maj-nom.is-claude .qbd-cli-maj-logo { color: #D97757; }
 .qbd-cli-maj-versions {
 	flex: 1 1 auto;
 	font-family: "Neo Quiz Mono", var(--font-monospace);
@@ -4688,4 +4692,3 @@
 @media (prefers-reduced-motion: reduce) {
 	.qbd-cli-maj-bouton.is-loading .qbd-cli-maj-bouton-icone svg { animation: none; }
 }
-.qbd-cli-maj-pied { margin: 0; font-size: 12px; color: var(--text-muted); }

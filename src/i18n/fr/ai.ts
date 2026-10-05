@@ -224,7 +224,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.update.updating": "Mise à jour…",
 	"ai.update.failed": "{name} n'a pas pu être mis à jour.",
 	"ai.update.done": "{name} est à jour ({version}).",
-	"ai.update.why": "Les nouveaux modèles demandent souvent la dernière version.",
 	"ai.status.codexMissing": "Codex CLI non installé",
 	"ai.status.antigravityOk": "Antigravity CLI v{version}",
 	"ai.status.antigravityMissing": "Antigravity CLI non installé",

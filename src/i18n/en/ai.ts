@@ -245,7 +245,6 @@ export const EN_AI = {
 	"ai.update.updating": "Updating…",
 	"ai.update.failed": "{name} could not be updated.",
 	"ai.update.done": "{name} is up to date ({version}).",
-	"ai.update.why": "New models often need the latest version.",
 	"ai.status.codexMissing": "Codex CLI not installed",
 	"ai.status.antigravityOk": "Antigravity CLI v{version}",
 	"ai.status.antigravityMissing": "Antigravity CLI not installed",
