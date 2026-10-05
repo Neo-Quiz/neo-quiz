@@ -310,7 +310,10 @@ export function openNewFolderModal(
 				   hors des dossiers ouverts. `path` est déjà calculé deux lignes
 				   plus haut, c'est là qu'on créé le dossier. */
 				const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-				if (!overrides[clean]) overrides[clean] = { name: clean, path };
+				/* An entry left WITHOUT a path (color or UE set on a folder that
+				   later disappeared) still gets this one: kept as it was, the new
+				   folder would show no card and stay unwritable. */
+				overrides[clean] = { ...(overrides[clean] || {}), name: overrides[clean]?.name || clean, path };
 				ctx.settings.quizzesModuleOverrides = overrides;
 				ctx.saveSettings().catch(() => {});
 				m.close();

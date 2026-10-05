@@ -180,8 +180,9 @@ export async function importSharedFolder(
 	const folderKey = folderPath.split("/").pop() as string;
 	const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
 	/* The card carries the FOLDER name, suffix included: two imports of the
-	   same archive must not give two cards both called "Demo". */
-	if (!overrides[folderKey]) overrides[folderKey] = { name: folderKey };
+	   same archive must not give two cards both called "Demo". With its PATH:
+	   only a declared folder with one shows as a card (`declaredFolders`). */
+	overrides[folderKey] = { ...(overrides[folderKey] || {}), name: overrides[folderKey]?.name || folderKey, path: folderPath };
 	ctx.settings.quizzesModuleOverrides = overrides;
 	ctx.saveSettings().catch(() => {});
 	annoncerImport(folderKey, written);

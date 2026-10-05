@@ -8,7 +8,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
 import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
-import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, estLeSas, modulesAffiches } from "./quiz-modules";
+import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, declaredFolders, estLeSas, modulesAffiches } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
 import { renderFolderProgress } from "./folder-progress";
@@ -143,7 +143,7 @@ export function renderQuizGrid(
 	// dans la section « Archivés » (sinon elle resterait en grille à 0 quiz).
 	const sasVide = deps.ctx.generatedFolder?.();
 	const modules = modulesAffiches(filtered, stats, map,
-		Object.keys(deps.ctx.settings.quizzesModuleOverrides || {}), archivedFolders, sasVide).filter(garde);
+		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), archivedFolders, sasVide).filter(garde);
 	if (!garder && modules.length === 0 && archivedQuizzes.length === 0 && archivedFolders.length === 0) {
 		ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.empty"));
 		return;

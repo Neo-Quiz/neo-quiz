@@ -241,6 +241,29 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ estLeSas }) => {
 	r.done();
 });
 
+/* A DECLARED FOLDER IS ONE WITH A PATH (2026-10-05): an override without one
+   (an archive imported as "X (2)", then deleted from the disk) kept an empty
+   "X" card on the page forever, with no path and nowhere to write. */
+await withSrcModule("src/dashboard/quiz-modules.ts", async ({ declaredFolders, modulesAffiches }) => {
+	const r = makeReporter("Module — dossiers déclarés");
+	const overrides = {
+		"XTI301": { color: "#3b82f6", path: "Neo Quiz/XTI301" },
+		"XTI301 (2)": { name: "XTI301" },
+		"Templates": { color: "#b6b6b6" },
+	};
+	r.check("seuls les overrides qui portent un chemin", declaredFolders(overrides), ["XTI301"]);
+	r.check("aucun override", declaredFolders(undefined), []);
+	const map = { byFolder: new Map(), ueOrder: [] };
+	r.check("le fantôme sans chemin ne fait aucune carte",
+		modulesAffiches([], {}, map, declaredFolders(overrides), [], undefined).map(g => g.folder), ["XTI301"]);
+	/* A pathless override still dresses a folder its QUIZZES reveal: only the
+	   empty card goes, never a folder with a quiz in it. */
+	r.check("un dossier sans chemin déclaré garde sa carte s'il contient un quiz",
+		modulesAffiches([{ path: "Personal/Templates/T.md", title: "T" }], {}, map, declaredFolders(overrides), [], undefined)
+			.map(g => g.folder).sort(), ["Templates", "XTI301"]);
+	r.done();
+});
+
 /* LE CHEMIN AU PIED D'UNE CARTE DE DOSSIER, coupé AU MILIEU (2026-09-27) :
    la tête (racine, intermédiaires) se tronque en CSS, la queue — le dernier
    segment avec son séparateur — reste entière. Une queue vide ou réduite à

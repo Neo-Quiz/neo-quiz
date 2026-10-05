@@ -4,7 +4,7 @@ import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
-import { buildUeGroups, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
+import { buildUeGroups, declaredFolders, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
 import { poserLogoObsidian } from "./brand-icons";
@@ -510,7 +510,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			const archives = ctx.settings.quizzesArchivedFolders || [];
 			const sas = ctx.generatedFolder?.();
 			const groupes = modulesAffiches(ctx.scanner.getQuizzes(), {}, map,
-				Object.keys(ctx.settings.quizzesModuleOverrides || {}), archives, sas)
+				declaredFolders(ctx.settings.quizzesModuleOverrides), archives, sas)
 				.filter(g => g.path && g.path !== dossierActuel && !archives.includes(g.folder));
 			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
 			   au lieu d'un second menu qui remplaçait le premier au clic. */

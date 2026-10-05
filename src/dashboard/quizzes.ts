@@ -15,7 +15,7 @@ import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
 import { moduleIcon } from "./module-icons";
-import { modulesAffiches, estLeSas } from "./quiz-modules";
+import { declaredFolders, modulesAffiches, estLeSas } from "./quiz-modules";
 import type { ModuleGroup } from "./quiz-modules";
 import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
@@ -255,7 +255,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (!ctx.renderGroupingSelect) return;
 		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
-			Object.keys(ctx.settings.quizzesModuleOverrides || {}), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
+			declaredFolders(ctx.settings.quizzesModuleOverrides), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
 		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
 		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
 		const TOUS = "";

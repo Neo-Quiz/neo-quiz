@@ -23,6 +23,7 @@ release notes.
 ### Fixed
 - A pairing request you ignored no longer comes back at the next connection attempt.
 - A pairing request left unanswered for one minute goes away on its own.
+- A deleted folder no longer leaves an empty card behind on the Folders page.
 - The Learn and the Test of a course are always shown together; the setting to separate them is gone.
 - In the app menu, "Display" no longer stays highlighted while the pointer rests on the menu's empty edges.
 

@@ -65,6 +65,16 @@ export interface ModuleOverride {
 	   d'effet, aucun lecteur ne les a jamais relues. */
 }
 
+/** The folders shown as a card even with no quiz: only the overrides that
+    carry a `path`. An override without one is cosmetic data (color, icon, UE)
+    for a folder its quizzes reveal; on its own it names no folder at all.
+    Counting every key used to keep a card alive after its folder was gone
+    from the disk: an archive imported as "X (2)", then deleted, left an empty
+    "X" card behind forever, with no path and nowhere to write. */
+export function declaredFolders(overrides: Record<string, ModuleOverride> | undefined): string[] {
+	return Object.entries(overrides || {}).filter(([, ov]) => !!ov?.path).map(([key]) => key);
+}
+
 /** Applique les overrides réglages PAR-DESSUS la table issue de la note.
     Retourne une nouvelle map (l'originale, mise en cache, reste intacte). */
 export function applyModuleOverrides(map: ModuleMap, overrides: Record<string, ModuleOverride>): ModuleMap {
