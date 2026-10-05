@@ -1743,3 +1743,10 @@
 @media (prefers-reduced-motion: reduce) {
 	.qbd-quizzes-fab { transition: none; }
 }
+
+/* On `<body>`, they show only while the folders grid is on screen (a folder
+   opened, another tab, a modal: gone). */
+body:not(:has(.qbd-quizzes-group)) > .qbd-quizzes-fab,
+body:has(.modal-container) > .qbd-quizzes-fab {
+	display: none;
+}

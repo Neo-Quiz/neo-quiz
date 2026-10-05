@@ -95,23 +95,21 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     }
                     imageTintList = ColorStateList.valueOf(if (on) active else muted)
                 }
-                // The active tab glows softly: a faint radial light behind its icon (2026-10-05).
+                // The active tab lights up: a soft white pill behind its icon (2026-10-05).
                 background = if (on) GradientDrawable().apply {
-                    gradientType = GradientDrawable.RADIAL_GRADIENT
-                    gradientRadius = dp(16).toFloat()
-                    colors = intArrayOf(0x40FFFFFF, 0x00FFFFFF)
+                    cornerRadius = dp(14).toFloat()
+                    setColor(0x29FFFFFF)
                 } else null
+                setPadding(dp(16), dp(3), dp(16), dp(3))
                 wasActive[id] = on
             }
-            tab.addView(icon, LayoutParams(dp(25), dp(25)))
+            tab.addView(icon, LayoutParams(dp(57), dp(31)))
             tab.addView(
                 TextView(context).apply {
                     text = item.optString("label")
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                     typeface = Typeface.create(Typeface.DEFAULT, 600, false)
                     setTextColor(if (on) active else muted)
-                    // Same soft light around the active label.
-                    if (on) setShadowLayer(dp(8).toFloat(), 0f, 0f, 0x99FFFFFF.toInt())
                     maxLines = 1
                     setPadding(0, dp(1), 0, 0)
                 },

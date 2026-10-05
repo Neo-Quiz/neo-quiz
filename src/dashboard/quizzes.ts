@@ -290,11 +290,14 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   top bar opens it, with the number of quizzes it holds (0 while empty or
 	   not created yet). Opening goes through `openModule`, like a card did, so
 	   the same sheet transition plays. Recognised by its PATH. */
-	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, flottant = false): void {
+	/** The phone's floating buttons, on `<body>` (see `render`). */
+	let boutonsFlottants: HTMLElement[] = [];
+
+	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, flottant = false): HTMLElement | null {
 		const sas = ctx.generatedFolder?.();
-		if (!sas) return;
+		if (!sas) return null;
 		const groupe = modulesAffiches(quizzes, stats, effectiveMap(), [], [], sas).find(m => estLeSas(m, sas));
-		if (!groupe) return;
+		if (!groupe) return null;
 		/* On a phone it floats at the bottom left, where StudySmarter puts its
 		   blue button (2026-10-05): the top keeps one row of filters. */
 		const btn = ajouter(parent, "button", flottant
@@ -306,11 +309,14 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		ajouter(label, "span", undefined, t("ai.side.generated"));
 		ajouter(label, "span", "qbd-quizzes-node-badge", String(groupe.quizzes.length));
 		btn.addEventListener("click", () => openModule(groupe.folder));
+		return btn;
 	}
 
 	function render(container: HTMLElement): void {
 		containerRef = container;
 		container.replaceChildren();
+		for (const f of boutonsFlottants) f.remove();
+		boutonsFlottants = [];
 
 		// Entry transition (spec 2026-07-20): the class is set ONLY when the
 		// view changes — mechanism shared with the home page (view-enter.ts).
@@ -507,11 +513,17 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			/* ON A PHONE (2026-10-05, StudySmarter's Library): the top keeps ONE
 			   row, the two filters; "Generated quizzes" floats at the bottom
 			   left and "New folder" is a round + at the bottom right. */
+			/* The floating buttons live on `<body>`: an ancestor of the page
+			   makes `position: fixed` relative to itself on a phone, and they
+			   ended up under the last card. Removed at each render; hidden by
+			   CSS whenever the folders grid is not on screen. */
 			const mobile = currentHost().platform.isMobile;
-			renderGeneratedButton(mobile ? container : selects, quizzes, stats, mobile);
+			const genere = renderGeneratedButton(mobile ? document.body : selects, quizzes, stats, mobile);
+			if (mobile && genere) boutonsFlottants.push(genere);
 
 			if (ctx.createFolder && mobile) {
-				const fab = ajouter(container, "button", "qbd-quizzes-fab qbd-quizzes-fab--droite");
+				const fab = ajouter(document.body, "button", "qbd-quizzes-fab qbd-quizzes-fab--droite");
+				boutonsFlottants.push(fab);
 				fab.type = "button";
 				fab.setAttribute("aria-label", t("dashboard.quizzes.new"));
 				currentHost().ui.setIcon(fab, "plus");
