@@ -18,6 +18,8 @@ release notes.
 - Add a device, Recent changes and Pause sync sit in one row under the list.
 - "Disable synchronization" becomes "Pause sync" and "Resume sync".
 - Each device says "Up to date" or "Syncing, N %"; the status line on top only shows when something needs a look.
+- On phones, the Folders page keeps one row of filters, with Generated quizzes and New folder as floating buttons.
+- On phones, the active tab of the bottom bar is bright white on a soft pill, and the bar takes the cards' colour.
 
 ## [1.20.28] - 2026-10-05
 
