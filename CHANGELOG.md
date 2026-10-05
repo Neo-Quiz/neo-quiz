@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.27] - 2026-10-05
+
 ### Changed
 - The CLI update panel shows the Claude and ChatGPT logos, without the line under it.
 - Adding a device by its ID no longer asks for a second confirmation.
