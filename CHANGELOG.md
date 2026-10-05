@@ -14,7 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
-- Import is framed in white, beside New folder and in a folder alike.
+- Import is a violet button beside New folder; a quiz is imported from New quiz in its folder.
 
 ## [1.20.31] - 2026-10-05
 

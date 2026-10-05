@@ -3,7 +3,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
-import { importQuizIntoFolder, importSharedFolder } from "./folder-create";
+import { importSharedFolder } from "./folder-create";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
@@ -433,15 +433,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				ajouter(nouveau, "span", undefined, t("dashboard.quizzes.newQuiz"));
 				const dossier = cheminOuvert ?? openModuleFolder;
 				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
-				/* "Import" a quiz received, beside "New quiz" (2026-10-05): the
-				   same white-framed pill as the folders' Import. */
-				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import");
-				importer.type = "button";
-				currentHost().ui.setIcon(ajouter(importer, "span", "qbd-btn-icon"), "download");
-				ajouter(importer, "span", undefined, t("dashboard.quizzes.import"));
-				ajouter(importer, "span", "qbd-btn-ext", ".md · .zip");
-				headerActions.insertBefore(importer, nouveau);
-				importer.addEventListener("click", () => void importQuizIntoFolder(ctx, dossier, () => { if (containerRef) render(containerRef); }));
 			}
 
 			/* No "Share" button here any more (2026-09-29): the ⋯ menu below
@@ -548,8 +539,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
 			/* "Import" beside "New folder" (2026-10-05): what was received has
 			   its own button, the modal only creates. The same 3D pill as "New
-			   folder", a dark face framed in white (after the library's level row,
-			   `card/level-row--framed-3d-press`): a page action, never a modal one. */
+			   folder" in the violet of the library's 3D button
+			   (`button/cta-3d--lifted-face-shimmer`): a page action, never a
+			   modal one. A quiz is imported from "New quiz" in its folder. */
 			if (ctx.createFolder && !mobile) {
 				const importBtn = ajouter(groupWrap, "button", "qbd-btn--create qbd-btn--import qbd-quizzes-import");
 				importBtn.type = "button";
