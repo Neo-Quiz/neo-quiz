@@ -1781,3 +1781,18 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	font-weight: 500;
 	color: #b48cff;
 }
+
+/* In a folder, Import (a quiz) is framed in blue. */
+.qbd-btn--create.qbd-btn--import.qbd-btn--import-bleu {
+	--qbd-create-edge: #3d6df2;
+	border-color: #3d6df2 !important;
+}
+
+.qbd-btn--create.qbd-btn--import.qbd-btn--import-bleu:hover {
+	background: #18203a !important;
+}
+
+.qbd-btn--import.qbd-btn--import-bleu .qbd-btn-icon,
+.qbd-btn--import.qbd-btn--import-bleu .qbd-btn-ext {
+	color: #8fb0ff;
+}

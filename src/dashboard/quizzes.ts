@@ -435,7 +435,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
 				/* "Import" a quiz received, beside "New quiz" (2026-10-05): the
 				   same violet-framed pill as the folders' Import. */
-				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import");
+				/* In a folder it is framed in BLUE (2026-10-05): violet imports a
+				   folder, blue a quiz. */
+				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import qbd-btn--import-bleu");
 				importer.type = "button";
 				currentHost().ui.setIcon(ajouter(importer, "span", "qbd-btn-icon"), "download");
 				ajouter(importer, "span", undefined, t("dashboard.quizzes.import"));
