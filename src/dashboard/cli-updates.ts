@@ -87,18 +87,29 @@ export async function majsDisponibles(): Promise<MajCli[]> {
 	return out;
 }
 
-/** Runs the CLI's own update. `true` when it ended well. */
-export async function mettreAJour(outil: OutilMaj): Promise<boolean> {
+/** The last meaningful line a failed update printed: what the panel shows
+    as the reason. Colour codes and blank lines dropped, at most 240 chars. */
+export function raisonEchec(stderr: string, stdout: string): string {
+	// eslint-disable-next-line no-control-regex
+	const lignes = `${stderr}\n${stdout}`.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+	return (lignes[lignes.length - 1] ?? "").slice(0, 240);
+}
+
+export type ResultatMaj = { ok: true } | { ok: false; raison: string };
+
+/** Runs the CLI's own update. On failure, the reason it gave (2026-10-05:
+    a bare "could not be updated" left the owner with nothing to do). */
+export async function mettreAJour(outil: OutilMaj): Promise<ResultatMaj> {
 	try {
 		const r = await requireHost("process").run({ tool: outil, args: ["update"], stdin: "", timeoutMs: DUREE_MAX_MS });
-		if (r.code !== 0) return false;
-	} catch {
-		return false;
+		if (r.code !== 0) return { ok: false, raison: raisonEchec(r.stderr, r.stdout) || t("ai.update.noReason", { code: String(r.code ?? "?") }) };
+	} catch (e) {
+		return { ok: false, raison: e instanceof Error ? e.message.slice(0, 240) : String(e).slice(0, 240) };
 	}
 	/* The new version, and the models it knows, at once: the version probes
 	   are asked again and the CLI caches re-read. */
 	await Promise.all([outil === "claude" ? checkClaudeCode(true) : checkCodex(true), refreshCliCaches().catch(() => false)]);
-	return true;
+	return { ok: true };
 }
 
 /** A dismissed update stays hidden until a newer one comes out (per viewer). */
@@ -139,6 +150,7 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 		}
 		for (const m of visibles) {
 			const l = ajouter(zone, "div", "qbd-cli-maj-ligne");
+			let erreur: HTMLElement | null = null;
 			const nom = ajouter(l, "span", `qbd-cli-maj-nom is-${m.outil}`);
 			setBrandLogo(ajouter(nom, "span", "qbd-cli-maj-logo"), LOGOS[m.outil]);
 			ajouter(nom, "span", undefined, NOMS[m.outil]);
@@ -155,10 +167,23 @@ export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: {
 				icone.replaceChildren();
 				currentHost().ui.setIcon(icone, "loader");
 				libelle.textContent = t("ai.update.updating");
-				void mettreAJour(m.outil).then(ok => {
+				erreur?.remove();
+				erreur = null;
+				void mettreAJour(m.outil).then(res => {
 					if (demonte) return;
-					if (!ok) {
-						currentHost().ui.notice(t("ai.update.failed", { name: NOMS[m.outil] }));
+					if (!res.ok) {
+						/* Why it failed, then what to do: the npm command to run by
+						   hand, and the package's page (2026-10-05). */
+						erreur = ajouter(zone, "div", "qbd-cli-maj-erreur");
+						l.after(erreur);
+						ajouter(erreur, "p", "qbd-cli-maj-erreur-titre", t("ai.update.failed", { name: NOMS[m.outil] }));
+						if (res.raison) ajouter(erreur, "p", "qbd-cli-maj-erreur-raison", res.raison);
+						ajouter(erreur, "p", "qbd-cli-maj-erreur-aide", t("ai.update.manual"));
+						ajouter(erreur, "code", "qbd-cli-maj-erreur-cmd", `npm install -g ${PAQUETS[m.outil]}@latest`);
+						const lien = ajouter(erreur, "a", "qbd-cli-maj-erreur-lien", t("ai.update.packagePage"));
+						const url = `https://www.npmjs.com/package/${PAQUETS[m.outil]}`;
+						lien.href = url;
+						lien.addEventListener("click", ev => { ev.preventDefault(); void currentHost().shell.openUrl(url); });
 						b.disabled = false;
 						b.classList.remove("is-loading");
 						b.removeAttribute("aria-busy");

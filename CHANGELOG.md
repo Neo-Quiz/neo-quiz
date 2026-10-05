@@ -16,6 +16,8 @@ release notes.
 ### Changed
 - In a folder, the view tabs are centred, at a fixed width.
 - Import takes the translucent look of a secondary button.
+- A failed CLI update says why, and gives the command to run by hand with a link to the package page.
+- New quiz lists its options in the order and colours of Create a folder.
 
 ## [1.20.32] - 2026-10-05
 
