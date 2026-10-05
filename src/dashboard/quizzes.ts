@@ -3,7 +3,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
-import { importSharedFolder } from "./folder-create";
+import { importQuizIntoFolder, importSharedFolder } from "./folder-create";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
@@ -433,6 +433,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				ajouter(nouveau, "span", undefined, t("dashboard.quizzes.newQuiz"));
 				const dossier = cheminOuvert ?? openModuleFolder;
 				nouveau.addEventListener("click", () => createQuiz(dossier, () => { if (containerRef) render(containerRef); }));
+				/* "Import" a quiz received, beside "New quiz" (2026-10-05): the
+				   same violet-framed pill as the folders' Import. */
+				const importer = ajouter(headerActions, "button", "qbd-btn--create qbd-btn--import");
+				importer.type = "button";
+				currentHost().ui.setIcon(ajouter(importer, "span", "qbd-btn-icon"), "download");
+				ajouter(importer, "span", undefined, t("dashboard.quizzes.import"));
+				ajouter(importer, "span", "qbd-btn-ext", ".md · .zip");
+				headerActions.insertBefore(importer, nouveau);
+				importer.addEventListener("click", () => void importQuizIntoFolder(ctx, dossier, () => { if (containerRef) render(containerRef); }));
 			}
 
 			/* No "Share" button here any more (2026-09-29): the ⋯ menu below
@@ -538,14 +547,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// 2026-07-20 — le header racine a disparu avec lui). Absent côté
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
 			/* "Import" beside "New folder" (2026-10-05): what was received has
-			   its own button, the modal only creates. The library's 3D button,
-			   translucent: a page action, never a modal one. */
+			   its own button, the modal only creates. The same 3D pill as "New
+			   folder", a dark face framed in violet (the library's level row,
+			   `card/level-row--framed-3d-press`): a page action, never a modal one. */
 			if (ctx.createFolder && !mobile) {
-				const importBtn = ajouter(groupWrap, "button", "fx-cta3d fx-cta3d--ghost qbd-quizzes-import");
+				const importBtn = ajouter(groupWrap, "button", "qbd-btn--create qbd-btn--import qbd-quizzes-import");
 				importBtn.type = "button";
-				const face = ajouter(importBtn, "span", "fx-cta3d__face");
-				currentHost().ui.setIcon(ajouter(face, "span", "qbd-quizzes-import-icone"), "download");
-				ajouter(face, "span", undefined, t("dashboard.quizzes.import"));
+				currentHost().ui.setIcon(ajouter(importBtn, "span", "qbd-btn-icon"), "download");
+				ajouter(importBtn, "span", undefined, t("dashboard.quizzes.import"));
+				/* The format it takes, always shown (a touch screen has no hover). */
+				ajouter(importBtn, "span", "qbd-btn-ext", ".zip");
 				importBtn.addEventListener("click", () => {
 					void importSharedFolder(ctx, effectiveMap(), quizzes, () => { if (containerRef) render(containerRef); });
 				});

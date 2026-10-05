@@ -1751,30 +1751,33 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	display: none;
 }
 
-/* "Import", the library's 3D button beside "New folder": sized to sit on
-   the same row, its icon before the label. */
+/* "Import" beside "New folder" (and beside "New quiz" in a folder): the
+   same 3D pill, a dark face framed in violet with a violet edge, after the
+   library's level row (`card/level-row--framed-3d-press`). */
+.qbd-btn--create.qbd-btn--import,
+.qbd-quizzes-group .qbd-btn--create.qbd-btn--import {
+	--qbd-create-edge: #7a45e6;
+	background: #161622 !important;
+	color: #f2ecff !important;
+	border: 2px solid #7a45e6 !important;
+}
+
+.qbd-btn--create.qbd-btn--import:hover,
+.qbd-quizzes-group .qbd-btn--create.qbd-btn--import:hover {
+	background: #1f1a33 !important;
+}
+
+.qbd-btn--create.qbd-btn--import .qbd-btn-icon {
+	color: #b48cff;
+}
+
 .qbd-quizzes-group .qbd-quizzes-import {
-	--fx-pad-y: 9px;
-	--fx-pad-x: 16px;
-	--fx-fs: 14px;
-	--fx-depth: 3px;
 	margin-left: auto;
-	font-weight: 600;
 }
 
-.qbd-quizzes-group .qbd-quizzes-import + .qbd-btn--create {
-	margin-left: 10px;
-}
-
-.qbd-quizzes-import .fx-cta3d__face {
-	gap: 8px;
-}
-
-.qbd-quizzes-import-icone {
-	display: inline-flex;
-}
-
-.qbd-quizzes-import-icone svg {
-	width: 16px;
-	height: 16px;
+/* The format an Import takes, small and quiet after its label. */
+.qbd-btn--import .qbd-btn-ext {
+	font-size: 11.5px;
+	font-weight: 500;
+	color: #b48cff;
 }

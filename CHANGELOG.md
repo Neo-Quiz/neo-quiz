@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Import, framed in violet with the format it takes, sits beside New folder and beside New quiz in a folder.
+
 ## [1.20.30] - 2026-10-05
 
 ### Changed
