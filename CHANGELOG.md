@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- In a folder, the view tabs are centred, at a fixed width.
+- Import takes the translucent look of a secondary button.
+
 ## [1.20.32] - 2026-10-05
 
 ### Changed

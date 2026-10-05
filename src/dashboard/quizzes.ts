@@ -543,9 +543,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// application (modals hors périmètre, D5) : bouton MASQUÉ (Ruling 7).
 			/* "Import" beside "New folder" (2026-10-05): what was received has
 			   its own button, the modal only creates. The same 3D pill as "New
-			   folder" in the violet of the library's 3D button
-			   (`button/cta-3d--lifted-face-shimmer`): a page action, never a
-			   modal one. A quiz is imported from "New quiz" in its folder. */
+			   folder" in the translucent colours of the library's secondary 3D
+			   button (`button/cta-3d--lifted-face-shimmer`, "Jump ahead"): a
+			   page action, never a modal one. A quiz is imported from "New quiz" in its folder. */
 			if (ctx.createFolder && !mobile) {
 				const importBtn = ajouter(groupWrap, "button", "qbd-btn--create qbd-btn--import qbd-quizzes-import");
 				importBtn.type = "button";
