@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.26] - 2026-10-05
+
 ### Changed
 - The pairing QR code no longer changes every 2 seconds: it shows this PC's ID and name.
 - A paired device has its own Rename and Remove buttons.
