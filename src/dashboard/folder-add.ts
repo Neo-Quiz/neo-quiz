@@ -33,17 +33,19 @@ function renderNewQuizOptions(c: HTMLElement, m: HostModalHandle | null, ctx: Da
 	/* Hidden when the host does not serve "ai": the same guard as the
 	   folder creation modal. From a folder, Generate arrives with this
 	   folder as destination and its documents and notes attached. */
+	/* The same order and colours as "Create a folder" (2026-10-05): by hand
+	   in blue, with the AI in green, import in violet. */
+	createOptionCard(m, c, "pencil-line", "#4573ff", t("dashboard.quizzes.createQuizEmptyTitle"), t("dashboard.folder.newQuizEmptyDesc"),
+		() => void createQuizInFolder(ctx, folder));
 	if (ctx.canOpen("ai")) {
-		createOptionCard(m, c, "sparkles", "#a78bfa", t("dashboard.folder.addGenerate"), t("dashboard.folder.newQuizAiDesc"), () => {
+		createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.folder.addGenerate"), t("dashboard.folder.newQuizAiDesc"), () => {
 			void lireContenuDossier(folder, (path) => !!ctx.scanner.getQuiz(path)).then(contenu => {
 				ctx.navigate("ai", { aiPreset: { destination: folder, attach: cheminsAJoindre(contenu) } });
 			});
 		});
 	}
-	createOptionCard(m, c, "file-plus", "#4573ff", t("dashboard.quizzes.createQuizEmptyTitle"), t("dashboard.folder.newQuizEmptyDesc"),
-		() => void createQuizInFolder(ctx, folder));
 	if (!withImport) return;
-	createOptionCard(m, c, "download", "#f5a524", t("dashboard.quizzes.createQuizImportTitle"), t("dashboard.folder.newQuizImportDesc"),
+	createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createQuizImportTitle"), t("dashboard.folder.newQuizImportDesc"),
 		() => void importQuizIntoFolder(ctx, folder, onDone));
 }
 
