@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.30] - 2026-10-05
+
 ### Changed
 - "Create a folder" drops "Open an existing folder" and brings back "Create with AI".
 - Import has its own button beside New folder.
