@@ -87,12 +87,16 @@ export async function majsDisponibles(): Promise<MajCli[]> {
 	return out;
 }
 
-/** The last meaningful line a failed update printed: what the panel shows
-    as the reason. Colour codes and blank lines dropped, at most 240 chars. */
+/** What the panel shows as the reason of a failed update: the last line
+    that names an error, else the last line printed (a CLI often ends on a
+    "retrying…" that explains nothing). Colour codes and blank lines
+    dropped, at most 240 chars. */
 export function raisonEchec(stderr: string, stdout: string): string {
 	// eslint-disable-next-line no-control-regex
 	const lignes = `${stderr}\n${stdout}`.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-	return (lignes[lignes.length - 1] ?? "").slice(0, 240);
+	const erreurs = lignes.filter(l => /\b(error|err!|failed|fail|denied|eacces|eperm|enoent|not found|unable|cannot|could not|forbidden|refused|timed? ?out)\b/i.test(l));
+	const retenues = erreurs.length ? erreurs : lignes;
+	return (retenues[retenues.length - 1] ?? "").slice(0, 240);
 }
 
 export type ResultatMaj = { ok: true } | { ok: false; raison: string };
