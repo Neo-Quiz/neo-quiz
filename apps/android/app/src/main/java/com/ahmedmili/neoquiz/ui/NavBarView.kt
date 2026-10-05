@@ -5,7 +5,6 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.util.TypedValue
@@ -95,15 +94,9 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     }
                     imageTintList = ColorStateList.valueOf(if (on) active else muted)
                 }
-                // The active tab lights up: a soft white pill behind its icon (2026-10-05).
-                background = if (on) GradientDrawable().apply {
-                    cornerRadius = dp(14).toFloat()
-                    setColor(0x29FFFFFF)
-                } else null
-                setPadding(dp(16), dp(3), dp(16), dp(3))
                 wasActive[id] = on
             }
-            tab.addView(icon, LayoutParams(dp(57), dp(31)))
+            tab.addView(icon, LayoutParams(dp(25), dp(25)))
             tab.addView(
                 TextView(context).apply {
                     text = item.optString("label")
