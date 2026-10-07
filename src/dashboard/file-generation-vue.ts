@@ -85,6 +85,8 @@ export function creerVueFile(opts: {
 	attente?: () => { text: string; documents: { name: string; path?: string }[] } | null;
 	/** The answers given to the clarifying cards (a recorded request, nothing live yet). */
 	repondre?: (requestId: string, answers: string[][]) => void;
+	/** May the pending card of this request still be answered (its state survived)? */
+	reprenable?: (requestId: string) => boolean;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -528,7 +530,7 @@ export function creerVueFile(opts: {
 		const { id: chatId, record } = opts.chat();
 		const items = threadItems(record, opts.file.lignes(), chatId);
 		for (const item of items) {
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");

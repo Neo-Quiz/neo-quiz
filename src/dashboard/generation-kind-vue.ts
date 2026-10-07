@@ -46,6 +46,8 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 	if (dejaRepondu) {
 		carte.classList.add("is-answered");
 		questions.forEach((q, i) => resume(carte, q, clarify.answers?.[i] ?? []));
+		// Never answered and no longer answerable (the page was reloaded): say so.
+		if (!clarify.answers) ajouter(carte, "div", "qbd-ai-kind-aide", t("ai.clarify.expired"));
 		return;
 	}
 	const etat = progres.get(cle) ?? { index: 0, reponses: [], envoye: false };

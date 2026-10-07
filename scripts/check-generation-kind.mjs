@@ -86,7 +86,7 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	]) r.check("clarify: " + nom + " is treated as ready", K.parseClarifyAnswer(brut), READY);
 
 	r.check("answers: one line per answered question, under the label",
-		K.formatClarifications("Précisions :", qs, [["Débutant"], ["A", "mes notes"]]), "Précisions :\n- Quel niveau ? Débutant\n- Quelles parties ? A, mes notes");
+		K.formatClarifications("Précisions :", qs, [["Débutant"], ["A", "mes notes"]]), "Précisions :\n- Quel niveau ?\n    Débutant\n- Quelles parties ?\n    A, mes notes");
 	r.check("answers: nothing answered gives nothing", K.formatClarifications("Précisions :", qs, [[], []]), "");
 
 	const p = K.clarifyPrompt("Python", ["cm1.pdf", "cm2.md"]);
@@ -94,6 +94,9 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	r.check("clarify prompt: ready, header/label/description shape, few questions, limits, vague-only, language",
 		["{\"ready\":true}", "\"questions\"", "\"header\"", "\"description\"", "at most 2", "prefer none", "2 to 4 options", "12 characters", "ONLY when the request is vague", "Ask NOTHING when the request is already precise", "NEVER ask what the attached documents already answer", "language of the request"].filter(w => !p.system.includes(w)), []);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
+	r.check("clarify prompt: when the request reveals no language, the app's language is the fallback (French or English)",
+		[K.clarifyPrompt("Python", [], "fr").system.includes("write them in French, the language of the app"), K.clarifyPrompt("Python", [], "en").system.includes("write them in English, the language of the app"), K.clarifyPrompt("Python", []).system.includes("write them in English")], [true, true, true]);
+	r.check("clarify prompt: the request's own language still comes first", K.clarifyPrompt("x", [], "fr").system.includes("in the language of the request; when the request does not reveal a language"), true);
 	r.check("clarify prompt: names only, no content line without documents", K.clarifyPrompt("x", []).user.includes("ATTACHED"), false);
 	r.done();
 });

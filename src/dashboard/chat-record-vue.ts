@@ -40,7 +40,7 @@ export function peindrePieces(parent: HTMLElement, notes: readonly { name: strin
 	}
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { ouvrir(path: string): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { ouvrir(path: string): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -53,7 +53,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 	}
 	if (q.clarify) {
 		const id = q.id;
-		peindreQuestions(tour, q.clarify, deps.repondre ? (answers) => deps.repondre?.(id, answers) : undefined, id);
+		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
 	}
 	for (const res of q.results) {
 		if (res.kind === "text") {

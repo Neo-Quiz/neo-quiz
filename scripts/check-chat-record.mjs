@@ -104,6 +104,15 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	r.check("an unknown chat or request changes nothing", [Q.answerClarify(withQ, "zz", "r1", answers, 1).changed, Q.answerClarify(withQ, "c1", "zz", answers, 1).changed], [false, false]);
 	r.check("the original list is never mutated", withQ[0].requests[0].clarify.answers, undefined);
 
+	// After a reload of the page the in-memory request is gone: only a request with no document can be rebuilt.
+	const pend = { ...base, clarify: { questions: qs, genre: "both" } };
+	r.check("the kind to generate is read back, `both` included", read([pend])[0].clarify.genre, "both");
+	r.check("an unknown kind is ignored", read([{ ...base, clarify: { questions: qs, genre: "exam" } }])[0].clarify.genre, undefined);
+	r.check("resume: a pending request with no document is rebuilt from the record (text and kind)", Q.resumeSource(read([pend])[0]), { text: "Python", genre: "both" });
+	r.check("resume: without a stored kind, the request's mode", [Q.resumeSource(read([{ ...base, mode: "practice", clarify: { questions: qs } }])[0])?.genre, Q.resumeSource(read([{ ...base, clarify: { questions: qs } }])[0])?.genre], ["practice", "learn"]);
+	r.check("resume: a request that carried a document cannot be rebuilt (its text is never kept)", Q.resumeSource(read([{ ...pend, documents: [{ name: "cm1.pdf" }] }])[0]), null);
+	r.check("resume: an answered request, or one with no questions, has nothing to resume", [Q.resumeSource(read([{ ...pend, clarify: { ...pend.clarify, answers: [["a"], ["b"]] } }])[0]), Q.resumeSource(read([base])[0])], [null, null]);
+
 	// The queue's record of the same request keeps the questions and their answers.
 	const ligne = { id: 1, etat: "prete", demande: { text: "Python", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
 	const rec = Q.recordRequest({ key: "r1", chatId: "c1", lines: [ligne] }, "d1", 50, ok.chats[0].requests[0]);

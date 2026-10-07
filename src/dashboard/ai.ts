@@ -38,7 +38,7 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { addClarify, answerClarify, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { rankFolders, suggestFolders } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
 import { decideByKeywords, formatClarifications, parseClarifyAnswer } from "./generation-kind";
@@ -404,6 +404,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		chat: chatSurEcran,
 		attente: () => attenteGenre,
 		repondre: (id, reponses) => repondreQuestions(id, reponses),
+		reprenable: (id) => reprenable(id),
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -4113,7 +4114,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		if ("questions" in reponse) {
 			const id = newRequestId();
-			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions }));
+			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre }));
 			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz });
 			notifyChatsChanged();
 		} else {
@@ -4126,11 +4127,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Every clarifying card is answered: records the answers and starts the
 	    generation, the answers appended to the request ("Details: …"). */
 	function repondreQuestions(requestId: string, reponses: string[][]): void {
-		const attente = questionsEnAttente.get(requestId);
-		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const chatId = activeChatId();
 		const requete = getChats().find(c => c.id === chatId)?.requests.find(q => q.id === requestId);
 		if (!requete?.clarify) return;
+		/* The in-memory request (documents' text included), or — after a reload
+		   of the page — what the record alone can rebuild (a request with no
+		   document). Neither: the card could not have been offered (`reprenable`). */
+		const gardee = questionsEnAttente.get(requestId);
+		const reprise = gardee ? null : resumeSource(requete);
+		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false } : null);
+		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const r = answerClarify(getChats(), chatId, requestId, reponses, Date.now());
 		if (!r.changed) return;
 		questionsEnAttente.delete(requestId);
@@ -4140,6 +4146,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
 		envoyerDansLaFile(envoi, attente.genre, { dejaVide: true, oneQuiz: attente.oneQuiz, requestId, sentAt: requete.at });
 		render(containerRef);
+	}
+
+	/** May the pending card of this request still be answered? True with its
+	    in-memory request, or when the record can rebuild it. */
+	function reprenable(requestId: string): boolean {
+		if (questionsEnAttente.has(requestId)) return true;
+		const req = getChats().flatMap(c => c.requests).find(q => q.id === requestId);
+		return !!req && resumeSource(req) !== null;
 	}
 
 	/** Un envoi par CLI part dans la FILE de l'application (spec 2026-09-26) :

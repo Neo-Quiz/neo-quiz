@@ -1372,9 +1372,10 @@
 /* Une question répondue (ou ignorée) : « Question → Réponse ». */
 .qbd-ai-kind-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px 8px; font-size: 13px; }
 .qbd-ai-kind-resume-q { color: var(--text-muted); overflow-wrap: anywhere; }
-.qbd-ai-kind-fleche { display: inline-flex; color: var(--text-faint); }
+.qbd-ai-kind-fleche { display: none; }
 .qbd-ai-kind-fleche svg { width: 14px; height: 14px; }
-.qbd-ai-kind-resume-r { color: var(--text-normal); font-weight: 600; overflow-wrap: anywhere; }
+/* The answer on its own line, under its question, indented by 1.5em. */
+.qbd-ai-kind-resume-r { flex-basis: 100%; padding-left: 1.5em; color: var(--text-normal); font-weight: 600; overflow-wrap: anywhere; }
 .qbd-ai-kind-resume-r.is-skipped { color: var(--text-faint); font-weight: 400; }
 
 /* « Ranger dans … ? » : des suggestions de dossier sous le composer, du texte

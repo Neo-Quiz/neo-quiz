@@ -26,7 +26,7 @@ export type RequestState = "done" | "failed" | "stopped";
     2026-10-07-generate-auto-kind): the questions, and the answers once all are
     given (one list of chosen labels per question, typed text included; an empty list is a skipped question).
     Absent `answers`: nothing generates yet. */
-export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][] }
+export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][]; /** The kind to generate once answered (`both` included: `mode` cannot say it). */ genre?: "learn" | "practice" | "both" }
 
 export interface ChatRequest {
 	id: string;
@@ -91,6 +91,7 @@ function readClarify(x: unknown): ChatClarify | null {
 		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options });
 	}
 	const clarify: ChatClarify = { questions };
+	if (x.genre === "learn" || x.genre === "practice" || x.genre === "both") clarify.genre = x.genre;
 	// One list per question; an EMPTY list is a skipped question.
 	if (Array.isArray(x.answers) && x.answers.length === questions.length && x.answers.every(a => Array.isArray(a) && a.every(isStr))) clarify.answers = (x.answers as string[][]).map(a => [...a]);
 	return clarify;

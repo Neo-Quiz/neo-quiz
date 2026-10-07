@@ -14,7 +14,7 @@ import {
 } from "./ai-providers";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage } from "./usage-format";
-import { t } from "../i18n";
+import { currentLang, t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
@@ -1844,7 +1844,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
-			const { system, user } = clarifyPrompt(request, documentNames);
+			const { system, user } = clarifyPrompt(request, documentNames, currentLang());
 			const plusBas = (id: string, m?: string): string => getEfforts(id, m)[0]?.value ?? "";
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);

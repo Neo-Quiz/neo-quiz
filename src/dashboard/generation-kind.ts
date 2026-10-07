@@ -96,16 +96,16 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	return { questions };
 }
 
-/** The answers as one block appended to the request: "Details: question: a, b" per question. */
+/** The answers as one block appended to the request: "- question" then the answer indented under it, per question. */
 export function formatClarifications(label: string, questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): string {
 	const lines = questions.map((q, i) => ({ q: q.question, a: (answers[i] ?? []).map(s => s.trim()).filter(Boolean) })).filter(l => l.a.length);
-	return lines.length ? label + "\n" + lines.map(l => `- ${l.q} ${l.a.join(", ")}`).join("\n") : "";
+	return lines.length ? label + "\n" + lines.map(l => `- ${l.q}\n    ${l.a.join(", ")}`).join("\n") : "";
 }
 
 /** The instruction of the clarify call: English like every instruction to the
     model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */
-export function clarifyPrompt(request: string, documentNames: readonly string[]): { system: string; user: string } {
+export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en"): { system: string; user: string } {
 	const system = [
 		"You are an assistant inside Neo Quiz, a revision app that generates a quiz from a learner's request (Learn: a guided path that teaches a topic step by step; or a Test: questions only). Before generating, you may ask the learner a question or two, the way a coding assistant asks a multiple-choice question.",
 		"Ask FEW questions: prefer none, sometimes one, at most 2. Ask ONLY when the request is vague about something that really changes the quiz: the scope or which parts of the subject, the learner's level, the goal or deadline, the number of questions. Examples of vague requests: \"Python\", \"le CM4\", \"networks\".",
@@ -113,7 +113,7 @@ export function clarifyPrompt(request: string, documentNames: readonly string[])
 		"You have no tools; you only see the request and the names of the attached documents.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
 		"- {\"ready\":true} when nothing needs to be asked;",
-		"- otherwise {\"questions\":[{\"header\":\"<label of at most 12 characters>\",\"question\":\"<the question>\",\"multiple\":false,\"options\":[{\"label\":\"<short answer>\",\"description\":\"<one line saying what it means or covers>\"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options (\"multiple\":true when several can apply). Write the header, questions, labels and descriptions in the language of the request. Do not add an \"Other\" option: the app adds one.",
+		`- otherwise {"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options ("multiple":true when several can apply). Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
 	const user = [

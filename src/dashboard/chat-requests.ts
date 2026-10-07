@@ -177,3 +177,12 @@ export function answerClarify(chats: readonly ChatRecord[], chatId: string, requ
 	const next: ChatRequest = { ...q, clarify: { ...q.clarify, answers: answers.map(a => [...a]) } };
 	return { chats: chats.map(c => (c === chat ? { ...c, updatedAt: now, requests: c.requests.map(r => (r === q ? next : r)) } : c)), changed: true };
 }
+
+/** What a pending clarifying card needs to generate when the page lost its
+    in-memory state (a window reload, a hot reload): only a request that carried
+    NO document can be rebuilt from the record (the text of a document is never
+    kept). `null`: the card cannot be answered any more. */
+export function resumeSource(req: ChatRequest): { text: string; genre: "learn" | "practice" | "both" } | null {
+	if (!req.clarify || req.clarify.answers || req.documents.length > 0) return null;
+	return { text: req.text, genre: req.clarify.genre ?? (req.mode === "practice" ? "practice" : "learn") };
+}
