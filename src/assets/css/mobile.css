@@ -1271,3 +1271,14 @@ html.nq-mobile ::-webkit-scrollbar {
 	font-size: 17px;
 	line-height: 1.2;
 }
+
+/* Played quiz header on the phone (2026-10-07): the mode pill keeps its icon
+   only — "Apprendre"/"Test" took the room the title needs. */
+.is-mobile .qbd-qz-mode-label {
+	display: none;
+}
+.is-mobile .qbd-qz-mode {
+	padding-left: 8px;
+	padding-right: 8px;
+	gap: 0;
+}

@@ -145,7 +145,9 @@ export async function openQuizPage(
 	   nothing a player needs. */
 	const mode = ajouter(titrage, "span", "qbd-qz-mode");
 	currentHost().ui.setIcon(ajouter(mode, "span", "qbd-qz-mode-icon"), quizModeIcon(entry.mode));
-	ajouter(mode, "span", undefined, quizModeLabel(entry.mode));
+	// The word is hidden on the phone (mobile.css): the icon says it, the title gets the room.
+	const libelle = ajouter(mode, "span", "qbd-qz-mode-label", quizModeLabel(entry.mode));
+	mode.setAttribute("aria-label", libelle.textContent ?? "");
 	ajouter(titrage, "h2", "qbd-qz-title", entry.title);
 
 	/* The container given to the engine, and THAT ALONE: the engine sets
