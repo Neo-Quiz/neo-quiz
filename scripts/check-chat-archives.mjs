@@ -78,7 +78,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	r.check("the Learn step", sys("learn", 0).includes("THIS STEP: the Learn path"), true);
 	r.check("Test 1 is the fundamentals", sys("practice", 1).includes("FUNDAMENTALS"), true);
 	r.check("the last Test is at the exam's level", sys("practice", 3).includes("AT THE EXAM'S LEVEL"), true);
-	r.check("a preparation asks one question per examinable point", sys("learn", 0).includes("as many questions as the source has EXAMINABLE POINTS"), true);
+	r.check("a preparation asks one question per examinable point", sys("learn", 0).includes("cover EVERY EXAMINABLE POINT") && sys("learn", 0).includes("NEVER two questions on the same point"), true);
 	r.check("a Learn cites its sources", composerPrompts("x", { mode: "learn" }).systemPrompt.includes('"cite"'), true);
 	r.check("a Test does not", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('"cite"'), false);
 	r.check("no preparation block without /exam", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("EXAM PREPARATION"), false);
@@ -121,7 +121,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ lirePlan }) => {
 await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {
 	const r = makeReporter("/exam plan step size");
 	const sys = (mode) => composerPrompts("x", { mode, preparation: { examen: { nom: "CC", date: "2026-10-02", module: "XTI301" }, palier: 0, paliers: 3, titre: "Listes", focus: "les listes", plan: ["Listes", "Tuples"], etape: 1, etapes: 2 } }).systemPrompt;
-	r.check("a Learn step: one question per examinable point", sys("learn").includes("as many questions as the source has EXAMINABLE POINTS"), true);
+	r.check("a Learn step: one question per examinable point", sys("learn").includes("cover EVERY EXAMINABLE POINT") && sys("learn").includes("NEVER two questions on the same point"), true);
 	r.check("a Test step: one question per examinable point", sys("practice").includes("as many questions as the source has EXAMINABLE POINTS"), true);
 	r.check("never an uncapped quantity", /no fixed (maximum|number)/i.test(sys("learn") + sys("practice")), false);
 	r.done();

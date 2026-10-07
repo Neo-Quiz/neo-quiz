@@ -280,6 +280,8 @@ jobs:
       # a tombstone survives the bound.
       - name: Chat record
         run: npm run check:chat-record
+      - name: Chat archives and the /exam prompts
+        run: npm run check:chat-archives
       # WHICH KIND A GENERATE REQUEST WANTS: keywords decide only when they
       # say one kind plainly, the model's answer is parsed strictly, and its
       # prompt carries document names, never content.
