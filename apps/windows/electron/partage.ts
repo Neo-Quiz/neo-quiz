@@ -20,7 +20,7 @@
    `npm run check:partage` les éprouve sans rien lancer.
 ══════════════════════════════════════════════════════════ */
 
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -67,7 +67,7 @@ export const VARIABLE_FICHIER = "NEO_QUIZ_PARTAGE_FICHIER";
     s'il est rendu (un clic humain ne partage pas plus vite) ; il retombe de
     lui-même après `delaiMax` ms, pour qu'un processus qui ne rendrait jamais
     la main ne bloque pas le partage jusqu'au redémarrage. */
-export function creerVerrou(delaiMax: number, intervalleMin = 0, maintenant: () => number = Date.now): { prendre(): number | null; rendre(jeton: number): void } {
+export function creerVerrou(delaiMax: number, intervalleMin = 0, maintenant: () => number = Date.now, recupere?: () => void): { prendre(): number | null; rendre(jeton: number): void } {
 	let pris: number | null = null;
 	let dernier: number | null = null;
 	let compteur = 0;
@@ -78,6 +78,9 @@ export function creerVerrou(delaiMax: number, intervalleMin = 0, maintenant: () 
 			const t = maintenant();
 			if (pris !== null && t - pris < delaiMax) return null;
 			if (dernier !== null && t - dernier < intervalleMin) return null;
+			// A lock older than its bound is taken over (and logged): whatever
+			// bug left it held can never block sharing for good.
+			if (pris !== null) recupere?.();
 			pris = dernier = t;
 			jetonCourant = ++compteur;
 			return jetonCourant;
@@ -153,8 +156,14 @@ export async function ecrireTemporaire(nom: string, octets: Uint8Array): Promise
    needs travels in environment variables it reads itself (the title, the
    text, the absolute path of a temporary file this module wrote, the point
    to centre on). Nothing from the window is ever spliced into the script.
-   The process ends when the panel is cancelled, 15 s after an app was
-   chosen (the target reads the file by then), or after five minutes. */
+   The script prints `SHOWN`, `CHOSEN` or `ERROR:<message>` on stdout. It
+   ends 15 s after an app was chosen (the target reads the file by then) or
+   after 90 s; the main process also kills it (30 s without `SHOWN`, 90 s in
+   all). `DataTransferManager` has NO cancel event (its events are
+   `DataRequested`, `TargetApplicationChosen`, `ShareProvidersRequested`,
+   checked on Windows 11 build 26300): the old `add_ShareCanceled`
+   subscription threw, was swallowed, and a dismissed panel left the process
+   and the lock alive for five and six minutes. */
 
 export const VARIABLES_NATIF = {
 	titre: "NEO_QUIZ_PARTAGE_TITRE",
@@ -164,8 +173,19 @@ export const VARIABLES_NATIF = {
 	y: "NEO_QUIZ_PARTAGE_Y",
 } as const;
 
-/** One native panel at a time, two seconds at least between two. */
-export const verrouNatif = creerVerrou(6 * 60_000, 2_000);
+/** Without a "panel shown" signal after this long, the process is killed. */
+export const BORNE_SANS_SIGNAL_MS = 30_000;
+/** Hard bound on one share, whatever happens (was 6 minutes, the cause of
+    "A share is already in progress" staying on screen with no panel). */
+export const BORNE_TOTALE_MS = 90_000;
+
+const journalRecuperation = (nom: string) => () => console.warn(`[partage] ${nom}: lock older than its bound taken over`);
+/** One native FILE share at a time. No minimum spacing any more: a double
+    click joins the first call (see `canaux.ts`) instead of raising a "busy"
+    toast with nothing on screen. */
+export const verrouNatif = creerVerrou(BORNE_TOTALE_MS, 0, Date.now, journalRecuperation("file"));
+/** The sync-ID share has its own lock: a stuck quiz share must not block it. */
+export const verrouSync = creerVerrou(BORNE_TOTALE_MS, 0, Date.now, journalRecuperation("sync"));
 
 export function scriptPartageNatif(): string {
 	return `$ErrorActionPreference = 'Stop'
@@ -204,13 +224,14 @@ if ($chemin) {
 	$null = $tache.Wait(-1)
 	$script:fichier = $tache.Result
 }
+function Signal($s) { [Console]::Out.WriteLine($s); [Console]::Out.Flush() }
 $f = New-Object System.Windows.Forms.Form
 $f.FormBorderStyle = 'None'; $f.ShowInTaskbar = $false; $f.Width = 1; $f.Height = 1; $f.Opacity = 0.01
 $x = 0; $y = 0
 if ([int]::TryParse($env:${VARIABLES_NATIF.x}, [ref]$x) -and [int]::TryParse($env:${VARIABLES_NATIF.y}, [ref]$y)) {
 	$f.StartPosition = 'Manual'; $f.Location = New-Object System.Drawing.Point $x, $y
 } else { $f.StartPosition = 'CenterScreen' }
-$fin = New-Object System.Windows.Forms.Timer; $fin.Interval = 300000; $fin.Add_Tick({ $f.Close() }); $fin.Start()
+$fin = New-Object System.Windows.Forms.Timer; $fin.Interval = 90000; $fin.Add_Tick({ $f.Close() }); $fin.Start()
 $f.Add_Shown({
 	try {
 		$script:dtm = [NeoQuiz.NativeShare]::ForWindow($dtmType, $f.Handle)
@@ -219,10 +240,10 @@ $f.Add_Shown({
 			if ($script:fichier) { $e.Request.Data.SetStorageItems([Windows.Storage.IStorageItem[]]@($script:fichier)) }
 			elseif ($texte) { $e.Request.Data.SetText($texte) }
 		})
-		$script:dtm.add_TargetApplicationChosen({ param($s, $e) $fin.Stop(); $fin.Interval = 15000; $fin.Start() })
-		try { $script:dtm.add_ShareCanceled({ param($s, $e) $f.Close() }) } catch { }
+		$script:dtm.add_TargetApplicationChosen({ param($s, $e) Signal 'CHOSEN'; $fin.Stop(); $fin.Interval = 15000; $fin.Start() })
 		[NeoQuiz.NativeShare]::Show($dtmType, $f.Handle)
-	} catch { [Console]::Error.WriteLine($_.Exception.Message); $f.Close() }
+		Signal 'SHOWN'
+	} catch { Signal ('ERROR:' + ($_.Exception.Message -replace '[\\r\\n]+', ' ')); $f.Close() }
 })
 [System.Windows.Forms.Application]::Run($f)
 `;
@@ -238,11 +259,71 @@ export interface PartageNatif {
 	centre?: { x: number; y: number };
 }
 
-/** Starts the hidden PowerShell that opens the panel. Resolves `true` once
-    it is LAUNCHED (the panel waits for the user, sometimes minutes); `fin`
-    is called when PowerShell exits, which is when the lock is released. */
-export function lancerPartageNatif(p: PartageNatif, fin: () => void): Promise<boolean> {
+/** What a share did, told truthfully: `ok` only once the panel is SHOWN. */
+export type ResultatPartage =
+	| { ok: true }
+	| { ok: false; raison: "lancement" | "sortie" | "delai" | "erreur"; message: string };
+
+interface FluxPartage { on(ev: "data", cb: (d: Buffer | string) => void): unknown }
+/** The part of a child process this module uses (so a test can fake it). */
+export interface EnfantPartage {
+	stdout: FluxPartage | null;
+	stderr: FluxPartage | null;
+	on(ev: "exit" | "close", cb: (code: number | null) => void): unknown;
+	on(ev: "error", cb: (e: Error) => void): unknown;
+	kill(): unknown;
+}
+export interface DepsPartage {
+	lancer?: (commande: string, args: string[], env: NodeJS.ProcessEnv) => EnfantPartage;
+	minuteur?: { set(f: () => void, ms: number): unknown; clear(h: unknown): void };
+	/** Called once the panel is shown (the lock is then really busy). */
+	surMontre?: () => void;
+}
+
+/** Starts the hidden PowerShell that opens the panel and follows what it
+    prints on stdout (`SHOWN`, `CHOSEN`, `ERROR:<message>`). Resolves only when
+    the panel is SHOWN (`ok: true`) or when it is known it will not be (spawn
+    error, exit or `ERROR` before `SHOWN`, 30 s without a signal). `fin`
+    releases the lock and is called EXACTLY ONCE, on every outcome: spawn
+    error, early exit, non-zero exit, error signal, either timeout, or the
+    normal exit. The process is killed on the timeouts, so a share can never
+    hold the lock longer than `BORNE_TOTALE_MS`. */
+export function lancerPartageNatif(p: PartageNatif, fin: () => void, deps: DepsPartage = {}): Promise<ResultatPartage> {
+	const lancer = deps.lancer ?? ((cmd, args, env) => spawn(cmd, args, { windowsHide: true, env, stdio: ["ignore", "pipe", "pipe"] }) as unknown as EnfantPartage);
+	const minuteur = deps.minuteur ?? { set: (f: () => void, ms: number) => setTimeout(f, ms), clear: (h: unknown) => clearTimeout(h as NodeJS.Timeout) };
 	return new Promise((resolve) => {
+		let resolu = false;
+		let libere = false;
+		let montre = false;
+		let enfant: EnfantPartage | null = null;
+		let tampon = "";
+		let erreurs = "";
+		let tSignal: unknown = null;
+		let tTotal: unknown = null;
+		const repondre = (r: ResultatPartage) => { if (!resolu) { resolu = true; resolve(r); } };
+		const liberer = () => {
+			if (libere) return;
+			libere = true;
+			minuteur.clear(tSignal);
+			minuteur.clear(tTotal);
+			fin();
+		};
+		const tuer = () => { try { enfant?.kill(); } catch { /* already gone */ } };
+		const echec = (raison: "lancement" | "sortie" | "delai" | "erreur", message: string, tue: boolean) => {
+			repondre({ ok: false, raison, message });
+			if (tue) tuer();
+			liberer();
+		};
+		const ligne = (l: string) => {
+			if (l === "SHOWN") {
+				montre = true;
+				minuteur.clear(tSignal);
+				deps.surMontre?.();
+				repondre({ ok: true });
+			} else if (l.startsWith("ERROR:")) {
+				echec("erreur", l.slice(6).slice(0, 300), true);
+			}
+		};
 		try {
 			const encode = Buffer.from(scriptPartageNatif(), "utf16le").toString("base64");
 			const env: NodeJS.ProcessEnv = { ...process.env, [VARIABLES_NATIF.titre]: p.titre.slice(0, 200) };
@@ -252,14 +333,26 @@ export function lancerPartageNatif(p: PartageNatif, fin: () => void): Promise<bo
 				env[VARIABLES_NATIF.x] = String(Math.round(p.centre.x));
 				env[VARIABLES_NATIF.y] = String(Math.round(p.centre.y));
 			}
-			const enfant = execFile("powershell.exe",
-				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
-				{ windowsHide: true, env }, () => fin());
-			enfant.once("error", () => { fin(); resolve(false); });
-			setTimeout(() => resolve(true), 300);
-		} catch {
-			fin();
-			resolve(false);
+			enfant = lancer("powershell.exe",
+				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode], env);
+			tSignal = minuteur.set(() => { if (!montre) echec("delai", "no signal from the share panel", true); }, BORNE_SANS_SIGNAL_MS);
+			tTotal = minuteur.set(() => echec("delai", "share panel timed out", true), BORNE_TOTALE_MS);
+			enfant.stdout?.on("data", (d) => {
+				tampon += String(d);
+				const lignes = tampon.split(/\r?\n/);
+				tampon = lignes.pop() ?? "";
+				for (const l of lignes) ligne(l.trim());
+			});
+			enfant.stderr?.on("data", (d) => { if (erreurs.length < 2000) erreurs += String(d); });
+			enfant.on("error", (e) => echec("lancement", e.message, false));
+			const sortie = (code: number | null) => {
+				if (tampon.trim()) { ligne(tampon.trim()); tampon = ""; }
+				echec("sortie", erreurs.trim().slice(0, 300) || `exit code ${code}`, false);
+			};
+			enfant.on("exit", sortie);
+			enfant.on("close", sortie);
+		} catch (e) {
+			echec("lancement", e instanceof Error ? e.message : String(e), true);
 		}
 	});
 }

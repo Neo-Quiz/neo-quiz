@@ -86,7 +86,7 @@ function empreinteAppel(tool: string, args: readonly string[], stdin: string, ma
 	const sans = (x: string): string => (marqueur ? x.split(marqueur).join("") : x);
 	return createHash("sha256").update(JSON.stringify([tool, args.map(sans), sans(stdin)])).digest("hex");
 }
-import { ecrireTemporaire, lancerPartageNatif, nomPartage, octetsPartage, verrouEnregistrer, verrouNatif } from "./partage";
+import { ecrireTemporaire, lancerPartageNatif, nomPartage, octetsPartage, verrouEnregistrer, verrouNatif, verrouSync } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
@@ -812,15 +812,30 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
 		if (process.platform !== "win32") return false;
 		const jeton = verrouNatif.prendre();
-		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
-		try {
-			const fichier = await ecrireTemporaire(propre, contenu);
-			return await lancerPartageNatif({ titre: propre, fichier, centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
-		} catch (e) {
-			verrouNatif.rendre(jeton);
-			throw e;
+		if (jeton === null) {
+			// A double click while the first call is still opening the panel
+			// joins it (no toast); "busy" only once a panel is really shown.
+			if (partageFichierEnCours && !partageFichierEnCours.montre) return partageFichierEnCours.promesse;
+			throw new Error(PARTAGE_OCCUPE);
 		}
+		const etat = { montre: false, promesse: Promise.resolve(false) };
+		etat.promesse = (async () => {
+			try {
+				const fichier = await ecrireTemporaire(propre, contenu);
+				const r = await lancerPartageNatif({ titre: propre, fichier, centre: centreFenetre() }, () => verrouNatif.rendre(jeton), { surMontre: () => { etat.montre = true; } });
+				if (!r.ok) console.warn(`[partage] file share failed (${r.raison}): ${r.message}`);
+				return r.ok;
+			} catch (e) {
+				verrouNatif.rendre(jeton);
+				throw e;
+			} finally {
+				if (partageFichierEnCours === etat) partageFichierEnCours = null;
+			}
+		})();
+		partageFichierEnCours = etat;
+		return etat.promesse;
 	});
+	let partageFichierEnCours: { montre: boolean; promesse: Promise<boolean> } | null = null;
 	/** The middle of the app window, where the native panel is centred. */
 	const centreFenetre = (): { x: number; y: number } | undefined => {
 		const f = deps.fenetreCourante();
@@ -1645,7 +1660,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				   a device", the message works too (`normaliserCode`). */
 				const nom = os.hostname().slice(0, 64);
 				const lien = `https://neo-quiz.github.io/pair/#device=${id}&name=${encodeURIComponent(nom)}`;
-				return lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { name: nom, link: lien }), centre: centreFenetre() }, () => verrouNatif.rendre(jeton));
+				const r = await lancerPartageNatif({ titre: PRODUCT_NAME, texte: t("app.syncShare.body", { name: nom, link: lien }), centre: centreFenetre() }, () => verrouSync.rendre(jeton));
+					if (!r.ok) console.warn(`[partage] sync share failed (${r.raison}): ${r.message}`);
+					return r.ok;
 			}
 			return false;
 		};

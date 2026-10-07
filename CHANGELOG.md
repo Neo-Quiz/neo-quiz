@@ -19,6 +19,7 @@ release notes.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- Sharing no longer gets stuck on "A share is already in progress".
 - The output folder chosen in Generate stays selected after a reload.
 - Learn generations no longer warn about missing pre-questions, which are optional.
 - A PC with an empty computer name now appears as "Windows PC" on your other devices.

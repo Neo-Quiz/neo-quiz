@@ -245,6 +245,7 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   seuls variables) ; `--dangerously-skip-permissions`, `--mcp-config` ou un
   bac à sable ouvert sont refusés. **Ajouter une option à un appel de CLI du
   rendu exige de l'ajouter à ce gabarit.** Dans la CI.
+- `npm run check:share-lock` — le VERROU du panneau de partage Windows (`electron/partage.ts`), sur une horloge et un processus enfant simulés (aucun panneau ouvert). Défaut empêché : « A share is already in progress » affiché sans panneau (1.20.42). Cause établie : `DataTransferManager` n'a PAS d'évènement d'annulation (`DataRequested`, `TargetApplicationChosen`, `ShareProvidersRequested` seulement) ; le script attendait un `add_ShareCanceled` qui lève, avalé par un `catch` vide, et le verrou ne tombait qu'à la sortie de PowerShell (jusqu'à 5 puis 6 minutes). Le contrôle fige : le verrou est relâché UNE fois sur chaque issue (erreur de lancement, sortie précoce, sortie non nulle, signal `ERROR`, `SHOWN` puis sortie, délai de 30 s sans `SHOWN`, borne dure de 90 s), la réponse au rendu n'est vraie qu'après `SHOWN`, plus d'espacement de 2 s, le verrou de l'ID de synchronisation est distinct, et le script reste constant. Dans la CI.
 - `npm run check:test-setup` — le noyau PUR des réglages de la fenêtre « Prépare
   ton test » (`src/test-setup.ts`, spec 2026-09-29-test-setup-modal). Le mode
   examen se DÉDUIT : actif exactement quand les indices sont coupés ET une

@@ -192,6 +192,11 @@ jobs:
       - name: Share names and script quoting
         run: npm run check:partage
 
+      # The share lock is released on every outcome of the panel process
+      # (fake clock, fake child): no more stuck "share already in progress".
+      - name: Share lock
+        run: npm run check:share-lock
+
       # MOODLE IN THE APP: the login token never leaves the main process, every
       # request and redirect stays on the configured site, paths cannot escape,
       # and the passport and host checks are replayed on mutants.
