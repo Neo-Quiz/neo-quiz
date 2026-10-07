@@ -52,6 +52,23 @@ object CodeProtocol {
         return "code/$rel"
     }
 
+    /**
+     * The path after `/pypi/` of a request to the package proxy (`https://<code host>/pypi/...`),
+     * percent-decoded like the PC's `decodeURIComponent`, or null: same host rules as
+     * [assetPathFor]. The segments are judged afterwards by `PythonPackages.pypiUrl`.
+     */
+    fun pypiPathFor(url: String): String? {
+        val uri = try {
+            URI(url)
+        } catch (_: Exception) {
+            return null
+        }
+        if (uri.scheme?.lowercase() != "https" || uri.host?.lowercase() != HOST) return null
+        if (uri.port != -1 || uri.rawUserInfo != null) return null
+        val path = uri.path ?: return null
+        return if (path.startsWith("/pypi/")) path.removePrefix("/pypi/") else null
+    }
+
     fun mimeFor(path: String): String = when (path.substringAfterLast('.', "").lowercase()) {
         "html" -> "text/html"
         "js", "mjs" -> "text/javascript"

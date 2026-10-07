@@ -29,11 +29,15 @@ function buildCodeSandbox() {
 	rmSync(codeAssets, { recursive: true, force: true });
 	mkdirSync(codeAssets, { recursive: true });
 	const pcCode = join(windowsApp, "electron", "code");
-	for (const f of ["index.html", "page.js", "worker-python.mjs"]) copyFileSync(join(pcCode, f), join(codeAssets, f));
+	for (const f of ["index.html", "page.js"]) copyFileSync(join(pcCode, f), join(codeAssets, f));
 	// worker-clang imports the pack by the PC scheme: point it at the Android code origin.
 	const clang = readFileSync(join(pcCode, "worker-clang.mjs"), "utf8");
 	if (!clang.includes("neo-code://app/")) throw new Error("worker-clang.mjs no longer names neo-code://app/: update the build");
 	writeFileSync(join(codeAssets, "worker-clang.mjs"), clang.replaceAll("neo-code://app/", CODE_ORIGIN + "/"));
+	// worker-python points micropip at the PC proxy: same path on the Android code origin.
+	const python = readFileSync(join(pcCode, "worker-python.mjs"), "utf8");
+	if (!python.includes("neo-code://app/pypi/")) throw new Error("worker-python.mjs no longer names neo-code://app/pypi/: update the build");
+	writeFileSync(join(codeAssets, "worker-python.mjs"), python.replaceAll("neo-code://app/", CODE_ORIGIN + "/"));
 	copyFileSync(join(here, "code-shim.js"), join(assetsRoot, "code-shim.js"));
 	console.log("[android:web] code sandbox ready (no language pack embedded)");
 }

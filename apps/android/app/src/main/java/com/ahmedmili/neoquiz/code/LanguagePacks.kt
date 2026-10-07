@@ -71,6 +71,9 @@ object LanguagePacks {
 
     private const val INACTIVITY_MS = 30_000
 
+    /** The WHOLE download may not take longer than this: inactivity timeouts alone let a host drip bytes and hold the pack lock forever. */
+    const val DEADLINE_MS = 10 * 60 * 1000L
+
     /** The refusal of a pack (hash, size, unsafe or unreadable archive). */
     class Refused(message: String) : Exception(message)
 
@@ -133,6 +136,7 @@ object LanguagePacks {
         fetch: (String) -> InputStream,
         progress: (Long, Long) -> Unit,
         pin: Pin? = PINS[name],
+        deadlineMs: Long = DEADLINE_MS,
     ): String = withContext(Dispatchers.IO) {
         if (pin == null || name !in PINS) return@withContext "reseau"
         val target = File(dir, name)
@@ -143,7 +147,7 @@ object LanguagePacks {
             // A `.part` or `.old` left by an aborted install is never reused.
             part.deleteRecursively()
             old.deleteRecursively()
-            val body = readBody(fetch, pin, progress)
+            val body = readBody(fetch, pin, progress, deadlineMs)
             ensureActive()
             if (!MessageDigest.isEqual(sha256(body).toByteArray(), pin.sha256.toByteArray())) {
                 throw Refused("SHA-256 of the downloaded pack does not match its pin")
@@ -162,6 +166,9 @@ object LanguagePacks {
             throw e
         } catch (e: Exception) {
             "reseau"
+        } catch (e: OutOfMemoryError) {
+            // An Error, not an Exception: a clean answer for the bridge, and the `finally` below leaves nothing on disk.
+            "reseau"
         } finally {
             // Success or failure: a `.part` never survives; nor the previous install once the new one is in place.
             part.deleteRecursively()
@@ -170,7 +177,8 @@ object LanguagePacks {
     }
 
     /** The body, hashed in memory as it arrives, cut as soon as it passes the pinned size. */
-    private fun readBody(fetch: (String) -> InputStream, pin: Pin, progress: (Long, Long) -> Unit): ByteArray {
+    private fun readBody(fetch: (String) -> InputStream, pin: Pin, progress: (Long, Long) -> Unit, deadlineMs: Long): ByteArray {
+        val deadline = System.nanoTime() + deadlineMs * 1_000_000L
         val out = ByteArrayOutputStream(pin.size.coerceAtMost(64L * 1024 * 1024).toInt())
         fetch(pin.url).use { input ->
             val buf = ByteArray(64 * 1024)
@@ -178,6 +186,7 @@ object LanguagePacks {
             while (true) {
                 val n = input.read(buf)
                 if (n < 0) break
+                if (System.nanoTime() >= deadline) throw IOException("the download took longer than its deadline")
                 received += n
                 if (received > pin.size) throw Refused("the language pack is larger than its pin")
                 out.write(buf, 0, n)
@@ -322,10 +331,10 @@ object LanguagePacks {
      * ([urlAllowed]) BEFORE it is requested; at most [MAX_HOPS] requests.
      * [open] makes one request without following redirects.
      */
-    fun follow(url: String, open: (String) -> Hop): InputStream {
+    fun follow(url: String, allowed: (String) -> Boolean = ::urlAllowed, open: (String) -> Hop): InputStream {
         var current = url
         repeat(MAX_HOPS) {
-            if (!urlAllowed(current)) throw IOException("host or scheme outside the list: $current")
+            if (!allowed(current)) throw IOException("host or scheme outside the list: $current")
             val hop = open(current)
             if (hop.status in 200..299) return hop.body ?: throw IOException("empty response")
             if (hop.status < 300 || hop.status >= 400) {
@@ -340,12 +349,17 @@ object LanguagePacks {
     }
 
     /** The production fetch: `HttpsURLConnection`, redirects never followed by the platform. */
-    fun openHttps(url: String): InputStream = follow(url) { u ->
+    fun openHttps(url: String): InputStream = openHttps(url, ::urlAllowed, null)
+
+    /** Same, with the judge of EVERY hop and an optional `Accept` header (the package proxy's). `identity`: the bytes hashed are the bytes published, never a transparently gunzipped copy. */
+    fun openHttps(url: String, allowed: (String) -> Boolean, accept: String?): InputStream = follow(url, allowed) { u ->
         val c = URL(u).openConnection() as? HttpsURLConnection ?: throw IOException("not an HTTPS connection")
         c.instanceFollowRedirects = false
         c.connectTimeout = INACTIVITY_MS
         c.readTimeout = INACTIVITY_MS
         c.requestMethod = "GET"
+        c.setRequestProperty("Accept-Encoding", "identity")
+        if (accept != null) c.setRequestProperty("Accept", accept)
         val status = c.responseCode
         val body: InputStream? = if (status in 200..299) {
             object : java.io.FilterInputStream(c.inputStream) {

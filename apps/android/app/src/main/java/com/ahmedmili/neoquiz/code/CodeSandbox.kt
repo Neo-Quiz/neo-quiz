@@ -218,7 +218,17 @@ class CodeSandbox(context: Context, private val scope: CoroutineScope) : CodeEng
         wv.loadUrl(CodeProtocol.PAGE_URL)
     }
 
+    /** The PyPI digests announced by this sandbox's index answers: a wheel is served only if its bytes match. */
+    private val pypi = PythonPackages.Session()
+
+    private fun reply(r: PythonPackages.Reply) =
+        WebResourceResponse(r.mime, null, r.status, if (r.status == 200) "OK" else "Error", CodeProtocol.headers(), ByteArrayInputStream(r.body))
+
     private fun serve(url: String): WebResourceResponse {
+        // The package proxy (`<code origin>/pypi/...`): same origin as the page, so no CORS and no CSP exception.
+        CodeProtocol.pypiPathFor(url)?.let { rel ->
+            return reply(PythonPackages.servePypi(rel, pypi, PythonPackages.network, File(languages, "python")))
+        }
         val path = CodeProtocol.assetPathFor(url) ?: return failure(403, "Forbidden")
         if (path.startsWith("code/languages/")) return servePack(path.removePrefix("code/languages/"))
         return try {
@@ -238,7 +248,16 @@ class CodeSandbox(context: Context, private val scope: CoroutineScope) : CodeEng
         } catch (_: java.io.IOException) {
             return failure(404, "Not Found")
         }
-        if (!file.path.startsWith(root.path + File.separator) || !file.isFile) return failure(404, "Not Found")
+        if (!file.path.startsWith(root.path + File.separator)) return failure(404, "Not Found")
+        if (!file.isFile) {
+            // A file the Python pack does not carry: a package, judged by its lock and fetched here.
+            val parts = rel.split('/')
+            if (parts.size == 2 && parts[0] == "python") {
+                val pin = LanguagePacks.PINS.getValue("python")
+                return reply(PythonPackages.servePackage(File(root, "python"), parts[1], PythonPackages.network, PythonPackages.cdnBase(pin.version)))
+            }
+            return failure(404, "Not Found")
+        }
         return try {
             WebResourceResponse(CodeProtocol.mimeFor(file.name), null, 200, "OK", CodeProtocol.headers(), file.inputStream())
         } catch (_: java.io.IOException) {

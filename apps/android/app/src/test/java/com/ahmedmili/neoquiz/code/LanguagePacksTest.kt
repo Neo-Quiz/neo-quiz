@@ -226,4 +226,28 @@ class LanguagePacksTest {
         assertThrows(IOException::class.java) { LanguagePacks.follow("https://github.com/a") { hop(302) } }
         assertThrows(IOException::class.java) { LanguagePacks.follow("https://github.com/a") { hop(404) } }
     }
+
+    @Test fun aDownloadPastItsOverallDeadlineIsAbandonedAndNothingIsWritten() {
+        val pack = gz(zip(good()))
+        // An immediate deadline: the first chunk read is already late (a drip-feeding host is cut the same way).
+        val r = runBlocking { LanguagePacks.install(dir, "python", { ByteArrayInputStream(pack) }, { _, _ -> }, pinOf(pack), deadlineMs = -1) }
+        assertEquals("reseau", r)
+        assertNothingWritten()
+    }
+
+    @Test fun anOutOfMemoryErrorIsACleanAnswerAndNothingIsWritten() {
+        val pack = gz(zip(good()))
+        val boom = object : InputStream() {
+            override fun read(): Int = throw OutOfMemoryError("test")
+            override fun read(b: ByteArray, off: Int, len: Int): Int = throw OutOfMemoryError("test")
+        }
+        assertEquals("reseau", install(pack, pinOf(pack)) { boom })
+        assertNothingWritten()
+    }
+
+    @Test fun everyRequestAsksForTheIdentityEncoding() {
+        // HttpsURLConnection cannot be faked here, so the header is tied to the source.
+        val src = File("src/main/java/com/ahmedmili/neoquiz/code/LanguagePacks.kt").readText()
+        assertTrue(src.contains("setRequestProperty(\"Accept-Encoding\", \"identity\")"))
+    }
 }
