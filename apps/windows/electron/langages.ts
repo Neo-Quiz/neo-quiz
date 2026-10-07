@@ -1,5 +1,12 @@
 /* ══════════════════════════════════════════════════════════
-   THE C/C++ LANGUAGE PACK — download, verify, install, delete
+   THE LANGUAGE PACKS (C/C++ and Python) — download, verify, install, delete
+
+   Two packs share this installer, listed in `PACKS`: `c` (Clang, LLD, the
+   WASI sysroot and the browser WASI shim, for C and C++) and `python` (the
+   Pyodide runtime files, built by `build:language-pack:python`). Each has its
+   own pin, its own folder under the packs root and its own marker file; the
+   text below was written for the C pack and holds for both (`<pack>` stands
+   for `c` or `python`).
 
    Task 9 of docs/superpowers/plans/2026-09-28-c-cpp-execution.md: Clang,
    LLD, the WASI sysroot and the browser WASI shim ship in a single pack
@@ -63,15 +70,21 @@ export const PACK_C = {
 	taille: 28432790,
 } as const;
 
-/** Placeholder pin of the Python (Pyodide) pack: the empty `url` makes
-    `installerLangage` refuse it with `reseau` until the real pack is
-    published (task 2 of the python-pack plan) and its values written here. */
+/** Pin of the Python (Pyodide) pack, a release asset of `Neo-Quiz/neo-quiz`
+    (`language-python-<version>`, `--latest=false`), values printed by
+    `npm run build:language-pack:python`. An empty `url` would be refused by
+    `installerLangage` with `reseau`. */
 export const PACK_PYTHON = {
 	version: "314.0.7",
-	url: "",
-	sha256: "",
-	taille: 0,
+	url: "https://github.com/Neo-Quiz/neo-quiz/releases/download/language-python-314.0.7/language-python-314.0.7.zip.gz",
+	sha256: "1df5db3471a7f17c4854434eda12a0ae26cd108370c9039b38e10397628fa7b7",
+	taille: 7019891,
 } as const;
+
+/** Base URL of the Pyodide CDN for the pinned runtime, for the PACKAGES the
+    pack does not carry (loaded on demand). Verified 2026-10-07: HTTP 200
+    on `<base>pyodide-lock.json` for 314.0.7. */
+export const CDN_PYODIDE = `https://cdn.jsdelivr.net/pyodide/v${PACK_PYTHON.version}/full/`;
 
 /** A pack's name. `c` carries C AND C++ (`code-sandbox.ts` shares ONE pack
     directory for both: one shared LLVM `Application` compiles either, spec

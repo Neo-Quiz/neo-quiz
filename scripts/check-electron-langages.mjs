@@ -67,7 +67,7 @@ const resteSurDisque = (dir) => (existsSync(dir) ? readdirSync(dir) : []);
 
 try {
 	await withSrcModule("src/dashboard/zip.ts", async ({ buildZip }) => {
-		await withSrcModule("apps/windows/electron/langages.ts", async ({ PACK_C, PACKS, etatLangage, installerLangage, supprimerLangage, nomEntreeAdmis }) => {
+		await withSrcModule("apps/windows/electron/langages.ts", async ({ PACK_C, PACK_PYTHON, PACKS, etatLangage, installerLangage, supprimerLangage, nomEntreeAdmis }) => {
 			/* THE TEST PACK: the exact layout the worker loads, tiny files. */
 			const entrees = [
 				{ name: "clang/bundle.js", content: "export const runClang = () => {};" },
@@ -182,6 +182,13 @@ try {
 			} else {
 				console.log("(dist-pack/ absent: the real pin was not compared — run `npm run build:language-pack` first)");
 			}
+			const reelPy = join("dist-pack", `language-python-${PACK_PYTHON.version}.zip.gz`);
+			if (existsSync(reelPy)) {
+				const octetsPy = readFileSync(reelPy);
+				r.check("the built Python pack is exactly PACK_PYTHON (size, SHA-256)",
+					[octetsPy.length, createHash("sha256").update(octetsPy).digest("hex")], [PACK_PYTHON.taille, PACK_PYTHON.sha256]);
+			}
+			r.check("PACK_PYTHON downloads from the app's own releases", PACK_PYTHON.url.startsWith("https://github.com/Neo-Quiz/neo-quiz/releases/download/language-python-"), true);
 			r.check("PACK_C downloads from the app's own releases", PACK_C.url.startsWith("https://github.com/Neo-Quiz/neo-quiz/releases/download/language-c-"), true);
 		});
 	});

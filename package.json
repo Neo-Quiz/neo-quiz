@@ -69,6 +69,7 @@
     "check:electron-video": "node scripts/check-electron-video.mjs",
     "check:electron-langages": "node scripts/check-electron-langages.mjs",
     "build:language-pack": "node scripts/build-language-pack.mjs",
+    "build:language-pack:python": "node scripts/build-language-pack.mjs python",
     "check:electron-comptes": "node scripts/check-electron-comptes.mjs",
     "check:electron-collage": "node scripts/check-electron-collage.mjs",
     "check:package": "node scripts/check-package.mjs",
