@@ -588,11 +588,9 @@ await withSrcModule(
 						r.check("our own id is refused", await h.appairer(etat.appareil), "invalide");
 						r.check("an id with wrong check characters is refused", await h.appairer(ID.slice(0, 3) + (ID[3] === "A" ? "B" : "A") + ID.slice(4)), "invalide");
 						r.check("invalid ids never reach the confirmation dialog", demandes.length, 0);
-						/* The QR flow still asks: a cancelled confirmation pairs nothing. */
-						r.check("a cancelled confirmation pairs nothing and says so", [await h.appairer(AUTRE_ID, true), (await h.etat()).appareils.length, demandes.map(d => d[0])], ["annule", 0, [AUTRE_ID]]);
-						/* An id typed in "Add a device" pairs at once: the click on Add
-						   is the answer, no dialog is asked (2026-10-05). */
-						r.check("a typed id pairs without asking", [await h.appairer(AUTRE_ID, false, "Laptop‮"), demandes.length], ["ok", 1]);
+						/* The QR flow pairs at once too (the scan is the answer, 2026-10-07), as does
+						   an id typed in "Add a device" (the click on Add, 2026-10-05): no dialog. */
+						r.check("a QR pairing pairs without asking", [await h.appairer(AUTRE_ID, true, "Laptop‮"), demandes.length], ["ok", 0]);
 						/* The name of a pasted pairing link is kept, cleaned. */
 						r.check("the pasted link's name names the device", (await h.etat()).appareils.map(a => a.nom), ["Laptop"]);
 						const apres = await h.etat();
