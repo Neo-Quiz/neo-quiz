@@ -10,7 +10,7 @@ export const EN_APP = {
 	   dossier doit dire ce qu'elle en fera. */
 	"app.empty.title": "Choose a quiz folder",
 	"app.empty.body": "Neo Quiz plays the quizzes in your notes, right where they already live. Nothing is copied, nothing is moved.",
-	"app.empty.yourVaults": "Your Obsidian vaults",
+	"app.empty.yourVaults": "Your notes folders",
 	"app.empty.pickFolder": "Choose a folder",
 	"app.error.startup": "Neo Quiz could not start: {error}",
 
@@ -98,7 +98,7 @@ export const EN_APP = {
 	   l'INFOBULLE du bouton : deux phrases pour quatre lignes de liste
 	   pesaient plus que ce qu'elles expliquaient, et celle-là ne se lit qu'au
 	   moment où l'on vise la croix. */
-	"app.settings.extraFoldersHint": "Your Obsidian vaults open by themselves.",
+	"app.settings.extraFoldersHint": "Your notes folders open by themselves.",
 	"app.settings.extraFoldersHintMobile": "Other folders Neo Quiz reads quizzes from.",
 	"app.settings.folderAlreadyOpen": "This folder is already open.",
 	"app.settings.folderInsideOpen": "This folder is already inside one of your open folders. Add it from Folders → New folder → Open an existing folder.",

@@ -4,7 +4,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.window.title": "Neo Quiz",
 	"app.empty.title": "Choisissez un dossier de quiz",
 	"app.empty.body": "Neo Quiz joue les quiz de vos notes, là où elles sont déjà. Rien n'est copié, rien n'est déplacé.",
-	"app.empty.yourVaults": "Vos vaults Obsidian",
+	"app.empty.yourVaults": "Vos dossiers de notes",
 	"app.empty.pickFolder": "Choisir un dossier",
 	"app.error.startup": "Neo Quiz n'a pas pu démarrer : {error}",
 
@@ -65,7 +65,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.defaultFolderHint": "Neo Quiz crée ses quiz ici. En changer garde le dossier précédent en emplacement supplémentaire — rien n'est déplacé ni copié.",
 	"app.settings.changeDefaultFolder": "Changer",
 	"app.settings.extraFolders": "Emplacements supplémentaires",
-	"app.settings.extraFoldersHint": "Vos vaults Obsidian s'ouvrent tout seuls.",
+	"app.settings.extraFoldersHint": "Vos dossiers de notes s'ouvrent tout seuls.",
 	"app.settings.extraFoldersHintMobile": "Autres dossiers dans lesquels Neo Quiz lit des quiz.",
 	"app.settings.folderAlreadyOpen": "Ce dossier est déjà ouvert.",
 	"app.settings.folderInsideOpen": "Ce dossier est déjà dans un de vos dossiers ouverts. Ajoutez-le depuis Dossiers → Nouveau dossier → Ouvrir un dossier existant.",
