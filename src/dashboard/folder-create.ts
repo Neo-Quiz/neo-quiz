@@ -201,7 +201,8 @@ export async function importArchiveAsFolder(
 
 	// Declared as an override: the module card appears at once.
 	const folderKey = folderPath.split("/").pop() as string;
-	const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+	// No prototype: a key such as `constructor` must stay a plain key (`baseNameVerdict` also refuses those names).
+	const overrides: NonNullable<typeof ctx.settings.quizzesModuleOverrides> = Object.assign(Object.create(null), ctx.settings.quizzesModuleOverrides || {});
 	const previous = overrides[folderKey] || {};
 	const look = plan.settings;
 	/* The card carries the FOLDER name, suffix included: two imports of the

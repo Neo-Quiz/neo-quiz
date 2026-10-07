@@ -291,6 +291,13 @@ await withSrcModule(
 			r.check("a NEW folder under a deep parent: path over 240 characters refused before the folder is even created", [snapshot(w.base), w.notices.length === 1 && /too long/.test(w.notices[0])], [before, true]);
 		});
 
+		await withWorld(async (w) => {
+			await importer.importArchiveAsFolder(w.ctx, {}, [], { name: "__proto__.zip", bytes: read("golden", "windows-explorer.zip") }, () => {});
+			const o = w.ctx.settings.quizzesModuleOverrides;
+			r.check("a folder named __proto__ is imported as \"Import\", stored as an own setting, with no prototype touched",
+				[Object.keys(o), o.Import?.path, Object.getPrototypeOf({}) === Object.prototype, Object.prototype.hasOwnProperty.call(Object.prototype, "path")], [["Import"], "Import", true, false]);
+		});
+
 		/* ── 5. ROUND TRIP: a realistic folder, exported then imported ── */
 		const noteRoot = "# Intro 🎓 à l'écosystème\n\n![[schéma.png|200]]\n\n" + fence("CM1");
 		const noteTd = "# TD évalué\r\n\r\n![[schéma.png]]\r\n\r\n" + fence("TD");

@@ -176,6 +176,8 @@ await withSrcModule(["src/dashboard/share-names.ts", "src/dashboard/zip.ts"], (n
 	r.check("Windows absolute path: 259 characters fit, 260 do not", [fitsWindowsPath(root, "a".repeat(100)), fitsWindowsPath(root, "a".repeat(167)), fitsWindowsPath(root, "a".repeat(168))], [true, true, false]);
 	r.check("... a SHORT folder name makes the staging path (.import- + 12 hex) the longer one",
 		[fitsWindowsPath(P + "x", "a".repeat(134)), fitsWindowsPath(P + "x", "a".repeat(135)), fitsWindowsPath(P + "y".repeat(30), "a".repeat(124)), fitsWindowsPath(P + "y".repeat(30), "a".repeat(125))], [true, false, true, false]);
+	r.check("a name that is an Object.prototype key is refused (a folder called __proto__ would not be stored as a setting)", ["__proto__", "constructor", "Prototype", " __PROTO__ "].map(n => baseNameVerdict(n).reason), ["reserved", "reserved", "reserved", "reserved"]);
+	r.check("... the exporter renames it, the archive name falls back to Import", [exportBaseName("constructor", "quiz"), exportBaseName("__proto__", "quiz"), folderNameFromArchive("__proto__.zip"), baseNameVerdict("constructors").ok], ["constructor_", "__proto___", "Import", true]);
 	r.check("the folder named after an archive: CON.zip, a download suffix, NFD, empty", [folderNameFromArchive("CON.zip"), folderNameFromArchive("Cours C (1).zip"), folderNameFromArchive("café.zip"), folderNameFromArchive(".zip"), folderNameFromArchive("a:b.zip")], ["Import", "Cours C", "café", "Import", "a-b"]);
 	r.done();
 });

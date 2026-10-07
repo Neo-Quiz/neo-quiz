@@ -41,6 +41,11 @@ export function isReservedName(name: string): boolean {
 	return RESERVED.test(stem);
 }
 
+/** Names that are keys of Object.prototype machinery: a folder called `__proto__` would be stored as
+    `overrides["__proto__"] = ...`, which sets a prototype instead of a setting. Refused like a device name. */
+const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+export const isPrototypeKey = (name: string): boolean => PROTOTYPE_KEYS.has(name.normalize("NFC").trim().toLowerCase());
+
 export type NameVerdict =
 	| { ok: true; name: string }
 	| { ok: false; reason: "empty" | "reserved" };
@@ -51,7 +56,7 @@ export function baseNameVerdict(raw: string): NameVerdict {
 	let name = cleanName(raw);
 	if (name.length > NAME_MAX) name = name.slice(0, NAME_MAX).replace(/[\s.]+$/, "");
 	if (name.length === 0) return { ok: false, reason: "empty" };
-	if (isReservedName(name)) return { ok: false, reason: "reserved" };
+	if (isReservedName(name) || isPrototypeKey(name)) return { ok: false, reason: "reserved" };
 	return { ok: true, name };
 }
 
