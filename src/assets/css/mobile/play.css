@@ -56,3 +56,52 @@ html.nq-mobile .quiz-submit-perle {
 	min-width: 40px;
 	min-height: 40px;
 }
+
+/* The slot's name in an ordering or a matching. A matching row names its term
+   here ("Sur quelle machine s'exécutent l'API et la base…"): the pill was
+   `flex: none`, so a long term ran past the card's right edge (2026-10-07,
+   393 px), and the drop hint beside it was squeezed to a one-letter column.
+   The pill now takes at most half the row and wraps, with a 12 px radius (a
+   999 px capsule over two lines reads as a blob). The drop hint keeps the rest. */
+html.nq-mobile .quiz-slot-label {
+	flex: 0 1 50%;
+	max-width: 50%;
+	min-width: 0;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: left;
+	border-radius: 12px;
+	line-height: 1.35;
+}
+
+/* The program's answer field of a terminal question (type "text" with
+   terminalVariant): 26 px tall at 393 px, below the 40 px target. It keeps its
+   rows and grows with its text, but never starts below 40 px. */
+html.nq-mobile .quiz-textarea.quiz-textarea-program {
+	min-height: 40px;
+}
+
+/* The end of a play: the bilan of a Learn ("N réponses écrites ne sont pas
+   encore auto-évaluées", the score, the written cards) and the hand-in screen
+   scroll inside their slide. Their last line ended under the bottom bar at
+   rest, so the slide keeps 96 px of room below its content: the bar (44 px
+   beads, 28 px inset) sits over the bottom of the slide. */
+html.nq-mobile .quiz-track-item[data-slide-kind="results"],
+html.nq-mobile .quiz-track-item[data-slide-kind="submit"] {
+	padding-bottom: 96px;
+}
+
+/* The hand-in screen lists every unanswered question as a bead. A test of 29
+   questions pushed "Retour" and "Voir le score" under the fold of a 393 px
+   phone; the action bar now stays at the foot of the slide while the beads
+   scroll beneath it, so the way out is always in reach. */
+html.nq-mobile .quiz-submit-card .quiz-actions {
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	width: 100%;
+	margin-top: 0;
+	padding: 10px 0 12px;
+	border-radius: 14px;
+	background: var(--background-primary);
+}
