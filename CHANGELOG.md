@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.43] - 2026-10-07
+
 ### Changed
 - On Android, a zip or a note opened or shared from another app (a file manager, Discord, mail) now offers Neo Quiz and imports it like the Import button does; the share sheet uses a dedicated, narrower file provider.
 - The folder an import is written to first (`.import-*`) is no longer synchronized between devices, so another device never receives a half-imported folder.
