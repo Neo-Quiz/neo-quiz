@@ -40,6 +40,19 @@ export interface HandInHandlers {
 	closeConfirm(): boolean;
 }
 
+/**
+ * True when a move from slide `from` to slide `to` passes OVER the submit
+ * slide without stopping on it. The slides sit side by side in one track
+ * strip, so the strip's slide animation would carry the submit slide across
+ * the viewport: a Test handed in from its last question lands on the results
+ * two slides further, and the "N questions unanswered" screen flashed for an
+ * instant before them. Such a move is shown as a jump (engine/track.ts).
+ */
+export function crossesSubmitSlide(from: number, to: number, submit: number): boolean {
+	const low = Math.min(from, to), high = Math.max(from, to);
+	return low < submit && submit < high;
+}
+
 export function createHandInHandlers(ctx: EngineCtx): HandInHandlers {
 	let overlay: HTMLElement | null = null;
 	let onKey: ((e: KeyboardEvent) => void) | null = null;

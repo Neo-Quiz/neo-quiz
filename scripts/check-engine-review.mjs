@@ -1072,6 +1072,61 @@ await withSrcModule("src/engine/hand-in.ts", ({ createHandInHandlers }) => {
 	r.done();
 });
 
+/* A MOVE OVER THE SUBMIT SLIDE IS A JUMP (engine/hand-in.ts crossesSubmitSlide,
+   engine/track.ts animateTrackToIndex): a Test handed in from its last question
+   lands on the results two slides further, and the strip used to carry the
+   "N questions unanswered" slide across the screen on the way. */
+await withSrcModule(["src/engine/hand-in.ts", "src/engine/track.ts"], ({ crossesSubmitSlide }, { createTrackHandlers }) => {
+	const r = makeReporter("Move over the submit slide");
+	r.check("only a move that passes over the submit slide crosses it",
+		[crossesSubmitSlide(7, 9, 8), crossesSubmitSlide(9, 7, 8), crossesSubmitSlide(8, 9, 8), crossesSubmitSlide(7, 8, 8),
+			crossesSubmitSlide(2, 3, 8), crossesSubmitSlide(3, 3, 8)],
+		[true, true, false, false, false, false]);
+
+	/* The DOM the track handlers touch, as far as an animation needs it. The
+	   animation frame runs at once, so a slide move that is NOT a jump sets
+	   its transition, and a jump never does — the discriminating fact. */
+	globalThis.window = { devicePixelRatio: 1, setTimeout: () => 0, clearTimeout() {} };
+	globalThis.requestAnimationFrame = (cb) => cb();
+	const move = (prev, target) => {
+		const track = { style: {}, addEventListener() {}, removeEventListener() {} };
+		const viewport = {
+			style: {}, dataset: {}, clientWidth: 400, clientHeight: 300,
+			getBoundingClientRect: () => ({ height: 300, width: 400 }),
+		};
+		const noop = () => {};
+		const ctx = {
+			__quizDestroyed: false, container: null, textOnly: null,
+			quizState: { slideToken: 1, prevCurrent: prev, current: target, swipeSettleMs: null, isSliding: false, locked: false, pendingResultsLock: false },
+			SLIDE_SUBMIT_INDEX: 8, SLIDE_RESULTS_INDEX: 9,
+			isResultsSlideIndex: (i) => i === 9,
+			setSlidingClass: noop, updateNavHighlight: noop, settleViewportHeightToIndex: noop,
+			viewport: {
+				getTrackElements: () => ({ track, viewport }),
+				applyTrackGeometry: noop, syncTrackViewportIsolation: noop, destroyActiveSlideResizeObserver: noop,
+				getViewportStableWidth: () => 400, getSlideStableHeight: () => 300, getElementStableHeight: () => 300,
+				getTrackItem: () => null, setViewportHeight: noop,
+				scheduleViewportHeightSync: noop, primeAllSlideHeights: noop, bindCurrentSlideMediaHeightSync: noop,
+				bindActiveSlideResizeObserver: noop, resyncCommandTextareasOnSlide: noop,
+			},
+		};
+		createTrackHandlers(ctx).animateTrackToIndex(target, { fromX: -400 * prev, fromHeight: 300 });
+		return { transition: track.style.transition, transform: track.style.transform };
+	};
+	const jump = move(7, 9);
+	r.check("last question to results: a jump, the strip does not slide over the submit slide",
+		[jump.transition, jump.transform], ["none", "translate3d(-3600px, 0, 0)"]);
+	const results = move(9, 3);
+	r.check("results back to a question: a jump too", [results.transition, results.transform], ["none", "translate3d(-1200px, 0, 0)"]);
+	const adjacent = move(7, 8);
+	r.check("question to the submit slide: still a slide", adjacent.transition.startsWith("transform "), true);
+	const submitToResults = move(8, 9);
+	r.check("submit slide to results: still a slide", submitToResults.transition.startsWith("transform "), true);
+	delete globalThis.window;
+	delete globalThis.requestAnimationFrame;
+	r.done();
+});
+
 /* THE HINT BADGE (spec 2026-09-29 §2.3): a dot whose question used its hint
    shows the bulb IN ADDITION to its verdict mark (::before / ::after) — only when it has one (right,
    retried, wrong), in a Test and in a Learn; the verdict class stays, so the

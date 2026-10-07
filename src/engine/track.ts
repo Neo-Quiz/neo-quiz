@@ -20,6 +20,7 @@ export interface TrackHandlers {
 }
 
 import { SETTLE_EASING } from "../swipe";
+import { crossesSubmitSlide } from "./hand-in";
 
 export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 	// Variables locales
@@ -247,7 +248,11 @@ export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 		const dist = Math.max(1, deltaPx / viewportWidth);
 		const swipeMs = ctx.quizState.swipeSettleMs ?? null;
 		ctx.quizState.swipeSettleMs = null;
-		const dur = swipeMs ?? slideDuration(dist);
+		/* A move that passes over the submit slide is a jump: the strip would
+		   otherwise carry that slide across the screen on its way (see
+		   crossesSubmitSlide, engine/hand-in.ts). */
+		const jumps = crossesSubmitSlide(ctx.quizState.prevCurrent, targetIndex, ctx.SLIDE_SUBMIT_INDEX);
+		const dur = jumps ? 0 : (swipeMs ?? slideDuration(dist));
 		const trackEase = swipeMs != null ? SETTLE_EASING : getTrackEaseForDistance(dist);
 
 		track.__quizTargetX = targetX;
