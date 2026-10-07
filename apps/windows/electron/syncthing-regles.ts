@@ -49,6 +49,9 @@ export const IGNORES: readonly string[] = [
 	"(?d).trash",
 	/* The partial download of a Moodle file (`moodle/disque.ts`). */
 	"(?d).*.moodle.tmp",
+	/* The STAGING folder of an import (`share-import.ts`, `<parent>/.import-<id>`):
+	   only the finished folder, once renamed into place, may reach another device. */
+	"(?d).import-*",
 ];
 
 const RELAIS_DYNAMIQUE = "dynamic+https://relays.syncthing.net/endpoint";

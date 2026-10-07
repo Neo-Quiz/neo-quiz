@@ -44,8 +44,12 @@ object ShareRules {
      */
     const val LOCAL_ANNOUNCE_PORT = 21028
 
-    /** Lines of the folder's `.stignore`: conflict copies under `.neo-quiz/` are the app's to merge, never to propagate. */
-    val IGNORES: List<String> = listOf("(?d).neo-quiz/**/*.sync-conflict-*", "(?d).trash")
+    /**
+     * Lines of the folder's `.stignore`: conflict copies under `.neo-quiz/` are the app's to merge, never
+     * to propagate; `.import-*` is the STAGING folder of an import (`share-import.ts`, `<parent>/.import-<id>`),
+     * which must never reach another device half written: only the finished folder, once renamed, does.
+     */
+    val IGNORES: List<String> = listOf("(?d).neo-quiz/**/*.sync-conflict-*", "(?d).trash", "(?d).import-*")
 
     private const val DYNAMIC_RELAY = "dynamic+https://relays.syncthing.net/endpoint"
     private val ID_FORMAT = Regex("^[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}$")

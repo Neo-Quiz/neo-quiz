@@ -154,6 +154,31 @@ function main() {
 		if (extra.length) fail(`ExecutableExtensions.kt refuses extensions ressources.ts does not: ${show(extra)}`);
 	}
 
+	// 4. sharing: the Kotlin copies of the share rules equal the TypeScript ones
+	const partage = read("apps/windows/electron/partage.ts");
+	const share = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/ShareChannel.kt");
+	const incoming = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/IncomingRules.kt");
+	const zipTs = read("src/dashboard/zip.ts");
+	// The forbidden-character class: TS `.replace(/[...]/g, "-")`, Kotlin `FORBIDDEN = Regex("[...]")` (string escapes undone).
+	const tsClass = /\.replace\(\/(\[[^\n]*?\])\/g, "-"\)/.exec(partage)?.[1];
+	const ktString = /FORBIDDEN = Regex\("((?:[^"\\]|\\.)*)"\)/.exec(share)?.[1];
+	const ktClass = ktString?.replace(/\\(["\\])/g, "$1");
+	if (!tsClass || !ktClass) fail("share name class not found (parser broken?)");
+	else if (tsClass !== ktClass) fail(`share forbidden-character class differs: TS ${tsClass} / Kotlin ${ktClass}`);
+	const tsMax = /SHARE_MAX_BYTES = (\d+) \* 1024 \* 1024/.exec(zipTs)?.[1];
+	const ktMax = /MAX_BYTES = (\d+) \* 1024 \* 1024/.exec(share)?.[1];
+	if (!tsMax || tsMax !== ktMax) fail(`share bound differs: TS ${tsMax} MB / Kotlin ${ktMax} MB`);
+	const tsArchive = /archive: (\d+) \* 1024 \* 1024/.exec(zipTs)?.[1];
+	const ktArchive = /MAX_BYTES = (\d+)L \* 1024 \* 1024/.exec(incoming)?.[1];
+	if (!tsArchive || tsArchive !== ktArchive) fail(`import bound differs: TS ${tsArchive} MB / Kotlin ${ktArchive} MB`);
+	const tsExt = [...(/EXTENSIONS_PARTAGE = \[([^\]]*)\]/.exec(partage)?.[1] ?? "").matchAll(/"\.(\w+)"/g)].map((m) => m[1]).sort().join();
+	const ktExt = [...(/EXTENSIONS = mapOf\(([^)]*)\)/.exec(share)?.[1] ?? "").matchAll(/"(\w+)" to/g)].map((m) => m[1]).sort().join();
+	if (!tsExt || tsExt !== ktExt) fail(`share extensions differ: TS ${tsExt} / Kotlin ${ktExt}`);
+	// The staging folder of an import is ignored by Syncthing on both platforms.
+	for (const [who, file] of [["Windows", "apps/windows/electron/syncthing-regles.ts"], ["Android", "apps/android/app/src/main/java/com/ahmedmili/neoquiz/sync/ShareRules.kt"]]) {
+		if (!read(file).includes('"(?d).import-*"')) fail(`${who} .stignore lacks the import staging rule "(?d).import-*"`);
+	}
+
 	console.log(`check:android-pont  channels sent ${sent.size}, listed ${listed.size}, Pont leaves ${pontLeaves.size}, shim leaves ${shimLeaves.size}, executable extensions ${windows.size}`);
 }
 

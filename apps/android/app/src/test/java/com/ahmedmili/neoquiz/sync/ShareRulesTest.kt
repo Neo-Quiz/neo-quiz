@@ -278,4 +278,9 @@ class ShareRulesTest {
             assertEquals(p, null, ShareRules.pathToScan(root, p))
         }
     }
+
+    @Test fun theStagingFolderOfAnImportIsNeverSynced() {
+        // `<parent>/.import-<id>` (share-import.ts) holds a half-written folder until its single rename.
+        assertTrue("(?d).import-*" in ShareRules.IGNORES)
+    }
 }
