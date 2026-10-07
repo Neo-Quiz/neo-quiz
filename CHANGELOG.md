@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Wallpaper names follow the interface language.
+
 ## [1.20.38] - 2026-10-07
 
 ### Changed

@@ -22,6 +22,7 @@ import { CLE_REGLAGES_FOND, CLE_REGLAGES_FOND_EFFETS } from "../../electron/pont
 import { urlDeRessource } from "../../electron/ressources";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
+import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { BORNES_EFFETS_FOND, estImageDeFond, normaliserEffetsFond, suivante } from "./fond-pur";
 import type { EffetsFond } from "./fond-pur";
@@ -38,6 +39,11 @@ import { FONDS_EMBARQUES, fondEmbarque, fondsParCategorie, urlFondEmbarque, urlV
 type ReglageFond =
 	| { embarque: string; dossier?: undefined; image?: undefined }
 	| { embarque?: undefined; dossier: string; image: string };
+
+/** The translated name of an embedded wallpaper (resolved at render, so a language change applies). */
+function nomFond(id: string): string {
+	return t(`app.fond.name.${id}` as TransKey);
+}
 
 /** Relit le réglage BRUT (JSON de `neo.reglages`) sans jamais lui faire
     confiance : deux chaînes non vides, sinon `null` — même garde que
@@ -255,7 +261,7 @@ function ouvrirChoixFond(reglage: ReglageFond | null, onFini: () => void): void 
 				for (const fond of groupe.fonds) {
 					poserOption(
 						urlVignetteEmbarquee(fond.id),
-						fond.libelle,
+						nomFond(fond.id),
 						t("app.fond.credit", { auteur: fond.auteur }),
 						reglage?.embarque === fond.id,
 						() => choisirFondEmbarque(fond.id),
@@ -364,9 +370,8 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 		apercu.style.backgroundImage = `url("${urlDuFond(reglage)}")`;
 		if (reglage.embarque !== undefined) {
 			const fond = fondEmbarque(reglage.embarque);
-			// Le nom de la photo est traduit une fois pour toutes dans le
-			// catalogue ; son AUTEUR ne l'est jamais.
-			poser(fond ? fond.libelle : reglage.embarque, fond ? t("app.fond.credit", { auteur: fond.auteur }) : "");
+			// The photo name is translated (app.fond.name.*); its AUTHOR never is.
+			poser(fond ? nomFond(fond.id) : reglage.embarque, fond ? t("app.fond.credit", { auteur: fond.auteur }) : "");
 		} else {
 			// Nom de fichier et chemin viennent du DISQUE : jamais traduits.
 			poser(reglage.image, reglage.dossier);
