@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Files downloaded from Moodle are marked as coming from the Internet, and Moodle never reaches local or private network addresses.
+
 ## [1.20.36] - 2026-10-07
 
 ### Changed
