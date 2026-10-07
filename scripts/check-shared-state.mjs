@@ -10,7 +10,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 const ex = (id, date, modifiedAt, extra = {}) => ({ id, nom: id, date, modifiedAt, ...extra });
 const plain = (id, date) => ({ id, nom: id, date });
 
-await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts, mergeModules, diffModules, rebaseModules }, ss) => {
+await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts, mergeModules, diffModules, rebaseModules, resoudreCleExamens }, ss) => {
 	const r = makeReporter("Shared state - merge");
 
 	r.check("newer edit beats older edit across devices",
@@ -80,6 +80,36 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 		rebaseModules({ K: { name: "a" } }, { K: { name: "a" } }, { K: { name: "z" } }), { K: { name: "z" } });
 	r.check("modules: diff lists changed fields and clears", diffModules({ K: { name: "a", color: "r" } }, { K: { name: "b" }, L: { ue: null } }),
 		[{ key: "K", field: "name", v: "b" }, { key: "K", field: "color" }, { key: "L", field: "ue", v: null }]);
+
+	// A folder's exams under its OLD key (the folder changed root). Exam ids and dates only.
+	const ex2 = (id, date) => ({ id, date });
+	const byId = (r) => r.examens.map(e => e.id);
+	const exact = resoudreCleExamens({ "Neo Quiz/XTI301": [ex2("n", "2026-03-01")], "Efrei/XTI301": [ex2("o", "2026-02-01")] },
+		"Neo Quiz/XTI301", ["Neo Quiz/XTI301"]);
+	r.check("exam key: the exact key wins, an old key with exams is not read",
+		[byId(exact), exact.anciennes], [["n"], []]);
+	const moved = resoudreCleExamens({ "Efrei/XTI301": [ex2("b", "2026-06-06"), ex2("a", "2026-12-01")] },
+		"Neo Quiz/XTI301", ["Neo Quiz/XTI301"]);
+	r.check("exam key: the old key of a folder that changed root is found by name, sorted by date",
+		[byId(moved), moved.anciennes, moved.cle], [["b", "a"], ["Efrei/XTI301"], "Neo Quiz/XTI301"]);
+	const ambigu = resoudreCleExamens({ "Efrei/XTI301": [ex2("a", "2026-12-01")] },
+		"Neo Quiz/XTI301", ["Neo Quiz/XTI301", "Perso/XTI301"]);
+	r.check("exam key: two folders named XTI301 under two roots: the old key is attached to neither",
+		[byId(ambigu), ambigu.anciennes], [[], []]);
+	const autreNom = resoudreCleExamens({ "Efrei/Maths": [ex2("m", "2026-12-01")] },
+		"Neo Quiz/XTI301", ["Neo Quiz/XTI301"]);
+	r.check("exam key: an old key with another folder name is not claimed",
+		[byId(autreNom), autreNom.anciennes], [[], []]);
+	const sansRacine = resoudreCleExamens({ "Efrei/XTI301": [ex2("a", "2026-12-01")] }, "XTI301", ["XTI301"]);
+	r.check("exam key: a key without a root part matches nothing",
+		[byId(sansRacine), sansRacine.anciennes], [[], []]);
+	const fusion = resoudreCleExamens({ "Efrei/XTI301": [ex2("b", "2026-06-06"), ex2("a", "2026-12-01")],
+		"Ancien/XTI301": [ex2("b", "2026-06-06"), ex2("c", "2026-09-09")], "Efrei/Autre": [ex2("z", "2026-01-01")] },
+		"Neo Quiz/XTI301", ["Neo Quiz/XTI301", "Efrei/Autre"]);
+	r.check("exam key: two unambiguous old keys merged, an id kept once, sorted by date",
+		[byId(fusion), fusion.anciennes], [["b", "c", "a"], ["Ancien/XTI301", "Efrei/XTI301"]]);
+	const vide = resoudreCleExamens({ "Efrei/XTI301": [] }, "Neo Quiz/XTI301", ["Neo Quiz/XTI301"]);
+	r.check("exam key: an empty old list is not a candidate", [byId(vide), vide.anciennes], [[], []]);
 
 	r.done();
 });

@@ -58,7 +58,7 @@ import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { sharedState } from "../host/shared-state";
-import { rebaseModules } from "../../../../src/shared-state/merge";
+import { rebaseModules, resoudreCleExamens } from "../../../../src/shared-state/merge";
 import { addFolder, removeFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
@@ -166,6 +166,26 @@ function cleExamens(group: ModuleGroup): string | null {
 	if (group.path) return cleModule(`${group.path}/_`, paths);
 	const quiz = group.quizzes[0];
 	return quiz ? cleModule(quiz.path, paths) : null;
+}
+
+/** The key of every folder that exists now: the declared ones and the ones
+    that hold a quiz. The exam key resolution needs them to tell an old key
+    that is still another folder's from one nobody owns any more. */
+function clesDossiersCourants(scanner: Scanner): string[] {
+	const paths = currentHost().paths;
+	const cles = new Set<string>();
+	for (const ov of Object.values(reglagesPagesCache.quizzesModuleOverrides ?? {})) {
+		if (ov?.path) cles.add(cleModule(`${ov.path}/_`, paths));
+	}
+	for (const quiz of scanner.getQuizzes()) cles.add(cleModule(quiz.path, paths));
+	return [...cles];
+}
+
+/** The exams of a folder, under its current key, and the old keys still
+    holding some (`resoudreCleExamens`). `null`: nothing to key it with. */
+function examensDuDossier(group: ModuleGroup, scanner: Scanner) {
+	const cle = cleExamens(group);
+	return cle ? resoudreCleExamens(examens(), cle, clesDossiersCourants(scanner)) : null;
 }
 
 function reglagesPages(): DashboardPageSettings {
@@ -564,27 +584,26 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			naviguer("quizzes");
 			quizzes.openFolderTab(folder, onglet);
 		},
-		/* LES EXAMENS D'UN DOSSIER, gérés dans l'onglet Planning (tâche 4,
-		   2026-09-26) — plus de section dans les Réglages depuis le
-		   2026-09-17 : les régler à l'endroit où on voit le dossier vaut mieux
-		   qu'une liste plate de toutes les matières, dont deux pouvaient porter
-		   le même nom.
+		/* A folder's exams, managed in the Planning tab (task 4, 2026-09-26).
+		   They used to sit in the Settings page, from 2026-09-17 on, as one flat
+		   list of every subject, two of which could share a name. Setting them
+		   where the folder is seen is the better place.
 
-		   LA CONVERSION DE CLÉ EST ICI, et nulle part ailleurs (`cleExamens`) :
-		   le code partagé ne connaît qu'un nom de segment, l'ordonnanceur veut
-		   une clé qui porte la racine. */
-		examens: group => {
-			const cle = cleExamens(group);
-			return cle ? (examens()[cle] ?? []) : [];
-		},
+		   THE KEY CONVERSION LIVES HERE, and nowhere else (`cleExamens`): the
+		   shared code only knows a segment name, while the scheduler wants a key
+		   that carries the root.
+
+		   An exam written under an OLD key (the folder changed root) is found
+		   here too; the first write takes it over (`examensDuDossier`). */
+		examens: group => examensDuDossier(group, deps.scanner)?.examens ?? [],
 		enregistrerExamen: (group, e) => {
-			const cle = cleExamens(group);
-			if (cle) void enregistrerExamenReglage(cle, e);
+			const r = examensDuDossier(group, deps.scanner);
+			if (r) void enregistrerExamenReglage(r.cle, e, r.anciennes);
 			else currentHost().ui.notice(t("dashboard.planning.examSaveFailed"));
 		},
 		retirerExamen: (group, id) => {
-			const cle = cleExamens(group);
-			if (cle) void retirerExamenReglage(cle, id);
+			const r = examensDuDossier(group, deps.scanner);
+			if (r) void retirerExamenReglage(r.cle, id, r.anciennes);
 		},
 		/* A move carries what the app keeps by path or module key: exams,
 		   sessions, remembered test setups, folder paths of the page settings

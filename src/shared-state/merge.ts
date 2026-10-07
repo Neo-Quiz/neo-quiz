@@ -175,3 +175,64 @@ export function diffModules(merged: Record<string, ModuleValues>, desired: Recor
 	}
 	return out;
 }
+
+/* ══════════════════════════════════════════════════════════
+   A FOLDER'S EXAMS UNDER ITS OLD KEY (PURE, no host, 2026-10-07)
+
+   An exam table is keyed `<root>/<folder>`. A folder that changes root (moved
+   from the vault "Efrei" to "C:\Neo Quiz") gets a new key, and its exams stay
+   under the old one: read by the new key, the folder finds nothing.
+
+   The old key is found by the folder's NAME, the part after the root, under
+   three rules: the exact key wins whenever it holds exams; an old key is
+   claimed only when no other current folder carries the same name (a key owned
+   by another folder carries that folder's name, so this covers it; two homonyms
+   under two roots: nothing is claimed, the guess would be a coin toss); several
+   unambiguous old keys are
+   merged, an exam id kept once. Nothing is written here: the caller takes the
+   `anciennes` over at the next write of this folder.
+══════════════════════════════════════════════════════════ */
+
+export interface ExamKeyResolution<T extends { id: string; date: string }> {
+	/** The key the folder's exams are read from and written to. */
+	cle: string;
+	/** The exams to show for the folder, sorted by date then id. */
+	examens: T[];
+	/** The old keys whose exams are in `examens`, to take over at the next write. */
+	anciennes: string[];
+}
+
+/** The folder name of a `<root>/<folder>` key: everything after the root. `null`
+    when the key has no root part (nothing to match on). */
+function nomDuDossier(cle: string): string | null {
+	const i = cle.indexOf("/");
+	return i < 0 ? null : cle.slice(i + 1);
+}
+
+/**
+ * Resolves the exams of the folder whose current key is `cle`.
+ * `dossiersCourants` is the key of EVERY current folder, `cle` included.
+ */
+export function resoudreCleExamens<T extends { id: string; date: string }>(
+	table: Record<string, T[]>,
+	cle: string,
+	dossiersCourants: readonly string[],
+): ExamKeyResolution<T> {
+	const exacts = table[cle] ?? [];
+	if (exacts.length) return { cle, examens: exacts, anciennes: [] };
+	const vide: ExamKeyResolution<T> = { cle, examens: [], anciennes: [] };
+	const nom = nomDuDossier(cle);
+	if (!nom) return vide;
+	const courants = new Set(dossiersCourants);
+	courants.add(cle);
+	// Two current folders with this name, under two roots: an old key cannot say which one it was.
+	if ([...courants].filter(k => nomDuDossier(k) === nom).length > 1) return vide;
+	const anciennes = Object.keys(table)
+		.filter(k => k !== cle && nomDuDossier(k) === nom && (table[k]?.length ?? 0) > 0)
+		.sort();
+	if (!anciennes.length) return vide;
+	const parId = new Map<string, T>();
+	for (const k of anciennes) for (const e of table[k]!) if (!parId.has(e.id)) parId.set(e.id, e);
+	const examens = [...parId.values()].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+	return { cle, examens, anciennes };
+}

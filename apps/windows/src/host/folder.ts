@@ -735,10 +735,20 @@ function magasin(): ExamStore {
 
 /** Saves one exam. The cache is updated first (the UI reads it at once), then
     replaced by the merged view once the file is written. */
-export async function enregistrerExamen(module: string, e: Examen): Promise<void> {
+export async function enregistrerExamen(module: string, e: Examen, anciennes: readonly string[] = []): Promise<void> {
+	await reprendreAnciennes(module, anciennes);
 	tableExamens = enregistrerExamenDans(tableExamens, module, e);
 	await magasin().save(module, e);
 	tableExamens = magasin().exams();
+}
+
+/* The first write of a folder whose exams sat under an OLD key (see
+   `resoudreCleExamens`) takes them over under the current key, entirely, and
+   only then. `renommerExamens` moves them and leaves tombstones under the old
+   key, so nothing is ever duplicated. Nothing is written at startup. */
+async function reprendreAnciennes(module: string, anciennes: readonly string[]): Promise<void> {
+	if (!anciennes.length) return;
+	await renommerExamens(anciennes.map(a => [a, module, false] as const));
 }
 
 /** Moves the exam lists of the module keys `paires` (`[old, new]`) to their
@@ -769,7 +779,8 @@ export async function renommerExamens(paires: ReadonlyArray<readonly [string, st
 	tableExamens = magasin().exams();
 }
 
-export async function retirerExamen(module: string, id: string): Promise<void> {
+export async function retirerExamen(module: string, id: string, anciennes: readonly string[] = []): Promise<void> {
+	await reprendreAnciennes(module, anciennes);
 	tableExamens = retirerExamenDe(tableExamens, module, id);
 	await magasin().remove(module, id);
 	tableExamens = magasin().exams();
