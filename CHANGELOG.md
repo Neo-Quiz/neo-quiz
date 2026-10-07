@@ -20,6 +20,8 @@ release notes.
 - Scanning the PC's pairing QR code no longer asks for a second confirmation on the PC.
 - On the phone, a device ID typed in Add a device is added without a second confirmation, and a pairing link opens Neo Quiz.
 - On the phone, the sync notification shows live progress and connected devices, with a Quit action.
+- On the phone, folder pages and settings fit the screen: tabs, titles and buttons no longer overflow.
+- Learn no longer shows a row of capsules: the step numbers at the top are enough.
 
 ## [1.20.35] - 2026-10-07
 
