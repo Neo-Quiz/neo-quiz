@@ -19,6 +19,8 @@
  * a new file (the check pins each hash). deflate output depends on the zlib
  * build, so `expected.json` records the zlib version that made the bytes.
  */
+// The manifest's `created` is an ISO (UTC) time: pin the zone so the bytes do not depend on the machine.
+process.env.TZ = "UTC";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -95,7 +97,7 @@ export async function buildFixtures() {
 		{ name: "CM1 - Intro.md", bytes: noteA, flags: 0x800, madeBy: 63 },
 		{ name: "TD \u00e9.md", bytes: noteB, flags: 0x800, madeBy: 63 },
 		{ name: "img/sch\u00e9ma.png", bytes: IMG, flags: 0x800, madeBy: 63 },
-	]), { folder: "7zip-deflate", files: files({ "CM1 - Intro.md": noteA, "TD \u00e9.md": noteB, "sch\u00e9ma.png": IMG }), junk: 0, skipped: [], ignored: [] });
+	]), { folder: "7zip-deflate", files: files({ "CM1 - Intro.md": noteA, "TD \u00e9.md": noteB, "img/sch\u00e9ma.png": IMG }), junk: 0, skipped: [], ignored: [] });
 
 	// 6. A root folder with sub-folders; two notes share a file name.
 	g("root-folder-subfolders.zip", forgeZip([
@@ -103,7 +105,7 @@ export async function buildFixtures() {
 		{ name: "Mon cours/Semaine 2/q1.md", bytes: noteC, flags: 0x800 },
 		{ name: "Mon cours/Semaine 2/figure.PNG", bytes: IMG2, flags: 0x800 },
 		{ name: "Mon cours/Semaine 2/notes.pdf", bytes: "%PDF-1.4", flags: 0x800 },
-	]), { folder: "root-folder-subfolders", files: files({ "q1.md": noteA, "q1 (2).md": noteC, "figure.png": IMG2 }), junk: 0, skipped: [], ignored: ["unsupported-type"] });
+	]), { folder: "root-folder-subfolders", files: files({ "Semaine 1/q1.md": noteA, "Semaine 2/q1.md": noteC, "Semaine 2/figure.PNG": IMG2 }), junk: 0, skipped: [], ignored: ["unsupported-type"] });
 
 	// 7. NFD accents everywhere; the note cites the NFC name of the image.
 	g("nfd-accents.zip", forgeZip([
@@ -127,6 +129,55 @@ export async function buildFixtures() {
 		{ name: "Big one.md", bytes: noteA, zip64: true, flags: 0x800 },
 		{ name: "Other.md", bytes: noteC, flags: 0x800 },
 	], { zip64End: true }), { folder: "zip64", files: files({ "Big one.md": noteA, "Other.md": noteC }), junk: 0, skipped: [], ignored: [] });
+
+	// 11. Format 1, made by the REAL exporter: a folder with its look, sub-folders, an uppercase extension.
+	const NOW = new Date(2026, 9, 7, 12, 0, 0);
+	let v1Folder; let v1Selection; let tamperedManifest;
+	await withSrcModule("src/dashboard/share-pack.ts", async ({ packShareV1 }) => {
+		const note = (path, text) => ({ path, kind: "note", bytes: enc.encode(text) });
+		const image = (path, bytes) => ({ path, kind: "image", bytes });
+		v1Folder = (await packShareV1(
+			[note("CM1 - Intro.md", noteA), note("Semaine 2/q1.md", noteC)],
+			[image("sch\u00e9ma.png", IMG), image("Semaine 2/img/figure.PNG", IMG2)],
+			{ app: "1.20.43", kind: "folder", name: "Cours C", folder: { name: "Cours C", color: "#4f8cff", icon: "book", ue: "UE 1" } },
+			NOW)).bytes;
+		v1Selection = (await packShareV1(
+			[note("TD \u00e9.md", noteB), note("Chapitre 2.md", noteC)],
+			[image("sch\u00e9ma.png", IMG)],
+			{ app: "1.20.43", kind: "quizzes", name: "S\u00e9lection" },
+			NOW)).bytes;
+	});
+	g("v1-folder.zip", v1Folder, { folder: "Cours C", files: files({ "CM1 - Intro.md": noteA, "Semaine 2/q1.md": noteC, "sch\u00e9ma.png": IMG, "Semaine 2/img/figure.PNG": IMG2 }), junk: 0, skipped: [], ignored: [], settings: { name: "Cours C", color: "#4f8cff", icon: "book", ue: "UE 1" } });
+	g("v1-selection.zip", v1Selection, { folder: "Sélection", files: files({ "TD \u00e9.md": noteB, "Chapitre 2.md": noteC, "sch\u00e9ma.png": IMG }), junk: 0, skipped: [], ignored: [] });
+
+	// 12. A manifest of a NEWER format: imported at best (notes and images), with a notice to update.
+	const futureManifest = JSON.stringify({ format: "neo-quiz-share", version: 99, kind: "folder", name: "Futur", folder: { color: "#ff0000", icon: "rocket" }, files: [{ path: "A.md", sha: "blake3:abc", size: 1 }], extras: { anything: true } });
+	g("v1-future-format.zip", forgeZip([
+		{ name: "neo-quiz.json", bytes: futureManifest, flags: 0x800 },
+		{ name: "A.md", bytes: noteA, flags: 0x800 },
+		{ name: "Dossier/sch\u00e9ma.png", bytes: IMG, flags: 0x800 },
+		{ name: "future.dat", bytes: "????", flags: 0x800 },
+	]), { folder: "v1-future-format", files: files({ "A.md": noteA, "Dossier/sch\u00e9ma.png": IMG }), junk: 0, skipped: [], ignored: ["unsupported-type"], notices: ["newer-format"] });
+
+	// 13. A format-1 archive whose note was changed after the manifest was written: that file is refused.
+	await withSrcModule("src/dashboard/share-manifest.ts", async ({ buildManifest, manifestBytes }) => {
+		const m = await buildManifest({ app: "1.20.43", now: NOW, kind: "quizzes", name: "Alt\u00e9r\u00e9", files: [{ path: "Bon.md", kind: "note", bytes: enc.encode(noteA) }, { path: "Modifi\u00e9.md", kind: "note", bytes: enc.encode(noteC) }] });
+		tamperedManifest = manifestBytes(m);
+	});
+	g("v1-tampered-file.zip", forgeZip([
+		{ name: "neo-quiz.json", bytes: tamperedManifest, flags: 0x800 },
+		{ name: "Bon.md", bytes: noteA, flags: 0x800 },
+		{ name: "Modifi\u00e9.md", bytes: noteC + "\n<!-- edited after sharing -->\n", flags: 0x800 },
+	]), { folder: "Alt\u00e9r\u00e9", files: files({ "Bon.md": noteA }), junk: 0, skipped: [], ignored: ["altered"] });
+
+	// 14. No manifest (format 0): a BOM + CRLF note kept byte for byte, an uppercase note and image
+	// extension kept as written, and sub-folders kept (`![](img/Photo.JPG)` must still resolve).
+	const noteBom = "\ufeff# Avec BOM\r\n\r\n![](img/Photo.JPG)\r\n\r\n" + fence("Bom");
+	g("v0-bom-subfolders-case.zip", forgeZip([
+		{ name: "BOM.md", bytes: noteBom, flags: 0x800 },
+		{ name: "Sem/Q.MD", bytes: noteC, flags: 0x800 },
+		{ name: "img/Photo.JPG", bytes: IMG2, flags: 0x800 },
+	]), { folder: "v0-bom-subfolders-case", files: files({ "BOM.md": noteBom, "Sem/Q.MD": noteC, "img/Photo.JPG": IMG2 }), junk: 0, skipped: [], ignored: [] });
 
 	// ── HOSTILE ──
 	const good = { name: "ok.md", bytes: noteA };

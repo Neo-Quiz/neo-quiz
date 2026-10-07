@@ -6,10 +6,13 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleMap } from "./quiz-modules";
 import { openNewFolderModal, commonModuleParent, defaultParent } from "./module-edit";
-import { IMPORT_LIMITS, ZipReadError, classerArchive, nomNoteImportee, readZip } from "./zip";
-import { exportBaseName, fitsPath, folderNameFromArchive } from "./share-names";
-import type { ImportedArchive } from "./zip";
-import { QUIZ_BLOCK_RE } from "../quiz-utils";
+import { IMPORT_LIMITS, ZipReadError, nomNoteImportee } from "./zip";
+import { exportBaseName, folderNameFromArchive } from "./share-names";
+import { ImportPathTooLongError, applyPlan, planFor, receiveArchive, scanTarget } from "./share-import";
+import type { ReceivedArchive } from "./share-import";
+import type { DiscardReason, ImportPlan } from "./share-plan";
+import { sha256Hex } from "./share-manifest";
+import { LOG_PREFIX } from "../branding";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
 
@@ -84,9 +87,10 @@ export function openCreateFolderModal(
 	});
 }
 
-/* ── Import d'un dossier partagé (.zip) : sélection cross-platform via un
-   <input type=file> (desktop ET mobile, pas de dépendance Node), parseZip
-   (store), puis recréation du dossier + de ses notes dans le vault. ── */
+/* ── Import of a received archive (.zip) or quiz (.md). File picking is
+   cross-platform (an <input type=file>, no Node). The decision is
+   `share-plan.ts` (pure), the writing `share-import.ts` (staging, then one
+   rename); this module is the part that talks to the user. ── */
 
 function pickFile(accept: string): Promise<{ name: string; bytes: Uint8Array } | null> {
 	return new Promise((resolve) => {
@@ -98,127 +102,66 @@ function pickFile(accept: string): Promise<{ name: string; bytes: Uint8Array } |
 			if (!file) { resolve(null); return; }
 			/* Refused BEFORE reading: `arrayBuffer()` of a multi-gigabyte file
 			   would hold it all in memory first. */
-			if (file.size > IMPORT_LIMITS.archive) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); resolve(null); return; }
+			if (file.size > IMPORT_LIMITS.archive) { currentHost().ui.notice(t("share.import.tooLarge")); resolve(null); return; }
 			resolve({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
 		});
 		input.click();
 	});
 }
 
-/** A RECEIVED archive, sorted: what will be written, and every entry left out
-    with the translated reason. Nothing is dropped without being listed. */
-type ArchiveRecue = ImportedArchive & { ecartes: { name: string; raison: string }[] };
+const why = (reason: DiscardReason): string => t(`share.why.${reason}` as "share.why.corrupt");
 
-function raisonEcart(code: string): string {
-	switch (code) {
-		case "encrypted": return t("dashboard.quizzes.importWhy.encrypted");
-		case "method": return t("dashboard.quizzes.importWhy.method");
-		case "too-big": return t("dashboard.quizzes.importWhy.too-big");
-		case "total": return t("dashboard.quizzes.importWhy.total");
-		case "ratio": return t("dashboard.quizzes.importWhy.ratio");
-		case "bad-crc": return t("dashboard.quizzes.importWhy.bad-crc");
-		case "name-mismatch": return t("dashboard.quizzes.importWhy.name-mismatch");
-		case "symlink": return t("dashboard.quizzes.importWhy.symlink");
-		case "zip64": return t("dashboard.quizzes.importWhy.zip64");
-		case "unsupported-type": return t("dashboard.quizzes.importWhy.unsupported-type");
-		case "bad-name": return t("dashboard.quizzes.importWhy.bad-name");
-		case "image-too-large": return t("dashboard.quizzes.importWhy.image-too-large");
-		case "duplicate-image": return t("dashboard.quizzes.importWhy.duplicate-image");
-		case "no-quiz": return t("dashboard.quizzes.importWhy.no-quiz");
-		default: return t("dashboard.quizzes.importWhy.corrupt");
-	}
+/** A short list for a notice: the first five names, then a count. */
+function shortList(items: string[]): string {
+	return items.slice(0, 5).join(", ") + (items.length > 5 ? ` +${items.length - 5}` : "");
 }
 
-/** Says what an import left out and why (first five, then a count). */
-function annoncerEcartes(ecartes: ArchiveRecue["ecartes"]): void {
-	if (ecartes.length === 0) return;
-	const liste = ecartes.slice(0, 5).map(e => `${e.name.split(/[\\/]/).pop()} (${e.raison})`).join(", ")
-		+ (ecartes.length > 5 ? ` +${ecartes.length - 5}` : "");
-	currentHost().ui.notice(t("dashboard.quizzes.importSkipped", { count: ecartes.length, list: liste }));
-}
-
-/** The notes and images of a RECEIVED archive, or `null` (the window already
-    said why): too big, not readable, or nothing importable in it. */
-async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<ArchiveRecue | null> {
-	const host = currentHost();
+/** Reads a received archive, or says why it cannot be (and returns null). */
+async function receive(bytes: Uint8Array): Promise<ReceivedArchive | null> {
 	try {
-		const { files, skipped } = await readZip(bytes);
-		const classe = classerArchive(files);
-		const ecartes: ArchiveRecue["ecartes"] = [
-			...skipped.map(x => ({ name: x.name, raison: raisonEcart(x.reason) })),
-			...classe.ignored.map(x => ({ name: x.name, raison: raisonEcart(x.reason) })),
-		];
-		if (quizOnly) {
-			const gardees = classe.notes.filter(n => QUIZ_BLOCK_RE.test(n.content));
-			for (const n of classe.notes) if (!gardees.includes(n)) ecartes.push({ name: n.name, raison: raisonEcart("no-quiz") });
-			classe.notes = gardees;
-		}
-		if (classe.notes.length === 0) { host.ui.notice(t("dashboard.quizzes.importEmpty")); annoncerEcartes(ecartes); return null; }
-		return { ...classe, ecartes };
+		return await receiveArchive(bytes);
 	} catch (e) {
 		const code = e instanceof ZipReadError ? e.code : "invalid";
-		host.ui.notice(t(
-			code === "too-large" || code === "too-many" ? "dashboard.quizzes.importTooLarge"
-				: code === "zip64" ? "dashboard.quizzes.importZip64"
-				: code === "multi-disk" ? "dashboard.quizzes.importMultiDisk"
-				: code === "overlap" ? "dashboard.quizzes.importOverlap"
-				: code === "unsafe-path" ? "dashboard.quizzes.importUnsafePath"
-				: "dashboard.quizzes.importUnreadable"));
+		currentHost().ui.notice(t(
+			code === "too-large" || code === "too-many" ? "share.import.tooLarge"
+				: code === "zip64" ? "share.import.zip64"
+				: code === "multi-disk" ? "share.import.multiDisk"
+				: code === "overlap" ? "share.import.overlap"
+				: code === "unsafe-path" ? "share.import.unsafePath"
+				: "share.import.unreadable"));
 		return null;
 	}
 }
 
-/** An imported file whose target path would pass `PATH_MAX`. Thrown BEFORE
-    anything is written, so the refusal leaves the disk untouched. */
-export class ImportPathTooLongError extends Error {
-	constructor(readonly fileName: string) { super(`import-path-too-long: ${fileName}`); }
-}
-
-/** Checks every target path of an archive against `PATH_MAX` (room kept for
-    a " (n)" suffix), naming the first one that does not fit. */
-function verifierChemins(folder: string, archive: ImportedArchive): void {
-	for (const f of [...archive.notes, ...archive.images]) {
-		if (!fitsPath(folder, `${f.name} (99)`)) throw new ImportPathTooLongError(f.name);
+/** Tells the user what an import did: added, skipped as identical, renamed,
+    left out (each with its reason), plus the notices of the archive itself.
+    Called for a plan that wrote something AND for one that wrote nothing. */
+function report(plan: ImportPlan, name: string): void {
+	const ui = currentHost().ui;
+	const notes = plan.writes.filter(w => w.kind === "note").length;
+	const images = plan.writes.length - notes;
+	if (plan.writes.length > 0) {
+		ui.notice(t("share.import.added", { name, notes, images }));
+	} else if (plan.duplicates.length > 0 && plan.discarded.length === 0) {
+		ui.notice(t("share.import.nothing"));
+	} else if (plan.discarded.length === 0 || plan.discarded.every(d => d.reason === "unsupported-type")) {
+		ui.notice(t("share.import.empty"));
 	}
+	if (plan.writes.length > 0 && plan.duplicates.length > 0) ui.notice(t("share.import.duplicates", { count: plan.duplicates.length }));
+	if (plan.renamed.length > 0) ui.notice(t("share.import.renamed", { count: plan.renamed.length, list: shortList(plan.renamed.map(r => `${r.from} -> ${r.to}`)) }));
+	if (plan.discarded.length > 0) {
+		ui.notice(t("share.import.skipped", { count: plan.discarded.length, list: shortList(plan.discarded.map(d => `${d.name.split(/[\\/]/).pop()} (${why(d.reason)})`)) }));
+	}
+	if (plan.missing.length > 0) ui.notice(t("share.import.missing", { count: plan.missing.length, list: shortList(plan.missing) }));
+	if (plan.notices.includes("newer-format")) ui.notice(t("share.import.newerFormat"));
+	if (plan.notices.includes("manifest-invalid")) ui.notice(t("share.import.manifestInvalid"));
 }
 
 /** The notice for a failed import: the path-too-long case names the file. */
-function noticeEchecImport(e: unknown): void {
+function noticeFailure(e: unknown): void {
 	currentHost().ui.notice(e instanceof ImportPathTooLongError
-		? t("dashboard.quizzes.importPathTooLong", { name: e.fileName })
-		: t("dashboard.quizzes.importError"));
-}
-
-/** Writes what a received archive carries into `folder`: every note under a
-    FREE name (`freeNotePath`), every image under its own name, since quizzes
-    cite it by name (`![[schema.png]]`). An image whose name is taken keeps
-    the file already there when the bytes are the same, and is otherwise left
-    out and counted: overwriting a file of the user's from a third party's
-    archive is never acceptable. Returns what was written. */
-async function ecrireArchive(folder: string, archive: ImportedArchive): Promise<{ notes: number; images: number; imagesKept: number }> {
-	const fs = currentHost().fs;
-	for (const n of archive.notes) {
-		/* Flattened and `.md` only (`nomNoteImportee`, 2026-09-25): the archive
-		   comes from a third party, and an `.exe`, a `.lnk` or a hidden file has
-		   no place in a course folder. The same de-duplication as the other
-		   imports: two entries from different sub-folders flatten to the same
-		   name, and `fs.write` REPLACES. */
-		await fs.write(await freeNotePath(folder, n.name.replace(/\.md$/i, "")), n.content);
-	}
-	let images = 0;
-	let imagesKept = 0;
-	for (const img of archive.images) {
-		const path = `${folder}/${img.name}`;
-		if (await fs.exists(path)) {
-			const existing = await fs.readBinary(path).catch(() => null);
-			if (existing && existing.length === img.bytes.length && existing.every((b, i) => b === img.bytes[i])) continue;
-			imagesKept++;
-			continue;
-		}
-		await fs.writeBinary(path, img.bytes);
-		images++;
-	}
-	return { notes: archive.notes.length, images, imagesKept };
+		? t("share.import.pathTooLong", { name: e.fileName })
+		: t("share.import.failed"));
 }
 
 export async function importSharedFolder(
@@ -234,7 +177,8 @@ export async function importSharedFolder(
 
 /** Recreates a received archive as a NEW folder (the file picker's step is
     `importSharedFolder`; this is the rest, so a check can drive the real
-    import without a file dialog). */
+    import without a file dialog). The folder's look (colour, icon, name,
+    unit) comes from the archive's manifest, for a new folder only. */
 export async function importArchiveAsFolder(
 	ctx: DashboardShellCtx,
 	map: ModuleMap,
@@ -242,53 +186,40 @@ export async function importArchiveAsFolder(
 	picked: { name: string; bytes: Uint8Array },
 	onDone: () => void
 ): Promise<void> {
-	// Only `.md` notes with a safe name and raster images enter (`classerArchive`).
-	const archive = await lireArchiveRecue(picked.bytes, false);
-	if (!archive) return;
-	// Dossier cible : base du zip, assainie, sous le parent commun des modules ;
-	// suffixe (2), (3)… si un dossier du même nom existe déjà.
-	// Same rules as any imported name (NFC, device names such as `CON.zip`, length,
-	// the " (1)" a browser appends to a second download).
-	const base = folderNameFromArchive(picked.name);
+	const received = await receive(picked.bytes);
+	if (!received) return;
+	const plan = planFor(received, new Map(), false, folderNameFromArchive(picked.name));
+	if (plan.writes.length === 0) { report(plan, plan.folderName); return; }
 	const parent = commonModuleParent(quizzes, map, defaultParent());
-	const root = parent ? `${parent}/${base}` : base;
-	let folderPath = root;
-	/* `fs.exists` (le DISQUE) et non `fs.getFile` : ce dernier ne consulte que
-	   l'index des `.md`, où un DOSSIER n'est jamais. Il répondrait donc
-	   toujours « absent », la boucle ne dédoublonnerait rien, et deux dossiers
-	   du même nom se retrouveraient fondus en silence. */
-	for (let n = 2; await currentHost().fs.exists(folderPath); n++) folderPath = `${root} (${n})`;
-
-	let written: { notes: number; images: number; imagesKept: number };
+	let folderPath: string;
 	try {
-		verifierChemins(folderPath, archive);
-		await currentHost().fs.mkdirs(folderPath);
-		written = await ecrireArchive(folderPath, archive);
+		folderPath = await applyPlan(plan, { kind: "new", parent: parent ?? "", name: plan.folderName });
 	} catch (e) {
-		noticeEchecImport(e);
+		noticeFailure(e);
 		return;
 	}
 
-	// Déclaré en override : la carte du module apparaît tout de suite.
+	// Declared as an override: the module card appears at once.
 	const folderKey = folderPath.split("/").pop() as string;
 	const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+	const previous = overrides[folderKey] || {};
+	const look = plan.settings;
 	/* The card carries the FOLDER name, suffix included: two imports of the
 	   same archive must not give two cards both called "Demo". With its PATH:
-	   only a declared folder with one shows as a card (`declaredFolders`). */
-	overrides[folderKey] = { ...(overrides[folderKey] || {}), name: overrides[folderKey]?.name || folderKey, path: folderPath };
+	   only a declared folder with one shows as a card (`declaredFolders`). A
+	   setting already stored under that key is never overwritten. */
+	overrides[folderKey] = {
+		...(look?.color ? { color: look.color } : {}),
+		...(look?.icon ? { icon: look.icon } : {}),
+		...(look?.ue ? { ue: look.ue } : {}),
+		...previous,
+		name: previous.name || (look?.name && folderKey === plan.folderName ? look.name : folderKey),
+		path: folderPath,
+	};
 	ctx.settings.quizzesModuleOverrides = overrides;
-	ctx.saveSettings().catch(() => {});
-	annoncerImport(folderKey, written);
-	annoncerEcartes(archive.ecartes);
+	ctx.saveSettings().catch((e) => console.warn(`${LOG_PREFIX} saving the imported folder's settings failed:`, e));
+	report(plan, folderKey);
 	onDone();
-}
-
-function annoncerImport(name: string, w: { notes: number; images: number; imagesKept: number }): void {
-	const host = currentHost();
-	host.ui.notice(w.images > 0
-		? t("dashboard.quizzes.importDoneImages", { name, count: w.notes, images: w.images })
-		: t("dashboard.quizzes.importDone", { name, count: w.notes }));
-	if (w.imagesKept > 0) host.ui.notice(t("dashboard.quizzes.importImagesKept", { count: w.imagesKept }));
 }
 
 /* ── Drill-down d'un dossier : créer un quiz dedans / y importer un quiz reçu.
@@ -348,28 +279,29 @@ export async function importQuizIntoFolder(ctx: DashboardShellCtx, folder: strin
 
 /** Writes a shared quiz (.md) or a shared folder's archive (.zip) into
     `folder`: the ONE path of the file picker and of a file dropped on an
-    empty folder (2026-09-29) — same name sanitising (`nomNoteImportee`),
-    same quiz block check, whatever brought the file. */
+    empty folder (2026-09-29). Whatever brought the file, the same plan and the
+    same staged write: existing files are never overwritten, an identical quiz
+    is not duplicated, a different one with the same name becomes "Name (2)". */
 export async function importFileIntoFolder(folder: string, picked: { name: string; bytes: Uint8Array }, onDone: () => void): Promise<void> {
+	let received: ReceivedArchive | null;
+	let isQuiz = false;
+	if (/\.zip$/i.test(picked.name)) {
+		received = await receive(picked.bytes);
+		if (!received) return;
+	} else {
+		if (picked.bytes.length > IMPORT_LIMITS.entry) { currentHost().ui.notice(t("share.import.tooLarge")); return; }
+		isQuiz = true;
+		const quizName = `${nomNoteImportee(picked.name) ?? "Quiz"}.md`;
+		received = { files: [{ name: quizName, bytes: picked.bytes, sha256: await sha256Hex(picked.bytes) }], skipped: [], junk: 0 };
+	}
 	try {
-		await ensureFolder(folder);
-		if (/\.zip$/i.test(picked.name)) {
-			const archive = await lireArchiveRecue(picked.bytes, true);
-			if (!archive) return;
-			verifierChemins(folder, archive);
-			annoncerImport(folder.split("/").pop() || folder, await ecrireArchive(folder, archive));
-			annoncerEcartes(archive.ecartes);
-		} else {
-			if (picked.bytes.length > IMPORT_LIMITS.entry) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); return; }
-			const content = new TextDecoder().decode(picked.bytes);
-			if (!QUIZ_BLOCK_RE.test(content)) { currentHost().ui.notice(t("dashboard.quizzes.importNoQuiz")); return; }
-			// Le nom venu du sélecteur, assaini comme une entrée d'archive.
-			const name = nomNoteImportee(picked.name) ?? "Quiz";
-			await currentHost().fs.write(await freeNotePath(folder, name), content);
-			currentHost().ui.notice(t("dashboard.quizzes.importQuizDone", { name }));
-		}
+		const existing = await scanTarget(folder, received.files);
+		const plan = planFor(received, existing, true, folder.split("/").pop() || folder);
+		if (isQuiz && plan.discarded.some(d => d.reason === "no-quiz")) { currentHost().ui.notice(t("share.import.noQuiz")); return; }
+		if (plan.writes.length > 0) await applyPlan(plan, { kind: "into", folder });
+		report(plan, folder.split("/").pop() || folder);
 	} catch (e) {
-		noticeEchecImport(e);
+		noticeFailure(e);
 		return;
 	}
 	onDone();

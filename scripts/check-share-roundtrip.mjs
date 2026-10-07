@@ -14,6 +14,13 @@
  * `generate.mjs`); their SHA-256 are pinned below, and the list can only GROW
  * (never edit or remove a fixture: add a new one, and pin it here).
  *
+ * Since 2026-10-07 the import is a PLAN (`planImport`, pure) applied in a
+ * STAGING folder (`applyPlan`): the check also drives the plan on every
+ * archive, the existing-folder rules (identical quiz not duplicated, different
+ * one renamed "Name (2)", nothing overwritten), the manifest (format 1, a
+ * future format, a tampered file), and a failure injected at the k-th write,
+ * which must leave nothing behind.
+ *
  * The filesystem is a REAL temporary folder (NTFS on Windows: case-insensitive,
  * so a collision is real), laid out as `base/vault` (the "vault"), `base/canary`
  * and `base/outside`; a hostile import is judged on a snapshot of the WHOLE
@@ -22,12 +29,12 @@
  *     npm run check:share-roundtrip
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
-import { buildFixtures, expectedJson, fakePng, fence, sha256 } from "./fixtures/share/generate.mjs";
+import { buildFixtures, expectedJson, fakePng, fence, noteA, noteC, sha256 } from "./fixtures/share/generate.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIX = join(HERE, "fixtures", "share");
@@ -48,6 +55,11 @@ const PINNED_GOLDEN = {
 	"legacy-cp437.zip": "ceac3bdef405809e5e0ec823f0cf5510915bdddd82cc68186a2fbd89b71dee0f",
 	"unicode-path-extra.zip": "ca78bdd8ff93ab45fffac62261013b9f9ae5c7c5d359cf1f5aef2d85c66cbc89",
 	"zip64.zip": "71599ef28406fc822da1d66cfa861fd5dfb03275390343752da1da88f2d88697",
+	"v1-folder.zip": "6095c4cae017528fa4929e37dbb5d74575214b5239d6d8e4bf0f93095cab2c0f",
+	"v1-selection.zip": "018dde86c3e29615988b3f013f1854593084e8078b33b237670f6974cca57a4e",
+	"v1-future-format.zip": "2fefeb88e86fe7b1508880e48d2846cb26f8dd36f02426b5dd21227178c07b47",
+	"v1-tampered-file.zip": "5728b1e094cacce562851675c451c66526ff1d31b8e802410f1c9dad76427e35",
+	"v0-bom-subfolders-case.zip": "fdf43f96331ca763745d170c0775079b7cbbead116114f45596963d69804233f",
 	// </pinned-golden>
 };
 const PINNED_HOSTILE = {
@@ -77,7 +89,7 @@ const PINNED_HOSTILE = {
 	"empty-file.zip": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 	// </pinned-hostile>
 };
-const MIN_GOLDEN = 10;
+const MIN_GOLDEN = 15;
 const MIN_HOSTILE = 23;
 
 const sha = (b) => createHash("sha256").update(b).digest("hex");
@@ -90,6 +102,7 @@ function makeWorld() {
 	mkdirSync(join(base, "outside"));
 	writeFileSync(join(base, "canary.txt"), "canary");
 	const notices = [];
+	const world = { failAt: null, writes: 0, renameFailAt: null, renames: 0 };
 	const abs = (p) => resolve(root, p); // NOT guarded: a path that climbs really climbs
 	const host = {
 		fs: {
@@ -97,8 +110,23 @@ function makeWorld() {
 			read: async (p) => readFileSync(abs(p), "utf8"),
 			readBinary: async (p) => new Uint8Array(readFileSync(abs(p))),
 			write: async (p, c) => { writeFileSync(abs(p), c, "utf8"); },
-			writeBinary: async (p, b) => { writeFileSync(abs(p), b); },
+			writeBinary: async (p, b) => {
+				// Failure injection: the k-th binary write throws (a full disk, a lock...).
+				if (++world.writes === world.failAt) throw new Error("injected failure");
+				writeFileSync(abs(p), b);
+			},
 			mkdirs: async (p) => { mkdirSync(abs(p), { recursive: true }); },
+			listDir: async (p) => (existsSync(abs(p)) ? readdirSync(abs(p), { withFileTypes: true }).map(e => ({ name: e.name, path: `${p}/${e.name}`, isFolder: e.isDirectory() })) : []),
+			remove: async (p) => { rmSync(abs(p), { force: true }); },
+			// A rename never overwrites (the host rejects an existing destination).
+			rename: async (a, b) => {
+				if (world.renameFailAt !== null && ++world.renames === world.renameFailAt) throw new Error("injected rename failure");
+				if (world.renameFailAt === null) world.renames++;
+				if (existsSync(abs(b))) throw new Error("exists: " + b);
+				renameSync(abs(a), abs(b));
+			},
+			// The host's recoverable trash: <root>/.trash/<path>.
+			trash: async (p) => { const t = abs(`.trash/${p}`); mkdirSync(dirname(t), { recursive: true }); renameSync(abs(p), t); },
 		},
 		links: {
 			resolve: (target, from) => {
@@ -122,7 +150,7 @@ function makeWorld() {
 		platform: { isMobile: false },
 	};
 	const ctx = { settings: { quizzesModuleOverrides: {} }, saveSettings: async () => {} };
-	return { base, root, notices, host, ctx, abs, close: () => rmSync(base, { recursive: true, force: true }) };
+	return { base, root, notices, host, ctx, abs, world, close: () => rmSync(base, { recursive: true, force: true }) };
 }
 
 /** Every file and folder under `dir`, with content hashes, sorted. */
@@ -139,11 +167,21 @@ function snapshot(dir) {
 }
 /** Files directly in `dir` (name -> sha). */
 const srt = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-const listFiles = (dir) => srt(Object.fromEntries(readdirSync(dir, { withFileTypes: true }).filter(e => e.isFile()).map(e => [e.name.normalize("NFC"), sha(readFileSync(join(dir, e.name)))])));
+const listFiles = (dir) => {
+	const out = {};
+	const walk = (d, rel) => {
+		for (const e of readdirSync(d, { withFileTypes: true })) {
+			const p = rel ? `${rel}/${e.name}` : e.name;
+			if (e.isDirectory()) walk(join(d, e.name), p); else out[p.normalize("NFC")] = sha(readFileSync(join(d, e.name)));
+		}
+	};
+	walk(dir, "");
+	return srt(out);
+};
 
 await withSrcModule(
-	["apps/windows/src/ui/partage.ts", "src/dashboard/folder-create.ts", "src/dashboard/zip.ts", "src/host/current.ts"],
-	async (partage, importer, zip, hostMod) => {
+	["apps/windows/src/ui/partage.ts", "src/dashboard/folder-create.ts", "src/dashboard/zip.ts", "src/host/current.ts", "src/dashboard/share-plan.ts", "src/dashboard/share-import.ts", "src/dashboard/share-manifest.ts"],
+	async (partage, importer, zip, hostMod, planner, shareImport, manifest) => {
 		const r = makeReporter("Sharing end to end - round trip, golden and hostile archives");
 		const withWorld = async (fn) => {
 			const w = makeWorld();
@@ -174,12 +212,15 @@ await withSrcModule(
 		for (const file of gFiles) {
 			const want = expected.golden[file];
 			const bytes = read("golden", file);
-			const read1 = await zip.readZip(bytes);
-			const cls = zip.classerArchive(read1.files);
-			r.check(`golden ${file}: read with nothing skipped, junk and ignored as expected`, [read1.skipped.map(x => x.reason), read1.junk + cls.junk, cls.ignored.map(x => x.reason)], [want.skipped, want.junk, want.ignored]);
+			const recu = await shareImport.receiveArchive(bytes);
+			const plan = planner.planImport({ files: recu.files, skipped: recu.skipped, junk: recu.junk, quizOnly: false, existing: new Map(), fallbackName: file.replace(/\.zip$/, "") });
+			const ignored = plan.discarded.filter(d => !recu.skipped.some(k => k.name === d.name && k.reason === d.reason)).map(d => d.reason);
+			r.check(`golden ${file}: read as expected (skipped, junk, left out, notices, folder look)`, [recu.skipped.map(x => x.reason), plan.junk, ignored, plan.notices, plan.settings ? srt(plan.settings) : null], [want.skipped, want.junk, want.ignored, want.notices ?? [], want.settings ? srt(want.settings) : null]);
+			r.check(`golden ${file}: the plan holds exactly the expected files (paths, bytes) and folder name`, [srt(Object.fromEntries(plan.writes.map(w => [w.path, sha(w.bytes)]))), plan.folderName], [srt(want.files), want.folder]);
 			await withWorld(async (w) => {
 				await importer.importArchiveAsFolder(w.ctx, {}, [], { name: file, bytes }, () => {});
 				const folder = join(w.root, want.folder);
+				r.check(`golden ${file}: no staging folder is left next to the imported one`, readdirSync(w.root).filter(n => n.startsWith(".import-")), []);
 				r.check(`golden ${file}: imported as a new folder, every file byte for byte (names NFC)`, existsSync(folder) ? listFiles(folder) : "no folder", srt(want.files));
 				r.check(`golden ${file}: the user was told what was left out, and only that`, w.notices.some(n => /not imported/.test(n)), want.ignored.length > 0 || want.skipped.length > 0);
 			});
@@ -199,9 +240,9 @@ await withSrcModule(
 			const bytes = read("hostile", file);
 			let outcome;
 			try {
-				const res = await zip.readZip(bytes);
-				const cls = zip.classerArchive(res.files);
-				outcome = { read: "ok", notes: cls.notes.length, skipped: res.skipped.map(x => x.reason), ignored: cls.ignored.map(x => x.reason) };
+				const res = await shareImport.receiveArchive(bytes);
+				const plan = planner.planImport({ files: res.files, skipped: res.skipped, junk: res.junk, quizOnly: false, existing: new Map(), fallbackName: "x" });
+				outcome = { read: "ok", notes: plan.writes.length, skipped: res.skipped.map(x => x.reason), ignored: plan.discarded.filter(d => !res.skipped.some(k => k.name === d.name && k.reason === d.reason)).map(d => d.reason) };
 			} catch (e) { outcome = { read: "error", code: e instanceof zip.ZipReadError ? e.code : String(e) }; }
 			const exp = want.read === "error" ? { read: "error", code: want.code } : { read: "ok", notes: 0, skipped: want.skipped, ignored: want.ignored };
 			r.check(`hostile ${file} (${want.why}): refused for the right reason`, outcome, exp);
@@ -266,15 +307,15 @@ await withSrcModule(
 			quizEntry("Cours C/Semaine 2/CM2 🎓.md", "CM2 🎓"),
 			quizEntry("Cours C/Café NFD.md", "Café NFD"),
 		];
-		const SOURCES = { "CM1 - Intro.md": noteRoot, "TD é.md": noteTd, "CM1 - Intro (2).md": noteSem, "CM2 🎓.md": noteEmoji, "Café NFD.md": noteNfd };
-		const wantFolder = { ...Object.fromEntries(Object.entries(SOURCES).map(([n, c]) => [n, sha(Buffer.from(c, "utf8"))])), "schéma.png": sha(SCHEMA), "photo 1.jpg": sha(PHOTO) };
+		const SOURCES = { "CM1 - Intro.md": noteRoot, "TD é.md": noteTd, "Semaine 2/CM1 - Intro.md": noteSem, "Semaine 2/CM2 🎓.md": noteEmoji, "Café NFD.md": noteNfd };
+		const wantFolder = { ...Object.fromEntries(Object.entries(SOURCES).map(([n, c]) => [n, sha(Buffer.from(c, "utf8"))])), "schéma.png": sha(SCHEMA), "Semaine 2/img/photo 1.jpg": sha(PHOTO) };
 
 		await withWorld(async (w) => {
 			seed(w);
 			const shared = await partage.construire({ group: { name: "Cours C", quizzes: QUIZZES } });
 			r.check("export of a whole folder: a .zip named after the folder, nothing left out", [shared?.nom, shared?.imagesLaissees], ["Cours C.zip", 0]);
 			const names = (await zip.readZip(shared.octets)).files.map(f => f.name);
-			r.check("the exported archive holds NFC names, unique case-insensitively, notes then images", names, ["CM1 - Intro.md", "TD é.md", "CM1 - Intro (2).md", "CM2 🎓.md", "Café NFD.md", "schéma.png", "photo 1.jpg"]);
+			r.check("the exported archive: the manifest FIRST, then NFC paths relative to the folder (sub-folders kept), notes then images", names, ["neo-quiz.json", "CM1 - Intro.md", "TD é.md", "Semaine 2/CM1 - Intro.md", "Semaine 2/CM2 🎓.md", "Café NFD.md", "schéma.png", "Semaine 2/img/photo 1.jpg"]);
 			const w2 = makeWorld();
 			hostMod.installHost(w2.host);
 			try {
@@ -293,8 +334,8 @@ await withSrcModule(
 			try {
 				await importer.importArchiveAsFolder(w2.ctx, {}, [], { name: shared.nom, bytes: shared.octets }, () => {});
 				r.check("ROUND TRIP, a selection of three: only those notes and the images THEY cite", listFiles(join(w2.root, "Sélection")), srt({
-					"CM1 - Intro.md": wantFolder["CM1 - Intro.md"], "CM2 🎓.md": wantFolder["CM2 🎓.md"], "Café NFD.md": wantFolder["Café NFD.md"],
-					"schéma.png": wantFolder["schéma.png"], "photo 1.jpg": wantFolder["photo 1.jpg"],
+					"CM1 - Intro.md": wantFolder["CM1 - Intro.md"], "Semaine 2/CM2 🎓.md": wantFolder["Semaine 2/CM2 🎓.md"], "Café NFD.md": wantFolder["Café NFD.md"],
+					"schéma.png": wantFolder["schéma.png"], "Semaine 2/img/photo 1.jpg": wantFolder["Semaine 2/img/photo 1.jpg"],
 				}));
 			} finally { hostMod.uninstallHost(); w2.close(); hostMod.installHost(w.host); }
 		});
@@ -334,9 +375,165 @@ await withSrcModule(
 			try {
 				await importer.importArchiveAsFolder(w2.ctx, {}, [], { name: shared.nom, bytes: shared.octets }, () => {});
 				const got = Object.keys(listFiles(join(w2.root, "CON_"))).sort();
-				r.check("round trip of hostile-looking names: renamed, none lost, the unusable image reported by the exporter", [got, shared.imagesLaissees], [["CON_.md", "e.md", "nul_.txt.md", "q (2).md", "q.md"], 1]);
+				r.check("round trip of hostile-looking names: renamed, none lost, the unusable image reported by the exporter", [got, shared.imagesLaissees], [["CON_.md", "Sub/q.md", "e.md", "nul_.txt.md", "q.md"], 1]);
 			} finally { hostMod.uninstallHost(); w2.close(); hostMod.installHost(w.host); }
 		});
+
+		/* ── 5b. THE EXPORTED MANIFEST (format 1) ── */
+		await withWorld(async (w) => {
+			seed(w);
+			const look = { name: "Cours C", color: "#4f8cff", icon: "book", ue: "UE 1" };
+			const shared = await partage.construire({ group: { folder: "Cours C", ...look, quizzes: QUIZZES } });
+			const read2 = await zip.readZip(shared.octets);
+			const m = JSON.parse(new TextDecoder().decode(read2.files[0].bytes));
+			r.check("manifest: format, version, kind, name and the folder's look", [m.format, m.version, m.kind, m.name, srt(m.folder)], ["neo-quiz-share", 1, "folder", "Cours C", srt(look)]);
+			r.check("manifest: a creation date and an app version are recorded", [/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(m.created), typeof m.app], [true, "string"]);
+			r.check("manifest: every file listed with its real size and SHA-256 (and nothing else)",
+				m.files.map(f => [f.path, f.size, f.sha256]), read2.files.slice(1).map(f => [f.name, f.bytes.length, sha(f.bytes)]));
+			r.check("manifest: images are marked as images, notes as notes", [m.files.filter(f => f.kind === "image").length, m.files.filter(f => f.kind === "note").length], [2, 5]);
+
+			// The look of the folder travels, and applies to a NEW folder only.
+			const w2 = makeWorld();
+			hostMod.installHost(w2.host);
+			try {
+				w2.ctx.settings.quizzesModuleOverrides = { "Cours C": { color: "#111111" } };
+				await importer.importArchiveAsFolder(w2.ctx, {}, [], { name: shared.nom, bytes: shared.octets }, () => {});
+				r.check("a NEW folder takes the archive's look (a setting already stored under that name is kept)", w2.ctx.settings.quizzesModuleOverrides["Cours C"], { color: "#111111", icon: "book", ue: "UE 1", name: "Cours C", path: "Cours C" });
+				await importer.importArchiveAsFolder(w2.ctx, {}, [], { name: shared.nom, bytes: shared.octets }, () => {});
+				r.check("a second import makes 'Cours C (2)' with the look, the first folder's settings untouched",
+					[w2.ctx.settings.quizzesModuleOverrides["Cours C (2)"], w2.ctx.settings.quizzesModuleOverrides["Cours C"].color], [{ color: "#4f8cff", icon: "book", ue: "UE 1", name: "Cours C (2)", path: "Cours C (2)" }, "#111111"]);
+			} finally { hostMod.uninstallHost(); w2.close(); hostMod.installHost(w.host); }
+		});
+
+		/* A quiz alone also takes the images cited in the BODY of its note. */
+		await withWorld(async (w) => {
+			const put = (p, c) => { mkdirSync(dirname(w.abs(p)), { recursive: true }); writeFileSync(w.abs(p), c); };
+			put("Q/corps.md", "# Titre\n\n![[corps.png]]\n\n![](img/Dessin.PNG)\n\n" + fence("Corps"));
+			put("Q/corps.png", fakePng(21));
+			put("Q/img/Dessin.PNG", fakePng(22));
+			const one = await partage.construire({ quiz: quizEntry("Q/corps.md", "Corps") });
+			const got = (await zip.readZip(one.octets)).files.map(f => f.name);
+			r.check("one quiz: images cited in the BODY of the note travel too (paths relative to the note, extension as written)", [one.nom, got], ["Corps.zip", ["neo-quiz.json", "Corps.md", "corps.png", "img/Dessin.PNG"]]);
+			const m = JSON.parse(new TextDecoder().decode((await zip.readZip(one.octets)).files[0].bytes));
+			r.check("a quiz archive is of kind 'quizzes'", m.kind, "quizzes");
+		});
+
+		/* ── 5c. IMPORT INTO AN EXISTING FOLDER ── */
+		const V1 = read("golden", "v1-folder.zip");
+		const NOTE_C_DIFFERENT = "# autre\n" + fence("Mon propre quiz");
+		await withWorld(async (w) => {
+			const put = (p, c) => { mkdirSync(dirname(w.abs(p)), { recursive: true }); writeFileSync(w.abs(p), c); };
+			put("Mes quiz/CM1 - Intro.md", noteA);            // identical to the archive's: not duplicated
+			put("Mes quiz/Semaine 2/q1.md", NOTE_C_DIFFERENT); // same name, different content: the new one is renamed
+			put("Mes quiz/schéma.png", fakePng(99));          // same image name, different bytes: mine stays
+			put("Mes quiz/perso.md", "perso");
+			const before = listFiles(w.abs("Mes quiz"));
+			await importer.importFileIntoFolder("Mes quiz", { name: "v1-folder.zip", bytes: V1 }, () => {});
+			const after = listFiles(w.abs("Mes quiz"));
+			r.check("into an existing folder: nothing of mine is overwritten (same bytes at every old path)", Object.entries(before).filter(([p, h]) => after[p] !== h), []);
+			r.check("into an existing folder: only the genuinely new files appear (a different homonym becomes 'q1 (2)', the identical quiz is not duplicated, my image keeps its name)",
+				Object.keys(after).filter(p => !(p in before)).sort(), ["Semaine 2/img/figure.PNG", "Semaine 2/q1 (2).md"]);
+			r.check("the renamed quiz holds the archive's bytes", after["Semaine 2/q1 (2).md"], sha(Buffer.from(noteC, "utf8")));
+			const said = w.notices.join(" | ");
+			r.check("the summary says what was added, ignored (identical) and renamed, and what was left out",
+				[/1 quizzes and 1 images added/.test(said), /1 already in the folder/.test(said), /renamed/.test(said) && /q1 \(2\)\.md/.test(said), /schéma\.png \(a different image/.test(said)], [true, true, true, true]);
+			r.check("no staging folder remains, and the host's trash holds no file", [readdirSync(w.root).filter(n => n.startsWith(".import-")), snapshot(w.base).filter(x => x.includes(".trash/") && !x.endsWith("/"))], [[], []]);
+
+			// The same archive again: nothing to add, nothing written, and it says so.
+			w.notices.length = 0;
+			await importer.importFileIntoFolder("Mes quiz", { name: "v1-folder.zip", bytes: V1 }, () => {});
+			r.check("importing the same archive twice writes nothing", listFiles(w.abs("Mes quiz")), after);
+			r.check("... and the user is told that everything is already there or kept", w.notices.some(n => /already in the folder|not imported/.test(n)), true);
+		});
+
+		/* A quiz (.md) into a folder: identical = skipped, different = renamed. */
+		await withWorld(async (w) => {
+			mkdirSync(w.abs("D"));
+			const md = (t) => new TextEncoder().encode(t);
+			await importer.importFileIntoFolder("D", { name: "Quiz.md", bytes: md(noteC) }, () => {});
+			await importer.importFileIntoFolder("D", { name: "Quiz.md", bytes: md(noteC) }, () => {});
+			r.check("a .md imported twice is not duplicated", Object.keys(listFiles(w.abs("D"))), ["Quiz.md"]);
+			await importer.importFileIntoFolder("D", { name: "Quiz.md", bytes: md(noteC + "\n<!-- v2 -->\n") }, () => {});
+			await importer.importFileIntoFolder("D", { name: "Quiz.md", bytes: md(noteC + "\n<!-- v2 -->\n") }, () => {});
+			r.check("a different quiz with the same name becomes 'Quiz (2)', and re-importing that version finds it (no 'Quiz (3)')", Object.keys(listFiles(w.abs("D"))).sort(), ["Quiz (2).md", "Quiz.md"]);
+			await importer.importFileIntoFolder("D", { name: "Notes.md", bytes: md("no quiz here") }, () => {});
+			r.check("a .md without a quiz block is refused with a message and written nowhere", [Object.keys(listFiles(w.abs("D"))).length, w.notices.at(-1)], [2, "No quiz found in this file"]);
+			await importer.importFileIntoFolder("D", { name: "QUIZ.MD", bytes: md(noteA) }, () => {});
+			r.check("on a case-insensitive disk 'QUIZ.MD' and the existing 'Quiz.md' are the SAME name: the newcomer takes the next free one", Object.keys(listFiles(w.abs("D"))).sort(), ["QUIZ (3).md", "Quiz (2).md", "Quiz.md"]);
+		});
+
+		/* ── 5d. THE PLAN, PURE: collisions, case, sub-folders ── */
+		{
+			const enc2 = new TextEncoder();
+			const pf = async (name, text) => { const bytes = typeof text === "string" ? enc2.encode(text) : text; return { name, bytes, sha256: await manifest.sha256Hex(bytes) }; };
+			const input = async (files, existing = new Map(), extra = {}) => ({ files, skipped: [], junk: 0, quizOnly: false, existing, fallbackName: "Imp", ...extra });
+			const a = await pf("A.md", noteA); const c = await pf("a.md", noteC); const a2 = await pf("sub/A.md", noteA);
+			const plan1 = planner.planImport(await input([a, c, a2]));
+			r.check("plan: two notes whose names differ only by case are two names; the same note in a sub-folder is another path",
+				[plan1.writes.map(x => x.path), plan1.renamed], [["A.md", "a (2).md", "sub/A.md"], [{ from: "a.md", to: "a (2).md" }]]);
+			const plan2 = planner.planImport(await input([a, await pf("A.md", noteA)]));
+			r.check("plan: the same note twice in one archive is written once", [plan2.writes.length, plan2.duplicates], [1, ["A.md"]]);
+			const existing = new Map([[planner.foldPath("A.md"), a.sha256], [planner.foldPath("img"), planner.DIRECTORY]]);
+			existing.set(planner.foldPath("img.md"), planner.DIRECTORY);
+			const plan3 = planner.planImport(await input([a, await pf("img.md", noteC)], existing));
+			r.check("plan: a name taken by a folder is never written over", [plan3.writes.map(x => x.path), plan3.duplicates], [["img (2).md"], ["A.md"]]);
+			const imgA = await pf("Photo.PNG", fakePng(1)); const imgB = await pf("photo.png", fakePng(2));
+			const plan4 = planner.planImport(await input([imgA, imgB]));
+			r.check("plan: an image keeps its extension as written; a different image with the same name (any case) is NOT imported",
+				[plan4.writes.map(x => x.path), plan4.discarded], [["Photo.PNG"], [{ name: "photo.png", reason: "duplicate-image" }]]);
+			const plan5 = planner.planImport(await input([await pf("W/N1.md", noteA), await pf("W/N2.md", noteC), await pf("W/img/x.png", fakePng(3))]));
+			r.check("plan: a single wrapping root folder is removed, the sub-folders below it are kept", plan5.writes.map(x => x.path), ["N1.md", "N2.md", "img/x.png"]);
+			const plan6 = planner.planImport(await input([await pf("N1.md", noteA), await pf("D/N2.md", noteC)]));
+			r.check("plan: no wrapper to remove when a note sits at the root", plan6.writes.map(x => x.path), ["N1.md", "D/N2.md"]);
+			const plan7 = planner.planImport(await input([await pf("CON/x.md", noteA), await pf("ok/..x/y.md", noteA), await pf("fine/z.md", noteA)]));
+			r.check("plan: a device-named folder in a path is refused as a bad name, never written", plan7.discarded.map(d => d.reason), ["bad-name"]);
+			const bom = enc2.encode("\ufeff# bom\r\n" + fence("b"));
+			const plan8 = planner.planImport(await input([await pf("b.md", bom)]));
+			r.check("plan: a note's bytes (BOM, CRLF) are carried untouched", Buffer.from(plan8.writes[0].bytes).equals(Buffer.from(bom)), true);
+		}
+
+		/* ── 5e. A FAILURE AT THE k-TH WRITE LEAVES NOTHING ── */
+		const visible = (arr) => arr.filter(x => !x.startsWith("vault/.trash/") && x !== "vault/.trash/");
+		for (const [label, run, seedFn] of [
+			["new folder", (w) => importer.importArchiveAsFolder(w.ctx, {}, [], { name: "Cours C.zip", bytes: V1 }, () => {}), () => {}],
+			["existing folder", (w) => importer.importFileIntoFolder("Mes quiz", { name: "v1-folder.zip", bytes: V1 }, () => {}), (w) => { mkdirSync(w.abs("Mes quiz")); writeFileSync(w.abs("Mes quiz/perso.md"), "perso"); }],
+		]) {
+			const probe = makeWorld();
+			hostMod.installHost(probe.host);
+			let total = 0;
+			try { seedFn(probe); await run(probe); total = probe.world.writes; } finally { hostMod.uninstallHost(); probe.close(); }
+			const results = [];
+			for (let k = 1; k <= total; k++) {
+				await withWorld(async (w) => {
+					seedFn(w);
+					const before = visible(snapshot(w.base));
+					w.world.failAt = k;
+					await run(w);
+					const after = visible(snapshot(w.base));
+					const trashFiles = snapshot(w.base).filter(x => x.startsWith("vault/.trash/") && !x.endsWith("/"));
+					if (JSON.stringify(after) !== JSON.stringify(before) || trashFiles.length || !w.notices.some(n => /import failed/.test(n))) results.push(k);
+				});
+			}
+			r.check(`failure injected at each of the ${total} writes (${label}): the tree is exactly as before, nothing in the trash but empty folders, and the user is told`, [total > 3, results], [true, []]);
+		}
+		for (const [label, run, seedFn] of [
+			["new folder", (w) => importer.importArchiveAsFolder(w.ctx, {}, [], { name: "Cours C.zip", bytes: V1 }, () => {}), () => {}],
+			["existing folder", (w) => importer.importFileIntoFolder("Mes quiz", { name: "v1-folder.zip", bytes: V1 }, () => {}), (w) => { mkdirSync(w.abs("Mes quiz")); writeFileSync(w.abs("Mes quiz/perso.md"), "perso"); }],
+		]) {
+			const results = [];
+			for (const k of [1, 2, 3]) {
+				await withWorld(async (w) => {
+					seedFn(w);
+					const before = visible(snapshot(w.base));
+					w.world.renameFailAt = k;
+					await run(w);
+					if (w.world.renames < k) return; // fewer renames than k (the new-folder case has one)
+					const after = visible(snapshot(w.base));
+					if (JSON.stringify(after) !== JSON.stringify(before)) results.push(k);
+				});
+			}
+			r.check(`failure injected at the k-th rename (${label}): files already moved are taken out again`, results, []);
+		}
 
 		/* ── 6. FUZZ (fixed seed): flipped bytes never crash, never write ── */
 		let s = 0x2545f491;
@@ -358,7 +555,8 @@ await withSrcModule(
 					await importer.importFileIntoFolder("Existing-not-there", { name: "f.zip", bytes: b }, () => {}).catch(() => {});
 				}
 				const after = snapshot(w.base).filter(x => !before.includes(x));
-				if (after.some(x => !x.startsWith("vault/Existing-not-there"))) wrote.push(file);
+				// The only residue allowed: an EMPTY set-aside staging folder in the host's trash.
+				if (after.some(x => !x.startsWith("vault/Existing-not-there") && !(x.startsWith("vault/.trash/") && x.endsWith("/")) && x !== "vault/.trash/")) wrote.push(file);
 			});
 		}
 		r.check("fuzz: flipped bytes only ever raise the typed error", untyped, 0);

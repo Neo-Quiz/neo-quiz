@@ -500,6 +500,32 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		index.apply(index.get(path) ? { kind: "modify", file } : { kind: "create", file });
 	}
 
+	/**
+	 * TEACHES THE MIRROR WHAT A MOVE BROUGHT IN, at once. A staged import
+	 * (`dashboard/share-import.ts`) writes into a hidden `.import-<id>` folder,
+	 * which the catalogue never sees, then moves it (or its files) to the
+	 * visible place by `rename`. The watcher reports the arrivals only after
+	 * its debounce, and the import's `onDone` rescans right away: without this,
+	 * the imported notes would be missing from the catalogue until the watcher
+	 * caught up (the "imported notes absent until a restart" failure again).
+	 * A file gets its fresh `mtime`; a folder is listed. Best effort: the
+	 * watcher stays the authority and recalibrates anyway.
+	 */
+	async function recalerApresDeplacement(to: string): Promise<void> {
+		try {
+			const fichiers = pont().fichiers;
+			const st = await fichiers.stat(abs(to));
+			if (st) { recaler(to, st.mtime); return; }
+			for (const e of await fichiers.liste(abs(to))) {
+				const rel = carte.depuisAbsolu(e.chemin);
+				if (rel === null || horsCatalogue(rel) || index.get(rel)) continue;
+				index.apply({ kind: "create", file: toHostFile(rel, e.mtime) });
+			}
+		} catch (e) {
+			console.warn(LOG_PREFIX, "recalage après déplacement impossible:", to, e);
+		}
+	}
+
 	return {
 		async read(path) {
 			return await pont().fichiers.read(abs(path));
@@ -599,6 +625,7 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		   venait de créer. */
 		async rename(from, to) {
 			await pont().fichiers.rename(abs(from), abs(to));
+			await recalerApresDeplacement(to);
 		},
 		listMarkdown() {
 			return index.all().filter(f => f.extension === "md");

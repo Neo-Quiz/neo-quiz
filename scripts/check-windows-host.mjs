@@ -659,7 +659,15 @@ function installerPont(fichiers = {}, perimetre = null) {
 				return [...disque.keys()].filter(p => p.startsWith(prefixe) && !p.slice(prefixe.length).includes("/"));
 			},
 			async remove(p) { journal.push(["remove", p]); disque.delete(p); },
-			async rename(de, vers) { journal.push(["rename", de, vers]); },
+			/* Moves the file, or every file under a folder (a staged import moves
+			   a hidden folder to its visible name). */
+			async rename(de, vers) {
+				journal.push(["rename", de, vers]);
+				for (const k of [...disque.keys()]) {
+					if (k === de) { disque.set(vers, disque.get(k)); disque.delete(k); }
+					else if (k.startsWith(de + "/")) { disque.set(vers + k.slice(de.length), disque.get(k)); disque.delete(k); }
+				}
+			},
 			async stat(p) { return disque.has(p) ? { mtime: dates.get(p) ?? 1000 } : null; },
 			/* Les trois canaux de la tranche 5, BORNÉS comme `read` (voir l'en-tête). Un
 			   dossier est ce qui a au moins un descendant sur le disque, ou ce que
@@ -1295,6 +1303,24 @@ await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsFs, bui
 		   exactement la divergence que `horsCatalogue` a été extraite pour
 		   fermer — deux copies d'un même prédicat avaient déjà divergé ici. */
 		await fs.append("Quiz/.neo-quiz/review-log.jsonl", "{}\n");
+		/* A STAGED IMPORT: written under a hidden folder (outside the catalogue),
+		   then moved by ONE `rename`. The notes must be in the catalogue when
+		   `rename` returns (the import's rescan runs at once), and a hidden
+		   target must still keep them out. */
+		await fs.write("Quiz/.import-abc/Neuf/q.md", "x");
+		await fs.writeBinary("Quiz/.import-abc/Neuf/img/a.png", new Uint8Array([1]));
+		r.check("under a hidden staging folder, a note is NOT in the catalogue",
+			fs.getFile("Quiz/.import-abc/Neuf/q.md"), null);
+		await fs.rename("Quiz/.import-abc", "Quiz/Importe");
+		r.check("a moved folder: its notes and files are in the catalogue as soon as rename returns",
+			[fs.getFile("Quiz/Importe/Neuf/q.md")?.basename, fs.getFile("Quiz/Importe/Neuf/img/a.png") !== null], ["q", true]);
+		await fs.rename("Quiz/Importe/Neuf/q.md", "Quiz/Importe/q2.md");
+		r.check("a moved single note is in the catalogue under its new path",
+			fs.getFile("Quiz/Importe/q2.md")?.basename, "q2");
+		await fs.rename("Quiz/Importe/q2.md", "Quiz/.cache/q2.md");
+		r.check("a note moved INTO a hidden folder does not enter the catalogue there",
+			fs.getFile("Quiz/.cache/q2.md"), null);
+
 		r.check("le journal de révision reste HORS du catalogue",
 			fs.getFile("Quiz/.neo-quiz/review-log.jsonl"), null);
 		r.check("… et le journal n'a pas fait le voyage jusqu'au catalogue",
@@ -1435,6 +1461,12 @@ await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsIndex, 
 		await createWindowsFs(carte, miroir).write("Quiz/Cours (2)/importe.md", "y");
 		r.check("réécrire une note déjà connue n'annonce rien",
 			vusEcriture.length, 1);
+		/* A staged import's folder move is ANNOUNCED too (the scanner learns the
+		   notes from `onChange`, not from the mirror alone). */
+		await createWindowsFs(carte, miroir).write("Quiz/.import-xyz/Sem/n.md", "x");
+		await createWindowsFs(carte, miroir).rename("Quiz/.import-xyz", "Quiz/Recu");
+		r.check("un dossier déplacé (import en staging) annonce ses notes aux abonnés",
+			vusEcriture.includes("create Quiz/Recu/Sem/n.md"), true);
 		desabonnerEcriture();
 		vus.splice(4); // the later cases count the events of the pushed ones only
 

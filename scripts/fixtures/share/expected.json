@@ -53,7 +53,7 @@
 			"files": {
 				"CM1 - Intro.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
 				"TD é.md": "7112de1d3b652fc55470536a24a3ac01b03c9c461c1197fcc777821f6d4f64d9",
-				"schéma.png": "2702fe8f58cdaf5ce56ad0cf7966e0d21da543240c6f758cd7608d2e3797e603"
+				"img/schéma.png": "2702fe8f58cdaf5ce56ad0cf7966e0d21da543240c6f758cd7608d2e3797e603"
 			},
 			"junk": 0,
 			"skipped": [],
@@ -63,9 +63,9 @@
 			"sha256": "fe853e869716907a819d85e1f12e74aba9d83089daa95c7d2b3fdbc3f1a5f579",
 			"folder": "root-folder-subfolders",
 			"files": {
-				"q1.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
-				"q1 (2).md": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b",
-				"figure.png": "e59dea7dbc71c5cf749a60a077bb83201343cbaf1a0f02985120602684920006"
+				"Semaine 1/q1.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
+				"Semaine 2/q1.md": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b",
+				"Semaine 2/figure.PNG": "e59dea7dbc71c5cf749a60a077bb83201343cbaf1a0f02985120602684920006"
 			},
 			"junk": 0,
 			"skipped": [],
@@ -111,6 +111,77 @@
 			"files": {
 				"Big one.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
 				"Other.md": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": []
+		},
+		"v1-folder.zip": {
+			"sha256": "6095c4cae017528fa4929e37dbb5d74575214b5239d6d8e4bf0f93095cab2c0f",
+			"folder": "Cours C",
+			"files": {
+				"CM1 - Intro.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
+				"Semaine 2/q1.md": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b",
+				"schéma.png": "2702fe8f58cdaf5ce56ad0cf7966e0d21da543240c6f758cd7608d2e3797e603",
+				"Semaine 2/img/figure.PNG": "e59dea7dbc71c5cf749a60a077bb83201343cbaf1a0f02985120602684920006"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": [],
+			"settings": {
+				"name": "Cours C",
+				"color": "#4f8cff",
+				"icon": "book",
+				"ue": "UE 1"
+			}
+		},
+		"v1-selection.zip": {
+			"sha256": "018dde86c3e29615988b3f013f1854593084e8078b33b237670f6974cca57a4e",
+			"folder": "Sélection",
+			"files": {
+				"TD é.md": "7112de1d3b652fc55470536a24a3ac01b03c9c461c1197fcc777821f6d4f64d9",
+				"Chapitre 2.md": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b",
+				"schéma.png": "2702fe8f58cdaf5ce56ad0cf7966e0d21da543240c6f758cd7608d2e3797e603"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": []
+		},
+		"v1-future-format.zip": {
+			"sha256": "2fefeb88e86fe7b1508880e48d2846cb26f8dd36f02426b5dd21227178c07b47",
+			"folder": "v1-future-format",
+			"files": {
+				"A.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015",
+				"Dossier/schéma.png": "2702fe8f58cdaf5ce56ad0cf7966e0d21da543240c6f758cd7608d2e3797e603"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": [
+				"unsupported-type"
+			],
+			"notices": [
+				"newer-format"
+			]
+		},
+		"v1-tampered-file.zip": {
+			"sha256": "5728b1e094cacce562851675c451c66526ff1d31b8e802410f1c9dad76427e35",
+			"folder": "Altéré",
+			"files": {
+				"Bon.md": "3a0641696b9346162d8766e23408b41bfbb1a6c2ca733eedecc91b6d5e918015"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": [
+				"altered"
+			]
+		},
+		"v0-bom-subfolders-case.zip": {
+			"sha256": "fdf43f96331ca763745d170c0775079b7cbbead116114f45596963d69804233f",
+			"folder": "v0-bom-subfolders-case",
+			"files": {
+				"BOM.md": "f160c03a584f2b1e29ead03e0089ff163a5f35ed6dc70070753eb97fb0519002",
+				"Sem/Q.MD": "50537b4755bbc4b42f5320ae87f7f9272caabbaa699ff98a5b3dac5c15ecb02b",
+				"img/Photo.JPG": "e59dea7dbc71c5cf749a60a077bb83201343cbaf1a0f02985120602684920006"
 			},
 			"junk": 0,
 			"skipped": [],
