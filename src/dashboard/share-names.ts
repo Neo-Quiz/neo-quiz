@@ -30,9 +30,18 @@ const FORBIDDEN = /[:*?"<>|\/\u0000-\u001f\u007f]/g;
    reserves, and the console handles. Tested on the part before the first dot. */
 const RESERVED = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9¹²³]|lpt[0-9¹²³])$/i;
 
-/** NFC, forbidden characters to "-", dots and spaces trimmed. Never empty-checks. */
+/* Invisible FORMAT characters, removed from every name: the bidirectional controls (U+202A-U+202E,
+   U+2066-U+2069, U+200E, U+200F, U+061C) reorder what is DISPLAYED (`ann<RLO>txt.md` shows as
+   `annd.txt`-style lookalikes of another extension), and the zero-width ones (U+200B, U+2060-U+2064,
+   U+FEFF, soft hyphen) make two different names look identical. U+200C/U+200D stay: emoji sequences
+   and Persian need them. Built from code points so the source holds no invisible character. */
+const INVISIBLE_CODES = [0xad, 0x61c, 0x200b, 0x200e, 0x200f, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064, 0xfeff,
+	...Array.from({ length: 5 }, (_, i) => 0x202a + i), ...Array.from({ length: 4 }, (_, i) => 0x2066 + i)];
+const INVISIBLE = new RegExp(`[${INVISIBLE_CODES.map(c => String.fromCharCode(c)).join("")}]`, "g");
+
+/** NFC, invisible format characters removed, forbidden characters to "-", dots and spaces trimmed. Never empty-checks. */
 export function cleanName(raw: string): string {
-	return raw.normalize("NFC").replace(FORBIDDEN, "-").replace(/^[\s.]+|[\s.]+$/g, "");
+	return raw.normalize("NFC").replace(INVISIBLE, "").replace(FORBIDDEN, "-").replace(/^[\s.]+|[\s.]+$/g, "");
 }
 
 /** Is this (full or base) file name a Windows device name for any extension? */
