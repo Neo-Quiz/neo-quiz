@@ -125,7 +125,7 @@ function main() {
 	wt(["checkout", "--detach", head]);
 	// Stale ignored files (old web assets, build outputs) must never reach the APK. Kept: the linked
 	// node_modules, dist-pack, the SDK path, the Gradle cache and the Syncthing libs (hash-pinned by the build).
-	wt(["clean", "-fdx", "-e", "node_modules", "-e", "dist-pack", "-e", "local.properties", "-e", ".gradle", "-e", "jniLibs"]);
+	wt(["-c", "core.longPaths=true", "clean", "-fdx", "-e", "node_modules", "-e", "dist-pack", "-e", "local.properties", "-e", ".gradle", "-e", "jniLibs"]);
 	console.log(`Building ${tag} from ${head.slice(0, 8)} in ${WORKTREE}`);
 	const isWindows = process.platform === "win32";
 	const npm = isWindows ? "npm.cmd" : "npm";
