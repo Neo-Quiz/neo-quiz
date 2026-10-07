@@ -851,7 +851,9 @@ réglages arrivent par un `AiSettingsHost` (`dashboard/ai-settings-host.ts`, don
 l'application ne les a pas : `openFiles` (pas d'onglets), `usage` (l'écran
 d'usage appartenait au greffon — `ai-usage.ts` lit le trousseau du CLI) et
 `renderCodeBlock` (sans lui, un `<pre><code>` nu). **Le texte d'un PDF joint est
-un membre OPTIONNEL du contrat** (`HostPdf`) : l'application ne l'a pas et REFUSE le PDF
+un membre OPTIONNEL du contrat** (`HostPdf`) : l'application le fournit depuis le
+2026-09-17 (`apps/windows/src/host/pdf.ts`, `pdfjs-dist` chargé à la demande, texte
+des pages extrait). Un hôte qui ne le fournit pas REFUSE le PDF
 (`ai.error.pdfUnsupportedInApp`) plutôt que d'en joindre le vide.
 
 **La clé `ai` des réglages de l'application est GARDÉE dans le processus
