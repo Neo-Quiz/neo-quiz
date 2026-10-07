@@ -4,13 +4,11 @@
 //  3. both copied into app/src/main/assets/web/.
 // Exit code is non-zero on any failure (process.exitCode, never process.exit()).
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync, statSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { createRequire } from "node:module";
-import { FICHIERS_PYODIDE } from "../../windows/electron/code/copier.mjs";
-import { PACK_C, assertPinEquals, extractPack, installSyncthing, readWindowsPin } from "./pins.mjs";
+import { installSyncthing } from "./pins.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..", "..", "..");
@@ -26,31 +24,18 @@ function run(label, command, args, cwd) {
 	if (r.status !== 0) throw new Error(`${label} failed (exit ${r.status ?? r.error})`);
 }
 
-/** The code sandbox: the PC's page and workers, Pyodide, and the pinned C/C++ pack. */
-async function buildCodeSandbox() {
-	// The pin is a copy of the Windows one: a mismatch fails the build.
-	assertPinEquals(PACK_C, readWindowsPin(readFileSync(join(windowsApp, "electron", "langages.ts"), "utf8")));
+/** The code sandbox: the PC's page and workers. The language packs (Python, C/C++) are NOT embedded: the app downloads them (LanguagePacks.kt). */
+function buildCodeSandbox() {
 	rmSync(codeAssets, { recursive: true, force: true });
-	mkdirSync(join(codeAssets, "languages", "python"), { recursive: true });
+	mkdirSync(codeAssets, { recursive: true });
 	const pcCode = join(windowsApp, "electron", "code");
 	for (const f of ["index.html", "page.js", "worker-python.mjs"]) copyFileSync(join(pcCode, f), join(codeAssets, f));
 	// worker-clang imports the pack by the PC scheme: point it at the Android code origin.
 	const clang = readFileSync(join(pcCode, "worker-clang.mjs"), "utf8");
 	if (!clang.includes("neo-code://app/")) throw new Error("worker-clang.mjs no longer names neo-code://app/: update the build");
 	writeFileSync(join(codeAssets, "worker-clang.mjs"), clang.replaceAll("neo-code://app/", CODE_ORIGIN + "/"));
-	const pyodide = dirname(createRequire(join(windowsApp, "package.json")).resolve("pyodide/package.json"));
-	// The worker loads Pyodide from `languages/python/` (the PC pack layout); Android embeds it.
-	for (const f of FICHIERS_PYODIDE) copyFileSync(join(pyodide, f), join(codeAssets, "languages", "python", f));
-	writeFileSync(join(codeAssets, "languages", "python", "manifest.json"), JSON.stringify({ version: "embedded" }));
-	const count = await extractPack(join(repo, "dist-pack"), join(codeAssets, "languages", "c"));
-	const manifest = JSON.parse(readFileSync(join(codeAssets, "languages", "c", "manifest.json"), "utf8"));
-	if (manifest.version !== PACK_C.version) throw new Error(`pack manifest version ${manifest.version} differs from the pin ${PACK_C.version}`);
-	let octets = 0;
-	const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else octets += statSync(p).size; } };
-	walk(join(codeAssets, "languages", "c"));
-	writeFileSync(join(codeAssets, "pack-info.json"), JSON.stringify({ version: PACK_C.version, octets }));
 	copyFileSync(join(here, "code-shim.js"), join(assetsRoot, "code-shim.js"));
-	console.log(`[android:web] code sandbox ready (${count} pack files, ${octets} bytes)`);
+	console.log("[android:web] code sandbox ready (no language pack embedded)");
 }
 
 try {
@@ -72,7 +57,7 @@ try {
 		logLevel: "warning",
 	});
 
-	await buildCodeSandbox();
+	buildCodeSandbox();
 
 	// The embedded Syncthing (Task 10): pinned APKs, libraries under jniLibs (git-ignored).
 	await installSyncthing(join(repo, "dist-pack", "syncthing-android"), join(here, "..", "app"));

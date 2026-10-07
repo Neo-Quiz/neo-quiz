@@ -1,20 +1,21 @@
 /**
- * The Android build's copy of the C/C++ pack pin (apps/android/web/pins.mjs):
- *  - it equals `PACK_C` of apps/windows/electron/langages.ts, literal for literal;
- *  - a pack whose size or hash differs is refused before anything is extracted;
- *  - an archive entry named `../x`, `C:x`, `/x`, `a\..\x` (and the other forms
- *    `nomEntreeAdmis` refuses) is refused and nothing is written, even when
- *    the other entries are fine.
+ * The Android app embeds NO language pack: it downloads them itself. This
+ * check ties the pin copies together:
+ *  - `PACK_C` and `PACK_PYTHON` of apps/android/web/pins.mjs equal those of
+ *    apps/windows/electron/langages.ts, literal for literal;
+ *  - the Kotlin copy (`LanguagePacks.kt`) equals them too;
+ *  - the sandbox constants of CodeProtocol.kt are the PC's;
+ *  - the APK build copies no pack (the JVM tests, `LanguagePacksTest`, hold the
+ *    hash, size and entry-name refusals).
  *
  *     npm run check:android-code-pack
  *
  * Exit code only (`process.exitCode`).
  */
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PACK_C, assertPinEquals, entryNameAllowed, readWindowsPin, verifyPack, writeEntries } from "../apps/android/web/pins.mjs";
+import { PACK_C, PACK_PYTHON, assertPinEquals, readWindowsPin } from "../apps/android/web/pins.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 let failures = 0;
@@ -23,18 +24,14 @@ function check(label, ok) {
 }
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
-const windows = readWindowsPin(readFileSync(join(root, "apps/windows/electron/langages.ts"), "utf8"));
-check("Windows pin is readable", Boolean(windows.version && windows.url && windows.sha256 && windows.taille));
-check("pin equals the Windows PACK_C", !throws(() => assertPinEquals(PACK_C, windows)));
-for (const k of ["version", "url", "sha256", "taille"]) {
-	check(`a different ${k} fails the build`, throws(() => assertPinEquals({ ...PACK_C, [k]: k === "taille" ? 1 : "x" }, windows)));
-}
-
-for (const bad of ["../x", "a/../x", "C:x", "C:/x", "c:\\x", "/x", "a\\..\\x", "\\\\server\\share\\x", "a//b", "./x", "", "a\0b"]) {
-	check(`refuses entry name ${JSON.stringify(bad)}`, entryNameAllowed(bad) === null);
-}
-for (const good of ["clang/bundle.js", "manifest.json", "wasi-shim/index.js"]) {
-	check(`admits entry name ${good}`, entryNameAllowed(good) === good);
+const langagesTs = readFileSync(join(root, "apps/windows/electron/langages.ts"), "utf8");
+for (const [name, pin] of [["PACK_C", PACK_C], ["PACK_PYTHON", PACK_PYTHON]]) {
+	const windows = readWindowsPin(langagesTs, name);
+	check(`Windows ${name} is readable`, Boolean(windows.version && windows.url && windows.sha256 && windows.taille));
+	check(`pins.mjs ${name} equals the Windows one`, !throws(() => assertPinEquals(pin, windows)));
+	for (const k of ["version", "url", "sha256", "taille"]) {
+		check(`a different ${name}.${k} is detected`, throws(() => assertPinEquals({ ...pin, [k]: k === "taille" ? 1 : "x" }, windows)));
+	}
 }
 
 // The sandbox constants are the PC's, literal for literal.
@@ -49,20 +46,7 @@ for (const [pc, kt] of [["SECOURS_MS", "FALLBACK_MS"], ["CHARGEMENT_MS", "LOADIN
 	check(`${kt} equals the PC's ${pc}`, v !== undefined && k !== undefined && Function(`return ${k}`)() === v);
 }
 
-const small = Buffer.from("hello");
-check("a pack of another size is refused", throws(() => verifyPack(small, { ...PACK_C, taille: 6 })));
-check("a pack of the right size but another hash is refused", throws(() => verifyPack(small, { ...PACK_C, taille: 5 })));
-
-const dest = mkdtempSync(join(tmpdir(), "neo-pack-"));
-try {
-	for (const bad of ["../x", "C:x", "/x", "a\\..\\x"]) {
-		check(`writeEntries(${JSON.stringify(bad)}) throws`, throws(() => writeEntries(join(dest, "pack"), [{ name: "ok.txt", data: Buffer.from("a") }, { name: bad, data: Buffer.from("b") }])));
-	}
-	check("nothing outside the pack directory was written", !existsSync(join(dest, "x")) && readdirSync(dest).every((n) => n === "pack"));
-	writeEntries(join(dest, "good"), [{ name: "a/b.txt", data: Buffer.from("ok") }]);
-	check("a safe entry is written", readFileSync(join(dest, "good", "a", "b.txt"), "utf8") === "ok");
-} finally {
-	rmSync(dest, { recursive: true, force: true });
-}
+const build = readFileSync(join(root, "apps/android/web/build.mjs"), "utf8");
+check("the APK build embeds no pack", !/extractPack|FICHIERS_PYODIDE|copierPyodide|languages", "(c|python)"/.test(build));
 
 if (failures) process.exitCode = 1;
