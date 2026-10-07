@@ -199,6 +199,13 @@ jobs:
         run: npm run check:moodle
 
 
+      # MOODLE IN THE APP: the login token never leaves the main process, every
+      # request and redirect stays on the configured site, paths cannot escape,
+      # and the passport and host checks are replayed on mutants.
+      - name: Moodle sync
+        run: npm run check:moodle
+
+
       # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
       # perdre de réponses, même si le quiz a changé entre deux sessions.
       - name: Quiz session snapshot
