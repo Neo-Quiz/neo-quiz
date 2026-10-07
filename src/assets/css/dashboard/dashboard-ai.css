@@ -2050,97 +2050,11 @@
    plus rien — mais, plus spécifique, il écrasait l'écart de 22 px écrit plus
    bas, et les deux voies se touchaient (Ahmed, 2026-09-20). */
 .qbd-install-modal .qbd-install-state { order: 4; }
-.qbd-install-modal .qbd-install-auto { order: 4; }
 .qbd-install-modal .qbd-install-learn { order: 5; }
 .qbd-install-modal .modal-title { font-size: 1.22em; margin-bottom: 16px; }
 .qbd-install-modal .modal-title-icon,
 .qbd-install-modal .modal-title-icon svg { width: 22px; height: 22px; }
 .qbd-install-what { margin: 0 0 20px; color: var(--text-muted); font-size: 14px; line-height: 1.6; }
-/* L'ÉCART EST ÉCRIT, il ne vient plus du hasard : tant qu'un plancher
-   étirait la boîte, `margin-top: auto` posait l'air entre la voie manuelle
-   et ce bouton ; sans plancher, il n'y a plus rien à distribuer et les deux
-   se touchaient (Ahmed, 2026-09-20). */
-/* ── LE BOUTON PRINCIPAL REPOND AU DOIGT ──
-   Choisi a l'ecran le 2026-09-20 parmi huit effets, variante « Vif » : il
-   respire au survol, s'ecrase plus profond que la course habituelle et
-   DEPASSE au retour (la courbe a rebond), pendant qu'une onde CLAIRE part du
-   point d'appui (`onde.ts`). Claire et non sombre : elle allume le bouton
-   sous le doigt au lieu de le tacher, ce qui tient mieux sur un fond lavande
-   clair. `overflow: hidden` borne le cercle au bouton ; les enfants passent
-   au-dessus de lui, faute de quoi l'onde, ajoutee en dernier, couvrirait le
-   libelle. */
-.qbd-install-auto {
-	position: relative;
-	overflow: hidden;
-	/* LA PLACE DE RESPIRER EST PRISE SUR LA LARGEUR, pas sur ce qui coupe :
-	   un bouton à 100 % n'a nulle part où grossir, et ce qui dépassait se
-	   faisait trancher ou sortait du panneau (Ahmed, 2026-09-20, deux fois).
-	   12 px de moins au repos, centré : au survol il atteint la largeur du
-	   texte au-dessus, jamais le bord. */
-	width: calc(100% - 12px);
-	justify-content: center;
-	margin: 22px auto 0;
-	min-height: 40px;
-	font-size: 14px;
-	/* NIVEAUX DE GRIS PLUTÔT QUE SOUS-PIXEL : sur un fond clair, le rendu
-	   sous-pixel borde chaque lettre de franges colorées. En niveaux de gris,
-	   le libellé reste propre, au prix d'un cheveu de contraste. */
-	-webkit-font-smoothing: antialiased;
-	/* LE BOUTON NE SE TRANSFORME PLUS, SA PILULE SI. Mettre à l'échelle un
-	   élément qui contient du texte fait redimensionner une image DÉJÀ
-	   RENDUE du texte : le libellé devenait pâteux à chaque appui (Ahmed,
-	   2026-09-20, deux fois). Le fond part donc sur `::before`, qui s'écrase
-	   seul : on voit la pilule se resserrer autour du libellé, et le libellé
-	   reste dessiné à sa taille. */
-	/* CE QUI BOUGE N'EST JAMAIS LE TEXTE. Toute mise à l'échelle redimensionne
-	   une IMAGE déjà rendue du libellé au lieu de le redessiner : il devient
-	   pâteux le temps de l'animation, et Ahmed l'a relevé trois fois
-	   (2026-09-20). Le mouvement de la maquette « Vif » est donc joué par
-	   deux pièces qui ne portent pas de texte : la PILULE (`::before`) respire
-	   et s'écrase, le CONTENU descend d'un pixel entier à l'appui — une
-	   translation entière ne déforme rien, elle déplace. Le rendu est celui de
-	   la maquette ; le libellé, lui, reste dessiné à sa taille. */
-	background: transparent !important;
-}
-.qbd-install-auto:hover,
-.qbd-install-auto:active { background: transparent !important; }
-.qbd-install-auto::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	z-index: 0;
-	border-radius: inherit;
-	/* La couleur passe par une variable : un fond posé sur la BOÎTE resterait
-	   visible derrière la pilule quand elle s'écrase, et on verrait ses
-	   extrémités dépasser. */
-	background: var(--qbd-pilule);
-	transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), background 150ms ease;
-}
-.qbd-install-auto:hover::before { transform: scale(1.015); }
-.qbd-install-auto:active::before { transform: scale(0.955); transition-duration: 80ms; }
-.qbd-install-auto > * {
-	position: relative;
-	z-index: 1;
-	transition: transform 160ms cubic-bezier(0.34, 1.5, 0.64, 1);
-}
-.qbd-install-auto:active > * { transform: translateY(1px); transition-duration: 80ms; }
-/* L'écrasement commun à tous les boutons principaux (dashboard-components)
-   mettrait le libellé à l'échelle par une autre porte. */
-.qbd-install-auto:active { transform: none; }
-/* LES TROIS COULEURS DU BOUTON, et le sens qui les relie. Au repos, un
-   LAVANDE de l'interface, tel quel ; le survol l'emmène presque au blanc
-   (12 % de teinte), et l'appui revient à mi-chemin (30 %). L'ordre a été
-   arrêté à l'écran le 2026-09-20 : « par défaut ça doit avoir cette
-   couleur, c'est au survol que ça devient blanc clair ». Le survol commun
-   des boutons principaux, lui, mêle 8 % du fond SOMBRE à la pilule — le
-   gris clair voulu sur le blanc cassé de « Mes quiz », mais une salissure
-   sur un lavande. Éclaircir, c'est aussi le sens de l'onde du clic : une
-   seule direction pour les trois états. */
-.qbd-install-auto { --qbd-pilule: var(--text-normal); }
-.qbd-install-auto:hover { --qbd-pilule: color-mix(in srgb, var(--text-normal) 12%, #ffffff); }
-.qbd-install-auto:active { --qbd-pilule: color-mix(in srgb, var(--text-normal) 30%, #ffffff); }
-
-.qbd-install-auto svg { width: 17px; height: 17px; }
 .qbd-onde {
 	position: absolute;
 	z-index: 0;
@@ -2157,16 +2071,10 @@
 /* Sans mouvement : ni respiration, ni ecrasement, ni onde — le survol et
    l'appui restent dits par le theme du bouton. */
 @media (prefers-reduced-motion: reduce) {
-	.qbd-install-auto { transition: none; }
-	.qbd-install-auto:hover::before, .qbd-install-auto:active::before { transform: none; }
-	.qbd-install-auto:active > * { transform: none; }
 	.qbd-onde { display: none; }
 }
 .qbd-install-state { display: flex; align-items: center; gap: 10px; min-height: 0; font-size: 14px; }
 .qbd-install-state:not(:empty) { margin: 22px 0 0; padding: 13px 14px; border-radius: 10px; background: var(--background-modifier-hover); }
-.qbd-install-modal[data-state="en-cours"] .qbd-install-auto,
-.qbd-install-modal[data-state="connexion"] .qbd-install-auto,
-.qbd-install-modal[data-state="detecte"] .qbd-install-auto { display: none; }
 .qbd-install-spinner {
 	width: 16px; height: 16px; flex-shrink: 0; border-radius: 50%;
 	border: 2px solid var(--text-faint); border-top-color: var(--interactive-accent);
