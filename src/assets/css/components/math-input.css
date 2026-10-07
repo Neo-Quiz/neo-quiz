@@ -317,3 +317,11 @@ body > .ML__keyboard,
 	--ui-menu-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.45);
 	--ui-font-family: var(--font-interface, inherit);
 }
+
+/* THE MATH KEYBOARD COVERS THE BOTTOM of the window (engine/math-input.ts
+   publishes its height): the page of the quiz stops above it, so the bar of
+   arrows stays in reach instead of sitting under the keys. 0 when the keyboard
+   is closed or dragged away from the bottom edge. */
+#neo-quiz-root > .qbd-qz {
+  padding-bottom: var(--nq-mathkb-inset, 0px);
+}

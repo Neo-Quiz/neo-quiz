@@ -350,6 +350,7 @@ function makeKeyboardFloating(attempt = 0): void {
 				w: Math.round(rr.width), h: Math.round(rr.height),
 			};
 			__kbDragging = false;
+			syncKeyboardInset();
 			// Rendre le focus au champ : la saisie continue sans re-clic.
 			if (__lastMathfield && __lastMathfield.isConnected) __lastMathfield.focus();
 		};
@@ -359,7 +360,19 @@ function makeKeyboardFloating(attempt = 0): void {
 	}, { capture: true });
 }
 
+/* The room the keyboard takes at the bottom of the window, published as
+   `--nq-mathkb-inset` so the quiz lifts its bar of arrows above it (math-input.css).
+   Only a keyboard resting on the bottom edge counts: one dragged up the screen
+   covers part of the question, not the arrows, and must not squash the page. */
+function syncKeyboardInset(): void {
+	const rect = document.querySelector<HTMLElement>(".ML__keyboard.is-visible .MLK__backdrop")?.getBoundingClientRect();
+	const docked = !!rect && rect.height > 0 && rect.bottom >= window.innerHeight - 40;
+	const inset = docked ? Math.max(0, Math.round(window.innerHeight - rect.top)) : 0;
+	document.documentElement.style.setProperty("--nq-mathkb-inset", inset + "px");
+}
+
 function clearKeyboardBodyPadding(): void {
+	if (!document.querySelector(".ML__keyboard.is-visible")) syncKeyboardInset();
 	if (document.querySelector(".ML__keyboard.is-visible")) return;
 	if (document.body.style.paddingBottom) document.body.style.paddingBottom = "";
 	// Le singleton MathLive MÉMORISE le « padding original » et le
@@ -560,6 +573,9 @@ function createMathField(host: HTMLElement, opts: CreateMathFieldOptions = {}): 
 				const kbTop = document.querySelector<HTMLElement>(".ML__keyboard.is-visible .MLK__backdrop")?.getBoundingClientRect().top;
 				const r = mf.getBoundingClientRect();
 				if (kbTop && r.bottom > kbTop) mf.scrollIntoView({ block: "center", behavior: "smooth" });
+				// The keyboard slides in: measure where it ends up, not where it starts.
+				syncKeyboardInset();
+				window.setTimeout(syncKeyboardInset, 450);
 			});
 		});
 		mf.addEventListener("focusout", () => {

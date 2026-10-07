@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- The math keyboard no longer hides the next and previous arrows of a question.
 - Arrow keys move through a quiz as soon as it opens, without a click first, and no longer act on the page behind it.
 - A folder reopens on the tab you left it on.
 - Home shows the next exam again after another device added it, instead of "No upcoming exam".
