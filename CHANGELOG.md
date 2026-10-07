@@ -14,6 +14,8 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Python downloads as a language pack, like C and C++, and can be deleted.
+- Python code blocks can import numpy, pandas and other packages; they download once, checked.
 - Settings → Languages shows Python and C/C++ with their download source, a switch to turn each off, and a bin to delete them.
 - Python code that needs more than the app's sandbox can be opened in Google Colab.
 - Create a folder can open an existing folder again, anywhere on the PC, such as your course folder.
