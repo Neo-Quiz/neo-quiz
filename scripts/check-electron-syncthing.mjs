@@ -36,8 +36,8 @@ const AUTRE_ID = "XJ6SOIF-RNGCUTX-2KULCG5-CEH4D3K-YNQRMY6-JT7O5CR-XXML5WU-J5ZVOA
 const CLE = "ab".repeat(32);
 
 await withSrcModule(
-	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts", "apps/windows/electron/appairage-qr.ts"],
-	async (regles, rest, sync, qrMod) => {
+	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts", "apps/windows/electron/appairage-qr.ts", "src/dashboard/sync-affichage.ts"],
+	async (regles, rest, sync, qrMod, aff) => {
 		const r = makeReporter("Electron: Syncthing");
 
 		/* ───────── pure rules ───────── */
@@ -167,8 +167,48 @@ await withSrcModule(
 			r.check("syncing with a percentage", folderEtat({ state: "syncing", globalBytes: 200, inSyncBytes: 50 }), { etat: "syncing", pourcentage: 25 });
 			r.check("syncing with nothing to measure", folderEtat({ state: "sync-preparing", globalBytes: 0, inSyncBytes: 0 }), { etat: "syncing", pourcentage: null });
 			r.check("error", folderEtat({ state: "error" }), { etat: "error", pourcentage: null });
-			r.check("scanning is not syncing", folderEtat({ state: "scanning", globalBytes: 1, inSyncBytes: 1 }).etat, "idle");
+			/* 2026-10-07: scanning used to read as idle, so every device said "Up to date" all the time. */
+			for (const st of ["scanning", "scan-waiting", "cleaning", "clean-waiting"]) r.check(st + " is scanning", folderEtat({ state: st }).etat, "scanning");
 			r.check("no status = absent", folderEtat(null), { etat: "absent", pourcentage: null });
+		});
+
+		await cas(r, "transfer rates", async () => {
+			const { calculerDebit, typeConnexion } = regles;
+			const c = (i, o, extra = {}) => ({ connected: true, inBytesTotal: i, outBytesTotal: o, ...extra });
+			const p1 = calculerDebit(undefined, c(1000, 500), 10_000);
+			r.check("first sample: no rate yet", [p1.bas, p1.haut, p1.echantillon], [0, 0, { t: 10_000, bas: 1000, haut: 500 }]);
+			const p2 = calculerDebit(p1.echantillon, c(3000, 500), 12_000);
+			r.check("bytes per second over the gap", [p2.bas, p2.haut], [1000, 0]);
+			const p3 = calculerDebit(p2.echantillon, c(9000, 9000), 12_300, { bas: p2.bas, haut: p2.haut });
+			r.check("a gap under one second keeps the old sample and rates", [p3.bas, p3.haut, p3.echantillon.t], [1000, 0, 12_000]);
+			r.check("a counter that went down restarts", calculerDebit(p2.echantillon, c(10, 10), 20_000).bas, 0);
+			r.check("not connected: nothing kept", calculerDebit(p2.echantillon, { connected: false, inBytesTotal: 99999 }, 20_000), { bas: 0, haut: 0, echantillon: undefined });
+			r.check("junk counters count as zero", calculerDebit(p1.echantillon, c("x", -5), 12_000).bas, 0);
+			r.check("relay type", typeConnexion({ connected: true, type: "relay-client" }), "relais");
+			r.check("local", typeConnexion({ connected: true, type: "tcp-client", isLocal: true }), "lan");
+			r.check("direct", typeConnexion({ connected: true, type: "quic-server", isLocal: false }), "direct");
+			r.check("not connected", typeConnexion({ connected: false }), undefined);
+		});
+
+		await cas(r, "device row display", async () => {
+			const { cleEtatAppareil, garderEtat, formaterDebit, DUREE_MIN_ETAT_MS } = aff;
+			const dev = (o = {}) => ({ id: "X", nom: "X", connecte: true, vuLe: null, ...o });
+			const et = (etat, a, pct = null) => ({ actif: true, appareil: "O", nom: "", appareils: [a], demandes: [], demandesPlus: 0, dossier: { etat, pourcentage: pct } });
+			r.check("scanning shows scanning", cleEtatAppareil(et("scanning", dev()), dev()), "scanning");
+			r.check("remote under 100 shows syncing", cleEtatAppareil(et("idle", dev()), dev({ progression: 60 })), "syncing");
+			r.check("local syncing shows syncing", cleEtatAppareil(et("syncing", dev()), dev()), "syncing");
+			r.check("idle and complete is up to date", cleEtatAppareil(et("idle", dev()), dev({ progression: 100 })), "uptodate");
+			r.check("paused beats everything", cleEtatAppareil(et("scanning", dev()), dev({ enPause: true, connecte: false })), "paused");
+			r.check("not connected", cleEtatAppareil(et("scanning", dev()), dev({ connecte: false })), "offline");
+			r.check("error beats scanning", cleEtatAppareil(et("error", dev()), dev()), "error");
+			const a = garderEtat(undefined, "scanning", 1000);
+			r.check("first state is shown at once", a, { affiche: { cle: "scanning", depuis: 1000 }, attente: 0 });
+			const b = garderEtat(a.affiche, "uptodate", 1100);
+			r.check("a 100 ms scan stays visible, 700 ms left", [b.affiche.cle, b.attente], ["scanning", DUREE_MIN_ETAT_MS - 100]);
+			r.check("after 800 ms it changes", garderEtat(a.affiche, "uptodate", 1800).affiche, { cle: "uptodate", depuis: 1800 });
+			r.check("leaving to offline is immediate", garderEtat(a.affiche, "offline", 1100).affiche.cle, "offline");
+			r.check("same state keeps its start", garderEtat(a.affiche, "scanning", 5000).affiche.depuis, 1000);
+			r.check("speed units", [formaterDebit(512, "en"), formaterDebit(40 * 1024, "en"), formaterDebit(1.2 * 1024 * 1024, "en"), formaterDebit(NaN, "en")], ["512 B/s", "40 kB/s", "1.2 MB/s", "0 B/s"]);
 		});
 
 		await cas(r, "reload detector", async () => {

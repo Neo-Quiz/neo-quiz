@@ -56,6 +56,8 @@ import {
 	plusDemandes,
 	folderConfig,
 	folderEtat,
+	calculerDebit, typeConnexion,
+	type EchantillonDebit,
 	hasValidCheckDigits,
 	isDeviceId,
 	launchArgs,
@@ -319,6 +321,14 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	let detecteur = creerDetecteurReception();
 	let dernier = "";
 	let enTick = false;
+	/** Counter samples and last rates per device (`calculerDebit`). */
+	const echantillons = new Map<string, EchantillonDebit>();
+	const debits = new Map<string, { bas: number; haut: number }>();
+	/** A scan seen in the events but over before the state was read: shown
+	    once anyway (a scan of a few ms would otherwise never reach the page). */
+	let scanVu = false;
+	/** Something moves (a rate or a sync): the state is reread every 2 s. */
+	let enMouvement = false;
 	const abonnesEtat = new Set<(e: EtatSync) => void>();
 	const abonnesDonnees = new Set<() => void>();
 	/** The "Recent changes" of the Sync page, in memory only: Syncthing keeps
@@ -415,6 +425,16 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		for (const [id, etat] of Object.entries(etatsDistants)) if (etat === "valid") envois.delete(id);
 		for (const id of retraitsDistants(etatsDistants, depuisNonPartage, Date.now())) void retirerDistant(id);
 		const maintenant = Date.now();
+		for (const id of [...echantillons.keys()]) if (!paires.includes(id)) { echantillons.delete(id); debits.delete(id); }
+		for (const d of visibles) {
+			const r = calculerDebit(echantillons.get(d.deviceID), connexions.connections?.[d.deviceID], maintenant, debits.get(d.deviceID));
+			if (r.echantillon) echantillons.set(d.deviceID, r.echantillon); else echantillons.delete(d.deviceID);
+			debits.set(d.deviceID, { bas: r.bas, haut: r.haut });
+		}
+		let dossier = folderEtat(statut);
+		if (scanVu && dossier.etat === "idle") dossier = { etat: "scanning", pourcentage: null };
+		scanVu = false;
+		enMouvement = dossier.etat === "syncing" || [...debits.values()].some(v => v.bas > 0 || v.haut > 0);
 		return {
 			actif: true,
 			appareil: ownId,
@@ -431,12 +451,17 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 					connecte: connexions.connections?.[d.deviceID]?.connected === true,
 					vuLe: dernierVu(vus[d.deviceID]?.lastSeen),
 					...(progressions[d.deviceID] !== undefined ? { progression: progressions[d.deviceID] } : {}),
+					...(d.paused === true ? { enPause: true } : {}),
+					...((debits.get(d.deviceID)?.bas ?? 0) > 0 ? { debitBas: debits.get(d.deviceID)!.bas } : {}),
+					...((debits.get(d.deviceID)?.haut ?? 0) > 0 ? { debitHaut: debits.get(d.deviceID)!.haut } : {}),
+					...(typeConnexion(connexions.connections?.[d.deviceID]) ? { connexion: typeConnexion(connexions.connections?.[d.deviceID]) } : {}),
+					...(connexions.connections?.[d.deviceID]?.connected === true && nomSur(connexions.connections?.[d.deviceID]?.clientVersion) ? { version: nomSur(connexions.connections?.[d.deviceID]?.clientVersion) } : {}),
 					...(demande ? { demande } : {}),
 				};
 			}),
 			demandes: demandesDepuis(attente, paires, ownId),
 			demandesPlus: plusDemandes(attente, paires, ownId),
-			dossier: folderEtat(statut),
+			dossier,
 			changements,
 		};
 	}
@@ -502,6 +527,10 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	surveiller(courant);
 	const minuteur = setInterval(() => { void tick(); }, intervalle);
 	minuteur.unref();
+	/* Rates and a progress bar move faster than the 10 s poll: while
+	   something moves, reread every 2 s (nothing when idle). */
+	const minuteurMouvement = setInterval(() => { if (enMouvement && !arrete && !mort) void diffuser().catch(() => undefined); }, 2000);
+	minuteurMouvement.unref();
 
 	/* THE EVENT LOOP, continuous (2026-10-03, real time): a long poll that
 	   returns as soon as Syncthing has something, so a change from another
@@ -529,6 +558,12 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				}
 				const c = changementDepuis(ev, nomDe);
 				if (c) { changements = ajouterChangement(changements, c); change = true; }
+			}
+			if (ev.type === "StateChanged" && ev.data?.folder === FOLDER_ID && typeof ev.data.to === "string" && /^(scan|clean)/.test(ev.data.to)) {
+				scanVu = true;
+				/* The scan may be over by the time the state is read: reread once
+				   more shortly so the page also sees it end. */
+				setTimeout(() => { if (!arrete && !mort) void diffuser().catch(() => undefined); }, 150).unref();
 			}
 			if (ev.type === "StateChanged" || ev.type === "DeviceConnected" || ev.type === "DeviceDisconnected" || ev.type === "PendingDevicesChanged") change = true;
 		}
@@ -717,6 +752,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 			if (arrete) return;
 			arrete = true;
 			clearInterval(minuteur);
+			clearInterval(minuteurMouvement);
 			if (minuteurScan) clearTimeout(minuteurScan);
 			const { rest, child, fini } = courant;
 			try { await rest.shutdown(); } catch { /* it may already be gone */ }

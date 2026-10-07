@@ -52,7 +52,7 @@ export interface DeviceStats {
 }
 
 export interface Connections {
-	connections: { [deviceId: string]: { connected?: boolean } };
+	connections: { [deviceId: string]: { connected?: boolean; inBytesTotal?: number; outBytesTotal?: number; type?: string; isLocal?: boolean; clientVersion?: string } };
 }
 
 const TIMEOUT_MS = 15_000;

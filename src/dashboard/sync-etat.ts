@@ -15,13 +15,20 @@ export interface EtatSync {
 	    ("envoyee") or expired ("expiree": it can be sent again). */
 	/** `progression`: how much of the folder this connected device has, 0 to
 	    100 (Syncthing's completion), absent when unknown. */
-	appareils: Array<{ id: string; nom: string; connecte: boolean; vuLe: number | null; demande?: "envoyee" | "expiree"; progression?: number }>;
+	/** `enPause`: the device is paused in Syncthing. `debitBas`/`debitHaut`:
+	    bytes per second received from / sent to it, absent or 0 when idle.
+	    `connexion` / `version`: connection details for the info window
+	    (`version` is the remote's own string, at most 64 characters: text only). */
+	appareils: Array<{
+		id: string; nom: string; connecte: boolean; vuLe: number | null; demande?: "envoyee" | "expiree"; progression?: number;
+		enPause?: boolean; debitBas?: number; debitHaut?: number; connexion?: "lan" | "relais" | "direct"; version?: string;
+	}>;
 	/** Devices that added THIS one and are waiting to be accepted. Names are the
 	    remote's, at most 64 characters: render as text only. */
 	demandes: Array<{ id: string; nom: string }>;
 	/** How many more requests exist than `demandes` lists (the page shows "+N"). */
 	demandesPlus: number;
-	dossier: { etat: "idle" | "syncing" | "error" | "absent"; pourcentage: number | null };
+	dossier: { etat: "idle" | "scanning" | "syncing" | "error" | "absent"; pourcentage: number | null };
 	/** The recent changes to the synced folder, newest first, at most
 	    `MAX_CHANGEMENTS`. Optional: a host that does not collect them (the
 	    Android app, for now) leaves it out and the page hides the section. */

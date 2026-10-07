@@ -247,12 +247,13 @@ export function cheminAScanner(root: string, abs: string): string | null {
 }
 
 export interface EtatDossier {
-	etat: "idle" | "syncing" | "error" | "absent";
+	etat: "idle" | "scanning" | "syncing" | "error" | "absent";
 	pourcentage: number | null;
 }
 
 /** `GET /rest/db/status` → what the Sync page shows. `null` = the folder is not
-    configured. Scanning counts as idle: nothing is being transferred. */
+    configured. Scanning is its own state (2026-10-07: counting it as idle made
+    every device read "Up to date" all the time, as Syncthing's own GUI never does). */
 export function folderEtat(s: { state?: string; globalBytes?: number; inSyncBytes?: number } | null): EtatDossier {
 	if (!s) return { etat: "absent", pourcentage: null };
 	if (s.state === "error") return { etat: "error", pourcentage: null };
@@ -262,7 +263,57 @@ export function folderEtat(s: { state?: string; globalBytes?: number; inSyncByte
 		const fait = Math.min(total, Math.max(0, s.inSyncBytes ?? 0));
 		return { etat: "syncing", pourcentage: Math.floor((fait / total) * 100) };
 	}
+	if (s.state === "scanning" || s.state === "scan-waiting" || s.state === "cleaning" || s.state === "clean-waiting") {
+		return { etat: "scanning", pourcentage: null };
+	}
 	return { etat: "idle", pourcentage: null };
+}
+
+/** What `/rest/system/connections` says of one device, the fields we read. */
+export interface ConnexionBrute {
+	connected?: boolean;
+	inBytesTotal?: number;
+	outBytesTotal?: number;
+	type?: string;
+	isLocal?: boolean;
+	clientVersion?: string;
+}
+
+/** A counter sample of one device: totals at `t` (ms). */
+export interface EchantillonDebit { t: number; bas: number; haut: number }
+
+/** Below this gap two samples are too close for a rate to mean anything. */
+export const ECART_DEBIT_MIN_MS = 1000;
+
+/** Bytes per second since the previous sample. Returns the rates and the
+    sample to keep: a gap under `ECART_DEBIT_MIN_MS` keeps the older sample and
+    the last rates; a counter that went down (reconnection) restarts from the
+    new total with no rate. */
+export function calculerDebit(
+	prec: EchantillonDebit | undefined,
+	connexion: ConnexionBrute | undefined,
+	maintenant: number,
+	derniers: { bas: number; haut: number } = { bas: 0, haut: 0 },
+): { bas: number; haut: number; echantillon: EchantillonDebit | undefined } {
+	if (connexion?.connected !== true) return { bas: 0, haut: 0, echantillon: undefined };
+	const nb = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+	const bas = nb(connexion.inBytesTotal);
+	const haut = nb(connexion.outBytesTotal);
+	const nouveau = { t: maintenant, bas, haut };
+	if (!prec) return { bas: 0, haut: 0, echantillon: nouveau };
+	const dt = maintenant - prec.t;
+	if (dt < ECART_DEBIT_MIN_MS) {
+		return dt < 0 ? { bas: 0, haut: 0, echantillon: nouveau } : { ...derniers, echantillon: prec };
+	}
+	if (bas < prec.bas || haut < prec.haut) return { bas: 0, haut: 0, echantillon: nouveau };
+	return { bas: Math.round(((bas - prec.bas) * 1000) / dt), haut: Math.round(((haut - prec.haut) * 1000) / dt), echantillon: nouveau };
+}
+
+/** How a connected device is reached, for the info window. */
+export function typeConnexion(c: ConnexionBrute | undefined): "lan" | "relais" | "direct" | undefined {
+	if (c?.connected !== true) return undefined;
+	if (typeof c.type === "string" && c.type.toLowerCase().includes("relay")) return "relais";
+	return c.isLocal === true ? "lan" : "direct";
 }
 
 export interface EvenementSync {
