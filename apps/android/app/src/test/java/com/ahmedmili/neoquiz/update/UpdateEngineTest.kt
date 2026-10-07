@@ -28,7 +28,7 @@ class UpdateEngineTest {
         .put("url", "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.0/NeoQuiz-0.2.0.apk")
         .put("sha256", digest).put("size", size).put("notes", "n").toString()
 
-    private class Fixture(val engine: UpdateEngine, val store: Store, val installed: MutableList<File>, val states: MutableList<UpdateState>, val asked: IntArray)
+    private class Fixture(val engine: UpdateEngine, val store: Store, val installed: MutableList<File>, val states: MutableList<UpdateState>, val asked: IntArray, val clock: LongArray, val abandoned: MutableList<Int>, val downloads: IntArray)
 
     private fun fixture(
         manifest: String = manifestJson(),
@@ -41,18 +41,22 @@ class UpdateEngineTest {
         val installed = mutableListOf<File>()
         val states = mutableListOf<UpdateState>()
         val asked = intArrayOf(0)
+        val clock = longArrayOf(10_000L)
+        val abandoned = mutableListOf<Int>()
+        val downloads = intArrayOf(0)
         val engine = UpdateEngine(
             installedCode = installedCode, installedName = "0.1.0", dir = dir,
             openManifest = { ByteArrayInputStream(manifest.toByteArray()) },
-            openApk = { ByteArrayInputStream(body) },
+            openApk = { downloads[0]++; ByteArrayInputStream(body) },
             store = store,
             canInstall = { canInstall },
             askPermission = { asked[0]++ },
-            installer = { f -> if (failInstall) throw IOException("no") else installed += f },
-            clock = { 10_000L },
+            installer = { f, _ -> if (failInstall) throw IOException("no") else { installed += f; 7 } },
+            abandonSession = { abandoned += it },
+            clock = { clock[0] },
             onState = { states += it },
         )
-        return Fixture(engine, store, installed, states, asked)
+        return Fixture(engine, store, installed, states, asked, clock, abandoned, downloads)
     }
 
     @Before fun setUp() {
@@ -145,5 +149,61 @@ class UpdateEngineTest {
         f.engine.install()
         assertEquals("inactif", f.engine.state.phase)
         assertTrue(f.installed.isEmpty())
+    }
+
+    @Test fun afterAFailureNoNewDownloadStartsBeforeTheCooldown() = runBlocking {
+        val f = fixture(manifest = manifestJson(digest = sha(ByteArray(5) { 1 })))
+        f.engine.check(true)
+        f.engine.install()
+        assertEquals(1, f.downloads[0])
+        f.engine.install()
+        f.clock[0] += UpdateEngine.FAILURE_COOLDOWN_MS - 1
+        f.engine.install()
+        assertEquals(1, f.downloads[0])
+        f.clock[0] += 1
+        f.engine.install()
+        assertEquals(2, f.downloads[0])
+    }
+
+    @Test fun theSettingsScreenOpensOncePerFiveMinutes() = runBlocking {
+        val f = fixture(canInstall = false)
+        f.engine.check(true)
+        f.engine.install()
+        f.engine.install()
+        f.engine.install()
+        assertEquals(1, f.asked[0])
+        assertEquals("autorisation", f.engine.state.phase)
+        f.clock[0] += UpdateEngine.ASK_COOLDOWN_MS
+        f.engine.install()
+        assertEquals(2, f.asked[0])
+    }
+
+    @Test fun onlyTheCurrentSessionsFailureCountsWhilePrete() = runBlocking {
+        val f = fixture()
+        f.engine.installFailed(7) // not prete: ignored
+        assertEquals("inactif", f.engine.state.phase)
+        f.engine.check(true)
+        f.engine.install()
+        assertEquals("prete", f.engine.state.phase)
+        f.engine.installFailed(99) // another session: ignored, the file stays
+        assertEquals("prete", f.engine.state.phase)
+        assertTrue(dir.listFiles()!!.isNotEmpty())
+        f.engine.installFailed(7)
+        assertEquals("install", f.engine.state.message)
+        assertTrue(dir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test fun preteTimesOutBackToAvailableAndAbandonsTheSession() = runBlocking {
+        val f = fixture()
+        f.engine.check(true)
+        f.engine.install()
+        f.clock[0] += UpdateEngine.PRETE_TIMEOUT_MS - 1
+        f.engine.expirePrete()
+        assertEquals("prete", f.engine.state.phase)
+        f.clock[0] += 1
+        f.engine.expirePrete()
+        assertEquals("disponible", f.engine.state.phase)
+        assertEquals(listOf(7), f.abandoned)
+        assertTrue(dir.listFiles()?.isEmpty() ?: true)
     }
 }

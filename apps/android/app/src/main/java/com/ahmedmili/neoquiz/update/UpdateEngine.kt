@@ -59,7 +59,9 @@ class UpdateEngine(
     private val store: CheckStore,
     private val canInstall: () -> Boolean,
     private val askPermission: () -> Unit,
-    private val installer: (File) -> Unit,
+    /** Hands the verified file to the system installer; answers the id of the install session (see [installFailed]). */
+    private val installer: (File, UpdateManifest) -> Int,
+    private val abandonSession: (Int) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
     private val onState: (UpdateState) -> Unit = {},
     private val apkDeadlineMs: Long = UpdateDownload.DEADLINE_MS,
@@ -69,6 +71,13 @@ class UpdateEngine(
     @Volatile private var manifest: UpdateManifest? = null
     private var working = false
 
+    // Native rate limits (the page is not trusted to throttle itself): after a failure no new
+    // download for FAILURE_COOLDOWN_MS, and the unknown-sources screen opens once per ASK_COOLDOWN_MS.
+    @Volatile private var lastFailureAt = Long.MIN_VALUE / 2
+    @Volatile private var lastAskAt = Long.MIN_VALUE / 2
+    @Volatile private var preteAt = 0L
+    @Volatile private var session = -1
+
     private fun set(next: UpdateState) {
         state = next
         onState(next)
@@ -77,6 +86,21 @@ class UpdateEngine(
     private fun claim(): Boolean = synchronized(this) { if (working) false else { working = true; true } }
     private fun release() = synchronized(this) { working = false }
 
+    /**
+     * "prete" means the system installer has the file. If the user dismisses its dialog no
+     * callback may ever come, so after PRETE_TIMEOUT_MS the offer comes back (and the file goes).
+     */
+    fun expirePrete() {
+        if (state.phase != "prete" || clock() - preteAt < PRETE_TIMEOUT_MS) return
+        val m = manifest
+        val id = session
+        session = -1
+        if (id >= 0) abandonSession(id)
+        cleanup()
+        if (m != null) set(UpdateState("disponible", installedName, version = m.versionName, notes = m.notes))
+        else set(UpdateState("inactif", installedName))
+    }
+
     /** Removes what an earlier run left in the cache (a partial or already installed APK). */
     fun cleanup() {
         dir.listFiles()?.forEach { it.delete() }
@@ -84,6 +108,7 @@ class UpdateEngine(
 
     /** Checks the manifest; [force] ignores the 6 h interval (the manual button). Returns whether a check ran. */
     suspend fun check(force: Boolean): Boolean = withContext(Dispatchers.IO) {
+        expirePrete()
         if (state.phase == "telechargement" || state.phase == "prete") return@withContext false
         if (!force && !UpdateRules.due(store.lastCheck(), clock())) return@withContext false
         if (!claim()) return@withContext false
@@ -121,11 +146,16 @@ class UpdateEngine(
 
     /** The tap on Install: permission, download, verification, then the installer. */
     suspend fun install() = withContext(Dispatchers.IO) {
+        expirePrete()
         val m = manifest ?: return@withContext
         if (state.phase != "disponible" && state.phase != "autorisation" && state.phase != "erreur") return@withContext
+        if (clock() - lastFailureAt < FAILURE_COOLDOWN_MS) return@withContext
         if (!canInstall()) {
             set(UpdateState("autorisation", installedName, version = m.versionName, notes = m.notes))
-            askPermission()
+            if (clock() - lastAskAt >= ASK_COOLDOWN_MS) {
+                lastAskAt = clock()
+                askPermission()
+            }
             return@withContext
         }
         if (!claim()) return@withContext
@@ -143,27 +173,51 @@ class UpdateEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: UpdateRefused) {
-                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "mismatch"))
+                return@withContext downloadFailed(m, "mismatch")
             } catch (e: Exception) {
-                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "network"))
+                return@withContext downloadFailed(m, "network")
             } catch (e: OutOfMemoryError) {
-                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "network"))
+                return@withContext downloadFailed(m, "network")
             }
+            preteAt = clock()
             set(UpdateState("prete", installedName, version = m.versionName))
             try {
-                installer(apk)
+                session = installer(apk, m)
             } catch (e: Exception) {
-                installFailed()
+                session = -1
+                fail()
             }
         } finally {
             release()
         }
     }
 
-    /** The system installer refused or was cancelled: the file goes, the user may tap again. */
-    fun installFailed() {
+    private fun downloadFailed(m: UpdateManifest, code: String) {
+        lastFailureAt = clock()
+        set(UpdateState("erreur", installedName, version = m.versionName, message = code))
+    }
+
+    private fun fail() {
+        lastFailureAt = clock()
         cleanup()
         val m = manifest
         set(UpdateState("erreur", installedName, version = m?.versionName, notes = m?.notes, message = "install"))
+    }
+
+    /**
+     * The system installer refused or was cancelled. Only believed while the phase is "prete"
+     * AND the broadcast is about THIS session: a stale answer must never delete the file of a
+     * newer download. The file goes, the user may tap again (after the cooldown).
+     */
+    fun installFailed(sessionId: Int) {
+        if (state.phase != "prete" || sessionId != session) return
+        session = -1
+        fail()
+    }
+
+    companion object {
+        const val FAILURE_COOLDOWN_MS = 30_000L
+        const val ASK_COOLDOWN_MS = 5 * 60_000L
+        const val PRETE_TIMEOUT_MS = 10 * 60_000L
     }
 }

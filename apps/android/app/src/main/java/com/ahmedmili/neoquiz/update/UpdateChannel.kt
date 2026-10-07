@@ -4,7 +4,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
+import java.security.MessageDigest
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -27,7 +30,7 @@ class UpdateChannel(private val engine: UpdateEngine, private val scope: Corouti
     }
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
-        "miseAJour.etat" to { _ -> engine.state.toMap() },
+        "miseAJour.etat" to { _ -> engine.expirePrete(); engine.state.toMap() },
         "miseAJour.verifier" to { _ -> engine.check(force = true); true },
         // The download is long: the call answers at once, the page follows the pushed states.
         "miseAJour.installer" to { _ -> scope.launch { engine.install() }; null },
@@ -59,32 +62,61 @@ class UpdateChannel(private val engine: UpdateEngine, private val scope: Corouti
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 },
-                installer = { apk -> commitSession(app, apk) },
+                installer = { apk, manifest -> commitSession(app, apk, manifest) },
+                abandonSession = { id -> try { app.packageManager.packageInstaller.abandonSession(id) } catch (_: Exception) {} },
                 onState = { emit(it.toMap()) },
             )
             engine.cleanup()
-            UpdateResultReceiver.onFailure = { engine.installFailed() }
+            UpdateResultReceiver.onFailure = { id -> engine.installFailed(id) }
             return UpdateChannel(engine, scope)
         }
 
-        /** Streams the verified APK into a PackageInstaller session and commits it; the result comes to [UpdateResultReceiver]. */
-        private fun commitSession(app: Context, apk: File) {
-            val installer = app.packageManager.packageInstaller
+        /** Signing certificates of a package info as SHA-256 digests (several signers: all of them). */
+        private fun digests(info: PackageInfo?): Set<String> {
+            val signing = info?.signingInfo ?: return emptySet()
+            val certs = if (signing.hasMultipleSigners()) signing.apkContentsSigners else signing.signingCertificateHistory
+            return certs.orEmpty().map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } }.toSet()
+        }
+
+        private fun archiveInfo(info: PackageInfo?): ArchiveInfo? = info?.let {
+            @Suppress("DEPRECATION")
+            val code = if (Build.VERSION.SDK_INT >= 28) it.longVersionCode else it.versionCode.toLong()
+            ArchiveInfo(it.packageName, code, digests(it))
+        }
+
+        /**
+         * Checks the verified APK against the installed app ([UpdateChecks.rejectArchive]), streams it
+         * into a PackageInstaller session while re-hashing it, and commits. Any failure abandons the
+         * session and throws; the engine then deletes the file. Answers the session id.
+         */
+        private fun commitSession(app: Context, apk: File, manifest: UpdateManifest): Int {
+            val pm = app.packageManager
+            val flags = PackageManager.GET_SIGNING_CERTIFICATES
+            val own = archiveInfo(pm.getPackageInfo(app.packageName, flags))!!
+            val reason = UpdateChecks.rejectArchive(archiveInfo(pm.getPackageArchiveInfo(apk.path, flags)), own, manifest)
+            if (reason != null) throw UpdateRefused(reason)
+            val installer = pm.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
             params.setAppPackageName(app.packageName)
             if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             val id = installer.createSession(params)
-            installer.openSession(id).use { session ->
-                apk.inputStream().use { input ->
-                    session.openWrite("NeoQuiz.apk", 0, apk.length()).use { out ->
-                        input.copyTo(out)
-                        session.fsync(out)
+            try {
+                installer.openSession(id).use { session ->
+                    apk.inputStream().use { input ->
+                        session.openWrite("NeoQuiz.apk", 0, apk.length()).use { out ->
+                            UpdateChecks.copyVerified(input, out, manifest)
+                            session.fsync(out)
+                        }
                     }
+                    val result = Intent(app, UpdateResultReceiver::class.java).setAction(UpdateResultReceiver.ACTION)
+                    val pending = PendingIntent.getBroadcast(app, id, result, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
+                    session.commit(pending.intentSender)
                 }
-                val result = Intent(app, UpdateResultReceiver::class.java).setAction(UpdateResultReceiver.ACTION)
-                val pending = PendingIntent.getBroadcast(app, id, result, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
-                session.commit(pending.intentSender)
+            } catch (t: Throwable) {
+                try { installer.abandonSession(id) } catch (_: Exception) {}
+                throw t
             }
+            return id
         }
     }
 }
@@ -97,6 +129,7 @@ class UpdateChannel(private val engine: UpdateEngine, private val scope: Corouti
  */
 class UpdateResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
         when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
@@ -104,13 +137,13 @@ class UpdateResultReceiver : BroadcastReceiver() {
                 if (confirm != null) context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             PackageInstaller.STATUS_SUCCESS -> Unit
-            else -> onFailure?.invoke()
+            else -> onFailure?.invoke(sessionId)
         }
     }
 
     companion object {
         const val ACTION = "com.ahmedmili.neoquiz.update.RESULT"
 
-        @Volatile var onFailure: (() -> Unit)? = null
+        @Volatile var onFailure: ((Int) -> Unit)? = null
     }
 }

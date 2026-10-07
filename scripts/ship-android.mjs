@@ -28,7 +28,7 @@
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -38,6 +38,15 @@ const REPO = "Neo-Quiz/neo-quiz";
 const GRADLE_FILE = "apps/android/app/build.gradle.kts";
 const MANIFEST_FILE = "docs/android-latest.json";
 const WORKTREE = path.join(process.env.LOCALAPPDATA ?? path.join(process.env.HOME ?? "", "AppData", "Local"), "Temp", "nq-release-07e7a972");
+/**
+ * SHA-256 of the signing certificate of the installed app (CN=Ahmed MILI, O=Neo Quiz),
+ * the one registered in the Google Play Console. Obtained on 2026-10-07 with
+ * `apksigner verify --print-certs` (build-tools 36.0.0) on the release APK built at
+ * f837fa10 by the same signing pipeline (with-keystore-password.ps1). A build signed by
+ * anything else is refused before it is uploaded.
+ */
+export const SIGNER_SHA256 = "8d99aac7f6415753ea01b3fd13d447225524a76bcd8f102a63b68d9021676088";
+const APPLICATION_ID = "com.ahmedmili.neoquiz";
 const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 
 /** versionCode and versionName out of the Gradle file. */
@@ -70,6 +79,22 @@ function fail(message) {
 	process.exitCode = 1;
 }
 
+/** apksigner (newest build-tools of the SDK): the signer must be the pinned one, and the app not debuggable. */
+function checkSignature(apk) {
+	const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? path.join(process.env.LOCALAPPDATA ?? "", "Android", "Sdk");
+	const tools = path.join(sdk, "build-tools");
+	const newest = readdirSync(tools).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop();
+	const dir = path.join(tools, newest);
+	const isWindows = process.platform === "win32";
+	const out = execFileSync(path.join(dir, isWindows ? "apksigner.bat" : "apksigner"), ["verify", "--print-certs", apk], { encoding: "utf8", shell: isWindows });
+	const signers = [...out.matchAll(/certificate SHA-256 digest: ([0-9a-f]{64})/g)].map((m) => m[1]);
+	if (signers.length !== 1 || signers[0] !== SIGNER_SHA256) throw new Error(`signer ${signers.join(",") || "none"} is not the pinned one`);
+	const aapt = path.join(dir, isWindows ? "aapt2.exe" : "aapt2");
+	const badging = execFileSync(aapt, ["dump", "badging", apk], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+	if (!badging.includes(`package: name='${APPLICATION_ID}'`)) throw new Error("the APK package name is not " + APPLICATION_ID);
+	if (/application-debuggable/.test(badging)) throw new Error("the APK is debuggable");
+}
+
 function main() {
 	const argv = process.argv.slice(2);
 	const at = argv.indexOf("--notes");
@@ -84,12 +109,11 @@ function main() {
 	if (run("git", ["status", "--porcelain"])) return fail("the working tree is not clean");
 	run("git", ["fetch", "origin", "main", "--tags", "--quiet"]);
 	const head = run("git", ["rev-parse", "HEAD"]);
-	const pushed = spawnSync("git", ["merge-base", "--is-ancestor", "HEAD", "origin/main"], { cwd: root }).status === 0;
-	if (!pushed) return fail("HEAD is not on origin/main: push main first (the release is cut from a pushed commit)");
-	if (existsSync(path.join(root, MANIFEST_FILE))) {
-		const published = JSON.parse(readFileSync(path.join(root, MANIFEST_FILE), "utf8"));
-		if (!(versionCode > published.versionCode)) return fail(`versionCode ${versionCode} is not above the published ${published.versionCode}`);
-	}
+	if (head !== run("git", ["rev-parse", "origin/main"])) return fail("HEAD is not exactly origin/main: pull or push so they are equal first");
+	// The published manifest is read from origin/main, never from a possibly stale working copy (absent: versionCode 0).
+	const shown = spawnSync("git", ["show", `origin/main:${MANIFEST_FILE}`], { cwd: root, encoding: "utf8" });
+	const publishedCode = shown.status === 0 ? JSON.parse(shown.stdout).versionCode : 0;
+	if (!(versionCode > publishedCode)) return fail(`versionCode ${versionCode} is not above the published ${publishedCode}`);
 	if (run("git", ["tag", "-l", tag])) return fail(`tag ${tag} already exists locally`);
 	if (run("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`])) return fail(`tag ${tag} already exists on origin`);
 	if (spawnSync("gh", ["release", "view", tag, "--repo", REPO], { cwd: root, stdio: "ignore" }).status === 0) return fail(`release ${tag} already exists`);
@@ -99,6 +123,9 @@ function main() {
 	const wt = (args, options = {}) => execFileSync("git", ["-C", WORKTREE, ...args], { encoding: "utf8", ...options }).trim();
 	if (wt(["status", "--porcelain"])) return fail("the release worktree is not clean");
 	wt(["checkout", "--detach", head]);
+	// Stale ignored files (old web assets, build outputs) must never reach the APK. Kept: the linked
+	// node_modules, dist-pack, the SDK path, the Gradle cache and the Syncthing libs (hash-pinned by the build).
+	wt(["clean", "-fdx", "-e", "node_modules", "-e", "dist-pack", "-e", "local.properties", "-e", ".gradle", "-e", "jniLibs"]);
 	console.log(`Building ${tag} from ${head.slice(0, 8)} in ${WORKTREE}`);
 	const isWindows = process.platform === "win32";
 	const npm = isWindows ? "npm.cmd" : "npm";
@@ -114,6 +141,9 @@ function main() {
 	const meta = JSON.parse(readFileSync(path.join(path.dirname(built), "output-metadata.json"), "utf8"));
 	const element = meta.elements?.[0];
 	if (!element || element.versionCode !== versionCode || element.versionName !== versionName) return fail("the built APK does not carry the expected versionCode / versionName");
+	if (meta.applicationId !== APPLICATION_ID) return fail(`applicationId is ${meta.applicationId}, expected ${APPLICATION_ID}`);
+	if (meta.variantName !== "release") return fail(`variant is ${meta.variantName}, expected release`);
+	checkSignature(built);
 
 	// 3. digest
 	const staging = mkdtempSync(path.join(tmpdir(), "nq-android-ship-"));
@@ -131,9 +161,13 @@ function main() {
 		"--title", `Neo Quiz for Android ${versionName}`, "--notes", notes,
 	], { cwd: root, stdio: "inherit" });
 
-	// 5. the uploaded asset is the one computed above
-	const uploaded = JSON.parse(run("gh", ["release", "view", tag, "--repo", REPO, "--json", "assets"])).assets.find((a) => a.name === `NeoQuiz-${versionName}.apk`);
-	if (!uploaded || uploaded.size !== size) return fail(`the uploaded asset does not match (${uploaded?.size} vs ${size}); manifest NOT written`);
+	// 5. the uploaded asset, downloaded back, has the size AND the SHA-256 computed above
+	const check = mkdtempSync(path.join(tmpdir(), "nq-android-verify-"));
+	run("gh", ["release", "download", tag, "--repo", REPO, "--pattern", `NeoQuiz-${versionName}.apk`, "--dir", check]);
+	const back = readFileSync(path.join(check, `NeoQuiz-${versionName}.apk`));
+	if (back.length !== size || createHash("sha256").update(back).digest("hex") !== sha256) {
+		return fail(`the uploaded asset does not match the built APK; manifest NOT written. Delete nothing: fix by a NEW version (published versions are never deleted).`);
+	}
 
 	// 6. the manifest, then main
 	const manifest = buildManifest({ versionCode, versionName, sha256, size, notes });
@@ -141,7 +175,20 @@ function main() {
 	writeFileSync(path.join(root, MANIFEST_FILE), JSON.stringify(manifest, null, 2) + "\n");
 	run("git", ["add", "--", MANIFEST_FILE]);
 	run("git", ["commit", "-m", `Publish Android ${versionName}`, "--", MANIFEST_FILE]);
-	run("git", ["push", "origin", "main"], { stdio: "inherit" });
+	try {
+		run("git", ["push", "origin", "main"], { stdio: "inherit" });
+	} catch (e) {
+		console.error([
+			"",
+			`The release ${tag} IS published but the manifest commit was not pushed. Recover with:`,
+			"  git fetch origin main",
+			"  git pull --rebase origin main",
+			"  git push origin main",
+			`(the local commit "Publish Android ${versionName}" already holds ${MANIFEST_FILE}; if it was lost, write this file again:)`,
+			JSON.stringify(manifest, null, 2),
+		].join("\n"));
+		throw e;
+	}
 	console.log(`Published Android ${versionName}. Phones see it once the site deploys ${MANIFEST_FILE}.`);
 }
 

@@ -57,7 +57,7 @@ class BridgeTest {
                         override fun lastCheck() = 0L
                         override fun setLastCheck(ms: Long) {}
                     },
-                    canInstall = { true }, askPermission = {}, installer = {},
+                    canInstall = { true }, askPermission = {}, installer = { _, _ -> 1 },
                 ),
                 CoroutineScope(Dispatchers.Default),
             ).handlers() +
