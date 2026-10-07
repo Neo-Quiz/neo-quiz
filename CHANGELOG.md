@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 - On the phone, a device ID typed in Add a device is added without a second confirmation, and a pairing link opens Neo Quiz.
+- On the phone, the sync notification shows live progress and connected devices, with a Quit action.
 
 ## [1.20.35] - 2026-10-07
 

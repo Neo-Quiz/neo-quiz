@@ -19,6 +19,19 @@
     <string name="sync_channel_name">Synchronisation</string>
     <string name="review_channel_name">Révision du jour</string>
     <string name="sync_notification_title">Neo Quiz se synchronise</string>
+    <string name="sync_notification_name">Neo Quiz</string>
+    <string name="sync_status_paused">En pause</string>
+    <string name="sync_status_scanning">Analyse…</string>
+    <string name="sync_status_error">Problème de synchronisation</string>
+    <string name="sync_status_none">Aucun appareil connecté</string>
+    <string name="sync_status_syncing">Synchronisation : %1$d %% · %2$s</string>
+    <string name="sync_status_syncing_unknown">Synchronisation · %1$s</string>
+    <string name="sync_status_synced">À jour · %1$s</string>
+    <string name="sync_quit">Quitter</string>
+    <plurals name="sync_connected_devices">
+        <item quantity="one">%d appareil connecté</item>
+        <item quantity="other">%d appareils connectés</item>
+    </plurals>
     <string name="sync_share_subject">Mon identifiant d\'appareil Neo Quiz</string>
     <string name="sync_share_body">Pour te synchroniser avec mon appareil dans Neo Quiz, ouvre Réglages, puis Synchronisation, et ajoute cet identifiant d\'appareil :\n\n%1$s</string>
 </resources>

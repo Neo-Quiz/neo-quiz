@@ -9,7 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.graphics.drawable.Icon
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -70,6 +74,9 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     @Volatile private var allowRoot: ((File) -> Unit)? = null
     @Volatile var stateListener: ((Map<String, Any?>) -> Unit)? = null
     @Volatile var receivedListener: (() -> Unit)? = null
+    /** The latest state the engine pushed, and a listener for the foreground notification (owned by [SyncService], independent of any page). */
+    @Volatile var lastState: Map<String, Any?>? = null
+    @Volatile var notifyListener: ((Map<String, Any?>) -> Unit)? = null
     /** True while an activity is on screen; a reception while away is remembered, see [takePendingReception]. */
     @Volatile var foreground = false
     @Volatile private var pendingReception = false
@@ -166,7 +173,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             portFree = process::listenPortFree,
             scope = scope,
         )
-        created.onState = { s -> stateListener?.invoke(s) }
+        created.onState = { s -> lastState = s; stateListener?.invoke(s); notifyListener?.invoke(s) }
         created.onReceived = { received() }
         created.onPaired = { prefs.edit().putBoolean(KEY_ACTIVE, true).apply() }
         try {
@@ -187,6 +194,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     suspend fun shutdown() = lock.withLock {
         val e = engine
         engine = null
+        lastState = null
         e?.stop()
     }
 
@@ -269,8 +277,20 @@ class SyncService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private val handler = Handler(Looper.getMainLooper())
+    private var latest: Map<String, Any?>? = null
+    private var lastPost = 0L
+    private var lastText: String? = null
+    private var scheduled = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val hub = SyncHub.get(this)
+        // "Quit" on the notification: the same path as the Sync page's off switch (the flag goes down, the
+        // engine stops, the service goes with it).
+        if (intent?.action == ACTION_QUIT) {
+            scope.launch { hub.deactivate() }
+            return START_NOT_STICKY
+        }
         try {
             // "specialUse", not "dataSync" (2026-10-03, same as Neo Calendar): Android 15+ refuses to start a dataSync
             // service at boot, and caps it at 6 h a day; sync must restart with the phone and run as long as needed.
@@ -287,6 +307,8 @@ class SyncService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        hub.notifyListener = { s -> handler.post { latest = s; postSoon() } }
+        latest = hub.lastState
         scope.launch { if (hub.launchEngine() == null) stopSelf() }
         return START_STICKY
     }
@@ -297,7 +319,42 @@ class SyncService : Service() {
         stopSelf()
     }
 
+    /** The notification follows the state, at most once a second (a progress burst must not flood the system). */
+    private fun postSoon() {
+        val wait = lastPost + MIN_GAP_MS - SystemClock.elapsedRealtime()
+        if (wait <= 0) post() else if (!scheduled) {
+            scheduled = true
+            handler.postDelayed({ scheduled = false; post() }, wait)
+        }
+    }
+
+    private fun post() {
+        val n = notification()
+        // Same text as already shown: nothing to send.
+        val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        if (text == lastText) return
+        lastText = text
+        lastPost = SystemClock.elapsedRealtime()
+        try { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, n) } catch (e: Exception) { SyncLog.warn(TAG, "cannot update the notification", e) }
+    }
+
+    private fun statusText(): String {
+        val s = SyncSummary.of(latest)
+        val devices = resources.getQuantityString(R.plurals.sync_connected_devices, s.connected, s.connected)
+        return when (s.kind) {
+            SyncSummary.Kind.STARTING -> getString(R.string.sync_notification_title)
+            SyncSummary.Kind.PAUSED -> getString(R.string.sync_status_paused)
+            SyncSummary.Kind.SCANNING -> getString(R.string.sync_status_scanning)
+            SyncSummary.Kind.ERROR -> getString(R.string.sync_status_error)
+            SyncSummary.Kind.NO_DEVICE -> getString(R.string.sync_status_none)
+            SyncSummary.Kind.SYNCING -> if (s.percent != null) getString(R.string.sync_status_syncing, s.percent, devices) else getString(R.string.sync_status_syncing_unknown, devices)
+            SyncSummary.Kind.UP_TO_DATE -> getString(R.string.sync_status_synced, devices)
+        }
+    }
+
     override fun onDestroy() {
+        SyncHub.peek()?.notifyListener = null
+        handler.removeCallbacksAndMessages(null)
         // The process may be killed right after: stop Syncthing on its own thread, with a bounded wait.
         val hub = SyncHub.peek()
         if (hub != null) Thread { kotlinx.coroutines.runBlocking { hub.shutdown() } }.apply { isDaemon = false; start() }
@@ -308,11 +365,16 @@ class SyncService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, getString(R.string.sync_channel_name), NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val quit = PendingIntent.getService(this, 1, Intent(this, SyncService::class.java).setAction(ACTION_QUIT), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.sync_notification_title))
+            .setContentTitle(getString(R.string.sync_notification_name))
+            .setContentText(statusText())
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentIntent(open)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel), getString(R.string.sync_quit), quit).build())
             .build()
     }
 
@@ -320,5 +382,7 @@ class SyncService : Service() {
         const val TAG = "NeoSync"
         const val CHANNEL_ID = "sync"
         const val NOTIFICATION_ID = 1
+        const val MIN_GAP_MS = 1000L
+        const val ACTION_QUIT = "com.ahmedmili.neoquiz.sync.QUIT"
     }
 }

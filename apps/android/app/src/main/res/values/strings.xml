@@ -18,6 +18,19 @@
     <string name="picker_suggested">%1$s (suggested)</string>
     <string name="sync_channel_name">Sync</string>
     <string name="sync_notification_title">Neo Quiz is syncing</string>
+    <string name="sync_notification_name">Neo Quiz</string>
+    <string name="sync_status_paused">Paused</string>
+    <string name="sync_status_scanning">Scanning…</string>
+    <string name="sync_status_error">Sync problem</string>
+    <string name="sync_status_none">No device connected</string>
+    <string name="sync_status_syncing">Syncing: %1$d%% · %2$s</string>
+    <string name="sync_status_syncing_unknown">Syncing · %1$s</string>
+    <string name="sync_status_synced">Up to date · %1$s</string>
+    <string name="sync_quit">Quit</string>
+    <plurals name="sync_connected_devices">
+        <item quantity="one">%d device connected</item>
+        <item quantity="other">%d devices connected</item>
+    </plurals>
     <string name="sync_share_subject">My Neo Quiz device ID</string>
     <string name="sync_share_body">To sync with my device in Neo Quiz, open Settings, then Sync, and add this device ID:\n\n%1$s</string>
     <string name="review_channel_name">Daily review</string>
