@@ -277,6 +277,14 @@ const pont: Pont = {
 	android: {
 		calendrier: (table, textes) => appeler("android.calendrier", [table, textes]),
 		revisionDemandee: () => appeler<boolean>("android.revisionDemandee"),
+		/* A zip or note another app opened or shared with us; bytes cross as base64 like every other file. */
+		fichierRecu: async () => {
+			const recu = await appeler<{ nom?: string; octets?: string; erreur?: "trop-grand" | "type" | "illisible" } | null>("android.fichierRecu");
+			if (!recu) return null;
+			if (typeof recu.nom === "string" && typeof recu.octets === "string") return { nom: recu.nom, octets: fromBase64(recu.octets) };
+			return { erreur: recu.erreur ?? "illisible" };
+		},
+		surFichierRecu: (rappel) => abonner<void>("android.fichierRecu", () => rappel()),
 	},
 
 	code: {

@@ -66,6 +66,31 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="neo-quiz.github.io" android:pathPrefix="/pair" />
             </intent-filter>
+            <!-- A zip or a note opened or shared FROM another app (a file manager, Discord, mail...).
+                 Only the file types themselves: no text/plain (every shared text would list Neo Quiz) and
+                 no octet-stream on VIEW (it would list us for every unknown file). The sender's type is a
+                 hint that lists us; the NAME (.zip/.md) and the content are checked in the app. Without
+                 the user choosing "Always", Neo Quiz never becomes the default opener of zip files. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+            </intent-filter>
+            <!-- The share sheet. application/octet-stream is here because WhatsApp and Discord often give
+                 a .zip or .md that type; the app refuses any other name with a message. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
         </activity>
 
         <!-- Keeps the embedded Syncthing alive in the background (not reachable by other apps). -->

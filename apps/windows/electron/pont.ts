@@ -524,6 +524,13 @@ export interface Pont {
 		calendrier(table: Array<{ date: string; due: number }>, textes: { title: string; bodyOne: string; bodyOther: string }): Promise<void>;
 		/** True once after a tap on the notification: the page then lands on Home, where today's review is. */
 		revisionDemandee(): Promise<boolean>;
+		/** A zip or a note ANOTHER app opened or shared with Neo Quiz ("Open with", "Share to"), read once:
+		    `{nom, octets}` (the sender's name made harmless, never a path), `{erreur}` when Kotlin refused it
+		    (`trop-grand` over 64 MB, `type` not a .zip or .md, `illisible`), `null` when nothing waits. The
+		    content is validated by the same importer as a file picked by hand. */
+		fichierRecu(): Promise<{ nom: string; octets: Uint8Array } | { erreur: "trop-grand" | "type" | "illisible" } | null>;
+		/** A file just arrived: time to read it (`fichierRecu`). */
+		surFichierRecu(rappel: () => void): () => void;
 	};
 
 	/**

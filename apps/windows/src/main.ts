@@ -21,6 +21,7 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
+import { lireFichierRecu } from "./ui/fichier-recu";
 import { estVaultObsidian, relireExamens, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
@@ -714,6 +715,10 @@ async function demarrer(): Promise<void> {
 		const derniereVue = depuisNotification ? { vue: "home" as const } : await chargerReprise();
 		if (derniereVue) reprendre(derniereVue, scanner);
 		mount(root, scanner, store, stats, sessions);
+		/* Android: a zip or note another app opened or shared with us ('Open with', 'Share to'),
+		   read at start (it launched the app) and at each push (it arrived while the app runs). */
+		pont().android?.surFichierRecu(() => { void lireFichierRecu(scanner); });
+		void lireFichierRecu(scanner);
 	} catch (e) {
 		root.textContent = t("app.error.startup", { error: e instanceof Error ? e.message : String(e) });
 	}

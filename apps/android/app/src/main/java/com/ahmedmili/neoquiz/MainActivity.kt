@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.viewinterop.AndroidView
 import android.content.Intent
+import com.ahmedmili.neoquiz.bridge.IncomingIntent
 import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.notify.ReviewOpenRequest
 import com.ahmedmili.neoquiz.sync.PairLinkRequest
@@ -66,7 +67,11 @@ class MainActivity : ComponentActivity() {
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
         // Not on a recreation or a relaunch from the recent apps: the link was already handled (or is old).
-        if (savedInstanceState == null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) raisePairLink(intent)
+        if (savedInstanceState == null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
+            raisePairLink(intent)
+            // A zip or note another app opened or shared with us: copied to the cache, then read once by the page.
+            IncomingIntent.handle(this, intent)
+        }
         setContent {
             val app = showApp
             // The first-run screen sits on the installer's backdrop, drawn as the window background so it
@@ -155,6 +160,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         raisePairLink(intent)
+        IncomingIntent.handle(this, intent)
         if (!intent.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false)) return
         ReviewOpenRequest.raise()
         if (loaded) appWebView.reload()

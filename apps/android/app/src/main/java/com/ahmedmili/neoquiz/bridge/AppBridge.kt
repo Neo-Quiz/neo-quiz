@@ -49,6 +49,7 @@ class AppBridge(
     fun shutdown() {
         sync.detach()
         PairLinkRequest.listener = null
+        IncomingInbox.shared.listener = null
         qr.detach()
         code.shutdown()
     }
@@ -112,6 +113,8 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val qr = QrScanner(activity as ComponentActivity)
     // A pairing link opened the app (or arrived while it runs): the page reads it, and only fills in "Add a device".
     PairLinkRequest.listener = { bridge?.emit("sync.lienAppairage", null) }
+    // A file another app opened or shared with us: the page reads it once (`android.fichierRecu`).
+    IncomingInbox.shared.listener = { bridge?.emit("android.fichierRecu", null) }
     hub.attach(allowed::allow)
     hub.stateListener = { state -> bridge?.emit("sync.etat", state) }
     hub.receivedListener = {
@@ -140,7 +143,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
-        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it) }.handlers() + scan.handlers() +
+        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + IncomingChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it) }.handlers() + scan.handlers() +
             settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
     )
     bridge = created

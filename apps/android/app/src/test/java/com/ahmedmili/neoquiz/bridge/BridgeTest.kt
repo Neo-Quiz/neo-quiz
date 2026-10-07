@@ -23,6 +23,7 @@ class BridgeTest {
             SystemChannel(perimeter, allowed, settings, { null }, { true }).handlers() +
             ClipboardChannel { }.handlers() +
             ShareChannel(File(base, "share"), { _, _ -> true }).handlers() +
+            IncomingChannel(IncomingInbox()).handlers() +
             settings.handlers() +
             CodeChannel(object : com.ahmedmili.neoquiz.code.CodeEngine {
                 override suspend fun run(job: Any?) = JSONObject()
