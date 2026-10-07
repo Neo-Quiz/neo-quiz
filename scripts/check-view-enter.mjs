@@ -153,3 +153,37 @@ for (const fichier of readdirSync(DOSSIER_CSS).filter((f) => f.endsWith(".css"))
 }
 r2.check("aucune animation sous .qbd-*-enter en `both` ni `forwards`", fautives, []);
 r2.done();
+
+/* ── 3. Sur téléphone, une page n'est jamais vide à sa première image ─── */
+
+/* Audit sur le vrai téléphone (2026-10-07) : l'entrée d'une page démarre
+   chaque bloc à opacité 0 et décale les cartes ; la page quittée a disparu
+   dans la même image, donc l'écran n'avait que le fond pendant 100 à 250 ms.
+   Sur téléphone (`.is-mobile`, qui n'a pas la pile de feuilles : `sheet-stack.ts`,
+   `transitionCourte`), chaque règle d'entrée `.qbd-quizzes-enter` /
+   `.qbd-qz-enter` qui pose une `animation` doit donc être neutralisée dans
+   `mobile.css`. Une règle d'entrée ajoutée sans son pendant téléphone fait
+   échouer ce contrôle au lieu de vider l'écran. */
+const r3 = makeReporter("Entrée d'une vue — aucune entrée à opacité 0 sur téléphone");
+const mobile = readFileSync("src/assets/css/mobile.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const neutralises = new Set();
+for (const m of mobile.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+	if (!/animation\s*:\s*none\s*;/.test(m[2])) continue;
+	for (const sel of m[1].split(",")) neutralises.add(sel.trim().replace(/\s+/g, " "));
+}
+const sansPendant = [];
+for (const fichier of readdirSync(DOSSIER_CSS).filter((f) => f.endsWith(".css"))) {
+	const css = readFileSync(join(DOSSIER_CSS, fichier), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+	/* Hors des blocs @media / @keyframes : on ne lit que les règles de premier niveau. */
+	const premierNiveau = css.replace(/@(media|keyframes|supports)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+	for (const m of premierNiveau.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+		if (!/animation\s*:\s*(?!none)/.test(m[2])) continue;
+		for (const sel of m[1].split(",")) {
+			const s = sel.trim().replace(/\s+/g, " ");
+			if (!/^\.qbd-(quizzes|qz)-enter/.test(s)) continue;
+			if (!neutralises.has(`.is-mobile ${s}`)) sansPendant.push(`${fichier} : ${s}`);
+		}
+	}
+}
+r3.check("chaque entrée .qbd-quizzes-enter / .qbd-qz-enter est neutralisée sous .is-mobile", sansPendant, []);
+r3.done();

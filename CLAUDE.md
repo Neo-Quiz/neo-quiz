@@ -159,7 +159,13 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   main sur `transform` rend les transitions de survol muettes : la carte SAUTE
   de 0 à -3 px en une image. Le chemin qui défile en boucle l'a provoqué
   (2026-09-17) en empêchant la classe d'entrée de tomber ; ça ne se voit qu'à
-  la souris, jamais dans un typecheck. Dans la CI.
+  la souris, jamais dans un typecheck. Tient aussi, depuis l'audit téléphone du
+  2026-10-07 : `markViewEnter` ne relève pas `getAnimations({ subtree })` à
+  CHAQUE `animationend` (un relevé vide le style du sous-arbre : 20 cartes
+  décalées = 20 tâches de 50 à 100 ms PENDANT l'entrée), et chaque règle
+  d'entrée `.qbd-quizzes-enter` / `.qbd-qz-enter` a son pendant neutralisé sous
+  `.is-mobile` dans `mobile.css` (sinon la page est vide à sa première image :
+  les blocs démarrent à opacité 0 et la page quittée a disparu). Dans la CI.
 - `npm run check:theme` — le thème de l'app définit toutes les variables CSS
   qu'Obsidian fournissait. Une oubliée ne produit AUCUNE erreur : un texte
   invisible sur un fond de la même couleur. Symétrique et dans la CI.
