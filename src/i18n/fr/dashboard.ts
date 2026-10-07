@@ -78,6 +78,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.importDoneImages": "Dossier importé : {name} ({count} quiz, {images} images)",
 	"dashboard.quizzes.importImagesKept": "{count} images non importées : un autre fichier du même nom est déjà dans le dossier",
 	"dashboard.quizzes.importTooLarge": "Ce fichier est trop volumineux pour être importé",
+	"dashboard.quizzes.importPathTooLong": "Rien n'a été importé : le chemin de « {name} » serait trop long pour Windows. Importe dans un dossier plus proche de la racine, ou renomme le fichier",
 	"dashboard.quizzes.importUnreadable": "Cette archive est illisible (abîmée, chiffrée ou pas un zip)",
 	"dashboard.quizzes.shareTooLarge": "Ces quiz sont trop volumineux pour tenir dans un seul fichier",
 	"dashboard.quizzes.shareImagesLeftOut": "{count} images n'ont pas été ajoutées au fichier partagé (limite de taille ou illisibles)",

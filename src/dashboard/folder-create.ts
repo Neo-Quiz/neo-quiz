@@ -7,6 +7,7 @@ import type { QuizIndexEntry } from "./scanner";
 import type { ModuleMap } from "./quiz-modules";
 import { openNewFolderModal, commonModuleParent, defaultParent } from "./module-edit";
 import { IMPORT_LIMITS, ZipReadError, classerArchive, nomNoteImportee, readZip } from "./zip";
+import { exportBaseName, fitsPath, folderNameFromArchive } from "./share-names";
 import type { ImportedArchive } from "./zip";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { makeDefault } from "../editor/utils";
@@ -120,6 +121,27 @@ async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<I
 	}
 }
 
+/** An imported file whose target path would pass `PATH_MAX`. Thrown BEFORE
+    anything is written, so the refusal leaves the disk untouched. */
+export class ImportPathTooLongError extends Error {
+	constructor(readonly fileName: string) { super(`import-path-too-long: ${fileName}`); }
+}
+
+/** Checks every target path of an archive against `PATH_MAX` (room kept for
+    a " (n)" suffix), naming the first one that does not fit. */
+function verifierChemins(folder: string, archive: ImportedArchive): void {
+	for (const f of [...archive.notes, ...archive.images]) {
+		if (!fitsPath(folder, `${f.name} (99)`)) throw new ImportPathTooLongError(f.name);
+	}
+}
+
+/** The notice for a failed import: the path-too-long case names the file. */
+function noticeEchecImport(e: unknown): void {
+	currentHost().ui.notice(e instanceof ImportPathTooLongError
+		? t("dashboard.quizzes.importPathTooLong", { name: e.fileName })
+		: t("dashboard.quizzes.importError"));
+}
+
 /** Writes what a received archive carries into `folder`: every note under a
     FREE name (`freeNotePath`), every image under its own name, since quizzes
     cite it by name (`![[schema.png]]`). An image whose name is taken keeps
@@ -165,7 +187,9 @@ export async function importSharedFolder(
 	if (!archive) return;
 	// Dossier cible : base du zip, assainie, sous le parent commun des modules ;
 	// suffixe (2), (3)… si un dossier du même nom existe déjà.
-	const base = picked.name.replace(/\.zip$/i, "").replace(/[\\/:*?"<>|]/g, "-").trim() || "Import";
+	// Same rules as any imported name (NFC, device names such as `CON.zip`, length,
+	// the " (1)" a browser appends to a second download).
+	const base = folderNameFromArchive(picked.name);
 	const parent = commonModuleParent(quizzes, map, defaultParent());
 	const root = parent ? `${parent}/${base}` : base;
 	let folderPath = root;
@@ -177,10 +201,11 @@ export async function importSharedFolder(
 
 	let written: { notes: number; images: number; imagesKept: number };
 	try {
+		verifierChemins(folderPath, archive);
 		await currentHost().fs.mkdirs(folderPath);
 		written = await ecrireArchive(folderPath, archive);
-	} catch {
-		currentHost().ui.notice(t("dashboard.quizzes.importError"));
+	} catch (e) {
+		noticeEchecImport(e);
 		return;
 	}
 
@@ -222,7 +247,7 @@ function annoncerImport(name: string, w: { notes: number; images: number; images
     fois le même nom libre dans les boucles d'import, et la seconde note
     écraserait la première. Le disque, lui, dit la vérité sous les deux hôtes. */
 export async function freeNotePath(folder: string, name: string, ext = ".md"): Promise<string> {
-	const base = name.replace(/[\\/:*?"<>|]/g, "-").trim() || "quiz";
+	const base = exportBaseName(name, "quiz");
 	const prefix = folder ? `${folder}/` : "";
 	let path = `${prefix}${base}${ext}`;
 	for (let n = 2; await currentHost().fs.exists(path); n++) path = `${prefix}${base} (${n})${ext}`;
@@ -270,6 +295,7 @@ export async function importFileIntoFolder(folder: string, picked: { name: strin
 		if (/\.zip$/i.test(picked.name)) {
 			const archive = await lireArchiveRecue(picked.bytes, true);
 			if (!archive) return;
+			verifierChemins(folder, archive);
 			annoncerImport(folder.split("/").pop() || folder, await ecrireArchive(folder, archive));
 		} else {
 			if (picked.bytes.length > IMPORT_LIMITS.entry) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); return; }
@@ -280,8 +306,8 @@ export async function importFileIntoFolder(folder: string, picked: { name: strin
 			await currentHost().fs.write(await freeNotePath(folder, name), content);
 			currentHost().ui.notice(t("dashboard.quizzes.importQuizDone", { name }));
 		}
-	} catch {
-		currentHost().ui.notice(t("dashboard.quizzes.importError"));
+	} catch (e) {
+		noticeEchecImport(e);
 		return;
 	}
 	onDone();

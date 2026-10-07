@@ -2,6 +2,8 @@ import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
 import { embedTargets, isShareableImage, packShare } from "../../../../src/dashboard/share-pack";
 import type { ZipEntry, ZipFile } from "../../../../src/dashboard/zip";
+import { nomImageImportee } from "../../../../src/dashboard/zip";
+import { dedupeNames, exportBaseName } from "../../../../src/dashboard/share-names";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
@@ -23,8 +25,10 @@ export type CiblePartage = { quiz: QuizIndexEntry } | { group: ModuleGroup };
 
 interface Fichier { nom: string; octets: Uint8Array; imagesLaissees: number }
 
+/** A name the importer accepts (shared rules, `share-names.ts`): NFC, no
+    forbidden character, no Windows device name, capped. */
 function nomSur(nom: string, repli: string): string {
-	return (nom || repli).replace(/[\\/:*?"<>|]/g, "-").trim() || repli;
+	return exportBaseName(nom || repli, repli);
 }
 
 /** The images the given notes embed, as files of the share: each one resolved
@@ -39,8 +43,12 @@ async function imagesDes(notes: { chemin: string; contenu: string }[]): Promise<
 		for (const cible of embedTargets(n.contenu)) {
 			const fichier = host.links.resolve(cible, n.chemin);
 			if (!fichier || !isShareableImage(fichier.name) || vues.has(fichier.path)) continue;
+			// A name the importer would refuse (device name, too long) is left out
+			// and counted, never shipped: an archive must import what it carries.
+			const nomEnvoye = nomImageImportee(fichier.name);
+			if (nomEnvoye === null) { vues.set(fichier.path, null); perdues++; continue; }
 			try {
-				const entree = { name: fichier.name, bytes: await host.fs.readBinary(fichier.path) };
+				const entree = { name: nomEnvoye, bytes: await host.fs.readBinary(fichier.path) };
 				vues.set(fichier.path, entree);
 				images.push(entree);
 			} catch {
@@ -77,11 +85,15 @@ async function construire(cible: CiblePartage): Promise<Fichier | null> {
 	for (const q of cible.group.quizzes) {
 		try {
 			const contenu = await fs.read(q.path);
-			entrees.push({ name: q.path.split("/").pop() as string, content: contenu });
+			const fichierNote = q.path.split("/").pop() as string;
+			entrees.push({ name: `${exportBaseName(fichierNote.replace(/\.md$/i, ""), "quiz")}.md`, content: contenu });
 			lus.push({ chemin: q.path, contenu });
 		} catch { /* un quiz disparu entre le scan et le clic : on partage le reste */ }
 	}
 	if (entrees.length === 0) { host.ui.notice(t("dashboard.detail.fileNotFound")); return null; }
+	// Two quizzes of different sub-folders can share a file name: unique, case-insensitively.
+	const uniques = dedupeNames(entrees.map(e => e.name));
+	entrees.forEach((e, i) => { e.name = uniques[i]; });
 	const { images, perdues } = await imagesDes(lus);
 	const paquet = packShare(entrees, images, maintenant);
 	if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }

@@ -143,6 +143,35 @@ await withSrcModule("src/dashboard/zip.ts", ({ nomNoteImportee }) => {
 	r.done();
 });
 
+/* THE NAME RULES, shared by the exporter and the importer (`share-names.ts`,
+   2026-10-07). A rule that lives in one side only lets an exported archive
+   hold a name the importer refuses. */
+await withSrcModule(["src/dashboard/share-names.ts", "src/dashboard/zip.ts"], (names, zip) => {
+	const { cleanName, isReservedName, baseNameVerdict, exportBaseName, dedupeNames, fitsPath, folderNameFromArchive, NAME_MAX, PATH_MAX } = names;
+	const r = makeReporter("Share name rules (exporter and importer)");
+	r.check("Windows reserves a device name for EVERY extension: con.txt.md, CON.md, nul.tar.gz", [isReservedName("con.txt.md"), isReservedName("CON.md"), isReservedName("nul.tar.gz")], [true, true, true]);
+	r.check("device names: com0-9, lpt0-9, the superscript digits, the console handles, a trailing space", [isReservedName("COM1"), isReservedName("lpt9.md"), isReservedName("COM¹.md"), isReservedName("conout$"), isReservedName("aux .md")], [true, true, true, true, true]);
+	r.check("a longer word that merely starts like one is fine", [isReservedName("console.md"), isReservedName("coma.md"), isReservedName("a.con.md")], [false, false, false]);
+	r.check("a note import refuses con.txt.md and keeps console.md", [zip.nomNoteImportee("con.txt.md"), zip.nomNoteImportee("console.md")], [null, "console"]);
+	r.check("an image import refuses nul.final.png", zip.nomImageImportee("nul.final.png"), null);
+	const nfd = "café.md";
+	r.check("NFD (macOS) becomes NFC", [zip.nomNoteImportee(nfd), zip.nomNoteImportee(nfd) === "café"], ["café", true]);
+	r.check("an NFD image name matches the NFC link", zip.nomImageImportee("café.png"), "café.png");
+	r.check("forbidden characters and controls become dashes, edge dots and spaces go", [cleanName(' a:b*c?"d<e>f|g\u0001 .'), cleanName("..x..")], ["a-b-c--d-e-f-g-", "x"]);
+	r.check("a 300-character name is cut to the cap, not dropped", [zip.nomNoteImportee("x".repeat(300) + ".md")?.length, NAME_MAX], [NAME_MAX, 100]);
+	r.check("empty after cleaning is refused with a reason", [baseNameVerdict("...").reason, baseNameVerdict("CON").reason], ["empty", "reserved"]);
+	r.check("the exporter never refuses: a reserved name gets an underscore, an empty one the fallback", [exportBaseName("CON", "quiz"), exportBaseName("???", "quiz"), exportBaseName("a/b", "quiz"), exportBaseName("con.txt", "quiz")], ["CON_", "---", "a-b", "con_.txt"]);
+	r.check("exporter and importer agree on hostile names: whatever is exported is accepted back", ["CON", "con.txt", "nul.", "Q:1", "x".repeat(400), "é́", "aux .z", " ", "lpt1"].every(n => {
+		const out = exportBaseName(n, "quiz");
+		return zip.nomNoteImportee(`${out}.md`) === out;
+	}), true);
+	r.check("names that differ only by case, or by NFC/NFD, collide: the next gets (2), (3)", dedupeNames(["A.md", "a.md", "café.md", "café.md", "A.MD"]), ["A.md", "a (2).md", "café.md", "café (2).md", "A (3).MD"]);
+	r.check("a deduplicated name does not collide with a later real one", dedupeNames(["a.md", "a.md", "a (2).md"]), ["a.md", "a (2).md", "a (2) (2).md"]);
+	r.check("the target path bound: 240 fits, 241 does not", [fitsPath("x".repeat(100), "y".repeat(139)), fitsPath("x".repeat(100), "y".repeat(140)), PATH_MAX], [true, false, 240]);
+	r.check("the folder named after an archive: CON.zip, a download suffix, NFD, empty", [folderNameFromArchive("CON.zip"), folderNameFromArchive("Cours C (1).zip"), folderNameFromArchive("café.zip"), folderNameFromArchive(".zip"), folderNameFromArchive("a:b.zip")], ["Import", "Cours C", "café", "Import", "a-b"]);
+	r.done();
+});
+
 /* THE SHARE'S CONTENT AND THE RECEIVING READER (2026-10-01). A shared folder
    used to carry quiz notes only (every embedded image was dead on arrival) and
    the reader skipped every archive it had not written itself (deflate: "empty"). */

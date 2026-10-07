@@ -94,6 +94,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.importDoneImages": "Imported {name} ({count} quizzes, {images} images)",
 	"dashboard.quizzes.importImagesKept": "{count} images were not imported: a different file with the same name is already in the folder",
 	"dashboard.quizzes.importTooLarge": "This file is too large to import",
+	"dashboard.quizzes.importPathTooLong": "Nothing was imported: the path for \"{name}\" would be too long for Windows. Import into a folder closer to the root, or rename the file",
 	"dashboard.quizzes.importUnreadable": "This archive cannot be read (damaged, encrypted or not a zip)",
 	"dashboard.quizzes.shareTooLarge": "These quizzes are too large to share as one file",
 	"dashboard.quizzes.shareImagesLeftOut": "{count} images were left out of the shared file (size limit or unreadable)",
