@@ -209,7 +209,10 @@
 	grid-template-columns: minmax(0, 1fr) 290px;
 	gap: 18px;
 	align-items: start;
-	margin-top: 0;
+	/* Room above the first card, as wide as the panel's side margin: without
+	   it (the decorative band above was removed on 2026-10-07) the cards sat
+	   glued to the panel's top edge. */
+	margin-top: 32px;
 }
 
 .qbd-home-folders {
