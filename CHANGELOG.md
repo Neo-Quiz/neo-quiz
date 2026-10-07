@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Icon-only buttons (provider in Generate, colour and icon in the folder window) have names for screen readers.
 - The math keyboard no longer hides the next and previous arrows of a question.
 - Arrow keys move through a quiz as soon as it opens, without a click first, and no longer act on the page behind it.
 - A folder reopens on the tab you left it on.

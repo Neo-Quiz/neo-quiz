@@ -1,6 +1,6 @@
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
-import { t } from "../i18n";
+import { t, type TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import { moduleForQuiz, estLeSas } from "./quiz-modules";
@@ -114,6 +114,8 @@ export function openModuleEditModal(
 			ajouter(c, "p", "qbd-medit-label", t("dashboard.quizzes.moduleEditIcon"));
 			const iconBtn = ajouter(c, "button", "qbd-medit-icon-btn");
 			iconBtn.type = "button";
+			iconBtn.setAttribute("aria-label", t("dashboard.quizzes.moduleEditIcon"));
+			iconBtn.title = t("dashboard.quizzes.moduleEditIcon");
 			const paintIcon = () => { iconBtn.replaceChildren(); currentHost().ui.setIcon(iconBtn, moduleIcon({ icon, name, ue }, { generated: genere })); };
 			paintIcon();
 			iconBtn.addEventListener("click", () => {
@@ -176,9 +178,12 @@ export function openModuleEditModal(
 			const row = ajouter(c, "div", "qbd-medit-colors");
 			const paintDots = () => {
 				row.replaceChildren();
-				for (const col of MODULE_PALETTE) {
+				MODULE_PALETTE.forEach((col, i) => {
 					const dot = ajouter(row, "button", "qbd-medit-dot");
 					dot.type = "button";
+					const nom = t(`dashboard.quizzes.moduleColor${i}` as TransKey);
+					dot.setAttribute("aria-label", nom);
+					dot.title = nom;
 					dot.style.background = col;
 					if (col === color) currentHost().ui.setIcon(dot, "check");
 					dot.addEventListener("click", () => {
@@ -186,12 +191,13 @@ export function openModuleEditModal(
 						paintDots();
 						apply();
 					});
-				}
+				});
 				// 9e cercle : couleur personnalisée. Roue chromatique au repos ;
 				// quand une couleur HORS palette est active, il la porte + check.
 				const custom = ajouter(row, "button", "qbd-medit-dot qbd-medit-dot--custom");
 				custom.type = "button";
 				custom.setAttribute("aria-label", t("dashboard.quizzes.moduleEditCustomColor"));
+				custom.title = t("dashboard.quizzes.moduleEditCustomColor");
 				const isCustom = !!color && !MODULE_PALETTE.includes(color);
 				if (isCustom && color) {
 					custom.style.background = color;

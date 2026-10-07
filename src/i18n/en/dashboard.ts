@@ -277,6 +277,14 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moduleIconAll": "All",
 	"dashboard.quizzes.moduleIconNoResult": "No icon found",
 	"dashboard.quizzes.moduleEditCustomColor": "Custom color",
+	"dashboard.quizzes.moduleColor0": "Blue",
+	"dashboard.quizzes.moduleColor1": "Teal",
+	"dashboard.quizzes.moduleColor2": "Green",
+	"dashboard.quizzes.moduleColor3": "Lime",
+	"dashboard.quizzes.moduleColor4": "Amber",
+	"dashboard.quizzes.moduleColor5": "Rose",
+	"dashboard.quizzes.moduleColor6": "Fuchsia",
+	"dashboard.quizzes.moduleColor7": "Violet",
 
 	/* ── Carte de quiz (état) ── */
 	/* Les boutons d'action d'une carte : un par mode, numérotés dans un cours. */

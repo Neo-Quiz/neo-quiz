@@ -238,6 +238,14 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.moduleIconAll": "Toutes",
 	"dashboard.quizzes.moduleIconNoResult": "Aucune icône trouvée",
 	"dashboard.quizzes.moduleEditCustomColor": "Couleur personnalisée",
+	"dashboard.quizzes.moduleColor0": "Bleu",
+	"dashboard.quizzes.moduleColor1": "Turquoise",
+	"dashboard.quizzes.moduleColor2": "Vert",
+	"dashboard.quizzes.moduleColor3": "Citron vert",
+	"dashboard.quizzes.moduleColor4": "Ambre",
+	"dashboard.quizzes.moduleColor5": "Rose",
+	"dashboard.quizzes.moduleColor6": "Fuchsia",
+	"dashboard.quizzes.moduleColor7": "Violet",
 
 	/* ── Carte de quiz ── */
 	"dashboard.card.more": "Plus d'actions",

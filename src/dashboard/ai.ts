@@ -1127,6 +1127,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const btn = ajouter(parent, "button", "qbd-select qbd-provider-trigger-logo");
 			btn.type = "button";
 			const p = provider ? aiProviders.getProvider(provider) : null;
+			// An icon-only button: its name is the brand, or the invitation to pick one.
+			btn.setAttribute("aria-label", (provider && aiProviders.getMarque(provider)?.name) || t("ai.provider.choose"));
 			if (p) {
 				const logo = ajouter(btn, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
 				aiProviders.setBrandLogo(logo, p.logo);
