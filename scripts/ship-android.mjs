@@ -71,7 +71,8 @@ export function buildManifest({ versionCode, versionName, sha256, size, notes })
 }
 
 function run(cmd, args, options = {}) {
-	return execFileSync(cmd, args, { encoding: "utf8", cwd: root, ...options }).trim();
+	// With `stdio: "inherit"` execFileSync returns null: nothing to trim then.
+	return (execFileSync(cmd, args, { encoding: "utf8", cwd: root, ...options }) ?? "").trim();
 }
 
 function fail(message) {
