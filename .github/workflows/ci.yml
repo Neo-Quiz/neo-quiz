@@ -243,6 +243,11 @@ jobs:
       - name: Overscroll stretch
         run: npm run check:overscroll
 
+      # INFINITE ANIMATIONS: each one is either transient or switched off on the
+      # phone, where an off-screen infinite animation redraws every frame.
+      - name: Idle animations
+        run: npm run check:idle-animations
+
       # EXAMS AND ATTEMPTS PER DEVICE in the synced folder: the merge (newest
       # edit, tombstones, delete-before-add), the one-time migration, conflict
       # copies, and a folder move between roots.

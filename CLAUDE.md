@@ -564,6 +564,14 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   (`auto`/`scroll` et contenu plus grand), la fin de défilement qu'une traction tente,
   et qu'une barre fixe ou une animation en cours n'est jamais étirée. Sans lui, une
   zone ne s'étire plus en bout et personne ne le voit sans téléphone. Dans la CI.
+- `npm run check:idle-animations` — le cliquet des animations INFINIES du CSS
+  partagé (2026-10-08) : chacune est classée « transitoire » (spinner,
+  génération) ou « coupée sur téléphone », et pour ces dernières la règle de
+  `mobile.css` qui les arrête doit exister. Le reflet du bouton 3D « Reprendre »,
+  hors écran en bas de l'Accueil, faisait recalculer une image à chaque
+  rafraîchissement (120 Hz) sur le téléphone : 15 % de CPU pour l'app et 20 %
+  pour la WebView, page immobile, sans un script qui tourne. Une nouvelle
+  animation infinie non classée fait échouer le contrôle. Dans la CI.
 - `npm run check:generation-kind` — quel type (Learn ou Test) une demande de
   génération veut et ce qu'on lui demande d'abord (`src/dashboard/generation-kind.ts`) :
   le défaut est un Learn, seule une formulation explicite d'entraînement donne un
