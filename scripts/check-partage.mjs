@@ -16,10 +16,17 @@
  *     npm run check:partage
  */
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptPartageNatif, VARIABLES_NATIF, creerVerrou, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
+await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPartage, scriptPartageNatif, VARIABLES_NATIF, creerVerrou, outilSysteme, POWERSHELL_PARTAGE, temporairesPerimes, VARIABLE_FICHIER, TAILLE_MAX_PARTAGE }) => {
 	const r = makeReporter("Partage — noms, contenus, script, verrou");
+	const sys = { SystemRoot: String.raw`D:\Win` };
+	r.check("PowerShell and taskkill are launched by their FULL System32 path (SystemRoot, else C:\\Windows), never through PATH",
+		[POWERSHELL_PARTAGE(sys), outilSysteme("taskkill.exe", sys), outilSysteme("taskkill.exe", {})],
+		[String.raw`D:\Win\System32\WindowsPowerShell\v1.0\powershell.exe`, String.raw`D:\Win\System32\taskkill.exe`, String.raw`C:\Windows\System32\taskkill.exe`]);
+	const src = readFileSync(new URL("../apps/windows/electron/partage.ts", import.meta.url), "utf8");
+	r.check("partage.ts never starts a bare powershell.exe or taskkill", [/(spawn|lancer)\(\s*"(powershell|taskkill)/.test(src), /(spawn|lancer)\(\s*POWERSHELL_PARTAGE\(\)/.test(src), /spawn\(outilSysteme\("taskkill\.exe"\)/.test(src)], [false, true, true]);
 	r.check("un nom de zip ordinaire passe tel quel", nomPartage("XTI301 - Écosystème Python.zip"), "XTI301 - Écosystème Python.zip");
 	r.check("un .md passe", nomPartage("CM1.md"), "CM1.md");
 	r.check("une apostrophe typographique reste dans le NOM (le script ne le voit jamais)", nomPartage("L’an.md"), "L’an.md");

@@ -23,7 +23,7 @@
 import { spawn } from "node:child_process";
 import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { isReservedName } from "../../../src/dashboard/share-names";
 import { SHARE_MAX_BYTES } from "../../../src/dashboard/zip";
 import { PARTAGE_OCCUPE } from "./pont";
@@ -291,10 +291,18 @@ export interface DepsPartage {
 	tuerArbre?: (pid: number) => void;
 }
 
+/** A system tool by its FULL path under `%SystemRoot%\System32` (never a bare name resolved through
+    PATH, which a folder earlier in PATH could answer with its own `powershell.exe`): the same rule as
+    `comptes.ts` and the `taskkill.exe` of `process.ts`. */
+export function outilSysteme(sousChemin: string, env: NodeJS.ProcessEnv = process.env): string {
+	return win32.join(env.SystemRoot || "C:\\Windows", "System32", sousChemin);
+}
+export const POWERSHELL_PARTAGE = (env?: NodeJS.ProcessEnv): string => outilSysteme(win32.join("WindowsPowerShell", "v1.0", "powershell.exe"), env);
+
 /** Kills the PowerShell AND anything it started (`taskkill /T /F`). */
 function tuerArbrePar(pid: number): void {
 	try {
-		spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("error", () => {});
+		spawn(outilSysteme("taskkill.exe"), ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("error", () => {});
 	} catch { /* best effort: `kill()` ran first */ }
 }
 
@@ -354,7 +362,7 @@ export function lancerPartageNatif(p: PartageNatif, fin: () => void, deps: DepsP
 				env[VARIABLES_NATIF.x] = String(Math.round(p.centre.x));
 				env[VARIABLES_NATIF.y] = String(Math.round(p.centre.y));
 			}
-			enfant = lancer("powershell.exe",
+			enfant = lancer(POWERSHELL_PARTAGE(),
 				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode], env);
 			deps.surLance?.(() => echec("annule", "replaced by a new share", true));
 			tSignal = minuteur.set(() => { if (!montre) echec("delai", "no signal from the share panel", true); }, BORNE_SANS_SIGNAL_MS);
