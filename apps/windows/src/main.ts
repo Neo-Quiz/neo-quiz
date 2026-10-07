@@ -49,6 +49,7 @@ import { estMobile } from "./host/platform";
 import { installRipple } from "./ui/ripple";
 import { installBarreNative } from "./ui/barre-native";
 import { installOverscrollStretch } from "./ui/overscroll-stretch";
+import { installStatusStrip } from "./ui/status-strip";
 import { installKeyboardState } from "./ui/clavier";
 import { retourAndroid } from "./ui/retour-android";
 import { armerCalendrier } from "./ui/calendrier-android";
@@ -494,6 +495,7 @@ async function demarrer(): Promise<void> {
 		document.documentElement.classList.add("nq-mobile");
 		installRipple();
 		installOverscrollStretch();
+		installStatusStrip();
 		installKeyboardState();
 		installBarreNative((window as unknown as { neoPlatform: Parameters<typeof installBarreNative>[0] }).neoPlatform);
 		(window as unknown as { neoPlatform: { surRetour(g: () => boolean): void } }).neoPlatform.surRetour(retourAndroid);

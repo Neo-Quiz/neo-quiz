@@ -814,6 +814,10 @@ html.nq-mobile body {
 /* The status bar strip: the panel's own glass, fixed over the top of the
    screen, so a scrolling page never shows under the clock. Not on a played
    quiz (its own top) and not on Settings (a modal with its own strip). */
+html.nq-scrolled .is-mobile #neo-quiz-root:not(:has(> .qbd-qz))::before {
+	opacity: 1;
+}
+
 .is-mobile #neo-quiz-root:not(:has(> .qbd-qz))::before {
 	content: "";
 	position: fixed;
@@ -825,6 +829,10 @@ html.nq-mobile body {
 	background: var(--nq-panel-bg);
 	backdrop-filter: var(--nq-panel-blur);
 	pointer-events: none;
+	/* Hidden at rest, where it only darkened the panel under the clock; it
+	   fades in once the page has scrolled (`nq-scrolled`, ui/status-strip.ts). */
+	opacity: 0;
+	transition: opacity 150ms linear;
 }
 
 .is-mobile #neo-quiz-root > .qbd-layout > .qbd-sidebar {
