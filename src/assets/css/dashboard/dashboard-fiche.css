@@ -405,21 +405,23 @@
 .qbd-fiche-grid {
 	/* TROIS colonnes au plus : une colonne ne descend jamais sous 280 px, ni
 	   sous le tiers de la largeur. TOUTES LES CARTES À LA MÊME TAILLE
-	   (2026-09-26, comme StudySmarter) : une hauteur fixe par rangée ; ce
-	   qui dépasse défile DANS la carte (fin ascenseur), comme chez eux. */
+	   (2026-09-26, comme StudySmarter) : une rangée a 216 px au moins et
+	   grandit avec sa carte la plus haute (voir `grid-auto-rows`). */
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - 28px) / 3)), 1fr));
-	grid-auto-rows: 216px;
+	/* A row is at least 216 px and grows to its tallest card: a reading or a
+	   code block is shown in full, never behind a scrollbar (rule: lecture
+	   jamais de scroll). */
+	grid-auto-rows: minmax(216px, auto);
 	gap: 14px;
 	align-items: stretch;
 }
-/* Une carte : hauteur de sa rangée, l'en-tête fixe, la consigne ENTIÈRE
-   dans une zone qui défile (`.qbd-fiche-card-corps`). Un clic ouvre
-   l'éditeur sur la question. */
+/* A card: the height of its row, a fixed header, and the WHOLE question
+   below it (`.qbd-fiche-card-corps`, no scroll). A click opens the editor on
+   the question. */
 .qbd-fiche-card {
-	height: 100%;
+	height: auto;
 	min-height: 0;
-	overflow: hidden;
 }
 .qbd-fiche-card > .qbd-fiche-q-top { flex-shrink: 0; }
 .qbd-fiche-card-corps {
@@ -428,12 +430,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
-	overflow-y: auto;
-	/* L'ascenseur ne décale pas le texte quand il apparaît. PAS de
-	   `scrollbar-width` / `scrollbar-color` : dans Chromium, ces propriétés
-	   standard désactivent les `::-webkit-scrollbar` ci-dessous. La molette
-	   passe à la grille une fois la zone au bout (pas d'`overscroll`). */
-	scrollbar-gutter: stable;
+	/* The whole question is shown: no scrolling area inside a card. */
+	overflow: visible;
 	margin-right: -8px;
 	padding-right: 4px;
 	--fondu: 28px;
