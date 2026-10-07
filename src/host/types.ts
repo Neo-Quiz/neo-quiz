@@ -901,7 +901,8 @@ export interface CodeRun {
 /** THE CODE SANDBOX — an OPTIONAL member, the app only
     (apps/windows/electron/code-sandbox.ts). The plugin runs nothing. */
 export interface HostCode {
-	/** Languages ▶ may offer now: installed, or downloadable (Task 9). */
+	/** Languages ▶ may offer now: ENABLED ones (per-language switch
+	    `languagesDisabled`), installed or downloadable. */
 	languages(): readonly CodeLanguage[];
 	run(job: CodeJob): Promise<CodeRun>;
 	/** Loads the engine in the background; no effect if already loaded. */

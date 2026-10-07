@@ -2272,3 +2272,26 @@ await withSrcModule("apps/windows/src/host/latex-mathlive.ts", async ({ latexPou
 		[/@import\s+["']mathlive\/static\.css["']/.test(css), /@import\s+["']mathlive\/fonts\.css["']/.test(css)], [true, false]);
 	r.done();
 });
+
+/* THE PER-LANGUAGE SWITCH (task 6 of 2026-10-04-python-pack): a disabled
+   language is neither offered nor run; `cpp` follows the `c` switch. */
+await withSrcModule("apps/windows/src/host/code.ts", async ({ createWindowsCode, langageActif, reglerLangageActif }) => {
+	const r = makeReporter("Windows host — per-language switch");
+	let appels = 0;
+	const magasin = new Map([["languagesDisabled", ["c"]]]);
+	const pont = { code: { run: async () => { appels++; return { status: "ok", stdout: "x" }; }, warm: async () => { appels++; } },
+		reglages: { lire: async (k) => magasin.get(k), ecrire: async (k, v) => { magasin.set(k, v); } } };
+	const host = createWindowsCode(() => pont);
+	await new Promise(res => setTimeout(res, 10));
+	r.check("languages() drops c and cpp when c is disabled", [...host.languages()], ["python"]);
+	r.check("run of a disabled language is unavailable", await host.run({ language: "c" }), { status: "unavailable", stdout: "" });
+	r.check("… and cpp too", (await host.run({ language: "cpp" })).status, "unavailable");
+	r.check("… without calling the bridge", appels, 0);
+	r.check("python still runs", (await host.run({ language: "python" })).status, "ok");
+	await reglerLangageActif("python", false);
+	r.check("disabling python persists the key", magasin.get("languagesDisabled"), ["c", "python"]);
+	r.check("langageActif reflects it", langageActif("python"), false);
+	await reglerLangageActif("cpp", true);
+	r.check("enabling cpp re-enables c", magasin.get("languagesDisabled"), ["python"]);
+	r.done();
+});
