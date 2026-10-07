@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
         backgroundSync = hasBackgroundSync(this)
         firstRunDone = isFirstRunDone(this)
         askForNotifications()
+        // Received files and shares nobody took stay in the cache otherwise until the next reception.
+        Thread { IncomingIntent.purgeAll(cacheDir, System.currentTimeMillis()) }.apply { isDaemon = true }.start()
         // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()

@@ -164,6 +164,8 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             Log.w(TAG, "Neo Quiz cannot be resolved to itself, or its old folder was not moved: sync not started")
             return null
         }
+        // An import interrupted long ago left its (Syncthing-ignored) staging folder: nobody else removes it.
+        scope.launch { StagingCleanup.purge(root, System.currentTimeMillis()) }
         val home = File(appContext.filesDir, "syncthing")
         val process = SyncthingProcess(File(appContext.applicationInfo.nativeLibraryDir, ProcTable.BINARY_NAME), home, File(appContext.cacheDir, "syncthing-tmp"))
         val created = SyncEngine(

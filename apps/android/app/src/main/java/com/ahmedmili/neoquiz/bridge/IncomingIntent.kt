@@ -8,7 +8,11 @@ import androidx.core.content.IntentCompat
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * The Android half of receiving a file ("Open with" = `ACTION_VIEW`, "Share to" = `ACTION_SEND`
@@ -18,7 +22,11 @@ import java.util.concurrent.Executors
  * text share) is left alone.
  */
 object IncomingIntent {
-    private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "incoming-file").apply { isDaemon = true } }
+    /** A provider that never answers must not hold the next reception: each one runs on its own thread. */
+    private val worker = Executors.newCachedThreadPool { r -> Thread(r, "incoming-file").apply { isDaemon = true } }
+
+    /** How long a third-party provider may take to hand the file over before the reception gives up. */
+    const val READ_TIMEOUT_MS = 30_000L
 
     /** The URI of the file an intent offers, or null when it is something else (a pairing link, a review tap). */
     fun uriOf(intent: Intent?): Uri? = when (intent?.action) {
@@ -32,11 +40,37 @@ object IncomingIntent {
         val app = context.applicationContext
         worker.execute {
             val entry = try {
-                resolve(app, uri)
+                runBounded(worker, READ_TIMEOUT_MS) { resolve(app, uri) }
             } catch (_: Exception) {
-                IncomingInbox.Entry(null, null, IncomingRules.UNREADABLE)
-            }
+                null
+            } ?: IncomingInbox.Entry(null, null, IncomingRules.UNREADABLE)
             inbox.raise(entry)
+        }
+    }
+
+    /**
+     * Runs [block] on [pool] and waits at most [timeoutMs]: past that the work is cancelled (its thread
+     * is interrupted, [IncomingRules.copyBounded] stops at the next buffer) and null is returned, so a
+     * provider that never hands the file over cannot block this reception, nor the next one.
+     */
+    internal fun <T> runBounded(pool: ExecutorService, timeoutMs: Long, block: () -> T): T? {
+        val future = pool.submit(Callable { block() })
+        return try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            future.cancel(true)
+            null
+        }
+    }
+
+    /**
+     * Run when the app OPENS: a received file or a share that nobody took (the app was closed before
+     * the page read it) must not stay in the cache until the next reception.
+     */
+    fun purgeAll(cacheDir: File, now: Long) {
+        purge(File(cacheDir, "incoming"), now)
+        File(cacheDir, "share").listFiles()?.forEach { f ->
+            if (now - f.lastModified() > IncomingRules.MAX_AGE_MS) f.deleteRecursively()
         }
     }
 

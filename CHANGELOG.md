@@ -53,6 +53,7 @@ release notes.
 - Invisible text-direction and zero-width characters are removed from shared file names, so a name cannot display as another extension.
 - Importing a shared archive leaves out a file named like an image whose content is something else, and says so.
 - Choosing quizzes to share now says that the whole note, with its images, is sent.
+- On Android, files received from other apps and unfinished imports no longer linger in storage, and an app that never hands its file over no longer blocks the next one.
 
 ## [1.20.42] - 2026-10-07
 

@@ -73,6 +73,8 @@ object IncomingRules {
         val buffer = ByteArray(64 * 1024)
         var total = 0L
         while (true) {
+            // A cancelled reception (the provider took too long) stops here instead of filling the cache.
+            if (Thread.currentThread().isInterrupted) throw java.io.InterruptedIOException("reception cancelled")
             val n = input.read(buffer)
             if (n < 0) return total
             total += n

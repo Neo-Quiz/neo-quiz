@@ -3,6 +3,7 @@ package com.ahmedmili.neoquiz.bridge
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.nio.file.Files
 import java.security.MessageDigest
 import org.junit.Assert.assertEquals
@@ -103,6 +104,40 @@ class IncomingRulesTest {
         assertTrue(young.exists())
         IncomingIntent.purge(dir, 1_000_000 + IncomingRules.MAX_AGE_MS + 1)
         assertFalse(young.exists())
+    }
+
+    @Test fun openingTheAppPurgesBothCachesOfWhatNobodyTook() {
+        val cache = Files.createTempDirectory("cache").toFile()
+        val incoming = File(cache, "incoming").apply { mkdirs() }
+        val oldCopy = File(incoming, "old.zip").apply { writeBytes(byteArrayOf(1)); setLastModified(1_000) }
+        val share = File(cache, "share").apply { mkdirs() }
+        val oldShare = File(share, "uuid-old").apply { mkdirs() }.also { File(it, "x.zip").writeBytes(byteArrayOf(1)); it.setLastModified(1_000) }
+        val youngShare = File(share, "uuid-young").apply { mkdirs(); setLastModified(5_000_000) }
+        IncomingIntent.purgeAll(cache, 5_000_000 + 1)
+        assertFalse(oldCopy.exists())
+        assertFalse(oldShare.exists())
+        assertTrue(youngShare.exists())
+    }
+
+    @Test fun aProviderThatNeverAnswersIsGivenUpOnAndTheNextReceptionRuns() {
+        val pool = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r).apply { isDaemon = true } }
+        val hung = java.util.concurrent.CountDownLatch(1)
+        val started = System.currentTimeMillis()
+        val first = IncomingIntent.runBounded(pool, 200) { hung.await(); "never" }
+        assertNull(first)
+        assertTrue("gave up near the limit", System.currentTimeMillis() - started < 5_000)
+        assertEquals("next", IncomingIntent.runBounded(pool, 5_000) { "next" })
+        pool.shutdownNow()
+    }
+
+    @Test fun aCancelledCopyStopsAtTheNextBuffer() {
+        val endless = object : InputStream() { override fun read() = 1; override fun read(b: ByteArray, o: Int, l: Int) = l }
+        Thread.currentThread().interrupt()
+        try {
+            assertThrows(java.io.InterruptedIOException::class.java) { IncomingRules.copyBounded(endless, java.io.OutputStream.nullOutputStream(), 1_000_000_000) }
+        } finally {
+            Thread.interrupted()
+        }
     }
 
     @Test fun theInboxGivesAFileOnceAndDeletesItsCopy() {
