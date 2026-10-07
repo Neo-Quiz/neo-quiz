@@ -143,3 +143,128 @@
 .is-mobile .qbd-ai-kind-option {
 	min-height: 44px;
 }
+
+/* ── Réglages and the Synchronisation page (2026-10-07 audit, 360/393/430 px) ──
+   Every control of the settings (one page on a phone, the sheets and dialogs
+   opened from it) reaches 40 px. The glyph and the look stay as they are: the
+   size grows the hit area, not the drawing. */
+
+/* « Vérifier » (Mises à jour): 28 px tall. */
+.is-mobile .nq-reglages-changer {
+	min-height: 40px;
+}
+
+/* The brightness and blur sliders: a 16 px track is a hard target to hit. */
+.is-mobile .nq-fond-curseur {
+	min-height: 40px;
+}
+
+.is-mobile .nq-fond-curseur-entree {
+	height: 40px;
+}
+
+/* « Choisir un dossier » in the background picker: 37 px. */
+.is-mobile .nq-fond-option {
+	min-height: 40px;
+}
+
+/* The « Run code blocks » switch: a 38 × 22 box. The label around it is the
+   tap target now, centred on the switch. */
+.is-mobile .nq-langage-interrupteur {
+	min-width: 40px;
+	min-height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* The source links of the language packs and « En savoir plus » are inline
+   text links, 17 px tall. Vertical padding paired with a negative margin
+   extends the tap area to about 40 px without moving a line of the text (a
+   flex box would have shown the link's visually hidden URL, « g. »). */
+.is-mobile .nq-langage-lien,
+.is-mobile .qbd-sync-lien {
+	padding: 12px 2px;
+	margin: -12px -2px;
+}
+
+/* The three buttons of the Sync page: 33 px tall. */
+.is-mobile .nq-set .fx-btn-primary,
+.is-mobile .nq-set .fx-btn-ghost {
+	min-height: 40px;
+}
+
+/* A device's speed (« 1.2 Mo/s ») broke into « 1.2 » and « Mo/s » in its
+   narrow column. It stays on one line. */
+.is-mobile .nq-set .qbd-sync-debit {
+	white-space: nowrap;
+}
+
+/* The Sync log: a line was squeezed into a 95 px column, one word per line
+   (the time and the level took the width). On a phone the message takes the
+   whole line under its time and level. The log scrolls without a visible bar. */
+.is-mobile .qbd-sync-journal {
+	scrollbar-width: none;
+}
+
+.is-mobile .qbd-sync-journal::-webkit-scrollbar {
+	display: none;
+}
+
+.is-mobile .qbd-sync-journal-ligne {
+	flex-wrap: wrap;
+	row-gap: 0;
+}
+
+.is-mobile .qbd-sync-journal-message {
+	flex: 1 1 100%;
+}
+
+/* The close cross of a dialog: 46 px square at 10 px from the top, so its
+   bottom edge (56 px) ran 3 px over the first row of the content (55 px) in
+   the Langue, Format and background dialogs. A 40 px square ends at 50 px,
+   still centred on the title. Specific enough to beat the 46 px rule of the
+   desktop skin. */
+.is-mobile .modal-container .modal-close-button {
+	width: 40px;
+	height: 40px;
+	min-width: 40px;
+	min-height: 40px;
+}
+
+/* Nothing cut on a phone: a row's value (« Automatique (suivre le
+   système) », « Format de l'heure ») and a background's name or folder wrap
+   onto a second line instead of ending in an ellipsis. A path with no space
+   breaks where it must. */
+.is-mobile .nq-set-ligne-valeur {
+	max-width: 55%;
+	overflow: visible;
+	text-overflow: clip;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: right;
+}
+
+.is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
+	max-width: 50%;
+	overflow: visible;
+	text-overflow: clip;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: right;
+}
+
+/* The value wrapping above pushed a row's chevron onto a line of its own
+   (« Langue »): the row stays on one line, the chevron keeps its place at the
+   right, the label and the value share the rest. */
+.is-mobile .nq-set-ligne-lien {
+	flex-wrap: nowrap;
+}
+
+.is-mobile .nq-set-ligne-lien > .nq-set-onglet-chevron {
+	flex: none;
+}
+
+.is-mobile .nq-set-ligne-lien > .nq-set-ligne-valeur {
+	flex: 0 1 auto;
+}
