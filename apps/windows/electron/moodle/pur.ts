@@ -217,6 +217,26 @@ export function uniqueJobs<T extends { dir: string; target?: string; file: { nam
 	return [...best.values()];
 }
 
+/** Per-run budget of an automatic download: no more than this many files or bytes. */
+export const RUN_MAX_FILES = 500;
+export const RUN_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** The jobs that fit the budget, in order, and how many were left for the next
+    run. A file of unknown size counts as `unknownBytes` (the per-file cap). */
+export function withinBudget<T extends { file: { size: number | null } }>(
+	jobs: T[], unknownBytes: number, maxFiles = RUN_MAX_FILES, maxBytes = RUN_MAX_BYTES,
+): { kept: T[]; left: number } {
+	const kept: T[] = [];
+	let bytes = 0;
+	for (const j of jobs) {
+		const n = j.file.size ?? unknownBytes;
+		if (kept.length >= maxFiles || bytes + n > maxBytes) continue;
+		kept.push(j);
+		bytes += n;
+	}
+	return { kept, left: jobs.length - kept.length };
+}
+
 export function launchUrl(root: string, passport: string, scheme: string): string {
 	return `${root}/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=${encodeURIComponent(passport)}`
 		+ `&urlscheme=${encodeURIComponent(scheme)}`;

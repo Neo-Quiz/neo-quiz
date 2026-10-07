@@ -6,6 +6,7 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
+import type { Stats } from "node:fs";
 import * as path from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type {
@@ -15,14 +16,14 @@ import { CLE_REGLAGES_MOODLE } from "../pont";
 import { hoteAutorise } from "../reseau";
 import type { Reglages } from "../reglages";
 import { coursesByIds, listCourses, scanCourse, searchCourses } from "./api";
-import { createClient, siteInfo, type Client, type OptionsClient } from "./client";
+import { createClient, siteInfo, MAX_FILE_BYTES, type Client, type OptionsClient } from "./client";
 import { ensembleParDefaut, estDans, dossierDepot, idDepuisUrl, suivis, type CoursChoisi } from "./cours";
 import { dejaPresent, dossierDuCours, downloadFiles, targetName, type Garde, type Job } from "./disque";
 import { MoodleError, TokenError, masquer } from "./erreurs";
 import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { extensionRefusee } from "../ressources";
-import { allFiles, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, type Course, type MoodleFile } from "./pur";
+import { allFiles, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -31,6 +32,11 @@ export const OPEN_INTERVAL = 2000;
 export const SYNC_INTERVAL = 10000;
 const MAX_FICHIERS = 2000;
 const MAX_TEXTE = 100;
+/** The catalogue is kept this long, and a verb called twice within the floor gets the first answer. */
+export const CATALOGUE_TTL = 30000;
+export const VERB_FLOOR = 1000;
+/** Followed `extra` courses (the rest of the setting is kept but not fetched). */
+export const MAX_EXTRA_SUIVIS = 50;
 
 export interface DepsMoodle {
 	/** The default quiz root (`C:/Neo Quiz`), read at each use. */
@@ -51,6 +57,10 @@ export interface DepsMoodle {
 	planifier?(fn: () => void, ms: number): () => void;
 	/** Tests only (`check:moodle`): see `OptionsClient`. Never set by the app. */
 	essai?: OptionsClient;
+	/** Tests only: no catalogue cache and no per-verb floor (most cases call a verb twice on purpose). */
+	essaiSansLimite?: boolean;
+	/** Tests only: the per-run budget of an automatic download. */
+	budget?: { fichiers: number; octets: number };
 }
 
 export interface ServiceMoodle {
@@ -141,6 +151,29 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	let arreterHoraire: (() => void) | null = null;
 	let ecriture: Promise<unknown> = Promise.resolve();
 	const echecsFichiers = new Map<number, Set<string>>();
+	let catCache: { at: number; userid: number; liste: CoursChoisi[] } | null = null;
+	const memos = new Map<string, { at: number; val: Promise<unknown> }>();
+	const dernierVerbe = new Map<string, number>();
+	/** Forgets what the throttle kept: after a write or a download, the next read is fresh. */
+	const oublier = (): void => {
+		catCache = null;
+		for (const k of memos.keys()) if (!k.startsWith("telechargerCours|")) memos.delete(k);
+	};
+	/** 1 s floor per verb: the same call within the floor returns the first answer;
+	    another call of the verb waits for its turn (a page cannot hammer the school server). */
+	function limite<T>(verbe: string, cle: string, fn: () => Promise<T>): Promise<T> {
+		if (deps.essaiSansLimite) return fn();
+		const k = verbe + "|" + cle;
+		const m = memos.get(k);
+		const t = maintenant();
+		if (m && t - m.at < VERB_FLOOR) return m.val as Promise<T>;
+		const attente = Math.max(0, (dernierVerbe.get(verbe) ?? 0) + VERB_FLOOR - t);
+		dernierVerbe.set(verbe, t + attente);
+		const val = (attente ? new Promise<void>(r => setTimeout(r, attente)) : Promise.resolve()).then(fn);
+		memos.set(k, { at: t + attente, val });
+		val.catch(() => { if (memos.get(k)?.val === val) memos.delete(k); });
+		return val;
+	}
 
 	async function lireEtat(): Promise<FichierEtat> {
 		if (persistant) return persistant;
@@ -182,6 +215,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const o = await brut();
 			fn(o);
 			await deps.reglages().ecrire(CLE_REGLAGES_MOODLE, o);
+			oublier();
 		});
 		ecriture = run.catch(() => undefined);
 		return run;
@@ -229,6 +263,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		try { deps.envoyer(await etat()); } catch { /* the window may be gone */ }
 	}
 	async function marquerExpire(): Promise<void> {
+		oublier();
 		await poserEtat({ expired: true });
 		await pousser();
 	}
@@ -273,6 +308,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			jeton = { token, userid: info.userid, fullname: info.fullname, at: maintenant(), site };
 			erreur = null;
 			cache = null;
+			oublier();
 			await poserEtat({ expired: false });
 			connecte = true;
 		} catch (e) {
@@ -293,6 +329,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		jeton = null;
 		erreur = null;
 		cache = null;
+		oublier();
 		await magasin.effacer();
 		await poserEtat({ expired: false });
 		await pousser();
@@ -323,8 +360,16 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	/** The listed courses: enrolled in progress with a code, added, favourites. */
 	async function catalogue(client: Client, userid: number): Promise<CoursChoisi[]> {
+		if (!deps.essaiSansLimite && catCache && catCache.userid === userid && maintenant() - catCache.at < CATALOGUE_TTL) return catCache.liste;
+		const liste = await catalogueFrais(client, userid);
+		catCache = { at: maintenant(), userid, liste };
+		return liste;
+	}
+	async function catalogueFrais(client: Client, userid: number): Promise<CoursChoisi[]> {
 		const inscrits = await listCourses(client, userid);
-		const r = await reglage();
+		const lu = await reglage();
+		// Only the last MAX_EXTRA_SUIVIS added courses are followed (and fetched).
+		const r = { ...lu, extra: lu.extra.slice(-MAX_EXTRA_SUIVIS) };
 		const manquants = [...new Set([...r.extra, ...r.favoris])].filter(id => !inscrits.some(c => c.id === id));
 		let connus: Course[] = [];
 		if (manquants.length) {
@@ -345,8 +390,8 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return c;
 	}
 
-	async function cours(): Promise<CoursMoodle[]> {
-		return (await avecClient(async (client, s) => (await catalogue(client, s.j.userid)).map(versCours))) ?? [];
+	function cours(): Promise<CoursMoodle[]> {
+		return limite("cours", "", async () => (await avecClient(async (client, s) => (await catalogue(client, s.j.userid)).map(versCours))) ?? []);
 	}
 
 	async function chercher(texte: unknown): Promise<ResultatRechercheMoodle[]> {
@@ -354,11 +399,11 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		const t = texte.trim();
 		if (t.length > MAX_TEXTE) throw new MoodleError("badarg", "Search text too long.");
 		if (!t) return [];
-		return (await avecClient(async (client, s) => {
+		return limite("chercher", t, async () => (await avecClient(async (client, s) => {
 			const trouves = await searchCourses(client, t);
 			const connus = new Set((await catalogue(client, s.j.userid)).map(c => c.course.id));
 			return trouves.filter(c => c.code).slice(0, 50).map(c => ({ id: c.id, name: c.name, code: c.code as string, dansListe: connus.has(c.id) }));
-		})) ?? [];
+		})) ?? []);
 	}
 
 	/** Moodle must know the course, and it must have a code (else nothing could be filed). */
@@ -400,7 +445,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	async function fichiers(courseId: unknown): Promise<FichierMoodle[]> {
 		const id = idOuErreur(courseId);
-		return (await avecClient(async (client, s) => {
+		return limite("fichiers", String(id), async () => (await avecClient(async (client, s) => {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return [];
@@ -417,7 +462,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				});
 			}
 			return out;
-		})) ?? [];
+		})) ?? []);
 	}
 
 	interface Cible { ids: number[] | null; nom?: string }
@@ -440,7 +485,15 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				const code = c.course.code as string;
 				const { dir } = dossierDuCours(deps.racine(), code, c.course.name);
 				if (!(await deps.garde.contient(dir))) { res.echecs++; continue; }
-				const scan = await scanCourse(client, c.course.id, dir);
+				// A course that fails (no access, a hostile id) is skipped; it never aborts the run.
+				let scan: Awaited<ReturnType<typeof scanCourse>>;
+				try {
+					scan = await scanCourse(client, c.course.id, dir);
+				} catch (e) {
+					if (e instanceof TokenError) throw e;
+					res.echecs++;
+					continue;
+				}
 				for (const d of pendingDeposits(scan)) {
 					devoirs.push({ cmid: d.id, courseId: c.course.id, course: c.course.name, dossier: dir, name: d.name, state: d.state as DevoirMoodle["state"], due: d.due, remaining: d.remaining });
 				}
@@ -454,7 +507,10 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				}
 			}
 			if (cible.ids === null) cache = { at: maintenant(), liste: devoirs };
-			const todo = uniqueJobs(jobs);
+			// A run downloads at most 500 files / 2 GB; the rest waits for the next run.
+			const budget = deps.budget ?? { fichiers: RUN_MAX_FILES, octets: RUN_MAX_BYTES };
+			const { kept: todo, left } = withinBudget(uniqueJobs(jobs), MAX_FILE_BYTES, budget.fichiers, budget.octets);
+			res.ignores += left;
 			progress = { done: 0, total: todo.length };
 			await pousser();
 			const out = await downloadFiles(client, todo, deps.garde, () => {
@@ -491,7 +547,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	/** One download run at a time, whoever asks. */
 	function lancer(cible: Cible): Promise<ResumeSyncMoodle> {
-		const run = faireSync(cible).then(r => r.res).finally(() => { enCours = null; void pousser(); });
+		const run = faireSync(cible).then(r => r.res).finally(() => { enCours = null; oublier(); void pousser(); });
 		enCours = run;
 		void pousser();
 		return run;
@@ -506,7 +562,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	}
 	async function telechargerCours(courseId: unknown): Promise<ResumeSyncMoodle> {
 		const id = idOuErreur(courseId);
-		return enCours ? occupe() : lancer({ ids: [id] });
+		return limite("telechargerCours", String(id), async () => (enCours ? occupe() : lancer({ ids: [id] })));
 	}
 	async function telechargerFichier(courseId: unknown, nom: unknown): Promise<ResumeSyncMoodle> {
 		const id = idOuErreur(courseId);
@@ -540,12 +596,23 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		});
 		if (!cible) return false;
 		const { dir, abs } = cible;
+		let avant: Stats;
 		try {
 			// A regular file, not a link, strictly inside the quiz root and the perimeter, never an executable type.
-			const st = await fs.lstat(abs);
-			if (!st.isFile() || st.isSymbolicLink()) return false;
+			avant = await fs.lstat(abs, { bigint: true }) as unknown as Stats;
+			if (!avant.isFile() || avant.isSymbolicLink()) return false;
 		} catch { return false; }
-		if (!estDans(deps.racine(), abs) || !estDans(dir, abs) || extensionRefusee(abs) || !(await deps.garde.contient(abs))) return false;
+		const dedans = async (): Promise<boolean> => estDans(deps.racine(), abs) && estDans(dir, abs) && !extensionRefusee(abs) && (await deps.garde.contient(abs));
+		if (!(await dedans())) return false;
+		// Re-check right before the hand-off: the same file (inode and device), still a regular file, still inside.
+		// RESIDUAL RISK, accepted: `shell.openPath` takes a path, not a handle, so a swap in the few
+		// microseconds after this check is still possible; it needs local write access to the module
+		// folder, which already holds the user's own files (no privilege is gained).
+		try {
+			const apres = await fs.lstat(abs, { bigint: true }) as unknown as Stats;
+			if (!apres.isFile() || apres.isSymbolicLink() || apres.ino !== avant.ino || apres.dev !== avant.dev) return false;
+		} catch { return false; }
+		if (!(await dedans())) return false;
 		return deps.ouvrirChemin(abs);
 	}
 

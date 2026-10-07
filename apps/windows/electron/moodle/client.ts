@@ -8,6 +8,7 @@ import * as fs from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
 import { pipeline, Transform } from "node:stream";
+import { creerLookup, type Resolveur } from "./adresse";
 import { MoodleError, TokenError, masquer } from "./erreurs";
 import { limiter } from "./pur";
 
@@ -31,6 +32,8 @@ export interface OptionsClient {
 	/** Tests only (`check:moodle`): the local server speaks `http:`. The app
 	    never sets it; `check:moodle` greps the app's own files for it. */
 	allowHttpForTests?: boolean;
+	/** Tests only: replaces the DNS resolver the connection-time address check uses. */
+	resolveur?: Resolveur;
 }
 
 export interface Client {
@@ -62,7 +65,9 @@ export function createClient(token: string, origin: string, opts: OptionsClient 
 	const fileDeadline = opts.fileDeadline ?? FILE_DEADLINE;
 	const maxFile = Math.min(opts.maxFileBytes ?? MAX_FILE_BYTES, MAX_FILE_BYTES);
 	const lib = scheme === "http:" ? http : https;
-	const agent = new lib.Agent({ keepAlive: true, maxSockets: API_CONCURRENCY });
+	// Every connection resolves the host through a lookup that refuses private addresses (blind SSRF,
+	// DNS rebinding); the tests-only http switch talks to 127.0.0.1 and skips it.
+	const agent = new lib.Agent({ keepAlive: true, maxSockets: API_CONCURRENCY, ...(scheme === "https:" ? { lookup: creerLookup(opts.resolveur) } : {}) });
 	const limit = limiter(API_CONCURRENCY);
 
 	const memeSite = (url: string): boolean => {

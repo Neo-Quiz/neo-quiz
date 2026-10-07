@@ -28,6 +28,7 @@
 
 import * as http from "node:http";
 import * as https from "node:https";
+import { creerLookup, nomHoteInterdit, type Resolveur } from "./adresse";
 
 export type RaisonRefus = "unreachable" | "not-moodle" | "mobile-disabled" | "login-unsupported";
 export interface VerdictSite { compatible: boolean; sitename?: string; reason?: RaisonRefus }
@@ -57,6 +58,8 @@ export interface OptionsCompat {
 	maxBytes?: number;
 	/** Tests only (`check:moodle`): the local server speaks `http:`. */
 	allowHttpForTests?: boolean;
+	/** Tests only: replaces the DNS resolver the connection-time address check uses. */
+	resolveur?: Resolveur;
 }
 
 /** The origins found compatible during this run: the guarded `moodle` setting
@@ -76,6 +79,9 @@ export function verifierSite(origine: string, opts: OptionsCompat = {}): Promise
 		return Promise.resolve({ compatible: false, reason: "unreachable" });
 	}
 	if (site.protocol !== scheme || site.origin !== origine) return Promise.resolve({ compatible: false, reason: "unreachable" });
+	// A public name only: no trailing dot, no `localhost`/`.internal`/`.lan` suffix, and (below) no private address.
+	if (!opts.allowHttpForTests && nomHoteInterdit(site.hostname)) return Promise.resolve({ compatible: false, reason: "unreachable" });
+	const lookup = opts.allowHttpForTests ? undefined : creerLookup(opts.resolveur);
 	const fin = (v: VerdictSite): VerdictSite => {
 		if (v.compatible) verifies.add(origine);
 		return v;
@@ -89,6 +95,8 @@ export function verifierSite(origine: string, opts: OptionsCompat = {}): Promise
 			const req = lib.request(url, {
 				method: "POST",
 				agent: false,
+				// Every hop is resolved here and refused when it lands on a private address (DNS rebinding included).
+				lookup,
 				timeout,
 				headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(CORPS), Accept: "application/json" },
 			}, res => {

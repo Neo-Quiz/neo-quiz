@@ -51,7 +51,7 @@ import type { EvenementSurveillant, Index } from "./index-fichiers";
 import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
 import { validerReglagesIa } from "./garde-ia";
-import { origineSite, validerReglagesMoodle } from "./moodle/garde";
+import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/garde";
 import { siteVerifie, verifierSite } from "./moodle/compat";
 import { ECOLES } from "./moodle/ecoles";
 import type { ServiceMoodle } from "./moodle/service";
@@ -66,7 +66,7 @@ import type { MiseAJour } from "./mise-a-jour";
 import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_MOODLE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
-import { autoriserHote, fetchBorne } from "./reseau";
+import { autoriserHote, fetchBorne, retirerHote } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises } from "./gabarits-cli";
@@ -618,9 +618,16 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				throw new Error("hôte refusé par l'utilisateur, réglages Moodle non écrits : " + verdict.confirmer);
 			}
 			autoriserHote(verdict.confirmer);
+			retirerEcole(siteActuel, demande);
 			return;
 		}
 		if (verdict.admettre) autoriserHote(verdict.admettre);
+		retirerEcole(siteActuel, origineSite(valeur && typeof valeur === "object" ? (valeur as { site?: unknown }).site : undefined));
+	}
+	/** Only the ACTIVE site stays allowed: a bundled school left behind loses its entry. */
+	function retirerEcole(siteActuel: string | null, nouvelOrigine: string | null): void {
+		const h = hoteEcoleARetirer(siteActuel, nouvelOrigine);
+		if (h) retirerHote(h);
 	}
 	ipcMain.handle(CANAUX.reglagesSupprimer, (_e, cle: string) => {
 		/* Removing `syncRoot` would let the next start pin the (renderer-changeable)

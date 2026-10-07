@@ -9,6 +9,7 @@
 
 import { ECOLES_ORIGINES } from "./ecoles";
 import { hoteEstPrive } from "../garde-ia";
+import { nomHoteInterdit } from "./adresse";
 
 /** The verdict on a value of the `moodle` key. Never confused:
     - `ok`: write it; `admettre` is the host to add to the network list now
@@ -44,7 +45,7 @@ export function origineSite(brut: unknown, opts: OptionsSite = {}): string | nul
 	if (!opts.http) {
 		if (u.port) return null;
 		const h = u.hostname;
-		if (!h.includes(".") || h.endsWith(".local") || /^[\d.]+$/.test(h) || h.startsWith("[") || hoteEstPrive(h)) return null;
+		if (!h.includes(".") || h.endsWith(".local") || /^[\d.]+$/.test(h) || h.startsWith("[") || hoteEstPrive(h) || nomHoteInterdit(h)) return null;
 	}
 	return u.origin;
 }
@@ -84,4 +85,12 @@ export function validerReglagesMoodle(valeur: unknown, siteActuel: string | null
 	if (!origine) return { refus: "Moodle settings refused: site must be a plain https origin (https://host)" };
 	if (origine === SITE_DEFAUT || ECOLES_ORIGINES.has(origine) || (siteActuel && origine === siteActuel)) return { ok: true, admettre: new URL(origine).hostname.toLowerCase() };
 	return { confirmer: new URL(origine).hostname.toLowerCase() };
+}
+
+/** The host of a BUNDLED school (never the built-in site, never a typed one) that
+    stops being the active site when `nouvelOrigine` replaces `siteActuel`: its
+    network-list entry must be removed, so only the active site stays allowed. */
+export function hoteEcoleARetirer(siteActuel: string | null, nouvelOrigine: string | null): string | null {
+	if (!siteActuel || siteActuel === SITE_DEFAUT || !ECOLES_ORIGINES.has(siteActuel) || siteActuel === nouvelOrigine) return null;
+	return new URL(siteActuel).hostname.toLowerCase();
 }

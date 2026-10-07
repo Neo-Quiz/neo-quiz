@@ -73,9 +73,9 @@ async function mutant(entry, from, to) {
 }
 
 const mods = [`${MOODLE}pur.ts`, `${MOODLE}noms.ts`, `${MOODLE}client.ts`, `${MOODLE}disque.ts`, `${MOODLE}api.ts`,
-	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`];
+	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`, `${MOODLE}adresse.ts`, "apps/windows/electron/reseau.ts"];
 
-await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod) => {
+await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod, adresse, reseau) => {
 	const { TokenError, MoodleError } = erreurs;
 	const { createClient, siteInfo } = client;
 	const T = { allowHttpForTests: true };
@@ -673,6 +673,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			}
 			const due = Math.floor(Date.now() / 1000) + 3 * 3600;
 			const nowSec = Math.floor(Date.now() / 1000);
+			if (opts.badCourse && fn === "core_course_get_contents" && p.get("courseid") === String(opts.badCourse)) {
+				res.end(JSON.stringify({ exception: "moodle_exception", errorcode: "nopermissions", message: "No access" })); return;
+			}
 			m.calls.push(fn);
 			const known = [
 				{ id: 5, shortname: "XTI500-CYB-2627PSA01", fullname: "XTI500 extra", enddate: 0 },
@@ -707,7 +710,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		m.calls = [];
 		return { m, other };
 	}
-	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service }) {
+	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service, limites = false, budget }) {
 		const opened = [], pushes = [], chemins = [];
 		// The tests that exercise the automatic download say `auto: true`; every other case runs with it off.
 		if (!autoParDefaut && store.moodle && store.moodle.auto === undefined) store.moodle.auto = false;
@@ -716,7 +719,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		};
 		const svc = impl.creerMoodle({
 			racine: () => base, garde, planifier, ouvrirChemin: async p => { chemins.push(p); return true; }, reglages: () => reglages, dossierDonnees: path.join(base, "..data-" + crypto.randomBytes(3).toString("hex")),
-			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T,
+			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T, essaiSansLimite: !limites, budget,
 		});
 		return { svc, opened, pushes, store, chemins };
 	}
@@ -1284,6 +1287,178 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.ok(canaux.indexOf("siteVerifie(demande)") > 0 && canaux.indexOf("siteVerifie(demande)") < canaux.indexOf("dialogueMoodle = true"), "verified before the native dialog");
 		});
 	}
+
+	/* ─────────── review hardening: SSRF, throttle, allow-list, budget, Mark-of-the-Web ─────────── */
+	const PRIVEES = ["127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "224.0.0.1",
+		"::1", "::", "fc00::1", "fd12:3456::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "64:ff9b::a00:1", "2002:7f00:1::", "ff02::1"];
+	const PUBLIQUES = ["203.0.113.5", "8.8.8.8", "172.32.0.1", "100.63.0.1", "2606:4700:4700::1111", "::ffff:8.8.8.8"];
+	const lookupCas = (mod, resolveur, hote, opts = {}) => new Promise(r => mod.creerLookup(resolveur)(hote, opts, (err, a, f) => r({ err, a, f })));
+	const verdictLookup = async mod => {
+		const pub = async () => [{ address: "203.0.113.5", family: 4 }];
+		const ok1 = await lookupCas(mod, pub, "moodle.example.org");
+		assert.deepEqual([ok1.err, ok1.a, ok1.f], [null, "203.0.113.5", 4], "a public host resolves");
+		assert.deepEqual((await lookupCas(mod, pub, "moodle.example.org", { all: true })).a, [{ address: "203.0.113.5", family: 4 }]);
+		for (const ip of ["127.0.0.1", "10.0.0.8", "169.254.169.254", "::1", "fd00::1"]) {
+			const r = await lookupCas(mod, async () => [{ address: ip, family: ip.includes(":") ? 6 : 4 }], "x.example.org");
+			assert.equal(r.err && r.err.code, "EPRIVATE", ip);
+		}
+		const mixte = await lookupCas(mod, async () => [{ address: "203.0.113.5", family: 4 }, { address: "10.0.0.1", family: 4 }], "x.example.org", { all: true });
+		assert.equal(mixte.err && mixte.err.code, "EPRIVATE", "one private answer among public ones refuses the host");
+		for (const h of ["localhost.", "a.localhost", "b.internal", "c.lan"]) {
+			const r = await lookupCas(mod, pub, h);
+			assert.equal(r.err && r.err.code, "EPRIVATE", h);
+		}
+	};
+	await test("SSRF: private, loopback, link-local, CGNAT, ULA and mapped addresses are private; public ones are not", () => {
+		for (const ip of PRIVEES) assert.equal(adresse.adresseEstPrivee(ip), true, ip);
+		for (const ip of PUBLIQUES) assert.equal(adresse.adresseEstPrivee(ip), false, ip);
+		assert.equal(adresse.adresseEstPrivee("not-an-ip"), true);
+	});
+	await test("SSRF: origineSite refuses a trailing dot and localhost/.localhost/.internal/.lan/.local names; public hosts stay", () => {
+		for (const bad of ["https://localhost./", "https://moodle.example.org./", "https://a.localhost", "https://b.internal", "https://c.lan", "https://d.local", "https://localhost"]) {
+			assert.equal(garde.origineSite(bad), null, bad);
+		}
+		for (const ok of ["https://moodle.example.org", "https://moodle.univ-lyon2.fr", "https://moodle.lan.example.org"]) assert.equal(garde.origineSite(ok), ok, ok);
+	});
+	await test("SSRF: the connection-time lookup refuses private answers (rebinding included) and lets public ones through", async () => {
+		await verdictLookup(adresse);
+	});
+	await test("SSRF discriminance: with the private-address refusal cut out, the same checks FAIL", async () => {
+		const { mod } = await mutant(`${MOODLE}adresse.ts`, "liste.some(r => adresseEstPrivee(r.address))", "false");
+		await assert.rejects(verdictLookup(mod));
+		const m2 = await mutant(`${MOODLE}garde.ts`, "|| nomHoteInterdit(h)) return null;", ") return null;");
+		assert.equal(m2.mod.origineSite("https://moodle.example.org."), "https://moodle.example.org.", "the mutant lets a trailing dot through");
+	});
+	await test("SSRF: verifierSite and the client resolve first and never connect to a private address", async () => {
+		let asked = 0;
+		const priv = async () => { asked++; return [{ address: "127.0.0.1", family: 4 }]; };
+		const v = await compat.verifierSite("https://moodle.example.org", { resolveur: priv, timeoutMs: 3000 });
+		assert.deepEqual([v.compatible, v.reason], [false, "unreachable"]);
+		assert.ok(asked >= 1, "the host was resolved through the guarded lookup");
+		assert.equal((await compat.verifierSite("https://localhost.")).reason, "unreachable");
+		assert.equal((await compat.verifierSite("https://a.internal")).reason, "unreachable");
+		const c = createClient("tok", "https://moodle.example.org", { resolveur: priv });
+		try { await assert.rejects(c.call("core_webservice_get_site_info"), { code: "EPRIVATE" }); } finally { c.close(); }
+	});
+	await test("throttle: cours is cached (one Moodle round) and a same call within 1 s returns the first answer; a write forgets it", async () => {
+		const c = await connecte({}, { limites: true });
+		try {
+			const n = () => c.m.calls.filter(x => x === "core_enrol_get_users_courses").length;
+			const a = await c.svc.cours();
+			const b = await c.svc.cours();
+			assert.equal(n(), 1);
+			assert.deepEqual(a, b);
+			await new Promise(r => setTimeout(r, 1100));
+			await c.svc.cours();
+			assert.equal(n(), 1, "past the floor, still inside the 30 s catalogue cache");
+			await c.svc.favori(4, true);
+			await new Promise(r => setTimeout(r, 1100));
+			const d = await c.svc.cours();
+			assert.equal(n(), 2, "a setting write drops the cache");
+			assert.equal(d.find(x => x.id === 4).favori, true);
+		} finally { fin(c); }
+	});
+	await test("throttle: different calls of one verb are spaced by the 1 s floor; fichiers and telechargerCours answer a repeat from memory", async () => {
+		const c = await connecte({}, { limites: true, reglages: { extra: [5] } });
+		try {
+			const t0 = Date.now();
+			await Promise.all([c.svc.chercher("a"), c.svc.chercher("b")]);
+			assert.ok(Date.now() - t0 >= 900, "the second search waited its turn");
+			const contents = () => c.m.calls.filter(x => x === "core_course_get_contents").length;
+			const f1 = await c.svc.fichiers(5);
+			const n = contents();
+			const f2 = await c.svc.fichiers(5);
+			assert.equal(contents(), n, "a repeat within the floor is not asked again");
+			assert.deepEqual(f1, f2);
+			const r1 = await c.svc.telechargerCours(5);
+			const r2 = await c.svc.telechargerCours(5);
+			assert.equal(r1, r2, "a repeated download request within the floor returns the first answer");
+			assert.equal(r1.nouveaux, 1);
+		} finally { fin(c); }
+	});
+	await test("allow-list: leaving a bundled school drops its host; the built-in site and unrelated hosts are never touched", () => {
+		const A = "https://moodle.ensea.fr", B = "https://moodle.epita.fr";
+		assert.equal(garde.hoteEcoleARetirer(A, B), "moodle.ensea.fr");
+		assert.equal(garde.hoteEcoleARetirer(A, null), "moodle.ensea.fr");
+		assert.equal(garde.hoteEcoleARetirer(A, A), null);
+		assert.equal(garde.hoteEcoleARetirer(garde.SITE_DEFAUT, B), null, "the built-in site stays");
+		assert.equal(garde.hoteEcoleARetirer("https://moodle.custom.example", B), null, "a typed site is not a bundled school");
+		assert.equal(garde.hoteEcoleARetirer(null, B), null);
+		reseau.autoriserHote("moodle.ensea.fr");
+		assert.equal(reseau.hoteAutorise(A), true);
+		reseau.retirerHote("moodle.ensea.fr");
+		assert.equal(reseau.hoteAutorise(A), false);
+		reseau.retirerHote("moodle.myefrei.fr");
+		assert.equal(reseau.hoteAutorise(garde.SITE_DEFAUT), true, "a host allowed by code is never removed");
+	});
+	await test("allow-list: choosing a school allows only the active one (bridge wiring)", async () => {
+		const canaux = await readFile("apps/windows/electron/canaux.ts", "utf8");
+		assert.ok(canaux.includes("retirerEcole(siteActuel, demande)") && canaux.includes("hoteEcoleARetirer(siteActuel, nouvelOrigine)"));
+	});
+	await test("budget: a run keeps at most N files / B bytes; unknown sizes count as the per-file cap", () => {
+		const j = n => ({ file: { size: n } });
+		let r = pur.withinBudget([j(10), j(10), j(10)], 100, 2, 1000);
+		assert.deepEqual([r.kept.length, r.left], [2, 1]);
+		r = pur.withinBudget([j(600), j(600), j(300)], 100, 500, 1000);
+		assert.deepEqual([r.kept.length, r.left], [2, 1], "the third (300) fits after the first; the second does not");
+		r = pur.withinBudget([j(null), j(null)], 600, 500, 1000);
+		assert.deepEqual([r.kept.length, r.left], [1, 1]);
+		assert.deepEqual([pur.RUN_MAX_FILES, pur.RUN_MAX_BYTES], [500, 2 * 1024 ** 3]);
+	});
+	await test("budget: an automatic run stops at the cap and counts the rest as left for the next run", async () => {
+		const c = await connecte({}, { reglages: { extra: [5] }, budget: { fichiers: 1, octets: 1e9 } });
+		try {
+			const r = await c.svc.synchroniser();
+			assert.equal(r.nouveaux, 1, "only one of the two files this run");
+			assert.ok(r.ignores >= 2, "the one over budget (and the off-host one) are left");
+		} finally { fin(c); }
+	});
+	await test("budget: a course that fails is skipped and the run goes on", async () => {
+		const c = await connecte({ moodle: { badCourse: 1 } }, { reglages: { extra: [5] } });
+		try {
+			const r = await c.svc.synchroniser();
+			assert.equal(r.erreur, null, "the run is not aborted");
+			assert.equal(r.nouveaux, 1, "the healthy course is still fetched");
+			assert.equal(r.echecs, 1, "the failing course is counted");
+		} finally { fin(c); }
+	});
+	await test("budget: only the last 50 added courses are followed", async () => {
+		const filler = Array.from({ length: 50 }, (_, i) => 1000 + i);
+		let c = await connecte({}, { reglages: { extra: [5, ...filler] } });
+		try { assert.equal((await c.svc.cours()).some(x => x.id === 5), false, "the 51st oldest is not followed"); } finally { fin(c); }
+		c = await connecte({}, { reglages: { extra: [...filler.slice(1), 5] } });
+		try { assert.equal((await c.svc.cours()).some(x => x.id === 5), true); } finally { fin(c); }
+	});
+	await test("Mark-of-the-Web: the stream holds ZoneId=3 and the site origin only, on Windows; nothing elsewhere; a failure never throws", async () => {
+		assert.equal(disque.contenuZone("https://moodle.x.fr/a/b?token=SECRET#h"), "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=https://moodle.x.fr\r\n");
+		const dir = tmpdir();
+		const f = path.join(dir, "a.pdf");
+		fs.writeFileSync(f, "x");
+		assert.equal(disque.marquerWeb(f, "https://moodle.x.fr", "linux"), false);
+		assert.equal(disque.marquerWeb(path.join(dir, "absent", "b.pdf"), "https://moodle.x.fr", "win32"), false, "a write failure is swallowed");
+		if (process.platform === "win32") {
+			const c = await connecte({}, { reglages: { extra: [5] } });
+			try {
+				await c.svc.telechargerFichier(5, "Notes.pdf");
+				const f2 = await c.svc.fichiers(5);
+				const rel = f2.find(x => x.name === "Notes.pdf").relPath.split("/");
+				const z = fs.readFileSync(path.join(c.base, ...rel) + ":Zone.Identifier", "utf8");
+				assert.equal(z, `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${c.m.root}\r\n`);
+				assert.equal(z.includes(TOKEN), false, "no token in the stream");
+				assert.equal(fs.readFileSync(path.join(c.base, ...rel), "utf8"), "12345", "the file itself is intact");
+			} finally { fin(c); }
+		}
+	});
+	await test("ouvrirFichier: re-checked right before the hand-off (same inode), residual risk documented", async () => {
+		const c = await connecte({}, { reglages: { extra: [5] } });
+		try {
+			await c.svc.telechargerFichier(5, "Notes.pdf");
+			assert.equal(await c.svc.ouvrirFichier(5, "Notes.pdf"), true);
+			const svc = await readFile(`${MOODLE}service.ts`, "utf8");
+			assert.ok(svc.includes("apres.ino !== avant.ino") && svc.includes("RESIDUAL RISK"));
+		} finally { fin(c); }
+	});
+
 });
 
 /* ─────────── the app never turns the tests-only switch on; the renderer never imports the module ─────────── */

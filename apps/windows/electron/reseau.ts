@@ -108,6 +108,16 @@ export function autoriserHote(hote: string): void {
 	if (h) HOTES_AUTORISES.add(h);
 }
 
+/** The hosts allowed by CODE: `retirerHote` never touches them. */
+const HOTES_DE_BASE: ReadonlySet<string> = new Set(HOTES_AUTORISES);
+
+/** Takes a host admitted at run time back off the list (a school that stopped
+    being the active Moodle site). A host of the built-in list stays. */
+export function retirerHote(hote: string): void {
+	const h = hote.trim().toLowerCase();
+	if (h && !HOTES_DE_BASE.has(h)) HOTES_AUTORISES.delete(h);
+}
+
 /**
  * PURE, et c'est ce qui la rend éprouvable : vrai si l'URL est du `http(s)`
  * vers un hôte de la liste.

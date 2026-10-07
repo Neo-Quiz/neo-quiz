@@ -15,6 +15,25 @@ export const DOWNLOAD_CONCURRENCY = 8;
 const RENAMED_MIN_SIZE = 1024;          // below, two files of the same size prove nothing
 const SKIP_DIRS = new Set(["node_modules", "__pycache__"]);
 
+/** The content of the `Zone.Identifier` stream: "downloaded from the Internet"
+    (ZoneId=3), with the SITE ORIGIN only as the host, never a tokenised file URL. */
+export function contenuZone(origin: string): string {
+	return `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${new URL(origin).origin}\r\n`;
+}
+
+/** Mark-of-the-Web: tags a downloaded file so Windows (SmartScreen, Office
+    Protected View) treats it as coming from the Internet. Best effort: it only
+    exists on NTFS/Windows, and a failure never blocks or fails the download. */
+export function marquerWeb(chemin: string, origin: string, plateforme: string = process.platform): boolean {
+	if (plateforme !== "win32") return false;
+	try {
+		fs.writeFileSync(chemin + ":Zone.Identifier", contenuZone(origin));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** The perimeter, as the sync needs it: `contient` of `perimetre.ts`. */
 export interface Garde { contient(chemin: string): Promise<boolean> }
 
@@ -146,6 +165,8 @@ async function downloadOne(client: Client, job: Job, garde: Garde): Promise<void
 		if (file.size != null && size !== file.size) {
 			throw new MoodleError("incomplete", `Incomplete file (${size} bytes of ${file.size}).`);
 		}
+		// Written on the temporary file BEFORE the date is set and the rename: the stream follows the rename.
+		marquerWeb(tmp, client.origin);
 		// Moodle's date becomes the file's: it is what `localStatus` compares.
 		if (file.timemodified) fs.utimesSync(tmp, file.timemodified, file.timemodified);
 		fs.renameSync(tmp, target);
