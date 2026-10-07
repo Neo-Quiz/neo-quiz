@@ -1,8 +1,8 @@
 {
-  "versionCode": 2,
-  "versionName": "0.2.0",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.0/NeoQuiz-0.2.0.apk",
-  "sha256": "f144d66aea3171c9411694a2d7e55cc238f4c44e16ca7be26b4d027589a83e28",
-  "size": 55868521,
-  "notes": "Neo Quiz pour Android 0.2.0 : mises à jour automatiques, nouveau Learn en page qui défile, swipe, Python téléchargeable, synchro améliorée."
+  "versionCode": 3,
+  "versionName": "0.2.1",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.1/NeoQuiz-0.2.1.apk",
+  "sha256": "2c563f641de6a1f14c47c4dc40d8aec8dd76af4162ed9ddf1cad704afefcf87f",
+  "size": 55919293,
+  "notes": "Neo Quiz pour Android 0.2.1 : barre du bas refaite, partage de plusieurs quiz, ouverture d'un zip reçu, app plus fluide et sans CPU au repos."
 }
