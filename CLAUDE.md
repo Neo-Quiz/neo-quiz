@@ -539,6 +539,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   dérive sur le côté, ni depuis les zones de bord, un champ de saisie, un
   défileur horizontal ou une modale ; verrouillage d'axe, suivi du doigt (résistance
   en bout), vitesse de relâchement. Dans la CI.
+- `npm run check:overscroll` — l'étirement en bout d'une zone qui défile (`apps/windows/src/ui/overscroll-stretch.ts`) :
+  la courbe de traction (0 au repos, jamais au-delà de 18 %, la moitié atteinte à 35 % de la
+  zone, croissante), les deux constantes figées, quelles boîtes défilent sur un axe
+  (`auto`/`scroll` et contenu plus grand), la fin de défilement qu'une traction tente,
+  et qu'une barre fixe ou une animation en cours n'est jamais étirée. Sans lui, une
+  zone ne s'étire plus en bout et personne ne le voit sans téléphone. Dans la CI.
 - `npm run check:generation-kind` — quel type (Learn ou Test) une demande de
   génération veut et ce qu'on lui demande d'abord (`src/dashboard/generation-kind.ts`) :
   le défaut est un Learn, seule une formulation explicite d'entraînement donne un

@@ -224,6 +224,10 @@ jobs:
       - name: Swipe
         run: npm run check:swipe
 
+      # THE OVERSCROLL STRETCH: the damped pull, the edge test, and which boxes can stretch.
+      - name: Overscroll stretch
+        run: npm run check:overscroll
+
       # EXAMS AND ATTEMPTS PER DEVICE in the synced folder: the merge (newest
       # edit, tombstones, delete-before-add), the one-time migration, conflict
       # copies, and a folder move between roots.
