@@ -23,7 +23,7 @@
  *
  *     npm run check:electron-reglages
  */
-import { mkdtemp, rm, readFile, readdir, mkdir, writeFile, symlink } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, mkdir, writeFile, symlink, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -209,7 +209,7 @@ await withSrcModule("apps/windows/electron/dossier-defaut.ts", async ({ cheminDo
 
 await withSrcModule("apps/windows/electron/perimetre.ts", async ({ creerPerimetre, perimetreInitial }) => {
 	const r = makeReporter("Électron — périmètre");
-	const dir = await mkdtemp(join(tmpdir(), "electron-perimetre-"));
+	const dir = await realpath(await mkdtemp(join(tmpdir(), "electron-perimetre-")));
 	try {
 		await cas(r, "le dossier de réglages (userData) est HORS périmètre au démarrage, les dossiers qu'il liste y sont", async () => {
 			/* Ruling 12. `settings.json` nourrit le périmètre (clé `folders`) au

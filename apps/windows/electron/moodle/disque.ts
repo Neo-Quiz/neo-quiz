@@ -141,7 +141,7 @@ async function downloadOne(client: Client, job: Job, garde: Garde): Promise<void
 	const resolvedDir = path.resolve(dir);
 	const target = path.resolve(dir, name);
 	// ONE path segment, directly inside the folder: never `..`, never a separator.
-	if (path.dirname(target) !== resolvedDir || name !== path.basename(name) || name === "." || name === "..") {
+	if (path.dirname(target) !== resolvedDir || name !== path.basename(name) || /[\\/]/.test(name) || name === "." || name === "..") {
 		throw new MoodleError("escape", "Refused: the file name leaves its folder.");
 	}
 	if (extensionRefusee(name)) throw new MoodleError("executable", "Refused: an executable file type.");
