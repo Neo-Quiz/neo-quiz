@@ -1,42 +1,49 @@
 /* ══════════════════════════════════════════════════════════
-   WHICH KIND OF QUIZ A REQUEST WANTS (spec 2026-10-07-generate-auto-kind) — pure
+   WHICH KIND OF QUIZ A REQUEST WANTS, AND WHAT TO ASK FIRST — pure
+   (spec 2026-10-07-generate-auto-kind, amended by the owner the same day)
 
-   The Generate page has no Learn | Test selector any more. On send the kind
-   is decided: by keywords when the request says it plainly (no AI call), else
-   by ONE short AI call that answers a kind or a question with clickable
-   answers. Anything unreadable falls back to the default question.
+   There is no Learn | Test selector. The kind comes from the words of the
+   request alone: a LEARN by default, a Test only when the request says it
+   wants to practise, both only when it says so. No AI call is made for the
+   kind. A vague request ("Python", "le CM4") gets ONE short AI call that
+   returns either `{"ready":true}` or 1 or 2 clarifying questions; any failure
+   of that call means "ready": generation is never blocked.
 ══════════════════════════════════════════════════════════ */
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
 export type KindChoice = "learn" | "practice" | "both";
-export interface KindOption { label: string; kind: KindChoice }
-export interface KindQuestion { ask: string; options: KindOption[] }
-export type KindAnswer = { kind: KindChoice } | KindQuestion;
-
-const KINDS: readonly string[] = ["learn", "practice", "both"];
-const isKind = (x: unknown): x is KindChoice => typeof x === "string" && KINDS.includes(x);
 
 /** Lower case, accents and combining marks removed, apostrophes straightened. */
 function plain(text: string): string {
 	return text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[‘’ʼ]/g, "'").toLowerCase();
 }
 
-/* Word-bounded on the ASCII-folded text. The lists are the ones of the spec
-   (FR + EN): a request that matches BOTH families, or neither, goes to the AI. */
-const LEARN_WORDS = /\b(apprendre|apprends|apprenez|apprentissage|decouvrir|decouvre|comprendre|comprends|expliquer|explique|explique-moi|expliques|cours|lecon|lecons|debutant|learn|learning|teach me|teach|explain|beginner|from scratch|i don'?t know|i do not know|je ne connais pas|je connais rien|je sais pas|je ne sais pas)\b/;
-const TEST_WORDS = /\b(qcm|test|tests|testez|tester|examen|examens|controle|controles|entraine|entraine-moi|entrainer|entrainement|revise|reviser|revision|revisions|interro|quiz me|practice|practise|exam|exams|mock|drill)\b/;
+/* Word-bounded on the ASCII-folded text (FR + EN). */
+const BOTH_WORDS = /\b(les deux|both|learn (then|and then|puis|et) (a )?test|learn puis test|apprendre (puis|et) (me )?(tester|m'entrainer|s'entrainer)|apprendre et test|cours et test)\b/;
+const PRACTICE_WORDS = /\b(qcm|test|tests|teste-moi|testez|tester|examen|examens|examen blanc|controle|controles|entraine|entraine-moi|entrainer|entrainement|m'entrainer|s'entrainer|revise|reviser|revision|revisions|interro|quiz me|practice|practise|exam|exams|mock|mock exam|drill)\b/;
 
-/** `"learn"` or `"practice"` when the request clearly says one, `null` when it
-    says both or none (the AI is asked). */
-export function decideByKeywords(text: string): "learn" | "practice" | null {
+/** `learn` unless the request says it wants to practise (`practice`) or says
+    both (`both`). Ambiguous or empty: `learn`. */
+export function decideByKeywords(text: string): KindChoice {
 	const p = plain(text);
-	const learn = LEARN_WORDS.test(p);
-	const test = TEST_WORDS.test(p);
-	if (learn === test) return null;
-	return learn ? "learn" : "practice";
+	if (BOTH_WORDS.test(p)) return "both";
+	return PRACTICE_WORDS.test(p) ? "practice" : "learn";
 }
 
-/** The first balanced `{ … }` of a text (strings and escapes respected), or null. */
+/** One answer the model proposes: a short label and a one-line description. */
+export interface ClarifyOption { label: string; description: string }
+/** One clarifying question, in the manner of Claude Code's AskUserQuestion: a
+    short header chip, the question, 2 to 4 options, one or several answers.
+    The app adds its own "write something" option. */
+export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[] }
+export type ClarifyAnswer = { ready: true } | { questions: ClarifyQuestion[] };
+/** The most questions a request is asked, and the longest header chip. */
+export const MAX_CLARIFY_QUESTIONS = 2;
+export const MAX_HEADER = 12;
+
+const READY: ClarifyAnswer = { ready: true };
+
+/** The first balanced `{ … }` of a text that parses (strings and escapes respected), or null. */
 function firstObject(raw: string): string | null {
 	for (let start = raw.indexOf("{"); start >= 0; start = raw.indexOf("{", start + 1)) {
 		let depth = 0, inStr = false, esc = false;
@@ -59,54 +66,54 @@ function firstObject(raw: string): string | null {
 	return null;
 }
 
-/** Reads the model's answer: a kind, or a question with 2 to 4 options. Text
-    around the JSON is ignored. Anything else (malformed, unknown kind, fewer
-    than 2 or more than 4 options, an empty label) is `null`: the caller shows
-    the default question. */
-export function parseKindAnswer(raw: string): KindAnswer | null {
+/** Reads the model's answer. Anything that is not a well-formed list of 1 or 2
+    questions with 2 to 4 options each ({label, description}) is `{ ready: true }`:
+    a broken answer never blocks a generation. A header over 12 characters is
+    cut. Text around the JSON is ignored. */
+export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	const slice = firstObject(String(raw ?? ""));
-	if (!slice) return null;
+	if (!slice) return READY;
 	let o: unknown;
-	try { o = JSON.parse(slice); } catch { return null; }
-	if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+	try { o = JSON.parse(slice); } catch { return READY; }
+	if (!o || typeof o !== "object" || Array.isArray(o)) return READY;
 	const obj = o as Record<string, unknown>;
-	if ("kind" in obj) return isKind(obj.kind) ? { kind: obj.kind } : null;
-	if (typeof obj.ask !== "string" || !obj.ask.trim() || !Array.isArray(obj.options)) return null;
-	if (obj.options.length < 2 || obj.options.length > 4) return null;
-	const options: KindOption[] = [];
-	for (const x of obj.options) {
-		if (!x || typeof x !== "object") return null;
-		const { label, kind } = x as Record<string, unknown>;
-		if (typeof label !== "string" || !label.trim() || !isKind(kind)) return null;
-		options.push({ label: label.trim().slice(0, 80), kind });
+	if (!Array.isArray(obj.questions) || obj.questions.length < 1 || obj.questions.length > MAX_CLARIFY_QUESTIONS) return READY;
+	const questions: ClarifyQuestion[] = [];
+	for (const x of obj.questions) {
+		if (!x || typeof x !== "object") return READY;
+		const { header, question, options, multiple } = x as Record<string, unknown>;
+		if (typeof question !== "string" || !question.trim()) return READY;
+		if (!Array.isArray(options) || options.length < 2 || options.length > 4) return READY;
+		const lues: ClarifyOption[] = [];
+		for (const op of options) {
+			if (!op || typeof op !== "object") return READY;
+			const { label, description } = op as Record<string, unknown>;
+			if (typeof label !== "string" || !label.trim()) return READY;
+			lues.push({ label: label.trim().slice(0, 80), description: typeof description === "string" ? description.trim().slice(0, 160) : "" });
+		}
+		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues });
 	}
-	return { ask: obj.ask.trim().slice(0, 300), options };
+	return { questions };
 }
 
-/** "Do you want to learn or to practise?" with Learn / Test / Both. */
-export type KindKey = "ai.kind.question" | "ai.kind.learn" | "ai.kind.practice" | "ai.kind.both";
-export function defaultKindQuestion(t: (key: KindKey) => string): KindQuestion {
-	return {
-		ask: t("ai.kind.question"),
-		options: [
-			{ label: t("ai.kind.learn"), kind: "learn" },
-			{ label: t("ai.kind.practice"), kind: "practice" },
-			{ label: t("ai.kind.both"), kind: "both" },
-		],
-	};
+/** The answers as one block appended to the request: "Details: question: a, b" per question. */
+export function formatClarifications(label: string, questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): string {
+	const lines = questions.map((q, i) => ({ q: q.question, a: (answers[i] ?? []).map(s => s.trim()).filter(Boolean) })).filter(l => l.a.length);
+	return lines.length ? label + "\n" + lines.map(l => `- ${l.q} ${l.a.join(", ")}`).join("\n") : "";
 }
 
-/** The instruction of the decide call: English like every instruction to the
-    model, the answer follows the language of the request. It carries the
+/** The instruction of the clarify call: English like every instruction to the
+    model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */
-export function kindDecisionPrompt(request: string, documentNames: readonly string[]): { system: string; user: string } {
+export function clarifyPrompt(request: string, documentNames: readonly string[]): { system: string; user: string } {
 	const system = [
-		"You are a router inside Neo Quiz, a revision app that generates two kinds of quiz: LEARN (a guided path that teaches a topic step by step: short readings, questions, instant feedback; for someone who does not know the subject yet) and PRACTICE (a test: questions only, to check or train what someone already studied).",
-		"Decide which kind the learner's request wants. You have no tools; you only see the request and the names of the attached documents.",
+		"You are an assistant inside Neo Quiz, a revision app that generates a quiz from a learner's request (Learn: a guided path that teaches a topic step by step; or a Test: questions only). Before generating, you may ask the learner a question or two, the way a coding assistant asks a multiple-choice question.",
+		"Ask FEW questions: prefer none, sometimes one, at most 2. Ask ONLY when the request is vague about something that really changes the quiz: the scope or which parts of the subject, the learner's level, the goal or deadline, the number of questions. Examples of vague requests: \"Python\", \"le CM4\", \"networks\".",
+		"Ask NOTHING when the request is already precise, and NEVER ask what the attached documents already answer (you see only their names: if a name makes the scope clear, ask nothing). When in doubt, ask nothing.",
+		"You have no tools; you only see the request and the names of the attached documents.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
-		"- {\"kind\":\"learn\"} or {\"kind\":\"practice\"} when the request makes it clear;",
-		"- {\"kind\":\"both\"} when it asks to learn AND then be tested;",
-		"- otherwise ask ONE short question, in the language of the request: {\"ask\":\"<the question>\",\"options\":[{\"label\":\"<short answer>\",\"kind\":\"learn|practice|both\"}, ...]} with 2 to 4 options, each label a short answer the learner can click, in the language of the request.",
+		"- {\"ready\":true} when nothing needs to be asked;",
+		"- otherwise {\"questions\":[{\"header\":\"<label of at most 12 characters>\",\"question\":\"<the question>\",\"multiple\":false,\"options\":[{\"label\":\"<short answer>\",\"description\":\"<one line saying what it means or covers>\"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options (\"multiple\":true when several can apply). Write the header, questions, labels and descriptions in the language of the request. Do not add an \"Other\" option: the app adds one.",
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
 	const user = [

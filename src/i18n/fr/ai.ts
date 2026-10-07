@@ -579,12 +579,13 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.format.flashcardNoAnswer": "{count} carte(s) n'ont pas de réponse au verso : {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) débloquent l'exécution de leur code là où c'est impossible (il faut un bloc exécutable dans l'énoncé, au moins 2 niveaux d'indice, jamais une sortie de programme) : {names}.",
 	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme Test.",
-	// Generate demande quel type de quiz quand la demande ne le dit pas (spec 2026-10-07).
-	"ai.kind.question": "Tu veux apprendre ou t'entraîner ?",
-	"ai.kind.learn": "Apprendre",
-	"ai.kind.practice": "M'entraîner",
-	"ai.kind.both": "Les deux",
-	"ai.kind.deciding": "Choix du bon format…",
-	"ai.kind.expired": "Cette question n'a plus de réponse possible ici. Renvoie ta demande.",
-
+	// Generate pose quelques questions quand la demande est vague (spec 2026-10-07).
+	"ai.clarify.deciding": "Préparation…",
+	"ai.clarify.other": "Écrire autre chose…",
+	"ai.clarify.otherPlaceholder": "Écris ta réponse, puis Entrée",
+	"ai.clarify.validate": "Valider",
+	"ai.clarify.skipped": "Ignorée",
+	"ai.clarify.hint": "Entrée pour choisir · ↑/↓ pour naviguer · 1-9 pour choisir · Échap pour passer",
+	"ai.clarify.details": "Précisions :",
+	"ai.clarify.expired": "Ces questions n'ont plus de réponse possible ici. Renvoie ta demande.",
 };

@@ -70,42 +70,43 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	r.done();
 });
 
-/* The question Generate asks when a request does not say Learn or Test
-   (spec 2026-10-07-generate-auto-kind): kept with the request, read back from
+/* The clarifying questions Generate asks when a request is vague (spec
+   2026-10-07-generate-auto-kind): kept with the request, read back from
    storage, answered once, never revived into a deleted chat. */
 await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-requests.ts"], (C, Q) => {
-	const r = makeReporter("Chat record: the asked kind");
-	const ask = { question: "Learn or practise?", options: [{ label: "Learn", kind: "learn" }, { label: "Test", kind: "practice" }, { label: "Both", kind: "both" }] };
-	const base = { id: "r1", at: 5, from: "d1", text: "pointeurs", mode: "practice", documents: [], results: [], state: "done" };
+	const r = makeReporter("Chat record: clarifying questions");
+	const op = (label) => ({ label, description: "d " + label });
+	const qs = [{ header: "Level", question: "Which level?", multiple: false, options: [op("Beginner"), op("Advanced")] }, { header: "Parts", question: "Which parts?", multiple: true, options: [op("A"), op("B"), op("C")] }];
+	const base = { id: "r1", at: 5, from: "d1", text: "Python", mode: "learn", documents: [], results: [], state: "done" };
 	const read = (reqs) => C.readChats({ v: 1, chats: [{ id: "a", origin: "d1", createdAt: 1, updatedAt: 1, requests: reqs }] })[0].requests;
-	r.check("an old request (no question) loads unchanged", read([base])[0].ask, undefined);
-	r.check("a question and its answer are read back", read([{ ...base, ask: { ...ask, chosen: "both" } }])[0].ask, { ...ask, chosen: "both" });
-	r.check("a pending question has no chosen", "chosen" in read([{ ...base, ask }])[0].ask, false);
-	for (const [nom, mauvais] of [["one option", { ...ask, options: ask.options.slice(0, 1) }], ["five options", { ...ask, options: [...ask.options, ...ask.options] }],
-		["unknown kind", { ...ask, options: [ask.options[0], { label: "x", kind: "exam" }] }], ["no question text", { options: ask.options }]]) {
-		r.check("a bad question is dropped, the request kept: " + nom, [read([{ ...base, ask: mauvais }]).length, read([{ ...base, ask: mauvais }])[0].ask], [1, undefined]);
-	}
-	r.check("an unknown chosen kind is ignored", read([{ ...base, ask: { ...ask, chosen: "exam" } }])[0].ask.chosen, undefined);
+	r.check("an old request (no questions) loads unchanged", read([base])[0].clarify, undefined);
+	r.check("questions and answers are read back", read([{ ...base, clarify: { questions: qs, answers: [["Beginner"], ["A", "my own"]] } }])[0].clarify, { questions: qs, answers: [["Beginner"], ["A", "my own"]] });
+	r.check("pending questions have no answers", "answers" in read([{ ...base, clarify: { questions: qs } }])[0].clarify, false);
+	r.check("a skipped question is an empty answer, read back as such", read([{ ...base, clarify: { questions: qs, answers: [[], ["A"]] } }])[0].clarify.answers, [[], ["A"]]);
+	r.check("a header over 12 characters is cut on reading", read([{ ...base, clarify: { questions: [{ ...qs[0], header: "x".repeat(30) }, qs[1]] } }])[0].clarify.questions[0].header.length, 12);
+	r.check("answers of the wrong length are ignored, the questions kept", read([{ ...base, clarify: { questions: qs, answers: [["x"]] } }])[0].clarify.answers, undefined);
+	const bad = [["no questions", { questions: [] }], ["three questions", { questions: [...qs, qs[0]] }], ["one option", { questions: [{ question: "q", options: [op("a")] }] }],
+		["five options", { questions: [{ question: "q", options: ["a", "b", "c", "d", "e"].map(op) }] }], ["option as a bare string", { questions: [{ question: "q", options: ["a", "b"] }] }], ["no question text", { questions: [{ options: [op("a"), op("b")] }] }]];
+	for (const [nom, mauvais] of bad) r.check("bad questions are dropped, the request kept: " + nom, [read([{ ...base, clarify: mauvais }]).length, read([{ ...base, clarify: mauvais }])[0].clarify], [1, undefined]);
 
 	const doc = [{ name: "cm1.pdf" }];
-	const withAsk = Q.addAsk([], "c1", "d1", 10, { id: "r1", text: "pointeurs", documents: doc }, ask);
-	r.check("addAsk makes the chat with the pending request", [withAsk.length, withAsk[0].requests[0].ask.chosen, withAsk[0].requests[0].results.length, withAsk[0].title], [1, undefined, 0, "pointeurs"]);
-	const second = Q.addAsk(withAsk, "c1", "d1", 20, { id: "r2", text: "autre", documents: [] }, ask);
-	r.check("addAsk adds a request to an existing chat, in order", second[0].requests.map(q => q.id), ["r1", "r2"]);
-	r.check("addAsk never revives a deleted chat", Q.addAsk([{ id: "c1", origin: "d1", createdAt: 1, updatedAt: 1, deleted: true, requests: [] }], "c1", "d1", 5, { id: "r", text: "t", documents: [] }, ask)[0].requests, []);
+	const withQ = Q.addClarify([], "c1", "d1", 10, { id: "r1", text: "Python", documents: doc, mode: "learn" }, { questions: qs });
+	r.check("addClarify makes the chat with the pending request", [withQ.length, withQ[0].requests[0].clarify.answers, withQ[0].requests[0].results.length, withQ[0].title], [1, undefined, 0, "Python"]);
+	r.check("addClarify adds a request to an existing chat, in order", Q.addClarify(withQ, "c1", "d1", 20, { id: "r2", text: "x", documents: [], mode: "practice" }, { questions: qs })[0].requests.map(q => q.id), ["r1", "r2"]);
+	r.check("addClarify never revives a deleted chat", Q.addClarify([{ id: "c1", origin: "d1", createdAt: 1, updatedAt: 1, deleted: true, requests: [] }], "c1", "d1", 5, { id: "r", text: "t", documents: [], mode: "learn" }, { questions: qs })[0].requests, []);
 
-	const ok = Q.answerAsk(withAsk, "c1", "r1", "both", 30);
-	r.check("answerAsk records the choice and the kind it generates", [ok.changed, ok.chats[0].requests[0].ask.chosen, ok.chats[0].requests[0].mode, ok.chats[0].updatedAt], [true, "both", "learn", 30]);
-	r.check("answerAsk keeps the question and its options", ok.chats[0].requests[0].ask.options, ask.options);
-	r.check("a Test choice records mode practice", Q.answerAsk(withAsk, "c1", "r1", "practice", 30).chats[0].requests[0].mode, "practice");
-	r.check("a question already answered is not answered twice", Q.answerAsk(ok.chats, "c1", "r1", "learn", 40).changed, false);
-	r.check("an unknown chat or request changes nothing", [Q.answerAsk(withAsk, "zz", "r1", "learn", 1).changed, Q.answerAsk(withAsk, "c1", "zz", "learn", 1).changed], [false, false]);
-	r.check("the original list is never mutated", withAsk[0].requests[0].ask.chosen, undefined);
+	const answers = [["Beginner"], ["A", "B"]];
+	const ok = Q.answerClarify(withQ, "c1", "r1", answers, 30);
+	r.check("answerClarify records the answers", [ok.changed, ok.chats[0].requests[0].clarify.answers, ok.chats[0].updatedAt], [true, answers, 30]);
+	r.check("answerClarify keeps the questions", ok.chats[0].requests[0].clarify.questions, qs);
+	r.check("questions already answered are not answered twice", Q.answerClarify(ok.chats, "c1", "r1", answers, 40).changed, false);
+	r.check("a wrong number of answers changes nothing", Q.answerClarify(withQ, "c1", "r1", [["x"]], 40).changed, false);
+	r.check("an unknown chat or request changes nothing", [Q.answerClarify(withQ, "zz", "r1", answers, 1).changed, Q.answerClarify(withQ, "c1", "zz", answers, 1).changed], [false, false]);
+	r.check("the original list is never mutated", withQ[0].requests[0].clarify.answers, undefined);
 
-	// The queue's record of the same request keeps the question (recordRequest).
-	const ligne = { id: 1, etat: "prete", demande: { text: "pointeurs", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
-	const g = { key: "r1", chatId: "c1", lines: [ligne] };
-	const rec = Q.recordRequest(g, "d1", 50, ok.chats[0].requests[0]);
-	r.check("recording the generation keeps the question and its answer", [rec.ask.chosen, rec.results.length], ["both", 1]);
+	// The queue's record of the same request keeps the questions and their answers.
+	const ligne = { id: 1, etat: "prete", demande: { text: "Python", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
+	const rec = Q.recordRequest({ key: "r1", chatId: "c1", lines: [ligne] }, "d1", 50, ok.chats[0].requests[0]);
+	r.check("recording the generation keeps the questions and answers", [rec.clarify.answers, rec.results.length], [answers, 1]);
 	r.done();
 });

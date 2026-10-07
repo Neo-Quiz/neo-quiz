@@ -18,7 +18,7 @@ import { t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
-import { kindDecisionPrompt } from "./generation-kind";
+import { clarifyPrompt } from "./generation-kind";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
 import type { TranscriptEvent } from "./transcript";
 
@@ -49,7 +49,7 @@ import type { TranscriptEvent } from "./transcript";
    valeur est UNE constante, injectée dans le message d'erreur : le texte ne
    peut plus mentir sur la durée réellement appliquée. */
 const CLI_TIMEOUT_MS = 900000;
-/** The decide call of "Generate" gives up after this long (the default question shows). */
+/** The clarify call of "Generate" gives up after this long (the default question shows). */
 const DECIDE_TIMEOUT_MS = 30000;
 const CLI_TIMEOUT_MIN = String(Math.round(CLI_TIMEOUT_MS / 60000));
 
@@ -224,12 +224,12 @@ export interface AiClient {
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
 	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string }): Promise<EtapePlan[]>;
-	/** The short call that picks the kind of quiz when the request does not say
-	    (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
+	/** The short call that may ask clarifying questions before a vague request
+	    generates (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
 	    documents only, the lowest effort, 30 s at most. Resolves with the
-	    model's raw text (`parseKindAnswer` reads it); rejects on any failure,
+	    model's raw text (`parseClarifyAnswer` reads it); rejects on any failure,
 	    including a provider that cannot hold the exchange. */
-	decideKind(request: string, documentNames: readonly string[]): Promise<string>;
+	clarify(request: string, documentNames: readonly string[]): Promise<string>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -503,6 +503,8 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 		: "QUANTITY: exactly as many questions as the source has EXAMINABLE POINTS — no more, no less: one question per fact, definition, rule, method or classic trap the exam can ask about, NEVER two on the same point, no trivia, no filler, and no examinable point left out. The number follows the source, never a target — EXCEPT when the user request below states how many questions it wants (per quiz): that stated number then wins, exactly, in EACH quiz; cover the most important points if the source has more.";
 
 	const blocMode = learn ? `MODE: LEARN. You are writing a guided LEARNING PATH through the source — not a test, and not a summary to read. It is done on a phone, often tired: BY DEFAULT the learner only TAPS. A Learn contains ONLY the reading cards, MCQ questions in the style of the course's real exam, and flashcards; the FIRST question of a slice is EASY, right after the notion it checks, and the following ones come closer to the exam.
+	WHO IT IS FOR: the learner did NOT follow the lecture (a long class where the teacher explained for hours: attention dropped and much was forgotten). Assume NO PRIOR KNOWLEDGE of the course and teach from zero, in plain language.
+	COVERAGE: cover EVERY notion of the provided material, in the order of the source, never a sample: one slice per notion. Each slice teaches first, with a short plain-language reading (what it is, why it matters, a worked example with its code and its output when relevant), and its recall questions come after it and only check what the slice has just taught.
 	Split the source into SLICES (steps), numbered from 1 in "slice", each small enough for ONE screen of reading. Every slice contains, in this order:
 	  1. zero or one question with "role": "pre", asked BEFORE the reading, ONLY when the slice brings a genuinely NEW idea the learner could reason about beforehand — not for a syntax detail nor a plain fact. The learner is expected to fail: it is a SINGLE-choice question with "explain". It also has "hint": a clue that lets someone who has NOT read the slice yet reason toward the answer (the principle to apply, an analogy, what a key word means) — never the answer itself.
 	  2. exactly one card with "role": "read": "title" names the slice, "lecture" is ALWAYS "etapes", "prompt" is a one-sentence introduction and "etapes" lists 3 to 5 SHORT steps, one idea per string, keeping the teacher's technical terms EXACTLY as in the source, in the order the notion builds up. A read card has no options and no answer. ONE of the steps is a fully WORKED EXAMPLE, correct, step by step: the code in a fenced block naming its language, then WHAT IT PRINTS (or its result); when the slice is not about code, a worked case with figures. Every idiom or compact line of the example is explained IN FULL, the way a good tutor does: the compact form, its result, then the developed equivalent (for example \`[2 * i for i in range(4)]\` gives \`[0, 2, 4, 6]\`, the same as a \`for\` loop that calls \`append\` on an empty list); never leave a compact line unexplained. Example: { "role": "read", "slice": 1, "title": "Lists", "lecture": "etapes", "prompt": "A list holds several values in order.", "etapes": ["Write the values between square brackets.", "Count from 0: the first value is at index 0.", "Worked example:\n\n\`\`\`python\nfruits = ['apple', 'pear']\nprint(fruits[1])\n\`\`\`\n\nThis prints \`pear\`, the value at index 1."] }.
@@ -1829,10 +1831,10 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 	}
 
-	/** The decide call of "Generate": same provider as the generation, same
+	/** The clarify call of "Generate": same provider as the generation, same
 	    call forms (no tool, no new option), the LOWEST effort the provider
 	    offers, and 30 s at most. */
-	async function decideKind(request: string, documentNames: readonly string[]): Promise<string> {
+	async function clarify(request: string, documentNames: readonly string[]): Promise<string> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = null;
@@ -1842,7 +1844,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
-			const { system, user } = kindDecisionPrompt(request, documentNames);
+			const { system, user } = clarifyPrompt(request, documentNames);
 			const plusBas = (id: string, m?: string): string => getEfforts(id, m)[0]?.value ?? "";
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);
@@ -1935,7 +1937,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	return {
 		generate,
 		chat,
-		decideKind,
+		clarify,
 		planifier,
 		abort: () => { if (abortCurrent) abortCurrent(); },
 		get lastUsage() { return lastUsage; }

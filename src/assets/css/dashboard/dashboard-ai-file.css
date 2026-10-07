@@ -1263,13 +1263,13 @@
 	right: -8px;
 }
 
-/* La question « apprendre ou s'entraîner ? » : un contenu, donc une tuile ;
-   ses réponses sont des lignes à plat, sans bouton encadré dans la carte. */
+/* La carte de questions (façon AskUserQuestion de Claude Code) : un contenu,
+   donc une tuile ; options numérotées à plat, sans bouton encadré dedans. */
 .qbd-ai-kind {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	width: min(460px, 100%);
+	gap: 6px;
+	width: min(520px, 100%);
 	box-sizing: border-box;
 	padding: 12px 8px 8px;
 	border-radius: 12px;
@@ -1277,7 +1277,21 @@
 	background: var(--qbd-glass-bg, var(--background-secondary));
 	backdrop-filter: var(--qbd-glass-blur, none);
 	-webkit-backdrop-filter: var(--qbd-glass-blur, none);
+	outline: none;
 }
+
+.qbd-ai-kind-tete { display: flex; align-items: center; gap: 8px; padding: 0 8px; }
+
+.qbd-ai-kind-chip {
+	padding: 1px 8px;
+	border-radius: 6px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent, #fff);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.qbd-ai-kind-etape { margin-left: auto; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 
 .qbd-ai-kind-question {
 	padding: 0 8px 4px;
@@ -1286,48 +1300,79 @@
 	overflow-wrap: anywhere;
 }
 
-.qbd-ai-kind-options {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
+.qbd-ai-kind-options { display: flex; flex-direction: column; gap: 2px; }
 
 .qbd-ai-kind-option {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
+	align-items: flex-start;
+	gap: 8px;
 	min-height: 34px;
-	padding: 0 8px;
+	box-sizing: border-box;
+	padding: 6px 8px;
 	border: none;
 	border-radius: 8px;
 	background: transparent !important;
 	box-shadow: none !important;
-	color: var(--interactive-accent);
+	color: var(--text-normal);
 	font-size: 14px;
-	font-weight: 600;
 	text-align: left;
 	cursor: pointer;
 }
 
-.qbd-ai-kind-option:hover:not(:disabled) {
-	background: var(--background-modifier-hover) !important;
-}
+.qbd-ai-kind-option.is-active,
+.qbd-ai-kind-option:hover { background: var(--background-modifier-hover) !important; }
+.qbd-ai-kind-option:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 
-.qbd-ai-kind-option:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-}
+.qbd-ai-kind-num { flex-shrink: 0; min-width: 18px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.qbd-ai-kind-option.is-active .qbd-ai-kind-num { color: var(--interactive-accent); }
 
-.qbd-ai-kind-label { min-width: 0; overflow-wrap: anywhere; }
+.qbd-ai-kind-corps { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+.qbd-ai-kind-label { font-weight: 600; overflow-wrap: anywhere; }
+.qbd-ai-kind-option.is-active .qbd-ai-kind-label { color: var(--interactive-accent); }
+.qbd-ai-kind-desc { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 
-.qbd-ai-kind-check { display: inline-flex; flex-shrink: 0; }
+.qbd-ai-kind-check { display: none; flex-shrink: 0; color: var(--interactive-accent); }
+.qbd-ai-kind-check.is-on { display: inline-flex; }
 .qbd-ai-kind-check svg { width: 16px; height: 16px; }
 
-/* Answered (or waiting for a click that cannot come): the chosen row stays
-   lit, the others fade. */
-.qbd-ai-kind.is-answered .qbd-ai-kind-option:not(.is-chosen) {
-	color: var(--text-faint);
-	font-weight: 500;
+/* « Écrire autre chose… » : le champ vit dans la ligne, sur une seule ligne. */
+.qbd-ai-kind-champ {
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 22px;
+	padding: 0;
+	border: none;
+	border-bottom: 1px solid var(--interactive-accent);
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: 14px;
+	box-shadow: none;
 }
-.qbd-ai-kind-option:disabled { cursor: default; }
+.qbd-ai-kind-champ:focus { outline: none; }
+
+.qbd-ai-kind-ok {
+	align-self: flex-start;
+	height: 28px;
+	margin: 2px 8px 0;
+	padding: 0 8px;
+	border: none;
+	border-radius: 6px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--interactive-accent);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.qbd-ai-kind-ok:hover { background: var(--background-modifier-hover) !important; }
+
+.qbd-ai-kind-aide { padding: 4px 8px 0; font-size: 12px; color: var(--text-faint); }
+
+/* Une question répondue (ou ignorée) : « Question → Réponse ». */
+.qbd-ai-kind-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px 8px; font-size: 13px; }
+.qbd-ai-kind-resume-q { color: var(--text-muted); overflow-wrap: anywhere; }
+.qbd-ai-kind-fleche { display: inline-flex; color: var(--text-faint); }
+.qbd-ai-kind-fleche svg { width: 14px; height: 14px; }
+.qbd-ai-kind-resume-r { color: var(--text-normal); font-weight: 600; overflow-wrap: anywhere; }
+.qbd-ai-kind-resume-r.is-skipped { color: var(--text-faint); font-weight: 400; }

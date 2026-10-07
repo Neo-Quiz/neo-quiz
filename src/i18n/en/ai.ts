@@ -641,12 +641,13 @@ export const EN_AI = {
 	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) unlock running their code in a way that cannot apply (a runnable block in the statement, 2 hint levels at least, never a program output question): {names}.",
 	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Test.",
-	// Generate asks which kind of quiz when the request does not say (spec 2026-10-07).
-	"ai.kind.question": "Do you want to learn or to practise?",
-	"ai.kind.learn": "Learn",
-	"ai.kind.practice": "Practice",
-	"ai.kind.both": "Both",
-	"ai.kind.deciding": "Choosing the right format…",
-	"ai.kind.expired": "This question can no longer be answered here. Send your request again.",
-
+	// Generate asks a few clarifying questions when a request is vague (spec 2026-10-07).
+	"ai.clarify.deciding": "Getting ready…",
+	"ai.clarify.other": "Type something",
+	"ai.clarify.otherPlaceholder": "Type your answer, then Enter",
+	"ai.clarify.validate": "Confirm",
+	"ai.clarify.skipped": "Skipped",
+	"ai.clarify.hint": "Enter to select · ↑/↓ to navigate · 1-9 to pick · Esc to skip",
+	"ai.clarify.details": "Details:",
+	"ai.clarify.expired": "These questions can no longer be answered here. Send your request again.",
 } as const;

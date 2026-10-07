@@ -16,7 +16,7 @@ release notes.
 ### Changed
 - On the phone, swiping follows your finger and snaps to the next page like a native app, with a short vibration.
 - Settings has a Moodle section: sign in, choose your courses, and their files arrive in your Neo Quiz folder, with your assignments and deadlines.
-- Generate no longer asks Learn or Test: it picks from your request, or asks you with clickable answers.
+- Generate makes a Learn by default, or a Test when you ask to practise, and asks a few quick questions when your request is vague.
 - Scanning the PC's pairing QR code no longer asks for a second confirmation on the PC.
 - On the phone, a device ID typed in Add a device is added without a second confirmation, and a pairing link opens Neo Quiz.
 - On the phone, the sync notification shows live progress and connected devices, with a Quit action.

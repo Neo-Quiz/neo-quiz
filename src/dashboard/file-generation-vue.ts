@@ -29,8 +29,7 @@ import * as aiProviders from "./ai-providers";
 import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
 import { peindrePieces, peindreTourEnregistre } from "./chat-record-vue";
-import { peindreQuestionGenre } from "./generation-kind-vue";
-import type { KindChoice } from "./generation-kind";
+import { peindreQuestions } from "./generation-kind-vue";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
@@ -84,8 +83,8 @@ export function creerVueFile(opts: {
 	/** A request waiting for the kind of quiz to be decided (spec
 	    2026-10-07-generate-auto-kind): shown last, with a status line. */
 	attente?: () => { text: string; documents: { name: string; path?: string }[] } | null;
-	/** The click on an answer of a question card (a recorded request, nothing live yet). */
-	choisirGenre?: (requestId: string, kind: KindChoice) => void;
+	/** The answers given to the clarifying cards (a recorded request, nothing live yet). */
+	repondre?: (requestId: string, answers: string[][]) => void;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -529,7 +528,7 @@ export function creerVueFile(opts: {
 		const { id: chatId, record } = opts.chat();
 		const items = threadItems(record, opts.file.lignes(), chatId);
 		for (const item of items) {
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, choisirGenre: opts.choisirGenre }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");
@@ -540,8 +539,8 @@ export function creerVueFile(opts: {
 			tour.setAttribute("role", "listitem");
 			peindreMessage(tour, montrees[0], lignes);
 			// The question that was asked before this request generated stays under it, answered.
-			const question = record?.requests.find(q => q.id === item.key)?.ask;
-			if (question) peindreQuestionGenre(tour, question);
+			const clarify = record?.requests.find(q => q.id === item.key)?.clarify;
+			if (clarify) peindreQuestions(tour, clarify, undefined, item.key);
 			for (const l of montrees) {
 				/* As MonoCode: while the model works, its status line then its
 				   activity; once done, the activity summary then the answer. */
@@ -563,7 +562,7 @@ export function creerVueFile(opts: {
 			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
 			logo.setAttribute("aria-hidden", "true");
 			host.ui.setIcon(logo, "sparkles");
-			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.kind.deciding"));
+			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.clarify.deciding"));
 		}
 		/* A NEW item is read from the key of the last one, not from the count: a
 		   reply closed while a request goes out leaves the count unchanged. */

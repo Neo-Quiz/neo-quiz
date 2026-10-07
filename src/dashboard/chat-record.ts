@@ -14,17 +14,19 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { ArchivedChat } from "./chat-archives";
-import type { KindChoice, KindOption } from "./generation-kind";
+import type { ClarifyOption, ClarifyQuestion } from "./generation-kind";
+import { MAX_CLARIFY_QUESTIONS, MAX_HEADER } from "./generation-kind";
 
 export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
 export type ChatResult = { kind: "quiz"; title: string; path: string } | { kind: "text"; text: string };
 export type RequestState = "done" | "failed" | "stopped";
 
-/** The question Generate asked under a request that did not say Learn or
-    Test (spec 2026-10-07-generate-auto-kind): its options, and the one the
-    user clicked (`chosen`, absent while nothing generates). */
-export interface ChatAsk { question: string; options: KindOption[]; chosen?: KindChoice }
+/** The clarifying questions Generate asked under a vague request (spec
+    2026-10-07-generate-auto-kind): the questions, and the answers once all are
+    given (one list of chosen labels per question, typed text included; an empty list is a skipped question).
+    Absent `answers`: nothing generates yet. */
+export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][] }
 
 export interface ChatRequest {
 	id: string;
@@ -38,8 +40,8 @@ export interface ChatRequest {
 	results: ChatResult[];
 	state: RequestState;
 	error?: string;
-	/** Set when the kind was asked: kept with the request, shown under it. */
-	ask?: ChatAsk;
+	/** Set when clarifying questions were asked: kept with the request, shown under it. */
+	clarify?: ChatClarify;
 }
 
 export interface ChatRecord {
@@ -76,17 +78,22 @@ function readDocument(x: unknown): ChatDocument | null {
 	return isStr(x.path) ? { name: x.name, path: x.path } : { name: x.name };
 }
 
-function readAsk(x: unknown): ChatAsk | null {
-	if (!isObj(x) || !isStr(x.question) || !Array.isArray(x.options)) return null;
-	const isKind = (k: unknown): k is KindChoice => k === "learn" || k === "practice" || k === "both";
-	const options: KindOption[] = [];
-	for (const o of x.options) {
-		if (isObj(o) && isStr(o.label) && isKind(o.kind)) options.push({ label: o.label, kind: o.kind });
+function readClarify(x: unknown): ChatClarify | null {
+	if (!isObj(x) || !Array.isArray(x.questions) || x.questions.length < 1 || x.questions.length > MAX_CLARIFY_QUESTIONS) return null;
+	const questions: ClarifyQuestion[] = [];
+	for (const q of x.questions) {
+		if (!isObj(q) || !isStr(q.question) || !Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4) return null;
+		const options: ClarifyOption[] = [];
+		for (const o of q.options) {
+			if (!isObj(o) || !isStr(o.label)) return null;
+			options.push({ label: o.label, description: isStr(o.description) ? o.description : "" });
+		}
+		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options });
 	}
-	if (options.length < 2 || options.length > 4) return null;
-	const ask: ChatAsk = { question: x.question, options };
-	if (isKind(x.chosen)) ask.chosen = x.chosen;
-	return ask;
+	const clarify: ChatClarify = { questions };
+	// One list per question; an EMPTY list is a skipped question.
+	if (Array.isArray(x.answers) && x.answers.length === questions.length && x.answers.every(a => Array.isArray(a) && a.every(isStr))) clarify.answers = (x.answers as string[][]).map(a => [...a]);
+	return clarify;
 }
 
 function readRequest(x: unknown): ChatRequest | null {
@@ -100,8 +107,8 @@ function readRequest(x: unknown): ChatRequest | null {
 		results: x.results.map(readResult).filter((d): d is ChatResult => !!d),
 	};
 	if (isStr(x.error)) req.error = x.error;
-	const ask = readAsk(x.ask);
-	if (ask) req.ask = ask;
+	const clarify = readClarify(x.clarify);
+	if (clarify) req.clarify = clarify;
 	return req;
 }
 

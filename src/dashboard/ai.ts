@@ -38,9 +38,9 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { addAsk, answerAsk, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
-import { decideByKeywords, defaultKindQuestion, parseKindAnswer } from "./generation-kind";
-import type { KindChoice, KindQuestion } from "./generation-kind";
+import { addClarify, answerClarify, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { decideByKeywords, formatClarifications, parseClarifyAnswer } from "./generation-kind";
+import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
@@ -323,10 +323,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    shown at the end of the thread with a status line while the decide call
 	    runs. */
 	let attenteGenre: { text: string; documents: { name: string; path?: string }[] } | null = null;
-	/** The questions asked and not answered yet, by request id: what the click
+	/** The clarifying questions asked and not answered yet, by request id: what the click
 	    needs to generate (the documents' text is only in memory). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi?: DemandeTexte; oneQuiz: boolean; jointesVideo: NoteAttachment[] }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean }>();
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
@@ -394,7 +394,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		copier: deps.copyText,
 		chat: chatSurEcran,
 		attente: () => attenteGenre,
-		choisirGenre: (id, kind) => repondreQuestion(id, kind),
+		repondre: (id, reponses) => repondreQuestions(id, reponses),
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -3990,19 +3990,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		arreterAttenteWeb();
 		const web = aiProviders.estCanalWeb(settings().aiProvider || "");
 		const commandeExam = !!examCible || retirerCommandeExam(composerText).commande;
-		/* The kind of quiz: an "/exam" preparation plans both; otherwise the
-		   request says it, or the model decides, or the user is asked. */
-		let genre: KindChoice | null = "learn";
-		if (!commandeExam) {
+		/* The kind comes from the words of the request alone (a Learn unless it
+		   says it wants to practise); an "/exam" preparation plans both. */
+		const genre: KindChoice = decideByKeywords(composerText);
+		if (web) { await lancerSurSite(container, jointesVideo, genre); return; }
+		if (!commandeExam && settings().aiProvider) {
 			demarrage = true;
-			try { genre = await decideGenre(container, jointesVideo, web); } finally { demarrage = false; }
+			let pris = false;
+			try { pris = await clarifier(container, jointesVideo, genre); } finally { demarrage = false; }
+			if (pris) return;
 		}
-		if (!genre) return;
-		if (web) await lancerSurSite(container, jointesVideo, genre);
-		else {
-			envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
-			render(container);
-		}
+		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
+		render(container);
 	}
 
 	/** Le canal web : le composer GARDE la demande pendant l'attente du site ;
@@ -4027,71 +4026,56 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
 	}
 
-	/* ── WHICH KIND (spec 2026-10-07-generate-auto-kind) ──
-	   1. the request says it (keywords, no AI call);
-	   2. else ONE short call to the same provider (not on a site: nothing to
-	      call) answers a kind or a question;
-	   3. a question, or any failure of the call, is the card of the thread:
-	      nothing generates until a click.
-	   Returns the kind to generate NOW, or `null` when the request was already
-	   sent (the model answered a kind) or a question was put to the user. */
-	async function decideGenre(container: HTMLElement | null, jointesVideo: NoteAttachment[], web: boolean): Promise<KindChoice | null> {
+	/* ── CLARIFYING QUESTIONS (spec 2026-10-07-generate-auto-kind) ──
+	   ONE short call to the same provider, with the request and the names of
+	   the documents, says whether the request is ready or asks 1 to 3 quick
+	   questions. Any failure or unreadable answer is "ready": generation is
+	   never blocked. Questions are cards in the thread; when all are answered
+	   the generation starts with the answers appended to the request.
+	   Returns true when the request was taken over (sent, or questions put). */
+	async function clarifier(container: HTMLElement | null, jointesVideo: NoteAttachment[], genre: KindChoice): Promise<boolean> {
 		const envoi = capturerEnvoi(jointesVideo);
-		const rapide = decideByKeywords(envoi.text);
-		if (rapide) return rapide;
 		const pieces = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
-		if (web || !settings().aiProvider) {
-			poserQuestion(container, envoi, defaultKindQuestion(t), { oneQuiz, jointesVideo, garderComposer: true });
-			return null;
-		}
 		const seulQuiz = oneQuiz;
 		attenteGenre = { text: envoi.text, documents: pieces };
 		viderComposer();
 		render(container);
-		let reponse: KindQuestion | { kind: KindChoice } | null = null;
+		let reponse: ClarifyAnswer = { ready: true };
 		try {
-			const client = createAiClient(deps.settings);
-			reponse = parseKindAnswer(await client.decideKind(envoi.text, pieces.map(p => p.name)));
+			reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name)));
 		} catch (err) {
-			console.warn(LOG_PREFIX, "decide call failed, asking the default question", err);
+			console.warn(LOG_PREFIX, "clarify call failed, generating right away", err);
 		} finally {
 			attenteGenre = null;
 		}
-		if (reponse && "kind" in reponse) {
-			envoyerDansLaFile(envoi, reponse.kind, { dejaVide: true, oneQuiz: seulQuiz });
-			render(container);
-			return null;
+		if ("questions" in reponse) {
+			const id = newRequestId();
+			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions }));
+			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz });
+			notifyChatsChanged();
+		} else {
+			envoyerDansLaFile(envoi, genre, { dejaVide: true, oneQuiz: seulQuiz });
 		}
-		poserQuestion(container, envoi, reponse ?? defaultKindQuestion(t), { oneQuiz: seulQuiz, jointesVideo, garderComposer: false });
-		return null;
-	}
-
-	/** Records the question under its request and paints it; the generation
-	    waits for `repondreQuestion`. On a site the composer keeps the request
-	    (as it does while the site works), so nothing else is kept. */
-	function poserQuestion(container: HTMLElement | null, envoi: DemandeTexte, q: KindQuestion, opts: { oneQuiz: boolean; jointesVideo: NoteAttachment[]; garderComposer: boolean }): void {
-		const id = newRequestId();
-		const documents = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
-		setChats(addAsk(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents }, { question: q.ask, options: q.options }));
-		questionsEnAttente.set(id, { envoi: opts.garderComposer ? undefined : envoi, oneQuiz: opts.oneQuiz, jointesVideo: opts.jointesVideo });
-		notifyChatsChanged();
 		render(container);
+		return true;
 	}
 
-	/** The click on an answer of a question card: records it and starts the
-	    generation of that kind (a Learn then a Test for `both`). */
-	function repondreQuestion(requestId: string, kind: KindChoice): void {
+	/** Every clarifying card is answered: records the answers and starts the
+	    generation, the answers appended to the request ("Details: …"). */
+	function repondreQuestions(requestId: string, reponses: string[][]): void {
 		const attente = questionsEnAttente.get(requestId);
-		if (!attente) { host.ui.notice(t("ai.kind.expired")); return; }
+		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const chatId = activeChatId();
-		const sentAt = getChats().find(c => c.id === chatId)?.requests.find(q => q.id === requestId)?.at;
-		const r = answerAsk(getChats(), chatId, requestId, kind, Date.now());
+		const requete = getChats().find(c => c.id === chatId)?.requests.find(q => q.id === requestId);
+		if (!requete?.clarify) return;
+		const r = answerClarify(getChats(), chatId, requestId, reponses, Date.now());
 		if (!r.changed) return;
 		questionsEnAttente.delete(requestId);
 		setChats(r.chats);
 		notifyChatsChanged();
-		if (!attente.envoi) { void lancerSurSite(containerRef, attente.jointesVideo, kind); return; }
-		envoyerDansLaFile(attente.envoi, kind, { dejaVide: true, oneQuiz: attente.oneQuiz, requestId, sentAt });
+		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
+		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
+		envoyerDansLaFile(envoi, attente.genre, { dejaVide: true, oneQuiz: attente.oneQuiz, requestId, sentAt: requete.at });
 		render(containerRef);
 	}
 
