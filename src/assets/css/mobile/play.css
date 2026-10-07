@@ -129,3 +129,19 @@ html.nq-mobile .quiz-md-table {
 	max-width: 100%;
 	overflow-x: auto;
 }
+
+/* A PLAYED QUIZ (Learn, Test): its panel starts at the top of the screen, under
+   the status bar, like the other pages (2026-10-08). The room under the status
+   bar used to be the root's own padding, which left the bare wallpaper showing
+   above the panel. The same room now sits inside the panel: the question header
+   stays exactly where it was (y 64 px at a 40 px status bar), and the bottom bar
+   keeps its 16 px from the screen's bottom. The panel's own padding-top was
+   16 px, so it becomes inset + 32 px (inset + 16 px of room, then the 16 px it
+   already had). */
+html.nq-mobile #neo-quiz-root:has(> .qbd-qz) {
+	padding-top: 0;
+}
+
+html.nq-mobile #neo-quiz-root > .qbd-qz {
+	padding-top: calc(var(--nq-inset-haut, 0px) + 32px);
+}
