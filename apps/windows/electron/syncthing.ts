@@ -654,10 +654,10 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 				   accepted from the page's request notification needs no second
 				   question: the click on Accept is it (owner's decision,
 				   2026-10-03, "on ne la garde pas"), and neither does an id typed
-				   in "Add a device": the click on Add is it (2026-10-05). Only a
-				   request that came by the QR code still goes through a native
-				   dialog, decided in the main process, that the window cannot
-				   answer (the owner's choice for the QR flow: code + confirmation). */
+				   in "Add a device": the click on Add is it (2026-10-05). Nor does a
+				   request that came by the QR code (a valid code, checked in
+				   constant time, and the scan are the answer: 2026-10-07). The
+				   rule is `confirmationRequise`, kept as the one place to change. */
 				if (confirmationRequise(attente !== undefined, viaQr)) {
 					let accord = false;
 					try { accord = await opts.confirmer(id, nom, viaQr); } catch { accord = false; }

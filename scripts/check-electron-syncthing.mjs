@@ -269,7 +269,7 @@ await withSrcModule(
 			const { confirmationRequise } = regles;
 			r.check("a pending device accepted from the page: no native dialog", confirmationRequise(true, false), false);
 			r.check("an id typed in Add a device (nothing pending): no native dialog, the click on Add is the answer", confirmationRequise(false, false), false);
-			r.check("a request that came by the QR code: native dialog, pending or not", [confirmationRequise(true, true), confirmationRequise(false, true)], [true, true]);
+			r.check("a request that came by the QR code: no native dialog either, the scan is the answer", [confirmationRequise(true, true), confirmationRequise(false, true)], [false, false]);
 		});
 		/* A `neo-quiz://pair` link comes from OUTSIDE (a click in the browser):
 		   only a well-formed id with valid check characters goes on. */
@@ -455,7 +455,7 @@ await withSrcModule(
 			demandes = [{ id: AUTRE_ID, nom: "Phone [NQ:" + code2 + "]" }];
 			await g.qrSuivant();
 			await new Promise(ok => setTimeout(ok, 10));
-			r.check("a request with a live code goes to the pairing, marked viaQr (the native confirmation still decides)", appaires, [[AUTRE_ID, true]]);
+			r.check("a request with a live code goes to the pairing, marked viaQr, and paired with no native dialog", appaires, [[AUTRE_ID, true]]);
 			demandes = [{ id: ID.replace("CJXCUH3", "CJXCUH4"), nom: "Other [NQ:" + code2 + "]" }];
 			await g.qrSuivant();
 			await new Promise(ok => setTimeout(ok, 10));

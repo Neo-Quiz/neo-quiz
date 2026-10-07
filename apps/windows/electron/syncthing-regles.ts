@@ -350,16 +350,17 @@ export function lienDansArguments(argv: readonly string[]): string | null {
 	return null;
 }
 
-/** Whether pairing `id` must first be confirmed by a native dialog. Only
-    for a request that came by the QR code (code + confirmation, the owner's
-    choice for that flow). NOT when the device asked (it is pending) and the
+/** Whether pairing `id` must first be confirmed by a native dialog: never
+    now. NOT for a request that came by the QR code either (a valid code, checked
+    in constant time, plus the scan itself are the answer: owner's decision,
+    2026-10-07, like Android). NOT when the device asked (it is pending) and the
     owner accepts it from the page's request notification: that click is the
     answer (owner's decision, 2026-10-03). And NOT for an id typed in "Add a
     device" either: the owner just clicked Add, a second question was one too
     many (owner's decision, 2026-10-05, accepting that a compromised window
     could then send a request on its own). */
-export function confirmationRequise(_enAttente: boolean, viaQr: boolean): boolean {
-	return viaQr;
+export function confirmationRequise(_enAttente: boolean, _viaQr: boolean): boolean {
+	return false;
 }
 
 /** The two events behind Syncthing's "Recent changes": a change found on
