@@ -110,6 +110,13 @@ await withSrcModule("src/quiz-format.ts", ({ modeDuBloc, verifierFormat, planDes
 		verifierFormat("learn", [...tranche(1), q({ title: "Sans", slice: 1, role: "pre" }), q({ title: "Vide", slice: 1, role: "pre", hint: "  " }), config]),
 		[{ kind: "preSansIndice", questions: ["Sans", "Vide"] }]);
 	r.check("Practice : l'indice n'est pas exigé", verifierFormat("practice", [q({ role: "pre" })]), []);
+	/* The pre-question is optional (prompt: "zero or one" per slice): a slice
+	   with its reading and recalls only is complete. */
+	r.check("Learn : une tranche sans pré-question est complète",
+		verifierFormat("learn", [...tranche(1).slice(1), ...tranche(2).slice(1), config]), []);
+	r.check("Learn : une tranche sans lecture est nommée, sa pré-question facultative ne compte pas",
+		verifierFormat("learn", [...tranche(1).filter(x => x.role !== "read"), config]),
+		[{ kind: "trancheIncomplete", slice: 1, rolesManquants: ["read"] }]);
 	/* CHAQUE question d'un Learn a un indice (retours du 2026-09-26, #1 et
 	   #10) : un rappel, une explication aussi. Un indice en TABLEAU de niveaux
 	   compte ; un tableau sans texte, un nombre, non. La lecture et la carte
@@ -255,7 +262,7 @@ await withSrcModule("src/quiz-hint.ts", ({ niveauxIndice, aIndice }) => {
 	r.done();
 });
 
-await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemande, trouverLearn }) => {
+await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemande, trouverLearn, messagesDesManques }) => {
 	const r = makeReporter("Source d'une note, et son Learn");
 	r.check("la première pièce jointe, sans extension", nomDeSource([{ name: "CM1 - Introduction à Python.pdf" }, { name: "TP1.md" }], "Fais-moi un quiz", "Nouveau quiz"), "CM1 - Introduction à Python");
 	/* Sans pièce jointe, la source est la DEMANDE — la même au lancement
@@ -290,6 +297,17 @@ await withSrcModule("src/dashboard/ai-sources.ts", ({ nomDeSource, debutDeDemand
 		trouverLearn(notes, "Racine/XTI", "CM1")?.path, "Racine/XTI/Parcours CM1 v2.md");
 	r.check("aucun Learn de cette source : null", trouverLearn(notes, "Racine/XTI", "CM3"), null);
 	r.check("un Learn d'un sous-dossier ne compte pas", trouverLearn(notes, "Racine/XTI/Autre", "CM2"), null);
+	/* A Learn with SEVERAL incomplete slices gets ONE notice for them all, after
+	   its other gaps: never one notice per slice. */
+	const notices = messagesDesManques([
+		{ kind: "sansObjectifs" },
+		{ kind: "trancheIncomplete", slice: 2, rolesManquants: ["read"] },
+		{ kind: "trancheIncomplete", slice: 5, rolesManquants: ["recall"] },
+	]);
+	r.check("tranches incomplètes : une seule notice, après les autres manques",
+		[notices.length, notices[1].includes("2") && notices[1].includes("5")], [2, true]);
+	r.check("sans tranche incomplète : une notice par manque, inchangé",
+		messagesDesManques([{ kind: "sansObjectifs" }]).length, 1);
 	r.done();
 });
 

@@ -232,7 +232,11 @@ export function verifierFormat(mode: ModeQuiz, items: readonly unknown[], tranch
 		s.add(typeof q.role === "string" ? q.role : "test");
 		roles.set(q.slice, s);
 	}
-	const exiges: QuestionRole[] = ["pre", "read", "recall"];
+	/* The pre-question is OPTIONAL: the Learn prompt asks for "zero or one" per
+	   slice, only when the slice brings a new idea. Requiring it reported a
+	   gap in almost every slice of a complete Learn (2026-10-07). A slice
+	   needs its reading and its recall questions. */
+	const exiges: QuestionRole[] = ["read", "recall"];
 	for (const slice of [...roles.keys()].sort((a, b) => a - b)) {
 		const presents = roles.get(slice) as Set<string>;
 		const rolesManquants = exiges.filter(r => !presents.has(r));

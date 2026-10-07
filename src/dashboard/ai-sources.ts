@@ -65,19 +65,25 @@ export async function lirePlanLearn(chemin: string): Promise<{ slice: number; ti
 	}
 }
 
-/** Une notice par manque, traduite, qui NOMME les questions. */
+/** Une notice par manque, traduite, qui NOMME les questions. Les tranches
+    incomplètes d'un même quiz ne font qu'UNE notice : un Learn qui en a
+    plusieurs ne doit pas empiler une notice par tranche. */
 export function messagesDesManques(manques: Manque[]): string[] {
-	return manques.map(m => {
-		switch (m.kind) {
-			case "sansExplication": return t("ai.format.noExplain", { count: m.questions.length, names: m.questions.join(", ") });
-			case "trancheInconnue": return t("ai.format.unknownSlice", { count: m.questions.length, names: m.questions.join(", ") });
-			case "sansTranche": return t("ai.format.noSlice", { count: m.questions.length, names: m.questions.join(", ") });
-			case "trancheIncomplete": return t("ai.format.incompleteSlice", { slice: m.slice, roles: m.rolesManquants.join(", ") });
-			case "sansObjectifs": return t("ai.format.noObjectives");
-			case "preSansIndice": return t("ai.format.preNoHint", { count: m.questions.length, names: m.questions.join(", ") });
-			case "sansIndice": return t("ai.format.noHint", { count: m.questions.length, names: m.questions.join(", ") });
-			case "carteSansReponse": return t("ai.format.flashcardNoAnswer", { count: m.questions.length, names: m.questions.join(", ") });
-			case "runInLastHintInvalide": return t("ai.format.runInLastHintInvalid", { count: m.questions.length, names: m.questions.join(", ") });
-		}
-	});
+	const tranches = manques.filter(m => m.kind === "trancheIncomplete");
+	const autres = manques.filter(m => m.kind !== "trancheIncomplete").map(messageDuManque);
+	return tranches.length ? [...autres, tranches.map(messageDuManque).join(" ")] : autres;
+}
+
+function messageDuManque(m: Manque): string {
+	switch (m.kind) {
+		case "sansExplication": return t("ai.format.noExplain", { count: m.questions.length, names: m.questions.join(", ") });
+		case "trancheInconnue": return t("ai.format.unknownSlice", { count: m.questions.length, names: m.questions.join(", ") });
+		case "sansTranche": return t("ai.format.noSlice", { count: m.questions.length, names: m.questions.join(", ") });
+		case "trancheIncomplete": return t("ai.format.incompleteSlice", { slice: m.slice, roles: m.rolesManquants.join(", ") });
+		case "sansObjectifs": return t("ai.format.noObjectives");
+		case "preSansIndice": return t("ai.format.preNoHint", { count: m.questions.length, names: m.questions.join(", ") });
+		case "sansIndice": return t("ai.format.noHint", { count: m.questions.length, names: m.questions.join(", ") });
+		case "carteSansReponse": return t("ai.format.flashcardNoAnswer", { count: m.questions.length, names: m.questions.join(", ") });
+		case "runInLastHintInvalide": return t("ai.format.runInLastHintInvalid", { count: m.questions.length, names: m.questions.join(", ") });
+	}
 }
