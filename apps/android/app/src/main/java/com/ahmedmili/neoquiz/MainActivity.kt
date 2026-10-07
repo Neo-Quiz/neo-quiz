@@ -25,6 +25,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import android.content.Intent
 import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.notify.ReviewOpenRequest
+import com.ahmedmili.neoquiz.sync.PairLinkRequest
+import com.ahmedmili.neoquiz.sync.ShareRules
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FirstRunBackdrop
 import com.ahmedmili.neoquiz.ui.FirstRunScreen
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
         // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
+        raisePairLink(intent)
         setContent {
             val app = showApp
             // The first-run screen sits on the installer's backdrop, drawn as the window background so it
@@ -150,9 +153,16 @@ class MainActivity : ComponentActivity() {
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        raisePairLink(intent)
         if (!intent.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false)) return
         ReviewOpenRequest.raise()
         if (loaded) appWebView.reload()
+    }
+
+    /** A pairing link (`neo-quiz://pair`, the site's `/pair/`): validated here, handed to the page, which only fills in "Add a device". */
+    private fun raisePairLink(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        ShareRules.externalPairing(intent.dataString)?.let { PairLinkRequest.raise(it) }
     }
 
     /** Android 13+: asked once, at first run, so the sync service's notification shows. Never blocks anything. */

@@ -12,10 +12,10 @@ import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.sync.FolderMove
 import com.ahmedmili.neoquiz.sync.ShareRules
 import com.ahmedmili.neoquiz.sync.SyncChannel
+import com.ahmedmili.neoquiz.sync.PairLinkRequest
 import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
 import com.ahmedmili.neoquiz.ui.NavBarView
-import com.ahmedmili.neoquiz.ui.PairConfirmDialog
 import com.ahmedmili.neoquiz.ui.QrScanner
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +46,7 @@ class AppBridge(
     /** Releases what the bridge holds besides coroutines: the hidden code WebView, and the page's hold on the sync. */
     fun shutdown() {
         sync.detach()
+        PairLinkRequest.listener = null
         qr.detach()
         code.shutdown()
     }
@@ -104,9 +105,9 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
     // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
     val hub = SyncHub.get(activity)
-    val pairDialog = PairConfirmDialog(activity, documents.path)
     val qr = QrScanner(activity as ComponentActivity)
-    hub.confirmer = { id, name -> pairDialog.ask(id, name) }
+    // A pairing link opened the app (or arrived while it runs): the page reads it, and only fills in "Add a device".
+    PairLinkRequest.listener = { bridge?.emit("sync.lienAppairage", null) }
     hub.attach(allowed::allow)
     hub.stateListener = { state -> bridge?.emit("sync.etat", state) }
     hub.receivedListener = {

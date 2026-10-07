@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- On the phone, a device ID typed in Add a device is added without a second confirmation, and a pairing link opens Neo Quiz.
+
 ## [1.20.35] - 2026-10-07
 
 ### Changed

@@ -121,6 +121,47 @@ class ShareRulesTest {
         assertEquals(null, ShareRules.scannedPairing(null))
     }
 
+    @Test fun aPairingLinkGivesTheCanonicalLink() {
+        val ok = "neo-quiz://pair?device=$id"
+        assertEquals(ok, ShareRules.externalPairing("neo-quiz://pair?device=$id"))
+        assertEquals(ok, ShareRules.externalPairing("NEO-QUIZ://PAIR?device=${id.lowercase()}"))
+        assertEquals("$ok&name=PC%20d%27Alex", ShareRules.externalPairing("https://neo-quiz.github.io/pair/#device=$id&name=PC%20d'Alex"))
+        assertEquals(ok, ShareRules.externalPairing("https://neo-quiz.github.io/pair?device=$id"))
+    }
+
+    @Test fun aPairingLinkWithABadIdIsRefused() {
+        val bad = id.dropLast(1) + (if (id.last() == 'A') 'B' else 'A') // wrong check character
+        for (l in listOf("neo-quiz://pair?device=$bad", "neo-quiz://pair?device=${id.take(20)}", "neo-quiz://pair?name=x", "neo-quiz://pair", "neo-quiz://pair?device=", "neo-quiz://pair?device=$id\n")) {
+            assertEquals(l, null, ShareRules.externalPairing(l))
+        }
+        assertEquals(null, ShareRules.externalPairing(null))
+    }
+
+    @Test fun aPairingLinkNameIsCleanedAndBounded() {
+        val ok = "neo-quiz://pair?device=$id"
+        assertEquals("$ok&name=AB", ShareRules.externalPairing("neo-quiz://pair?device=$id&name=A%0A%E2%80%AEB"))
+        assertEquals(ok, ShareRules.externalPairing("neo-quiz://pair?device=$id&name=%0A%0D"))
+        val long = ShareRules.externalPairing("neo-quiz://pair?device=$id&name=" + "x".repeat(200))!!
+        assertEquals(64, long.substringAfter("&name=").length)
+        assertEquals(null, ShareRules.externalPairing("neo-quiz://pair?device=$id&name=" + "x".repeat(600)))
+    }
+
+    @Test fun otherParametersAreIgnoredAndNeverCarried() {
+        val out = ShareRules.externalPairing("neo-quiz://pair?code=K7Q2&folder=/sdcard&device=$id&auto=1&device=OTHER&name=n&name=m")
+        assertEquals("neo-quiz://pair?device=$id&name=n", out)
+    }
+
+    @Test fun aPairingLinkWithAnotherSchemeHostOrPathIsRefused() {
+        for (l in listOf(
+            "http://neo-quiz.github.io/pair/#device=$id", "https://evil.example/pair/#device=$id",
+            "https://neo-quiz.github.io.evil.example/pair/#device=$id", "https://neo-quiz.github.io@evil.example/pair/#device=$id",
+            "https://user@neo-quiz.github.io/pair/#device=$id", "https://neo-quiz.github.io:8443/pair/#device=$id",
+            "https://neo-quiz.github.io/other/#device=$id", "https://neo-quiz.github.io/pairing/#device=$id",
+            "neo-quiz://other?device=$id", "neo-quiz://pair.evil?device=$id", "neo-quiz://pair/x?device=$id",
+            "neo-quiz-x://pair?device=$id", "file:///sdcard/x?device=$id", "javascript:alert(1)", "",
+        )) assertEquals(l, null, ShareRules.externalPairing(l))
+    }
+
     @Test fun theCanonicalRootMustBeNeoQuizItself() {
         val storage = File("/storage/emulated/0")
         assertTrue(ShareRules.isCanonicalSharedRoot(File("/storage/emulated/0/Neo Quiz"), storage))

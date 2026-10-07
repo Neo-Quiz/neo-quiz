@@ -102,6 +102,7 @@ object Channels {
         "sync.activer",
         "sync.ignorer",
         "sync.partagerId",
+        "sync.lienAppairage",
         "sync.scanner",
         "sync.scannerAppairer",
     )

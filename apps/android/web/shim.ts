@@ -265,9 +265,9 @@ const pont: Pont = {
 		partagerId: (canal) => appeler("sync.partagerId", [canal]),
 		surEtat: (rappel) => abonner<EtatSync>("sync.etat", rappel),
 		surDonneesRecues: (rappel) => abonner<void>("sync.donneesRecues", () => rappel()),
-		/* No `neo-quiz://` link handed to the app on Android yet. */
-		lienAppairage: async () => null,
-		surLienAppairage: () => () => undefined,
+		/* A pairing link that opened the app, validated by Kotlin (never pairs: it only fills in "Add a device"). */
+		lienAppairage: () => appeler<string | null>("sync.lienAppairage"),
+		surLienAppairage: (rappel) => abonner<void>("sync.lienAppairage", () => rappel()),
 		scanner: () => appeler("sync.scanner"),
 		scannerAppairer: () => appeler("sync.scannerAppairer"),
 	},

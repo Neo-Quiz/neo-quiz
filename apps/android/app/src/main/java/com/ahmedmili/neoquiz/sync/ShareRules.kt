@@ -81,6 +81,43 @@ object ShareRules {
         return if (isDeviceId(id)) id to name else null
     }
 
+    /**
+     * A pairing link handed to the app by Android (a tap in a browser or a message: UNTRUSTED, anyone can
+     * send one), as the canonical `neo-quiz://pair?device=<ID>[&name=<name>]` the page already reads, or
+     * `null`. Mirror of `lienAppairageExterne`. Accepted: `neo-quiz://pair?...` and the site's
+     * `https://neo-quiz.github.io/pair/#device=...&name=...` (the data travels in the fragment; the
+     * query is read when there is no fragment). Only `device` (a well-formed id with valid check
+     * characters) and `name` (cleaned, at most 64, text only) are read: any other parameter, user info,
+     * port, other host or path is refused or dropped, and the output is rebuilt from the two values, never
+     * copied. The link only fills in "Add a device": nothing is paired here.
+     */
+    fun externalPairing(link: String?): String? {
+        if (link == null || link.length > LINK_MAX || link.any { it.code <= 0x20 || it.code == 0x7f }) return null
+        val uri = try { java.net.URI(link) } catch (_: Exception) { return null }
+        val params = when (uri.scheme?.lowercase()) {
+            "neo-quiz" -> if (uri.rawAuthority?.lowercase() == "pair" && uri.rawPath.isNullOrEmpty()) uri.rawQuery else return null
+            "https" -> if (uri.host?.lowercase() == "neo-quiz.github.io" && uri.port == -1 && uri.rawUserInfo == null &&
+                (uri.rawPath == "/pair" || uri.rawPath == "/pair/")) (uri.rawFragment ?: uri.rawQuery) else return null
+            else -> return null
+        } ?: return null
+        var device: String? = null
+        var name: String? = null
+        for (p in params.split("&")) {
+            val kv = p.split("=", limit = 2)
+            if (kv.size != 2) continue
+            when (decodeParam(kv[0])) {
+                "device" -> if (device == null) device = decodeParam(kv[1])
+                "name" -> if (name == null) name = decodeParam(kv[1])
+            }
+        }
+        val id = (device ?: return null).trim().uppercase()
+        if (!isDeviceId(id) || !hasValidCheckDigits(id)) return null
+        val clean = cleanName(name)
+        return "neo-quiz://pair?device=$id" + (if (clean.isEmpty()) "" else "&name=" + java.net.URLEncoder.encode(clean, "UTF-8").replace("+", "%20"))
+    }
+
+    private const val LINK_MAX = 512
+
     private val PAIR_LINK = Regex("^neo-quiz://pair\\?(.*)$", RegexOption.IGNORE_CASE)
 
     private fun decodeParam(s: String): String = try { java.net.URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { "" }

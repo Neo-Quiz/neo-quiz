@@ -32,7 +32,7 @@ interface SyncBackend {
     suspend fun state(): Map<String, Any?>
     /** `name`: announced by a scanned pairing QR code, shown in the confirmation; null when typed. */
     suspend fun pair(id: String, name: String?): String
-    /** Pairs an id the camera just read (never one from the page): no native dialog, the scan is the answer. */
+    /** Pairs an id the camera just read (never one from the page). */
     suspend fun pairScanned(id: String, name: String): String
     suspend fun forget(id: String)
     /** The name this device shows for a paired one (cleaned, at most 64). */
@@ -67,8 +67,6 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     @Volatile private var engine: SyncEngine? = null
     private val prefs get() = appContext.getSharedPreferences("sync", Context.MODE_PRIVATE)
 
-    /** The native pairing confirmation (set by the bridge, which owns the activity); no confirmer = no pairing. */
-    @Volatile var confirmer: (suspend (deviceId: String, name: String) -> Boolean)? = null
     @Volatile private var allowRoot: ((File) -> Unit)? = null
     @Volatile var stateListener: ((Map<String, Any?>) -> Unit)? = null
     @Volatile var receivedListener: (() -> Unit)? = null
@@ -117,7 +115,6 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     }
 
     fun detach() {
-        confirmer = null
         allowRoot = null
         stateListener = null
         receivedListener = null
@@ -167,7 +164,6 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             root = root,
             deviceName = ownName(),
             portFree = process::listenPortFree,
-            confirm = { id, name -> confirmer?.invoke(id, name) ?: false },
             scope = scope,
         )
         created.onState = { s -> stateListener?.invoke(s) }
@@ -208,13 +204,13 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
 
     override suspend fun state(): Map<String, Any?> = ensure()?.state() ?: SyncEngine.ABSENT
 
-    // One native dialog at a time: a second pairing while one is open is dropped, so a page cannot stack dialogs.
+    // One pairing at a time: a second one while another runs is dropped.
     private val pairing = SingleFlight()
 
     override suspend fun pair(id: String, name: String?): String = pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name) ?: PairResult.UNAVAILABLE }
 
     override suspend fun pairScanned(id: String, name: String): String =
-        pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name, scanned = true) ?: PairResult.UNAVAILABLE }
+        pairing.run(PairResult.CANCELLED) { ensure()?.pair(id, name) ?: PairResult.UNAVAILABLE }
 
     override suspend fun forget(id: String) { ensure()?.forget(id) }
 

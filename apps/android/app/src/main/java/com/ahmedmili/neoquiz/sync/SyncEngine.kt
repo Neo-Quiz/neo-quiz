@@ -33,15 +33,15 @@ object PairResult {
  *   acceptance), and the state pushed when it changed;
  * - one restart on an unexpected exit, then the page shows sync as off.
  *
- * `confirm` is the NATIVE pairing confirmation (a dialog the page cannot
- * answer); nothing is paired without it.
+ * There is no native pairing confirmation any more (owner's decision, 2026-10-05, like the PC): the
+ * tap on "Add" is the answer.
+ * The page cannot pair on its own either: only its verbs reach this class, and a link never pairs.
  */
 class SyncEngine(
     private val launcher: () -> SyncthingInstance,
     private val root: File,
     private val deviceName: String,
     private val portFree: () -> Boolean,
-    private val confirm: suspend (deviceId: String, name: String) -> Boolean,
     private val scope: CoroutineScope,
     private val intervalMs: Long = 10_000,
 ) {
@@ -336,7 +336,7 @@ class SyncEngine(
     }
 
     /** [scanned]: the id was read by the camera in THIS process (`sync.scannerAppairer`), never given by the page. */
-    suspend fun pair(raw: String, scannedName: String? = null, scanned: Boolean = false): String = withContext(Dispatchers.IO) {
+    suspend fun pair(raw: String, scannedName: String? = null): String = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
         if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || dead) return@withContext PairResult.INVALID
@@ -349,16 +349,9 @@ class SyncEngine(
             val waiting = r.instance.rest.pendingDevices().optJSONObject(id)
             // The name the device announced (pending), else the one its scanned QR code carried.
             val name = ShareRules.cleanName(waiting?.optString("name")).ifEmpty { ShareRules.cleanName(scannedName) }
-            // The owner's say. A device that ASKED (it is pending) and is accepted from the page's
-            // request notification needs no second question: the tap on Accept is it (owner's
-            // decision, 2026-10-03, same as Windows). An id typed or scanned in "Add a device"
-            // (nothing asked for it) still goes through a native dialog the page cannot answer.
-            // A SCANNED id needs none either (2026-10-04, like Syncthing's app): the camera read it in
-            // this process, the page only asked for a scan, so the owner's scan is the answer.
-            if (waiting == null && !scanned) {
-                val agreed = try { confirm(id, name) } catch (_: Exception) { false }
-                if (!agreed) return@withContext PairResult.CANCELLED
-            }
+            // No native question, whatever the path: the tap on Accept (a device that asked), on Add (an
+            // id typed or filled in by a pairing link: owner's decision, 2026-10-05, like the PC, and
+            // 2026-10-03 for Accept) or the scan itself (2026-10-04) is the owner's answer.
             // An ignored device that is paired after all leaves the ignore list.
             val cfg = r.instance.rest.config()
             if (ShareRules.isIgnored(cfg.optJSONArray("remoteIgnoredDevices"), id)) {

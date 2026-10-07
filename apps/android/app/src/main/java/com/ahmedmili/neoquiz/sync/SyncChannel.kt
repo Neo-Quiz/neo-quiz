@@ -10,7 +10,7 @@ import org.json.JSONArray
  * the page reaches those verbs, a scan, and two pushes (`sync.etat`,
  * `sync.donneesRecues`, emitted by the hub's listeners), never a folder, a path, a
  * port, the API key or a REST call. A device id is validated before it reaches
- * a config, and pairing is confirmed in a native dialog the page cannot answer.
+ * a config; the owner's tap on Add / Accept / the scan is the confirmation.
  */
 class SyncChannel(
     private val backend: SyncBackend,
@@ -41,8 +41,10 @@ class SyncChannel(
             }
         },
         "sync.scanner" to { _ -> scanner() },
+        // The pairing link that opened the app, already validated natively: once, or null. It only fills in "Add a device".
+        "sync.lienAppairage" to { _ -> PairLinkRequest.take() },
         // Scan AND pair in one native step: the page asks for a scan and gets a result, it never
-        // hands over the id, so this pairing needs no confirmation (a typed id still does).
+        // hands over the id.
         "sync.scannerAppairer" to { _ ->
             val text = scanner()
             if (text == null) PairResult.CANCELLED
