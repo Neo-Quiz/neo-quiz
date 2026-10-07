@@ -87,6 +87,7 @@
     "check:langue": "node scripts/check-langue.mjs",
     "check:shared-state": "node scripts/check-shared-state.mjs",
     "check:stats": "node scripts/check-stats.mjs",
+    "check:swipe": "node scripts/check-swipe.mjs",
     "check:home": "node scripts/check-home.mjs",
     "check:gestes": "node scripts/check-gestes.mjs",
     "check:termes": "node scripts/check-termes.mjs",

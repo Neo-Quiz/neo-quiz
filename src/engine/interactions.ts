@@ -1,6 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import type { OrderingQuestion, MatchingQuestion } from "../types/quiz";
 import { t } from "../i18n";
+import { bindSwipe } from "./swipe";
 
 /** Charge utile du drag-and-drop (ordering/matching), sérialisée en JSON dans le dataTransfer. */
 interface DragPayload {
@@ -535,6 +536,25 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		bindResultsSlideControls(ctx.container.querySelector('.quiz-track-item[data-slide-kind="results"]'));
 
 		// ── Flèches clavier : navigation entre questions ──
+		/* The → / ← move, shared by the keys and the swipe. `bySwipe` ignores a
+		   forward move on a Test's last question (a swipe never hands in). */
+		const navigate = (forward: boolean, bySwipe = false): boolean => {
+			const cur = ctx.quizState.current;
+			if (forward) {
+				if (ctx.isQuestionSlideIndex(cur)) {
+					if (bySwipe && ctx.handIn.isTest() && ctx.slideMap[cur + 1]?.type !== "question") return false;
+					advanceFrom((ctx.slideMap[cur] as { questionIndex: number }).questionIndex);
+					return true;
+				}
+				if (ctx.isSubmitSlideIndex(cur)) { ctx.goToResults(); return true; }
+				return false;
+			}
+			if (ctx.isResultsSlideIndex(cur)) { ctx.goToQuestion(ctx.quizState.lastQuestionIndex); return true; }
+			if (ctx.isSubmitSlideIndex(cur)) { ctx.goToQuestion(ctx.quizState.lastQuestionIndex); return true; }
+			if (cur > 0) { ctx.goToSlide(cur - 1, { forceRender: false }); return true; }
+			return false;
+		};
+
 		const onArrowKey = (e: KeyboardEvent) => {
 			if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
 			if (ctx.__quizDestroyed) return;
@@ -542,25 +562,13 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
 			if ((document.activeElement as HTMLElement | null)?.isContentEditable) return;
 			if (ctx.quizState.isSliding) return;
-
-			const cur = ctx.quizState.current;
-			let navigated = false;
-			if (e.key === "ArrowRight") {
-				if (ctx.isQuestionSlideIndex(cur)) {
-					advanceFrom((ctx.slideMap[cur] as { questionIndex: number }).questionIndex);
-					navigated = true;
-				}
-				else if (ctx.isSubmitSlideIndex(cur)) { ctx.goToResults(); navigated = true; }
-			} else {
-				if (ctx.isResultsSlideIndex(cur)) { ctx.goToQuestion(ctx.quizState.lastQuestionIndex); navigated = true; }
-				else if (ctx.isSubmitSlideIndex(cur)) { ctx.goToQuestion(ctx.quizState.lastQuestionIndex); navigated = true; }
-				else if (cur > 0) {
-					ctx.goToSlide(cur - 1, { forceRender: false });
-					navigated = true;
-				}
-			}
-			if (navigated) e.preventDefault();
+			if (navigate(e.key === "ArrowRight")) e.preventDefault();
 		};
+		// A swipe on the played quiz is the same move as the arrows.
+		ctx.__quizGlobalCleanups.push(bindSwipe(ctx.container, d => {
+			if (ctx.__quizDestroyed || ctx.quizState.isSliding) return;
+			navigate(d === "next", true);
+		}));
 		// Bindé sur le container (pas document) : le keydown ne remonte au handler que
 		// si le focus est DANS ce quiz. Sinon plusieurs blocs quiz d'une même note
 		// naviguaient tous ensemble à chaque flèche (handler document partagé), et un

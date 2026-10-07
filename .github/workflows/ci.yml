@@ -213,6 +213,10 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      # SWIPE between pages: thresholds, edge zones, scrollers, fields, modals.
+      - name: Swipe
+        run: npm run check:swipe
+
       # EXAMS AND ATTEMPTS PER DEVICE in the synced folder: the merge (newest
       # edit, tombstones, delete-before-add), the one-time migration, conflict
       # copies, and a folder move between roots.
