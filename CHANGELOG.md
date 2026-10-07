@@ -19,6 +19,10 @@ release notes.
 - On the phone, swipe left or right to move between Home, Folders and Settings.
 - Learn shows each answer in green or red with a short note, one capsule per question, and a summary at the end.
 - Flashcards flip in 3D, with the rating buttons always in view.
+- A Learn plays one step per page: read, then answer with a tap; nothing to type. A missed question comes back at the end of its step.
+- Swipe left or right to change page in a quiz.
+- Generated Learn quizzes use exam-style multiple-choice questions and flashcards by default.
+- On the phone, pages start below the status bar.
 
 ## [1.20.34] - 2026-10-07
 
