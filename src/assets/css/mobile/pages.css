@@ -269,9 +269,11 @@
 	min-height: 44px;
 }
 
-/* The floating + (new folder) and Générer buttons sit above the bottom bar
-   (57 px), not on its tabs. */
-.is-mobile .qbd-quizzes-fab {
+/* The floating + (new folder) and Générer buttons sit above the WEB bottom bar
+   (57 px), not on its tabs. The Android app draws its bar natively below the
+   WebView (`.nq-bar-native`): there the page ends above the bar and the 16 px
+   of mobile.css is right. */
+html:not(.nq-bar-native) .is-mobile .qbd-quizzes-fab {
 	bottom: 73px;
 }
 
