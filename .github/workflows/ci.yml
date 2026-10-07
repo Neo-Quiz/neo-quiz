@@ -192,6 +192,13 @@ jobs:
       - name: Share names and script quoting
         run: npm run check:partage
 
+      # MOODLE IN THE APP: the login token never leaves the main process, every
+      # request and redirect stays on the configured site, paths cannot escape,
+      # and the passport and host checks are replayed on mutants.
+      - name: Moodle sync
+        run: npm run check:moodle
+
+
       # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
       # perdre de réponses, même si le quiz a changé entre deux sessions.
       - name: Quiz session snapshot
@@ -269,6 +276,11 @@ jobs:
       # a tombstone survives the bound.
       - name: Chat record
         run: npm run check:chat-record
+      # WHICH KIND A GENERATE REQUEST WANTS: keywords decide only when they
+      # say one kind plainly, the model's answer is parsed strictly, and its
+      # prompt carries document names, never content.
+      - name: Generation kind
+        run: npm run check:generation-kind
       # THE CHAT STORE: a full or refused storage never loses the chat on
       # screen, a deleted chat stays deleted, the legacy archive is imported
       # once, and a reload keeps the active chat.

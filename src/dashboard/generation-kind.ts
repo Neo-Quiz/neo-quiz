@@ -84,7 +84,8 @@ export function parseKindAnswer(raw: string): KindAnswer | null {
 }
 
 /** "Do you want to learn or to practise?" with Learn / Test / Both. */
-export function defaultKindQuestion(t: (key: string) => string): KindQuestion {
+export type KindKey = "ai.kind.question" | "ai.kind.learn" | "ai.kind.practice" | "ai.kind.both";
+export function defaultKindQuestion(t: (key: KindKey) => string): KindQuestion {
 	return {
 		ask: t("ai.kind.question"),
 		options: [

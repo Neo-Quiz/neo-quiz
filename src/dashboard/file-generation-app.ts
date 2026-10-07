@@ -75,6 +75,9 @@ export interface DemandeFile extends DemandeTexte {
 	    every document, chooses the quizzes, and each becomes a line of the
 	    queue behind this one. It makes no quiz itself. */
 	planifier?: boolean;
+	/** With `planifier`: the plan mixes kinds (a Learn, then Tests) instead of
+	    following `mode` alone (2026-10-07, no Learn | Test selector any more). */
+	mixte?: boolean;
 	/** Le quiz que le modèle a produit, gardé dès sa réception : si l'écriture
 	    de la note échoue, il n'est pas perdu (nouvel essai d'enregistrement,
 	    ou ouverture sans enregistrer), et le CLI n'est jamais relancé pour ça. */
@@ -381,7 +384,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const transcript = transcriptVide();
 			transcripts.set(ligne.id, transcript);
 			etapeDe(ligne.id, "redaction");
-			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mode, {
+			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mixte ? undefined : d.mode, {
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;

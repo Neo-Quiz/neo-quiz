@@ -1010,14 +1010,9 @@
 /* Groupe droite du pied : modèle + effort puis bouton d'envoi. */
 /* ── Sans fournisseur : composer inerte, une bulle désigne le bouton ── */
 .qbd-ai-composer--sans-fournisseur .qbd-ai-composer-input,
-.qbd-ai-composer--sans-fournisseur .qbd-ai-composer-add,
-.qbd-ai-composer--sans-fournisseur .qbd-ai-seg {
+.qbd-ai-composer--sans-fournisseur .qbd-ai-composer-add {
 	opacity: 0.45;
 	cursor: not-allowed;
-}
-
-.qbd-ai-composer--sans-fournisseur .qbd-ai-seg-btn {
-	pointer-events: none;
 }
 
 /* `hidden` perd contre le `display: inline-flex` du bouton : masqué ici. */
@@ -2926,66 +2921,6 @@
 	height: 18px;
 }
 
-/* Learn | Test selector — sizes measured on claude.ai's "Chat | Cowork"
-   (2026-09-23): 28 px track, 1 px padding, 7 px radius; 26 px block, 6 px
-   radius; options 0 10 px, 14 px. The COLOURS are the composer's own
-   (2026-09-29): the old veils of `--text-normal` (5 % track, 10 % block)
-   turned into a blue-grey on the app's blue-tinted text colour and clashed
-   with the composer. The track is now nothing at all (the composer's
-   surface shows through) and the sliding block is the same light overlay as
-   the hover of the "+" button beside it. */
-.qbd-ai-seg {
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	height: 28px;
-	padding: 1px;
-	border-radius: 7px;
-	background: transparent;
-	flex-shrink: 0;
-}
-
-.qbd-ai-seg-indic {
-	position: absolute;
-	top: 1px;
-	left: 0;
-	height: 26px;
-	border-radius: 6px;
-	background: var(--background-modifier-hover);
-	transform-origin: 0 50%;
-	will-change: transform;
-	pointer-events: none;
-}
-
-.qbd-ai-seg-btn {
-	position: relative;
-	z-index: 1;
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	height: 26px;
-	padding: 0 10px;
-	border-radius: 5px;
-	background: transparent !important;
-	border: none;
-	box-shadow: none !important;
-	color: var(--text-muted);
-	font-size: 14px;
-	font-weight: 400;
-	line-height: 20px;
-	cursor: pointer;
-}
-
-.qbd-ai-seg-btn:hover,
-.qbd-ai-seg-btn.is-active {
-	color: var(--text-normal);
-}
-
-.qbd-ai-seg-btn:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: 1px;
-}
-
 /* ── Menu Options en trois lignes + flyouts (2026-09-23) ──
    Même surface que le menu « + » (.qbd-action-menu) : icône mutée, nom,
    valeur courante en gris à droite, chevron. La ligne dont le flyout est
@@ -3166,23 +3101,6 @@
 .qbd-opts-custom-field:focus {
 	border-color: var(--interactive-accent);
 	background-color: var(--background-modifier-form-field);
-}
-
-/* L'icône Options s'allume en accent quand le mode change (Learn ↔
-   Practice) : allumée d'un coup avec un léger rebond, éteinte en 0,5 s. Ni
-   halo ni longue traîne (Ahmed, 2026-09-23 : 1,6 s « dure trop longtemps »). */
-.qbd-ai-opts-pulse {
-	animation: qbd-ai-opts-pulse 0.5s ease-out;
-}
-
-@keyframes qbd-ai-opts-pulse {
-	0%   { color: var(--interactive-accent); transform: scale(1.18); }
-	35%  { color: var(--interactive-accent); transform: scale(1); }
-	100% { color: var(--text-muted); transform: scale(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.qbd-ai-opts-pulse { animation-duration: 0.01s; }
 }
 
 .qbd-options-pop {

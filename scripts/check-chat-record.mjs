@@ -69,3 +69,43 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	], ["CM1.pdf", "A", ""]);
 	r.done();
 });
+
+/* The question Generate asks when a request does not say Learn or Test
+   (spec 2026-10-07-generate-auto-kind): kept with the request, read back from
+   storage, answered once, never revived into a deleted chat. */
+await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-requests.ts"], (C, Q) => {
+	const r = makeReporter("Chat record: the asked kind");
+	const ask = { question: "Learn or practise?", options: [{ label: "Learn", kind: "learn" }, { label: "Test", kind: "practice" }, { label: "Both", kind: "both" }] };
+	const base = { id: "r1", at: 5, from: "d1", text: "pointeurs", mode: "practice", documents: [], results: [], state: "done" };
+	const read = (reqs) => C.readChats({ v: 1, chats: [{ id: "a", origin: "d1", createdAt: 1, updatedAt: 1, requests: reqs }] })[0].requests;
+	r.check("an old request (no question) loads unchanged", read([base])[0].ask, undefined);
+	r.check("a question and its answer are read back", read([{ ...base, ask: { ...ask, chosen: "both" } }])[0].ask, { ...ask, chosen: "both" });
+	r.check("a pending question has no chosen", "chosen" in read([{ ...base, ask }])[0].ask, false);
+	for (const [nom, mauvais] of [["one option", { ...ask, options: ask.options.slice(0, 1) }], ["five options", { ...ask, options: [...ask.options, ...ask.options] }],
+		["unknown kind", { ...ask, options: [ask.options[0], { label: "x", kind: "exam" }] }], ["no question text", { options: ask.options }]]) {
+		r.check("a bad question is dropped, the request kept: " + nom, [read([{ ...base, ask: mauvais }]).length, read([{ ...base, ask: mauvais }])[0].ask], [1, undefined]);
+	}
+	r.check("an unknown chosen kind is ignored", read([{ ...base, ask: { ...ask, chosen: "exam" } }])[0].ask.chosen, undefined);
+
+	const doc = [{ name: "cm1.pdf" }];
+	const withAsk = Q.addAsk([], "c1", "d1", 10, { id: "r1", text: "pointeurs", documents: doc }, ask);
+	r.check("addAsk makes the chat with the pending request", [withAsk.length, withAsk[0].requests[0].ask.chosen, withAsk[0].requests[0].results.length, withAsk[0].title], [1, undefined, 0, "pointeurs"]);
+	const second = Q.addAsk(withAsk, "c1", "d1", 20, { id: "r2", text: "autre", documents: [] }, ask);
+	r.check("addAsk adds a request to an existing chat, in order", second[0].requests.map(q => q.id), ["r1", "r2"]);
+	r.check("addAsk never revives a deleted chat", Q.addAsk([{ id: "c1", origin: "d1", createdAt: 1, updatedAt: 1, deleted: true, requests: [] }], "c1", "d1", 5, { id: "r", text: "t", documents: [] }, ask)[0].requests, []);
+
+	const ok = Q.answerAsk(withAsk, "c1", "r1", "both", 30);
+	r.check("answerAsk records the choice and the kind it generates", [ok.changed, ok.chats[0].requests[0].ask.chosen, ok.chats[0].requests[0].mode, ok.chats[0].updatedAt], [true, "both", "learn", 30]);
+	r.check("answerAsk keeps the question and its options", ok.chats[0].requests[0].ask.options, ask.options);
+	r.check("a Test choice records mode practice", Q.answerAsk(withAsk, "c1", "r1", "practice", 30).chats[0].requests[0].mode, "practice");
+	r.check("a question already answered is not answered twice", Q.answerAsk(ok.chats, "c1", "r1", "learn", 40).changed, false);
+	r.check("an unknown chat or request changes nothing", [Q.answerAsk(withAsk, "zz", "r1", "learn", 1).changed, Q.answerAsk(withAsk, "c1", "zz", "learn", 1).changed], [false, false]);
+	r.check("the original list is never mutated", withAsk[0].requests[0].ask.chosen, undefined);
+
+	// The queue's record of the same request keeps the question (recordRequest).
+	const ligne = { id: 1, etat: "prete", demande: { text: "pointeurs", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
+	const g = { key: "r1", chatId: "c1", lines: [ligne] };
+	const rec = Q.recordRequest(g, "d1", 50, ok.chats[0].requests[0]);
+	r.check("recording the generation keeps the question and its answer", [rec.ask.chosen, rec.results.length], ["both", 1]);
+	r.done();
+});

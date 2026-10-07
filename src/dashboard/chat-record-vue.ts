@@ -17,6 +17,8 @@ import { mathifyElement } from "../engine/mathjax";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import type { ChatRequest } from "./chat-record";
+import { peindreQuestionGenre } from "./generation-kind-vue";
+import type { KindChoice } from "./generation-kind";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
     else the name cut IN THE MIDDLE so the extension always shows). */
@@ -39,7 +41,7 @@ export function peindrePieces(parent: HTMLElement, notes: readonly { name: strin
 	}
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { ouvrir(path: string): void; copier?(text: string): Promise<boolean> }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { ouvrir(path: string): void; copier?(text: string): Promise<boolean>; choisirGenre?(requestId: string, kind: KindChoice): void }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -49,6 +51,10 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const message = ajouter(tour, "div", "qbd-ai-message");
 		if (q.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), q.documents);
 		if (q.text.trim()) ajouter(message, "div", "qbd-ai-bulle", q.text.trim());
+	}
+	if (q.ask) {
+		const id = q.id;
+		peindreQuestionGenre(tour, q.ask, deps.choisirGenre ? (kind) => deps.choisirGenre?.(id, kind) : undefined);
 	}
 	for (const res of q.results) {
 		if (res.kind === "text") {

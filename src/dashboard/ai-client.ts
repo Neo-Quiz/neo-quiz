@@ -6,6 +6,7 @@ import {
 	resolveCodexModel, resolveAntigravityModel, antigravityModelId, niveauAntigravity, resolveOllamaSelection,
 	resolveEffort,
 	getCodexModels,
+	getEfforts,
 	getProvider,
 	isOllamaCloudModel,
 	refreshCliCaches,
@@ -17,6 +18,7 @@ import { t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
+import { kindDecisionPrompt } from "./generation-kind";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
 import type { TranscriptEvent } from "./transcript";
 
@@ -47,6 +49,8 @@ import type { TranscriptEvent } from "./transcript";
    valeur est UNE constante, injectée dans le message d'erreur : le texte ne
    peut plus mentir sur la durée réellement appliquée. */
 const CLI_TIMEOUT_MS = 900000;
+/** The decide call of "Generate" gives up after this long (the default question shows). */
+const DECIDE_TIMEOUT_MS = 30000;
 const CLI_TIMEOUT_MIN = String(Math.round(CLI_TIMEOUT_MS / 60000));
 
 /** Le NOM du fichier que Codex écrit avec `-o`, relu par l'hôte et rendu dans
@@ -219,7 +223,13 @@ export interface AiClient {
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
-	planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string }): Promise<EtapePlan[]>;
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string }): Promise<EtapePlan[]>;
+	/** The short call that picks the kind of quiz when the request does not say
+	    (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
+	    documents only, the lowest effort, 30 s at most. Resolves with the
+	    model's raw text (`parseKindAnswer` reads it); rejects on any failure,
+	    including a provider that cannot hold the exchange. */
+	decideKind(request: string, documentNames: readonly string[]): Promise<string>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -1770,7 +1780,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    document at once, then chooses the quizzes that will cover everything
 	    that can come up — their number, their order, what each covers.
 	    `typeImpose`: the Learn | Test selector, which the plan follows. */
-	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice", options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string } = {}): Promise<EtapePlan[]> {
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string } = {}): Promise<EtapePlan[]> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
@@ -1780,7 +1790,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
-			const genre = typeImpose === "learn"
+			const genre = !typeImpose
+				? "a LEARN path first (\"type\": \"learn\", teaching the program step by step, one per part of it), then TESTS (\"type\": \"test\") in rising difficulty, the last ones at the exam's level"
+				: typeImpose === "learn"
 				? "LEARN paths only (\"type\": \"learn\"): each one teaches a part of the program step by step"
 				: "TESTS only (\"type\": \"test\"): in rising difficulty, the last ones at the exam's level";
 			const systeme = [
@@ -1814,6 +1826,49 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			repriseBase = null;
+		}
+	}
+
+	/** The decide call of "Generate": same provider as the generation, same
+	    call forms (no tool, no new option), the LOWEST effort the provider
+	    offers, and 30 s at most. */
+	async function decideKind(request: string, documentNames: readonly string[]): Promise<string> {
+		aborted = false;
+		pendingUsage = null;
+		transcriptSink = null;
+		repriseBase = null;
+		await refreshCliCaches();
+		const limite = window.setTimeout(() => { if (abortCurrent) abortCurrent(); }, DECIDE_TIMEOUT_MS);
+		try {
+			const provider = settings.get().aiProvider || "";
+			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
+			const { system, user } = kindDecisionPrompt(request, documentNames);
+			const plusBas = (id: string, m?: string): string => getEfforts(id, m)[0]?.value ?? "";
+			if (provider === "claude-code") {
+				model = resolveClaudeModel(model);
+				return await callClaudeCodeTexte(model, system, user);
+			}
+			if (provider === "codex") {
+				model = resolveCodexModel(model);
+				const m = getCodexModels().find(x => x.value === model);
+				return await callCodexTexte(model, system, user, [], plusBas("codex", model), !!settings.get().aiCodexFast && !!(m && m.fast));
+			}
+			if (provider === "ollama") {
+				if (!model) model = resolveOllamaSelection(settings.get().aiOllamaModels, settings.get().aiOllamaCatalog)[0]?.value || "";
+				const ollamaUrl = (settings.get().aiOllamaUrl || "http://localhost:11434").replace(/\/+$/, "");
+				const key = (settings.get().aiOllamaCloudKey || "").trim();
+				const authHeader: Record<string, string> = key ? { "Authorization": "Bearer " + key } : {};
+				return await callOllamaTexte(model, system, user, ollamaUrl, authHeader, [], plusBas("ollama") || null);
+			}
+			if (provider === "antigravity-cli") {
+				model = resolveAntigravityModel(model);
+				// The effort is in the model's name: the lowest variant of the family.
+				return await callAntigravityTexte(antigravityModelId(model, plusBas("antigravity-cli", model)), system, user);
+			}
+			throw new Error(t("ai.chat.providerUnsupported"));
+		} finally {
+			window.clearTimeout(limite);
+			abortCurrent = null;
 		}
 	}
 
@@ -1880,6 +1935,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	return {
 		generate,
 		chat,
+		decideKind,
 		planifier,
 		abort: () => { if (abortCurrent) abortCurrent(); },
 		get lastUsage() { return lastUsage; }

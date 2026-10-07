@@ -101,11 +101,8 @@ export const EN_AI = {
 	"ai.type.count": "{count} types",
 
 	/* ── Quiz type: Learn / Test (composer) ── */
-	"ai.type.learnGenerateTip": "Generate a quiz optimised for learning: short readings, a question before each one and instant feedback, until it sticks.",
-	"ai.type.testGenerateTip": "Generate a quiz optimised for testing yourself: exam-style questions, each one explained, to take with or without hints and a time limit.",
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained. When you start it, you can play it as a timed exam.",
-	"ai.mode.group": "Quiz type",
 	/* "N quizzes <-> 1 quiz" toggle, under the attached documents */
 	"ai.oneQuiz.label": "One quiz",
 	"ai.oneQuiz.tipOne": "The {count} documents go into a single quiz. Click for one quiz per document.",
@@ -644,5 +641,12 @@ export const EN_AI = {
 	"ai.format.flashcardNoAnswer": "{count} flashcard(s) have no answer on the back: {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) unlock running their code in a way that cannot apply (a runnable block in the statement, 2 hint levels at least, never a program output question): {names}.",
 	"ai.format.notLearn": "The model did not produce a learning path: the note was saved as a Test.",
+	// Generate asks which kind of quiz when the request does not say (spec 2026-10-07).
+	"ai.kind.question": "Do you want to learn or to practise?",
+	"ai.kind.learn": "Learn",
+	"ai.kind.practice": "Practice",
+	"ai.kind.both": "Both",
+	"ai.kind.deciding": "Choosing the right format…",
+	"ai.kind.expired": "This question can no longer be answered here. Send your request again.",
 
 } as const;

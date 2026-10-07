@@ -1,5 +1,4 @@
 import JSON5 from "json5";
-import { placerIndicateur } from "./seg-indic";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
@@ -19,7 +18,7 @@ import { LOG_PREFIX } from "../branding";
 import * as aiProviders from "./ai-providers";
 import { monterBandeauMaj } from "./cli-updates";
 import { demarrerConnexionCli, poserCroixAnnuler } from "./connexion-cli";
-import { composerPrompts, parseReponseLot, parseReponseQuiz } from "./ai-client";
+import { composerPrompts, createAiClient, parseReponseLot, parseReponseQuiz } from "./ai-client";
 import { nouveauJeton, texteWeb, preparerOuverture } from "./ai-web";
 import type { ResultatOuverture } from "./ai-web";
 import type { Scanner, QuizIndexEntry } from "./scanner";
@@ -36,10 +35,12 @@ import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categor
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
-import { activeChatId, onChatsChanged, setActiveChat } from "./chat-session";
-import { getChats } from "./chat-store";
+import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
+import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { addAsk, answerAsk, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { decideByKeywords, defaultKindQuestion, parseKindAnswer } from "./generation-kind";
+import type { KindChoice, KindQuestion } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
@@ -318,6 +319,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    (hints, time limit, Exam mode) is chosen when it starts, never here.
 	    Holds for the page session, like the count and the type. */
 	let modeGeneration: ModeGeneration = "learn";
+	/** The request waiting for its kind (spec 2026-10-07-generate-auto-kind):
+	    shown at the end of the thread with a status line while the decide call
+	    runs. */
+	let attenteGenre: { text: string; documents: { name: string; path?: string }[] } | null = null;
+	/** The questions asked and not answered yet, by request id: what the click
+	    needs to generate (the documents' text is only in memory). A question
+	    read back from an earlier session has no entry: it cannot be answered. */
+	const questionsEnAttente = new Map<string, { envoi?: DemandeTexte; oneQuiz: boolean; jointesVideo: NoteAttachment[] }>();
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
@@ -373,7 +382,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
 	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id); };
-	const chatAContenu = (): boolean => filDuChat().length > 0;
+	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null;
 	const vueFile = creerVueFile({
 		file: fileGen,
 		ouvrir: (chemin) => {
@@ -384,6 +393,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 		copier: deps.copyText,
 		chat: chatSurEcran,
+		attente: () => attenteGenre,
+		choisirGenre: (id, kind) => repondreQuestion(id, kind),
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -710,7 +721,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	const TYPE_KEYS: TransKey[] = ["ai.type.mixed", "ai.type.single", "ai.type.multiple", "ai.type.text", "ai.type.numeric", "ai.type.cloze", "ai.type.ordering", "ai.type.matching", "ai.type.codeOutput", "ai.type.comprehension"];
 	/** What an untouched selection means: a Test is a written MCQ, a Learn
 	    lets its roles pick the types. Choosing Auto explicitly is Auto in both. */
-	const effectiveTypes = (): string[] => questionTypes ?? (modeGeneration === "learn" ? [TYPE_VALUES[0]] : [TYPE_VALUES[1], TYPE_VALUES[2]]);
+	const effectiveTypes = (kind: ModeGeneration = modeGeneration): string[] => questionTypes ?? (kind === "learn" ? [TYPE_VALUES[0]] : [TYPE_VALUES[1], TYPE_VALUES[2]]);
 	/** The grey value of the Type row and of the options tip. */
 	const typesResume = (values: string[]): string => {
 		const v = values.length ? values : [TYPE_VALUES[0]];
@@ -1957,60 +1968,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		addBtn.setAttribute("aria-label", t("ai.composer.addContent"));
 		host.ui.setIcon(addBtn, "plus");
 
-		/* Segmented selector Learn | Test (spec 2026-09-29 §4.1) — a bare left
-		   side in the manner of claude.ai's "Chat | Cowork": "+", the
-		   Learn | Test selector, then the single Options icon (count, type,
-		   destination). Two TYPES of quiz, one file each: how a Test is taken
-		   (hints, time limit, Exam mode) is chosen when it starts, so the Test
-		   button has no sub-menu. */
-		const seg = ajouter(composerBottom, "div", "qbd-ai-seg");
-		seg.setAttribute("role", "radiogroup");
-		seg.setAttribute("aria-label", t("ai.mode.group"));
-		/* The sliding block (measured on claude.ai on 2026-09-23), shared
-		   with a course's sheet: `seg-indic.ts`. */
-		const indic = ajouter(seg, "div", "qbd-ai-seg-indic");
-		const selectMode = (m: ModeGeneration): void => {
-			if (modeGeneration === m) return;
-			modeGeneration = m;
-			paintSeg(true);
-			/* The options are not the same from one type to the other: the icon
-			   lights up in accent then fades, so that a first-time user sees that
-			   something changed THERE. Removing then re-adding the class restarts
-			   the animation at each switch. */
-			optsBtn.classList.remove("qbd-ai-opts-pulse");
-			void optsBtn.offsetWidth;
-			optsBtn.classList.add("qbd-ai-opts-pulse");
-		};
-		const segBtns = (["learn", "practice"] as const).map(kind => {
-			const b = ajouter(seg, "button", "qbd-ai-seg-btn");
-			b.type = "button";
-			b.setAttribute("role", "radio");
-			/* A Test is generated as a "practice" file: the label is the type's,
-			   `quizModeLabel` reads "Test" for it. */
-			ajouter(b, "span", "qbd-ai-seg-label", quizModeLabel(kind));
-			b.addEventListener("click", () => selectMode(kind));
-			/* Each type's goal, on hover, above (reference: the bubble of
-			   claude.ai's "Chat | Cowork"). */
-			attachHoverTip(b, (tip) => {
-				tip.classList.add("qbd-hover-tip--card");
-				ajouter(tip, "div", "qbd-hover-tip-title", quizModeLabel(kind));
-				/* What GENERATING this type gives — not the course sheet's
-				   description of an existing quiz (`quizModeTip`). */
-				ajouter(tip, "div", "qbd-hover-tip-body", t(kind === "learn" ? "ai.type.learnGenerateTip" : "ai.type.testGenerateTip"));
-			});
-			return { kind, b };
-		});
-		const paintSeg = (anime: boolean): void => {
-			const courant = modeGeneration;
-			segBtns.forEach(({ kind, b }) => {
-				const active = kind === courant;
-				b.classList.toggle("is-active", active);
-				b.setAttribute("aria-checked", String(active));
-			});
-			placerIndicateur(indic, segBtns.find(({ kind }) => kind === courant)!.b, anime);
-		};
-		// Measure after insertion in the document (real widths of the options).
-		requestAnimationFrame(() => paintSeg(false));
+		/* No Learn | Test selector any more (spec 2026-10-07-generate-auto-kind):
+		   the kind is decided when the request is sent (`decideGenre`). */
 		const optsBtn = ajouter(composerBottom, "button", "qbd-ai-composer-opts");
 		optsBtn.type = "button";
 		host.ui.setIcon(optsBtn, "settings-2");
@@ -2177,7 +2136,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			composer.classList.add("qbd-ai-composer--sans-fournisseur");
 			composerInput.disabled = true;
 			addBtn.disabled = true;
-			segBtns.forEach(({ b }) => { b.disabled = true; });
 			optsBtn.hidden = true;
 			// Posé par buildProviderControl, dans une fermeture : TS ne le voit pas.
 			const bouton = (providerSelect as ProviderControl | null)?.el;
@@ -4030,22 +3988,111 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   écouteurs `document` (Esc, collage) continueraient de tourner sous la
 		   génération CLI qui vient de partir. */
 		arreterAttenteWeb();
-		if (aiProviders.estCanalWeb(settings().aiProvider || "")) {
-			/* Le composer GARDE la demande pendant l'attente du site ; tout ce
-			   qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit
-			   qu'une demande à la fois : le premier fichier part, les autres
-			   attendent la réponse du précédent (`recevoirReponse`). */
-			/* ONE PASS (2026-10-01): with several documents the site gets ALL of
-			   them in one request and answers with one quiz per document. */
-			const parFichier = decouperParFichier(takeComposerMessage(jointesVideo), oneQuiz, lectureEnUnePasse(settings().aiProvider || ""));
-			lotWebRestant = parFichier.slice(1);
-			lotWebPremier = null;
-			lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
-			await ouvrirSite(parFichier[0], container);
-			return;
+		const web = aiProviders.estCanalWeb(settings().aiProvider || "");
+		const commandeExam = !!examCible || retirerCommandeExam(composerText).commande;
+		/* The kind of quiz: an "/exam" preparation plans both; otherwise the
+		   request says it, or the model decides, or the user is asked. */
+		let genre: KindChoice | null = "learn";
+		if (!commandeExam) {
+			demarrage = true;
+			try { genre = await decideGenre(container, jointesVideo, web); } finally { demarrage = false; }
 		}
-		envoyerDansLaFile(jointesVideo);
+		if (!genre) return;
+		if (web) await lancerSurSite(container, jointesVideo, genre);
+		else {
+			envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
+			render(container);
+		}
+	}
+
+	/** Le canal web : le composer GARDE la demande pendant l'attente du site ;
+	    tout ce qui suit lit `msg`, jamais l'état du composer. Un site ne reçoit
+	    qu'une demande à la fois : le premier fichier part, les autres attendent
+	    la réponse du précédent (`recevoirReponse`). A site cannot make both
+	    kinds from one request: `both` starts with the Learn. */
+	async function lancerSurSite(container: HTMLElement | null, jointesVideo: NoteAttachment[], genre: KindChoice): Promise<void> {
+		modeGeneration = genre === "practice" ? "practice" : "learn";
+		/* ONE PASS (2026-10-01): with several documents the site gets ALL of
+		   them in one request and answers with one quiz per document. */
+		const parFichier = decouperParFichier(takeComposerMessage(jointesVideo), oneQuiz, lectureEnUnePasse(settings().aiProvider || ""));
+		lotWebRestant = parFichier.slice(1);
+		lotWebPremier = null;
+		lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
+		await ouvrirSite(parFichier[0], container);
+	}
+
+	/** What the composer holds, as a request (a copy: the generation never
+	    reads the composer's state). */
+	function capturerEnvoi(jointesVideo: NoteAttachment[]): DemandeTexte {
+		return { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
+	}
+
+	/* ── WHICH KIND (spec 2026-10-07-generate-auto-kind) ──
+	   1. the request says it (keywords, no AI call);
+	   2. else ONE short call to the same provider (not on a site: nothing to
+	      call) answers a kind or a question;
+	   3. a question, or any failure of the call, is the card of the thread:
+	      nothing generates until a click.
+	   Returns the kind to generate NOW, or `null` when the request was already
+	   sent (the model answered a kind) or a question was put to the user. */
+	async function decideGenre(container: HTMLElement | null, jointesVideo: NoteAttachment[], web: boolean): Promise<KindChoice | null> {
+		const envoi = capturerEnvoi(jointesVideo);
+		const rapide = decideByKeywords(envoi.text);
+		if (rapide) return rapide;
+		const pieces = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
+		if (web || !settings().aiProvider) {
+			poserQuestion(container, envoi, defaultKindQuestion(t), { oneQuiz, jointesVideo, garderComposer: true });
+			return null;
+		}
+		const seulQuiz = oneQuiz;
+		attenteGenre = { text: envoi.text, documents: pieces };
+		viderComposer();
 		render(container);
+		let reponse: KindQuestion | { kind: KindChoice } | null = null;
+		try {
+			const client = createAiClient(deps.settings);
+			reponse = parseKindAnswer(await client.decideKind(envoi.text, pieces.map(p => p.name)));
+		} catch (err) {
+			console.warn(LOG_PREFIX, "decide call failed, asking the default question", err);
+		} finally {
+			attenteGenre = null;
+		}
+		if (reponse && "kind" in reponse) {
+			envoyerDansLaFile(envoi, reponse.kind, { dejaVide: true, oneQuiz: seulQuiz });
+			render(container);
+			return null;
+		}
+		poserQuestion(container, envoi, reponse ?? defaultKindQuestion(t), { oneQuiz: seulQuiz, jointesVideo, garderComposer: false });
+		return null;
+	}
+
+	/** Records the question under its request and paints it; the generation
+	    waits for `repondreQuestion`. On a site the composer keeps the request
+	    (as it does while the site works), so nothing else is kept. */
+	function poserQuestion(container: HTMLElement | null, envoi: DemandeTexte, q: KindQuestion, opts: { oneQuiz: boolean; jointesVideo: NoteAttachment[]; garderComposer: boolean }): void {
+		const id = newRequestId();
+		const documents = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
+		setChats(addAsk(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents }, { question: q.ask, options: q.options }));
+		questionsEnAttente.set(id, { envoi: opts.garderComposer ? undefined : envoi, oneQuiz: opts.oneQuiz, jointesVideo: opts.jointesVideo });
+		notifyChatsChanged();
+		render(container);
+	}
+
+	/** The click on an answer of a question card: records it and starts the
+	    generation of that kind (a Learn then a Test for `both`). */
+	function repondreQuestion(requestId: string, kind: KindChoice): void {
+		const attente = questionsEnAttente.get(requestId);
+		if (!attente) { host.ui.notice(t("ai.kind.expired")); return; }
+		const chatId = activeChatId();
+		const sentAt = getChats().find(c => c.id === chatId)?.requests.find(q => q.id === requestId)?.at;
+		const r = answerAsk(getChats(), chatId, requestId, kind, Date.now());
+		if (!r.changed) return;
+		questionsEnAttente.delete(requestId);
+		setChats(r.chats);
+		notifyChatsChanged();
+		if (!attente.envoi) { void lancerSurSite(containerRef, attente.jointesVideo, kind); return; }
+		envoyerDansLaFile(attente.envoi, kind, { dejaVide: true, oneQuiz: attente.oneQuiz, requestId, sentAt });
+		render(containerRef);
 	}
 
 	/** Un envoi par CLI part dans la FILE de l'application (spec 2026-09-26) :
@@ -4054,8 +4101,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    un réglage ensuite ne touche que les envois suivants. Le composer se
 	    vide aussitôt et reste libre : on peut préparer la demande suivante
 	    pendant que celle-ci tourne. */
-	function envoyerDansLaFile(jointesVideo: NoteAttachment[]): void {
-		const envoi: DemandeTexte = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
+	function envoyerDansLaFile(envoi: DemandeTexte, genre: KindChoice | "exam", repris: { dejaVide: boolean; oneQuiz?: boolean; requestId?: string; sentAt?: number }): void {
+		const seulQuiz = repris.oneQuiz ?? oneQuiz;
+		const vider = (): void => { if (!repris.dejaVide) viderComposer(); };
 		/* A FOLLOW-UP carries the chat's history: the earlier requests of the
 		   chat on screen (live or read back from its record), their documents
 		   (kept when this one attaches none) and what the quizzes produced
@@ -4063,7 +4111,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   the names of the documents, the titles and files of the quizzes, the
 		   written answers. */
 		const chatId = activeChatId();
-		const tours = toursOfThread(filDuChat());
+		// The request being sent is not its own history (a question card keeps its record).
+		const tours = toursOfThread(filDuChat().filter(i => i.key !== repris.requestId));
 		if (tours.length) {
 			envoi.contexte = contexteConversation(tours);
 			if (!envoi.notes.length && !envoi.images.length) {
@@ -4075,7 +4124,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		/* THE IDENTITY of the send: the chat on screen, ONE request id for every
 		   line it makes, and the time. */
-		const identite = { chatId, requestId: newRequestId(), sentAt: Date.now() };
+		const identite = { chatId, requestId: repris.requestId ?? newRequestId(), sentAt: repris.sentAt ?? Date.now() };
 		const reglages = figerReglages(settings());
 		/* "/exam": a whole PREPARATION over every document at once — a Learn
 		   over everything that can come up, then Tests of rising difficulty,
@@ -4100,7 +4149,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const d: DemandeTexte = { ...envoi, text: texte };
 			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
 			const examen = examCible ?? undefined;
-			const base = { count: null, type: effectiveTypes(), destination, reglages, categorie };
+			const base = { count: null, type: effectiveTypes("learn"), destination, reglages, categorie };
 			/* THE RIGHT NUMBER OF QUIZZES: one Learn per document (CM1, CM2, CM3
 			   each get their path), then the Tests of rising difficulty over
 			   all of them together. One `lot`: the queue shows the request once
@@ -4109,22 +4158,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   then chooses the quizzes; each comes behind it in the queue, and
 			   the sidebar shows the plan as it goes. Learn | Test decides the
 			   kind of quizzes planned. */
-			fileGen.envoyer({ ...d, ...base, ...identite, mode: modeGeneration, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
+			fileGen.envoyer({ ...d, ...base, ...identite, mode: "learn", mixte: true, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
 			examCible = null;
-			viderComposer();
+			vider();
 			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
 			return;
 		}
 		/* ONE PASS (2026-10-01): N quizzes = ONE line of the queue, ONE
 		   generation that reads every document and writes one quiz per
 		   document (Ollama keeps one line per document: `lectureEnUnePasse`). */
-		for (const d of decouperParFichier(envoi, oneQuiz, lectureEnUnePasse(reglages.aiProvider || ""))) {
-			/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
-			   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
-			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
-			fileGen.envoyer({ ...d, ...identite, mode: modeGeneration, count: questionCount, type: effectiveTypes(), destination, reglages, categorie });
+		/* `both` (spec 2026-10-07-generate-auto-kind): a Learn, then a Test on
+		   the same documents, behind it in the queue, one request. */
+		const genres: ModeGeneration[] = genre === "both" ? ["learn", "practice"] : [genre === "practice" ? "practice" : "learn"];
+		for (const mode of genres) {
+			for (const d of decouperParFichier(envoi, seulQuiz, lectureEnUnePasse(reglages.aiProvider || ""))) {
+				/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
+				   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
+				const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
+				fileGen.envoyer({ ...d, ...identite, mode, count: questionCount, type: effectiveTypes(mode), destination, reglages, categorie });
+			}
 		}
-		viderComposer();
+		vider();
 		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
 		if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
 	}

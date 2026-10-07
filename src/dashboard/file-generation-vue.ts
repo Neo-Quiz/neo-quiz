@@ -29,6 +29,8 @@ import * as aiProviders from "./ai-providers";
 import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
 import { peindrePieces, peindreTourEnregistre } from "./chat-record-vue";
+import { peindreQuestionGenre } from "./generation-kind-vue";
+import type { KindChoice } from "./generation-kind";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
@@ -44,6 +46,8 @@ export interface VueFile {
 	rendre(parent: HTMLElement): void;
 	/** Désabonne la vue et arrête l'horloge : la page se démonte. */
 	liberer(): void;
+	/** Repaints the thread (the page changed what `attente` returns). */
+	repeindre(): void;
 }
 
 /** « 0:42 », « 12:05 » — le temps écoulé, sans unité à traduire. */
@@ -77,6 +81,11 @@ export function creerVueFile(opts: {
 	copier?: (texte: string) => Promise<boolean>;
 	/** The chat on screen and its record (null until something is recorded). */
 	chat: () => { id: string; record: ChatRecord | null };
+	/** A request waiting for the kind of quiz to be decided (spec
+	    2026-10-07-generate-auto-kind): shown last, with a status line. */
+	attente?: () => { text: string; documents: { name: string; path?: string }[] } | null;
+	/** The click on an answer of a question card (a recorded request, nothing live yet). */
+	choisirGenre?: (requestId: string, kind: KindChoice) => void;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -520,7 +529,7 @@ export function creerVueFile(opts: {
 		const { id: chatId, record } = opts.chat();
 		const items = threadItems(record, opts.file.lignes(), chatId);
 		for (const item of items) {
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, choisirGenre: opts.choisirGenre }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");
@@ -530,6 +539,9 @@ export function creerVueFile(opts: {
 			const tour = ajouter(zone, "div", "qbd-ai-tour");
 			tour.setAttribute("role", "listitem");
 			peindreMessage(tour, montrees[0], lignes);
+			// The question that was asked before this request generated stays under it, answered.
+			const question = record?.requests.find(q => q.id === item.key)?.ask;
+			if (question) peindreQuestionGenre(tour, question);
 			for (const l of montrees) {
 				/* As MonoCode: while the model works, its status line then its
 				   activity; once done, the activity summary then the answer. */
@@ -539,9 +551,23 @@ export function creerVueFile(opts: {
 			const lot = montrees[0].demande.preparation?.lot;
 			if (lot) peindreAvancement(tour, lot, lignes);
 		}
+		const attente = opts.attente?.() ?? null;
+		if (attente) {
+			const tour = ajouter(zone, "div", "qbd-ai-tour");
+			tour.setAttribute("role", "listitem");
+			tour.dataset.attente = "1";
+			const message = ajouter(tour, "div", "qbd-ai-message");
+			if (attente.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), attente.documents);
+			if (attente.text.trim()) ajouter(message, "div", "qbd-ai-bulle", attente.text.trim());
+			const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--cours");
+			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
+			logo.setAttribute("aria-hidden", "true");
+			host.ui.setIcon(logo, "sparkles");
+			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.kind.deciding"));
+		}
 		/* A NEW item is read from the key of the last one, not from the count: a
 		   reply closed while a request goes out leaves the count unchanged. */
-		const dernier = items.length ? items[items.length - 1].key : "";
+		const dernier = attente ? "waiting" : items.length ? items[items.length - 1].key : "";
 		const nouveau = dernier !== dernierPeint;
 		dernierPeint = dernier;
 		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
@@ -582,5 +608,6 @@ export function creerVueFile(opts: {
 			peindre();
 		},
 		liberer,
+		repeindre: peindre,
 	};
 }

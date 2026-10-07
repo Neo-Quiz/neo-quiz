@@ -82,11 +82,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.type.count": "{count} types",
 
 	/* ── Type de quiz : Learn / Test (composer) ── */
-	"ai.type.learnGenerateTip": "Générer un quiz optimisé pour apprendre : de courtes lectures, une question avant chacune et la correction aussitôt, jusqu'à ce que ça tienne.",
-	"ai.type.testGenerateTip": "Générer un quiz optimisé pour se tester : des questions au format de l'examen, chacune expliquée, à passer avec ou sans indices et temps limité.",
 	"ai.mode.learnTip": "Apprendre un cours pas à pas : une question avant chaque passage, la correction aussitôt, jusqu'à ce que ça tienne.",
 	"ai.mode.practiceTip": "S'entraîner sur des exercices pour préparer votre examen, chaque erreur expliquée. Au lancement, vous pouvez le jouer comme un examen chronométré.",
-	"ai.mode.group": "Type de quiz",
 	/* Bascule « N quiz <-> 1 quiz », sous les documents joints */
 	"ai.oneQuiz.label": "Un seul quiz",
 	"ai.oneQuiz.tipOne": "Les {count} documents forment un seul quiz. Cliquer pour un quiz par document.",
@@ -582,5 +579,12 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.format.flashcardNoAnswer": "{count} carte(s) n'ont pas de réponse au verso : {names}.",
 	"ai.format.runInLastHintInvalid": "{count} question(s) débloquent l'exécution de leur code là où c'est impossible (il faut un bloc exécutable dans l'énoncé, au moins 2 niveaux d'indice, jamais une sortie de programme) : {names}.",
 	"ai.format.notLearn": "Le modèle n'a pas produit de parcours : la note est enregistrée comme Test.",
+	// Generate demande quel type de quiz quand la demande ne le dit pas (spec 2026-10-07).
+	"ai.kind.question": "Tu veux apprendre ou t'entraîner ?",
+	"ai.kind.learn": "Apprendre",
+	"ai.kind.practice": "M'entraîner",
+	"ai.kind.both": "Les deux",
+	"ai.kind.deciding": "Choix du bon format…",
+	"ai.kind.expired": "Cette question n'a plus de réponse possible ici. Renvoie ta demande.",
 
 };

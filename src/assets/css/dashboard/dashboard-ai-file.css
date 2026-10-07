@@ -1262,3 +1262,72 @@
 	top: -8px;
 	right: -8px;
 }
+
+/* La question « apprendre ou s'entraîner ? » : un contenu, donc une tuile ;
+   ses réponses sont des lignes à plat, sans bouton encadré dans la carte. */
+.qbd-ai-kind {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: min(460px, 100%);
+	box-sizing: border-box;
+	padding: 12px 8px 8px;
+	border-radius: 12px;
+	border: 1px solid var(--qbd-glass-edge, var(--background-modifier-border));
+	background: var(--qbd-glass-bg, var(--background-secondary));
+	backdrop-filter: var(--qbd-glass-blur, none);
+	-webkit-backdrop-filter: var(--qbd-glass-blur, none);
+}
+
+.qbd-ai-kind-question {
+	padding: 0 8px 4px;
+	color: var(--text-normal);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.qbd-ai-kind-options {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.qbd-ai-kind-option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	min-height: 34px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--interactive-accent);
+	font-size: 14px;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+}
+
+.qbd-ai-kind-option:hover:not(:disabled) {
+	background: var(--background-modifier-hover) !important;
+}
+
+.qbd-ai-kind-option:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.qbd-ai-kind-label { min-width: 0; overflow-wrap: anywhere; }
+
+.qbd-ai-kind-check { display: inline-flex; flex-shrink: 0; }
+.qbd-ai-kind-check svg { width: 16px; height: 16px; }
+
+/* Answered (or waiting for a click that cannot come): the chosen row stays
+   lit, the others fade. */
+.qbd-ai-kind.is-answered .qbd-ai-kind-option:not(.is-chosen) {
+	color: var(--text-faint);
+	font-weight: 500;
+}
+.qbd-ai-kind-option:disabled { cursor: default; }
