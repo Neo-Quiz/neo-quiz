@@ -216,10 +216,14 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   dossier ARCHIVÉ depuis sa carte de la section « Archivés » et on y voit
 	   son contenu) est calculé UNE fois par render() — mêmes quiz que les
 	   stats du header. */
-	/* L'onglet du dossier ouvert : revient à « Contenu » quand on change de
-	   dossier, reste sur un re-rendu du même dossier. */
+	/* L'onglet du dossier ouvert : celui où ce dossier avait été laissé (« Contenu »
+	   la première fois) quand on change de dossier, inchangé sur un re-rendu du
+	   même dossier. */
 	let ongletDossier: OngletDossier = "contenu";
 	let ongletPour: string | null = null;
+	/* The last tab each folder was left on, for the session: a folder reopens
+	   where it was, "Content" only the first time. */
+	const ongletsMemorises = new Map<string, OngletDossier>();
 	let vuesDossier: VuesDossier | null = null;
 	/* Where the back arrow of the open folder goes instead of the grid, when the
 	   folder was opened from another page (Generate's "Generated quizzes"). One
@@ -326,7 +330,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 
 		// Entry transition (spec 2026-07-20): the class is set ONLY when the
 		// view changes — mechanism shared with the home page (view-enter.ts).
-		if (openModuleFolder !== ongletPour) { ongletDossier = "contenu"; ongletPour = openModuleFolder; }
+		if (openModuleFolder !== ongletPour) {
+			ongletDossier = (openModuleFolder !== null ? ongletsMemorises.get(openModuleFolder) : undefined) ?? "contenu";
+			ongletPour = openModuleFolder;
+		}
 		vuesDossier = null;
 		const viewKey = openModuleFolder ?? "root";
 		const entering = viewKey === "root" ? regrouping : viewKey !== lastPaintedView;
@@ -426,6 +433,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			if (!sas) {
 				renderOngletsDossier(ligneHaut, ongletDossier, (onglet) => {
 					ongletDossier = onglet;
+					if (openModuleFolder !== null) ongletsMemorises.set(openModuleFolder, onglet);
 					if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
 				});
 			}
@@ -603,6 +611,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// quand `openModuleFolder !== ongletPour` (changement de dossier).
 			ongletDossier = onglet;
 			ongletPour = folder;
+			ongletsMemorises.set(folder, onglet);
 			if (containerRef) render(containerRef);
 		},
 		openFolderOfQuiz(quizPath: string, retour?: () => void) {
