@@ -1421,3 +1421,26 @@ html.nq-mobile ::-webkit-scrollbar {
 .is-mobile .qbd-qz-enter .qbd-qz-main {
 	animation: none;
 }
+
+/* ── No decorative animation that never ends (phone audit, 2026-10-08) ──
+   A page that stands still must not run anything. On Home with a quiz to
+   resume, the Resume card's 3D button (cta3d) kept its light sweep going
+   forever, even scrolled out of view: the keyframes move the sweep by
+   `cqw`, a unit that needs layout, so Blink animated it on the MAIN thread
+   and restyled, painted and committed a frame on every vsync (120 Hz here:
+   WebView renderer 10 to 39 % and app process 7 to 18 % of a core, battery
+   included, on a still page). The sweep of the current bead of a played
+   quiz does the same through `background-position`. On a phone both stay
+   still: the button keeps its 3D face, the bead its plain colour. The
+   desktop keeps both (a window that is not a battery). Any new infinite
+   animation is a decision: `check:idle-animations` refuses an unlisted one. */
+.nq-mobile .qbd-cta3d-clip svg {
+	animation: none;
+	will-change: auto;
+}
+
+.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active,
+.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+	animation: none;
+	background-image: none;
+}

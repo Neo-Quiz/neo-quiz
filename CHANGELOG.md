@@ -26,6 +26,7 @@ release notes.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- On Android, the Resume button's light sweep and the current question bead's sweep no longer run forever: a still Home page kept the app at 10 to 40 % of a core, and now sits idle.
 - The Android app no longer keeps the CPU busy while idle (the tab bar was being refreshed every frame).
 - Opening a folder, or coming back from a quiz page, on a phone no longer shows an empty screen then cards appearing one by one.
 - Swiping between the main pages on a phone no longer leaves an empty screen while the next page is built.
