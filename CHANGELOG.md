@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.42] - 2026-10-07
+
 ### Changed
 - On a metered connection, updates and Moodle files wait for your click instead of downloading on their own.
 - The update window can be minimised, and shows the same download and install steps as the installer.
