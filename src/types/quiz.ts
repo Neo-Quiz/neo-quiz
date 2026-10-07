@@ -420,6 +420,8 @@ export interface QuizState {
 	/** Élément en cours de sélection pour glisser-déposer, question d'association (engine/interactions.js). */
 	matchPick: Array<number | null>;
 	isSliding: boolean;
+	/** Set by a committed finger swipe: the next slide animation takes this many ms, on the decelerate curve (consumed once). */
+	swipeSettleMs?: number | null;
 	slideToken: number;
 	/**
 	 * Task 7, mode Lesson : une question `role: "pre"` marquée « Je ne sais pas »

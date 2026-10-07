@@ -19,6 +19,8 @@ export interface TrackHandlers {
 	animateTrackToIndex(targetIndex: number, opts?: { fromX?: number | null; fromHeight?: number | null; refreshTargetHeight?: boolean }): void;
 }
 
+import { SETTLE_EASING } from "../swipe";
+
 export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 	// Variables locales
 	let __quizTrackTransitionFallbackTimer = 0;
@@ -243,8 +245,10 @@ export function createTrackHandlers(ctx: EngineCtx): TrackHandlers {
 		const deltaPx = Math.abs(targetX - startX);
 		const viewportWidth = Math.max(1, viewport.clientWidth || Math.ceil(viewport.getBoundingClientRect().width) || 1);
 		const dist = Math.max(1, deltaPx / viewportWidth);
-		const dur = slideDuration(dist);
-		const trackEase = getTrackEaseForDistance(dist);
+		const swipeMs = ctx.quizState.swipeSettleMs ?? null;
+		ctx.quizState.swipeSettleMs = null;
+		const dur = swipeMs ?? slideDuration(dist);
+		const trackEase = swipeMs != null ? SETTLE_EASING : getTrackEaseForDistance(dist);
 
 		track.__quizTargetX = targetX;
 		track.__quizTargetIndex = targetIndex;

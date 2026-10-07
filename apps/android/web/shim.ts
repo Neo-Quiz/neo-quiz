@@ -35,6 +35,8 @@ declare global {
 			barre(etat: unknown): void;
 			/** A tap on a tab of that native bar: its index. */
 			surBarreClic(rappel: (index: number) => void): void;
+			/** A short haptic tick (a swipe changed page). */
+			haptique(): void;
 		};
 	}
 }
@@ -314,4 +316,5 @@ abonner<void>("android.retour", () => {
 window.neoPlatform = { mobile: true, resourceBase: `${location.origin}/neo-res/`, surRetour: (gestionnaire) => { gestionnaireRetour = gestionnaire; },
 	barre: (etat) => { void appeler("android.barre", [etat]).catch(() => {}); },
 	surBarreClic: (rappel) => { abonner<number>("android.barreClic", rappel); },
+	haptique: () => { void appeler("android.haptique").catch(() => {}); },
 };

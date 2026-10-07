@@ -136,7 +136,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val created = Bridge(
         scope,
         Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it) }.handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar::apply).handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
     )
     bridge = created
     return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar)

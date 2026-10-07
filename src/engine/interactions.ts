@@ -2,7 +2,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 import type { OrderingQuestion, MatchingQuestion } from "../types/quiz";
 import { t } from "../i18n";
 import { stepMembers } from "./step-page";
-import { bindSwipe } from "../swipe";
+import { bindSwipe, hapticTick, prefersReducedMotion, settleDuration, SETTLE_EASING } from "../swipe";
 
 /** Charge utile du drag-and-drop (ordering/matching), sérialisée en JSON dans le dataTransfer. */
 interface DragPayload {
@@ -598,10 +598,54 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			if (ctx.quizState.isSliding) return;
 			if (navigate(e.key === "ArrowRight")) e.preventDefault();
 		};
-		// A swipe on the played quiz is the same move as the arrows.
+		/* A swipe on the played quiz is the same move as the arrows, and the
+		   track FOLLOWS THE FINGER (translate3d only, no layout). */
+		const canMove = (forward: boolean): boolean => {
+			const cur = ctx.quizState.current;
+			if (forward) {
+				if (ctx.isQuestionSlideIndex(cur)) return !(ctx.handIn.isTest() && ctx.slideMap[cur + 1]?.type !== "question");
+				return ctx.isSubmitSlideIndex(cur);
+			}
+			return ctx.isResultsSlideIndex(cur) || ctx.isSubmitSlideIndex(cur) || cur > 0;
+		};
+		const trackEl = () => ctx.viewport.getTrackElements().track;
+		let resting = "";
+		let dragging = false;
+		const settleBack = (fromOffset: number, width: number) => {
+			const track = trackEl();
+			if (!track) return;
+			const home = ctx.track.getSlideTranslateX(ctx.quizState.current);
+			const ms = prefersReducedMotion() ? 0 : settleDuration(fromOffset, width);
+			track.style.transition = ms ? `transform ${ms}ms ${SETTLE_EASING}` : "none";
+			ctx.track.setTrackTransformPx(home);
+			window.setTimeout(() => { if (!dragging) track.style.transition = resting; }, ms + 30);
+		};
 		ctx.__quizGlobalCleanups.push(bindSwipe(ctx.container, d => {
 			if (ctx.__quizDestroyed || ctx.quizState.isSliding) return;
 			navigate(d === "next", true);
+		}, undefined, {
+			canGo: dir => !ctx.__quizDestroyed && !ctx.quizState.isSliding && canMove(dir === "next"),
+			drag: offset => {
+				const track = trackEl();
+				if (!track || ctx.__quizDestroyed || ctx.quizState.isSliding) return;
+				if (!dragging) { dragging = true; resting = track.style.transition; track.style.transition = "none"; }
+				ctx.track.setTrackTransformPx(ctx.track.getSlideTranslateX(ctx.quizState.current) + offset);
+			},
+			release: (dir, offset, _v, width) => {
+				if (!dragging) return;
+				dragging = false;
+				const track = trackEl();
+				if (!track) return;
+				if (!dir) { dragging = true; settleBack(offset, width); dragging = false; return; }
+				const remaining = width - Math.abs(offset);
+				ctx.quizState.swipeSettleMs = prefersReducedMotion() ? 0 : settleDuration(remaining, width);
+				track.style.transition = resting;
+				const before = ctx.quizState.current;
+				const moved = navigate(dir === "next", true);
+				ctx.quizState.swipeSettleMs = null;
+				if (moved && (ctx.quizState.current !== before || ctx.quizState.isSliding)) hapticTick();
+				else { dragging = true; settleBack(offset, width); dragging = false; }
+			},
 		}));
 		// Bindé sur le container (pas document) : le keydown ne remonte au handler que
 		// si le focus est DANS ce quiz. Sinon plusieurs blocs quiz d'une même note

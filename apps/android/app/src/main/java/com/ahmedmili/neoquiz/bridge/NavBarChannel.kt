@@ -9,13 +9,18 @@ import org.json.JSONArray
  * `android.barre`: the page publishes the state of its bottom tab bar (labels, active tab, icons,
  * visibility) and `NavBarView` draws it natively (see its comment for why). Phone only.
  */
-class NavBarChannel(private val apply: (JSONObject) -> Unit) {
+class NavBarChannel(private val apply: (JSONObject) -> Unit, private val tick: () -> Unit = {}) {
     private val main by lazy { Handler(Looper.getMainLooper()) }
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
         "android.barre" to { a ->
             val state = a.optJSONObject(0) ?: throw IllegalArgumentException("barre: etat manquant")
             main.post { apply(state) }
+            null
+        },
+        /* A short tick when a swipe changes page (the page asks, the view performs). */
+        "android.haptique" to { _ ->
+            main.post { tick() }
             null
         },
     )

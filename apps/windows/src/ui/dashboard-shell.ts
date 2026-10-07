@@ -35,7 +35,7 @@ import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 import { dossierParDefaut } from "../../../../src/dashboard/generation-demande";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
-import { bindSwipe, nextTab } from "../../../../src/swipe";
+import { bindSwipe, nextTab, hapticTick, prefersReducedMotion, settleDuration, SETTLE_EASING } from "../../../../src/swipe";
 import { createNavHandlers } from "../../../../src/dashboard/nav";
 import { createHomeHandlers } from "../../../../src/dashboard/home";
 import { createQuizzesHandlers } from "../../../../src/dashboard/quizzes";
@@ -969,15 +969,50 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   tab, in bottom-bar order, by clicking that tab's button (the very path of
 	   a tap on the bar: history, highlight and view transition stay the same).
 	   Not on a quiz or folder page (sheets stacked), not under a menu. */
-	bindSwipe(contentEl, dir => {
-		if (!currentHost().platform.isMobile || sheets.depth() > 0) return;
-		const btns = Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item"))
-			.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
-		const key = (b: HTMLElement) => b.dataset.nav ?? "settings";
+	const tabButtons = () => Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item"))
+		.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
+	const tabKey = (b: HTMLElement) => b.dataset.nav ?? "settings";
+	const tabTarget = (dir: "next" | "prev"): HTMLElement | null => {
+		if (!currentHost().platform.isMobile || sheets.depth() > 0) return null;
+		const btns = tabButtons();
 		const current = btns.find(b => b.classList.contains("qbd-nav-item--active"));
-		const target = current && nextTab(key(current), dir, btns.map(key));
-		if (target) btns.find(b => key(b) === target)?.click();
-	}, () => !!document.querySelector(".qbd-select-menu"));
+		const target = current && nextTab(tabKey(current), dir, btns.map(tabKey));
+		return target ? btns.find(b => tabKey(b) === target) ?? null : null;
+	};
+	let swipeAnim: Animation | null = null;
+	bindSwipe(contentEl, dir => tabTarget(dir)?.click(), () => !!document.querySelector(".qbd-select-menu"), {
+		canGo: dir => tabTarget(dir) !== null,
+		drag: offset => {
+			swipeAnim?.cancel(); swipeAnim = null;
+			contentEl.style.transform = `translate3d(${offset}px, 0, 0)`;
+			contentEl.style.opacity = String(Math.max(0.55, 1 - Math.abs(offset) / (window.innerWidth * 1.2)));
+		},
+		release: (dir, offset, _v, width) => {
+			const reduced = prefersReducedMotion();
+			const from = `translate3d(${offset}px, 0, 0)`;
+			const clear = () => { contentEl.style.transform = ""; contentEl.style.opacity = ""; };
+			const target = dir ? tabTarget(dir) : null;
+			if (!dir || !target) {
+				// Spring back.
+				clear();
+				if (!reduced) swipeAnim = contentEl.animate([{ transform: from, opacity: 1 }, { transform: "none", opacity: 1 }], { duration: settleDuration(offset, width), easing: SETTLE_EASING });
+				return;
+			}
+			// The page leaves along the finger, the neighbour tab enters from the other side.
+			const sign = dir === "next" ? -1 : 1;
+			const exit = reduced ? 0 : Math.round(settleDuration(width - Math.abs(offset), width) * 0.5);
+			const enter = () => {
+				clear();
+				target.click();
+				hapticTick();
+				if (!reduced) swipeAnim = contentEl.animate([{ transform: `translate3d(${-sign * width * 0.25}px, 0, 0)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 220, easing: SETTLE_EASING });
+			};
+			if (!exit) { enter(); return; }
+			swipeAnim?.cancel();
+			swipeAnim = contentEl.animate([{ transform: from, opacity: Number(contentEl.style.opacity || 1) }, { transform: `translate3d(${sign * width * 0.3}px, 0, 0)`, opacity: 0 }], { duration: exit, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+			swipeAnim.onfinish = () => { swipeAnim?.cancel(); enter(); };
+		},
+	});
 	/* The app's mark at the top of the rail, above Home (StudySmarter's
 	   layout), a line-drawn SVG in the rail's colour instead of the app's
 	   bitmap icon (`shell.css`, `.nq-rail-logo`). Since 2026-09-29 it opens

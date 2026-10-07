@@ -5,7 +5,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/swipe.ts", ({ decideSwipe, nextTab }) => {
+await withSrcModule("src/swipe.ts", ({ decideSwipe, nextTab, lockAxis, followOffset, releaseVelocity, releaseVerdict, settleDuration }) => {
 	const r = makeReporter("Swipe between pages");
 	const base = { dx: -80, dy: 10, ms: 200, startX: 200, viewportWidth: 400,
 		inHorizontalScroller: false, inTextField: false, modalOpen: false };
@@ -29,5 +29,22 @@ await withSrcModule("src/swipe.ts", ({ decideSwipe, nextTab }) => {
 	r.check("next past the last tab clamps", nextTab("settings", "next", tabs), null);
 	r.check("a hidden tab is skipped", nextTab("quizzes", "next", tabs), "settings");
 	r.check("an unknown current tab goes nowhere", nextTab("detail", "next", tabs), null);
+	// Finger following.
+	r.check("under the slop stays pending", lockAxis(6, 3), "pending");
+	r.check("horizontal past the slop locks h", lockAxis(-14, 4), "h");
+	r.check("vertical past the slop locks v", lockAxis(4, 14), "v");
+	r.check("a diagonal favouring y locks v", lockAxis(11, 12), "v");
+	r.check("possible move follows 1:1", followOffset(-80, true), -80);
+	r.check("an end resists at 0.3", followOffset(-100, false), -30);
+	r.check("velocity over the last 100 ms", releaseVelocity([{ x: 0, t: 0 }, { x: 50, t: 200 }, { x: 80, t: 250 }, { x: 120, t: 300 }]), 0.7);
+	r.check("a lone sample has no velocity", releaseVelocity([{ x: 0, t: 0 }]), 0);
+	r.check("fast fling commits a short drag", releaseVerdict(-40, -0.6, 400, true), "next");
+	r.check("slow short drag springs back", releaseVerdict(-60, -0.1, 400, true), "none");
+	r.check("slow drag past 40 % commits", releaseVerdict(170, 0.05, 400, true), "prev");
+	r.check("fast fling against the drag does not commit", releaseVerdict(-40, 0.6, 400, true), "none");
+	r.check("a twitch (5 px) never commits by velocity", releaseVerdict(-5, -2, 400, true), "none");
+	r.check("an end never commits", releaseVerdict(-300, -2, 400, false), "none");
+	r.check("settle is 300 ms from far", settleDuration(400, 400), 300);
+	r.check("settle is shorter when close", settleDuration(40, 400), 192);
 	r.done();
 });

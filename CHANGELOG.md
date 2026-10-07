@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- On the phone, swiping follows your finger and snaps to the next page like a native app, with a short vibration.
 - Settings has a Moodle section: sign in, choose your courses, and their files arrive in your Neo Quiz folder, with your assignments and deadlines.
 - Generate no longer asks Learn or Test: it picks from your request, or asks you with clickable answers.
 - Scanning the PC's pairing QR code no longer asks for a second confirmation on the PC.

@@ -14,6 +14,7 @@ object Channels {
         "android.calendrier",
         "android.revisionDemandee",
         "android.barre",
+        "android.haptique",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",
