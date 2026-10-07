@@ -2,8 +2,6 @@
    mesuré le 2026-09-23). `jsglobals: {}` coupe le module `js`, mais ce
    n'est PAS une frontière de sécurité : la CSP du schéma (pas
    d'`unsafe-eval`) et la partition du principal le sont. */
-import { loadPyodide } from "./pyodide/pyodide.mjs";
-
 const PLAFOND = 20000;
 /* Le prélude remplace `sys.stdin` et `input()` : l'invite PUIS la ligne
    lue sont écrites, comme dans un vrai terminal. La sortie ressemble ainsi
@@ -29,7 +27,11 @@ const PRELUDE = [
    second `executer` ici. `pret` ne sert donc qu'à distinguer « chargement en
    cours » de « pas encore lancé » pendant la préchauffe. */
 let pret = null;
-const charger = () => (pret ??= loadPyodide({ indexURL: "./pyodide/", jsglobals: {} }));
+/* Pyodide comes from the DOWNLOADED pack (`languages/python/`, served by the
+   sandbox scheme) and is imported dynamically: a missing pack makes the
+   import reject, which the `executer` handler answers as `unavailable`
+   instead of crashing the worker at load time. */
+const charger = () => (pret ??= import("./languages/python/pyodide.mjs").then(m => m.loadPyodide({ indexURL: "./languages/python/", jsglobals: {} })));
 
 /* Tronqué ICI, avant l'IPC : une exception de 100 Mo (`raise
    Exception("x" * 10**8)`) ne doit pas traverser worker → page → principal

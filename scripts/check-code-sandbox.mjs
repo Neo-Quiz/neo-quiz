@@ -19,7 +19,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { makeReporter } from "./lib/load-src.mjs";
-import { copierBacASable } from "../apps/windows/electron/code/copier.mjs";
+import { copierBacASable, copierPyodide } from "../apps/windows/electron/code/copier.mjs";
 
 /* Task 8's own pack, until Task 9's real builder/installer exist: the exact
    layout `worker-clang.mjs` expects under `languages/c/` (its `BASE`,
@@ -41,11 +41,18 @@ function buildTestPack(languagesDir) {
 	writeFileSync(join(dir, "manifest.json"), JSON.stringify({ version: "test" }));
 }
 
+/* The python pack: the npm Pyodide files, where the worker imports them. */
+async function buildPythonPack(languagesDir) {
+	await copierPyodide(join(languagesDir, "python"));
+	writeFileSync(join(languagesDir, "python", "manifest.json"), JSON.stringify({ version: "test" }));
+}
+
 const tmp = mkdtempSync(join(tmpdir(), "neo-code-"));
 try {
 	const racine = join(tmp, "code");
 	const langages = join(tmp, "languages");
 	buildTestPack(langages);
+	await buildPythonPack(langages);
 	await copierBacASable(racine);
 	await build({
 		entryPoints: { harnais: "scripts/fixtures/code-sandbox/harnais.ts", preload: "apps/windows/electron/code-preload.ts" },

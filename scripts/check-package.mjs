@@ -212,9 +212,8 @@ if (existsSync(asar)) {
 	if (existsSync(exePaquet)) {
 		p.check("the packaged syncthing.exe matches its pin", createHash("sha256").update(readFileSync(exePaquet)).digest("hex"), SYNCTHING.exeSha256);
 	}
-	for (const f of ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]) {
-		p.check(`Embedded Pyodide: ${f}`, chemins.some(c => c.endsWith(`/dist-electron/code/pyodide/${f}`)), true);
-	}
+	/* Pyodide ships in the downloadable python pack, never in the app. */
+	p.check("Pyodide is not embedded in the app", chemins.some(c => c.includes("/dist-electron/code/pyodide/")), false);
 	/* Le paquet porte son flux (`app-update.yml`, écrit par electron-builder à
 	   côté de l'asar), et le dossier de sortie porte les métadonnées que la
 	   release publie. La version de `latest.yml` DOIT être celle du manifeste :

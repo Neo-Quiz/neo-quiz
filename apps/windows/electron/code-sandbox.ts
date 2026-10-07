@@ -240,6 +240,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
 	   the app on 2026-09-28, the run right after the install failed and
 	   only the one after it worked. */
 	function moteurPresent(langue: CodeLanguage): boolean {
+		if (langue === "python") return existsSync(path.join(langages, "python", "manifest.json"));
 		return (langue !== "c" && langue !== "cpp") || existsSync(path.join(langages, "c", "manifest.json"));
 	}
 

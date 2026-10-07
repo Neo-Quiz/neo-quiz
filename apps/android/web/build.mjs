@@ -31,7 +31,7 @@ async function buildCodeSandbox() {
 	// The pin is a copy of the Windows one: a mismatch fails the build.
 	assertPinEquals(PACK_C, readWindowsPin(readFileSync(join(windowsApp, "electron", "langages.ts"), "utf8")));
 	rmSync(codeAssets, { recursive: true, force: true });
-	mkdirSync(join(codeAssets, "pyodide"), { recursive: true });
+	mkdirSync(join(codeAssets, "languages", "python"), { recursive: true });
 	const pcCode = join(windowsApp, "electron", "code");
 	for (const f of ["index.html", "page.js", "worker-python.mjs"]) copyFileSync(join(pcCode, f), join(codeAssets, f));
 	// worker-clang imports the pack by the PC scheme: point it at the Android code origin.
@@ -39,7 +39,9 @@ async function buildCodeSandbox() {
 	if (!clang.includes("neo-code://app/")) throw new Error("worker-clang.mjs no longer names neo-code://app/: update the build");
 	writeFileSync(join(codeAssets, "worker-clang.mjs"), clang.replaceAll("neo-code://app/", CODE_ORIGIN + "/"));
 	const pyodide = dirname(createRequire(join(windowsApp, "package.json")).resolve("pyodide/package.json"));
-	for (const f of FICHIERS_PYODIDE) copyFileSync(join(pyodide, f), join(codeAssets, "pyodide", f));
+	// The worker loads Pyodide from `languages/python/` (the PC pack layout); Android embeds it.
+	for (const f of FICHIERS_PYODIDE) copyFileSync(join(pyodide, f), join(codeAssets, "languages", "python", f));
+	writeFileSync(join(codeAssets, "languages", "python", "manifest.json"), JSON.stringify({ version: "embedded" }));
 	const count = await extractPack(join(repo, "dist-pack"), join(codeAssets, "languages", "c"));
 	const manifest = JSON.parse(readFileSync(join(codeAssets, "languages", "c", "manifest.json"), "utf8"));
 	if (manifest.version !== PACK_C.version) throw new Error(`pack manifest version ${manifest.version} differs from the pin ${PACK_C.version}`);
