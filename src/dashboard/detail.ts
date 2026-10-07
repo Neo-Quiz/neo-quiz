@@ -992,6 +992,9 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// document. Sans ce garde, une flèche pressée ailleurs faisait aussi
 			// naviguer les pages invisibles — trois hôtes, trois écoutes.
 			if (!page.offsetParent && page.style.display !== "contents") return;
+			// Kept behind a quiz being played (the shell is made inert under it):
+			// the arrows belong to the quiz, never to this page.
+			if (page.closest("[inert]")) return;
 			/* Deux pages VISIBLES à la fois (vue partagée) avancent ensemble.
 			   Le garde évident — n'accepter que le leaf `mod-active` — a été
 			   essayé puis retiré : Obsidian ne pose cette classe qu'au leaf

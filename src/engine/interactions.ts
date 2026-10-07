@@ -586,6 +586,13 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		const onArrowKey = (e: KeyboardEvent) => {
 			if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
 			if (ctx.__quizDestroyed) return;
+			if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.defaultPrevented) return;
+			/* Focus on the page itself (a quiz just opened, nothing clicked yet) still
+			   plays: only a keystroke aimed at something OUTSIDE this quiz (a dialog
+			   over it, another screen) is not ours. */
+			const cible = e.target;
+			if (cible instanceof Node && cible !== document.body && cible !== document.documentElement && !ctx.container.contains(cible)) return;
+			if (!ctx.container.isConnected || ctx.container.closest("[inert]")) return;
 			const tag = document.activeElement?.tagName;
 			if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
 			if ((document.activeElement as HTMLElement | null)?.isContentEditable) return;
@@ -641,12 +648,12 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 				else { dragging = true; settleBack(offset, width); dragging = false; }
 			},
 		}));
-		// Bindé sur le container (pas document) : le keydown ne remonte au handler que
-		// si le focus est DANS ce quiz. Sinon plusieurs blocs quiz d'une même note
-		// naviguaient tous ensemble à chaque flèche (handler document partagé), et un
-		// quiz captait les flèches globalement même hors focus.
-		ctx.container.addEventListener("keydown", onArrowKey);
-		ctx.__quizGlobalCleanups.push(() => ctx.container.removeEventListener("keydown", onArrowKey));
+		/* On `document`, guarded in `onArrowKey` (the note-hosted days, where several
+		   quizzes shared a page and one global handler moved them all, are gone):
+		   with the focus on the page, before any click, a container listener never
+		   heard the arrows, and the screen behind took them instead. */
+		document.addEventListener("keydown", onArrowKey);
+		ctx.__quizGlobalCleanups.push(() => document.removeEventListener("keydown", onArrowKey));
 
 		const bindNavTab = (tab: HTMLElement | null, navigateFn: () => void) => {
 			if (!tab) return;
