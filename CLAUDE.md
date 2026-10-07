@@ -342,8 +342,19 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une
-  vérification en cours mais garde « prête ». Le câblage electron-updater
+  vérification en cours mais garde « prête ». Sur une connexion LIMITÉE
+  (2026-10-07, sonde `connexion-limitee.ts`, `autoDownload` à faux), une
+  version trouvée reste « disponible » sans un octet téléchargé, jusqu'au
+  clic. Le câblage electron-updater
   (`mise-a-jour.ts`) ne s'éprouve qu'installé, sur deux releases.
+- `npm run check:fenetre-maj` — le REFLET de l'installation qui porte la
+  fenêtre « Updating Neo Quiz » (`apps/windows/electron/fenetre-maj-liens.ts`,
+  sur de vrais dossiers temporaires) : un reflet à moitié fait est abandonné
+  (un arbre Electron incomplet meurt ou affiche une erreur par-dessus la mise
+  à jour) ; l'exécutable du reflet change de NOM (NSIS tue par nom de
+  fichier : sinon la fenêtre meurt au moment où elle sert) ; le nettoyage ne
+  vise que les reflets, et les vise tous. **Ne jamais lancer une vraie mise à
+  jour sur le PC de dev pour l'éprouver** : elle désinstalle l'application.
 - `npm run check:menu-app` — l'arbre pur du menu d'application (identifiants
   uniques, paliers d'échelle bornés comme le principal, coche sur le zoom
   courant).
