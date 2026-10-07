@@ -20,6 +20,7 @@ release notes.
 
 ### Fixed
 - Sharing no longer gets stuck on "A share is already in progress".
+- Importing a shared archive now lists every file it leaves out and why, reads archives made by older tools (accents, zip64), and no longer imports macOS system files as notes.
 - The output folder chosen in Generate stays selected after a reload.
 - Learn generations no longer warn about missing pre-questions, which are optional.
 - A PC with an empty computer name now appears as "Windows PC" on your other devices.

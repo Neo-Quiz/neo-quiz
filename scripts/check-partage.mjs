@@ -207,7 +207,7 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 	// Round trip of our own writer, binary included.
 	const own = buildZipFiles([{ name: "a.md", bytes: enc.encode("```quiz-blocks\n[]\n```") }, { name: "img/x.png", bytes: PNG }]);
 	const back = await readZip(own);
-	r.check("our own archive reads back, images byte for byte", [back.files.map(f => f.name), Array.from(back.files[1].bytes), back.skipped], [["a.md", "img/x.png"], Array.from(PNG), 0]);
+	r.check("our own archive reads back, images byte for byte", [back.files.map(f => f.name), Array.from(back.files[1].bytes), back.skipped.length], [["a.md", "img/x.png"], Array.from(PNG), 0]);
 	r.check("buildZip stays deterministic without a date (the pinned language pack)", Array.from(buildZip([{ name: "a.md", content: "x" }]).slice(10, 14)), [0, 0, 0, 0]);
 	const dated = buildZip([{ name: "a.md", content: "x" }], new Date(2026, 9, 1, 12, 30, 20));
 	const dv = new DataView(dated.buffer);
@@ -220,22 +220,22 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 
 	// Hostile archives.
 	const bomb = await readZip(make([{ name: "b.md", bytes: new Uint8Array(1000), declared: 10 }]));
-	r.check("an entry that inflates past its DECLARED size is dropped (zip bomb)", [bomb.files.length, bomb.skipped], [0, 1]);
+	r.check("an entry that inflates past its DECLARED size is dropped (zip bomb)", [bomb.files.length, bomb.skipped.map(x => x.reason)], [0, ["corrupt"]]);
 	const hugeDeclared = await readZip(make([{ name: "b.md", bytes: new Uint8Array(100), declared: IMPORT_LIMITS.entry + 1 }]));
-	r.check("an entry declared over the per-entry bound is dropped without inflating", [hugeDeclared.files.length, hugeDeclared.skipped], [0, 1]);
+	r.check("an entry declared over the per-entry bound is dropped without inflating", [hugeDeclared.files.length, hugeDeclared.skipped.map(x => x.reason)], [0, ["too-big"]]);
 	const badCrc = await readZip(make([{ name: "c.md", bytes: enc.encode("abc") }], { dropCrc: true }));
-	r.check("a bad checksum is dropped", [badCrc.files.length, badCrc.skipped], [0, 1]);
+	r.check("a bad checksum is dropped", [badCrc.files.length, badCrc.skipped.map(x => `${x.name}:${x.reason}`)], [0, ["c.md:bad-crc"]]);
 	const enc1 = await readZip(make([{ name: "e.md", bytes: enc.encode("abc") }], { flags: 1 }));
-	r.check("an encrypted entry is dropped", [enc1.files.length, enc1.skipped], [0, 1]);
+	r.check("an encrypted entry is dropped", [enc1.files.length, enc1.skipped.map(x => x.reason)], [0, ["encrypted"]]);
 	const m9 = await readZip(make([{ name: "e.md", bytes: enc.encode("abc"), method: 9 }]));
-	r.check("an unknown method is dropped", [m9.files.length, m9.skipped], [0, 1]);
+	r.check("an unknown method is dropped", [m9.files.length, m9.skipped.map(x => x.reason)], [0, ["method"]]);
 	const many = make(Array.from({ length: 5 }, (_, i) => ({ name: `n${i}.md`, bytes: enc.encode("x") })));
 	r.check("too many entries: refused whole", await refus(readZip(many, { ...IMPORT_LIMITS, entries: 4 })), "too-many");
 	r.check("an archive over the bound: refused whole", await refus(readZip(own, { ...IMPORT_LIMITS, archive: 10 })), "too-large");
 	r.check("not a zip: refused", await refus(readZip(enc.encode("hello, this is not a zip file at all"))), "invalid");
 	r.check("a truncated archive: refused", await refus(readZip(own.slice(0, own.length - 30))), "invalid");
 	const tot = await readZip(make([{ name: "a.md", bytes: enc.encode("x".repeat(60)) }, { name: "b.md", bytes: enc.encode("y".repeat(60)) }]), { ...IMPORT_LIMITS, total: 100 });
-	r.check("the total inflated size is bounded", [tot.files.length, tot.skipped], [1, 1]);
+	r.check("the total inflated size is bounded", [tot.files.length, tot.skipped.map(x => x.reason)], [1, ["total"]]);
 
 	// What may be imported.
 	const cls = classerArchive([
@@ -243,7 +243,7 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 		{ name: "setup.exe", bytes: PNG }, { name: "cours.pdf", bytes: PNG }, { name: "gros.png", bytes: new Uint8Array(8 * 1024 * 1024 + 1) },
 	]);
 	r.check("notes and raster images are kept, flattened; svg, exe, pdf, oversize are ignored",
-		[cls.notes.map(n => n.name), cls.images.map(i => i.name), cls.ignored], [["CM1.md"], ["x.png"], 4]);
+		[cls.notes.map(n => n.name), cls.images.map(i => i.name), cls.ignored.map(x => x.reason).sort()], [["CM1.md"], ["x.png"], ["image-too-large", "unsupported-type", "unsupported-type", "unsupported-type"]]);
 	r.check("an image name: path flattened, hidden dots stripped, no extension refused", [nomImageImportee("a/b/c.PNG"), nomImageImportee("..png"), nomImageImportee("x"), nomImageImportee("x.png.bat")], ["c.png", null, null, null]);
 	r.check("Windows device names are refused as imported names", [nomImageImportee("CON.png"), nomImageImportee("d/nul.jpg"), zip.nomNoteImportee("COM1.md"), zip.nomNoteImportee("console.md")], [null, null, null, "console"]);
 
@@ -261,6 +261,77 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 	r.check("notes alone over the bound: no archive", packShare([{ name: "q.md", content: "x".repeat(2000) }], [], new Date(), 1000).bytes, null);
 	r.check("a duplicate name is left out, not overwritten", packShare(notes, [{ name: "a.png", bytes: PNG }, { name: "A.png", bytes: PNG }], new Date()).imagesOut, 1);
 	r.check("the bound is the share bound", SHARE_MAX_BYTES, 16 * 1024 * 1024);
+	r.done();
+});
+
+/* THE READER HARDENED (2026-10-07): legacy names, zip64, overlap, system
+   litter, links, ratio, and above all NOTHING dropped without a name and a
+   reason. */
+await withSrcModule("src/dashboard/zip.ts", async (zip) => {
+	const { readZip, classerArchive, isJunkEntry, ZipReadError, IMPORT_LIMITS, CP437_HIGH } = zip;
+	const { forgeZip, unicodePathExtra } = await import("./lib/zip-forge.mjs");
+	const r = makeReporter("Archive reader hardening");
+	const note = "```quiz-blocks\n[{prompt:'x'}]\n```\n";
+	const refus = (p) => p.then(() => "read", (e) => e instanceof ZipReadError && e.code);
+	const names = async (z) => (await readZip(z)).files.map(f => f.name);
+
+	r.check("the code page 437 table has 128 characters", [...CP437_HIGH].length, 128);
+	// "Cafe" with 0x82 = e acute in CP437, no UTF-8 flag (legacy Windows tools).
+	const cp = forgeZip([{ nameBytes: Buffer.from([0x43, 0x61, 0x66, 0x82, 0x2e, 0x6d, 0x64]), bytes: note }]);
+	r.check("no UTF-8 flag and not valid UTF-8: decoded as CP437 (Café.md, not mojibake)", await names(cp), ["Café.md"]);
+	const cpFr = forgeZip([{ nameBytes: Buffer.from([0x82, 0x8a, 0x85, 0x87, 0x2e, 0x6d, 0x64]), bytes: note }]);
+	r.check("French accents of CP437: é è à ç", await names(cpFr), ["éèàç.md"]);
+	r.check("no flag but valid UTF-8 (many tools): read as UTF-8", await names(forgeZip([{ name: "Café.md", bytes: note }])), ["Café.md"]);
+	r.check("the UTF-8 flag is honoured", await names(forgeZip([{ name: "Café.md", bytes: note, flags: 0x800 }])), ["Café.md"]);
+	const rawLegacy = Buffer.from([0x43, 0x82]);
+	r.check("the Unicode Path field wins when its checksum matches the stored name", await names(forgeZip([{ nameBytes: rawLegacy, extra: unicodePathExtra(rawLegacy, "Cœur.md"), localExtra: unicodePathExtra(rawLegacy, "Cœur.md"), bytes: note }])), ["Cœur.md"]);
+	const badUp = unicodePathExtra(Buffer.from([0x41]), "Evil.md");
+	r.check("a Unicode Path field for ANOTHER name is ignored", await names(forgeZip([{ nameBytes: rawLegacy, extra: badUp, bytes: note }])), ["Cé"]);
+
+	// zip64.
+	const z64 = forgeZip([{ name: "a.md", bytes: note, zip64: true }, { name: "b.md", bytes: note }], { zip64End: true });
+	const z64r = await readZip(z64);
+	r.check("a zip64 archive (end record, locator and extra fields) is READ", [z64r.files.map(f => f.name), z64r.skipped.length], [["a.md", "b.md"], 0]);
+	const z64Broken = forgeZip([{ name: "a.md", bytes: note }]);
+	new DataView(z64Broken.buffer).setUint32(z64Broken.length - 6, 0xffffffff, true); // central directory offset = "see zip64", no locator
+	r.check("zip64 that cannot be read: its OWN error code, not \"damaged\"", await refus(readZip(z64Broken)), "zip64");
+	const z64NoExtra = forgeZip([{ name: "a.md", bytes: note, extra: [], zip64: false, size: 0xffffffff }]);
+	const nx = await readZip(z64NoExtra);
+	r.check("an entry whose 32-bit size says \"see zip64\" with no field: listed as skipped, named", nx.skipped.map(x => `${x.name}:${x.reason}`), ["a.md:zip64"]);
+	r.check("a split (multi-disk) archive: its own error code", await refus(readZip(forgeZip([{ name: "a.md", bytes: note }], { diskNumber: 1 }))), "multi-disk");
+
+	// Overlap and name mismatch.
+	const ov = forgeZip([{ name: "a.md", bytes: note }, { name: "b.md", bytes: note, noLocal: true, localOffsetOf: 0 }]);
+	r.check("two entries sharing the same bytes: the archive is refused (overlap)", await refus(readZip(ov)), "overlap");
+	const mism = await readZip(forgeZip([{ name: "a.md", localNameBytes: Buffer.from("b.md"), bytes: note }]));
+	r.check("local and central names differ: the entry is skipped, named, with its reason", [mism.files.length, mism.skipped.map(x => `${x.name}:${x.reason}`)], [0, ["a.md:name-mismatch"]]);
+
+	// System litter.
+	const mac = await readZip(forgeZip([
+		{ name: "Cours/CM1.md", bytes: note }, { name: "__MACOSX/Cours/._CM1.md", bytes: new Uint8Array([0, 5, 22, 7]) },
+		{ name: "Cours/.DS_Store", bytes: new Uint8Array([0, 0, 0, 1]) }, { name: "Thumbs.db", bytes: new Uint8Array([1]) }, { name: "desktop.ini", bytes: "x" },
+	]));
+	r.check("macOS and Windows litter is filtered BEFORE reading and counted apart (never a junk note)", [mac.files.map(f => f.name), mac.junk, mac.skipped.length], [["Cours/CM1.md"], 4, 0]);
+	r.check("isJunkEntry: only the litter", ["__MACOSX/x", "a/._b.md", ".DS_Store", "Thumbs.db", "THUMBS.DB", "a/desktop.ini"].map(isJunkEntry).concat(["a._b.md", "cours.md", "__MACOSXY/x.md"].map(isJunkEntry)), [true, true, true, true, true, true, false, false, false]);
+	const clsMac = classerArchive([{ name: "__MACOSX/._CM1.md", bytes: new Uint8Array([0, 5]) }, { name: "CM1.md", bytes: new TextEncoder().encode(note) }]);
+	r.check("classerArchive never turns an AppleDouble file into a note", [clsMac.notes.map(n => n.name), clsMac.junk, clsMac.ignored.length], [["CM1.md"], 1, 0]);
+
+	// Links, ratio, hostile counts.
+	const sl = await readZip(forgeZip([{ name: "link.md", bytes: "/etc/passwd", madeBy: (3 << 8) | 20, attrs: (0o120777 << 16) >>> 0 }, { name: "ok.md", bytes: note, madeBy: (3 << 8) | 20, attrs: (0o100644 << 16) >>> 0 }]));
+	r.check("a symbolic link entry is skipped and named; a regular unix file is read", [sl.files.map(f => f.name), sl.skipped.map(x => `${x.name}:${x.reason}`)], [["ok.md"], ["link.md:symlink"]]);
+	const zeros = new Uint8Array(8 * 1024 * 1024);
+	const ratio = await readZip(forgeZip([{ name: "z.md", bytes: zeros }]));
+	r.check("8 MB of zeros stored in a few KB: skipped for its ratio, named", ratio.skipped.map(x => `${x.name}:${x.reason}`), ["z.md:ratio"]);
+	r.check("a long ordinary note is NOT mistaken for a bomb", (await readZip(forgeZip([{ name: "n.md", bytes: "word ".repeat(200000) }]))).files.length, 1);
+
+	// Every refusal carries a name and a reason; nothing is silent.
+	const mixed = await readZip(forgeZip([
+		{ name: "ok.md", bytes: note }, { name: "enc.md", bytes: note, flags: 1 }, { name: "m.md", bytes: note, method: 8, crc: 1 },
+		{ name: "big.md", bytes: "x", size: IMPORT_LIMITS.entry + 1 },
+	]));
+	r.check("the good entry is read and every other one is listed with its reason", [mixed.files.length, mixed.skipped.map(x => `${x.name}:${x.reason}`).sort()], [1, ["big.md:too-big", "enc.md:encrypted", "m.md:bad-crc"]]);
+	const cl = classerArchive([{ name: "a.png", bytes: new Uint8Array([1]) }, { name: "dir/A.PNG", bytes: new Uint8Array([2]) }, { name: "dir2/a.png", bytes: new Uint8Array([1]) }, { name: "con.md", bytes: new Uint8Array([1]) }, { name: "x.pdf", bytes: new Uint8Array([1]) }]);
+	r.check("classerArchive lists what it leaves out: a different image of the same name, a refused name, a type", [cl.images.length, cl.ignored.map(x => `${x.name}:${x.reason}`)], [1, ["dir/A.PNG:duplicate-image", "con.md:bad-name", "x.pdf:unsupported-type"]]);
 	r.done();
 });
 

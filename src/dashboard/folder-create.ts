@@ -105,18 +105,64 @@ function pickFile(accept: string): Promise<{ name: string; bytes: Uint8Array } |
 	});
 }
 
+/** A RECEIVED archive, sorted: what will be written, and every entry left out
+    with the translated reason. Nothing is dropped without being listed. */
+type ArchiveRecue = ImportedArchive & { ecartes: { name: string; raison: string }[] };
+
+function raisonEcart(code: string): string {
+	switch (code) {
+		case "encrypted": return t("dashboard.quizzes.importWhy.encrypted");
+		case "method": return t("dashboard.quizzes.importWhy.method");
+		case "too-big": return t("dashboard.quizzes.importWhy.too-big");
+		case "total": return t("dashboard.quizzes.importWhy.total");
+		case "ratio": return t("dashboard.quizzes.importWhy.ratio");
+		case "bad-crc": return t("dashboard.quizzes.importWhy.bad-crc");
+		case "name-mismatch": return t("dashboard.quizzes.importWhy.name-mismatch");
+		case "symlink": return t("dashboard.quizzes.importWhy.symlink");
+		case "zip64": return t("dashboard.quizzes.importWhy.zip64");
+		case "unsupported-type": return t("dashboard.quizzes.importWhy.unsupported-type");
+		case "bad-name": return t("dashboard.quizzes.importWhy.bad-name");
+		case "image-too-large": return t("dashboard.quizzes.importWhy.image-too-large");
+		case "duplicate-image": return t("dashboard.quizzes.importWhy.duplicate-image");
+		case "no-quiz": return t("dashboard.quizzes.importWhy.no-quiz");
+		default: return t("dashboard.quizzes.importWhy.corrupt");
+	}
+}
+
+/** Says what an import left out and why (first five, then a count). */
+function annoncerEcartes(ecartes: ArchiveRecue["ecartes"]): void {
+	if (ecartes.length === 0) return;
+	const liste = ecartes.slice(0, 5).map(e => `${e.name.split(/[\\/]/).pop()} (${e.raison})`).join(", ")
+		+ (ecartes.length > 5 ? ` +${ecartes.length - 5}` : "");
+	currentHost().ui.notice(t("dashboard.quizzes.importSkipped", { count: ecartes.length, list: liste }));
+}
+
 /** The notes and images of a RECEIVED archive, or `null` (the window already
     said why): too big, not readable, or nothing importable in it. */
-async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<ImportedArchive | null> {
+async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<ArchiveRecue | null> {
 	const host = currentHost();
 	try {
-		const { files } = await readZip(bytes);
-		const archive = classerArchive(files);
-		if (quizOnly) archive.notes = archive.notes.filter(n => QUIZ_BLOCK_RE.test(n.content));
-		if (archive.notes.length === 0) { host.ui.notice(t("dashboard.quizzes.importEmpty")); return null; }
-		return archive;
+		const { files, skipped } = await readZip(bytes);
+		const classe = classerArchive(files);
+		const ecartes: ArchiveRecue["ecartes"] = [
+			...skipped.map(x => ({ name: x.name, raison: raisonEcart(x.reason) })),
+			...classe.ignored.map(x => ({ name: x.name, raison: raisonEcart(x.reason) })),
+		];
+		if (quizOnly) {
+			const gardees = classe.notes.filter(n => QUIZ_BLOCK_RE.test(n.content));
+			for (const n of classe.notes) if (!gardees.includes(n)) ecartes.push({ name: n.name, raison: raisonEcart("no-quiz") });
+			classe.notes = gardees;
+		}
+		if (classe.notes.length === 0) { host.ui.notice(t("dashboard.quizzes.importEmpty")); annoncerEcartes(ecartes); return null; }
+		return { ...classe, ecartes };
 	} catch (e) {
-		host.ui.notice(t(e instanceof ZipReadError && e.code !== "invalid" ? "dashboard.quizzes.importTooLarge" : "dashboard.quizzes.importUnreadable"));
+		const code = e instanceof ZipReadError ? e.code : "invalid";
+		host.ui.notice(t(
+			code === "too-large" || code === "too-many" ? "dashboard.quizzes.importTooLarge"
+				: code === "zip64" ? "dashboard.quizzes.importZip64"
+				: code === "multi-disk" ? "dashboard.quizzes.importMultiDisk"
+				: code === "overlap" ? "dashboard.quizzes.importOverlap"
+				: "dashboard.quizzes.importUnreadable"));
 		return null;
 	}
 }
@@ -219,6 +265,7 @@ export async function importSharedFolder(
 	ctx.settings.quizzesModuleOverrides = overrides;
 	ctx.saveSettings().catch(() => {});
 	annoncerImport(folderKey, written);
+	annoncerEcartes(archive.ecartes);
 	onDone();
 }
 
@@ -297,6 +344,7 @@ export async function importFileIntoFolder(folder: string, picked: { name: strin
 			if (!archive) return;
 			verifierChemins(folder, archive);
 			annoncerImport(folder.split("/").pop() || folder, await ecrireArchive(folder, archive));
+			annoncerEcartes(archive.ecartes);
 		} else {
 			if (picked.bytes.length > IMPORT_LIMITS.entry) { currentHost().ui.notice(t("dashboard.quizzes.importTooLarge")); return; }
 			const content = new TextDecoder().decode(picked.bytes);
