@@ -23,6 +23,10 @@ release notes.
 - Learn generations no longer warn about missing pre-questions, which are optional.
 - A PC with an empty computer name now appears as "Windows PC" on your other devices.
 - The AI provider button in Generate has a translated accessible name.
+- Handing in a Test goes straight to the results, without flashing the unanswered-questions screen.
+- Code questions have an answer box again (self-rated for now).
+- Question cards on a quiz page show their whole content without an inner scrollbar.
+- A folder's exams show up again after the folder moved to another location.
 
 ## [1.20.42] - 2026-10-07
 
