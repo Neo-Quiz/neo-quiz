@@ -88,3 +88,6 @@
 
 /* Phone and tablet: last, it overrides everything above. */
 @import url('./mobile.css');
+@import url('./mobile/pages.css');
+@import url('./mobile/play.css');
+@import url('./mobile/tools.css');
