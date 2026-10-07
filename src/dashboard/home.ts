@@ -5,7 +5,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { isFolderArchived } from "./folder-archive";
-import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, estLeSas } from "./quiz-modules";
+import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, declaredFolders, estLeSas } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { moduleIcon } from "./module-icons";
@@ -131,7 +131,12 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
 		// Every upcoming exam of every folder — a folder with nothing to do
 		// today can still have its exam this week.
-		const exams: HomeExam[] = groups
+		/* Built apart from the folder cards: a declared folder still EMPTY has no
+		   card, but its exam is as real as any ("No upcoming exam" was shown
+		   while one stood a week away in such a folder). */
+		const examGroups = buildModuleGroups(quizzes, stats, map, declaredFolders(ctx.settings.quizzesModuleOverrides))
+			.filter(g => !estLeSas(g, ctx.generatedFolder?.()) && !isFolderArchived(ctx, g.folder));
+		const exams: HomeExam[] = examGroups
 			.flatMap(group => upcomingExams(ctx.examens?.(group) ?? [], todayIso).map(exam => ({ exam, group })))
 			.sort((a, b) => a.exam.date.localeCompare(b.exam.date));
 

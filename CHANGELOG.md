@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Home finds the next exam even in a folder that holds no quiz yet.
 - While Settings is open, the rail highlights Settings instead of the page behind.
 - Back from Generated quizzes (opened from Generate) returns to Generate.
 - In a handed-in test, unanswered questions show the wrong mark on their bead.
