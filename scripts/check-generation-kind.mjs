@@ -56,12 +56,16 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 
 	const READY = { ready: true };
 	const o = (label, description = "") => ({ label, description });
-	const q = (header, question, labels, multiple = false) => ({ header, question, multiple, options: labels.map(l => o(l, "d " + l)) });
+	const q = (header, question, labels, multiple = false, def = 0) => ({ header, question, multiple, options: labels.map(l => o(l, "d " + l)), default: def });
 	const qs = [q("Niveau", "Quel niveau ?", ["Débutant", "Avancé"]), q("Parties", "Quelles parties ?", ["A", "B", "C"], true)];
 	r.check("clarify: ready", K.parseClarifyAnswer("{\"ready\":true}"), READY);
 	r.check("clarify: 1 or 2 questions are kept with header, label and description; `multiple` defaults to false",
 		[K.parseClarifyAnswer(JSON.stringify({ questions: qs })), K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [{ label: "a" }, { label: "b", description: "x" }] }] }))],
-		[{ questions: qs }, { questions: [{ header: "", question: "?", multiple: false, options: [o("a"), o("b", "x")] }] }]);
+		[{ questions: qs }, { questions: [{ header: "", question: "?", multiple: false, options: [o("a"), o("b", "x")], default: 0 }] }]);
+	const withDefault = (d) => K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [o("a"), o("b"), o("c")], default: d }] })).questions[0].default;
+	r.check("clarify: the model's default option is kept", [withDefault(0), withDefault(2)], [0, 2]);
+	r.check("clarify: a default out of range, negative, fractional or not a number is the first option", [withDefault(3), withDefault(-1), withDefault(1.5), withDefault("2"), withDefault(null)], [0, 0, 0, 0, 0]);
+	r.check("clarify: a missing default is the first option", K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [o("a"), o("b")] }] })).questions[0].default, 0);
 	r.check("clarify: a header over 12 characters is cut to 12", K.parseClarifyAnswer(JSON.stringify({ questions: [{ header: "Un en-tete beaucoup trop long", question: "?", options: [o("a"), o("b")] }] })).questions[0].header, "Un en-tete b");
 	r.check("clarify: text before and after the JSON, and a code fence", [
 		K.parseClarifyAnswer("Sure! {\"ready\":true} Done."),
@@ -87,12 +91,14 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 
 	r.check("answers: one line per answered question, under the label",
 		K.formatClarifications("Précisions :", qs, [["Débutant"], ["A", "mes notes"]]), "Précisions :\n- Quel niveau ?\n    Débutant\n- Quelles parties ?\n    A, mes notes");
-	r.check("answers: nothing answered gives nothing", K.formatClarifications("Précisions :", qs, [[], []]), "");
+	r.check("answers: a skipped question stands for its default option",
+		K.formatClarifications("Précisions :", [q("N", "Niveau ?", ["Avancé", "Débutant total"], false, 1), qs[1]], [[], ["B"]]), "Précisions :\n- Niveau ?\n    Débutant total\n- Quelles parties ?\n    B");
+	r.check("answers: everything skipped gives the defaults", K.formatClarifications("P :", qs, [[], []]), "P :\n- Quel niveau ?\n    Débutant\n- Quelles parties ?\n    A");
 
 	const p = K.clarifyPrompt("Python", ["cm1.pdf", "cm2.md"]);
 	r.check("clarify prompt: the request and the document names", [p.user.includes("Python"), p.user.includes("- cm1.pdf"), p.user.includes("- cm2.md")], [true, true, true]);
 	r.check("clarify prompt: ready, header/label/description shape, few questions, limits, vague-only, language",
-		["{\"ready\":true}", "\"questions\"", "\"header\"", "\"description\"", "at most 2", "prefer none", "2 to 4 options", "12 characters", "ONLY when the request is vague", "Ask NOTHING when the request is already precise", "NEVER ask what the attached documents already answer", "language of the request"].filter(w => !p.system.includes(w)), []);
+		["{\"ready\":true}", "\"questions\"", "\"header\"", "\"description\"", "\"default\"", "most beginner option", "at most 2", "prefer none", "2 to 4 options", "12 characters", "ONLY when the request is vague", "Ask NOTHING when the request is already precise", "NEVER ask what the attached documents already answer", "language of the request"].filter(w => !p.system.includes(w)), []);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
 	r.check("clarify prompt: when the request reveals no language, the app's language is the fallback (French or English)",
 		[K.clarifyPrompt("Python", [], "fr").system.includes("write them in French, the language of the app"), K.clarifyPrompt("Python", [], "en").system.includes("write them in English, the language of the app"), K.clarifyPrompt("Python", []).system.includes("write them in English")], [true, true, true]);

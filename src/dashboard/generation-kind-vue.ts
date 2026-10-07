@@ -38,7 +38,8 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 		if (q.header) ajouter(ligne, "span", "qbd-ai-kind-chip", q.header);
 		ajouter(ligne, "span", "qbd-ai-kind-resume-q", q.question);
 		host.ui.setIcon(ajouter(ligne, "span", "qbd-ai-kind-fleche"), "arrow-right");
-		const r = ajouter(ligne, "span", "qbd-ai-kind-resume-r", reponse.length ? reponse.join(", ") : t("ai.clarify.skipped"));
+		const defaut = q.options[q.default]?.label ?? q.options[0].label;
+		const r = ajouter(ligne, "span", "qbd-ai-kind-resume-r", reponse.length ? reponse.join(", ") : t("ai.clarify.skippedDefault", { answer: defaut }));
 		r.classList.toggle("is-skipped", reponse.length === 0);
 	};
 

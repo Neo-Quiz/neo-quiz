@@ -15,7 +15,7 @@
 
 import type { ArchivedChat } from "./chat-archives";
 import type { ClarifyOption, ClarifyQuestion } from "./generation-kind";
-import { MAX_CLARIFY_QUESTIONS, MAX_HEADER } from "./generation-kind";
+import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex } from "./generation-kind";
 
 export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
@@ -88,7 +88,7 @@ function readClarify(x: unknown): ChatClarify | null {
 			if (!isObj(o) || !isStr(o.label)) return null;
 			options.push({ label: o.label, description: isStr(o.description) ? o.description : "" });
 		}
-		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options });
+		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length) });
 	}
 	const clarify: ChatClarify = { questions };
 	if (x.genre === "learn" || x.genre === "practice" || x.genre === "both") clarify.genre = x.genre;

@@ -76,13 +76,14 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-requests.ts"], (C, Q) => {
 	const r = makeReporter("Chat record: clarifying questions");
 	const op = (label) => ({ label, description: "d " + label });
-	const qs = [{ header: "Level", question: "Which level?", multiple: false, options: [op("Beginner"), op("Advanced")] }, { header: "Parts", question: "Which parts?", multiple: true, options: [op("A"), op("B"), op("C")] }];
+	const qs = [{ header: "Level", question: "Which level?", multiple: false, options: [op("Beginner"), op("Advanced")], default: 0 }, { header: "Parts", question: "Which parts?", multiple: true, options: [op("A"), op("B"), op("C")], default: 2 }];
 	const base = { id: "r1", at: 5, from: "d1", text: "Python", mode: "learn", documents: [], results: [], state: "done" };
 	const read = (reqs) => C.readChats({ v: 1, chats: [{ id: "a", origin: "d1", createdAt: 1, updatedAt: 1, requests: reqs }] })[0].requests;
 	r.check("an old request (no questions) loads unchanged", read([base])[0].clarify, undefined);
 	r.check("questions and answers are read back", read([{ ...base, clarify: { questions: qs, answers: [["Beginner"], ["A", "my own"]] } }])[0].clarify, { questions: qs, answers: [["Beginner"], ["A", "my own"]] });
 	r.check("pending questions have no answers", "answers" in read([{ ...base, clarify: { questions: qs } }])[0].clarify, false);
 	r.check("a skipped question is an empty answer, read back as such", read([{ ...base, clarify: { questions: qs, answers: [[], ["A"]] } }])[0].clarify.answers, [[], ["A"]]);
+	r.check("the default option is read back, a bad one becomes the first", [read([{ ...base, clarify: { questions: qs } }])[0].clarify.questions.map(x => x.default), read([{ ...base, clarify: { questions: [{ ...qs[0], default: 9 }, { ...qs[1], default: "x" }] } }])[0].clarify.questions.map(x => x.default)], [[0, 2], [0, 0]]);
 	r.check("a header over 12 characters is cut on reading", read([{ ...base, clarify: { questions: [{ ...qs[0], header: "x".repeat(30) }, qs[1]] } }])[0].clarify.questions[0].header.length, 12);
 	r.check("answers of the wrong length are ignored, the questions kept", read([{ ...base, clarify: { questions: qs, answers: [["x"]] } }])[0].clarify.answers, undefined);
 	const bad = [["no questions", { questions: [] }], ["three questions", { questions: [...qs, qs[0]] }], ["one option", { questions: [{ question: "q", options: [op("a")] }] }],

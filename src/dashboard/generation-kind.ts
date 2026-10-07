@@ -35,7 +35,7 @@ export interface ClarifyOption { label: string; description: string }
 /** One clarifying question, in the manner of Claude Code's AskUserQuestion: a
     short header chip, the question, 2 to 4 options, one or several answers.
     The app adds its own "write something" option. */
-export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[] }
+export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number }
 export type ClarifyAnswer = { ready: true } | { questions: ClarifyQuestion[] };
 /** The most questions a request is asked, and the longest header chip. */
 export const MAX_CLARIFY_QUESTIONS = 2;
@@ -66,6 +66,11 @@ function firstObject(raw: string): string | null {
 	return null;
 }
 
+/** The option assumed when a question is skipped: the model's index, else the first. */
+export function defaultIndex(value: unknown, count: number): number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < count ? value : 0;
+}
+
 /** Reads the model's answer. Anything that is not a well-formed list of 1 or 2
     questions with 2 to 4 options each ({label, description}) is `{ ready: true }`:
     a broken answer never blocks a generation. A header over 12 characters is
@@ -81,7 +86,7 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	const questions: ClarifyQuestion[] = [];
 	for (const x of obj.questions) {
 		if (!x || typeof x !== "object") return READY;
-		const { header, question, options, multiple } = x as Record<string, unknown>;
+		const { header, question, options, multiple, default: defaut } = x as Record<string, unknown>;
 		if (typeof question !== "string" || !question.trim()) return READY;
 		if (!Array.isArray(options) || options.length < 2 || options.length > 4) return READY;
 		const lues: ClarifyOption[] = [];
@@ -91,14 +96,18 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 			if (typeof label !== "string" || !label.trim()) return READY;
 			lues.push({ label: label.trim().slice(0, 80), description: typeof description === "string" ? description.trim().slice(0, 160) : "" });
 		}
-		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues });
+		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length) });
 	}
 	return { questions };
 }
 
-/** The answers as one block appended to the request: "- question" then the answer indented under it, per question. */
+/** The answers as one block appended to the request: "- question" then the answer indented under it, per question; a skipped question gives its default option. */
 export function formatClarifications(label: string, questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): string {
-	const lines = questions.map((q, i) => ({ q: q.question, a: (answers[i] ?? []).map(s => s.trim()).filter(Boolean) })).filter(l => l.a.length);
+	// A skipped question (an empty answer) stands for its default option.
+	const lines = questions.map((q, i) => {
+		const a = (answers[i] ?? []).map(s => s.trim()).filter(Boolean);
+		return { q: q.question, a: a.length ? a : [q.options[q.default]?.label ?? q.options[0].label] };
+	});
 	return lines.length ? label + "\n" + lines.map(l => `- ${l.q}\n    ${l.a.join(", ")}`).join("\n") : "";
 }
 
@@ -113,7 +122,7 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"You have no tools; you only see the request and the names of the attached documents.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
 		"- {\"ready\":true} when nothing needs to be asked;",
-		`- otherwise {"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options ("multiple":true when several can apply). Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Do not add an "Other" option: the app adds one.`,
+		`- otherwise {"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question: for a level question the most beginner option, for a scope question "everything in the material", for a goal question "learn from zero". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
 	const user = [

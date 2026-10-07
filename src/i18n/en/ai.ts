@@ -646,7 +646,7 @@ export const EN_AI = {
 	"ai.clarify.other": "Type something",
 	"ai.clarify.otherPlaceholder": "Type your answer, then Enter",
 	"ai.clarify.validate": "Confirm",
-	"ai.clarify.skipped": "Skipped",
+	"ai.clarify.skippedDefault": "Skipped → {answer} (default)",
 	"ai.clarify.hint": "Enter to select · ↑/↓ to navigate · 1-9 to pick · Esc to skip",
 	"ai.clarify.details": "Details:",
 	"ai.clarify.expired": "These questions can no longer be answered here. Send your request again.",
