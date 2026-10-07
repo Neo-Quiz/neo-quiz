@@ -1,2 +1,281 @@
 /* Phone-only fixes (html.nq-mobile / .is-mobile) for the pages screens, from the
-   2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css. */
+   2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css.
+
+   Every rule here is scoped to a phone class: the Windows layout does not move.
+   TOUCH TARGETS reach 40 px either by size (min-width/min-height) or, where the
+   icon must keep its place in a tight row, by a transparent ::after that
+   extends the hit area without moving anything. */
+
+/* ── Home (Accueil) ── */
+
+/* The course title is the tap target of a card: a full row, not a 21 px line. */
+.is-mobile .qbd-homef-name {
+	min-height: 40px;
+}
+
+.is-mobile .qbd-homef-more {
+	min-height: 40px;
+}
+
+/* Week arrows: a 40 px square, the glyph unchanged. */
+.is-mobile .qbd-homes-arrow {
+	width: 40px;
+	height: 40px;
+}
+
+/* ── Folders list (Dossiers) ── */
+
+/* The toolbar: Import and New folder share the row evenly, both on the left
+   edge of the chips above (at 393 px Import sat 33 px in, pushed by its
+   auto margin). */
+.is-mobile .qbd-quizzes-group .qbd-quizzes-import {
+	margin-left: 0;
+}
+
+/* Both take the room the labels need and share the rest; a label never wraps
+   (at 360 px "Nouveau dossier" broke onto two lines and grew 10 px). */
+.is-mobile .qbd-quizzes-group > .qbd-btn--create {
+	flex: 1 1 auto;
+	white-space: nowrap;
+}
+
+.is-mobile .qbd-quizzes-group .qbd-btn--create {
+	min-height: 44px;
+}
+
+/* The card menu: the dots stay where they are, the hit area is 40 px. */
+.is-mobile .qbd-module-card__menu {
+	position: relative;
+	width: 40px;
+	height: 40px;
+	margin: -7px -7px -7px 0;
+}
+
+/* ── A folder opened (Contenu / Progression / Plan de révision) ── */
+
+/* The view tabs: 40 px high, the pill around them keeps its width. */
+.is-mobile .qbd-folder-view-tab {
+	min-height: 40px;
+}
+
+.is-mobile .qbd-folder-tab {
+	min-height: 40px;
+}
+
+.is-mobile .qbd-folder-section-action {
+	min-width: 40px;
+	min-height: 40px;
+}
+
+/* Back arrow and the folder's own ⋮ menu: 40 px squares. */
+.is-mobile .qbd-quizzes-crumb-back,
+.is-mobile .qbd-folder-more-btn {
+	width: 40px;
+	height: 40px;
+}
+
+/* A quiz card: play and ⋮ are 40 px; the mode pills (Apprendre, Test) get the
+   same height, their width already fits their label. */
+.is-mobile .qbd-quiz-card .qbd-quiz-card-play,
+.is-mobile .qbd-quiz-card .qbd-card-more {
+	width: 40px;
+	height: 40px;
+	box-sizing: border-box;
+}
+
+/* A folder's drill grid sets its own 36 px menu (more specific): the phone
+   size wins here, the margin keeps the dots where the 36 px put them. */
+.is-mobile .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-modes .qbd-card-more {
+	width: 40px;
+	height: 40px;
+	margin: -6px -6px -6px auto;
+}
+
+.is-mobile .qbd-quiz-card .qbd-quiz-card-mode-btn {
+	min-height: 40px;
+	box-sizing: border-box;
+}
+
+/* A course title in the Progression tab is a tap target too. */
+.is-mobile .qbd-folder-course-title {
+	min-height: 40px;
+}
+
+/* A folder's list is part of the page: it grows with its content and the page
+   scrolls once, not a box inside it (the documents list showed 7 of 12). */
+.is-mobile .qbd-folder-list--defile {
+	max-height: none;
+	height: auto;
+	overflow: visible;
+}
+
+/* Plan de révision: add and edit/delete for an exam, 40 px each. */
+.is-mobile .qbd-planning-exam-add,
+.is-mobile .qbd-planning-exam-action {
+	width: 40px;
+	height: 40px;
+}
+
+/* ── Quiz page (questions, Modifier / Terminé) ── */
+
+/* The question list in the flow of the page. In sheet mode (the phone host,
+   detail-list-sheet.ts) the list is a bottom sheet and mobile.css owns it. */
+.is-mobile .qbd-qz-body:not(.qbd-qz-body--sheet) > .qbd-qz-list {
+	max-height: none;
+	height: auto;
+	overflow: visible;
+}
+
+.is-mobile .qbd-qz-card-act {
+	position: relative;
+	min-width: 40px;
+	min-height: 40px;
+}
+
+.is-mobile .qbd-qz-list-add {
+	min-height: 40px;
+}
+
+/* Terminé, Commencer le quiz and ⋮ stay on one row: the start button takes the
+   room the three do not need, the ⋮ keeps its 40 px. */
+.is-mobile .qbd-fiche-actions {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.is-mobile .qbd-fiche-actions .qbd-qz-start {
+	flex: 1 1 0;
+	min-width: 0;
+	justify-content: center;
+}
+
+/* The question search field: 44 px, a thumb can hit it. */
+.is-mobile .qbd-fiche-search-input {
+	min-height: 44px;
+}
+
+/* Section header of the question list ("Plus"), a full 40 px row. */
+.is-mobile .qbd-qz-section-head {
+	min-height: 40px;
+}
+
+/* Option gestures (mark as correct, add, remove): the glyph stays 18-22 px,
+   the touch area is 40 px around it. */
+.is-mobile .qb-er-geste {
+	position: relative;
+}
+
+.is-mobile .qb-er-geste::after {
+	content: "";
+	position: absolute;
+	inset: -11px;
+}
+
+/* The type selector and the editor's format buttons. */
+.is-mobile .qbd-qz .qbd-select {
+	min-height: 40px;
+}
+
+.is-mobile .qb-format-btn {
+	position: relative;
+	min-height: 36px;
+}
+
+.is-mobile .qb-format-btn::after {
+	content: "";
+	position: absolute;
+	inset: -7px -4px;
+}
+
+/* ── Dialogs opened from these pages ── */
+
+/* The close cross of every dialog: a 40 px square. */
+.is-mobile .modal-close-button {
+	width: 40px;
+	height: 40px;
+}
+
+/* Edit folder: icon button, name field, colour swatches. */
+.is-mobile .qbd-medit-icon-btn {
+	width: 40px;
+	height: 40px;
+}
+
+.is-mobile .qbd-medit-input {
+	min-height: 44px;
+}
+
+/* Nine swatches, 40 px each: five to a row, centred, the coloured disc
+   unchanged inside its 40 px square. */
+.is-mobile .qbd-medit-colors {
+	display: grid;
+	grid-template-columns: repeat(5, 40px);
+	justify-content: space-between;
+	row-gap: 6px;
+	padding: 10px 12px;
+}
+
+.is-mobile .qbd-medit-dot {
+	width: 40px;
+	height: 40px;
+	padding: 7px !important;
+	background-clip: content-box;
+	box-sizing: border-box;
+}
+
+/* The date row under the UE field: a full 40 px line. */
+.is-mobile .qbd-medit-modal .qbd-folder-section-action {
+	width: 100%;
+	min-height: 40px;
+}
+
+/* Icon picker: the picker's width and left are set inline by the script
+   (244 px, anchored to the icon button), so they are overridden with
+   !important: from one screen edge to the other, 16 px in. Cells 40 px, seven
+   to a row. */
+.is-mobile .qbd-icon-picker {
+	left: 16px !important;
+	right: 16px !important;
+	width: auto !important;
+	box-sizing: border-box;
+}
+
+.is-mobile .qbd-icon-grid {
+	grid-template-columns: repeat(7, 40px);
+	justify-content: space-between;
+}
+
+.is-mobile .qbd-icon-grid .qbd-icon-cell,
+.is-mobile .qbd-icon-grid > button {
+	width: 40px;
+	height: 40px;
+}
+
+/* Test setup: the switch keeps its 40 x 22 track; its touch area is 40 px high
+   around it. The start button fills the width. */
+.is-mobile .qbd-setup-switch {
+	position: relative;
+}
+
+.is-mobile .qbd-setup-switch::after {
+	content: "";
+	position: absolute;
+	inset: -9px -4px;
+}
+
+.is-mobile .qbd-setup-start {
+	width: 100%;
+	min-height: 44px;
+}
+
+/* The floating + (new folder) and Générer buttons sit above the bottom bar
+   (57 px), not on its tabs. */
+.is-mobile .qbd-quizzes-fab {
+	bottom: 73px;
+}
+
+/* Confirmations (delete, archive): both buttons 44 px, the same height. */
+.is-mobile .qb-confirm-modal .qb-btn {
+	min-height: 44px;
+}
