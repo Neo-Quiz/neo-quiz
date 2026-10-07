@@ -763,3 +763,45 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 		true);
 	r.done();
 }
+
+/* ─────────── la garde de la clé `moodle` (site Moodle) ───────────
+   Même schéma que `aiOllamaUrl` : verdict PUR (`moodle/garde.ts`), puis la
+   porte NATIVE et l'admission dans `canaux.ts`. Le site est l'endroit où part
+   un jeton de connexion : https seul, origine nue, et un hôte NOUVEAU se
+   confirme. Éprouvé par discriminance : sans la garde, la valeur passerait. */
+await withSrcModule("apps/windows/electron/moodle/garde.ts", async ({ origineSite, validerReglagesMoodle }) => {
+	const r = makeReporter("Électron — la garde de la clé `moodle`");
+	const v = (val, cur = null) => validerReglagesMoodle(val, cur);
+	r.check("un site https en origine nue est lu", origineSite("https://moodle.myefrei.fr"), "https://moodle.myefrei.fr");
+	r.check("http, un chemin, un port, des identifiants, une IP, localhost sont refusés",
+		["http://moodle.myefrei.fr", "https://moodle.myefrei.fr/x", "https://moodle.myefrei.fr:8443", "https://u:p@moodle.myefrei.fr",
+			"https://10.0.0.1", "https://localhost", "file:///C:/x"].map(x => origineSite(x)),
+		[null, null, null, null, null, null, null]);
+	r.check("un hôte NOUVEAU demande la confirmation native",
+		v({ site: "https://moodle.myefrei.fr" }), { confirmer: "moodle.myefrei.fr" });
+	r.check("le même site déjà admis passe sans nouvelle question (et s'admet)",
+		v({ site: "https://moodle.myefrei.fr", courses: [3] }, "https://moodle.myefrei.fr"), { ok: true, admettre: "moodle.myefrei.fr" });
+	r.check("un autre site que celui des réglages redemande", v({ site: "https://autre.example.fr" }, "https://moodle.myefrei.fr"),
+		{ confirmer: "autre.example.fr" });
+	r.check("une valeur sans site (cours seuls, retrait) ne demande rien", [v({ courses: [1] }), v({ site: "" })],
+		[{ ok: true, admettre: null }, { ok: true, admettre: null }]);
+	r.check("un site non https, des cours invalides, un champ inconnu sont refusés (rien d'écrit)",
+		[v({ site: "http://x.example.fr" }), v({ courses: [0] }), v({ courses: ["1"] }), v({ site: "https://moodle.myefrei.fr", token: "x" }), v("x")].map(x => "refus" in x),
+		[true, true, true, true, true]);
+	const source = await readFile("apps/windows/electron/canaux.ts", "utf-8");
+	const debut = source.indexOf("async function garderReglagesMoodle");
+	const corps = debut >= 0 ? source.slice(debut, source.indexOf("ipcMain.handle(CANAUX.reglagesSupprimer", debut)) : "";
+	r.check("garderReglagesMoodle passe par le verdict pur, demande par une boîte NATIVE et n'admet l'hôte qu'après un « oui »",
+		{
+			verdict: /validerReglagesMoodle\(\s*valeur\s*,/.test(corps),
+			boite: corps.includes("dialog.showMessageBox"),
+			refus: /response !== 0\) \{[\s\S]*throw/.test(corps),
+			admet: corps.indexOf("autoriserHote(verdict.confirmer)") > corps.indexOf("response !== 0"),
+		},
+		{ verdict: true, boite: true, refus: true, admet: true });
+	const ecrire = source.slice(source.indexOf("ipcMain.handle(CANAUX.reglagesEcrire,"));
+	r.check("reglagesEcrire garde la clé `moodle` AVANT d'écrire",
+		ecrire.indexOf("garderReglagesMoodle(valeur)") > 0 && ecrire.indexOf("garderReglagesMoodle(valeur)") < ecrire.indexOf(".ecrire(String(cle)"),
+		true);
+	r.done();
+});

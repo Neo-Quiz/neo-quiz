@@ -24,7 +24,7 @@
    RÉPOND par un `invoke`.
 ══════════════════════════════════════════════════════════ */
 
-import { BrowserWindow, Menu, app, dialog, net, protocol, shell } from "electron";
+import { BrowserWindow, Menu, app, dialog, net, protocol, safeStorage, shell } from "electron";
 import * as fs from "node:fs/promises";
 // Le SEUL usage synchrone du disque dans ce fichier — voir `poserLocaleChromium`.
 import { readFileSync } from "node:fs";
@@ -49,10 +49,14 @@ import { chargerPathRegistre } from "./process";
 import { surveillerCachesCli } from "./surveillant-cli";
 import { perimetreInitial } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_SYNC_ROOT, CLE_REGLAGES_IA, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, CLE_DOSSIER_DEFAUT, CLE_SYNC_ACTIF, CLE_SYNC_ROOT, CLE_REGLAGES_IA, CLE_REGLAGES_MOODLE, CLE_REGLAGES_LANGUE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
 import { lienDansArguments, nomSur } from "./syncthing-regles";
+import { creerMoodle } from "./moodle/service";
+import type { ServiceMoodle } from "./moodle/service";
+import { jetonDansArguments } from "./moodle/pur";
+import { origineSite } from "./moodle/garde";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
 import type { MiseAJour } from "./mise-a-jour";
@@ -138,6 +142,13 @@ let fermetureArmee = false;
 /** The last `neo-quiz://pair` link Windows handed over, validated, until the
     page takes it (`prendreLienAppairage`). */
 let lienAppairage: string | null = null;
+/** Moodle (`./moodle/service.ts`), created once the settings are ready. A
+    `neo-quiz://token=` link is routed to it ONLY while a login is pending. */
+let moodle: ServiceMoodle | null = null;
+function recevoirLienMoodle(argv: readonly string[]): void {
+	const jeton = jetonDansArguments(argv);
+	if (jeton && moodle) void moodle.recevoirJeton(jeton).catch(e => console.warn(LOG_PREFIX, "Moodle: lien de connexion:", e instanceof Error ? e.message : e));
+}
 function recevoirLienAppairage(argv: readonly string[]): void {
 	const lien = lienDansArguments(argv);
 	if (!lien) return;
@@ -528,6 +539,19 @@ async function admettreHoteOllama(reg: Reglages): Promise<void> {
 	}
 }
 
+/** The Moodle site of the settings joins the network list at launch, as
+    Ollama's host does: the write was guarded (native confirmation), this only
+    restores it. A site that is not a plain https origin is ignored. */
+async function admettreHoteMoodle(reg: Reglages): Promise<void> {
+	try {
+		const v = await reg.lire(CLE_REGLAGES_MOODLE);
+		const site = origineSite(v && typeof v === "object" ? (v as { site?: unknown }).site : undefined);
+		if (site) autoriserHote(new URL(site).hostname);
+	} catch (e) {
+		console.warn(LOG_PREFIX, "réglages Moodle illisibles, hôte non admis:", e);
+	}
+}
+
 /* ─────────── le protocole des ressources ─────────── */
 
 /**
@@ -651,6 +675,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   a second instance with it, which stops at once (above); the link
 		   lands here. */
 		recevoirLienAppairage(argv);
+		recevoirLienMoodle(argv);
 		if (!fenetre || fenetre.isDestroyed()) return;
 		if (fenetre.isMinimized()) fenetre.restore();
 		fenetre.focus();
@@ -726,6 +751,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		const perimetre = await perimetreInitial({ dossierDonnees: donnees, reglages: reglagesOuErreur(), dossierDefaut });
 		// Même geste que le périmètre, pour les URL : l'hôte Ollama des réglages.
 		await admettreHoteOllama(reglagesOuErreur());
+		await admettreHoteMoodle(reglagesOuErreur());
 		// Le MÊME objet que les canaux : une racine admise par `choisirDossier`
 		// ou `vaultsObsidian` devient aussitôt servable, sans second registre.
 		servirRessources(perimetre);
@@ -800,7 +826,28 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				poserActif: actif => reglagesOuErreur().ecrire(CLE_SYNC_ACTIF, actif),
 			});
 		}
+		moodle = creerMoodle({
+			racine: () => dossierDefaut,
+			garde: perimetre,
+			reglages: reglagesOuErreur,
+			dossierDonnees: donnees,
+			chiffrement: {
+				disponible: () => safeStorage.isEncryptionAvailable(),
+				chiffrer: clair => safeStorage.encryptString(clair),
+				dechiffrer: chiffre => safeStorage.decryptString(chiffre),
+			},
+			/* https only, whatever the caller passes: the system browser opens
+			   the Moodle login and assignment pages, nothing else. */
+			ouvrirExterne: async url => {
+				if (new URL(url).protocol !== "https:") throw new Error("Moodle: only https links are opened");
+				await shell.openExternal(url);
+			},
+			envoyer: etat => {
+				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.moodleSurEtat, etat);
+			},
+		});
 		const canaux = enregistrerCanaux({
+			moodle,
 			perimetre,
 			reglagesOuErreur,
 			code,
@@ -865,6 +912,11 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			},
 		});
 		arreterAttente = canaux.arreterAttente;
+		/* Moodle: at most one automatic sync an hour (the service decides), a few
+		   seconds after launch so it never competes with the window opening. */
+		setTimeout(() => {
+			void moodle?.demarrerAuto().catch(e => console.warn(LOG_PREFIX, "Moodle: synchronisation automatique:", e instanceof Error ? e.message : e));
+		}, 10_000);
 		creerFenetre();
 		/* APRÈS la fenêtre, comme le surveillant des notes : le menu des
 		   modèles se redessine dès que Claude Code ou Codex réécrit ses

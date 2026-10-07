@@ -51,6 +51,8 @@ import type { EvenementSurveillant, Index } from "./index-fichiers";
 import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
 import { validerReglagesIa } from "./garde-ia";
+import { origineSite, validerReglagesMoodle } from "./moodle/garde";
+import type { ServiceMoodle } from "./moodle/service";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
 import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
@@ -59,7 +61,7 @@ import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
 import type { MiseAJour } from "./mise-a-jour";
-import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
+import { CANAUX, PARTAGE_OCCUPE, CLE_DOSSIER_DEFAUT, CLE_REGLAGES_FOND, CLE_REGLAGES_IA, CLE_REGLAGES_MOODLE, CLE_REGLAGES_ZOOM, borneZoom } from "./pont";
 import type { EnveloppeVideo, EtatFenetre, EvenementDisque, RequeteCli, RequeteReseau, ResultatCli } from "./pont";
 import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne } from "./reseau";
@@ -168,6 +170,8 @@ export interface DependancesCanaux {
 	/** The embedded Syncthing, `null` where there is none (Linux): the `sync`
 	    channels are then not registered at all. */
 	sync: GestionSync | null;
+	/** Moodle (`./moodle/service.ts`), created by `main.ts`. */
+	moodle: ServiceMoodle;
 	/** The pairing link Windows handed to the app (`lienAppairageExterne`,
 	    already validated), forgotten once taken; `null` when there is none. */
 	prendreLienAppairage?: () => string | null;
@@ -516,6 +520,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   (`garde-ia.ts`, éprouvé par `check:electron-reglages`) ; ici ne
 		   restent que la porte NATIVE et l'admission. */
 		if (cle === CLE_REGLAGES_IA) await garderReglagesIa(valeur);
+		/* The `moodle` key too: its `site` is where a login token is sent, so a
+		   NEW host is asked of the user through a native dialog. */
+		if (cle === CLE_REGLAGES_MOODLE) await garderReglagesMoodle(valeur);
 		/* La clé du FOND D'ÉCRAN est gardée pour la même raison que `folders` :
 		   `perimetreInitial` admet `fond.dossier` au démarrage suivant. */
 		if (cle === CLE_REGLAGES_FOND) await verifierDossierFond(perimetre, valeur);
@@ -572,12 +579,50 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		}
 		if (verdict.admettre) autoriserHote(verdict.admettre);
 	}
+	/** Same door as `garderReglagesIa`, for the Moodle site. */
+	async function garderReglagesMoodle(valeur: unknown): Promise<void> {
+		const actuel = await reglagesOuErreur().lire(CLE_REGLAGES_MOODLE);
+		const siteActuel = origineSite(actuel && typeof actuel === "object" ? (actuel as { site?: unknown }).site : undefined);
+		const verdict = validerReglagesMoodle(valeur, siteActuel);
+		if ("refus" in verdict) throw new Error(verdict.refus);
+		if ("confirmer" in verdict) {
+			const options = {
+				type: "question" as const,
+				title: t("app.moodleHost.title"),
+				message: t("app.moodleHost.message", { host: verdict.confirmer }),
+				detail: t("app.moodleHost.detail"),
+				buttons: [t("app.moodleHost.allow"), t("app.moodleHost.deny")],
+				defaultId: 1,
+				cancelId: 1,
+			};
+			const parent = deps.fenetreCourante();
+			const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+			if (response !== 0) {
+				console.warn(LOG_PREFIX, "hôte Moodle refusé par l'utilisateur:", verdict.confirmer);
+				throw new Error("hôte refusé par l'utilisateur, réglages Moodle non écrits : " + verdict.confirmer);
+			}
+			autoriserHote(verdict.confirmer);
+			return;
+		}
+		if (verdict.admettre) autoriserHote(verdict.admettre);
+	}
 	ipcMain.handle(CANAUX.reglagesSupprimer, (_e, cle: string) => {
 		/* Removing `syncRoot` would let the next start pin the (renderer-changeable)
 		   default folder as the shared one: same refusal as the write. */
 		if (reglageReserve(String(cle))) throw new Error("réglage refusé : " + String(cle) + " n'est supprimé que par le processus principal");
 		return reglagesOuErreur().supprimer(String(cle));
 	});
+
+	/* MOODLE: verbs only. The service holds the token; nothing it returns
+	   carries it. Arguments from the window are re-validated inside. */
+	ipcMain.handle(CANAUX.moodleEtat, () => deps.moodle.etat());
+	ipcMain.handle(CANAUX.moodleConnecter, () => deps.moodle.connecter());
+	ipcMain.handle(CANAUX.moodleDeconnecter, () => deps.moodle.deconnecter());
+	ipcMain.handle(CANAUX.moodleCours, () => deps.moodle.cours());
+	ipcMain.handle(CANAUX.moodleChoisir, (_e, ids: unknown) => deps.moodle.choisir(ids));
+	ipcMain.handle(CANAUX.moodleSynchroniser, () => deps.moodle.synchroniser());
+	ipcMain.handle(CANAUX.moodleDevoirs, () => deps.moodle.devoirs());
+	ipcMain.handle(CANAUX.moodleOuvrirDevoir, (_e, cmid: unknown) => deps.moodle.ouvrirDevoir(cmid));
 
 	ipcMain.handle(CANAUX.ouvrir, async (_e, abs: unknown) => {
 		/* BORNÉ comme une lecture : `shell.openPath` lance l'application par

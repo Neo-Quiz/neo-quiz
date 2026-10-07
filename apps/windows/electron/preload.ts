@@ -21,7 +21,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { CANAUX } from "./pont";
-import type { EtatFenetre, EtatMiseAJour, EtatSync, EvenementDisque, Pont } from "./pont";
+import type { EtatFenetre, EtatMiseAJour, EtatMoodle, EtatSync, EvenementDisque, Pont } from "./pont";
 
 /* Les rappels de fermeture, et l'écouteur UNIQUE qui les sert. Un écouteur par
    appel à `surFermeture` répondrait autant de fois au principal, qui détruirait
@@ -223,6 +223,24 @@ const pont: Pont = {
 			const ecouteur = (): void => rappel();
 			ipcRenderer.on(CANAUX.syncLienAppairage, ecouteur);
 			return () => { ipcRenderer.off(CANAUX.syncLienAppairage, ecouteur); };
+		},
+	},
+
+	/* MOODLE: verbs only; the token stays in the main process. Windows only,
+	   like the sync (the same build gate keeps Android out). */
+	moodle: process.platform !== "win32" ? undefined : {
+		etat: () => ipcRenderer.invoke(CANAUX.moodleEtat),
+		connecter: () => ipcRenderer.invoke(CANAUX.moodleConnecter),
+		deconnecter: () => ipcRenderer.invoke(CANAUX.moodleDeconnecter),
+		cours: () => ipcRenderer.invoke(CANAUX.moodleCours),
+		choisir: ids => ipcRenderer.invoke(CANAUX.moodleChoisir, ids),
+		synchroniser: () => ipcRenderer.invoke(CANAUX.moodleSynchroniser),
+		devoirs: () => ipcRenderer.invoke(CANAUX.moodleDevoirs),
+		ouvrirDevoir: cmid => ipcRenderer.invoke(CANAUX.moodleOuvrirDevoir, cmid),
+		surEtat(rappel) {
+			const ecouteur = (_e: unknown, etat: EtatMoodle): void => rappel(etat);
+			ipcRenderer.on(CANAUX.moodleSurEtat, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.moodleSurEtat, ecouteur); };
 		},
 	},
 

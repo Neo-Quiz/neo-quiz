@@ -164,6 +164,59 @@ export type EvenementDisque =
  * la même opération, pour que l'hôte du rendu (tâche 4) soit un passe-plat
  * lisible plutôt qu'un traducteur.
  */
+/* ─────────── Moodle (main process; the token never crosses) ─────────── */
+
+/** What the window may know about the Moodle link. No token, no tokenised URL. */
+export interface EtatMoodle {
+	/** The configured site origin (`https://host`), or "". */
+	site: string;
+	connected: boolean;
+	fullname: string;
+	/** `off`: no site or not logged in; `connected`; `expired`: the token was
+	    refused, log in again; `error`: the login cannot work (for instance
+	    secure storage unavailable), see `error`. */
+	state: "off" | "connected" | "expired" | "error";
+	/** A short message when `state` is `error`, else null. */
+	error: string | null;
+	/** Epoch ms of the last successful sync, or null. */
+	lastSync: number | null;
+	syncing: boolean;
+	/** A login was started in the browser and is awaited (10 minutes at most). */
+	loginPending: boolean;
+	progress: { done: number; total: number } | null;
+}
+export interface CoursMoodle {
+	id: number;
+	name: string;
+	/** Module code parsed from the short name (`XTI302`), null when it has none. */
+	code: string | null;
+	/** The folder name under the default quiz root: existing, or the one to create. */
+	folder: string | null;
+	enabled: boolean;
+	/** False when the course has no code: it is listed but cannot be enabled. */
+	available: boolean;
+}
+export interface ResumeSyncMoodle {
+	nouveaux: number;
+	mis_a_jour: number;
+	echecs: number;
+	/** Files skipped (address not on the site, or a newer local copy). */
+	ignores: number;
+	/** null on success; otherwise why nothing (or not everything) was synced. */
+	erreur: null | "not-connected" | "expired" | "no-courses" | "busy" | "network" | "failed";
+}
+export interface DevoirMoodle {
+	/** Course module id: pass it to `ouvrirDevoir`. */
+	cmid: number;
+	course: string;
+	name: string;
+	state: "todo" | "urgent" | "late" | "open";
+	/** Due date, epoch SECONDS (0 = none). */
+	due: number;
+	/** Milliseconds left at the time of the answer (negative when late). */
+	remaining: number;
+}
+
 export interface Pont {
 	/**
 	 * Déclare les racines ouvertes (chemins ABSOLUS), dans l'ordre où le rendu
@@ -392,6 +445,31 @@ export interface Pont {
 		calendrier(table: Array<{ date: string; due: number }>, textes: { title: string; bodyOne: string; bodyOther: string }): Promise<void>;
 		/** True once after a tap on the notification: the page then lands on Home, where today's review is. */
 		revisionDemandee(): Promise<boolean>;
+	};
+
+	/**
+	 * MOODLE (docs/superpowers/specs/2026-10-07-moodle-sync-design.md): course
+	 * files into the default quiz folder, assignment deadlines. Absent on
+	 * Android. Every method is a VERB: the window never sees the token, a file
+	 * URL, or a path; the site and the chosen courses are the `moodle` setting
+	 * (`CLE_REGLAGES_MOODLE`, guarded in the main process).
+	 */
+	moodle?: {
+		etat(): Promise<EtatMoodle>;
+		/** Opens the Moodle login in the system browser; the answer arrives by a
+		    `neo-quiz://token=` link and `surEtat` pushes the new state. */
+		connecter(): Promise<void>;
+		/** Forgets the stored token (settings are kept). */
+		deconnecter(): Promise<void>;
+		cours(): Promise<CoursMoodle[]>;
+		/** Chooses the synced courses (only courses with a code are kept); returns
+		    the ids actually saved. */
+		choisir(ids: number[]): Promise<number[]>;
+		synchroniser(): Promise<ResumeSyncMoodle>;
+		devoirs(): Promise<DevoirMoodle[]>;
+		/** Opens `<site>/mod/assign/view.php?id=<cmid>` in the browser. */
+		ouvrirDevoir(cmid: number): Promise<boolean>;
+		surEtat(rappel: (etat: EtatMoodle) => void): () => void;
 	};
 
 	/**
@@ -890,6 +968,16 @@ export const CANAUX = {
 	syncDonneesRecues: "neo:sync/donnees-recues",
 	syncLienAppairage: "neo:sync/lien-appairage",
 	syncLienAppairageLire: "neo:sync/lien-appairage-lire",
+	moodleEtat: "neo:moodle/etat",
+	moodleConnecter: "neo:moodle/connecter",
+	moodleDeconnecter: "neo:moodle/deconnecter",
+	moodleCours: "neo:moodle/cours",
+	moodleChoisir: "neo:moodle/choisir",
+	moodleSynchroniser: "neo:moodle/synchroniser",
+	moodleDevoirs: "neo:moodle/devoirs",
+	moodleOuvrirDevoir: "neo:moodle/ouvrir-devoir",
+	/** Pushed to the window: the Moodle state changed. */
+	moodleSurEtat: "neo:moodle/sur-etat",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
@@ -963,6 +1051,9 @@ export const CANAUX = {
     littéraux « ai » recopiés divergeraient sans une erreur : l'hôte du NAS
     resterait refusé alors que le réglage est bien enregistré. */
 export const CLE_REGLAGES_IA = "ai";
+/** The `moodle` setting: `{ site?: "https://host", courses?: number[] }`.
+    GUARDED in the main process (`moodle/garde.ts`, `canaux.ts`). */
+export const CLE_REGLAGES_MOODLE = "moodle";
 
 /* LA CLÉ « updates » N'EXISTE PLUS ICI (2026-09-17). Elle portait
    `{ auto: boolean }` ; la mise à jour automatique ne se coupe plus, donc plus

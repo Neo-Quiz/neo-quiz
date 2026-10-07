@@ -25,6 +25,11 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.aiHost.detail": "Ce serveur n'est ni un hôte connu ni sur votre réseau local. Ne l'autorisez que si vous l'avez configuré vous-même.",
 	"app.aiHost.allow": "Autoriser",
 	"app.aiHost.deny": "Annuler",
+	"app.moodleHost.title": "Autoriser ce site Moodle ?",
+	"app.moodleHost.message": "Neo Quiz se connectera à {host} et en téléchargera les fichiers de vos cours.",
+	"app.moodleHost.detail": "Ne l'autorisez que s'il s'agit du Moodle de votre établissement. Rien n'y est envoyé, hormis votre connexion et des requêtes de lecture.",
+	"app.moodleHost.allow": "Autoriser",
+	"app.moodleHost.deny": "Annuler",
 
 	/* ── Mise à jour automatique (application seulement) ── */
 	"app.update.restart": "Redémarrer pour mettre à jour",

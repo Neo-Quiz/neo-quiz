@@ -47,6 +47,11 @@ export const EN_APP = {
 	"app.aiHost.detail": "This server is neither a known host nor on your local network. Allow it only if you set it up yourself.",
 	"app.aiHost.allow": "Allow",
 	"app.aiHost.deny": "Cancel",
+	"app.moodleHost.title": "Allow this Moodle site?",
+	"app.moodleHost.message": "Neo Quiz will sign in to {host} and download your course files from it.",
+	"app.moodleHost.detail": "Allow it only if it is your school's Moodle. Nothing is ever sent to it except your login and read requests.",
+	"app.moodleHost.allow": "Allow",
+	"app.moodleHost.deny": "Cancel",
 
 	/* ── Mise à jour automatique (application seulement) ── */
 	"app.update.restart": "Restart to update",
