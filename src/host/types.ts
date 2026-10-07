@@ -695,6 +695,9 @@ export interface HostRoot {
 	    cas, et le faire dépendre de ceci scinderait l'historique le jour
 	    où un dossier devient un vault. */
 	vault: boolean;
+	/** The root's ABSOLUTE path on the disk (forward slashes), when the host knows it. Used only to
+	    measure a path against the file system's own limit (Windows' 260); never to build a path. */
+	diskPath?: string;
 }
 
 export interface HostPaths {

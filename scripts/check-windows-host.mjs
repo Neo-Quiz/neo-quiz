@@ -290,6 +290,7 @@ await withSrcModule("apps/windows/src/host/roots.ts", async (mod) => {
 	   non chargeable ici (il tire MathLive), donc éprouvé par équivalence sur
 	   `carte`, la seule logique derrière ce membre. */
 	r.check("defaultRoot() est roots()[0]", hr[0], carte.hostRoots()[0]);
+	r.check("each root tells its absolute disk path (Windows length limit)", hr.map(h => h.diskPath), ["C:/obsidian-vaults/Efrei", "D:/Notes"]);
 
 	/* RÈGLE SANS FILET (revue 1) : aucun cas n'éprouvait `resultsDirFor` —
 	   une erreur y écrirait les résultats d'un quiz du dossier B dans le

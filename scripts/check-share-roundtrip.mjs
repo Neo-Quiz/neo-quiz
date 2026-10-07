@@ -191,6 +191,19 @@ await withSrcModule(
 		};
 		const read = (kind, file) => new Uint8Array(readFileSync(join(FIX, kind, file)));
 
+		/* ── 0. the length of the ABSOLUTE target on Windows ── */
+		{
+			const planOf = (path) => ({ writes: [{ path, kind: "note", bytes: new Uint8Array(0), sha256: "0" }] });
+			// The CONTRACT path is short ("Cours/Sub"); the root's disk path is what makes it long.
+			const folder = "Cours/x";
+			const absolute = "C:/Users/Ahmed/" + "d".repeat(120) + "/x";
+			const tooLong = (windows, path) => { try { shareImport.checkPaths(folder, planOf(path), windows ? absolute : null); return null; } catch (e) { return e instanceof shareImport.ImportPathTooLongError ? e.fileName : "other"; } };
+			const fits = "a".repeat(60) + ".md";
+			const over = "b".repeat(110) + ".md";
+			r.check("Windows: a relative path under 240 whose ABSOLUTE path passes 260 is refused, naming the file; elsewhere it is accepted",
+				[tooLong(true, fits), tooLong(true, over), tooLong(false, over)], [null, over, null]);
+		}
+
 		/* ── 1. THE RATCHET ── */
 		const gFiles = readdirSync(join(FIX, "golden")).sort();
 		const hFiles = readdirSync(join(FIX, "hostile")).sort();

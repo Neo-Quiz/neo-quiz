@@ -79,11 +79,20 @@ const randomId = (): string => {
 
 /** Throws `ImportPathTooLongError` naming the first file that would not fit: the relative path against
     `PATH_MAX`, and on Windows the ABSOLUTE path (root, folder, staging folder, file) against its 260. */
-export function checkPaths(folder: string, plan: ImportPlan, windows: boolean = currentHost().platform.isWindows): void {
+export function checkPaths(folder: string, plan: ImportPlan, absolute: string | null = absoluteFolder(folder)): void {
 	for (const w of plan.writes) {
 		const name = `${w.path} (99)`;
-		if (!fitsPath(folder, name) || (windows && !fitsWindowsPath(folder, name))) throw new ImportPathTooLongError(w.path);
+		if (!fitsPath(folder, name) || (absolute !== null && !fitsWindowsPath(absolute, name))) throw new ImportPathTooLongError(w.path);
 	}
+}
+
+/** The disk path of a contract path (root id replaced by the root's absolute path), only on a Windows
+    host that tells it; null elsewhere (Android's limits are not Windows'). */
+export function absoluteFolder(folder: string): string | null {
+	const host = currentHost();
+	if (!host.platform.isWindows) return null;
+	const root = host.paths.roots().find(r => r.diskPath && (folder === r.id || folder.startsWith(`${r.id}/`)));
+	return root?.diskPath ? root.diskPath + folder.slice(root.id.length) : null;
 }
 
 export type Destination =

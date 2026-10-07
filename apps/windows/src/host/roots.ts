@@ -70,6 +70,7 @@ export function creerCarteRacines(racines: RacineOuverte[], deviceId: string): C
 				id: r.id,
 				name: r.name,
 				vault: r.vault,
+				diskPath: nettoyer(r.path),
 				/* Le journal, TOUJOURS au même endroit sous la racine — jamais
 				   selon qu'elle est un vault ou non. La raison est écrite dans
 				   `src/review/paths.ts` : une détection peut changer d'avis, un
