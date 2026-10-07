@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.41] - 2026-10-07
+
 ### Changed
 - The Android app updates itself: it checks for a new version and installs it after you tap Install.
 - On the phone, a played quiz shows only the Learn or Test icon before its title, leaving the room to the title.
