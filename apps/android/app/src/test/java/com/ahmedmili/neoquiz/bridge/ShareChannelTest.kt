@@ -61,6 +61,14 @@ class ShareChannelTest {
         assertEquals("a-b.zip", FileShare.name("a/b.zip"))
     }
 
+    @Test fun aWindowsDeviceNameIsRefusedForEveryExtension() {
+        for (n in listOf("CON.zip", "con.md", "nul.zip", "Aux.md", "com1.zip", "LPT9.md", "con.txt.md", "con .md", "COM¹.zip", "conin\$.md")) {
+            assertNull(n, FileShare.name(n))
+        }
+        assertEquals("console.md", FileShare.name("console.md"))
+        assertEquals("com10.zip", FileShare.name("com10.zip"))
+    }
+
     @Test fun refusedNamesAndContentsThrowAndShareNothing() {
         for ((n, c) in listOf<Pair<Any?, Any?>>("x.bat" to b64(5), "x.zip" to "", "x.zip" to "%%%not base64", "x.zip" to null, null to b64(5))) {
             assertThrows(IllegalArgumentException::class.java) { runBlocking { channel.enregistrer(n, c); clock += 5_000 } }

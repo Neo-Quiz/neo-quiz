@@ -174,6 +174,11 @@ function main() {
 	const tsExt = [...(/EXTENSIONS_PARTAGE = \[([^\]]*)\]/.exec(partage)?.[1] ?? "").matchAll(/"\.(\w+)"/g)].map((m) => m[1]).sort().join();
 	const ktExt = [...(/EXTENSIONS = mapOf\(([^)]*)\)/.exec(share)?.[1] ?? "").matchAll(/"(\w+)" to/g)].map((m) => m[1]).sort().join();
 	if (!tsExt || tsExt !== ktExt) fail(`share extensions differ: TS ${tsExt} / Kotlin ${ktExt}`);
+	// Windows device names: the reserved-name pattern of share-names.ts equals the Kotlin copy (string escapes undone).
+	const tsReserved = /const RESERVED = \/(.*)\/i;/.exec(read("src/dashboard/share-names.ts"))?.[1];
+	const ktReserved = /RESERVED = Regex\("((?:[^"\\]|\\.)*)"/.exec(share)?.[1]?.replace(/\\\\/g, "\\");
+	if (!tsReserved || !ktReserved) fail("reserved-name pattern not found (parser broken?)");
+	else if (tsReserved !== ktReserved) fail(`reserved-name pattern differs: TS ${tsReserved} / Kotlin ${ktReserved}`);
 	// The staging folder of an import is ignored by Syncthing on both platforms.
 	for (const [who, file] of [["Windows", "apps/windows/electron/syncthing-regles.ts"], ["Android", "apps/android/app/src/main/java/com/ahmedmili/neoquiz/sync/ShareRules.kt"]]) {
 		if (!read(file).includes('"(?d).import-*"')) fail(`${who} .stignore lacks the import staging rule "(?d).import-*"`);

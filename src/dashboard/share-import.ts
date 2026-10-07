@@ -2,7 +2,7 @@ import { currentHost } from "../host/current";
 import { DIRECTORY, foldPath, importDirs, planImport } from "./share-plan";
 import type { ImportPlan, PreparedFile } from "./share-plan";
 import { sha256Hex } from "./share-manifest";
-import { fitsPath } from "./share-names";
+import { fitsPath, fitsWindowsPath } from "./share-names";
 import { readZip } from "./zip";
 import type { ZipSkip } from "./zip";
 
@@ -77,9 +77,13 @@ const randomId = (): string => {
 	return Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
 };
 
-/** Throws `ImportPathTooLongError` naming the first file that would not fit. */
-export function checkPaths(folder: string, plan: ImportPlan): void {
-	for (const w of plan.writes) if (!fitsPath(folder, `${w.path} (99)`)) throw new ImportPathTooLongError(w.path);
+/** Throws `ImportPathTooLongError` naming the first file that would not fit: the relative path against
+    `PATH_MAX`, and on Windows the ABSOLUTE path (root, folder, staging folder, file) against its 260. */
+export function checkPaths(folder: string, plan: ImportPlan, windows: boolean = currentHost().platform.isWindows): void {
+	for (const w of plan.writes) {
+		const name = `${w.path} (99)`;
+		if (!fitsPath(folder, name) || (windows && !fitsWindowsPath(folder, name))) throw new ImportPathTooLongError(w.path);
+	}
 }
 
 export type Destination =

@@ -24,6 +24,7 @@ import { spawn } from "node:child_process";
 import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isReservedName } from "../../../src/dashboard/share-names";
 import { SHARE_MAX_BYTES } from "../../../src/dashboard/zip";
 import { PARTAGE_OCCUPE } from "./pont";
 
@@ -46,6 +47,8 @@ export function nomPartage(nom: unknown): string | null {
 		.replace(/^[\s.]+|[\s.]+$/g, "")
 		.trim();
 	if (propre.length === 0 || propre.length > 150) return null;
+	// A Windows device name (`CON.zip`, `con.txt.md`) is no file: refused for every extension.
+	if (isReservedName(propre)) return null;
 	const point = propre.lastIndexOf(".");
 	if (point <= 0) return null;
 	const ext = propre.slice(point).toLowerCase();

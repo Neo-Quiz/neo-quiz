@@ -93,6 +93,22 @@ export function fitsPath(parent: string, name: string): boolean {
 	return (parent ? parent.length + 1 : 0) + name.length <= PATH_MAX;
 }
 
+/** Windows' MAX_PATH, counted without the long-path prefix (the app opens plain paths). */
+export const WINDOWS_PATH_LIMIT = 260;
+/** `.import-` + 12 hex digits: the staging folder an import writes into first (`share-import.ts`). */
+export const STAGING_NAME_LENGTH = ".import-".length + 12;
+
+/** Does the ABSOLUTE path of `name` fit Windows' limit, both in `folder` (the final place) and in the
+    staging folder next to it (`<parent of folder>/.import-<12 hex>/name`, longer when the folder's own
+    name is short)? `folder` is the absolute path as the host writes it. */
+export function fitsWindowsPath(folder: string, name: string): boolean {
+	const slash = folder.lastIndexOf("/");
+	const parentLength = slash >= 0 ? slash + 1 : 0;
+	const target = folder.length + 1 + name.length;
+	const staged = parentLength + STAGING_NAME_LENGTH + 1 + name.length;
+	return Math.max(target, staged) < WINDOWS_PATH_LIMIT;
+}
+
 /** The folder name for an imported archive, from the archive's FILE name:
     extension and a browser's " (1)" download suffix dropped, the same rules
     as any name, and `Import` when nothing usable is left (`CON.zip`). */

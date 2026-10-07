@@ -30,6 +30,8 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 	r.check("l'extension compte même en majuscules", nomPartage("x.ZIP"), "x.ZIP");
 	r.check("sans extension, refusé", nomPartage("zip"), null);
 	r.check("un point final ne cache pas une autre extension", nomPartage("x.bat."), null);
+	r.check("a Windows device name is refused whatever the extension", ["CON.zip", "nul.md", "Com1.zip", "con.txt.md", "LPT3 .md"].map(nomPartage), [null, null, null, null, null]);
+	r.check("a name that only STARTS like a device name is kept", [nomPartage("console.md"), nomPartage("com10.zip")], ["console.md", "com10.zip"]);
 	r.check("pas une chaîne, refusé", nomPartage(42), null);
 	r.check("vide, refusé", nomPartage(""), null);
 	r.check("trop long, refusé", nomPartage("a".repeat(200) + ".zip"), null);
@@ -147,7 +149,7 @@ await withSrcModule("src/dashboard/zip.ts", ({ nomNoteImportee }) => {
    2026-10-07). A rule that lives in one side only lets an exported archive
    hold a name the importer refuses. */
 await withSrcModule(["src/dashboard/share-names.ts", "src/dashboard/zip.ts"], (names, zip) => {
-	const { cleanName, isReservedName, baseNameVerdict, exportBaseName, dedupeNames, fitsPath, folderNameFromArchive, NAME_MAX, PATH_MAX } = names;
+	const { cleanName, isReservedName, baseNameVerdict, exportBaseName, dedupeNames, fitsPath, fitsWindowsPath, folderNameFromArchive, NAME_MAX, PATH_MAX } = names;
 	const r = makeReporter("Share name rules (exporter and importer)");
 	r.check("Windows reserves a device name for EVERY extension: con.txt.md, CON.md, nul.tar.gz", [isReservedName("con.txt.md"), isReservedName("CON.md"), isReservedName("nul.tar.gz")], [true, true, true]);
 	r.check("device names: com0-9, lpt0-9, the superscript digits, the console handles, a trailing space", [isReservedName("COM1"), isReservedName("lpt9.md"), isReservedName("COM¹.md"), isReservedName("conout$"), isReservedName("aux .md")], [true, true, true, true, true]);
@@ -168,6 +170,12 @@ await withSrcModule(["src/dashboard/share-names.ts", "src/dashboard/zip.ts"], (n
 	r.check("names that differ only by case, or by NFC/NFD, collide: the next gets (2), (3)", dedupeNames(["A.md", "a.md", "café.md", "café.md", "A.MD"]), ["A.md", "a (2).md", "café.md", "café (2).md", "A (3).MD"]);
 	r.check("a deduplicated name does not collide with a later real one", dedupeNames(["a.md", "a.md", "a (2).md"]), ["a.md", "a (2).md", "a (2) (2).md"]);
 	r.check("the target path bound: 240 fits, 241 does not", [fitsPath("x".repeat(100), "y".repeat(139)), fitsPath("x".repeat(100), "y".repeat(140)), PATH_MAX], [true, false, 240]);
+	// An absolute Windows target: 260 counts the root, the folder AND the staging folder (".import-" + 12 hex) that sits beside it.
+	const root = "C:/Users/Ahmed/Documents/Cours/" + "d".repeat(60);
+	const P = "C:/" + "p".repeat(100) + "/";
+	r.check("Windows absolute path: 259 characters fit, 260 do not", [fitsWindowsPath(root, "a".repeat(100)), fitsWindowsPath(root, "a".repeat(167)), fitsWindowsPath(root, "a".repeat(168))], [true, true, false]);
+	r.check("... a SHORT folder name makes the staging path (.import- + 12 hex) the longer one",
+		[fitsWindowsPath(P + "x", "a".repeat(134)), fitsWindowsPath(P + "x", "a".repeat(135)), fitsWindowsPath(P + "y".repeat(30), "a".repeat(124)), fitsWindowsPath(P + "y".repeat(30), "a".repeat(125))], [true, false, true, false]);
 	r.check("the folder named after an archive: CON.zip, a download suffix, NFD, empty", [folderNameFromArchive("CON.zip"), folderNameFromArchive("Cours C (1).zip"), folderNameFromArchive("café.zip"), folderNameFromArchive(".zip"), folderNameFromArchive("a:b.zip")], ["Import", "Cours C", "café", "Import", "a-b"]);
 	r.done();
 });

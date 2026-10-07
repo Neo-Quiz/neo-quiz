@@ -23,11 +23,19 @@ object FileShare {
     private val EXTENSIONS = mapOf("zip" to "application/zip", "md" to "text/markdown")
     private val FORBIDDEN = Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]")
 
+    /** Windows device names (reserved for every extension): COPY of `RESERVED` in `src/dashboard/share-names.ts`, pinned by `check:android-pont`. */
+    private val RESERVED = Regex("^(con|prn|aux|nul|conin\\$|conout\\$|com[0-9¹²³]|lpt[0-9¹²³])$", RegexOption.IGNORE_CASE)
+
+    /** Is the name a Windows device name for any extension (`con.txt.md` as much as `CON.md`)? */
+    internal fun isReservedName(name: String): Boolean =
+        RESERVED.matches(java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFC).substringBefore('.').trimEnd())
+
     /** The sanitised file name, or null when it is not a share. */
     fun name(raw: Any?): String? {
         if (raw !is String) return null
         val clean = raw.replace(FORBIDDEN, "-").replace(Regex("^[\\s.]+|[\\s.]+$"), "").trim()
         if (clean.isEmpty() || clean.length > 150) return null
+        if (isReservedName(clean)) return null
         val dot = clean.lastIndexOf('.')
         if (dot <= 0) return null
         return if (clean.substring(dot + 1).lowercase() in EXTENSIONS) clean else null
