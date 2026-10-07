@@ -135,6 +135,17 @@
 				"ue": "UE 1"
 			}
 		},
+		"v1-quiz-whole-note.zip": {
+			"sha256": "fbefa521714bb46dc9cdbb034b1e320bfdbe0134b1577147db8b2c6cdb265e33",
+			"folder": "Notre cours",
+			"files": {
+				"Notre cours.md": "21db6553df0fc3d57279d0e4f068ce7a9085d044da6d09bdea5d61d9d49f4eab",
+				"img/figure.PNG": "e59dea7dbc71c5cf749a60a077bb83201343cbaf1a0f02985120602684920006"
+			},
+			"junk": 0,
+			"skipped": [],
+			"ignored": []
+		},
 		"v1-selection.zip": {
 			"sha256": "018dde86c3e29615988b3f013f1854593084e8078b33b237670f6974cca57a4e",
 			"folder": "Sélection",

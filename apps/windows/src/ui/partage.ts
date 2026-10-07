@@ -7,7 +7,6 @@ import { baseNameVerdict, dedupeNames, exportBaseName } from "../../../../src/da
 import { receiveArchive } from "../../../../src/dashboard/share-import";
 import { planImport } from "../../../../src/dashboard/share-plan";
 import { createOptionCard } from "../../../../src/dashboard/folder-create";
-import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
 import type { ModuleGroup } from "../../../../src/dashboard/quiz-modules";
@@ -17,8 +16,8 @@ import { PARTAGE_OCCUPE } from "../../electron/pont";
 /* ══════════════════════════════════════════════════════════
    « PARTAGER » un quiz ou un dossier (2026-09-25), le modal du greffon
    (`src/dashboard/share.ts`, retiré le 2026-09-13) porté dans l'application.
-   On n'a pas de lien mais un FICHIER : le zip des quiz d'un dossier, ou le
-   .md d'un quiz réduit à son bloc — ce que « Importer » sait relire. Since
+   On n'a pas de lien mais un FICHIER : le zip des quiz d'un dossier, ou la
+   NOTE ENTIÈRE d'un quiz (depuis le 2026-10-07, plus son seul bloc) — ce que « Importer » sait relire. Since
    2026-10-03 it goes straight to the system's share panel (see
    `ouvrirPartage`). The file is built HERE; the main process
    (`electron/partage.ts`) only receives a name and bytes.
@@ -31,7 +30,8 @@ import { PARTAGE_OCCUPE } from "../../electron/pont";
    ship a file the importer would refuse.
 ══════════════════════════════════════════════════════════ */
 
-export type CiblePartage = { quiz: QuizIndexEntry } | { group: ModuleGroup };
+/** A quiz, a whole folder, or a selection of quizzes (named after its folder). */
+export type CiblePartage = { quiz: QuizIndexEntry } | { group: ModuleGroup } | { quizzes: QuizIndexEntry[]; name: string };
 
 interface Fichier { nom: string; octets: Uint8Array; imagesLaissees: number }
 
@@ -125,35 +125,26 @@ async function verifier(octets: Uint8Array, notes: number): Promise<boolean> {
 
 /** The file to share, or `null` (and a message) when nothing is readable or
     the notes alone are over the bound. A folder is a .zip of its quizzes and
-    the images they embed; a quiz is its block as a .md, or, when its note
-    embeds images, a .zip with them (a .md cannot carry them). */
+    the images they cite; a quiz (or a selection of quizzes) carries its WHOLE
+    NOTE, the .md exactly as it is on disk, and every image cited anywhere in
+    the note: a lone quiz without images is that .md, anything else a .zip. */
 export async function construire(cible: CiblePartage): Promise<Fichier | null> {
 	const host = currentHost();
 	const fs = host.fs;
 	const maintenant = new Date();
 	const app = appVersion();
-	if ("quiz" in cible) {
-		const contenu = await fs.read(cible.quiz.path);
-		const bloc = contenu.match(QUIZ_BLOCK_RE);
-		if (!bloc) { host.ui.notice(t("dashboard.detail.noBlockInNote")); return null; }
-		const texte = bloc[0].replace(/\r\n/g, "\n") + "\n";
-		const nom = nomSur(cible.quiz.title, "quiz");
-		const octetsNote = new TextEncoder().encode(texte);
-		const { images, perdues } = await imagesDes([{ chemin: cible.quiz.path, contenu }], dossierDe(cible.quiz.path));
-		if (images.length === 0) return { nom: `${nom}.md`, octets: octetsNote, imagesLaissees: perdues };
-		const paquet = await packShareV1([{ path: `${nom}.md`, kind: "note", bytes: octetsNote }], images, { app, kind: "quizzes", name: nom }, maintenant);
-		if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }
-		if (!(await verifier(paquet.bytes, 1))) { host.ui.notice(t("share.export.selfCheck")); return null; }
-		return { nom: `${nom}.zip`, octets: paquet.bytes, imagesLaissees: paquet.imagesOut + perdues };
-	}
-	const groupe = cible.group;
-	const base = groupe.path && groupe.quizzes.every(q => q.path.startsWith(`${groupe.path}/`)) ? groupe.path : dossierCommun(groupe.quizzes.map(q => q.path));
-	const lus: { chemin: string; contenu: string; rel: string }[] = [];
+	const group = "group" in cible ? cible.group : null;
+	const quizzes = "quiz" in cible ? [cible.quiz] : "quizzes" in cible ? cible.quizzes : (group as ModuleGroup).quizzes;
+	const base = group
+		? (group.path && group.quizzes.every(q => q.path.startsWith(`${group.path}/`)) ? group.path : dossierCommun(group.quizzes.map(q => q.path)))
+		: quizzes.length === 1 ? dossierDe(quizzes[0].path) : dossierCommun(quizzes.map(q => q.path));
+	const lus: { chemin: string; contenu: string; octets: Uint8Array; rel: string }[] = [];
 	let illisibles = 0;
-	for (const q of groupe.quizzes) {
+	for (const q of quizzes) {
 		try {
-			const contenu = await fs.read(q.path);
-			lus.push({ chemin: q.path, contenu, rel: cheminSur(relatif(q.path, base) ?? (q.path.split("/").pop() as string), true) as string });
+			// The note's own bytes: BOM and line endings reach the receiver untouched.
+			const octets = await fs.readBinary(q.path);
+			lus.push({ chemin: q.path, contenu: new TextDecoder().decode(octets), octets, rel: cheminSur(relatif(q.path, base) ?? (q.path.split("/").pop() as string), true) as string });
 		} catch (e) {
 			// A quiz that vanished between the scan and the click: the rest is shared, and it is said.
 			console.warn(`${LOG_PREFIX} share: quiz unreadable:`, q.path, e);
@@ -162,15 +153,23 @@ export async function construire(cible: CiblePartage): Promise<Fichier | null> {
 	}
 	if (lus.length === 0) { host.ui.notice(t("dashboard.detail.fileNotFound")); return null; }
 	if (illisibles > 0) host.ui.notice(t("share.export.unreadable", { count: illisibles }));
+	const { images, perdues } = await imagesDes(lus, base);
+	if (lus.length === 1 && !group) {
+		// One quiz: named after its title, as a bare .md when no image goes with it.
+		const nom = nomSur(quizzes[0].title, "quiz");
+		if (images.length === 0) return { nom: `${nom}.md`, octets: lus[0].octets, imagesLaissees: perdues };
+		const paquet = await packShareV1([{ path: `${nom}.md`, kind: "note", bytes: lus[0].octets }], images, { app, kind: "quizzes", name: nom }, maintenant);
+		if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }
+		if (!(await verifier(paquet.bytes, 1))) { host.ui.notice(t("share.export.selfCheck")); return null; }
+		return { nom: `${nom}.zip`, octets: paquet.bytes, imagesLaissees: paquet.imagesOut + perdues };
+	}
 	// Two quizzes can end up with the same path once cleaned: unique, case-insensitively.
 	const uniques = dedupeNames(lus.map(l => l.rel));
-	const notes: ShareFileIn[] = lus.map((l, i) => ({ path: uniques[i], kind: "note", bytes: new TextEncoder().encode(l.contenu) }));
-	const { images, perdues } = await imagesDes(lus, base);
-	const nom = nomSur(groupe.name, "quizzes");
-	const paquet = await packShareV1(notes, images, {
-		app, kind: "folder", name: nom,
-		folder: { name: groupe.name, color: groupe.color, icon: groupe.icon, ue: groupe.ue ?? undefined },
-	}, maintenant);
+	const notes: ShareFileIn[] = lus.map((l, i) => ({ path: uniques[i], kind: "note", bytes: l.octets }));
+	const nom = nomSur(group ? group.name : "quizzes" in cible ? cible.name : "", "quizzes");
+	const paquet = await packShareV1(notes, images, group
+		? { app, kind: "folder", name: nom, folder: { name: group.name, color: group.color, icon: group.icon, ue: group.ue ?? undefined } }
+		: { app, kind: "quizzes", name: nom }, maintenant);
 	if (!paquet.bytes) { host.ui.notice(t("dashboard.quizzes.shareTooLarge")); return null; }
 	if (!(await verifier(paquet.bytes, notes.length))) { host.ui.notice(t("share.export.selfCheck")); return null; }
 	return { nom: `${nom}.zip`, octets: paquet.bytes, imagesLaissees: paquet.imagesOut + perdues };

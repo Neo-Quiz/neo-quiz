@@ -36,6 +36,7 @@ export const sha256 = (b) => createHash("sha256").update(b).digest("hex");
 export const fence = (title) => "```quiz-blocks\n[{ title: '" + title + "', prompt: 'Quelle est la capitale de la France ?', options: ['Paris', 'Lyon'], correctIndex: 0 }]\n```\n";
 export const noteA = "# Introduction \u00e0 l'\u00e9cosyst\u00e8me\n\n" + fence("CM1 \u00c9cosyst\u00e8me");
 export const noteB = "# TD \u00e9valu\u00e9\r\n\r\nVoir ![[sch\u00e9ma.png]]\r\n\r\n" + fence("TD");
+export const noteWhole = "---\ntags: [cours]\n---\n# Notre cours\r\n\r\nUn texte avant le quiz.\r\n\r\n![](img/figure.PNG)\r\n\r\n" + fence("Notre cours") + "\r\nEt après.\r\n";
 export const noteC = "# Chapitre 2\n\n" + fence("Chapitre 2");
 
 /** Deterministic pseudo-image: a PNG signature and seeded noise. */
@@ -132,7 +133,7 @@ export async function buildFixtures() {
 
 	// 11. Format 1, made by the REAL exporter: a folder with its look, sub-folders, an uppercase extension.
 	const NOW = new Date(2026, 9, 7, 12, 0, 0);
-	let v1Folder; let v1Selection; let tamperedManifest;
+	let v1Folder; let v1Selection; let v1WholeNote; let tamperedManifest;
 	await withSrcModule("src/dashboard/share-pack.ts", async ({ packShareV1 }) => {
 		const note = (path, text) => ({ path, kind: "note", bytes: enc.encode(text) });
 		const image = (path, bytes) => ({ path, kind: "image", bytes });
@@ -146,8 +147,15 @@ export async function buildFixtures() {
 			[image("sch\u00e9ma.png", IMG)],
 			{ app: "1.20.43", kind: "quizzes", name: "S\u00e9lection" },
 			NOW)).bytes;
+		// A quiz shared with its WHOLE note (front matter and a body that cites an image), since the selection share.
+		v1WholeNote = (await packShareV1(
+			[note("Notre cours.md", noteWhole)],
+			[image("img/figure.PNG", IMG2)],
+			{ app: "1.20.44", kind: "quizzes", name: "Notre cours" },
+			NOW)).bytes;
 	});
 	g("v1-folder.zip", v1Folder, { folder: "Cours C", files: files({ "CM1 - Intro.md": noteA, "Semaine 2/q1.md": noteC, "sch\u00e9ma.png": IMG, "Semaine 2/img/figure.PNG": IMG2 }), junk: 0, skipped: [], ignored: [], settings: { name: "Cours C", color: "#4f8cff", icon: "book", ue: "UE 1" } });
+	g("v1-quiz-whole-note.zip", v1WholeNote, { folder: "Notre cours", files: files({ "Notre cours.md": noteWhole, "img/figure.PNG": IMG2 }), junk: 0, skipped: [], ignored: [] });
 	g("v1-selection.zip", v1Selection, { folder: "Sélection", files: files({ "TD \u00e9.md": noteB, "Chapitre 2.md": noteC, "sch\u00e9ma.png": IMG }), junk: 0, skipped: [], ignored: [] });
 
 	// 12. A manifest of a NEWER format: imported at best (notes and images), with a notice to update.

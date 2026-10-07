@@ -55,6 +55,7 @@ const PINNED_GOLDEN = {
 	"legacy-cp437.zip": "ceac3bdef405809e5e0ec823f0cf5510915bdddd82cc68186a2fbd89b71dee0f",
 	"unicode-path-extra.zip": "ca78bdd8ff93ab45fffac62261013b9f9ae5c7c5d359cf1f5aef2d85c66cbc89",
 	"zip64.zip": "71599ef28406fc822da1d66cfa861fd5dfb03275390343752da1da88f2d88697",
+	"v1-quiz-whole-note.zip": "fbefa521714bb46dc9cdbb034b1e320bfdbe0134b1577147db8b2c6cdb265e33",
 	"v1-folder.zip": "6095c4cae017528fa4929e37dbb5d74575214b5239d6d8e4bf0f93095cab2c0f",
 	"v1-selection.zip": "018dde86c3e29615988b3f013f1854593084e8078b33b237670f6974cca57a4e",
 	"v1-future-format.zip": "2fefeb88e86fe7b1508880e48d2846cb26f8dd36f02426b5dd21227178c07b47",
@@ -89,7 +90,7 @@ const PINNED_HOSTILE = {
 	"empty-file.zip": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 	// </pinned-hostile>
 };
-const MIN_GOLDEN = 15;
+const MIN_GOLDEN = 16;
 const MIN_HOSTILE = 23;
 
 const sha = (b) => createHash("sha256").update(b).digest("hex");
@@ -342,20 +343,33 @@ await withSrcModule(
 
 		await withWorld(async (w) => {
 			seed(w);
-			// One quiz, no image: a .md holding only the block (LF), read back identically.
+			// One quiz, no image: a .md that is the WHOLE NOTE, byte for byte, read back identically.
 			const one = await partage.construire({ quiz: QUIZZES[4] });
-			const block = noteNfd.match(/```quiz-blocks[\s\S]*?```/)[0] + "\n";
-			r.check("one quiz without images: a .md of its block", [one.nom, Buffer.from(one.octets).toString("utf8")], ["Café NFD.md", block]);
+			const whole = Buffer.from(noteNfd, "utf8");
+			r.check("one quiz without images: a .md that is the whole note, as it is on disk", [one.nom, Buffer.from(one.octets).equals(whole)], ["Café NFD.md", true]);
 			mkdirSync(w.abs("Reçus"));
 			await importer.importFileIntoFolder("Reçus", { name: one.nom, bytes: one.octets }, () => {});
-			r.check("ROUND TRIP, one quiz: imported under its name, block byte for byte", listFiles(w.abs("Reçus")), { "Café NFD.md": sha(Buffer.from(block, "utf8")) });
-			// One quiz that embeds an image: a .zip with it.
+			r.check("ROUND TRIP, one quiz: imported under its name, the whole note byte for byte", listFiles(w.abs("Reçus")), { "Café NFD.md": sha(whole) });
+			// One quiz that embeds an image: a .zip with them.
 			const withImg = await partage.construire({ quiz: quizEntry("Cours C/Avec image.md", "Avec image") });
-			r.check("one quiz whose block embeds an image: a .zip", withImg.nom, "Avec image.zip");
+			r.check("one quiz whose note embeds an image: a .zip", withImg.nom, "Avec image.zip");
 			mkdirSync(w.abs("Reçus 2"));
 			await importer.importFileIntoFolder("Reçus 2", { name: withImg.nom, bytes: withImg.octets }, () => {});
-			const blockImg = noteImg.match(/```quiz-blocks[\s\S]*?```/)[0] + "\n";
-			r.check("ROUND TRIP, one quiz with an image: block and image byte for byte", listFiles(w.abs("Reçus 2")), srt({ "Avec image.md": sha(Buffer.from(blockImg, "utf8")), "schéma.png": sha(SCHEMA) }));
+			r.check("ROUND TRIP, one quiz with an image: the whole note and the image byte for byte", listFiles(w.abs("Reçus 2")), srt({ "Avec image.md": sha(Buffer.from(noteImg, "utf8")), "schéma.png": sha(SCHEMA) }));
+		});
+
+		/* A selection (the folder page's Ctrl+click) is `{ quizzes, name }`: the
+		   whole notes, the images cited anywhere in them, kind "quizzes". */
+		await withWorld(async (w) => {
+			seed(w);
+			const two = [QUIZZES[1], QUIZZES[4]];
+			const shared = await partage.construire({ quizzes: two, name: "Cours C" });
+			const read2 = await zip.readZip(shared.octets);
+			const m = JSON.parse(new TextDecoder().decode(read2.files[0].bytes));
+			r.check("a selection of two: one archive named after the folder, kind quizzes, the two whole notes", [shared.nom, m.kind, m.name, read2.files.slice(1).filter(f => f.name.endsWith(".md")).map(f => f.name)], ["Cours C.zip", "quizzes", "Cours C", ["TD é.md", "Café NFD.md"]]);
+			r.check("a selection of two: the notes are the files themselves, byte for byte", read2.files.filter(f => f.name.endsWith(".md")).map(f => sha(f.bytes)), [sha(Buffer.from(noteTd, "utf8")), sha(Buffer.from(noteNfd, "utf8"))]);
+			const solo = await partage.construire({ quizzes: [QUIZZES[4]], name: "Cours C" });
+			r.check("a selection of ONE quiz is the same share as that quiz alone", [solo.nom, Buffer.from(solo.octets).equals(Buffer.from(noteNfd, "utf8"))], ["Café NFD.md", true]);
 		});
 
 		/* The exporter never ships a name the importer refuses (the drift this
