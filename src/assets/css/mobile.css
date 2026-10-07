@@ -716,10 +716,25 @@ html.nq-mobile .modal-container > .modal {
 	min-width: 0;
 }
 
-/* The line under the filters, like StudySmarter's Library (2026-10-05). */
+/* The line under the filters, like StudySmarter's Library (2026-10-05). The
+   desktop's 61 px top margin lines its pill up with the folder's breadcrumb;
+   on a phone the filters start 16 px under the status bar instead. */
 .is-mobile .qbd-quizzes-group {
+	margin-top: 0;
 	padding-bottom: 16px;
 	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* The home page's 32 px room above its first card is the desktop's: a phone
+   starts the cards right under the status bar. */
+.is-mobile .qbd-home-layout {
+	margin-top: 0;
+}
+
+/* An open folder's breadcrumb row keeps 8 px of desktop air above it; on a
+   phone it is the first content, 16 px under the status bar. */
+.is-mobile .qbd-quizzes-folder-hero-inner > .qbd-quizzes-toprow:first-child {
+	margin-top: 0;
 }
 
 /* Room under the last card for the two floating buttons. */
@@ -754,11 +769,16 @@ html.nq-mobile body {
 	height: auto;
 	min-height: 100vh;
 	overflow: visible;
-	/* Resting position below the status bar plus a gap. The bare `padding-top: 0`
-	   that stood here beat shell.css's `#neo-quiz-root` padding, so the first
-	   card started under the clock (2026-10-07). Scrolling still runs under it. */
-	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
+	/* No room above the page: the panel itself starts at the top of the screen,
+	   under the status bar (its colour goes up there too). The clearance below
+	   the status bar sits on the panel, `.qbd-content` (2026-10-07). */
+	padding-top: 0;
 	box-sizing: border-box;
+}
+
+/* A played quiz keeps its room above: its question header is not moved. */
+.is-mobile #neo-quiz-root:has(> .qbd-qz) {
+	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
 }
 
 .is-mobile #neo-quiz-root > .qbd-layout {
@@ -772,7 +792,39 @@ html.nq-mobile body {
 .is-mobile #neo-quiz-root > .qbd-layout > .qbd-content {
 	flex: 1 0 auto;
 	overflow: visible;
+	/* Nothing wider than the screen widens the page: the bubble that points at
+	   the provider button can hang past the edge, and it is clipped here. */
+	overflow-x: clip;
 	height: auto;
+	/* First content 16 px under the status bar, on every page of the panel. */
+	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
+}
+
+/* A folder opened on a phone: the sheet behind it would show above the front
+   one, and the front one starts at the top of the screen like every page. */
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-content.nq-sheet-front {
+	margin-top: 0;
+	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
+}
+
+.is-mobile #neo-quiz-root > .qbd-layout .nq-sheet-back {
+	visibility: hidden;
+}
+
+/* The status bar strip: the panel's own glass, fixed over the top of the
+   screen, so a scrolling page never shows under the clock. Not on a played
+   quiz (its own top) and not on Settings (a modal with its own strip). */
+.is-mobile #neo-quiz-root:not(:has(> .qbd-qz))::before {
+	content: "";
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: var(--nq-inset-haut, 0px);
+	z-index: 50;
+	background: var(--nq-panel-bg);
+	backdrop-filter: var(--nq-panel-blur);
+	pointer-events: none;
 }
 
 .is-mobile #neo-quiz-root > .qbd-layout > .qbd-sidebar {
@@ -1070,6 +1122,18 @@ html.nq-keyboard #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
 	top: var(--nq-inset-haut, 0px);
 	z-index: 5;
 	background: var(--background-primary);
+	/* First content 16 px under the status bar, as on the panel's pages (2026-10-07). */
+	padding-top: 16px;
+}
+
+/* The same on the principal page: no top padding of its own, and its first
+   title keeps 16 px under the status bar. */
+body.is-mobile .modal-container:has(> .nq-reglages-modal) .nq-set-volet {
+	padding-top: 0;
+}
+
+.is-mobile .nq-set-page-titre {
+	margin-top: 16px;
 }
 
 body.is-mobile .modal-container:has(> .nq-reglages-modal)::before {
