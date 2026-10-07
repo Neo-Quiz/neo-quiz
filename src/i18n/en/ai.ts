@@ -194,6 +194,7 @@ export const EN_AI = {
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Select a provider",
+	"ai.provider.label": "AI provider: {name}",
 	"ai.provider.claudeSub": "Pro / Max account",
 	"ai.provider.codexSub": "Codex CLI · ChatGPT subscription",
 	"ai.provider.antigravitySub": "Antigravity CLI · Google account",
