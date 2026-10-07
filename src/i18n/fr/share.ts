@@ -37,5 +37,10 @@ export const FR_SHARE: Record<keyof typeof EN_SHARE, string> = {
 	"share.why.no-quiz": "aucun quiz dans cette note",
 	"share.why.altered": "modifié depuis le partage (la somme de contrôle ne correspond pas)",
 	"share.export.unreadable": "{count} quiz n'ont pas pu être lus et ont été laissés hors du fichier partagé",
+	"share.export.panelFailed": "Windows n'a pas pu ouvrir son panneau de partage. Enregistrez plutôt le fichier, puis envoyez-le vous-même (courriel, messagerie, clé USB).",
+	"share.export.panelTitle": "Partager le fichier soi-même",
+	"share.export.saveFile": "Enregistrer le fichier…",
+	"share.export.saved": "Fichier enregistré : {path}",
 	"share.export.selfCheck": "Le fichier à partager n'a pas passé sa propre vérification, il n'a donc pas été partagé. Merci de le signaler",
+	"share.export.saveFailed": "Le fichier n'a pas pu être enregistré",
 };

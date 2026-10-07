@@ -37,5 +37,10 @@ export const EN_SHARE = {
 	"share.why.no-quiz": "no quiz in this note",
 	"share.why.altered": "changed since it was shared (checksum does not match)",
 	"share.export.unreadable": "{count} quizzes could not be read and were left out of the shared file",
+	"share.export.panelFailed": "Windows could not open its share panel. Save the file instead, then send it yourself (mail, chat, USB key).",
+	"share.export.panelTitle": "Share the file yourself",
+	"share.export.saveFile": "Save the file…",
+	"share.export.saved": "File saved: {path}",
 	"share.export.selfCheck": "The shared file failed its own check, so it was not shared. Please report this",
+	"share.export.saveFailed": "The file could not be saved",
 } as const;

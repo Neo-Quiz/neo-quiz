@@ -14,11 +14,18 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- A shared archive now carries a description file (folder name, colour, icon, unit, and a checksum for every file): a folder you import takes the look of the original, and a file changed after sharing is refused with a message.
+- Importing never overwrites: an identical quiz is skipped, a different one with the same name becomes "Name (2)", and a summary lists what was added, skipped and renamed. A file made by a newer version is imported as far as possible, with a note to update the app.
+- Every sharing and import message is now translated and says what happened, with no silent failure.
 - In a Learn step, each question now has a single title line ("Question 1: Title"), and the small "Reading" label above a reading is gone.
 - Every scrollable area on Android now stretches at its ends, in both directions.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- Importing a shared archive keeps its sub-folders (images in an `img/` folder keep working), file extensions as written and notes byte for byte, and a failed import leaves nothing behind.
+- Sharing one quiz now also carries the images cited in the body of its note.
+- Imported notes show up at once, without waiting for the folder watcher.
+- When the Windows share panel cannot open, a "Save the file…" window lets you save the .zip or .md and send it yourself.
 - Opening a quiz page no longer freezes while its question cards are measured one by one.
 - Pages that animate many cards in no longer freeze for 50 to 100 ms each time a card finishes.
 - Sharing no longer gets stuck on "A share is already in progress": clicking Share again after closing the panel without choosing an app starts a new share.

@@ -1,11 +1,12 @@
 import { t } from "../../../../src/i18n";
-import { currentHost } from "../../../../src/host/current";
+import { currentHost, requireHost } from "../../../../src/host/current";
 import { embedTargets, isShareableImage, packShareV1 } from "../../../../src/dashboard/share-pack";
 import type { ShareFileIn } from "../../../../src/dashboard/share-pack";
 import { IMAGE_IMPORT_MAX_BYTES } from "../../../../src/dashboard/zip";
 import { baseNameVerdict, dedupeNames, exportBaseName } from "../../../../src/dashboard/share-names";
 import { receiveArchive } from "../../../../src/dashboard/share-import";
 import { planImport } from "../../../../src/dashboard/share-plan";
+import { createOptionCard } from "../../../../src/dashboard/folder-create";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
@@ -184,25 +185,46 @@ function noterLaissees(fichier: Fichier): void {
     the system's own share panel. Windows: its Share panel (Discord,
     WhatsApp, Outlook, Nearby Share…), opened by the main process
     (`partageNatif`). Android: its share sheet, which `partage.enregistrer`
-    opens there. */
+    opens there. If the Windows panel cannot be opened, the user is offered
+    to SAVE the file where they choose (the main process's own dialog: the
+    location comes from the user, never from the window). */
 export function ouvrirPartage(cible: CiblePartage): void {
 	void (async () => {
+		let fichier: Fichier | null = null;
 		try {
-			const fichier = await construire(cible);
+			fichier = await construire(cible);
 			if (!fichier) return;
 			const natif = pont().partageNatif;
 			const ok = natif
 				? await natif.fichier(fichier.nom, fichier.octets)
 				: (await pont().partage.enregistrer(fichier.nom, fichier.octets)) !== null;
 			if (ok) noterLaissees(fichier);
-			else if (natif) currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
+			else if (natif) proposerEnregistrer(fichier);
 		} catch (e) {
 			if (e instanceof Error && e.message.includes(PARTAGE_OCCUPE)) {
 				currentHost().ui.notice(t("dashboard.quizzes.shareBusy"));
 			} else {
 				console.error(`${LOG_PREFIX} partage impossible :`, e);
-				currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
+				if (fichier && pont().partageNatif) proposerEnregistrer(fichier);
+				else currentHost().ui.notice(t("dashboard.quizzes.shareSaveError"));
 			}
 		}
 	})();
+}
+
+/** The fallback when the share panel failed: a small window with one action,
+    "Save the file…", which opens the native save dialog. */
+function proposerEnregistrer(fichier: Fichier): void {
+	requireHost("modals").open({
+		className: "qbd-create-modal",
+		title: t("share.export.panelTitle"),
+		onOpen: (m) => {
+			createOptionCard(m, m.contentEl, "download", "#4573ff", t("share.export.saveFile"), t("share.export.panelFailed"), () => {
+				void pont().partage.enregistrer(fichier.nom, fichier.octets).then(
+					(chemin) => { if (chemin) { currentHost().ui.notice(t("share.export.saved", { path: chemin })); noterLaissees(fichier); } },
+					(e) => { console.error(`${LOG_PREFIX} save failed:`, e); currentHost().ui.notice(t("share.export.saveFailed")); },
+				);
+			});
+		},
+	});
 }
