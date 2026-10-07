@@ -513,6 +513,57 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   l'entrée du bootstrapper (`installer/main.ts`) est bien BUNDLÉE (un import
   perdu l'avait laissé bloqué sur l'écran de démarrage de desktop-v1.20.0 à
   1.20.15).
+- `npm run check:moodle` — la synchronisation Moodle du processus principal
+  (`apps/windows/electron/moodle/*.ts`, spec 2026-10-07-moodle-sync-design),
+  sur de vrais serveurs http locaux : les cas du greffon d'origine, portés, plus
+  les cas de sécurité. Chaque requête et chaque redirection va EXACTEMENT à
+  l'origine du site configuré, en https ; un nom qui résout vers une adresse
+  privée, loopback ou réservée est refusé à la connexion (rebinding compris). Le
+  jeton ne sort jamais vers la fenêtre. Discriminance : la garde de redirection
+  hors hôte et celle du passeport sont rejouées sur un MUTANT du vrai code et
+  doivent alors échouer ; aucun fichier de l'app ne pose le commutateur
+  `allowHttpForTests`. Dans la CI.
+- `npm run check:swipe` — la décision de balayage (`src/swipe.ts`) : un balayage
+  horizontal change de page comme les flèches, jamais un défilement vertical qui
+  dérive sur le côté, ni depuis les zones de bord, un champ de saisie, un
+  défileur horizontal ou une modale ; verrouillage d'axe, suivi du doigt (résistance
+  en bout), vitesse de relâchement. Dans la CI.
+- `npm run check:generation-kind` — quel type (Learn ou Test) une demande de
+  génération veut et ce qu'on lui demande d'abord (`src/dashboard/generation-kind.ts`) :
+  le défaut est un Learn, seule une formulation explicite d'entraînement donne un
+  Test ; une réponse cassée de l'appel de clarification (0 ou 3+ questions,
+  moins de 2 ou plus de 4 options, texte autour du JSON) ne bloque jamais la
+  génération ; les réponses ne se perdent pas ; le prompt de clarification ne
+  porte que des NOMS de documents, jamais leur contenu. Dans la CI.
+- `npm run check:folder-suggest` — l'ordre des dossiers de destination et leurs
+  suggestions (`src/dashboard/folder-suggest.ts`) : plus récemment modifié
+  d'abord, mot de la demande apparié à travers les accents, un nom de dossier
+  devant un simple titre de fichier, mots vides sans suggestion, dossier déjà
+  choisi non re-suggéré, ordre stable entre égaux. Dans la CI.
+- `npm run check:chat-record` — le format des conversations de la page
+  « Générer » (`src/dashboard/chat-record.ts`) : une valeur stockée corrompue ou
+  hostile ne casse pas la page (requête, résultat ou document invalide écarté
+  seul), un résultat jamais perdu ni doublé à la réécriture, l'ancienne archive
+  texte importée par question, 200 conversations au plus sans jamais élaguer une
+  pierre tombale (une conversation supprimée reviendrait). Dans la CI.
+- `npm run check:code-packages` — le proxy de paquets Python du principal
+  (`apps/windows/electron/paquets-python.ts`), sur un transport injecté : un
+  fichier que le `pyodide-lock.json` du pack ne nomme pas ne déclenche AUCUNE
+  requête ; des octets dont le SHA-256 diffère ne sont ni servis ni mis en cache
+  (rien dans `paquets/`, pas même un `.part`) ; corps de plus de 50 Mo, redirection
+  vers `http:` ou un hôte hors liste, roue PyPI différente du condensé annoncé ou non
+  pure (`manylinux`) refusés ; budget de 500 Mo respecté. Dans la CI.
+- `npm run check:code-run` — le bouton « Exécuter » d'un bloc de code
+  (`src/engine/code-run.ts`) : la sortie d'un programme (stdout ou erreur) est
+  du texte dont l'auteur peut être un quiz PARTAGÉ hostile ; un faux `HostCode`
+  rend une charge HTML et aucun ÉLÉMENT ne doit apparaître sous
+  `.quiz-code-output`, seulement du texte posé par `textContent`. Dans la CI.
+- `npm run check:ci-coverage` — échoue si un script `check:*` de `package.json`
+  n'a pas sa ligne `run: npm run <script>` dans `.github/workflows/ci.yml` : un
+  contrôle rouge ne passe plus inaperçu (`check:folders` est resté rouge trois
+  jours hors CI). Seules exceptions écrites avec leur raison dans le script :
+  `check:watch` (ne termine jamais) et `check:app` (build déjà fait par les
+  étapes `pack:*`). Un nouveau `check:*` exige donc sa ligne dans `ci.yml`.
 
 Vérification d'un changement = `npm run check`, plus `check:md` / `check:export` /
 `check:markers` si le rendu ou l'écriture sont touchés, **`check:quiz-io` dès que
@@ -549,6 +600,25 @@ ce qu'il faut savoir avant de toucher.
   lui.
 - **Étirement** : le défilement doit rester sur le scroller racine avec
   `overscroll` d'étirement NATIF ; la barre du bas ne bouge jamais.
+- **Moodle** : tourne dans le processus principal (`apps/windows/electron/
+  moodle/`, relayé par `canaux.ts`) ; lecture seule côté Moodle, jeton gardé
+  dans `jeton.ts` (jamais renvoyé à la fenêtre), hôte public seulement
+  (`adresse.ts`). Voir `check:moodle`.
+- **Packs de code téléchargeables** (Python et C/C++) : sur PC, le pack C/C++
+  vient de `langages.ts` (empreinte `PACK_C`) et les paquets Python passent par
+  le proxy `paquets-python.ts`, le bac à sable restant fermé ; sur Android,
+  `apps/android/.../code/LanguagePacks.kt` et `PythonPackages.kt`, avec la
+  copie d'empreinte `apps/android/web/pins.mjs` (`check:android-code-pack`).
+- **Mise à jour automatique Android** : l'app lit `docs/android-latest.json`
+  (site Pages), vérifie taille et SHA-256 de l'APK (`update/UpdateRules.kt`).
+  `npm run ship:android [-- --notes "…"]` (`scripts/ship-android.mjs`) construit
+  l'APK signé dans un worktree propre, crée la release GitHub `android-vX.Y.Z`
+  (`--latest=false`, sans toucher aux releases desktop), puis écrit le manifeste
+  et pousse `main` : ce dernier pas publie la mise à jour aux téléphones.
+- **Réglages de dossier partagés** (nom, UE, couleur, icône, chemin) : un
+  fichier par appareil, `<racine>/.neo-quiz/modules/<appareil>.json`, fusionné à
+  la lecture par champ, le plus récent gagne, un champ effacé reste une pierre
+  tombale (`src/shared-state/merge.ts`, `check:shared-state`).
 - **Données par appareil** : `.neo-quiz/journal|exams|attempts/<appareil>` dans
   le dossier synchronisé, un fichier par appareil (jamais d'écriture partagée,
   fusion à la lecture : `check:shared-state`).
