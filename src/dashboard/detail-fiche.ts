@@ -392,10 +392,20 @@ function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): ()
 
 /** GRILLE : une carte par question. Pas un bouton : on répond en jouant le
     quiz ; un clic fait briller « Commencer le quiz ». */
-/** Pose `a-suivre` (reste du texte en bas) et `a-precede` (texte au-dessus)
-    sur une zone qui défile, à chaque défilement et à chaque changement de
-    taille (formules rendues, fenêtre redimensionnée). Exportée : les listes
-    d'un dossier (`folder-sections.ts`) défilent avec les mêmes fondus. */
+/** Sets `a-suivre` (rest of the text below) and `a-precede` (text above) on
+    a scrolling area, at every scroll and every size change (formulas
+    rendered, window resized). Exported: a folder's lists scroll with the same
+    fades (`folder-sections.ts`).
+
+    NEVER READ THE GEOMETRY RIGHT AFTER APPENDING (phone audit, 2026-10-07).
+    The first reading used to run at once, "the grid already being in the
+    document": each of the 27 cards of a quiz page forced a layout of the page
+    built so far, 27 times in a row, a 400 ms task under a 6x CPU slowdown
+    (the profile put it all in this function) right when the page slides in.
+    The `ResizeObserver` delivers its first observation after the next
+    layout, once for every card, and the frame callback covers a browser
+    without it: the first reading comes one frame later, a single layout
+    for the whole grid. */
 export function suivreDebord(zone: HTMLElement): void {
 	const maj = (): void => {
 		const bas = zone.scrollTop + zone.clientHeight < zone.scrollHeight - 2;
@@ -408,9 +418,7 @@ export function suivreDebord(zone: HTMLElement): void {
 		ro.observe(zone);
 		for (const enfant of Array.from(zone.children)) ro.observe(enfant);
 	}
-	// Tout de suite (la grille est déjà dans le document), puis au cadre
-	// suivant, une fois les polices et les formules posées.
-	maj();
+	// One frame later, once the fonts and the formulas are in place.
 	requestAnimationFrame(maj);
 }
 
