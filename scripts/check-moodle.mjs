@@ -29,6 +29,7 @@ const failures = [];
 let total = 0;
 async function test(name, fn) {
 	total++;
+	if (process.env.MOODLE_TRACE) console.log("...", name);
 	try {
 		await fn();
 	} catch (e) {
@@ -532,6 +533,95 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		}
 	});
 
+
+	/* ─────────── fix round 1 ─────────── */
+	await test("untrusted server values: a bad filesize is unknown, a date is clamped to tomorrow", () => {
+		const now = Math.floor(Date.now() / 1000);
+		const f = (extra) => pur.flattenContents([{ name: "s", modules: [{ id: 1, name: "m", modname: "resource", contents: [
+			{ type: "file", filename: "a.pdf", fileurl: "https://m/1", ...extra }] }] }])[0].activities[0].files[0];
+		for (const bad of ["x", -5, 1.5, NaN, null, 2 ** 60, {}]) assert.equal(f({ filesize: bad }).size, null, String(bad));
+		assert.equal(f({ filesize: 123 }).size, 123);
+		assert.equal(f({ timemodified: 4e12 }).timemodified <= now + 86400, true);
+		for (const bad of ["x", -1, NaN, Infinity, null]) assert.equal(f({ timemodified: bad }).timemodified, 0, String(bad));
+		assert.equal(f({ timemodified: 1700000000 }).timemodified, 1700000000);
+	});
+	await test("size cap: a stream beyond the announced size or the hard cap is cut; DISCRIMINANCE: without the cap it completes", async () => {
+		const { s, root } = await server((req, res) => { res.setHeader("Content-Type", "application/pdf"); res.end("x".repeat(5000)); });
+		const dir = tmpdir();
+		const c = mk(root, { maxFileBytes: 1000 });
+		const mine = (name, size) => ({ file: { name, url: `${root}/a.pdf`, size, timemodified: 1, status: "missing" }, dir });
+		try {
+			const [a, b] = await disque.downloadFiles(c, [mine("inconnue.pdf", null), mine("mentie.pdf", 5000)], ALL);
+			assert.deepEqual([a.ok, b.ok], [false, false], "unknown size and a size above the cap are both cut");
+			assert.deepEqual(fs.readdirSync(dir), []);
+			const { mod, dir: md } = await mutant(`${MOODLE}client.ts`, "Math.min(expected ?? maxFile, maxFile)", "(expected ?? Infinity)");
+			const c2 = mod.createClient("tok", root, { ...T, maxFileBytes: 1000 });
+			try {
+				const [m2] = await disque.downloadFiles(c2, [mine("mentie.pdf", 5000)], ALL);
+				assert.equal(m2.ok, true, "the mutant must download it (else this case proves nothing)");
+			} finally { c2.close(); fs.rmSync(md, { recursive: true, force: true }); }
+		} finally { c.close(); stop(s); }
+	});
+	await test("a NEW file never replaces an existing one; DISCRIMINANCE: without the rule a future date overwrites", async () => {
+		const dir = tmpdir();
+		fs.writeFileSync(path.join(dir, "Note.md"), "ma note");
+		fs.utimesSync(path.join(dir, "Note.md"), 1000, 1000);
+		const job = { file: { name: "a.pdf", timemodified: 4000000000, status: "missing" }, target: "Note.md", dir };
+		assert.equal(disque.dejaPresent(job), true);
+		assert.equal(disque.dejaPresent({ ...job, file: { ...job.file, status: "outdated" }, target: "Note.md" }), false, "an outdated file is replaced, as the spec says");
+		assert.equal(disque.dejaPresent({ ...job, target: "Autre.md" }), false);
+		const { mod, dir: md } = await mutant(`${MOODLE}disque.ts`, 'job.file.status === "missing" && fs.existsSync', 'false && fs.existsSync');
+		try { assert.equal(mod.dejaPresent(job), false, "the mutant overwrites"); } finally { fs.rmSync(md, { recursive: true, force: true }); }
+	});
+	await test("an executable file type is refused, whatever the server names it", async () => {
+		const { s, root } = await server((req, res) => { res.setHeader("Content-Type", "application/octet-stream"); res.end("12345"); });
+		const dir = tmpdir();
+		const c = mk(root);
+		try {
+			const names = ["run.bat", "x.lnk", "y.HTA", "z.js", "w.ps1"];
+			const r = await disque.downloadFiles(c, names.map(n => ({ file: { name: n, url: `${root}/a`, size: 5, timemodified: 1, status: "missing" }, dir })), ALL);
+			assert.deepEqual(r.map(x => x.ok), names.map(() => false));
+			assert.equal(r.every(x => /executable/.test(x.error)), true);
+			assert.deepEqual(fs.readdirSync(dir), []);
+		} finally { c.close(); stop(s); }
+	});
+	await test("an overall deadline ends a download and an API call that drip bytes forever", async () => {
+		const drip = (res) => { res.setHeader("Content-Type", "application/pdf"); res.write("1"); const t = setInterval(() => res.write("1"), 20); res.on("close", () => clearInterval(t)); };
+		const { s, root } = await server((req, res) => drip(res));
+		const dir = tmpdir();
+		const c = mk(root, { idleTimeout: 5000, apiTimeout: 5000, fileDeadline: 300, apiDeadline: 300 });
+		try {
+			const t0 = Date.now();
+			const [r] = await disque.downloadFiles(c, [{ file: { name: "d.pdf", url: `${root}/d.pdf`, size: null, timemodified: 1, status: "missing" }, dir }], ALL);
+			assert.equal(r.ok, false);
+			assert.match(r.error, /too long/);
+			await assert.rejects(c.call("f"), e => e.code === "timeout" && /too long/.test(e.message));
+			assert.ok(Date.now() - t0 < 3000);
+			assert.deepEqual(fs.readdirSync(dir), []);
+		} finally { c.close(); stop(s); }
+	});
+	await test("the temp file is created exclusively: a directory or link in its place is refused, a stale regular temp is replaced", async () => {
+		const { s, root } = await server((req, res) => { res.setHeader("Content-Type", "application/pdf"); res.end("12345"); });
+		const dir = tmpdir();
+		const c = mk(root);
+		const job = n => ({ file: { name: n, url: `${root}/a.pdf`, size: 5, timemodified: 1, status: "missing" }, dir });
+		try {
+			fs.mkdirSync(path.join(dir, ".dir.pdf.moodle.tmp"));
+			fs.writeFileSync(path.join(dir, ".stale.pdf.moodle.tmp"), "old");
+			const outside = path.join(tmpdir(), "victim.txt");
+			fs.writeFileSync(outside, "intact");
+			let linked = true;
+			try { fs.symlinkSync(outside, path.join(dir, ".link.pdf.moodle.tmp")); } catch { linked = false; }
+			const names = ["dir.pdf", "stale.pdf"].concat(linked ? ["link.pdf"] : []);
+			const r = await disque.downloadFiles(c, names.map(job), ALL);
+			assert.deepEqual(r.map(x => x.ok), [false, true].concat(linked ? [false] : []));
+			assert.equal(fs.readFileSync(outside, "utf8"), "intact", "nothing was written through the link");
+			assert.equal(fs.readFileSync(path.join(dir, "stale.pdf"), "utf8"), "12345");
+			// the stream itself refuses an existing file (wx), even if the pre-check were skipped
+			fs.writeFileSync(path.join(dir, "taken.tmp"), "x");
+			await assert.rejects(c.fetchToFile(`${root}/a.pdf`, path.join(dir, "taken.tmp"), 5), e => e.code === "EEXIST");
+		} finally { c.close(); stop(s); }
+	});
 	/* ─────────── token storage ─────────── */
 	const fakeCrypt = (available = true) => ({
 		disponible: () => available,
@@ -576,7 +666,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			}
 			const fn = p.get("wsfunction");
 			if (opts.fail && fn === "core_enrol_get_users_courses") {
-				res.end(JSON.stringify({ exception: "x", errorcode: "boom", message: `failure for ${TOKEN} here` })); return;
+				res.end(JSON.stringify({ exception: "x", errorcode: "boom", message: opts.long ? "y".repeat(500) : `failure for ${TOKEN} here` })); return;
 			}
 			const due = Math.floor(Date.now() / 1000) + 3 * 3600;
 			res.end(JSON.stringify({
@@ -657,10 +747,12 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		const { m, other } = await fakeMoodle();
 		const base = tmpdir();
 		fs.mkdirSync(path.join(base, "XTI302 - Admin existant"));
-		const { svc, opened, pushes, store } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [] } } });
+		let clock = Date.now();
+		const { svc, opened, pushes, store } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [] } }, now: () => clock });
 		try {
 			assert.deepEqual(await svc.cours(), [], "not connected: no courses");
 			assert.equal((await svc.synchroniser()).erreur, "not-connected");
+			clock += 11000;
 			await svc.connecter();
 			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
 			const cours = await svc.cours();
@@ -676,6 +768,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(fs.readFileSync(path.join(dest, "Séance 2 - TP Socle.pdf"), "utf8"), "12345");
 			assert.equal(other.hits, 0, "the off-host file was never requested");
 			// second run: the file is present (same size found), nothing new
+			assert.equal(await svc.synchroniser(), await svc.synchroniser(), "a finished sync is not re-triggered within 10 s");
+			clock += 11000;
 			const r2 = await svc.synchroniser();
 			assert.deepEqual([r2.nouveaux, r2.mis_a_jour, r2.echecs], [0, 0, 0]);
 			assert.equal(fs.readdirSync(dest).length, 1);
@@ -683,6 +777,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.deepEqual(devoirs.map(d => [d.cmid, d.name, d.state]), [[23, "Rendu TP1", "urgent"]]);
 			assert.equal(await svc.ouvrirDevoir(23), true);
 			assert.equal(opened.at(-1), `${m.root}/mod/assign/view.php?id=23`);
+			assert.equal(await svc.ouvrirDevoir(23), false, "opened again within 2 s: refused");
+			clock += 3000;
 			for (const bad of ["23", -1, 1.5, NaN, null, {}]) assert.equal(await svc.ouvrirDevoir(bad), false);
 			const e = await svc.etat();
 			assert.equal(typeof e.lastSync, "number");
@@ -762,6 +858,22 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(fs.existsSync(dest), true, "an hour later: synced again");
 		} finally { stop(m.s); stop(other.s); }
 	});
+	await test("service: connecter is refused while a login is pending; the window cannot spam the browser or syncs", async () => {
+		const { m, other } = await fakeMoodle({ long: true, fail: true });
+		const base = tmpdir();
+		let clock = Date.now();
+		const { svc, opened } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [1] } }, now: () => clock });
+		try {
+			await svc.connecter();
+			await assert.rejects(svc.connecter(), { code: "pending" });
+			assert.equal(opened.length, 1, "no second browser tab, the first passport is kept");
+			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
+			// a server error text is truncated before it reaches the window
+			const err = await svc.cours().then(() => "", e => e.message);
+			assert.ok(err.length > 0 && err.length <= 200, String(err.length));
+		} finally { stop(m.s); stop(other.s); }
+	});
+
 });
 
 /* ─────────── the app never turns the tests-only switch on; the renderer never imports the module ─────────── */
@@ -780,6 +892,7 @@ await test("the bridge wiring: token files only in the main process, handlers pr
 	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChoisir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir"]) {
 		assert.ok(canaux.includes(`CANAUX.${c},`), c);
 	}
+	assert.ok(canaux.includes("dialogueMoodle ||") && canaux.includes("dialogueMoodleFin"), "one native Moodle dialog at a time, with a pause");
 	assert.ok(canaux.indexOf("garderReglagesMoodle(valeur)") < canaux.indexOf("await reglagesOuErreur().ecrire(String(cle), valeur)"));
 	const preload = await readFile("apps/windows/electron/preload.ts", "utf8");
 	assert.equal(/token/i.test(preload.slice(preload.indexOf("moodle:"), preload.indexOf("miseAJour:"))), false);

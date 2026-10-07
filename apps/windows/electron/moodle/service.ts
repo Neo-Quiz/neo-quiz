@@ -17,11 +17,14 @@ import { dejaPresent, dossierDuCours, downloadFiles, targetName, type Garde, typ
 import { MoodleError, TokenError, masquer } from "./erreurs";
 import { coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
+import { extensionRefusee } from "../ressources";
 import { allFiles, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
 const DEVOIRS_TTL = 5 * 60 * 1000;
+export const OPEN_INTERVAL = 2000;
+export const SYNC_INTERVAL = 10000;
 
 export interface DepsMoodle {
 	/** The default quiz root (`C:/Neo Quiz`), read at each use. */
@@ -58,7 +61,7 @@ export interface ServiceMoodle {
 interface Reglage { site: string; courses: number[] }
 interface FichierEtat { lastSync: number | null; expired: boolean }
 
-const msg = (e: unknown, secret?: string): string => masquer(e instanceof Error ? e.message : String(e), secret);
+const msg = (e: unknown, secret?: string): string => masquer(e instanceof Error ? e.message : String(e), secret).slice(0, 200);
 
 export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	const maintenant = deps.maintenant ?? Date.now;
@@ -70,6 +73,8 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	let erreur: string | null = null;
 	let enCours: Promise<ResumeSyncMoodle> | null = null;
 	let progress: { done: number; total: number } | null = null;
+	let dernierOuvert = 0;
+	let dernierSync: { at: number; res: ResumeSyncMoodle } | null = null;
 	let cache: { at: number; liste: DevoirMoodle[] } | null = null;
 
 	async function lireEtat(): Promise<FichierEtat> {
@@ -134,6 +139,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			await pousser();
 			throw new MoodleError("nostorage", "Secure storage is unavailable on this computer: the login cannot be saved.");
 		}
+		if (attente && maintenant() <= attente.expire) throw new MoodleError("pending", "A login is already waiting for the browser.");
 		erreur = null;
 		// One passport at a time: a new login replaces the previous one.
 		const passport = crypto.randomBytes(16).toString("hex");
@@ -248,7 +254,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 					if (f.status !== "missing" && f.status !== "outdated") continue;
 					const job = { file: f, dir, target: targetName(f), fresh: f.status === "missing" };
 					// A file on another host, or a copy already there and not older: skipped.
-					if (!client.memeSite(f.url) || dejaPresent(job)) { res.ignores++; continue; }
+					if (!client.memeSite(f.url) || extensionRefusee(job.target) || dejaPresent(job)) { res.ignores++; continue; }
 					jobs.push(job);
 				}
 			}
@@ -280,7 +286,9 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	function synchroniser(): Promise<ResumeSyncMoodle> {
 		if (enCours) return enCours;
-		const run = faireSync().finally(() => { enCours = null; void pousser(); });
+		// A finished sync cannot be re-triggered within 10 s: the last answer is returned.
+		if (dernierSync && maintenant() - dernierSync.at < SYNC_INTERVAL) return Promise.resolve(dernierSync.res);
+		const run = faireSync().then(res => { dernierSync = { at: maintenant(), res }; return res; }).finally(() => { enCours = null; void pousser(); });
 		enCours = run;
 		void pousser();
 		return run;
@@ -312,6 +320,8 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	async function ouvrirDevoir(cmid: unknown): Promise<boolean> {
 		const site = await siteAdmis();
 		if (!site || typeof cmid !== "number" || !Number.isSafeInteger(cmid) || cmid <= 0) return false;
+		if (maintenant() - dernierOuvert < OPEN_INTERVAL) return false;
+		dernierOuvert = maintenant();
 		const url = new URL("/mod/assign/view.php", site);
 		url.searchParams.set("id", String(cmid));
 		await deps.ouvrirExterne(url.href);

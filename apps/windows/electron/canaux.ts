@@ -580,12 +580,17 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (verdict.admettre) autoriserHote(verdict.admettre);
 	}
 	/** Same door as `garderReglagesIa`, for the Moodle site. */
+	let dialogueMoodle = false;
+	let dialogueMoodleFin = 0;
 	async function garderReglagesMoodle(valeur: unknown): Promise<void> {
 		const actuel = await reglagesOuErreur().lire(CLE_REGLAGES_MOODLE);
 		const siteActuel = origineSite(actuel && typeof actuel === "object" ? (actuel as { site?: unknown }).site : undefined);
 		const verdict = validerReglagesMoodle(valeur, siteActuel);
 		if ("refus" in verdict) throw new Error(verdict.refus);
 		if ("confirmer" in verdict) {
+			// One native dialog at a time, and a pause after each: the window cannot spam modals.
+			if (dialogueMoodle || Date.now() - dialogueMoodleFin < 3000) throw new Error("Moodle host question already open or just closed");
+			dialogueMoodle = true;
 			const options = {
 				type: "question" as const,
 				title: t("app.moodleHost.title"),
@@ -596,7 +601,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				cancelId: 1,
 			};
 			const parent = deps.fenetreCourante();
-			const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+			let response: number;
+			try {
+				({ response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options));
+			} finally {
+				dialogueMoodle = false;
+				dialogueMoodleFin = Date.now();
+			}
 			if (response !== 0) {
 				console.warn(LOG_PREFIX, "hôte Moodle refusé par l'utilisateur:", verdict.confirmer);
 				throw new Error("hôte refusé par l'utilisateur, réglages Moodle non écrits : " + verdict.confirmer);

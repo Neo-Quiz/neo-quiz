@@ -6,6 +6,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { MoodleError } from "./erreurs";
 import type { Client } from "./client";
+import { extensionRefusee } from "../ressources";
 import { newFolderName, prettyName } from "./noms";
 import { allFiles, limiter, type MoodleFile, type Scan } from "./pur";
 
@@ -124,11 +125,21 @@ async function downloadOne(client: Client, job: Job, garde: Garde): Promise<void
 	if (path.dirname(target) !== resolvedDir || name !== path.basename(name) || name === "." || name === "..") {
 		throw new MoodleError("escape", "Refused: the file name leaves its folder.");
 	}
+	if (extensionRefusee(name)) throw new MoodleError("executable", "Refused: an executable file type.");
 	const tmp = path.join(resolvedDir, `.${name}.moodle.tmp`);
 	if (!(await garde.contient(resolvedDir)) || !(await garde.contient(target)) || !(await garde.contient(tmp))) {
 		throw new MoodleError("perimeter", "Refused: outside the folders the app may write to.");
 	}
 	fs.mkdirSync(resolvedDir, { recursive: true });
+	// Only a stale temp of OUR OWN making (a regular file, never a link) is removed;
+	// the stream then creates it exclusively and fails if anything is there.
+	try {
+		const st = fs.lstatSync(tmp);
+		if (!st.isFile()) throw new MoodleError("tmpexists", "Refused: the temporary name is taken.");
+		fs.rmSync(tmp, { force: true });
+	} catch (e) {
+		if (e instanceof MoodleError) throw e;
+	}
 	try {
 		await client.fetchToFile(file.url, tmp, file.size);
 		const size = fs.statSync(tmp).size;
@@ -179,5 +190,7 @@ export function targetName(file: MoodleFile): string {
     annotated PDF, a file already fetched under its pretty name) is never
     overwritten: the job is dropped before it starts. */
 export function dejaPresent(job: Job): boolean {
+	// A NEW file never replaces anything already at its final name.
+	if (job.file.status === "missing" && fs.existsSync(path.join(job.dir, job.target ?? job.file.name))) return true;
 	return localStatus({ name: job.target ?? job.file.name, timemodified: job.file.timemodified }, job.dir) === "present";
 }

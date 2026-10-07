@@ -16,11 +16,18 @@ export const API_TIMEOUT = 30000;      // ms per API call
 export const IDLE_TIMEOUT = 60000;     // ms without data before a download is dropped
 export const MAX_REDIRECTS = 3;
 const MAX_API_BYTES = 32 * 1024 * 1024;
-const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;   // when Moodle does not say the size
+/** Hard cap on one file, whatever the server announces. */
+export const MAX_FILE_BYTES = 200 * 1024 * 1024;
+export const API_DEADLINE = 120000;     // ms in total per API call
+export const FILE_DEADLINE = 600000;    // ms in total per file download
 
 export interface OptionsClient {
 	apiTimeout?: number;
 	idleTimeout?: number;
+	apiDeadline?: number;
+	fileDeadline?: number;
+	/** Tests only: a lower per-file cap (never above MAX_FILE_BYTES). */
+	maxFileBytes?: number;
 	/** Tests only (`check:moodle`): the local server speaks `http:`. The app
 	    never sets it; `check:moodle` greps the app's own files for it. */
 	allowHttpForTests?: boolean;
@@ -51,6 +58,9 @@ export function createClient(token: string, origin: string, opts: OptionsClient 
 	if (site.protocol !== scheme || site.origin !== origin) throw new MoodleError("badsite", "The site must be a plain " + scheme + " origin.");
 	const apiTimeout = opts.apiTimeout ?? API_TIMEOUT;
 	const idleTimeout = opts.idleTimeout ?? IDLE_TIMEOUT;
+	const apiDeadline = opts.apiDeadline ?? API_DEADLINE;
+	const fileDeadline = opts.fileDeadline ?? FILE_DEADLINE;
+	const maxFile = Math.min(opts.maxFileBytes ?? MAX_FILE_BYTES, MAX_FILE_BYTES);
 	const lib = scheme === "http:" ? http : https;
 	const agent = new lib.Agent({ keepAlive: true, maxSockets: API_CONCURRENCY });
 	const limit = limiter(API_CONCURRENCY);
@@ -96,6 +106,9 @@ export function createClient(token: string, origin: string, opts: OptionsClient 
 					else resolve(json);
 				});
 			});
+			// An overall deadline too: a server dripping bytes must not hold the call forever.
+			const deadline = setTimeout(() => req.destroy(new MoodleError("timeout", "Moodle took too long to answer.")), apiDeadline);
+			req.on("close", () => clearTimeout(deadline));
 			req.on("timeout", () => req.destroy(new MoodleError("timeout", "Moodle does not answer (30 s).")));
 			req.on("error", e => reject(e instanceof MoodleError ? e : new MoodleError((e as NodeJS.ErrnoException).code || "network", masquer(e.message, token))));
 			req.end(data);
@@ -122,7 +135,7 @@ export function createClient(token: string, origin: string, opts: OptionsClient 
 					return;
 				}
 				// Never more than announced (or the hard cap): a server cannot fill the disk.
-				const maxBytes = expected != null ? expected : MAX_FILE_BYTES;
+				const maxBytes = Math.min(expected ?? maxFile, maxFile);
 				let seen = 0;
 				const cap = new Transform({
 					transform(chunk: Buffer, _enc, cb) {
@@ -130,8 +143,10 @@ export function createClient(token: string, origin: string, opts: OptionsClient 
 						cb(seen > maxBytes ? new MoodleError("incomplete", "The file is larger than announced.") : null, chunk);
 					},
 				});
-				pipeline(res, cap, fs.createWriteStream(tmp), err => (err ? reject(err) : resolve()));
+				pipeline(res, cap, fs.createWriteStream(tmp, { flags: "wx" }), err => (err ? reject(err) : resolve()));
 			});
+			const deadline = setTimeout(() => req.destroy(new MoodleError("timeout", "Download took too long.")), fileDeadline);
+			req.on("close", () => clearTimeout(deadline));
 			req.on("timeout", () => req.destroy(new MoodleError("timeout", "Download interrupted: no data for 60 s.")));
 			req.on("error", e => reject(e instanceof MoodleError ? e : new MoodleError((e as NodeJS.ErrnoException).code || "network", masquer(e.message, token))));
 			req.end();

@@ -54,14 +54,21 @@ export interface Scan { sections: Section[]; external: string[] }
 /* The Moodle API answers are untyped JSON: `any` is deliberate below. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** A Moodle date (seconds): finite and not negative, never later than now + 1 day. */
+export function cleanDate(v: unknown, now = Date.now()): number {
+	if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return 0;
+	return Math.min(Math.floor(v), Math.floor(now / 1000) + 86400);
+}
+
 interface RawContent { type?: string; filename?: string; filesize?: number; fileurl?: string; timemodified?: number }
 function toFile(c: RawContent): MoodleFile {
 	return {
 		url: String(c.fileurl),
 		// One safe path segment: a name from the server can never carry `..` or a separator.
 		name: safeSegment(String(c.filename ?? "")),
-		size: c.filesize ?? null,
-		timemodified: c.timemodified || 0,
+		// Server values are untrusted: a bad size means "unknown", a date is clamped to tomorrow.
+		size: typeof c.filesize === "number" && Number.isSafeInteger(c.filesize) && c.filesize >= 0 ? c.filesize : null,
+		timemodified: cleanDate(c.timemodified),
 		status: "missing",
 	};
 }
