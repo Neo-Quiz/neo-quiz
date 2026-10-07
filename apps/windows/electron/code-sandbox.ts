@@ -160,7 +160,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
 			if (u.hostname === "app" && u.pathname.startsWith("/pypi/")) {
 				let chemin: string;
 				try { chemin = decodeURIComponent(u.pathname.slice("/pypi/".length)); } catch { return new Response(null, { status: 403 }); }
-				return habiller(await servirPypi(chemin, transportDefaut, digestsPypi));
+				return habiller(await servirPypi(chemin, transportDefaut, digestsPypi, undefined, dossierPython));
 			}
 			const abs = resoudreFichierCode(racine, langages, req.url);
 			if (!abs) return new Response(null, { status: 403 });

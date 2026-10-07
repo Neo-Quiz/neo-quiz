@@ -136,14 +136,14 @@ export function estErreurInstallation(e: unknown): e is ErreurInstallation {
     `reseau` — the list is not negotiable. `maxSauts` defaults to 3: two
     real hops (github.com → release-assets.githubusercontent.com, or the
     equivalent object storage host) plus one — a third would be suspect. */
-export async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation, maxSauts = 3, headers?: Record<string, string>): Promise<ReponseInstallation> {
+export async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation, maxSauts = 3, headers?: Record<string, string>, autorise: (url: string) => boolean = hoteAutorise): Promise<ReponseInstallation> {
 	let courant = url;
 	for (let saut = 0; saut < maxSauts; saut++) {
 		/* HTTPS ONLY (security review 2026-09-28): the host list also admits
 		   `http:`, `localhost` and the local Ollama host for other channels;
 		   a download, or a hop of its redirects, never does. */
 		if (!courant.startsWith("https://")) throw erreurInstallation("reseau", "not an https URL: " + courant);
-		if (!hoteAutorise(courant)) throw erreurInstallation("reseau", "host outside the list: " + courant);
+		if (!autorise(courant)) throw erreurInstallation("reseau", "host outside the list: " + courant);
 		const reponse = await transport(courant, headers ? { method, headers } : { method });
 		if (reponse.status < 300 || reponse.status >= 400) return reponse;
 		const lieu = reponse.entete("location");

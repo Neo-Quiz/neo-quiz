@@ -95,6 +95,45 @@ export function roueAdmise(nom: string): boolean {
 	return /^(?:pyodide|pyemscripten|emscripten)_/.test(plateforme);
 }
 
+/** EVERY hop of a package download, redirects included: exactly these three
+    hosts over HTTPS — not the app-wide list (localhost, github.com…). */
+const HOTES_PAQUETS = new Set(["cdn.jsdelivr.net", "pypi.org", "files.pythonhosted.org"]);
+export function hotePaquetAutorise(url: string): boolean {
+	try {
+		const u = new URL(url);
+		return u.protocol === "https:" && HOTES_PAQUETS.has(u.hostname.toLowerCase());
+	} catch { return false; }
+}
+const telecharger = (url: string, transport: TransportInstallation, headers?: Record<string, string>) =>
+	demander(url, "GET", transport, 3, headers, hotePaquetAutorise);
+/** The pack is still installed (a delete during a download must not
+    recreate `paquets/` behind it). */
+const packPresent = (dossierPack: string): boolean => existsSync(join(dossierPack, "manifest.json"));
+/** Writes `octets` to the cache atomically (`.part` then rename). */
+function ecrireCache(dossierPack: string, nom: string, octets: Buffer): void {
+	const dossier = join(dossierPack, "paquets");
+	const cible = join(dossier, nom);
+	const part = cible + ".part";
+	try {
+		mkdirSync(dossier, { recursive: true });
+		writeFileSync(part, octets);
+		renameSync(part, cible);
+	} catch {
+		rmSync(part, { force: true });
+	}
+}
+function lireCache(dossierPack: string, nom: string, sha: string): Buffer | null {
+	const cible = join(dossierPack, "paquets", nom);
+	if (!existsSync(cible)) return null;
+	try {
+		const octets = readFileSync(cible);
+		if (sha256Hex(octets) === sha) return octets;
+	} catch { /* unreadable */ }
+	rmSync(cible, { force: true });
+	return null;
+}
+const indexMemo = new Map<string, { corps: string; digs: Array<[string, string]> }>();
+
 const sha256Hex = (octets: Uint8Array): string => createHash("sha256").update(octets).digest("hex");
 const vide = (status: number): Response => new Response(null, { status });
 
@@ -154,19 +193,11 @@ export function servirPaquet(
 async function servir(dossierPack: string, fichier: string, transport: TransportInstallation, budget: Budget, base: string): Promise<Response> {
 	const entree = entreeDuLock(lireLock(dossierPack), fichier);
 	if (!entree) return vide(404);
-	const dossier = join(dossierPack, "paquets");
-	const cible = join(dossier, fichier);
-	if (existsSync(cible)) {
-		/* Re-judged on every read: the cache lives in the user's profile. */
-		try {
-			const octets = readFileSync(cible);
-			if (sha256Hex(octets) === entree.sha256) return repondre(octets);
-		} catch { /* unreadable: download again */ }
-		rmSync(cible, { force: true });
-	}
+	const cache = lireCache(dossierPack, fichier, entree.sha256);
+	if (cache) return repondre(cache);
 	let octets: Buffer | "trop-gros" | "budget";
 	try {
-		const rep = await demander(urlCdn(base, fichier), "GET", transport);
+		const rep = await telecharger(urlCdn(base, fichier), transport);
 		if (rep.status !== 200 || !rep.octets) return vide(rep.status === 404 ? 404 : 502);
 		octets = await lireBorne(rep.octets.bind(rep), PLAFOND_FICHIER, budget);
 	} catch {
@@ -175,15 +206,11 @@ async function servir(dossierPack: string, fichier: string, transport: Transport
 	if (octets === "budget") return vide(503);
 	if (octets === "trop-gros") return vide(502);
 	if (sha256Hex(octets) !== entree.sha256) return vide(502);
-	const part = cible + ".part";
-	try {
-		mkdirSync(dossier, { recursive: true });
-		writeFileSync(part, octets);
-		renameSync(part, cible);
-	} catch {
-		rmSync(part, { force: true });
-		/* The bytes are verified: serving them without caching is harmless. */
-	}
+	/* The pack may have been deleted while this download ran: never
+	   recreate `paquets/` behind it. */
+	if (!packPresent(dossierPack)) return vide(503);
+	/* The bytes are verified: serving them without caching is harmless. */
+	ecrireCache(dossierPack, fichier, octets);
 	return repondre(octets);
 }
 
@@ -194,6 +221,7 @@ export async function servirPypi(
 	transport: TransportInstallation,
 	digests: Map<string, string>,
 	budget: Budget = budgetGlobal,
+	dossierPack?: string,
 ): Promise<Response> {
 	const url = urlPypi(chemin);
 	if (!url) return vide(403);
@@ -201,9 +229,15 @@ export async function servirPypi(
 	const nom = url.slice(url.lastIndexOf("/") + 1);
 	const attendu = digests.get(url);
 	if (!roueAdmise(nom) || !attendu) return vide(403);
+	/* Content-addressed cache: a repeated request costs no download. */
+	const nomCache = `pypi-${attendu}.whl`;
+	if (dossierPack) {
+		const cache = lireCache(dossierPack, nomCache, attendu);
+		if (cache) return repondre(cache, "application/zip");
+	}
 	let octets: Buffer | "trop-gros" | "budget";
 	try {
-		const rep = await demander(url, "GET", transport);
+		const rep = await telecharger(url, transport);
 		if (rep.status !== 200 || !rep.octets) return vide(rep.status === 404 ? 404 : 502);
 		octets = await lireBorne(rep.octets.bind(rep), PLAFOND_FICHIER, budget);
 	} catch {
@@ -212,14 +246,23 @@ export async function servirPypi(
 	if (octets === "budget") return vide(503);
 	if (octets === "trop-gros") return vide(403);
 	if (sha256Hex(octets) !== attendu) return vide(403);
+	if (dossierPack) {
+		if (!packPresent(dossierPack)) return vide(503);
+		ecrireCache(dossierPack, nomCache, octets);
+	}
 	return repondre(octets, "application/zip");
 }
 
 async function servirIndex(url: string, transport: TransportInstallation, digests: Map<string, string>, budget: Budget): Promise<Response> {
+	const memo = indexMemo.get(url);
+	if (memo) {
+		for (const [k, v] of memo.digs) digests.set(k, v);
+		return new Response(memo.corps, { status: 200, headers: { "content-type": ACCEPT_INDEX } });
+	}
 	let corps: Buffer | "trop-gros" | "budget";
 	let status: number;
 	try {
-		const rep = await demander(url, "GET", transport, 3, { Accept: ACCEPT_INDEX });
+		const rep = await telecharger(url, transport, { Accept: ACCEPT_INDEX });
 		status = rep.status;
 		if (status !== 200 || !rep.octets) return vide(status === 404 ? 404 : 502);
 		corps = await lireBorne(rep.octets.bind(rep), PLAFOND_INDEX, budget);
@@ -235,6 +278,7 @@ async function servirIndex(url: string, transport: TransportInstallation, digest
 	   and drop `core-metadata`: micropip then downloads the whole wheel
 	   (judged here) instead of asking for a `.metadata` sibling. */
 	const gardes: unknown[] = [];
+	const digs: Array<[string, string]> = [];
 	for (const f of json.files as Array<Record<string, unknown>>) {
 		const fu = typeof f?.url === "string" ? f.url : "";
 		const sha = (f?.hashes as { sha256?: unknown } | undefined)?.sha256;
@@ -243,10 +287,13 @@ async function servirIndex(url: string, transport: TransportInstallation, digest
 		const canon = urlPypi("files/" + rel);
 		if (!canon || !roueAdmise(rel.slice(rel.lastIndexOf("/") + 1))) continue;
 		digests.set(canon, sha.toLowerCase());
+		digs.push([canon, sha.toLowerCase()]);
 		const { "core-metadata": _a, "data-dist-info-metadata": _b, ...reste } = f;
 		gardes.push({ ...reste, url: `file:///pypi/files/${rel}` });
 	}
-	return new Response(JSON.stringify({ ...json, files: gardes }), {
+	const sortie = JSON.stringify({ ...json, files: gardes });
+	indexMemo.set(url, { corps: sortie, digs });
+	return new Response(sortie, {
 		status: 200,
 		headers: { "content-type": ACCEPT_INDEX },
 	});

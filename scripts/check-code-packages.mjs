@@ -56,12 +56,13 @@ function packAvecLock(nom, fichiers) {
 	const packages = {};
 	for (const [f, octets] of Object.entries(fichiers)) packages[f] = { file_name: f, sha256: sha(octets) };
 	writeFileSync(join(d, "pyodide-lock.json"), JSON.stringify({ packages }));
+	writeFileSync(join(d, "manifest.json"), "{}");
 	return d;
 }
 const reste = (d) => (existsSync(join(d, "paquets")) ? readdirSync(join(d, "paquets")) : []);
 
 try {
-	await withSrcModule("apps/windows/electron/paquets-python.ts", async ({ entreeDuLock, urlCdn, urlPypi, roueAdmise, Budget, servirPaquet, servirPypi }) => {
+	await withSrcModule("apps/windows/electron/paquets-python.ts", async ({ hotePaquetAutorise, entreeDuLock, urlCdn, urlPypi, roueAdmise, Budget, servirPaquet, servirPypi }) => {
 		const bon = Buffer.from("good wheel bytes ".repeat(50));
 		const autre = Buffer.from("other wheel bytes ".repeat(50));
 
@@ -123,6 +124,23 @@ try {
 			}
 		}
 		{
+			/* Redirects are judged against the 3 package hosts, NOT the app-wide list. */
+			const d = packAvecLock("redir-app", { "numpy-1.whl": bon });
+			for (const lieu of ["https://localhost/x", "https://github.com/x", "https://127.0.0.1/x", "https://api.anthropic.com/x"]) {
+				const t = transport({ [BASE + "numpy-1.whl"]: () => reponse(302, null, { location: lieu }) });
+				const s = await statut(servirPaquet(d, "numpy-1.whl", t, undefined, BASE));
+				ok(`redirect to ${lieu}: never followed`, s !== 200 && t.demandees.length === 1 && !t.demandees.includes(lieu) && reste(d).length === 0);
+			}
+			ok("hotePaquetAutorise: exactly the 3 hosts over https", hotePaquetAutorise("https://pypi.org/x") && hotePaquetAutorise("https://files.pythonhosted.org/x") && hotePaquetAutorise("https://cdn.jsdelivr.net/x") && !hotePaquetAutorise("https://github.com/x") && !hotePaquetAutorise("http://pypi.org/x"));
+		}
+		{
+			/* The pack deleted while the download runs: paquets/ is never recreated. */
+			const d = packAvecLock("supprime", { "numpy-1.whl": bon });
+			const t = transport({ [BASE + "numpy-1.whl"]: () => { rmSync(join(d, "manifest.json")); return reponse(200, bon); } });
+			const s = await statut(servirPaquet(d, "numpy-1.whl", t, undefined, BASE));
+			ok("pack deleted mid-download: refused, paquets/ not recreated", s !== 200 && !existsSync(join(d, "paquets")));
+		}
+		{
 			const d = packAvecLock("budget", { "numpy-1.whl": bon });
 			const t = transport({ [BASE + "numpy-1.whl"]: () => reponse(200, bon) });
 			ok("budget exhausted: 503, nothing on disk", (await statut(servirPaquet(d, "numpy-1.whl", t, new Budget(5), BASE))) === 503 && reste(d).length === 0);
@@ -161,6 +179,15 @@ try {
 			const d2 = new Map([[FILES + "demo-1-cp312-cp312-manylinux_2_17_x86_64.whl", sha(roue)]]);
 			ok("manylinux wheel: 403, never requested", (await statut(servirPypi("files/packages/ab/cd/demo-1-cp312-cp312-manylinux_2_17_x86_64.whl", t3, d2))) === 403 && t3.demandees.length === 0);
 			ok("file never announced by an index: 403, never requested", (await statut(servirPypi("files/packages/ab/cd/other-1-py3-none-any.whl", t3, digests))) === 403 && t3.demandees.length === 0);
+			/* A verified wheel is cached: asked twice, downloaded once. */
+			const dp = packAvecLock("pypi-cache", {});
+			const t4 = transport({ [FILES + "demo-1-py3-none-any.whl"]: () => reponse(200, roue) });
+			const a = await servirPypi("files/packages/ab/cd/demo-1-py3-none-any.whl", t4, digests, undefined, dp);
+			const b2 = await servirPypi("files/packages/ab/cd/demo-1-py3-none-any.whl", t4, digests, undefined, dp);
+			ok("same PyPI wheel twice: 200 both, downloaded once", a.status === 200 && b2.status === 200 && t4.demandees.length === 1 && Buffer.from(await b2.arrayBuffer()).equals(roue));
+			const idx2 = await servirPypi("simple/demo/", t, new Map());
+			const n = t.demandees.filter((u) => u === "https://pypi.org/simple/demo/").length;
+			ok("index answer cached per package for the session", idx2.status === 200 && n === 1);
 			ok("PyPI budget exhausted: 503", (await statut(servirPypi("files/packages/ab/cd/demo-1-py3-none-any.whl", t, digests, new Budget(5)))) === 503);
 		}
 	});
