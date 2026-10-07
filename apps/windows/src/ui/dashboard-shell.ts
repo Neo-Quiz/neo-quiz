@@ -56,7 +56,7 @@ import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
-import { ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lireReglage, renommerExamens, retirerExamen as retirerExamenReglage } from "../host/folder";
+import { addFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
@@ -427,6 +427,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
 		createFolder: (map, quizzes, done) => openCreateFolderModal(ctx, map, quizzes, done),
+		openExistingFolder: (done) => { void ouvrirDossierExistant(done); },
 		/* Le SAS des quiz générés : le MÊME calcul que `saveGeneratedQuiz`
 		   (ai.ts, `defaultDestination`) — racine par défaut + `aiOutputFolder`.
 		   Lu à chaque appel : le réglage peut changer sans remonter la coquille. */
@@ -685,6 +686,68 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			};
 		}
 		return [...vus.entries()].map(([path, name]) => decrire(path, name)).sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	/**
+	 * "Open an existing folder": the native picker, then the DECLARATION of the
+	 * chosen folder as a quiz folder.
+	 *
+	 * Inside an already open root (a course folder in a vault) this is NOT
+	 * `addFolder`: adding it as a second root would give the same files two
+	 * contract paths, hence two review histories for the same questions. Only a
+	 * quiz FOLDER is declared there: an override entry carrying its path, which
+	 * "New quiz" and the Generate page know how to target.
+	 *
+	 * Outside every open root (e.g. an Obsidian vault folder on the PC), the
+	 * folder becomes a new root through `addFolder`, then is declared the same
+	 * way. Roots are only read at startup, so the page reloads once it is saved.
+	 */
+	async function ouvrirDossierExistant(done: () => void): Promise<void> {
+		const choisi = await pickFolder();
+		// Cancelling is not an error, it is the answer "no".
+		if (!choisi) return;
+		const host = currentHost();
+		const racines = await savedFolders();
+		const lien = lienAvecRacines(choisi, racines);
+		/* A folder that contains an open root would nest roots, which
+		   `depuisAbsolu` exists to prevent. */
+		if (lien === "contient") { host.ui.notice(t("dashboard.quizzes.createOpenContains")); return; }
+		const declarer = async (contrat: string): Promise<string> => {
+			/* The KEY stays one segment (what `moduleForQuiz` and the overrides
+			   read), the PATH is what makes the folder writable. A name already
+			   declared is not overwritten: it only gets its path. */
+			const cle = contrat.split("/").pop() as string;
+			const overrides: Record<string, ModuleOverride> = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+			overrides[cle] = { ...(overrides[cle] || {}), name: overrides[cle]?.name || cle, path: contrat };
+			ctx.settings.quizzesModuleOverrides = overrides;
+			await ctx.saveSettings();
+			return cle;
+		};
+		if (lien === "doublon") {
+			const cle = deps.cheminDuContrat(choisi)?.split("/").pop();
+			if (cle && ctx.settings.quizzesModuleOverrides?.[cle]) host.ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }));
+			else host.ui.notice(t("dashboard.quizzes.createOpenAlready"));
+			return;
+		}
+		if (lien === "dedans") {
+			const contrat = deps.cheminDuContrat(choisi);
+			if (!contrat) { host.ui.notice(t("dashboard.quizzes.createOpenOutside")); return; }
+			const cle = await declarer(contrat);
+			host.ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }));
+			done();
+			return;
+		}
+		// "libre": outside every root, so it becomes one.
+		const apres = await addFolder(choisi);
+		if (apres.length <= racines.length) { host.ui.notice(t("dashboard.quizzes.createOpenLimit")); return; }
+		const nouvelle = apres.find(d => lienAvecRacines(choisi, [d]) === "doublon");
+		/* The startup root map does not know the new root yet: its contract
+		   path is its id (see `depuisAbsolu`). */
+		if (!nouvelle) { host.ui.notice(t("dashboard.quizzes.createOpenOutside")); return; }
+		const cle = await declarer(nouvelle.id);
+		host.ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }));
+		// Roots are installed once at startup: reload so the catalogue and watcher see the new one.
+		location.reload();
 	}
 
 

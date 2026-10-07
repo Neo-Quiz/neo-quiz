@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Create a folder can open an existing folder again, anywhere on the PC, such as a course folder in an Obsidian vault.
+
 ## [1.20.33] - 2026-10-07
 
 ### Changed

@@ -263,6 +263,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const cartes = ajouter(wrap, "div", "qbd-onboarding-cards");
 		createOptionCard(null, cartes, "folder-plus", "#4573ff", t("dashboard.quizzes.createEmptyTitle"), t("dashboard.quizzes.createEmptyDesc"),
 			() => openNewFolderModal(ctx, map, allQuizzes, rerender));
+		if (ctx.openExistingFolder) {
+			createOptionCard(null, cartes, "folder-open", "#f5a524", t("dashboard.quizzes.createOpenTitle"), t("dashboard.quizzes.createOpenDesc"),
+				() => ctx.openExistingFolder!(rerender));
+		}
 		createOptionCard(null, cartes, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
 			() => void importSharedFolder(ctx, map, allQuizzes, rerender));
 	}

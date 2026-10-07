@@ -328,6 +328,12 @@ export interface DashboardShellCtx {
 	    que `openCreateFolderModal` (l'import d'un .zip partagé cherche le parent
 	    commun des modules déjà résolus — folder-create.ts). */
 	createFolder?: (map: ModuleMap, quizzes: QuizIndexEntry[], done: () => void) => void;
+	/** Picks a folder that already exists and declares it as a quiz folder
+	    ("Open an existing folder" card of the create modal). Absent = the card
+	    is not rendered. The host opens its native picker, translates the
+	    absolute path into a contract path (opening it as a new root when it is
+	    outside every open one) and writes the override: only it knows its roots. */
+	openExistingFolder?: (done: () => void) => void;
 	/** Le chemin du CONTRAT du dossier où atterrissent les quiz générés
 	    (`<racine par défaut>/<aiOutputFolder>`). Ce dossier est un SAS, pas
 	    une matière : sa carte porte l'icône de l'IA et ni lui ni sa page

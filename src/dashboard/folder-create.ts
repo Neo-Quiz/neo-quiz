@@ -67,9 +67,12 @@ export function openCreateFolderModal(
 				createOptionCard(m, c, "sparkles", "#3ddc84", t("dashboard.quizzes.createAiTitle"), t("dashboard.quizzes.createAiDesc"),
 					() => ctx.navigate("ai"));
 			}
-			/* No "Open an existing folder" any more (2026-10-05): every quiz
-			   folder lives in the one Neo Quiz folder, the Obsidian plugin it
-			   was meant for is gone. Create, or import what was received. */
+			/* The first two CREATE, this one ATTACHES an existing folder (any
+			   folder on the PC), the last one IMPORTS what was received. */
+			if (ctx.openExistingFolder) {
+				createOptionCard(m, c, "folder-open", "#f5a524", t("dashboard.quizzes.createOpenTitle"), t("dashboard.quizzes.createOpenDesc"),
+					() => ctx.openExistingFolder!(onDone));
+			}
 			/* Import has its own button beside "New folder" on a PC; a phone
 			   has no room for a third floating button, so it stays here. */
 			if (currentHost().platform.isMobile) {
