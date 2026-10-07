@@ -47,6 +47,7 @@ release notes.
 - Question cards on a quiz page show their whole content without an inner scrollbar.
 - A folder's exams show up again after the folder moved to another location.
 - An archive that holds two files with the same path, or a description file listing thousands of files, is now refused or checked instead of being half-verified or slowing the import down.
+- On Android, a file opened from another app can no longer be disguised as one of Neo Quiz's own files.
 
 ## [1.20.42] - 2026-10-07
 

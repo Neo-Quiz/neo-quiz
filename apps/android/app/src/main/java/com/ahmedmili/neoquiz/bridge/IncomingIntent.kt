@@ -61,6 +61,13 @@ object IncomingIntent {
         val verdict = IncomingRules.decide(uri.scheme, uri.authority, context.packageName, name ?: uri.lastPathSegment, size)
         if (verdict is IncomingRules.Verdict.Reject) return IncomingInbox.Entry(null, null, verdict.reason)
         verdict as IncomingRules.Verdict.Accept
+        // The system's answer, not the URI's spelling: whoever really serves this authority must not be us.
+        val serving = try {
+            context.packageManager.resolveContentProvider(uri.authority.orEmpty(), 0)?.packageName
+        } catch (_: Exception) {
+            null
+        }
+        if (IncomingRules.servedByUs(serving, context.packageName)) return IncomingInbox.Entry(null, null, IncomingRules.WRONG_TYPE)
 
         val dir = File(context.cacheDir, "incoming").apply { mkdirs() }
         purge(dir, System.currentTimeMillis())

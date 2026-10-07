@@ -38,6 +38,9 @@ object IncomingRules {
     fun decide(scheme: String?, authority: String?, ownPackage: String, displayName: String?, size: Long?): Verdict {
         if (scheme?.lowercase(Locale.ROOT) != "content") return Verdict.Reject(WRONG_TYPE)
         val host = authority?.lowercase(Locale.ROOT) ?: return Verdict.Reject(UNREADABLE)
+        // Android drops `userId@` when it resolves a content URI (`content://0@com.x.fileprovider/..` opens
+        // `com.x.fileprovider`), so a string comparison would let our own provider through: refuse any `@`.
+        if (host.contains('@') || host.isEmpty()) return Verdict.Reject(WRONG_TYPE)
         val own = ownPackage.lowercase(Locale.ROOT)
         if (host == own || host.startsWith("$own.")) return Verdict.Reject(WRONG_TYPE)
         if (!ChooserRules.acceptsName(displayName)) return Verdict.Reject(WRONG_TYPE)
@@ -45,6 +48,14 @@ object IncomingRules {
         val label = label(displayName!!)
         return Verdict.Accept(label.substringAfterLast('.').lowercase(Locale.ROOT), label)
     }
+
+    /**
+     * The package that REALLY serves [authority], asked of the system, is this app: the string rules
+     * above are only a first filter (a provider of ours may be declared under an authority that does
+     * not start with our package name). [providerPackage] is `resolveContentProvider(..)?.packageName`.
+     */
+    fun servedByUs(providerPackage: String?, ownPackage: String): Boolean =
+        providerPackage != null && providerPackage.equals(ownPackage, ignoreCase = true)
 
     /** The last component of [raw] without separators or characters Windows forbids, at most 150 long, extension kept. */
     fun label(raw: String): String {

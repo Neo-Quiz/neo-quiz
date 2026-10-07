@@ -34,6 +34,24 @@ class IncomingRulesTest {
         assertTrue("unknown size is bounded while reading", decide("a.zip", null) is IncomingRules.Verdict.Accept)
     }
 
+    @Test fun anAuthorityWithAUserIdIsRefusedBecauseAndroidDropsIt() {
+        // `content://0@<our fileprovider>/..` resolves to OUR provider (all the storage): refused on the spelling.
+        for (a in listOf("0@com.ahmedmili.neoquiz.fileprovider", "10@com.ahmedmili.neoquiz.fileprovider", "0@com.ahmedmili.neoquiz", "x@y@com.other", "@")) {
+            assertEquals(a, IncomingRules.Verdict.Reject(IncomingRules.WRONG_TYPE), decide("a.zip", authority = a))
+        }
+        assertEquals(IncomingRules.Verdict.Reject(IncomingRules.WRONG_TYPE), decide("a.zip", authority = "com.ahmedmili.neoquiz.share"))
+        assertEquals(IncomingRules.Verdict.Reject(IncomingRules.WRONG_TYPE), decide("a.zip", authority = "COM.AHMEDMILI.NEOQUIZ.fileprovider"))
+        assertTrue(decide("a.zip", authority = "com.discord.fileprovider") is IncomingRules.Verdict.Accept)
+        assertTrue(decide("a.zip", authority = "media") is IncomingRules.Verdict.Accept)
+    }
+
+    @Test fun aProviderTheSystemSaysIsOursIsRefused() {
+        assertTrue(IncomingRules.servedByUs("com.ahmedmili.neoquiz", pkg))
+        assertTrue(IncomingRules.servedByUs("COM.AHMEDMILI.NEOQUIZ", pkg))
+        assertFalse(IncomingRules.servedByUs("com.discord", pkg))
+        assertFalse(IncomingRules.servedByUs(null, pkg))
+    }
+
     @Test fun onlyAContentUriOfAnotherAppIsRead() {
         // file: would reach the app's own private files; the app's own providers need no grant.
         assertEquals(IncomingRules.Verdict.Reject(IncomingRules.WRONG_TYPE), decide("a.zip", scheme = "file", authority = null))
