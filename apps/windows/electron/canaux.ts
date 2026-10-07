@@ -52,6 +52,8 @@ import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
 import { validerReglagesIa } from "./garde-ia";
 import { origineSite, validerReglagesMoodle } from "./moodle/garde";
+import { siteVerifie, verifierSite } from "./moodle/compat";
+import { ECOLES } from "./moodle/ecoles";
 import type { ServiceMoodle } from "./moodle/service";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
@@ -588,6 +590,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const verdict = validerReglagesMoodle(valeur, siteActuel);
 		if ("refus" in verdict) throw new Error(verdict.refus);
 		if ("confirmer" in verdict) {
+			// A site that is neither the school list nor already set must have been verified compatible first.
+			const demande = origineSite(valeur && typeof valeur === "object" ? (valeur as { site?: unknown }).site : undefined);
+			if (!demande || !siteVerifie(demande)) throw new Error("Moodle site refused: not verified as compatible (moodle.verifierSite)");
 			// One native dialog at a time, and a pause after each: the window cannot spam modals.
 			if (dialogueMoodle || Date.now() - dialogueMoodleFin < 3000) throw new Error("Moodle host question already open or just closed");
 			dialogueMoodle = true;
@@ -626,6 +631,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	/* MOODLE: verbs only. The service holds the token; nothing it returns
 	   carries it. Arguments from the window are re-validated inside. */
+	let derniereVerif = 0;
+	ipcMain.handle(CANAUX.moodleVerifierSite, (_e, origine: unknown) => {
+		const o = origineSite(origine);
+		if (!o) return Promise.resolve({ compatible: false, reason: "unreachable" });
+		if (Date.now() - derniereVerif < 1000) throw new Error("ratelimited");
+		derniereVerif = Date.now();
+		return verifierSite(o);
+	});
+	ipcMain.handle(CANAUX.moodleEcoles, () => ECOLES);
 	ipcMain.handle(CANAUX.moodleEtat, () => deps.moodle.etat());
 	ipcMain.handle(CANAUX.moodleConnecter, () => deps.moodle.connecter());
 	ipcMain.handle(CANAUX.moodleDeconnecter, () => deps.moodle.deconnecter());

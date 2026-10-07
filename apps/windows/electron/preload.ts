@@ -229,6 +229,8 @@ const pont: Pont = {
 	/* MOODLE: verbs only; the token stays in the main process. Windows only,
 	   like the sync (the same build gate keeps Android out). */
 	moodle: process.platform !== "win32" ? undefined : {
+		verifierSite: origine => ipcRenderer.invoke(CANAUX.moodleVerifierSite, origine),
+		ecoles: () => ipcRenderer.invoke(CANAUX.moodleEcoles),
 		etat: () => ipcRenderer.invoke(CANAUX.moodleEtat),
 		connecter: () => ipcRenderer.invoke(CANAUX.moodleConnecter),
 		deconnecter: () => ipcRenderer.invoke(CANAUX.moodleDeconnecter),

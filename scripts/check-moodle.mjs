@@ -73,9 +73,9 @@ async function mutant(entry, from, to) {
 }
 
 const mods = [`${MOODLE}pur.ts`, `${MOODLE}noms.ts`, `${MOODLE}client.ts`, `${MOODLE}disque.ts`, `${MOODLE}api.ts`,
-	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`];
+	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`];
 
-await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k) => {
+await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod) => {
 	const { TokenError, MoodleError } = erreurs;
 	const { createClient, siteInfo } = client;
 	const T = { allowHttpForTests: true };
@@ -1193,6 +1193,97 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		}
 	});
 
+
+	/* ─────────── schools: compatibility and the bundled list ─────────── */
+	{
+		const cfg = (o = {}) => [{ error: false, data: { sitename: "Univ", enablewebservices: 1, enablemobilewebservice: 1, typeoflogin: 2, launchurl: "https://x/admin/tool/mobile/launch.php", ...o } }];
+		await test("compat decision from public-config samples, each reason", async () => {
+			assert.deepEqual(compat.decider(cfg()), { compatible: true, sitename: "Univ" });
+			assert.equal(compat.decider(cfg({ typeoflogin: 3 })).compatible, true);
+			assert.equal(compat.decider(cfg({ enablemobilewebservice: 0 })).reason, "mobile-disabled");
+			assert.equal(compat.decider(cfg({ enablewebservices: 0 })).reason, "mobile-disabled");
+			assert.equal(compat.decider(cfg({ typeoflogin: 1 })).reason, "login-unsupported");
+			for (const bad of [null, {}, [], [{ error: true, exception: "x" }], [{ error: false, data: { foo: 1 } }], "x"]) assert.equal(compat.decider(bad).reason, "not-moodle");
+			assert.equal(compat.decider(cfg({ sitename: "<b>AB</b>" })).sitename, "bAB/b");
+		});
+		const T2 = { allowHttpForTests: true };
+		await test("verifierSite: one POST, no cookie, verdicts over the wire; 404 not-moodle; closed port unreachable", async () => {
+			let seen = null;
+			const { s, root } = await server(async (req, res) => {
+				seen = { method: req.method, url: req.url, cookie: req.headers.cookie, body: await readBody(req) };
+				if (req.url.startsWith("/m404")) { res.statusCode = 404; return res.end("no"); }
+				res.setHeader("Set-Cookie", "a=b");
+				res.end(JSON.stringify(cfg()));
+			});
+			try {
+				const v = await compat.verifierSite(root, T2);
+				assert.deepEqual(v, { compatible: true, sitename: "Univ" });
+				assert.equal(seen.method, "POST");
+				assert.ok(seen.url.includes("tool_mobile_get_public_config") && seen.body.includes("tool_mobile_get_public_config"));
+				assert.equal(seen.cookie, undefined);
+				assert.equal(compat.siteVerifie(root), true);
+			} finally { stop(s); }
+			const dead = await server((q, r) => r.end()); const deadRoot = dead.root; stop(dead.s);
+			assert.equal((await compat.verifierSite(deadRoot, T2)).reason, "unreachable");
+			assert.equal(compat.siteVerifie(deadRoot), false);
+			// plain http is refused outright without the tests-only switch
+			assert.equal((await compat.verifierSite(root)).reason, "unreachable");
+		});
+		await test("verifierSite: an off-origin redirect is refused and never followed", async () => {
+			let hits = 0;
+			const other = await server((q, r) => { hits++; r.end(JSON.stringify(cfg())); });
+			const { s, root } = await server((q, r) => { r.statusCode = 307; r.setHeader("Location", other.root + "/x"); r.end(); });
+			try {
+				const v = await compat.verifierSite(root, T2);
+				assert.equal(v.compatible, false);
+				assert.equal(v.reason, "unreachable");
+				assert.equal(hits, 0);
+			} finally { stop(s); stop(other.s); }
+		});
+		await test("verifierSite: a same-origin redirect is followed (at most 2 hops)", async () => {
+			const { s, root } = await server((q, r) => {
+				if (q.url.startsWith("/lib/")) { r.statusCode = 307; r.setHeader("Location", "/a"); return r.end(); }
+				if (q.url === "/a") { r.statusCode = 307; r.setHeader("Location", "/b"); return r.end(); }
+				if (q.url === "/b") { r.statusCode = 307; r.setHeader("Location", "/c"); return r.end(); }
+				r.end(JSON.stringify(cfg()));
+			});
+			try { assert.equal((await compat.verifierSite(root, T2)).compatible, false, "3 hops is too many"); } finally { stop(s); }
+		});
+		await test("verifierSite: the 64 KB cap stops an endless answer", async () => {
+			const { s, root } = await server((q, r) => { r.write("["); const t = setInterval(() => r.write("x".repeat(8192)), 1); r.on("close", () => clearInterval(t)); });
+			try {
+				const v = await compat.verifierSite(root, { ...T2, timeoutMs: 5000 });
+				assert.equal(v.compatible, false);
+				assert.equal(v.reason, "not-moodle");
+			} finally { stop(s); }
+		});
+		await test("verifierSite: a silent server times out", async () => {
+			const { s, root } = await server(() => {});
+			try { assert.equal((await compat.verifierSite(root, { ...T2, timeoutMs: 300 })).reason, "unreachable"); } finally { stop(s); }
+		});
+		await test("the bundled list: https origins only, no duplicates, Efrei first, allowed by the guard without a question", async () => {
+			const L = ecolesMod.ECOLES;
+			assert.ok(L.length >= 30, "at least 30 schools");
+			assert.equal(L[0].url, "https://moodle.myefrei.fr");
+			const urls = new Set();
+			for (const e of L) {
+				assert.deepEqual(Object.keys(e).sort(), ["city", "name", "url"]);
+				assert.equal(garde.origineSite(e.url), e.url, e.url);
+				assert.equal(urls.has(e.url), false, "duplicate " + e.url);
+				urls.add(e.url);
+				const v = garde.validerReglagesMoodle({ site: e.url }, null);
+				assert.equal(v.ok, true, e.url);
+			}
+			assert.equal(new Set(L.map(e => e.name)).size, L.length, "names unique");
+			assert.ok("confirmer" in garde.validerReglagesMoodle({ site: "https://moodle.autre-ecole.fr" }, null), "a custom site still asks");
+		});
+		await test("the bridge: verifierSite is rate-limited and a custom site needs a prior compatible verdict", async () => {
+			const canaux = await readFile("apps/windows/electron/canaux.ts", "utf8");
+			assert.ok(canaux.includes("CANAUX.moodleVerifierSite") && canaux.includes("CANAUX.moodleEcoles"));
+			assert.ok(canaux.includes("Date.now() - derniereVerif < 1000"));
+			assert.ok(canaux.indexOf("siteVerifie(demande)") > 0 && canaux.indexOf("siteVerifie(demande)") < canaux.indexOf("dialogueMoodle = true"), "verified before the native dialog");
+		});
+	}
 });
 
 /* ─────────── the app never turns the tests-only switch on; the renderer never imports the module ─────────── */

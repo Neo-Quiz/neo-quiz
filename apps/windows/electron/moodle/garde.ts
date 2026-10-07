@@ -7,6 +7,7 @@
    NATIVE dialog (`canaux.ts`), which a compromised renderer can neither
    write nor answer. Same pattern as `aiOllamaUrl` (`garde-ia.ts`). */
 
+import { ECOLES_ORIGINES } from "./ecoles";
 import { hoteEstPrive } from "../garde-ia";
 
 /** The verdict on a value of the `moodle` key. Never confused:
@@ -81,6 +82,6 @@ export function validerReglagesMoodle(valeur: unknown, siteActuel: string | null
 	if (site === undefined || site === "") return { ok: true, admettre: null };
 	const origine = origineSite(site, opts);
 	if (!origine) return { refus: "Moodle settings refused: site must be a plain https origin (https://host)" };
-	if (origine === SITE_DEFAUT || (siteActuel && origine === siteActuel)) return { ok: true, admettre: new URL(origine).hostname.toLowerCase() };
+	if (origine === SITE_DEFAUT || ECOLES_ORIGINES.has(origine) || (siteActuel && origine === siteActuel)) return { ok: true, admettre: new URL(origine).hostname.toLowerCase() };
 	return { confirmer: new URL(origine).hostname.toLowerCase() };
 }

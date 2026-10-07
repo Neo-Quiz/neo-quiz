@@ -167,6 +167,11 @@ export type EvenementDisque =
 /* ─────────── Moodle (main process; the token never crosses) ─────────── */
 
 /** What the window may know about the Moodle link. No token, no tokenised URL. */
+/** Answer of `moodle.verifierSite` (see `moodle/compat.ts` for the rule). */
+export interface VerdictSiteMoodle { compatible: boolean; sitename?: string; reason?: "unreachable" | "not-moodle" | "mobile-disabled" | "login-unsupported" }
+/** One school of the bundled list. */
+export interface EcoleMoodle { name: string; city: string; url: string }
+
 export interface EtatMoodle {
 	/** The configured site origin (`https://host`), or "". */
 	site: string;
@@ -492,6 +497,10 @@ export interface Pont {
 	 * (`CLE_REGLAGES_MOODLE`, guarded in the main process).
 	 */
 	moodle?: {
+		/** Is this https origin a Moodle Neo Quiz can sign in to? One public, token-less request (`moodle/compat.ts`). Rate-limited to 1/s (rejects `ratelimited`). A custom site can only be written to the `moodle` setting after a `compatible: true` answer. */
+		verifierSite(origine: string): Promise<VerdictSiteMoodle>;
+		/** The bundled list of compatible schools (Efrei first). Choosing one needs no confirmation dialog. */
+		ecoles(): Promise<EcoleMoodle[]>;
 		etat(): Promise<EtatMoodle>;
 		/** Opens the Moodle login in the system browser; the answer arrives by a
 		    `neo-quiz://token=` link and `surEtat` pushes the new state. */
@@ -1023,6 +1032,8 @@ export const CANAUX = {
 	syncDonneesRecues: "neo:sync/donnees-recues",
 	syncLienAppairage: "neo:sync/lien-appairage",
 	syncLienAppairageLire: "neo:sync/lien-appairage-lire",
+	moodleVerifierSite: "neo:moodle/verifier-site",
+	moodleEcoles: "neo:moodle/ecoles",
 	moodleEtat: "neo:moodle/etat",
 	moodleConnecter: "neo:moodle/connecter",
 	moodleDeconnecter: "neo:moodle/deconnecter",
