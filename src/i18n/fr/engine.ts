@@ -209,6 +209,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Bouton Exécuter d'un bloc de code Python ── */
 	"engine.code.run": "Exécuter",
+	"engine.code.answerPlaceholder": "Écris ton code ici...",
 	"engine.code.running": "Exécution…",
 	"engine.code.output": "Sortie",
 	"engine.code.empty": "(aucune sortie)",

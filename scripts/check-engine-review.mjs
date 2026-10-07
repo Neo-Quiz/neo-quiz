@@ -81,7 +81,7 @@ await withSrcModule(
 			isMatchingQuestion: () => false,
 			// Exercice de code (engine/state.ts isCorrect) et bulle de
 			// définition (goToSlide) : hors sujet ici, des stubs suffisent.
-			isCodeQuestion: () => false,
+			isCodeQuestion: (q) => !!q && typeof q.language === "string" && q.language.trim().length > 0,
 			termes: { poserTermes: () => {}, fermerBulle: () => {} },
 			isLessonMode: () => isLessonMode,
 			// The Learn retry loop (engine/learn.ts) reads the CURRENT mode.
@@ -542,6 +542,24 @@ await withSrcModule(
 		r.check("le clic a bien appelé recordReview (une ligne journalisée)", appels, [
 			{ q: "Cours/ch1.md::recall1", grade: "understood", role: "recall" },
 		]);
+		r.done();
+	}
+
+	/* Case C2 — a CODE question (`language`, the kernel of engine/code-run.ts)
+	   has no options and no typed key: it is answered in writing and self-rated,
+	   never graded as a choice. Before, it fell through to the empty choice card. */
+	{
+		const r = makeReporter("question de code — réponse écrite, notée à la main");
+		const quiz = [
+			{ id: "code1", prompt: "Affiche 42", language: "python", solution: "print(42)" },
+			{ id: "qcm1", prompt: "2 + 3 ?", options: ["4", "5"], correctIndex: 1 },
+		];
+		const { ctx } = makeCtx({ quiz, selections: ["", null], isLessonMode: false, roles: [undefined, undefined] });
+		ctx.quizState.textOnlyAnswers = ["", ""];
+		ctx.quizState.textOnlyChecked = [false, false];
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+		r.check("a code question is answered in writing, self-rated; a choice stays a choice",
+			[ctx.textOnly.isTextOnlyFor(0), ctx.textOnly.isTextOnlyFor(1)], [true, false]);
 		r.done();
 	}
 

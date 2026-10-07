@@ -147,6 +147,10 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
 		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
 		if (ctx.isFlashcardQuestion(q)) return true;
+		// A code question has no options and no text key: it is answered in
+		// writing (its program), then self-rated — the program is never run
+		// here (engine/state.ts isCorrect), so the verdict is the learner's.
+		if (ctx.isCodeQuestion(q)) return true;
 		// In a step page nothing is typed: every card that is not answered by a
 		// tap is a REVEAL card, self-rated like a flashcard (engine/step-page.ts).
 		if (ctx.stepSlides && !ctx.isReadingCard(qi) && !isTapType(q)) return true;
@@ -581,11 +585,11 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				     already says what to write. Screen readers keep the name. -->
 				<textarea
 					id="quizTextOnly_${ctx.QUIZ_INSTANCE_ID}_${qi}"
-					class="quiz-textarea quiz-textonly-textarea"
+					class="quiz-textarea quiz-textonly-textarea${ctx.isCodeQuestion(q) ? " quiz-textonly-code" : ""}"
 					aria-label="${ctx.escapeHtmlAttr(t("engine.textOnly.answerLabel"))}"
 					data-textonly-answer="1"
 					name="${textareaName}"
-					placeholder="${ctx.escapeHtmlAttr(t("engine.textOnly.answerPlaceholder"))}"
+					placeholder="${ctx.escapeHtmlAttr(t(ctx.isCodeQuestion(q) ? "engine.code.answerPlaceholder" : "engine.textOnly.answerPlaceholder"))}"
 					spellcheck="false"
 					autocapitalize="off"
 					autocomplete="off"

@@ -44,6 +44,11 @@
   min-height: 140px;
 }
 
+/* A code question's answer is a program: monospace, like the code blocks. */
+.quiz-textarea.quiz-textonly-code{
+  font-family: var(--font-monospace);
+}
+
 .quiz-textarea::placeholder{
   color: var(--text-faint);
 }

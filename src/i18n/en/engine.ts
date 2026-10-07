@@ -228,6 +228,7 @@ export const EN_ENGINE = {
 
 	/* ── Run button on a Python code block ── */
 	"engine.code.run": "Run",
+	"engine.code.answerPlaceholder": "Write your code here...",
 	"engine.code.running": "Running…",
 	"engine.code.output": "Output",
 	"engine.code.empty": "(no output)",
