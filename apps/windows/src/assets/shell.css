@@ -1933,3 +1933,11 @@ label.nq-set-ligne {
 .nq-langage-telecharger:disabled {
 	cursor: default;
 }
+
+/* SETTINGS › MOODLE: state colours of the assignment line, the site field. */
+.nq-moodle-site { width: 240px; text-align: left; }
+.nq-moodle-rouge { color: var(--color-red, #f87171); }
+.nq-moodle-ambre { color: var(--color-orange, #fb923c); }
+.nq-moodle-lien-icone { display: inline-flex; margin-left: 6px; vertical-align: middle; }
+.nq-moodle-interrupteur { display: inline-flex; }
+.nq-moodle-lien-icone svg { width: 14px; height: 14px; }

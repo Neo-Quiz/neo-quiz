@@ -132,7 +132,7 @@ await withSrcModule(
 			const { listenAddresses, folderConfig, IGNORES } = regles;
 			r.check("listenAddresses on the pinned port", listenAddresses(true), ["tcp://:22100", "quic://:22100", "dynamic+https://relays.syncthing.net/endpoint"]);
 			r.check("listenAddresses falls back to any port", listenAddresses(false), ["tcp://:0", "quic://:0", "dynamic+https://relays.syncthing.net/endpoint"]);
-			r.check("ignores", IGNORES, ["(?d).neo-quiz/**/*.sync-conflict-*", "(?d).trash"]);
+			r.check("ignores", IGNORES, ["(?d).neo-quiz/**/*.sync-conflict-*", "(?d).trash", "(?d).*.moodle.tmp"]);
 			const f = folderConfig("C:/Neo Quiz", ID, [AUTRE_ID, ID, AUTRE_ID]);
 			r.check("folderConfig: one folder, shared with the paired, once each, plus ourselves",
 				{ id: f.id, path: f.path, type: f.type, devices: f.devices.map(d => d.deviceID) },

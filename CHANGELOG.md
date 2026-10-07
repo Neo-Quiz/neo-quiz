@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Settings has a Moodle section: sign in, choose your courses, and their files arrive in your Neo Quiz folder, with your assignments and deadlines.
 - Generate no longer asks Learn or Test: it picks from your request, or asks you with clickable answers.
 - Scanning the PC's pairing QR code no longer asks for a second confirmation on the PC.
 - On the phone, a device ID typed in Add a device is added without a second confirmation, and a pairing link opens Neo Quiz.

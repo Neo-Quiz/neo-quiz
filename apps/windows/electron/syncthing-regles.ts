@@ -47,6 +47,8 @@ export const PORT_ANNONCE_LAN = 21028;
 export const IGNORES: readonly string[] = [
 	"(?d).neo-quiz/**/*.sync-conflict-*",
 	"(?d).trash",
+	/* The partial download of a Moodle file (`moodle/disque.ts`). */
+	"(?d).*.moodle.tmp",
 ];
 
 const RELAIS_DYNAMIQUE = "dynamic+https://relays.syncthing.net/endpoint";

@@ -32,11 +32,12 @@ import type { AiSettings } from "../../../../src/types/dashboard-ctx";
 import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
 import { mountLanguagePackSettings } from "./language-packs";
+import { mountMoodleSettings } from "./moodle-settings";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
 import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
 
-type Category = "general" | "sync" | "ai" | "appearance" | "languages";
+type Category = "general" | "sync" | "ai" | "appearance" | "languages" | "moodle";
 
 const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
 	{ id: "general", icon: "sliders-horizontal", label: "app.settings.general" },
@@ -45,6 +46,8 @@ const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
 	{ id: "ai", icon: "sparkles", label: "app.settings.navAi" },
 	{ id: "appearance", icon: "image", label: "app.settings.navAppearance" },
 	{ id: "languages", icon: "code", label: "settings.languages.title" },
+	/* PC only (the phone receives the files by sync): `pont().moodle` is absent there. */
+	{ id: "moodle", icon: "graduation-cap", label: "settings.moodle.title" },
 ];
 
 /* The category shown last, for the next opening in the same session: most
@@ -222,7 +225,7 @@ export function renderSettings(
 	/* No AI category on a phone or tablet: generation and the Explain button are
 	   not offered there (`HostPlatform.isMobile`). */
 	const mobile = currentHost().platform.isMobile;
-	const categories = CATEGORIES.filter(c => (c.id !== "sync" || sync) && (c.id !== "ai" || !mobile));
+	const categories = CATEGORIES.filter(c => (c.id !== "sync" || sync) && (c.id !== "ai" || !mobile) && (c.id !== "moodle" || (!mobile && !!pont().moodle)));
 	for (const c of categories) {
 		const tab = ajouter(nav, "button", "nq-set-onglet");
 		tab.type = "button";
@@ -491,6 +494,11 @@ export function renderSettings(
 	const languagesPage = pages.get("languages")!;
 	const demonterLangages = mountLanguagePackSettings(section(languagesPage, null, t("settings.languages.hint")));
 
+	/* The Moodle page is mounted when its tab exists (PC): it only reads the
+	   state; nothing is contacted until the user signs in or syncs. */
+	const moodlePage = pages.get("moodle");
+	const demonterMoodle = moodlePage ? mountMoodleSettings(moodlePage) : () => undefined;
+
 	if (mobile) montrerPrincipal();
 	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
@@ -507,5 +515,5 @@ export function renderSettings(
 	   (whose page then opens "Add a device" with it). */
 	const allerSync = (): void => { if (sync) show("sync"); };
 	surAjoutEnAttente.add(allerSync);
-	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterSync(); root.replaceChildren(); };
+	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterMoodle(); demonterSync(); root.replaceChildren(); };
 }
