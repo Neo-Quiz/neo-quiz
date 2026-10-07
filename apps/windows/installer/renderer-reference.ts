@@ -4,6 +4,7 @@ import { currentLang, setLanguage, t } from "../../../src/i18n";
 import { poserIcone } from "../src/host/ui";
 import { poserGlyphe } from "../src/ui/glyphes-fenetre";
 import type { PageLegale } from "./noyau";
+import { formatOctets, formatPourcent, libellesProgression as libellesPartages, type LibellesProgression } from "./presentation";
 import type {
 	CodeErreurInstallateur,
 	EtatInstallateur,
@@ -36,31 +37,6 @@ function ajouter<K extends keyof HTMLElementTagNameMap>(
 	if (texte !== undefined) element.textContent = texte;
 	parent.appendChild(element);
 	return element;
-}
-
-function formatOctets(octets: number): string {
-	const langue = currentLang() === "fr" ? "fr-FR" : "en-US";
-	let diviseur = 1_000_000;
-	let unite = "megabyte";
-	if (octets >= 1_000_000_000_000) {
-		diviseur = 1_000_000_000_000;
-		unite = "terabyte";
-	} else if (octets >= 1_000_000_000) {
-		diviseur = 1_000_000_000;
-		unite = "gigabyte";
-	}
-	return new Intl.NumberFormat(langue, {
-		style: "unit",
-		unit: unite,
-		unitDisplay: "short",
-		maximumFractionDigits: 1,
-	}).format(octets / diviseur);
-}
-
-function formatPourcent(pourcent: number): string {
-	return new Intl.NumberFormat(currentLang() === "fr" ? "fr-FR" : "en-US", {
-		maximumFractionDigits: 1,
-	}).format(Math.max(0, Math.min(100, pourcent)));
 }
 
 function libelleErreur(code: CodeErreurInstallateur): string {
@@ -267,21 +243,6 @@ function rendreChargement(parent: HTMLElement): void {
 	anneau.setAttribute("aria-hidden", "true");
 }
 
-function detailTelechargement(recus: number, total: number): string {
-	const restant = Math.max(0, total - recus);
-	if (debitTelechargement && debitTelechargement > 0 && restant > 0) {
-		return t("installer.status.downloadDetail", {
-			downloaded: formatOctets(recus),
-			total: formatOctets(total),
-			seconds: Math.max(1, Math.ceil(restant / debitTelechargement)),
-		});
-	}
-	return t("installer.status.downloadDetailNoTime", {
-		downloaded: formatOctets(recus),
-		total: formatOctets(total),
-	});
-}
-
 function ouvrirConfirmationAnnulation(): void {
 	if (!phaseInstallationActive() || annulationDemandee) return;
 	confirmationAnnulation = true;
@@ -327,35 +288,11 @@ function rendreConfirmationAnnulation(parent: HTMLElement): void {
 /** Ce que l'étape de progression AFFICHE, séparé de la façon dont elle le
     construit : le premier rendu bâtit le DOM avec, les messages suivants ne
     font que remplacer ces trois valeurs. */
-function libellesProgression(): { pourcent: number | null; statut: string; detail: string | null } {
-	let pourcent: number | null = null;
-	let statut = t("installer.status.downloadingPending");
-	let detail: string | null = null;
+function libellesProgression(): LibellesProgression {
 	if (annulationDemandee) {
-		statut = t("installer.status.cancelling");
-	} else if (etat.phase === "telechargement") {
-		pourcent = etat.total > 0 ? (etat.recus / etat.total) * 100 : 0;
-		statut = t("installer.status.downloading", { percent: formatPourcent(pourcent) });
-		detail = detailTelechargement(etat.recus, etat.total);
-	} else if (etat.phase === "verification") {
-		/* Le calcul SHA-256 ne fournit pas de progression exploitable à l'UI. */
-		pourcent = null;
-		statut = t("installer.status.verifying");
-	} else if (etat.phase === "installation") {
-		/* Le pourcentage compte désormais les octets réellement écrits dans le
-		   dossier d'installation, comme celui du téléchargement — `null` tant
-		   que le principal ne sait pas encore le calculer (release sans taille
-		   installée publiée, mise à jour qui n'a pas fini de rétrécir). Le
-		   100 % envoyé après le vrai code de sortie 0 de NSIS reste exact. */
-		if (etat.pourcent === null) {
-			pourcent = null;
-			statut = t("installer.status.installing");
-		} else {
-			pourcent = etat.pourcent;
-			statut = t("installer.status.installingProgress", { percent: formatPourcent(etat.pourcent) });
-		}
+		return { pourcent: null, statut: t("installer.status.cancelling"), detail: null };
 	}
-	return { pourcent, statut, detail };
+	return libellesPartages(etat, debitTelechargement);
 }
 
 /** LES SEULS NŒUDS QUI CHANGENT d'un message du travailleur au suivant.

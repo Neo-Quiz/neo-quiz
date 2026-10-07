@@ -58,6 +58,33 @@ p {
 	line-height: 1.45;
 	color: rgba(207, 218, 239, .78);
 }
+/* Minimise: same glyph, size and colours as the bootstrapper's window controls
+   (`src/ui/glyphes-fenetre.ts`, `installer/style-window.css`). The rest of the
+   window drags. */
+#app { -webkit-app-region: drag; }
+#min {
+	position: absolute;
+	top: 12px;
+	right: 20px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: rgb(142, 149, 179);
+	transition: color 100ms ease;
+	-webkit-app-region: no-drag;
+}
+#min:hover, #min:focus-visible { color: rgb(198, 208, 245); }
+#min:focus-visible { outline: 1px solid rgba(198, 208, 245, .5); outline-offset: -1px; }
+#detail { margin-bottom: 14px; font-size: 12px; color: rgba(207, 218, 239, .55); }
+#detail:empty { display: none; }
+#statut { margin: 0 0 9px; font-size: 12.5px; color: rgba(207, 218, 239, .9); }
 .barre {
 	position: relative;
 	height: 4px;
@@ -71,11 +98,18 @@ p {
 .barre i {
 	position: absolute;
 	display: block;
+	left: 0;
 	width: 42%;
 	height: 100%;
 	border-radius: inherit;
 	background: linear-gradient(90deg, #5c72ff, #9db8ff);
 	animation: glisse 1.15s ease-in-out infinite;
+}
+/* Determinate: the fill grows with the measured percentage, no sliding. */
+.barre:not(.indeterminee) i {
+	animation: none;
+	width: 0;
+	transition: width 150ms linear;
 }
 @keyframes glisse {
 	0% { transform: translateX(-115%); }
@@ -89,10 +123,12 @@ p {
 <body>
 <div id="app">
 	<div id="decor"></div>
+	<button id="min" type="button" title="Minimize" aria-label="Minimize"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.25 10H13.75"/></svg></button>
 	<div id="contenu">
 		<h1 id="titre">Updating Neo Quiz</h1>
-		<p id="detail">Neo Quiz will reopen on its own once this is done.</p>
-		<div class="barre"><i></i></div>
+		<p id="detail"></p>
+		<p id="statut"></p>
+		<div class="barre indeterminee" id="barre"><i id="rempli"></i></div>
 	</div>
 </div>
 </body>

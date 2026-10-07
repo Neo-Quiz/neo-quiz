@@ -46,6 +46,8 @@ export interface MiseAJour {
 	    quand tout est fermé. */
 	armerInstallation(): boolean;
 	installationArmee(): boolean;
+	/** Sizes of the downloaded installer and of the installed software (`null` when unpublished), for the update window. */
+	tailles(): { paquet: number; installe: number | null };
 	/** `quitAndInstall` : ne revient pas si tout va bien. */
 	installerArmee(): void;
 	surFocus(): void;
@@ -59,6 +61,7 @@ export function creerMiseAJour(deps: {
 	let armee = false;
 	let derniereVerification = 0;
 	let minuteur: NodeJS.Timeout | null = null;
+	let tailles: { paquet: number; installe: number | null } = { paquet: 0, installe: null };
 
 	const appliquer = (ev: EvenementMiseAJour): void => {
 		etat = transition(etat, ev);
@@ -78,7 +81,20 @@ export function creerMiseAJour(deps: {
 	autoUpdater.on("update-available", info => appliquer({ type: "update-available", version: info.version }));
 	autoUpdater.on("update-not-available", () => appliquer({ type: "update-not-available" }));
 	autoUpdater.on("download-progress", p => appliquer({ type: "download-progress", percent: p.percent, transferred: p.transferred, total: p.total }));
-	autoUpdater.on("update-downloaded", info => appliquer({ type: "update-downloaded", version: info.version }));
+	autoUpdater.on("update-downloaded", info => {
+		/* The update window measures the installation against these two sizes
+		   (`installer/noyau.ts`, `progressionInstallation`). `installedSize` is the
+		   optional root key the CI publishes in `latest.yml`; absent, the window's
+		   bar stays indeterminate. */
+		const racine = info as unknown as { files?: { size?: unknown }[]; installedSize?: unknown };
+		const paquet = Number(racine.files?.[0]?.size);
+		const installe = Number(racine.installedSize);
+		tailles = {
+			paquet: Number.isSafeInteger(paquet) && paquet > 0 ? paquet : 0,
+			installe: Number.isSafeInteger(installe) && installe > 0 ? installe : null,
+		};
+		appliquer({ type: "update-downloaded", version: info.version });
+	});
 	// Le type de l'événement est `(error: Error, message?: string) => void` :
 	// `error` n'est jamais absent, contrairement à ce qu'un `catch` laisserait
 	// penser.
@@ -118,6 +134,7 @@ export function creerMiseAJour(deps: {
 			return true;
 		},
 		installationArmee: () => armee,
+		tailles: () => tailles,
 		installerArmee() {
 			autoUpdater.quitAndInstall(true, true);
 		},

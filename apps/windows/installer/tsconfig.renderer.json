@@ -13,5 +13,5 @@
 		"forceConsistentCasingInFileNames": true,
 		"types": []
 	},
-	"include": ["renderer.ts", "renderer-reference.ts", "protocole.ts", "noyau.ts", "../../../src/**/*.d.ts"]
+	"include": ["renderer.ts", "renderer-reference.ts", "protocole.ts", "noyau.ts", "presentation.ts", "../../../src/**/*.d.ts"]
 }

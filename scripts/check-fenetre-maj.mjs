@@ -64,6 +64,7 @@ async function existe(chemin) {
 
 await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 	cheminTemoin,
+	donneesMajDepuisArguments,
 	langueDepuisArguments,
 	marquerDemarrage,
 	nettoyerLiensMaj,
@@ -163,6 +164,18 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 		r.check("arguments : une langue inconnue retombe sur l'anglais",
 			["de", "FR", "", "fr-FR"].map(l => langueDepuisArguments([DRAPEAU_FENETRE_MAJ, "1.11.0", l])),
 			["en", "en", "en", "en"]);
+
+		const dossierAbs = join(base, "install");
+		const valides = donneesMajDepuisArguments([DRAPEAU_FENETRE_MAJ, "1.11.0", "fr",
+			"--neo-quiz-maj-paquet=123", "--neo-quiz-maj-installe=456", `--neo-quiz-maj-dossier=${dossierAbs}`, "--neo-quiz-maj-pid=789"]);
+		r.check("arguments de mesure : valeurs valides lues",
+			valides, { paquet: 123, installe: 456, dossier: dossierAbs, pid: 789 });
+		const abimes = donneesMajDepuisArguments([DRAPEAU_FENETRE_MAJ, "1.11.0", "fr",
+			"--neo-quiz-maj-paquet=-5", "--neo-quiz-maj-installe=1e9", "--neo-quiz-maj-dossier=relatif/x", "--neo-quiz-maj-pid=abc"]);
+		r.check("arguments de mesure : négatif, notation, chemin relatif ou pid non numérique écartés",
+			abimes, { paquet: 0, installe: null, dossier: null, pid: null });
+		r.check("arguments de mesure : absents = rien à mesurer",
+			donneesMajDepuisArguments([DRAPEAU_FENETRE_MAJ, "1.11.0", "fr"]), { paquet: 0, installe: null, dossier: null, pid: null });
 
 	} finally {
 		await rm(base, { recursive: true, force: true }).catch(() => undefined);

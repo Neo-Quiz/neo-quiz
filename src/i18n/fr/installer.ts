@@ -36,6 +36,7 @@ export const FR_INSTALLER = {
 	"installer.status.verifying": "Vérification du téléchargement…",
 	"installer.status.installing": "Installation de Neo Quiz…",
 	"installer.status.installingProgress": "Installation… {percent} %",
+	"installer.status.installDetail": "{done} sur {total}",
 	"installer.status.launching": "Ouverture de Neo Quiz…",
 	"installer.error.release": "La version actuelle de Neo Quiz n'a pas pu être préparée.",
 	"installer.error.network": "Le téléchargement n'a pas pu aboutir. Vérifiez votre connexion puis réessayez.",

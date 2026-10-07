@@ -677,3 +677,31 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 
 	r.done();
 });
+
+/* THE PRESENTATION SHARED BY THE BOOTSTRAPPER AND THE UPDATE WINDOW
+   (`installer/presentation.ts`). The update window must show the same steps as
+   the installer: this pins the phase -> (percent, label, detail) mapping both
+   consume, and the phase the update window derives from what it can observe. */
+await withSrcModule("apps/windows/installer/presentation.ts", ({ libellesProgression, etatFenetreMaj, formatPourcent, formatOctets, detailTelechargement }) => {
+	const r = makeReporter("Présentation partagée (installeur et fenêtre de mise à jour)");
+	const verif = libellesProgression({ phase: "verification" }, null);
+	r.check("vérification : barre indéterminée, un libellé, aucun détail",
+		[verif.pourcent, verif.statut.length > 0, verif.detail], [null, true, null]);
+	const sans = libellesProgression({ phase: "installation", pourcent: null }, null);
+	r.check("installation sans pourcentage : indéterminée, libellé distinct de la vérification",
+		[sans.pourcent, sans.statut !== verif.statut], [null, true]);
+	const avec = libellesProgression({ phase: "installation", pourcent: 42.5 }, null);
+	r.check("installation à 42,5 % : la barre porte 42,5 et le libellé le pourcentage formaté",
+		[avec.pourcent, avec.statut.includes(formatPourcent(42.5)), avec.statut !== sans.statut], [42.5, true, true]);
+	const dl = libellesProgression({ phase: "telechargement", recus: 50_000_000, total: 200_000_000 }, null);
+	r.check("téléchargement : 25 %, octets reçus et total dans le détail",
+		[dl.pourcent, dl.detail?.includes(formatOctets(50_000_000)), dl.detail?.includes(formatOctets(200_000_000))], [25, true, true]);
+	r.check("téléchargement : un débit connu ajoute un temps restant",
+		detailTelechargement(50_000_000, 200_000_000, 5_000_000) !== detailTelechargement(50_000_000, 200_000_000, null), true);
+	const demarrage = libellesProgression({ phase: "demarrage" }, null);
+	r.check("démarrage : barre pleine", demarrage.pourcent, 100);
+	r.check("fenêtre de mise à jour : l'appli encore là = vérification, partie = installation (avec le pourcentage)",
+		[etatFenetreMaj(true, 50), etatFenetreMaj(false, null), etatFenetreMaj(false, 63)],
+		[{ phase: "verification" }, { phase: "installation", pourcent: null }, { phase: "installation", pourcent: 63 }]);
+	r.done();
+});

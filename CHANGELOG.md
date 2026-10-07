@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- The update window can be minimised, and shows the same download and install steps as the installer.
+
 ## [1.20.41] - 2026-10-07
 
 ### Changed

@@ -979,7 +979,7 @@ app.on("window-all-closed", () => {
 	   `resources/syncthing/syncthing.exe` would keep the installer from
 	   replacing the install folder. */
 	const arretSync = sync ? sync.arreter().catch(() => undefined) : Promise.resolve();
-	void Promise.all([lancerFenetreMaj(armee.etat().version ?? "", currentLang()), arretSync]).finally(() => armee.installerArmee());
+	void Promise.all([lancerFenetreMaj(armee.etat().version ?? "", currentLang(), armee.tailles()), arretSync]).finally(() => armee.installerArmee());
 });
 /* Any other way out: stop the embedded Syncthing first (it asks the process to
    shut down, then kills it after a few seconds), THEN quit for real. Without

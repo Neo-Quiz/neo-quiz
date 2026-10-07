@@ -34,7 +34,7 @@
 
 import { link, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 export type LangueFenetre = "en" | "fr";
 
@@ -165,4 +165,36 @@ export function versionDepuisArguments(argv: readonly string[]): string {
 export function langueDepuisArguments(argv: readonly string[]): LangueFenetre {
 	const index = argv.indexOf(DRAPEAU_FENETRE_MAJ);
 	return index >= 0 && argv[index + 2] === "fr" ? "fr" : "en";
+}
+
+/** What the update window needs to measure the installation, passed by the app
+    that launches it (`--neo-quiz-maj-*=value`). It is only READ: sizes for the
+    percentage, the install folder to weigh, and the pid of the launching app
+    (still running = NSIS has not started). Anything malformed yields `null`
+    fields and the window falls back to an indeterminate bar. */
+export interface DonneesMaj {
+	paquet: number;
+	installe: number | null;
+	dossier: string | null;
+	pid: number | null;
+}
+
+export function donneesMajDepuisArguments(argv: readonly string[]): DonneesMaj {
+	const lire = (nom: string): string | null => {
+		const prefixe = `--neo-quiz-maj-${nom}=`;
+		const arg = argv.find(a => a.startsWith(prefixe));
+		return arg ? arg.slice(prefixe.length) : null;
+	};
+	const entier = (v: string | null): number | null => {
+		if (v === null || !/^\d{1,15}$/.test(v)) return null;
+		const n = Number(v);
+		return Number.isSafeInteger(n) && n > 0 ? n : null;
+	};
+	const dossier = lire("dossier");
+	return {
+		paquet: entier(lire("paquet")) ?? 0,
+		installe: entier(lire("installe")),
+		dossier: dossier && isAbsolute(dossier) ? dossier : null,
+		pid: entier(lire("pid")),
+	};
 }

@@ -20,11 +20,15 @@
 import { spawn } from "node:child_process";
 import { rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { LOG_PREFIX, PRODUCT_NAME } from "../../../src/branding";
 import { setLanguage, t } from "../../../src/i18n";
+import { suivre, suiviInitial, type BaremeInstallation } from "../installer/noyau";
+import { etatFenetreMaj, formatOctets, libellesProgression } from "../installer/presentation";
+import { tailleDossier, tailleTemporairesNsis } from "../installer/sondage";
 import {
 	cheminTemoin,
+	donneesMajDepuisArguments,
 	DRAPEAU_FENETRE_MAJ,
 	type LangueFenetre,
 	preparerReflet,
@@ -32,6 +36,7 @@ import {
 
 export {
 	DRAPEAU_FENETRE_MAJ,
+	donneesMajDepuisArguments,
 	langueDepuisArguments,
 	marquerDemarrage,
 	nettoyerLiensMaj,
@@ -44,7 +49,11 @@ export {
     Si le reflet échoue (volume différent, temporaire inaccessible), la mise à
     jour se fait comme avant, en silence : une mise à jour sans fenêtre vaut
     mieux qu'une mise à jour empêchée. */
-export async function lancerFenetreMaj(version: string, langue: LangueFenetre): Promise<boolean> {
+export async function lancerFenetreMaj(
+	version: string,
+	langue: LangueFenetre,
+	tailles: { paquet: number; installe: number | null } = { paquet: 0, installe: null },
+): Promise<boolean> {
 	if (process.platform !== "win32") return false;
 	const executable = app.getPath("exe");
 	const exeLie = await preparerReflet(dirname(executable), basename(executable));
@@ -54,6 +63,11 @@ export async function lancerFenetreMaj(version: string, langue: LangueFenetre): 
 			DRAPEAU_FENETRE_MAJ,
 			version,
 			langue,
+			/* What the window needs to measure the installation (read-only). */
+			`--neo-quiz-maj-paquet=${tailles.paquet}`,
+			...(tailles.installe === null ? [] : [`--neo-quiz-maj-installe=${tailles.installe}`]),
+			`--neo-quiz-maj-dossier=${dirname(executable)}`,
+			`--neo-quiz-maj-pid=${process.pid}`,
 			/* Le profil est à cette fenêtre SEULE — voir l'en-tête. */
 			`--user-data-dir=${join(dirname(exeLie), "profil")}`,
 		], { detached: true, windowsHide: false, stdio: "ignore" });
@@ -76,7 +90,11 @@ const INTERVALLE_TEMOIN_MS = 400;
 
 /** LE PROCESSUS FENÊTRE : ouvre la fenêtre, attend le témoin de l'application
     relancée, puis rend la main. */
-export async function afficherFenetreMaj(version: string, langue: LangueFenetre): Promise<void> {
+export async function afficherFenetreMaj(
+	version: string,
+	langue: LangueFenetre,
+	donnees = donneesMajDepuisArguments(process.argv),
+): Promise<void> {
 	setLanguage(langue);
 	const temoin = cheminTemoin();
 	/* Le témoin d'un démarrage PASSÉ ne doit pas faire refermer la fenêtre
@@ -87,7 +105,7 @@ export async function afficherFenetreMaj(version: string, langue: LangueFenetre)
 		width: 480,
 		height: 300,
 		resizable: false,
-		minimizable: false,
+		minimizable: true,
 		maximizable: false,
 		fullscreenable: false,
 		center: true,
@@ -99,27 +117,43 @@ export async function afficherFenetreMaj(version: string, langue: LangueFenetre)
 		transparent: true,
 		show: false,
 		title: PRODUCT_NAME,
-		webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+			/* Exposes one function: minimise this window. */
+			preload: join(__dirname, "maj-preload.cjs"),
+		},
 	});
 	fenetre.setMenuBarVisibility(false);
-	/* Au-dessus du bureau que laisse l'application fermée, sans voler le focus
-	   à ce que l'utilisateur fait pendant ce temps. */
+	/* Above the desktop the closed app leaves behind, without stealing focus
+	   from what the user is doing meanwhile. Dropped once minimised and kept off
+	   after restoring: the window must never stay above anything it was pushed
+	   behind on purpose. */
 	fenetre.setAlwaysOnTop(true, "normal");
+	fenetre.on("minimize", () => fenetre.setAlwaysOnTop(false));
+	const reduire = (e: Electron.IpcMainEvent): void => {
+		if (!fenetre.isDestroyed() && e.sender === fenetre.webContents) fenetre.minimize();
+	};
+	ipcMain.on("neo-maj-reduire", reduire);
 
 	await fenetre.loadFile(join(__dirname, "maj", "index.html"));
-	/* Les textes sont POSÉS après chargement : la page n'a aucun script (sa
-	   politique de sécurité l'interdit), et c'est bien ainsi — elle n'affiche
-	   que ce que le principal lui donne. */
-	const detail = version
-		? `${t("app.update.window.version", { version })} — ${t("app.update.window.detail")}`
-		: t("app.update.window.detail");
-	await fenetre.webContents.executeJavaScript(
+	/* Sober on purpose: title, current step, and the version in small text. */
+	const detailFixe = version ? t("installer.version", { version }) : "";
+	/* Texts are SET after loading: the page has no script of its own (its
+	   security policy forbids it) and only shows what the main process gives it. */
+	const poser = (code: string): Promise<unknown> => fenetre.webContents.executeJavaScript(code).catch(() => undefined);
+	await poser(
 		`document.getElementById("titre").textContent = ${JSON.stringify(t("app.update.window.title"))};` +
-		`document.getElementById("detail").textContent = ${JSON.stringify(detail)};`,
-	).catch(() => undefined);
+		`document.getElementById("detail").textContent = ${JSON.stringify(detailFixe)};` +
+		`document.getElementById("min").title = ${JSON.stringify(t("installer.minimize"))};` +
+		`document.getElementById("min").setAttribute("aria-label", ${JSON.stringify(t("installer.minimize"))});` +
+		`document.getElementById("min").addEventListener("click", () => window.neoMaj.reduire());`,
+	);
 	fenetre.show();
 
 	const debut = Date.now();
+	const arreterSuivi = demarrerSuivi(fenetre, donnees, poser);
 	await new Promise<void>(termine => {
 		const minuteur = setInterval(() => {
 			void (async () => {
@@ -134,5 +168,80 @@ export async function afficherFenetreMaj(version: string, langue: LangueFenetre)
 			})();
 		}, INTERVALLE_TEMOIN_MS);
 	});
-	if (!fenetre.isDestroyed()) fenetre.close();
+	arreterSuivi();
+	ipcMain.removeListener("neo-maj-reduire", reduire);
+	if (!fenetre.isDestroyed()) {
+		fenetre.setProgressBar(-1);
+		fenetre.close();
+	}
+}
+
+/** Probes the installation every 150 ms like the bootstrapper's worker does
+    (same `suivre` core, same probes) and shows the step with the shared
+    presentation: verification while the launching app is still alive, then the
+    installation with its percentage and installed size. Mirrors the percentage
+    on the taskbar button. Returns the function that stops it. */
+function demarrerSuivi(
+	fenetre: BrowserWindow,
+	donnees: ReturnType<typeof donneesMajDepuisArguments>,
+	poser: (code: string) => Promise<unknown>,
+): () => void {
+	const bareme: BaremeInstallation | null = donnees.dossier && donnees.paquet > 0
+		? { paquet: donnees.paquet, installe: donnees.installe, initial: 0 }
+		: null;
+	const depart = Date.now();
+	let suivi: ReturnType<typeof suiviInitial> | null = null;
+	let baremeVivant: BaremeInstallation | null = null;
+	let enCours = false;
+	let dernierAffiche = "";
+	const vivante = (): boolean => {
+		if (donnees.pid === null) return false;
+		try {
+			process.kill(donnees.pid, 0);
+			return true;
+		} catch (e) {
+			return (e as NodeJS.ErrnoException).code === "EPERM";
+		}
+	};
+	const sonder = async (): Promise<void> => {
+		if (enCours || fenetre.isDestroyed()) return;
+		enCours = true;
+		try {
+			const appEnCours = vivante();
+			let pourcent: number | null = null;
+			let installe = "";
+			if (!appEnCours && bareme && donnees.dossier) {
+				const [courant, temporaire] = await Promise.all([tailleDossier(donnees.dossier), tailleTemporairesNsis(depart)]);
+				/* `initial` is the folder weight when the app has just quit: NSIS
+				   then starts by uninstalling the old version, like an update. */
+				baremeVivant ??= { ...bareme, initial: courant };
+				suivi ??= suiviInitial(baremeVivant);
+				suivi = suivre(baremeVivant, suivi, { ecoule: Date.now() - depart, dossier: courant, temporaire });
+				pourcent = suivi.dernier;
+				if (pourcent !== null && bareme.installe) {
+					installe = ` — ${t("installer.status.installDetail", {
+						done: formatOctets(bareme.installe * pourcent / 100),
+						total: formatOctets(bareme.installe),
+					})}`;
+				}
+			}
+			const { pourcent: valeur, statut } = libellesProgression(etatFenetreMaj(appEnCours, pourcent), null);
+			const texte = `${statut}${installe}`;
+			const cle = `${texte}|${valeur}`;
+			if (cle === dernierAffiche || fenetre.isDestroyed()) return;
+			dernierAffiche = cle;
+			fenetre.setProgressBar(valeur === null ? 2 : valeur / 100, { mode: valeur === null ? "indeterminate" : "normal" });
+			await poser(
+				`document.getElementById("statut").textContent = ${JSON.stringify(texte)};` +
+				`document.getElementById("barre").classList.toggle("indeterminee", ${valeur === null});` +
+				`document.getElementById("rempli").style.width = ${JSON.stringify(valeur === null ? "" : `${valeur}%`)};`,
+			);
+		} catch {
+			/* A probe must never get in the way of the installation. */
+		} finally {
+			enCours = false;
+		}
+	};
+	const minuterie = setInterval(() => { void sonder(); }, 150);
+	return () => clearInterval(minuterie);
 }

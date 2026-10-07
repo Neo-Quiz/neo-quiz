@@ -40,7 +40,7 @@ const ici = fileURLToPath(new URL(".", import.meta.url));
    lui-même, le bundler ne doit pas tenter de le résoudre. Les modules `node:*`
    le sont déjà par `platform: "node"`. */
 await build({
-	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`, `${ici}code-preload.ts`],
+	entryPoints: [`${ici}main.ts`, `${ici}preload.ts`, `${ici}code-preload.ts`, `${ici}maj-preload.ts`],
 	outdir: `${ici}../dist-electron`,
 	outExtension: { ".js": ".cjs" },
 	bundle: true,
