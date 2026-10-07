@@ -96,6 +96,12 @@ class SyncEngine(
     private var since = 0L
     private var detector = ReceptionDetector()
     private var last = ""
+    // Counter samples and last rates per device (`ShareRules.rate`), a scan seen in the events but over before the state
+    // was read (shown once anyway), and whether something moves (state reread every 2 s).
+    private val samples = java.util.concurrent.ConcurrentHashMap<String, RateSample>()
+    private val rates = java.util.concurrent.ConcurrentHashMap<String, Rate>()
+    @Volatile private var scanSeen = false
+    @Volatile private var moving = false
     private val tickLock = Mutex()
     private var loop: Job? = null
 
@@ -204,7 +210,8 @@ class SyncEngine(
         val devices = rest.devices()
         val connections = rest.connections().optJSONObject("connections") ?: JSONObject()
         val status = try { rest.folderStatus(ShareRules.FOLDER_ID) } catch (_: Exception) { null }
-        val folder = ShareRules.folderState(status)
+        val folder = ShareRules.folderState(status).let { if (scanSeen && it.state == "idle") FolderState("scanning", null) else it }
+        scanSeen = false
         // Both are extras: failing to read them must not hide the rest.
         val seen = try { rest.deviceStats() } catch (_: Exception) { JSONObject() }
         val pending = try { rest.pendingDevices() } catch (_: Exception) { null }
@@ -218,14 +225,27 @@ class SyncEngine(
         val others = (0 until devices.length()).map { devices.getJSONObject(it) }.filter { it.getString("deviceID") != r.ownId && it.getString("deviceID") !in removing }
         // What each connected device says of the folder: "valid" once it accepted us, "notSharing" kept up = it removed us.
         val remote = mutableMapOf<String, String>()
+        val progress = mutableMapOf<String, Int>()
         for (d in others) {
             val id = d.getString("deviceID")
             if (connections.optJSONObject(id)?.optBoolean("connected") != true) continue
-            try { rest.completion(ShareRules.FOLDER_ID, id).optString("remoteState").takeIf { it.isNotEmpty() }?.let { remote[id] = it } } catch (_: Exception) { }
+            try {
+                val c = rest.completion(ShareRules.FOLDER_ID, id)
+                c.optString("remoteState").takeIf { it.isNotEmpty() }?.let { remote[id] = it }
+                if (c.has("completion")) progress[id] = c.optDouble("completion", 100.0).coerceIn(0.0, 100.0).toInt()
+            } catch (_: Exception) { }
         }
         for ((id, st) in remote) if (st == "valid") sentAt.remove(id)
         for (id in ShareRules.removedByOther(remote, notSharingSince, System.currentTimeMillis())) scope.launch { removeByOther(r, id) }
         val nowMs = System.currentTimeMillis()
+        for (id in samples.keys.toList()) if (others.none { it.getString("deviceID") == id }) { samples.remove(id); rates.remove(id) }
+        for (d in others) {
+            val id = d.getString("deviceID")
+            val rt = ShareRules.rate(samples[id], connections.optJSONObject(id), nowMs, rates[id] ?: Rate(0, 0, null))
+            if (rt.sample != null) samples[id] = rt.sample else samples.remove(id)
+            rates[id] = rt
+        }
+        moving = folder.state == "syncing" || rates.values.any { it.down > 0 || it.up > 0 }
         return mapOf(
             "actif" to true,
             "appareil" to r.ownId,
@@ -237,6 +257,12 @@ class SyncEngine(
                     "nom" to d.optString("name").ifEmpty { id.take(7) },
                     "connecte" to (connections.optJSONObject(id)?.optBoolean("connected") == true),
                     "vuLe" to ShareRules.lastSeen(seen.optJSONObject(id)?.optString("lastSeen")),
+                    "progression" to progress[id],
+                    "enPause" to (if (d.optBoolean("paused")) true else null),
+                    "debitBas" to (rates[id]?.down?.takeIf { it > 0 }),
+                    "debitHaut" to (rates[id]?.up?.takeIf { it > 0 }),
+                    "connexion" to ShareRules.connectionType(connections.optJSONObject(id)),
+                    "version" to connections.optJSONObject(id)?.takeIf { it.optBoolean("connected") }?.optString("clientVersion")?.let { ShareRules.cleanName(it) }?.takeIf { it.isNotEmpty() },
                     "demande" to ShareRules.requestState(sentAt[id], d.optBoolean("paused"), nowMs).also { st ->
                         // Expired: paused, so it stops knocking at the other side.
                         if (st == "expiree" && !d.optBoolean("paused")) scope.launch {
@@ -265,12 +291,18 @@ class SyncEngine(
             val r = current ?: return
             val rest = r.instance.rest
             var received = false
-            val events = rest.events(since, EVENTS, 10)
+            val events = rest.events(since, EVENTS, if (moving) 2 else 10)
             for (i in 0 until events.length()) {
                 val ev = events.getJSONObject(i)
                 if (ev.optLong("id") > since) since = ev.optLong("id")
                 if (detector.observe(ev)) received = true
                 if (ShareRules.isNewRemoteDir(ev)) restartWatcherSoon()
+                // A scan of our folder, maybe over before the state is read: the page must see it once.
+                val evData = ev.optJSONObject("data")
+                if (ev.optString("type") == "StateChanged" && evData?.optString("folder") == ShareRules.FOLDER_ID && Regex("^(scan|clean)").containsMatchIn(evData.optString("to"))) {
+                    scanSeen = true
+                    scope.launch { delay(150); push() }
+                }
                 // The name Syncthing reports for a device that connected, kept when we have none yet (a device paired by id has no name).
                 val data = ev.optJSONObject("data")
                 if (ev.optString("type") == "DeviceConnected" && data != null && data.optString("deviceName").isNotBlank()) {
@@ -294,7 +326,7 @@ class SyncEngine(
             // The state is reread only when something happened, or every 10 s: rereading it on every turn of the
             // event loop would delay the next event (Neo Calendar, 2026-10-03).
             val now = System.currentTimeMillis()
-            if (events.length() > 0 || realign || now - lastPush > 10_000) { lastPush = now; push() }
+            if (events.length() > 0 || realign || now - lastPush > (if (moving) 2_000 else 10_000)) { lastPush = now; push() }
             if (received) onReceived?.invoke()
         } catch (e: Exception) {
             if (!stopped) SyncLog.warn(TAG, "poll failed", e)

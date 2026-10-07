@@ -167,8 +167,29 @@ class ShareRulesTest {
         assertEquals(FolderState("syncing", 25), ShareRules.folderState(st("syncing", 200, 50)))
         assertEquals(FolderState("syncing", null), ShareRules.folderState(st("sync-preparing")))
         assertEquals(FolderState("error", null), ShareRules.folderState(st("error")))
-        assertEquals("scanning is not syncing", "idle", ShareRules.folderState(st("scanning", 1, 1)).state)
+        for (x in listOf("scanning", "scan-waiting", "cleaning", "clean-waiting")) assertEquals(x, "scanning", ShareRules.folderState(st(x)).state)
         assertEquals(FolderState("absent", null), ShareRules.folderState(null))
+    }
+
+    @Test fun transferRates() {
+        fun c(i: Long, o: Long, connected: Boolean = true) = JSONObject().put("connected", connected).put("inBytesTotal", i).put("outBytesTotal", o)
+        val p1 = ShareRules.rate(null, c(1000, 500), 10_000)
+        assertEquals(Rate(0, 0, RateSample(10_000, 1000, 500)), p1)
+        val p2 = ShareRules.rate(p1.sample, c(3000, 500), 12_000)
+        assertEquals(1000L, p2.down)
+        assertEquals(0L, p2.up)
+        val p3 = ShareRules.rate(p2.sample, c(9000, 9000), 12_300, p2)
+        assertEquals("a gap under a second keeps the old sample and rates", Rate(1000, 0, p2.sample), p3)
+        assertEquals("a counter that went down restarts", 0L, ShareRules.rate(p2.sample, c(10, 10), 20_000).down)
+        assertEquals(Rate(0, 0, null), ShareRules.rate(p2.sample, c(99999, 0, false), 20_000))
+    }
+
+    @Test fun connectionType() {
+        fun c(type: String, local: Boolean, connected: Boolean = true) = JSONObject().put("connected", connected).put("type", type).put("isLocal", local)
+        assertEquals("relais", ShareRules.connectionType(c("relay-client", false)))
+        assertEquals("lan", ShareRules.connectionType(c("tcp-client", true)))
+        assertEquals("direct", ShareRules.connectionType(c("quic-server", false)))
+        assertEquals(null, ShareRules.connectionType(c("tcp-client", true, false)))
     }
 
     private fun ev(type: String, vararg data: Pair<String, Any?>) = JSONObject().put("type", type).put("data", JSONObject(data.toMap()))

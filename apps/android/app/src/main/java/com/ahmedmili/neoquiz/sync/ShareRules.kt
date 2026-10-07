@@ -4,8 +4,14 @@ import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** What the Sync page shows of the folder: `idle` / `syncing` / `error` / `absent`, and a percentage while syncing. */
+/** What the Sync page shows of the folder: `idle` / `scanning` / `syncing` / `error` / `absent`, and a percentage while syncing. */
 data class FolderState(val state: String, val percent: Int?)
+
+/** Counters of one device at [t] (ms), the base of a transfer rate. */
+data class RateSample(val t: Long, val down: Long, val up: Long)
+
+/** Bytes per second received ([down]) and sent ([up]), and the sample to keep (`null` = not connected). */
+data class Rate(val down: Long, val up: Long, val sample: RateSample?)
 
 /**
  * THE RULES OF THE EMBEDDED SYNCTHING, mirror of
@@ -313,7 +319,31 @@ object ShareRules {
         return if (ms > 946_684_800_000L) ms else null // 2000-01-01
     }
 
-    /** `GET /rest/db/status` to what the page shows; `null` = the folder is not configured. Scanning counts as idle. */
+    /** Below this gap two samples are too close for a rate to mean anything. */
+    const val RATE_MIN_GAP_MS = 1000L
+
+    /** Mirror of `calculerDebit`: bytes per second since [prev]; a gap under a second keeps the older sample and [last] rates. */
+    fun rate(prev: RateSample?, conn: JSONObject?, now: Long, last: Rate = Rate(0, 0, null)): Rate {
+        if (conn == null || !conn.optBoolean("connected")) return Rate(0, 0, null)
+        val down = conn.optLong("inBytesTotal", 0).coerceAtLeast(0)
+        val up = conn.optLong("outBytesTotal", 0).coerceAtLeast(0)
+        val fresh = RateSample(now, down, up)
+        if (prev == null) return Rate(0, 0, fresh)
+        val dt = now - prev.t
+        if (dt < 0) return Rate(0, 0, fresh)
+        if (dt < RATE_MIN_GAP_MS) return Rate(last.down, last.up, prev)
+        if (down < prev.down || up < prev.up) return Rate(0, 0, fresh)
+        return Rate(Math.round((down - prev.down) * 1000.0 / dt), Math.round((up - prev.up) * 1000.0 / dt), fresh)
+    }
+
+    /** Mirror of `typeConnexion`: `relais` / `lan` / `direct`, `null` when not connected. */
+    fun connectionType(conn: JSONObject?): String? {
+        if (conn == null || !conn.optBoolean("connected")) return null
+        if (conn.optString("type").lowercase().contains("relay")) return "relais"
+        return if (conn.optBoolean("isLocal")) "lan" else "direct"
+    }
+
+    /** `GET /rest/db/status` to what the page shows; `null` = the folder is not configured. Scanning is its own state (2026-10-07). */
     fun folderState(s: JSONObject?): FolderState {
         if (s == null) return FolderState("absent", null)
         return when (s.optString("state")) {
@@ -323,6 +353,7 @@ object ShareRules {
                 if (total <= 0) FolderState("syncing", null)
                 else FolderState("syncing", ((s.optLong("inSyncBytes", 0).coerceIn(0, total) * 100) / total).toInt())
             }
+            "scanning", "scan-waiting", "cleaning", "clean-waiting" -> FolderState("scanning", null)
             else -> FolderState("idle", null)
         }
     }
