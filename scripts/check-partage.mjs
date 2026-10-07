@@ -258,3 +258,49 @@ await withSrcModule("apps/windows/electron/process.ts", ({ citerPs }) => {
 	}
 	r.done();
 });
+
+/* ── METERED CONNECTION (2026-10-07, `connexion-limitee.ts`) ──
+   The probe that decides whether updates and Moodle wait for a click. The
+   script is a constant, the answer is cached, and ANY failure means "not
+   metered" (never block updates for good on a machine where the probe cannot
+   run). */
+await withSrcModule("apps/windows/electron/connexion-limitee.ts", async ({ lireCout, creerSonde, SCRIPT_COUT, DUREE_CACHE_MS, executerPowerShell }) => {
+	const r = makeReporter("Connexion limitée — lecture, cache, échec = non limitée");
+	r.check("Unrestricted seul : non limitée", lireCout("Unrestricted False False False\r\n"), false);
+	r.check("Fixed : limitée", lireCout("Fixed False False False"), true);
+	r.check("Variable (case « connexion limitée » de Windows) : limitée", lireCout("Variable False False False"), true);
+	r.check("Unrestricted mais en itinérance : limitée", lireCout("Unrestricted True False False"), true);
+	r.check("Unrestricted mais forfait dépassé : limitée", lireCout("Unrestricted False True False"), true);
+	r.check("Unrestricted mais forfait bientôt atteint : limitée", lireCout("Unrestricted False False True"), true);
+	r.check("aucun profil : non limitée", lireCout("none"), false);
+	r.check("sortie illisible, vide ou non texte : non limitée", [lireCout("blah"), lireCout(""), lireCout(null), lireCout(42), lireCout("Fixed")], [false, false, false, false, false]);
+	r.check("le script est constant : pas de variable d'environnement, pas d'interpolation de valeur extérieure", /\$env:|\$\{/.test(SCRIPT_COUT), false);
+
+	let t = 1000, appels = 0, sortie = "Fixed False False False";
+	const sonde = creerSonde({ executer: async () => { appels++; return sortie; }, maintenant: () => t });
+	const [a, b] = await Promise.all([sonde.limitee(), sonde.limitee()]);
+	r.check("deux demandes simultanées partagent UN lancement", [a, b, appels], [true, true, 1]);
+	await sonde.limitee();
+	r.check("dans les cinq minutes : réponse en cache, aucun lancement", appels, 1);
+	sortie = "Unrestricted False False False"; t += DUREE_CACHE_MS + 1;
+	r.check("cache expiré : nouvelle mesure", [await sonde.limitee(), appels], [false, 2]);
+	sortie = "Fixed False False False";
+	sonde.invalider();
+	r.check("invalider() (reprise de veille) force une nouvelle mesure", [await sonde.limitee(), appels], [true, 3]);
+	const casse = creerSonde({ executer: async () => { throw new Error("boom"); } });
+	r.check("exécuteur qui échoue : non limitée, sans rejet", await casse.limitee(), false);
+	const nul = creerSonde({ executer: async () => null });
+	r.check("exécuteur sans sortie (pas Windows, délai) : non limitée", await nul.limitee(), false);
+	const forcee = creerSonde({ executer: async () => "Unrestricted False False False", forcer: () => true });
+	r.check("forçage de développement honoré, sans cache", await forcee.limitee(), true);
+
+	/* The REAL script on Windows: a line we can read (a machine with no
+	   connection prints `none`, which is also accepted). */
+	if (process.platform === "win32") {
+		const brut = await executerPowerShell();
+		r.check("vrai PowerShell : sortie lisible (coût réseau ou « none »)", /^(none|(Unrestricted|Fixed|Variable|Unknown) (True|False) (True|False) (True|False))\s*$/.test((brut ?? "").trim()), true);
+	} else {
+		r.check("hors Windows : aucun lancement, non limitée", await executerPowerShell(), null);
+	}
+	r.done();
+});

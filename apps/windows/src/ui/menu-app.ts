@@ -136,6 +136,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				for (const texte of [
 					t("app.update.btn.checking"), t("app.update.btn.upToDate"), t("app.update.btn.failed"), t("app.update.btn.devBuild"),
 					t("app.update.btn.downloading", { version: deps.version }), t("app.update.btn.ready", { version: deps.version }),
+					t("app.update.btn.waiting", { version: deps.version }),
 				]) ajouter(verifierTexte, "span", "nq-menu-verifier-mesure", texte).setAttribute("aria-hidden", "true");
 				verifier.addEventListener("click", () => {
 					void verifierMiseAJour(entree.checkLabel, verifier, verifierIcone, verifierLibelle);
@@ -274,6 +275,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		if (resultat.kind === "up-to-date") montrer(t("app.update.btn.upToDate"), "check", "resultat");
 		else if (resultat.kind === "downloading") montrer(t("app.update.btn.downloading", { version: resultat.version }), "download", "resultat");
 		else if (resultat.kind === "ready") montrer(t("app.update.btn.ready", { version: resultat.version }), "circle-arrow-up", "resultat");
+		else if (resultat.kind === "waiting") montrer(t("app.update.btn.waiting", { version: resultat.version }), "download", "resultat");
 		else if (resultat.kind === "dev-build") montrer(t("app.update.btn.devBuild"), "info", "resultat");
 		else {
 			// The full message is for a screen reader and the console, never a native tooltip.

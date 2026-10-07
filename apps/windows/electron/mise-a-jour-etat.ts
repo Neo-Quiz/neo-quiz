@@ -21,8 +21,9 @@
    vérifié, et un échec de re-vérification réseau n'y change rien.
 ══════════════════════════════════════════════════════════ */
 
-/* "disponible" and "autorisation" exist on the phone only (Android app): a version waits for the tap on
-   Install, or Android must first allow Neo Quiz to install apps. Electron never sends them. */
+/* "disponible": a version waits for the tap on Install (Android) or on Download (Windows, METERED
+   connection only: `limitee` is then true and nothing downloads until the click, see
+   `connexion-limitee.ts`). "autorisation" is Android only: it must first allow Neo Quiz to install apps. */
 export type PhaseMiseAJour = "inactif" | "verification" | "a-jour" | "disponible" | "autorisation" | "telechargement" | "prete" | "erreur";
 
 export interface EtatMiseAJour {
@@ -36,11 +37,15 @@ export interface EtatMiseAJour {
 	/** Phone only: the installed versionName, and the notes of the version on offer. */
 	actuelle?: string;
 	notes?: string;
+	/** Windows: the connection is metered, so the version waits for a click on Download. */
+	limitee?: boolean;
 }
 
 export type EvenementMiseAJour =
 	| { type: "checking-for-update" }
-	| { type: "update-available"; version: string }
+	| { type: "update-available"; version: string; limitee?: boolean }
+	/** The user clicked Download on a metered connection (or the connection became free). */
+	| { type: "download-started" }
 	| { type: "update-not-available" }
 	| { type: "download-progress"; percent: number; transferred?: number; total?: number }
 	| { type: "update-downloaded"; version: string }
@@ -53,7 +58,16 @@ export function transition(etat: EtatMiseAJour, ev: EvenementMiseAJour): EtatMis
 		case "checking-for-update":
 			return { phase: "verification" };
 		case "update-available":
+			/* A version already downloaded stays "ready": a re-check that finds it
+			   again must not demote it to "available" (metered) or to 0 %. */
+			if (etat.phase === "prete" && etat.version === ev.version) return etat;
+			/* A download already running for this version keeps its progress. */
+			if (etat.phase === "telechargement" && etat.version === ev.version) return etat;
+			if (ev.limitee) return { phase: "disponible", version: ev.version, limitee: true };
 			return { phase: "telechargement", version: ev.version, pourcent: 0, octetsRecus: null, octetsTotal: null };
+		case "download-started":
+			if (etat.phase !== "disponible" || !etat.version) return etat;
+			return { phase: "telechargement", version: etat.version, pourcent: 0, octetsRecus: null, octetsTotal: null };
 		case "download-progress":
 		{
 			/* A total that is missing, zero, negative or not finite is no size at
@@ -62,7 +76,8 @@ export function transition(etat: EtatMiseAJour, ev: EvenementMiseAJour): EtatMis
 			const total = typeof ev.total === "number" && Number.isFinite(ev.total) && ev.total > 0 ? ev.total : null;
 			const recu = total === null ? null
 				: Math.max(0, Math.min(total, Number.isFinite(ev.transferred) ? (ev.transferred as number) : 0));
-			return { ...etat, pourcent: Math.max(0, Math.min(100, Math.round(ev.percent))), octetsRecus: recu, octetsTotal: total };
+			const { limitee: _limitee, ...reste } = etat;
+			return { ...reste, phase: "telechargement", pourcent: Math.max(0, Math.min(100, Math.round(ev.percent))), octetsRecus: recu, octetsTotal: total };
 		}
 		case "update-downloaded":
 			return { phase: "prete", version: ev.version };

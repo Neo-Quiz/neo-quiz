@@ -50,6 +50,35 @@ await withSrcModule("apps/windows/electron/mise-a-jour-etat.ts", ({ ETAT_INITIAL
 	r.check("download-progress : un total connu mais des octets reçus absents → 0 reçu",
 		(e => [e.octetsRecus, e.octetsTotal])(transition(dl, { type: "download-progress", percent: 0, total: 80 })),
 		[0, 80]);
+	/* METERED CONNECTION (2026-10-07): the version waits for a click. */
+	r.check("update-available sur connexion limitée : disponible, drapeau limitee, aucun octet",
+		transition({ phase: "verification" }, { type: "update-available", version: "2.5.3", limitee: true }),
+		{ phase: "disponible", version: "2.5.3", limitee: true });
+	r.check("download-started : le clic sur Télécharger passe en téléchargement à 0 %",
+		transition({ phase: "disponible", version: "2.5.3", limitee: true }, { type: "download-started" }),
+		{ phase: "telechargement", version: "2.5.3", pourcent: 0, octetsRecus: null, octetsTotal: null });
+	r.check("download-started hors « disponible » : sans effet",
+		[transition({ phase: "prete", version: "1" }, { type: "download-started" }), transition({ phase: "inactif" }, { type: "download-started" })],
+		[{ phase: "prete", version: "1" }, { phase: "inactif" }]);
+	r.check("download-progress depuis « disponible » : devient téléchargement, sans drapeau limitee",
+		transition({ phase: "disponible", version: "2.5.3", limitee: true }, { type: "download-progress", percent: 3, transferred: 3, total: 100 }),
+		{ phase: "telechargement", version: "2.5.3", pourcent: 3, octetsRecus: 3, octetsTotal: 100 });
+	r.check("une version déjà prête retrouvée par une nouvelle vérification reste prête (limitée ou non)",
+		[
+			transition({ phase: "prete", version: "2.5.3" }, { type: "update-available", version: "2.5.3", limitee: true }),
+			transition({ phase: "prete", version: "2.5.3" }, { type: "update-available", version: "2.5.3" }),
+		],
+		[{ phase: "prete", version: "2.5.3" }, { phase: "prete", version: "2.5.3" }]);
+	r.check("une version plus récente que la prête repart (limitée : disponible)",
+		transition({ phase: "prete", version: "2.5.3" }, { type: "update-available", version: "2.5.4", limitee: true }),
+		{ phase: "disponible", version: "2.5.4", limitee: true });
+	r.check("un téléchargement en cours de la même version garde sa progression",
+		transition({ phase: "telechargement", version: "2.5.3", pourcent: 40, octetsRecus: 4, octetsTotal: 10 }, { type: "update-available", version: "2.5.3" }),
+		{ phase: "telechargement", version: "2.5.3", pourcent: 40, octetsRecus: 4, octetsTotal: 10 });
+	r.check("error depuis « disponible » : erreur, drapeau oublié",
+		transition({ phase: "disponible", version: "2.5.3", limitee: true }, { type: "error", message: "x" }),
+		{ phase: "erreur", message: "x" });
+
 	r.check("update-downloaded : prête, sans pourcentage",
 		transition({ phase: "telechargement", version: "2.5.2", pourcent: 99 }, { type: "update-downloaded", version: "2.5.2" }),
 		{ phase: "prete", version: "2.5.2" });

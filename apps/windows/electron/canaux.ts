@@ -1578,6 +1578,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.miseAJourEtatLire, () => deps.miseAJour.etat());
 	ipcMain.handle(CANAUX.miseAJourVerifier, () => deps.miseAJour.verifier());
 	ipcMain.handle(CANAUX.miseAJourInstaller, () => {
+		/* A version waiting on a metered connection: the click is Download. */
+		if (deps.miseAJour.etat().phase === "disponible") { void deps.miseAJour.telecharger(); return; }
 		if (deps.miseAJour.armerInstallation()) deps.fermerPourInstaller();
 	});
 

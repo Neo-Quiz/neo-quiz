@@ -192,6 +192,8 @@ export interface EtatMoodle {
 	/** What the last download run did, or null. `parCours`: new + updated files per module code. */
 	lastSummary: ResumeMoodle | null;
 	syncing: boolean;
+	/** The automatic downloads are paused: the connection is metered (manual ones still work). */
+	pausedMetered: boolean;
 	/** A login was started in the browser and is awaited (10 minutes at most). */
 	loginPending: boolean;
 	progress: { done: number; total: number } | null;

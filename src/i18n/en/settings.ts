@@ -156,6 +156,7 @@ export const EN_SETTINGS = {
 	"settings.moodle.newFiles": "{n} new files in {code}",
 	"settings.moodle.newFilesMany": "{n} new files in {count} courses",
 	"settings.moodle.neverChecked": "Not checked yet",
+	"settings.moodle.pausedMetered": "Paused: metered connection",
 	"settings.moodle.checking": "Checking… {done} of {total}",
 	"settings.moodle.checkingStart": "Checking…",
 	"settings.moodle.today": "Today",

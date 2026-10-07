@@ -59,6 +59,9 @@ export const EN_APP = {
 	"app.update.size": "{done} MB / {total} MB",
 	"app.update.install": "Update",
 	"app.update.installing": "Installing…",
+	/* Metered connection: the version waits for a click instead of downloading. */
+	"app.update.download": "Download",
+	"app.update.meteredAvailable": "Update available ({version}) - metered connection",
 	/* Android app: the updater (banner and the Settings row). */
 	"app.update.android.available": "Update available ({version})",
 	"app.update.android.install": "Install",
@@ -79,6 +82,7 @@ export const EN_APP = {
 	"app.update.btn.upToDate": "Up to date",
 	"app.update.btn.downloading": "v{version} downloading",
 	"app.update.btn.ready": "v{version} ready",
+	"app.update.btn.waiting": "v{version} on hold",
 	"app.update.btn.failed": "Check failed",
 	"app.update.btn.devBuild": "Dev build",
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée

@@ -23,7 +23,7 @@ import { MoodleError, TokenError, masquer } from "./erreurs";
 import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { extensionRefusee } from "../ressources";
-import { allFiles, depositState, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
+import { allFiles, decisionAuto, depositState, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -52,6 +52,8 @@ export interface DepsMoodle {
 	    has already bounded the path and refused executable types). */
 	ouvrirChemin(abs: string): Promise<boolean>;
 	envoyer(etat: EtatMoodle): void;
+	/** True when the connection is metered (`connexion-limitee.ts`); absent = never. Only AUTOMATIC runs ask. */
+	limitee?(): Promise<boolean>;
 	maintenant?(): number;
 	/** Runs `fn` every `ms` until the returned function is called. Tests inject a fake clock. */
 	planifier?(fn: () => void, ms: number): () => void;
@@ -146,6 +148,8 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	let erreur: string | null = null;
 	let enCours: Promise<ResumeSyncMoodle> | null = null;
 	let progress: { done: number; total: number } | null = null;
+	/** The last automatic run was skipped because the connection is metered. */
+	let pauseLimitee = false;
 	let dernierOuvert = 0;
 	let dernierSync: { at: number; res: ResumeSyncMoodle } | null = null;
 	let cache: { at: number; liste: DevoirBrut[] } | null = null;
@@ -256,7 +260,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		else if (err && state !== "connected") state = "error";
 		return {
 			site, connected: state === "connected", fullname: lie ? j.fullname : "", state, error: state === "error" ? err : null,
-			lastSync: p.lastSync, auto, lastCheck: p.lastSync, lastSummary: p.summary,
+			lastSync: p.lastSync, auto, lastCheck: p.lastSync, lastSummary: p.summary, pausedMetered: auto && pauseLimitee,
 			syncing: enCours !== null, loginPending: !!attente && maintenant() <= attente.expire, progress,
 		};
 	}
@@ -327,6 +331,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	async function deconnecter(): Promise<void> {
 		attente = null;
+		pauseLimitee = false;
 		jeton = null;
 		erreur = null;
 		cache = null;
@@ -718,9 +723,17 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return basculer("devoirsIgnores", idOuErreur(cmid), boolOuErreur(on), "refuser");
 	}
 
-	/** Never when `auto` is off, nor when not connected. */
+	/** Never when `auto` is off, nor when not connected, nor on a metered connection (recorded: `pausedMetered`). */
 	async function verifierAuto(): Promise<void> {
-		if (!(await reglage()).auto || !(await session())) return;
+		const { auto } = await reglage();
+		if (!(await session())) return;
+		/* A failing probe means "not metered" (see `connexion-limitee.ts`). */
+		const limitee = auto && deps.limitee ? await deps.limitee().catch(() => false) : false;
+		const regle = decisionAuto(auto, limitee);
+		const avant = pauseLimitee;
+		pauseLimitee = regle === "metered"; // `off` clears it too
+		if (pauseLimitee !== avant) await pousser();
+		if (regle !== "run") return;
 		await synchroniser();
 	}
 	async function demarrerAuto(): Promise<void> {

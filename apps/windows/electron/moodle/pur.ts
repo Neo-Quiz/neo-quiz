@@ -283,3 +283,12 @@ export function jetonDansArguments(argv: readonly string[]): string | null {
 	}
 	return null;
 }
+
+/** What an AUTOMATIC run (app start, hourly, right after sign-in) does:
+    `off` when the `auto` setting is off, `metered` when Windows says the
+    connection is metered (the run is skipped and recorded: "paused, metered
+    connection"), else `run`. A manual download never asks this. PURE. */
+export function decisionAuto(auto: boolean, limitee: boolean): "run" | "off" | "metered" {
+	if (!auto) return "off";
+	return limitee ? "metered" : "run";
+}

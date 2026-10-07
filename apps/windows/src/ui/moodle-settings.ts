@@ -194,6 +194,8 @@ export function mountMoodleSettings(page: HTMLElement, fermer: () => void): () =
 		if (e.syncing) {
 			return e.progress ? t("settings.moodle.checking", { done: e.progress.done, total: e.progress.total }) : t("settings.moodle.checkingStart");
 		}
+		/* Automatic downloads skipped on a metered connection (manual ones still work). */
+		if (e.pausedMetered) return t("settings.moodle.pausedMetered");
 		if (!e.lastCheck) return t("settings.moodle.neverChecked");
 		const par = e.lastSummary?.parCours ?? {};
 		const codes = Object.keys(par).filter(c => par[c] > 0);

@@ -54,6 +54,7 @@ export type ResultatVerification =
 	| { kind: "up-to-date" }
 	| { kind: "downloading"; version: string }
 	| { kind: "ready"; version: string }
+	| { kind: "waiting"; version: string }
 	| { kind: "failed"; message: string }
 	| { kind: "dev-build" };
 
@@ -71,6 +72,7 @@ export async function verifierMaintenant(): Promise<ResultatVerification> {
 		const version = e.version ?? "";
 		if (e.phase === "telechargement") return { kind: "downloading", version };
 		if (e.phase === "prete") return { kind: "ready", version };
+		if (e.phase === "disponible") return { kind: "waiting", version };
 		if (e.phase === "erreur") return { kind: "failed", message: e.message ?? "" };
 		return { kind: "up-to-date" };
 	};
@@ -137,6 +139,9 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 		libelle = ajouter(bouton, "span", "qbd-nav-label nq-maj-libelle", t("app.update.install"));
 		bouton.addEventListener("click", () => {
 			if (!bouton || bouton.disabled || bouton.classList.contains("is-telechargement")) return;
+			/* Metered connection: the click is Download, the state flips to
+			   "telechargement" by itself. */
+			if (bouton.classList.contains("is-disponible")) { void pont().miseAJour.installer(); return; }
 			/* L'appui se VOIT (Ahmed, 2026-09-19) : la pilule s'enfonce, le
 			   chiffre cède la place à un spinner et le libellé dit ce qui se
 			   passe, jusqu'à ce que le principal ferme la fenêtre pour
@@ -159,7 +164,9 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 	};
 
 	const desabonner = abonner(e => {
-		const visible = e.phase === "telechargement" || e.phase === "prete";
+		/* "disponible" shows here only with `limitee` (Windows, metered connection). */
+		const attend = e.phase === "disponible" && e.limitee === true;
+		const visible = e.phase === "telechargement" || e.phase === "prete" || attend;
 		if (!visible) { retirer(); phasePrecedente = e.phase; return; }
 		if (!bouton) creer();
 		if (!bouton || !pilule || !compteur || !libelle) return;
@@ -167,6 +174,8 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 		const pourcent = typeof e.pourcent === "number" && e.pourcent >= 0 ? Math.min(100, Math.round(e.pourcent)) : null;
 		bouton.classList.toggle("is-telechargement", telecharge);
 		bouton.classList.toggle("is-prete", !telecharge);
+		bouton.classList.toggle("is-disponible", attend);
+		bouton.title = attend ? t("app.update.meteredAvailable", { version: e.version ?? "" }) : "";
 		pilule.classList.toggle("is-tourne", telecharge && pourcent === null);
 		/* Le dernier chiffre atteint reste en place, à l'opacité zéro, le
 		   temps du fondu : un texte vidé au moment où il devrait s'effacer ne
@@ -181,9 +190,9 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 		/* The label carries the size only while downloading; it opens on
 		   hover/focus (shell.css). Without a known size it stays the install label
 		   and stays closed. */
-		libelle.textContent = detail ?? t("app.update.install");
+		libelle.textContent = attend ? t("app.update.download") : detail ?? t("app.update.install");
 		bouton.classList.toggle("has-detail", detail !== null);
-		bouton.setAttribute("aria-label", telecharge
+		bouton.setAttribute("aria-label", attend ? t("app.update.meteredAvailable", { version: e.version ?? "" }) : telecharge
 			? t("app.update.downloading") + (pourcent === null ? "" : " " + pourcent + " %") + (detail ? ", " + detail : "")
 			: t("app.update.install") + (e.version ? " " + e.version : ""));
 		/* S'ouvrir une fois, à l'instant où la descente s'achève — pas au

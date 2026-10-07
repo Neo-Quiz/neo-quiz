@@ -19,6 +19,15 @@
    mise à jour. Sans clic, `autoInstallOnAppQuit` installe à la prochaine
    fermeture (sans relance).
 
+   CONNEXION LIMITÉE (2026-10-07) : `autoDownload` est COUPÉ ; c'est ce module
+   qui décide, à chaque `update-available`, selon `deps.limitee()` (voir
+   `connexion-limitee.ts` : en cas de doute, NON limitée). Libre : on
+   télécharge aussitôt, comme avant. Limitée : phase « disponible », rien ne
+   descend avant le clic sur « Télécharger » (le canal `miseAJourInstaller`,
+   qui sur Windows ne servait qu'à l'état « prête »). Tant qu'une version
+   attend, on remesure toutes les cinq minutes (et au focus) : si la
+   connexion redevient libre, le téléchargement part tout seul.
+
    EN DÉVELOPPEMENT (`app.isPackaged === false`) : rien, dit une fois.
    electron-updater n'a pas d'`app-update.yml` à lire hors d'un paquet.
 ══════════════════════════════════════════════════════════ */
@@ -31,6 +40,8 @@ import type { EtatMiseAJour, EvenementMiseAJour } from "./mise-a-jour-etat";
 
 const GARDE_FOCUS_MS = 15 * 60 * 1000;
 const PERIODE_MS = 4 * 60 * 60 * 1000;
+/** While a version waits on a metered connection: how often to ask again. */
+const REMESURE_MS = 5 * 60 * 1000;
 
 export interface MiseAJour {
 	etat(): EtatMiseAJour;
@@ -50,17 +61,26 @@ export interface MiseAJour {
 	tailles(): { paquet: number; installe: number | null };
 	/** `quitAndInstall` : ne revient pas si tout va bien. */
 	installerArmee(): void;
+	/** Starts the download of a version that waits on a metered connection (the click on Download). */
+	telecharger(): Promise<boolean>;
 	surFocus(): void;
 	arreter(): void;
 }
 
 export function creerMiseAJour(deps: {
 	envoyer(etat: EtatMiseAJour): void;
+	/** True when Windows says the connection is metered; false when unknown (never rejects). */
+	limitee(): Promise<boolean>;
 }): MiseAJour {
 	let etat: EtatMiseAJour = ETAT_INITIAL;
 	let armee = false;
 	let derniereVerification = 0;
 	let minuteur: NodeJS.Timeout | null = null;
+	let remesure: NodeJS.Timeout | null = null;
+	/** The version whose download this module already started: never twice. */
+	let versionDemandee: string | null = null;
+	/** The decision (metered or not) of the last `update-available`: a manual check waits for it, so its answer reads the settled state. */
+	let decision: Promise<void> = Promise.resolve();
 	let tailles: { paquet: number; installe: number | null } = { paquet: 0, installe: null };
 
 	const appliquer = (ev: EvenementMiseAJour): void => {
@@ -68,7 +88,7 @@ export function creerMiseAJour(deps: {
 		deps.envoyer(etat);
 	};
 
-	autoUpdater.autoDownload = true;
+	autoUpdater.autoDownload = false;
 	autoUpdater.autoInstallOnAppQuit = true;
 	autoUpdater.allowPrerelease = false;
 	autoUpdater.logger = {
@@ -78,7 +98,7 @@ export function creerMiseAJour(deps: {
 		debug: () => {},
 	};
 	autoUpdater.on("checking-for-update", () => appliquer({ type: "checking-for-update" }));
-	autoUpdater.on("update-available", info => appliquer({ type: "update-available", version: info.version }));
+	autoUpdater.on("update-available", info => { decision = surDisponible(info.version).catch(e => console.warn(LOG_PREFIX, "mise à jour:", e)); });
 	autoUpdater.on("update-not-available", () => appliquer({ type: "update-not-available" }));
 	autoUpdater.on("download-progress", p => appliquer({ type: "download-progress", percent: p.percent, transferred: p.transferred, total: p.total }));
 	autoUpdater.on("update-downloaded", info => {
@@ -100,6 +120,50 @@ export function creerMiseAJour(deps: {
 	// penser.
 	autoUpdater.on("error", error => appliquer({ type: "error", message: error.message }));
 
+	function lancerTelechargement(version: string): void {
+		if (versionDemandee === version) return;
+		versionDemandee = version;
+		/* The `error` event already turns a failure into a state; the catch only
+		   keeps the rejected promise from surfacing as "unhandled". */
+		autoUpdater.downloadUpdate().catch(e => {
+			versionDemandee = null;
+			console.warn(LOG_PREFIX, "mise à jour: téléchargement impossible:", e);
+		});
+	}
+
+	function arreterRemesure(): void {
+		if (remesure) clearInterval(remesure);
+		remesure = null;
+	}
+
+	/** While a version waits: ask again, and download as soon as the link is free. */
+	async function remesurer(): Promise<void> {
+		if (etat.phase !== "disponible") { arreterRemesure(); return; }
+		if (await deps.limitee()) return;
+		await telecharger();
+	}
+
+	async function surDisponible(version: string): Promise<void> {
+		const limitee = await deps.limitee();
+		appliquer({ type: "update-available", version, limitee });
+		if (etat.phase === "disponible") {
+			if (!remesure) remesure = setInterval(() => { void remesurer(); }, REMESURE_MS);
+		} else {
+			arreterRemesure();
+			/* "telechargement" only: a version already "prete" is not fetched again. */
+			if (etat.phase === "telechargement") lancerTelechargement(version);
+		}
+	}
+
+	async function telecharger(): Promise<boolean> {
+		if (etat.phase !== "disponible" || !etat.version) return false;
+		arreterRemesure();
+		const version = etat.version;
+		appliquer({ type: "download-started" });
+		lancerTelechargement(version);
+		return true;
+	}
+
 	async function verifier(): Promise<boolean> {
 		if (!app.isPackaged) {
 			console.log(LOG_PREFIX, "mise à jour: ignorée hors d'un paquet (app.isPackaged faux)");
@@ -108,6 +172,7 @@ export function creerMiseAJour(deps: {
 		derniereVerification = Date.now();
 		try {
 			await autoUpdater.checkForUpdates();
+			await decision;
 		} catch (e) {
 			// Déjà traduit en état par l'événement `error` ; ici seulement pour
 			// qu'une promesse rejetée ne remonte pas en « unhandled ».
@@ -138,13 +203,16 @@ export function creerMiseAJour(deps: {
 		installerArmee() {
 			autoUpdater.quitAndInstall(true, true);
 		},
+		telecharger,
 		surFocus() {
+			if (etat.phase === "disponible") void remesurer();
 			if (Date.now() - derniereVerification < GARDE_FOCUS_MS) return;
 			void verifier();
 		},
 		arreter() {
 			if (minuteur) clearInterval(minuteur);
 			minuteur = null;
+			arreterRemesure();
 		},
 	};
 }

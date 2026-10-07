@@ -156,6 +156,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.newFiles": "{n} nouveaux fichiers dans {code}",
 	"settings.moodle.newFilesMany": "{n} nouveaux fichiers dans {count} cours",
 	"settings.moodle.neverChecked": "Pas encore vérifié",
+	"settings.moodle.pausedMetered": "En pause : connexion limitée",
 	"settings.moodle.checking": "Vérification… {done} sur {total}",
 	"settings.moodle.checkingStart": "Vérification…",
 	"settings.moodle.today": "Aujourd'hui",

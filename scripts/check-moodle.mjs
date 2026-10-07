@@ -430,6 +430,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		assert.equal(pur.launchUrl(ROOT_SITE, "p1", "neo-quiz"), `${ROOT_SITE}/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=p1&urlscheme=neo-quiz`);
 		assert.equal(pur.jetonDansArguments(["x", "neo-quiz://token=QUJD"]), "QUJD");
 		assert.equal(pur.jetonDansArguments(["neo-quiz://pair?device=X"]), null);
+		// the automatic-run rule (metered connection)
+		assert.deepEqual([pur.decisionAuto(true, false), pur.decisionAuto(true, true), pur.decisionAuto(false, false), pur.decisionAuto(false, true)], ["run", "metered", "off", "off"]);
 	});
 	await test("DISCRIMINANCE: with the passport comparison cut out, a wrong passport IS accepted", async () => {
 		const { mod, dir } = await mutant(`${MOODLE}pur.ts`, "parts[0] !== expected", "false");
@@ -710,7 +712,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		m.calls = [];
 		return { m, other };
 	}
-	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service, limites = false, budget }) {
+	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service, limites = false, budget, limitee }) {
 		const opened = [], pushes = [], chemins = [];
 		// The tests that exercise the automatic download say `auto: true`; every other case runs with it off.
 		if (!autoParDefaut && store.moodle && store.moodle.auto === undefined) store.moodle.auto = false;
@@ -719,7 +721,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		};
 		const svc = impl.creerMoodle({
 			racine: () => base, garde, planifier, ouvrirChemin: async p => { chemins.push(p); return true; }, reglages: () => reglages, dossierDonnees: path.join(base, "..data-" + crypto.randomBytes(3).toString("hex")),
-			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T, essaiSansLimite: !limites, budget,
+			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T, essaiSansLimite: !limites, budget, limitee,
 		});
 		return { svc, opened, pushes, store, chemins };
 	}
@@ -861,8 +863,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.ok(all.length > 200);
 		} finally { stop(m.s); stop(other.s); }
 	});
-	await test("DISCRIMINANCE: without the `auto` check the sign-in downloads even when it is off; without the origin check another host's course URL is accepted", async () => {
-		const mu = await mutant(`${MOODLE}service.ts`, "if (!(await reglage()).auto || !(await session())) return;", "if (!(await session())) return;");
+	await test("DISCRIMINANCE: without the automatic-run rule (`auto` off, metered connection) the sign-in downloads anyway; without the origin check another host's course URL is accepted", async () => {
+		const mu = await mutant(`${MOODLE}service.ts`, 'if (regle !== "run") return;', "");
 		const { m, other } = await fakeMoodle();
 		const base = tmpdir();
 		const t = newService({ root: m.root, base, store: { moodle: { site: m.root, auto: false } }, impl: mu.mod });
@@ -1207,7 +1209,43 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 	/* ─────────── schools: compatibility and the bundled list ─────────── */
 	{
 		const cfg = (o = {}) => [{ error: false, data: { sitename: "Univ", enablewebservices: 1, enablemobilewebservice: 1, typeoflogin: 2, launchurl: "https://x/admin/tool/mobile/launch.php", ...o } }];
-		await test("compat decision from public-config samples, each reason", async () => {
+		await test("metered connection: automatic runs (sign-in, start, hourly) are skipped and recorded; manual ones work; unmetered resumes", async () => {
+		const wait = async (cond) => { for (let i = 0; i < 150 && !cond(); i++) await new Promise(r => setTimeout(r, 20)); };
+		let clock = 1_800_000_000_000;
+		let metered = true;
+		const timers = [];
+		const planifier = (fn, ms) => { timers.push(fn); return () => {}; };
+		const { m, other } = await fakeMoodle();
+		const base = tmpdir();
+		const t = newService({ root: m.root, base, store: { moodle: { site: m.root, auto: true } }, now: () => clock, planifier, limitee: async () => metered });
+		try {
+			await t.svc.connecter();
+			await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+			await t.svc.demarrerAuto();
+			timers.forEach(fn => fn());
+			await new Promise(r => setTimeout(r, 300));
+			const dest = path.join(base, "XTI302 - Admin système");
+			assert.equal(fs.existsSync(dest), false, "metered: nothing downloaded automatically");
+			assert.equal(m.calls.some(f => /contents/.test(f)), false, "metered: Moodle is not asked for contents");
+			assert.equal((await t.svc.etat()).pausedMetered, true, "the pause is recorded in the state");
+			assert.equal(t.pushes.at(-1).pausedMetered, true, "and pushed to the window");
+			// a manual request still works after the click
+			clock += 11000;
+			assert.equal((await t.svc.synchroniser()).nouveaux, 1, "manual sync works while metered");
+			// the link is free again: the next tick resumes and clears the record
+			fs.rmSync(dest, { recursive: true });
+			metered = false;
+			clock += 3600 * 1000;
+			timers.forEach(fn => fn());
+			await wait(() => fs.existsSync(dest));
+			assert.equal(fs.existsSync(dest), true, "unmetered: the automatic download resumes");
+			assert.equal((await t.svc.etat()).pausedMetered, false);
+			// a failing probe means "not metered"
+			const f = newService({ root: m.root, base: tmpdir(), store: { moodle: { site: m.root, auto: true } }, limitee: async () => { throw new Error("probe"); } });
+			assert.equal((await f.svc.etat()).pausedMetered, false);
+		} finally { stop(m.s); stop(other.s); }
+	});
+	await test("compat decision from public-config samples, each reason", async () => {
 			assert.deepEqual(compat.decider(cfg()), { compatible: true, sitename: "Univ" });
 			assert.equal(compat.decider(cfg({ typeoflogin: 3 })).compatible, true);
 			assert.equal(compat.decider(cfg({ enablemobilewebservice: 0 })).reason, "mobile-disabled");

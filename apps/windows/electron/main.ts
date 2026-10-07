@@ -24,7 +24,7 @@
    RÉPOND par un `invoke`.
 ══════════════════════════════════════════════════════════ */
 
-import { BrowserWindow, Menu, app, dialog, net, protocol, safeStorage, shell } from "electron";
+import { BrowserWindow, Menu, app, dialog, net, powerMonitor, protocol, safeStorage, shell } from "electron";
 import * as fs from "node:fs/promises";
 // Le SEUL usage synchrone du disque dans ce fichier — voir `poserLocaleChromium`.
 import { readFileSync } from "node:fs";
@@ -54,6 +54,7 @@ import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
 import { lienDansArguments, nomSur } from "./syncthing-regles";
 import { creerMoodle } from "./moodle/service";
+import { creerSonde, executerPowerShell } from "./connexion-limitee";
 import type { ServiceMoodle } from "./moodle/service";
 import { jetonDansArguments } from "./moodle/pur";
 import { origineSite } from "./moodle/garde";
@@ -136,6 +137,19 @@ let reglages: Reglages | null = null;
     au démarrage — le canal `systeme.dossierDefaut` le sert tel quel. */
 let dossierDefaut = "";
 let miseAJour: MiseAJour | null = null;
+
+/* Metered connection (`connexion-limitee.ts`): one probe for the updater and
+   Moodle, cached five minutes. DEV ONLY override: `NEO_QUIZ_FORCE_METERED=1`
+   (or `0`) forces the answer, and only when `!app.isPackaged` — a packaged
+   build ignores the variable, so it cannot ship enabled. */
+const sondeLimitee = creerSonde({
+	executer: executerPowerShell,
+	forcer: () => {
+		if (app.isPackaged) return null;
+		const v = process.env.NEO_QUIZ_FORCE_METERED;
+		return v === "1" ? true : v === "0" ? false : null;
+	},
+});
 /** The embedded Syncthing (Windows only), stopped with the application. */
 let sync: GestionSync | null = null;
 let fermetureArmee = false;
@@ -756,6 +770,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		// ou `vaultsObsidian` devient aussitôt servable, sans second registre.
 		servirRessources(perimetre);
 		miseAJour = creerMiseAJour({
+			limitee: () => sondeLimitee.limitee(),
 			envoyer: etat => {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);
 			},
@@ -827,6 +842,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			});
 		}
 		moodle = creerMoodle({
+			limitee: () => sondeLimitee.limitee(),
 			racine: () => dossierDefaut,
 			garde: perimetre,
 			reglages: reglagesOuErreur,
@@ -944,6 +960,8 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		// retarder. Sans argument — la mise à jour automatique ne se règle
 		// plus, elle est le seul mode (voir `mise-a-jour-etat.ts`).
 		miseAJour.initialiser();
+		/* After a sleep the network may be another one: measure again. */
+		powerMonitor.on("resume", () => sondeLimitee.invalider());
 		/* After the window, like the other background work: a slow start of
 		   Syncthing must never delay it. A failure is logged, never fatal. */
 		void sync?.demarrerSiActif().catch(e => console.warn(LOG_PREFIX, "sync unavailable:", e));

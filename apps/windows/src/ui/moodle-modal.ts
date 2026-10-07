@@ -541,6 +541,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const verifie = visibles().filter(co => analyses.get(co.id)?.state === "busy").length;
 		if (!verifie && note) dire(note);
 		else if (verifie) dire(t(verifie > 1 ? "settings.moodle.wCheckingMany" : "settings.moodle.wCheckingOne", { n: verifie }), true);
+		else if (etat?.pausedMetered) dire(t("settings.moodle.pausedMetered"));
 		else dire(t("settings.moodle.wCount", { n: visibles().length }));
 		const b = boutonTout;
 		b.replaceChildren();
@@ -752,6 +753,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		}
 		statut = ajouter(pied, "div", "nqm-status");
 		statut.hidden = true;
+		if (etat?.pausedMetered) dire(t("settings.moodle.pausedMetered"));
 		boutonCours = bouton(pied, "nqm-primary nqm-all", "");
 		boutonCours.addEventListener("click", () => { void telechargerCours(co); });
 		pieCours(mod);
