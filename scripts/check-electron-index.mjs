@@ -347,9 +347,13 @@ await withSrcModule(["apps/windows/electron/index-fichiers.ts", "apps/windows/el
 			const evs = [];
 			const arreter = index.surveiller(ev => evs.push(ev), 50);
 			try {
-				await attendre(300); // parcours initial : "Cours" entre au catalogue
+				// Initial scan: generous wait (a loaded Linux CI runner can take
+				// longer than 300 ms to arm inotify, so the rename is never seen).
+				await attendre(1500);
 				await rename(join(racine, "Cours"), join(racine, "Cours B2"));
-				await attendre(500);
+				// Wait on the event itself, not a fixed sleep.
+				for (let i = 0; i < 100 && !evs.some(e => e.kind === "renameDir"); i++) await attendre(100);
+				await attendre(400); // a second (wrong) renameDir would show up here
 				const renames = evs.filter(e => e.kind === "renameDir");
 				r.check("renommer un dossier émet UN renameDir avec ses deux chemins du contrat",
 					renames, [{ kind: "renameDir", from: "0/Cours", to: "0/Cours B2" }]);
