@@ -10,7 +10,7 @@ import type { Stats } from "node:fs";
 import * as path from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type {
-	CoursMoodle, DevoirMoodle, EtatMoodle, FichierMoodle, ResultatRechercheMoodle, ResumeMoodle, ResumeSyncMoodle,
+	ActiviteMoodle, CoursMoodle, DevoirMoodle, ModuleMoodle, EtatMoodle, FichierMoodle, ResultatRechercheMoodle, ResumeMoodle, ResumeSyncMoodle,
 } from "../pont";
 import { CLE_REGLAGES_MOODLE } from "../pont";
 import { hoteAutorise } from "../reseau";
@@ -23,7 +23,7 @@ import { MoodleError, TokenError, masquer } from "./erreurs";
 import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { extensionRefusee } from "../ressources";
-import { allFiles, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
+import { allFiles, depositState, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -78,6 +78,7 @@ export interface ServiceMoodle {
 	ajouter(id: unknown): Promise<number[]>;
 	retirer(id: unknown): Promise<number[]>;
 	fichiers(courseId: unknown): Promise<FichierMoodle[]>;
+	module(courseId: unknown): Promise<ModuleMoodle>;
 	telechargerCours(courseId: unknown): Promise<ResumeSyncMoodle>;
 	telechargerFichier(courseId: unknown, nom: unknown): Promise<ResumeSyncMoodle>;
 	ouvrirDossier(courseId: unknown): Promise<boolean>;
@@ -382,6 +383,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return {
 			id: c.course.id, name: c.course.name, code: c.course.code, folder: f ? f.name : null, folderExists: f ? f.exists : false,
 			favori: c.favori, exclu: c.exclu, enCours: c.enCours, extra: c.extra,
+			annee: c.course.yearKey, cohorte: c.course.cohort,
 		};
 	}
 	async function coursConnu(client: Client, userid: number, id: number): Promise<CoursChoisi> {
@@ -443,6 +445,14 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return targetName(f);
 	}
 
+	function versFichier(f: MoodleFile, dossier: string, echecs: Set<string> | undefined): FichierMoodle {
+		const status = f.status === "present" ? "present" : echecs?.has(f.name) ? "failed" : f.status === "outdated" ? "outdated" : "missing";
+		return {
+			name: f.name, section: "", size: f.size, status, date: f.timemodified,
+			relPath: [dossier, ...cheminRelatif(f).split(/[\/]/)].join("/"),
+		};
+	}
+
 	async function fichiers(courseId: unknown): Promise<FichierMoodle[]> {
 		const id = idOuErreur(courseId);
 		return limite("fichiers", String(id), async () => (await avecClient(async (client, s) => {
@@ -455,14 +465,45 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const out: FichierMoodle[] = [];
 			for (const sec of scan.sections) for (const a of sec.activities) for (const f of a.files) {
 				if (out.length >= MAX_FICHIERS) break;
-				const status = f.status === "present" ? "present" : echecs?.has(f.name) ? "failed" : f.status === "outdated" ? "outdated" : "missing";
-				out.push({
-					name: f.name, section: sec.name, size: f.size, status,
-					relPath: [dossier, ...cheminRelatif(f).split(/[\\/]/)].join("/"),
-				});
+				out.push({ ...versFichier(f, dossier, echecs), section: sec.name });
 			}
 			return out;
 		})) ?? []);
+	}
+
+	/** The course as its page shows it. Same bounds as `fichiers`; a course
+	    without a code has no folder, so its files are not offered. */
+	async function moduleDuCours(courseId: unknown): Promise<ModuleMoodle> {
+		const id = idOuErreur(courseId);
+		const vide: ModuleMoodle = { sections: [], externes: 0 };
+		return limite("module", String(id), async () => (await avecClient(async (client, s) => {
+			const c = await coursConnu(client, s.j.userid, id);
+			const code = c.course.code;
+			if (!code) return vide;
+			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name);
+			const scan = await scanCourse(client, id, dir);
+			const echecs = echecsFichiers.get(id);
+			const ignores = (await reglage()).ignores;
+			let total = 0;
+			const sections = scan.sections.map(sec => ({
+				name: sec.name,
+				activites: sec.activities.map((a): ActiviteMoodle => {
+					const fichiers = a.files.slice(0, Math.max(0, MAX_FICHIERS - total)).map(f => ({ ...versFichier(f, dossier, echecs), section: sec.name }));
+					total += fichiers.length;
+					let depot: ActiviteMoodle["depot"] = null;
+					if (a.deposit) {
+						const st = depositState(a.deposit, maintenant());
+						depot = {
+							state: st.state, due: st.due, cutoff: a.deposit.cutoff, remaining: st.remaining,
+							brouillon: a.deposit.status === "draft", deposeLe: a.deposit.submittedAt,
+							fichiers: a.deposit.files.map(f => f.name).slice(0, 20),
+						};
+					}
+					return { id: a.id, name: a.name, type: a.type, fichiers, depot, masque: !!a.deposit && ignores.includes(a.id) };
+				}),
+			}));
+			return { sections, externes: scan.external.length };
+		})) ?? vide);
 	}
 
 	interface Cible { ids: number[] | null; nom?: string }
@@ -690,7 +731,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	return {
 		etat, connecter, recevoirJeton, deconnecter, cours, chercher, ajouterParUrl, favori, exclure, ajouter, retirer,
-		fichiers, telechargerCours, telechargerFichier, ouvrirDossier, ouvrirFichier, synchroniser, devoirs, ouvrirDevoir, deposer,
+		fichiers, module: moduleDuCours, telechargerCours, telechargerFichier, ouvrirDossier, ouvrirFichier, synchroniser, devoirs, ouvrirDevoir, deposer,
 		devoirVu, ignorerDevoir, demarrerAuto,
 	};
 }

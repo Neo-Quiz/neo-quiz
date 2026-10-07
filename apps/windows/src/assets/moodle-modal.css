@@ -1,0 +1,1167 @@
+/* THE MOODLE WINDOW (PC only, `ui/moodle-modal.ts`): a port of the stylesheet of
+   the Moodle plugin window, classes `ms-*` renamed `nqm-*` and scoped under
+   `.nq-moodle-modal`. Kept different on purpose: no capitals (year and section
+   names are bold), no colour tile per course code, the app's own opening
+   animation. `--color-yellow` is not a theme variable: it falls back. */
+
+.nq-moodle-modal .modal-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.nq-moodle-modal .nqm-head {
+	padding-right: 32px;
+}
+
+
+
+.nq-moodle-modal {
+	width: min(760px, 92vw);
+	max-height: min(86vh, 940px);
+	display: flex;
+	flex-direction: column;
+	background: var(--background-primary) !important;
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.nq-moodle-modal .nqm-root {
+	--nqm-text: var(--text-normal);
+	--nqm-muted: var(--text-muted);
+	--nqm-faint: var(--text-faint);
+	--nqm-border: var(--background-modifier-border);
+	--nqm-field: var(--background-modifier-form-field);
+	--nqm-hover: var(--background-modifier-hover);
+	--nqm-accent: var(--interactive-accent);
+	--nqm-on-accent: var(--text-on-accent);
+	--nqm-green: var(--color-green);
+	--nqm-orange: var(--color-orange);
+	--nqm-red: var(--color-red);
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-height: 0;
+	flex: 1;
+	overflow: hidden;
+}
+
+.nq-moodle-modal .nqm-head {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: none;
+}
+
+.nq-moodle-modal .nqm-title {
+	margin: 0;
+	font-family: "Neo Sans Std", var(--font-interface);
+	font-weight: 700;
+	font-size: 1.25em;
+	line-height: 1.3;
+	color: var(--nqm-text);
+}
+
+.nq-moodle-modal .nqm-hint {
+	margin: 0;
+	font-size: 0.88em;
+	line-height: 1.45;
+	color: var(--nqm-muted);
+}
+
+.nq-moodle-modal .nqm-back {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 6px 2px 2px;
+	background: transparent !important;
+	box-shadow: none !important;
+	border: none;
+	color: var(--nqm-muted) !important;
+	font-size: 0.82em;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-back:hover {
+	color: var(--nqm-text) !important;
+}
+
+.nq-moodle-modal .nqm-back .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.nq-moodle-modal .nqm-dest {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	flex: none;
+	padding: 7px 10px;
+	border-radius: var(--radius-m);
+	background: var(--nqm-field);
+	border: 1px solid var(--nqm-border);
+	color: var(--nqm-muted);
+	font-size: 0.8em;
+}
+
+.nq-moodle-modal .nqm-dest.is-warn {
+	color: var(--nqm-orange);
+}
+
+.nq-moodle-modal .nqm-dest .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.nq-moodle-modal .nqm-dest-path {
+	font-family: var(--font-monospace);
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-urlrow {
+	display: flex;
+	gap: 8px;
+}
+
+.nq-moodle-modal .nqm-input {
+	flex: 1;
+	min-width: 0;
+	padding: 9px 12px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: var(--nqm-field);
+	color: var(--nqm-text);
+	font-family: var(--font-monospace);
+	font-size: 0.82em;
+}
+
+.nq-moodle-modal .nqm-input:focus {
+	outline: none;
+	border-color: color-mix(in srgb, var(--nqm-accent) 55%, var(--nqm-border));
+}
+
+.nq-moodle-modal .nqm-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--nqm-muted);
+	font-size: 0.85em;
+	line-height: 1.45;
+}
+
+.nq-moodle-modal .nqm-status.is-error {
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-sections {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 4px;
+	scrollbar-color: var(--nqm-border) transparent;
+}
+
+.nq-moodle-modal .nqm-section-name {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin-bottom: 4px;
+	padding: 4px 10px 7px;
+	border-bottom: 1px solid var(--nqm-border);
+	background: var(--background-primary);
+	color: var(--nqm-muted);
+	font-family: "Neo Sans Std", var(--font-interface);
+	font-weight: 700;
+	font-size: 0.76em;
+}
+
+.nq-moodle-modal .nqm-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 10px;
+	border-radius: var(--radius-m);
+	transition: background 120ms ease;
+}
+
+.nq-moodle-modal .nqm-row:hover {
+	background: var(--nqm-hover);
+}
+
+.nq-moodle-modal .nqm-row-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--nqm-muted) 14%, transparent);
+	color: var(--nqm-muted);
+}
+
+.nq-moodle-modal .nqm-row-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.nq-moodle-modal .nqm-file.is-present .nqm-row-icon {
+	background: color-mix(in srgb, var(--nqm-green) 14%, transparent);
+	color: var(--nqm-green);
+}
+
+.nq-moodle-modal .nqm-file.is-missing .nqm-row-icon,
+.nq-moodle-modal .nqm-file.is-busy .nqm-row-icon {
+	background: color-mix(in srgb, var(--nqm-accent) 16%, transparent);
+	color: var(--nqm-accent);
+}
+
+.nq-moodle-modal .nqm-file.is-outdated .nqm-row-icon {
+	background: color-mix(in srgb, var(--nqm-orange) 16%, transparent);
+	color: var(--nqm-orange);
+}
+
+.nq-moodle-modal .nqm-file.is-failed .nqm-row-icon {
+	background: color-mix(in srgb, var(--nqm-red) 16%, transparent);
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-row-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.nq-moodle-modal .nqm-row-name {
+	color: var(--nqm-text);
+	font-weight: 600;
+	font-size: 0.88em;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-row-meta {
+	margin-top: 2px;
+	color: var(--nqm-faint);
+	font-size: 0.74em;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-row-type {
+	flex: none;
+	color: var(--nqm-faint);
+	font-size: 0.74em;
+}
+
+.nq-moodle-modal .nqm-act-row .nqm-row-name {
+	color: var(--nqm-muted);
+	font-weight: 500;
+}
+
+.nq-moodle-modal .nqm-act-files {
+	margin: 2px 0 4px 26px;
+	padding-left: 10px;
+	border-left: 1px solid var(--nqm-border);
+}
+
+.nq-moodle-modal .nqm-file-note {
+	color: var(--nqm-orange);
+}
+
+.nq-moodle-modal .nqm-file-action {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+}
+
+.nq-moodle-modal .nqm-busy-label {
+	color: var(--nqm-faint);
+	font-size: 0.76em;
+}
+
+.nq-moodle-modal .nqm-file-open,
+.nq-moodle-modal .nqm-file-get,
+.nq-moodle-modal .nqm-never {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: auto !important;
+}
+
+.nq-moodle-modal .nqm-file-open .nqm-btn-icon,
+.nq-moodle-modal .nqm-file-get .nqm-btn-icon {
+	display: inline-flex;
+}
+
+.nq-moodle-modal .nqm-file-open .svg-icon,
+.nq-moodle-modal .nqm-file-get .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+.nq-moodle-modal .nqm-file-get.is-accent {
+	border-color: transparent;
+	background: var(--nqm-accent) !important;
+	color: var(--nqm-on-accent) !important;
+}
+
+.nq-moodle-modal .nqm-file-get.is-accent:hover {
+	background: var(--interactive-accent-hover) !important;
+}
+
+.nq-moodle-modal .nqm-badge {
+	padding: 3px 9px;
+	border-radius: 999px;
+	font-size: 0.72em;
+	white-space: nowrap;
+}
+
+.nq-moodle-modal .nqm-badge.is-present {
+	background: color-mix(in srgb, var(--nqm-green) 15%, transparent);
+	color: var(--nqm-green);
+}
+
+.nq-moodle-modal .nqm-deposit {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 4px 0 6px 54px;
+	padding: 8px 10px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.nq-moodle-modal .nqm-deposit.is-submitted {
+	background: transparent;
+	border-style: dashed;
+}
+
+.nq-moodle-modal .nqm-deposit.is-urgent {
+	border-color: color-mix(in srgb, var(--nqm-red) 60%, var(--nqm-border));
+	background: color-mix(in srgb, var(--nqm-red) 10%, transparent);
+}
+
+.nq-moodle-modal .nqm-deposit-icon {
+	display: flex;
+	flex: none;
+	color: var(--nqm-muted);
+}
+
+.nq-moodle-modal .nqm-deposit.is-submitted .nqm-deposit-icon {
+	color: var(--nqm-green);
+}
+
+.nq-moodle-modal .nqm-deposit.is-urgent .nqm-deposit-icon,
+.nq-moodle-modal .nqm-deposit.is-urgent .nqm-deposit-title {
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-deposit-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.nq-moodle-modal .nqm-deposit-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.nq-moodle-modal .nqm-deposit-title {
+	color: var(--nqm-text);
+	font-size: 0.85em;
+	line-height: 1.4;
+}
+
+.nq-moodle-modal .nqm-deposit.is-submitted .nqm-deposit-title {
+	color: var(--nqm-muted);
+}
+
+.nq-moodle-modal .nqm-deposit-meta {
+	color: var(--nqm-faint);
+	font-size: 0.75em;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-deposit-side {
+	display: flex;
+	align-items: center;
+	flex: none;
+}
+
+.nq-moodle-modal .nqm-deposit.is-urgent .nqm-ghost {
+	border-color: color-mix(in srgb, var(--nqm-red) 60%, var(--nqm-border));
+	color: var(--nqm-red) !important;
+}
+
+.nq-moodle-modal .nqm-ghost {
+	padding: 5px 12px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-text) !important;
+	font-size: 0.78em;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-ghost:hover {
+	background: var(--nqm-hover) !important;
+	border-color: var(--background-modifier-border-hover);
+}
+
+.nq-moodle-modal .nqm-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 8px 18px;
+	border: none;
+	border-radius: var(--radius-m);
+	background: var(--nqm-accent) !important;
+	box-shadow: none !important;
+	color: var(--nqm-on-accent) !important;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--nqm-accent) 85%, white) !important;
+}
+
+.nq-moodle-modal .nqm-primary:disabled {
+	background: var(--nqm-field) !important;
+	color: var(--nqm-muted) !important;
+	cursor: default;
+}
+
+.nq-moodle-modal .nqm-btn-icon {
+	display: flex;
+}
+
+.nq-moodle-modal .nqm-btn-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.nq-moodle-modal .nqm-external {
+	padding: 9px 12px;
+	border-radius: var(--radius-m);
+	background: var(--nqm-field);
+	border: 1px solid var(--nqm-border);
+	font-size: 0.78em;
+	color: var(--nqm-muted);
+}
+
+.nq-moodle-modal .nqm-external-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 500;
+}
+
+.nq-moodle-modal .nqm-external-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.nq-moodle-modal .nqm-external ul {
+	margin: 6px 0 0;
+	padding-left: 22px;
+}
+
+.nq-moodle-modal .nqm-external a {
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	flex: none;
+	padding-top: 12px;
+	border-top: 1px solid var(--nqm-border);
+}
+
+.nq-moodle-modal .nqm-spinner {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+	border-top-color: currentColor;
+	border-radius: 50%;
+	animation: nqm-spin 0.7s linear infinite;
+}
+
+@keyframes nqm-spin {
+	to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nq-moodle-modal .nqm-spinner { animation-duration: 2.4s; }
+}
+
+.nq-moodle-modal .nqm-searchbar {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+	padding: 4px 4px 4px 12px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: var(--nqm-field);
+}
+
+.nq-moodle-modal .nqm-searchbar:focus-within {
+	border-color: color-mix(in srgb, var(--nqm-accent) 55%, var(--nqm-border));
+}
+
+.nq-moodle-modal .nqm-search-icon {
+	display: flex;
+	flex: none;
+	color: var(--nqm-faint);
+}
+
+.nq-moodle-modal .nqm-search-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.nq-moodle-modal .nqm-search {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 0;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-text);
+	font-size: 0.95em;
+}
+
+.nq-moodle-modal .nqm-search:focus {
+	outline: none;
+}
+
+.nq-moodle-modal .nqm-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	padding: 5px 10px;
+	border: none;
+	border-radius: calc(var(--radius-m) - 2px);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-muted) !important;
+	font-family: "Neo Sans Std", var(--font-interface);
+	font-weight: 700;
+	font-size: 0.76em;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-filter:hover {
+	background: var(--nqm-hover) !important;
+	color: var(--nqm-text) !important;
+}
+
+.nq-moodle-modal .nqm-filter.is-active {
+	background: color-mix(in srgb, var(--nqm-accent) 18%, transparent) !important;
+	color: var(--nqm-accent) !important;
+}
+
+.nq-moodle-modal .nqm-filter-icon {
+	display: flex;
+}
+
+.nq-moodle-modal .nqm-filter-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.nq-moodle-modal .nqm-filter-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	z-index: 20;
+	min-width: 190px;
+	padding: 4px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.nq-moodle-modal .nqm-filter-option {
+	display: block;
+	width: 100%;
+	padding: 7px 10px;
+	border: none;
+	border-radius: calc(var(--radius-m) - 2px);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-text) !important;
+	font-size: 0.82em;
+	text-align: left;
+	white-space: normal !important;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-filter-option:hover {
+	background: var(--nqm-hover) !important;
+}
+
+.nq-moodle-modal .nqm-results {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 4px;
+	scrollbar-color: var(--nqm-border) transparent;
+}
+
+.nq-moodle-modal .nqm-course {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	width: 100%;
+	padding: 7px 10px;
+	border: none;
+	border-radius: var(--radius-m);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-text) !important;
+	justify-content: flex-start;
+	text-align: left;
+	white-space: normal !important;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-course:hover {
+	background: var(--nqm-hover) !important;
+}
+
+.nq-moodle-modal .nqm-course-icon {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	background-color: rgb(var(--tc, 148, 163, 184));
+	-webkit-mask: var(--ic) center / contain no-repeat;
+	mask: var(--ic) center / contain no-repeat;
+	align-self: center;
+}
+
+.nq-moodle-modal .nqm-course-code {
+	flex: none;
+	min-width: 74px;
+	color: rgb(var(--tc, 148, 163, 184));
+	font-family: "Neo Sans Std", var(--font-monospace);
+	font-weight: 700;
+	font-size: 0.84em;
+	letter-spacing: 0.01em;
+}
+
+.nq-moodle-modal .nqm-course-code.is-orphan {
+	opacity: 0.55;
+}
+
+.nq-moodle-modal .nqm-course:hover {
+	background: rgba(var(--tc, 148, 163, 184), 0.12) !important;
+}
+
+.nq-moodle-modal .nqm-year + .nqm-year {
+	margin-top: 16px;
+}
+
+.nq-moodle-modal .nqm-year-name {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 4px;
+	padding: 0 10px 6px;
+	border-bottom: 1px solid var(--nqm-border);
+	color: var(--nqm-muted);
+	font-family: "Neo Sans Std", var(--font-interface);
+	font-weight: 700;
+	font-size: 0.76em;
+}
+
+.nq-moodle-modal .nqm-year-count {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--nqm-field);
+	color: var(--nqm-faint);
+	font-weight: 500;
+	letter-spacing: 0;
+}
+
+.nq-moodle-modal .nqm-course-name {
+	flex: 1;
+	min-width: 0;
+	font-family: "Neo Sans Std", var(--font-interface);
+	font-weight: 700;
+	font-size: 0.86em;
+	line-height: 1.4;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nq-moodle-modal .nqm-empty {
+	padding: 14px 10px;
+	color: var(--nqm-muted);
+	font-size: 0.85em;
+}
+
+.nq-moodle-modal .nqm-footer-split {
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.nq-moodle-modal .nqm-foot-tools {
+	display: flex;
+	gap: 14px;
+}
+
+.nq-moodle-modal .nqm-link {
+	padding: 0;
+	border: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-muted) !important;
+	font-size: 0.78em;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-link:hover {
+	color: var(--nqm-accent) !important;
+	text-decoration: underline;
+}
+
+.nq-moodle-modal .nqm-searchall {
+	width: 100%;
+	margin-bottom: 10px;
+	padding: 8px 10px;
+	border: 1px dashed var(--nqm-border);
+	border-radius: var(--radius-m);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-muted) !important;
+	font-size: 0.8em;
+	text-align: left;
+	white-space: normal !important;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-searchall:hover:not(:disabled) {
+	background: var(--nqm-hover) !important;
+	color: var(--nqm-text) !important;
+}
+
+.nq-moodle-modal .nqm-course-cohort {
+	flex: none;
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--nqm-field);
+	color: var(--nqm-faint);
+	font-family: var(--font-monospace);
+	font-size: 0.68em;
+}
+
+.nq-moodle-modal .nqm-course-badge {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	gap: 4px;
+	flex: none;
+	padding: 2px 9px;
+	border-radius: 999px;
+	color: var(--nqm-faint);
+	font-size: 0.72em;
+	white-space: nowrap;
+}
+
+.nq-moodle-modal .nqm-course-deposit {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	gap: 4px;
+	flex: none;
+	padding: 2px 9px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--nqm-orange) 16%, transparent);
+	color: var(--nqm-orange);
+	font-size: 0.72em;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.nq-moodle-modal .nqm-course-deposit:empty {
+	display: none;
+}
+
+.nq-moodle-modal .nqm-course-deposit.is-urgent {
+	background: color-mix(in srgb, var(--nqm-red) 18%, transparent);
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-course-deposit.is-fresh::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.nq-moodle-modal .nqm-dl-late {
+	color: var(--nqm-red);
+	font-weight: 500;
+	font-size: 0.9em;
+}
+
+.nq-moodle-modal .nqm-deadlines {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--nqm-orange) 40%, var(--nqm-border));
+	border-radius: var(--radius-m);
+	background: color-mix(in srgb, var(--nqm-orange) 7%, transparent);
+}
+
+.nq-moodle-modal .nqm-deadlines.is-urgent {
+	border-color: color-mix(in srgb, var(--nqm-red) 55%, var(--nqm-border));
+	background: color-mix(in srgb, var(--nqm-red) 8%, transparent);
+}
+
+.nq-moodle-modal .nqm-dl-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+	color: var(--nqm-orange);
+	font-weight: 600;
+	font-size: 0.9em;
+}
+
+.nq-moodle-modal .nqm-deadlines.is-urgent .nqm-dl-head {
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-dl-icon {
+	display: flex;
+}
+
+.nq-moodle-modal .nqm-dl-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.nq-moodle-modal .nqm-dl-fresh,
+.nq-moodle-modal .nqm-dl-new {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--nqm-accent) 18%, transparent);
+	color: var(--nqm-accent);
+	font-size: 0.78em;
+	font-weight: 600;
+}
+
+.nq-moodle-modal .nqm-dl-new {
+	margin-left: 8px;
+	font-size: 0.72em;
+}
+
+.nq-moodle-modal .nqm-dl-list {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.nq-moodle-modal .nqm-dl-list.is-scroll {
+	height: 172px;
+	min-height: 64px;
+	max-height: 70vh;
+	overflow: auto;
+	overscroll-behavior: contain;
+	resize: vertical;
+}
+
+.nq-moodle-modal .nqm-dl-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 3px 6px;
+	border-radius: var(--radius-s);
+	font-size: 0.85em;
+	line-height: 1.35;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-dl-item:hover {
+	background: var(--nqm-hover);
+}
+
+.nq-moodle-modal .nqm-dl-code {
+	flex: none;
+	width: 64px;
+	color: var(--nqm-text);
+	font-family: "Neo Sans Std", var(--font-monospace);
+	font-weight: 700;
+}
+
+.nq-moodle-modal .nqm-dl-name {
+	flex: 1;
+	min-width: 0;
+	color: var(--nqm-text);
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-dl-when {
+	flex: none;
+		min-width: 7.5em;
+	color: var(--nqm-muted);
+	font-size: 0.9em;
+	white-space: nowrap;
+}
+
+.nq-moodle-modal .nqm-dl-item.is-urgent .nqm-dl-when,
+.nq-moodle-modal .nqm-dl-item.is-late .nqm-dl-when {
+	color: var(--nqm-red);
+	font-weight: 600;
+}
+
+.nq-moodle-modal .nqm-dl-hide {
+	display: flex;
+	align-items: center;
+	flex: none;
+	height: auto !important;
+	padding: 4px !important;
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-faint) !important;
+	font-size: 0.85em;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-dl-hide:hover {
+	background: var(--nqm-hover) !important;
+	color: var(--nqm-text) !important;
+}
+
+.nq-moodle-modal .nqm-dl-send {
+	flex: none;
+	height: auto !important;
+	padding: 0 !important;
+	border: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-text) !important;
+	font-size: 0.9em;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-dl-send:hover {
+	color: var(--text-accent) !important;
+}
+
+.nq-moodle-modal .nqm-dl-hide .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.nq-moodle-modal .nqm-dl-module {
+	flex: 0 1 34%;
+	min-width: 0;
+	color: var(--nqm-text);
+	font-family: "Neo Sans Std", var(--font-monospace);
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.nq-moodle-modal .nqm-deadlines.is-clear {
+	border-color: var(--nqm-border);
+	background: transparent;
+}
+
+.nq-moodle-modal .nqm-deadlines.is-clear .nqm-dl-head {
+	color: var(--nqm-green);
+}
+
+.nq-moodle-modal .nqm-deposit-hide {
+	margin-right: 8px;
+}
+
+.nq-moodle-modal .nqm-course-badge:empty {
+	display: none;
+}
+
+.nq-moodle-modal .nqm-course-badge .nqm-spinner {
+	width: 12px;
+	height: 12px;
+}
+
+.nq-moodle-modal .nqm-course-badge.is-new {
+	background: color-mix(in srgb, var(--nqm-accent) 18%, transparent);
+	color: var(--nqm-accent);
+	font-weight: 600;
+}
+
+.nq-moodle-modal .nqm-course-badge.is-ok {
+	color: var(--nqm-green);
+}
+
+.nq-moodle-modal .nqm-course-badge.is-error {
+	background: color-mix(in srgb, var(--nqm-red) 15%, transparent);
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-course-badge.is-warn {
+	color: var(--nqm-orange);
+}
+
+.nq-moodle-modal .nqm-badge-icon {
+	display: flex;
+}
+
+.nq-moodle-modal .nqm-badge-icon .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+.nq-moodle-modal .nqm-foot-right {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 14px;
+}
+
+.nq-moodle-modal .nqm-sync-all {
+	padding: 6px 14px;
+	font-size: 0.85em;
+}
+
+.nq-moodle-modal .nqm-sync-all .nqm-spinner {
+	width: 13px;
+	height: 13px;
+}
+
+.nq-moodle-modal .nqm-connect {
+	display: flex;
+	justify-content: center;
+	padding: 18px 0 6px;
+}
+
+.nq-moodle-modal .nqm-file-error {
+	color: var(--nqm-red);
+}
+
+.nq-moodle-modal .nqm-course-star {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	flex: none;
+	padding: 3px;
+	border-radius: var(--radius-s);
+	color: var(--nqm-faint);
+	opacity: 0;
+	transition: opacity 120ms ease, color 120ms ease;
+}
+
+.nq-moodle-modal .nqm-course:hover .nqm-course-star,
+.nq-moodle-modal .nqm-course-star:focus-visible,
+.nq-moodle-modal .nqm-course-star.is-on {
+	opacity: 1;
+}
+
+.nq-moodle-modal .nqm-course-star:hover {
+	background: var(--nqm-hover);
+	color: var(--nqm-text);
+}
+
+.nq-moodle-modal .nqm-course-star.is-on {
+	color: var(--color-yellow, #e0ac00);
+}
+
+.nq-moodle-modal .nqm-course-star.is-on .svg-icon {
+	fill: currentColor;
+}
+
+.nq-moodle-modal .nqm-course-star .svg-icon,
+.nq-moodle-modal .nqm-year-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.nq-moodle-modal .nqm-year-icon {
+	display: inline-flex;
+	color: var(--color-yellow, #e0ac00);
+}
+
+.nq-moodle-modal .nqm-year-icon .svg-icon {
+	fill: currentColor;
+}
+
+.nq-moodle-modal .nqm-file-open.is-opening {
+	cursor: progress;
+	opacity: 1;
+	border-color: color-mix(in srgb, var(--nqm-accent) 55%, var(--nqm-border));
+	color: var(--nqm-accent) !important;
+}
+
+.nq-moodle-modal .nqm-file-open .nqm-spinner {
+	width: 12px;
+	height: 12px;
+}
+
+.nq-moodle-modal .nqm-footer .nqm-never {
+	margin-right: auto;
+}
+
+.nq-moodle-modal .nqm-footer > .nqm-status {
+	flex: 1;
+	justify-content: flex-end;
+}
+
+.nq-moodle-modal .nqm-footer-split > .nqm-status {
+	flex: initial;
+	justify-content: flex-start;
+}
+
+.nq-moodle-modal .nqm-dest .nqm-ghost {
+	margin-left: auto;
+}
+
+.nq-moodle-modal .nqm-link .nqm-btn-icon {
+	display: none;
+}
+
+.nq-moodle-modal .nqm-course-icon {
+	display: inline-flex;
+	background: none;
+	-webkit-mask: none;
+	mask: none;
+}
+
+.nq-moodle-modal .nqm-course-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}

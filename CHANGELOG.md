@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- Moodle opens in a window like the one you know: open files, star modules, search courses and hand in assignments from there.
+
 ## [1.20.39] - 2026-10-07
 
 ### Changed

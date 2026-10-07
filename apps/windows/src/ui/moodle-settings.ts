@@ -20,11 +20,10 @@ import { t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { boutonPlat, heure, origineValide } from "./moodle-common";
+import { openMoodleModal } from "./moodle-modal";
 
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
-/** Asks the shell to open the Moodle page (the settings are a modal over it). */
-export const EVENEMENT_OUVRIR_MOODLE = "nq:ouvrir-moodle";
 
 export function mountMoodleSettings(page: HTMLElement, fermer: () => void): () => void {
 	const api = pont().moodle;
@@ -82,7 +81,8 @@ export function mountMoodleSettings(page: HTMLElement, fermer: () => void): () =
 			const p = ajouter(carte, "div", "nq-set-ligne");
 			const lien = ajouter(p, "button", "nq-moodle-lien", t("settings.moodle.openPage"));
 			lien.type = "button";
-			lien.addEventListener("click", () => { fermer(); window.dispatchEvent(new CustomEvent(EVENEMENT_OUVRIR_MOODLE)); });
+			/* The settings are a modal too: it leaves first, then the Moodle window comes in. */
+			lien.addEventListener("click", () => { fermer(); setTimeout(openMoodleModal, 220); });
 			return;
 		}
 

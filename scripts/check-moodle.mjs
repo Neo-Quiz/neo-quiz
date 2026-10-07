@@ -1028,6 +1028,13 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.deepEqual(f.map(x => [x.name, x.section, x.status]), [["Notes.pdf", "S1", "missing"], ["tool.bat", "S1", "missing"]]);
 			assert.ok(f.every(x => x.relPath.startsWith("XTI500 - XTI500 extra/") || x.relPath.startsWith("XTI500")), JSON.stringify(f));
 			assert.equal(/https?:|token/i.test(JSON.stringify(f)), false);
+			// the course as its page shows it: same files grouped by activity, same bounds, never a URL
+			const mod = await c.svc.module(5);
+			assert.deepEqual(mod.sections.flatMap(x => x.activites.flatMap(y => y.fichiers.map(z => z.name))), f.map(x => x.name));
+			assert.equal(typeof mod.externes, "number");
+			assert.equal(/https?:|token/i.test(JSON.stringify(mod)), false);
+			await assert.rejects(c.svc.module(0), { code: "badid" });
+			assert.deepEqual(await c.svc.module(99).catch(() => "rejected"), "rejected", "an unknown course gives nothing");
 			const r = await c.svc.telechargerFichier(5, "Notes.pdf");
 			assert.deepEqual([r.nouveaux, r.erreur], [1, null]);
 			f = await c.svc.fichiers(5);

@@ -16,7 +16,7 @@ export function origineValide(brut: string): string | null {
 	} catch { return null; }
 }
 
-function span(ms: number): string {
+export function span(ms: number): string {
 	const min = Math.max(1, Math.round(ms / 60_000));
 	if (min < 60) return t("settings.moodle.spanMinutes", { n: min });
 	const h = Math.round(min / 60);

@@ -1934,8 +1934,7 @@ label.nq-set-ligne {
 	cursor: default;
 }
 
-/* SETTINGS › MOODLE and the Moodle page. Flat: rows separated by hairlines,
-   no tile in a tile, no capitals. */
+/* SETTINGS › MOODLE. Flat: rows separated by hairlines, no tile in a tile, no capitals. */
 .nq-moodle-site { width: 240px; text-align: left; }
 .nq-moodle-rouge { color: var(--color-red, #f87171); }
 .nq-moodle-ambre { color: var(--color-orange, #fb923c); }
@@ -1948,44 +1947,6 @@ label.nq-set-ligne {
 .nq-moodle-lien { border: 0; background: none; padding: 0; color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
 .nq-moodle-lien:hover { color: var(--text-normal); }
 
-.nq-mdl { display: flex; flex-direction: column; gap: 16px; padding: 24px 28px; max-width: 920px; margin: 0 auto; }
-.nq-mdl-entete { display: flex; align-items: center; gap: 12px; }
-.nq-mdl-titre { margin: 0; font-size: 22px; font-weight: 700; }
-.nq-mdl-etat { flex: 1; font-size: 12px; color: var(--text-muted); }
-.nq-mdl-corps { display: flex; flex-direction: column; gap: 20px; }
-.nq-mdl-vide { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 24px 0; }
-.nq-mdl-texte { margin: 0; color: var(--text-muted); }
-.nq-mdl-section-titre { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-.nq-mdl-liste { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); overflow: hidden; }
-.nq-mdl-liste > * + *, .nq-mdl-fichiers > * + * { border-top: 1px solid var(--background-modifier-border); }
-.nq-mdl-ligne { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; }
-.nq-mdl-texte-col { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; text-align: left; }
-.nq-mdl-ouvrir { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
-.nq-mdl-nom { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nq-mdl-sous { font-size: 12px; color: var(--text-muted); }
-.nq-mdl-message { margin: 0; padding: 0 14px 8px; font-size: 12px; color: var(--text-muted); }
-.nq-mdl-actions { display: flex; gap: 8px; flex: none; }
-.nq-mdl-cours.is-exclu .nq-mdl-ligne { opacity: 0.6; }
-.nq-mdl-fichiers { background: var(--background-secondary); }
-.nq-mdl-fichier { padding-left: 52px; }
-.nq-mdl-recherche { display: flex; align-items: center; gap: 10px; }
-.nq-mdl-champ { flex: 1; height: 36px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); color: var(--text-normal); font: inherit; font-size: 13px; }
-.nq-mdl-champ:focus { outline: none; border-color: var(--interactive-accent); }
-.nq-mdl-icone, .nq-mdl-icone svg { width: 16px; height: 16px; }
-.nq-mdl-bouton-icone { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border: 0; border-radius: var(--radius-m); background: none; color: var(--text-muted); cursor: pointer; }
-.nq-mdl-bouton-icone:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
-.nq-mdl-bouton-icone.is-actif { color: var(--color-orange, #fb923c); }
-.nq-mdl-bouton-icone.is-actif svg { fill: currentColor; }
-.nq-mdl-puce { flex: none; font-size: 12px; color: var(--text-muted); }
-.nq-mdl-puce.is-present { color: var(--color-green, #4ade80); }
-.nq-mdl-puce.is-missing, .nq-mdl-puce.is-outdated { color: var(--interactive-accent); }
-.nq-mdl-puce.is-failed { color: var(--color-red, #f87171); }
-.nq-mdl-groupe { padding: 8px 14px 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--background-secondary); }
-.nq-mdl-groupe-late { color: var(--color-red, #f87171); }
-.nq-mdl-groupe-urgent { color: var(--color-orange, #fb923c); }
-.nq-mdl-echeance-late { color: var(--color-red, #f87171); }
-.nq-mdl-echeance-urgent { color: var(--color-orange, #fb923c); }
-.nq-mdl-nouveau { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--interactive-accent); }
 .nq-moodle-ecoles { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .nq-moodle-filtre { width: 100%; text-align: left; }
 .nq-moodle-ecoles-liste { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }

@@ -218,6 +218,10 @@ export interface CoursMoodle {
 	enCours: boolean;
 	/** Added by search or URL (setting `moodle.extra`). */
 	extra: boolean;
+	/** School year read from the short name (`2026-2027`), null when unknown. */
+	annee: string | null;
+	/** Cohort tag (`PSA01`), tells apart two courses with the same code. */
+	cohorte: string | null;
 }
 export interface ResultatRechercheMoodle {
 	id: number;
@@ -232,8 +236,39 @@ export interface FichierMoodle {
 	section: string;
 	size: number | null;
 	status: "present" | "missing" | "outdated" | "failed";
+	/** Last change on Moodle, epoch seconds (0 unknown). */
+	date: number;
 	/** Path inside the quiz root (forward slashes), where the file is or will go. Never a URL. */
 	relPath: string;
+}
+/** The hand-in state of an assignment, as the course page shows it (no token, no URL). */
+export interface DepotMoodle {
+	state: "submitted" | "todo" | "urgent" | "late" | "closed" | "open";
+	/** Epoch seconds (0 none). */
+	due: number;
+	cutoff: number;
+	remaining: number;
+	brouillon: boolean;
+	/** Epoch seconds, 0 when not handed in. */
+	deposeLe: number;
+	/** Names of the submitted files. */
+	fichiers: string[];
+}
+export interface ActiviteMoodle {
+	/** Course module id. */
+	id: number;
+	name: string;
+	/** Moodle module type: resource, folder, url, page, book, assign, forum, quiz, feedback... */
+	type: string;
+	fichiers: FichierMoodle[];
+	depot: DepotMoodle | null;
+	/** An assignment the user hid from "to hand in" (the course page hides it too). */
+	masque: boolean;
+}
+export interface ModuleMoodle {
+	sections: { name: string; activites: ActiviteMoodle[] }[];
+	/** Links that lead outside Moodle: only counted, never given. */
+	externes: number;
 }
 export interface ResumeSyncMoodle {
 	nouveaux: number;
@@ -519,6 +554,8 @@ export interface Pont {
 		ajouter(id: number): Promise<number[]>;
 		retirer(id: number): Promise<number[]>;
 		fichiers(courseId: number): Promise<FichierMoodle[]>;
+		/** The course as its page shows it: sections, activities, their files and hand-in state. */
+		module(courseId: number): Promise<ModuleMoodle>;
 		telechargerCours(courseId: number): Promise<ResumeSyncMoodle>;
 		telechargerFichier(courseId: number, name: string): Promise<ResumeSyncMoodle>;
 		/** Opens the module folder in Explorer; false when it does not exist. */
@@ -1045,6 +1082,7 @@ export const CANAUX = {
 	moodleAjouter: "neo:moodle/ajouter",
 	moodleRetirer: "neo:moodle/retirer",
 	moodleFichiers: "neo:moodle/fichiers",
+	moodleModule: "neo:moodle/module",
 	moodleTelechargerCours: "neo:moodle/telecharger-cours",
 	moodleTelechargerFichier: "neo:moodle/telecharger-fichier",
 	moodleOuvrirDossier: "neo:moodle/ouvrir-dossier",

@@ -49,7 +49,7 @@ export interface ExamenDossier {
 }
 
 /** Vues possibles du dashboard (dashboard.js:23 currentView, navigate, previousView). */
-export type DashboardViewName = "home" | "quizzes" | "detail" | "ai" | "moodle";
+export type DashboardViewName = "home" | "quizzes" | "detail" | "ai";
 
 /**
  * Réglages IA du plugin (src/plugin.js DEFAULT_SETTINGS, encore .js). Couvre
@@ -347,7 +347,7 @@ export interface DashboardShellCtx {
 	    peut s'appeler « Generated » dans un vault. Absent = aucun dossier n'est
 	    le sas (le greffon). */
 	generatedFolder?: () => string | undefined;
-	/** Opens the Moodle page (PC only): a "Moodle" button of the Folders top bar
+	/** Opens the Moodle window (PC only): a "Moodle" button of the Folders top bar
 	    when present. Absent on a phone and in the plugin. */
 	openMoodle?: () => void;
 	/** Ouvre N'IMPORTE QUEL fichier du dossier (chemin du contrat) avec

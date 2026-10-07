@@ -658,6 +658,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodleAjouter, (_e, id: unknown) => deps.moodle.ajouter(id));
 	ipcMain.handle(CANAUX.moodleRetirer, (_e, id: unknown) => deps.moodle.retirer(id));
 	ipcMain.handle(CANAUX.moodleFichiers, (_e, id: unknown) => deps.moodle.fichiers(id));
+	ipcMain.handle(CANAUX.moodleModule, (_e, id: unknown) => deps.moodle.module(id));
 	ipcMain.handle(CANAUX.moodleTelechargerCours, (_e, id: unknown) => deps.moodle.telechargerCours(id));
 	ipcMain.handle(CANAUX.moodleTelechargerFichier, (_e, id: unknown, nom: unknown) => deps.moodle.telechargerFichier(id, nom));
 	ipcMain.handle(CANAUX.moodleOuvrirDossier, (_e, id: unknown) => deps.moodle.ouvrirDossier(id));
