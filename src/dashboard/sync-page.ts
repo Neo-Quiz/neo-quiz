@@ -31,6 +31,7 @@ import { ajouter } from "../dom";
 import { currentLang, hourOptions, t } from "../i18n";
 import type { Changement, EtatSync } from "./sync-etat";
 import type { LigneJournal } from "./sync-etat";
+import { cleEtatAppareil, formaterDebit, garderEtat, type CleEtat, type EtatAffiche } from "./sync-affichage";
 
 export type CanalPartage = "systeme";
 
@@ -696,6 +697,11 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 	    a connected device was ACCEPTED, and the page says so before
 	    "Connected" (2026-10-04). */
 	const demandesVues = new Map<string, string>();
+	/** The state each device row shows now, and since when (`garderEtat`). */
+	const affiches = new Map<string, EtatAffiche>();
+	let reveil: ReturnType<typeof setTimeout> | null = null;
+	/** The open device-details window, repainted on each state. */
+	let dialogueAppareil: { id: string; peindre(e: EtatSync): void } | null = null;
 
 	function peindreAppareils(e: EtatSync): void {
 		fermerMenu();
@@ -706,7 +712,12 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			demandesVues.set(a.id, a.demande ?? "");
 		}
 		appareilsCarte.replaceChildren();
+		const maintenantMs = Date.now();
+		let reveilMs = Infinity;
+		if (reveil) { clearTimeout(reveil); reveil = null; }
+		for (const id of [...affiches.keys()]) if (!e.appareils.some(a => a.id === id)) affiches.delete(id);
 		if (e.appareils.length === 0) {
+			dialogueAppareil?.peindre(e);
 			ajouter(ajouter(appareilsCarte, "div", "qbd-sync-ligne"), "span", "qbd-sync-vide", t("settings.sync.noDevices"));
 			return;
 		}
@@ -723,11 +734,44 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 			   connection and closes it at once, and that blink read "Connected"
 			   (2026-10-04). The host clears `demande` once it is accepted. */
 			const connecte = a.connecte && !a.demande;
+			/* What Syncthing's own GUI shows: Paused, Scanning, Syncing N %, Up
+			   to date. A state stays on screen at least 800 ms (`garderEtat`),
+			   or a 100 ms scan would never be seen. */
+			let cle: CleEtat | null = null;
+			if (!a.demande) {
+				const g = garderEtat(affiches.get(a.id), cleEtatAppareil(e, a), maintenantMs);
+				affiches.set(a.id, g.affiche);
+				cle = g.affiche.cle;
+				if (g.attente > 0) reveilMs = Math.min(reveilMs, g.attente);
+			} else affiches.delete(a.id);
 			const sous = a.demande === "envoyee" ? t("settings.sync.waitingAccept")
 				: a.demande === "expiree" ? t("settings.sync.requestExpired")
-				: connecte ? (a.progression !== undefined && a.progression < 100 ? t("settings.sync.deviceSyncing", { pct: a.progression }) : t("settings.sync.deviceUpToDate"))
+				: cle === "paused" ? t("settings.sync.devicePaused")
+				: cle === "error" ? t("settings.sync.statusError")
+				: cle === "scanning" ? t("settings.sync.deviceScanning")
+				: cle === "syncing" ? (a.progression !== undefined && a.progression < 100 ? t("settings.sync.deviceSyncing", { pct: a.progression }) : t("settings.sync.deviceSyncingNoPct"))
+				: cle === "uptodate" ? t("settings.sync.deviceUpToDate")
 				: a.vuLe === null ? t("settings.sync.offline") : t("settings.sync.offlineSeen", { when: ilYA(a.vuLe) });
-			ajouter(texte, "span", connecte ? "qbd-sync-sous qbd-sync-sous-ok" : "qbd-sync-sous", sous);
+			const ton = cle === "uptodate" ? " qbd-sync-sous-ok" : cle === "scanning" || cle === "syncing" ? " qbd-sync-sous-actif" : cle === "error" ? " qbd-sync-sous-erreur" : "";
+			const ligneSous = ajouter(texte, "span", "qbd-sync-sous-ligne");
+			ajouter(ligneSous, "span", "qbd-sync-sous" + ton, sous);
+			/* Speeds, only while moving; Lucide icons, never arrows as text. */
+			if (connecte) {
+				for (const [valeur, nomIcone, libelle] of [[a.debitBas, "arrow-down", t("settings.sync.speedDown")], [a.debitHaut, "arrow-up", t("settings.sync.speedUp")]] as const) {
+					if (!valeur || valeur <= 0) continue;
+					const d = ajouter(ligneSous, "span", "qbd-sync-debit");
+					d.title = libelle;
+					currentHost().ui.setIcon(ajouter(d, "span", "qbd-sync-debit-icone"), nomIcone);
+					ajouter(d, "span", "", formaterDebit(valeur, currentLang()));
+				}
+			}
+			/* A click on the row opens its details (not on its buttons). */
+			l.classList.add("qbd-sync-ligne-info");
+			l.tabIndex = 0;
+			l.setAttribute("role", "button");
+			l.setAttribute("aria-label", t("settings.sync.infoLabel", { name: a.nom }));
+			l.addEventListener("click", ev => { if (!(ev.target as HTMLElement).closest(".qbd-sync-appareil-actions")) ouvrirInfoAppareil(a.id); });
+			l.addEventListener("keydown", ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target === l) { ev.preventDefault(); ouvrirInfoAppareil(a.id); } });
 			iconeL.classList.toggle("is-connecte", connecte);
 			/* Two plain actions, no menu (2026-10-04): rename what THIS device
 			   shows for it, and remove it (red bin). */
@@ -759,6 +803,68 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					.then(() => rafraichir());
 			});
 		}
+		/* Repaint when the longest-held state may change. */
+		if (Number.isFinite(reveilMs)) reveil = setTimeout(() => { reveil = null; if (dernierEtat && !demonte) peindreAppareils(dernierEtat); }, reveilMs + 20);
+		dialogueAppareil?.peindre(e);
+	}
+
+	/* ── Device details: how it is reached, last seen, Syncthing version, the
+	   full ID (no address). Remote strings go in with `textContent` only. ── */
+	function ouvrirInfoAppareil(id: string): void {
+		const depart = dernierEtat?.appareils.find(a => a.id === id);
+		if (dialogueAppareil || !depart) return;
+		let retour: ReturnType<typeof setTimeout> | null = null;
+		requireHost("modals").open({
+			className: "qbd-sync-modal qbd-sync-modal-info",
+			title: t("settings.sync.infoLabel", { name: depart.nom }),
+			titleIcon: el => { currentHost().ui.setIcon(el, "info"); },
+			onOpen: handle => {
+				const corps = ajouter(handle.contentEl, "div", "qbd-sync-dialogue");
+				const liste = ajouter(corps, "div", "qbd-sync-info");
+				const pied = ajouter(corps, "div", "qbd-sync-dialogue-pied");
+				ajouter(pied, "span", "qbd-sync-espace");
+				const copierBtn = bouton(pied, "copy", t("settings.sync.copy"));
+				const copierLbl = copierBtn.querySelector<HTMLElement>("span:last-of-type");
+				let vu = "";
+				const peindreInfo = (e: EtatSync): void => {
+					const a = e.appareils.find(x => x.id === id);
+					if (!a) { handle.close(); return; }
+					const connexion = !a.connecte ? t("settings.sync.connNone")
+						: a.connexion === "lan" ? t("settings.sync.connLan")
+						: a.connexion === "relais" ? t("settings.sync.connRelay")
+						: t("settings.sync.connDirect");
+					const vue = a.connecte ? t("settings.sync.connected") : a.vuLe === null ? t("settings.sync.infoNever") : ilYA(a.vuLe);
+					const lignes: Array<[string, string, boolean]> = [
+						[t("settings.sync.infoConnection"), connexion, false],
+						[t("settings.sync.infoLastSeen"), vue, false],
+						...(a.version ? [[t("settings.sync.infoVersion"), a.version.slice(0, 64), false] as [string, string, boolean]] : []),
+						[t("settings.sync.infoId"), a.id, true],
+					];
+					const empreinte = JSON.stringify(lignes);
+					if (empreinte === vu) return;
+					vu = empreinte;
+					liste.replaceChildren();
+					for (const [k, v, mono] of lignes) {
+						const r = ajouter(liste, "div", "qbd-sync-info-ligne");
+						ajouter(r, "span", "qbd-sync-info-cle", k);
+						ajouter(r, "span", mono ? "qbd-sync-id qbd-sync-info-valeur" : "qbd-sync-info-valeur", v);
+					}
+				};
+				copierBtn.addEventListener("click", () => {
+					void deps.copier(id).then(ok => {
+						if (!ok) { currentHost().ui.notice(t("settings.sync.shareFailed")); return; }
+						if (!copierLbl) return;
+						copierLbl.textContent = t("settings.sync.idCopied");
+						copierBtn.disabled = true;
+						if (retour) clearTimeout(retour);
+						retour = setTimeout(() => { copierLbl.textContent = t("settings.sync.copy"); copierBtn.disabled = false; }, 1500);
+					});
+				});
+				dialogueAppareil = { id, peindre: peindreInfo };
+				peindreInfo(dernierEtat ?? { actif: true, appareil: null, nom: "", appareils: [depart], demandes: [], demandesPlus: 0, dossier: { etat: "idle", pourcentage: null } });
+			},
+			onClose: () => { if (retour) clearTimeout(retour); dialogueAppareil = null; },
+		});
 	}
 
 	function ouvrirRenommer(id: string, nom: string): void {
@@ -970,6 +1076,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		demonte = true;
 		clearInterval(horloge);
 		clearInterval(horlogeChangements);
+		if (reveil) clearTimeout(reveil);
 		fermerMenu();
 		dialogueId?.fermer();
 		dialogueChangements?.fermer();

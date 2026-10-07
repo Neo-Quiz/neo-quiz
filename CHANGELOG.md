@@ -16,6 +16,7 @@ release notes.
 ### Changed
 - Create a folder can open an existing folder again, anywhere on the PC, such as your course folder.
 - Texts no longer name another app when they talk about your notes folders.
+- The Sync page shows each device scanning, syncing with its speed, or up to date, and a click on a device shows its connection details.
 
 ## [1.20.33] - 2026-10-07
 
