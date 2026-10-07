@@ -18,6 +18,7 @@ import { freeNotePath } from "./folder-create";
 import { parMode, quizFreres } from "./course-pairs";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
+import { openShareChooser } from "./share-choose";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
@@ -715,7 +716,8 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		if (shareQuiz) items.push({
 			icon: "share-2",
 			label: t("dashboard.quizzes.menuShare"),
-			onClick: () => { shareQuiz({ group: g }); },
+			// A small window first: the whole folder, or a choice of its quizzes.
+			onClick: () => { openShareChooser(g, shareQuiz); },
 		});
 		if (!fixe) items.push({
 			icon: "pencil",
