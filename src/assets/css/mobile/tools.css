@@ -1,2 +1,145 @@
 /* Phone-only fixes (html.nq-mobile / .is-mobile) for the tools screens, from the
    2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css. */
+
+/* ── Générer : the sidebar of chats sits ABOVE the page on a phone ──
+   On the desktop, the entries and the chats take a 220 px column beside
+   the page: on a phone that left the page 137 px wide (greeting, composer
+   and replies squeezed into a strip). Here the entries become a block on
+   top (search full width, new and generated side by side), the chats a
+   short list that scrolls on its own without a visible bar, and the page
+   takes the whole width underneath. */
+.is-mobile .qbd-content:has(> .qbd-ai-lateral) {
+	flex-direction: column;
+}
+.is-mobile .qbd-ai-lateral {
+	width: 100%;
+	max-height: none;
+	flex: none;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	gap: 4px;
+	padding: 8px 12px 0;
+	box-sizing: border-box;
+}
+.is-mobile .qbd-ai-lateral-recherche,
+.is-mobile .qbd-ai-lateral-item {
+	flex: 1 1 0;
+	min-width: 0;
+	width: auto;
+	min-height: 40px;
+	box-sizing: border-box;
+}
+.is-mobile .qbd-ai-lateral-recherche {
+	flex-basis: 100%;
+}
+.is-mobile .qbd-ai-chats {
+	flex: 0 1 auto;
+	flex-basis: 100%;
+	max-height: 20vh;
+	min-height: 0;
+	margin-top: 4px;
+	padding-bottom: 4px;
+	scrollbar-width: none;
+}
+/* A chat open: the thread gets the room, the list keeps two rows. */
+.is-mobile .qbd-content:has(> .qbd-ai-stage--conversation) .qbd-ai-chats {
+	max-height: 12vh;
+}
+.is-mobile .qbd-ai-chats::-webkit-scrollbar {
+	display: none;
+}
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage {
+	flex: 1 1 0;
+	width: 100%;
+	height: auto;
+	min-height: 0;
+	container-type: normal;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage:has(> .qbd-ai-title-row) {
+	overflow-y: auto;
+}
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage:has(> .qbd-ai-title-row) > * {
+	translate: none;
+}
+.is-mobile .qbd-ai-stage .qbd-ai-composer {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* The page of chats is as tall as the window, not as tall as its content:
+   the thread and the composer scroll inside the stage, and the bar at the
+   bottom stays where it is. Without a bounded height the whole document
+   scrolled (1498 px for a 800 px window) and the composer ended below the
+   bar. Only the Générer page (it holds the chats sidebar). */
+.is-mobile .qbd-layout:has(> .qbd-content > .qbd-ai-lateral) {
+	height: 100vh;
+	min-height: 0;
+	max-height: 100vh;
+	overflow: hidden;
+}
+.is-mobile .qbd-layout:has(> .qbd-content > .qbd-ai-lateral) > .qbd-content {
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+/* The provider bubble ("Choisissez un fournisseur") is placed by the page
+   centred on the provider button, 178 px wide: at the right of the composer
+   it ran past the screen edge ("Choisissez un fourni" cut at 393 px). On a
+   phone it hangs from the button's right edge instead, and its pointer
+   stays on the button. The button keeps its own width (the tools cell
+   shrank to 22 px and the 28 px button spilled out of it). */
+.is-mobile .qbd-ai-composer-tools {
+	flex: none;
+}
+.is-mobile .qbd-ai-provider-nudge.is-placed {
+	left: auto !important;
+	right: 0;
+}
+.is-mobile .qbd-ai-provider-nudge::after {
+	left: auto;
+	right: 8px;
+	transform: translateX(50%);
+}
+
+/* The « + » menu of the composer: its keyboard hints (Ctrl+U, @) mean
+   nothing on a touch screen and took the room the labels needed, so
+   « Ajouter des fichiers ou des images » was cut at « des imag… ». The
+   labels wrap instead. */
+.is-mobile .qbd-ai-plus-menu .qbd-action-menu-hint {
+	display: none;
+}
+.is-mobile .qbd-ai-plus-menu .qbd-select-option-label {
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+}
+
+/* Touch targets of the Générer page: 40 px at least (the rows of chats,
+   the « Generated » destination, the provider button, the chat delete and
+   the file chips were 26 to 34 px). */
+.is-mobile .qbd-ai-chat-ouvrir {
+	min-height: 40px;
+}
+.is-mobile .qbd-ai-chat-suppr,
+.is-mobile .qbd-ai-file-btn {
+	min-width: 40px;
+	min-height: 40px;
+}
+.is-mobile .qbd-ai-dest {
+	min-height: 40px;
+}
+.is-mobile .qbd-ai-composer-tools .qbd-select.qbd-provider-trigger-logo {
+	min-width: 40px;
+	min-height: 40px;
+}
+.is-mobile .qbd-ai-provider-nudge {
+	min-height: 40px;
+}
+.is-mobile .qbd-ai-plus-menu .qbd-select-option,
+.is-mobile .qbd-ai-kind-option {
+	min-height: 44px;
+}
