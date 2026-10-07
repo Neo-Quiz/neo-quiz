@@ -71,11 +71,23 @@ class ShareChannel(
         val t = now()
         val before = last.get()
         if (before != 0L && t - before < MIN_INTERVAL_MS || !last.compareAndSet(before, t)) throw IllegalStateException(BUSY)
-        purge(t)
-        val folder = File(dir, UUID.randomUUID().toString()).apply { mkdirs() }
-        val file = File(folder, clean)
-        file.writeBytes(bytes)
-        return if (sender.send(file, FileShare.mime(clean))) clean else null
+        var folder: File? = null
+        var sent = false
+        try {
+            purge(t)
+            folder = File(dir, UUID.randomUUID().toString()).apply { mkdirs() }
+            val file = File(folder, clean)
+            file.writeBytes(bytes)
+            sent = sender.send(file, FileShare.mime(clean))
+            return if (sent) clean else null
+        } finally {
+            // The guard is ALWAYS released when the share did not reach the sheet (failure, no app to
+            // receive it): the user may try again at once, and no half share stays in the cache.
+            if (!sent) {
+                folder?.deleteRecursively()
+                last.compareAndSet(t, before)
+            }
+        }
     }
 
     /** Removes the shares older than [MAX_AGE_MS]; failures are silent (a purge must not stop a share). */

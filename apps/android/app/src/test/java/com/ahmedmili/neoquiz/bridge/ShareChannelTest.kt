@@ -99,4 +99,23 @@ class ShareChannelTest {
         assertTrue(sent[1].first.exists())
     }
 
+    @Test fun aFailedShareLeavesNothingAndDoesNotBlockTheNextOne() = runBlocking {
+        accept = false
+        assertNull(channel.enregistrer("a.zip", b64(5)))
+        // No half share stays in the cache, and the user may try again at once (no 2 s wait after a failure).
+        assertEquals(0, dir.listFiles()?.size ?: 0)
+        accept = true
+        assertEquals("a.zip", channel.enregistrer("a.zip", b64(5)))
+    }
+
+    @Test fun aSenderThatThrowsReleasesTheGuard() {
+        var explode = true
+        val ch = ShareChannel(dir, { _, _ -> if (explode) throw IllegalStateException("no activity") else true }, { clock })
+        assertThrows(IllegalStateException::class.java) { runBlocking { ch.enregistrer("a.zip", b64(5)) } }
+        assertEquals(0, dir.listFiles()?.size ?: 0)
+        // Same clock, no wait: the guard was given back.
+        explode = false
+        assertEquals("b.zip", runBlocking { ch.enregistrer("b.zip", b64(5)) })
+    }
+
 }

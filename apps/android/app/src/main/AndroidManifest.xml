@@ -109,5 +109,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- The share sheet's own provider: not exported, read-only grants per share, and ONLY
+             `cache/share/` (`share_paths.xml`), unlike the one above. -->
+        <provider
+            android:name=".bridge.ShareFileProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
     </application>
 </manifest>

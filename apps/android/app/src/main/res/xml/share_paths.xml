@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The provider of the share sheet (`ShareFileProvider`): ONLY `cache/share/`, the files a share
+     hands to the system, written by the bridge itself (`ShareChannel`). The rest of the cache, the
+     shared storage and every private folder stay out. -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>
