@@ -48,7 +48,7 @@ export interface QuizzesHandlers {
 	    son dossier, pas à la racine de « Mes quiz » (demande Ahmed
 	    2026-07-21) — et la correspondance chemin → dossier de module vit ici,
 	    avec la note de correspondance et les overrides. */
-	openFolderOfQuiz(quizPath: string): void;
+	openFolderOfQuiz(quizPath: string, retour?: () => void): void;
 	/** The same folder as `openFolderOfQuiz`, set WITHOUT painting nor
 	    recording history: the host paints it itself, into the back sheet
 	    that comes forward when a quiz's page closes (`sheetStack.close`). */
@@ -221,6 +221,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	let ongletDossier: OngletDossier = "contenu";
 	let ongletPour: string | null = null;
 	let vuesDossier: VuesDossier | null = null;
+	/* Where the back arrow of the open folder goes instead of the grid, when the
+	   folder was opened from another page (Generate's "Generated quizzes"). One
+	   shot: set with the folder, dropped by the first back or any other
+	   navigation (`resetDrilldown`). */
+	let retourDossier: (() => void) | null = null;
 
 	function renderContent(treeEl: HTMLElement, quizzes: QuizIndexEntry[], inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (openModuleFolder !== null) {
@@ -390,6 +395,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// Flèche dessinée en CSS (masque), comme tout bouton retour du dashboard.
 			ajouter(back, "span", "qbd-quizzes-crumb-icon");
 			back.addEventListener("click", () => {
+				const retour = retourDossier;
+				retourDossier = null;
+				if (retour) { retour(); return; }
 				ctx.recordNav();
 				openModuleFolder = null;
 				// The folder's sheet slides back down, uncovering the grid.
@@ -585,7 +593,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		render,
 		// `dossierAttenduPour` aussi : une refermeture demandée pendant la
 		// lecture de la table ne doit pas être annulée par un retour différé.
-		resetDrilldown() { openModuleFolder = null; dossierAttenduPour = null; lastPaintedView = null; },
+		resetDrilldown() { openModuleFolder = null; retourDossier = null; dossierAttenduPour = null; lastPaintedView = null; },
 		getOpenFolder() { return openModuleFolder; },
 		openFolder(folder: string) { openModule(folder); },
 		openFolderTab(folder: string, onglet: OngletDossier) {
@@ -597,7 +605,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			ongletPour = folder;
 			if (containerRef) render(containerRef);
 		},
-		openFolderOfQuiz(quizPath: string) {
+		openFolderOfQuiz(quizPath: string, retour?: () => void) {
+			retourDossier = retour ?? null;
 			// Table pas encore lue (`lireModuleMap` rend toujours un objet, même
 			// vide : `null` veut dire « en cours ») : c'est `loadModuleMap` qui
 			// ouvrira, sur la vraie table. Voir `dossierAttenduPour`.

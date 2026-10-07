@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Back from Generated quizzes (opened from Generate) returns to Generate.
 - In a handed-in test, unanswered questions show the wrong mark on their bead.
 - Wallpaper names follow the interface language.
 

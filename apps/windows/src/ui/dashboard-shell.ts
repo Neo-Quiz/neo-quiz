@@ -664,7 +664,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			const dossier = dossierParDefaut(deps.aiSettings.get().aiOutputFolder);
 			const premier = deps.scanner.getQuizzes().find(q => q.path.startsWith(dossier + "/"));
 			naviguer("quizzes");
-			if (premier) quizzes.openFolderOfQuiz(premier.path);
+			// Its back arrow returns to Generate, not to the grid of folders.
+			if (premier) quizzes.openFolderOfQuiz(premier.path, () => naviguer("ai"));
 		},
 		quizFolders: () => dossiersDeQuiz(),
 		copyText: copierTexte,
