@@ -650,7 +650,11 @@ html.nq-mobile body {
 	height: auto;
 	min-height: 100vh;
 	overflow: visible;
-	padding-top: 0;
+	/* Resting position below the status bar plus a gap. The bare `padding-top: 0`
+	   that stood here beat shell.css's `#neo-quiz-root` padding, so the first
+	   card started under the clock (2026-10-07). Scrolling still runs under it. */
+	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
+	box-sizing: border-box;
 }
 
 .is-mobile #neo-quiz-root > .qbd-layout {
