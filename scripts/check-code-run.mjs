@@ -15,7 +15,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 const { document } = parseHTML("<html><body></body></html>");
 globalThis.document = document;
 
-await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }) => {
+await withSrcModule(["src/engine/code-run.ts", "src/code-exercise/besoin-en-ligne.ts"], async ({ createCodeRunHandlers }, { besoinEnLigne, URL_EN_LIGNE }) => {
 	const r = makeReporter("Bouton « Exécuter » — sortie jamais interprétée (M4)");
 
 	const CHARGE = '<img src=x onerror=alert(1)>';
@@ -66,6 +66,55 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 		const bloc = container.querySelector(".quiz-code-block");
 		r.check("table language not offered by the host: toolbar removed", bloc.querySelector(".quiz-code-toolbar"), null);
 		r.check("table language not offered by the host: executable class removed", bloc.classList.contains("quiz-code-block-executable"), false);
+	}
+
+	// "Run online": classification on the REAL strings of the Pyodide sandbox
+	// (task 3 and 4 reports), then the button's wiring.
+	const OUI = [
+		"ModuleNotFoundError: No module named 'torch'",
+		"ModuleNotFoundError: No module named 'numpy'\nThe module 'numpy' is included in the Pyodide distribution, but it is not installed.",
+		"ImportError: dynamic module does not define module export function (PyInit_base)",
+		"RuntimeError: TLS not supported in this environment",
+		"ValueError: Can't find a pure Python 3 wheel for 'pygame'.",
+		"ValueError: Can't fetch metadata for 'x'. Please make sure you have entered a correct package name",
+		"pyodide.ffi.JsException: TypeError: Failed to fetch",
+	];
+	const NON = [
+		"NameError: name 'x' is not defined",
+		"SyntaxError: invalid syntax",
+		"AssertionError: 3 != 4",
+		"ZeroDivisionError: division by zero",
+		"ImportError: cannot import name 'foo' from 'math'",
+		"FileNotFoundError: [Errno 44] No such file or directory: 'a.txt'",
+		"",
+	];
+	for (const e of OUI) r.check(`online needed: ${e.slice(0, 50)}`, besoinEnLigne(e), true);
+	for (const e of NON) r.check(`ordinary error: ${e.slice(0, 50)}`, besoinEnLigne(e), false);
+
+	{
+		const calls = [];
+		const container = fabriquerBloc();
+		const host = {
+			code: { languages: () => ["python"], run: async () => ({ status: "error", stdout: "", error: "ModuleNotFoundError: No module named 'torch'" }), warm: () => {} },
+			ui: { setIcon: () => {} },
+			shell: { copyText: async t => { calls.push(["copy", t]); return true; }, openUrl: async u => { calls.push(["open", u]); return true; } },
+		};
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		container.querySelector(".quiz-code-run-btn").dispatchEvent(new document.defaultView.Event("click"));
+		await new Promise(res => setTimeout(res, 0));
+		await new Promise(res => setTimeout(res, 0));
+		const online = container.querySelector(".quiz-code-online-btn");
+		r.check("online button shown for a blocked import", !!online, true);
+		online.dispatchEvent(new document.defaultView.Event("click"));
+		await new Promise(res => setTimeout(res, 0));
+		await new Promise(res => setTimeout(res, 0));
+		r.check("click copies the code then opens Colab", JSON.stringify(calls), JSON.stringify([["copy", 'print("x")'], ["open", URL_EN_LIGNE]]));
+		// an ordinary error offers nothing
+		host.code.run = async () => ({ status: "error", stdout: "", error: "NameError: name 'x' is not defined" });
+		container.querySelector(".quiz-code-run-btn").dispatchEvent(new document.defaultView.Event("click"));
+		await new Promise(res => setTimeout(res, 0));
+		await new Promise(res => setTimeout(res, 0));
+		r.check("no online button for a NameError (and the old one is gone)", container.querySelector(".quiz-code-online-btn"), null);
 	}
 
 	r.done();

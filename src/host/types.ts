@@ -378,6 +378,9 @@ export interface HostShell {
 	    de fichier : c'est `openExternal`. Sert au canal web de la page
 	    « Générer » (spec 2026-09-18). */
 	openUrl(url: string): Promise<boolean>;
+	/** Copies text to the system clipboard (`navigator.clipboard` is refused
+	    in the app window). Optional: `false` or absent means it did not work. */
+	copyText?(text: string): Promise<boolean>;
 }
 
 export interface HostPlatform {

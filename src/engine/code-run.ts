@@ -1,6 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
+import { besoinEnLigne, URL_EN_LIGNE } from "../code-exercise/besoin-en-ligne";
 import type { CodeRun } from "../host/types";
 import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../code-languages";
 
@@ -91,6 +92,31 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		}
 	}
 
+	/** « Run online »: copies the block's code, then opens Colab in the system
+	    browser. Built with DOM calls and `t()` only, no HTML string. */
+	function boutonEnLigne(source: string): HTMLElement {
+		const ligne = document.createElement("div");
+		ligne.className = "quiz-code-online";
+		const info = document.createElement("span");
+		info.textContent = t("engine.code.needsMore");
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "quiz-code-online-btn";
+		const icone = document.createElement("span");
+		icone.className = "quiz-code-online-icon";
+		ctx.host.ui.setIcon(icone, "external-link");
+		btn.append(icone, document.createTextNode(t("engine.code.runOnline")));
+		btn.addEventListener("click", e => {
+			e.preventDefault();
+			void (async () => {
+				try { await ctx.host.shell.copyText?.(source); } catch { /* best effort */ }
+				await ctx.host.shell.openUrl(URL_EN_LIGNE);
+			})();
+		});
+		ligne.append(info, btn);
+		return ligne;
+	}
+
 	async function executer(btn: HTMLButtonElement, source: string, language: CodeLanguage): Promise<void> {
 		const code = ctx.host.code;
 		if (!code) return; // cannot happen (button removed without HostCode), honest guard
@@ -102,6 +128,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		btn.classList.add("quiz-code-run-running");
 		sortie.hidden = false;
 		sortie.classList.remove("quiz-code-output-error", "quiz-code-output-panne");
+		sortie.querySelector(".quiz-code-online")?.remove();
 		sortie.textContent = t("engine.code.running");
 
 		try {
@@ -127,6 +154,9 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			sortie.textContent = texte;
 			sortie.classList.toggle("quiz-code-output-error", erreur);
 			sortie.classList.toggle("quiz-code-output-panne", panne);
+				if (language === "python" && resultat.status === "error" && besoinEnLigne(resultat.error ?? "")) {
+					sortie.appendChild(boutonEnLigne(source));
+				}
 		} catch {
 			sortie.textContent = t("engine.code.unavailable");
 			sortie.classList.add("quiz-code-output-panne");

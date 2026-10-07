@@ -100,6 +100,9 @@ export function createWindowsHost(carte: CarteRacines, index: MiroirDisque): Hos
 			window.open(url, "_blank", "noopener");
 			return true;
 		},
+		async copyText(text) {
+			try { await pont().systeme.copierTexte(text); return true; } catch { return false; }
+		},
 	};
 
 	const paths: Host["paths"] = {
