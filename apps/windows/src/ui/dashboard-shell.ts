@@ -62,6 +62,8 @@ import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
+import { mountMoodlePage } from "./moodle-page";
+import { EVENEMENT_OUVRIR_MOODLE } from "./moodle-settings";
 import { monterBoutonRail } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
@@ -404,7 +406,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   « fournisseur indisponible » propre, jamais un composer mort). */
 		/* The AI page and every entry that leads to it (rail, Home, folder
 		   menus) are guarded by this: nothing generates on a phone or tablet. */
-		canOpen: (vue) => vue !== "ai" || !currentHost().platform.isMobile,
+		canOpen: (vue) => (vue !== "ai" && vue !== "moodle") || !currentHost().platform.isMobile,
+		/* The Moodle page: a sheet over Folders, like a quiz's page. PC only. */
+		openMoodle: pont().moodle && !currentHost().platform.isMobile ? () => naviguer("moodle") : undefined,
 		reviewStore: deps.reviewStore,
 		sessionOf: (path) => {
 			const s = deps.sessions?.toutes()[path];
@@ -757,6 +761,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	    appartient ensuite à l'utilisateur (`pendingEdit` du greffon). Locale
 	    au montage : elle est toujours consommée dans le même tour. */
 	let editionEnAttente = false;
+	/** Unmounts the Moodle page painted last (timers, bridge subscription). */
+	let demonterMoodle: () => void = () => undefined;
 	/** Posée par `naviguer("detail")` et consommée par le prochain `peindre()` :
 	    l'utilisateur OUVRE la page, qui repart donc de sa fiche même sur le
 	    quiz déjà ouvert. Un repeint (annulation d'une suppression) la laisse
@@ -771,8 +777,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	    dernière peinte. */
 	function peindre(target: HTMLElement = contentEl): void {
 		// The sheets each page stands on ("Folders" sets its own).
-		if (vueCourante === "detail") sheets.sync(detailDepth);
+		if (vueCourante === "detail" || vueCourante === "moodle") sheets.sync(detailDepth);
 		else if (vueCourante !== "quizzes") sheets.sync(0);
+		demonterMoodle();
+		demonterMoodle = () => undefined;
 		target.replaceChildren();
 		const entering = vueCourante !== dernierePeinte;
 		dernierePeinte = vueCourante;
@@ -833,6 +841,19 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 					initialQuestion: initial,
 					ouverture,
 					onQuestionChange: (i) => noterVue({ vue: "detail", quiz: quiz.path, question: i }),
+				});
+				break;
+			}
+			case "moodle": {
+				const cible = vuePrecedente;
+				demonterMoodle = mountMoodlePage(target, {
+					onBack: () => {
+						if (cible === "quizzes" || cible === "home") {
+							naviguer(cible, undefined, () => sheets.close(t => peindre(t)));
+							return;
+						}
+						naviguer(cible);
+					},
 				});
 				break;
 			}
@@ -951,6 +972,17 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			return;
 		}
 		if (!ctx.canOpen(vue)) return;
+		if (vue === "moodle") {
+			const from = vueCourante;
+			if (from === "moodle") return;
+			vuePrecedente = from;
+			vueCourante = "moodle";
+			nav.setActive("moodle");
+			poserLueur(null);
+			detailDepth = sheets.depth() + 1;
+			if (!enRestauration) sheets.open(() => peindre()); else peindre();
+			return;
+		}
 		// Même refermeture qu'au greffon (dashboard.ts, navigate()) : entrer
 		// dans un module puis revenir par le rail doit rouvrir la GRILLE, pas
 		// le module laissé ouvert.
@@ -1054,7 +1086,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	// SAUF aussi la page « Générer » (même exclusion que le greffon) : elle
 	// porte un composer en cours de frappe et un popover d'options qu'un
 	// rendu détruirait.
-	const desabonner = deps.scanner.onChange(() => { if (vueCourante !== "detail" && vueCourante !== "ai") peindre(); });
+	/* "Open the Moodle page" of the settings (a modal over the shell). */
+	const ouvrirMoodle = (): void => { if (pont().moodle && !currentHost().platform.isMobile) naviguer("moodle"); };
+	window.addEventListener(EVENEMENT_OUVRIR_MOODLE, ouvrirMoodle);
+	const desabonner = deps.scanner.onChange(() => { if (vueCourante !== "detail" && vueCourante !== "ai" && vueCourante !== "moodle") peindre(); });
 
 	/* Le retour DÉSABONNE, et l'appelant DOIT l'invoquer avant tout
 	   remontage — même contrat que `renderSettings`/`openQuizPage` : sans lui,
@@ -1090,6 +1125,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		document.removeEventListener("mouseup", surBoutonSouris, true);
 		document.removeEventListener(EVENEMENT_RETOUR, surRetourAndroid);
 		desabonner();
+		window.removeEventListener(EVENEMENT_OUVRIR_MOODLE, ouvrirMoodle);
+		demonterMoodle();
 		demonterMaj();
 		sheets.drop();
 		/* La page « Générer » aussi : une génération en vol, son écoute Échap

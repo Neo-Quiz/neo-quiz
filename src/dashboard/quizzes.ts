@@ -523,6 +523,14 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   ended up under the last card. Removed at each render; hidden by
 			   CSS whenever the folders grid is not on screen. */
 			const mobile = currentHost().platform.isMobile;
+			if (!mobile && ctx.openMoodle) {
+				const moodle = ajouter(selects, "button", "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
+				moodle.type = "button";
+				const lm = ajouter(moodle, "span", "qbd-select-label");
+				currentHost().ui.setIcon(ajouter(lm, "span", "qbd-quizzes-subject-icon"), "graduation-cap");
+				ajouter(lm, "span", undefined, t("settings.moodle.title"));
+				moodle.addEventListener("click", () => ctx.openMoodle?.());
+			}
 			const genere = renderGeneratedButton(mobile ? document.body : selects, quizzes, stats, mobile);
 			if (mobile && genere) boutonsFlottants.push(genere);
 
