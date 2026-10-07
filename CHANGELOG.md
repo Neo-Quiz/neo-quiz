@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.35] - 2026-10-07
+
 ### Changed
 - On the phone, the bottom bar uses the same icons and press effect as the PC.
 - The glowing line at the top of the main panel is gone.
