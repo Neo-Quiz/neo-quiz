@@ -102,6 +102,11 @@ export interface AiSettings {
 	aiMentionExtraFolders?: string[];
 	/** Chemin relatif persistant du dossier qui reçoit les quiz générés. */
 	aiOutputFolder?: string;
+	/** The output folder the composer's row last chose, as a contract path
+	    (`Efrei/…/XTI301`, from `quizFolders`). "" = the default folder. Read
+	    back on each arrival at « Générer », and checked against the folders
+	    that still exist (`destinationMemorisee`). */
+	aiComposerDestination?: string;
 	/** The message "Explain" sends about a played question (2026-09-29,
 	    `explain-prompt.ts` placeholders). Empty: the translated default. */
 	aiExplainPrompt?: string;

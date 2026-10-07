@@ -408,3 +408,18 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	delete globalThis.document;
 	r.done();
 });
+
+/* The composer's output folder survives a reload (ai-settings-host.ts):
+   the folder last chosen is read back on arrival, only while it is still
+   one of the folders offered; anything else falls back to the default (""). */
+await withSrcModule("src/dashboard/ai-settings-host.ts", (S) => {
+	const r = makeReporter("Destination du composer — relue au retour");
+	const offerts = ["Efrei/XTI301", "Efrei/XTI302"];
+	r.check("un dossier choisi et toujours offert est relu tel quel", S.destinationMemorisee("Efrei/XTI302", offerts), "Efrei/XTI302");
+	r.check("aucun choix persisté : le dossier par défaut", S.destinationMemorisee(undefined, offerts), "");
+	r.check("un choix vide : le dossier par défaut", S.destinationMemorisee("", offerts), "");
+	r.check("un dossier supprimé depuis : retombe sur le défaut, pas écrit là", S.destinationMemorisee("Efrei/Supprime", offerts), "");
+	r.check("une valeur abîmée ou hors liste : le défaut", S.destinationMemorisee("../../Privé", offerts), "");
+	r.check("les réglages par défaut ne portent aucun choix persisté", S.aiSettingsDefaults().aiComposerDestination, "");
+	r.done();
+});

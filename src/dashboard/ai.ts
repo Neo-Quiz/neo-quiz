@@ -23,7 +23,7 @@ import { nouveauJeton, texteWeb, preparerOuverture } from "./ai-web";
 import type { ResultatOuverture } from "./ai-web";
 import type { Scanner, QuizIndexEntry } from "./scanner";
 import type { StatsStore } from "./stats-store";
-import { aiSettingsDefaults } from "./ai-settings-host";
+import { aiSettingsDefaults, destinationMemorisee } from "./ai-settings-host";
 import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
@@ -352,9 +352,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    the default of the current mode (`effectiveTypes`). */
 	let questionTypes: string[] | null = null;
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
-	   par défaut. Comme le nombre et le type, elle vaut pour la SESSION de la
-	   page et n'est pas persistée — rouvrir « Générer » repart du défaut,
-	   c'est-à-dire du comportement d'avant le 2026-09-17. */
+	   par défaut. Le CHOIX fait dans les options ou les suggestions est
+	   persisté (`aiComposerDestination`) et relu à chaque arrivée sur la page
+	   (`entrer`) ; un préréglage ou une destination d'examen ne l'est pas. */
 	let destination = "";
 	/* La destination vient d'un PRÉRÉGLAGE (« Créer avec l'IA » depuis un
 	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
@@ -987,6 +987,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		stageRef = null;
 		heroShown = false;
 		dossierProposePour = null;
+		// Un préréglage (« Créer avec l'IA ») ou un dossier d'examen est posé AVANT
+		// cette arrivée (`naviguer` appelle `preset` d'abord) : il l'emporte.
+		if (!destinationDuPreset && !destinationParExam) destination = destinationMemoriseeCourante();
 		return render(container);
 	}
 
@@ -1651,6 +1654,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				onClick: () => {
 					destination = d.value;
 					destinationDuPreset = false;
+					memoriserDestination(d.value);
 					majAvisCategorie();
 					paintDestination?.();
 				},
@@ -1811,7 +1815,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.setIcon(croix, "x");
 			croix.addEventListener("click", () => {
 				examCible = null;
-				if (destinationParExam) { destination = ""; destinationParExam = false; void render(containerRef); return; }
+				if (destinationParExam) { destination = destinationMemoriseeCourante(); destinationParExam = false; void render(containerRef); return; }
 				peindreExamCible();
 				updateGenerateBtn(generateBtnRef);
 			});
@@ -3646,6 +3650,19 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return dossierParDefaut(settings().aiOutputFolder);
 	}
 
+	/** The destination the user last chose, if its folder still exists;
+	    otherwise the default (""). What an arrival or a cancelled preset falls
+	    back to. */
+	function destinationMemoriseeCourante(): string {
+		return destinationMemorisee(settings().aiComposerDestination, destinationOptions().map(o => o.value).filter(v => v !== ""));
+	}
+
+	/** Remembers a folder the user chose in the composer's row or suggestions.
+	    A preset or an exam's folder is never remembered: it is for one send. */
+	function memoriserDestination(chemin: string): void {
+		void saveSettings({ aiComposerDestination: chemin });
+	}
+
 	/** The destinations offered by the composer's output-folder row: the
 	    default first (value `""`), then the folders the host declares. The
 	    default is removed from the others if it appears there — the same
@@ -3704,6 +3721,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				b.addEventListener("click", () => {
 					destination = d.path;
 					destinationDuPreset = false;
+					memoriserDestination(d.path);
 					majAvisCategorie();
 					paintDestination?.();
 					el.replaceChildren();
@@ -4224,7 +4242,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			fileGen.envoyer({ ...d, ...base, ...identite, mode: "learn", mixte: true, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
 			examCible = null;
 			vider();
-			if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
+			if (destinationDuPreset) { destination = destinationMemoriseeCourante(); destinationDuPreset = false; }
 			return;
 		}
 		/* ONE PASS (2026-10-01): N quizzes = ONE line of the queue, ONE
@@ -4243,7 +4261,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		vider();
 		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
-		if (destinationDuPreset) { destination = ""; destinationDuPreset = false; }
+		if (destinationDuPreset) { destination = destinationMemoriseeCourante(); destinationDuPreset = false; }
 	}
 
 
