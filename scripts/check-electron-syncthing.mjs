@@ -95,6 +95,11 @@ await withSrcModule(
 			r.check("nomSur: no control, line/paragraph separator or bidi override survives a hostile name",
 				regles.nomSur(hostile), ("EveDevice ID: " + ID).slice(0, 64));
 			r.check("nomSur: non strings give nothing, length capped at 64", [regles.nomSur(7), regles.nomSur("y".repeat(99)).length], ["", 64]);
+			/* This PC's own name: an empty hostname (or one that is only
+			   blanks) must not leave the device nameless on the others. */
+			r.check("nomDeCetAppareil: an empty hostname gets the fallback", [regles.nomDeCetAppareil(""), regles.nomDeCetAppareil("   "), regles.nomDeCetAppareil(undefined)], [regles.NOM_APPAREIL_DEFAUT, regles.NOM_APPAREIL_DEFAUT, regles.NOM_APPAREIL_DEFAUT]);
+			r.check("nomDeCetAppareil: a 100-character hostname is cut to 64", regles.nomDeCetAppareil("h".repeat(100)).length, 64);
+			r.check("nomDeCetAppareil: a normal hostname is kept as it is", regles.nomDeCetAppareil("PC-AHMED"), "PC-AHMED");
 			r.check("a hostile pending name cannot forge a line in the list either", [...demandesDepuis({ [AUTRE_ID]: { name: hostile } }, [], "OWN")[0].nom].some(c => [10, 13, 0x2028, 0x2029, 0x202e].includes(c.charCodeAt(0))), false);
 			{
 				const dates = { [AUTRE_ID]: { name: "old", time: "2026-10-01T08:00:00Z" }, [ID]: { name: "new", time: "2026-10-01T09:00:00Z" } };

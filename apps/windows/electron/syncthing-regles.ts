@@ -483,6 +483,16 @@ export function nomSur(brut: unknown): string {
 	return brut.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, NOM_MAX);
 }
 
+/** Name this PC gives itself to the other devices. `os.hostname()` can come
+    back empty, and an empty name leaves this device nameless on every other
+    one: the fallback is a plain label, since the main process has no i18n. The
+    same sanitising as a name received (`nomSur`), so a hostname is cut to 64
+    like any other. */
+export const NOM_APPAREIL_DEFAUT = "Windows PC";
+export function nomDeCetAppareil(hote: unknown): string {
+	return nomSur(hote) || NOM_APPAREIL_DEFAUT;
+}
+
 /** `lastSeen` of `GET /rest/stats/device` → milliseconds, `null` when the
     device was never seen (Syncthing writes the zero date) or the text is junk. */
 export function dernierVu(texte: unknown): number | null {

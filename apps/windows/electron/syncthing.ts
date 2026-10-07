@@ -52,6 +52,7 @@ import {
 	creerDetecteurReception,
 	dernierVu,
 	demandesDepuis,
+	nomDeCetAppareil,
 	nomSur,
 	plusDemandes,
 	folderConfig,
@@ -297,7 +298,7 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 		await rest.patchOptions(optionsFixees(await portLibre(LISTEN_PORT), process.platform));
 		const appareils = await rest.devices();
 		const moi = appareils.find(d => d.deviceID === ownId);
-		const nom = os.hostname();
+		const nom = nomDeCetAppareil(os.hostname());
 		if (moi && moi.name !== nom) await rest.putDevice({ ...moi, name: nom });
 		const paires = appareils.filter(d => d.deviceID !== ownId).map(d => d.deviceID);
 		await rest.putFolder(folderConfig(opts.root, ownId, paires));
@@ -438,7 +439,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		return {
 			actif: true,
 			appareil: ownId,
-			nom: os.hostname().slice(0, 64),
+			nom: nomDeCetAppareil(os.hostname()),
 			appareils: visibles.map(d => {
 				const demande = etatDemande(envois.get(d.deviceID), d.paused === true, maintenant);
 				/* Expired: paused, so it stops knocking at the other side. */
@@ -540,7 +541,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		let change = false;
 		let noms: Map<string, string> | null = null;
 		const nomDe = (court: string): string => {
-			if (court && courant.ownId.startsWith(court)) return os.hostname().slice(0, 64);
+			if (court && courant.ownId.startsWith(court)) return nomDeCetAppareil(os.hostname());
 			for (const [id, nom] of noms ?? []) if (court && id.startsWith(court)) return nom || id.slice(0, 7);
 			return court || "?";
 		};
@@ -941,7 +942,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 			if (!fenetreQr.ouverte()) { try { await h.pardonnerIgnores(); } catch { /* best effort */ } }
 			const code = fenetreQr.tourner();
 			try { await verifierDemandesQr(h); } catch { /* the next call looks again */ }
-			return { texte: texteQr(h.idPropre(), code, os.hostname().slice(0, 64)), periodeMs: PERIODE_MS };
+			return { texte: texteQr(h.idPropre(), code, nomDeCetAppareil(os.hostname())), periodeMs: PERIODE_MS };
 		},
 		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
 		signalerEcriture(abs) { handle?.signalerEcriture(abs); },
