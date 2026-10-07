@@ -17,6 +17,7 @@ import com.ahmedmili.neoquiz.sync.SyncHub
 import com.ahmedmili.neoquiz.ui.FolderPickerDialog
 import com.ahmedmili.neoquiz.ui.NavBarView
 import com.ahmedmili.neoquiz.ui.QrScanner
+import com.ahmedmili.neoquiz.update.UpdateChannel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ class AppBridge(
     private val perimeter: Perimeter,
     /** The native bottom tab bar (`NavBarView`); the activity places it under the WebView. */
     val navBar: NavBarView,
+    private val update: UpdateChannel,
 ) {
     /** The image behind a `/neo-res/` URL, or `null` when the perimeter or the type allow-list refuses it. */
     fun resource(url: String): ResourceFile? = ResourceRoute.resolve(url, perimeter)
@@ -57,6 +59,8 @@ class AppBridge(
      * are announced after the scan, so the journals are reloaded on top of it.
      */
     fun rescan() {
+        // Start and every return to the foreground: the updater checks for a new version (at most every 6 h).
+        update.onForeground()
         scope.launch {
             scan.rescan()
             if (sync.takePendingReception()) bridge.emit("sync.donneesRecues", null)
@@ -132,12 +136,13 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
 
     val backChannel = BackChannel { bridge?.emit("android.retour", null) }
     val navBar = NavBarView(activity).apply { onTap = { i -> bridge?.emit("android.barreClic", i) } }
+    val updateChannel = UpdateChannel.create(activity, scope) { state -> bridge?.emit("miseAJour.etat", state) }
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
         Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it) }.handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
     )
     bridge = created
-    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar)
+    return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar, updateChannel)
 }

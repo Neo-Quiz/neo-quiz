@@ -6,6 +6,7 @@
     "app:dev": "npm --prefix apps/windows run dev",
     "app:build": "npm --prefix apps/windows run build",
     "android:web": "node apps/android/web/build.mjs",
+    "ship:android": "node scripts/ship-android.mjs",
     "android:build": "npm run android:web && cd apps/android && gradlew assembleDebug",
     "check": "tsc --noEmit",
     "check:ci-coverage": "node scripts/check-ci-coverage.mjs",

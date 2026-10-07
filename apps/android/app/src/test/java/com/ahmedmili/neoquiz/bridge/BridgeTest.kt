@@ -49,6 +49,18 @@ class BridgeTest {
                 override fun read(): String? = null
                 override fun write(raw: String) {}
             }), { }).handlers() +
+            com.ahmedmili.neoquiz.update.UpdateChannel(
+                com.ahmedmili.neoquiz.update.UpdateEngine(
+                    installedCode = 1, installedName = "0.1.0", dir = File(base, "update"),
+                    openManifest = { throw java.io.IOException("offline") }, openApk = { throw java.io.IOException("offline") },
+                    store = object : com.ahmedmili.neoquiz.update.CheckStore {
+                        override fun lastCheck() = 0L
+                        override fun setLastCheck(ms: Long) {}
+                    },
+                    canInstall = { true }, askPermission = {}, installer = {},
+                ),
+                CoroutineScope(Dispatchers.Default),
+            ).handlers() +
             Unavailable.handlers()
     }
 

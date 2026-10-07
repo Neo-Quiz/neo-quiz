@@ -25,6 +25,7 @@ import { savedFolders } from "../host/folder";
 import { chargerLangue, lireLangue, reglerLangue } from "./langue";
 import { lireFormatHeure, reglerFormatHeure } from "./format-heure";
 import { pont } from "../host/pont";
+import { monterLigneMajAndroid } from "./mise-a-jour";
 import { createSelect } from "../../../../src/dashboard/ui-select";
 import { getProvider, MARQUES, resoudreApresMasquage } from "../../../../src/dashboard/ai-providers";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
@@ -372,6 +373,14 @@ export function renderSettings(
 		createSelect(row(general, t("app.settings.timeFormat")), { value: currentHourCycle(), options: formats, onChange: changerFormat });
 	}
 
+	/* PHONE: the in-app updater (version, manual check). The desktop's menu has its own. */
+	let demonterMajAndroid: () => void = () => {};
+	if (mobile) {
+		const controle = row(general, t("app.update.android.row"), " ");
+		const aide = controle.parentElement!.querySelector<HTMLElement>(".nq-set-ligne-aide")!;
+		demonterMajAndroid = monterLigneMajAndroid(controle, aide);
+	}
+
 	/* ═══ AI ═══ */
 	/* On mobile the page is never attached (no category): it is built into a
 	   detached node so that the prompt sections below keep their handles, and
@@ -515,5 +524,5 @@ export function renderSettings(
 	   (whose page then opens "Add a device" with it). */
 	const allerSync = (): void => { if (sync) show("sync"); };
 	surAjoutEnAttente.add(allerSync);
-	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterComptes(); demonterFond(); demonterLangages(); demonterMoodle(); demonterSync(); root.replaceChildren(); };
+	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterMajAndroid(); demonterComptes(); demonterFond(); demonterLangages(); demonterMoodle(); demonterSync(); root.replaceChildren(); };
 }

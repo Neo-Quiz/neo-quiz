@@ -1,0 +1,169 @@
+package com.ahmedmili.neoquiz.update
+
+import java.io.File
+import java.io.InputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Where the time of the last successful check lives (SharedPreferences in the app, a variable in tests). */
+interface CheckStore {
+    fun lastCheck(): Long
+    fun setLastCheck(ms: Long)
+}
+
+/**
+ * What the page shows: the `EtatMiseAJour` of the bridge (`mise-a-jour-etat.ts`),
+ * with two phases the phone adds, `disponible` (a version waits for the tap on
+ * Install) and `autorisation` (Android must first be told Neo Quiz may install
+ * apps). `message` is a CODE (`network`, `invalid`, `mismatch`, `install`) the
+ * page translates.
+ */
+data class UpdateState(
+    val phase: String,
+    val actuelle: String,
+    val version: String? = null,
+    val notes: String? = null,
+    val pourcent: Int? = null,
+    val octetsRecus: Long? = null,
+    val octetsTotal: Long? = null,
+    val message: String? = null,
+) {
+    fun toMap(): Map<String, Any?> = buildMap {
+        put("phase", phase)
+        put("actuelle", actuelle)
+        version?.let { put("version", it) }
+        notes?.let { put("notes", it) }
+        pourcent?.let { put("pourcent", it) }
+        octetsRecus?.let { put("octetsRecus", it) }
+        octetsTotal?.let { put("octetsTotal", it) }
+        message?.let { put("message", it) }
+    }
+}
+
+/**
+ * The updater's state machine: check the manifest, wait for the tap, download,
+ * verify, hand the file to the installer. Every effect (network, clock,
+ * install permission, installer) is injected, so `UpdateEngineTest` drives the
+ * whole thing on the JVM.
+ *
+ * Nothing is downloaded by [check]: a download starts only from [install], i.e.
+ * from the user's tap, so no data (metered or not) is spent without it.
+ */
+class UpdateEngine(
+    private val installedCode: Int,
+    private val installedName: String,
+    private val dir: File,
+    private val openManifest: () -> InputStream,
+    private val openApk: (String) -> InputStream,
+    private val store: CheckStore,
+    private val canInstall: () -> Boolean,
+    private val askPermission: () -> Unit,
+    private val installer: (File) -> Unit,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val onState: (UpdateState) -> Unit = {},
+    private val apkDeadlineMs: Long = UpdateDownload.DEADLINE_MS,
+) {
+    @Volatile var state: UpdateState = UpdateState("inactif", installedName)
+        private set
+    @Volatile private var manifest: UpdateManifest? = null
+    private var working = false
+
+    private fun set(next: UpdateState) {
+        state = next
+        onState(next)
+    }
+
+    private fun claim(): Boolean = synchronized(this) { if (working) false else { working = true; true } }
+    private fun release() = synchronized(this) { working = false }
+
+    /** Removes what an earlier run left in the cache (a partial or already installed APK). */
+    fun cleanup() {
+        dir.listFiles()?.forEach { it.delete() }
+    }
+
+    /** Checks the manifest; [force] ignores the 6 h interval (the manual button). Returns whether a check ran. */
+    suspend fun check(force: Boolean): Boolean = withContext(Dispatchers.IO) {
+        if (state.phase == "telechargement" || state.phase == "prete") return@withContext false
+        if (!force && !UpdateRules.due(store.lastCheck(), clock())) return@withContext false
+        if (!claim()) return@withContext false
+        val before = state
+        try {
+            set(UpdateState("verification", installedName))
+            val found = try {
+                UpdateRules.parse(UpdateDownload.readManifest(openManifest))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: UpdateRefused) {
+                return@withContext failedCheck(force, before, "invalid")
+            } catch (e: Exception) {
+                return@withContext failedCheck(force, before, "network")
+            }
+            store.setLastCheck(clock())
+            if (UpdateRules.isNewer(installedCode, found)) {
+                manifest = found
+                set(UpdateState("disponible", installedName, version = found.versionName, notes = found.notes))
+            } else {
+                manifest = null
+                set(UpdateState("a-jour", installedName))
+            }
+            true
+        } finally {
+            release()
+        }
+    }
+
+    /** A failed AUTOMATIC check is silent (the previous state comes back); a manual one says so. */
+    private fun failedCheck(force: Boolean, before: UpdateState, code: String): Boolean {
+        set(if (force) UpdateState("erreur", installedName, message = code) else before)
+        return true
+    }
+
+    /** The tap on Install: permission, download, verification, then the installer. */
+    suspend fun install() = withContext(Dispatchers.IO) {
+        val m = manifest ?: return@withContext
+        if (state.phase != "disponible" && state.phase != "autorisation" && state.phase != "erreur") return@withContext
+        if (!canInstall()) {
+            set(UpdateState("autorisation", installedName, version = m.versionName, notes = m.notes))
+            askPermission()
+            return@withContext
+        }
+        if (!claim()) return@withContext
+        try {
+            var last = -1
+            set(UpdateState("telechargement", installedName, version = m.versionName, pourcent = 0, octetsRecus = 0, octetsTotal = m.size))
+            val apk = try {
+                UpdateDownload.fetchApk(m, dir, openApk, { got, total ->
+                    val pct = (got * 100 / total).toInt()
+                    if (pct != last) {
+                        last = pct
+                        set(UpdateState("telechargement", installedName, version = m.versionName, pourcent = pct, octetsRecus = got, octetsTotal = total))
+                    }
+                }, apkDeadlineMs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: UpdateRefused) {
+                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "mismatch"))
+            } catch (e: Exception) {
+                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "network"))
+            } catch (e: OutOfMemoryError) {
+                return@withContext set(UpdateState("erreur", installedName, version = m.versionName, message = "network"))
+            }
+            set(UpdateState("prete", installedName, version = m.versionName))
+            try {
+                installer(apk)
+            } catch (e: Exception) {
+                installFailed()
+            }
+        } finally {
+            release()
+        }
+    }
+
+    /** The system installer refused or was cancelled: the file goes, the user may tap again. */
+    fun installFailed() {
+        cleanup()
+        val m = manifest
+        set(UpdateState("erreur", installedName, version = m?.versionName, notes = m?.notes, message = "install"))
+    }
+}

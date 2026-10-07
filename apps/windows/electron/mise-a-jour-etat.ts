@@ -21,7 +21,9 @@
    vérifié, et un échec de re-vérification réseau n'y change rien.
 ══════════════════════════════════════════════════════════ */
 
-export type PhaseMiseAJour = "inactif" | "verification" | "a-jour" | "telechargement" | "prete" | "erreur";
+/* "disponible" and "autorisation" exist on the phone only (Android app): a version waits for the tap on
+   Install, or Android must first allow Neo Quiz to install apps. Electron never sends them. */
+export type PhaseMiseAJour = "inactif" | "verification" | "a-jour" | "disponible" | "autorisation" | "telechargement" | "prete" | "erreur";
 
 export interface EtatMiseAJour {
 	phase: PhaseMiseAJour;
@@ -31,6 +33,9 @@ export interface EtatMiseAJour {
 	octetsRecus?: number | null;
 	octetsTotal?: number | null;
 	message?: string;
+	/** Phone only: the installed versionName, and the notes of the version on offer. */
+	actuelle?: string;
+	notes?: string;
 }
 
 export type EvenementMiseAJour =

@@ -198,3 +198,86 @@ export function monterBoutonRail(navEl: HTMLElement): () => void {
 	});
 	return () => { desabonner(); retirer(); };
 }
+
+/* ══════════════════════════════════════════════════════════
+   ANDROID: the banner and the Settings row of the in-app updater
+
+   Same channels as the rail button (`miseAJour.*`), answered in Kotlin by
+   `update/UpdateEngine.kt`. A check never downloads: the banner offers
+   "Install", and only that tap starts the download (no data spent without
+   it). `message` of an error state is a CODE the page translates.
+══════════════════════════════════════════════════════════ */
+
+/** The sentence under an error / permission state, or null when there is none. */
+function texteEtat(e: EtatMiseAJour): string | null {
+	if (e.phase === "autorisation") return t("app.update.android.allow");
+	if (e.phase !== "erreur") return null;
+	const code = e.message === "invalid" || e.message === "mismatch" || e.message === "install" ? e.message : "network";
+	return t(`app.update.android.err.${code}` as const);
+}
+
+/**
+ * The banner above the bottom bar: "Update available (x.y.z)" with Install, then
+ * the progress, then the reason of a failure. Only where the app really offers
+ * a version or says something about a tapped install; silent otherwise.
+ */
+export function monterBanniereMajAndroid(): () => void {
+	let banniere: HTMLElement | null = null;
+	const retirer = (): void => { banniere?.remove(); banniere = null; };
+	const demonter = abonner(e => {
+		const installer = e.phase === "disponible" || e.phase === "autorisation" || (e.phase === "erreur" && !!e.version);
+		const enCours = e.phase === "telechargement" || e.phase === "prete";
+		if (!installer && !enCours) { retirer(); return; }
+		if (!banniere) {
+			banniere = document.createElement("div");
+			banniere.className = "nq-maj-banniere";
+			banniere.setAttribute("role", "status");
+			document.body.append(banniere);
+		}
+		banniere.textContent = "";
+		const version = e.version ?? "";
+		const texte = ajouter(banniere, "div", "nq-maj-banniere-texte");
+		const titre = e.phase === "telechargement"
+			? t("app.update.android.downloading", { version }) + (typeof e.pourcent === "number" ? " " + e.pourcent + " %" : "")
+			: e.phase === "prete" ? t("app.update.android.ready", { version })
+				: t("app.update.android.available", { version });
+		ajouter(texte, "span", "nq-maj-banniere-titre", titre);
+		const detail = texteEtat(e);
+		if (detail) ajouter(texte, "span", "nq-maj-banniere-detail", detail);
+		if (installer) {
+			const bouton = ajouter(banniere, "button", "nq-maj-banniere-bouton", t("app.update.android.install"));
+			bouton.type = "button";
+			bouton.addEventListener("click", () => { void pont().miseAJour.installer(); });
+		}
+	});
+	return () => { demonter(); retirer(); };
+}
+
+/**
+ * The "Updates" row of the phone's Settings: the installed version under the
+ * name, and a "Check" button (a manual check ignores the 6 h interval). A
+ * version on offer is installed from the banner.
+ */
+export function monterLigneMajAndroid(controle: HTMLElement, aide: HTMLElement): () => void {
+	const bouton = ajouter(controle, "button", "nq-reglages-changer", t("app.update.android.check"));
+	bouton.type = "button";
+	let verification = false;
+	bouton.addEventListener("click", () => {
+		if (verification) return;
+		verification = true;
+		bouton.disabled = true;
+		bouton.textContent = t("app.update.android.checking");
+		void pont().miseAJour.verifier().catch(() => false).then(() => {
+			verification = false;
+			bouton.disabled = false;
+			bouton.textContent = t("app.update.android.check");
+		});
+	});
+	return abonner(e => {
+		const actuelle = e.actuelle ? t("app.update.android.version", { version: e.actuelle }) : "";
+		const suite = e.phase === "a-jour" ? t("app.update.android.upToDate")
+			: e.phase === "disponible" ? t("app.update.android.available", { version: e.version ?? "" })
+				: texteEtat(e);
+		aide.textContent = [actuelle, suite].filter(Boolean).join(" · ");
+	});
+}

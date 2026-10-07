@@ -20,6 +20,9 @@
     <!-- Daily review notification: an inexact alarm (no exact-alarm permission), re-armed after boot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- The in-app updater hands a verified APK to the system installer (PackageInstaller session). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- The phone's own QR code scanner (Xiaomi / HyperOS), looked up before Google's. -->
     <queries>
         <intent>
@@ -91,6 +94,9 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- The system installer's answer to the updater's session. Not reachable by other apps. -->
+        <receiver android:name=".update.UpdateResultReceiver" android:exported="false" />
 
         <!-- Hands a file of the quiz folder to another app (`systeme.ouvrir`); URIs are only
              minted by the bridge after the perimeter check, and granted read-only per call. -->

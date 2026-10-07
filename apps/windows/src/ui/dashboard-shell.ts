@@ -65,7 +65,7 @@ import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { openMoodleModal } from "./moodle-modal";
-import { monterBoutonRail } from "./mise-a-jour";
+import { monterBoutonRail, monterBanniereMajAndroid } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
 import { basculerMenuApp } from "./barre-titre";
@@ -1088,7 +1088,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
 	// posé une fois pour toute la durée de la coquille — un seul abonnement
 	// au pont pour toute la fenêtre (`mise-a-jour.ts`).
-	const demonterMaj = monterBoutonRail(navEl);
+	const demonterMajRail = monterBoutonRail(navEl);
+	// The phone has no rail: its updater speaks through a banner above the bottom bar.
+	const demonterMajBanniere = currentHost().platform.isMobile ? monterBanniereMajAndroid() : () => {};
+	const demonterMaj = (): void => { demonterMajRail(); demonterMajBanniere(); };
 	// Synchronise le rail sur la vue persistée (retour d'un quiz sur « Mes
 	// quiz », par exemple) : `createNavHandlers` démarre chaque fois avec son
 	// propre `activeNav` interne à "home".
