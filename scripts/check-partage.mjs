@@ -268,6 +268,14 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts", "src
 	r.check("notes are kept; svg, exe, pdf, a path with .. and an oversize image are left out, each with its reason",
 		[cls.writes.map(w => w.path), cls.discarded.map(x => `${x.name}:${x.reason}`).sort()],
 		[["Cours/CM1.md"], ["..\\..\\Startup\\x.png:bad-name", "cours.pdf:unsupported-type", "dessin.SVG:unsupported-type", "gros.png:image-too-large", "setup.exe:unsupported-type"]]);
+	const png = (n) => new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, n]);
+	const bytesOf = (...parts) => new Uint8Array(parts.flatMap(x => typeof x === "string" ? [...x].map(c => c.charCodeAt(0)) : x));
+	const sigs = { "a.png": png(0), "b.jpg": new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0]), "c.gif": bytesOf("GIF89a"), "d.webp": bytesOf("RIFF", [0, 0, 0, 0], "WEBPVP8 "), "e.bmp": bytesOf("BM", new Array(30).fill(0)), "f.avif": bytesOf([0, 0, 0, 28], "ftypavif") };
+	const real = planOf(Object.entries(sigs).map(([name, bytes]) => ({ name, bytes })));
+	r.check("images whose bytes are a PNG, JPEG, GIF, WebP, BMP or AVIF are imported", [real.writes.map(w => w.path), real.discarded], [Object.keys(sigs), []]);
+	const fake = planOf([{ name: "shot.png", bytes: bytesOf("MZ", [0x90, 0], "a program") }, { name: "x.jpg", bytes: bytesOf("<script>alert(1)</script>") }, { name: "y.gif", bytes: new Uint8Array(0) }, { name: "z.webp", bytes: bytesOf("RIFF", [0, 0, 0, 0], "WAVEfmt ") }, { name: "renamed.jpg", bytes: png(9) }]);
+	r.check("a file that only CLAIMS to be an image (program, script, empty, a WAV) is left out as 'not-an-image'; a PNG named .jpg still displays and stays",
+		[fake.writes.map(w => w.path), fake.discarded.map(x => `${x.name}:${x.reason}`)], [["renamed.jpg"], ["shot.png:not-an-image", "x.jpg:not-an-image", "y.gif:not-an-image", "z.webp:not-an-image"]]);
 	r.check("an image name: path flattened, hidden dots stripped, no extension refused", [nomImageImportee("a/b/c.PNG"), nomImageImportee("..png"), nomImageImportee("x"), nomImageImportee("x.png.bat")], ["c.png", null, null, null]);
 	r.check("Windows device names are refused as imported names", [nomImageImportee("CON.png"), nomImageImportee("d/nul.jpg"), zip.nomNoteImportee("COM1.md"), zip.nomNoteImportee("console.md")], [null, null, null, "console"]);
 
@@ -423,7 +431,8 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-plan.ts"], asy
 		{ name: "big.md", bytes: "x", size: IMPORT_LIMITS.entry + 1 },
 	]));
 	r.check("the good entry is read and every other one is listed with its reason", [mixed.files.length, mixed.skipped.map(x => `${x.name}:${x.reason}`).sort()], [1, ["big.md:too-big", "enc.md:encrypted", "m.md:bad-crc"]]);
-	const cl = planOf([{ name: "a.png", bytes: new Uint8Array([1]) }, { name: "dir/A.PNG", bytes: new Uint8Array([2]) }, { name: "dir2/a.png", bytes: new Uint8Array([1]) }, { name: "con.md", bytes: new Uint8Array([1]) }, { name: "x.pdf", bytes: new Uint8Array([1]) }]);
+	const png = (n) => new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, n]);
+	const cl = planOf([{ name: "a.png", bytes: png(1) }, { name: "dir/A.PNG", bytes: png(2) }, { name: "dir2/a.png", bytes: png(1) }, { name: "con.md", bytes: new Uint8Array([1]) }, { name: "x.pdf", bytes: new Uint8Array([1]) }]);
 	r.check("the import plan keeps same-named images of different folders and lists a refused name and a type", [cl.writes.map(w => w.path), cl.discarded.map(x => `${x.name}:${x.reason}`)], [["a.png", "dir/A.PNG", "dir2/a.png"], ["x.pdf:unsupported-type", "con.md:bad-name"]]);
 	r.done();
 });

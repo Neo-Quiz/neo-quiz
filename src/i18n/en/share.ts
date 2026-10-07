@@ -32,6 +32,7 @@ export const EN_SHARE = {
 	"share.why.unsupported-type": "not a quiz or an image",
 	"share.why.bad-name": "name not allowed",
 	"share.why.image-too-large": "image over 8 MB",
+	"share.why.not-an-image": "not really an image (its content is something else)",
 	"share.why.duplicate-image": "another image in the archive has the same name",
 	"share.why.image-name-taken": "a different image with this name is already in the folder",
 	"share.why.no-quiz": "no quiz in this note",

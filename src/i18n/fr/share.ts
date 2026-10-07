@@ -32,6 +32,7 @@ export const FR_SHARE: Record<keyof typeof EN_SHARE, string> = {
 	"share.why.unsupported-type": "ni un quiz ni une image",
 	"share.why.bad-name": "nom non autorisé",
 	"share.why.image-too-large": "image de plus de 8 Mo",
+	"share.why.not-an-image": "pas vraiment une image (son contenu est autre chose)",
 	"share.why.duplicate-image": "une autre image de l'archive porte le même nom",
 	"share.why.image-name-taken": "une image différente porte déjà ce nom dans le dossier",
 	"share.why.no-quiz": "aucun quiz dans cette note",

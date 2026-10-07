@@ -51,6 +51,7 @@ release notes.
 - Sharing refuses file names Windows reserves (CON, NUL, COM1...), and an import whose files would end up at a path too long for Windows says which file is the problem.
 - Importing an archive named `__proto__`, `constructor` or `prototype` no longer loses the folder's settings; such names are imported as "Import".
 - Invisible text-direction and zero-width characters are removed from shared file names, so a name cannot display as another extension.
+- Importing a shared archive leaves out a file named like an image whose content is something else, and says so.
 
 ## [1.20.42] - 2026-10-07
 

@@ -2,7 +2,7 @@ import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import { MANIFEST_NAME, readManifest } from "./share-manifest";
 import type { FolderSettings } from "./share-manifest";
 import { NAME_MAX, baseNameVerdict, cleanName, isReservedName } from "./share-names";
-import { IMAGE_IMPORT_EXTENSIONS, IMAGE_IMPORT_MAX_BYTES, isJunkEntry } from "./zip";
+import { IMAGE_IMPORT_EXTENSIONS, IMAGE_IMPORT_MAX_BYTES, isJunkEntry, looksLikeImage } from "./zip";
 import type { ZipSkip, ZipSkipReason } from "./zip";
 
 /* ══════════════════════════════════════════════════════════
@@ -35,7 +35,7 @@ export interface PreparedFile { name: string; bytes: Uint8Array; sha256: string 
 
 export type DiscardReason =
 	| ZipSkipReason
-	| "unsupported-type" | "bad-name" | "image-too-large" | "duplicate-image" | "image-name-taken" | "no-quiz" | "altered";
+	| "unsupported-type" | "bad-name" | "image-too-large" | "not-an-image" | "duplicate-image" | "image-name-taken" | "no-quiz" | "altered";
 
 export interface PlannedWrite {
 	/** Relative to the target folder, "/" separated, NFC. */
@@ -202,6 +202,7 @@ export function planImport(input: PlanInput): ImportPlan {
 
 		if (e.kind === "image") {
 			if (e.file.bytes.length > IMAGE_IMPORT_MAX_BYTES) { plan.discarded.push({ name: e.file.name, reason: "image-too-large" }); continue; }
+			if (!looksLikeImage(e.file.bytes)) { plan.discarded.push({ name: e.file.name, reason: "not-an-image" }); continue; }
 			const path = `${prefix}${verdict.name}${ext}`;
 			const key = foldPath(path);
 			const same = taken.get(key);

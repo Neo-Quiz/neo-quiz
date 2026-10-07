@@ -430,6 +430,19 @@ export async function readZip(bytes: Uint8Array, limits = IMPORT_LIMITS): Promis
 /** The raster formats a quiz can embed and a share may carry (no SVG: it can
     carry script). */
 export const IMAGE_IMPORT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp"];
+/** Do these bytes start like one of the raster formats of `IMAGE_IMPORT_EXTENSIONS` (PNG, JPEG, GIF,
+    WebP, BMP, AVIF)? The extension is only a claim: a renamed program or script is not an image.
+    Any of the formats is accepted whatever the extension says (a PNG saved as `.jpg` still displays). */
+export function looksLikeImage(bytes: Uint8Array): boolean {
+	const at = (i: number, s: string): boolean => s.length + i <= bytes.length && [...s].every((c, k) => bytes[i + k] === c.charCodeAt(0));
+	const png = bytes.length >= 8 && bytes[0] === 0x89 && at(1, "PNG") && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+	const jpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+	const gif = at(0, "GIF87a") || at(0, "GIF89a");
+	const webp = at(0, "RIFF") && at(8, "WEBP");
+	const bmp = at(0, "BM") && bytes.length >= 26;
+	const avif = at(4, "ftyp") && (at(8, "avif") || at(8, "avis"));
+	return png || jpeg || gif || webp || bmp || avif;
+}
 /** One imported image, once read. */
 export const IMAGE_IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 
