@@ -132,7 +132,8 @@ function main() {
 	execFileSync(npm, ["run", "android:web"], { cwd: WORKTREE, stdio: "inherit", shell: isWindows });
 	execFileSync(
 		"pwsh",
-		["-NoProfile", "-File", "apps/android/scripts/with-keystore-password.ps1", isWindows ? "./gradlew.bat" : "./gradlew", "assembleRelease", "--no-daemon"],
+		// Relative to the cwd below (apps/android), not to the repository root.
+		["-NoProfile", "-File", "./scripts/with-keystore-password.ps1", isWindows ? "./gradlew.bat" : "./gradlew", "assembleRelease", "--no-daemon"],
 		{ cwd: path.join(WORKTREE, "apps", "android"), stdio: "inherit" },
 	);
 	if (wt(["status", "--porcelain"])) return fail("the release worktree is not clean after the build");
