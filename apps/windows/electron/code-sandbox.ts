@@ -30,6 +30,8 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CANAUX_BAC } from "./code-canaux";
+import { servirPaquet, servirPypi } from "./paquets-python";
+import { transportDefaut } from "./telechargement";
 import type { CodeJob, CodeRun } from "../../../src/host/types";
 import type { CodeLanguage } from "../../../src/code-languages";
 
@@ -140,14 +142,36 @@ export function creerBacASable(racine: string, langages: string, preload: string
 		const ses = session.fromPartition(PARTITION);
 		if (sessionPrete) return ses;
 		sessionPrete = true;
+		/* Python packages (task 4): the PyPI digests announced by the index
+		   answers of THIS window; a wheel is served only if its bytes match. */
+		const digestsPypi = new Map<string, string>();
+		const dossierPython = path.resolve(langages, "python");
+		/* Every answer carries the CSP. */
+		const habiller = (r: Response): Response => {
+			const h = new Headers(r.headers);
+			if (cspActive) h.set("Content-Security-Policy", CSP);
+			return new Response(r.body, { status: r.status, headers: h });
+		};
 		ses.protocol.handle(SCHEMA_CODE, async (req) => {
+			let u: URL;
+			try { u = new URL(req.url); } catch { return new Response(null, { status: 403 }); }
+			/* `neo-code://app/pypi/...`: the PyPI proxy, SAME origin as the page (no
+			   CORS, no CSP exception). Only the `app` host, only that prefix. */
+			if (u.hostname === "app" && u.pathname.startsWith("/pypi/")) {
+				let chemin: string;
+				try { chemin = decodeURIComponent(u.pathname.slice("/pypi/".length)); } catch { return new Response(null, { status: 403 }); }
+				return habiller(await servirPypi(chemin, transportDefaut, digestsPypi));
+			}
 			const abs = resoudreFichierCode(racine, langages, req.url);
 			if (!abs) return new Response(null, { status: 403 });
+			/* A file of the Python pack that is not in it: a package, judged by
+			   the lock and fetched by the main process. */
+			if (path.dirname(abs) === dossierPython && !existsSync(abs)) {
+				return habiller(await servirPaquet(dossierPython, path.basename(abs)));
+			}
 			try {
 				const r = await net.fetch(pathToFileURL(abs).href);
-				const h = new Headers(r.headers);
-				if (cspActive) h.set("Content-Security-Policy", CSP);
-				return new Response(r.body, { status: r.status, headers: h });
+				return habiller(r);
 			} catch {
 				return new Response(null, { status: 404 });
 			}

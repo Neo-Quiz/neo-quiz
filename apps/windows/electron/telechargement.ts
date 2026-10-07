@@ -37,7 +37,7 @@ export interface ReponseInstallation {
     temp folder, NEVER the network), production laying it over the main
     process's global `fetch`. Every call is judged against the host list
     BEFORE the transport — the transport does not decide, it obeys. */
-export type TransportInstallation = (url: string, init: { method: "GET" | "HEAD" }) => Promise<ReponseInstallation>;
+export type TransportInstallation = (url: string, init: { method: "GET" | "HEAD"; headers?: Record<string, string> }) => Promise<ReponseInstallation>;
 
 /** A fetch body's chunks, read by an explicit reader: undici's
     ReadableStream is iterable at runtime, but its typed shape varies by
@@ -67,7 +67,7 @@ export const transportDefaut: TransportInstallation = async (url, init) => {
 	const rearmer = (): void => { clearTimeout(minuteur); minuteur = setTimeout(() => abandon.abort(), INACTIVITE_MS); };
 	let reponse: Response;
 	try {
-		reponse = await globalThis.fetch(url, { method: init.method, redirect: "manual", signal: abandon.signal });
+		reponse = await globalThis.fetch(url, { method: init.method, headers: init.headers, redirect: "manual", signal: abandon.signal });
 	} catch (e) {
 		clearTimeout(minuteur);
 		throw e;
@@ -136,7 +136,7 @@ export function estErreurInstallation(e: unknown): e is ErreurInstallation {
     `reseau` — the list is not negotiable. `maxSauts` defaults to 3: two
     real hops (github.com → release-assets.githubusercontent.com, or the
     equivalent object storage host) plus one — a third would be suspect. */
-export async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation, maxSauts = 3): Promise<ReponseInstallation> {
+export async function demander(url: string, method: "GET" | "HEAD", transport: TransportInstallation, maxSauts = 3, headers?: Record<string, string>): Promise<ReponseInstallation> {
 	let courant = url;
 	for (let saut = 0; saut < maxSauts; saut++) {
 		/* HTTPS ONLY (security review 2026-09-28): the host list also admits
@@ -144,7 +144,7 @@ export async function demander(url: string, method: "GET" | "HEAD", transport: T
 		   a download, or a hop of its redirects, never does. */
 		if (!courant.startsWith("https://")) throw erreurInstallation("reseau", "not an https URL: " + courant);
 		if (!hoteAutorise(courant)) throw erreurInstallation("reseau", "host outside the list: " + courant);
-		const reponse = await transport(courant, { method });
+		const reponse = await transport(courant, headers ? { method, headers } : { method });
 		if (reponse.status < 300 || reponse.status >= 400) return reponse;
 		const lieu = reponse.entete("location");
 		if (!lieu) throw erreurInstallation("reseau", "redirect without a destination: " + courant);

@@ -31,7 +31,20 @@ let pret = null;
    sandbox scheme) and is imported dynamically: a missing pack makes the
    import reject, which the `executer` handler answers as `unavailable`
    instead of crashing the worker at load time. */
-const charger = () => (pret ??= import("./languages/python/pyodide.mjs").then(m => m.loadPyodide({ indexURL: "./languages/python/", jsglobals: {} })));
+/* The `js` module of Python: NOT the whole worker scope. micropip's `pyfetch`
+   needs exactly these five (measured 2026-10-07: with `{}`, `pyfetch` dies on
+   `NameError: name 'AbortController' is not defined` and micropip answers
+   `Can't fetch metadata`). Still no boundary: `fetch` can only reach
+   `neo-code:` (CSP `connect-src 'self'` + the partition's `webRequest`), and
+   `Function` is refused by the CSP. */
+const JSGLOBALS = {
+	AbortController: globalThis.AbortController,
+	AbortSignal: globalThis.AbortSignal,
+	Object: globalThis.Object,
+	Request: globalThis.Request,
+	fetch: globalThis.fetch.bind(globalThis),
+};
+const charger = () => (pret ??= import("./languages/python/pyodide.mjs").then(m => m.loadPyodide({ indexURL: "./languages/python/", jsglobals: JSGLOBALS })));
 
 /* Tronqué ICI, avant l'IPC : une exception de 100 Mo (`raise
    Exception("x" * 10**8)`) ne doit pas traverser worker → page → principal
@@ -59,6 +72,16 @@ self.onmessage = async (e) => {
 	py.setStderr({ batched: ecrire });
 	const ns = py.globals.get("dict")();
 	try {
+		/* Packages on demand: the main process fetches and hash-checks them
+		   (`paquets-python.ts`); nothing here reaches the network. micropip
+		   (pure PyPI wheels) is loaded only for code that names it, and its
+		   index points at the proxy. */
+		await py.loadPackagesFromImports(m.code);
+		if (m.after) await py.loadPackagesFromImports(m.after);
+		if (/\bmicropip\b/.test(m.code)) {
+			await py.loadPackage("micropip");
+			py.runPython("import micropip\nmicropip.set_index_urls([\"neo-code://app/pypi/simple/{package_name}/\"])");
+		}
 		ns.set("__neo_stdin", m.stdin);
 		py.runPython(PRELUDE, { globals: ns });
 		await py.runPythonAsync(m.code, { globals: ns, filename: "main.py" });

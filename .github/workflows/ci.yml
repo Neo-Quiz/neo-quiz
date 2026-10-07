@@ -149,6 +149,13 @@ jobs:
       - name: Language pack installer
         run: npm run check:electron-langages
 
+      # The Python package proxy: a package file the pack lock does not
+      # name never reaches the network, bytes that do not match the lock
+      # (or the digest PyPI announced) are never served or cached, only
+      # pure wheels pass, and the download budget stops. Injected transport.
+      - name: Python package proxy
+        run: npm run check:code-packages
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar
