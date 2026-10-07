@@ -40,4 +40,23 @@ class NavBarMotionTest {
         assertEquals(26, c ushr 24)
         assertEquals(0x112233, c and 0xFFFFFF)
     }
+
+    @Test fun tapMovesTheActiveTabAtOnce() {
+        // Home active, Folders tapped: Folders alone is active, before the page has answered.
+        val none = listOf(false, false, false, false)
+        assertEquals(listOf(false, true, false, false), NavBarMotion.activeAfterTap(listOf(true, false, false, false), none, 1))
+    }
+
+    @Test fun placeholderTapNeverMovesThePill() {
+        // Generate is a placeholder: the tap is handed to the page, the pill stays where it is.
+        val placeholder = listOf(false, false, true, false)
+        assertEquals(null, NavBarMotion.activeAfterTap(listOf(true, false, false, false), placeholder, 2))
+    }
+
+    @Test fun tapOnTheActiveTabOrOutOfRangeChangesNothing() {
+        val none = listOf(false, false, false)
+        assertEquals(null, NavBarMotion.activeAfterTap(listOf(false, true, false), none, 1))
+        assertEquals(null, NavBarMotion.activeAfterTap(listOf(false, true, false), none, 3))
+        assertEquals(null, NavBarMotion.activeAfterTap(listOf(false, true, false), none, -1))
+    }
 }

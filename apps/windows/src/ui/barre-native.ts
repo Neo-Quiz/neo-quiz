@@ -25,7 +25,12 @@ interface PontBarre {
 	surBarreClic(rappel: (index: number) => void): void;
 }
 
+import { currentHost } from "../../../../src/host/current";
+import { t } from "../../../../src/i18n";
+import { nextTab } from "../../../../src/swipe";
+
 const ACTIVE = "qbd-nav-item--active";
+const PLACEHOLDER = "qbd-nav-item--placeholder";
 const MODAL_CLOSE = ".modal-container .modal-close-button";
 const SETTINGS_MODAL = ".modal-container .nq-reglages-modal";
 
@@ -36,6 +41,11 @@ function estReglages(btn: HTMLElement): boolean {
 
 function boutons(): HTMLElement[] {
 	return Array.from(document.querySelectorAll<HTMLElement>(".qbd-sidebar .qbd-nav-item"));
+}
+
+/** The key of a rail button: its `data-nav`, or `settings` for the footer button. */
+function cle(btn: HTMLElement): string {
+	return btn.dataset.nav ?? "settings";
 }
 
 /** The text colour of a rail button in the given state, from an offscreen clone's computed style. */
@@ -73,7 +83,10 @@ export function installBarreNative(pont: PontBarre): void {
 	let encours = false;
 	let replanifie = false;
 
-	const publier = async (): Promise<void> => {
+	/* `actifForce`: the tab the user just chose, published before the page
+	   changes (see the click and swipe listeners below). Without it the active
+	   tab is read from the page. */
+	const publier = async (actifForce?: string): Promise<void> => {
 		if (encours) { replanifie = true; return; }
 		encours = true;
 		try {
@@ -89,7 +102,10 @@ export function installBarreNative(pont: PontBarre): void {
 			   rail still marks the page under it: it becomes active again by
 			   itself when the modal closes). */
 			const reglagesOuverts = !!document.querySelector(SETTINGS_MODAL);
-			const estActif = (b: HTMLElement): boolean => reglagesOuverts ? estReglages(b) : b.classList.contains(ACTIVE);
+			const estActif = (b: HTMLElement): boolean => {
+				if (actifForce !== undefined) return cle(b) === actifForce;
+				return reglagesOuverts ? estReglages(b) : b.classList.contains(ACTIVE);
+			};
 			const texte = resoudre("--text-normal");
 			const accent = resoudre("--interactive-accent");
 			const accentTexte = resoudre("--text-accent");
@@ -127,9 +143,34 @@ export function installBarreNative(pont: PontBarre): void {
 		rafId = requestAnimationFrame(() => { rafId = 0; void publier(); });
 	};
 
+	/* The tab the user chooses is published BEFORE the page changes: a click
+	   (on the rail, or a tap on the bar, which clicks the rail button) and a
+	   swipe the shell has decided. Otherwise the pill follows the page by a
+	   frame or more, after the new view is built. The page's own state is
+	   published again after the change, so a refused move takes effect. */
+	document.addEventListener("click", (e) => {
+		const btn = (e.target as Element | null)?.closest?.<HTMLElement>(".qbd-sidebar .qbd-nav-item");
+		if (!btn || btn.classList.contains(PLACEHOLDER)) return;
+		void publier(cle(btn));
+	}, true);
+	document.addEventListener("swipe-decided", (e) => {
+		const dir = (e as CustomEvent<"next" | "prev">).detail;
+		// The same tab order as the shell's swipe (placeholders are skipped).
+		const onglets = boutons().filter(b => !b.classList.contains(PLACEHOLDER));
+		const courant = onglets.find(b => b.classList.contains(ACTIVE));
+		const cible = courant ? nextTab(cle(courant), dir, onglets.map(cle)) : null;
+		if (cible) void publier(cible);
+	});
+
 	pont.surBarreClic((index) => {
 		const btn = boutons()[index];
-		if (!btn || btn.classList.contains("qbd-nav-item--placeholder")) return;
+		if (!btn) return;
+		/* Generate is not served on the phone yet: the bar shows the tap (the
+		   ripple) and the page says why, instead of going nowhere. */
+		if (btn.classList.contains(PLACEHOLDER)) {
+			currentHost().ui.notice(t("dashboard.nav.generateOnPc"));
+			return;
+		}
 		/* A modal (the Settings page) covers the page but not the bar: a tap on
 		   a tab closes it first, then goes to the tab (the click on a page that
 		   is still under a modal went nowhere). */

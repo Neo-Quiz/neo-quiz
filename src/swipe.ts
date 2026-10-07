@@ -173,6 +173,10 @@ export function bindSwipe(root: HTMLElement, onSwipe: (d: "next" | "prev") => vo
 			const v = releaseVelocity(s.samples);
 			const dir = dx < 0 ? "next" : "prev";
 			const verdict = releaseVerdict(dx, v, window.innerWidth, follow.canGo(dir));
+			/* The navigation is decided here, before the caller's exit animation
+			   and the page change: a host that shows the destination at once (the
+			   native tab bar) listens for this event on the page. */
+			if (verdict !== "none") root.dispatchEvent(new CustomEvent("swipe-decided", { bubbles: true, detail: verdict }));
 			follow.release(verdict === "none" ? null : verdict, s.offset, v, window.innerWidth);
 			return;
 		}

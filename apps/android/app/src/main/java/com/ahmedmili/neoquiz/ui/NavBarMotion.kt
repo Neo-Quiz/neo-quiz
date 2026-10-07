@@ -62,6 +62,16 @@ internal object NavBarMotion {
         return (channel(24) shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
 
+    /**
+     * The active tabs after a tap on tab [index], shown before the page answers: the tapped tab
+     * becomes the only active one. Null when nothing moves: a placeholder tab, an index out of
+     * range, or the tab that is already active.
+     */
+    fun activeAfterTap(active: List<Boolean>, placeholder: List<Boolean>, index: Int): List<Boolean>? {
+        if (index !in active.indices || placeholder.getOrElse(index) { true } || active[index]) return null
+        return active.indices.map { it == index }
+    }
+
     /** [color] with its alpha replaced by [alpha] (0..1). */
     fun withAlpha(color: Int, alpha: Float): Int =
         ((alpha.coerceIn(0f, 1f) * 255).roundToInt() shl 24) or (color and 0x00FFFFFF)

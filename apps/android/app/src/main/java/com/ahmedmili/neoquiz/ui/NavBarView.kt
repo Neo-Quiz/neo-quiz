@@ -58,10 +58,12 @@ import kotlin.math.roundToInt
  * filled shape when active), picked by the tab's `id`.
  */
 class NavBarView(context: Context) : LinearLayout(context) {
-    /** Called on the main thread with the index of the tapped tab. */
+    /** Called on the main thread with the index of the tapped tab (a placeholder tab too: the page answers). */
     var onTap: (Int) -> Unit = {}
 
     private val row = LinearLayout(context)
+    /** The page's colours as last applied, for the optimistic change on a tap. */
+    private var shown: NavColors? = null
     private var signature = ""
     /** The ids, labels and placeholder flags of the tabs as they were built. */
     private var tabsKey = ""
@@ -88,6 +90,7 @@ class NavBarView(context: Context) : LinearLayout(context) {
         if (sig == signature) return
         signature = sig
         val colors = NavColors.from(state)
+        shown = colors
         setBackgroundColor(colors.bg)
         val items = state.optJSONArray("items")
         if (items == null) {
@@ -116,10 +119,10 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     context,
                     item.optString("id"),
                     item.optString("label"),
-                    tappable = !item.optBoolean("placeholder"),
+                    placeholder = item.optBoolean("placeholder"),
                     on = item.optBoolean("active"),
                 )
-                if (tab.tappable) tab.setOnClickListener { onTap(i) }
+                tab.setOnClickListener { tapped(i) }
                 tabs.add(tab)
                 row.addView(tab, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
             }
@@ -127,6 +130,21 @@ class NavBarView(context: Context) : LinearLayout(context) {
         for (i in tabs.indices) {
             tabs[i].update(colors, items.getJSONObject(i).optBoolean("active"), animate = sameTabs)
         }
+    }
+
+    /**
+     * A tap: the pill and the colours move to the tapped tab at once, without waiting for the page.
+     * The signature is cleared so that the page's answer is applied even when it equals the last
+     * state it sent: a refused move brings the old tab back. A placeholder tab changes nothing here.
+     */
+    private fun tapped(index: Int) {
+        val colors = shown
+        val next = NavBarMotion.activeAfterTap(tabs.map { it.isOn }, tabs.map { it.placeholder }, index)
+        if (colors != null && next != null) {
+            signature = ""
+            for (i in tabs.indices) tabs[i].update(colors, next[i], animate = true)
+        }
+        onTap(index)
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + 0.5f).toInt()
@@ -138,10 +156,13 @@ class NavBarView(context: Context) : LinearLayout(context) {
         context: Context,
         private val id: String,
         private val label: String,
-        val tappable: Boolean,
+        /** A tab the phone does not serve yet: it takes taps (ripple, and the page answers) but never moves the pill. */
+        val placeholder: Boolean,
         on: Boolean,
     ) : View(context) {
         private var selected = on
+        /** Whether the tab is the active one, as shown (optimistic changes included). */
+        val isOn: Boolean get() = selected
         private var colors = NavColors(Color.BLACK, Color.WHITE, Color.WHITE, Color.WHITE)
         /** Pill progress t: 0 hidden, 1 fully travelled. Starts at its resting value. */
         private var pillT = if (on) 1f else 0f
@@ -169,7 +190,7 @@ class NavBarView(context: Context) : LinearLayout(context) {
 
         init {
             contentDescription = label
-            isClickable = tappable
+            isClickable = true
             isSelected = on
         }
 
@@ -218,7 +239,7 @@ class NavBarView(context: Context) : LinearLayout(context) {
 
         /** The press ripple, clipped to the pill's shape (56 x 32 dp, centred, top 10 dp). */
         private fun refreshRipple() {
-            if (!tappable || width == 0) {
+            if (width == 0) {
                 foreground = null
                 return
             }

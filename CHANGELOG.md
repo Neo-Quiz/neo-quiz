@@ -23,6 +23,7 @@ release notes.
 - Importing a shared archive now lists every file it leaves out and why, reads archives made by older tools (accents, zip64), and no longer imports macOS system files as notes.
 - The output folder chosen in Generate stays selected after a reload.
 - Learn generations no longer warn about missing pre-questions, which are optional.
+- The Android tab bar moves its active pill as soon as you tap or swipe, and tapping Generate says it runs from your PC for now.
 - A PC with an empty computer name now appears as "Windows PC" on your other devices.
 - The AI provider button in Generate has a translated accessible name.
 - Handing in a Test goes straight to the results, without flashing the unanswered-questions screen.
