@@ -18,6 +18,12 @@ release notes.
 - Every scrollable area on Android now stretches at its ends, in both directions.
 - The Android tab bar has a new active-tab pill animation.
 
+### Fixed
+- The output folder chosen in Generate stays selected after a reload.
+- Learn generations no longer warn about missing pre-questions, which are optional.
+- A PC with an empty computer name now appears as "Windows PC" on your other devices.
+- The AI provider button in Generate has a translated accessible name.
+
 ## [1.20.42] - 2026-10-07
 
 ### Changed
