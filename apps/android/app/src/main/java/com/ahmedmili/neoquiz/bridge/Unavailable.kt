@@ -60,8 +60,6 @@ object Unavailable {
         "video.installer" to { mapOf("ok" to false, "code" to "reseau") },
         "video.transcrire" to { mapOf("ok" to false, "code" to "inconnue", "detail" to "not available on Android") },
         "video.annuler" to { null },
-        "langages.installer" to { mapOf("ok" to false, "code" to "reseau") },
-        "langages.supprimer" to { null },
     )
 
     val names: Set<String> get() = value.keys

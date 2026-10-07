@@ -28,6 +28,8 @@ class BridgeTest {
                 override suspend fun run(job: Any?) = JSONObject()
                 override fun warm(language: String) {}
                 override fun packState(name: String) = emptyMap<String, Any?>()
+                override suspend fun installPack(name: String, progress: (Long, Long) -> Unit) = "reseau"
+                override suspend fun deletePack(name: String) {}
             }).handlers() +
             com.ahmedmili.neoquiz.sync.SyncChannel(object : com.ahmedmili.neoquiz.sync.SyncBackend {
                 override suspend fun state() = emptyMap<String, Any?>()
@@ -54,9 +56,8 @@ class BridgeTest {
         assertEquals(Channels.ALL, allHandlers().keys)
     }
 
-    @Test fun theCodeChannelsAreHandledAndThePackIsNeverDownloaded() {
-        assertTrue(Unavailable.names.none { it in setOf("code.run", "code.warm", "langages.etat") })
-        assertTrue(Unavailable.names.containsAll(setOf("langages.installer", "langages.supprimer")))
+    @Test fun theCodeAndLanguagePackChannelsAreHandled() {
+        assertTrue(Unavailable.names.none { it in setOf("code.run", "code.warm", "langages.etat", "langages.installer", "langages.supprimer") })
     }
 
     @Test fun noChannelIsBothHandledAndUnavailable() {

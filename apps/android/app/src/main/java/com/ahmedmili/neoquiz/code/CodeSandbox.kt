@@ -16,6 +16,7 @@ import androidx.webkit.WebMessagePortCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -36,8 +37,14 @@ interface CodeEngine {
     suspend fun run(job: Any?): JSONObject
     fun warm(language: String)
 
-    /** `{installe, version, octets}` of a language pack (only `"c"` exists). */
+    /** `{installe, version, octets}` of a language pack (`"c"` or `"python"`). */
     fun packState(name: String): Map<String, Any?>
+
+    /** Downloads and installs a pack; `"ok"`, `"reseau"` or `"empreinte"`. `progress` gets (received, total) bytes. */
+    suspend fun installPack(name: String, progress: (Long, Long) -> Unit): String
+
+    /** Deletes ONE pack (after any install of it that is running). */
+    suspend fun deletePack(name: String)
 }
 
 /**
@@ -72,20 +79,29 @@ class CodeSandbox(context: Context, private val scope: CoroutineScope) : CodeEng
     private var idle: Job? = null
 
     private val shim: String by lazy { app.assets.open("code-shim.js").bufferedReader().use { it.readText() } }
-    private val pack: JSONObject? by lazy {
-        try {
-            JSONObject(app.assets.open("code/pack-info.json").bufferedReader().use { it.readText() })
-        } catch (_: Exception) {
-            null
+    /** The downloaded packs live in the app's private storage, never in the APK. */
+    private val languages = File(app.filesDir, "languages")
+    private val packLocks = ConcurrentHashMap<String, Mutex>()
+    private fun lockOf(name: String) = packLocks.getOrPut(name) { Mutex() }
+
+    private fun enginePresent(language: String): Boolean {
+        val pack = LanguagePacks.packFor(language) ?: return false
+        return LanguagePacks.installedVersion(languages, pack) != null
+    }
+
+    override fun packState(name: String): Map<String, Any?> = LanguagePacks.state(languages, name)
+
+    override suspend fun installPack(name: String, progress: (Long, Long) -> Unit): String {
+        if (name !in LanguagePacks.PINS) return "reseau"
+        // One install per pack at a time; a second caller waits, then finds it in place.
+        return lockOf(name).withLock {
+            if (LanguagePacks.inPlace(languages, name)) "ok" else LanguagePacks.install(languages, name, LanguagePacks::openHttps, progress)
         }
     }
 
-    private fun enginePresent(language: String): Boolean = (language != "c" && language != "cpp") || pack != null
-
-    override fun packState(name: String): Map<String, Any?> {
-        val p = pack
-        if (name != "c" || p == null) return mapOf("installe" to false, "version" to null, "octets" to 0)
-        return mapOf("installe" to true, "version" to p.getString("version"), "octets" to p.getLong("octets"))
+    override suspend fun deletePack(name: String) {
+        if (name !in LanguagePacks.PINS) return
+        lockOf(name).withLock { LanguagePacks.delete(languages, name) }
     }
 
     override suspend fun run(job: Any?): JSONObject {
@@ -106,7 +122,7 @@ class CodeSandbox(context: Context, private val scope: CoroutineScope) : CodeEng
     }
 
     override fun warm(language: String) {
-        if (language !in listOf("python", "c", "cpp") || !enginePresent(language)) return
+        if (!enginePresent(language)) return
         scope.launch {
             if (openAndAwaitReady()) withContext(Dispatchers.Main) { send(JSONObject().put("type", "chauffe").put("language", language)) }
         }
@@ -204,8 +220,27 @@ class CodeSandbox(context: Context, private val scope: CoroutineScope) : CodeEng
 
     private fun serve(url: String): WebResourceResponse {
         val path = CodeProtocol.assetPathFor(url) ?: return failure(403, "Forbidden")
+        if (path.startsWith("code/languages/")) return servePack(path.removePrefix("code/languages/"))
         return try {
             WebResourceResponse(CodeProtocol.mimeFor(path), null, 200, "OK", CodeProtocol.headers(), app.assets.open(path))
+        } catch (_: java.io.IOException) {
+            failure(404, "Not Found")
+        }
+    }
+
+    /** `<pack>/<file>` from the downloaded pack directory, never outside it (`assetPathFor` already refused any odd segment). */
+    private fun servePack(rel: String): WebResourceResponse {
+        val name = rel.substringBefore('/')
+        if (name !in LanguagePacks.PINS) return failure(404, "Not Found")
+        val root = languages.canonicalFile
+        val file = try {
+            File(root, rel).canonicalFile
+        } catch (_: java.io.IOException) {
+            return failure(404, "Not Found")
+        }
+        if (!file.path.startsWith(root.path + File.separator) || !file.isFile) return failure(404, "Not Found")
+        return try {
+            WebResourceResponse(CodeProtocol.mimeFor(file.name), null, 200, "OK", CodeProtocol.headers(), file.inputStream())
         } catch (_: java.io.IOException) {
             failure(404, "Not Found")
         }
