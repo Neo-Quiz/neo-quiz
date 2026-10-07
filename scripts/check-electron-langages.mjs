@@ -190,6 +190,11 @@ try {
 			}
 			r.check("PACK_PYTHON downloads from the app's own releases", PACK_PYTHON.url.startsWith("https://github.com/Neo-Quiz/neo-quiz/releases/download/language-python-"), true);
 			r.check("PACK_C downloads from the app's own releases", PACK_C.url.startsWith("https://github.com/Neo-Quiz/neo-quiz/releases/download/language-c-"), true);
+			await withSrcModule("apps/windows/electron/pont.ts", async ({ PAGES_PACKS }) => {
+				r.check("the Settings source pages are the pins' own release tags",
+					[PAGES_PACKS.c, PAGES_PACKS.python],
+					[PACK_C.url, PACK_PYTHON.url].map(u => u.replace("/download/", "/tag/").replace(/\/[^/]+$/, "")));
+			});
 		});
 	});
 } finally {

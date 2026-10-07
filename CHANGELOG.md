@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Settings → Languages shows Python and C/C++ with their download source, a switch to turn each off, and a bin to delete them.
 - Python code that needs more than the app's sandbox can be opened in Google Colab.
 - Create a folder can open an existing folder again, anywhere on the PC, such as your course folder.
 - Texts no longer name another app when they talk about your notes folders.

@@ -1031,6 +1031,15 @@ export const CLE_DOSSIER_DEFAUT = "defaultFolder";
     `app:` (403), il ne donne aucun accès disque supplémentaire au rendu. */
 export const CLE_REGLAGES_FOND = "fond";
 
+/** The release page each language pack is downloaded from, shown in Settings
+    as its source. The renderer cannot import `langages.ts` (it pulls Node), so
+    the tags are written here and `check:electron-langages` ties them to the
+    pins' own URLs. */
+export const PAGES_PACKS = {
+	c: "https://github.com/Neo-Quiz/neo-quiz/releases/tag/language-c-22.0.0-git20542-10",
+	python: "https://github.com/Neo-Quiz/neo-quiz/releases/tag/language-python-314.0.7",
+} as const;
+
 /** Whether the embedded Syncthing starts with the application (`neo.reglages`).
     Set to `true` by the MAIN process alone, after a first successful pairing
     (`syncthing.ts`): the window never writes it (`canaux.ts` refuses), because
