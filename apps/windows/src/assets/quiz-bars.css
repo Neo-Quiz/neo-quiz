@@ -59,7 +59,8 @@
    here): those would scroll away with a long question. The bar's buttons
    forward their clicks to the current slide's own buttons
    (ui/quiz-bars.ts): the engine keeps every rule of its navigation. */
-#neo-quiz-root > .qbd-qz .quiz-card > .quiz-question-nav {
+#neo-quiz-root > .qbd-qz .quiz-card > .quiz-question-nav,
+#neo-quiz-root > .qbd-qz .quiz-step-page > .quiz-question-nav {
 	display: none;
 }
 

@@ -21,6 +21,8 @@
  * pas d'une étape de sanitization centralisée.
  */
 
+import type { StepSlide } from "../engine/step-page";
+
 /** Bouton de ressource optionnel affiché sur une question (sanitizer.js resourceButtonHtml, engine/cards.js). */
 export interface ResourceButton {
 	label: string;
@@ -476,7 +478,9 @@ export interface QuizState {
  * narrowent sur `slideMap[i]?.type`).
  */
 export type SlideMapEntry =
-	| { type: "question"; questionIndex: number }
+	// `step`: a step-page Learn's slide (engine/step-page.ts), whose
+	// `questionIndex` is the FIRST card of the page.
+	| { type: "question"; questionIndex: number; step?: StepSlide }
 	| { type: "submit" }
 	| { type: "results" };
 

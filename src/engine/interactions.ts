@@ -1,7 +1,8 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import type { OrderingQuestion, MatchingQuestion } from "../types/quiz";
 import { t } from "../i18n";
-import { bindSwipe } from "./swipe";
+import { stepMembers } from "./step-page";
+import { bindSwipe } from "../swipe";
 
 /** Charge utile du drag-and-drop (ordering/matching), sérialisée en JSON dans le dataTransfer. */
 interface DragPayload {
@@ -81,7 +82,8 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 	};
 
 	function playOptionRelease(qi: number, pressed: number, gained: number[], lost: number[]): void {
-		const item = ctx.container.querySelector<HTMLElement>(`.quiz-track-item[data-slide-kind="question"][data-qi="${qi}"]`);
+		const item = ctx.container.querySelector<HTMLElement>(`.quiz-step-page .quiz-card[data-card-qi="${qi}"]`)
+			?? ctx.container.querySelector<HTMLElement>(`.quiz-track-item[data-slide-kind="question"][data-qi="${qi}"]`);
 		if (!item) return;
 		const mark = (oi: number, cls: string): void => {
 			const el = item.querySelector<HTMLElement>(`.quiz-option[data-orig="${oi}"]`);
@@ -384,7 +386,21 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 	function bindQuestionTrackItem(trackItem: HTMLElement | null): void {
 		if (!trackItem) return;
 
-		const qi = Number(trackItem.dataset.qi);
+		/* A step page: each of its cards binds as a card of its own, and the
+		   foot's two arrows are the page's previous and next. */
+		if (trackItem.classList.contains("quiz-step-page")) {
+			const first = Number(trackItem.dataset.qi);
+			trackItem.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]").forEach(card => bindQuestionTrackItem(card));
+			trackItem.querySelector(".quiz-step-nav .quiz-prev-btn")?.addEventListener("click", () => {
+				const precedente = ctx.slideMap[ctx.getSlideIndexForQuestion(first) - 1];
+				if (precedente?.type === "question") ctx.goToQuestion(precedente.questionIndex);
+			});
+			trackItem.querySelector(".quiz-step-nav .quiz-next-btn")?.addEventListener("click", () => advanceFrom(first));
+			return;
+		}
+
+		// A card of a step page carries its own index (`data-card-qi`).
+		const qi = Number(trackItem.dataset.cardQi ?? trackItem.dataset.qi);
 		if (!Number.isFinite(qi) || qi < 0 || qi >= ctx.quiz.length) return;
 
 		const q = ctx.quiz[qi];
@@ -468,6 +484,11 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 	   question first, then brings a missed one back when it is due
 	   (engine/learn.ts); everywhere else it goes to the next slide. */
 	function advanceFrom(qi: number): void {
+		/* A step page has ONE next (the arrow, the swipe, the bar, the button
+		   at its foot): it speaks for the page's LAST card, so that no answered
+		   but unchecked card in the middle of the page takes the press. */
+		const page = ctx.stepOf?.(qi);
+		if (page) qi = stepMembers(page)[stepMembers(page).length - 1];
 		const move = ctx.learn.advance(qi);
 		if (move.kind !== "go") return;
 		if (move.qi !== null) ctx.goToQuestion(move.qi);

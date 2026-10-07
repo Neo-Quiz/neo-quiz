@@ -12,6 +12,7 @@ import { countAnswerLines } from "./terminal";
 import { t, type TransKey } from "../i18n";
 import { isNumericQuestion } from "./numeric";
 import { usesMathField } from "./math-input";
+import { isTapType } from "./step-page";
 
 /* Icône Lucide `check` inline, même tracé que celle du cours (lecture-rendu.ts
    ICON_BOOK/`quiz-lecture-coche`) : le moteur n'a pas d'autre canal d'icône
@@ -146,6 +147,9 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		// Une carte mémoire EST une auto-évaluation, quel que soit le mode :
 		// retournée (textOnlyChecked), puis notée (textOnlyRatings).
 		if (ctx.isFlashcardQuestion(q)) return true;
+		// In a step page nothing is typed: every card that is not answered by a
+		// tap is a REVEAL card, self-rated like a flashcard (engine/step-page.ts).
+		if (ctx.stepSlides && !ctx.isReadingCard(qi) && !isTapType(q)) return true;
 		if (isTextOnlyMode()) return true;
 		if (isExplainWritten(qi, q)) return true;
 		return ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall" && isRecallForcedTextOnly(q);
@@ -441,16 +445,9 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				</button>
 			</div>`;
 		}
-		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
 		const verso = typeof q.answer === "string" && q.answer.trim()
 			? ctx.sanitize.renderInlineText(q.answer)
 			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
-		// In a Learn, the rating IS the check: given once per attempt.
-		const rated = ctx.learn.isGraded(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
-		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
-			const on = current === value;
-			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"${rated ? " disabled" : ""}><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
-		};
 		const animate = justFlipped === qi;
 		if (animate) justFlipped = null;
 		/* Turned, the card stays clickable: a click (or Space) turns it back to
@@ -469,11 +466,43 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				</span>
 			</div>
 			${learningHtml(q)}
-			<div class="quiz-flashcard-rating quiz-fc-ratings">
+			${selfRatingHtml(qi)}
+		</div>`;
+	}
+
+	/* The two self-verdict buttons of a flashcard — and of a reveal card, which
+	   is a flashcard whose front is a question. In a Learn the rating IS the
+	   check: given once per attempt, so the buttons lock once it is. */
+	function selfRatingHtml(qi: number): string {
+		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
+		const rated = ctx.learn.isGraded(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
+		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
+			const on = current === value;
+			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"${rated ? " disabled" : ""}><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
+		};
+		return `<div class="quiz-flashcard-rating quiz-fc-ratings">
 				${note("review", "engine.flashcard.again", "1")}
 				${note("understood", "engine.flashcard.knew", "2")}
-			</div>
-		</div>`;
+			</div>`;
+	}
+
+	/* A REVEAL CARD (step page, any type answered by neither a tap nor a
+	   flashcard): the prompt is on the card (cards.ts); here the "Show the
+	   answer" button, then the answer, the explanation and the self-verdict.
+	   A code exercise shows its starter read-only first and keeps its
+	   solution behind the button. It is the text-only "check" button: the
+	   same click handler turns it over (`textOnlyChecked`). */
+	function revealCardHtml(q: QuizQuestion, qi: number): string {
+		const code = ctx.isCodeQuestion(q) ? q : null;
+		const fenced = (src: string): string => ctx.sanitize.renderTextWithEmbeds("```" + String(code?.language ?? "") + "\n" + src + "\n```");
+		const starter = code?.starter?.trim() ? `<div class="quiz-reveal-code">${fenced(code.starter)}</div>` : "";
+		if (!isChecked(qi)) {
+			return `<div class="quiz-reveal">${starter}<button class="quiz-action-btn quiz-reveal-btn quiz-textonly-check-btn" type="button">${t("engine.learn.showAnswer")}</button></div>`;
+		}
+		const answer = code
+			? (code.solution?.trim() ? `<div class="quiz-textonly-correct"><div class="quiz-reveal-code">${fenced(code.solution)}</div></div>` : "")
+			: expectedAnswerHtml(q);
+		return `<div class="quiz-reveal is-open">${starter}${answer}${learningHtml(q, { plain: true })}${selfRatingHtml(qi)}</div>`;
 	}
 
 	/* The flashcard turned by the LAST click, whose re-render must play the
@@ -526,6 +555,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 
 	function questionCardBodyHtml(q: QuizQuestion, qi: number): string {
 		if (ctx.isFlashcardQuestion(q)) return flashcardBodyHtml(q, qi);
+		if (ctx.stepSlides) return revealCardHtml(q, qi);
 		const value = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
 		const checkedInLearn = ctx.learn.isCheckable(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
 		const textareaName = ctx.escapeHtmlAttr(q?.id || `q${qi + 1}`);
@@ -645,6 +675,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				// In a Learn the rating is the flashcard's check (engine/learn.ts).
 				ctx.learn.selfVerdict(qi, rating);
 				ctx.commitQuestionInteraction(qi, { syncHeight: true });
+				ctx.stepScrollNext?.(qi);
 			});
 		});
 
@@ -659,6 +690,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				ctx.recordReview(qi, rating);
 				ctx.learn.selfVerdict(qi, rating);
 				ctx.commitQuestionInteraction(qi, { syncHeight: true });
+				ctx.stepScrollNext?.(qi);
 			});
 		});
 	}
@@ -681,6 +713,8 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 	   revoir », 2 « Je savais » ; après le retournement, le focus passe sur
 	   « Je savais » (restauration de `focus.ts`). */
 	function currentFlashcardQuestionIndex(): number | null {
+		// A step page holds several cards: no key stands for one of them.
+		if (ctx.stepSlides) return null;
 		const si = ctx.quizState.current;
 		if (!ctx.isQuestionSlideIndex(si)) return null;
 		const qi = (ctx.slideMap[si] as { questionIndex: number }).questionIndex;

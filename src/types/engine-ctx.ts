@@ -81,6 +81,7 @@ import type { ResultsSaverHandlers } from "../engine/results-save";
 import type { PassageHandlers } from "../engine/passage";
 import type { ClozeHandlers } from "../engine/cloze";
 import type { LessonHandlers } from "../engine/lesson";
+import type { StepSlide } from "../engine/step-page";
 import type { LearnHandlers } from "../engine/learn";
 import type { HandInHandlers } from "../engine/hand-in";
 import type { TermesHandlers } from "../engine/termes";
@@ -224,6 +225,15 @@ export interface EngineCtx {
 	/* ── État runtime & carte des slides (engine.js:295-299) ── */
 	quizState: QuizState;
 	slideMap: SlideMapEntry[];
+	/** The pages of a Learn played one page per step, else `null` (a Test, a
+	    Learn without any valid slice). Fixed at assembly, like `slideMap`. */
+	stepSlides: StepSlide[] | null;
+	/** The step the learner is on (`StepSlide.step`), `null` off a step page. */
+	currentStep(): number | null;
+	/** The page that holds card `qi`, `null` off a step-page Learn. */
+	stepOf(qi: number): StepSlide | null;
+	/** After a verdict on card `qi` of a step page: brings the next unanswered card into view. */
+	stepScrollNext(qi: number): void;
 	SLIDE_SUBMIT_INDEX: number;
 	SLIDE_RESULTS_INDEX: number;
 	TOTAL_SLIDES: number;

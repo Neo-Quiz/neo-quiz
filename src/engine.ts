@@ -22,6 +22,7 @@ import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
 import { createLearnHandlers } from "./engine/learn";
+import { buildStepSlides, scrollNextOpenIntoView, stepHolding, stepMembers } from "./engine/step-page";
 import { createHandInHandlers } from "./engine/hand-in";
 import { installCodeLangBubble } from "./engine/code-lang-bubble";
 import { emptyLearnState } from "./engine/learn-loop";
@@ -412,13 +413,20 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	   but no question number (0; its tab is a book, engine/cards.ts
 	   `navHtml`). FIXED at assembly, like `slideMap` — the mode of a quiz no
 	   longer changes while it is played. */
-	const estLecon = buildLessonModel(quiz, quizMode).isLesson;
+	const lessonModel = buildLessonModel(quiz, quizMode);
+	const estLecon = lessonModel.isLesson;
+	/* A Learn with valid steps plays ONE PAGE PER STEP (engine/step-page.ts);
+	   fixed at assembly like the slide map. */
+	const stepSlides = estLecon ? buildStepSlides(quiz, lessonModel) : null;
+	ctx.stepSlides = stepSlides;
+	ctx.stepOf = (qi: number) => (stepSlides ? stepHolding(stepSlides, qi) : null);
 	const numeros = numerosAffiches(quiz, estLecon);
 	ctx.numeroAffiche = (qi: number): number => numeros[qi] ?? qi + 1;
 	/* SHORT READINGS (same rule) have no screen: they are read above their
 	   host question (engine/cards.ts). Fixed at assembly too, since the slide
 	   map is built once: a short reading never gets a slide of its own. */
-	const courtes = lecturesCourtes(quiz, estLecon);
+	// In a step page every reading is a card of the page, in order: none is absorbed.
+	const courtes = stepSlides ? new Map<number, number>() : lecturesCourtes(quiz, estLecon);
 	ctx.lecturesAbsorbees = new Set(courtes.keys());
 	ctx.lectureCourteDe = (qi: number): number | null => {
 		for (const [lecture, hote] of courtes) if (hote === qi) return lecture;
@@ -428,6 +436,12 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// ── Slide Map : index dynamique basé sur le mode ──
 	function buildSlideMap(): SlideMapEntry[] {
 		const map: SlideMapEntry[] = [];
+		if (stepSlides) {
+			for (const step of stepSlides) map.push({ type: "question", questionIndex: stepMembers(step)[0], step });
+			map.push({ type: "submit" });
+			map.push({ type: "results" });
+			return map;
+		}
 		for (let i = 0; i < quiz.length; i++) {
 			if (courtes.has(i)) continue;
 			map.push({ type: "question", questionIndex: i });
@@ -473,6 +487,16 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	// Ajouter quizState, les constantes et les fonctions utilitaires au contexte AVANT de créer les modules qui en dépendent
 	ctx.quizState = quizState;
 	ctx.slideMap = slideMap;
+	ctx.stepScrollNext = (qi: number) => {
+		const page = ctx.stepOf(qi);
+		if (!page) return;
+		scrollNextOpenIntoView(container, stepMembers(page), qi,
+			n => !ctx.isReadingCard(n) && !ctx.isRevealed(n) && !ctx.textOnly.isChecked(n));
+	};
+	ctx.currentStep = () => {
+		const entry = slideMap[quizState.current];
+		return entry?.type === "question" ? entry.step?.step ?? null : null;
+	};
 	ctx.SLIDE_SUBMIT_INDEX = SLIDE_SUBMIT_INDEX;
 	ctx.SLIDE_RESULTS_INDEX = SLIDE_RESULTS_INDEX;
 	ctx.TOTAL_SLIDES = TOTAL_SLIDES;
@@ -497,7 +521,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		const cible = courtes.get(qi) ?? qi;
 		for (let si = 0; si < slideMap.length; si++) {
 			const entry = slideMap[si];
-			if (entry.type === "question" && entry.questionIndex === cible) return si;
+			if (entry.type !== "question") continue;
+			if (entry.step ? stepMembers(entry.step).includes(cible) : entry.questionIndex === cible) return si;
 		}
 		return -1;
 	};
@@ -866,7 +891,47 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	container.__quizDestroy = destroyQuiz;
 	ctx.destroyQuiz = destroyQuiz;
 
+	/* A card of a step page is repainted ALONE, in place: the page, its other
+	   cards and the scroll position stay where they are. */
+	function refreshStepCard(qi: number, syncHeight: boolean): Element | null {
+		const oldCard = container.querySelector<HTMLElement>(`.quiz-step-page .quiz-card[data-card-qi="${qi}"]`);
+		if (!oldCard) return null;
+		const item = oldCard.closest<HTMLElement>(".quiz-track-item");
+		if (typeof oldCard.__quizTextQuestionCleanup === "function") {
+			try { oldCard.__quizTextQuestionCleanup(); } catch (_) {}
+		}
+		const focusDescriptor = ctx.focus.getQuestionFocusDescriptor(oldCard);
+		const slideIdx = getSlideIndexForQuestion(qi);
+		if (slideIdx >= 0) ctx.lifecycle.bumpSlideGeneration(slideIdx);
+		reinitialiserBudgetRendu();
+		const tmp = document.createElement("div");
+		tmp.innerHTML = ctx.cards.stepCardHtml(qi).trim();
+		const newCard = tmp.firstElementChild as HTMLElement | null;
+		if (!newCard) return null;
+		oldCard.replaceWith(newCard);
+		ctx.termes.poserTermes(newCard);
+		mathifyElement(newCard);
+		ctx.viewport.applyTrackGeometry({ refreshWidth: false });
+		ctx.resources.bindQuizResourceButtons(newCard);
+		ctx.codeRun.bindCodeRunButtons(newCard);
+		ctx.warming.bindTrackItemImages(newCard, qi);
+		ctx.interactions.bindQuestionTrackItem(newCard);
+		ctx.state.updateNavHighlight();
+		ctx.focus.restoreQuestionFocus(newCard, focusDescriptor);
+		if (syncHeight && item && slideIdx === quizState.current) {
+			requestAnimationFrame(() => {
+				if (__quizDestroyed) return;
+				__quizSlideHeightCache.delete(slideIdx);
+				ctx.warming.bindCurrentSlideMediaHeightSync();
+				ctx.viewport.bindActiveSlideResizeObserver();
+				ctx.viewport.scheduleViewportHeightSync({ index: slideIdx, animate: false, refresh: true });
+			});
+		}
+		return newCard;
+	}
+
 	function refreshQuestionSlide(qi: number, { syncHeight = true }: { syncHeight?: boolean } = {}): Element | null {
+		if (stepSlides) return refreshStepCard(qi, syncHeight);
 		const oldItem = container.querySelector<HTMLElement>(`.quiz-track-item[data-slide-kind="question"][data-qi="${qi}"]`);
 		if (!oldItem) return null;
 
@@ -987,7 +1052,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	    reinitialiserBudgetRendu();
 	    // Construire le HTML des slides à partir du slideMap
 	    const slidesHtml = slideMap.map(entry => {
-	        if (entry.type === "question") return ctx.cards.questionCardHtml(entry.questionIndex);
+	        if (entry.type === "question") return entry.step ? ctx.cards.stepSlideHtml(entry.step) : ctx.cards.questionCardHtml(entry.questionIndex);
 	        if (entry.type === "submit") return ctx.cards.submitSlideHtml();
 	        if (entry.type === "results") return ctx.cards.resultsSlideHtml();
 	        return "";

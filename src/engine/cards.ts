@@ -12,6 +12,7 @@ import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
+import { stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -66,6 +67,9 @@ export interface CardHandlers {
 	resultsSlideHtml(): string;
 	refreshMetaSlides(opts?: { force?: boolean }): void;
 	questionCardHtml(qi: number): string;
+	stepSlideHtml(step: StepSlide): string;
+	/** One card of a step page (a `section`), for a repaint in place. */
+	stepCardHtml(qi: number): string;
 }
 
 export function createCardRenderers(ctx: EngineCtx): CardHandlers {
@@ -83,12 +87,21 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 
 	/** Le numéro AFFICHÉ (Q1…Qn), qui saute les lectures absorbées. */
 	const numero = (i: number): number => ctx.numeroAffiche?.(i) ?? i + 1;
+	/** The number of the BEAD of card `i` (a step's page number, else `numero`). */
+	const beadNumero = (i: number): number => stepOrdinal(i) ?? numero(i);
+
+	/** In a step-page Learn a bead stands for a STEP: it is named by the
+	    page's number, and `i` is the page's first card. */
+	function stepOrdinal(i: number): number | null {
+		const page = ctx.stepSlides?.find(p => stepMembers(p)[0] === i);
+		return page ? page.step : null;
+	}
 
 	/** Classes d'un onglet : son état, et `is-lecture` pour une lecture de
 	    Learn sans numéro (un livre) — ici et non dans le gabarit, parce que
 	    `updateNavHighlight` (state.ts) réécrit la classe à chaque déplacement. */
 	function tabClass(i: number): string {
-		const n = numero(i);
+		const n = beadNumero(i);
 		/* `is-repere` : une question sur cinq (Q5, Q10…), qui garde son numéro
 		   quand la frise de perles de l'application passe en points
 		   (`perles.css`). Sans effet sur les onglets du greffon. */
@@ -100,7 +113,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	    returns; any class it does not know gives the plain "Question N". */
 	function tabLabel(i: number): string {
 		const cls = ` ${tabClass(i)} `;
-		const n = numero(i);
+		const n = beadNumero(i);
 		const has = (c: string): boolean => cls.includes(` ${c} `);
 		const key: TransKey | null = has("correct") ? "engine.nav.tabCorrect"
 			: has("retried") ? "engine.nav.tabRetried"
@@ -118,6 +131,13 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const entry = ctx.slideMap[cur] as { questionIndex?: number } | undefined;
 		const isActive = ctx.isQuestionSlideIndex(cur) && entry?.questionIndex === i;
 		const active = isActive ? "active" : "";
+		const page = ctx.stepSlides?.find(p => stepMembers(p)[0] === i);
+		if (page) {
+			// The bead of a step: its graded questions' verdicts, as one.
+			const graded = page.questions.filter(qi => ctx.learn.isGraded(qi));
+			const touched = page.questions.some(qi => ctx.hasAnyAnswer(qi));
+			return `${active} ${stepBeadState(graded.map(qi => ctx.learn.verdictOf(qi)), touched)}`.trim();
+		}
 		/* THE LEARN VERDICT comes first (engine/learn.ts, 2026-09-29): green =
 		   right the first time, orange = right after a miss, red = not right
 		   yet. It outlives the lock too: after the results, a retried question
@@ -147,6 +167,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	/** Un onglet par DIAPOSITIVE : une lecture absorbée n'en a pas, et les
 	    numéros la sautent (la question qui la suit devient Q2, pas Q3). */
 	function ongletsNav(): number[] {
+		if (ctx.stepSlides) return ctx.stepSlides.map(p => stepMembers(p)[0]);
 		return ctx.quiz.map((_, i) => i).filter(i => !ctx.lecturesAbsorbees?.has(i));
 	}
 
@@ -199,7 +220,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   la frise de perles de l'application n'en garde que le numéro et un
 		   drapeau, les onglets du greffon les affichent tels quels. */
 		const onglet = (i: number): string => {
-			const n = numero(i);
+			const n = beadNumero(i);
 			if (n > 0) return `<a class="quiz-tab ${tabClass(i)}" href="#" data-nav="${i}" aria-label="${ctx.escapeHtmlAttr(tabLabel(i))}"><span class="quiz-tab-q">Q</span>${n}</a>`;
 			const nom = ctx.escapeHtmlAttr(stripInlineMarkdown(ctx.quiz[i]?.title || t("engine.lesson.roleRead")));
 			/* `data-titre`: the reading's title, shown ABOVE the bead on hover by
@@ -635,6 +656,36 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	   rôle reste une classe de la carte (`quiz-role-*`) pour la mise en page. */
 
 	function questionCardHtml(qi: number): string {
+		const card = cardParts(qi, false);
+		return `<div class="quiz-track-item${card.roleClass}${card.revealedClass}" data-slide-kind="question" data-qi="${qi}">${card.section}</div>`;
+	}
+
+	/** One slide per STEP (engine/step-page.ts): the step's readings, then its
+	    questions, stacked in one page, then the way on. Each card is a
+	    `section` of its own (`data-card-qi`), refreshed alone by
+	    `refreshQuestionSlide`; the slide keeps the first card's index in
+	    `data-qi`, which every slide-level lookup of the engine reads. */
+	function stepSlideHtml(step: StepSlide): string {
+		const members = stepMembers(step);
+		const cards = members.map(qi => cardParts(qi, true).section).join("");
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+	}
+
+	/** The foot of a step page: back, and ONE wide "Next step" button that is
+	    the next arrow itself (`quiz-next-btn`: the keys, the swipe and the
+	    application's bar all click it). On the last step it leads where the
+	    last arrow of a quiz leads. */
+	function stepFooterHtml(lastQi: number): string {
+		const slide = ctx.getSlideIndexForQuestion(lastQi);
+		const isLast = ctx.questionSuivante(lastQi) === null;
+		const label = t(isLast ? ctx.handIn.lastArrowLabel() : "engine.learn.nextStep");
+		return `<div class="quiz-question-nav quiz-step-nav">
+			<button class="quiz-nav-btn quiz-prev-btn" type="button" aria-label="${ctx.escapeHtmlAttr(t("engine.nav.prevQuestion"))}"${slide <= 0 ? " disabled" : ""}>${ICON_ARROW_LEFT}</button>
+			<button class="quiz-nav-btn quiz-next-btn quiz-step-next-btn" type="button" aria-label="${ctx.escapeHtmlAttr(label)}" title="${ctx.escapeHtmlAttr(label)}">${ICON_ARROW_RIGHT}</button>
+		</div>`;
+	}
+
+	function cardParts(qi: number, inStep: boolean): { roleClass: string; revealedClass: string; section: string } {
 		// Le budget de coloration des blocs de code (code-highlight.ts) n'est
 		// PLUS remis à zéro ici (retiré au tour 4) : cette fonction est appelée
 		// une fois PAR CARTE dans une boucle (engine.ts, `slideMap.map`), et un
@@ -789,8 +840,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			courteHtml = corpsLectureCourte(ctx, l, String(l.prompt ?? ""), texte).html;
 		}
 
-		return `<div class="quiz-track-item${roleClass}${revealedClass}" data-slide-kind="question" data-qi="${qi}">
-			<section class="quiz-card"${sectionIdAttr}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
+		const section = `<section class="quiz-card${inStep ? `${roleClass}${revealedClass} quiz-step-card` : ""}"${sectionIdAttr}${inStep ? ` data-card-qi="${qi}"` : ""}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
 				${passageSection}
 				${courteHtml}
 				${ctx.learn.retryNoteHtml(qi)}
@@ -804,9 +854,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				${dontKnowBtn}
 				${ctx.learn.checkButtonHtml(qi)}
 				${!isRead && !isTextOnly && ctx.isRevealed(qi) ? explanationHtml(qi) : ""}
-				${questionNavHtml(qi)}
-			</section>
-		</div>`;
+				${inStep ? "" : questionNavHtml(qi)}
+			</section>`;
+		return { roleClass, revealedClass, section };
 	}
 
 	return {
@@ -824,6 +874,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		submitSlideHtml,
 		resultsSlideHtml,
 		refreshMetaSlides,
-		questionCardHtml
+		questionCardHtml,
+		stepSlideHtml,
+		stepCardHtml: (qi: number) => cardParts(qi, true).section
 	};
 }

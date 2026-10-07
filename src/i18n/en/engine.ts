@@ -114,6 +114,8 @@ export const EN_ENGINE = {
 	/* The Learn retry loop (engine/learn.ts, 2026-09-29): each question is
 	   checked on its card, a missed one comes back later. */
 	"engine.learn.check": "Check",
+	"engine.learn.nextStep": "Next step",
+	"engine.learn.showAnswer": "Show the answer",
 	"engine.learn.retryNote": "You missed this one earlier: try again.",
 	"engine.learn.summaryFirst": "Right the first time",
 	"engine.learn.summaryRetried": "Right after a retry",

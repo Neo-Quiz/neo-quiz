@@ -98,6 +98,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.lesson.roleRecall": "De mémoire",
 	"engine.lesson.dontKnow": "Je ne sais pas",
 	"engine.learn.check": "Vérifier",
+	"engine.learn.nextStep": "Étape suivante",
+	"engine.learn.showAnswer": "Voir la réponse",
 	"engine.learn.retryNote": "Cette question vous avait échappé : réessayez.",
 	"engine.learn.summaryFirst": "Juste du premier coup",
 	"engine.learn.summaryRetried": "Juste après une reprise",

@@ -132,6 +132,7 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 			if (outcome?.firstCheck) ctx.recordReview(qi, correct ? "correct" : "wrong");
 		}
 		refresh(qi);
+		ctx.stepScrollNext?.(qi);
 		return true;
 	}
 
@@ -159,7 +160,8 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 
 	function advance(qi: number): LearnAdvance {
 		if (!isActive() || s().locked) return { kind: "go", qi: ctx.questionSuivante(qi) };
-		if (canCheck(qi)) {
+		// In a step page nothing is checked by the next press: each card has its own Check.
+		if (!ctx.stepOf?.(qi) && canCheck(qi)) {
 			checkQuestion(qi);
 			return { kind: "checked" };
 		}
@@ -182,6 +184,8 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 
 	function checkButtonHtml(qi: number): string {
 		if (!isCheckable(qi) || isRevealed(qi) || ctx.isFlashcardQuestion(ctx.quiz[qi]) || checksOnClick(qi)) return "";
+		// A step page's only Check is a multiple choice's: reveal cards have their own button.
+		if (ctx.stepSlides && ctx.textOnly.isTextOnlyFor(qi)) return "";
 		return `<button class="quiz-action-btn success quiz-learn-check-btn" type="button" data-learn-check="${qi}"${canCheck(qi) ? "" : " disabled"}>${t("engine.learn.check")}</button>`;
 	}
 
@@ -196,6 +200,7 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 			btn.disabled = !canCheck(Number(btn.dataset.learnCheck));
 		});
 		ctx.container.querySelectorAll<HTMLElement>('.quiz-track-item[data-slide-kind="question"]').forEach(item => {
+			if (item.classList.contains("quiz-step-page")) return;
 			const qi = Number(item.dataset.qi);
 			const next = item.querySelector<HTMLButtonElement>(".quiz-next-btn");
 			if (!next || !Number.isInteger(qi)) return;

@@ -24,8 +24,8 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(
-	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts", "src/engine/lesson.ts"],
-	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }, { createLessonHandlers }) => {
+	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts", "src/engine/lesson.ts", "src/engine/step-page.ts"],
+	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }, { createLessonHandlers, buildLessonModel }, { buildStepSlides, isTapType, stepBeadState }) => {
 	/**
 	 * Construit un ctx minimal, avec le câblage croisé réel des méthodes
 	 * aplaties (même pattern qu'engine.ts).
@@ -894,6 +894,81 @@ await withSrcModule(
 			statsStore: { updateRecord: (path, rec) => records.push(rec) } });
 		learnAide.ctx.goToResults();
 		r.check("a Learn's attempt carries no hint count", [records.length, records[0]?.withHint], [1, undefined]);
+		r.done();
+	}
+
+	/* ────────────────────────────────────────────────────────────
+	   ONE PAGE PER STEP (engine/step-page.ts, spec 2026-10-07-learn-scroll §1-2).
+	   ──────────────────────────────────────────────────────────── */
+	{
+		const r = makeReporter("step pages — the page model, the tap types, the reveal path");
+		const read = (id, slice) => ({ id, title: id, role: "read", prompt: "p", slice });
+		const qcm = (id, slice) => ({ id, title: id, options: ["a", "b"], correctIndex: 0, ...(slice ? { slice } : {}) });
+		const summary = pages => pages.map(p => ({ step: p.step, reads: p.reads, questions: p.questions }));
+
+		// Steps 1,1,2,2 and one question WITHOUT a slice: three pages, the last one holds it.
+		const quiz = [read("r1", 1), qcm("a", 1), qcm("b", 2), read("r2", 2), qcm("c", 2), qcm("loose")];
+		const pages = buildStepSlides(quiz, buildLessonModel(quiz, "lesson"));
+		r.check("a question without a slice forms a trailing page, never dropped",
+			summary(pages), [
+				{ step: 1, reads: [0], questions: [1] },
+				{ step: 2, reads: [3], questions: [2, 4] },
+				{ step: 3, reads: [], questions: [5] },
+			]);
+
+		const noSlice = [qcm("x"), qcm("y"), qcm("z")];
+		r.check("a Learn without any slice keeps one page per question",
+			summary(buildStepSlides(noSlice, buildLessonModel(noSlice, "lesson"))).map(p => p.questions), [[0], [1], [2]]);
+
+		const allLoose = [read("r", 1), qcm("a", 1)];
+		r.check("every card lands on exactly one page", pages.flatMap(p => [...p.reads, ...p.questions]).sort(), [0, 1, 2, 3, 4, 5]);
+		r.check("a lone reading is a page with no question", summary(buildStepSlides([read("r", 1)], buildLessonModel([read("r", 1)], "lesson"))), [{ step: 1, reads: [0], questions: [] }]);
+		void allLoose;
+
+		r.check("tap types: single choice, multiple choice, flashcard",
+			[qcm("s"), { options: ["a", "b"], multiSelect: true, correctIndices: [0, 1] }, { flashcard: true, answer: "x" }].map(isTapType), [true, true, true]);
+		r.check("not tap types: text, cloze, ordering, matching, numeric, code, recall without options",
+			[{ type: "text", answer: "x" }, { cloze: "a {{b}}" }, { ordering: true, options: ["a", "b"] }, { matching: true }, { type: "text", numeric: true },
+				{ language: "python", solution: "x" }, { title: "t", prompt: "p" }].map(isTapType), [false, false, false, false, false, false, false]);
+
+		r.check("bead: all right first time = correct", stepBeadState(["first", "first"], true), "correct");
+		r.check("bead: a miss still standing = wrong", stepBeadState(["first", "missed"], true), "wrong");
+		r.check("bead: right after a retry = retried", stepBeadState(["first", "retried"], true), "retried");
+		r.check("bead: unfinished = answered, untouched = nothing", [stepBeadState(["first", "none"], true), stepBeadState(["none", "none"], false)], ["answered", ""]);
+
+		// A text question in a step page: a reveal card, no field, ONE journal line at the first verdict.
+		const cartes = [
+			{ id: "t1", title: "T", prompt: "Write it", type: "text", answer: "42", slice: 1 },
+			{ id: "t2", title: "C", prompt: "Fill", cloze: "a {{b}}", slice: 1 },
+			{ id: "t3", title: "O", prompt: "Order", ordering: true, options: ["a", "b"], slice: 1 },
+		];
+		const { ctx, appels } = makeCtx({ quiz: cartes, selections: ["", [""], [null, null]], isLessonMode: true, roles: ["test", "test", "test"] });
+		ctx.stepSlides = buildStepSlides(cartes, buildLessonModel(cartes, "lesson"));
+		ctx.isTextQuestion = q => q.type === "text";
+		ctx.isCodeQuestion = () => false;
+		ctx.escapeHtmlAttr = v => String(v);
+		ctx.cards = { renderQuizPromptHtml: q => String(q.prompt), optionContentHtml: (q, oi) => q.options[oi] };
+		ctx.textOnly = createTextOnlyHandlers(ctx);
+		ctx.quizState.textOnlyAnswers = cartes.map(() => "");
+		ctx.quizState.textOnlyChecked = cartes.map(() => false);
+		ctx.terminal = { getTextAcceptedAnswers: q => [q.answer] };
+		ctx.commitQuestionInteraction = () => {};
+		ctx.recordReview = createStateHandlers(ctx).recordReview;
+		r.check("every non-tap type is a reveal card in a step page", cartes.map((_, i) => ctx.textOnly.isTextOnlyFor(i)), [true, true, true]);
+		const before = cartes.map((q, i) => ctx.textOnly.questionCardBodyHtml(q, i));
+		r.check("before the reveal: a Show the answer button, no field, no rating",
+			before.map(h => [h.includes("quiz-reveal-btn"), /<textarea|<input|math-field/.test(h), h.includes("data-textonly-rating")]), cartes.map(() => [true, false, false]));
+		ctx.quizState.textOnlyChecked[0] = true;
+		const after = ctx.textOnly.questionCardBodyHtml(cartes[0], 0);
+		r.check("after the reveal: the answer and the two self-verdict buttons, still no field",
+			[after.includes("42"), /<textarea|<input|math-field/.test(after), [...after.matchAll(/data-textonly-rating="(\w+)"/g)].map(m => m[1])], [true, false, ["review", "understood"]]);
+
+		const bouton = fakeRatingButton("understood");
+		ctx.textOnly.bindTextOnlyQuestion(fakeTrackItem([bouton]), 0);
+		bouton.click();
+		bouton.click();
+		r.check("the verdict is first-try and journaled ONCE",
+			[ctx.quizState.learnVerdicts[0], appels], ["first", [{ q: "Cours/ch1.md::t1", grade: "understood", role: "test" }]]);
 		r.done();
 	}
 });
