@@ -1696,9 +1696,11 @@ await withSrcModule("apps/windows/electron/surveillant-cli.ts", async ({ surveil
 		/* The plain terminal of the manual install path (2026-09-30): the same
 		   ShellExecute launcher, for a window the user types in. */
 		{ fichier: RACINE + "/process.ts", appel: 'spawn("powershell.exe", plainTerminalArguments(env), { stdio: "ignore" })' },
-		/* La fenêtre de mise à jour : l'application ELLE-MÊME (un exécutable
-		   graphique Electron, sans console), qui doit se montrer. */
-		{ fichier: RACINE + "/fenetre-maj.ts", appel: 'spawn(exeLie, [ DRAPEAU_FENETRE_MAJ, version, langue, `--user-data-dir=${join(dirname(exeLie), "profil")}`, ], { detached: true, windowsHide: false, stdio: "ignore" })' },
+		/* The update window: the app ITSELF (a graphical Electron executable,
+		   no console), which has to show. Every argument is built by the main
+		   process: two numbers from the update, its own install folder, its
+		   own pid (only probed with signal 0 by the window), its own profile. */
+		{ fichier: RACINE + "/fenetre-maj.ts", appel: 'spawn(exeLie, [ DRAPEAU_FENETRE_MAJ, version, langue, `--neo-quiz-maj-paquet=${tailles.paquet}`, ...(tailles.installe === null ? [] : [`--neo-quiz-maj-installe=${tailles.installe}`]), `--neo-quiz-maj-dossier=${dirname(executable)}`, `--neo-quiz-maj-pid=${process.pid}`, `--user-data-dir=${join(dirname(exeLie), "profil")}`, ], { detached: true, windowsHide: false, stdio: "ignore" })' },
 	];
 
 	/** Commentaires retirés : la prose de ces fichiers nomme d'anciens appels
