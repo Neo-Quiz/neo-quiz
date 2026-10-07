@@ -1394,3 +1394,30 @@ html.nq-mobile ::-webkit-scrollbar {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 }
+
+/* ── A page is never empty on its first frame ──
+   The entry of a page (`markViewEnter`, dashboard-quizzes.css,
+   dashboard-detail.css) starts every block of it at opacity 0 and staggers the
+   cards by 100 to 200 ms. The page being left is gone on the same frame, so
+   the phone showed the bare wallpaper for 100 to 250 ms, then cards filling
+   in one after the other until about 400 ms (phone audit, 2026-10-07: frames
+   of opening a folder, and of coming back from a quiz page). On a phone the
+   page appears whole on its first frame, like the other main pages: this
+   list is the one of `prefers-reduced-motion` in dashboard-quizzes.css, plus
+   the same entry on a quiz page opened from a generation. The class
+   `.qbd-*-enter` then lingers until the next render, which only holds
+   animations that are off here. */
+.is-mobile .qbd-quizzes-enter .qbd-quizzes-folder-hero,
+.is-mobile .qbd-quizzes-enter .qbd-quizzes-folder-hero .qbd-quizzes-title,
+.is-mobile .qbd-quizzes-enter > .qbd-quizzes-header,
+.is-mobile .qbd-quizzes-enter > .qbd-quizzes-group,
+.is-mobile .qbd-quizzes-enter .qbd-empty-state,
+.is-mobile .qbd-quizzes-enter .qbd-quizzes-node-head,
+.is-mobile .qbd-quizzes-enter .qbd-module-card,
+.is-mobile .qbd-quizzes-enter .qbd-quiz-card.qbd-quiz-card--folder,
+.is-mobile .qbd-quizzes-enter .qbd-quizzes-drill-next,
+.is-mobile .qbd-qz-enter .qbd-qz-top,
+.is-mobile .qbd-qz-enter .qbd-qz-list,
+.is-mobile .qbd-qz-enter .qbd-qz-main {
+	animation: none;
+}
