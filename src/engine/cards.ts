@@ -12,7 +12,7 @@ import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
-import { stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { drawOrder, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -667,7 +667,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	    `data-qi`, which every slide-level lookup of the engine reads. */
 	function stepSlideHtml(step: StepSlide): string {
 		const members = stepMembers(step);
-		const cards = members.map(qi => cardParts(qi, true).section).join("");
+		const st = ctx.quizState;
+		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
+		const cards = order.map(qi => cardParts(qi, true).section).join("");
 		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 

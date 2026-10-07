@@ -157,3 +157,41 @@ await withSrcModule("src/engine/learn-loop.ts", (m) => {
 	}
 	r.done();
 });
+
+/* A step page (spec 2026-10-07-learn-scroll §3): the miss comes back at the
+   bottom of the SAME page once due, or when the learner presses "Next step". */
+await withSrcModule("src/engine/learn-loop.ts", (m) => {
+	const r = makeReporter("Learn retry loop - step page");
+	const { emptyLearnState, applyCheck, nextLearnMove, beginRetry, dueRetryOnPage, MAX_RETRIES } = m;
+	const N = 6;
+	const page = (qi) => (qi <= 3 ? 1 : 2);
+	const next = (qi) => (qi + 1 < N ? qi + 1 : null);
+	const onPage1 = (qi) => qi <= 3;
+	const s = emptyLearnState(N);
+	applyCheck(s, 0, false);
+	r.check("a miss is not due at once", dueRetryOnPage(s, onPage1, 0), null);
+	applyCheck(s, 1, true);
+	r.check("not due after one other check", dueRetryOnPage(s, onPage1, 1), null);
+	applyCheck(s, 2, true);
+	r.check("due after two other checks, on its own page", dueRetryOnPage(s, onPage1, 2), 0);
+	r.check("never picked as the card just checked", dueRetryOnPage(s, onPage1, 0), null);
+	r.check("a page that is not its own never gets it", dueRetryOnPage(s, qi => qi >= 4, 4), null);
+
+	const t = emptyLearnState(N);
+	applyCheck(t, 0, false);
+	const move = nextLearnMove(t, 3, page, next);
+	r.check('"Next step" with a miss pending shows it first, then goes on', [move.kind, move.qi, move.resume], ["retry", 0, 4]);
+	beginRetry(t, 0, 4);
+	applyCheck(t, 0, true);
+	r.check("right on the retry: retried, journal-neutral (first verdict kept in learnMisses)", [t.learnVerdicts[0], t.learnMisses[0]], ["retried", 1]);
+
+	const u = emptyLearnState(N);
+	let gave = false;
+	for (let i = 0; i < MAX_RETRIES + 1; i++) {
+		const o = applyCheck(u, 0, false);
+		gave = o.gaveUp;
+		if (o.queued) beginRetry(u, 0, 4);
+	}
+	r.check("three retries at most on a page", [gave, u.learnQueue.length, u.learnVerdicts[0]], [true, 0, "missed"]);
+	r.done();
+});

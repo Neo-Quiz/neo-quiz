@@ -132,6 +132,17 @@ export function nextLearnMove(
 	return { kind: "go", qi: target };
 }
 
+/**
+ * In a step page nothing is left behind: a queued question of the page
+ * comes back at its bottom as soon as it is due (RETRY_LAG checks since its
+ * miss), without waiting for the learner to press "Next step". `null` when
+ * none is due. `onPage` says which questions share the page; `current` (the
+ * card just checked) is never picked.
+ */
+export function dueRetryOnPage(s: LearnLoopState, onPage: (qi: number) => boolean, current: number): number | null {
+	return s.learnQueue.find(e => e.qi !== current && onPage(e.qi) && e.since >= RETRY_LAG)?.qi ?? null;
+}
+
 /** The learner arrives on a queued question: it leaves the queue and opens
     again (the engine clears its answer and reshuffles its options). */
 export function beginRetry(s: LearnLoopState, qi: number, resume: Exclude<LearnResume, null>): void {

@@ -183,3 +183,32 @@ await withSrcModule("src/engine/session.ts", ({ canSnapshot }) => {
 		[canSnapshot({ exam: false, locked: true, onQuestion: true }), canSnapshot({ exam: false, locked: false, onQuestion: false })], [false, false]);
 	r.done();
 });
+
+/* Resume mid-step (spec 2026-10-07-learn-scroll §3): the snapshot is by question
+   id, so a page keeps its answers, its verdicts and its pending retry; a
+   snapshot of the one-slide-per-question era (current = a middle card of a
+   step) still names a card the engine maps onto its step page. */
+await withSrcModule("src/engine/session.ts", ({ photographier, restaurer }) => {
+	const r = makeReporter("Session - mid-step resume");
+	const ids = ["a", "b", "c", "d", "e"];
+	const n = ids.length;
+	const maps = [null, [1, 0, 2], null, [2, 0, 1], null];
+	const base = { selections: new Array(n).fill(null), shuffleMap: maps };
+	const etat = {
+		selections: [null, 1, null, 0, null],
+		shuffleMap: maps,
+		textOnlyAnswers: new Array(n).fill(""), textOnlyChecked: new Array(n).fill(false),
+		textOnlyRatings: new Array(n).fill(null), lessonPreSkipped: new Array(n).fill(false),
+		hintSeen: new Array(n).fill(false), recorded: [false, true, false, true, false],
+		learnVerdicts: ["none", "missed", "none", "first", "none"], learnMisses: [0, 1, 0, 0, 0],
+		learnRetrying: [false, true, false, false, false], learnChecked: [false, false, false, true, false],
+		learnPending: new Array(n).fill(false), learnQueue: [{ qi: 4, since: 1 }],
+		learnResume: 4, learnRetryQi: 1,
+	};
+	const back = restaurer(JSON.parse(JSON.stringify(photographier(etat, ids, 3, 5))), ids, base);
+	r.check("step 2 (cards c,d) restores on the card named", back.courante, 3);
+	r.check("answers and verdicts of the page", [back.selections[3], back.learnVerdicts[3], back.learnChecked[3]], [0, "first", true]);
+	r.check("the pending retry stays open, with its resume point", [back.learnRetrying[1], back.learnVerdicts[1], back.learnResume, back.learnRetryQi], [true, "missed", 4, 1]);
+	r.check("the queue keeps its lag", back.learnQueue, [{ qi: 4, since: 1 }]);
+	r.done();
+});

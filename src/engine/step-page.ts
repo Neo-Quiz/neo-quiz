@@ -43,6 +43,16 @@ export function stepMembers(step: StepSlide): number[] {
 	return [...step.reads, ...step.questions];
 }
 
+/**
+ * The order the cards of a page are drawn in: a question whose retry is
+ * open (reopened, not yet checked) sits at the BOTTOM, where a retry is
+ * appended live, so that a page drawn again after a resume looks the same.
+ * Readings and the other cards keep their order.
+ */
+export function drawOrder(members: readonly number[], retryOpen: (qi: number) => boolean): number[] {
+	return [...members.filter(qi => !retryOpen(qi)), ...members.filter(retryOpen)];
+}
+
 /** The page that holds question `qi`, or `null`. */
 export function stepHolding(slides: readonly StepSlide[], qi: number): StepSlide | null {
 	return slides.find(s => s.reads.includes(qi) || s.questions.includes(qi)) ?? null;

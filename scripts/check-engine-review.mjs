@@ -1258,3 +1258,12 @@ await withSrcModule("src/engine/exam.ts", ({ createExamHandlers }) => {
 	}
 	r.done();
 });
+
+/* Step page: where an open retry is drawn (bottom of its page). */
+await withSrcModule("src/engine/step-page.ts", ({ drawOrder }) => {
+	const r = makeReporter("Step page - retry at the bottom");
+	r.check("an open retry is drawn last, the rest keep their order", drawOrder([4, 5, 6, 7], qi => qi === 5), [4, 6, 7, 5]);
+	r.check("no open retry: unchanged", drawOrder([4, 5, 6], () => false), [4, 5, 6]);
+	r.check("two open retries keep their relative order", drawOrder([0, 1, 2, 3], qi => qi === 0 || qi === 2), [1, 3, 0, 2]);
+	r.done();
+});
