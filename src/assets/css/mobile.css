@@ -1005,6 +1005,14 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
 	flex: none;
 }
 
+/* The row of beads fades out at both ends, so a bead cut by the edge reads as
+   "more this way" instead of as a clipping accident. */
+.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+	padding-inline: 24px;
+	-webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+	mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+}
+
 /* No keyboard on a touch screen: no "press Space" tip under a flashcard, no
    key badge on its rating buttons. */
 @media (pointer: coarse) {
@@ -1025,9 +1033,25 @@ html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
 }
 
 /* The last button of a question (Check) sat flush against the bar of arrows
-   once scrolled to the end: a little room under the content. */
+   once scrolled to the end: a little room under the content, and the slide
+   fades out over its last pixels instead of being cut flat against the arrows. */
 .is-mobile #neo-quiz-root > .qbd-qz .quiz-track-item {
-	padding-bottom: 16px;
+	padding-bottom: 28px;
+	-webkit-mask-image: linear-gradient(#000 calc(100% - 22px), transparent 100%);
+	mask-image: linear-gradient(#000 calc(100% - 22px), transparent 100%);
+}
+
+/* A slimmer bar of arrows on the phone (swipe changes page too): 44 px
+   targets, less air around them, the panel's own background. */
+.is-mobile #neo-quiz-root > .qbd-qz > .qz-bottom-bar {
+	padding: 10px 0 12px;
+	gap: 12px;
+}
+
+.is-mobile #neo-quiz-root > .qbd-qz > .qz-bottom-bar .quiz-nav-btn {
+	min-width: 56px;
+	min-height: 44px;
+	height: 44px;
 }
 
 /* THE SOFT KEYBOARD (ui/clavier.ts): while a text answer is typed, the bar of
@@ -1234,3 +1258,16 @@ html.nq-mobile ::-webkit-scrollbar {
 .is-mobile .quiz-step-card .quiz-reveal-btn{ width: 100%; min-height: 52px; }
 .is-mobile .quiz-learn-figure strong{ font-size: 2rem; }
 .is-mobile .quiz-learn-result{ gap: 24px; }
+
+/* A played quiz's title may take two lines on the phone rather than end in an
+   ellipsis after a few letters. */
+.is-mobile .qbd-qz-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	font-size: 17px;
+	line-height: 1.2;
+}
