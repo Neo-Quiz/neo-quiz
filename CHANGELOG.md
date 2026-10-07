@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.39] - 2026-10-07
+
 ### Changed
 - The @ picker only suggests notes, PDFs and images, and matches the words of a name instead of letters scattered along its path.
 - Icon-only buttons (provider in Generate, colour and icon in the folder window) have names for screen readers.
