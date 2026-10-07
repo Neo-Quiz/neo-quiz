@@ -34,6 +34,42 @@ export function isAttachable(name: string): boolean {
 	return ATTACHABLE_EXT.has(name.slice(i + 1).toLowerCase());
 }
 
+/* What the « @ » picker SUGGESTS: the documents a quiz is made from (notes, text,
+   PDFs) and images. `ATTACHABLE_EXT` stays wider, for a path TYPED in the
+   composer, but a script or a stylesheet is never a source to offer
+   (`@Tests` suggested `valorantRefresh.js`). */
+const PICKABLE_EXT = new Set(["md", "txt", "pdf", ...IMAGE_EXT]);
+
+export function isPickable(name: string): boolean {
+	const i = name.lastIndexOf(".");
+	return i >= 0 && PICKABLE_EXT.has(name.slice(i + 1).toLowerCase());
+}
+
+/** The words of a file or folder name, lower case and without accents: split on
+    anything that is not a letter or digit and on camelCase, the extension left
+    out (« valorantRefresh.js » → valorant, refresh). */
+export function nameWords(name: string, isFolder: boolean): string[] {
+	const dot = name.lastIndexOf(".");
+	const bare = !isFolder && dot > 0 ? name.slice(0, dot) : name;
+	return bare.normalize("NFD").replace(/\p{M}/gu, "")
+		.replace(/(\p{Ll}|\d)(\p{Lu})/gu, "$1 $2")
+		.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/** Does `query` pick this entry? Every word typed must OPEN a word of its NAME:
+    « tests » finds « Tests », never « stw-storm-shard.png » or a file that only
+    has the letters scattered along its path. A typed « dir/ » part must be a
+    folder somewhere in the path. */
+export function matchesName(entry: FileEntry, query: string): boolean {
+	const cut = query.lastIndexOf("/");
+	const dir = cut < 0 ? "" : query.slice(0, cut).toLowerCase();
+	if (dir && !entry.path.toLowerCase().includes(dir + "/")) return false;
+	const typed = nameWords(query.slice(cut + 1), true);
+	if (!typed.length) return true;
+	const words = nameWords(entry.name, entry.isFolder);
+	return typed.every(w => words.some(n => n.startsWith(w)));
+}
+
 /* Tri de la référence (capture Claude Code) : fichiers et dossiers
    MÉLANGÉS, alphabétique insensible à la casse. Pas de dossiers d'abord. */
 function compareEntries(a: FileEntry, b: FileEntry): number {
@@ -52,7 +88,7 @@ function toVaultEntry(e: DirEntry): FileEntry {
 export async function listVaultFolder(folderPath: string): Promise<FileEntry[]> {
 	const entrees = await currentHost().fs.listDir(folderPath);
 	return entrees
-		.filter(e => e.isFolder || isAttachable(e.name))
+		.filter(e => e.isFolder || isPickable(e.name))
 		.map(toVaultEntry)
 		.sort(compareEntries);
 }
@@ -165,7 +201,7 @@ export function listExternalRoots(roots: string[]): FileEntry[] {
     (`walk`) : deux copies avaient chacune leur chance de diverger. */
 function externalEntryOf(e: DirEntry, root: string): FileEntry | null {
 	if (e.name.startsWith(".")) return null;
-	if (e.isFolder ? SKIP_DIRS.has(e.name) : !isAttachable(e.name)) return null;
+	if (e.isFolder ? SKIP_DIRS.has(e.name) : !isPickable(e.name)) return null;
 	return { name: e.name, path: toRelPath(e.path, root), isFolder: e.isFolder, source: "external" };
 }
 
@@ -315,13 +351,17 @@ export function searchAll(roots: string[], query: string): { entries: FileEntry[
 	// matche « Cours/Java/TD3.md » parce que le motif tapé fait simplement
 	// partie du chemin, sans notion de périmètre.
 	const files = host.fs.listFiles();
+	/* Matched on the NAME's words (`matchesName`), then ranked by the fuzzy score
+	   of the path as before: the fuzzy match alone finds any subsequence, and a
+	   long path always has one. */
 	for (const f of files) {
-		if (!isAttachable(f.name)) continue;
-		const r = fuzzy(f.path);
-		if (r) scored.push({ entry: { name: f.name, path: f.path, isFolder: false, source: "vault" }, score: r.score });
+		if (!isPickable(f.name)) continue;
+		const entry: FileEntry = { name: f.name, path: f.path, isFolder: false, source: "vault" };
+		const r = matchesName(entry, query) && fuzzy(f.path);
+		if (r) scored.push({ entry, score: r.score });
 	}
 	for (const entry of vaultFoldersOf(files)) {
-		const r = fuzzy(entry.path);
+		const r = matchesName(entry, query) && fuzzy(entry.path);
 		if (r) scored.push({ entry, score: r.score });
 	}
 
@@ -338,7 +378,7 @@ export function searchAll(roots: string[], query: string): { entries: FileEntry[
 			if (!idx) continue;
 			if (idx.truncated) truncated.push(baseName(root));
 			for (const entry of idx.entries) {
-				const r = fuzzy(entry.path);
+				const r = matchesName(entry, query) && fuzzy(entry.path);
 				if (r) scored.push({ entry, score: r.score });
 			}
 		}
