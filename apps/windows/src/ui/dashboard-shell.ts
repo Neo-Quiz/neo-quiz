@@ -57,6 +57,7 @@ import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
+import { sharedState } from "../host/shared-state";
 import { addFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
@@ -102,6 +103,31 @@ import { createMovedPrefix } from "../review/folder-move";
 
 let reglagesPagesCache: DashboardPageSettings = {};
 
+/** Folder settings (colour, icon, name, UE, path) live in the synced folder
+    (`.neo-quiz/modules/<device>.json`, merged across devices) once the legacy
+    `quizzesModuleOverrides` setting has been copied there. Until then (a failed
+    migration) the setting stays the source and is still written. */
+let modulesPartages = false;
+
+async function lireOverrides(): Promise<Record<string, ModuleOverride> | undefined> {
+	try {
+		if (await lireReglage<boolean>("sharedModulesMigrated") === true) {
+			const fusion = sharedState().modules() as Record<string, ModuleOverride>;
+			modulesPartages = true;
+			return fusion;
+		}
+	} catch (e) {
+		console.warn("[quiz-blocks] shared folder settings unavailable, using the local ones:", e);
+	}
+	return (await lireReglage<Record<string, ModuleOverride>>("quizzesModuleOverrides")) ?? undefined;
+}
+
+/** Another device's folder settings landed (sync): adopt the merged view in
+    place, the pages hold this very object. */
+export function adopterOverrides(): void {
+	if (modulesPartages) reglagesPagesCache.quizzesModuleOverrides = sharedState().modules() as Record<string, ModuleOverride>;
+}
+
 /**
  * À charger UNE FOIS au démarrage (main.ts, comme `chargerExamDates`) :
  * sans cet appel, la première page de la session verrait des réglages vides
@@ -111,7 +137,7 @@ export async function chargerReglagesPages(): Promise<DashboardPageSettings> {
 	reglagesPagesCache = {
 		quizzesExpandedFolders: (await lireReglage<string[]>("quizzesExpandedFolders")) ?? undefined,
 		quizzesGrouping: (await lireReglage<string>("quizzesGrouping")) ?? undefined,
-		quizzesModuleOverrides: (await lireReglage<Record<string, ModuleOverride>>("quizzesModuleOverrides")) ?? undefined,
+		quizzesModuleOverrides: await lireOverrides(),
 		quizzesModuleMapNote: (await lireReglage<string>("quizzesModuleMapNote")) ?? undefined,
 		quizzesArchivedFolders: (await lireReglage<string[]>("quizzesArchivedFolders")) ?? undefined,
 	};
@@ -141,7 +167,9 @@ async function enregistrerReglagesPages(): Promise<void> {
 	// doit s'écrire comme tel, jamais laisser une ancienne valeur trainer.
 	await ecrireReglage("quizzesExpandedFolders", reglagesPagesCache.quizzesExpandedFolders ?? []);
 	await ecrireReglage("quizzesGrouping", reglagesPagesCache.quizzesGrouping ?? null);
-	await ecrireReglage("quizzesModuleOverrides", reglagesPagesCache.quizzesModuleOverrides ?? {});
+	const overrides = reglagesPagesCache.quizzesModuleOverrides ?? {};
+	if (modulesPartages) await sharedState().syncModules(overrides);
+	else await ecrireReglage("quizzesModuleOverrides", overrides);
 	await ecrireReglage("quizzesModuleMapNote", reglagesPagesCache.quizzesModuleMapNote ?? null);
 	await ecrireReglage("quizzesArchivedFolders", reglagesPagesCache.quizzesArchivedFolders ?? []);
 }

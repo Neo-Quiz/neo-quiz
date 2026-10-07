@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- A folder's colour, icon, name and teaching unit now follow you on every device.
 - On the phone, swiping follows your finger and snaps to the next page like a native app, with a short vibration.
 - Sign in to Moodle once: new course files download into your Neo Quiz folder by themselves, and a Moodle page lets you search courses, star them, open their folder and hand in assignments.
 - Generate makes a Learn by default, or a Test when you ask to practise, and asks a few quick questions when your request is vague.

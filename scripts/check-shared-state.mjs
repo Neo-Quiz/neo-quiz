@@ -10,7 +10,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 const ex = (id, date, modifiedAt, extra = {}) => ({ id, nom: id, date, modifiedAt, ...extra });
 const plain = (id, date) => ({ id, nom: id, date });
 
-await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts }, ss) => {
+await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts, mergeModules, diffModules }, ss) => {
 	const r = makeReporter("Shared state - merge");
 
 	r.check("newer edit beats older edit across devices",
@@ -61,6 +61,21 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 	const best = (e) => ss.recalculer({ bestScore: 0, questionsDone: 5, totalQuestions: 10, lastPlayed: 0, attempts: 0 }, foldAttempts(e)["A/q.md"]).bestScore;
 	r.check("best score drops when the best attempt is deleted on another device",
 		[best(evts), best([...evts, del("A/q.md", 200, 4)])], [90, 60]);
+
+	const f = (v, at) => (v === undefined ? { at } : { v, at });
+	r.check("modules: per field, the newest wins, whatever the order",
+		[mergeModules([{ K: { name: f("a", 1), color: f("r", 9) } }, { K: { name: f("b", 5) } }]),
+			mergeModules([{ K: { name: f("b", 5) } }, { K: { name: f("a", 1), color: f("r", 9) } }])],
+		[{ K: { name: "b", color: "r" } }, { K: { name: "b", color: "r" } }]);
+	r.check("modules: a newer tombstone clears the field, an older one loses",
+		[mergeModules([{ K: { color: f("r", 1) } }, { K: { color: f(undefined, 2) } }]), mergeModules([{ K: { color: f("r", 3) } }, { K: { color: f(undefined, 2) } }])],
+		[{}, { K: { color: "r" } }]);
+	r.check("modules: ue null is a value, not a tombstone", mergeModules([{ K: { ue: f(null, 1) } }]), { K: { ue: null } });
+	r.check("modules: a tie is deterministic",
+		[mergeModules([{ K: { name: f("x", 4) } }, { K: { name: f("y", 4) } }]).K.name, mergeModules([{ K: { name: f("y", 4) } }, { K: { name: f("x", 4) } }]).K.name].every((v, _, a) => v === a[0]), true);
+	r.check("modules: diff lists changed fields and clears", diffModules({ K: { name: "a", color: "r" } }, { K: { name: "b" }, L: { ue: null } }),
+		[{ key: "K", field: "name", v: "b" }, { key: "K", field: "color" }, { key: "L", field: "ue", v: null }]);
+
 	r.done();
 });
 
@@ -347,5 +362,112 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 		fs.read = real;
 		r.check("refresh never re-reads our own files (an unreadable one does not block it)", st.exams()["Efrei/M"].map(e => e.id).sort(), ["late", "mine", "theirs"]);
 	}
+
+	// 12. Folder settings: per-field stamps, the migration, conflict copies, corrupt files.
+	{
+		const stamp = (v, at) => (v === undefined ? { at } : { v, at });
+		const mod = (dev, tbl) => ({ [`Efrei/.neo-quiz/modules/${dev}.json`]: JSON.stringify(tbl) });
+		const mk = (files, dev) => { const fs = memFs(new Map(Object.entries(files))); return [fs, make(fs, dev, ["Efrei"])]; };
+		const mdir = "Efrei/.neo-quiz/modules";
+
+		// Two devices change DIFFERENT fields of one folder: both survive.
+		{
+			const [fs, st] = mk({
+				...mod("phone", { XTI: { color: stamp("#f00", 500) } }),
+				...mod("pc", { XTI: { name: stamp("Python", 400), color: stamp("#00f", 100) } }),
+			}, "pc");
+			await st.load();
+			r.check("modules: colour from the phone, name from the PC, both kept", st.modules(), { XTI: { name: "Python", color: "#f00" } });
+			await st.syncModules({ XTI: { name: "Python 2", color: "#f00", icon: "book" } });
+			r.check("modules: only the changed fields are stamped, in our file",
+				Object.keys(json(fs, `${mdir}/pc.json`).XTI).sort(), ["color", "icon", "name"]);
+			r.check("modules: the unchanged field keeps its old stamp (not rewritten as ours)", json(fs, `${mdir}/pc.json`).XTI.color.at, 100);
+			r.check("modules: another device's file is never rewritten", json(fs, `${mdir}/phone.json`), { XTI: { color: stamp("#f00", 500) } });
+			r.check("modules: a later write always outranks the stamp it replaces", json(fs, `${mdir}/pc.json`).XTI.name.at > 400, true);
+		}
+		// Clearing a field is a tombstone that beats an older value elsewhere; `ue: null` is a value.
+		{
+			const [fs, st] = mk({
+				...mod("phone", { A: { color: stamp("#f00", 10), ue: stamp("UE1", 10) } }),
+			}, "pc");
+			await st.load();
+			await st.syncModules({ A: { ue: null } });
+			const s2 = make(fs, "phone2", ["Efrei"]); await s2.load();
+			r.check("modules: cleared colour stays cleared, ue null is kept as a value", s2.modules(), { A: { ue: null } });
+			await st.syncModules({});
+			const s3 = make(fs, "phone3", ["Efrei"]); await s3.load();
+			r.check("modules: a key cleared field by field disappears", s3.modules(), {});
+		}
+		// A tie is resolved the same way whatever the order.
+		{
+			const a = mod("a", { K: { name: stamp("x", 7) } }), b = mod("b", { K: { name: stamp("y", 7) } });
+			const [, s1] = mk({ ...a, ...b }, "c"); await s1.load();
+			const [, s2] = mk({ ...b, ...a }, "c"); await s2.load();
+			r.check("modules: a tie on `at` gives one answer on every device", s1.modules(), s2.modules());
+		}
+		// Conflict copies and corrupt files are ignored, never fatal.
+		{
+			const [, st] = mk({
+				...mod("phone", { K: { name: stamp("ok", 5) } }),
+				[`${mdir}/phone.sync-conflict-20261001-000000-ABC.json`]: JSON.stringify({ K: { name: stamp("conflict", 99) } }),
+				[`${mdir}/junk.json`]: "{not json",
+				[`${mdir}/odd.json`]: JSON.stringify({ K: { name: { v: 5, at: "x" }, color: { v: "#fff", at: 3 } }, "": { name: stamp("e", 1) } }),
+			}, "pc");
+			await quiet(() => st.load());
+			r.check("modules: conflict copy and corrupt file ignored, malformed fields dropped", st.modules(), { K: { name: "ok", color: "#fff" } });
+		}
+		// Own file unreadable: refuse (the root stays read-only), nothing replaced.
+		{
+			const [fs, st] = mk(mod("pc", { K: { name: stamp("mine", 5) } }), "pc");
+			const real = fs.read; fs.read = async p => { if (p.endsWith("modules/pc.json")) throw new Error("locked"); return real(p); };
+			await quiet(() => st.load());
+			await quiet(async () => { try { await st.syncModules({ K: { name: "new" } }); } catch { /* refused */ } });
+			fs.read = real;
+			r.check("modules: an unreadable own file is never replaced", json(fs, `${mdir}/pc.json`), { K: { name: stamp("mine", 5) } });
+		}
+		// Migration: placed once, never over what exists, idempotent, the setting stays.
+		{
+			const io = settingsIo({ quizzesModuleOverrides: { XTI: { name: "Python", color: "#0f0", ue: null, path: "Efrei/XTI", bogus: 1 }, B: { icon: "x" } } });
+			const [fs, st] = mk(mod("phone", { XTI: { color: stamp("#f00", 50) } }), "pc");
+			await st.load();
+			await sh.migrateLegacyModules(st, io);
+			r.check("modules migration: legacy fills the gaps, an existing stamp wins",
+				st.modules(), { B: { icon: "x" }, XTI: { name: "Python", ue: null, color: "#f00", path: "Efrei/XTI" } });
+			r.check("modules migration: flag set, the legacy setting is untouched",
+				[io.m.get("sharedModulesMigrated"), Object.keys(io.m.get("quizzesModuleOverrides"))], [true, ["XTI", "B"]]);
+			const n = fs.writes.length;
+			await sh.migrateLegacyModules(st, io);
+			const again = make(fs, "pc", ["Efrei"]); await again.load();
+			await again.migrateModules({ XTI: { name: "Python" } });
+			r.check("modules migration twice: nothing more written", fs.writes.length, n);
+			// An edit made after the migration beats the migrated value.
+			await again.syncModules({ XTI: { name: "Renamed", color: "#f00", ue: null, path: "Efrei/XTI" }, B: { icon: "x" } });
+			r.check("modules: an edit after the migration wins", again.modules().XTI.name, "Renamed");
+		}
+		// A folder move rewrites `path` only: the colour and the rest follow it.
+		{
+			const [fs, st] = mk(mod("pc", { XTI: { path: stamp("Efrei/Old/XTI", 1), color: stamp("#abc", 1) } }), "pc");
+			await st.load();
+			const view = st.modules(); view.XTI.path = "Efrei/New/XTI";
+			await st.syncModules(view);
+			const other = make(fs, "phone", ["Efrei"]); await other.load();
+			r.check("modules: a moved folder keeps its colour and gets its new path", other.modules(), { XTI: { color: "#abc", path: "Efrei/New/XTI" } });
+		}
+		// refresh() brings another device's change.
+		{
+			const [fs, st] = mk(mod("pc", { K: { name: stamp("a", 5) } }), "pc");
+			await st.load();
+			fs.files.set(`${mdir}/phone.json`, JSON.stringify({ K: { name: stamp("b", 9), icon: stamp("star", 9) } }));
+			await st.refresh(() => true);
+			r.check("modules: refresh adopts the other device's newer stamps", st.modules(), { K: { name: "b", icon: "star" } });
+		}
+		// Discrimination: a whole-module "last writer wins" would drop the phone's colour here.
+		{
+			const [, st] = mk({ ...mod("phone", { Z: { color: stamp("#f00", 500) } }), ...mod("pc", { Z: { name: stamp("N", 600) } }) }, "pc");
+			await st.load();
+			r.check("modules: per-field merge (a whole-module rule would drop the colour)", st.modules(), { Z: { name: "N", color: "#f00" } });
+		}
+	}
+
 	r.done();
 });

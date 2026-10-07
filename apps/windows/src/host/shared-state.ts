@@ -4,8 +4,8 @@ import { currentHost } from "../../../../src/host/current";
 import type { ExamenDossier } from "../../../../src/types/dashboard-ctx";
 import { recalculer, tentativesDe } from "../../../../src/dashboard/stats-store";
 import type { QuizStatRecord, Tentative } from "../../../../src/dashboard/stats-store";
-import { foldAttemptState, mergeExams } from "../../../../src/shared-state/merge";
-import type { AttemptEvent, StoredExam } from "../../../../src/shared-state/merge";
+import { MODULE_FIELDS, diffModules, foldAttemptState, mergeExams, mergeModules, winningStamps } from "../../../../src/shared-state/merge";
+import type { AttemptEvent, ModuleField, ModuleValues, StoredExam, StoredModules } from "../../../../src/shared-state/merge";
 import { brancherExamens, ecrireReglage, lireExamens, lireReglage } from "./folder";
 
 /* ══════════════════════════════════════════════════════════
@@ -18,7 +18,10 @@ import { brancherExamens, ecrireReglage, lireExamens, lireReglage } from "./fold
      exams/<deviceId>.json      this device's whole exam table for the root
                                 (entries carry `modifiedAt`, deletions are
                                 tombstones), replaced through a temp file;
-     attempts/<deviceId>.jsonl  this device's attempt events, append only.
+     attempts/<deviceId>.jsonl  this device's attempt events, append only;
+     modules/<deviceId>.json    this device's folder settings (colour, icon,
+                                name, UE, path), one stamp per field, replaced
+                                through a temp file (2026-10-07).
 
    A device writes ONLY its own two files, so a sync tool never sees two
    writers on one file; every device reads all of them and merges
@@ -33,6 +36,7 @@ import { brancherExamens, ecrireReglage, lireExamens, lireReglage } from "./fold
 
 export const EXAMS_DIR = "exams";
 export const ATTEMPTS_DIR = "attempts";
+export const MODULES_DIR = "modules";
 
 /** The part of `HostFs` this module uses. */
 export interface SharedFs {
@@ -77,6 +81,15 @@ export interface SharedState {
 	syncStats(table: Record<string, QuizStatRecord>): Promise<void>;
 	/** Copies legacy settings into this device's files, skipping what is
 	    already there. Returns the keys it could not place (root not open). */
+	/** The merged folder settings (a fresh copy: callers may mutate it). */
+	modules(): Record<string, ModuleValues>;
+	/** Writes, as THIS device's stamps, the difference between the merged
+	    settings and `desired`; a key goes to the file of the root of its `path`,
+	    else of the first open root. Never touches another device's file. */
+	syncModules(desired: Record<string, ModuleValues>): Promise<void>;
+	/** Copies the legacy `quizzesModuleOverrides` as the oldest possible
+	    stamps, skipping every field already stamped anywhere. */
+	migrateModules(legacy: Record<string, ModuleValues>): Promise<void>;
 	migrate(legacy: { exams: Record<string, ExamenDossier[]>; stats: Record<string, QuizStatRecord> }): Promise<string[]>;
 }
 
@@ -115,7 +128,27 @@ export function readAttemptEvents(text: string, root: string): AttemptEvent[] {
 	return out;
 }
 
+/** Valid stamps of one modules file; unknown fields and malformed entries are dropped. */
+export function readModuleTable(raw: unknown): StoredModules {
+	const out = new Map<string, StoredModules[string]>();
+	if (!isRecord(raw)) return {};
+	for (const [key, fields] of Object.entries(raw)) {
+		if (!key || !isRecord(fields)) continue;
+		const clean: StoredModules[string] = {};
+		for (const f of MODULE_FIELDS) {
+			const s = fields[f];
+			if (!isRecord(s) || typeof s.at !== "number" || !Number.isFinite(s.at)) continue;
+			if (s.v === undefined) clean[f] = { at: s.at };
+			else if (typeof s.v === "string" || (f === "ue" && s.v === null)) clean[f] = { v: s.v, at: s.at };
+		}
+		if (Object.keys(clean).length) out.set(key, clean);
+	}
+	return Object.fromEntries(out);
+}
+
 interface RootState {
+	ownModules: StoredModules;
+	otherModules: StoredModules[];
 	own: Record<string, StoredExam[]>;
 	others: Array<Record<string, StoredExam[]>>;
 	ownEvents: AttemptEvent[];
@@ -156,8 +189,8 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 	    the refresh), only the other devices' are. */
 	async function loadRoot(root: string, keep?: RootState): Promise<RootState> {
 		const state: RootState = keep
-			? { own: keep.own, others: [], ownEvents: keep.ownEvents, otherEvents: [], needsNewline: keep.needsNewline }
-			: { own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
+			? { ownModules: keep.ownModules, otherModules: [], own: keep.own, others: [], ownEvents: keep.ownEvents, otherEvents: [], needsNewline: keep.needsNewline }
+			: { ownModules: {}, otherModules: [], own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
 		const examDir = dir(root, EXAMS_DIR);
 		const names = new Set((await fs.list(examDir)).map(baseName));
 		const ownName = `${deviceId}.json`;
@@ -210,8 +243,34 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 			if (n === ownAtt) { state.ownEvents = events; state.needsNewline = text.length > 0 && !text.endsWith("\n"); }
 			else state.otherEvents.push(...events);
 		}
+		await loadModules(root, state, !!keep);
 		loaded.set(root, state);
 		return state;
+	}
+
+	/** The modules files of a root; same safety rules as the exams files. */
+	async function loadModules(root: string, state: RootState, keep: boolean): Promise<void> {
+		const modDir = dir(root, MODULES_DIR);
+		const names = new Set((await fs.list(modDir)).map(baseName));
+		const ownName = `${deviceId}.json`;
+		for (const n of names) {
+			if (!n.endsWith(".json") || isConflictCopy(n) || (keep && n === ownName)) continue;
+			const full = `${modDir}/${n}`;
+			let raw: string;
+			try { raw = await fs.read(full); } catch (e) {
+				if (n === ownName) throw new Error(`own modules file unreadable: ${full}`);
+				console.warn(`${LOG_PREFIX} modules file unreadable:`, full, e);
+				continue;
+			}
+			let table: StoredModules;
+			try { table = readModuleTable(JSON.parse(raw)); } catch {
+				// A corrupt file is ignored, never fatal; ours is kept aside before a write replaces it.
+				if (n === ownName && raw.trim()) await fs.write(`${full}.corrupt-${clock()}`, raw);
+				console.warn(`${LOG_PREFIX} modules file unreadable:`, full);
+				continue;
+			}
+			if (n === ownName) state.ownModules = table; else state.otherModules.push(table);
+		}
 	}
 
 	const known = (root: string): boolean => deps.roots().includes(root);
@@ -265,6 +324,57 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		}
 		examsCache = null;
 		if (adoptStats?.()) resnapshot();
+	});
+
+	const moduleTables = (): StoredModules[] => [...loaded.values()].flatMap(s => [s.ownModules, ...s.otherModules]);
+	const modules = (): Record<string, ModuleValues> => mergeModules(moduleTables());
+
+	async function writeModules(root: string, s: RootState): Promise<void> {
+		const target = `${dir(root, MODULES_DIR)}/${deviceId}.json`;
+		await fs.mkdirs(dir(root, MODULES_DIR));
+		await fs.write(`${target}.tmp`, JSON.stringify(s.ownModules));
+		if (await fs.exists(target)) await fs.remove(target);
+		await fs.rename(`${target}.tmp`, target);
+	}
+
+	/** Stamps `changes` into this device's files; `at` is always above the
+	    stamp it replaces, whatever the clocks say (`minAt`: a fixed stamp, for
+	    the migration). */
+	async function stampModules(changes: Array<{ key: string; field: ModuleField; v?: string | null }>, desired: Record<string, ModuleValues>, minAt?: number): Promise<void> {
+		if (!changes.length) return;
+		const first = deps.roots()[0];
+		const best = winningStamps(moduleTables());
+		const current = modules();
+		const touched = new Set<string>();
+		for (const c of changes) {
+			const path = desired[c.key]?.path ?? current[c.key]?.path;
+			const root = path && known(rootOf(path)) ? rootOf(path) : first;
+			if (!root) continue;
+			const s = await rootState(root);
+			const prev = best.get(c.key)?.[c.field]?.at ?? 0;
+			const at = minAt ?? Math.max(nextAt(), prev + 1);
+			(s.ownModules[c.key] ??= {})[c.field] = c.v === undefined ? { at } : { v: c.v, at };
+			touched.add(root);
+		}
+		for (const root of touched) await writeModules(root, loaded.get(root)!);
+	}
+
+	const syncModules = (desired: Record<string, ModuleValues>): Promise<void> => enqueue(async () => {
+		await stampModules(diffModules(modules(), desired), desired);
+	});
+
+	const migrateModules = (legacy: Record<string, ModuleValues>): Promise<void> => enqueue(async () => {
+		if (!deps.roots().length) throw new Error("no open root");
+		const best = winningStamps(moduleTables());
+		const changes: Array<{ key: string; field: ModuleField; v?: string | null }> = [];
+		for (const [key, ov] of Object.entries(legacy)) {
+			if (!key) continue;
+			for (const f of MODULE_FIELDS) {
+				// Anything already stamped (an edit, a tombstone) is newer than the settings.
+				if (ov[f] !== undefined && !best.get(key)?.[f]) changes.push({ key, field: f, v: ov[f] });
+			}
+		}
+		await stampModules(changes, legacy, 1);
 	});
 
 	function exams(): Record<string, ExamenDossier[]> {
@@ -440,7 +550,7 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		return skipped;
 	});
 
-	return { load, refresh, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
+	return { load, refresh, modules, syncModules, migrateModules, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -473,6 +583,30 @@ export async function migrateLegacy(state: SharedState, settings: SettingsIo): P
 	await settings.ecrire(FLAG, true);
 }
 
+const MODULES_FLAG = "sharedModulesMigrated";
+
+/** Copies the legacy `quizzesModuleOverrides` setting into the device files,
+    once. The setting is only READ and stays as a backup; the flag is set only
+    after a successful write, so a failure retries at the next start. */
+export async function migrateLegacyModules(state: SharedState, settings: SettingsIo): Promise<void> {
+	if (await settings.lire(MODULES_FLAG) === true) return;
+	const raw = await settings.lire("quizzesModuleOverrides");
+	const legacy: Record<string, ModuleValues> = {};
+	if (isRecord(raw)) {
+		for (const [key, ov] of Object.entries(raw)) {
+			if (!isRecord(ov)) continue;
+			const v: Record<string, unknown> = {};
+			for (const f of MODULE_FIELDS) {
+				const x = ov[f];
+				if (typeof x === "string" || (f === "ue" && x === null)) v[f] = x;
+			}
+			if (Object.keys(v).length) legacy[key] = v as ModuleValues;
+		}
+	}
+	await state.migrateModules(legacy);
+	await settings.ecrire(MODULES_FLAG, true);
+}
+
 let courant: SharedState | null = null;
 export const sharedState = (): SharedState => {
 	if (!courant) throw new Error("shared state not loaded");
@@ -489,6 +623,11 @@ export async function loadSharedState(roots: string[], deviceId: string): Promis
 	} catch (e) {
 		// Not migrated, flag unset: the next start tries again; the settings are untouched.
 		console.warn(`${LOG_PREFIX} migration to the synced folder failed:`, e);
+	}
+	try {
+		await migrateLegacyModules(state, { lire: k => lireReglage(k), ecrire: ecrireReglage });
+	} catch (e) {
+		console.warn(`${LOG_PREFIX} folder settings migration failed:`, e);
 	}
 	installSharedState(state);
 	return state;

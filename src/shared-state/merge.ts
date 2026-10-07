@@ -95,3 +95,70 @@ export function foldAttemptState(events: readonly AttemptEvent[]): Record<string
 export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]> {
 	return Object.fromEntries(Object.entries(foldAttemptState(events)).map(([p, f]) => [p, f.attempts]));
 }
+
+/* ══════════════════════════════════════════════════════════
+   FOLDER SETTINGS (colour, icon, name, teaching unit, path), MERGED ACROSS
+   DEVICES (2026-10-07)
+
+   Each device writes `<root>/.neo-quiz/modules/<deviceId>.json`: per module key
+   (the folder's segment, as in `quizzesModuleOverrides`) and per FIELD a stamp
+   `{ v?, at }`. The merge is per field, the highest `at` wins: a colour changed
+   on the phone and a rename made on the PC both survive. A stamp without `v`
+   is a CLEARED field (a tombstone, never dropped: an older value on another
+   device must not come back); `ue: null` ("no UE") is a value, distinct from
+   cleared. Ties break on the serialised stamp, identical on every device.
+══════════════════════════════════════════════════════════ */
+
+export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path"] as const;
+export type ModuleField = (typeof MODULE_FIELDS)[number];
+export interface ModuleStamp { v?: string | null; at: number }
+export type StoredModules = Record<string, Partial<Record<ModuleField, ModuleStamp>>>;
+export interface ModuleValues { name?: string; ue?: string | null; color?: string; icon?: string; path?: string }
+
+function stampWins(a: ModuleStamp, b: ModuleStamp): boolean {
+	if (a.at !== b.at) return a.at > b.at;
+	return JSON.stringify(a) > JSON.stringify(b);
+}
+
+/** The winning stamp of every (key, field), tombstones included. */
+export function winningStamps(perDevice: readonly StoredModules[]): Map<string, Partial<Record<ModuleField, ModuleStamp>>> {
+	const best = new Map<string, Partial<Record<ModuleField, ModuleStamp>>>();
+	for (const table of perDevice) {
+		for (const [key, fields] of Object.entries(table)) {
+			let cur = best.get(key);
+			if (!cur) best.set(key, cur = {});
+			for (const f of MODULE_FIELDS) {
+				const s = fields[f];
+				if (s && (!cur[f] || stampWins(s, cur[f]!))) cur[f] = s;
+			}
+		}
+	}
+	return best;
+}
+
+export function mergeModules(perDevice: readonly StoredModules[]): Record<string, ModuleValues> {
+	const out: Array<[string, ModuleValues]> = [];
+	for (const [key, fields] of winningStamps(perDevice)) {
+		const v: Record<string, string | null> = {};
+		for (const f of MODULE_FIELDS) {
+			const s = fields[f];
+			if (s && s.v !== undefined) v[f] = s.v;
+		}
+		if (Object.keys(v).length) out.push([key, v as ModuleValues]);
+	}
+	return Object.fromEntries(out.sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+/** The field changes that turn `merged` into `desired` (both override tables). */
+export function diffModules(merged: Record<string, ModuleValues>, desired: Record<string, ModuleValues>): Array<{ key: string; field: ModuleField; v?: string | null }> {
+	const out: Array<{ key: string; field: ModuleField; v?: string | null }> = [];
+	for (const key of new Set([...Object.keys(merged), ...Object.keys(desired)])) {
+		for (const field of MODULE_FIELDS) {
+			const was = merged[key]?.[field];
+			const now = desired[key]?.[field];
+			if (was === now) continue;
+			out.push(now === undefined ? { key, field } : { key, field, v: now });
+		}
+	}
+	return out;
+}
