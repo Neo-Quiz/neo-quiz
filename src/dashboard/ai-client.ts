@@ -471,7 +471,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	// « Mixte » est la valeur canonique d'« Auto » : le mode choisit le mélange.
 	const typeInstruction = qcm
 		? "a WRITTEN MCQ EXAM (see the WRITTEN MCQ EXAM FORMAT above)"
-		: learn
+		: learn && auto
 		? "MCQ questions and flashcards, as the MODE above describes (other question types only if the request explicitly asks for them)"
 		: auto
 		? (
@@ -499,7 +499,7 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	  KEY POINTS: a read card may add "retenir", what to keep from it: { "forme": "cartes", "items": [{ "recto": "term", "verso": "its meaning in a few words" }, ...] } for TERMS to memorize (flip cards), or { "forme": "recap", "items": ["fact to keep", ...] } for FACTS to keep (a checked recap); 2 to 5 items, never a copy of a later question's answer. Omit "retenir" when it adds nothing.
 	  3. then 2 to 3 MCQ questions per slice in all, the optional "pre" one counted: the others have "role": "recall", each with 3 to 5 options ("options"), "explain" and "hint", written like the written MCQ of the course's real exam: ONE OR SEVERAL correct answers ("correctIndex" for one; "multiSelect": true with "correctIndices" for several — the statement never says how many), often a SHORT code snippet in a fenced block to read and predict, PLAUSIBLE distractors (the classic confusions), never "all of the above". The first question of the slice is easy, answered by recognising what the reading said; the next ones are closer to the exam. Never two recalls on the same point.
 	  4. 1 to 2 FLASHCARDS per slice, with "role": "recall": set "flashcard": true, put the question in "prompt" (front) and the expected answer in "answer" (back), add "explain"; no "options", no "type". A flashcard is for a pure FACT or SYNTAX whose answer fits in one sentence, one formula or one line of code (a definition, a syntax, the output of a short expression); a slice that introduces TERMS, DEFINITIONS or FACTS to memorize has AT LEAST ONE.
-	NOTHING ELSE, unless the request explicitly asks for other types: a Learn contains no free-text question (no "type": "text"), no fill-in-the-blanks, no ordering, no matching, no numeric answer, no code exercise and no question asking the learner to write an explanation. Only when the request explicitly asks for other types may you use them, in the format of the question types of the request.
+	NOTHING ELSE, unless the request explicitly asks for other types or the QUESTION TYPES line at the end names them: a Learn contains no free-text question (no "type": "text"), no fill-in-the-blanks, no ordering, no matching, no numeric answer, no code exercise and no question asking the learner to write an explanation. Only then may you use other types, in the format of the question types of the request.
 	HINTS IN LEARN: EVERY MCQ question of the path has "hint", pre and recall alike; only the read cards and the flashcards have none.
 	A "read" passage NEVER contains the exact sentence that a later question of the same slice asks for: recall must be recognition of the idea, not copying.
 	"topic": optional short label of a family of notions that are easily confused, shared by the questions that test it.
@@ -548,7 +548,7 @@ ${documents.map((d, i) => `\t${i + 1}. ${d}`).join("\n")}
 	- explain: the explanation shown after the answer
 	- hint: a nudge shown on demand — a string
 `;
-	const champs = learn ? learnFields : `	- title: short question title
+	const champs = learn && auto ? learnFields : `	- title: short question title
 	- prompt: full question text
 	- options: array of options (for single/multiple choice, 3-5 options)
 	- correctIndex: index of the correct answer (single choice)
