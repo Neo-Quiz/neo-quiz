@@ -29,7 +29,7 @@ import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
 import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
-import { adopterOverrides, chargerReglagesPages, monterDashboard, reprendre } from "./ui/dashboard-shell";
+import { adopterOverrides, chargerReglagesPages, overridesPartages, monterDashboard, reprendre } from "./ui/dashboard-shell";
 import { chargerReprise } from "./ui/reprise";
 import { aiSettingsDefaults } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
@@ -593,6 +593,7 @@ async function demarrer(): Promise<void> {
 		const rechargerApresSync = async (): Promise<void> => {
 			if (rechargeEnCours) { rechargeDemandee = true; return; }
 			rechargeEnCours = true;
+			const avantOverrides = overridesPartages();
 			try {
 				do {
 					rechargeDemandee = false;
@@ -602,7 +603,7 @@ async function demarrer(): Promise<void> {
 					   `SharedState.refresh`). */
 					await sharedState().refresh(() => stats.reload());
 				} while (rechargeDemandee);
-				adopterOverrides();
+				adopterOverrides(avantOverrides);
 				demonterCourant?.repaint?.();
 			} catch (e) {
 				console.warn(LOG_PREFIX, "reload after sync failed:", e);

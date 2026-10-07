@@ -10,7 +10,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 const ex = (id, date, modifiedAt, extra = {}) => ({ id, nom: id, date, modifiedAt, ...extra });
 const plain = (id, date) => ({ id, nom: id, date });
 
-await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts, mergeModules, diffModules }, ss) => {
+await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"], ({ mergeExams, foldAttempts, mergeModules, diffModules, rebaseModules }, ss) => {
 	const r = makeReporter("Shared state - merge");
 
 	r.check("newer edit beats older edit across devices",
@@ -73,6 +73,11 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 	r.check("modules: ue null is a value, not a tombstone", mergeModules([{ K: { ue: f(null, 1) } }]), { K: { ue: null } });
 	r.check("modules: a tie is deterministic",
 		[mergeModules([{ K: { name: f("x", 4) } }, { K: { name: f("y", 4) } }]).K.name, mergeModules([{ K: { name: f("y", 4) } }, { K: { name: f("x", 4) } }]).K.name].every((v, _, a) => v === a[0]), true);
+	r.check("modules: rebase keeps an unsaved local edit on top of the merged view",
+		rebaseModules({ K: { name: "a", color: "r" } }, { K: { name: "mine", color: "r" } }, { K: { name: "a", color: "p", icon: "i" } }),
+		{ K: { name: "mine", color: "p", icon: "i" } });
+	r.check("modules: rebase with no local edit is the merged view",
+		rebaseModules({ K: { name: "a" } }, { K: { name: "a" } }, { K: { name: "z" } }), { K: { name: "z" } });
 	r.check("modules: diff lists changed fields and clears", diffModules({ K: { name: "a", color: "r" } }, { K: { name: "b" }, L: { ue: null } }),
 		[{ key: "K", field: "name", v: "b" }, { key: "K", field: "color" }, { key: "L", field: "ue", v: null }]);
 
@@ -407,22 +412,51 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 		}
 		// Conflict copies and corrupt files are ignored, never fatal.
 		{
-			const [, st] = mk({
+			const [fs, st] = mk({
 				...mod("phone", { K: { name: stamp("ok", 5) } }),
 				[`${mdir}/phone.sync-conflict-20261001-000000-ABC.json`]: JSON.stringify({ K: { name: stamp("conflict", 99) } }),
 				[`${mdir}/junk.json`]: "{not json",
 				[`${mdir}/odd.json`]: JSON.stringify({ K: { name: { v: 5, at: "x" }, color: { v: "#fff", at: 3 } }, "": { name: stamp("e", 1) } }),
 			}, "pc");
 			await quiet(() => st.load());
-			r.check("modules: conflict copy and corrupt file ignored, malformed fields dropped", st.modules(), { K: { name: "ok", color: "#fff" } });
+			r.check("modules: conflict copy merged read-only, corrupt file ignored, malformed fields dropped", st.modules(), { K: { name: "conflict", color: "#fff" } });
+			await st.syncModules({ K: { name: "mine", color: "#fff" } });
+			r.check("modules: a conflict copy is never written", [...fs.files.keys()].filter(k => k.includes("sync-conflict")).length === 1
+				&& JSON.parse(fs.files.get(`${mdir}/phone.sync-conflict-20261001-000000-ABC.json`)).K.name.v === "conflict", true);
 		}
-		// Own file unreadable: refuse (the root stays read-only), nothing replaced.
+		// A crash between the removal of the old file and the rename leaves only the .tmp: recovered.
+		{
+			const [fs, st] = mk({ [`${mdir}/pc.json.tmp`]: JSON.stringify({ K: { name: stamp("kept", 5) } }) }, "pc");
+			await st.load();
+			r.check("modules: an orphan .tmp stands in for the missing own file", st.modules(), { K: { name: "kept" } });
+			await st.syncModules({ K: { name: "kept", icon: "star" } });
+			r.check("modules: the next write keeps the recovered stamps", json(fs, `${mdir}/pc.json`).K.name.v, "kept");
+		}
+		// Hostile or oversized input from another device.
+		{
+			const far = 1e15;
+			const [, st] = mk({
+				...mod("x", {
+					A: { name: stamp("far", far), color: stamp("red", 5), icon: stamp("Bad Icon!", 5) },
+					B: { name: stamp("n".repeat(201), 5), ue: stamp("ok", 5), color: stamp("#12ab", 5), icon: stamp("book-open", 5) },
+				}),
+			}, "pc");
+			await st.load();
+			r.check("modules: far-future stamps, bad colour/icon shapes and long strings are dropped",
+				st.modules(), { B: { ue: "ok", color: "#12ab", icon: "book-open" } });
+			const many = Object.fromEntries(Array.from({ length: 1500 }, (_, i) => [`k${i}`, { name: stamp("n", 5) }]));
+			const [, big] = mk(mod("y", many), "pc"); await big.load();
+			r.check("modules: at most 1000 keys are read from a file", Object.keys(big.modules()).length, 1000);
+		}
+		// Own file unreadable: the root still loads, the feature refuses to write, nothing replaced.
 		{
 			const [fs, st] = mk(mod("pc", { K: { name: stamp("mine", 5) } }), "pc");
 			const real = fs.read; fs.read = async p => { if (p.endsWith("modules/pc.json")) throw new Error("locked"); return real(p); };
 			await quiet(() => st.load());
-			await quiet(async () => { try { await st.syncModules({ K: { name: "new" } }); } catch { /* refused */ } });
+			let refused = false;
+			await quiet(async () => { try { await st.syncModules({ K: { name: "new" } }); } catch { refused = true; } });
 			fs.read = real;
+			r.check("modules: an unreadable own file does not fail the load, the write is refused", refused, true);
 			r.check("modules: an unreadable own file is never replaced", json(fs, `${mdir}/pc.json`), { K: { name: stamp("mine", 5) } });
 		}
 		// Migration: placed once, never over what exists, idempotent, the setting stays.

@@ -149,6 +149,19 @@ export function mergeModules(perDevice: readonly StoredModules[]): Record<string
 	return Object.fromEntries(out.sort((a, b) => a[0].localeCompare(b[0])));
 }
 
+/** Re-applies `local`'s unsaved edits (its difference from `base`) on top of
+    `merged`: a sync that lands while an edit is pending must not drop it. */
+export function rebaseModules(base: Record<string, ModuleValues>, local: Record<string, ModuleValues>, merged: Record<string, ModuleValues>): Record<string, ModuleValues> {
+	const out: Record<string, Record<string, string | null>> = {};
+	for (const [k, v] of Object.entries(merged)) out[k] = { ...v };
+	for (const c of diffModules(base, local)) {
+		const cur = out[c.key] ?? (out[c.key] = {});
+		if (c.v === undefined) delete cur[c.field]; else cur[c.field] = c.v;
+		if (!Object.keys(cur).length) delete out[c.key];
+	}
+	return out as Record<string, ModuleValues>;
+}
+
 /** The field changes that turn `merged` into `desired` (both override tables). */
 export function diffModules(merged: Record<string, ModuleValues>, desired: Record<string, ModuleValues>): Array<{ key: string; field: ModuleField; v?: string | null }> {
 	const out: Array<{ key: string; field: ModuleField; v?: string | null }> = [];

@@ -58,6 +58,7 @@ import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { sharedState } from "../host/shared-state";
+import { rebaseModules } from "../../../../src/shared-state/merge";
 import { addFolder, removeFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
@@ -124,8 +125,18 @@ async function lireOverrides(): Promise<Record<string, ModuleOverride> | undefin
 
 /** Another device's folder settings landed (sync): adopt the merged view in
     place, the pages hold this very object. */
-export function adopterOverrides(): void {
-	if (modulesPartages) reglagesPagesCache.quizzesModuleOverrides = sharedState().modules() as Record<string, ModuleOverride>;
+export function adopterOverrides(avant: Record<string, ModuleOverride>): void {
+	if (!modulesPartages) return;
+	/* An edit still pending in memory (the folder modal saves on close) is
+	   re-applied on top of the merged view, never dropped. */
+	reglagesPagesCache.quizzesModuleOverrides = rebaseModules(
+		avant, reglagesPagesCache.quizzesModuleOverrides ?? {}, sharedState().modules(),
+	) as Record<string, ModuleOverride>;
+}
+
+/** The merged view as it is NOW: the base `adopterOverrides` rebases from. */
+export function overridesPartages(): Record<string, ModuleOverride> {
+	return (modulesPartages ? sharedState().modules() : {}) as Record<string, ModuleOverride>;
 }
 
 /**

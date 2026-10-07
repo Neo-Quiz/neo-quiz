@@ -129,17 +129,32 @@ export function readAttemptEvents(text: string, root: string): AttemptEvent[] {
 }
 
 /** Valid stamps of one modules file; unknown fields and malformed entries are dropped. */
-export function readModuleTable(raw: unknown): StoredModules {
+const MAX_MODULE_KEYS = 1000;
+const YEAR_MS = 366 * 24 * 3600 * 1000;
+/** Shape and size of a value, per field: a file from another device is not trusted. */
+const MODULE_VALUE_OK: Record<ModuleField, (v: string) => boolean> = {
+	name: v => v.length <= 200,
+	ue: v => v.length <= 200,
+	path: v => v.length <= 1000,
+	color: v => /^#[0-9a-fA-F]{3,8}$/.test(v),
+	icon: v => /^[a-z0-9-]{1,64}$/.test(v),
+};
+
+/** `now`: a stamp more than a year ahead is a corrupt or hostile clock and is
+    dropped (it would outrank every later local edit). */
+export function readModuleTable(raw: unknown, now: number = Date.now()): StoredModules {
 	const out = new Map<string, StoredModules[string]>();
 	if (!isRecord(raw)) return {};
 	for (const [key, fields] of Object.entries(raw)) {
-		if (!key || !isRecord(fields)) continue;
+		if (out.size >= MAX_MODULE_KEYS) break;
+		if (!key || key.length > 200 || !isRecord(fields)) continue;
 		const clean: StoredModules[string] = {};
 		for (const f of MODULE_FIELDS) {
 			const s = fields[f];
-			if (!isRecord(s) || typeof s.at !== "number" || !Number.isFinite(s.at)) continue;
+			if (!isRecord(s) || typeof s.at !== "number" || !Number.isFinite(s.at) || s.at > now + YEAR_MS) continue;
 			if (s.v === undefined) clean[f] = { at: s.at };
-			else if (typeof s.v === "string" || (f === "ue" && s.v === null)) clean[f] = { v: s.v, at: s.at };
+			else if (typeof s.v === "string" && MODULE_VALUE_OK[f](s.v)) clean[f] = { v: s.v, at: s.at };
+			else if (f === "ue" && s.v === null) clean[f] = { v: null, at: s.at };
 		}
 		if (Object.keys(clean).length) out.set(key, clean);
 	}
@@ -149,6 +164,8 @@ export function readModuleTable(raw: unknown): StoredModules {
 interface RootState {
 	ownModules: StoredModules;
 	otherModules: StoredModules[];
+	/** The own modules file could not be read: it is never replaced. */
+	modulesLocked: boolean;
 	own: Record<string, StoredExam[]>;
 	others: Array<Record<string, StoredExam[]>>;
 	ownEvents: AttemptEvent[];
@@ -189,8 +206,8 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 	    the refresh), only the other devices' are. */
 	async function loadRoot(root: string, keep?: RootState): Promise<RootState> {
 		const state: RootState = keep
-			? { ownModules: keep.ownModules, otherModules: [], own: keep.own, others: [], ownEvents: keep.ownEvents, otherEvents: [], needsNewline: keep.needsNewline }
-			: { ownModules: {}, otherModules: [], own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
+			? { ownModules: keep.ownModules, otherModules: [], modulesLocked: keep.modulesLocked, own: keep.own, others: [], ownEvents: keep.ownEvents, otherEvents: [], needsNewline: keep.needsNewline }
+			: { ownModules: {}, otherModules: [], modulesLocked: false, own: {}, others: [], ownEvents: [], otherEvents: [], needsNewline: false };
 		const examDir = dir(root, EXAMS_DIR);
 		const names = new Set((await fs.list(examDir)).map(baseName));
 		const ownName = `${deviceId}.json`;
@@ -253,23 +270,38 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		const modDir = dir(root, MODULES_DIR);
 		const names = new Set((await fs.list(modDir)).map(baseName));
 		const ownName = `${deviceId}.json`;
+		/* A `.json.tmp` whose `.json` is missing is a write interrupted between
+		   the removal of the old file and the rename: it is complete (written
+		   first), so it stands in for the missing file. Conflict copies are
+		   merged like any other device's file, read-only (never written). */
+		const sources = new Set<string>();
 		for (const n of names) {
-			if (!n.endsWith(".json") || isConflictCopy(n) || (keep && n === ownName)) continue;
+			if (n.endsWith(".json")) sources.add(n);
+			else if (n.endsWith(".json.tmp") && !names.has(n.slice(0, -4))) sources.add(n.slice(0, -4));
+		}
+		for (const n of sources) {
+			if (keep && n === ownName) continue;
 			const full = `${modDir}/${n}`;
-			let raw: string;
-			try { raw = await fs.read(full); } catch (e) {
-				if (n === ownName) throw new Error(`own modules file unreadable: ${full}`);
-				console.warn(`${LOG_PREFIX} modules file unreadable:`, full, e);
-				continue;
+			const own = n === ownName;
+			let raw: string | null = null;
+			let table: StoredModules | null = null;
+			for (const file of [full, `${full}.tmp`]) {
+				if (!names.has(baseName(file))) continue;
+				try { raw = await fs.read(file); } catch (e) {
+					console.warn(`${LOG_PREFIX} modules file unreadable:`, file, e);
+					continue;
+				}
+				try { table = readModuleTable(JSON.parse(raw), clock()); break; } catch { console.warn(`${LOG_PREFIX} modules file unparseable:`, file); }
 			}
-			let table: StoredModules;
-			try { table = readModuleTable(JSON.parse(raw)); } catch {
-				// A corrupt file is ignored, never fatal; ours is kept aside before a write replaces it.
-				if (n === ownName && raw.trim()) await fs.write(`${full}.corrupt-${clock()}`, raw);
-				console.warn(`${LOG_PREFIX} modules file unreadable:`, full);
-				continue;
+			if (table) {
+				if (own) state.ownModules = table; else state.otherModules.push(table);
+			} else if (own) {
+				/* Ours could not be read or parsed: never replace it with only the new
+				   stamps. Unparseable bytes are kept aside; the feature stays
+				   read-only for this root, and the root itself still loads. */
+				state.modulesLocked = true;
+				if (raw && raw.trim()) await fs.write(`${full}.corrupt-${clock()}`, raw);
 			}
-			if (n === ownName) state.ownModules = table; else state.otherModules.push(table);
 		}
 	}
 
@@ -343,6 +375,7 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 	async function stampModules(changes: Array<{ key: string; field: ModuleField; v?: string | null }>, desired: Record<string, ModuleValues>, minAt?: number): Promise<void> {
 		if (!changes.length) return;
 		const first = deps.roots()[0];
+		const locked: string[] = [];
 		const best = winningStamps(moduleTables());
 		const current = modules();
 		const touched = new Set<string>();
@@ -351,12 +384,14 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 			const root = path && known(rootOf(path)) ? rootOf(path) : first;
 			if (!root) continue;
 			const s = await rootState(root);
+			if (s.modulesLocked) { locked.push(root); continue; }
 			const prev = best.get(c.key)?.[c.field]?.at ?? 0;
 			const at = minAt ?? Math.max(nextAt(), prev + 1);
 			(s.ownModules[c.key] ??= {})[c.field] = c.v === undefined ? { at } : { v: c.v, at };
 			touched.add(root);
 		}
 		for (const root of touched) await writeModules(root, loaded.get(root)!);
+		if (locked.length) throw new Error(`own modules file unreadable, not written for: ${[...new Set(locked)].join(", ")}`);
 	}
 
 	const syncModules = (desired: Record<string, ModuleValues>): Promise<void> => enqueue(async () => {
