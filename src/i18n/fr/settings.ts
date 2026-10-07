@@ -58,6 +58,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.sync.addButton": "Ajouter un appareil",
 	"settings.sync.addHint": "Sur l'autre appareil, ouvre Réglages, Synchronisation, Afficher mon ID. Puis colle son ID ici, ou scanne son QR code.",
 	"settings.sync.cancel": "Annuler",
+	"settings.sync.linkCheck": "Vérifie que c'est bien ton appareil",
 	"settings.sync.addPlaceholder": "Identifiant de l'autre appareil",
 	"settings.sync.add": "Ajouter",
 	"settings.sync.scanQr": "Scanner un QR code",

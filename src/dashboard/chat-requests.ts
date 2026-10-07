@@ -11,7 +11,8 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { LigneGeneration } from "./file-generation-app";
-import type { ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
+import type { ChatAsk, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
+import type { KindChoice } from "./generation-kind";
 import { LEGACY_CHAT_ID, deriveTitle, mergeResults } from "./chat-record";
 
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
@@ -100,6 +101,8 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 		results: mergeResults(old?.results ?? [], terminal.flatMap(resultsOfLine)),
 		state,
 	};
+	// The question asked under the request stays with it.
+	if (old?.ask) req.ask = old.ask;
 	const error = failed?.erreur ?? old?.error;
 	if (error && state === "failed") req.error = error;
 	return req;
@@ -149,4 +152,28 @@ export function closableLines(lines: readonly LigneGeneration[], activeChatId: s
 		out.push(...g.lines);
 	}
 	return out;
+}
+
+/** A request that only asked its kind so far (spec 2026-10-07-generate-auto-kind):
+    recorded with the question and no result, so the thread shows the card and a
+    reload keeps it. Nothing generates until an option is clicked (`answerAsk`). */
+export function addAsk(chats: readonly ChatRecord[], chatId: string, device: string, now: number, req: { id: string; text: string; documents: ChatDocument[] }, ask: ChatAsk): ChatRecord[] {
+	const request: ChatRequest = { id: req.id, at: now, from: device, text: req.text, mode: "practice", documents: req.documents, results: [], state: "done", ask };
+	const idx = chats.findIndex(c => c.id === chatId);
+	if (idx >= 0 && chats[idx].deleted) return [...chats];
+	const list = [...chats];
+	if (idx >= 0) list[idx] = { ...chats[idx], updatedAt: now, requests: [...chats[idx].requests, request].sort((a, b) => a.at - b.at) };
+	else list.push({ id: chatId, origin: device, createdAt: now, updatedAt: now, title: deriveTitle(request) || undefined, requests: [request] });
+	return list;
+}
+
+/** Records the clicked option on the request's question (and the kind the
+    generation will have). Unknown chat or request, or a question already
+    answered: nothing changes. */
+export function answerAsk(chats: readonly ChatRecord[], chatId: string, requestId: string, chosen: KindChoice, now: number): { chats: ChatRecord[]; changed: boolean } {
+	const chat = chats.find(c => c.id === chatId);
+	const q = chat?.requests.find(r => r.id === requestId);
+	if (!chat || !q?.ask || q.ask.chosen) return { chats: [...chats], changed: false };
+	const next: ChatRequest = { ...q, mode: chosen === "practice" ? "practice" : "learn", ask: { ...q.ask, chosen } };
+	return { chats: chats.map(c => (c === chat ? { ...c, updatedAt: now, requests: c.requests.map(r => (r === q ? next : r)) } : c)), changed: true };
 }

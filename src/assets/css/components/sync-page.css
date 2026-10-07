@@ -1132,3 +1132,12 @@
 	font-size: 12px;
 	color: var(--text-normal);
 }
+
+/* The full ID of a pairing link, never cut: it wraps instead. */
+.qbd-sync-id-lien {
+	font-family: var(--font-monospace, ui-monospace, monospace);
+	font-size: 0.9em;
+	overflow-wrap: anywhere;
+	user-select: all;
+	margin: 0;
+}

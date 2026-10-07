@@ -65,7 +65,8 @@ class MainActivity : ComponentActivity() {
         // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
-        raisePairLink(intent)
+        // Not on a recreation or a relaunch from the recent apps: the link was already handled (or is old).
+        if (savedInstanceState == null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) raisePairLink(intent)
         setContent {
             val app = showApp
             // The first-run screen sits on the installer's backdrop, drawn as the window background so it

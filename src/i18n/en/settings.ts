@@ -58,6 +58,7 @@ export const EN_SETTINGS = {
 	"settings.sync.addButton": "Add a device",
 	"settings.sync.addHint": "On the other device, open Settings, Sync, Show my ID. Then paste its ID here, or scan its QR code.",
 	"settings.sync.cancel": "Cancel",
+	"settings.sync.linkCheck": "Check this is your own device",
 	"settings.sync.addPlaceholder": "ID of the other device",
 	"settings.sync.add": "Add",
 	"settings.sync.scanQr": "Scan a QR code",

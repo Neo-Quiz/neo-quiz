@@ -14,11 +14,17 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { ArchivedChat } from "./chat-archives";
+import type { KindChoice, KindOption } from "./generation-kind";
 
 export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
 export type ChatResult = { kind: "quiz"; title: string; path: string } | { kind: "text"; text: string };
 export type RequestState = "done" | "failed" | "stopped";
+
+/** The question Generate asked under a request that did not say Learn or
+    Test (spec 2026-10-07-generate-auto-kind): its options, and the one the
+    user clicked (`chosen`, absent while nothing generates). */
+export interface ChatAsk { question: string; options: KindOption[]; chosen?: KindChoice }
 
 export interface ChatRequest {
 	id: string;
@@ -32,6 +38,8 @@ export interface ChatRequest {
 	results: ChatResult[];
 	state: RequestState;
 	error?: string;
+	/** Set when the kind was asked: kept with the request, shown under it. */
+	ask?: ChatAsk;
 }
 
 export interface ChatRecord {
@@ -68,6 +76,19 @@ function readDocument(x: unknown): ChatDocument | null {
 	return isStr(x.path) ? { name: x.name, path: x.path } : { name: x.name };
 }
 
+function readAsk(x: unknown): ChatAsk | null {
+	if (!isObj(x) || !isStr(x.question) || !Array.isArray(x.options)) return null;
+	const isKind = (k: unknown): k is KindChoice => k === "learn" || k === "practice" || k === "both";
+	const options: KindOption[] = [];
+	for (const o of x.options) {
+		if (isObj(o) && isStr(o.label) && isKind(o.kind)) options.push({ label: o.label, kind: o.kind });
+	}
+	if (options.length < 2 || options.length > 4) return null;
+	const ask: ChatAsk = { question: x.question, options };
+	if (isKind(x.chosen)) ask.chosen = x.chosen;
+	return ask;
+}
+
 function readRequest(x: unknown): ChatRequest | null {
 	if (!isObj(x) || !isStr(x.id) || !isNum(x.at) || !isStr(x.from) || !isStr(x.text)) return null;
 	if (x.mode !== "learn" && x.mode !== "practice") return null;
@@ -79,6 +100,8 @@ function readRequest(x: unknown): ChatRequest | null {
 		results: x.results.map(readResult).filter((d): d is ChatResult => !!d),
 	};
 	if (isStr(x.error)) req.error = x.error;
+	const ask = readAsk(x.ask);
+	if (ask) req.ask = ask;
 	return req;
 }
 

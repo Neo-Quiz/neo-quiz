@@ -594,6 +594,15 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					nomTexte.textContent = nom;
 					nomDetecte.hidden = !nom;
 				});
+				/* Filled in by a LINK (anyone can send one): the whole ID is shown, never cut, with a
+				   reminder to check it, and only an explicit click on Add submits (no Enter, no focus
+				   on Add). */
+				const duLien = valeur !== undefined;
+				if (duLien) {
+					const idComplet = normaliserCode(valeur);
+					if (idComplet) ajouter(corps, "p", "qbd-sync-id-lien", idComplet);
+					ajouter(corps, "p", "qbd-sync-aide", t("settings.sync.linkCheck"));
+				}
 				const message = ajouter(corps, "p", "qbd-sync-message qbd-sync-message-erreur");
 				message.setAttribute("role", "alert");
 				const piedDialogue = ajouter(corps, "div", "qbd-sync-dialogue-pied");
@@ -627,7 +636,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 				}
 				validerBtn.addEventListener("click", () => { void soumettre(champ.value); });
 				annulerBtn.addEventListener("click", () => handle.close());
-				champ.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); void soumettre(champ.value); } });
+				champ.addEventListener("keydown", ev => { if (ev.key === "Enter" && !duLien) { ev.preventDefault(); void soumettre(champ.value); } });
 				scannerBtn?.addEventListener("click", () => {
 					void deps.scannerAppairer!().then(async res => {
 						if (demonte || ferme) return;
@@ -645,7 +654,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 					champ.value = valeur;
 					champ.dispatchEvent(new Event("input"));
 				}
-				champ.focus();
+				(duLien ? annulerBtn : champ).focus();
 			},
 			onClose: () => { fermerAjout = () => undefined; },
 		});
