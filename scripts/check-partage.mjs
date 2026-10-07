@@ -267,6 +267,51 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-pack.ts"], asy
 /* THE READER HARDENED (2026-10-07): legacy names, zip64, overlap, system
    litter, links, ratio, and above all NOTHING dropped without a name and a
    reason. */
+await withSrcModule(["src/dashboard/share-manifest.ts", "src/dashboard/share-pack.ts", "src/dashboard/zip.ts"], async (mf, pack, zip) => {
+	const r = makeReporter("Share manifest (format 1) and the v1 packer");
+	const enc = new TextEncoder();
+	const dec = new TextDecoder();
+	const read = (o) => mf.readManifest(enc.encode(typeof o === "string" ? o : JSON.stringify(o)));
+	const sha = "a".repeat(64);
+	const ok = { format: "neo-quiz-share", version: 1, app: "1.0.0", created: "2026-10-07T12:00:00Z", kind: "folder", name: "X", files: [{ path: "A.md", kind: "note", size: 3, sha256: sha }] };
+
+	r.check("no manifest = format 0", mf.readManifest(null), { status: "none" });
+	r.check("a valid manifest is read", read(ok).status, "ok");
+	r.check("garbage, an array, another format, a version below 1: all 'invalid', never a throw", [read("not json").status, read("[]").status, read({ ...ok, format: "x" }).status, read({ ...ok, version: 0 }).status, read({ ...ok, version: 1.5 }).status], ["invalid", "invalid", "invalid", "invalid", "invalid"]);
+	r.check("a file entry with a bad hash makes the manifest invalid (no half-trusted list)", read({ ...ok, files: [{ path: "A.md", size: 1, sha256: "zz" }] }).status, "invalid");
+	r.check("a NEWER version is 'newer' whatever else it holds (unknown fields, another hash scheme)", read({ format: "neo-quiz-share", version: 7, files: "blake3", extra: {} }), { status: "newer", version: 7 });
+	r.check("unknown fields of the current version are ignored", read({ ...ok, brandNew: 1 }).status, "ok");
+	r.check("paths are read as NFC", read({ ...ok, files: [{ ...ok.files[0], path: "e\u0301.md" }] }).manifest.files[0].path, "\u00e9.md");
+
+	r.check("folder settings: a bad colour, an icon outside the list, control characters are dropped",
+		mf.sanitizeFolderSettings({ color: "red", icon: "not-an-icon", name: "A\u0000B", ue: "\u0007UE\n1", extra: 1 }), { name: "A-B", ue: "UE 1" });
+	r.check("folder settings: valid values are kept (colour lower-cased)", mf.sanitizeFolderSettings({ color: "#4F8CFF", icon: "book", name: "Cours", ue: "UE 1" }), { color: "#4f8cff", icon: "book", name: "Cours", ue: "UE 1" });
+	r.check("folder settings: nothing usable = null", [mf.sanitizeFolderSettings({}), mf.sanitizeFolderSettings(null), mf.sanitizeFolderSettings("x")], [null, null, null]);
+	r.check("folder settings: names are cut to 100 characters", mf.sanitizeFolderSettings({ name: "n".repeat(300) }).name.length, 100);
+
+	const now = new Date(Date.UTC(2026, 9, 7, 12, 0, 0));
+	const note = (path, text) => ({ path, kind: "note", bytes: enc.encode(text) });
+	const img = (path, n) => ({ path, kind: "image", bytes: new Uint8Array(n).fill(7) });
+	const packed = await pack.packShareV1([note("Dossier/a.md", "alpha")], [img("x.png", 10)], { app: "9.9.9", kind: "quizzes", name: "N", folder: { color: "bad", icon: "book" } }, now);
+	const files = (await zip.readZip(packed.bytes)).files;
+	const m = JSON.parse(dec.decode(files[0].bytes));
+	r.check("packShareV1: the manifest is the FIRST entry", files.map(f => f.name), ["neo-quiz.json", "Dossier/a.md", "x.png"]);
+	r.check("packShareV1: kind, app, a Z-time, the sanitised look (bad colour dropped)", [m.kind, m.app, m.created, m.folder], ["quizzes", "9.9.9", "2026-10-07T12:00:00Z", { icon: "book" }]);
+	r.check("packShareV1: size and SHA-256 are those of the bytes that went in",
+		m.files.map(f => [f.path, f.size, f.sha256]), [["Dossier/a.md", 5, await mf.sha256Hex(enc.encode("alpha"))], ["x.png", 10, await mf.sha256Hex(new Uint8Array(10).fill(7))]]);
+	r.check("packShareV1: same input, same bytes (deterministic)", Buffer.from((await pack.packShareV1([note("Dossier/a.md", "alpha")], [img("x.png", 10)], { app: "9.9.9", kind: "quizzes", name: "N", folder: { color: "bad", icon: "book" } }, now)).bytes).equals(Buffer.from(packed.bytes)), true);
+
+	// The budget includes the manifest: images that no longer fit are left out and the archive stays under the bound.
+	const limit = 3000;
+	const big = await pack.packShareV1([note("a.md", "alpha")], [img("1.png", 1200), img("2.png", 1200), img("3.png", 1200)], { app: "1", kind: "folder", name: "N" }, now, limit);
+	r.check("packShareV1: the archive never exceeds the bound, manifest included; the rest is counted as left out", [big.bytes.length <= limit, big.imagesIn + big.imagesOut, big.imagesOut > 0], [true, 3, true]);
+	const mBig = JSON.parse(dec.decode((await zip.readZip(big.bytes)).files[0].bytes));
+	r.check("... and the manifest lists only what is in", mBig.files.length, 1 + big.imagesIn);
+	r.check("notes alone over the bound: no archive", (await pack.packShareV1([note("a.md", "x".repeat(5000))], [], { app: "1", kind: "folder", name: "N" }, now, limit)).bytes, null);
+	r.check("two images whose paths differ only by case: the second is left out", (await pack.packShareV1([note("a.md", "x")], [img("I.png", 5), img("i.PNG", 5)], { app: "1", kind: "folder", name: "N" }, now)).imagesOut, 1);
+	r.done();
+});
+
 await withSrcModule("src/dashboard/zip.ts", async (zip) => {
 	const { readZip, classerArchive, isJunkEntry, ZipReadError, IMPORT_LIMITS, CP437_HIGH } = zip;
 	const { forgeZip, unicodePathExtra } = await import("./lib/zip-forge.mjs");

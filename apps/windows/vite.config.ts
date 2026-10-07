@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
+import { readFileSync } from "node:fs";
 
 /*
  * L'app importe le code partagé par CHEMIN RELATIF (../../../src/…), sans
@@ -16,7 +17,11 @@ import { fileURLToPath, URL } from "node:url";
  */
 const racineDepot = fileURLToPath(new URL("../../", import.meta.url));
 
+/* The app version, for the manifest of a shared archive (`ui/partage.ts`). */
+const versionApp = (JSON.parse(readFileSync(fileURLToPath(new URL("./package.json", import.meta.url)), "utf8")) as { version: string }).version;
+
 export default defineConfig({
+	define: { __APP_VERSION__: JSON.stringify(versionApp) },
 	clearScreen: false,
 	/*
 	 * `./` et non `/` : la fenêtre Electron charge `dist/index.html` par
