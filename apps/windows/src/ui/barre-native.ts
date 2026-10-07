@@ -63,18 +63,25 @@ function couleur(btn: HTMLElement | undefined, active: boolean): string {
 	}
 }
 
+/** The one probe that resolves theme variables. It is created once and never
+    removed: a probe appended to and removed from <body> on every publish was a
+    childList mutation that the body observer below turned into the next publish,
+    every frame, forever (60 to 90 ms a frame on a still page, 2026-10-07).
+    Changing its inline `color` is an attribute mutation no observer watches. */
+let sondeCouleur: HTMLSpanElement | null = null;
+
 /** A theme variable as the browser computes it (a plain `rgb()` / `rgba()` string). */
 function resoudre(variable: string): string {
-	const sonde = document.createElement("span");
-	sonde.style.setProperty("color", `var(${variable})`);
-	sonde.style.setProperty("position", "absolute");
-	sonde.style.setProperty("visibility", "hidden");
-	document.body.append(sonde);
-	try {
-		return getComputedStyle(sonde).color;
-	} finally {
-		sonde.remove();
+	if (!sondeCouleur || !sondeCouleur.isConnected) {
+		sondeCouleur = document.createElement("span");
+		sondeCouleur.setAttribute("aria-hidden", "true");
+		sondeCouleur.style.setProperty("position", "absolute");
+		sondeCouleur.style.setProperty("visibility", "hidden");
+		sondeCouleur.style.setProperty("pointer-events", "none");
+		document.body.append(sondeCouleur);
 	}
+	sondeCouleur.style.setProperty("color", `var(${variable})`);
+	return getComputedStyle(sondeCouleur).color;
 }
 
 export function installBarreNative(pont: PontBarre): void {

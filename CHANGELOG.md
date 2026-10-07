@@ -25,6 +25,7 @@ release notes.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- The Android app no longer keeps the CPU busy while idle (the tab bar was being refreshed every frame).
 - Opening a folder, or coming back from a quiz page, on a phone no longer shows an empty screen then cards appearing one by one.
 - Swiping between the main pages on a phone no longer leaves an empty screen while the next page is built.
 - Importing a shared archive keeps its sub-folders (images in an `img/` folder keep working), file extensions as written and notes byte for byte, and a failed import leaves nothing behind.
