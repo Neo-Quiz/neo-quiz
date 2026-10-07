@@ -112,28 +112,6 @@ export function stepCardKind(q: QuizQuestion): StepCardKind {
 	return isTapType(q) ? "choice" : "reveal";
 }
 
-/** One question of a step page, as its capsule reads it. */
-export interface CapsuleInput {
-	/** The card shows its correction. */
-	done: boolean;
-	verdict: LearnVerdict;
-}
-
-/** green = right (first time or after a retry), red = a miss still standing,
-    outline = the first question left to do, dim = the ones after it. */
-export type CapsuleState = "right" | "wrong" | "current" | "idle";
-
-export function capsuleStates(items: readonly CapsuleInput[]): CapsuleState[] {
-	let currentTaken = false;
-	return items.map(it => {
-		if (it.verdict === "missed") return "wrong";
-		if (it.verdict === "first" || it.verdict === "retried" || it.done) return "right";
-		if (currentTaken) return "idle";
-		currentTaken = true;
-		return "current";
-	});
-}
-
 /** The numbers of a Learn's summary: "x/N learned" counts the questions
     right first time AND the ones right after a retry; the accuracy counts
     only the first (a retried miss was still a miss), over the questions

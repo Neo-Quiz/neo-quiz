@@ -12,7 +12,7 @@ import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
-import { capsuleStates, drawOrder, formatElapsed, learnFigures, stepCardKind, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { drawOrder, formatElapsed, learnFigures, stepCardKind, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -72,8 +72,6 @@ export interface CardHandlers {
 	stepSlideHtml(step: StepSlide): string;
 	/** One card of a step page (a `section`), for a repaint in place. */
 	stepCardHtml(qi: number): string;
-	/** Repaints the capsules of the step page holding `qi`, in place. */
-	refreshStepCapsules(qi: number): void;
 }
 
 export function createCardRenderers(ctx: EngineCtx): CardHandlers {
@@ -704,33 +702,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const st = ctx.quizState;
 		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
 		const cards = order.map(qi => cardParts(qi, true).section).join("");
-		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${capsulesHtml(step)}${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
-	}
-
-	/** One capsule per question of the page (readings have none): green = right,
-	    red = missed, outline = the one to do now, dim = not reached. A tap
-	    scrolls to its question (interactions.ts). */
-	function capsulesInner(step: StepSlide): string {
-		const states = capsuleStates(step.questions.map(qi => {
-			const done = ctx.learn.isRevealed(qi);
-			// A question that is not graded (a `pre`) has no verdict: its capsule reads the answer itself.
-			const verdict = ctx.learn.isGraded(qi) ? ctx.learn.verdictOf(qi) : done ? (ctx.isCorrect(qi) ? "first" : "missed") : "none";
-			return { done, verdict };
-		}));
-		return step.questions.map((qi, i) =>
-			`<button type="button" class="quiz-capsule is-${states[i]}" data-capsule-qi="${qi}" aria-label="${ctx.escapeHtmlAttr(t("engine.step.goToQuestion", { n: i + 1 }))}"${states[i] === "current" ? ' aria-current="step"' : ""}></button>`
-		).join("");
-	}
-
-	function capsulesHtml(step: StepSlide): string {
-		if (step.questions.length === 0) return "";
-		return `<nav class="quiz-capsules" aria-label="${ctx.escapeHtmlAttr(t("engine.step.progress"))}">${capsulesInner(step)}</nav>`;
-	}
-
-	function refreshStepCapsules(qi: number): void {
-		const page = ctx.stepOf?.(qi);
-		const nav = page && ctx.container.querySelector<HTMLElement>(`.quiz-step-page[data-step="${page.step}"] .quiz-capsules`);
-		if (page && nav) nav.innerHTML = capsulesInner(page);
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 
 	/** The header of a card of a step page: "Question 2 of 5 · QCM", or the
@@ -959,7 +931,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		refreshMetaSlides,
 		questionCardHtml,
 		stepSlideHtml,
-		stepCardHtml: (qi: number) => cardParts(qi, true).section,
-		refreshStepCapsules
+		stepCardHtml: (qi: number) => cardParts(qi, true).section
 	};
 }

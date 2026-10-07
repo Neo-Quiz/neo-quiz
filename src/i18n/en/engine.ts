@@ -133,8 +133,6 @@ export const EN_ENGINE = {
 	"engine.step.typeFlashcard": "Flashcard",
 	"engine.step.typeReveal": "Answer to reveal",
 	"engine.step.reading": "Reading",
-	"engine.step.progress": "Questions of this step",
-	"engine.step.goToQuestion": "Go to question {n}",
 	"engine.step.answerLabel": "Answer",
 
 	/* ── Question texte / terminal ── */

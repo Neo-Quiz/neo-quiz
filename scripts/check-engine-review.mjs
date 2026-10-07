@@ -1268,19 +1268,9 @@ await withSrcModule("src/engine/step-page.ts", ({ drawOrder }) => {
 	r.done();
 });
 
-/* Step page: capsules, card kind and the Learn summary's numbers. */
-await withSrcModule("src/engine/step-page.ts", ({ capsuleStates, stepCardKind, learnFigures, formatElapsed }) => {
-	const r = makeReporter("Step page - capsules and summary");
-	const c = (done, verdict) => ({ done, verdict });
-	r.check("right first, missed, then the first open one is current, the rest dim",
-		capsuleStates([c(true, "first"), c(true, "missed"), c(false, "none"), c(false, "none")]),
-		["right", "wrong", "current", "idle"]);
-	r.check("a retry that came right is green", capsuleStates([c(true, "retried")]), ["right"]);
-	r.check("a miss stays red while its retry is open (and is not the current one)",
-		capsuleStates([c(false, "missed"), c(false, "none")]), ["wrong", "current"]);
-	r.check("an ungraded card that shows its correction is green", capsuleStates([c(true, "none"), c(false, "none")]), ["right", "current"]);
-	r.check("nothing answered: the first is current", capsuleStates([c(false, "none"), c(false, "none")]), ["current", "idle"]);
-	r.check("everything done: no current capsule", capsuleStates([c(true, "first"), c(true, "first")]), ["right", "right"]);
+/* Step page: card kind and the Learn summary's numbers. */
+await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, formatElapsed }) => {
+	const r = makeReporter("Step page - card kind and summary");
 	r.check("flashcard kind", stepCardKind({ flashcard: true, options: [] }), "flashcard");
 	r.check("choice kind", stepCardKind({ options: ["a", "b"], correctIndex: 0 }), "choice");
 	r.check("text is a card to reveal", stepCardKind({ type: "text" }), "reveal");

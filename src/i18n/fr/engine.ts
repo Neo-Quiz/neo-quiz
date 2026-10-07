@@ -117,8 +117,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.step.typeFlashcard": "Flashcard",
 	"engine.step.typeReveal": "Réponse à révéler",
 	"engine.step.reading": "Lecture",
-	"engine.step.progress": "Questions de cette étape",
-	"engine.step.goToQuestion": "Aller à la question {n}",
 	"engine.step.answerLabel": "Réponse",
 
 	/* ── Question texte / terminal ── */

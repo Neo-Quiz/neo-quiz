@@ -1226,8 +1226,6 @@ html.nq-mobile ::-webkit-scrollbar {
 
 /* A LEARN STEP PAGE ON A PHONE (2026-10-07): thumb-size targets, the two
    ratings side by side across the width, nothing wider than the screen. */
-.is-mobile .quiz-capsule{ height: 36px; }
-.is-mobile .quiz-capsule::before{ inset: 14px 0; }
 .is-mobile .quiz-step-card{ scroll-margin-top: 52px; }
 .is-mobile .quiz-step-card .quiz-option{ min-height: 56px; }
 .is-mobile .quiz-fc-ratings{ width: 100%; flex-wrap: nowrap; gap: 10px; }

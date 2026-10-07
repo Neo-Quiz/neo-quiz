@@ -391,12 +391,6 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		if (trackItem.classList.contains("quiz-step-page")) {
 			const first = Number(trackItem.dataset.qi);
 			trackItem.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]").forEach(card => bindQuestionTrackItem(card));
-			// A capsule scrolls to its question.
-			trackItem.querySelector(".quiz-capsules")?.addEventListener("click", e => {
-				const cap = (e.target as HTMLElement).closest<HTMLElement>("[data-capsule-qi]");
-				if (!cap) return;
-				trackItem.querySelector<HTMLElement>(`.quiz-card[data-card-qi="${cap.dataset.capsuleQi}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
-			});
 			trackItem.querySelector(".quiz-step-nav .quiz-prev-btn")?.addEventListener("click", () => {
 				const precedente = ctx.slideMap[ctx.getSlideIndexForQuestion(first) - 1];
 				if (precedente?.type === "question") ctx.goToQuestion(precedente.questionIndex);
