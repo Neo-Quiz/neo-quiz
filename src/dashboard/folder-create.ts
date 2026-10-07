@@ -126,7 +126,7 @@ async function receive(bytes: Uint8Array): Promise<ReceivedArchive | null> {
 			code === "too-large" || code === "too-many" ? "share.import.tooLarge"
 				: code === "zip64" ? "share.import.zip64"
 				: code === "multi-disk" ? "share.import.multiDisk"
-				: code === "overlap" ? "share.import.overlap"
+				: code === "overlap" || code === "duplicate" ? "share.import.overlap"
 				: code === "unsafe-path" ? "share.import.unsafePath"
 				: "share.import.unreadable"));
 		return null;

@@ -199,7 +199,7 @@ export interface ReadZipResult {
     technique, or damage). `unsafe-path` is an archive naming a path that tries
     to leave the target folder (`../x`, `/x`, `C:x`, a UNC share): no zip tool
     writes one, so the WHOLE archive is refused, not just that entry. */
-export type ZipReadCode = "invalid" | "too-large" | "too-many" | "zip64" | "multi-disk" | "overlap" | "unsafe-path";
+export type ZipReadCode = "invalid" | "too-large" | "too-many" | "zip64" | "multi-disk" | "overlap" | "unsafe-path" | "duplicate";
 export class ZipReadError extends Error {
 	readonly code: ZipReadCode;
 	constructor(code: ZipReadCode) {
@@ -367,6 +367,17 @@ export async function readZip(bytes: Uint8Array, limits = IMPORT_LIMITS): Promis
 		const symlink = (madeBy >> 8) === 3 && ((attrs >>> 16) & 0xf000) === 0xa000;
 		entries.push({ name, flags, method, crc, compSize, size, local, symlink, zip64Missing });
 		off += 46 + nameLen + extraLen + commentLen;
+	}
+
+	// Two entries with the same path: the importer would verify only the last
+	// one against the manifest while a tool may extract the first. No zip tool
+	// writes one by accident, so the whole archive is refused.
+	const seenPaths = new Set<string>();
+	for (const e of entries) {
+		if (e.name.endsWith("/")) continue;
+		const key = e.name.normalize("NFC").replace(/[\\]/g, "/");
+		if (seenPaths.has(key)) throw new ZipReadError("duplicate");
+		seenPaths.add(key);
 	}
 
 	// Pass 2: where each entry's bytes sit. Two entries that share bytes are a

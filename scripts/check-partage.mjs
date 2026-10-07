@@ -283,6 +283,9 @@ await withSrcModule(["src/dashboard/share-manifest.ts", "src/dashboard/share-pac
 	r.check("garbage, an array, another format, a version below 1: all 'invalid', never a throw", [read("not json").status, read("[]").status, read({ ...ok, format: "x" }).status, read({ ...ok, version: 0 }).status, read({ ...ok, version: 1.5 }).status], ["invalid", "invalid", "invalid", "invalid", "invalid"]);
 	r.check("a file entry with a bad hash makes the manifest invalid (no half-trusted list)", read({ ...ok, files: [{ path: "A.md", size: 1, sha256: "zz" }] }).status, "invalid");
 	r.check("a NEWER version is 'newer' whatever else it holds (unknown fields, another hash scheme)", read({ format: "neo-quiz-share", version: 7, files: "blake3", extra: {} }), { status: "newer", version: 7 });
+	r.check("a manifest listing more than IMPORT_LIMITS.entries files is invalid (the bound is pinned to the archive's)", [mf.MANIFEST_MAX_FILES, mf.MANIFEST_MAX_FILES === zip.IMPORT_LIMITS.entries,
+		read({ ...ok, files: Array.from({ length: mf.MANIFEST_MAX_FILES + 1 }, (_, i) => ({ path: `f${i}.md`, kind: "note", size: 1, sha256: sha })) }).status,
+		read({ ...ok, files: Array.from({ length: mf.MANIFEST_MAX_FILES }, (_, i) => ({ path: `f${i}.md`, kind: "note", size: 1, sha256: sha })) }).status], [2000, true, "invalid", "ok"]);
 	r.check("unknown fields of the current version are ignored", read({ ...ok, brandNew: 1 }).status, "ok");
 	r.check("paths are read as NFC", read({ ...ok, files: [{ ...ok.files[0], path: "e\u0301.md" }] }).manifest.files[0].path, "\u00e9.md");
 
@@ -348,11 +351,31 @@ await withSrcModule(["src/dashboard/zip.ts", "src/dashboard/share-plan.ts"], asy
 	r.check("an entry whose 32-bit size says \"see zip64\" with no field: listed as skipped, named", nx.skipped.map(x => `${x.name}:${x.reason}`), ["a.md:zip64"]);
 	r.check("a split (multi-disk) archive: its own error code", await refus(readZip(forgeZip([{ name: "a.md", bytes: note }], { diskNumber: 1 }))), "multi-disk");
 
+	// Two entries with one path: refused whole (the manifest check would only see the last).
+	r.check("two entries with the same path: the archive is refused (duplicate)", await refus(readZip(forgeZip([{ name: "a.md", bytes: note }, { name: "a.md", bytes: note + " " }]))), "duplicate");
+	r.check("... also across separators and NFD", await refus(readZip(forgeZip([{ name: "d/é.md", bytes: note }, { name: "d" + String.fromCharCode(92) + "e" + String.fromCharCode(0x301) + ".md", bytes: note + " " }]))), "duplicate");
+
 	// Overlap and name mismatch.
 	const ov = forgeZip([{ name: "a.md", bytes: note }, { name: "b.md", bytes: note, noLocal: true, localOffsetOf: 0 }]);
 	r.check("two entries sharing the same bytes: the archive is refused (overlap)", await refus(readZip(ov)), "overlap");
 	const mism = await readZip(forgeZip([{ name: "a.md", localNameBytes: Buffer.from("b.md"), bytes: note }]));
 	r.check("local and central names differ: the entry is skipped, named, with its reason", [mism.files.length, mism.skipped.map(x => `${x.name}:${x.reason}`)], [0, ["a.md:name-mismatch"]]);
+
+	// A hostile manifest must not make the plan quadratic: 2000 skipped entries + 60 000 manifest lines.
+	{
+		const sha64 = "b".repeat(64);
+		const enc = new TextEncoder();
+		const manifest = enc.encode(JSON.stringify({ format: "neo-quiz-share", version: 1, app: "1", created: "", kind: "folder", name: "X", files: Array.from({ length: 60000 }, (_, i) => ({ path: `m${i}.md`, kind: "note", size: 1, sha256: sha64 })) }));
+		const skipped = Array.from({ length: 2000 }, (_, i) => ({ name: `s${i}.md`, reason: "corrupt" }));
+		const t0 = performance.now();
+		const big = planner.planImport({ files: [{ name: "neo-quiz.json", bytes: manifest, sha256: "0" }], skipped, junk: 0, quizOnly: false, existing: new Map(), fallbackName: "x" });
+		const ms = performance.now() - t0;
+		r.check("a 60 000-line manifest is refused as invalid, with a notice, and fast", [big.notices, big.missing.length, ms < 200], [["manifest-invalid"], 0, true]);
+		const ok2000 = enc.encode(JSON.stringify({ format: "neo-quiz-share", version: 1, app: "1", created: "", kind: "folder", name: "X", files: Array.from({ length: 2000 }, (_, i) => ({ path: `s${i}.md`, kind: "note", size: 1, sha256: sha64 })) }));
+		const t1 = performance.now();
+		const full = planner.planImport({ files: [{ name: "neo-quiz.json", bytes: ok2000, sha256: "0" }], skipped, junk: 0, quizOnly: false, existing: new Map(), fallbackName: "x" });
+		r.check("2000 skipped entries all listed by a 2000-line manifest: none reported missing, fast (a Set, not a scan)", [full.missing.length, performance.now() - t1 < 200], [0, true]);
+	}
 
 	// System litter.
 	const mac = await readZip(forgeZip([

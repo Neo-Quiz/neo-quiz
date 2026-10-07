@@ -149,10 +149,11 @@ export function planImport(input: PlanInput): ImportPlan {
 	if (read.status === "ok") {
 		const byPath = new Map(rest.map(f => [slashes(f.name), f]));
 		const refused = new Set<PreparedFile>();
+		const skippedNames = new Set(input.skipped.map(s => slashes(s.name)));
 		for (const mf of read.manifest.files) {
 			const f = byPath.get(mf.path);
 			if (!f) {
-				if (!input.skipped.some(s => slashes(s.name) === mf.path)) plan.missing.push(mf.path);
+				if (!skippedNames.has(mf.path)) plan.missing.push(mf.path);
 				continue;
 			}
 			if (f.bytes.length !== mf.size || f.sha256 !== mf.sha256) { refused.add(f); plan.discarded.push({ name: f.name, reason: "altered" }); }

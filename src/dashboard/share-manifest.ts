@@ -111,6 +111,9 @@ export type ManifestRead =
 	| { status: "newer"; version: number }
 	| { status: "ok"; manifest: ShareManifest };
 
+/** The most files a manifest may list: the same bound as the entries read from an archive (`IMPORT_LIMITS.entries`, pinned by `check:partage`). */
+export const MANIFEST_MAX_FILES = 2000;
+
 /** Reads the bytes of `neo-quiz.json`. Never throws. A `version` above
     `SHARE_VERSION` is `newer`: its content is not trusted for checks. */
 export function readManifest(bytes: Uint8Array | null): ManifestRead {
@@ -124,6 +127,8 @@ export function readManifest(bytes: Uint8Array | null): ManifestRead {
 	if (o.format !== SHARE_FORMAT || typeof o.version !== "number" || !Number.isInteger(o.version) || o.version < 1) return { status: "invalid" };
 	if (o.version > SHARE_VERSION) return { status: "newer", version: o.version };
 	if (!Array.isArray(o.files)) return { status: "invalid" };
+	// An archive holds at most `IMPORT_LIMITS.entries` files: a longer list is not ours (and would make the checks quadratic).
+	if (o.files.length > MANIFEST_MAX_FILES) return { status: "invalid" };
 	const files: ManifestFile[] = [];
 	for (const f of o.files as unknown[]) {
 		if (!f || typeof f !== "object") return { status: "invalid" };
