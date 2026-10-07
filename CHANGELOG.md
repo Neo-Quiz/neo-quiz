@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.36] - 2026-10-07
+
 ### Changed
 - Open an existing folder works again for folders outside your Neo Quiz folder (they stay on this PC), and such a folder can be removed from Neo Quiz.
 - A folder's colour, icon, name and teaching unit now follow you on every device.
