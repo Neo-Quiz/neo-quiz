@@ -105,3 +105,27 @@ html.nq-mobile .quiz-submit-card .quiz-actions {
 	border-radius: 14px;
 	background: var(--background-primary);
 }
+
+/* A reading's table on a phone (2026-10-07, 393 px): held to the card's width,
+   its columns were squeezed until a "Commande" column wrapped one letter per
+   line. Each cell keeps a readable minimum and inline code stays on one line,
+   so a wide table scrolls sideways in its wrap (lecture.css) instead. */
+html.nq-mobile .quiz-lecture-tableau th,
+html.nq-mobile .quiz-lecture-tableau td,
+html.nq-mobile .quiz-md-table th,
+html.nq-mobile .quiz-md-table td {
+	min-width: 9ch;
+}
+
+html.nq-mobile .quiz-lecture-tableau code,
+html.nq-mobile .quiz-md-table code {
+	white-space: nowrap;
+}
+
+/* A markdown table has no scrolling wrap of its own: on a phone it becomes its
+   own sideways scroller, so the cell minimum above never widens the page. */
+html.nq-mobile .quiz-md-table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+}
