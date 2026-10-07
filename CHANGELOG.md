@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.34] - 2026-10-07
+
 ### Changed
 - Python downloads as a language pack, like C and C++, and can be deleted.
 - Python code blocks can import numpy, pandas and other packages; they download once, checked.
