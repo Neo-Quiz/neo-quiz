@@ -36,17 +36,12 @@ export type ModeGeneration = Exclude<ModeQuiz, "exam">;
     explanation at all). */
 export const CHAMPS_DECRITS: Readonly<Record<ModeGeneration, readonly string[]>> = {
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"flashcard"',
-		// Reading styles (2026-09-26, reading styles spec §4): the keys and their values.
-		'"lecture"', '"page"', '"etapes"', '"tableau"', '"colonnes"', '"lignes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"', '"methode"',
+		// A generated Learn is tap-only (spec 2026-10-07-learn-scroll §5): readings are
+		// always "etapes" with "retenir"; no typed, cloze, ordering, hint-run field.
+		'"lecture"', '"etapes"', '"retenir"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"',
 		// Glossary (batch D, 2026-09-27, spec §6): generation writes it in the
 		// final configuration, next to `objectives`.
-		'"glossary"', '"term"', '"definition"',
-		// Code execution (2026-09-28, task 7 of the C/C++ plan): the field that
-		// unlocks ▶ on the question's program once its last hint level is
-		// revealed.
-		"runInLastHint",
-		// A character limit per blank of a fill-in-the-blanks (2026-09-29).
-		'"blankMaxLengths"'],
+		'"glossary"', '"term"', '"definition"'],
 	practice: ['"explain"', '"hint"', '"topic"', '"slice"',
 		// Glossary (batch D, 2026-09-27): replaces "No configuration object".
 		'"glossary"', '"term"', '"definition"',
