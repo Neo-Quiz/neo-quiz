@@ -1,7 +1,12 @@
 /* Sharing and importing quizzes (2026-10-07): every outcome has a message,
    none is silent. Reasons for a left-out file are plain words. */
 export const EN_SHARE = {
-	"share.import.added": "{name}: {notes} quizzes and {images} images added",
+	"share.import.added": "{name}: {what} added",
+	"share.import.added.notes.one": "{count} quiz",
+	"share.import.added.notes": "{count} quizzes",
+	"share.import.added.images.one": "{count} image",
+	"share.import.added.images": "{count} images",
+	"share.import.added.and": "{a} and {b}",
 	"share.import.duplicates": "{count} already in the folder (identical, skipped)",
 	"share.import.renamed": "{count} renamed so your own files stay as they are: {list}",
 	"share.import.skipped": "{count} files were not imported: {list}",

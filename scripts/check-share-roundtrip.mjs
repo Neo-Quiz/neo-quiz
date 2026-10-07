@@ -470,7 +470,7 @@ await withSrcModule(
 			r.check("the renamed quiz holds the archive's bytes", after["Semaine 2/q1 (2).md"], sha(Buffer.from(noteC, "utf8")));
 			const said = w.notices.join(" | ");
 			r.check("the summary says what was added, ignored (identical) and renamed, and what was left out",
-				[/1 quizzes and 1 images added/.test(said), /1 already in the folder/.test(said), /renamed/.test(said) && /q1 \(2\)\.md/.test(said), /schéma\.png \(a different image/.test(said)], [true, true, true, true]);
+				[/1 quiz and 1 image added/.test(said), /1 already in the folder/.test(said), /renamed/.test(said) && /q1 \(2\)\.md/.test(said), /schéma\.png \(a different image/.test(said)], [true, true, true, true]);
 			r.check("no staging folder remains, and the host's trash holds no file", [readdirSync(w.root).filter(n => n.startsWith(".import-")), snapshot(w.base).filter(x => x.includes(".trash/") && !x.endsWith("/"))], [[], []]);
 
 			// The same archive again: nothing to add, nothing written, and it says so.

@@ -1,7 +1,12 @@
 import type { EN_SHARE } from "../en/share";
 
 export const FR_SHARE: Record<keyof typeof EN_SHARE, string> = {
-	"share.import.added": "{name} : {notes} quiz et {images} images ajoutés",
+	"share.import.added": "{name} : {what} ajoutés",
+	"share.import.added.notes.one": "{count} quiz",
+	"share.import.added.notes": "{count} quiz",
+	"share.import.added.images.one": "{count} image",
+	"share.import.added.images": "{count} images",
+	"share.import.added.and": "{a} et {b}",
 	"share.import.duplicates": "{count} déjà dans le dossier (identiques, ignorés)",
 	"share.import.renamed": "{count} renommés pour garder vos propres fichiers intacts : {list}",
 	"share.import.skipped": "{count} fichiers n'ont pas été importés : {list}",

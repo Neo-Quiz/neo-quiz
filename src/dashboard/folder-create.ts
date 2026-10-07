@@ -141,7 +141,14 @@ function report(plan: ImportPlan, name: string): void {
 	const notes = plan.writes.filter(w => w.kind === "note").length;
 	const images = plan.writes.length - notes;
 	if (plan.writes.length > 0) {
-		ui.notice(t("share.import.added", { name, notes, images }));
+		// Each count agrees with its own noun ("1 image", not "1 images"), and a
+		// part with nothing in it is left out.
+		const parts = [
+			notes > 0 ? t(notes === 1 ? "share.import.added.notes.one" : "share.import.added.notes", { count: notes }) : "",
+			images > 0 ? t(images === 1 ? "share.import.added.images.one" : "share.import.added.images", { count: images }) : "",
+		].filter(Boolean);
+		const what = parts.length === 2 ? t("share.import.added.and", { a: parts[0], b: parts[1] }) : parts[0];
+		ui.notice(t("share.import.added", { name, what }));
 	} else if (plan.duplicates.length > 0 && plan.discarded.length === 0) {
 		ui.notice(t("share.import.nothing"));
 	} else if (plan.discarded.length === 0 || plan.discarded.every(d => d.reason === "unsupported-type")) {
