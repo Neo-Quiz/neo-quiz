@@ -20,7 +20,7 @@ import { createWindowsHost, createWindowsIndex, creerCarteRacines } from "./host
 import type { CarteRacines, MiroirDisque } from "./host";
 import type { RacineOuverte } from "./host";
 import { pont } from "./host/pont";
-import { estVaultObsidian, savedFolders } from "./host/folder";
+import { estVaultObsidian, relireExamens, savedFolders } from "./host/folder";
 import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
@@ -603,6 +603,7 @@ async function demarrer(): Promise<void> {
 					   pending; the shared state then keeps its diff base (see
 					   `SharedState.refresh`). */
 					await sharedState().refresh(() => stats.reload());
+					relireExamens();
 				} while (rechargeDemandee);
 				adopterOverrides(avantOverrides);
 				demonterCourant?.repaint?.();

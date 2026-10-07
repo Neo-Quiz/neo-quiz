@@ -15,7 +15,7 @@ release notes.
 
 ### Changed
 - A folder reopens on the tab you left it on.
-- Home finds the next exam even in a folder that holds no quiz yet.
+- Home shows the next exam again after another device added it, instead of "No upcoming exam".
 - While Settings is open, the rail highlights Settings instead of the page behind.
 - Back from Generated quizzes (opened from Generate) returns to Generate.
 - In a handed-in test, unanswered questions show the wrong mark on their bead.

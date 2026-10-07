@@ -720,6 +720,14 @@ export function brancherExamens(magasin: ExamStore): void {
 	tableExamens = magasin.exams();
 }
 
+/** Takes the merged table again from the store: the exams another device added
+    land in the shared state at a sync refresh, and the in-memory copy would
+    otherwise keep serving the old list (Home said "No upcoming exam" for one
+    set on the phone) until the next start. */
+export function relireExamens(): void {
+	if (magasinExamens) tableExamens = magasinExamens.exams();
+}
+
 function magasin(): ExamStore {
 	if (!magasinExamens) throw new Error("exam store not connected");
 	return magasinExamens;

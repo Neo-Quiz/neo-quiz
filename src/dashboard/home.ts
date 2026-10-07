@@ -132,8 +132,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		// Every upcoming exam of every folder — a folder with nothing to do
 		// today can still have its exam this week.
 		/* Built apart from the folder cards: a declared folder still EMPTY has no
-		   card, but its exam is as real as any ("No upcoming exam" was shown
-		   while one stood a week away in such a folder). */
+		   card, but its exam is as real as any. */
 		const examGroups = buildModuleGroups(quizzes, stats, map, declaredFolders(ctx.settings.quizzesModuleOverrides))
 			.filter(g => !estLeSas(g, ctx.generatedFolder?.()) && !isFolderArchived(ctx, g.folder));
 		const exams: HomeExam[] = examGroups
