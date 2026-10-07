@@ -16,10 +16,14 @@ Google code scanner, play-services-code-scanner (QR code scan)
   Licence: Android Software Development Kit License (https://developer.android.com/studio/terms)
   https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner
 
-Material Symbols Rounded (bottom bar icons: home, folder, auto_awesome, settings)
+Material Symbols Rounded (the check icon of the first-run screen)
   Licence: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
   Copyright Google LLC. Source: https://github.com/google/material-design-icons at commit
   bd8cb85bd4bad964fe6918f79665bb40c3a8efef, files symbols/web/<name>/materialsymbolsrounded/
-  <name>_24px.svg (outlined, FILL 0) and <name>_fill1_24px.svg (filled), weight 400, grade 0,
+  <name>_24px.svg (outlined, FILL 0), weight 400, grade 0,
   optical size 24; LICENSE at that commit is the Apache License 2.0. Converted unchanged to
-  Android vector drawables (res/drawable/ic_nav_*.xml).
+  an Android vector drawable (res/drawable/ic_first_run_check.xml).
+
+Lucide (bottom bar icons: house, folders, sparkles, settings)
+  Licence: ISC (the lucide npm package, version 1.41.0, same as the PC rail). Path data converted
+  unchanged to Android vector drawables (res/drawable/ic_nav_*.xml).

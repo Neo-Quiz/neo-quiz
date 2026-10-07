@@ -4,12 +4,12 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.TransitionDrawable
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -23,8 +23,9 @@ import org.json.JSONObject
  * page stretched with the content. Outside the WebView it stays still, like Neo Calendar's. The
  * page stays the source of truth (labels, icons, which tab is active, whether the bar shows at
  * all): it publishes its state on `android.barre` (`NavBarChannel`) and gets a tap back as the
- * index of the tab. Icons are Material Symbols Rounded vector drawables (outlined when inactive,
- * filled when active), picked by the tab's `id`; the tint is the page's active / muted colour.
+ * index of the tab. Icons are the PC rail's Lucide icons as vector drawables (outline when inactive, the
+ * rail's filled shape when active), picked by the tab's `id`; the tint is the page's active / muted
+ * colour. Pressing a tab shrinks it to 0.98 in 200 ms ease-in-out, like `.qbd-nav-item:active`.
  */
 class NavBarView(context: Context) : LinearLayout(context) {
     /** Called on the main thread with the index of the tapped tab. */
@@ -68,8 +69,18 @@ class NavBarView(context: Context) : LinearLayout(context) {
                 orientation = VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(0, dp(6), 0, 0)
-                foreground = RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), null, ColorDrawable(Color.WHITE))
                 isClickable = true
+                // The PC rail's press effect (dashboard-nav.css): scale(0.98), 0.2s ease-in-out; down starts
+                // it, up or cancel releases it. No ripple: the rail has none.
+                setOnTouchListener { v, e ->
+                    when (e.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> v.animate().scaleX(PRESS_SCALE).scaleY(PRESS_SCALE)
+                            .setDuration(PRESS_MS).setInterpolator(EASE).start()
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(PRESS_MS).setInterpolator(EASE).start()
+                    }
+                    false
+                }
                 contentDescription = item.optString("label")
                 if (!item.optBoolean("placeholder")) setOnClickListener { onTap(i) }
             }
@@ -82,9 +93,9 @@ class NavBarView(context: Context) : LinearLayout(context) {
                     val outlined = resources.getDrawable(pair.first, context.theme).mutate()
                     val filled = resources.getDrawable(pair.second, context.theme).mutate()
                     val to = if (on) filled else outlined
-                    // Fade only when the tab really changed state (<= 150 ms). A plain redraw sets the icon
+                    // Fade only when the tab really changed state (200 ms, as the rail's fill). A plain redraw sets the icon
                     // directly: a zero-length fade from a drawable to itself sometimes drew nothing.
-                    val changed = wasActive[id] != null && wasActive[id] != on
+                    val changed = wasActive[id] != null && wasActive[id] != on && pair.first != pair.second
                     if (changed) {
                         val fade = TransitionDrawable(arrayOf(if (on) outlined else filled, to)).apply { isCrossFadeEnabled = true }
                         setImageDrawable(fade)
@@ -115,14 +126,18 @@ class NavBarView(context: Context) : LinearLayout(context) {
     private fun dp(v: Int) = (v * resources.displayMetrics.density + 0.5f).toInt()
 
     companion object {
-        private const val FADE_MS = 120
+        private const val FADE_MS = 200
+        private const val PRESS_MS = 200L
+        private const val PRESS_SCALE = 0.98f
+        private val EASE = AccelerateDecelerateInterpolator()
 
         /** Tab id (the page's `data-nav` key, or `settings`) to its (outlined, filled) drawables. */
         private val ICONS = mapOf(
-            "home" to (R.drawable.ic_nav_home_outlined to R.drawable.ic_nav_home_filled),
-            "quizzes" to (R.drawable.ic_nav_folder_outlined to R.drawable.ic_nav_folder_filled),
-            "ai" to (R.drawable.ic_nav_generate_outlined to R.drawable.ic_nav_generate_filled),
-            "settings" to (R.drawable.ic_nav_settings_outlined to R.drawable.ic_nav_settings_filled),
+            "home" to (R.drawable.ic_nav_home to R.drawable.ic_nav_home_filled),
+            "quizzes" to (R.drawable.ic_nav_folders to R.drawable.ic_nav_folders_filled),
+            "ai" to (R.drawable.ic_nav_sparkles to R.drawable.ic_nav_sparkles_filled),
+            // The rail does not fill Settings: same drawable both ways.
+            "settings" to (R.drawable.ic_nav_settings to R.drawable.ic_nav_settings),
         )
 
         /** `rgb(1, 2, 3)` / `rgba(1, 2, 3, 0.5)` as the page's computed styles give them. */
