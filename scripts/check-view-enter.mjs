@@ -47,6 +47,7 @@ class FauxConteneur {
 		this.classes = new Set();
 		this.ecouteurs = new Map();
 		this.animations = animations;
+		this.appels = 0;
 		this.classList = {
 			toggle: (c, force) => { force ? this.classes.add(c) : this.classes.delete(c); },
 			remove: (c) => { this.classes.delete(c); },
@@ -54,7 +55,7 @@ class FauxConteneur {
 	}
 	addEventListener(type, fn) { this.ecouteurs.set(type, fn); }
 	removeEventListener(type) { this.ecouteurs.delete(type); }
-	getAnimations() { return this.animations; }
+	getAnimations() { this.appels++; return this.animations; }
 	/** Simule l'`animationend` d'UNE animation : elle passe à « finished ». */
 	finir(nom) {
 		for (const a of this.animations) if (a.animationName === nom) a.playState = "finished";
@@ -97,6 +98,23 @@ await withSrcModule("src/dashboard/view-enter.ts", ({ markViewEnter }) => {
 		r.check("gardée tant qu'une entrée FINIE tourne encore", c.aLaClasse, true);
 		c.finir("qbd-folder-card-in");
 		r.check("retirée quand la dernière entrée finit", c.aLaClasse, false);
+	}
+	{
+		/* LA CASCADE NE COÛTE PAS UNE PASSE DE STYLE PAR CARTE (audit téléphone,
+		   2026-10-07) : `getAnimations({ subtree })` vide le style de tout le
+		   sous-arbre ; appelé à chaque `animationend`, une page de 20 cartes
+		   décalées l'exécutait 20 fois PENDANT l'entrée (tâches de 50 à 100 ms
+		   à 6x). Premier événement = un relevé, puis seulement `playState`,
+		   et un dernier relevé pour confirmer la fin. */
+		const cartes = Array.from({ length: 20 }, () => new CSSAnimation("qbd-folder-card-in", "running"));
+		const c = new FauxConteneur(cartes);
+		markViewEnter(c, true, "qbd-quizzes-enter");
+		for (const carte of cartes.slice(0, 19)) { carte.playState = "finished"; c.ecouteurs.get("animationend")({ animationName: "qbd-folder-card-in" }); }
+		r.check("gardée tant que la 20e carte tourne", c.aLaClasse, true);
+		r.check("19 fins de cartes : UN relevé, pas 19", c.appels, 1);
+		c.finir("qbd-folder-card-in");
+		r.check("retirée à la dernière carte", c.aLaClasse, false);
+		r.check("… après un seul relevé de confirmation de plus", c.appels, 2);
 	}
 	{
 		const c = new FauxConteneur([new CSSAnimation("qbd-folder-card-in", "running")]);

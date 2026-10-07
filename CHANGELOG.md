@@ -19,6 +19,7 @@ release notes.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- Pages that animate many cards in no longer freeze for 50 to 100 ms each time a card finishes.
 - Sharing no longer gets stuck on "A share is already in progress": clicking Share again after closing the panel without choosing an app starts a new share.
 - Importing a shared archive now lists every file it leaves out and why, reads archives made by older tools (accents, zip64), and no longer imports macOS system files as notes.
 - The output folder chosen in Generate stays selected after a reload.
