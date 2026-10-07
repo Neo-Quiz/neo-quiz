@@ -322,6 +322,58 @@ jobs:
       - name: Update window mirror
         run: npm run check:fenetre-maj
 
+      # Block writing: the exported quiz block reads back identical.
+      - name: Quiz block export
+        run: npm run check:export
+
+      # The only path that rewrites a note: compare-and-swap, line endings, fences.
+      - name: Quiz note writing
+        run: npm run check:quiz-io
+
+      # Unrendered markdown markers in sample notes.
+      - name: Unrendered markdown markers
+        run: npm run check:markers
+
+      # Catalogue keys: a shifted key would lose review history.
+      - name: Quiz catalogue scanner
+        run: npm run check:scanner
+
+      # The pure scheduler core stays pure and correct.
+      - name: Review scheduler core
+        run: npm run check:scheduler
+
+      # Video tile rules.
+      - name: Video tile
+        run: npm run check:video-tile
+
+      # Text search rules.
+      - name: Text search
+        run: npm run check:text-search
+
+      # Ported dashboard pages never regain Obsidian DOM extensions.
+      - name: Dashboard DOM ratchet
+        run: npm run check:dashboard-dom
+
+      # Shared LaTeX segmentation ($ before $).
+      - name: Math segmentation
+        run: npm run check:math-render
+
+      # Review journal location and migration.
+      - name: Review log location
+        run: npm run check:review-log
+
+      # Rename matching between hosts is by proof, not resemblance.
+      - name: Rename matching
+        run: npm run check:rename-match
+
+      # Engine wiring to the review journal and the timed Test.
+      - name: Engine review wiring
+        run: npm run check:engine-review
+
+      # EVERY check:* SCRIPT RUNS HERE: a check that is not in this file can go red unseen.
+      - name: CI covers every check
+        run: npm run check:ci-coverage
+
       - name: Changelog
         run: npm run check:changelog
 
@@ -370,6 +422,58 @@ jobs:
       - name: Course grouping and module editing
         run: npm run check:module-edit
 
+      # The Android copy of the C/C++ pack pin equals PACK_C.
+      - name: Android code pack pin
+        run: npm run check:android-code-pack
+
+      # Review store wiring across hosts.
+      - name: Review store
+        run: npm run check:review-store
+
+      # Moving a quiz between folders.
+      - name: Move quiz
+        run: npm run check:move-quiz
+
+      # The debounced watcher and index never lose a note history on rename.
+      - name: Electron file index
+        run: npm run check:electron-index
+
+      # Network allow-list of the main process.
+      - name: Electron network rules
+        run: npm run check:electron-reseau
+
+      # Electron paste handling.
+      - name: Electron paste
+        run: npm run check:electron-collage
+
+      # The pure auto-update core.
+      - name: Auto-update core
+        run: npm run check:updater
+
+      # The pure application menu tree.
+      - name: Application menu
+        run: npm run check:menu-app
+
+      # Reopening where the user stopped never crashes on a bad value.
+      - name: Resume last view
+        run: npm run check:reprise
+
+      # Mouse back/forward navigation history.
+      - name: Navigation history
+        run: npm run check:historique-nav
+
+      # Language selection rules.
+      - name: Language selection
+        run: npm run check:langue
+
+      # Time formatting.
+      - name: Time format
+        run: npm run check:format-heure
+
+      # Wallpaper extensions and next-image cycle.
+      - name: Wallpaper rules
+        run: npm run check:fond
+
       - name: Build and package (AppImage)
         run: npm run pack:linux
         working-directory: apps/windows
@@ -414,6 +518,30 @@ jobs:
 
       - name: Code sandbox (Pyodide isolation)
         run: npm run check:code-sandbox
+
+      # The Windows host implementation of src/host/types.ts.
+      - name: Windows host contract
+        run: npm run check:windows-host
+
+      # CLI launching: name allow-list, quoting, process tree kill, per-tool lock.
+      - name: Electron process launching
+        run: npm run check:electron-process
+
+      # Main-process file primitives on a real temp folder.
+      - name: Electron file primitives
+        run: npm run check:electron-fs
+
+      # Electron accounts handling.
+      - name: Electron accounts
+        run: npm run check:electron-comptes
+
+      # Settings, declared vaults and the bridge security perimeter.
+      - name: Electron settings and perimeter
+        run: npm run check:electron-reglages
+
+      # AI providers: catalogue from net, offline detection, CLI cache snapshot.
+      - name: AI providers
+        run: npm run check:ai-providers
 
       - name: Build and package (NSIS)
         run: npm run pack:win
