@@ -1,2 +1,58 @@
 /* Phone-only fixes (html.nq-mobile / .is-mobile) for the play screens, from the
    2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css. */
+
+/* The numbered beads: 8 of them (7 steps and the flag) must all fit at 360 px.
+   The coarse-pointer sizes (40 px beads, 44 px pitch) overflowed the row and cut
+   the flag, so a phone keeps 32 px beads 4 px apart. */
+html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+	--perle: 32px;
+	gap: 4px;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+/* The « Expliquer » row (ui/explain.ts) cancels the panel gap with -16 px, so
+   the slide's last 12 px slid under its button: the last option of a revue was
+   half-covered. -4 px keeps the row tight under the slide without overlap. */
+html.nq-mobile .qz-explain-row {
+	margin-top: -4px;
+}
+
+/* Rich content in a question or a lecture: a long word, URL or list item wraps
+   in the card instead of running off the screen. */
+html.nq-mobile .quiz-md-p,
+html.nq-mobile .quiz-md-liste li,
+html.nq-mobile .quiz-md-citation {
+	overflow-wrap: anywhere;
+}
+
+/* A display formula wider than the card scrolls in its own box (like a code
+   block) instead of being cut by the step page. */
+html.nq-mobile .math-block {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+html.nq-mobile .math-inline {
+	display: inline-block;
+	max-width: 100%;
+	overflow-x: auto;
+	vertical-align: middle;
+}
+
+/* An image never wider than the card. */
+html.nq-mobile .quiz-md img,
+html.nq-mobile .quiz-md-p img {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Touch targets of the play screens below 40 px (the code run button, the
+   verdict icons of a text answer, the numbered buttons of the hand-in screen). */
+html.nq-mobile .quiz-code-run-btn,
+html.nq-mobile .quiz-textonly-verdict-icon-btn,
+html.nq-mobile .quiz-submit-perle {
+	min-width: 40px;
+	min-height: 40px;
+}
