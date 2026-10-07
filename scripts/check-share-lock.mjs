@@ -13,7 +13,7 @@
 import { EventEmitter } from "node:events";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("apps/windows/electron/partage.ts", async ({ lancerPartageNatif, creerVerrou, verrouNatif, verrouSync, scriptPartageNatif, BORNE_SANS_SIGNAL_MS, BORNE_TOTALE_MS }) => {
+await withSrcModule("apps/windows/electron/partage.ts", async ({ lancerPartageNatif, creerVerrou, verrouNatif, verrouSync, creerPartageFichier, scriptPartageNatif, BORNE_SANS_SIGNAL_MS, BORNE_TOTALE_MS }) => {
 	const r = makeReporter("Share lock - released on every outcome");
 
 	/** A fake clock: timers fire when `avancer` passes them. */
@@ -119,6 +119,58 @@ await withSrcModule("apps/windows/electron/partage.ts", async ({ lancerPartageNa
 	r.check("the production file lock has no spacing: released then taken again at once", jn2 !== null, true);
 	verrouNatif.rendre(jn2);
 	r.check("hard bounds are 30 s and 90 s", [BORNE_SANS_SIGNAL_MS, BORNE_TOTALE_MS], [30_000, 90_000]);
+
+	/* A NEW click while the previous panel is still held. The panel may have been
+	   closed without choosing an app (no event says so), so after SHOWN a click
+	   replaces the old share instead of answering "busy". */
+	{
+		const h = horloge();
+		const enfants = [];
+		const tues = [];
+		let lancements = 0; let liberations = 0;
+		const lancerFaux = () => { const e = faux(); e.pid = 1000 + lancements++; enfants.push(e); return e; };
+		const lanceur = (p, fin, deps) => lancerPartageNatif(p, fin, { ...deps, lancer: lancerFaux, minuteur: h, tuerArbre: (pid) => tues.push(pid) });
+		const verrou = creerVerrou(BORNE_TOTALE_MS, 0, () => 0);
+		const verrouEspion = { prendre: () => verrou.prendre(), rendre: (j) => { liberations++; verrou.rendre(j); } };
+		const ctrl = creerPartageFichier({ verrou: verrouEspion, ecrire: async (nom) => `C:/tmp/${nom}`, lancer: lanceur });
+		const attendre = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+
+		const p1 = ctrl.demander("a.zip", new Uint8Array([1]));
+		const p1bis = ctrl.demander("a.zip", new Uint8Array([1]));
+		await attendre();
+		r.check("a double click BEFORE the panel is shown joins the call: one process, no error", lancements, 1);
+		dit(enfants[0], "SHOWN\n");
+		await attendre();
+		const [ok1, ok1bis] = await Promise.all([p1, p1bis]);
+		r.check("both calls of the double click get the same true answer", [ok1, ok1bis], [true, true]);
+
+		const p2 = ctrl.demander("b.zip", new Uint8Array([2]));
+		await attendre();
+		r.check("a NEW click after SHOWN does not answer busy: the old process tree is killed (kill and taskkill) and a new one started",
+			[lancements, enfants[0].tue, tues, liberations], [2, 1, [1000], 1]);
+		dit(enfants[1], "SHOWN\n");
+		await attendre();
+		r.check("the new share is the one holding the lock, and it resolves true", [await p2, verrou.prendre()], [true, null]);
+
+		enfants[0].emit("exit", 1);
+		await attendre();
+		r.check("the late exit of the killed process does not release the new share's lock", verrou.prendre(), null);
+		enfants[1].emit("exit", 0);
+		await attendre();
+		const p3 = ctrl.demander("c.zip", new Uint8Array([3]));
+		await attendre();
+		r.check("after the panel is over the next click starts at once", lancements, 3);
+		dit(enfants[2], "SHOWN\n");
+		await attendre();
+		await p3;
+		// A lock held by something that is not a share of ours stays "busy".
+		const autre = creerVerrou(BORNE_TOTALE_MS, 0, () => 0);
+		autre.prendre();
+		const ctrl2 = creerPartageFichier({ verrou: autre, ecrire: async (n) => n, lancer: lanceur });
+		let message = "";
+		try { await ctrl2.demander("d.zip", new Uint8Array([4])); } catch (e) { message = String(e.message); }
+		r.check("a lock held by something else (no share of ours to replace) still answers busy", message, "partage-occupe");
+	}
 
 	// The script reports its state and stays constant.
 	const s = scriptPartageNatif();

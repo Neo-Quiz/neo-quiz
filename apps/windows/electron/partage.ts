@@ -25,6 +25,7 @@ import { lstat, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SHARE_MAX_BYTES } from "../../../src/dashboard/zip";
+import { PARTAGE_OCCUPE } from "./pont";
 
 /** Ce qu'un partage produit : le zip d'un dossier, le .md d'un quiz. */
 export const EXTENSIONS_PARTAGE = [".zip", ".md"] as const;
@@ -262,7 +263,7 @@ export interface PartageNatif {
 /** What a share did, told truthfully: `ok` only once the panel is SHOWN. */
 export type ResultatPartage =
 	| { ok: true }
-	| { ok: false; raison: "lancement" | "sortie" | "delai" | "erreur"; message: string };
+	| { ok: false; raison: "lancement" | "sortie" | "delai" | "erreur" | "annule"; message: string };
 
 interface FluxPartage { on(ev: "data", cb: (d: Buffer | string) => void): unknown }
 /** The part of a child process this module uses (so a test can fake it). */
@@ -272,12 +273,26 @@ export interface EnfantPartage {
 	on(ev: "exit" | "close", cb: (code: number | null) => void): unknown;
 	on(ev: "error", cb: (e: Error) => void): unknown;
 	kill(): unknown;
+	pid?: number;
 }
 export interface DepsPartage {
 	lancer?: (commande: string, args: string[], env: NodeJS.ProcessEnv) => EnfantPartage;
 	minuteur?: { set(f: () => void, ms: number): unknown; clear(h: unknown): void };
 	/** Called once the panel is shown (the lock is then really busy). */
 	surMontre?: () => void;
+	/** Called right after the launch with a function that CANCELS this share
+	    (kills the whole process tree and releases the lock). A new click on
+	    "Share" while the previous panel is already shown uses it. */
+	surLance?: (annuler: () => void) => void;
+	/** Kills a process tree by pid (default: `taskkill /T /F`). */
+	tuerArbre?: (pid: number) => void;
+}
+
+/** Kills the PowerShell AND anything it started (`taskkill /T /F`). */
+function tuerArbrePar(pid: number): void {
+	try {
+		spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("error", () => {});
+	} catch { /* best effort: `kill()` ran first */ }
 }
 
 /** Starts the hidden PowerShell that opens the panel and follows what it
@@ -308,8 +323,11 @@ export function lancerPartageNatif(p: PartageNatif, fin: () => void, deps: DepsP
 			minuteur.clear(tTotal);
 			fin();
 		};
-		const tuer = () => { try { enfant?.kill(); } catch { /* already gone */ } };
-		const echec = (raison: "lancement" | "sortie" | "delai" | "erreur", message: string, tue: boolean) => {
+		const tuer = () => {
+			try { enfant?.kill(); } catch { /* already gone */ }
+			if (typeof enfant?.pid === "number") (deps.tuerArbre ?? tuerArbrePar)(enfant.pid);
+		};
+		const echec = (raison: "lancement" | "sortie" | "delai" | "erreur" | "annule", message: string, tue: boolean) => {
 			repondre({ ok: false, raison, message });
 			if (tue) tuer();
 			liberer();
@@ -335,6 +353,7 @@ export function lancerPartageNatif(p: PartageNatif, fin: () => void, deps: DepsP
 			}
 			enfant = lancer("powershell.exe",
 				["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode], env);
+			deps.surLance?.(() => echec("annule", "replaced by a new share", true));
 			tSignal = minuteur.set(() => { if (!montre) echec("delai", "no signal from the share panel", true); }, BORNE_SANS_SIGNAL_MS);
 			tTotal = minuteur.set(() => echec("delai", "share panel timed out", true), BORNE_TOTALE_MS);
 			enfant.stdout?.on("data", (d) => {
@@ -355,4 +374,66 @@ export function lancerPartageNatif(p: PartageNatif, fin: () => void, deps: DepsP
 			echec("lancement", e instanceof Error ? e.message : String(e), true);
 		}
 	});
+}
+
+/** The file share as a small controller, so every click rule is testable with
+    fakes (`check:share-lock`):
+    - a click BEFORE the panel is shown (a double click) joins the call in
+      progress: one panel, no toast;
+    - a click AFTER the panel was shown replaces it: the panel may have been
+      closed without choosing an app (no signal exists for that), so the old
+      process tree is killed and a new share starts. It is never "busy";
+    - "busy" is thrown only if the lock cannot be had even after that. */
+export interface DepsPartageFichier {
+	verrou: { prendre(): number | null; rendre(jeton: number): void };
+	/** Writes the file to a fresh temporary folder and returns its path. */
+	ecrire: (nom: string, octets: Uint8Array) => Promise<string>;
+	lancer?: typeof lancerPartageNatif;
+	centre?: () => { x: number; y: number } | undefined;
+	titre?: (nom: string) => string;
+	deps?: DepsPartage;
+}
+export function creerPartageFichier(d: DepsPartageFichier): { demander(nom: string, octets: Uint8Array): Promise<boolean> } {
+	const lancer = d.lancer ?? lancerPartageNatif;
+	interface Etat { montre: boolean; annuler: () => void; promesse: Promise<boolean> }
+	let enCours: Etat | null = null;
+	return {
+		async demander(nom, octets) {
+			let jeton = d.verrou.prendre();
+			if (jeton === null) {
+				const en = enCours;
+				if (en && !en.montre) return en.promesse;
+				if (en) {
+					en.annuler();
+					jeton = d.verrou.prendre();
+				}
+				if (jeton === null) throw new Error(PARTAGE_OCCUPE);
+			}
+			const monJeton = jeton;
+			const etat: Etat = { montre: false, annuler: () => {}, promesse: Promise.resolve(false) };
+			// Released on EVERY outcome; the record stays until the process is
+			// over (not only until the panel is shown), so a later click finds it.
+			const fin = () => {
+				d.verrou.rendre(monJeton);
+				if (enCours === etat) enCours = null;
+			};
+			etat.promesse = (async () => {
+				try {
+					const fichier = await d.ecrire(nom, octets);
+					const r = await lancer({ titre: d.titre ? d.titre(nom) : nom, fichier, centre: d.centre?.() }, fin, {
+						...d.deps,
+						surMontre: () => { etat.montre = true; d.deps?.surMontre?.(); },
+						surLance: (a) => { etat.annuler = a; d.deps?.surLance?.(a); },
+					});
+					if (!r.ok) console.warn(`[partage] file share failed (${r.raison}): ${r.message}`);
+					return r.ok;
+				} catch (e) {
+					fin();
+					throw e;
+				}
+			})();
+			enCours = etat;
+			return etat.promesse;
+		},
+	};
 }
