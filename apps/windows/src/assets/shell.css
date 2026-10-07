@@ -1847,18 +1847,24 @@ label.nq-set-ligne {
    The link is text (metadata), not a button; it may wrap, never overflow. */
 .nq-langage-source {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0 4px;
-	white-space: normal;
-}
-
-.nq-langage-lien {
-	display: inline-flex;
+	flex-wrap: nowrap;
 	align-items: center;
 	gap: 4px;
 	min-width: 0;
-	overflow-wrap: anywhere;
+	white-space: nowrap;
+	overflow: visible;
+}
+
+.nq-langage-source-nom {
+	flex: none;
+}
+
+.nq-langage-lien {
+	display: flex;
+	flex: 0 1 auto;
+	align-items: center;
+	min-width: 0;
+	gap: 4px;
 	color: var(--text-muted);
 	text-decoration: underline;
 	cursor: pointer;
@@ -1866,6 +1872,22 @@ label.nq-set-ligne {
 
 .nq-langage-lien:hover {
 	color: var(--text-normal);
+}
+
+.nq-langage-lien-debut {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.nq-langage-lien-fin {
+	flex: none;
+}
+
+.nq-langage .nq-reglages-texte {
+	min-width: 0;
+	flex: 1 1 auto;
 }
 
 .nq-langage-lien-icone {
@@ -1890,43 +1912,24 @@ label.nq-set-ligne {
 	display: flex;
 	flex: none;
 	align-items: center;
-	width: 104px;
+	width: 40px;
 	justify-content: flex-end;
-}
-
-.nq-langage-telecharger {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	height: 32px;
-	padding: 0 12px;
-	border: 1px solid var(--background-modifier-border-hover);
-	border-radius: var(--radius-m);
-	background: transparent;
-	color: var(--text-normal);
-	font: inherit;
-	font-size: 13px;
-	cursor: pointer;
-}
-
-.nq-langage-telecharger:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-}
-
-.nq-langage-telecharger:disabled {
-	opacity: 0.5;
-	cursor: default;
 }
 
 .nq-langage-telecharger[hidden] {
 	display: none;
 }
 
-.nq-langage-telecharger-icone {
-	display: inline-flex;
+.nq-langage-telecharger-icone[hidden],
+.nq-langage-pourcent[hidden] {
+	display: none;
 }
 
-.nq-langage-telecharger-icone svg {
-	width: 14px;
-	height: 14px;
+.nq-langage-pourcent {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.nq-langage-telecharger:disabled {
+	cursor: default;
 }

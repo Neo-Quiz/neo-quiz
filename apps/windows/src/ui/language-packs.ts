@@ -35,11 +35,17 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 	ajouter(text, "span", "nq-reglages-nom", t(pack === "python" ? "settings.languages.python" : "settings.languages.c"));
 	const state = ajouter(text, "span", "nq-reglages-chemin");
 	const source = ajouter(text, "span", "nq-reglages-chemin nq-langage-source");
-	ajouter(source, "span", undefined, t("settings.languages.source") + " ");
+	ajouter(source, "span", "nq-langage-source-nom", t("settings.languages.source"));
 	const href = PAGES_PACKS[pack];
 	const link = ajouter(source, "a", "nq-langage-lien");
 	link.href = href;
-	ajouter(link, "span", undefined, href.replace("https://", ""));
+	/* Two spans so that, when the room runs out, the MIDDLE is what is cut: the
+	   start shrinks with an ellipsis, the end (the version tag) never does. */
+	const shown = href.replace("https://", "");
+	const cut = shown.lastIndexOf("/") + 1;
+	link.title = href;
+	ajouter(link, "span", "nq-langage-lien-debut", shown.slice(0, cut));
+	ajouter(link, "span", "nq-langage-lien-fin", shown.slice(cut));
 	currentHost().ui.setIcon(ajouter(link, "span", "nq-langage-lien-icone"), "external-link");
 	link.addEventListener("click", event => {
 		event.preventDefault();
@@ -72,15 +78,25 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 		remove.disabled = true;
 		void pont().langages.supprimer(pack).catch(() => undefined).then(draw);
 	});
-	const download = ajouter(slot, "button", "nq-langage-telecharger");
+	const download = ajouter(slot, "button", "qbd-sync-action nq-langage-telecharger");
 	download.type = "button";
 	download.hidden = true;
-	currentHost().ui.setIcon(ajouter(download, "span", "nq-langage-telecharger-icone"), "download");
-	ajouter(download, "span", undefined, t("settings.languages.download"));
+	download.setAttribute("aria-label", t("settings.languages.download"));
+	download.title = t("settings.languages.download");
+	const downloadIcon = ajouter(download, "span", "nq-langage-telecharger-icone");
+	currentHost().ui.setIcon(downloadIcon, "download");
+	const percentLabel = ajouter(download, "span", "nq-langage-pourcent");
+	percentLabel.hidden = true;
 	download.addEventListener("click", () => {
 		download.disabled = true;
+		downloadIcon.hidden = true;
+		percentLabel.hidden = false;
+		percentLabel.textContent = "0%";
 		void pont().langages.installer(pack, (received, total) => {
-			if (!isDestroyed()) state.textContent = t("settings.languages.downloading", { percent: Math.floor((received * 100) / Math.max(1, total)) });
+			if (isDestroyed()) return;
+			const percent = Math.floor((received * 100) / Math.max(1, total));
+			state.textContent = t("settings.languages.downloading", { percent });
+			percentLabel.textContent = percent + "%";
 		}).then(result => {
 			if (isDestroyed()) return;
 			if (!result.ok) currentHost().ui.notice(t(result.code === "empreinte" ? "settings.languages.refused" : "settings.languages.offline"));
