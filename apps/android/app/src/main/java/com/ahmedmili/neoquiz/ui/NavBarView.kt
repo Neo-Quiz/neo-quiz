@@ -1,20 +1,32 @@
 package com.ahmedmili.neoquiz.ui
 
+import android.animation.TimeInterpolator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
-import android.graphics.drawable.TransitionDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.RippleDrawable
+import android.text.TextPaint
+import android.text.TextUtils
 import android.util.TypedValue
-import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.ImageView
+import android.view.animation.AnimationUtils
+import android.view.animation.LinearInterpolator
 import android.widget.LinearLayout
-import android.widget.TextView
 import com.ahmedmili.neoquiz.R
 import org.json.JSONObject
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * The bottom tab bar, drawn natively under the WebView instead of inside the page.
@@ -22,28 +34,47 @@ import org.json.JSONObject
  * WHY: the Android 12 stretch overscroll is applied to the WHOLE WebView, so a bar fixed in the
  * page stretched with the content. Outside the WebView it stays still, like Neo Calendar's. The
  * page stays the source of truth (labels, icons, which tab is active, whether the bar shows at
- * all): it publishes its state on `android.barre` (`NavBarChannel`) and gets a tap back as the
- * index of the tab. Icons are the PC rail's Lucide icons as vector drawables (outline when inactive, the
- * rail's filled shape when active), picked by the tab's `id`; the tint is the page's active / muted
- * colour. Pressing a tab shrinks it to 0.98 in 200 ms ease-in-out, like `.qbd-nav-item:active`.
+ * all, its colours): it publishes its state on `android.barre` (`NavBarChannel`) and gets a tap
+ * back as the index of the tab.
+ *
+ * Measures copied from Mihon's bottom bar (Material 3 NavigationBar), read on a phone at density 3
+ * (1 dp = 3 px), portrait:
+ * - bar 80 dp high, no separator line, tabs of equal width over the whole width (no side margin);
+ * - pill (indicator) 56 x 32 dp, corner radius 16 dp, its top 10 dp below the top of the bar, centred
+ *   in its tab; the icon (24 dp) is centred in it, so the icon centre sits 26 dp from the top;
+ * - label 14 sp, weight 500, letter spacing 0.1 sp, one line, ellipsized at the end, always shown; its
+ *   glyphs run from about 50 dp to 63 dp from the top (baseline 60.4 dp);
+ * - pill colour = the text colour at 11 % over the bar; the inactive icon and label use the page's
+ *   normal text colour; the active icon uses the app's accent, the active label its accent text colour;
+ * - the press feedback is a ripple clipped to the pill shape, the text colour at 10 % (Material 3).
+ *
+ * Pill animation copied from Thunder (Flutter NavigationBar, `NavigationIndicator`): see `NavBarMotion`.
+ * Icon animation copied from Mihon's AnimatedVectorDrawable: the outline is drawn, and the filled
+ * drawable is revealed by a circle growing from the icon centre over 300 ms with the platform's
+ * `fast_out_slow_in`, and closing again on deselection. The colour of the icon and of the label
+ * changes over 100 ms, linearly.
+ *
+ * Icons are the PC rail's Lucide icons as vector drawables (outline when inactive, the rail's
+ * filled shape when active), picked by the tab's `id`.
  */
 class NavBarView(context: Context) : LinearLayout(context) {
     /** Called on the main thread with the index of the tapped tab. */
     var onTap: (Int) -> Unit = {}
 
-    private val line = View(context)
     private val row = LinearLayout(context)
     private var signature = ""
-    /** Active state of each tab at the last render, to cross-fade only the tabs that changed. */
-    private val wasActive = HashMap<String, Boolean>()
+    /** The ids, labels and placeholder flags of the tabs as they were built. */
+    private var tabsKey = ""
+    private val tabs = ArrayList<NavTab>()
+    private val fastOutSlowIn: TimeInterpolator by lazy {
+        AnimationUtils.loadInterpolator(context, android.R.interpolator.fast_out_slow_in)
+    }
 
     init {
         orientation = VERTICAL
         visibility = GONE
-        addView(line, LayoutParams(LayoutParams.MATCH_PARENT, 1))
         row.orientation = HORIZONTAL
-        row.setPadding(dp(20), 0, dp(20), 0)
-        addView(row, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)))
+        addView(row, LayoutParams(LayoutParams.MATCH_PARENT, dp(BAR_HEIGHT)))
     }
 
     /** Applies the page's state (main thread). Cheap when nothing changed. */
@@ -56,80 +87,247 @@ class NavBarView(context: Context) : LinearLayout(context) {
         visibility = VISIBLE
         if (sig == signature) return
         signature = sig
-        setBackgroundColor(css(state.optString("bg"), Color.BLACK))
-        line.setBackgroundColor(css(state.optString("line"), Color.DKGRAY))
-        val muted = css(state.optString("muted"), Color.GRAY)
-        val active = css(state.optString("active"), Color.WHITE)
-        row.removeAllViews()
-        val items = state.optJSONArray("items") ?: return
+        val colors = NavColors.from(state)
+        setBackgroundColor(colors.bg)
+        val items = state.optJSONArray("items")
+        if (items == null) {
+            tabs.clear()
+            row.removeAllViews()
+            tabsKey = ""
+            return
+        }
+        val key = StringBuilder()
         for (i in 0 until items.length()) {
             val item = items.getJSONObject(i)
-            val on = item.optBoolean("active")
-            val tab = LinearLayout(context).apply {
-                orientation = VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                setPadding(0, dp(6), 0, 0)
-                isClickable = true
-                // The PC rail's press effect (dashboard-nav.css): scale(0.98), 0.2s ease-in-out; down starts
-                // it, up or cancel releases it. No ripple: the rail has none.
-                setOnTouchListener { v, e ->
-                    when (e.actionMasked) {
-                        MotionEvent.ACTION_DOWN -> v.animate().scaleX(PRESS_SCALE).scaleY(PRESS_SCALE)
-                            .setDuration(PRESS_MS).setInterpolator(EASE).start()
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f)
-                            .setDuration(PRESS_MS).setInterpolator(EASE).start()
-                    }
-                    false
-                }
-                contentDescription = item.optString("label")
-                if (!item.optBoolean("placeholder")) setOnClickListener { onTap(i) }
+            key.append(item.optString("id")).append('\u0001')
+                .append(item.optString("label")).append('\u0001')
+                .append(item.optBoolean("placeholder")).append('\u0002')
+        }
+        // Same tabs as before: only their state changes, and that change animates. A first display
+        // or a changed list is set in place without animation.
+        val sameTabs = key.toString() == tabsKey && tabs.size == items.length()
+        if (!sameTabs) {
+            row.removeAllViews()
+            tabs.clear()
+            tabsKey = key.toString()
+            for (i in 0 until items.length()) {
+                val item = items.getJSONObject(i)
+                val tab = NavTab(
+                    context,
+                    item.optString("id"),
+                    item.optString("label"),
+                    tappable = !item.optBoolean("placeholder"),
+                    on = item.optBoolean("active"),
+                )
+                if (tab.tappable) tab.setOnClickListener { onTap(i) }
+                tabs.add(tab)
+                row.addView(tab, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
             }
-            val icon = ImageView(context).apply {
-                val id = item.optString("id")
-                val pair = ICONS[id]
-                if (pair != null) {
-                    // mutate(): each tab gets its OWN copy; drawables of a resource share their state, and an
-                    // alpha set on one (the fade) showed on another (a filled icon on an inactive tab).
-                    val outlined = resources.getDrawable(pair.first, context.theme).mutate()
-                    val filled = resources.getDrawable(pair.second, context.theme).mutate()
-                    val to = if (on) filled else outlined
-                    // Fade only when the tab really changed state (200 ms, as the rail's fill). A plain redraw sets the icon
-                    // directly: a zero-length fade from a drawable to itself sometimes drew nothing.
-                    val changed = wasActive[id] != null && wasActive[id] != on && pair.first != pair.second
-                    if (changed) {
-                        val fade = TransitionDrawable(arrayOf(if (on) outlined else filled, to)).apply { isCrossFadeEnabled = true }
-                        setImageDrawable(fade)
-                        fade.startTransition(FADE_MS)
-                    } else {
-                        setImageDrawable(to)
-                    }
-                    imageTintList = ColorStateList.valueOf(if (on) active else muted)
-                }
-                wasActive[id] = on
-            }
-            tab.addView(icon, LayoutParams(dp(25), dp(25)))
-            tab.addView(
-                TextView(context).apply {
-                    text = item.optString("label")
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                    typeface = Typeface.create(Typeface.DEFAULT, 600, false)
-                    setTextColor(if (on) active else muted)
-                    maxLines = 1
-                    setPadding(0, dp(1), 0, 0)
-                },
-                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
-            )
-            row.addView(tab, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        }
+        for (i in tabs.indices) {
+            tabs[i].update(colors, items.getJSONObject(i).optBoolean("active"), animate = sameTabs)
         }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + 0.5f).toInt()
 
+    private fun dpF(v: Float) = v * resources.displayMetrics.density
+
+    /** One tab: draws its pill, icon and label itself, so each animation is a plain value it can read. */
+    private inner class NavTab(
+        context: Context,
+        private val id: String,
+        private val label: String,
+        val tappable: Boolean,
+        on: Boolean,
+    ) : View(context) {
+        private var selected = on
+        private var colors = NavColors(Color.BLACK, Color.WHITE, Color.WHITE, Color.WHITE)
+        /** Pill progress t: 0 hidden, 1 fully travelled. Starts at its resting value. */
+        private var pillT = if (on) 1f else 0f
+        /** Reveal of the filled icon: 0 outline only, 1 filled only. */
+        private var reveal = pillT
+        /** Colour progress: 0 inactive colours, 1 active colours. */
+        private var colorT = pillT
+        private val anims = HashMap<String, ValueAnimator>()
+
+        private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val labelPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.DEFAULT, 500, false)
+            textAlign = Paint.Align.CENTER
+            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, LABEL_SP, resources.displayMetrics)
+            // letterSpacing is in em: 0.1 sp over a 14 sp label.
+            letterSpacing = LETTER_SPACING_SP / LABEL_SP
+        }
+        // Each tab gets its OWN copy: drawables of a resource share their state, so a tint or an alpha
+        // set on one tab showed on another (a filled icon on an inactive tab).
+        private val pair = ICONS[id]
+        private val outline: Drawable? = pair?.let { resources.getDrawable(it.first, context.theme).mutate() }
+        private val filled: Drawable? = pair?.let { resources.getDrawable(it.second, context.theme).mutate() }
+        private val sameIcon = pair != null && pair.first == pair.second
+        private val clipPath = Path()
+
+        init {
+            contentDescription = label
+            isClickable = tappable
+            isSelected = on
+        }
+
+        /** Sets the tab's colours and state; a change of state animates when [animate] is set. */
+        fun update(colors: NavColors, on: Boolean, animate: Boolean) {
+            this.colors = colors
+            isSelected = on
+            if (on != selected) {
+                selected = on
+                val target = if (on) 1f else 0f
+                if (animate) {
+                    tween("pill", pillT, target, NavBarMotion.PILL_MS, LinearInterpolator()) { pillT = it }
+                    tween("reveal", reveal, target, REVEAL_MS, fastOutSlowIn) { reveal = it }
+                    tween("color", colorT, target, COLOR_MS, LinearInterpolator()) { colorT = it }
+                } else {
+                    anims.values.forEach { it.cancel() }
+                    anims.clear()
+                    pillT = target
+                    reveal = target
+                    colorT = target
+                }
+            }
+            refreshRipple()
+            invalidate()
+        }
+
+        /** Runs one value from [from] to [to]; [ms] is the time of a full 0 to 1 travel, so a part-way change takes its share. */
+        private fun tween(key: String, from: Float, to: Float, ms: Long, interpolator: TimeInterpolator, set: (Float) -> Unit) {
+            anims.remove(key)?.cancel()
+            if (from == to) return
+            anims[key] = ValueAnimator.ofFloat(from, to).apply {
+                duration = max(1L, (ms * abs(to - from)).toLong())
+                this.interpolator = interpolator
+                addUpdateListener {
+                    set(it.animatedValue as Float)
+                    invalidate()
+                }
+                start()
+            }
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, oldW: Int, oldH: Int) {
+            super.onSizeChanged(w, h, oldW, oldH)
+            refreshRipple()
+        }
+
+        /** The press ripple, clipped to the pill's shape (56 x 32 dp, centred, top 10 dp). */
+        private fun refreshRipple() {
+            if (!tappable || width == 0) {
+                foreground = null
+                return
+            }
+            val insetX = ((width - dpF(PILL_W)) / 2f).roundToInt()
+            val insetTop = dpF(PILL_TOP).roundToInt()
+            val insetBottom = (height - dpF(PILL_TOP + PILL_H)).roundToInt()
+            val shape = GradientDrawable().apply {
+                setShape(GradientDrawable.RECTANGLE)
+                cornerRadius = dpF(PILL_RADIUS)
+                setColor(Color.WHITE)
+            }
+            val mask = InsetDrawable(shape, insetX, insetTop, insetX, insetBottom)
+            val ripple = ColorStateList.valueOf(NavBarMotion.withAlpha(colors.texte, RIPPLE_ALPHA))
+            foreground = RippleDrawable(ripple, null, mask)
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            drawPill(canvas, cx)
+            drawIcon(canvas, cx)
+            drawLabel(canvas, cx)
+        }
+
+        private fun drawPill(canvas: Canvas, cx: Float) {
+            if (pillT <= 0f) return
+            val alpha = NavBarMotion.indicatorAlpha(pillT, selected)
+            if (alpha <= 0f) return
+            val half = dpF(PILL_W) / 2f * NavBarMotion.indicatorScaleX(pillT)
+            pillPaint.color = NavBarMotion.mix(colors.bg, colors.texte, PILL_MIX)
+            pillPaint.alpha = (alpha * 255).roundToInt()
+            val top = dpF(PILL_TOP)
+            canvas.drawRoundRect(cx - half, top, cx + half, top + dpF(PILL_H), min(dpF(PILL_RADIUS), half), min(dpF(PILL_RADIUS), half), pillPaint)
+        }
+
+        private fun drawIcon(canvas: Canvas, cx: Float) {
+            val out = outline ?: return
+            val fill = filled ?: return
+            val iconColor = NavBarMotion.mix(colors.texte, colors.accent, colorT)
+            val half = dpF(ICON_PX / 2f)
+            val centreY = dpF(ICON_TOP + ICON_PX / 2f)
+            val left = (cx - half).roundToInt()
+            val top = dpF(ICON_TOP).roundToInt()
+            val right = (cx + half).roundToInt()
+            val bottom = dpF(ICON_TOP + ICON_PX).roundToInt()
+            if (sameIcon || reveal >= 1f) {
+                drawIconDrawable(canvas, fill, left, top, right, bottom, iconColor)
+                return
+            }
+            drawIconDrawable(canvas, out, left, top, right, bottom, iconColor)
+            if (reveal > 0f) {
+                // The filled shape, shown inside a circle from the icon centre that reaches the corners.
+                val save = canvas.save()
+                clipPath.reset()
+                clipPath.addCircle(cx, centreY, hypot(half, half) * reveal, Path.Direction.CW)
+                canvas.clipPath(clipPath)
+                drawIconDrawable(canvas, fill, left, top, right, bottom, iconColor)
+                canvas.restoreToCount(save)
+            }
+        }
+
+        private fun drawIconDrawable(canvas: Canvas, d: Drawable, l: Int, t: Int, r: Int, b: Int, color: Int) {
+            d.setBounds(l, t, r, b)
+            d.setTint(color)
+            d.draw(canvas)
+        }
+
+        private fun drawLabel(canvas: Canvas, cx: Float) {
+            labelPaint.color = NavBarMotion.mix(colors.texte, colors.accentTexte, colorT)
+            val fitted = TextUtils.ellipsize(label, labelPaint, width - dpF(8f), TextUtils.TruncateAt.END).toString()
+            canvas.drawText(fitted, cx, dpF(LABEL_BASELINE), labelPaint)
+        }
+    }
+
+    /** The page's colours of the bar, as its computed styles give them. */
+    internal data class NavColors(val bg: Int, val texte: Int, val accent: Int, val accentTexte: Int) {
+        companion object {
+            /** Pages that do not send the newer keys fall back to the older ones (`muted`, `active`). */
+            fun from(state: JSONObject): NavColors {
+                val muted = css(state.optString("muted"), Color.GRAY)
+                val active = css(state.optString("active"), Color.WHITE)
+                return NavColors(
+                    bg = css(state.optString("bg"), Color.BLACK),
+                    texte = css(state.optString("texte"), muted),
+                    accent = css(state.optString("accent"), active),
+                    accentTexte = css(state.optString("accentTexte"), active),
+                )
+            }
+        }
+    }
+
     companion object {
-        private const val FADE_MS = 200
-        private const val PRESS_MS = 200L
-        private const val PRESS_SCALE = 0.98f
-        private val EASE = AccelerateDecelerateInterpolator()
+        private const val BAR_HEIGHT = 80
+        private const val PILL_W = 56f
+        private const val PILL_H = 32f
+        private const val PILL_TOP = 10f
+        private const val PILL_RADIUS = 16f
+        /** Share of the text colour mixed over the bar for the pill (Mihon: 11 %). */
+        private const val PILL_MIX = 0.11f
+        private const val ICON_PX = 24f
+        private const val ICON_TOP = 14f
+        /** Baseline of the label: its glyphs run from about 50 dp to 63 dp (ascender top to descender bottom). */
+        private const val LABEL_BASELINE = 60.4f
+        private const val LABEL_SP = 14f
+        private const val LETTER_SPACING_SP = 0.1f
+        private const val REVEAL_MS = 300L
+        private const val COLOR_MS = 100L
+        /** The press ripple: the text colour at 10 % (Material 3). */
+        private const val RIPPLE_ALPHA = 0.10f
 
         /** Tab id (the page's `data-nav` key, or `settings`) to its (outlined, filled) drawables. */
         private val ICONS = mapOf(

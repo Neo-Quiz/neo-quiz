@@ -5,13 +5,19 @@
    fixed inside the page stretched along with the content. Neo Calendar's bar
    does not move: it is outside the scrolling view. Here the page keeps being
    the source of truth for the bar (the four buttons of the rail, their labels,
-   which one is active, whether the bar shows at all) and publishes it to
-   Kotlin (`neoPlatform.barre`, drawn by `NavBarView.kt`), which draws it under
-   the WebView; a tap comes back as the index of the button, and this module
-   clicks it. The page's own bar is hidden (`mobile.css`, `.nq-bar-native`).
+   which one is active, whether the bar shows at all, its colours) and publishes
+   it to Kotlin (`neoPlatform.barre`, drawn by `NavBarView.kt`), which draws it
+   under the WebView; a tap comes back as the index of the button, and this
+   module clicks it. The page's own bar is hidden (`mobile.css`, `.nq-bar-native`).
 
    ICONS are drawn by Kotlin (Material Symbols Rounded vector drawables,
-   outlined / filled); the page only sends each tab's id and the two tints.
+   outlined / filled); the page only sends each tab's id and the colours.
+
+   COLOURS: `texte` is the page's normal text colour (inactive icon and label),
+   `accent` the app's interactive accent (active icon), `accentTexte` its accent
+   text colour (active label). They are resolved by the browser from the theme
+   variables, so `color-mix()` and the like come out as plain rgb().
+   `muted` and `active` are the rail's own colours, kept for older Kotlin builds.
 ══════════════════════════════════════════════════════════ */
 
 interface PontBarre {
@@ -47,6 +53,20 @@ function couleur(btn: HTMLElement | undefined, active: boolean): string {
 	}
 }
 
+/** A theme variable as the browser computes it (a plain `rgb()` / `rgba()` string). */
+function resoudre(variable: string): string {
+	const sonde = document.createElement("span");
+	sonde.style.setProperty("color", `var(${variable})`);
+	sonde.style.setProperty("position", "absolute");
+	sonde.style.setProperty("visibility", "hidden");
+	document.body.append(sonde);
+	try {
+		return getComputedStyle(sonde).color;
+	} finally {
+		sonde.remove();
+	}
+}
+
 export function installBarreNative(pont: PontBarre): void {
 	let envoye = "";
 	let dernier = "";
@@ -65,17 +85,23 @@ export function installBarreNative(pont: PontBarre): void {
 				return;
 			}
 			const cs = getComputedStyle(barre);
-			// Cheap check first: the icons are only redrawn when the bar itself changed.
 			/* While the Settings modal is shown, Settings is the active tab (the
 			   rail still marks the page under it: it becomes active again by
 			   itself when the modal closes). */
 			const reglagesOuverts = !!document.querySelector(SETTINGS_MODAL);
 			const estActif = (b: HTMLElement): boolean => reglagesOuverts ? estReglages(b) : b.classList.contains(ACTIVE);
-			const rapide = JSON.stringify(boutons().map(b => [b.querySelector(".qbd-nav-label")?.textContent, estActif(b), b.classList.contains("qbd-nav-item--placeholder")]));
+			const texte = resoudre("--text-normal");
+			const accent = resoudre("--interactive-accent");
+			const accentTexte = resoudre("--text-accent");
+			// Cheap check first: the icons are only redrawn when the bar itself changed.
+			const rapide = JSON.stringify([
+				boutons().map(b => [b.querySelector(".qbd-nav-label")?.textContent, estActif(b), b.classList.contains("qbd-nav-item--placeholder")]),
+				texte, accent, accentTexte, cs.backgroundColor,
+			]);
 			if (rapide === dernier) return;
 			const items = [];
-			// The two tints are the rail's own computed colours, read from an
-			// offscreen clone in each state (the page's CSS decides them).
+			// The rail's own computed colours, read from an offscreen clone in each
+			// state (the page's CSS decides them). Kept for older Kotlin builds.
 			const muted = couleur(boutons()[0], false);
 			const active = couleur(boutons()[0], true);
 			for (const btn of boutons()) {
@@ -83,7 +109,7 @@ export function installBarreNative(pont: PontBarre): void {
 				const label = btn.querySelector(".qbd-nav-label")?.textContent ?? "";
 				items.push({ id: btn.dataset.nav ?? "settings", label, active: on, placeholder: btn.classList.contains("qbd-nav-item--placeholder") });
 			}
-			const etat = { visible: true, bg: cs.backgroundColor, line: cs.borderTopColor, muted, active, items };
+			const etat = { visible: true, bg: cs.backgroundColor, line: cs.borderTopColor, muted, active, texte, accent, accentTexte, items };
 			dernier = rapide;
 			envoye = "visible";
 			pont.barre(etat);

@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 - In a Learn step, each question now has a single title line ("Question 1: Title"), and the small "Reading" label above a reading is gone.
+- The Android tab bar has a new active-tab pill animation.
 
 ## [1.20.42] - 2026-10-07
 
