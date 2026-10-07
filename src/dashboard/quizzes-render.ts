@@ -21,6 +21,7 @@ import { renderCollapsibleSection } from "./collapsible";
 import { suggestIcons } from "./icon-suggest";
 import { renderFolderSections } from "./folder-sections";
 import { renderEmptyFolder } from "./folder-add";
+import { createSelectionView, resetSelection } from "./selection-view";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES RENDER — extrait de quizzes.ts (Task 4) pour rester
@@ -123,6 +124,8 @@ export function renderQuizGrid(
 	const sasCache = deps.ctx.generatedFolder?.();
 	const garde = (m: ModuleGroup): boolean => !estLeSas(m, sasCache) && (!garder || garder(m));
 	treeEl.replaceChildren();
+	// Not in a folder any more: a selection made there is forgotten.
+	resetSelection();
 	// Cascade d'ENTRÉE globale : un seul compteur traverse toutes les
 	// sections (en-têtes ET cartes de dossier) — même formule que les cartes
 	// du drill (quiz-card.ts). Les délais sont posés à chaque rendu mais
@@ -268,8 +271,17 @@ export function renderModuleDrill(
 		renderNextStep(rangee, ctx, ordre, stats);
 		if (!rangee.firstChild) rangee.remove();
 	}
-	for (const [index, { quiz, freres }] of cartes.entries()) {
-		renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
+	/* Several cards can be selected (Ctrl+click, a long press on a phone) and
+	   shared in one archive. Only where the host can share at all. */
+	const shareQuiz = ctx.shareQuiz;
+	const selection = shareQuiz ? createSelectionView({
+		scope: openModuleFolder,
+		host: layout,
+		onShare: (quizzes) => shareQuiz({ quizzes, name: info?.name || openModuleFolder }),
+	}) : null;
+	for (const [index, carte] of cartes.entries()) {
+		const { quiz, freres } = carte;
+		const cardEl = renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
 			freres,
 			statsFreres: freres.map(f => stats[f.path]),
 			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
@@ -285,7 +297,9 @@ export function renderModuleDrill(
 			accent,
 			entryIndex: index,
 		});
+		selection?.add({ id: quiz.path, el: cardEl, quizzes: quizDeLaCarte(carte) });
 	}
+	selection?.ready();
 
 	/* Les trois sections (Documents, Liens, Notes) sous la grille, pour tout
 	   dossier dont on connaît le chemin — SAUF LE SAS (demande d'Ahmed,

@@ -1810,3 +1810,206 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	font-size: 13.5px;
 	white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════════════════
+   SELECTING QUIZ CARDS (2026-10-07, selection-view.ts)
+
+   A selected card keeps its 3D edge and gains a 2 px ring and a check badge
+   in the folder's accent; the badge is a small round mark in the corner (cards clip what lies
+   outside them), not a framed button, so no tile ends up in a tile. The action bar is one glass strip that sticks
+   to the bottom of the page while something is selected: the count as text,
+   "Share" the one filled button, the other two plain text buttons.
+══════════════════════════════════════════════════════════ */
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder.is-selected {
+	border-color: var(--accent);
+	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), 0 0 0 2px var(--accent), var(--qbd-glass-sheen);
+}
+
+.qbd-quizzes-drill-grid .qbd-quiz-card.is-selected::after {
+	content: "";
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	width: 18px;
+	height: 18px;
+	box-sizing: border-box;
+	border-radius: 50%;
+	background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+	pointer-events: none;
+}
+
+.qbd-quiz-card.is-selecting {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.qbd-sel-bar {
+	position: sticky;
+	bottom: 20px;
+	z-index: 30;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	box-sizing: border-box;
+	width: fit-content;
+	max-width: 100%;
+	margin: 20px auto 0;
+	padding: 6px 8px 6px 18px;
+	background: color-mix(in srgb, var(--text-normal) 9%, var(--background-primary, #12141c));
+	border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft, transparent));
+	border-radius: 16px;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+	animation: qbd-sel-bar-in 160ms ease-out;
+}
+
+.qbd-sel-bar[hidden] {
+	display: none;
+}
+
+@keyframes qbd-sel-bar-in {
+	from { opacity: 0; translate: 0 8px; }
+	to { opacity: 1; translate: 0 0; }
+}
+
+.qbd-sel-count {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-weight: 600;
+	font-size: 14px;
+	white-space: nowrap;
+}
+
+.qbd-sel-actions {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.qbd-sel-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 40px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.qbd-sel-btn:hover {
+	color: var(--text-normal);
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.qbd-sel-btn-icon {
+	display: inline-flex;
+}
+
+.qbd-sel-btn-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-sel-btn.qbd-sel-share {
+	background: var(--accent);
+	color: #fff;
+}
+
+.qbd-sel-btn.qbd-sel-share:hover {
+	background: color-mix(in oklab, var(--accent) 88%, #fff);
+}
+
+.qbd-sel-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.qbd-sel-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   THE QUIZ CHECKLIST OF "SHARE" ON A FOLDER (share-choose.ts): plain rows
+   in the modal, one native checkbox each, no tile inside the modal's own.
+══════════════════════════════════════════════════════════ */
+.qbd-share-pick-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.qbd-share-pick-count {
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.qbd-share-pick-all {
+	min-height: 36px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--interactive-accent);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.qbd-share-pick-all:hover {
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.qbd-share-pick-list {
+	max-height: min(50vh, 380px);
+	overflow-y: auto;
+	margin-bottom: 14px;
+	border-top: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	scrollbar-width: thin;
+}
+
+.qbd-share-pick-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 44px;
+	padding: 6px 4px;
+	border-bottom: 1px solid color-mix(in srgb, var(--text-normal) 8%, transparent);
+	cursor: pointer;
+}
+
+.qbd-share-pick-box {
+	flex: none;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var(--interactive-accent);
+}
+
+.qbd-share-pick-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+.qbd-share-pick-mode {
+	flex: none;
+	font-size: 12px;
+	color: var(--text-muted);
+}

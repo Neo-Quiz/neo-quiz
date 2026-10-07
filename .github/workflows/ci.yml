@@ -234,6 +234,11 @@ jobs:
       - name: Swipe
         run: npm run check:swipe
 
+      # SELECTING quiz cards (Ctrl/Shift+click, long press, Escape, a page that
+      # changes under the selection): the pure rules behind the folder page.
+      - name: Card selection
+        run: npm run check:selection
+
       # THE OVERSCROLL STRETCH: the damped pull, the edge test, and which boxes can stretch.
       - name: Overscroll stretch
         run: npm run check:overscroll

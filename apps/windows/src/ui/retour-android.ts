@@ -9,7 +9,9 @@
       shell are all `.modal-container`s): its close button, the one the user
       would tap;
    2. the editor's question sheet (`detail-list-sheet.ts`), then the quiz
-      engine's hint window;
+      engine's hint window, then the folder page's card selection (its
+      "Cancel" button, `selection-view.ts`: Back leaves the selection mode
+      before it leaves the page);
    3. a screen: every screen that can go back listens to `EVENEMENT_RETOUR`
       on the document and marks the event handled. The played quiz closes
       (as its cross does); the dashboard shell steps back in its history, the
@@ -55,6 +57,11 @@ export function retourAndroid(): boolean {
 	const indice = document.querySelector<HTMLElement>(".quiz-hint-modal-overlay.is-open .quiz-hint-modal-close");
 	if (indice) {
 		indice.click();
+		return true;
+	}
+	const selection = document.querySelector<HTMLElement>(".qbd-sel-bar:not([hidden]) .qbd-sel-clear");
+	if (selection) {
+		selection.click();
 		return true;
 	}
 	const evenement = new CustomEvent<DetailRetour>(EVENEMENT_RETOUR, { detail: { traite: false } });

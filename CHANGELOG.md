@@ -19,6 +19,7 @@ release notes.
 - A shared archive now carries a description file (folder name, colour, icon, unit, and a checksum for every file): a folder you import takes the look of the original, and a file changed after sharing is refused with a message.
 - Importing never overwrites: an identical quiz is skipped, a different one with the same name becomes "Name (2)", and a summary lists what was added, skipped and renamed. A file made by a newer version is imported as far as possible, with a note to update the app.
 - Sharing a quiz now sends its whole note (the file as it is, not only the quiz block), with every image cited anywhere in it.
+- Share several quizzes at once: Ctrl+click or long-press to select, or pick them from the folder's Share menu.
 - Every sharing and import message is now translated and says what happened, with no silent failure.
 - In a Learn step, each question now has a single title line ("Question 1: Title"), and the small "Reading" label above a reading is gone.
 - Every scrollable area on Android now stretches at its ends, in both directions.

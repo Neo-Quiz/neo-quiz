@@ -281,3 +281,60 @@ html:not(.nq-bar-native) .is-mobile .qbd-quizzes-fab {
 .is-mobile .qb-confirm-modal .qb-btn {
 	min-height: 44px;
 }
+
+/* Card selection (long press, selection-view.ts): the action bar is a full-width strip
+   stuck above the bottom bar, every target 44 px. On the web layout the bar sits above the web
+   bottom bar like the floating + (57 px), under the Android WebView the page already
+   ends above the native one. The cards stay put: no hover lift under a finger. */
+.is-mobile .qbd-sel-bar {
+	/* Sticky, not fixed: the folder page sits in a stacked sheet whose transform
+	   would make `fixed` measure from the sheet instead of the screen. */
+	bottom: 12px;
+	width: auto;
+	max-width: none;
+	margin: 16px 12px 0;
+	padding: 4px 6px 4px 14px;
+}
+
+html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
+	bottom: 69px;
+}
+
+.is-mobile .qbd-sel-btn {
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 10px;
+}
+
+/* Under 440 px the three buttons give way to their icons (the labels stay for screen
+   readers): "8 quizzes selected" and three labels do not fit in 308 px. */
+@media (max-width: 439px) {
+	.is-mobile .qbd-sel-btn .qbd-sel-btn-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+	}
+}
+
+.is-mobile .qbd-quiz-card.is-selecting {
+	-webkit-touch-callout: none;
+}
+
+/* The share checklist: 48 px rows, the list without a scrollbar (never drawn on a phone). */
+.is-mobile .qbd-share-pick-row {
+	min-height: 48px;
+}
+
+.is-mobile .qbd-share-pick-list {
+	scrollbar-width: none;
+}
+
+.is-mobile .qbd-share-pick-list::-webkit-scrollbar {
+	display: none;
+}
+
+.is-mobile .qbd-share-pick-all {
+	min-height: 44px;
+}

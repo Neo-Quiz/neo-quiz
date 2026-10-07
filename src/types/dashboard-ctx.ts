@@ -427,7 +427,7 @@ export interface DashboardShellCtx {
 	    « Partager » du menu « ⋯ » n'est simplement pas rendue dans la fenêtre
 	    (quiz-menu.ts). Union et non deux champs optionnels : une cible sans
 	    quiz ni module ne se construit pas. */
-	shareQuiz?: (cible: { quiz: QuizIndexEntry } | { group: ModuleGroup }) => void;
+	shareQuiz?: (cible: { quiz: QuizIndexEntry } | { group: ModuleGroup } | { quizzes: QuizIndexEntry[]; name: string }) => void;
 	/** Renomme la note d'un quiz EN METTANT LES LIENS À JOUR. Optionnel et
 	    absent côté application : seul Obsidian tient l'index des liens
 	    ENTRANTS que cette opération exige (`fileManager.renameFile`).
