@@ -64,7 +64,7 @@ async function imagesDes(notes: { chemin: string; contenu: string }[]): Promise<
     the notes alone are over the bound. A folder is a .zip of its quizzes and
     the images they embed; a quiz is its block as a .md, or, when it embeds
     images, a .zip with them (a .md cannot carry them). */
-async function construire(cible: CiblePartage): Promise<Fichier | null> {
+export async function construire(cible: CiblePartage): Promise<Fichier | null> {
 	const host = currentHost();
 	const fs = host.fs;
 	const maintenant = new Date();

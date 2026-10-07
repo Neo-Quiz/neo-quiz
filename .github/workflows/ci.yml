@@ -197,6 +197,11 @@ jobs:
       - name: Share lock
         run: npm run check:share-lock
 
+      # Sharing end to end: the real exporter into the real importer, byte for
+      # byte; golden archives from other tools import; hostile ones write nothing.
+      - name: Share round trip and archives
+        run: npm run check:share-roundtrip
+
       # MOODLE IN THE APP: the login token never leaves the main process, every
       # request and redirect stays on the configured site, paths cannot escape,
       # and the passport and host checks are replayed on mutants.

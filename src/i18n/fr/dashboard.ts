@@ -83,6 +83,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.importZip64": "Cette archive utilise un format zip étendu que l'application ne sait pas lire. Compresse à nouveau les fichiers en .zip standard (clic droit, Envoyer vers, Dossier compressé)",
 	"dashboard.quizzes.importMultiDisk": "Cette archive est découpée en plusieurs fichiers. Réunis les parties en un seul .zip d'abord",
 	"dashboard.quizzes.importOverlap": "Cette archive est abîmée ou construite de façon refusée (ses fichiers se chevauchent). Rien n'a été importé",
+	"dashboard.quizzes.importUnsafePath": "Cette archive désigne des fichiers hors de son propre dossier, ce qu'aucun outil normal ne fait. Elle a été refusée et rien n'a été importé",
 	"dashboard.quizzes.importSkipped": "{count} fichiers de l'archive n'ont pas été importés : {list}",
 	"dashboard.quizzes.importWhy.encrypted": "protégé par mot de passe",
 	"dashboard.quizzes.importWhy.method": "compression non prise en charge",

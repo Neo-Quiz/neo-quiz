@@ -84,6 +84,7 @@
     "check:menu-app": "node scripts/check-menu-app.mjs",
     "check:partage": "node scripts/check-partage.mjs",
     "check:share-lock": "node scripts/check-share-lock.mjs",
+    "check:share-roundtrip": "node scripts/check-share-roundtrip.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",
     "check:session": "node scripts/check-session.mjs",
     "check:test-setup": "node scripts/check-test-setup.mjs",

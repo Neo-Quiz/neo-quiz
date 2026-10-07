@@ -196,14 +196,23 @@ export interface ReadZipResult {
 /** The archive cannot be read at all. `zip64` and `multi-disk` are valid
     archives this reader does not support: they get their own message instead
     of "damaged". `overlap` is an archive whose entries share bytes (a zip-bomb
-    technique, or damage). */
-export type ZipReadCode = "invalid" | "too-large" | "too-many" | "zip64" | "multi-disk" | "overlap";
+    technique, or damage). `unsafe-path` is an archive naming a path that tries
+    to leave the target folder (`../x`, `/x`, `C:x`, a UNC share): no zip tool
+    writes one, so the WHOLE archive is refused, not just that entry. */
+export type ZipReadCode = "invalid" | "too-large" | "too-many" | "zip64" | "multi-disk" | "overlap" | "unsafe-path";
 export class ZipReadError extends Error {
 	readonly code: ZipReadCode;
 	constructor(code: ZipReadCode) {
 		super(`zip-${code}`);
 		this.code = code;
 	}
+}
+
+/** A path that climbs out (a `..` segment, either separator), is absolute
+    (`/x`, `\x`, a UNC share), names a drive (`C:x`), or holds a NUL. */
+export function isUnsafeEntryPath(name: string): boolean {
+	if (/^[\\/]/.test(name) || /^[a-zA-Z]:/.test(name) || name.includes("\u0000")) return true;
+	return name.split(/[\\/]/).includes("..");
 }
 
 /** Entries a zip tool adds on its own, whatever the folder they sit in. */
@@ -327,6 +336,7 @@ export async function readZip(bytes: Uint8Array, limits = IMPORT_LIMITS): Promis
 		const rawName = bytes.subarray(off + 46, off + 46 + nameLen);
 		const extra = bytes.subarray(off + 46 + nameLen, off + 46 + nameLen + extraLen);
 		const name = decodeEntryName(rawName, flags, extra);
+		if (isUnsafeEntryPath(name)) throw new ZipReadError("unsafe-path");
 		// zip64 extra field (0x0001): the fields that were 0xffffffff, in this order.
 		let zip64Missing = false;
 		if (size === 0xffffffff || compSize === 0xffffffff || local === 0xffffffff) {

@@ -162,6 +162,7 @@ async function lireArchiveRecue(bytes: Uint8Array, quizOnly: boolean): Promise<A
 				: code === "zip64" ? "dashboard.quizzes.importZip64"
 				: code === "multi-disk" ? "dashboard.quizzes.importMultiDisk"
 				: code === "overlap" ? "dashboard.quizzes.importOverlap"
+				: code === "unsafe-path" ? "dashboard.quizzes.importUnsafePath"
 				: "dashboard.quizzes.importUnreadable"));
 		return null;
 	}
@@ -228,6 +229,19 @@ export async function importSharedFolder(
 ): Promise<void> {
 	const picked = await pickFile(".zip,application/zip");
 	if (!picked) return;
+	await importArchiveAsFolder(ctx, map, quizzes, picked, onDone);
+}
+
+/** Recreates a received archive as a NEW folder (the file picker's step is
+    `importSharedFolder`; this is the rest, so a check can drive the real
+    import without a file dialog). */
+export async function importArchiveAsFolder(
+	ctx: DashboardShellCtx,
+	map: ModuleMap,
+	quizzes: QuizIndexEntry[],
+	picked: { name: string; bytes: Uint8Array },
+	onDone: () => void
+): Promise<void> {
 	// Only `.md` notes with a safe name and raster images enter (`classerArchive`).
 	const archive = await lireArchiveRecue(picked.bytes, false);
 	if (!archive) return;

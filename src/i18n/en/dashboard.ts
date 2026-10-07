@@ -99,6 +99,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.importZip64": "This archive uses an extended zip format this app cannot read. Compress the files again as a standard .zip (right-click, Send to, Compressed folder)",
 	"dashboard.quizzes.importMultiDisk": "This archive is split over several files. Join the parts into one .zip first",
 	"dashboard.quizzes.importOverlap": "This archive is damaged or built in a refused way (its files overlap). Nothing was imported",
+	"dashboard.quizzes.importUnsafePath": "This archive names files outside its own folder, which no normal tool does. It was refused and nothing was imported",
 	"dashboard.quizzes.importSkipped": "{count} files in the archive were not imported: {list}",
 	"dashboard.quizzes.importWhy.encrypted": "password-protected",
 	"dashboard.quizzes.importWhy.method": "unsupported compression",
