@@ -230,6 +230,10 @@ jobs:
       - name: Shared state
         run: npm run check:shared-state
 
+      # THE FOLDER LIST: picked folders persist, the default one stays first.
+      - name: Folders
+        run: npm run check:folders
+
       # THE EMBEDDED SYNCTHING: only the neo-quiz folder, only from a paired
       # device, device ids validated, launch arguments with nothing but their
       # parameters, every REST call carrying the key. (The real-binary section

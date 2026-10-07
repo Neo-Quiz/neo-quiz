@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- Open an existing folder works again for folders outside your Neo Quiz folder (they stay on this PC), and such a folder can be removed from Neo Quiz.
 - A folder's colour, icon, name and teaching unit now follow you on every device.
 - On the phone, swiping follows your finger and snaps to the next page like a native app, with a short vibration.
 - Sign in to Moodle once: new course files download into your Neo Quiz folder by themselves, and a Moodle page lets you search courses, star them, open their folder and hand in assignments.

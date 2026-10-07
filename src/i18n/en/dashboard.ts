@@ -241,6 +241,11 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.deleteConfirmTitle": "Delete quiz",
 	"dashboard.quizzes.deleteConfirmBody": "Remove “{title}” and its stats from the note?",
 	"dashboard.quizzes.deleteConfirmCta": "Delete",
+	"dashboard.quizzes.menuRemoveRoot": "Remove from Neo Quiz",
+	"dashboard.quizzes.removeRootTitle": "Remove {name} from Neo Quiz?",
+	"dashboard.quizzes.removeRootBody": "The folder and its files stay on your disk; Neo Quiz just stops showing them.",
+	"dashboard.quizzes.removeRootCta": "Remove",
+	"dashboard.quizzes.createOpenStaysHere": "This folder stays on this PC: it is not synced to your other devices.",
 	"dashboard.quizzes.menuDeleteModule": "Delete module quizzes",
 	"dashboard.quizzes.deleteModuleConfirmBody": "Remove the {count} quizzes of “{name}” and their stats?",
 	/* « Déplacer vers… » (tranche 9, tâche 3) : n'apparaît que quand plusieurs

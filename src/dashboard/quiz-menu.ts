@@ -807,6 +807,21 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				})),
 			});
 		}
+		/* A folder opened from elsewhere on the PC is a root of its own: it can be
+		   taken out of Neo Quiz (files untouched), never the default one. */
+		const racineDeG = g.path ? host.paths.rootOf(g.path) : null;
+		if (ctx.removeExtraRoot && racineDeG && racineDeG.id !== host.paths.defaultRoot().id) items.push({
+			icon: "folder-minus",
+			label: t("dashboard.quizzes.menuRemoveRoot"),
+			onClick: () => {
+				openConfirm({
+					title: t("dashboard.quizzes.removeRootTitle", { name: racineDeG.name }),
+					body: t("dashboard.quizzes.removeRootBody"),
+					cta: t("dashboard.quizzes.removeRootCta"),
+					warning: true,
+				}, () => { void ctx.removeExtraRoot?.(racineDeG.id); });
+			},
+		});
 		if (!fixe) items.push({
 			icon: "trash-2",
 			label: t("dashboard.quizzes.menuDeleteModule"),

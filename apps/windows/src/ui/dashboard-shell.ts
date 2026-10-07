@@ -58,7 +58,7 @@ import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
 import { sharedState } from "../host/shared-state";
-import { addFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
+import { addFolder, removeFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
 import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
@@ -529,6 +529,18 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			if (extra?.length && items[0]) items[0] = { ...items[0], sepBefore: true };
 			openActionMenu(anchor, [...(extra ?? []), ...items]);
 		},
+		removeExtraRoot: async (rootId) => {
+			await removeFolder(rootId);
+			// Forget the folder declarations that pointed into the removed root.
+			const overrides: Record<string, ModuleOverride> = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+			for (const [cle, o] of Object.entries(overrides)) {
+				if (o.path === rootId || o.path?.startsWith(rootId + "/")) delete overrides[cle];
+			}
+			ctx.settings.quizzesModuleOverrides = overrides;
+			await ctx.saveSettings();
+			// Roots are installed once at startup: reload so the catalogue drops it.
+			location.reload();
+		},
 		openModuleMenu: (group, anchor, rerender, map) => {
 			openActionMenu(anchor, buildModuleCardMenu(ctx, rerender, map)(group, anchor));
 		},
@@ -778,7 +790,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   path is its id (see `depuisAbsolu`). */
 		if (!nouvelle) { host.ui.notice(t("dashboard.quizzes.createOpenOutside")); return; }
 		const cle = await declarer(nouvelle.id);
-		host.ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }));
+		host.ui.notice(t("dashboard.quizzes.createOpenDone", { name: cle }) + " " + t("dashboard.quizzes.createOpenStaysHere"));
 		// Roots are installed once at startup: reload so the catalogue and watcher see the new one.
 		location.reload();
 	}

@@ -269,6 +269,9 @@ export interface DashboardShellCtx {
 	    opt-in — l'application ne la fournit pas (menus et modals = tranche
 	    2.6, D5). */
 	openModuleMenu?: (group: ModuleGroup, anchor: HTMLElement, rerender: () => void, map: ModuleMap) => void;
+	/** Takes a folder the user opened (a root other than the default one) out
+	    of Neo Quiz; its files are left untouched. Absent = no such menu entry. */
+	removeExtraRoot?: (rootId: string) => Promise<void>;
 	/* ── LES EXAMENS D'UN DOSSIER ──
 
 	   Ils ne passent PAS par `quizzesModuleOverrides`, alors que le modal
