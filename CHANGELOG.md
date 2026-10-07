@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.38] - 2026-10-07
+
 ### Changed
 - On Linux, a Moodle file name can no longer place a file outside its course folder.
 
