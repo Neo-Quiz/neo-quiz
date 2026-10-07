@@ -281,6 +281,10 @@ jobs:
       # prompt carries document names, never content.
       - name: Generation kind
         run: npm run check:generation-kind
+      # THE DESTINATION FOLDERS: most recently changed first, and the ones a
+      # request's words match suggested (accents ignored, name before titles).
+      - name: Folder suggestions
+        run: npm run check:folder-suggest
       # THE CHAT STORE: a full or refused storage never loses the chat on
       # screen, a deleted chat stays deleted, the legacy archive is imported
       # once, and a reload keeps the active chat.

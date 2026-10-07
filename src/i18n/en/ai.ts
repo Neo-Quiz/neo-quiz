@@ -650,4 +650,6 @@ export const EN_AI = {
 	"ai.clarify.hint": "Enter to select · ↑/↓ to navigate · 1-9 to pick · Esc to skip",
 	"ai.clarify.details": "Details:",
 	"ai.clarify.expired": "These questions can no longer be answered here. Send your request again.",
+	"ai.suggest.put": "Put it in {folder}?",
+
 } as const;

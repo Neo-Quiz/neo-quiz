@@ -588,4 +588,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.clarify.hint": "Entrée pour choisir · ↑/↓ pour naviguer · 1-9 pour choisir · Échap pour passer",
 	"ai.clarify.details": "Précisions :",
 	"ai.clarify.expired": "Ces questions n'ont plus de réponse possible ici. Renvoie ta demande.",
+	"ai.suggest.put": "Ranger dans {folder} ?",
+
 };

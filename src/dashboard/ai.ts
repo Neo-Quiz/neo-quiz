@@ -39,6 +39,8 @@ import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActive
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
 import { addClarify, answerClarify, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { rankFolders, suggestFolders } from "./folder-suggest";
+import type { FileRef, FolderRef } from "./folder-suggest";
 import { decideByKeywords, formatClarifications, parseClarifyAnswer } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
@@ -360,6 +362,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let destinationDuPreset = false;
 	/** Repaints the output-folder row of the composer, set at each render. */
 	let paintDestination: (() => void) | null = null;
+	/** The chat the destination picker was already offered for on arrival
+	    (spec 2026-10-07): it opens once per arrival and per new chat, never
+	    again while the user types in the same chat. `entrer` clears it. */
+	let dossierProposePour: string | null = null;
+	/** The row of folder suggestions under the composer, and its debounce. */
+	let suggestionsEl: HTMLElement | null = null;
+	let suggestionsTimer = 0;
 	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
 	   déduite à l'envoi des pièces jointes, du dossier et de la demande
 	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
@@ -976,6 +985,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function entrer(container: HTMLElement): Promise<void> {
 		stageRef = null;
 		heroShown = false;
+		dossierProposePour = null;
 		return render(container);
 	}
 
@@ -1643,6 +1653,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				},
 			})), { className: "qbd-menu-claude" });
 		});
+		/* Folder suggestions, under the composer; and the picker offered on
+		   arrival (like "Choose a provider"): a popover anchored to the chip,
+		   once per arrival and per new chat, only while nothing is chosen. */
+		suggestionsEl = ajouter(formCol, "div", "qbd-ai-suggestions");
+		suggestionsEl.setAttribute("aria-live", "polite");
+		if (provider && dossierProposePour !== activeChatId() && !destination && !examCible && !composerText && destinationOptions().length > 1) {
+			dossierProposePour = activeChatId();
+			window.setTimeout(() => { if (!disposed && destBtn.isConnected && !document.querySelector(".qbd-action-menu")) destBtn.click(); }, 450);
+		}
+		planifierSuggestions();
 		/* The SUBJECT notice (feedback #7), right of the folder since
 		   2026-09-29 — it sat before the Options icon, in the bottom bar:
 		   "Python detected", text and icon, no badge; hidden for `general`.
@@ -3639,12 +3659,54 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			sub: racine.name,
 		}];
 		const vus = new Set([defaut]);
+		const dossiers: { path: string; name: string; icon: string; color: string; root: string }[] = [];
 		for (const d of deps.quizFolders?.() ?? []) {
 			if (!d.path || vus.has(d.path)) continue;
 			vus.add(d.path);
-			options.push({ value: d.path, label: d.name || d.path, icon: d.icon, color: d.color, sub: d.root });
+			dossiers.push(d);
+		}
+		// Most recently changed first (the latest file change inside each folder).
+		const ordre = rankFolders(dossiers.map(d => ({ path: d.path, name: d.name || d.path })), fichiersDesDossiers());
+		for (const o of ordre) {
+			const d = dossiers.find(x => x.path === o.path);
+			if (d) options.push({ value: d.path, label: d.name || d.path, icon: d.icon, color: d.color, sub: d.root });
 		}
 		return options;
+	}
+
+	/** What the folders' recency and suggestions read: every note of the index
+	    (quizzes and documents), with its last change — in memory, no disk walk. */
+	function fichiersDesDossiers(): FileRef[] {
+		return host.fs.listMarkdown().map(f => ({ path: f.path, mtime: f.mtime, title: f.basename }));
+	}
+
+	/** The folders a request's words match, shown under the composer as "Put it
+	    in X?" chips; one tap chooses, nothing is ever chosen on its own. Debounced
+	    250 ms: it runs on each keystroke. */
+	function planifierSuggestions(): void {
+		window.clearTimeout(suggestionsTimer);
+		suggestionsTimer = window.setTimeout(() => {
+			const el = suggestionsEl;
+			if (!el || !el.isConnected) return;
+			el.replaceChildren();
+			if (examCible || destinationParExam) return;
+			const options = destinationOptions().filter(o => o.value !== "");
+			const dossiers: FolderRef[] = options.map(o => ({ path: o.value, name: o.label }));
+			const choisi = destination || defaultDestination();
+			for (const d of suggestFolders(composerText, dossiers, fichiersDesDossiers(), { except: choisi })) {
+				const b = ajouter(el, "button", "qbd-ai-suggest");
+				b.type = "button";
+				host.ui.setIcon(ajouter(b, "span", "qbd-ai-suggest-icone"), "folder-input");
+				ajouter(b, "span", "qbd-ai-suggest-texte", t("ai.suggest.put", { folder: d.name }));
+				b.addEventListener("click", () => {
+					destination = d.path;
+					destinationDuPreset = false;
+					majAvisCategorie();
+					paintDestination?.();
+					el.replaceChildren();
+				});
+			}
+		}, 250);
 	}
 
 	/** Enregistre le quiz généré et ouvre sa page. Avec `differerNavigation`,
@@ -3821,6 +3883,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
 		majAvisCategorie();
+		planifierSuggestions();
 		if (!btn) return;
 		// Le bouton d'envoi n'apparaît qu'avec du contenu (texte/image/note),
 		// et reste désactivé tant que la génération n'est pas possible
