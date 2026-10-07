@@ -12,7 +12,7 @@ import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
-import { drawOrder, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { capsuleStates, drawOrder, formatElapsed, learnFigures, stepCardKind, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -35,6 +35,8 @@ const DUREE_ARRIVEE_MS = 900;
    questions remain. */
 const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
 const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 /** THE HINT BADGE (spec 2026-09-29-test-practice-exam-design §2.3): a dot
@@ -70,6 +72,8 @@ export interface CardHandlers {
 	stepSlideHtml(step: StepSlide): string;
 	/** One card of a step page (a `section`), for a repaint in place. */
 	stepCardHtml(qi: number): string;
+	/** Repaints the capsules of the step page holding `qi`, in place. */
+	refreshStepCapsules(qi: number): void;
 }
 
 export function createCardRenderers(ctx: EngineCtx): CardHandlers {
@@ -572,6 +576,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		/* A LEARN says how the questions went (2026-09-29): right the first
 		   time, right after a retry, still to review — the same three colours
 		   as the beads. */
+		if (ctx.learn.isActive() && ctx.stepSlides) return learnResultsHtml(pendingNote, writtenReview);
 		let learnSummary = "";
 		if (ctx.learn.isActive()) {
 			const sum = ctx.learn.summary();
@@ -586,6 +591,35 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong>${withHintNote}</p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 	}
 
+
+	/* The start of this engine, for the "Time" of a Learn's summary. */
+	const startedAt = Date.now();
+
+	/** The summary of a Learn played in step pages (StudySmarter-inspired,
+	    2026-10-07): accuracy and time side by side, a gauge with "x/N learned",
+	    the three counts as a legend, and "Done" back to the folder. */
+	function learnResultsHtml(pendingNote: string, writtenReview: string): string {
+		const sum = ctx.learn.summary();
+		const gradedTotal = ctx.quiz.map((_, i) => i).filter(i => ctx.learn.isGraded(i)).length;
+		const fig = learnFigures(sum, gradedTotal);
+		const seg = (cls: string, n: number) => n > 0 ? `<span class="quiz-learn-gauge-seg ${cls}" style="flex-grow:${n}"></span>` : "";
+		const rest = Math.max(0, fig.total - sum.first - sum.retried - sum.missed);
+		const stat = (cls: string, n: number, key: TransKey) => `<li class="quiz-learn-summary-stat ${cls}"><strong>${n}</strong><span>${t(key)}</span></li>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-learn-result">
+			<h2 class="quiz-result-title">${t("engine.learn.summaryTitle")}</h2>
+			<div class="quiz-learn-figures">
+				<div class="quiz-learn-figure"><strong>${fig.accuracy}%</strong><span>${t("engine.learn.summaryAccuracy")}</span></div>
+				<div class="quiz-learn-figure"><strong>${formatElapsed(Date.now() - startedAt)}</strong><span>${t("engine.learn.summaryTime")}</span></div>
+			</div>
+			<div class="quiz-learn-learned">
+				<p class="quiz-learn-learned-label">${t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total })}</p>
+				<div class="quiz-learn-gauge" role="img" aria-label="${ctx.escapeHtmlAttr(t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total }))}">${seg("first", sum.first)}${seg("retried", sum.retried)}${seg("missed", sum.missed)}${seg("rest", rest)}</div>
+				<ul class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</ul>
+			</div>
+			<div class="quiz-actions quiz-learn-actions"><button class="quiz-action-btn success quiz-learn-done-btn" type="button">${t("engine.learn.done")}</button><button class="quiz-action-btn quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${saveResultsButtonHtml()}</div>
+			${pendingNote}${writtenReview}
+		</section></div>`;
+	}
 
 	function refreshMetaSlides({ force = false }: { force?: boolean } = {}): void {
 		const nextSubmitSignature = ctx.getSubmitSlideSignature();
@@ -670,7 +704,52 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const st = ctx.quizState;
 		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
 		const cards = order.map(qi => cardParts(qi, true).section).join("");
-		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${capsulesHtml(step)}${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+	}
+
+	/** One capsule per question of the page (readings have none): green = right,
+	    red = missed, outline = the one to do now, dim = not reached. A tap
+	    scrolls to its question (interactions.ts). */
+	function capsulesInner(step: StepSlide): string {
+		const states = capsuleStates(step.questions.map(qi => {
+			const done = ctx.learn.isRevealed(qi);
+			// A question that is not graded (a `pre`) has no verdict: its capsule reads the answer itself.
+			const verdict = ctx.learn.isGraded(qi) ? ctx.learn.verdictOf(qi) : done ? (ctx.isCorrect(qi) ? "first" : "missed") : "none";
+			return { done, verdict };
+		}));
+		return step.questions.map((qi, i) =>
+			`<button type="button" class="quiz-capsule is-${states[i]}" data-capsule-qi="${qi}" aria-label="${ctx.escapeHtmlAttr(t("engine.step.goToQuestion", { n: i + 1 }))}"${states[i] === "current" ? ' aria-current="step"' : ""}></button>`
+		).join("");
+	}
+
+	function capsulesHtml(step: StepSlide): string {
+		if (step.questions.length === 0) return "";
+		return `<nav class="quiz-capsules" aria-label="${ctx.escapeHtmlAttr(t("engine.step.progress"))}">${capsulesInner(step)}</nav>`;
+	}
+
+	function refreshStepCapsules(qi: number): void {
+		const page = ctx.stepOf?.(qi);
+		const nav = page && ctx.container.querySelector<HTMLElement>(`.quiz-step-page[data-step="${page.step}"] .quiz-capsules`);
+		if (page && nav) nav.innerHTML = capsulesInner(page);
+	}
+
+	/** The header of a card of a step page: "Question 2 of 5 · QCM", or the
+	    book and "Reading" for a reading. */
+	function stepHeadHtml(qi: number, isRead: boolean): string {
+		if (isRead) return `<header class="quiz-step-head is-read">${ICON_LIVRE}<span>${t("engine.step.reading")}</span></header>`;
+		const page = ctx.stepOf?.(qi);
+		const qs = page?.questions ?? [qi];
+		const kind = stepCardKind(ctx.quiz[qi]);
+		const typeKey = kind === "flashcard" ? "engine.step.typeFlashcard" : kind === "choice" ? "engine.step.typeChoice" : "engine.step.typeReveal";
+		return `<header class="quiz-step-head"><span class="quiz-step-head-n">${t("engine.step.questionOf", { n: Math.max(1, qs.indexOf(qi) + 1), total: qs.length })}</span><span class="quiz-step-head-sep" aria-hidden="true">·</span><span class="quiz-step-head-type">${t(typeKey)}</span></header>`;
+	}
+
+	/** The ONE correction zone of a choice question in a step page: the
+	    encouragement line, then the explanation. */
+	function stepCorrectionHtml(qi: number): string {
+		const right = ctx.isCorrect(qi);
+		const lead = `<p class="quiz-correction-lead">${right ? ICON_CHECK : ICON_X}<span>${t(right ? "engine.learn.feedbackRight" : "engine.learn.feedbackWrong")}</span></p>`;
+		return `<div class="quiz-correction ${right ? "is-right" : "is-wrong"}">${lead}${explanationHtml(qi)}</div>`;
 	}
 
 	/** The foot of a step page: back, and ONE wide "Next step" button that is
@@ -773,7 +852,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   a checked Learn card): the explanation is there, and a hint read
 		   AFTER the verdict would add the bulb to its mark (withHintBadge)
 		   although it did not help. Levels already seen stay displayed. */
-		const hintBtn = ctx.isRevealed(qi) ? "" : indice.bouton;
+		// A reveal card of a step page whose answer is shown has nothing left to hint at.
+		const hintBtn = ctx.isRevealed(qi) || (inStep && isTextOnly && ctx.quizState.textOnlyChecked?.[qi]) ? "" : indice.bouton;
 		const indiceHtml = indice.revele;
 		// Task 7 (Learn): "I don't know" on a pre-question — an EMPTY but
 		// EXPLICIT attempt. Moving on without answering now gives the same
@@ -842,7 +922,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			courteHtml = corpsLectureCourte(ctx, l, String(l.prompt ?? ""), texte).html;
 		}
 
-		const section = `<section class="quiz-card${inStep ? `${roleClass}${revealedClass} quiz-step-card` : ""}"${sectionIdAttr}${inStep ? ` data-card-qi="${qi}"` : ""}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
+		const section = `<section class="quiz-card${inStep ? `${roleClass}${revealedClass} quiz-step-card${isRead ? " quiz-step-read" : ""}` : ""}"${sectionIdAttr}${inStep ? ` data-card-qi="${qi}"` : ""}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
+				${inStep ? stepHeadHtml(qi, isRead) : ""}
 				${passageSection}
 				${courteHtml}
 				${ctx.learn.retryNoteHtml(qi)}
@@ -855,7 +936,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				${hintBtn}
 				${dontKnowBtn}
 				${ctx.learn.checkButtonHtml(qi)}
-				${!isRead && !isTextOnly && ctx.isRevealed(qi) ? explanationHtml(qi) : ""}
+				${!isRead && !isTextOnly && ctx.isRevealed(qi) ? (inStep ? stepCorrectionHtml(qi) : explanationHtml(qi)) : ""}
 				${inStep ? "" : questionNavHtml(qi)}
 			</section>`;
 		return { roleClass, revealedClass, section };
@@ -878,6 +959,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		refreshMetaSlides,
 		questionCardHtml,
 		stepSlideHtml,
-		stepCardHtml: (qi: number) => cardParts(qi, true).section
+		stepCardHtml: (qi: number) => cardParts(qi, true).section,
+		refreshStepCapsules
 	};
 }

@@ -1119,3 +1119,16 @@ html.nq-mobile ::-webkit-scrollbar {
 	height: 28px;
 	border-radius: 6px;
 }
+
+/* A LEARN STEP PAGE ON A PHONE (2026-10-07): thumb-size targets, the two
+   ratings side by side across the width, nothing wider than the screen. */
+.is-mobile .quiz-capsule{ height: 36px; }
+.is-mobile .quiz-capsule::before{ inset: 14px 0; }
+.is-mobile .quiz-step-card{ scroll-margin-top: 52px; }
+.is-mobile .quiz-step-card .quiz-option{ min-height: 56px; }
+.is-mobile .quiz-fc-ratings{ width: 100%; flex-wrap: nowrap; gap: 10px; }
+.is-mobile .quiz-fc-rate{ flex: 1 1 0; min-width: 0; min-height: 52px; padding: 12px 10px; }
+.is-mobile .quiz-correction{ padding: 12px 14px 14px; }
+.is-mobile .quiz-step-card .quiz-reveal-btn{ width: 100%; min-height: 52px; }
+.is-mobile .quiz-learn-figure strong{ font-size: 2rem; }
+.is-mobile .quiz-learn-result{ gap: 24px; }

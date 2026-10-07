@@ -1267,3 +1267,28 @@ await withSrcModule("src/engine/step-page.ts", ({ drawOrder }) => {
 	r.check("two open retries keep their relative order", drawOrder([0, 1, 2, 3], qi => qi === 0 || qi === 2), [1, 3, 0, 2]);
 	r.done();
 });
+
+/* Step page: capsules, card kind and the Learn summary's numbers. */
+await withSrcModule("src/engine/step-page.ts", ({ capsuleStates, stepCardKind, learnFigures, formatElapsed }) => {
+	const r = makeReporter("Step page - capsules and summary");
+	const c = (done, verdict) => ({ done, verdict });
+	r.check("right first, missed, then the first open one is current, the rest dim",
+		capsuleStates([c(true, "first"), c(true, "missed"), c(false, "none"), c(false, "none")]),
+		["right", "wrong", "current", "idle"]);
+	r.check("a retry that came right is green", capsuleStates([c(true, "retried")]), ["right"]);
+	r.check("a miss stays red while its retry is open (and is not the current one)",
+		capsuleStates([c(false, "missed"), c(false, "none")]), ["wrong", "current"]);
+	r.check("an ungraded card that shows its correction is green", capsuleStates([c(true, "none"), c(false, "none")]), ["right", "current"]);
+	r.check("nothing answered: the first is current", capsuleStates([c(false, "none"), c(false, "none")]), ["current", "idle"]);
+	r.check("everything done: no current capsule", capsuleStates([c(true, "first"), c(true, "first")]), ["right", "right"]);
+	r.check("flashcard kind", stepCardKind({ flashcard: true, options: [] }), "flashcard");
+	r.check("choice kind", stepCardKind({ options: ["a", "b"], correctIndex: 0 }), "choice");
+	r.check("text is a card to reveal", stepCardKind({ type: "text" }), "reveal");
+	r.check("summary: learned counts first and retried, accuracy only the first",
+		learnFigures({ first: 6, retried: 2, missed: 2 }, 12), { learned: 8, total: 12, accuracy: 60 });
+	r.check("summary: nothing answered is 0 %, never NaN", learnFigures({ first: 0, retried: 0, missed: 0 }, 5), { learned: 0, total: 5, accuracy: 0 });
+	r.check("summary: the total never falls under the answered count", learnFigures({ first: 3, retried: 0, missed: 0 }, 1).total, 3);
+	r.check("elapsed m:ss", formatElapsed(132_000), "2:12");
+	r.check("elapsed h:mm:ss", formatElapsed(3_725_000), "1:02:05");
+	r.done();
+});

@@ -35,7 +35,36 @@
   color: inherit;
   font: inherit;
   text-align: center;
-  perspective: 1400px;
+  perspective: 900px;
+  /* Two ghost cards under the card, as a stack (2026-10-07). */
+  position: relative;
+  margin-bottom: 36px;
+}
+
+.quiz-fc-card::before,
+.quiz-fc-card::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: -1;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--text-normal) 16%, var(--quiz-fc-face));
+  box-shadow: var(--quiz-fc-rim);
+  pointer-events: none;
+}
+
+.quiz-fc-card::before{
+  transform: translateY(20px) scale(0.94);
+  opacity: 0.95;
+}
+
+.quiz-fc-card::after{
+  transform: translateY(38px) scale(0.88);
+  opacity: 0.6;
+  z-index: -2;
 }
 
 button.quiz-fc-card{
@@ -54,7 +83,7 @@ button.quiz-fc-card{
   transform: rotateY(180deg);
   /* Turning back and forth by hand: the same springy turn as the first
      flip, as a transition this time (pure class toggle, no re-render). */
-  transition: transform 620ms cubic-bezier(0.34, 1.25, 0.5, 1);
+  transition: transform 450ms cubic-bezier(0.45, 0, 0.55, 1);
 }
 
 .quiz-fc.is-flipped.is-front .quiz-fc-inner{
@@ -81,10 +110,11 @@ button.quiz-fc-card{
 }
 
 /* The turn, played once right after the click (the click re-renders the
-   card, which starts face up). 620 ms on a slightly springy curve: a card
-   this size turning in less reads as a flicker, in more as a wait. */
+   card, which starts face up). 450 ms, ease in-out, around the vertical axis
+   with perspective (the StudySmarter turn, 2026-10-07): the front hides at
+   90 degrees (`backface-visibility`), so the content swaps mid-turn. */
 .quiz-fc.is-flipping .quiz-fc-inner{
-  animation: quiz-fc-flip 620ms cubic-bezier(0.34, 1.25, 0.5, 1);
+  animation: quiz-fc-flip 450ms cubic-bezier(0.45, 0, 0.55, 1);
 }
 
 @keyframes quiz-fc-flip{
@@ -243,6 +273,13 @@ button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
   box-shadow: var(--quiz-fc-rim), 0 0 0 0 var(--quiz-fc-rate-edge);
 }
 
+.quiz-fc-rate:disabled{
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  box-shadow: var(--quiz-fc-rim), 0 4px 0 0 var(--quiz-fc-rate-edge);
+}
+
 .quiz-fc-rate:focus-visible{
   outline: 2px solid #fff;
   outline-offset: 3px;
@@ -271,10 +308,10 @@ button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
 }
 
 @media (prefers-reduced-motion: reduce){
-  .quiz-fc.is-flipping .quiz-fc-inner{ animation: quiz-fc-fade 150ms ease-out; }
+  /* Instant: no turn at all. */
+  .quiz-fc.is-flipping .quiz-fc-inner{ animation: none; }
   .quiz-fc-inner,
   .quiz-fc.is-flipped .quiz-fc-inner,
   .quiz-fc-rate{ transition: none; }
 }
 
-@keyframes quiz-fc-fade{ from{ opacity: 0; } }

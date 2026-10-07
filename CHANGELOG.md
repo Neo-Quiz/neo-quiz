@@ -17,6 +17,8 @@ release notes.
 - On the phone, the bottom bar uses the same icons and press effect as the PC.
 - The glowing line at the top of the main panel is gone.
 - On the phone, swipe left or right to move between Home, Folders and Settings.
+- Learn shows each answer in green or red with a short note, one capsule per question, and a summary at the end.
+- Flashcards flip in 3D, with the rating buttons always in view.
 
 ## [1.20.34] - 2026-10-07
 

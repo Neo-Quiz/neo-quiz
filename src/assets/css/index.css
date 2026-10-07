@@ -54,6 +54,7 @@
 @import url('./pages/results.css');
 @import url('./pages/exam.css');
 @import url('./pages/learn.css');
+@import url('./components/step-page.css');
 
 /* Mobile overrides — MUST come after components & pages for correct cascade */
 @import url('./components/mobile.css');

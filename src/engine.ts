@@ -917,6 +917,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		ctx.warming.bindTrackItemImages(newCard, qi);
 		ctx.interactions.bindQuestionTrackItem(newCard);
 		ctx.state.updateNavHighlight();
+		ctx.cards.refreshStepCapsules(qi);
 		ctx.focus.restoreQuestionFocus(newCard, focusDescriptor);
 		if (syncHeight && item && slideIdx === quizState.current) {
 			requestAnimationFrame(() => {

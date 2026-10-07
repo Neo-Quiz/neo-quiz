@@ -443,6 +443,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				<button class="quiz-fc-card quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space" aria-label="${ctx.escapeHtmlAttr(t("engine.flashcard.flip"))}">
 					<span class="quiz-fc-inner">${front}</span>
 				</button>
+				${ctx.stepSlides ? selfRatingHtml(qi, true) : ""}
 			</div>`;
 		}
 		const verso = typeof q.answer === "string" && q.answer.trim()
@@ -465,20 +466,33 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					</span>
 				</span>
 			</div>
-			${learningHtml(q)}
-			${selfRatingHtml(qi)}
+			${ctx.stepSlides ? `${selfRatingHtml(qi)}${flashcardZoneHtml(q, qi)}` : `${learningHtml(q)}${selfRatingHtml(qi)}`}
 		</div>`;
+	}
+
+	/* What the correction zone of a step page's card is called, by the rating
+	   given: green once "I knew it", red once "Review again", neutral before. */
+	function toneOf(qi: number): string {
+		const r = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
+		return r === "understood" ? " is-right" : r === "review" ? " is-wrong" : "";
+	}
+
+	/* A turned flashcard of a step page: what it teaches, in the correction
+	   zone under the ratings (nothing when the card teaches nothing more). */
+	function flashcardZoneHtml(q: FlashcardQuestion, qi: number): string {
+		const learning = learningHtml(q, { plain: true });
+		return learning ? `<div class="quiz-correction${toneOf(qi)}">${learning}</div>` : "";
 	}
 
 	/* The two self-verdict buttons of a flashcard — and of a reveal card, which
 	   is a flashcard whose front is a question. In a Learn the rating IS the
 	   check: given once per attempt, so the buttons lock once it is. */
-	function selfRatingHtml(qi: number): string {
+	function selfRatingHtml(qi: number, locked = false): string {
 		const current = normalizeRating(ctx.quizState.textOnlyRatings?.[qi]);
 		const rated = ctx.learn.isGraded(qi) && ctx.isRevealed(qi) && !ctx.quizState.locked;
 		const note = (value: TextOnlyRating, key: TransKey, touche: string) => {
 			const on = current === value;
-			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"${rated ? " disabled" : ""}><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
+			return `<button class="quiz-fc-rate quiz-textonly-rating-btn ${RATINGS[value].className}${on ? " selected" : ""}" type="button" data-textonly-rating="${value}" aria-pressed="${on}" aria-keyshortcuts="${touche}"${rated || locked ? " disabled" : ""}><kbd class="quiz-flashcard-kbd">${touche}</kbd><span>${t(key)}</span></button>`;
 		};
 		return `<div class="quiz-flashcard-rating quiz-fc-ratings">
 				${note("review", "engine.flashcard.again", "1")}
@@ -502,7 +516,8 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		const answer = code
 			? (code.solution?.trim() ? `<div class="quiz-textonly-correct"><div class="quiz-reveal-code">${fenced(code.solution)}</div></div>` : "")
 			: expectedAnswerHtml(q);
-		return `<div class="quiz-reveal is-open">${starter}${answer}${learningHtml(q, { plain: true })}${selfRatingHtml(qi)}</div>`;
+		/* ONE correction zone: the answer, what it teaches, then the rating. */
+		return `<div class="quiz-reveal is-open">${starter}<div class="quiz-correction${toneOf(qi)}"><p class="quiz-correction-label">${t("engine.step.answerLabel")}</p>${answer}${learningHtml(q, { plain: true })}${selfRatingHtml(qi)}</div></div>`;
 	}
 
 	/* The flashcard turned by the LAST click, whose re-render must play the

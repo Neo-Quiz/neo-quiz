@@ -102,3 +102,55 @@ export function scrollNextOpenIntoView(root: ParentNode, members: readonly numbe
 		return;
 	}
 }
+
+/** What a card of a step page is, for its header label: a tap on options, a
+    flashcard to flip, or any other type shown as a card to reveal. */
+export type StepCardKind = "choice" | "flashcard" | "reveal";
+
+export function stepCardKind(q: QuizQuestion): StepCardKind {
+	if ((q as unknown as { flashcard?: unknown } | null)?.flashcard === true) return "flashcard";
+	return isTapType(q) ? "choice" : "reveal";
+}
+
+/** One question of a step page, as its capsule reads it. */
+export interface CapsuleInput {
+	/** The card shows its correction. */
+	done: boolean;
+	verdict: LearnVerdict;
+}
+
+/** green = right (first time or after a retry), red = a miss still standing,
+    outline = the first question left to do, dim = the ones after it. */
+export type CapsuleState = "right" | "wrong" | "current" | "idle";
+
+export function capsuleStates(items: readonly CapsuleInput[]): CapsuleState[] {
+	let currentTaken = false;
+	return items.map(it => {
+		if (it.verdict === "missed") return "wrong";
+		if (it.verdict === "first" || it.verdict === "retried" || it.done) return "right";
+		if (currentTaken) return "idle";
+		currentTaken = true;
+		return "current";
+	});
+}
+
+/** The numbers of a Learn's summary: "x/N learned" counts the questions
+    right first time AND the ones right after a retry; the accuracy counts
+    only the first (a retried miss was still a miss), over the questions
+    answered so far. */
+export function learnFigures(sum: { first: number; retried: number; missed: number }, gradedTotal: number): { learned: number; total: number; accuracy: number } {
+	const answered = sum.first + sum.retried + sum.missed;
+	return {
+		learned: sum.first + sum.retried,
+		total: Math.max(gradedTotal, answered),
+		accuracy: answered === 0 ? 0 : Math.round((sum.first / answered) * 100),
+	};
+}
+
+/** Milliseconds as `m:ss` (`h:mm:ss` from an hour). */
+export function formatElapsed(ms: number): string {
+	const total = Math.max(0, Math.floor(ms / 1000));
+	const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+	const ss = String(s).padStart(2, "0");
+	return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}

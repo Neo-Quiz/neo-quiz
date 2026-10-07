@@ -118,6 +118,8 @@ export async function openQuizPage(
 		else onBack();
 	};
 	retour.addEventListener("click", quitter);
+	/* "Done" on a Learn's summary (engine/interactions.ts) leaves like the cross. */
+	contenu.addEventListener("quiz-done", quitter);
 	/* The mouse's "back" button does the same as the arrow (2026-09-25).
 	   Consumed on press, in the capture phase; the action fires on release.
 	   "Forward" is consumed with no effect: there is nothing after a quiz being
