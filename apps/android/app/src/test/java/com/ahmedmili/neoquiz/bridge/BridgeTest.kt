@@ -44,7 +44,7 @@ class BridgeTest {
                 override suspend fun ignore(id: String) {}
             }, { null }).handlers() +
             BackChannel { }.handlers() +
-            NavBarChannel { }.handlers() +
+            NavBarChannel({ _ -> }, { }).handlers() +
             com.ahmedmili.neoquiz.notify.CalendarChannel(com.ahmedmili.neoquiz.notify.DueCalendar(object : com.ahmedmili.neoquiz.notify.DueCalendar.Storage {
                 override fun read(): String? = null
                 override fun write(raw: String) {}
