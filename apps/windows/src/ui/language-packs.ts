@@ -58,9 +58,11 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 		void reglerLangageActif(pack, toggle.checked).catch(() => { toggle.checked = langageActif(pack); });
 	});
 
-	/* Delete is a red bin IN the row (2026-10-04), like a paired device's;
-	   Download stays a button under it. */
-	const remove = ajouter(row, "button", "qbd-sync-action qbd-sync-action-danger");
+	/* ONE slot at the right of the row: the red bin when the pack is installed,
+	   a FLAT Download button when it is not (no 3D effect in a modal), and the
+	   progress stays in the state line. */
+	const slot = ajouter(row, "div", "nq-langage-action");
+	const remove = ajouter(slot, "button", "qbd-sync-action qbd-sync-action-danger");
 	remove.type = "button";
 	remove.hidden = true;
 	remove.setAttribute("aria-label", t("settings.languages.delete"));
@@ -70,38 +72,32 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 		remove.disabled = true;
 		void pont().langages.supprimer(pack).catch(() => undefined).then(draw);
 	});
-	const actions = ajouter(section, "div", "nq-reglages-actions");
-
-	function button(icon: string, label: string): HTMLButtonElement {
-		const b = ajouter(actions, "button", "qbd-btn--create");
-		b.type = "button";
-		currentHost().ui.setIcon(ajouter(b, "span", "qbd-btn-icon"), icon);
-		ajouter(b, "span", undefined, label);
-		return b;
-	}
+	const download = ajouter(slot, "button", "nq-langage-telecharger");
+	download.type = "button";
+	download.hidden = true;
+	currentHost().ui.setIcon(ajouter(download, "span", "nq-langage-telecharger-icone"), "download");
+	ajouter(download, "span", undefined, t("settings.languages.download"));
+	download.addEventListener("click", () => {
+		download.disabled = true;
+		void pont().langages.installer(pack, (received, total) => {
+			if (!isDestroyed()) state.textContent = t("settings.languages.downloading", { percent: Math.floor((received * 100) / Math.max(1, total)) });
+		}).then(result => {
+			if (isDestroyed()) return;
+			if (!result.ok) currentHost().ui.notice(t(result.code === "empreinte" ? "settings.languages.refused" : "settings.languages.offline"));
+			return draw();
+		}, () => { if (!isDestroyed()) { currentHost().ui.notice(t("settings.languages.offline")); void draw(); } });
+	});
 
 	async function draw(): Promise<void> {
 		const st = await pont().langages.etat(pack).catch(() => ({ installe: false, version: null, octets: 0 }));
 		if (isDestroyed()) return;
-		actions.replaceChildren();
 		remove.hidden = !st.installe;
 		remove.disabled = false;
-		if (st.installe) {
-			state.textContent = t("settings.languages.installed", { version: st.version ?? "", size: megaOctets(st.octets) });
-			return;
-		}
-		state.textContent = t("settings.languages.notInstalled");
-		const download = button("download", t("settings.languages.download"));
-		download.addEventListener("click", () => {
-			download.disabled = true;
-			void pont().langages.installer(pack, (received, total) => {
-				if (!isDestroyed()) state.textContent = t("settings.languages.downloading", { percent: Math.floor((received * 100) / Math.max(1, total)) });
-			}).then(result => {
-				if (isDestroyed()) return;
-				if (!result.ok) currentHost().ui.notice(t(result.code === "empreinte" ? "settings.languages.refused" : "settings.languages.offline"));
-				return draw();
-			}, () => { if (!isDestroyed()) { currentHost().ui.notice(t("settings.languages.offline")); void draw(); } });
-		});
+		download.hidden = st.installe;
+		download.disabled = false;
+		state.textContent = st.installe
+			? t("settings.languages.installed", { version: st.version ?? "", size: megaOctets(st.octets) })
+			: t("settings.languages.notInstalled");
 	}
 
 	void draw();

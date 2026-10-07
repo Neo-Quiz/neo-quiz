@@ -1883,3 +1883,50 @@ label.nq-set-ligne {
 	flex: none;
 	align-items: center;
 }
+
+/* The right-hand slot of a language row: the bin or a FLAT Download button
+   (3D effects belong on pages, never in the Settings modal). */
+.nq-langage-action {
+	display: flex;
+	flex: none;
+	align-items: center;
+	width: 104px;
+	justify-content: flex-end;
+}
+
+.nq-langage-telecharger {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 12px;
+	border: 1px solid var(--background-modifier-border-hover);
+	border-radius: var(--radius-m);
+	background: transparent;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.nq-langage-telecharger:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+}
+
+.nq-langage-telecharger:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.nq-langage-telecharger[hidden] {
+	display: none;
+}
+
+.nq-langage-telecharger-icone {
+	display: inline-flex;
+}
+
+.nq-langage-telecharger-icone svg {
+	width: 14px;
+	height: 14px;
+}
