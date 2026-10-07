@@ -737,6 +737,13 @@ html.nq-mobile .modal-container > .modal {
 	margin-top: 0;
 }
 
+/* The Content | Progress | Review plan tabs sat 4 px lower than the breadcrumb
+   row (the hero's desktop `margin-top: 4px`, 20 px under the status bar):
+   the row's 16 px applies to them too. */
+.is-mobile .qbd-quizzes-folder-hero .qbd-folder-view-tabs {
+	margin-top: 0;
+}
+
 /* Room under the last card for the two floating buttons. */
 .is-mobile .qbd-quizzes-tree {
 	padding-bottom: 88px;

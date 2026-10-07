@@ -55,6 +55,9 @@ release notes.
 - Importing a shared archive leaves out a file named like an image whose content is something else, and says so.
 - Choosing quizzes to share now says that the whole note, with its images, is sent.
 - On Android, files received from other apps and unfinished imports no longer linger in storage, and an app that never hands its file over no longer blocks the next one.
+- The Share menu's "Share" button in the quiz picker is clearly disabled while no quiz is ticked, and enabled as soon as one is.
+- Menus and tips open on a phone (a quiz page's ⋮ menu, for one) now close when the page changes, including with the Android Back key; they no longer stay on screen over the folder.
+- On a phone, an open folder's Content | Progress | Review plan tabs start 16 px under the status bar, like the other pages.
 
 ## [1.20.42] - 2026-10-07
 

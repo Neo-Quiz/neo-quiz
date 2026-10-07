@@ -14,12 +14,22 @@ import { ajouter } from "../dom";
    composer clippe.
 ══════════════════════════════════════════════════════════ */
 
+/* Hiding of every tip still shown, whatever its anchor: a navigation takes
+   the page (and its buttons) away while the tip, portalled to <body>, stays.
+   Called by the shell on each view change (`dashboard-shell.ts`, `naviguer`). */
+const fermeurs = new Set<() => void>();
+
+export function fermerBullesSurvol(): void {
+	for (const fermer of Array.from(fermeurs)) fermer();
+}
+
 export function attachHoverTip(btn: HTMLElement, fill: (tip: HTMLElement) => void): void {
 	let tip: HTMLElement | null = null;
-	const hide = () => { if (tip) { tip.remove(); tip = null; } };
+	const hide = () => { if (tip) { tip.remove(); tip = null; } fermeurs.delete(hide); };
 	btn.addEventListener("mouseenter", () => {
 		if (tip) return;
 		tip = ajouter(document.body, "div", "qbd-hover-tip");
+		fermeurs.add(hide);
 		fill(tip);
 		const r = btn.getBoundingClientRect();
 		tip.style.visibility = "hidden";

@@ -323,6 +323,22 @@
 	box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px #ef4466;
 }
 
+/* Désactivé (« Partager » sans quiz coché) : le même gris que `.qb-save-btn:disabled`
+   (editor-forms-extra.css), sans survol ni appui. Les règles ci-dessus sont plus
+   spécifiques pour le primaire ; celle-ci les surclasse par sa spécificité et son ordre. */
+.qb-confirm-buttons .qb-btn:disabled,
+.qb-confirm-buttons .qb-btn:last-child:not(.qb-btn-danger):disabled,
+.qb-confirm-buttons .qb-btn-danger:disabled {
+	background: var(--background-modifier-border);
+	border-color: transparent;
+	color: var(--text-muted);
+	box-shadow: none;
+	transform: none;
+	filter: none;
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.qb-confirm-icon { animation: none; }
 	.qb-confirm-buttons .qb-btn:active,

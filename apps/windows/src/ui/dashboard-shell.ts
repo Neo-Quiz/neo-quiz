@@ -51,7 +51,8 @@ import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
-import { createSelect, openActionMenu } from "../../../../src/dashboard/ui-select";
+import { closeAllSelects, createSelect, openActionMenu } from "../../../../src/dashboard/ui-select";
+import { fermerBullesSurvol } from "../../../../src/dashboard/hover-tip";
 import type { DashboardPageSettings, DashboardShellCtx, DashboardViewName, NavigateData } from "../../../../src/types/dashboard-ctx";
 import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner";
 import type { StatsStore } from "../../../../src/dashboard/stats-store";
@@ -989,6 +990,17 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		if (cible) appliquerNav(cible);
 	};
 
+	/* Every change of page takes the menus and tips open at that moment with
+	   it: they are portalled to <body>, so the page they hang from leaves
+	   without taking them along. Only a press outside closed them before,
+	   which the Android back key never makes (a menu stayed up after Back).
+	   Every route into a page comes through `naviguer`: the rail, the phone's
+	   tab swipe, the mouse and back keys, a quiz's Back. */
+	function fermerPortails(): void {
+		closeAllSelects();
+		fermerBullesSurvol();
+	}
+
 	function naviguer(vue: DashboardViewName, data?: NavigateData, repaint: () => void = peindre): void {
 		/* « Créer avec l'IA » depuis un dossier : le préréglage est posé sur
 		   la page AVANT qu'elle se peigne — c'est son premier `render` qui
@@ -997,7 +1009,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		/* L'état QUITTÉ va dans l'historique — sauf si la navigation est
 		   refusée, ou immobile (re-clic du rail sur la page courante). */
 		if (vue === "detail" ? !data?.quiz : !ctx.canOpen(vue)) return;
-		if (!memeEtatNav(etatCourant(), { vue, dossier: null, quiz: vue === "detail" ? data?.quiz ?? null : null })) enregistrerNav();
+		if (!memeEtatNav(etatCourant(), { vue, dossier: null, quiz: vue === "detail" ? data?.quiz ?? null : null })) {
+			enregistrerNav();
+			fermerPortails();
+		}
 		if (vue === "detail") {
 			if (!data?.quiz) return;
 			const from = vueCourante;
