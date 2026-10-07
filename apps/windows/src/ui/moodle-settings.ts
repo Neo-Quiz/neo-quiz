@@ -203,14 +203,14 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	/* ── Courses ── */
 	function peindreCours(cours: CoursMoodle[]): void {
 		blocCours.replaceChildren();
-		coursChoisis = cours.filter(c => c.enabled).map(c => c.id);
+		coursChoisis = cours.filter(c => !c.exclu && !!c.code).map(c => c.id);
 		if (!cours.length) {
 			ajouter(ajouter(blocCours, "div", "nq-set-ligne"), "span", "nq-set-ligne-aide", t("settings.moodle.coursesEmpty"));
 			return;
 		}
 		for (const c of cours) {
 			const dossier = c.folder
-				? (c.available ? t("settings.moodle.toFolder", { folder: c.folder }) : t("settings.moodle.toNewFolder", { folder: c.folder }))
+				? (c.folderExists ? t("settings.moodle.toFolder", { folder: c.folder }) : t("settings.moodle.toNewFolder", { folder: c.folder }))
 				: t("settings.moodle.noCode");
 			const r = ligne(blocCours, c.name, c.code ? `${c.code} ${dossier}` : dossier);
 			const l = ajouter(r.controle, "label", "nq-moodle-interrupteur");
@@ -218,11 +218,11 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 			sw.type = "checkbox";
 			sw.setAttribute("role", "switch");
 			sw.setAttribute("aria-label", c.name);
-			sw.checked = c.enabled && !!c.code;
+			sw.checked = !c.exclu && !!c.code;
 			sw.disabled = !c.code;
 			sw.addEventListener("change", () => {
-				const suivants = sw.checked ? [...new Set([...coursChoisis, c.id])] : coursChoisis.filter(id => id !== c.id);
-				void api!.choisir(suivants).then(ids => { coursChoisis = ids; }, () => { sw.checked = !sw.checked; });
+				// Interim: the full Moodle page replaces these switches (course exclusion).
+				void api!.exclure(c.id, !sw.checked).then(() => { coursChoisis = sw.checked ? [...new Set([...coursChoisis, c.id])] : coursChoisis.filter(id => id !== c.id); }, () => { sw.checked = !sw.checked; });
 			});
 		}
 	}

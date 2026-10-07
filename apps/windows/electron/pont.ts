@@ -180,21 +180,55 @@ export interface EtatMoodle {
 	error: string | null;
 	/** Epoch ms of the last successful sync, or null. */
 	lastSync: number | null;
+	/** Download new files automatically (setting `moodle.auto`, default true). */
+	auto: boolean;
+	/** Epoch ms of the last finished check (same moment as `lastSync`), or null. */
+	lastCheck: number | null;
+	/** What the last download run did, or null. `parCours`: new + updated files per module code. */
+	lastSummary: ResumeMoodle | null;
 	syncing: boolean;
 	/** A login was started in the browser and is awaited (10 minutes at most). */
 	loginPending: boolean;
 	progress: { done: number; total: number } | null;
 }
+/** What a download run did, per module code. */
+export interface ResumeMoodle {
+	nouveaux: number;
+	misAJour: number;
+	echecs: number;
+	parCours: Record<string, number>;
+}
 export interface CoursMoodle {
 	id: number;
 	name: string;
-	/** Module code parsed from the short name (`XTI302`), null when it has none. */
+	/** Module code parsed from the short name (`XTI302`), null when it has none (nothing downloads then). */
 	code: string | null;
 	/** The folder name under the default quiz root: existing, or the one to create. */
 	folder: string | null;
-	enabled: boolean;
-	/** False when the course has no code: it is listed but cannot be enabled. */
-	available: boolean;
+	folderExists: boolean;
+	favori: boolean;
+	/** Excluded: listed, but never downloaded. */
+	exclu: boolean;
+	/** Enrolled course in progress (no end date, or ended less than 30 days ago). */
+	enCours: boolean;
+	/** Added by search or URL (setting `moodle.extra`). */
+	extra: boolean;
+}
+export interface ResultatRechercheMoodle {
+	id: number;
+	name: string;
+	code: string;
+	/** Already in the course list (default set or added). */
+	dansListe: boolean;
+}
+export interface FichierMoodle {
+	/** The file's name on Moodle (pass it to `ouvrirFichier` / `telechargerFichier`). */
+	name: string;
+	section: string;
+	size: number | null;
+	status: "present" | "missing" | "outdated" | "failed";
+	/** Path inside the quiz root (forward slashes), where the file is or will go. Never a URL. */
+	relPath: string;
 }
 export interface ResumeSyncMoodle {
 	nouveaux: number;
@@ -206,8 +240,11 @@ export interface ResumeSyncMoodle {
 	erreur: null | "not-connected" | "expired" | "no-courses" | "busy" | "network" | "failed";
 }
 export interface DevoirMoodle {
-	/** Course module id: pass it to `ouvrirDevoir`. */
+	/** Course module id: pass it to `ouvrirDevoir`, `deposer`, `devoirVu`, `ignorerDevoir`. */
 	cmid: number;
+	courseId: number;
+	/** Not seen yet (not in `moodle.devoirsVus`). */
+	nouveau: boolean;
 	course: string;
 	name: string;
 	state: "todo" | "urgent" | "late" | "open";
@@ -461,14 +498,32 @@ export interface Pont {
 		connecter(): Promise<void>;
 		/** Forgets the stored token (settings are kept). */
 		deconnecter(): Promise<void>;
+		/** The followed set (enrolled with a code and in progress, + added, + favourites; excluded ones flagged), favourites first. [] when not connected. */
 		cours(): Promise<CoursMoodle[]>;
-		/** Chooses the synced courses (only courses with a code are kept); returns
-		    the ids actually saved. */
-		choisir(ids: number[]): Promise<number[]>;
+		/** Search across all of Moodle (text <= 100 chars, <= 50 results, courses with a code). */
+		chercher(texte: string): Promise<ResultatRechercheMoodle[]>;
+		/** Adds a course from its URL (`<site>/course/view.php?id=N`, the configured site only); rejects otherwise. */
+		ajouterParUrl(url: string): Promise<CoursMoodle>;
+		favori(id: number, on: boolean): Promise<number[]>;
+		exclure(id: number, on: boolean): Promise<number[]>;
+		/** Adds a course (from a search result) to `moodle.extra`; rejects when Moodle does not know it. */
+		ajouter(id: number): Promise<number[]>;
+		retirer(id: number): Promise<number[]>;
+		fichiers(courseId: number): Promise<FichierMoodle[]>;
+		telechargerCours(courseId: number): Promise<ResumeSyncMoodle>;
+		telechargerFichier(courseId: number, name: string): Promise<ResumeSyncMoodle>;
+		/** Opens the module folder in Explorer; false when it does not exist. */
+		ouvrirDossier(courseId: number): Promise<boolean>;
+		/** Opens a downloaded file (never an executable type); false when missing or refused. */
+		ouvrirFichier(courseId: number, name: string): Promise<boolean>;
 		synchroniser(): Promise<ResumeSyncMoodle>;
 		devoirs(): Promise<DevoirMoodle[]>;
 		/** Opens `<site>/mod/assign/view.php?id=<cmid>` in the browser. */
 		ouvrirDevoir(cmid: number): Promise<boolean>;
+		/** `ouvrirDevoir` AND the course's `Rendus...` sub-folder (else the module folder) in Explorer. */
+		deposer(cmid: number): Promise<boolean>;
+		devoirVu(cmid: number): Promise<void>;
+		ignorerDevoir(cmid: number, on: boolean): Promise<number[]>;
 		surEtat(rappel: (etat: EtatMoodle) => void): () => void;
 	};
 
@@ -972,7 +1027,20 @@ export const CANAUX = {
 	moodleConnecter: "neo:moodle/connecter",
 	moodleDeconnecter: "neo:moodle/deconnecter",
 	moodleCours: "neo:moodle/cours",
-	moodleChoisir: "neo:moodle/choisir",
+	moodleChercher: "neo:moodle/chercher",
+	moodleAjouterParUrl: "neo:moodle/ajouter-par-url",
+	moodleFavori: "neo:moodle/favori",
+	moodleExclure: "neo:moodle/exclure",
+	moodleAjouter: "neo:moodle/ajouter",
+	moodleRetirer: "neo:moodle/retirer",
+	moodleFichiers: "neo:moodle/fichiers",
+	moodleTelechargerCours: "neo:moodle/telecharger-cours",
+	moodleTelechargerFichier: "neo:moodle/telecharger-fichier",
+	moodleOuvrirDossier: "neo:moodle/ouvrir-dossier",
+	moodleOuvrirFichier: "neo:moodle/ouvrir-fichier",
+	moodleDeposer: "neo:moodle/deposer",
+	moodleDevoirVu: "neo:moodle/devoir-vu",
+	moodleIgnorerDevoir: "neo:moodle/ignorer-devoir",
 	moodleSynchroniser: "neo:moodle/synchroniser",
 	moodleDevoirs: "neo:moodle/devoirs",
 	moodleOuvrirDevoir: "neo:moodle/ouvrir-devoir",
@@ -1051,7 +1119,8 @@ export const CANAUX = {
     littéraux « ai » recopiés divergeraient sans une erreur : l'hôte du NAS
     resterait refusé alors que le réglage est bien enregistré. */
 export const CLE_REGLAGES_IA = "ai";
-/** The `moodle` setting: `{ site?: "https://host", courses?: number[] }`.
+/** The `moodle` setting: `{ site?: "https://host" (default: the school's), auto?: boolean (default true),
+    favoris?, exclus?, extra?, devoirsIgnores?, devoirsVus?: number[] (<= 500 positive integers each) }`.
     GUARDED in the main process (`moodle/garde.ts`, `canaux.ts`). */
 export const CLE_REGLAGES_MOODLE = "moodle";
 

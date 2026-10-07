@@ -83,6 +83,10 @@ export const HOTES_AUTORISES = new Set([
 	"cdn.jsdelivr.net",
 	"pypi.org",
 	"files.pythonhosted.org",
+	/* The school's own Moodle (`moodle/garde.ts` SITE_DEFAUT, 2026-10-07):
+	   allowed by code, so it needs no field and no dialog. Another site goes
+	   through the guarded `moodle` setting. */
+	"moodle.myefrei.fr",
 ]);
 
 /** L'hôte d'`aiOllamaUrl` s'ajoute ici par DEUX chemins, et aucun des deux

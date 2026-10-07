@@ -778,7 +778,7 @@ await withSrcModule("apps/windows/electron/moodle/garde.ts", async ({ origineSit
 			"https://10.0.0.1", "https://localhost", "file:///C:/x"].map(x => origineSite(x)),
 		[null, null, null, null, null, null, null]);
 	r.check("un hôte NOUVEAU demande la confirmation native",
-		v({ site: "https://moodle.myefrei.fr" }), { confirmer: "moodle.myefrei.fr" });
+		v({ site: "https://moodle.autre.example.fr" }), { confirmer: "moodle.autre.example.fr" });
 	r.check("le même site déjà admis passe sans nouvelle question (et s'admet)",
 		v({ site: "https://moodle.myefrei.fr", courses: [3] }, "https://moodle.myefrei.fr"), { ok: true, admettre: "moodle.myefrei.fr" });
 	r.check("un autre site que celui des réglages redemande", v({ site: "https://autre.example.fr" }, "https://moodle.myefrei.fr"),
@@ -788,6 +788,16 @@ await withSrcModule("apps/windows/electron/moodle/garde.ts", async ({ origineSit
 	r.check("un site non https, des cours invalides, un champ inconnu sont refusés (rien d'écrit)",
 		[v({ site: "http://x.example.fr" }), v({ courses: [0] }), v({ courses: ["1"] }), v({ site: "https://moodle.myefrei.fr", token: "x" }), v("x")].map(x => "refus" in x),
 		[true, true, true, true, true]);
+	r.check("le site Moodle intégré s'admet sans boîte native ; un autre site la demande encore",
+		[v({ site: "https://moodle.myefrei.fr" }), v({ site: "https://moodle.autre.example.fr" })],
+		[{ ok: true, admettre: "moodle.myefrei.fr" }, { confirmer: "moodle.autre.example.fr" }]);
+	r.check("auto, favoris, exclus, extra, devoirsIgnores, devoirsVus valides sont acceptés (500 entiers au plus)",
+		[v({ auto: false, favoris: [1], exclus: [2], extra: [3], devoirsIgnores: [4], devoirsVus: Array.from({ length: 500 }, (_, i) => i + 1) })],
+		[{ ok: true, admettre: null }]);
+	r.check("un auto non booléen, une liste non entière, négative ou de plus de 500 entrées sont refusés",
+		[v({ auto: "true" }), v({ favoris: [1.5] }), v({ exclus: [-1] }), v({ extra: ["3"] }), v({ devoirsIgnores: [0] }),
+			v({ devoirsVus: Array.from({ length: 501 }, (_, i) => i + 1) })].map(x => "refus" in x),
+		[true, true, true, true, true, true]);
 	const source = await readFile("apps/windows/electron/canaux.ts", "utf-8");
 	const debut = source.indexOf("async function garderReglagesMoodle");
 	const corps = debut >= 0 ? source.slice(debut, source.indexOf("ipcMain.handle(CANAUX.reglagesSupprimer", debut)) : "";

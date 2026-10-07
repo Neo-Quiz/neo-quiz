@@ -842,6 +842,14 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				if (new URL(url).protocol !== "https:") throw new Error("Moodle: only https links are opened");
 				await shell.openExternal(url);
 			},
+			/* A file or a folder of the quiz root: `shell.openPath` (a folder opens
+			   in Explorer). The service has already bounded the path to the
+			   perimeter and refused executable types. */
+			ouvrirChemin: async abs => {
+				const erreur = await shell.openPath(path.normalize(abs));
+				if (erreur) console.warn(LOG_PREFIX, "Moodle: ouverture impossible:", abs, erreur);
+				return !erreur;
+			},
 			envoyer: etat => {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.moodleSurEtat, etat);
 			},

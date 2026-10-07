@@ -73,9 +73,9 @@ async function mutant(entry, from, to) {
 }
 
 const mods = [`${MOODLE}pur.ts`, `${MOODLE}noms.ts`, `${MOODLE}client.ts`, `${MOODLE}disque.ts`, `${MOODLE}api.ts`,
-	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`];
+	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`];
 
-await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs) => {
+await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k) => {
 	const { TokenError, MoodleError } = erreurs;
 	const { createClient, siteInfo } = client;
 	const T = { allowHttpForTests: true };
@@ -125,7 +125,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		assert.deepEqual(pur.parseCourse({ id: "23101", shortname: "XTI302-CYB-2627PSA01",
 			fullname: "* XTI302-CYB-2627PSA01 - Administration système avancées &amp; Scripting (X-BAC-CS-2, X-BAC-ICS-2)" }), {
 			id: 23101, name: "XTI302-CYB-2627PSA01 - Administration système avancées & Scripting",
-			code: "XTI302", yearKey: "2026-2027", cohort: "PSA01" });
+			code: "XTI302", yearKey: "2026-2027", cohort: "PSA01", enddate: 0 });
+		assert.equal(pur.parseCourse({ id: 1, shortname: "x", fullname: "x", enddate: 1700000000 }).enddate, 1700000000);
+		assert.equal(pur.parseCourse({ id: 1, shortname: "x", fullname: "x", enddate: -5 }).enddate, 0);
 		assert.equal(pur.parseCourse({ id: 1, shortname: "XCS-413-2627PSA01", fullname: "x" }).code, "XCS413");
 		assert.equal(pur.parseCourse({ id: 2, shortname: "XMUT301-2627PSA01", fullname: "x" }).code, "XMUT301");
 		assert.equal(pur.parseCourse({ id: 3, shortname: "LXP-4GOOD-2627PSA01", fullname: "x" }).code, null);
@@ -522,7 +524,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(garde.origineSite(bad), null, String(bad));
 		}
 		const v = (val, cur = null) => garde.validerReglagesMoodle(val, cur);
-		assert.deepEqual(v({ site: "https://moodle.myefrei.fr" }), { confirmer: "moodle.myefrei.fr" });
+		assert.deepEqual(v({ site: "https://moodle.myefrei.fr" }), { ok: true, admettre: "moodle.myefrei.fr" }, "the built-in site needs no dialog");
+		assert.deepEqual(v({ site: "https://moodle.autre.example.fr" }), { confirmer: "moodle.autre.example.fr" });
 		assert.deepEqual(v({ site: "https://moodle.myefrei.fr", courses: [1] }, "https://moodle.myefrei.fr"), { ok: true, admettre: "moodle.myefrei.fr" });
 		assert.deepEqual(v({ site: "https://autre.example.fr" }, "https://moodle.myefrei.fr"), { confirmer: "autre.example.fr" });
 		assert.deepEqual(v({ courses: [1, 2] }), { ok: true, admettre: null });
@@ -669,35 +672,53 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 				res.end(JSON.stringify({ exception: "x", errorcode: "boom", message: opts.long ? "y".repeat(500) : `failure for ${TOKEN} here` })); return;
 			}
 			const due = Math.floor(Date.now() / 1000) + 3 * 3600;
+			const nowSec = Math.floor(Date.now() / 1000);
+			m.calls.push(fn);
+			const known = [
+				{ id: 5, shortname: "XTI500-CYB-2627PSA01", fullname: "XTI500 extra", enddate: 0 },
+				{ id: 6, shortname: "LXP-4GOOD-2627PSA01", fullname: "Sans code", enddate: 0 },
+			];
+			const idsAsked = (p.get("value") || "").split(",").map(Number);
+			const course5Files = { id: 50, name: "Docs", modname: "resource", uservisible: true, contents: [
+				{ type: "file", filename: "Notes.pdf", filesize: 5, fileurl: `${m.root}/pluginfile/a.pdf`, timemodified: 1700000000 },
+				{ type: "file", filename: "tool.bat", filesize: 5, fileurl: `${m.root}/pluginfile/a.pdf`, timemodified: 1700000000 },
+			] };
 			res.end(JSON.stringify({
 				core_webservice_get_site_info: { userid: 42, fullname: "Ahmed Test" },
 				core_enrol_get_users_courses: [
 					{ id: 1, shortname: "XTI302-CYB-2627PSA01", fullname: "* XTI302-CYB-2627PSA01 - Admin système (X-BAC)" },
 					{ id: 2, shortname: "LXP-4GOOD-2627PSA01", fullname: "LXP" },
+					{ id: 3, shortname: "XTI999-CYB-2627PSA01", fullname: "XTI999 vieux", enddate: nowSec - 40 * 86400 },
+					{ id: 4, shortname: "XCS-413-2627PSA01", fullname: "XCS413 récent", enddate: nowSec - 20 * 86400 },
 				],
-				core_course_get_contents: [{ name: "S1", modules: [
+				core_course_search_courses: { total: 2, courses: known },
+				core_course_get_courses_by_field: { courses: known.filter(c => idsAsked.includes(c.id)) },
+				core_course_get_contents: p.get("courseid") === "5" ? [{ name: "S1", modules: [course5Files] }] : p.get("courseid") !== "1" ? [] : [{ name: "S1", modules: [
 					{ id: 10, name: "Cours", modname: "resource", uservisible: true, contents: [
 						{ type: "file", filename: "XTI302-CYB-Seance2_TP_Socle_Etudiant.pdf", filesize: 5, fileurl: `${m.root}/pluginfile/a.pdf`, timemodified: 1700000000 },
 						{ type: "file", filename: "Dehors.pdf", filesize: 5, fileurl: `${other.root}/x.pdf`, timemodified: 1 },
 					] },
 					{ id: 23, name: "Rendu TP1", modname: "assign", uservisible: true },
 				] }],
-				mod_assign_get_assignments: { courses: [{ id: 1, assignments: [{ id: 900, cmid: 23, duedate: due, cutoffdate: 0 }] }] },
+				mod_assign_get_assignments: { courses: [{ id: 1, assignments: p.get("courseids[0]") === "1" ? [{ id: 900, cmid: 23, duedate: due, cutoffdate: 0 }] : [] }] },
 				mod_assign_get_submission_status: { lastattempt: { submission: { status: "new" } } },
 			}[fn] ?? null));
 		});
+		m.calls = [];
 		return { m, other };
 	}
-	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now }) {
-		const opened = [], pushes = [];
+	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service }) {
+		const opened = [], pushes = [], chemins = [];
+		// The tests that exercise the automatic download say `auto: true`; every other case runs with it off.
+		if (!autoParDefaut && store.moodle && store.moodle.auto === undefined) store.moodle.auto = false;
 		const reglages = {
 			lire: async k => store[k], ecrire: async (k, v) => { store[k] = JSON.parse(JSON.stringify(v)); }, supprimer: async k => { delete store[k]; },
 		};
-		const svc = service.creerMoodle({
-			racine: () => base, garde: ALL, reglages: () => reglages, dossierDonnees: path.join(base, "..data-" + crypto.randomBytes(3).toString("hex")),
+		const svc = impl.creerMoodle({
+			racine: () => base, garde, planifier, ouvrirChemin: async p => { chemins.push(p); return true; }, reglages: () => reglages, dossierDonnees: path.join(base, "..data-" + crypto.randomBytes(3).toString("hex")),
 			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T,
 		});
-		return { svc, opened, pushes, store };
+		return { svc, opened, pushes, store, chemins };
 	}
 	const everything = []; // every value handed to the window, across the service cases
 
@@ -756,10 +777,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			await svc.connecter();
 			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
 			const cours = await svc.cours();
-			assert.deepEqual(cours.map(c => [c.id, c.code, c.folder, c.enabled, c.available]), [[1, "XTI302", "XTI302 - Admin existant", false, true], [2, null, null, false, false]]);
-			assert.deepEqual(await svc.choisir([1, 2, 99, "x"].filter(n => typeof n === "number")), [1], "a course without a code or unknown cannot be chosen");
-			await assert.rejects(svc.choisir("1"), /array/);
-			assert.deepEqual(store.moodle.courses, [1]);
+			assert.deepEqual(cours.map(c => [c.id, c.code, c.folderExists, c.favori, c.exclu, c.enCours, c.extra]),
+				[[4, "XCS413", false, false, false, true, false], [1, "XTI302", true, false, false, true, false]]);
+			assert.equal(cours[1].folder, "XTI302 - Admin existant");
 			assert.equal(store.moodle.site, m.root);
 			const r = await svc.synchroniser();
 			assert.deepEqual([r.nouveaux, r.mis_a_jour, r.echecs, r.ignores, r.erreur], [1, 0, 0, 1, null]);
@@ -838,25 +858,21 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.ok(all.length > 200);
 		} finally { stop(m.s); stop(other.s); }
 	});
-	await test("service: auto sync waits an hour after the last one", async () => {
+	await test("DISCRIMINANCE: without the `auto` check the sign-in downloads even when it is off; without the origin check another host's course URL is accepted", async () => {
+		const mu = await mutant(`${MOODLE}service.ts`, "if (!(await reglage()).auto || !(await session())) return;", "if (!(await session())) return;");
 		const { m, other } = await fakeMoodle();
 		const base = tmpdir();
-		let clock = 1_800_000_000_000;
-		const { svc, opened } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [1] } }, now: () => clock });
+		const t = newService({ root: m.root, base, store: { moodle: { site: m.root, auto: false } }, impl: mu.mod });
 		try {
-			await svc.connecter();
-			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
-			await svc.demarrerAuto();
-			const dest = path.join(base, "XTI302 - Admin système");
-			assert.equal(fs.readdirSync(dest).length, 1);
-			fs.rmSync(dest, { recursive: true });
-			clock += 30 * 60 * 1000;
-			await svc.demarrerAuto();
-			assert.equal(fs.existsSync(dest), false, "30 minutes later: not synced again");
-			clock += 31 * 60 * 1000;
-			await svc.demarrerAuto();
-			assert.equal(fs.existsSync(dest), true, "an hour later: synced again");
-		} finally { stop(m.s); stop(other.s); }
+			await t.svc.connecter();
+			await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+			for (let i = 0; i < 100 && !m.calls.some(f => /contents/.test(f)); i++) await new Promise(r => setTimeout(r, 20));
+			assert.ok(m.calls.some(f => /contents/.test(f)), "the mutant must download (else the auto-off case proves nothing)");
+		} finally { stop(m.s); stop(other.s); fs.rmSync(mu.dir, { recursive: true, force: true }); }
+		const mc = await mutant(`${MOODLE}cours.ts`, "if (u.origin !== s.origin || u.username || u.password) return null;", "if (u.username || u.password) return null;");
+		try { assert.equal(mc.mod.idDepuisUrl("https://evil.example/course/view.php?id=5", "https://moodle.myefrei.fr"), 5); } finally { fs.rmSync(mc.dir, { recursive: true, force: true }); }
+		const me = await mutant(`${MOODLE}cours.ts`, 'rel !== "" && rel !== ".." && !rel.startsWith(".." + path.sep) &&', 'rel !== "" &&');
+		try { assert.equal(me.mod.estDans("/a/b", "/a/b/../c"), true, "the mutant lets a parent step through"); assert.equal(k.estDans("/a/b", "/a/b/../c"), false); } finally { fs.rmSync(me.dir, { recursive: true, force: true }); }
 	});
 	await test("service: connecter is refused while a login is pending; the window cannot spam the browser or syncs", async () => {
 		const { m, other } = await fakeMoodle({ long: true, fail: true });
@@ -874,6 +890,309 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		} finally { stop(m.s); stop(other.s); }
 	});
 
+	/* ─────────── courses, files, hand-in, auto download (revision of 2026-10-07) ─────────── */
+	async function connecte(opts = {}, svcOpts = {}) {
+		const { m, other } = await fakeMoodle(opts.moodle);
+		const base = tmpdir();
+		const t = newService({ root: m.root, base, ...svcOpts, store: { moodle: { site: m.root, ...(svcOpts.reglages || {}) } } });
+		await t.svc.connecter();
+		await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+		return { m, other, base, ...t };
+	}
+	const fin = ({ m, other }) => { stop(m.s); stop(other.s); };
+
+	await test("default course set: enrolled with a code and in progress (end date none or < 30 days ago) + added + favourites - excluded; favourites first", async () => {
+		const c = await connecte({}, { reglages: { extra: [5], favoris: [3, 5], exclus: [4] } });
+		try {
+			const l = await c.svc.cours();
+			assert.deepEqual(l.map(x => [x.id, x.favori, x.exclu, x.enCours, x.extra]), [
+				[5, true, false, true, true],
+				[3, true, false, false, false],
+				[4, false, true, true, false],
+				[1, false, false, true, false],
+			]);
+			assert.equal(l.some(x => x.id === 2), false, "a course without a code is not followed");
+			// without any setting: the old one (id 3, 40 days) is out, the 20-day one is in
+			const d = await connecte({});
+			try { assert.deepEqual((await d.svc.cours()).map(x => x.id), [4, 1]); } finally { fin(d); }
+			// the followed set (what downloads and what lists assignments) leaves the excluded out
+			const dest = path.join(c.base, "XTI500 - extra");
+			await c.svc.synchroniser();
+			assert.ok(fs.readdirSync(c.base).some(n => n.startsWith("XTI500")), "an added course downloads");
+			assert.equal(fs.readdirSync(c.base).some(n => n.startsWith("XCS413")), false, "an excluded course never does");
+			assert.equal(dest.length > 0, true);
+		} finally { fin(c); }
+	});
+	await test("cours.ts rules, pure: in progress boundary, URL parsing, hand-in folder, containment", async () => {
+		{
+			const NOW = 1_800_000_000_000;
+			assert.equal(k.enCours({ enddate: 0 }, NOW), true);
+			assert.equal(k.enCours({ enddate: NOW / 1000 - 29 * 86400 }, NOW), true);
+			assert.equal(k.enCours({ enddate: NOW / 1000 - 31 * 86400 }, NOW), false);
+			assert.equal(k.enCours({ enddate: NOW / 1000 + 86400 }, NOW), true);
+			const S = "https://moodle.myefrei.fr";
+			assert.equal(k.idDepuisUrl(`${S}/course/view.php?id=123`, S), 123);
+			assert.equal(k.idDepuisUrl(`${S}/course/view.php?id=7&section=2`, S), 7);
+			for (const bad of ["https://evil.example/course/view.php?id=1", "http://moodle.myefrei.fr/course/view.php?id=1", "https://moodle.myefrei.fr.evil.example/course/view.php?id=1",
+				"https://u:p@moodle.myefrei.fr/course/view.php?id=1", "https://moodle.myefrei.fr:8443/course/view.php?id=1", `${S}/course/view.php`, `${S}/course/view.php?id=0`,
+				`${S}/course/view.php?id=-1`, `${S}/course/view.php?id=abc`, `${S}/course/view.php?id=1e3`, `${S}/course/view.php?id=012`, `${S}/course/view.php?id=12345678901`,
+				`${S}/course/other.php?id=1`, `${S}/x/course/view.php?id=1`, ` ${S}/course/view.php?id=1`, "javascript:alert(1)", "", 5, null,
+				`${S}/${"a".repeat(600)}`]) {
+				assert.equal(k.idDepuisUrl(bad, S), null, String(bad).slice(0, 60));
+			}
+			const dir = tmpdir();
+			assert.equal(k.dossierDepot(path.join(dir, "absent")), null);
+			assert.equal(k.dossierDepot(dir), dir, "no `Rendus` folder: the module folder");
+			fs.mkdirSync(path.join(dir, "Cours"));
+			fs.mkdirSync(path.join(dir, "rendus TP"));
+			assert.equal(k.dossierDepot(dir), path.join(dir, "rendus TP"), "the `Rendus...` sub-folder, case ignored");
+			fs.writeFileSync(path.join(dir, "Rendus.txt"), "a file is not a folder");
+			assert.equal(k.dossierDepot(dir), path.join(dir, "rendus TP"));
+			const R = path.join(dir, "root");
+			assert.equal(k.estDans(R, path.join(R, "a", "b.pdf")), true);
+			assert.equal(k.estDans(R, R), false, "the folder itself is not inside itself");
+			assert.equal(k.estDans(R, path.join(R, "..", "x")), false);
+			assert.equal(k.estDans(R, path.join(R, "..x", "y")), true, "a name starting with two dots is not a parent step");
+			assert.equal(k.estDans(R, path.join(R, "a", "..", "..", "x")), false);
+			assert.equal(k.estDans(R, path.resolve(R + "-evil", "x")), false, "a sibling sharing the prefix is outside");
+		}
+	});
+	await test("settings: non-integers, oversize lists, a non-boolean auto and unknown fields are refused; the school's site needs no dialog", () => {
+		const v = o => garde.validerReglagesMoodle(o, null);
+		assert.deepEqual(v({ auto: false, favoris: [1], exclus: [2], extra: [3], devoirsIgnores: [4], devoirsVus: [5] }), { ok: true, admettre: null });
+		for (const k of ["favoris", "exclus", "extra", "devoirsIgnores", "devoirsVus", "courses"]) {
+			for (const bad of [[1.5], ["1"], [0], [-3], [NaN], [Infinity], [2 ** 60], "1", { 0: 1 }, null, [1, null], Array.from({ length: 501 }, (_, i) => i + 1)]) {
+				assert.ok("refus" in v({ [k]: bad }), k + " " + JSON.stringify(bad)?.slice(0, 40));
+			}
+			assert.ok(!("refus" in v({ [k]: Array.from({ length: 500 }, (_, i) => i + 1) })), k + " 500 is allowed");
+		}
+		for (const bad of ["true", 1, null, [], {}]) assert.ok("refus" in v({ auto: bad }), String(bad));
+		assert.ok("refus" in v({ favoris: [1], other: 1 }));
+		assert.deepEqual(v({ site: "https://moodle.myefrei.fr", favoris: [1] }), { ok: true, admettre: "moodle.myefrei.fr" });
+		assert.deepEqual(garde.SITE_DEFAUT, "https://moodle.myefrei.fr");
+	});
+	await test("service: favourites, exclusion, added courses persist in the setting; bad ids and a full list are refused", async () => {
+		const c = await connecte();
+		try {
+			assert.deepEqual(await c.svc.favori(1, true), [1]);
+			assert.deepEqual(await c.svc.favori(1, true), [1], "no duplicate");
+			assert.deepEqual(await c.svc.exclure(4, true), [4]);
+			assert.deepEqual(await c.svc.exclure(4, false), []);
+			assert.deepEqual(await c.svc.ajouter(5), [5]);
+			assert.deepEqual(await c.svc.retirer(5), []);
+			assert.deepEqual(c.store.moodle.favoris, [1]);
+			assert.equal(c.store.moodle.site, c.m.root, "the other keys are kept");
+			assert.equal(c.store.moodle.auto, false);
+			for (const bad of ["1", 0, -1, 1.5, NaN, null, {}, 2 ** 60]) {
+				await assert.rejects(c.svc.favori(bad, true), { code: "badid" });
+				await assert.rejects(c.svc.ajouter(bad), { code: "badid" });
+			}
+			await assert.rejects(c.svc.favori(1, "yes"), { code: "badarg" });
+			await assert.rejects(c.svc.ajouter(6), { code: "nocode" }, "a course without a code cannot be added");
+			await assert.rejects(c.svc.ajouter(77), { code: "nocourse" });
+			c.store.moodle.exclus = Array.from({ length: 500 }, (_, i) => i + 1000);
+			await assert.rejects(c.svc.exclure(1, true), { code: "toomany" });
+			assert.equal(c.store.moodle.exclus.length, 500);
+			// two quick changes never lose one
+			await Promise.all([c.svc.favori(10, true), c.svc.favori(11, true), c.svc.favori(12, true)]);
+			assert.deepEqual([...c.store.moodle.favoris].sort((a, b) => a - b), [1, 10, 11, 12]);
+		} finally { fin(c); }
+	});
+	await test("service: search (<= 100 chars, courses with a code) and add by URL (the configured site only)", async () => {
+		const c = await connecte();
+		try {
+			const r = await c.svc.chercher("  cyber ");
+			assert.deepEqual(r, [{ id: 5, name: "XTI500 extra", code: "XTI500", dansListe: false }]);
+			assert.deepEqual(await c.svc.chercher("   "), []);
+			await assert.rejects(c.svc.chercher("x".repeat(101)), { code: "badarg" });
+			await assert.rejects(c.svc.chercher(5), { code: "badarg" });
+			const calls = c.m.calls.length;
+			for (const bad of [`https://evil.example/course/view.php?id=5`, `${c.m.root}/course/view.php?id=0`, `${c.m.root}/course/view.php?id=abc`, `${c.m.root}/other?id=5`, 5, null, ""]) {
+				await assert.rejects(c.svc.ajouterParUrl(bad), { code: "badurl" }, String(bad));
+			}
+			assert.equal(c.m.calls.length, calls, "a refused address never reaches Moodle");
+			const added = await c.svc.ajouterParUrl(`${c.m.root}/course/view.php?id=5`);
+			assert.deepEqual([added.id, added.code, added.extra, added.exclu], [5, "XTI500", true, false]);
+			assert.deepEqual(c.store.moodle.extra, [5]);
+			assert.equal((await c.svc.chercher("cyber"))[0].dansListe, true);
+			await assert.rejects(c.svc.ajouterParUrl(`${c.m.root}/course/view.php?id=77`), { code: "nocourse" });
+		} finally { fin(c); }
+	});
+	await test("service: files with their status, download a file / a whole course, summary in the state; never a URL", async () => {
+		const c = await connecte({}, { reglages: { extra: [5] } });
+		try {
+			let f = await c.svc.fichiers(5);
+			assert.deepEqual(f.map(x => [x.name, x.section, x.status]), [["Notes.pdf", "S1", "missing"], ["tool.bat", "S1", "missing"]]);
+			assert.ok(f.every(x => x.relPath.startsWith("XTI500 - XTI500 extra/") || x.relPath.startsWith("XTI500")), JSON.stringify(f));
+			assert.equal(/https?:|token/i.test(JSON.stringify(f)), false);
+			const r = await c.svc.telechargerFichier(5, "Notes.pdf");
+			assert.deepEqual([r.nouveaux, r.erreur], [1, null]);
+			f = await c.svc.fichiers(5);
+			assert.equal(f.find(x => x.name === "Notes.pdf").status, "present");
+			assert.equal(fs.existsSync(path.join(c.base, ...f.find(x => x.name === "Notes.pdf").relPath.split("/"))), true, "relPath is where the file is");
+			assert.equal(f.find(x => x.name === "tool.bat").status, "missing");
+			const r2 = await c.svc.telechargerCours(5);
+			assert.deepEqual([r2.nouveaux, r2.ignores], [0, 1], "the executable type is skipped, never fetched");
+			assert.equal(fs.existsSync(path.join(c.base, f.find(x => x.name === "tool.bat").relPath.replace(/\//g, path.sep))), false);
+			await assert.rejects(c.svc.telechargerFichier(5, ""), { code: "badarg" });
+			assert.equal((await c.svc.telechargerCours(99)).erreur, "failed", "an unknown course downloads nothing");
+			// a full run records its summary in the state
+			await c.svc.synchroniser();
+			const e = await c.svc.etat();
+			assert.equal(e.auto, false);
+			assert.equal(e.lastCheck, e.lastSync);
+			assert.deepEqual(e.lastSummary, { nouveaux: 1, misAJour: 0, echecs: 0, parCours: { XTI302: 1 } });
+			const s = JSON.stringify([e, f, r, r2]);
+			assert.equal(s.includes(TOKEN) || /token=|wstoken/i.test(s), false);
+		} finally { fin(c); }
+	});
+	await test("service: ouvrirFichier / ouvrirDossier stay inside the module folder and the perimeter, and never open an executable type", async () => {
+		const deny = { contient: async p => !p.includes("DENIED") };
+		const c = await connecte({}, { reglages: { extra: [5] }, garde: deny });
+		try {
+			await c.svc.telechargerFichier(5, "Notes.pdf");
+			const dir = path.join(c.base, fs.readdirSync(c.base).find(n => n.startsWith("XTI500")));
+			assert.equal(await c.svc.ouvrirFichier(5, "Notes.pdf"), true);
+			assert.equal(c.chemins.at(-1), path.join(dir, "Notes.pdf"));
+			assert.equal(await c.svc.ouvrirDossier(5), true);
+			assert.equal(c.chemins.at(-1), dir);
+			const n = c.chemins.length;
+			// not downloaded: nothing to open
+			assert.equal(await c.svc.ouvrirFichier(5, "tool.bat"), false);
+			// an executable that IS on disk under a Moodle name: refused
+			fs.writeFileSync(path.join(dir, "tool.bat"), "12345");
+			fs.utimesSync(path.join(dir, "tool.bat"), 1700000000, 1700000000);
+			assert.equal(await c.svc.ouvrirFichier(5, "tool.bat"), false, "an executable extension is never opened");
+			// traversal in the name: not a file of the course
+			for (const bad of ["../x.pdf", "..\\..\\x.pdf", "Notes.pdf/../../x", "C:\\Windows\\notepad.exe", "/etc/passwd", "Notes.PDF", 5, null, "x".repeat(300)]) {
+				assert.equal(await c.svc.ouvrirFichier(5, bad), false, String(bad).slice(0, 30));
+			}
+			assert.equal(c.chemins.length, n, "nothing else was opened");
+			// a link in place of the file: refused (when the system lets us make one)
+			const out = path.join(tmpdir(), "outside.pdf");
+			fs.writeFileSync(out, "12345");
+			fs.rmSync(path.join(dir, "Notes.pdf"));
+			let linked = true;
+			try { fs.symlinkSync(out, path.join(dir, "Notes.pdf")); } catch { linked = false; }
+			if (linked) {
+				fs.utimesSync(out, 1700000000, 1700000000);
+				assert.equal(await c.svc.ouvrirFichier(5, "Notes.pdf"), false, "a link is not followed");
+			}
+			await assert.rejects(c.svc.ouvrirDossier(99), { code: "unknown-course" });
+			await assert.rejects(c.svc.ouvrirDossier("5"), { code: "badid" });
+			assert.equal(await c.svc.ouvrirDossier(1), false, "the module folder does not exist yet: nothing opens");
+		} finally { fin(c); }
+		// a perimeter that refuses the folder: nothing opens
+		const d = await connecte({}, { reglages: { extra: [5] }, garde: { contient: async p => !p.includes("XTI500") } });
+		try {
+			assert.equal(await d.svc.ouvrirDossier(5), false);
+			assert.equal(d.chemins.length, 0);
+		} finally { fin(d); }
+	});
+	await test("service: assignments are marked new until seen, can be hidden, and hand-in opens the page AND the `Rendus` folder (else the module folder)", async () => {
+		const base0 = tmpdir();
+		const { m, other } = await fakeMoodle();
+		let clock = Date.now();
+		fs.mkdirSync(path.join(base0, "XTI302 - Module", "Rendus TP"), { recursive: true });
+		const t = newService({ root: m.root, base: base0, store: { moodle: { site: m.root } }, now: () => clock });
+		try {
+			await t.svc.connecter();
+			await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+			let d = await t.svc.devoirs();
+			assert.deepEqual(d.map(x => [x.cmid, x.courseId, x.nouveau]), [[23, 1, true]]);
+			await t.svc.devoirVu(23);
+			assert.deepEqual(t.store.moodle.devoirsVus, [23]);
+			assert.equal((await t.svc.devoirs())[0].nouveau, false);
+			assert.deepEqual(await t.svc.ignorerDevoir(23, true), [23]);
+			assert.deepEqual(await t.svc.devoirs(), [], "an ignored assignment is hidden");
+			assert.deepEqual(await t.svc.ignorerDevoir(23, false), []);
+			assert.equal((await t.svc.devoirs()).length, 1);
+			await assert.rejects(t.svc.devoirVu("23"), { code: "badid" });
+			await assert.rejects(t.svc.ignorerDevoir(23, 1), { code: "badarg" });
+			// hand-in: the page, then the `Rendus` sub-folder
+			clock += 5000;
+			assert.equal(await t.svc.deposer(23), true);
+			assert.equal(t.opened.at(-1), `${m.root}/mod/assign/view.php?id=23`);
+			assert.deepEqual(t.chemins, [path.join(base0, "XTI302 - Module", "Rendus TP")]);
+			// the rate limit of the page also holds the folder back
+			assert.equal(await t.svc.deposer(23), false);
+			assert.equal(t.chemins.length, 1);
+			// no `Rendus` folder: the module folder
+			clock += 5000;
+			fs.rmSync(path.join(base0, "XTI302 - Module", "Rendus TP"), { recursive: true });
+			assert.equal(await t.svc.deposer(23), true);
+			assert.equal(t.chemins.at(-1), path.join(base0, "XTI302 - Module"));
+			// a bad id opens nothing
+			clock += 5000;
+			for (const bad of ["23", -1, 0, 1.5, null]) assert.equal(await t.svc.deposer(bad), false);
+			assert.equal(t.chemins.length, 2);
+		} finally { stop(m.s); stop(other.s); }
+	});
+	await test("auto download: after sign-in, at start and every hour (fake clock); never when `auto` is false", async () => {
+		const wait = async (cond) => { for (let i = 0; i < 150 && !cond(); i++) await new Promise(r => setTimeout(r, 20)); };
+		// auto ON: sign-in alone downloads
+		{
+			let clock = 1_800_000_000_000;
+			const timers = [];
+			const planifier = (fn, ms) => { const h = { fn, ms, off: false }; timers.push(h); return () => { h.off = true; }; };
+			const { m, other } = await fakeMoodle();
+			const base = tmpdir();
+			const t = newService({ root: m.root, base, store: { moodle: { site: m.root, auto: true } }, now: () => clock, planifier });
+			try {
+				await t.svc.connecter();
+				await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+				const dest = path.join(base, "XTI302 - Admin système");
+				await wait(() => fs.existsSync(dest) && fs.readdirSync(dest).length === 1);
+				assert.equal(fs.readdirSync(dest).length, 1, "downloaded right after sign-in");
+				// at start: arms the hourly timer ONCE and checks
+				fs.rmSync(dest, { recursive: true });
+				clock += 11000;
+				await t.svc.demarrerAuto();
+				await t.svc.demarrerAuto();
+				assert.equal(timers.length, 1, "one hourly timer");
+				assert.equal(timers[0].ms, 3600 * 1000);
+				assert.equal(fs.readdirSync(dest).length, 1, "downloaded at start");
+				// every hour
+				fs.rmSync(dest, { recursive: true });
+				clock += 3600 * 1000;
+				timers[0].fn();
+				await wait(() => fs.existsSync(dest));
+				assert.equal(fs.existsSync(dest), true, "downloaded at the hourly tick");
+				// `auto` switched off: the next tick does nothing
+				fs.rmSync(dest, { recursive: true });
+				t.store.moodle.auto = false;
+				const calls = m.calls.length;
+				clock += 3600 * 1000;
+				timers[0].fn();
+				await new Promise(r => setTimeout(r, 300));
+				assert.equal(fs.existsSync(dest), false, "auto off: no download");
+				assert.equal(m.calls.length, calls, "auto off: Moodle is not even asked");
+				assert.equal((await t.svc.etat()).auto, false);
+			} finally { stop(m.s); stop(other.s); }
+		}
+		// auto OFF from the start: neither sign-in nor start downloads
+		{
+			const timers = [];
+			const { m, other } = await fakeMoodle();
+			const base = tmpdir();
+			const t = newService({ root: m.root, base, store: { moodle: { site: m.root, auto: false } }, planifier: (fn, ms) => { timers.push(fn); return () => {}; } });
+			try {
+				await t.svc.connecter();
+				await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
+				await t.svc.demarrerAuto();
+				timers.forEach(fn => fn());
+				await new Promise(r => setTimeout(r, 300));
+				assert.deepEqual(fs.readdirSync(base).filter(n => !n.startsWith("..data")), []);
+				assert.equal(m.calls.some(f => /contents/.test(f)), false);
+				// an explicit request still works
+				assert.equal((await t.svc.synchroniser()).nouveaux, 1);
+				// auto defaults to ON when the key does not say
+				const d = newService({ root: m.root, base: tmpdir(), store: { moodle: { site: m.root } }, autoParDefaut: true });
+				assert.equal((await d.svc.etat()).auto, true);
+			} finally { stop(m.s); stop(other.s); }
+		}
+	});
+
 });
 
 /* ─────────── the app never turns the tests-only switch on; the renderer never imports the module ─────────── */
@@ -889,7 +1208,7 @@ await test("the app's own files never set allowHttpForTests or `essai`", async (
 });
 await test("the bridge wiring: token files only in the main process, handlers present, setting guarded before write", async () => {
 	const canaux = await readFile("apps/windows/electron/canaux.ts", "utf8");
-	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChoisir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir"]) {
+	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChercher", "moodleAjouterParUrl", "moodleFavori", "moodleExclure", "moodleAjouter", "moodleRetirer", "moodleFichiers", "moodleTelechargerCours", "moodleTelechargerFichier", "moodleOuvrirDossier", "moodleOuvrirFichier", "moodleDeposer", "moodleDevoirVu", "moodleIgnorerDevoir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir"]) {
 		assert.ok(canaux.includes(`CANAUX.${c},`), c);
 	}
 	assert.ok(canaux.includes("dialogueMoodle ||") && canaux.includes("dialogueMoodleFin"), "one native Moodle dialog at a time, with a pause");

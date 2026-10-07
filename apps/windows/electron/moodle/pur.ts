@@ -7,8 +7,8 @@ import * as path from "node:path";
 import { MoodleError } from "./erreurs";
 import { decodeEntities, sanitize, safeSegment } from "./noms";
 
-export interface RawCourse { id: number | string; shortname?: string; fullname?: string; displayname?: string }
-export interface Course { id: number; name: string; code: string | null; yearKey: string | null; cohort: string | null }
+export interface RawCourse { id: number | string; shortname?: string; fullname?: string; displayname?: string; enddate?: number }
+export interface Course { id: number; name: string; code: string | null; yearKey: string | null; cohort: string | null; /** Epoch seconds, 0 = none. */ enddate: number }
 
 /** "XTI302-CYB-2627PSA01" or "XCS-413-2627PSA01" -> code, year, cohort. */
 export function parseCourse(raw: RawCourse): Course {
@@ -27,6 +27,7 @@ export function parseCourse(raw: RawCourse): Course {
 		code: code ? code[1] + code[2] : null,
 		yearKey: year ? `20${year[1]}-20${year[2]}` : null,
 		cohort: cohort ? cohort[1] : null,
+		enddate: typeof raw.enddate === "number" && Number.isFinite(raw.enddate) && raw.enddate > 0 ? Math.floor(raw.enddate) : 0,
 	};
 }
 
