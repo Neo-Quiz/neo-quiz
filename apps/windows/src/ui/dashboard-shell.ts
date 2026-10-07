@@ -35,6 +35,7 @@ import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 import { dossierParDefaut } from "../../../../src/dashboard/generation-demande";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
+import { pageGhost } from "./page-ghost";
 import { bindSwipe, nextTab, hapticTick, prefersReducedMotion, settleDuration, SETTLE_EASING } from "../../../../src/swipe";
 import { createNavHandlers } from "../../../../src/dashboard/nav";
 import { createHomeHandlers } from "../../../../src/dashboard/home";
@@ -1054,10 +1055,13 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		return target ? btns.find(b => tabKey(b) === target) ?? null : null;
 	};
 	let swipeAnim: Animation | null = null;
+	// The ghost of the page a swipe is leaving, while it plays.
+	let dropGhost: (() => void) | null = null;
 	bindSwipe(contentEl, dir => tabTarget(dir)?.click(), () => !!document.querySelector(".qbd-select-menu"), {
 		canGo: dir => tabTarget(dir) !== null,
 		drag: offset => {
 			swipeAnim?.cancel(); swipeAnim = null;
+			dropGhost?.(); dropGhost = null;
 			contentEl.style.transform = `translate3d(${offset}px, 0, 0)`;
 			contentEl.style.opacity = String(Math.max(0.55, 1 - Math.abs(offset) / (window.innerWidth * 1.2)));
 		},
@@ -1074,17 +1078,24 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			}
 			// The page leaves along the finger, the neighbour tab enters from the other side.
 			const sign = dir === "next" ? -1 : 1;
-			const exit = reduced ? 0 : Math.round(settleDuration(width - Math.abs(offset), width) * 0.5);
-			const enter = () => {
-				clear();
-				target.click();
-				hapticTick();
-				if (!reduced) swipeAnim = contentEl.animate([{ transform: `translate3d(${-sign * width * 0.25}px, 0, 0)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 220, easing: SETTLE_EASING });
-			};
-			if (!exit) { enter(); return; }
+			if (reduced) { clear(); target.click(); hapticTick(); return; }
+			/* The new page is built FIRST, under a ghost of the old one that keeps
+			   leaving on the compositor: fading the old page out and only then
+			   building the next left an invisible page on screen for the whole
+			   build, 100 to 400 ms on a phone (`page-ghost.ts`). */
 			swipeAnim?.cancel();
-			swipeAnim = contentEl.animate([{ transform: from, opacity: Number(contentEl.style.opacity || 1) }, { transform: `translate3d(${sign * width * 0.3}px, 0, 0)`, opacity: 0 }], { duration: exit, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
-			swipeAnim.onfinish = () => { swipeAnim?.cancel(); enter(); };
+			dropGhost?.();
+			/* The ghost lasts as long as the entry of the new page: leaving
+			   faster than it fades in left two frames of bare wallpaper. */
+			const entryMs = 220;
+			const { ghost, drop } = pageGhost(contentEl);
+			dropGhost = drop;
+			clear();
+			target.click();
+			hapticTick();
+			const leaving = ghost.animate([{ transform: from, opacity: Number(ghost.style.opacity || 1) }, { transform: `translate3d(${sign * width * 0.3}px, 0, 0)`, opacity: 0 }], { duration: entryMs, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+			leaving.onfinish = () => { if (dropGhost === drop) dropGhost = null; drop(); };
+			swipeAnim = contentEl.animate([{ transform: `translate3d(${-sign * width * 0.25}px, 0, 0)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: entryMs, easing: SETTLE_EASING });
 		},
 	});
 	/* The app's mark at the top of the rail, above Home (StudySmarter's

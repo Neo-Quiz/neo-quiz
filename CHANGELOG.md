@@ -23,6 +23,7 @@ release notes.
 - The Android tab bar has a new active-tab pill animation.
 
 ### Fixed
+- Swiping between the main pages on a phone no longer leaves an empty screen while the next page is built.
 - Importing a shared archive keeps its sub-folders (images in an `img/` folder keep working), file extensions as written and notes byte for byte, and a failed import leaves nothing behind.
 - Sharing one quiz now also carries the images cited in the body of its note.
 - Imported notes show up at once, without waiting for the folder watcher.
