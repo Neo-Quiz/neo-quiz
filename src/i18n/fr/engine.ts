@@ -32,6 +32,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.nav.tabCorrect": "Question {n}, juste",
 	"engine.nav.tabRetried": "Question {n}, juste après une reprise",
 	"engine.nav.tabWrong": "Question {n}, fausse",
+	"engine.nav.tabUnanswered": "Question {n}, sans réponse",
 	"engine.nav.tabAnswered": "Question {n}, répondue",
 	"engine.nav.tabWithHint": "{label}, avec indice",
 

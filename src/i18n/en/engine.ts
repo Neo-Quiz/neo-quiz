@@ -40,6 +40,7 @@ export const EN_ENGINE = {
 	"engine.nav.tabCorrect": "Question {n}, right",
 	"engine.nav.tabRetried": "Question {n}, right after a retry",
 	"engine.nav.tabWrong": "Question {n}, wrong",
+	"engine.nav.tabUnanswered": "Question {n}, unanswered",
 	"engine.nav.tabAnswered": "Question {n}, answered",
 	"engine.nav.tabWithHint": "{label}, with hint",
 

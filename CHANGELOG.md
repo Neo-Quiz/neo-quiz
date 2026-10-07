@@ -14,6 +14,7 @@ release notes.
 ## [Unreleased]
 
 ### Changed
+- In a handed-in test, unanswered questions show the wrong mark on their bead.
 - Wallpaper names follow the interface language.
 
 ## [1.20.38] - 2026-10-07

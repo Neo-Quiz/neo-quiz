@@ -117,7 +117,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const cls = ` ${tabClass(i)} `;
 		const n = beadNumero(i);
 		const has = (c: string): boolean => cls.includes(` ${c} `);
-		const key: TransKey | null = has("correct") ? "engine.nav.tabCorrect"
+		const key: TransKey | null = has("unanswered") ? "engine.nav.tabUnanswered"
+			: has("correct") ? "engine.nav.tabCorrect"
 			: has("retried") ? "engine.nav.tabRetried"
 			: has("wrong") ? "engine.nav.tabWrong"
 			: has("answered") ? "engine.nav.tabAnswered"
@@ -159,7 +160,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			if (ctx.textOnly.hasAnyAnswer(i)) return `${active} answered`.trim();
 			return active;
 		}
-		if (!ctx.hasAnyAnswer(i)) return active;
+		/* Handed in without an answer: it counts as wrong, so its bead carries the
+		   same wrong mark (a reading, numbered 0, is never graded). */
+		if (!ctx.hasAnyAnswer(i)) return ctx.quizState.locked && beadNumero(i) !== 0 ? `${active} wrong unanswered`.trim() : active;
 		if (!ctx.isRevealed(i)) return `${active} answered`.trim();
 		// A checked `pre` question has no verdict: it stays "answered".
 		if (!ctx.quizState.locked) return `${active} answered`.trim();
