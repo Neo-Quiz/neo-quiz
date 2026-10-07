@@ -12,7 +12,7 @@ import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { t, type TransKey } from "../i18n";
-import { drawOrder, formatElapsed, learnFigures, stepCardKind, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { drawOrder, formatElapsed, learnFigures, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -708,15 +708,18 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 
-	/** The header of a card of a step page: "Question 2 of 5 · QCM", or the
-	    book and "Reading" for a reading. */
-	function stepHeadHtml(qi: number, isRead: boolean): string {
-		if (isRead) return `<header class="quiz-step-head is-read">${ICON_LIVRE}<span>${t("engine.step.reading")}</span></header>`;
-		const page = ctx.stepOf?.(qi);
-		const qs = page?.questions ?? [qi];
-		const kind = stepCardKind(ctx.quiz[qi]);
-		const typeKey = kind === "flashcard" ? "engine.step.typeFlashcard" : kind === "choice" ? "engine.step.typeChoice" : "engine.step.typeReveal";
-		return `<header class="quiz-step-head"><span class="quiz-step-head-n">${t("engine.step.questionOf", { n: Math.max(1, qs.indexOf(qi) + 1), total: qs.length })}</span><span class="quiz-step-head-sep" aria-hidden="true">·</span><span class="quiz-step-head-type">${t(typeKey)}</span></header>`;
+	/** The title line of a card of a step page: "Question 2: Title" (just
+	    "Question 2" without a title), always rendered as the card's title. The
+	    title goes through the same inline door as before; the number comes from
+	    the t() template, never concatenated with unescaped text. A reading has
+	    no such line (its title is written in its own page). */
+	function stepTitleHtml(qi: number): string {
+		const qs = ctx.stepOf?.(qi)?.questions ?? [qi];
+		const n = Math.max(1, qs.indexOf(qi) + 1);
+		const title = ctx.sanitize.renderInlineText(ctx.quiz[qi].title);
+		return title.trim()
+			? `<h2>${t("engine.step.questionTitle", { n })} ${title}</h2>`
+			: `<h2>${t("engine.step.questionBare", { n })}</h2>`;
 	}
 
 	/** The ONE correction zone of a choice question in a step page: the
@@ -898,11 +901,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		}
 
 		const section = `<section class="quiz-card${inStep ? `${roleClass}${revealedClass} quiz-step-card${isRead ? " quiz-step-read" : ""}` : ""}"${sectionIdAttr}${inStep ? ` data-card-qi="${qi}"` : ""}${lecture ? ` data-lecture="${lecture.style}"` : ""}>
-				${inStep ? stepHeadHtml(qi, isRead) : ""}
 				${passageSection}
 				${courteHtml}
 				${ctx.learn.retryNoteHtml(qi)}
-				${lecture ? "" : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
+				${lecture ? "" : inStep ? stepTitleHtml(qi) : `<h2>${ctx.sanitize.renderInlineText(q.title)}</h2>`}
 				${ctx.isFlashcardQuestion(q) ? "" : `<div class="quiz-question">${lecture ? lecture.html : promptHtml}</div>`}
 				${body}
 				${learnSection}

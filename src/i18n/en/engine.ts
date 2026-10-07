@@ -129,11 +129,8 @@ export const EN_ENGINE = {
 	"engine.learn.summaryTime": "Time",
 	"engine.learn.summaryLearned": "{learned}/{total} learned",
 	"engine.learn.done": "Done",
-	"engine.step.questionOf": "Question {n} of {total}",
-	"engine.step.typeChoice": "QCM",
-	"engine.step.typeFlashcard": "Flashcard",
-	"engine.step.typeReveal": "Answer to reveal",
-	"engine.step.reading": "Reading",
+	"engine.step.questionTitle": "Question {n}:",
+	"engine.step.questionBare": "Question {n}",
 	"engine.step.answerLabel": "Answer",
 
 	/* ── Question texte / terminal ── */

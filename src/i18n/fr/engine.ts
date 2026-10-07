@@ -113,11 +113,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.learn.summaryTime": "Temps",
 	"engine.learn.summaryLearned": "{learned}/{total} appris",
 	"engine.learn.done": "Terminé",
-	"engine.step.questionOf": "Question {n} sur {total}",
-	"engine.step.typeChoice": "QCM",
-	"engine.step.typeFlashcard": "Flashcard",
-	"engine.step.typeReveal": "Réponse à révéler",
-	"engine.step.reading": "Lecture",
+	"engine.step.questionTitle": "Question {n} :",
+	"engine.step.questionBare": "Question {n}",
 	"engine.step.answerLabel": "Réponse",
 
 	/* ── Question texte / terminal ── */

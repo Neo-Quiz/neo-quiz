@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- In a Learn step, each question now has a single title line ("Question 1: Title"), and the small "Reading" label above a reading is gone.
+
 ## [1.20.42] - 2026-10-07
 
 ### Changed

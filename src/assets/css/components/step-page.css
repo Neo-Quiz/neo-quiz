@@ -2,10 +2,10 @@
    A LEARN STEP PAGE (engine/cards.ts stepSlideHtml, 2026-10-07).
    One page per step: its readings, then its questions stacked. The rule:
    nothing glued, everything in its place. Each question is a BLOCK: a 1 px
-   divider and room above it, a small header ("Question 2 of 5 · QCM"),
+   divider and room above it, a title line ("Question 2: Title"),
    then its zones in order: prompt, choices, ONE correction zone (a rule on
    its left, a light flat background). The reading is a light zone of its
-   own, with a book. No tile inside a tile, no capitals.
+   own. No tile inside a tile, no capitals.
    ========================================================= */
 
 .quiz-step-page{
@@ -26,35 +26,9 @@
   border-top: 0;
 }
 
-.quiz-step-head{
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.quiz-step-head-n{ color: var(--text-normal); }
-.quiz-step-head-sep{ opacity: 0.6; }
-
-.quiz-step-head svg{
-  flex: none;
-  width: 18px;
-  height: 18px;
-}
-
-/* The reading: its page is already a zone of its own (lecture.css), so only
-   its header sets it apart: the book, in the accent colour. */
+/* The reading: its page is already a zone of its own (lecture.css). */
 .quiz-step-read{
   border-top: 0;
-}
-
-.quiz-step-read .quiz-step-head{
-  margin-inline: 0;
-  color: var(--quiz-primary);
 }
 
 
