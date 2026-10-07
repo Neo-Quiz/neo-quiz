@@ -16,6 +16,7 @@ release notes.
 ### Changed
 - On the phone, the bottom bar uses the same icons and press effect as the PC.
 - The glowing line at the top of the main panel is gone.
+- On the phone, swipe left or right to move between Home, Folders and Settings.
 
 ## [1.20.34] - 2026-10-07
 

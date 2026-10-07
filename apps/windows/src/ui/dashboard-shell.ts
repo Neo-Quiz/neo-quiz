@@ -35,6 +35,7 @@ import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 import { dossierParDefaut } from "../../../../src/dashboard/generation-demande";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
+import { bindSwipe, nextTab } from "../../../../src/swipe";
 import { createNavHandlers } from "../../../../src/dashboard/nav";
 import { createHomeHandlers } from "../../../../src/dashboard/home";
 import { createQuizzesHandlers } from "../../../../src/dashboard/quizzes";
@@ -964,6 +965,19 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	}
 
 	nav.render(navEl);
+	/* Phone: a horizontal swipe on a MAIN tab page moves to the neighbouring
+	   tab, in bottom-bar order, by clicking that tab's button (the very path of
+	   a tap on the bar: history, highlight and view transition stay the same).
+	   Not on a quiz or folder page (sheets stacked), not under a menu. */
+	bindSwipe(contentEl, dir => {
+		if (!currentHost().platform.isMobile || sheets.depth() > 0) return;
+		const btns = Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item"))
+			.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
+		const key = (b: HTMLElement) => b.dataset.nav ?? "settings";
+		const current = btns.find(b => b.classList.contains("qbd-nav-item--active"));
+		const target = current && nextTab(key(current), dir, btns.map(key));
+		if (target) btns.find(b => key(b) === target)?.click();
+	}, () => !!document.querySelector(".qbd-select-menu"));
 	/* The app's mark at the top of the rail, above Home (StudySmarter's
 	   layout), a line-drawn SVG in the rail's colour instead of the app's
 	   bitmap icon (`shell.css`, `.nq-rail-logo`). Since 2026-09-29 it opens

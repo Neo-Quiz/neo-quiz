@@ -32,6 +32,13 @@ export function decideSwipe(s: SwipeSample): "next" | "prev" | "none" {
 	return s.dx < 0 ? "next" : "prev";
 }
 
+/** The tab a swipe lands on: ends clamp (null), `tabs` holds only the tabs the bar really offers. */
+export function nextTab(current: string, direction: "next" | "prev", tabs: readonly string[]): string | null {
+	const i = tabs.indexOf(current);
+	if (i < 0) return null;
+	return tabs[i + (direction === "next" ? 1 : -1)] ?? null;
+}
+
 const TEXT_FIELD = "input, textarea, [contenteditable], math-field";
 
 function isInHorizontalScroller(target: Element | null, root: HTMLElement): boolean {
@@ -44,7 +51,7 @@ function isInHorizontalScroller(target: Element | null, root: HTMLElement): bool
 }
 
 /** Binds the swipe on `root`; returns the unbinder (called by `destroyQuiz`). */
-export function bindSwipe(root: HTMLElement, onSwipe: (d: "next" | "prev") => void): () => void {
+export function bindSwipe(root: HTMLElement, onSwipe: (d: "next" | "prev") => void, blocked?: () => boolean): () => void {
 	let start: { x: number; y: number; t: number; target: Element | null; id: number } | null = null;
 
 	// Vertical scrolling stays native; the horizontal axis is ours.
@@ -68,7 +75,7 @@ export function bindSwipe(root: HTMLElement, onSwipe: (d: "next" | "prev") => vo
 			viewportWidth: window.innerWidth,
 			inHorizontalScroller: isInHorizontalScroller(s.target, root),
 			inTextField: !!s.target?.closest?.(TEXT_FIELD),
-			modalOpen: !!document.querySelector(".modal-container"),
+			modalOpen: !!document.querySelector(".modal-container") || !!blocked?.(),
 		});
 		if (verdict !== "none") onSwipe(verdict);
 	};
