@@ -109,7 +109,8 @@ import type { CodeLanguage } from "../../../src/code-languages";
 import type { BacASable } from "./code-sandbox";
 /* THE LANGUAGE PACKS (task 9): download, verify, install, delete — the pack
    is pinned in `langages.ts`; the renderer only names the language. */
-import { etatLangage, installerLangage, PACK_C, supprimerLangage } from "./langages";
+import { etatLangage, installerLangage, PACKS, supprimerLangage } from "./langages";
+import type { NomPack } from "./langages";
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
@@ -1677,43 +1678,46 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never)) deps.code.warm(language as CodeLanguage); });
 
 	/* THE LANGUAGE PACKS (task 9). The renderer passes ONE argument, the
-	   pack's name, and only `"c"` exists (it serves C and C++): anything
+	   pack's name (`"c"`, which serves C and C++, or `"python"`): anything
 	   else is refused before a byte moves. The URL, the hash and the
 	   directory are the main process's own (`langages.ts`, `main.ts`).
-	   ONE install at a time: a second call while one runs gets the SAME
-	   promise instead of racing it on the same `.part` files, and a delete
-	   waits for it rather than removing a directory being renamed into
-	   place. Progress is PUSHED (`langagesProgression`), like yt-dlp's. */
-	const PACKS = ["c"] as const;
-	const packConnu = (nom: unknown): boolean => PACKS.includes(nom as never);
-	let installationPack: Promise<EnveloppeVideo<null, CodeInstallation>> | null = null;
+	   ONE install at a time PER PACK: a second call for the same pack while
+	   one runs gets the SAME promise instead of racing it on the same
+	   `.part` files, and a delete waits for that pack's install rather than
+	   removing a directory being renamed into place. Progress is PUSHED
+	   (`langagesProgression`), like yt-dlp's. */
+	const PACKS_CONNUS = ["c", "python"] as const;
+	const packConnu = (nom: unknown): nom is NomPack => PACKS_CONNUS.includes(nom as never);
+	const installationsPack = new Map<NomPack, Promise<EnveloppeVideo<null, CodeInstallation>>>();
 	ipcMain.handle(CANAUX.langagesEtat, async (e, nom: unknown) => {
 		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return { installe: false, version: null, octets: 0 };
-		return etatLangage(deps.dossierLangages);
+		return etatLangage(deps.dossierLangages, nom);
 	});
 	ipcMain.handle(CANAUX.langagesInstaller, (e, nom: unknown): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return Promise.resolve({ ok: false, code: "reseau", detail: "pack refused" });
-		if (installationPack) return installationPack;
+		const enCoursDeCePack = installationsPack.get(nom);
+		if (enCoursDeCePack) return enCoursDeCePack;
 		/* Already installed at the pinned version: nothing to download — a
 		   compromised renderer cannot make the app re-fetch 28 MB in a loop.
-		   Unless the compiler itself is gone (an antivirus quarantine): then
-		   Install repairs it. */
+		   Unless the pack's marker file is gone (an antivirus quarantine of
+		   the compiler or the wasm): then Install repairs it. */
+		const pin = PACKS[nom];
 		const enPlace = (st: { installe: boolean; version: string | null }): boolean =>
-			st.installe && st.version === PACK_C.version && existsSync(path.join(deps.dossierLangages, "c", "clang", "llvm.core.wasm"));
-		const enCours = etatLangage(deps.dossierLangages).then(st => (enPlace(st) ? undefined : installerLangage(deps.dossierLangages, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
+			st.installe && st.version === pin.version && existsSync(path.join(deps.dossierLangages, nom, ...pin.marqueur.split("/")));
+		const enCours = etatLangage(deps.dossierLangages, nom).then(st => (enPlace(st) ? undefined : installerLangage(deps.dossierLangages, nom, (recus, total) => deps.envoyer(CANAUX.langagesProgression, { recus, total }))))
 			.then((): EnveloppeVideo<null, CodeInstallation> => ({ ok: true, valeur: null }), (err: unknown): EnveloppeVideo<null, CodeInstallation> => {
 				if (estErreurInstallation(err)) return { ok: false, code: err.code, detail: err.detail };
 				console.warn(LOG_PREFIX, "language pack install threw:", err);
 				return { ok: false, code: "reseau" };
 			})
-			.finally(() => { installationPack = null; });
-		installationPack = enCours;
+			.finally(() => { installationsPack.delete(nom); });
+		installationsPack.set(nom, enCours);
 		return enCours;
 	});
 	ipcMain.handle(CANAUX.langagesSupprimer, async (e, nom: unknown) => {
 		if (!depuisFenetrePrincipale(e) || !packConnu(nom)) return;
-		await installationPack;
-		await supprimerLangage(deps.dossierLangages);
+		await installationsPack.get(nom);
+		await supprimerLangage(deps.dossierLangages, nom);
 	});
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {

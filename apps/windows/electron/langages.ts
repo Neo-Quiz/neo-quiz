@@ -63,14 +63,42 @@ export const PACK_C = {
 	taille: 28432790,
 } as const;
 
-/** The only language this pack carries. `code-sandbox.ts` shares ONE pack
-    directory for `c` AND `cpp` (one shared LLVM `Application` compiles
-    either — spec §6), so `dossier`'s argument here is always the pack
-    ROOT (`userData/languages`), never a per-language path. */
-const NOM_LANGUE = "c";
+/** Placeholder pin of the Python (Pyodide) pack: the empty `url` makes
+    `installerLangage` refuse it with `reseau` until the real pack is
+    published (task 2 of the python-pack plan) and its values written here. */
+export const PACK_PYTHON = {
+	version: "314.0.7",
+	url: "",
+	sha256: "",
+	taille: 0,
+} as const;
 
-function dossierLangue(dossier: string): string {
-	return join(dossier, NOM_LANGUE);
+/** A pack's name. `c` carries C AND C++ (`code-sandbox.ts` shares ONE pack
+    directory for both: one shared LLVM `Application` compiles either, spec
+    §6); `python` carries Pyodide. */
+export type NomPack = "c" | "python";
+
+/** A pinned pack. `marqueur` is a file (relative to the pack directory)
+    whose presence proves the pack is really in place, not just that its
+    manifest was written (an antivirus may quarantine the big wasm alone). */
+export interface Pin {
+	version: string;
+	url: string;
+	sha256: string;
+	taille: number;
+	marqueur: string;
+}
+
+/** The table of packs: every pin the app trusts, by name. */
+export const PACKS: Record<NomPack, Pin> = {
+	c: { ...PACK_C, marqueur: "clang/llvm.core.wasm" },
+	python: { ...PACK_PYTHON, marqueur: "pyodide.asm.wasm" },
+};
+
+/** `dossier` is always the pack ROOT (`userData/languages`), never a
+    per-pack path. */
+function dossierLangue(dossier: string, nom: NomPack): string {
+	return join(dossier, nom);
 }
 
 /** Total bytes under `dir`, recursively — for Settings › Languages, "398 MB
@@ -86,15 +114,15 @@ function tailleDossier(dir: string): number {
 }
 
 /**
- * The pack's state, read from `<dossier>/c/manifest.json` alone — the SAME
+ * The pack's state, read from `<dossier>/<nom>/manifest.json` alone — the SAME
  * file `code-sandbox.ts`'s `run` checks with `existsSync`, so the engine
  * and Settings › Languages can never disagree about whether the pack is
  * usable. `installe: false` on ANY read failure (absent, unreadable,
  * malformed JSON, no string `version`) — a half-written pack must never
  * report itself installed, and this function never throws.
  */
-export async function etatLangage(dossier: string): Promise<{ installe: boolean; version: string | null; octets: number }> {
-	const cible = dossierLangue(dossier);
+export async function etatLangage(dossier: string, nom: NomPack): Promise<{ installe: boolean; version: string | null; octets: number }> {
+	const cible = dossierLangue(dossier, nom);
 	try {
 		const manifeste = JSON.parse(readFileSync(join(cible, "manifest.json"), "utf8")) as { version?: unknown };
 		if (typeof manifeste.version !== "string") return { installe: false, version: null, octets: 0 };
@@ -146,8 +174,8 @@ function ecrireEntrees(dest: string, entries: ZipEntry[]): void {
 }
 
 /**
- * Downloads `PACK_C`, verifies its SHA-256, and installs it atomically
- * under `<dossier>/c`. Rejects `ErreurInstallation` with code `"reseau"`
+ * Downloads the pack `PACKS[nom]`, verifies its SHA-256, and installs it
+ * atomically under `<dossier>/<nom>`. Rejects `ErreurInstallation` with code `"reseau"`
  * (unreachable, a redirect outside the host list, an HTTP error) or
  * `"empreinte"` (hash mismatch, truncated download, an unsafe or unreadable
  * archive) — in EVERY failure, nothing is left on disk: the `.part` archive
@@ -163,17 +191,20 @@ function ecrireEntrees(dest: string, entries: ZipEntry[]): void {
  * test pack with its own pin — the real pack's gzip bytes depend on the
  * zlib that built it, so a check that had to rebuild it bit for bit on CI
  * would test zlib, not this installer. The IPC channel passes neither
- * (canaux.ts): in the app, the pin is always `PACK_C`.
+ * (canaux.ts): in the app, the pin is always `PACKS[nom]`.
  */
 export async function installerLangage(
 	dossier: string,
+	nom: NomPack,
 	progression: (recus: number, total: number) => void,
 	transport: TransportInstallation = transportDefaut,
-	pack: { url: string; sha256: string; taille: number } = PACK_C,
+	pack: { url: string; sha256: string; taille: number } = PACKS[nom],
 ): Promise<void> {
-	const cible = dossierLangue(dossier);
+	const cible = dossierLangue(dossier, nom);
 	const partielDossier = cible + ".part";
 	const ancien = cible + ".old";
+	/* A pack not published yet (placeholder pin): nothing to download. */
+	if (!pack.url) throw erreurInstallation("reseau", "the " + nom + " language pack has no download URL yet");
 	mkdirSync(dossier, { recursive: true });
 	try {
 		/* A `.part` or `.old` left by an aborted install is never reused. */
@@ -251,10 +282,10 @@ export async function installerLangage(
 
 /** Deletes the installed pack. Re-downloadable, so nothing more is asked
     than the button that calls this (Settings › Languages, task 10). */
-export async function supprimerLangage(dossier: string): Promise<void> {
+export async function supprimerLangage(dossier: string, nom: NomPack): Promise<void> {
 	/* `manifest.json` first: if the recursive delete then fails halfway, the
 	   pack reads as NOT installed (and re-downloads), never as a broken one
 	   that `code-sandbox.ts` would still try to serve. */
-	rmSync(join(dossierLangue(dossier), "manifest.json"), { force: true });
-	rmSync(dossierLangue(dossier), { recursive: true, force: true });
+	rmSync(join(dossierLangue(dossier, nom), "manifest.json"), { force: true });
+	rmSync(dossierLangue(dossier, nom), { recursive: true, force: true });
 }

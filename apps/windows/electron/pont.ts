@@ -794,14 +794,14 @@ export interface Pont {
 	/**
 	 * THE LANGUAGE PACKS (task 9, `langages.ts`): the C/C++ compiler, a
 	 * pinned download. The renderer only NAMES the pack (`"c"`, which serves
-	 * C and C++); URL, hash and directory stay in the main process. As for
+	 * C and C++, or `"python"`); URL, hash and directory stay in the main process. As for
 	 * `video.installer`, the progress callback does not cross the IPC: the
 	 * bytes come back on a PUSHED channel (`langagesProgression`).
 	 */
 	langages: {
-		etat(nom: "c"): Promise<{ installe: boolean; version: string | null; octets: number }>;
-		installer(nom: "c", surProgression: (recus: number, total: number) => void): Promise<EnveloppeVideo<null, CodeInstallation>>;
-		supprimer(nom: "c"): Promise<void>;
+		etat(nom: "c" | "python"): Promise<{ installe: boolean; version: string | null; octets: number }>;
+		installer(nom: "c" | "python", surProgression: (recus: number, total: number) => void): Promise<EnveloppeVideo<null, CodeInstallation>>;
+		supprimer(nom: "c" | "python"): Promise<void>;
 	};
 }
 

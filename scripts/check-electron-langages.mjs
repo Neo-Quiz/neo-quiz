@@ -67,7 +67,7 @@ const resteSurDisque = (dir) => (existsSync(dir) ? readdirSync(dir) : []);
 
 try {
 	await withSrcModule("src/dashboard/zip.ts", async ({ buildZip }) => {
-		await withSrcModule("apps/windows/electron/langages.ts", async ({ PACK_C, etatLangage, installerLangage, supprimerLangage, nomEntreeAdmis }) => {
+		await withSrcModule("apps/windows/electron/langages.ts", async ({ PACK_C, PACKS, etatLangage, installerLangage, supprimerLangage, nomEntreeAdmis }) => {
 			/* THE TEST PACK: the exact layout the worker loads, tiny files. */
 			const entrees = [
 				{ name: "clang/bundle.js", content: "export const runClang = () => {};" },
@@ -81,8 +81,8 @@ try {
 			// ── A good pack installs, where the worker looks ──
 			const dir = nouveauDossier("ok");
 			const vues = [];
-			await installerLangage(dir, (recus, total) => vues.push([recus, total]), transportServant(pack), pin);
-			const st = await etatLangage(dir);
+			await installerLangage(dir, "c", (recus, total) => vues.push([recus, total]), transportServant(pack), pin);
+			const st = await etatLangage(dir, "c");
 			r.check("installs and reports", [st.installe, st.version], [true, "test"]);
 			r.check("files served where the worker looks",
 				["clang/bundle.js", "wasi-shim/index.js", "manifest.json"].map((f) => existsSync(join(dir, "c", ...f.split("/")))), [true, true, true]);
@@ -94,38 +94,38 @@ try {
 			modifie[modifie.length >> 1] ^= 0xff;
 			const dir2 = nouveauDossier("modifie");
 			r.check("wrong hash refused, nothing left",
-				[await codeDuRejet(installerLangage(dir2, () => {}, transportServant(modifie), pin)), resteSurDisque(dir2)], ["empreinte", []]);
+				[await codeDuRejet(installerLangage(dir2, "c", () => {}, transportServant(modifie), pin)), resteSurDisque(dir2)], ["empreinte", []]);
 			/* The cases above are also caught by gzip's own CRC; this one only
 			   by the pin: a VALID pack, just not the pinned one. */
 			const autre = Buffer.from(gzipSync(buildZip([...entrees.slice(0, -1), { name: "manifest.json", content: JSON.stringify({ version: "other" }) }])));
 			const dirAutre = nouveauDossier("autre");
 			r.check("a valid pack other than the pinned one refused, nothing left",
-				[await codeDuRejet(installerLangage(dirAutre, () => {}, transportServant(autre), pin)), resteSurDisque(dirAutre)], ["empreinte", []]);
+				[await codeDuRejet(installerLangage(dirAutre, "c", () => {}, transportServant(autre), pin)), resteSurDisque(dirAutre)], ["empreinte", []]);
 			const dir3 = nouveauDossier("tronque");
 			r.check("truncated download never installed",
-				[await codeDuRejet(installerLangage(dir3, () => {}, transportServant(pack.subarray(0, pack.length >> 1)), pin)), resteSurDisque(dir3)], ["empreinte", []]);
+				[await codeDuRejet(installerLangage(dir3, "c", () => {}, transportServant(pack.subarray(0, pack.length >> 1)), pin)), resteSurDisque(dir3)], ["empreinte", []]);
 
 			// ── A redirect outside the host list ──
 			const dir4 = nouveauDossier("redirige");
 			const t4 = transportServant(pack, { redirigeVers: "https://evil.example/x" });
 			r.check("a host outside the list is never followed",
-				[await codeDuRejet(installerLangage(dir4, () => {}, t4, pin)), t4.demandees, resteSurDisque(dir4)], ["reseau", [URL_TEST], []]);
+				[await codeDuRejet(installerLangage(dir4, "c", () => {}, t4, pin)), t4.demandees, resteSurDisque(dir4)], ["reseau", [URL_TEST], []]);
 
 			// ── A body longer than the pin, a redirect to plain http ──
 			const dirLong = nouveauDossier("long");
 			r.check("a body larger than the pin cut and refused, nothing left",
-				[await codeDuRejet(installerLangage(dirLong, () => {}, transportServant(Buffer.concat([pack, Buffer.alloc(10)])), pin)), resteSurDisque(dirLong)], ["empreinte", []]);
+				[await codeDuRejet(installerLangage(dirLong, "c", () => {}, transportServant(Buffer.concat([pack, Buffer.alloc(10)])), pin)), resteSurDisque(dirLong)], ["empreinte", []]);
 			const dirHttp = nouveauDossier("http");
 			const tHttp = transportServant(pack, { redirigeVers: "http://github.com/Neo-Quiz/neo-quiz/x" });
 			r.check("a redirect to plain http never followed",
-				[await codeDuRejet(installerLangage(dirHttp, () => {}, tHttp, pin)), tHttp.demandees], ["reseau", [URL_TEST]]);
+				[await codeDuRejet(installerLangage(dirHttp, "c", () => {}, tHttp, pin)), tHttp.demandees], ["reseau", [URL_TEST]]);
 
 			// ── An archive entry that would escape, in a pack whose hash MATCHES ──
 			for (const nom of ["../evil.txt", "clang/../../evil.txt", "C:evil.txt", "/evil.txt", "a\\..\\..\\evil.txt"]) {
 				const piege = Buffer.from(gzipSync(buildZip([...entrees, { name: nom, content: "pwned" }])));
 				const d = nouveauDossier("piege-" + readdirSync(tmp).length);
 				r.check("entry " + JSON.stringify(nom) + " refused, nothing written",
-					[await codeDuRejet(installerLangage(d, () => {}, transportServant(piege), pinDe(piege))), resteSurDisque(d), existsSync(join(tmp, "evil.txt"))], ["empreinte", [], false]);
+					[await codeDuRejet(installerLangage(d, "c", () => {}, transportServant(piege), pinDe(piege))), resteSurDisque(d), existsSync(join(tmp, "evil.txt"))], ["empreinte", [], false]);
 			}
 			r.check("entry names: every unsafe form refused",
 				["..", "a/../b", "a//b", "./a", "C:/x", "c:x", "/x", "\\\\srv\\share\\x", "a\\b", "a\0b", ""].map((n) => nomEntreeAdmis(n)),
@@ -135,16 +135,38 @@ try {
 
 			// ── A previous install is replaced, a delete removes it ──
 			mkdirSync(join(dir, "c.old", "clang"), { recursive: true });
-			await installerLangage(dir, () => {}, transportServant(pack), pin);
+			await installerLangage(dir, "c", () => {}, transportServant(pack), pin);
 			r.check("reinstall over an installed pack, leftovers of an aborted one removed",
-				[(await etatLangage(dir)).installe, resteSurDisque(dir)], [true, ["c"]]);
+				[(await etatLangage(dir, "c")).installe, resteSurDisque(dir)], [true, ["c"]]);
 			const dirSansVersion = nouveauDossier("sans-version");
 			mkdirSync(join(dirSansVersion, "c"), { recursive: true });
 			writeFileSync(join(dirSansVersion, "c", "manifest.json"), "{}");
-			r.check("a manifest without a version is not an installed pack", (await etatLangage(dirSansVersion)).installe, false);
-			await supprimerLangage(dir);
-			r.check("delete removes the directory", [(await etatLangage(dir)).installe, existsSync(join(dir, "c"))], [false, false]);
-			r.check("state of a never-installed pack", await etatLangage(nouveauDossier("jamais")), { installe: false, version: null, octets: 0 });
+			r.check("a manifest without a version is not an installed pack", (await etatLangage(dirSansVersion, "c")).installe, false);
+			await supprimerLangage(dir, "c");
+			r.check("delete removes the directory", [(await etatLangage(dir, "c")).installe, existsSync(join(dir, "c"))], [false, false]);
+			r.check("state of a never-installed pack", await etatLangage(nouveauDossier("jamais"), "c"), { installe: false, version: null, octets: 0 });
+
+			// Several packs side by side: python next to c.
+			const packPy = Buffer.from(gzipSync(buildZip([
+				{ name: "pyodide.asm.wasm", content: "wasm" },
+				{ name: "manifest.json", content: JSON.stringify({ version: "t" }) },
+			])));
+			const dirPacks = nouveauDossier("packs");
+			await installerLangage(dirPacks, "c", () => {}, transportServant(pack), pin);
+			await installerLangage(dirPacks, "python", () => {}, transportServant(packPy), pinDe(packPy));
+			r.check("python pack lands under python/",
+				[existsSync(join(dirPacks, "python", "pyodide.asm.wasm")), resteSurDisque(dirPacks).sort()], [true, ["c", "python"]]);
+			r.check("state is per pack", [(await etatLangage(dirPacks, "python")).installe, (await etatLangage(dirPacks, "c")).installe], [true, true]);
+			const dirSeulPy = nouveauDossier("seul-python");
+			await installerLangage(dirSeulPy, "python", () => {}, transportServant(packPy), pinDe(packPy));
+			r.check("an installed python pack does not make c installed", (await etatLangage(dirSeulPy, "c")).installe, false);
+			await supprimerLangage(dirPacks, "python");
+			r.check("deleting python leaves no python/ and c/ untouched",
+				[existsSync(join(dirPacks, "python")), (await etatLangage(dirPacks, "c")).installe, (await etatLangage(dirPacks, "python")).installe], [false, true, false]);
+			const dirVide = nouveauDossier("python-sans-url");
+			r.check("the unpublished python pin (empty url) is refused, nothing left",
+				[await codeDuRejet(installerLangage(dirVide, "python", () => {}, transportServant(packPy))), resteSurDisque(dirVide)], ["reseau", []]);
+			r.check("pack table markers", [PACKS.c.marqueur, PACKS.python.marqueur], ["clang/llvm.core.wasm", "pyodide.asm.wasm"]);
 
 			// ── The REAL pin against the built pack, when it has been built ──
 			const reel = join("dist-pack", `language-c-${PACK_C.version}.zip.gz`);
@@ -154,9 +176,9 @@ try {
 					[octets.length, createHash("sha256").update(octets).digest("hex")], [PACK_C.taille, PACK_C.sha256]);
 				const t = async (url) => (url === PACK_C.url ? reponse(200, octets) : reponse(404, Buffer.alloc(0)));
 				const dirReel = nouveauDossier("reel");
-				await installerLangage(dirReel, () => {}, t);
+				await installerLangage(dirReel, "c", () => {}, t);
 				r.check("the real pack installs with the app's own pin",
-					[(await etatLangage(dirReel)).version, existsSync(join(dirReel, "c", "clang", "llvm.core.wasm"))], [PACK_C.version, true]);
+					[(await etatLangage(dirReel, "c")).version, existsSync(join(dirReel, "c", "clang", "llvm.core.wasm"))], [PACK_C.version, true]);
 			} else {
 				console.log("(dist-pack/ absent: the real pin was not compared — run `npm run build:language-pack` first)");
 			}
