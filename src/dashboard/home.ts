@@ -110,14 +110,6 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		   glow behind the top of the page any more (2026-09-29): cut by the
 		   tile's edge, it read as a smear rather than light. */
 		const page = ajouter(container, "div", "qbd-home-page");
-		/* An empty band at the top, lit by a slow glow (2026-09-29): a line of
-		   light that breathes, a highlight running along it. Pure decoration,
-		   hidden from assistive tech; its CSS keeps it inside its band, faded
-		   at every edge, so it is never cut by the tile as the old glow was. */
-		const halo = ajouter(page, "div", "qbd-home-halo");
-		halo.setAttribute("aria-hidden", "true");
-		ajouter(halo, "span", "qbd-home-halo-line");
-
 		/* No header (2026-09-29): no title and no "Generate a quiz" — the
 		   folder cards and the side column say what to do by themselves. */
 
