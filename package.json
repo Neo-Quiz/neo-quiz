@@ -81,7 +81,6 @@
     "check:menu-app": "node scripts/check-menu-app.mjs",
     "check:partage": "node scripts/check-partage.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",
-    "check:moodle": "node scripts/check-moodle.mjs",
     "check:session": "node scripts/check-session.mjs",
     "check:test-setup": "node scripts/check-test-setup.mjs",
     "check:learn-loop": "node scripts/check-learn-loop.mjs",
