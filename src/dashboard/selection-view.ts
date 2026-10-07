@@ -79,6 +79,7 @@ export function createSelectionView(deps: SelectionViewDeps): SelectionView {
 	const bar = ajouter(deps.host, "div", "qbd-sel-bar");
 	bar.setAttribute("role", "toolbar");
 	bar.setAttribute("aria-label", t("share.select.bar"));
+	bar.title = t("share.choose.wholeNote");
 	bar.hidden = true;
 	const count = ajouter(bar, "span", "qbd-sel-count");
 	count.setAttribute("aria-live", "polite");

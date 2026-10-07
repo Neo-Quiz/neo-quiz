@@ -56,6 +56,7 @@ export const FR_SHARE: Record<keyof typeof EN_SHARE, string> = {
 	"share.choose.pick": "Choisir des quiz…",
 	"share.choose.pickDesc": "Coche les quiz à envoyer ensemble dans un seul fichier",
 	"share.choose.listTitle": "Choisir les quiz à partager",
+	"share.choose.wholeNote": "La note entière est envoyée, avec son texte hors du quiz et les images qu'elle cite.",
 	"share.choose.checkAll": "Tout cocher",
 	"share.choose.uncheckAll": "Tout décocher",
 };

@@ -52,6 +52,7 @@ release notes.
 - Importing an archive named `__proto__`, `constructor` or `prototype` no longer loses the folder's settings; such names are imported as "Import".
 - Invisible text-direction and zero-width characters are removed from shared file names, so a name cannot display as another extension.
 - Importing a shared archive leaves out a file named like an image whose content is something else, and says so.
+- Choosing quizzes to share now says that the whole note, with its images, is sent.
 
 ## [1.20.42] - 2026-10-07
 

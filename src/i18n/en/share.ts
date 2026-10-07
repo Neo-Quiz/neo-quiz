@@ -56,6 +56,7 @@ export const EN_SHARE = {
 	"share.choose.pick": "Choose quizzes…",
 	"share.choose.pickDesc": "Tick the quizzes to send together in one file",
 	"share.choose.listTitle": "Choose quizzes to share",
+	"share.choose.wholeNote": "The whole note is sent, including its text outside the quiz and the images it cites.",
 	"share.choose.checkAll": "Check all",
 	"share.choose.uncheckAll": "Uncheck all",
 } as const;

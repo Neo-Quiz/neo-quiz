@@ -63,6 +63,7 @@ function openQuizPicker(group: ModuleGroup, share: (target: ShareTarget) => void
 				ajouter(row, "span", "qbd-share-pick-mode", quizModeLabel(q.mode));
 				box.addEventListener("change", () => { sel = toggle(sel, q.path); paint(); });
 			}
+			ajouter(c, "p", "qbd-share-pick-note", t("share.choose.wholeNote"));
 			const buttons = ajouter(c, "div", "qb-confirm-buttons");
 			const cancel = ajouter(buttons, "button", "qb-btn", t("share.select.cancel"));
 			cancel.type = "button";
