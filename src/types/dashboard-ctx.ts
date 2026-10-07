@@ -214,7 +214,8 @@ export interface DashboardShellCtx {
 	    note sous Obsidian, monter la page de quiz dans l'application. */
 	openQuiz(quiz: QuizIndexEntry): void;
 	/** Ouvre les réglages de l'hôte (l'onglet du plugin sous Obsidian). */
-	openSettings(): void;
+	/** `onClosed` runs when the settings window goes away (the rail follows it). */
+	openSettings(onClosed?: () => void): void;
 	/** Pages que cet hôte sait ouvrir. Une entrée du rail absente d'ici est
 	    rendue DÉSACTIVÉE, pas masquée : la génération atterrira dans
 	    l'application (tranche 4) et y sera exclusive — le greffon la perdra.

@@ -53,8 +53,14 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 	   claire apparaît d'un coup. */
 	let buttons: { key: DashboardViewName; el: HTMLElement }[] = [];
 
+	/* While the settings window is open, the rail shows IT as the current place
+	   and not the page behind it. */
+	let settingsOpen = false;
+	let settingsBtn: HTMLElement | null = null;
+
 	function paintActive(): void {
-		for (const b of buttons) b.el.classList.toggle("qbd-nav-item--active", b.key === activeNav);
+		for (const b of buttons) b.el.classList.toggle("qbd-nav-item--active", !settingsOpen && b.key === activeNav);
+		settingsBtn?.classList.toggle("qbd-nav-item--active", settingsOpen);
 	}
 
 	const NAV_ITEMS: NavItem[] = [
@@ -129,11 +135,17 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 		// l'onglet du plugin dans les réglages ; l'application ouvrira sa
 		// propre page Réglages.
 		const footer = ajouter(container, "div", "qbd-nav-footer");
-		const settingsBtn = ajouter(footer, "button", "qbd-nav-item");
-		const settingsIcon = ajouter(settingsBtn, "span", "qbd-nav-icon");
+		const btnReglages = ajouter(footer, "button", "qbd-nav-item");
+		settingsBtn = btnReglages;
+		const settingsIcon = ajouter(btnReglages, "span", "qbd-nav-icon");
 		currentHost().ui.setIcon(settingsIcon, "settings");
-		ajouter(settingsBtn, "span", "qbd-nav-label", t("dashboard.nav.settings"));
-		settingsBtn.addEventListener("click", () => { ctx.openSettings(); });
+		ajouter(btnReglages, "span", "qbd-nav-label", t("dashboard.nav.settings"));
+		btnReglages.addEventListener("click", () => {
+			settingsOpen = true;
+			paintActive();
+			ctx.openSettings(() => { settingsOpen = false; paintActive(); });
+		});
+		paintActive();
 	}
 
 	function setActive(key: DashboardViewName): void {

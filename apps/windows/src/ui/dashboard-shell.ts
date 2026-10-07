@@ -348,7 +348,7 @@ export interface MonterDashboardDeps {
 	    principal en chemin absolu — `systeme.ouvrir`, borné au périmètre. */
 	cheminAbsolu(contrat: string): string | null;
 	onOpenQuiz(entry: QuizIndexEntry): void;
-	onOpenSettings(): void;
+	onOpenSettings(onClosed?: () => void): void;
 	/** Les sessions en cours (2026-09-26) : reprendre un quiz là où on
 	    s'était arrêté. Lues par `sessionOf` (le « Reprendre » du dossier) ;
 	    absentes, pas de « Reprendre ». */
@@ -438,7 +438,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   Folders root grid. That workaround is gone: it made every return
 		   land on the quiz's page, over the folder, even from the folder. */
 		openQuiz: (quiz) => deps.onOpenQuiz(quiz),
-		openSettings: () => deps.onOpenSettings(),
+		openSettings: (onClosed) => deps.onOpenSettings(onClosed),
 		/* Toutes les vues, la génération comprise (tranche 5, tâche 6) : la page
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à
 		   ce que l'hôte sache lancer un CLI (tâche 7 — d'ici là, une Notice

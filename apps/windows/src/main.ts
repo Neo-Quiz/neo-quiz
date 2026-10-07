@@ -292,7 +292,7 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		cheminDuContrat: (absolu) => carteCourante?.depuisAbsolu(absolu) ?? null,
 		cheminAbsolu: (contrat) => carteCourante?.absolu(contrat) ?? null,
 		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); },
-		onOpenSettings: () => ouvrirReglages(),
+		onOpenSettings: (onClosed) => ouvrirReglages(onClosed),
 		sessions,
 	});
 	demonterCourant = coquille;
@@ -329,7 +329,7 @@ let reglagesOuverts: HostModalHandle | null = null;
  * DOM, ses écouteurs vivants, sous le suivant. Le démontage de la page se fait
  * dans `onClose`, que l'hôte appelle APRÈS la disparition.
  */
-function ouvrirReglages(): void {
+function ouvrirReglages(onClosed?: () => void): void {
 	if (reglagesOuverts) return;
 	let demonterReglages: (() => void) | null = null;
 	reglagesOuverts = requireHost("modals").open({
@@ -354,6 +354,7 @@ function ouvrirReglages(): void {
 		onClose: () => {
 			reglagesOuverts = null;
 			demonterReglages?.();
+			onClosed?.();
 		},
 	});
 }
