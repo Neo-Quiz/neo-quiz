@@ -104,6 +104,20 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("a deleted chat's failed and stopped lines leave too", R.closableLines([line(1, "echouee"), line(2, "arret")], "c2", () => false, gone).map(l => l.id), [1, 2]);
 	r.check("a deleted chat's request with a line still running is never touched", R.closableLines([line(1, "prete", {}, quiz("A", "a.md")), line(2, "cours")], "c2", () => false, gone).map(l => l.id), []);
 	r.check("another chat's failed line still stays", R.closableLines([line(1, "echouee", { chatId: "c3" })], "c2", rien, gone).map(l => l.id), []);
+	// A remote request that never produced a line is recorded as failed (the PC runner).
+	const PC = "11111111-1111-4111-8111-111111111111", PH = "22222222-2222-4222-8222-222222222222";
+	const rreq = { v: 1, id: "lq3k2-fail01", at: 100, from: PH, target: PC, chatId: "chat-9999", text: "Quiz on lists", mode: "learn", documents: [{ path: "Python/cm1.md" }] };
+	const made = R.addFailedRequest([], rreq, PC, "Root", 500, "boom");
+	r.check("an unknown chat is created with the PC as origin", [made.length, made[0].id, made[0].origin, made[0].updatedAt], [1, "chat-9999", PC, 500]);
+	const qf = made[0].requests[0];
+	r.check("the request is failed, from the phone, with the message and the absolute document", [qf.state, qf.from, qf.error, qf.documents, qf.results], ["failed", PH, "boom", [{ name: "cm1.md", path: "Root/Python/cm1.md" }], []]);
+	const known = [{ id: "chat-9999", origin: PH, createdAt: 1, updatedAt: 1, requests: [{ id: "earlier", at: 50, from: PH, text: "x", mode: "learn", documents: [], results: [], state: "done" }] }];
+	const appended = R.addFailedRequest(known, rreq, PC, "Root", 600, "boom");
+	r.check("a known chat gets the request appended in time order, its origin kept, updatedAt bumped", [appended[0].requests.map(q => q.id), appended[0].origin, appended[0].updatedAt], [["earlier", "lq3k2-fail01"], PH, 600]);
+	const twice = R.addFailedRequest(appended, rreq, PC, "Root", 700, "boom");
+	r.check("the same request id is never recorded twice (idempotent, updatedAt untouched)", [twice[0].requests.length, twice[0].updatedAt], [2, 600]);
+	r.check("a deleted chat stays deleted", R.addFailedRequest([{ ...known[0], deleted: true }], rreq, PC, "Root", 600, "boom")[0].requests.length, 1);
+	r.check("an input list is never mutated", [known.length, known[0].requests.length], [1, 1]);
 	r.done();
 });
 

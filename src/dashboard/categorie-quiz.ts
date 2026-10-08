@@ -337,6 +337,13 @@ export function detecterCategorie(indices: IndicesCategorie): CategorieQuiz {
 /** A FOLDER's subject, for the subject filter of the folders page
     (2026-09-29): its path, then its displayed name as the deepest segment
     ("XTI301 - Écosystème Python" says Python where the path may not). */
+/** What the category detection reads of a request: the attachment names, the
+    destination folder (`dossier`, already resolved by the caller), the text.
+    Shared by the composer and the remote-request runner. */
+export function indicesCategorie(notes: readonly { name: string }[], texte: string, dossier: string): IndicesCategorie {
+	return { pieces: notes.map(n => n.name), dossier, demande: texte };
+}
+
 export function categorieDuDossier(chemin: string | undefined, nom: string | undefined): CategorieQuiz {
 	return detecterCategorie({ dossier: [chemin, nom].filter(Boolean).join("/") });
 }

@@ -444,6 +444,11 @@ export const EN_AI = {
 	"ai.thread.failed": "This request failed",
 	"ai.side.running": "Generating",
 	/* Progress of a request running on another device, read from its generations file. */
+	"ai.remote.notifyTitle": "Request from {device}",
+	"ai.remote.unknownDevice": "your phone",
+	"ai.remote.interrupted": "The PC app was closed before this finished.",
+	"ai.remote.noProvider": "No AI provider is set up on the PC.",
+	"ai.remote.missingDocument": "Document not found on the PC: {path}",
 	"ai.remote.onDevice": "Running on another device",
 	"ai.remote.progress": "Question {n} / {total}",
 	"ai.remote.progressNoTotal": "Question {n}",

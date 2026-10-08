@@ -165,6 +165,10 @@ export interface FileGenerationApp {
 	    every 80 ms, so a view updates the transcript in place instead of
 	    repainting the whole queue on every chunk. Returns the unsubscribe. */
 	abonnerTranscript(ecouteur: (id: number) => void): () => void;
+	/** Settles once the queue of before the reload was read back: a request
+	    sent earlier would wait for it anyway, but a reader of `lignes()` must
+	    not look before it (the remote runner decides "interrupted" on it). */
+	readonly pret: Promise<void>;
 }
 
 let instance: FileGenerationApp | null = null;
@@ -229,6 +233,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	   read back once, below. Until then, a request sent waits in `differees`
 	   — the restored lines come first, and their ids must not be reused. */
 	let restauree = false;
+	let ouvrirPret!: () => void;
+	const pret = new Promise<void>(r => { ouvrirPret = r; });
 	const differees: DemandeFile[] = [];
 	let derniereGardee: FileGeneration<DemandeFile, ResultatFile> | null = null;
 
@@ -492,9 +498,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			else if (l.etat === "enregistrement") void enregistrer(l.id, l.demande).finally(publier);
 		}
 		pomper();
-	});
+	}).catch(() => { /* an unreadable saved queue: `pret` still settles below */ }).finally(ouvrirPret);
 
 	return {
+		pret,
 		lignes: () => file.lignes,
 		etape: (id) => etapes.get(id) ?? null,
 		reessayerEnregistrement(id) {

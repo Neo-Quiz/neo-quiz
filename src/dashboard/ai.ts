@@ -29,7 +29,7 @@ import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker, openActionMenu } from "./ui-select";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { categorieChoisie, detecterCategorie, estCategorie } from "./categorie-quiz";
+import { categorieChoisie, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
@@ -3892,11 +3892,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Ce que la détection de catégorie lit d'une demande : les noms des
 	    pièces jointes, le dossier de destination, le texte. */
 	function indicesCategorie(notes: readonly { name: string }[], texte: string): IndicesCategorie {
-		return {
-			pieces: notes.map(n => n.name),
-			dossier: destination || dossierParDefaut(settings().aiOutputFolder),
-			demande: texte,
-		};
+		return indicesCategorieDe(notes, texte, destination || dossierParDefaut(settings().aiOutputFolder));
 	}
 
 	/** La catégorie qui partirait maintenant avec le composer. */

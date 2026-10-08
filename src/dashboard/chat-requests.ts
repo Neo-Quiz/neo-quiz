@@ -12,6 +12,8 @@
 
 import type { LigneGeneration } from "./file-generation-app";
 import type { ChatClarify, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
+import { absoluteInRoot } from "../shared-state/chat-merge";
+import type { RemoteRequest } from "../shared-state/remote-request";
 import { LEGACY_CHAT_ID, deriveTitle, mergeResults } from "./chat-record";
 
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
@@ -91,7 +93,7 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	const req: ChatRequest = {
 		id: g.key,
 		at: old?.at ?? first.sentAt ?? now,
-		from: old?.from ?? device,
+		from: old?.from ?? first.fromDevice ?? device,
 		// What the user sent is fixed once recorded; the remaining lines may be
 		// only a part of the send.
 		text: old?.text ?? first.text,
@@ -185,4 +187,26 @@ export function answerClarify(chats: readonly ChatRecord[], chatId: string, requ
 export function resumeSource(req: ChatRequest): { text: string; genre: "learn" | "practice" | "both" } | null {
 	if (!req.clarify || req.clarify.answers || req.documents.length > 0) return null;
 	return { text: req.text, genre: req.clarify.genre ?? (req.mode === "practice" ? "practice" : "learn") };
+}
+
+/** A remote request that never produced a line (no provider, a document
+    missing, the PC app closed mid-run): recorded as failed so the phone's
+    thread says why. Creates the chat (origin = this PC) when unknown;
+    idempotent on the request id; a deleted chat stays deleted. */
+export function addFailedRequest(chats: readonly ChatRecord[], req: RemoteRequest, device: string, rootId: string, now: number, error: string): ChatRecord[] {
+	const idx = chats.findIndex(c => c.id === req.chatId);
+	if (idx >= 0 && (chats[idx].deleted || chats[idx].requests.some(q => q.id === req.id))) return [...chats];
+	const request: ChatRequest = {
+		id: req.id, at: req.at, from: req.from, text: req.text, mode: req.mode,
+		documents: req.documents.map(d => {
+			const path = absoluteInRoot(d.path, rootId);
+			const name = d.path.slice(d.path.lastIndexOf("/") + 1);
+			return path ? { name, path } : { name };
+		}),
+		results: [], state: "failed", error,
+	};
+	const list = [...chats];
+	if (idx >= 0) list[idx] = { ...chats[idx], updatedAt: now, requests: [...chats[idx].requests, request].sort((a, b) => a.at - b.at) };
+	else list.push({ id: req.chatId, origin: device, createdAt: now, updatedAt: now, title: deriveTitle(request) || undefined, requests: [request] });
+	return list;
 }

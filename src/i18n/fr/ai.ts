@@ -403,6 +403,11 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.thread.failed": "Cette demande a échoué",
 	"ai.side.running": "Génération en cours",
 	/* Avancement d'une demande lancée sur un autre appareil, lu dans son fichier de générations. */
+	"ai.remote.notifyTitle": "Demande de {device}",
+	"ai.remote.unknownDevice": "ton téléphone",
+	"ai.remote.interrupted": "L'appli du PC a été fermée avant la fin.",
+	"ai.remote.noProvider": "Aucun fournisseur d'IA n'est configuré sur le PC.",
+	"ai.remote.missingDocument": "Document introuvable sur le PC : {path}",
 	"ai.remote.onDevice": "En cours sur un autre appareil",
 	"ai.remote.progress": "Question {n} / {total}",
 	"ai.remote.progressNoTotal": "Question {n}",

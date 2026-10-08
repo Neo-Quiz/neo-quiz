@@ -457,6 +457,9 @@ const TYPE_SENTENCES: Record<string, string> = {
 	The questions must be ANSWERABLE FROM THE DOCUMENT ALONE and test understanding — main idea, inference, meaning in context, cause and effect, the author's intent, what can or cannot be concluded — NOT recall of outside knowledge`,
 };
 
+/** Every type string a request may name: the canonical values, nothing else. */
+export const CANONICAL_TYPES: readonly string[] = [TYPE_AUTO, ...Object.keys(TYPE_SENTENCES)];
+
 const QCM_EXPLAIN_RULE = 'EVERY question has "explain": SHORT, 1 to 3 sentences saying why the right answer is right and naming the trap. NO step-by-step correction and NO paragraph per wrong option.';
 
 const QCM_FORMAT_BLOCK = `WRITTEN MCQ EXAM FORMAT: write the quiz as the written MCQ (QCM) of an engineering-school exam.

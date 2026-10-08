@@ -30,6 +30,13 @@ import { loadSharedState, sharedState } from "./host/shared-state";
 import { createChatFiles } from "./host/chat-files";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
+import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
+import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
+import { addFailedRequest } from "../../../src/dashboard/chat-requests";
+import { getChats, setChats } from "../../../src/dashboard/chat-store";
+import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
+import { notifyPc } from "./host/notify";
+import { ecrireReglage, lireReglage } from "./host/folder";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
@@ -590,8 +597,45 @@ async function demarrer(): Promise<void> {
 		/* What this PC generates is published for the other devices as soon as the
 		   queue exists (it appears with the shell). Idle: no timer, no write. */
 		let stopGenerations: (() => void) | null = null;
+		/* Requests sent by the phone: the PC turns each valid one into an
+		   ordinary queue line (`remote-runner.ts`). Started with the queue, on
+		   the PC only; a delivery event, a periodic pass and the start itself
+		   ask for a scan. */
+		let remoteScan: (() => void) | null = null;
+		let stopRemote: (() => void) | null = null;
 		onQueueCreated(queue => {
 			stopGenerations = publishGenerations({ queue, write: f => chatFiles.writeGenerations(f), device: idAppareil });
+			if (estMobile()) return;
+			const runner = createRemoteRunner({
+				device: idAppareil,
+				now: () => Date.now(),
+				readIncoming: () => chatFiles.readIncoming(),
+				recordedIds: () => new Set(getChats().flatMap(c => c.requests.map(q => q.id))),
+				queue,
+				readDocument: async rel => {
+					const path = absoluteInRoot(rel, racineChats.id);
+					if (!path) return null;
+					try {
+						const content = await currentHost().fs.read(path);
+						return content.length > 1_000_000 ? null : { name: rel.slice(rel.lastIndexOf("/") + 1), content, path, source: "vault" };
+					} catch { return null; }
+				},
+				settings: () => reglagesIa.get(),
+				takenLog: {
+					async read() {
+						const raw = await lireReglage<unknown>("remoteTaken");
+						if (!Array.isArray(raw)) return [];
+						return raw.filter((e): e is TakenLogEntry => !!e && typeof e.id === "string" && typeof e.from === "string" && typeof e.at === "number" && Number.isFinite(e.at)).slice(-MAX_TAKEN);
+					},
+					write: list => ecrireReglage("remoteTaken", list),
+				},
+				recordFailure: (req, message) => { setChats(addFailedRequest(getChats(), req, idAppareil, racineChats.id, Date.now(), message)); },
+				notify: (title, body) => { void notifyPc(title, body); },
+			});
+			remoteScan = () => { void runner.scan(); };
+			const timer = setInterval(remoteScan, 60_000);
+			stopRemote = () => { clearInterval(timer); remoteScan = null; };
+			remoteScan();
 		});
 		/* Without this load, the very first mount of the shell (below) would see
 		   empty page settings (no folder expanded, default axis) instead of
@@ -633,6 +677,7 @@ async function demarrer(): Promise<void> {
 					await sharedState().refresh(() => stats.reload());
 					relireExamens();
 					await chatSync?.afterSync();
+					remoteScan?.();
 				} while (rechargeDemandee);
 				adopterOverrides(avantOverrides);
 				demonterCourant?.repaint?.();
@@ -725,6 +770,7 @@ async function demarrer(): Promise<void> {
 			await chatSync?.flush();
 			// Closing cleanly: the file goes, so no other device waits for a dead PC.
 			stopGenerations?.();
+			stopRemote?.();
 			await chatFiles.clearGenerations().catch(() => {});
 			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
 			await sessions.vider();
