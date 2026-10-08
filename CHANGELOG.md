@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.45] - 2026-10-08
+
 ### Added
 - Chats are now kept in the synced folder, so every device lists the chats of the others.
 - A generation running on your PC shows its progress in the chat, on every device.
