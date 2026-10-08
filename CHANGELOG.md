@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.50] - 2026-10-08
+
 ### Added
 
 - A Learn generated from PDFs can show, on a reading, the diagram of the course page it explains, cut out of the page.
