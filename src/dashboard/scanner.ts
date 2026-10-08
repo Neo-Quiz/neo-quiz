@@ -101,6 +101,8 @@ export interface QuizIndexEntry extends QuizMeta {
 	basename: string;
 	title: string;
 	mtime: number;
+	/** File creation time when the host knows it (see `HostFile.ctime`). */
+	ctime?: number;
 	/** Qui a généré ce quiz — absent d'un quiz écrit à la main ou partagé
 	    sans frontmatter (lireFrontmatterNeoQuiz). */
 	generated?: NeoQuizFrontmatter;
@@ -230,6 +232,7 @@ export function createScanner(host: Host): Scanner {
 					title: titreSansMode(file.basename, meta.mode),
 					...meta,
 					mtime: file.mtime,
+					ctime: file.ctime,
 					generated: lireFrontmatterNeoQuiz(content) || undefined,
 				});
 			} catch {
@@ -275,6 +278,7 @@ export function createScanner(host: Host): Scanner {
 				title: titreSansMode(file.basename, meta.mode),
 				...meta,
 				mtime: file.mtime,
+					ctime: file.ctime,
 				generated: lireFrontmatterNeoQuiz(content) || undefined,
 			};
 			// L'autosave d'Obsidian déclenche `modify` toutes les ~2 s

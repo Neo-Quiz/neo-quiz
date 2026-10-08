@@ -17,7 +17,7 @@ import { renderNextStep } from "./folder-next";
 import { buildRecentModuleGroups } from "./quiz-recent";
 import type { RecentGroupKey } from "./quiz-recent";
 import { moduleAccent } from "./module-color";
-import { renderCollapsibleSection } from "./collapsible";
+import { renderCollapsibleSection, type CollapseDeps } from "./collapsible";
 import { suggestIcons } from "./icon-suggest";
 import { renderFolderSections } from "./folder-sections";
 import { renderEmptyFolder } from "./folder-add";
@@ -209,7 +209,8 @@ export function renderModuleDrill(
 	openModuleFolder: string,
 	/* Re-rendu SANS refermer le drill-down (reset de stats depuis le menu ⋯). */
 	rerender: () => void,
-	onglet: OngletDossier
+	onglet: OngletDossier,
+	collapse: CollapseDeps
 ): VuesDossier {
 	treeEl.replaceChildren();
 
@@ -248,7 +249,9 @@ export function renderModuleDrill(
 		if (sas) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyGeneratedHint"));
 		else if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
 	}
-	const grid = ajouter(principal, "div", "qbd-home-grid qbd-quizzes-drill-grid");
+	/* Two sections below the actions row: Learn first, then Tests (practice
+	   and exam-mode quizzes), each only when it has cards. */
+	const grid = ajouter(principal, "div", "qbd-quizzes-drill-sections");
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
 	const cartes = regrouperParCours(inModule, false);
@@ -278,24 +281,36 @@ export function renderModuleDrill(
 		host: layout,
 		onShare: (quizzes) => shareQuiz({ quizzes, name: info?.name || openModuleFolder }),
 	}) : null;
-	for (const [index, carte] of cartes.entries()) {
-		const { quiz, freres } = carte;
-		const cardEl = renderQuizCard(grid, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
-			freres,
-			statsFreres: freres.map(f => stats[f.path]),
-			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
-			showPath: false,
-			// The progress ring replaces the play arrow (play lives on the quiz page).
-			showRing: true,
-			// Absent côté application (menus et modals = tranche 2.6) : la
-			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
-			// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
-			// correction 1, tâche 6).
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map, undefined, true) : undefined,
-			accent,
-			entryIndex: index,
-		});
-		selection?.add({ id: quiz.path, el: cardEl, quizzes: quizDeLaCarte(carte) });
+	const learnCards = cartes.filter(c => c.quiz.mode === "learn");
+	const testCards = cartes.filter(c => c.quiz.mode !== "learn");
+	let index = 0;
+	for (const [key, label, list] of [
+		["learn", t("dashboard.quizzes.sectionLearn"), learnCards],
+		["tests", t("dashboard.quizzes.sectionTests"), testCards],
+	] as const) {
+		if (list.length === 0) continue;
+		const clip = renderCollapsibleSection(collapse, grid, `drill:${openModuleFolder}:${key}`, label, list.length);
+		const cardsEl = ajouter(clip, "div", "qbd-home-grid qbd-quizzes-drill-grid");
+		for (const carte of list) {
+			const { quiz, freres } = carte;
+			const cardEl = renderQuizCard(cardsEl, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
+				freres,
+				statsFreres: freres.map(f => stats[f.path]),
+				// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
+				showPath: false,
+				// The progress ring replaces the play arrow (play lives on the quiz page).
+				showRing: true,
+				showDate: true,
+				// Absent côté application (menus et modals = tranche 2.6) : la
+				// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
+				// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
+				// correction 1, tâche 6).
+				onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map, undefined, true) : undefined,
+				accent,
+				entryIndex: index++,
+			});
+			selection?.add({ id: quiz.path, el: cardEl, quizzes: quizDeLaCarte(carte) });
+		}
 	}
 	selection?.ready();
 

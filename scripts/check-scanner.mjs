@@ -210,6 +210,17 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 		[learnAvecGlossaire?.questions, learnAvecGlossaire?.items.map(it => it.id)],
 		[learnSansGlossaire?.questions, learnSansGlossaire?.items.map(it => it.id)]);
 
+	/* The scanner carries the host's creation time to the entry (the folder
+	   page card shows it); a host without it leaves it undefined. */
+	{
+		const avec = { path: "Cours/c.md", name: "c.md", basename: "c", extension: "md", mtime: 5, ctime: 3 };
+		const quizSrc = "```quiz-blocks\n[{ title: 'Q', prompt: 'P', options: ['a', 'b'], correctIndex: 0 }]\n```";
+		const hoteCtime = { fs: { listMarkdown: () => [avec], readCached: async () => quizSrc, read: async () => quizSrc, getFile: () => avec }, watcher: { onChange: () => () => {} } };
+		const sC = createScanner(hoteCtime);
+		await sC.scanFile(avec);
+		r.check("le scanner reporte la date de création de l'hôte sur l'entrée", sC.getQuiz(avec.path)?.ctime, 3);
+	}
+
 	/* A delete landing while a scan's read is in flight must not be undone by
 	   that scan: "Delete both" on a course card writes then trashes each note,
 	   and the late read re-indexed the trashed note (card stayed on screen). */

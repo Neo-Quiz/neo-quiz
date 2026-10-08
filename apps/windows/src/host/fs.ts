@@ -129,7 +129,7 @@ export function normaliser(chemin: string): string {
 
 /** Le `HostFile` d'un chemin du contrat. `mtime` vaut 0 quand l'hôte l'ignore,
     ce que le contrat autorise explicitement. */
-export function toHostFile(relatif: string, mtime = 0): HostFile {
+export function toHostFile(relatif: string, mtime = 0, ctime?: number): HostFile {
 	const path = normaliser(relatif).replace(/^\/+/, "");
 	const name = path.split("/").pop() || path;
 	// `lastIndexOf > 0` et non `>= 0` : « .gitignore » est un nom, pas une
@@ -141,6 +141,7 @@ export function toHostFile(relatif: string, mtime = 0): HostFile {
 		basename: point > 0 ? name.slice(0, point) : name,
 		extension: point > 0 ? name.slice(point + 1) : "",
 		mtime,
+		...(ctime ? { ctime } : {}),
 	};
 }
 
@@ -250,7 +251,7 @@ function versContrat(
 	if (ev.kind === "delete") return index.get(rel) ? { kind: "delete", path: rel } : null;
 	const connu = index.get(rel);
 	if (connu && connu.mtime === ev.mtime) return null;
-	const file = toHostFile(rel, ev.mtime);
+	const file = toHostFile(rel, ev.mtime, ev.ctime);
 	return connu ? { kind: "modify", file } : { kind: "create", file };
 }
 
@@ -404,7 +405,7 @@ export async function createWindowsIndex(carte: CarteRacines): Promise<MiroirDis
 		for (const entree of entrees) {
 			const rel = carte.depuisAbsolu(entree.chemin);
 			if (rel === null || horsCatalogue(rel) || index.get(rel)) continue;
-			index.apply({ kind: "create", file: toHostFile(rel, entree.mtime) });
+			index.apply({ kind: "create", file: toHostFile(rel, entree.mtime, entree.ctime) });
 		}
 	}
 

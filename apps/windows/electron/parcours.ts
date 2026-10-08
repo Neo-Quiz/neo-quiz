@@ -65,7 +65,7 @@ export async function listerRacine(racine: string): Promise<EntreeDisque[]> {
 			if (entree.isDirectory()) {
 				if (!dossierIgnore(entree.name)) await descendre(chemin);
 			} else if (entree.isFile()) {
-				sortie.push({ chemin, mtime: 0 });
+				sortie.push({ chemin, mtime: 0, ctime: 0 });
 			}
 		}
 	}
@@ -80,7 +80,7 @@ export async function listerRacine(racine: string): Promise<EntreeDisque[]> {
 	for (let i = 0; i < aDater.length; i += LOTS_STAT) {
 		await Promise.all(aDater.slice(i, i + LOTS_STAT).map(async f => {
 			const info = await stat(f.chemin);
-			if (info) f.mtime = info.mtime;
+			if (info) { f.mtime = info.mtime; f.ctime = info.ctime; }
 		}));
 	}
 	return sortie;

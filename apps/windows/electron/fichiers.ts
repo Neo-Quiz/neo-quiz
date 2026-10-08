@@ -231,11 +231,12 @@ async function creerDossiers(chemin: string): Promise<void> {
     chemin désigne un dossier. Primitive INTERNE — voir l'en-tête : la tâche 2
     (l'index) en aura besoin pour les `mtime`, mais elle n'est présentée à
     personne comme une méthode du contrat `HostFs`. */
-export async function stat(chemin: string): Promise<{ mtime: number } | null> {
+export async function stat(chemin: string): Promise<{ mtime: number; ctime: number } | null> {
 	try {
 		const info = await fs.stat(chemin);
 		if (info.isDirectory()) return null;
-		return { mtime: info.mtimeMs };
+		// birthtime is 0 on a filesystem that does not record it.
+		return { mtime: info.mtimeMs, ctime: info.birthtimeMs };
 	} catch {
 		return null;
 	}

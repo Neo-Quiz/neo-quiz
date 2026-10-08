@@ -1,6 +1,6 @@
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
-import { t } from "../i18n";
+import { t, currentLang } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { QuizIndexEntry, QuizTypeTag } from "./scanner";
 import type { ModeQuiz } from "../quiz-format";
@@ -70,6 +70,29 @@ export function quizModeIcon(mode: ModeQuiz): string {
 	return mode === "learn" ? "book-open" : mode === "exam" ? "timer" : "file-text";
 }
 
+
+/** When a quiz (or the earliest of a course's quizzes) was created: the
+    generation date of the app's `neo-quiz:` frontmatter when the note has one,
+    else the file's creation time, else its modification time (a host that
+    does not report `ctime`). 0 when nothing is known. */
+export function quizCreationTime(quizzes: readonly QuizIndexEntry[]): number {
+	const times = quizzes.map(q => {
+		const generated = q.generated ? Date.parse(q.generated.generatedAt) : NaN;
+		return Number.isFinite(generated) ? generated : (q.ctime || q.mtime || 0);
+	}).filter(n => n > 0);
+	return times.length > 0 ? Math.min(...times) : 0;
+}
+
+/** Short localized date: "Oct 8" / "8 oct.", with the year only when it is
+    not the current one. */
+export function formatCardDate(ms: number, now: Date = new Date()): string {
+	const d = new Date(ms);
+	return d.toLocaleDateString(currentLang(), {
+		day: "numeric", month: "short",
+		...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
+	});
+}
+
 /* ══════════════════════════════════════════════════════════
    QUIZ CARD — composant carte partagé (home + quizzes)
    État lisible (pastille couleur + icône), accent coloré par état,
@@ -112,6 +135,8 @@ export function renderQuizCard(
 		    onglet « Progression » donne déjà chaque cours mode par mode
 		    (2026-09-26) ; l'accueil, qui n'a pas cet onglet, le garde. */
 		showRing?: boolean;
+		/** Creation date, right-aligned on the count line (folder pages). */
+		showDate?: boolean;
 		onPlay?: (quiz: QuizIndexEntry) => void;
 		onMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement) => void;
 		accent?: string;
@@ -168,6 +193,11 @@ export function renderQuizCard(
 		ajouter(compte, "span", "qbd-count-sep");
 		ajouter(compte, "span", undefined,
 			t(totalReadings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: totalReadings }));
+	}
+
+	if (opts?.showDate) {
+		const created = quizCreationTime([quiz, ...freres]);
+		if (created > 0) ajouter(compte, "span", "qbd-quiz-card-date", formatCardDate(created));
 	}
 
 	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans

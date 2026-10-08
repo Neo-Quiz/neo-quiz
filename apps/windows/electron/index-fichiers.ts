@@ -145,7 +145,7 @@ export interface Index {
 /** Le `HostFile` d'un chemin déjà au format contrat (indice de racine en
     tête). Même découpe que `toHostFile` de l'hôte du rendu : un point de TÊTE
     de nom n'est pas une extension (« .gitignore »). */
-function toHostFile(cheminContrat: string, mtime: number): HostFile {
+function toHostFile(cheminContrat: string, mtime: number, ctime?: number): HostFile {
 	const p = normaliser(cheminContrat);
 	const name = p.split("/").pop() || p;
 	const point = name.lastIndexOf(".");
@@ -155,6 +155,7 @@ function toHostFile(cheminContrat: string, mtime: number): HostFile {
 		basename: point > 0 ? name.slice(0, point) : name,
 		extension: point > 0 ? name.slice(point + 1) : "",
 		mtime,
+		...(ctime ? { ctime } : {}),
 	};
 }
 
@@ -272,7 +273,7 @@ export function creerIndex(racines: string[]): Index {
 		if (!absolu) return;
 		const info = await stat(absolu);
 		if (!info) return;
-		const file = toHostFile(cheminContrat, info.mtime);
+		const file = toHostFile(cheminContrat, info.mtime, info.ctime);
 		apply(parChemin.has(cheminContrat) ? { kind: "modify", file } : { kind: "create", file });
 	}
 
@@ -353,7 +354,7 @@ export function creerIndex(racines: string[]): Index {
 			if (chemin === null || horsCatalogue(chemin)) return;
 			void stat(absolu).then(info => {
 				if (!info) return; // disparu entre l'événement et le `stat`.
-				const file = toHostFile(chemin, info.mtime);
+				const file = toHostFile(chemin, info.mtime, info.ctime);
 				const ev: HostFileEvent = { kind, file };
 				apply(ev);
 				onEvenement(ev);
@@ -448,12 +449,12 @@ export function creerIndex(racines: string[]): Index {
 	/** Diffs the disk against the index and emits what changed while the
 	    watcher was closed. Same filters as the watcher (`horsCatalogue`). */
 	async function reconcilier(onEvenement: (ev: EvenementSurveillant) => void): Promise<void> {
-		const surDisque = new Map<string, number>();
+		const surDisque = new Map<string, { mtime: number; ctime: number }>();
 		for (let i = 0; i < racinesAbs.length; i++) {
 			for (const entree of await listerRacine(racinesAbs[i])) {
 				const chemin = contratDepuisAbsolu(racinesAbs, entree.chemin);
 				if (chemin === null || horsCatalogue(chemin)) continue;
-				surDisque.set(chemin, entree.mtime);
+				surDisque.set(chemin, { mtime: entree.mtime, ctime: entree.ctime ?? 0 });
 			}
 		}
 		for (const chemin of [...parChemin.keys()]) {
@@ -462,12 +463,12 @@ export function creerIndex(racines: string[]): Index {
 			apply(ev);
 			onEvenement(ev);
 		}
-		for (const [chemin, mtime] of surDisque) {
+		for (const [chemin, { mtime, ctime }] of surDisque) {
 			const connu = parChemin.get(chemin);
 			// `mtime` is 0 for non-`.md` files (the walk does not stat them): an
 			// unknown date never counts as a change.
 			if (connu && (mtime === 0 || mtime === connu.mtime)) continue;
-			const file = toHostFile(chemin, mtime);
+			const file = toHostFile(chemin, mtime, ctime);
 			const ev: HostFileEvent = { kind: connu ? "modify" : "create", file };
 			apply(ev);
 			onEvenement(ev);

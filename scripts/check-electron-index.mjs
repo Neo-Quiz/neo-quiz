@@ -316,6 +316,9 @@ await withSrcModule(["apps/windows/electron/index-fichiers.ts", "apps/windows/el
 			const file = index.get("0/g.md");
 			r.check("après une écriture par index.write, get() rend le mtime NEUF sans attendre le surveillant",
 				file !== null && typeof file.mtime === "number" && file.mtime > 0, true);
+			// The creation time rides along (0 is left out: the host then falls back to mtime).
+			r.check("index.write: ctime, when the filesystem records it, is a positive number",
+				file !== null && (file.ctime === undefined || file.ctime > 0), true);
 		});
 
 		await cas(r, "surveiller rend une fonction qui arrête vraiment l'écoute", async () => {

@@ -33,6 +33,9 @@ export interface HostFile {
 	extension: string;
 	/** Dernière modification, ms depuis l'époque. 0 si l'hôte l'ignore. */
 	mtime: number;
+	/** Creation (birth) time, ms since the epoch. Optional: a host that does
+	    not know it leaves it out and callers fall back to `mtime`. */
+	ctime?: number;
 }
 
 /**
