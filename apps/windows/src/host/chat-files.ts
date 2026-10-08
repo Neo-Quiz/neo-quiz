@@ -53,6 +53,10 @@ export interface ChatFiles {
 	readIncoming(): Promise<IncomingFile[]>;
 }
 
+/** A scan examines at most this many sender folders and request files per sender. */
+export const MAX_SENDERS = 8;
+export const MAX_REQUEST_FILES = 20;
+
 /** A generations file is a few KB; past this it is not read. */
 const MAX_GENERATIONS_CHARS = 100_000;
 
@@ -198,13 +202,15 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		let senders: Array<{ name: string; isFolder: boolean }>;
 		try { senders = await fs.listDir(reqDir); } catch { return []; }
 		const out: IncomingFile[] = [];
-		for (const s of senders) {
-			if (!s.isFolder || !DEVICE.test(s.name) || s.name.toLowerCase() === deviceId.toLowerCase()) continue;
+		const eligible = senders.filter(s => s.isFolder && DEVICE.test(s.name) && s.name.toLowerCase() !== deviceId.toLowerCase()).sort((a, b) => a.name < b.name ? -1 : 1);
+		if (eligible.length > MAX_SENDERS) console.warn(`${LOG_PREFIX} too many request folders, only the first ${MAX_SENDERS} are examined`);
+		for (const s of eligible.slice(0, MAX_SENDERS)) {
 			let names: string[];
 			try { names = (await fs.list(`${reqDir}/${s.name}`)).map(baseName); } catch { continue; }
-			for (const n of names) {
-				// A Syncthing conflict copy duplicates a request, it is never a second one.
-				if (!n.endsWith(".json") || isConflictCopy(n) || !SLUG.test(n.slice(0, -5))) continue;
+			// Request ids start with a base-36 timestamp: sorted by name, the OLDEST come first.
+			const candidates = names.filter(n => n.endsWith(".json") && !isConflictCopy(n) && SLUG.test(n.slice(0, -5))).sort();
+			if (candidates.length > MAX_REQUEST_FILES) console.warn(`${LOG_PREFIX} too many request files from ${s.name}, only the first ${MAX_REQUEST_FILES} are examined`);
+			for (const n of candidates.slice(0, MAX_REQUEST_FILES)) {
 				try {
 					if (!(await smallEnough(`${reqDir}/${s.name}/${n}`, MAX_REQUEST_CHARS))) continue;
 					const raw = await fs.read(`${reqDir}/${s.name}/${n}`);

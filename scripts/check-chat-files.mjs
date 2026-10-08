@@ -210,6 +210,14 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		const hcf = make(hugeFs, ME); await quiet(() => hcf.load());
 		const hin = await quiet(() => hcf.readIncoming()); await quiet(() => hcf.readGenerations());
 		r.check("a request, generations or chat file past its byte cap is never read", [hugeFs.reads.filter(p => p.includes("huge") || p.endsWith("generations/pc.json") || p === `${D}/pc.json`), hin.map(i => i.fileId)], [[], ["ok-00001"]]);
+		// Flood: bounded senders and files per scan
+		const flood = new Map();
+		for (let i = 0; i < 1000; i++) flood.set(`${RD}/${PC}/f${String(i).padStart(5, "0")}.json`, JSON.stringify(req("f" + i, { from: PC, target: ME })));
+		for (let d = 0; d < 20; d++) flood.set(`${RD}/aaaaaaaa-aaaa-4aaa-8aaa-${String(d).padStart(12, "0")}/x-00001.json`, JSON.stringify(req("x-00001", { target: ME })));
+		const floodFs = memFs(flood);
+		const fin = await quiet(() => make(floodFs, ME).readIncoming());
+		r.check("1000 request files and 20 sender folders: at most 8 senders x 20 files are read", [floodFs.reads.length <= 8 * 20, fin.length <= 160], [true, true]);
+		r.check("the first names are the ones examined, no more than 20 per sender", [fin.filter(i => i.fileDevice === PC).length, fin.find(i => i.fileDevice === PC)?.fileId], [20, "f00000"]);
 		const none = make(memFs(), ME);
 		r.check("no requests folder: nothing, no throw", [await none.readIncoming(), await none.listOwnRequests()], [[], []]);
 	}
