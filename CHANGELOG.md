@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.46] - 2026-10-08
+
 ### Added
 
 - Your PC runs generations requested from your phone, and tells you when one starts.
