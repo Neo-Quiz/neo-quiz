@@ -190,3 +190,23 @@ html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="submit"]
 html.nq-mobile pre.quiz-md-code {
 	touch-action: pan-x pan-y;
 }
+
+/* A code block inside a numbered reading step takes the card's whole width on
+   a phone (2026-10-08): the number column and its gap (34 + 14 px, 26 + 10 px
+   in a short reading) left a 255 px block at 393 px, where a line such as
+   `plt.bar(bureaux["nom"], bureaux["chiffre_affaires"])` still scrolled at
+   the 11 px floor of the code fit (ui/code-fit.ts). The text of the step keeps
+   its indent; only the code runs under the number. */
+html.nq-mobile .quiz-lecture-etape-texte > .quiz-code-block,
+html.nq-mobile .quiz-lecture-etape-texte > .quiz-md-code {
+	margin-left: -48px;
+	width: calc(100% + 48px);
+	max-width: none;
+	box-sizing: border-box;
+}
+
+html.nq-mobile .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-code-block,
+html.nq-mobile .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-md-code {
+	margin-left: -36px;
+	width: calc(100% + 36px);
+}
