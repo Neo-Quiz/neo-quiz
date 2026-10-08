@@ -325,6 +325,11 @@ jobs:
       # own chats, a tombstone or a copy of a foreign chat), and the path rule.
       - name: Chat sync
         run: npm run check:chat-sync
+      # THE CHAT FILES of the synced folder: other devices' files read bounded
+      # and strictly (a bad one skipped), our own written through a temp file
+      # and never replaced by a partial list, stored paths kept inside the root.
+      - name: Chat files
+        run: npm run check:chat-files
       # THE CHATS, pure cores: lines grouped into requests (one bubble per
       # send), reconciled into records without erasing an answer, the thread
       # and the list derived from record + live lines, the follow-up context.

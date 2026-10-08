@@ -603,6 +603,15 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   une pierre tombale ou une copie d'une conversation d'un autre appareil ne
   portant que les demandes qu'aucun autre fichier ne tient, origine conservée) ;
   un chemin stocké hostile ne devient jamais une cible d'Ouvrir. Dans la CI.
+- `npm run check:chat-files` — les fichiers de conversations du dossier
+  synchronisé (`apps/windows/src/host/chat-files.ts`), sur un fs en mémoire :
+  le fichier d'un autre appareil est lu borné (2 Mo) et strictement (JSON
+  abîmé, version inconnue ou vide ignorés sans jamais lever), copies de
+  conflit et `.json.tmp` d'un échange interrompu lus, chemins ramenés à la
+  racine ; SON fichier n'est écrit que par fichier temporaire puis
+  renommage, jamais sur place, jamais celui d'un autre, et jamais remplacé
+  par une liste partielle quand il est illisible (octets gardés à part) ;
+  200 conversations au plus, pierres tombales conservées. Dans la CI.
 - `npm run check:code-packages` — le proxy de paquets Python du principal
   (`apps/windows/electron/paquets-python.ts`), sur un transport injecté : un
   fichier que le `pyodide-lock.json` du pack ne nomme pas ne déclenche AUCUNE
