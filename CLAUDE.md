@@ -519,6 +519,16 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   `apps/windows/src/host/shared-state.ts`) : fusion pure des examens et des
   tentatives, un fichier par racine et par appareil, migration unique, copies
   de conflit Syncthing, déplacements. Dans la CI.
+- `npm run check:remote-request` — le VALIDATEUR d'une demande envoyée par le
+  téléphone (`src/shared-state/remote-request.ts`), seul filtre entre un fichier
+  synchronisé et le lancement d'un CLI : schéma strict (champ inconnu, dont
+  `__proto__`, refusé : une demande ne nomme ni fournisseur, ni modèle, ni
+  chemin de CLI), expéditeur = dossier et jamais ce PC, destinataire = ce PC,
+  âge (24 h) et futur, tailles, chemins de documents (relatifs, `.md`/`.markdown`/
+  `.txt`, jamais sous `.neo-quiz/`, ni `..`, lecteur, UNC, flux `:`, noms de
+  périphérique Windows, caractères bidi/invisibles/pleine chasse, NFD), puis
+  l'admission (une à la fois, 6 par heure, jamais deux fois la même) et l'état
+  « en attente ». Dans la CI.
 - `npm run check:generations` â ce qu'un PC publie sur ce qu'il gÃ©nÃ¨re en ce moment
   (`src/shared-state/generations.ts`, fichier `.neo-quiz/generations/<appareil>.json`) :
   un fichier datÃ© de plus de deux minutes, ou de plus de deux minutes dans le futur

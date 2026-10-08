@@ -42,6 +42,7 @@
     "check:chat-sync": "node scripts/check-chat-sync.mjs",
     "check:chat-files": "node scripts/check-chat-files.mjs",
     "check:chat-thread": "node scripts/check-chat-thread.mjs",
+    "check:remote-request": "node scripts/check-remote-request.mjs",
     "check:explain": "node scripts/check-explain.mjs",
     "check:web-channel": "node scripts/check-web-channel.mjs",
     "check:dashboard-dom": "node scripts/check-dashboard-dom.mjs",

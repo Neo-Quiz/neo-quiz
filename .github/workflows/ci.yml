@@ -341,6 +341,12 @@ jobs:
       - name: Chat thread and list
         run: npm run check:chat-thread
 
+      # REMOTE REQUESTS from the phone, the validator between a synced file and
+      # a CLI launch: strict schema, sender/target, age, sizes, document paths
+      # (Unicode tricks included), admission (one at a time, 6 per hour).
+      - name: Remote request
+        run: npm run check:remote-request
+
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is
       # stopped after the delay; a closed window stops its runs at once.
