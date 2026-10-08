@@ -846,11 +846,12 @@ export interface HostPdf {
 	 * rendues ; `total` est le nombre de pages du document, rendues ou non.
 	 * `first` (1 par défaut) : la première page rendue — une FIGURE d'une
 	 * carte de lecture générée ne veut qu'UNE page, au milieu du cours
-	 * (2026-10-08).
+	 * (2026-10-08). `figure` : la page réduite à son DESSIN (schéma, tableau,
+	 * figure) quand l'hôte sait le trouver, la page entière sinon.
 	 * OPTIONNEL, comme le membre lui-même : un hôte qui sait lire le texte
 	 * mais pas dessiner rend la carte sans vignette et l'aperçu en texte.
 	 */
-	renderPages?(data: Uint8Array, opts: { width: number; max?: number; first?: number }): Promise<{ pages: string[]; total: number }>;
+	renderPages?(data: Uint8Array, opts: { width: number; max?: number; first?: number; figure?: boolean }): Promise<{ pages: string[]; total: number }>;
 }
 
 /**

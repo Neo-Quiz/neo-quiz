@@ -15,7 +15,7 @@ release notes.
 
 ### Added
 
-- A Learn generated from PDFs can show, on a reading, the course page that holds the diagram it explains.
+- A Learn generated from PDFs can show, on a reading, the diagram of the course page it explains, cut out of the page.
 
 ### Changed
 

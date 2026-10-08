@@ -28,6 +28,8 @@
 
 import type { HostPdf } from "../../../../src/host/types";
 import { ouvrirDocument, texteDesPages } from "./pdf-texte";
+import { zoneDeFigure } from "./pdf-figure";
+import type { Boite, CodesOps, ListeOps, TexteSurPage } from "./pdf-figure";
 import type { PdfJsLib } from "./pdf-texte";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
 
@@ -36,6 +38,8 @@ export function createWindowsPdf(): HostPdf {
 	   chargent pas deux fois le module, et un échec de chargement se rejoue
 	   au prochain appel (la promesse rejetée est oubliée). */
 	let moteur: Promise<PdfJsLib> | null = null;
+	/** pdf.js's operator codes, kept when the engine loads (`zoneDeFigure`). */
+	let ops: CodesOps | null = null;
 	const charger = (): Promise<PdfJsLib> => {
 		if (!moteur) {
 			moteur = import("pdfjs-dist").then(pdfjs => {
@@ -54,6 +58,7 @@ export function createWindowsPdf(): HostPdf {
 				   type `port` en `null` (une erreur de la `.d.ts`), celle de
 				   `create` en `Worker` — même code derrière. */
 				const worker = pdfjs.PDFWorker.create({ port: new PdfWorker() });
+				ops = pdfjs.OPS as unknown as CodesOps;
 				const lib: PdfJsLib = {
 					/* La COPIE des octets, elle, vit dans `ouvrirDocument`
 					   (`./pdf-texte.ts`, pur et éprouvé par `check:pdf`) : c'est la
@@ -66,6 +71,28 @@ export function createWindowsPdf(): HostPdf {
 		}
 		return moteur;
 	};
+	/** The page's figure alone, as a PNG `data:` URL, or null (no figure found,
+	    or an engine without operator lists). */
+	async function dessinerFigure(page: PageDessinable, largeur: number): Promise<string | null> {
+		if (!ops || !page.getOperatorList || !page.view) return null;
+		const zone = zoneDeFigure(await page.getOperatorList(), ops, (await page.getTextContent()).items, page.view as Boite);
+		if (!zone) return null;
+		const dpr = Math.min(2, window.devicePixelRatio || 1);
+		// A small drawing is enlarged, up to three times its printed size.
+		const echelle = Math.min(3, largeur / (zone[2] - zone[0])) * dpr;
+		const plein = page.getViewport({ scale: echelle });
+		const [ax, ay, bx, by] = plein.convertToViewportRectangle(zone);
+		const x = Math.min(ax, bx), y = Math.min(ay, by);
+		const viewport = page.getViewport({ scale: echelle, offsetX: -x, offsetY: -y });
+		const canvas = document.createElement("canvas");
+		canvas.width = Math.ceil(Math.abs(bx - ax));
+		canvas.height = Math.ceil(Math.abs(by - ay));
+		await page.render({ canvas, viewport }).promise;
+		const url = canvas.toDataURL("image/png");
+		canvas.width = 0;
+		canvas.height = 0;
+		return url;
+	}
 	return {
 		async extractText(data) {
 			return texteDesPages(await charger(), data);
@@ -90,6 +117,13 @@ export function createWindowsPdf(): HostPdf {
 				for (let i = premiere; i <= derniere; i++) {
 					const page = await doc.getPage(i);
 					if (!page.getViewport || !page.render) break;
+					/* A FIGURE (2026-10-08): only the drawing of the page, found by
+					   `zoneDeFigure`, at the requested width; the whole page when it
+					   finds none. */
+					if (opts.figure) {
+						const figure = await dessinerFigure(page as unknown as PageDessinable, opts.width);
+						if (figure) { pages.push(figure); continue; }
+					}
 					if (echelle === null) echelle = opts.width / page.getViewport({ scale: 1 }).width;
 					/* Le facteur d'écran entre dans l'ÉCHELLE : une vignette dessinée
 					   en 1× sur un écran 2× sort floue. Le canvas est plus grand, le
@@ -115,4 +149,13 @@ export function createWindowsPdf(): HostPdf {
 			}
 		},
 	};
+}
+
+/** The surface of a pdf.js page that drawing a figure needs. */
+interface PageDessinable {
+	view?: number[];
+	getOperatorList?(): Promise<ListeOps>;
+	getTextContent(): Promise<{ items: TexteSurPage[] }>;
+	getViewport(opts: { scale: number; offsetX?: number; offsetY?: number }): { width: number; height: number; convertToViewportRectangle(rect: number[]): number[] };
+	render(params: { canvas: HTMLCanvasElement; viewport: unknown }): { promise: Promise<void> };
 }

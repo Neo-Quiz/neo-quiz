@@ -48,7 +48,10 @@ function fabriquerPdf(pages) {
 	const idPagesNoeud = objets.length + 1 + pages.length * 2; // réservé plus bas
 	for (const texte of pages) {
 		let contenu = "";
-		if (texte !== null) {
+		if (texte !== null && typeof texte === "object") {
+			// A page given as its raw content stream (the figure cases below).
+			contenu = texte.contenu;
+		} else if (texte !== null) {
 			/* UN seul opérateur Tj par page : pdf.js fusionne ou sépare les
 			   opérateurs voisins selon leurs positions, et ce découpage-là est
 			   le sien, pas le nôtre. Ce qu'on éprouve ici est la SÉPARATION DES
@@ -124,5 +127,46 @@ await withSrcModule("apps/windows/src/host/pdf-texte.ts", async ({ texteDesPages
 	await texteDesPages(factice, new Uint8Array()).catch(() => {});
 	r.check("le document est libéré même si une page échoue", detruit, true);
 
+	r.done();
+});
+
+/* WHERE THE FIGURE IS (`pdf-figure.ts`, 2026-10-08), on pages drawn here and
+   read by the real engine: a title, a rule under it, a paragraph, then a
+   drawing of two boxes joined by a line (the second placed by a `cm`
+   matrix, as a PDF often does), a short label above it, a multiplicity
+   inside, and the question written just under it. The figure is the drawing
+   and its labels, never the title, the rule, the paragraph or the question. */
+await withSrcModule("apps/windows/src/host/pdf-figure.ts", async ({ zoneDeFigure }) => {
+	const r = makeReporter("PDF — where the figure is");
+	const zone = async (contenu) => {
+		const doc = await pdfjs.getDocument({ data: fabriquerPdf([{ contenu }]), verbosity: 0 }).promise;
+		try {
+			const page = await doc.getPage(1);
+			return zoneDeFigure(await page.getOperatorList(), pdfjs.OPS, (await page.getTextContent()).items, page.view);
+		} finally { await doc.destroy(); }
+	};
+	const texte = (x, y, s) => `BT /F1 10 Tf ${x} ${y} Td (${s}) Tj ET`;
+	const page = [
+		texte(40, 780, "Dossier 3 Heritage composition et modele metier"),
+		"40 772 m 555 772 l S",
+		texte(40, 740, "Une commande contient des lignes qui lui sont exclusivement rattachees."),
+		"100 500 200 100 re S",
+		"q 1 0 0 1 50 0 cm 300 500 150 100 re S Q",
+		"300 550 m 350 550 l S",
+		texte(100, 606, "Vue A"),
+		texte(305, 555, "1..*"),
+		texte(40, 490, "1"),
+		texte(52, 490, "Quelles conclusions sur les losanges sont defendables ?"),
+	].join("\n");
+	const z = await zone(page);
+	const arrondi = z && z.map(v => Math.round(v));
+	r.check("the drawing, placed through its cm, with a margin", arrondi && [arrondi[0], arrondi[1], arrondi[2]], [94, 494, 506]);
+	r.check("… its label above included, the title, rule and paragraph not", !!z && z[3] >= 614 && z[3] < 640, true);
+	r.check("… the question under it left out, its number too", !!z && z[1] > 490, true);
+	r.check("a page of text only has no figure", await zone([texte(40, 780, "Titre"), texte(40, 760, "Un paragraphe de texte.")].join("\n")), null);
+	r.check("a background over the whole page is no figure", await zone(["0 0 595 842 re f", texte(40, 760, "Texte")].join("\n")), null);
+	r.check("a drawing too small to matter (a check box) is no figure", await zone(["500 800 8 8 re S", texte(40, 760, "Texte")].join("\n")), null);
+	r.check("a long arrow is part of the drawing, not a rule",
+		(await zone(["100 500 50 50 re S", "150 525 m 450 525 l S", "450 500 50 50 re S"].join("\n")))?.map(v => Math.round(v)), [94, 494, 506, 556]);
 	r.done();
 });

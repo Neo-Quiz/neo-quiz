@@ -148,7 +148,7 @@ export async function figuresParHote(
 					: doc.path ? await host.fs.readBinary(doc.path)
 					: null;
 				if (!octets) return null;
-				const rendu = await pdf.renderPages(octets, { width: LARGEUR_FIGURE, first: page, max: 1 });
+				const rendu = await pdf.renderPages(octets, { width: LARGEUR_FIGURE, first: page, max: 1, figure: true });
 				const png = rendu.pages[0] ? octetsDeDataUrl(rendu.pages[0]) : null;
 				if (!png) return null;
 				await host.fs.mkdirs(chemin.slice(0, chemin.lastIndexOf("/")));
