@@ -146,5 +146,21 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		await first; await second;
 		r.check("a failed save does not poison the next one", [rejected, JSON.parse(fs.files.get(`${D}/me.json`)).chats[0].id], [true, "b"]);
 	}
+	// 11. Generations files
+	{
+		const GD = "Root/.neo-quiz/generations";
+		const gen = (at, device) => JSON.stringify({ v: 1, at, running: [{ requestId: "r", chatId: "c", from: device, text: "t", mode: "learn", startedAt: 1, provider: "p", model: "m", progress: { question: 2 } }] });
+		const fs = memFs(new Map([[`${GD}/pc.json`, gen(5, "pc")], [`${GD}/bad.json`, "{ torn"], [`${GD}/huge.json`, gen(5, "x") + " ".repeat(100_001)], [`${GD}/me.json`, gen(7, "me")]]));
+		const cf = make(fs); await cf.load();
+		const seen = await quiet(() => cf.readGenerations());
+		r.check("other devices' valid generations files are read, ours, torn and oversized ones skipped", seen.map(s => s.device), ["pc"]);
+		await cf.writeGenerations({ v: 1, at: 9, running: [] });
+		r.check("our generations file is written through a temp file", [JSON.parse(fs.files.get(`${GD}/me.json`)).at, fs.writes.includes(`${GD}/me.json.tmp`), fs.writes.includes(`${GD}/me.json`)], [9, true, false]);
+		await cf.clearGenerations();
+		r.check("clearing removes only our file", [fs.files.has(`${GD}/me.json`), fs.files.has(`${GD}/pc.json`)], [false, true]);
+		const empty = make(memFs());
+		r.check("no generations folder: nothing, no throw", await empty.readGenerations(), []);
+		await empty.clearGenerations();
+	}
 	r.done();
 });

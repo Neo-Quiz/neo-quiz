@@ -176,8 +176,21 @@ let depsCourants: DepsFile | null = null;
     la même. */
 export function fileDeGeneration(d: DepsFile): FileGenerationApp {
 	depsCourants = d;
-	if (!instance) instance = creer(() => depsCourants as DepsFile);
+	if (!instance) {
+		instance = creer(() => depsCourants as DepsFile);
+		for (const cb of creationHooks) cb(instance);
+	}
 	return instance;
+}
+
+const creationHooks = new Set<(q: FileGenerationApp) => void>();
+/** Calls `cb` with the window's queue as soon as it exists (at once when it
+    already does). The queue only appears when the shell is mounted, so a
+    host service that follows it (the generations publisher) registers here
+    instead of building its own. */
+export function onQueueCreated(cb: (q: FileGenerationApp) => void): void {
+	if (instance) cb(instance);
+	else creationHooks.add(cb);
 }
 
 function creer(lireDeps: () => DepsFile): FileGenerationApp {

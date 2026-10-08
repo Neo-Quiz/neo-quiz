@@ -62,3 +62,44 @@ await withSrcModule("src/shared-state/generations.ts", (G) => {
 	r.check("last PC seen: none when all are stale", G.lastPcSeen([{ device: "a", file: file(1000) }], 900_000), null);
 	r.done();
 });
+
+await withSrcModule("src/dashboard/generations-publisher.ts", async (P) => {
+	const r = makeReporter("Generations - publisher");
+	const line = (id, etat) => ({ id, etat, debut: 1, demande: { text: "Q", notes: [], mode: "learn", count: 10, reglages: { aiProvider: "p", aiModel: "m" }, chatId: "c", requestId: "r" + id, sentAt: 1 } });
+	let lines = [], listener = null, transcriptListener = null, now = 1000;
+	const writes = [];
+	let subscribed = 0;
+	let tx = "[{prompt: 'a'}";
+	const queue = {
+		lignes: () => lines, transcript: () => ({ text: tx }),
+		abonner: (cb) => { subscribed++; listener = cb; return () => { subscribed--; }; },
+		abonnerTranscript: (cb) => { subscribed++; transcriptListener = cb; return () => { subscribed--; }; },
+	};
+	const stop = P.publishGenerations({ queue, write: async (f) => { writes.push(f); }, device: "pc", now: () => now });
+	await Promise.resolve();
+	r.check("nothing runs: nothing is written at start", writes.length, 0);
+	lines = [line(1, "cours")]; listener(); await Promise.resolve();
+	r.check("a request starts: one write with its entry", [writes.length, writes.at(-1).running[0].requestId], [1, "r1"]);
+	now += 1000; tx += ", {prompt: 'b'}"; transcriptListener(1); await Promise.resolve();
+	r.check("a chunk within 5 s does not write again", writes.length, 1);
+	now += 6000; tx += ", {prompt: 'c'}"; transcriptListener(1); await Promise.resolve();
+	r.check("after 5 s the progress is written", writes.length, 2);
+	lines = [line(1, "prete")]; listener(); await Promise.resolve();
+	r.check("the end is written at once, with the entry gone", [writes.length, writes.at(-1).running.length], [3, 0]);
+	listener(); await Promise.resolve();
+	r.check("idle and unchanged: no more writes", writes.length, 3);
+	stop(); await Promise.resolve();
+	r.check("stop unsubscribes from both feeds", subscribed, 0);
+	r.check("stop writes a final empty file only when something was published", writes.length, 4);
+	r.done();
+});
+
+await withSrcModule("src/dashboard/generations-publisher.ts", async (P) => {
+	const r = makeReporter("Generations - publisher, idle");
+	let n = 0;
+	const queue = { lignes: () => [], transcript: () => null, abonner: () => () => {}, abonnerTranscript: () => () => {} };
+	const stop = P.publishGenerations({ queue, write: async () => { n++; }, device: "pc" });
+	stop();
+	r.check("an app that never generated writes nothing, even on stop", n, 0);
+	r.done();
+});

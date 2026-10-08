@@ -28,6 +28,8 @@ import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
 import { loadSharedState, sharedState } from "./host/shared-state";
 import { createChatFiles } from "./host/chat-files";
+import { publishGenerations } from "../../../src/dashboard/generations-publisher";
+import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
@@ -585,6 +587,12 @@ async function demarrer(): Promise<void> {
 		} catch (e) {
 			console.warn(LOG_PREFIX, "chat sync not started:", e);
 		}
+		/* What this PC generates is published for the other devices as soon as the
+		   queue exists (it appears with the shell). Idle: no timer, no write. */
+		let stopGenerations: (() => void) | null = null;
+		onQueueCreated(queue => {
+			stopGenerations = publishGenerations({ queue, write: f => chatFiles.writeGenerations(f), device: idAppareil });
+		});
 		/* Without this load, the very first mount of the shell (below) would see
 		   empty page settings (no folder expanded, default axis) instead of
 		   those of the previous session. */
@@ -715,6 +723,9 @@ async function demarrer(): Promise<void> {
 			stats.destroy();
 			// Awaited: the chat file is written before the window closes.
 			await chatSync?.flush();
+			// Closing cleanly: the file goes, so no other device waits for a dead PC.
+			stopGenerations?.();
+			await chatFiles.clearGenerations().catch(() => {});
 			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
 			await sessions.vider();
 		});

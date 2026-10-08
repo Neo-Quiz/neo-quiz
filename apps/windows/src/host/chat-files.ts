@@ -1,8 +1,10 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import { REVIEW_DIR } from "../../../../src/review/paths";
-import { CHATS_DIR, chatsFromFile, chatsToFile } from "../../../../src/shared-state/chat-merge";
+import { CHATS_DIR, GENERATIONS_DIR, chatsFromFile, chatsToFile } from "../../../../src/shared-state/chat-merge";
 import { boundChats, readChats } from "../../../../src/dashboard/chat-record";
 import type { ChatRecord } from "../../../../src/dashboard/chat-record";
+import { readGenerations as parseGenerations } from "../../../../src/shared-state/generations";
+import type { GenerationsFile } from "../../../../src/shared-state/generations";
 import type { SharedFs } from "./shared-state";
 
 /* ══════════════════════════════════════════════════════════
@@ -30,7 +32,16 @@ export interface ChatFiles {
 	others(): ChatRecord[][];
 	/** Replaces this device's file (bounded to 200 live chats + tombstones). Serialised; a failure rejects its own caller only. */
 	saveOwn(chats: ReadonlyArray<ChatRecord>): Promise<void>;
+	/** Rewrites this device's generations file (temp file, remove, rename). */
+	writeGenerations(file: GenerationsFile): Promise<void>;
+	/** Every OTHER device's valid generations file, read fresh. */
+	readGenerations(): Promise<Array<{ device: string; file: GenerationsFile }>>;
+	/** Removes our generations file (app closing cleanly). */
+	clearGenerations(): Promise<void>;
 }
+
+/** A generations file is a few KB; past this it is not read. */
+const MAX_GENERATIONS_CHARS = 100_000;
 
 const baseName = (full: string): string => full.slice(full.lastIndexOf("/") + 1);
 
@@ -127,5 +138,33 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		});
 	}
 
-	return { device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn };
+	const genDir = `${rootId}/${REVIEW_DIR}/${GENERATIONS_DIR}`;
+	const genOwn = `${genDir}/${ownName}`;
+
+	async function readGenerations(): Promise<Array<{ device: string; file: GenerationsFile }>> {
+		let names: string[];
+		try { names = (await fs.list(genDir)).map(baseName); } catch { return []; }
+		const out: Array<{ device: string; file: GenerationsFile }> = [];
+		for (const n of names) {
+			if (!n.endsWith(".json") || n === ownName) continue;
+			try {
+				const raw = await fs.read(`${genDir}/${n}`);
+				if (raw.length > MAX_GENERATIONS_CHARS) continue;
+				const file = parseGenerations(JSON.parse(raw));
+				if (file) out.push({ device: n.slice(0, -5), file });
+			} catch { console.warn(`${LOG_PREFIX} generations file unreadable, ignored:`, n); }
+		}
+		return out;
+	}
+
+	const writeGenerations = (file: GenerationsFile): Promise<void> => enqueue(async () => {
+		await fs.mkdirs(genDir);
+		await fs.write(`${genOwn}.tmp`, JSON.stringify(file));
+		if (await fs.exists(genOwn)) await fs.remove(genOwn);
+		await fs.rename(`${genOwn}.tmp`, genOwn);
+	});
+
+	const clearGenerations = (): Promise<void> => enqueue(async () => { if (await fs.exists(genOwn)) await fs.remove(genOwn); });
+
+	return { device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations };
 }
