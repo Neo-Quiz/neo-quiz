@@ -39,11 +39,11 @@ html.nq-mobile .modal-container {
 .is-mobile {
 	--nq-panel-gap: 0px;
 	--nq-panel-radius: 0px;
-	/* The PC's look (a 60 % tint over a blurred wallpaper) without its live
-	   backdrop blur, which costs a phone's GPU a full-screen pass on every
-	   frame: the blur goes on the static wallpaper layer instead (`shell.css`, `body.is-mobile::before`),
-	   computed once. A 94 % tint used to hide the wallpaper almost entirely
-	   (2026-10-08: "you cannot even make out the shapes").
+	/* A 60 % tint like the PC, so the wallpaper shows through; no live
+	   backdrop blur (it costs a phone's GPU a full-screen pass every frame).
+	   The wallpaper's own blur and brightness are the user's Settings sliders
+	   (`body::before`, shell.css), which a 94 % tint used to hide entirely:
+	   moving them changed nothing visible (2026-10-08).
 	   `--nq-panel-bg` is resolved where tokens.css defines it, so the alpha
 	   alone would not reach it: it is restated here. */
 	--nq-panel-alpha: 0.6;
