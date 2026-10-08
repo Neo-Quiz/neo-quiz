@@ -142,8 +142,33 @@ html.nq-mobile #neo-quiz-root:has(> .qbd-qz) {
 	padding-top: 0;
 }
 
+/* THE TOP OF A PHONE QUIZ, COMPACTED (2026-10-08). The room under the status
+   bar is inset + 16 px, and the header's -8 px margin puts the cross 8 px under
+   the status bar (it was 24 px). The beads sit 8 px under the header line, and
+   the first card 8 px under the beads (4 px of bead shadow room, 4 px of card
+   margin). The panel still starts at the top of the screen: its colour goes
+   up under the status bar. */
 html.nq-mobile #neo-quiz-root > .qbd-qz {
-	padding-top: calc(var(--nq-inset-haut, 0px) + 32px);
+	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
+}
+
+/* The beads: 8 px above them (the header line ends where the row starts, and
+   its own padding is the 8 px), 4 px below them for the shadow, and no margin
+   under the row. The slide starts right under the row. */
+html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+	padding-top: 8px;
+	padding-bottom: 4px;
+	margin-bottom: 0;
+}
+
+html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-track-item > .quiz-card {
+	margin-top: 4px;
+}
+
+/* The test clock sits on the cross: the cross moved up with the header. Its
+   centre is inset + 30 px (cross top inset + 8 px, radius 22 px), and the pill is 34 px tall. */
+html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-exam-timer {
+	top: calc(var(--nq-inset-haut, 0px) + 13px);
 }
 
 /* THE BOTTOM BAR OF ARROWS IS GONE ON A PHONE (2026-10-08): a question swipes
