@@ -39,13 +39,15 @@ const DOCUMENT_EXTENSION = /\.(md|markdown|txt)$/i;
     look-alike dots (dot leaders, ideographic full stop) and the whole fullwidth block (`．．／`). */
 const FORBIDDEN_IN_PATH = /[:<>"|?*\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2024-\u2026\u2028-\u202e\u2060-\u206f\u3002\ufeff\uff00-\uffef\ufff0-\uffff]/;
 /** Names Windows reads as a device, with or without an extension (`con.md` opens the console). */
-const DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i;
+const DEVICE_NAME = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i;
 /** A short 8.3 name (`PROGRA~1`) designates another file than the one written. */
 const SHORT_NAME = /~[0-9]/;
 const NAME_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff0-\uffff]/;
 /** Text keeps tab, newline and carriage return; every other control character is refused. */
 const TEXT_UNSAFE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
+/** Device ids compare case-insensitively: a Windows folder `ABC` and `abc` is one folder. */
+const sameDevice = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const invalid: Verdict = { ok: false, reason: "invalid" };
 
@@ -56,7 +58,7 @@ function documentOk(d: unknown): d is { path: string } {
 	if (p.normalize("NFC") !== p) return false;
 	const segments = p.split("/");
 	// A segment ending in a dot or a space is read by Windows as another name (`x.md.` opens `x.md`).
-	if (segments.some(s => /[. ]$/.test(s) || DEVICE_NAME.test(s) || SHORT_NAME.test(s))) return false;
+	if (segments.some(s => /[. ]$/.test(s) || DEVICE_NAME.test(s.split(".")[0].replace(/ +$/, "")) || SHORT_NAME.test(s))) return false;
 	// An extension with no name before it (`.md`) is a hidden file, not a document.
 	if (segments[segments.length - 1].replace(DOCUMENT_EXTENSION, "") === "") return false;
 	return segments[0].toLowerCase() !== ".neo-quiz";
@@ -73,8 +75,8 @@ export function validateRemote(raw: unknown, ctx: { device: string; fileDevice: 
 	if (!isObj(raw) || Object.keys(raw).some(k => !KEYS.has(k)) || raw.v !== 1) return invalid;
 	const { id, at, from, target, chatId, text, mode, documents } = raw;
 	if (typeof id !== "string" || !SLUG.test(id) || id !== ctx.fileId) return invalid;
-	if (typeof from !== "string" || !DEVICE.test(from) || from !== ctx.fileDevice || from === ctx.device) return { ok: false, reason: "wrong-sender" };
-	if (target !== ctx.device) return { ok: false, reason: "wrong-target" };
+	if (typeof from !== "string" || !DEVICE.test(from) || sameDevice(from, ctx.fileDevice) === false || sameDevice(from, ctx.device)) return { ok: false, reason: "wrong-sender" };
+	if (typeof target !== "string" || !sameDevice(target, ctx.device)) return { ok: false, reason: "wrong-target" };
 	if (typeof at !== "number" || !Number.isFinite(at) || !Number.isFinite(ctx.now)) return invalid;
 	if (at > ctx.now + FUTURE_SKEW_MS) return { ok: false, reason: "future" };
 	if (ctx.now - at > MAX_AGE_MS) return { ok: false, reason: "expired" };
@@ -98,10 +100,12 @@ export function validateRemote(raw: unknown, ctx: { device: string; fileDevice: 
 	return { ok: true, request: out };
 }
 
-export interface TakenEntry { id: string; at: number }
+export interface TakenEntry { id: string; from?: string; at: number }
 
-export function admit(req: Pick<RemoteRequest, "id">, st: { taken: ReadonlyArray<TakenEntry>; busy: boolean }, now: number): "run" | "known" | "busy" | "rate" {
-	if (st.taken.some(t => t.id === req.id)) return "known";
+export function admit(req: Pick<RemoteRequest, "id" | "from">, st: { taken: ReadonlyArray<TakenEntry>; busy: boolean }, now: number): "run" | "known" | "busy" | "rate" {
+	// Keyed on sender + id: two senders drawing the same id never collide.
+	const key = (e: { id: string; from?: string }) => (e.from ?? "").toLowerCase() + "/" + e.id;
+	if (st.taken.some(t => key(t) === key(req))) return "known";
 	if (st.busy) return "busy";
 	if (!Number.isFinite(now)) return "rate";
 	// A taken entry with a corrupt time counts as recent: never a way around the limit.

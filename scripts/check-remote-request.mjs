@@ -58,14 +58,14 @@ await withSrcModule("src/shared-state/remote-request.ts", (R) => {
 	r.check("a sender name longer than 64 is refused", v(good({ fromName: "x".repeat(65) })).reason, "invalid");
 
 	// Admission
-	const taken = (n, at) => Array.from({ length: n }, (_, i) => ({ id: "t" + i, at }));
-	r.check("a fresh request runs", R.admit({ id: "new" }, { taken: [], busy: false }, NOW), "run");
-	r.check("a request already taken never runs again (restart, replay)", R.admit({ id: "t0" }, { taken: taken(1, NOW - 10), busy: false }, NOW), "known");
-	r.check("another remote request is running: wait", R.admit({ id: "new" }, { taken: [], busy: true }, NOW), "busy");
-	r.check("6 taken in the last hour: the 7th waits", R.admit({ id: "new" }, { taken: taken(6, NOW - 1000), busy: false }, NOW), "rate");
-	r.check("5 taken: the 6th runs", R.admit({ id: "new" }, { taken: taken(5, NOW - 1000), busy: false }, NOW), "run");
-	r.check("6 taken but over an hour ago: runs", R.admit({ id: "new" }, { taken: taken(6, NOW - 3601e3), busy: false }, NOW), "run");
-	r.check("a request already known wins over busy", R.admit({ id: "t0" }, { taken: taken(1, NOW), busy: true }, NOW), "known");
+	const taken = (n, at) => Array.from({ length: n }, (_, i) => ({ id: "t" + i, from: PH, at }));
+	r.check("a fresh request runs", R.admit({ id: "new", from: PH }, { taken: [], busy: false }, NOW), "run");
+	r.check("a request already taken never runs again (restart, replay)", R.admit({ id: "t0", from: PH }, { taken: taken(1, NOW - 10), busy: false }, NOW), "known");
+	r.check("another remote request is running: wait", R.admit({ id: "new", from: PH }, { taken: [], busy: true }, NOW), "busy");
+	r.check("6 taken in the last hour: the 7th waits", R.admit({ id: "new", from: PH }, { taken: taken(6, NOW - 1000), busy: false }, NOW), "rate");
+	r.check("5 taken: the 6th runs", R.admit({ id: "new", from: PH }, { taken: taken(5, NOW - 1000), busy: false }, NOW), "run");
+	r.check("6 taken but over an hour ago: runs", R.admit({ id: "new", from: PH }, { taken: taken(6, NOW - 3601e3), busy: false }, NOW), "run");
+	r.check("a request already known wins over busy", R.admit({ id: "t0", from: PH }, { taken: taken(1, NOW), busy: true }, NOW), "known");
 
 	// Pending state shown on the phone
 	const st = (over) => R.pendingState({ id: "x", at: NOW - 1000 }, { recorded: new Set(), running: new Set(), now: NOW, ...over });
@@ -99,9 +99,22 @@ await withSrcModule("src/shared-state/remote-request.ts", (R) => {
 	r.check("the id slug is exported and strict", [R.SLUG.test("lq3k2-abc123"), R.SLUG.test("../x"), R.SLUG.test("A-bcd"), R.SLUG.test("ab")], [true, false, false, false]);
 	r.check("device id regex is exported", [R.DEVICE.test(PC), R.DEVICE.test("bob")], [true, false]);
 	r.check("the result is a copy, never the raw object", (() => { const g = good(); const out = v(g).request; return out !== g && out.documents !== g.documents; })(), true);
-	r.check("a non-finite clock rate-limits", R.admit({ id: "new" }, { taken: [], busy: false }, NaN), "rate");
-	r.check("a taken entry with a corrupt time still counts", R.admit({ id: "new" }, { taken: Array.from({ length: 6 }, (_, i) => ({ id: "t" + i, at: NaN })), busy: false }, NOW), "rate");
+	r.check("a non-finite clock rate-limits", R.admit({ id: "new", from: PH }, { taken: [], busy: false }, NaN), "rate");
+	r.check("a taken entry with a corrupt time still counts", R.admit({ id: "new", from: PH }, { taken: Array.from({ length: 6 }, (_, i) => ({ id: "t" + i, at: NaN })), busy: false }, NOW), "rate");
 	r.check("pending: a non-finite clock is never expired", R.pendingState({ id: "x", at: NOW }, { recorded: new Set(), running: new Set(), now: NaN }), "waiting");
 	r.check("pending: a corrupt request time is expired", R.pendingState({ id: "x", at: NaN }, { recorded: new Set(), running: new Set(), now: NOW }), "expired");
+	// Fix round 1
+	const A = "abcdef01-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bcdef012-bbbb-4bbb-8bbb-bbbbbbbbbbbb", AU = A.toUpperCase(), BU = B.toUpperCase();
+	const cx = (over = {}) => ctx({ device: A, fileDevice: B, ...over });
+	const gd = (over = {}) => good({ from: B, target: A, ...over });
+	r.check("letters ids differ in case (sanity)", [A !== AU, B !== BU], [true, true]);
+	r.check("own id in upper case is still us as sender", v(gd({ from: AU }), cx({ fileDevice: AU })).reason, "wrong-sender");
+	r.check("own folder in upper case is still us", v(gd({ from: A }), cx({ fileDevice: AU })).reason, "wrong-sender");
+	r.check("sender folder in other case is the same device", v(gd({ from: BU }), cx()).ok, true);
+	r.check("target in upper case is this device", v(gd({ target: AU }), cx()).ok, true);
+	for (const n of ["COM¹.md", "lpt².txt", "COM³.md", "CONIN$.md", "conout$.txt", "nul .md", "nul  .txt", "a/con .md", "aux.tar.md", "NUL.x.md"]) r.check("device name refused: " + JSON.stringify(n), v(good({ documents: [{ path: n }] })).reason, "invalid");
+	r.check("a name merely starting like a device is fine", v(good({ documents: [{ path: "console.md" }] })).ok, true);
+	r.check("same id from two senders is not known", R.admit({ id: "same", from: PH }, { taken: [{ id: "same", from: PC, at: NOW }], busy: false }, NOW), "run");
+	r.check("same sender and id (any case) is known", R.admit({ id: "same", from: B }, { taken: [{ id: "same", from: BU, at: NOW }], busy: false }, NOW), "known");
 	r.done();
 });
