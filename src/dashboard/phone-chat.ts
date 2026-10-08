@@ -104,6 +104,9 @@ export function poserBarreHaute(container: HTMLElement, lateral: HTMLElement, op
 
 /* ── The PC icon next to "+" ── */
 
+/** The icon of the PC everywhere (button, window): the one place to change it. */
+const ICONE_PC = "laptop";
+
 const pcBoutons = new Set<() => void>();
 let abonne = false;
 
@@ -122,13 +125,30 @@ export function poserBoutonPc(parent: HTMLElement, chat: () => ChatRecord | null
 	const b = ajouter(parent, "button", "qbd-ai-composer-pc");
 	b.type = "button";
 	b.setAttribute("aria-label", t("ai.pc.button"));
+	// The same bubble as the provider one, above the icon while no PC is available; a tap opens the window.
+	const bulle = ajouter(parent, "button", "qbd-ai-provider-nudge", t("ai.pc.nudge"));
+	bulle.type = "button";
+	bulle.addEventListener("click", () => ouvrirFenetrePc(etatPc(chat)));
+	const placer = (): void => {
+		requestAnimationFrame(() => {
+			if (bulle.hidden) return;
+			const gauche = Math.max(0, b.offsetLeft + b.offsetWidth / 2 - bulle.offsetWidth / 2);
+			bulle.style.left = `${gauche}px`;
+			bulle.style.setProperty("--pointe", `${b.offsetLeft + b.offsetWidth / 2 - gauche}px`);
+			bulle.classList.add("is-placed");
+		});
+	};
 	const peindre = (): void => {
-		if (!b.isConnected) { pcBoutons.delete(peindre); return; }
+		if (!b.isConnected) { pcBoutons.delete(peindre); bulle.remove(); return; }
 		const s = etatPc(chat);
+		const etait = bulle.hidden;
+		bulle.hidden = s.tone === "ok";
+		if (bulle.hidden) bulle.classList.remove("is-placed");
+		else if (etait || !bulle.classList.contains("is-placed")) placer();
 		b.dataset.tone = s.tone;
 		b.title = phrase(s);
 		b.replaceChildren();
-		host.ui.setIcon(ajouter(b, "span", "qbd-ai-composer-pc-icone"), "laptop");
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-composer-pc-icone"), ICONE_PC);
 	};
 	pcBoutons.add(peindre);
 	if (!abonne) {
@@ -151,7 +171,7 @@ function ouvrirFenetrePc(s: PcStatus): void {
 			const c = m.contentEl;
 			const etat = ajouter(c, "div", "qbd-ai-pc-state");
 			etat.dataset.tone = s.tone;
-			currentHost().ui.setIcon(ajouter(etat, "span", "qbd-ai-pc-state-icone"), "laptop");
+			currentHost().ui.setIcon(ajouter(etat, "span", "qbd-ai-pc-state-icone"), ICONE_PC);
 			ajouter(etat, "span", "qbd-ai-pc-state-texte", phrase(s));
 			const ligne = (cle: string, valeur: string, erreur = false): void => {
 				const l = ajouter(c, "div", "qbd-ai-pc-row" + (erreur ? " is-error" : ""));

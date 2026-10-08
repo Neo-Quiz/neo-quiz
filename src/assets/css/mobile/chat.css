@@ -207,6 +207,7 @@
 	min-height: 26px;
 }
 .is-mobile .qbd-ai-composer-bottom {
+	position: relative;
 	gap: 8px;
 }
 .is-mobile .qbd-ai-composer-add,
@@ -380,4 +381,12 @@
 	border: none !important;
 	background: transparent !important;
 	box-shadow: none !important;
+}
+
+/* The "Choose a device" bubble hangs over the PC icon: its pointer follows the icon. */
+.is-mobile .qbd-ai-composer-bottom .qbd-ai-provider-nudge::after {
+	left: var(--pointe, 50%);
+}
+.is-mobile .qbd-ai-composer-bottom .qbd-ai-provider-nudge[hidden] {
+	display: none;
 }

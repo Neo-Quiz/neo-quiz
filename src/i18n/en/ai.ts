@@ -698,6 +698,7 @@ export const EN_AI = {
 	"ai.notify.failed": "Generation failed: {error}",
 	"ai.notify.channel": "Chats",
 	"ai.pc.lastSeenLabel": "Last seen",
+	"ai.pc.nudge": "Choose a device",
 	"ai.pc.button": "PC status",
 	"ai.pc.title": "Your PC",
 	"ai.pc.fallbackName": "Your PC",

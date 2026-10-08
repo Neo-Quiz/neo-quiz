@@ -95,11 +95,11 @@
 .is-mobile .qbd-ai-composer-tools {
 	flex: none;
 }
-.is-mobile .qbd-ai-provider-nudge.is-placed {
+.is-mobile .qbd-ai-composer-tools .qbd-ai-provider-nudge.is-placed {
 	left: auto !important;
 	right: 0;
 }
-.is-mobile .qbd-ai-provider-nudge::after {
+.is-mobile .qbd-ai-composer-tools .qbd-ai-provider-nudge::after {
 	left: auto;
 	right: 8px;
 	transform: translateX(50%);
