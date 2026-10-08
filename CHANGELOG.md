@@ -17,6 +17,10 @@ release notes.
 
 - Your PC runs generations requested from your phone, and tells you when one starts.
 
+### Changed
+
+- From the phone, send a generation request to your PC; the PC runs it and the phone notifies you when the quiz is ready.
+
 ## [1.20.45] - 2026-10-08
 
 ### Added

@@ -531,6 +531,10 @@ export interface Pont {
 		calendrier(table: Array<{ date: string; due: number }>, textes: { title: string; bodyOne: string; bodyOther: string }): Promise<void>;
 		/** True once after a tap on the notification: the page then lands on Home, where today's review is. */
 		revisionDemandee(): Promise<boolean>;
+		/** Tells the notifier which device this phone is (a UUID) and the localized notification texts; `{title}` and `{extra}` / `{error}` are replaced natively. */
+		suivreChats(deviceId: string, textes: { quizReady: string; quizReadyMore: string; textReady: string; failed: string; channel: string }): Promise<void>;
+		/** The relative path of the quiz a notification tap asked to open, once; null when none waits. */
+		quizDemande(): Promise<string | null>;
 		/** A zip or a note ANOTHER app opened or shared with Neo Quiz ("Open with", "Share to"), read once:
 		    `{nom, octets}` (the sender's name made harmless, never a path), `{erreur}` when Kotlin refused it
 		    (`trop-grand` over 64 MB, `type` not a .zip or .md, `illisible`), `null` when nothing waits. The

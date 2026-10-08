@@ -50,6 +50,10 @@ class BridgeTest {
                 override fun read(): String? = null
                 override fun write(raw: String) {}
             }), { }).handlers() +
+            com.ahmedmili.neoquiz.notify.ChatNotifyChannel(object : com.ahmedmili.neoquiz.notify.ChatNotifyChannel.Store {
+                override fun get(key: String): String? = null
+                override fun put(key: String, value: String?) {}
+            }).handlers() +
             com.ahmedmili.neoquiz.update.UpdateChannel(
                 com.ahmedmili.neoquiz.update.UpdateEngine(
                     installedCode = 1, installedName = "0.1.0", dir = File(base, "update"),

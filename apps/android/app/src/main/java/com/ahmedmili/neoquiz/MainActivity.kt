@@ -1,5 +1,7 @@
 package com.ahmedmili.neoquiz
 
+import com.ahmedmili.neoquiz.notify.ChatNotifier
+import com.ahmedmili.neoquiz.notify.ChatNotifyChannel
 import android.Manifest
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
         // Arms the daily review alarm (idempotent); a launch from its notification lands on Home.
         ReviewAlarm.scheduleNext(this)
         if (intent?.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false) == true) ReviewOpenRequest.raise()
+        raiseOpenQuiz(intent)
         // Not on a recreation or a relaunch from the recent apps: the link was already handled (or is old).
         if (savedInstanceState == null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
             raisePairLink(intent)
@@ -163,9 +166,17 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         raisePairLink(intent)
         IncomingIntent.handle(this, intent)
-        if (!intent.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false)) return
-        ReviewOpenRequest.raise()
-        if (loaded) appWebView.reload()
+        val quiz = raiseOpenQuiz(intent)
+        val review = intent.getBooleanExtra(ReviewAlarm.EXTRA_OPEN_REVIEW, false)
+        if (review) ReviewOpenRequest.raise()
+        if ((review || quiz) && loaded) appWebView.reload()
+    }
+
+    /** A "quiz ready" notification tap: the relative path is re-validated by the channel, then read once by the page. */
+    private fun raiseOpenQuiz(intent: Intent?): Boolean {
+        val path = intent?.getStringExtra(ChatNotifier.EXTRA_OPEN_QUIZ) ?: return false
+        ChatNotifyChannel(ChatNotifier.store(this)).openQuiz(path)
+        return true
     }
 
     /** A pairing link (`neo-quiz://pair`, the site's `/pair/`): validated here, handed to the page, which only fills in "Add a device". */

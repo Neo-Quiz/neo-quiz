@@ -673,5 +673,10 @@ export const EN_AI = {
 	"ai.clarify.details": "Details:",
 	"ai.clarify.expired": "These questions can no longer be answered here. Send your request again.",
 	"ai.suggest.put": "Put it in {folder}?",
+	"ai.notify.quizReady": "Quiz ready: {title}",
+	"ai.notify.quizReadyMore": "Quiz ready: {title} (+{extra})",
+	"ai.notify.textReady": "Answer ready",
+	"ai.notify.failed": "Generation failed: {error}",
+	"ai.notify.channel": "Chats",
 
 } as const;

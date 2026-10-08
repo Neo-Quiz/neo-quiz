@@ -7,6 +7,8 @@ import android.os.Environment
 import com.ahmedmili.neoquiz.code.CodeSandbox
 import androidx.activity.ComponentActivity
 import com.ahmedmili.neoquiz.notify.CalendarChannel
+import com.ahmedmili.neoquiz.notify.ChatNotifier
+import com.ahmedmili.neoquiz.notify.ChatNotifyChannel
 import com.ahmedmili.neoquiz.notify.DueCalendar
 import com.ahmedmili.neoquiz.notify.ReviewAlarm
 import com.ahmedmili.neoquiz.sync.FolderMove
@@ -143,10 +145,11 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val navBar = NavBarView(activity).apply { onTap = { i -> bridge?.emit("android.barreClic", i) } }
     val updateChannel = UpdateChannel.create(activity, scope) { state -> bridge?.emit("miseAJour.etat", state) }
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
+    val chatNotifyChannel = ChatNotifyChannel(ChatNotifier.store(activity))
     val created = Bridge(
         scope,
         Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + IncomingChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { ownWrites.onWrite(it); hub.signalWrite(it) }.handlers() + scan.handlers() +
-            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
+            settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + chatNotifyChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
     )
     bridge = created
     return AppBridge(created, scan, scope, codeSandbox, hub, qr, backChannel, perimeter, navBar, updateChannel)

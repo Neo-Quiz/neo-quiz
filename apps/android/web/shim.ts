@@ -277,6 +277,8 @@ const pont: Pont = {
 	android: {
 		calendrier: (table, textes) => appeler("android.calendrier", [table, textes]),
 		revisionDemandee: () => appeler<boolean>("android.revisionDemandee"),
+		suivreChats: (id, textes) => appeler("android.suivreChats", [id, textes]),
+		quizDemande: () => appeler<string | null>("android.quizDemande"),
 		/* A zip or note another app opened or shared with us; bytes cross as base64 like every other file. */
 		fichierRecu: async () => {
 			const recu = await appeler<{ nom?: string; octets?: string; erreur?: "trop-grand" | "type" | "illisible" } | null>("android.fichierRecu");

@@ -65,6 +65,7 @@ import { installStatusStrip } from "./ui/status-strip";
 import { installKeyboardState } from "./ui/clavier";
 import { retourAndroid } from "./ui/retour-android";
 import { armerCalendrier } from "./ui/calendrier-android";
+import { armerNotificationsChats } from "./ui/chats-android";
 import { appliquerEffetsFond, appliquerFond, choisirFond, fondSuivant } from "./ui/fond";
 
 /*
@@ -791,8 +792,15 @@ async function demarrer(): Promise<void> {
 		   review is, instead of the last view; and the page hands the notification the
 		   next days' due counts each time it goes to the background. */
 		const depuisNotification = estMobile() && await pont().android?.revisionDemandee().catch(() => false);
-		if (estMobile()) armerCalendrier(store);
-		const derniereVue = depuisNotification ? { vue: "home" as const } : await chargerReprise();
+		if (estMobile()) { armerCalendrier(store); armerNotificationsChats(idAppareil); }
+		/* A tap on a "quiz ready" notification: the path is relative, checked again against the perimeter
+		   (absoluteInRoot), and opened only if the catalogue knows it. */
+		const quizDemande = estMobile() ? await pont().android?.quizDemande().catch(() => null) : null;
+		const quizAbsolu = quizDemande ? absoluteInRoot(quizDemande, racineChats.id) : "";
+		if (quizDemande && !(quizAbsolu && scanner.getQuiz(quizAbsolu))) currentHost().ui.notice(t("ai.card.missing"));
+		const derniereVue = quizAbsolu && scanner.getQuiz(quizAbsolu)
+			? { vue: "detail" as const, quiz: quizAbsolu }
+			: depuisNotification ? { vue: "home" as const } : await chargerReprise();
 		if (derniereVue) reprendre(derniereVue, scanner);
 		mount(root, scanner, store, stats, sessions);
 		/* Android: a zip or note another app opened or shared with us ('Open with', 'Share to'),

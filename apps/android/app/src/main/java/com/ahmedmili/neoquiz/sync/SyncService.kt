@@ -176,7 +176,10 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             scope = scope,
         )
         created.onState = { s -> lastState = s; stateListener?.invoke(s); notifyListener?.invoke(s) }
-        created.onReceived = { received() }
+        created.onReceived = {
+            received()
+            scope.launch(Dispatchers.IO) { com.ahmedmili.neoquiz.notify.ChatNotifier.scan(appContext, root) }
+        }
         created.onPaired = { prefs.edit().putBoolean(KEY_ACTIVE, true).apply() }
         try {
             created.start()

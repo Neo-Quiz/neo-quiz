@@ -610,5 +610,10 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.clarify.details": "Précisions :",
 	"ai.clarify.expired": "Ces questions n'ont plus de réponse possible ici. Renvoie ta demande.",
 	"ai.suggest.put": "Ranger dans {folder} ?",
+	"ai.notify.quizReady": "Quiz prêt : {title}",
+	"ai.notify.quizReadyMore": "Quiz prêt : {title} (+{extra})",
+	"ai.notify.textReady": "Réponse prête",
+	"ai.notify.failed": "Échec de la génération : {error}",
+	"ai.notify.channel": "Conversations",
 
 };
