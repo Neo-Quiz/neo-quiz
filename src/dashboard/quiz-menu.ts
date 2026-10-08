@@ -365,34 +365,63 @@ async function deleteCourseQuizzes(ctx: DashboardShellCtx, quizzes: readonly Qui
 		: deletedNotice());
 }
 
-/** Delete d'un MODULE entier : chaque quiz passe par le même cœur. */
-async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): Promise<void> {
-	/* Une note qui résiste n'arrête pas les autres, et ne fait pas passer la
-	   suppression pour un échec total : chaque quiz est indépendant, et laisser
-	   une exception remonter d'ici laissait le module A MOITIÉ supprimé avec
-	   une interface qui ne se redessinait même pas (revue codex 2026-07-31). */
-	let echecs = 0;
+/** The folder on disk that "Delete folder" may send to the trash, or `null`:
+    never a root itself, never a folder holding the generated-quizzes folder,
+    and nothing for a group declared without a path. */
+function trashableFolder(ctx: DashboardShellCtx, group: ModuleGroup): string | null {
+	const sas = ctx.generatedFolder?.();
+	if (!group.path || currentHost().paths.localPath(group.path) === "") return null;
+	if (sas && (sas === group.path || sas.startsWith(group.path + "/"))) return null;
+	return group.path;
+}
+
+/** "Delete folder": the FOLDER goes to the host's trash (recoverable) with
+    everything in it, and its declaration is forgotten on every device.
+
+    Until 2026-10-08 this gesture only deleted the folder's quizzes. A folder
+    the user DECLARED ("New folder", "Open an existing folder") is shown even
+    with no quiz (`modulesAffiches`), so its empty card stayed on the page
+    after every delete, with no gesture left to remove it. */
+export async function deleteFolder(ctx: DashboardShellCtx, group: ModuleGroup): Promise<void> {
 	if (estLeSas(group, ctx.generatedFolder?.())) return;
+	const host = currentHost();
+	const folder = trashableFolder(ctx, group);
+	const inside = (p: string): boolean => !!folder && p.startsWith(folder + "/");
+	/* A fresh undo batch: the folder itself cannot be brought back from here
+	   (it is in the trash), and Ctrl+Z must not revive an older delete. */
 	derniereSuppression = [];
+	let echecs = 0;
+	/* Quizzes filed under this folder's key but living OUTSIDE its path (a
+	   namesake folder in another root): removed one by one, as before. A
+	   note that resists does not stop the others. */
 	for (const q of group.quizzes) {
-		// Fichier introuvable (ou dossier à ce chemin — `getFile` rend null
-		// dans les deux cas) : c'est un échec comme un autre, pas un silence.
-		// Le compter est la seule façon pour l'utilisateur de savoir que le
-		// module n'a pas été entièrement supprimé.
-		if (!currentHost().fs.getFile(q.path)) { echecs++; continue; }
+		if (inside(q.path)) continue;
+		if (!host.fs.getFile(q.path)) { echecs++; continue; }
 		try {
-			// Un `false` — aucun bloc trouvé — est un échec comme un autre :
-			// l'annoncer comme un succès faisait croire le module entièrement
-			// supprimé (revue codex 2026-07-31).
 			if (!await deleteQuizCore(ctx, q)) echecs++;
 		} catch (e) {
 			echecs++;
-			console.error("[quiz-blocks] suppression impossible :", q.path, e);
+			console.error("[quiz-blocks] quiz delete failed:", q.path, e);
 		}
 	}
-	currentHost().ui.notice(echecs
+	// A folder already gone from disk only loses its declaration.
+	if (folder && await host.fs.exists(folder)) await host.fs.trash(folder);
+	for (const q of group.quizzes) if (inside(q.path)) ctx.statsStore?.deleteRecord(q.path);
+	/* Forget every declaration of this folder: its key, and any other key
+	   pointing at the same path. Removing the key tombstones each field in
+	   the synced folder settings, so another device does not bring it back. */
+	const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+	for (const [key, ov] of Object.entries(overrides)) {
+		if (key === group.folder || (group.path && ov?.path === group.path)) delete overrides[key];
+	}
+	ctx.settings.quizzesModuleOverrides = overrides;
+	if (ctx.settings.quizzesArchivedFolders?.includes(group.folder)) {
+		ctx.settings.quizzesArchivedFolders = ctx.settings.quizzesArchivedFolders.filter(f => f !== group.folder);
+	}
+	await ctx.saveSettings();
+	host.ui.notice(echecs
 		? t("dashboard.quizzes.deletedPartial", { count: echecs })
-		: deletedNotice());
+		: t("dashboard.quizzes.folderDeleted", { name: group.name }));
 }
 
 /* ── Move ONE quiz to another known folder ──
@@ -852,15 +881,15 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		});
 		if (!fixe) items.push({
 			icon: "trash-2",
-			label: t("dashboard.quizzes.menuDeleteModule"),
+			label: t("dashboard.quizzes.menuDeleteFolder"),
 			danger: true,
 			onClick: () => {
 				openConfirm({
-					title: t("dashboard.quizzes.deleteConfirmTitle"),
-					body: t("dashboard.quizzes.deleteModuleConfirmBody", { count: g.quizzes.length, name: g.name }),
+					title: t("dashboard.quizzes.deleteFolderConfirmTitle"),
+					body: t(trashableFolder(ctx, g) ? "dashboard.quizzes.deleteFolderConfirmBody" : "dashboard.quizzes.deleteFolderConfirmBodyNoDisk", { name: g.name }),
 					cta: t("dashboard.quizzes.deleteConfirmCta"),
 					warning: true,
-				}, () => { void deleteModuleQuizzes(ctx, g).then(rerender); });
+				}, () => { void runFileGesture(() => deleteFolder(ctx, g), "dashboard.quizzes.deleteFolderError", rerender); });
 			},
 		});
 		return items;

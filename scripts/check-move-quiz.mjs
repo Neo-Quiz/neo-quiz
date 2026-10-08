@@ -332,5 +332,53 @@ await withSrcModule(
 		}
 	}
 
+	/* ── 11. "Delete folder" removes the FOLDER, not only its quizzes
+	   (2026-10-08). The gesture used to delete the quizzes alone: a declared
+	   folder is shown even empty, so its empty card stayed on the page. ── */
+	{
+		const roots = [{ id: "NeoQuiz", name: "Neo Quiz" }];
+		const paths = { roots: () => roots, rootOf: () => roots[0], defaultRoot: () => roots[0], localPath: (p) => p.split("/").slice(1).join("/"), contractPath: (id, l) => id + "/" + l };
+		const run = async (g, { onDisk = true, sas } = {}) => {
+			const trashed = [], notices = [], statsDeleted = [];
+			let saved = 0;
+			const settings = {
+				quizzesModuleOverrides: { [g.folder]: { name: g.name, path: g.path }, Other: { name: "Other", path: "NeoQuiz/Other" }, Alias: { name: "Alias", path: g.path } },
+				quizzesArchivedFolders: [g.folder, "Other"],
+			};
+			hote.installHost({
+				paths,
+				ui: { notice: (m) => { notices.push(m); } },
+				fs: {
+					exists: async () => onDisk,
+					trash: async (p) => { trashed.push(p); },
+					getFile: () => { throw new Error("no per-quiz delete expected"); },
+				},
+			});
+			try {
+				await qm.deleteFolder({
+					settings, saveSettings: async () => { saved++; },
+					statsStore: { deleteRecord: (p) => { statsDeleted.push(p); } },
+					generatedFolder: () => sas,
+				}, g);
+			} finally {
+				hote.uninstallHost();
+			}
+			return { trashed, notices, statsDeleted, saved, settings };
+		};
+		const g = { folder: "ZZ test", name: "ZZ test", path: "NeoQuiz/ZZ test", quizzes: [{ path: "NeoQuiz/ZZ test/q.md" }] };
+		const a = await run(g);
+		r.check("11. the folder goes to the trash, its stats go, settings saved",
+			[a.trashed, a.statsDeleted, a.saved], [["NeoQuiz/ZZ test"], ["NeoQuiz/ZZ test/q.md"], 1]);
+		r.check("11. every declaration of the folder is forgotten, others kept",
+			[Object.keys(a.settings.quizzesModuleOverrides), a.settings.quizzesArchivedFolders], [["Other"], ["Other"]]);
+		const empty = await run({ ...g, quizzes: [] }, { onDisk: false });
+		r.check("11. a folder already gone from disk only loses its declaration",
+			[empty.trashed, Object.keys(empty.settings.quizzesModuleOverrides)], [[], ["Other"]]);
+		const root = await run({ folder: "NeoQuiz", name: "Neo Quiz", path: "NeoQuiz", quizzes: [] });
+		r.check("11. a root is never sent to the trash", root.trashed, []);
+		const holder = await run({ folder: "Parent", name: "Parent", path: "NeoQuiz/Parent", quizzes: [] }, { sas: "NeoQuiz/Parent/Generated" });
+		r.check("11. a folder holding the generated-quizzes folder is never trashed", holder.trashed, []);
+	}
+
 	r.done();
 });

@@ -241,8 +241,12 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.removeRootBody": "The folder and its files stay on your disk; Neo Quiz just stops showing them.",
 	"dashboard.quizzes.removeRootCta": "Remove",
 	"dashboard.quizzes.createOpenStaysHere": "This folder stays on this PC: it is not synced to your other devices.",
-	"dashboard.quizzes.menuDeleteModule": "Delete module quizzes",
-	"dashboard.quizzes.deleteModuleConfirmBody": "Remove the {count} quizzes of “{name}” and their stats?",
+	"dashboard.quizzes.menuDeleteFolder": "Delete folder",
+	"dashboard.quizzes.deleteFolderConfirmTitle": "Delete folder",
+	"dashboard.quizzes.deleteFolderConfirmBody": "Move “{name}” and everything in it to the trash, and remove its stats?",
+	"dashboard.quizzes.deleteFolderConfirmBodyNoDisk": "Remove “{name}” from Neo Quiz?",
+	"dashboard.quizzes.folderDeleted": "“{name}” deleted",
+	"dashboard.quizzes.deleteFolderError": "The folder could not be deleted.",
 	/* « Déplacer vers… » (tranche 9, tâche 3) : n'apparaît que quand plusieurs
 	   racines sont ouvertes (l'application). L'historique de révision suit le
 	   dossier, jamais les wikilinks entrants — d'où l'avertissement. */
