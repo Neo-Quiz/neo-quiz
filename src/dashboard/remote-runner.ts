@@ -93,6 +93,11 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 			}
 			return false;
 		}
+		// Already recorded in a chat (the taken log was lost, e.g. a settings reset): note it as taken, never run it again.
+		if (deps.recordedIds().has(req.id)) {
+			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
+			return true;
+		}
 		if (admit(req, { taken: log, busy: live() }, deps.now()) !== "run") return false;
 		// ONE frozen copy for the whole admission: the live settings may change while documents are read.
 		const s = figerReglages(deps.settings());

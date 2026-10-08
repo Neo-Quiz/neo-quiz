@@ -92,6 +92,11 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		r.check("an unknown type string is dropped", t.includes("..") || t.includes("--model"), false);
 		r.check("and the default type stays", g.sent[0].type, ["Mixte"]);
 	}
+	{ // Already recorded in a chat but absent from the (lost) taken log: noted as taken, never run
+		const g = rig(); g.setRecorded(new Set(["lq3k2-rec001"])); g.setIncoming([file("lq3k2-rec001")]);
+		const run = RU.createRemoteRunner(g.deps); await run.scan();
+		r.check("a recorded request is not run again, and is noted as taken and reported", [g.sent.length, g.failures.length, g.log.list.map(e => [e.id, e.reported])], [0, 0, [["lq3k2-rec001", true]]]);
+	}
 	{ // Invalid, foreign, expired, from this very device: nothing runs and nothing is recorded
 		const g = rig();
 		g.setIncoming([file("lq3k2-bad001", { extra: 1 }), file("lq3k2-bad002", { target: "33333333-3333-4333-8333-333333333333" }), file("lq3k2-bad003", { at: NOW - 30 * 3600e3 }), file("lq3k2-bad004", { documents: [{ path: "../x.md" }] }), file("lq3k2-bad005", {}, "99999999-9999-4999-8999-999999999999"), file("lq3k2-bad006", { from: PC }, PC), file("lq3k2-bad007", { documents: [{ path: "C:/x.md" }] }), file("lq3k2-bad008", { provider: "claude-code", cliPath: "C:/evil.exe" })]);
