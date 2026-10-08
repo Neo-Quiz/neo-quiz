@@ -316,6 +316,10 @@ jobs:
       # prompt carries document names, never content.
       - name: Generation kind
         run: npm run check:generation-kind
+      # THE RELAY: the prompt shared to an AI app is the PC's, and the pasted
+      # answer is size-capped, one quiz only, never executed, format-checked.
+      - name: Relay
+        run: npm run check:relay
       # THE DESTINATION FOLDERS: most recently changed first, and the ones a
       # request's words match suggested (accents ignored, name before titles).
       - name: Folder suggestions

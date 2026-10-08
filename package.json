@@ -37,6 +37,7 @@
     "check:chat-archives": "node scripts/check-chat-archives.mjs",
     "check:chat-record": "node scripts/check-chat-record.mjs",
     "check:generation-kind": "node scripts/check-generation-kind.mjs",
+    "check:relay": "node scripts/check-relay.mjs",
     "check:folder-suggest": "node scripts/check-folder-suggest.mjs",
     "check:chat-store": "node scripts/check-chat-store.mjs",
     "check:chat-sync": "node scripts/check-chat-sync.mjs",

@@ -612,6 +612,7 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   moins de 2 ou plus de 4 options, texte autour du JSON) ne bloque jamais la
   génération ; les réponses ne se perdent pas ; le prompt de clarification ne
   porte que des NOMS de documents, jamais leur contenu. Dans la CI.
+- `npm run check:relay` — le RELAIS (`src/dashboard/relay.ts`, noyau pur) : le prompt partagé à une appli IA est octet pour octet celui du PC (`composerPrompts` + `texteWeb`, Learn sauf si les mots disent un Test), et la réponse COLLÉE, non fiable, est bornée à 1 Mo avant tout parsing, refusée si elle porte le jeton d'une autre demande, si deux blocs candidats existent (jamais le premier deviné) ou si le format échoue ; clés de prototype retirées, NaN et Infinity refusés, les clés `*Html` gardées (assainies au rendu par les quatre portes). Dans la CI.
 - `npm run check:folder-suggest` — l'ordre des dossiers de destination et leurs
   suggestions (`src/dashboard/folder-suggest.ts`) : plus récemment modifié
   d'abord, mot de la demande apparié à travers les accents, un nom de dossier
