@@ -613,6 +613,8 @@ function installerPont(fichiers = {}, perimetre = null) {
 	/** Les rappels que `surveiller` a posés — de quoi POUSSER un événement
 	    depuis le « principal », comme le fait `webContents.send`. */
 	const abonnes = [];
+	/** Failures a case asks the "main process" to raise (`pont.rejeter = { trash: new Error(...) }`). */
+	const etat = { rejeter: null };
 
 	const neo = {
 		async demarrer(racines) {
@@ -654,7 +656,11 @@ function installerPont(fichiers = {}, perimetre = null) {
 			   `npm run check:electron-fs` qui l'éprouve (cas 7 et 8). Ici, on ne
 			   retient QUE ce que le rendu a décidé : le chemin absolu, et la
 			   racine dont il relève. */
-			async trash(p, racine) { journal.push(["trash", p, racine]); disque.delete(p); },
+			async trash(p, racine) {
+				if (etat.rejeter?.trash) throw etat.rejeter.trash;
+				journal.push(["trash", p, racine]);
+				disque.delete(p);
+			},
 			async list(dossier) {
 				const prefixe = dossier + "/";
 				return [...disque.keys()].filter(p => p.startsWith(prefixe) && !p.slice(prefixe.length).includes("/"));
@@ -809,6 +815,7 @@ function installerPont(fichiers = {}, perimetre = null) {
 	globalThis.window = { neo };
 
 	return {
+		set rejeter(v) { etat.rejeter = v; },
 		journal,
 		date: (p) => dates.get(p) ?? null,
 		texte: (p) => (disque.has(p) ? decodeur.decode(disque.get(p)) : null),
@@ -1460,14 +1467,61 @@ await withSrcModule("apps/windows/src/host/fs.ts", async ({ createWindowsIndex, 
 		r.check("une note NEUVE écrite par HostFs est annoncée aux abonnés",
 			vusEcriture, ["create Quiz/Cours (2)/importe.md"]);
 		await createWindowsFs(carte, miroir).write("Quiz/Cours (2)/importe.md", "y");
-		r.check("réécrire une note déjà connue n'annonce rien",
-			vusEcriture.length, 1);
+		/* A known note rewritten by HostFs IS announced (2026-10-08): the
+		   watcher's echo carries the mtime the write recorded and is swallowed,
+		   so without this the scanner never re-read a quiz edited in the app
+		   (question added, count stale until a restart). The scanner compares
+		   what it shows and stays silent when nothing changed. */
+		r.check("réécrire une note déjà connue l'annonce (le surveillant, lui, est avalé par le mtime)",
+			vusEcriture, ["create Quiz/Cours (2)/importe.md", "modify Quiz/Cours (2)/importe.md"]);
 		/* A staged import's folder move is ANNOUNCED too (the scanner learns the
 		   notes from `onChange`, not from the mirror alone). */
 		await createWindowsFs(carte, miroir).write("Quiz/.import-xyz/Sem/n.md", "x");
 		await createWindowsFs(carte, miroir).rename("Quiz/.import-xyz", "Quiz/Recu");
 		r.check("un dossier déplacé (import en staging) annonce ses notes aux abonnés",
 			vusEcriture.includes("create Quiz/Recu/Sem/n.md"), true);
+		/* A HOST WITHOUT A WATCHER (Android between rescans): nothing is ever
+		   pushed here, so what HostFs does itself must be enough. A trashed or
+		   removed file, a file moved away and a folder moved away are announced
+		   as `delete`, folder contents included, and only once the main process
+		   has done them (a failure announces nothing). Without `forget` the
+		   deleted quiz stayed in the list (2026-10-08). */
+		const hote = createWindowsFs(carte, miroir);
+		await hote.write("Quiz/Dos/a.md", "a");
+		await hote.write("Quiz/Dos/Sous/b.md", "b");
+		await hote.write("Quiz/Dos/c.md", "c");
+		await hote.write("Quiz/Autre/d.md", "d");
+		vusEcriture.length = 0;
+		await hote.trash("Quiz/Dos/a.md");
+		r.check("trash annonce la disparition du fichier sans surveillant",
+			[vusEcriture, miroir.get("Quiz/Dos/a.md")], [["delete Quiz/Dos/a.md"], null]);
+		vusEcriture.length = 0;
+		await hote.remove("Quiz/Dos/c.md");
+		r.check("remove annonce la disparition du fichier sans surveillant",
+			[vusEcriture, miroir.get("Quiz/Dos/c.md")], [["delete Quiz/Dos/c.md"], null]);
+		vusEcriture.length = 0;
+		await hote.rename("Quiz/Dos/Sous/b.md", "Quiz/Autre/b.md");
+		r.check("rename annonce la disparition de l'ANCIEN chemin et l'arrivée du nouveau",
+			vusEcriture.includes("delete Quiz/Dos/Sous/b.md") && vusEcriture.includes("create Quiz/Autre/b.md"), true);
+		vusEcriture.length = 0;
+		await hote.rename("Quiz/Autre", "Quiz/Deplace");
+		r.check("le renommage d'un DOSSIER annonce chaque fichier parti de l'ancien chemin",
+			[vusEcriture.includes("delete Quiz/Autre/d.md"), vusEcriture.includes("delete Quiz/Autre/b.md"), miroir.get("Quiz/Autre/d.md")], [true, true, null]);
+		/* Not announced twice: the watcher's own delete of the same path finds
+		   the index empty (`versContrat`) and is swallowed. */
+		const avantEcho = vusEcriture.length;
+		pont.emettre({ kind: "delete", abs: "D:/Quiz/Dos/a.md" });
+		r.check("l'événement du surveillant pour un fichier déjà oublié est avalé",
+			vusEcriture.length, avantEcho);
+		/* A failed trash announces nothing and keeps the file listed. */
+		await hote.write("Quiz/Dos/e.md", "e");
+		vusEcriture.length = 0;
+		pont.rejeter = { trash: new Error("disque plein") };
+		let refus = null;
+		try { await hote.trash("Quiz/Dos/e.md"); } catch (e) { refus = e.message; }
+		pont.rejeter = null;
+		r.check("un trash refusé n'annonce rien et laisse le fichier au miroir",
+			[refus, vusEcriture, miroir.get("Quiz/Dos/e.md")?.path], ["disque plein", [], "Quiz/Dos/e.md"]);
 		desabonnerEcriture();
 		vus.splice(4); // the later cases count the events of the pushed ones only
 

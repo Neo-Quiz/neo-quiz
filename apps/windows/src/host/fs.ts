@@ -411,14 +411,17 @@ export async function createWindowsIndex(carte: CarteRacines): Promise<MiroirDis
 	return {
 		all: index.all,
 		get: index.get,
-		/* A NEW file written through `HostFs` (`recaler`) must reach the
-		   subscribers too, not only the index. The watcher's own `create` for
-		   it carries the mtime the write already recorded, so `versContrat`
-		   swallows it: with a silent `apply` the catalogue never heard about
-		   an imported shared folder's notes (empty card until a restart).
-		   Only `create` is announced: a `modify` of a known file stays
-		   silent, as before (no rescan on every autosave). */
-		apply: (ev) => (ev.kind === "create" ? diffuser(ev) : index.apply(ev)),
+		/* What `HostFs` does ITSELF (`recaler`, `forget`) must reach the
+		   subscribers too, not only the index. The watcher's own event for it
+		   carries the mtime the write already recorded (or names a path the
+		   index no longer holds), so `versContrat` swallows it: with a silent
+		   `apply` the catalogue never heard about an imported shared folder's
+		   notes (empty card until a restart), nor about a question added in
+		   the editor (stale count), nor, on a host with NO watcher (Android
+		   outside a rescan), about a deleted or moved quiz (2026-10-08).
+		   Every kind is announced: the scanner compares what it displays and
+		   only notifies when that changed, so an autosave costs one read. */
+		apply: diffuser,
 		demarrerSurveillance,
 		onChange(cb) {
 			abonnes.add(cb);
@@ -501,6 +504,24 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 	}
 
 	/**
+	 * TELLS THE MIRROR (and its subscribers) that a file, or everything under a
+	 * folder, is GONE: after `trash`, `remove`, or the source side of a
+	 * `rename`. The watcher reports the same disappearance later, but a host
+	 * without one (Android between rescans) never does, and the catalogue kept a
+	 * deleted quiz on screen until the next foreground (2026-10-08). The
+	 * watcher's own `delete` is swallowed afterwards (`versContrat` ignores a
+	 * path the index no longer holds), so nothing is announced twice. Only what
+	 * the index holds is announced: a hidden path was never there.
+	 */
+	function forget(path: string): void {
+		const exact = path.replace(/\/+$/, "");
+		const under = exact + "/";
+		for (const f of index.all()) {
+			if (f.path === exact || f.path.startsWith(under)) index.apply({ kind: "delete", path: f.path });
+		}
+	}
+
+	/**
 	 * TEACHES THE MIRROR WHAT A MOVE BROUGHT IN, at once. A staged import
 	 * (`dashboard/share-import.ts`) writes into a hidden `.import-<id>` folder,
 	 * which the catalogue never sees, then moves it (or its files) to the
@@ -576,20 +597,21 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		async readBinary(path) {
 			return await pont().fichiers.readBinary(abs(path));
 		},
-		/* `<racine>/.trash/<chemin local>`, composé et numéroté par le PRINCIPAL
-		   (`fichiers.ts`) : le rendu ne lui passe que le fichier et SA racine —
-		   par `carte`, jamais à la main, c'est le SEUL endroit qui sait de quelle
-		   racine relève un chemin du contrat. Le point de tête de `.trash` suffit
-		   à l'exclure du catalogue (`dossierIgnore`) des deux côtés.
-		   Le miroir n'est PAS touché ici : le surveillant remonte la disparition
-		   (`unlink`), et c'est par lui que le scanner l'apprend. La retirer du
-		   miroir avant ferait tomber la garde de `versContrat` (« un fichier que
-		   le catalogue n'a jamais connu ») sur ce même événement, et le scanner
-		   garderait un quiz fantôme. */
+		/* `<root>/.trash/<local path>`, composed and numbered by the MAIN process
+		   (`fichiers.ts`): the renderer only passes the file and ITS root, taken
+		   from `carte`, never by hand (the one place that knows which root a
+		   contract path belongs to). The leading dot of `.trash` is enough to
+		   keep it out of the catalogue (`dossierIgnore`) on both sides.
+		   The mirror is then emptied of that path AND the subscribers told
+		   (`forget`): removing it silently would trip the `versContrat` guard
+		   ("a file the catalogue never knew") on the watcher's own event and
+		   the scanner would keep a ghost quiz; relying on the watcher alone left
+		   a deleted quiz on screen on a host without one (Android). */
 		async trash(path) {
 			const racine = carte.pour(path);
 			if (!racine) throw new Error(`chemin hors des dossiers ouverts : ${path}`);
 			await pont().fichiers.trash(abs(path), normaliser(racine.path));
+			forget(path);
 		},
 		async exists(path) {
 			return await pont().fichiers.exists(abs(path));
@@ -617,6 +639,7 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		},
 		async remove(path) {
 			await pont().fichiers.remove(abs(path));
+			forget(path);
 		},
 		/* Pas d'écrasement : c'est le PRINCIPAL qui rejette si la destination
 		   existe (`fichiers.ts`, « rename REJETTE si la destination existe »),
@@ -625,6 +648,7 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		   venait de créer. */
 		async rename(from, to) {
 			await pont().fichiers.rename(abs(from), abs(to));
+			forget(from);
 			await recalerApresDeplacement(to);
 		},
 		listMarkdown() {

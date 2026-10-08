@@ -19,6 +19,7 @@ release notes.
 
 ### Fixed
 - On Android, a quiz you delete (or create, rename, import) leaves or joins the list at once, instead of after leaving and reopening the app.
+- A quiz you delete or move, and the question count after you edit a quiz, now update in the list at once on every device, even where the app has no file watcher.
 
 ## [1.20.44] - 2026-10-08
 
