@@ -11,6 +11,7 @@ import type {
 import { mathifyElement } from "./mathjax";
 import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
+import { figureDeLecture } from "./lecture-rendu";
 import { t, type TransKey } from "../i18n";
 import { drawOrder, formatElapsed, learnFigures, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
@@ -867,7 +868,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		// tant que la question n'est pas répondue (2026-09-26) — décision
 		// tranchée par `passageVisibility` (engine/passage.ts), jamais
 		// recalculée ici.
-		const passageSection = ctx.passage.passageHtml(qi);
+		/* A READING shows its own figure inside its text (lecture-rendu.ts
+		   `figureDeLecture`), not in a document card above it. */
+		const passageSection = isRead && figureDeLecture(q) !== null ? "" : ctx.passage.passageHtml(qi);
 
 		/* Classe de RÔLE sur la carte : le CSS doit pouvoir distinguer une carte
 		   de LECTURE des autres. Sur une carte "read", le support de cours EST

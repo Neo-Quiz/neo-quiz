@@ -22,6 +22,9 @@ export const EN_ENGINE = {
 	"engine.passage.scopeRange": "questions {first} to {last}",
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Hide the document",
+	"engine.image.zoomIn": "Zoom in",
+	"engine.image.zoomOut": "Zoom out",
+	"engine.image.fit": "Fit to the window",
 	"engine.passage.expand": "Show the document",
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */

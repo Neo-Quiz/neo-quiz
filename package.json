@@ -35,6 +35,7 @@
     "check:categorie": "node scripts/check-categorie.mjs",
     "check:transcript": "node scripts/check-transcript.mjs",
     "check:figures": "node scripts/check-figures.mjs",
+    "check:image-zoom": "node scripts/check-image-zoom.mjs",
     "check:chat-archives": "node scripts/check-chat-archives.mjs",
     "check:chat-record": "node scripts/check-chat-record.mjs",
     "check:generation-kind": "node scripts/check-generation-kind.mjs",

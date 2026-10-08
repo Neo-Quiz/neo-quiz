@@ -25,6 +25,7 @@ import { createLearnHandlers } from "./engine/learn";
 import { buildStepSlides, scrollNextOpenIntoView, stepHolding, stepMembers } from "./engine/step-page";
 import { createHandInHandlers } from "./engine/hand-in";
 import { installCodeLangBubble } from "./engine/code-lang-bubble";
+import { installImageZoom } from "./engine/image-zoom";
 import { emptyLearnState } from "./engine/learn-loop";
 import { createTermesHandlers } from "./engine/termes";
 import { lecturesCourtes, numerosAffiches } from "./lecture-etape";
@@ -1118,6 +1119,8 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 
 	// The language name above a code block's logo, on hover (engine/code-lang-bubble.ts).
 	__quizGlobalCleanups.push(installCodeLangBubble(container));
+	// A tap on a picture of a card opens it larger, to zoom (engine/image-zoom.ts).
+	__quizGlobalCleanups.push(installImageZoom(container));
 
 	// Assign remaining local functions to ctx
 	// Navigation functions use ctx.state.*

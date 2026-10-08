@@ -52,6 +52,8 @@ jobs:
         run: npm run check:transcript
       - name: Figures of a generated reading
         run: npm run check:figures
+      - name: Zoom of a quiz picture
+        run: npm run check:image-zoom
 
       # THE "EXPLAIN" PROMPT of a question: its choices, its expected answer
       # and the learner's go with it, never a raw placeholder.

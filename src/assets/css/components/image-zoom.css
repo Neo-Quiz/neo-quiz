@@ -1,0 +1,106 @@
+/* ══════════════════════════════════════════════════════════
+   AN IMAGE OF A QUIZ, LARGER (engine/image-zoom.ts, 2026-10-08)
+   The pictures of a card say they open (zoom-in cursor); the modal is as
+   large as the window allows, its scene clips the zoomed picture, and the
+   browser's own gestures (scroll, page zoom) are off inside it.
+══════════════════════════════════════════════════════════ */
+
+.quiz-card img:not(.quiz-option img){
+  cursor: zoom-in;
+}
+
+.modal.qbd-image-modal{
+  width: min(1400px, calc(100vw - 32px));
+  height: min(900px, 90vh);
+  max-height: 90vh;
+}
+
+.qbd-image-modal .modal-content{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.qbd-image-scene{
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: zoom-in;
+  user-select: none;
+}
+
+.qbd-image-scene.is-zoomed{
+  cursor: grab;
+}
+
+.qbd-image-zoom{
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: 0 0;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.qbd-image-barre{
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.qbd-image-bouton{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.qbd-image-bouton:hover{
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.qbd-image-bouton svg{
+  width: 18px;
+  height: 18px;
+}
+
+/* The zoomed picture never covers the close button (it overflows the
+   scene's box while it is being transformed). */
+.qbd-image-modal .modal-close-button{
+  z-index: 2;
+  background: var(--background-primary);
+}
+
+.qbd-image-modal .modal-content{
+  padding-top: 30px;
+}
+
+/* On a phone the picture takes the whole screen: no room kept for the
+   desktop rail on the modal layer. */
+.is-mobile .modal-container:has(> .modal.qbd-image-modal){
+  padding: 0;
+}
+.is-mobile .modal.qbd-image-modal{
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-width: 0;
+  border-radius: 0;
+  padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
+}

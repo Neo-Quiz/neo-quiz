@@ -127,7 +127,31 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	const source = typeof cite === "string" && cite.trim()
 		? `<div class="quiz-lecture-source">${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
 		: "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${corps}${retenir}${source}</div>` };
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${courte ? "" : figureHtml(item, p)}${corps}${retenir}${source}</div>` };
+}
+
+/** The reading's FIGURE (2026-10-08): its `passage` (a diagram drawn from the
+    course, dashboard/figures.ts, or a picture an author put there) shown
+    INSIDE the reading, under its title, and no longer in a framed card of
+    its own above it. Its title is a caption, unless it only repeats the
+    source line. `null` without a text `passage` (a shared `passageId` or a
+    `passageHtml` keeps the document card: engine/cards.ts). */
+export function figureDeLecture(item: unknown): string | null {
+	const r = item as { passage?: unknown; passageHtml?: unknown; passageId?: unknown } | null;
+	if (!r || typeof r.passage !== "string" || !r.passage.trim()) return null;
+	if (typeof r.passageHtml === "string" && r.passageHtml.trim()) return null;
+	if (typeof r.passageId === "string" && r.passageId.trim()) return null;
+	return r.passage;
+}
+
+function figureHtml(item: unknown, p: PortesLecture): string {
+	const passage = figureDeLecture(item);
+	if (passage === null) return "";
+	const r = item as { passageTitle?: unknown; cite?: unknown };
+	const titre = typeof r.passageTitle === "string" ? r.passageTitle.trim() : "";
+	const cite = typeof r.cite === "string" ? r.cite.trim() : "";
+	const legende = titre && titre !== cite ? `<figcaption class="quiz-lecture-legende">${p.inline(titre)}</figcaption>` : "";
+	return `<figure class="quiz-lecture-figure">${p.bloc(passage)}${legende}</figure>`;
 }
 
 /**

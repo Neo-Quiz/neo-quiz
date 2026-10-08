@@ -48,6 +48,31 @@
   margin: 0 0 14px;
 }
 
+/* The reading's figure, inside the reading (2026-10-08): no frame of its
+   own, the full width of the text; a tap opens it larger (engine/
+   image-zoom.ts). */
+.quiz-lecture-figure{
+  margin: 0 0 18px;
+}
+
+.quiz-lecture-figure .quiz-passage-embed-wrap{
+  margin: 0;
+}
+
+.quiz-lecture-figure img{
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.quiz-lecture-legende{
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 /* ── Page de lecture (B) : titre serif, méta, lettrine ── */
 
 .quiz-lecture--page .quiz-lecture-titre{

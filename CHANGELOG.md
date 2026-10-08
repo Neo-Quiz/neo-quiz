@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Tap a picture of a quiz to open it full size, then pinch, scroll or double-tap to zoom in and out.
+
+### Changed
+
+- In a Learn, a reading's picture sits inside the reading, under its title, instead of in a separate card above it.
+
 ## [1.20.50] - 2026-10-08
 
 ### Added

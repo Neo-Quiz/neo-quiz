@@ -15,6 +15,9 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.passage.scopeRange": "questions {first} à {last}",
 	"engine.passage.scopeCount": "{count} questions",
 	"engine.passage.collapse": "Masquer le document",
+	"engine.image.zoomIn": "Zoomer",
+	"engine.image.zoomOut": "Dézoomer",
+	"engine.image.fit": "Ajuster à la fenêtre",
 	"engine.passage.expand": "Afficher le document",
 
 	"engine.lecture.keyPoints": "À retenir",
