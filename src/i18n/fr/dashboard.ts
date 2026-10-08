@@ -192,6 +192,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.renameLabel": "Nom du quiz",
 	"dashboard.quizzes.renameCta": "Renommer",
 	"dashboard.quizzes.deleted": "Quiz supprimé · Ctrl+Z pour annuler",
+	"dashboard.quizzes.deletedPhone": "Quiz supprimé",
 	"dashboard.quizzes.restored": "Quiz restauré",
 	"dashboard.quizzes.restoredPartial": "Quiz restauré — {count} n'ont pas pu l'être, la note a changé depuis",
 	"dashboard.quizzes.deletedPartial": "Quiz supprimé — {count} n'ont pas pu être retirés",

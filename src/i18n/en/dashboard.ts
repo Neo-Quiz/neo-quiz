@@ -227,6 +227,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.renameLabel": "Quiz name",
 	"dashboard.quizzes.renameCta": "Rename",
 	"dashboard.quizzes.deleted": "Quiz deleted · Ctrl+Z to undo",
+	"dashboard.quizzes.deletedPhone": "Quiz deleted",
 	"dashboard.quizzes.restored": "Quiz restored",
 	"dashboard.quizzes.restoredPartial": "Quiz restored — {count} could not be, the note has changed since",
 	"dashboard.quizzes.deletedPartial": "Quiz deleted — {count} could not be removed",

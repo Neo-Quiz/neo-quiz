@@ -243,6 +243,12 @@ export async function annulerDerniereSuppression(ctx: DashboardShellCtx): Promis
 	return restaures > 0;
 }
 
+/** "Quiz deleted", with the Ctrl+Z hint only where a keyboard is expected:
+    a phone has no Ctrl+Z, and the hint promised a gesture it cannot make. */
+function deletedNotice(): string {
+	return t(currentHost().platform.isMobile ? "dashboard.quizzes.deletedPhone" : "dashboard.quizzes.deleted");
+}
+
 async function deleteQuiz(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Promise<void> {
 	// `getFile` rend null pour un dossier comme pour un absent : la garde
 	// reste nécessaire, seule sa forme a changé (`instanceof TFile` avant).
@@ -253,7 +259,7 @@ async function deleteQuiz(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Promise
 	// La note peut ne plus contenir de bloc (supprimé ailleurs entre-temps) :
 	// annoncer « Quiz supprimé » serait alors faux.
 	derniereSuppression = [];
-	if (await deleteQuizCore(ctx, quiz)) currentHost().ui.notice(t("dashboard.quizzes.deleted"));
+	if (await deleteQuizCore(ctx, quiz)) currentHost().ui.notice(deletedNotice());
 	else currentHost().ui.notice(t("dashboard.detail.noBlockInNote"));
 }
 
@@ -344,6 +350,9 @@ async function deleteQuizCore(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Pro
     thrown, so a course is never half-deleted without a word. */
 async function deleteCourseQuizzes(ctx: DashboardShellCtx, quizzes: readonly QuizIndexEntry[]): Promise<void> {
 	let failures = 0;
+	/* A fresh undo batch, as the single and folder deletes start one: without
+	   it Ctrl+Z after "Delete both" also brought back quizzes deleted earlier. */
+	derniereSuppression = [];
 	for (const q of quizzes) {
 		try {
 			if (!await deleteQuizCore(ctx, q)) failures++;
@@ -353,7 +362,7 @@ async function deleteCourseQuizzes(ctx: DashboardShellCtx, quizzes: readonly Qui
 	}
 	currentHost().ui.notice(failures > 0
 		? t("dashboard.quizzes.deletedPartial", { count: failures })
-		: t("dashboard.quizzes.deleted"));
+		: deletedNotice());
 }
 
 /** Delete d'un MODULE entier : chaque quiz passe par le même cœur. */
@@ -383,7 +392,7 @@ async function deleteModuleQuizzes(ctx: DashboardShellCtx, group: ModuleGroup): 
 	}
 	currentHost().ui.notice(echecs
 		? t("dashboard.quizzes.deletedPartial", { count: echecs })
-		: t("dashboard.quizzes.deleted"));
+		: deletedNotice());
 }
 
 /* ── Move ONE quiz to another known folder ──
