@@ -81,6 +81,16 @@ p {
 	-webkit-app-region: no-drag;
 }
 #min:hover, #min:focus-visible { color: rgb(198, 208, 245); }
+/* Close: only once the update is known to have failed, left of Minimise. */
+#fermer {
+	position: absolute; top: 12px; right: 52px; z-index: 1;
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+	background: transparent; color: rgb(142, 149, 179);
+	-webkit-app-region: no-drag;
+}
+#fermer[hidden] { display: none; }
+#fermer:hover, #fermer:focus-visible { color: rgb(198, 208, 245); }
 #min:focus-visible { outline: 1px solid rgba(198, 208, 245, .5); outline-offset: -1px; }
 #detail { margin-bottom: 14px; font-size: 12px; color: rgba(207, 218, 239, .55); }
 #detail:empty { display: none; }
@@ -123,6 +133,7 @@ p {
 <body>
 <div id="app">
 	<div id="decor"></div>
+	<button id="fermer" type="button" title="Close" aria-label="Close" hidden><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/></svg></button>
 	<button id="min" type="button" title="Minimize" aria-label="Minimize"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.25 10H13.75"/></svg></button>
 	<div id="contenu">
 		<h1 id="titre">Updating Neo Quiz</h1>

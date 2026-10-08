@@ -87,6 +87,8 @@ export async function lancerFenetreMaj(
     disque lent avec une marge que personne n'atteindra. */
 const EXPIRATION_MS = 3 * 60 * 1000;
 const INTERVALLE_TEMOIN_MS = 400;
+/** How long the "did not finish" message stays before the window goes by itself. */
+const ECHEC_VISIBLE_MS = 60 * 1000;
 
 /** LE PROCESSUS FENÊTRE : ouvre la fenêtre, attend le témoin de l'application
     relancée, puis rend la main. */
@@ -126,16 +128,19 @@ export async function afficherFenetreMaj(
 		},
 	});
 	fenetre.setMenuBarVisibility(false);
-	/* Above the desktop the closed app leaves behind, without stealing focus
-	   from what the user is doing meanwhile. Dropped once minimised and kept off
-	   after restoring: the window must never stay above anything it was pushed
-	   behind on purpose. */
-	fenetre.setAlwaysOnTop(true, "normal");
-	fenetre.on("minimize", () => fenetre.setAlwaysOnTop(false));
+	/* NEVER always-on-top (2026-10-08): it stayed above every other window,
+	   and above the installer's own error box too, so a failed update looked
+	   like a window frozen at 60 % that hid the one message explaining why.
+	   An ordinary window: the installer's dialogs come up over it. */
 	const reduire = (e: Electron.IpcMainEvent): void => {
 		if (!fenetre.isDestroyed() && e.sender === fenetre.webContents) fenetre.minimize();
 	};
 	ipcMain.on("neo-maj-reduire", reduire);
+	let fermer: () => void = () => undefined;
+	const surFermer = (e: Electron.IpcMainEvent): void => {
+		if (!fenetre.isDestroyed() && e.sender === fenetre.webContents) fermer();
+	};
+	ipcMain.on("neo-maj-fermer", surFermer);
 
 	await fenetre.loadFile(join(__dirname, "maj", "index.html"));
 	/* Sober on purpose: title, current step, and the version in small text. */
@@ -148,13 +153,16 @@ export async function afficherFenetreMaj(
 		`document.getElementById("detail").textContent = ${JSON.stringify(detailFixe)};` +
 		`document.getElementById("min").title = ${JSON.stringify(t("installer.minimize"))};` +
 		`document.getElementById("min").setAttribute("aria-label", ${JSON.stringify(t("installer.minimize"))});` +
-		`document.getElementById("min").addEventListener("click", () => window.neoMaj.reduire());`,
+		`document.getElementById("min").addEventListener("click", () => window.neoMaj.reduire());` +
+		`document.getElementById("fermer").title = ${JSON.stringify(t("app.update.window.close"))};` +
+		`document.getElementById("fermer").setAttribute("aria-label", ${JSON.stringify(t("app.update.window.close"))});` +
+		`document.getElementById("fermer").addEventListener("click", () => window.neoMaj.fermer());`,
 	);
 	fenetre.show();
 
 	const debut = Date.now();
 	const arreterSuivi = demarrerSuivi(fenetre, donnees, poser);
-	await new Promise<void>(termine => {
+	const vuTemoin = await new Promise<boolean>(termine => {
 		const minuteur = setInterval(() => {
 			void (async () => {
 				let vu = false;
@@ -163,13 +171,31 @@ export async function afficherFenetreMaj(
 				} catch { /* pas encore de témoin */ }
 				if (vu || Date.now() - debut > EXPIRATION_MS) {
 					clearInterval(minuteur);
-					termine();
+					termine(vu);
 				}
 			})();
 		}, INTERVALLE_TEMOIN_MS);
 	});
 	arreterSuivi();
+	/* NO RESTARTED APP after the delay: the update did not finish. Say so
+	   instead of vanishing (the user was left facing an empty desktop, or a
+	   bar frozen mid-way), with a close button; still gone by itself after a
+	   minute, so it never becomes a window stuck on the desktop. */
+	if (!vuTemoin && !fenetre.isDestroyed()) {
+		fenetre.setProgressBar(-1);
+		await poser(
+			`document.getElementById("statut").textContent = ${JSON.stringify(t("app.update.window.failed"))};` +
+			`document.getElementById("barre").hidden = true;` +
+			`document.getElementById("fermer").hidden = false;`,
+		);
+		fenetre.flashFrame(true);
+		await new Promise<void>(fin => {
+			const delai = setTimeout(fin, ECHEC_VISIBLE_MS);
+			fermer = () => { clearTimeout(delai); fin(); };
+		});
+	}
 	ipcMain.removeListener("neo-maj-reduire", reduire);
+	ipcMain.removeListener("neo-maj-fermer", surFermer);
 	if (!fenetre.isDestroyed()) {
 		fenetre.setProgressBar(-1);
 		fenetre.close();

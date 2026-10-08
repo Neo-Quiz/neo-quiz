@@ -88,6 +88,8 @@ export const EN_APP = {
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée
 	   depuis un reflet de l'installation (`electron/fenetre-maj.ts`). */
 	"app.update.window.title": "Updating Neo Quiz",
+	"app.update.window.failed": "The update did not finish. Close this window and open Neo Quiz again.",
+	"app.update.window.close": "Close",
 
 	/* ── Barre de titre et menu d'application (application seulement) ── */
 	"app.titlebar.menu": "Application menu",

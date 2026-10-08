@@ -62,6 +62,8 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.update.btn.failed": "Vérification impossible",
 	"app.update.btn.devBuild": "Version de développement",
 	"app.update.window.title": "Mise à jour de Neo Quiz",
+	"app.update.window.failed": "La mise à jour n'a pas abouti. Ferme cette fenêtre et rouvre Neo Quiz.",
+	"app.update.window.close": "Fermer",
 
 	/* ── Barre de titre et menu d'application (application seulement) ── */
 	"app.titlebar.menu": "Menu de l'application",
