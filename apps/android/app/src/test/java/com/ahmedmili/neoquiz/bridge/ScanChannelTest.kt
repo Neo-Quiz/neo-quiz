@@ -108,4 +108,14 @@ class ScanChannelTest {
         val e = org.junit.Assert.assertThrows(SecurityException::class.java) { runBlocking { scan.liste(root.parent) } }
         assertEquals("outside-perimeter", e.message)
     }
+
+    /** A write the page's catalogue can see is followed by a rescan; a dot folder (journals, trash) never is. */
+    @Test
+    fun visibleToCatalogue_skipsDotFolders() {
+        assertTrue(ScanChannel.visibleToCatalogue("/storage/emulated/0/Neo Quiz/XTI301/New quiz.md"))
+        assertTrue(ScanChannel.visibleToCatalogue("C:\\Neo Quiz\\Cours\\q.md"))
+        assertEquals(false, ScanChannel.visibleToCatalogue("/storage/emulated/0/Neo Quiz/.neo-quiz/journal/phone.jsonl"))
+        assertEquals(false, ScanChannel.visibleToCatalogue("/storage/emulated/0/Neo Quiz/.trash/XTI301/New quiz.md"))
+        assertEquals(false, ScanChannel.visibleToCatalogue("/storage/emulated/0/Neo Quiz/Cours/.import-0123456789ab/q.md"))
+    }
 }

@@ -127,4 +127,13 @@ class ScanChannel(private val perimeter: Perimeter, private val emit: (Map<Strin
 
     /** `dossierIgnore` of `apps/windows/electron/catalogue.ts`. */
     private fun ignoredFolder(name: String) = name.startsWith(".") || name == "node_modules"
+
+    companion object {
+        /** Whether a written path can be in the page's catalogue: none of its segments is an
+            ignored folder (`ignoredFolder`) nor a dot file. Journals (`.neo-quiz`), the trash
+            and an import's staging folder are not, so a write there needs no rescan. */
+        fun visibleToCatalogue(path: String): Boolean =
+            path.replace('\\', '/').split('/').filter { it.isNotEmpty() }
+                .none { it.startsWith(".") || it == "node_modules" }
+    }
 }

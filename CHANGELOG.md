@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- On Android, a quiz you delete (or create, rename, import) leaves or joins the list at once, instead of after leaving and reopening the app.
+
 ## [1.20.44] - 2026-10-08
 
 ### Changed
