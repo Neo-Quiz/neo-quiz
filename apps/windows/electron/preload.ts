@@ -107,6 +107,10 @@ const pont: Pont = {
 		fichier: (nom, octets) => ipcRenderer.invoke(CANAUX.partageNatif, nom, octets),
 	},
 
+	notification: {
+		afficher: (t, c) => ipcRenderer.invoke(CANAUX.notificationAfficher, t, c),
+	},
+
 	systeme: {
 		ouvrir: abs => ipcRenderer.invoke(CANAUX.ouvrir, abs),
 		copierTexte: texte => ipcRenderer.invoke(CANAUX.systemeCopierTexte, texte),

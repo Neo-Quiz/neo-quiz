@@ -73,6 +73,7 @@
     "check:electron-reglages": "node scripts/check-electron-reglages.mjs",
     "check:electron-reseau": "node scripts/check-electron-reseau.mjs",
     "check:electron-process": "node scripts/check-electron-process.mjs",
+    "check:electron-notification": "node scripts/check-electron-notification.mjs",
     "check:electron-syncthing": "node scripts/check-electron-syncthing.mjs",
     "fetch:syncthing": "node scripts/fetch-syncthing.mjs",
     "check:electron-video": "node scripts/check-electron-video.mjs",

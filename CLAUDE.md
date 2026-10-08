@@ -203,6 +203,10 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   réglage `aiExamDurationMinutes` (la durée d'un Examen générable, retiré le
   2026-09-29) n'est plus gardé : une valeur restée dans un fichier de
   réglages est acceptée et ignorée, et n'affaiblit aucune autre règle de la clé.
+- `npm run check:electron-notification` — le canal de notification native
+  (`apps/windows/electron/notification.ts`) : la fenêtre ne fournit que deux
+  chaînes (contrôles retirés, 80 et 200 caractères au plus), jamais d'icône,
+  d'URL ni d'action ; au plus 30 par heure, 2 s d'écart. Dans la CI.
 - `npm run check:electron-process` — les fichiers de cache des CLI ET le
   LANCEMENT d'un CLI (`apps/windows/electron/process.ts`), sur de vrais process.
   C'est la capacité la plus dangereuse du pont : la liste blanche de NOMS

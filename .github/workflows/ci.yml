@@ -581,6 +581,10 @@ jobs:
       - name: Electron process launching
         run: npm run check:electron-process
 
+      # Native notification channel: two bounded strings, rate limit.
+      - name: Electron notification
+        run: npm run check:electron-notification
+
       # Main-process file primitives on a real temp folder.
       - name: Electron file primitives
         run: npm run check:electron-fs

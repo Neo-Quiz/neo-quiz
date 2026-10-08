@@ -513,6 +513,13 @@ export interface Pont {
 		fichier(nom: string, octets: Uint8Array): Promise<boolean>;
 	};
 
+	/** A native notification built by the main process from two strings only
+	    (no icon, URL or action from the page); bounded and rate-limited there
+	    (`notification.ts`). `false` when refused or unsupported. */
+	notification?: {
+		afficher(titre: string, corps: string): Promise<boolean>;
+	};
+
 	/**
 	 * Android only (absent on Windows, which has no background alarm). The daily
 	 * review notification: no JavaScript ever runs in the background, so the page
@@ -1061,6 +1068,7 @@ export const CANAUX = {
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",
 	partageNatif: "neo:partage/natif",
+	notificationAfficher: "neo:notification/afficher",
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
 	syncOublier: "neo:sync/oublier",

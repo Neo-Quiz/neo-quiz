@@ -37,7 +37,7 @@
    réussi.
 ══════════════════════════════════════════════════════════ */
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, screen, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, screen, shell } from "electron";
 import * as os from "node:os";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
@@ -50,6 +50,7 @@ import { absoluDepuisContrat, contratDepuisAbsolu, creerIndex, renameDirVersAbso
 import type { EvenementSurveillant, Index } from "./index-fichiers";
 import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
+import { cleanNotification, createNotificationGate } from "./notification";
 import { validerReglagesIa } from "./garde-ia";
 import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/garde";
 import { siteVerifie, verifierSite } from "./moodle/compat";
@@ -826,6 +827,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (typeof texte !== "string" || texte.length > 524288) throw new Error("copie refusée : le presse-papiers ne prend qu'un texte borné");
 		dernierTexteEcritParLapp = texte;
 		clipboard.writeText(texte);
+	});
+
+	/* Only two strings cross: no icon, URL, action or click handler comes from the page. */
+	const porteNotification = createNotificationGate();
+	ipcMain.handle(CANAUX.notificationAfficher, (_e, titre: unknown, corps: unknown) => {
+		const propre = cleanNotification(titre, corps);
+		if (!propre || !Notification.isSupported() || !porteNotification.allow()) return false;
+		new Notification({ title: propre.title, body: propre.body, silent: false }).show();
+		return true;
 	});
 
 	ipcMain.handle(CANAUX.systemeRelancer, async () => {
