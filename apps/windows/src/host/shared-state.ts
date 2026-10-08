@@ -42,6 +42,8 @@ export const MODULES_DIR = "modules";
 export interface SharedFs {
 	exists(path: string): Promise<boolean>;
 	read(path: string): Promise<string>;
+	/** Size in bytes without reading the file; null when absent or unreadable. */
+	size(path: string): Promise<number | null>;
 	write(path: string, data: string): Promise<void>;
 	append(path: string, data: string): Promise<void>;
 	list(dir: string): Promise<string[]>;

@@ -72,6 +72,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 
 	async function readOne(path: string): Promise<ChatRecord[] | null> {
 		try {
+			if (!(await smallEnough(path, MAX_FILE_CHARS))) { console.warn(`${LOG_PREFIX} chat file too large or unreadable, ignored:`, path); return null; }
 			const raw = await fs.read(path);
 			if (raw.length > MAX_FILE_CHARS) { console.warn(`${LOG_PREFIX} chat file too large, ignored:`, path); return null; }
 			const parsed: unknown = JSON.parse(raw);
@@ -126,6 +127,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		if (list) { own = list; return; }
 		locked = true;
 		try {
+			if (!(await smallEnough(ownPath, MAX_FILE_CHARS))) return;
 			const raw = await fs.read(ownPath);
 			if (raw.trim()) await fs.write(`${ownPath}.corrupt-${clock()}`, raw);
 		} catch { /* kept aside is best effort */ }
@@ -154,6 +156,15 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 	const genDir = `${rootId}/${REVIEW_DIR}/${GENERATIONS_DIR}`;
 	const genOwn = `${genDir}/${ownName}`;
 
+	/** A synced file is size-checked BEFORE it is read (a UTF-8 character is at
+	    most 4 bytes, so `max` characters is at most `4 * max` bytes): another
+	    device controls its size, and reading it whole would crash this process.
+	    An unknown size is refused. */
+	async function smallEnough(path: string, maxChars: number): Promise<boolean> {
+		const n = await fs.size(path);
+		return n !== null && n <= 4 * maxChars;
+	}
+
 	async function readGenerations(): Promise<Array<{ device: string; file: GenerationsFile }>> {
 		let names: string[];
 		try { names = (await fs.list(genDir)).map(baseName); } catch { return []; }
@@ -161,6 +172,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		for (const n of names) {
 			if (!n.endsWith(".json") || n === ownName) continue;
 			try {
+				if (!(await smallEnough(`${genDir}/${n}`, MAX_GENERATIONS_CHARS))) continue;
 				const raw = await fs.read(`${genDir}/${n}`);
 				if (raw.length > MAX_GENERATIONS_CHARS) continue;
 				const file = parseGenerations(JSON.parse(raw));
@@ -194,6 +206,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 				// A Syncthing conflict copy duplicates a request, it is never a second one.
 				if (!n.endsWith(".json") || isConflictCopy(n) || !SLUG.test(n.slice(0, -5))) continue;
 				try {
+					if (!(await smallEnough(`${reqDir}/${s.name}/${n}`, MAX_REQUEST_CHARS))) continue;
 					const raw = await fs.read(`${reqDir}/${s.name}/${n}`);
 					if (raw.length > MAX_REQUEST_CHARS) continue;
 					out.push({ fileDevice: s.name, fileId: n.slice(0, -5), raw: JSON.parse(raw) });
@@ -227,6 +240,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		for (const n of names) {
 			if (!n.endsWith(".json") || isConflictCopy(n)) continue;
 			try {
+				if (!(await smallEnough(`${ownReqDir}/${n}`, MAX_REQUEST_CHARS))) continue;
 				const raw = await fs.read(`${ownReqDir}/${n}`);
 				if (raw.length > MAX_REQUEST_CHARS) continue;
 				const parsed: unknown = JSON.parse(raw);

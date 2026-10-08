@@ -180,6 +180,10 @@ export interface HostFs {
 	    corbeille système n'est atteignable. */
 	trash(path: string): Promise<void>;
 	exists(path: string): Promise<boolean>;
+	/** The size in bytes of a FILE, read WITHOUT reading its content (a synced
+	    file written by another device must be size-checked before it is read).
+	    `null` when absent, not a file, unreadable or outside the roots. */
+	size(path: string): Promise<number | null>;
 	/** Crée le dossier ET ses parents. Ne rejette pas s'il existe déjà. */
 	mkdirs(path: string): Promise<void>;
 	/** Ajoute à la FIN du fichier, en le créant s'il n'existe pas.

@@ -9,11 +9,12 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 function memFs(files = new Map()) {
-	const writes = [];
+	const writes = [], reads = [];
 	return {
-		files, writes,
+		files, writes, reads,
+		size: async (p) => files.has(p) ? Buffer.byteLength(files.get(p)) : null,
 		exists: async (p) => files.has(p),
-		read: async (p) => { if (!files.has(p)) throw new Error("ENOENT " + p); return files.get(p); },
+		read: async (p) => { reads.push(p); if (!files.has(p)) throw new Error("ENOENT " + p); return files.get(p); },
 		write: async (p, d) => { writes.push(p); files.set(p, d); },
 		append: async (p, d) => { writes.push(p); files.set(p, (files.get(p) ?? "") + d); },
 		list: async (dir) => [...files.keys()].filter(k => k.startsWith(dir + "/") && !k.slice(dir.length + 1).includes("/")),
@@ -199,6 +200,16 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		refused = false;
 		try { await cf.writeRequest(req("fake-0004", { from: PC })); } catch { refused = true; }
 		r.check("a request claiming another sender is not written under our directory", refused, true);
+		// Size first: a huge synced file is never read at all
+		const hugeFs = memFs(new Map([
+			[`${RD}/${PC}/huge-0001.json`, "x".repeat(4 * 100_000 + 1)],
+			[`${RD}/${PC}/ok-00001.json`, JSON.stringify(req("ok-00001", { from: PC, target: ME }))],
+			["Root/.neo-quiz/generations/pc.json", "x".repeat(4 * 100_000 + 1)],
+			[`${D}/pc.json`, "x".repeat(4 * C.MAX_FILE_CHARS + 1)],
+		]));
+		const hcf = make(hugeFs, ME); await quiet(() => hcf.load());
+		const hin = await quiet(() => hcf.readIncoming()); await quiet(() => hcf.readGenerations());
+		r.check("a request, generations or chat file past its byte cap is never read", [hugeFs.reads.filter(p => p.includes("huge") || p.endsWith("generations/pc.json") || p === `${D}/pc.json`), hin.map(i => i.fileId)], [[], ["ok-00001"]]);
 		const none = make(memFs(), ME);
 		r.check("no requests folder: nothing, no throw", [await none.readIncoming(), await none.listOwnRequests()], [[], []]);
 	}

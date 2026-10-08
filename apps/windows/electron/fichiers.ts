@@ -244,10 +244,10 @@ export async function stat(chemin: string): Promise<{ mtime: number } | null> {
     DISTINCTE de `stat` ci-dessus, qui rend `null` pour un dossier et dont
     `fraicheur` (canaux.ts) et `parcours.ts` dépendent : l'index d'une racine
     externe s'invalide sur le `mtime` de la RACINE, qui est un dossier. */
-export async function statEntree(chemin: string): Promise<{ isFile: boolean; mtimeMs: number } | null> {
+export async function statEntree(chemin: string): Promise<{ isFile: boolean; mtimeMs: number; size: number } | null> {
 	try {
 		const info = await fs.stat(chemin);
-		return { isFile: info.isFile(), mtimeMs: info.mtimeMs };
+		return { isFile: info.isFile(), mtimeMs: info.mtimeMs, size: info.size };
 	} catch {
 		return null;
 	}

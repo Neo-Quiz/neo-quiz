@@ -511,8 +511,8 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			   c'est le `mtime` du DOSSIER qui invalide l'index d'une racine
 			   externe — un `null` le laisserait périmé à jamais. */
 			r.check("statEntree distingue fichier et dossier, null si absent",
-				[sf?.isFile, sf?.mtimeMs > 0, sd?.isFile, sd?.mtimeMs > 0, await statEntree(join(dir, "k-rien"))],
-				[true, true, false, true, null]);
+				[sf?.isFile, sf?.mtimeMs > 0, sf?.size, sd?.isFile, sd?.mtimeMs > 0, await statEntree(join(dir, "k-rien"))],
+				[true, true, 1, false, true, null]);
 		});
 
 		await cas(r, "readBinary rend les octets en Uint8Array, jamais un Buffer", async () => {

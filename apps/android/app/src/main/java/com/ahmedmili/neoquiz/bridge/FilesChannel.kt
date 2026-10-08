@@ -151,7 +151,7 @@ class FilesChannel(
 
     suspend fun statEntree(abs: String): Map<String, Any?>? {
         val f = perimeter.check(abs)
-        return if (f.exists()) mapOf("isFile" to f.isFile, "mtimeMs" to f.lastModified()) else null
+        return if (f.exists()) mapOf("isFile" to f.isFile, "mtimeMs" to f.lastModified(), "size" to f.length()) else null
     }
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(

@@ -405,7 +405,7 @@ export interface Pont {
 		    la RACINE externe (un dossier) qui invalide son index. `null` si
 		    absent ; et REJETTE hors périmètre comme tout canal `fichiers.*`,
 		    l'hôte du rendu traduit ce rejet en `null`. */
-		statEntree(abs: string): Promise<{ isFile: boolean; mtimeMs: number } | null>;
+		statEntree(abs: string): Promise<{ isFile: boolean; mtimeMs: number; size: number } | null>;
 		/** TOUTES les entrées d'un dossier, avec leur type, sans descendre —
 		    `HostFs.listDir` (navigation « @Cours/ ») et `HostFs.externe.list`
 		    (les racines externes). Le NOM seul : le rendu recompose le chemin,

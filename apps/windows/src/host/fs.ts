@@ -616,6 +616,12 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		async exists(path) {
 			return await pont().fichiers.exists(abs(path));
 		},
+		async size(path) {
+			try {
+				const st = await pont().fichiers.statEntree(abs(path));
+				return st && st.isFile ? st.size : null;
+			} catch { return null; }
+		},
 		/* Le principal crée le dossier ET ses parents, et ne rejette pas s'il
 		   existe déjà (`fichiers.ts`, éprouvé par `check:electron-fs`). */
 		async mkdirs(path) {
