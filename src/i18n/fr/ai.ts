@@ -349,6 +349,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.relay.paste": "Coller la réponse",
 	"ai.relay.cancel": "Annuler",
 	"ai.relay.ok": "Quiz enregistré : {title}",
+	"ai.relay.tooLong": "Cette demande est trop longue pour être partagée avec une appli : retire un document ou raccourcis-la.",
 	"ai.relay.shareFailed": "La demande n'a pas pu être partagée. Vérifie que les documents sont des fichiers texte dans ton dossier Neo Quiz.",
 	"ai.relay.err.clipboard-empty": "Le presse-papiers est vide. Copie la réponse de l'IA, puis colle-la ici. Rien n'a été enregistré.",
 	"ai.relay.err.empty": "Ce que tu as copié est vide. Rien n'a été enregistré.",

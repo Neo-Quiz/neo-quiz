@@ -36,7 +36,7 @@ class RelayChannel(
     private fun name(raw: Any?): String {
         val s = raw as? String ?: throw IllegalArgumentException("nom refusé")
         val ok = s.isNotEmpty() && s.length <= 150 && s == s.trim() && !s.contains(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]")) &&
-            !FileShare.isReservedName(s) && s.lowercase().let { it.endsWith(".md") || it.endsWith(".txt") } &&
+            !FileShare.isReservedName(s) && s.lowercase().let { it.endsWith(".md") || it.endsWith(".markdown") || it.endsWith(".txt") } &&
             s.substringBeforeLast('.').isNotEmpty() && !s.startsWith(".")
         if (!ok) throw IllegalArgumentException("nom refusé")
         return s

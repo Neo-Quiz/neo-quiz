@@ -387,6 +387,7 @@ export const EN_AI = {
 	"ai.relay.paste": "Paste the answer",
 	"ai.relay.cancel": "Cancel",
 	"ai.relay.ok": "Quiz saved: {title}",
+	"ai.relay.tooLong": "This request is too long to share with an app: remove a document or shorten it.",
 	"ai.relay.shareFailed": "The request could not be shared. Check that the documents are text files inside your Neo Quiz folder.",
 	"ai.relay.err.clipboard-empty": "The clipboard is empty. Copy the AI's answer, then paste it here. Nothing was saved.",
 	"ai.relay.err.empty": "What you copied is empty. Nothing was saved.",

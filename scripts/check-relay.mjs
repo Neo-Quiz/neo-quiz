@@ -92,6 +92,17 @@ await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests
 	}
 	const req = { chatId: "chat-1234", text: "Make a test on lists", documents: [{ path: "Python/cm1.md" }], destination: "" };
 
+	{ const g = rig({ readDocument: async (rel) => ({ name: "big.md", content: "x".repeat(200_000), bytes: new Uint8Array(3) }) });
+		let key = null; try { await F.startRelay(g.deps, req); } catch (e) { key = e.key; }
+		r.check("a prompt over the share cap is refused before Kotlin, with its own message, nothing shared", [key, g.shared.length], ["ai.relay.tooLong", 0]);
+	}
+	{ const g = rig({ readDocument: async () => ({ name: "notes.pdf", content: "x", bytes: new Uint8Array(1) }) });
+		let key = null; try { await F.startRelay(g.deps, req); } catch (e) { key = e.key; }
+		r.check("a document extension the share refuses is refused before Kotlin", [key, g.shared.length], ["ai.remote.textOnly", 0]);
+	}
+	{ const g = rig({ readDocument: async () => ({ name: "notes.markdown", content: "x", bytes: new Uint8Array(1) }) });
+		r.check(".markdown is shareable (Kotlin accepts it too)", (await F.startRelay(g.deps, req)) !== null, true);
+	}
 	{ const g = rig();
 		const s = await F.startRelay(g.deps, req);
 		r.check("the prompt and the documents are shared; a Test is chosen from the words", [g.shared.length, g.shared[0][1], s.mode], [1, ["cm1.md"], "practice"]);

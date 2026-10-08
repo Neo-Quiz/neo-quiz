@@ -30,6 +30,15 @@ export interface RelaySession { token: string; mode: "learn" | "practice"; reque
 export type PasteOutcome = { ok: true; title: string; path: string } | { ok: false; reason: RelayRefusal | "clipboard-empty" | "save-failed" | "already-saved"; detail?: string };
 
 const MAX_DOCUMENT_BYTES = 1_000_000;
+/** The phone's share channel (`RelayChannel.kt` `MAX_TEXT`) refuses a text longer than this. */
+export const MAX_SHARE_TEXT = 200_000;
+/** The document names the share channel accepts (the same as the PC's remote rules, `refusPourTelephone`). */
+const SHAREABLE_NAME = /\.(md|markdown|txt)$/i;
+
+/** A refusal known before sharing, with the translated message key to show. */
+export class RelayRefused extends Error {
+	constructor(readonly key: "ai.relay.tooLong" | "ai.remote.textOnly") { super(key); }
+}
 
 /** One document of the root for the relay: its text (for the prompt) and its
     bytes (to share), bounded, read through the host. null when missing, too
@@ -56,6 +65,8 @@ export async function startRelay(deps: RelayDeps, req: RelayRequest): Promise<Re
 		docs.push(doc);
 	}
 	const built = buildRelayPrompt({ text: req.text, mode: req.mode, types: req.types, count: req.count, documents: docs.map(d => ({ name: d.name, content: d.content })) });
+	if (docs.some(d => !SHAREABLE_NAME.test(d.name))) throw new RelayRefused("ai.remote.textOnly");
+	if (built.text.length > MAX_SHARE_TEXT) throw new RelayRefused("ai.relay.tooLong");
 	const opened = await deps.share(built.text, docs.map(d => ({ nom: d.name, octets: d.bytes })));
 	return opened ? { token: built.token, mode: built.mode, requestId: newRequestId(), request: req } : null;
 }

@@ -41,7 +41,7 @@ import { threadItems, toursOfThread } from "./chat-thread";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
 import { pcReachable, pickTarget, refusPourTelephone } from "./remote-send";
-import { pasteAnswer, startRelay } from "./relay-flow";
+import { pasteAnswer, RelayRefused, startRelay } from "./relay-flow";
 import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
@@ -4146,7 +4146,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			else host.ui.notice(t("ai.relay.shareFailed"));
 		} catch (e) {
 			console.warn(LOG_PREFIX, "relay not shared:", e);
-			host.ui.notice(t("ai.relay.shareFailed"));
+			host.ui.notice(t(e instanceof RelayRefused ? e.key : "ai.relay.shareFailed"));
 		} finally {
 			demarrage = false;
 		}
