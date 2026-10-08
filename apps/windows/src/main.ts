@@ -751,8 +751,9 @@ async function demarrer(): Promise<void> {
 		mount(root, scanner, store, stats, sessions);
 		/* Android: a zip or note another app opened or shared with us ('Open with', 'Share to'),
 		   read at start (it launched the app) and at each push (it arrived while the app runs). */
-		pont().android?.surFichierRecu(() => { void lireFichierRecu(scanner); });
-		void lireFichierRecu(scanner);
+		const repeindreApresReception = (): void => { demonterCourant?.repaint?.(); };
+		pont().android?.surFichierRecu(() => { void lireFichierRecu(scanner, repeindreApresReception); });
+		void lireFichierRecu(scanner, repeindreApresReception);
 	} catch (e) {
 		root.textContent = t("app.error.startup", { error: e instanceof Error ? e.message : String(e) });
 	}

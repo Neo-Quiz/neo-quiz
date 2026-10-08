@@ -598,3 +598,17 @@ await withSrcModule(
 		r.done();
 	},
 );
+
+/* A folder another Android app hands over ("Open with", "Share to") is imported
+   with the SHELL's own settings (2026-10-08). A throwaway `{ settings: {} }`
+   there dropped the folder's name, colour, icon and unit from the manifest, and
+   never declared the folder, although the same archive imported from the
+   "Import" button kept them. */
+{
+	const r = makeReporter("Received file (Android): the shell's settings");
+	const src = readFileSync(join(HERE, "..", "apps", "windows", "src", "ui", "fichier-recu.ts"), "utf8");
+	r.check("the import writes through the shell's settings, not a throwaway object",
+		[/reglagesDeLaCoquille\(\)/.test(src), /settings:\s*\{\s*\}/.test(src), /saveSettings:\s*async\s*\(\)\s*=>\s*\{\s*\}/.test(src)],
+		[true, false, false]);
+	r.done();
+}

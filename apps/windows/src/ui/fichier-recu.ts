@@ -7,6 +7,7 @@ import { MODULE_MAP_VIDE } from "../../../../src/dashboard/module-map-note";
 import { defaultParent } from "../../../../src/dashboard/module-edit";
 import { IMPORT_LIMITS, nomNoteImportee } from "../../../../src/dashboard/zip";
 import { pont } from "../host/pont";
+import { reglagesDeLaCoquille } from "./dashboard-shell";
 
 /* ══════════════════════════════════════════════════════════
    A FILE ANOTHER APP HANDED TO NEO QUIZ (Android: "Open with", "Share to").
@@ -19,15 +20,17 @@ import { pont } from "../host/pont";
    Nothing here is trusted: the importer validates the content.
 ══════════════════════════════════════════════════════════ */
 
-/** The two `ctx` members `importArchiveAsFolder` touches. The folder's colour and icon from the
-    archive's manifest are applied to the shell's own settings object, which this module does not
-    hold: they are skipped here (the folder and its quizzes are all there). */
-function contexteMinimal(): DashboardShellCtx {
-	return { settings: {}, saveSettings: async () => {} } as unknown as DashboardShellCtx;
+/** The two `ctx` members `importArchiveAsFolder` touches, the shell's own: the folder's colour,
+    icon, name and unit from the archive's manifest are written to the page settings and saved,
+    exactly as when the same archive is imported from the "Import" button. */
+function contexteDeLaCoquille(): DashboardShellCtx {
+	return reglagesDeLaCoquille() as unknown as DashboardShellCtx;
 }
 
-/** Reads the waiting file, if any, and imports it. Never throws: every outcome is a notice. */
-export async function lireFichierRecu(scanner: Scanner): Promise<void> {
+/** Reads the waiting file, if any, and imports it. Never throws: every outcome is a notice.
+    `repaint` redraws the page the user is on once the import is done (the folder's look is
+    written to the settings after its notes appear). */
+export async function lireFichierRecu(scanner: Scanner, repaint: () => void = () => {}): Promise<void> {
 	const recu = await pont().android?.fichierRecu().catch(() => null);
 	if (!recu) return;
 	const notice = (cle: "share.import.tooLarge" | "share.import.unreadable"): void => currentHost().ui.notice(t(cle));
@@ -39,10 +42,10 @@ export async function lireFichierRecu(scanner: Scanner): Promise<void> {
 	if (octets.length > IMPORT_LIMITS.archive) { notice("share.import.tooLarge"); return; }
 	try {
 		if (/\.zip$/i.test(nom)) {
-			await importArchiveAsFolder(contexteMinimal(), MODULE_MAP_VIDE, scanner.getQuizzes(), { name: nom, bytes: octets }, () => {});
+			await importArchiveAsFolder(contexteDeLaCoquille(), MODULE_MAP_VIDE, scanner.getQuizzes(), { name: nom, bytes: octets }, repaint);
 		} else if (/\.md$/i.test(nom)) {
 			const dossier = `${defaultParent()}/${nomNoteImportee(nom) ?? "Quiz"}`.replace(/^\//, "");
-			await importFileIntoFolder(dossier, { name: nom, bytes: octets }, () => {});
+			await importFileIntoFolder(dossier, { name: nom, bytes: octets }, repaint);
 		} else {
 			notice("share.import.unreadable");
 		}

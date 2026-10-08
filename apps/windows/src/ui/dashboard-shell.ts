@@ -194,6 +194,15 @@ function reglagesPages(): DashboardPageSettings {
 	return reglagesPagesCache;
 }
 
+/** The two members of the shell's `ctx` that an import writes through: the page
+    settings object (mutated in place, the pages hold this very object) and the
+    function that saves it. For code that runs outside the shell (a file another
+    Android app handed over): a throwaway `{}` there dropped the imported
+    folder's name, colour, icon and unit, and never declared the folder. */
+export function reglagesDeLaCoquille(): Pick<DashboardShellCtx, "settings" | "saveSettings"> {
+	return { settings: reglagesPagesCache, saveSettings: enregistrerReglagesPages };
+}
+
 async function enregistrerReglagesPages(): Promise<void> {
 	// `?? null`/`?? []` : un réglage effacé par la page (retour à « aucun »)
 	// doit s'écrire comme tel, jamais laisser une ancienne valeur trainer.
