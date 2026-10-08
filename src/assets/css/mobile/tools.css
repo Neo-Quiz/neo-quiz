@@ -268,3 +268,18 @@
 .is-mobile .nq-set-ligne-lien > .nq-set-ligne-valeur {
 	flex: 0 1 auto;
 }
+
+/* "Scroll to the latest message": 44 px tap target, no hover face (the
+   arrow shows at rest once nothing runs; dots only while it does). It sits
+   in the thread, so it is already above the composer and the bottom bar. */
+.is-mobile .qbd-ai-fil-bas {
+	width: 44px;
+	height: 44px;
+	margin-top: -44px;
+	bottom: 12px;
+}
+.is-mobile .qbd-ai-fil-bas:hover { background: var(--background-primary); }
+.is-mobile .qbd-ai-fil-bas:hover .qbd-ai-fil-bas-points { opacity: 1; }
+.is-mobile .qbd-ai-fil-bas:hover .qbd-ai-fil-bas-fleche { opacity: 0; }
+.is-mobile .qbd-ai-fil-bas:not(.is-working) .qbd-ai-fil-bas-points { opacity: 0; }
+.is-mobile .qbd-ai-fil-bas:not(.is-working) .qbd-ai-fil-bas-fleche { opacity: 1; }

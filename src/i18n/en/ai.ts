@@ -519,7 +519,7 @@ export const EN_AI = {
 	"ai.transcript.progressQuizOf": "Quiz {n} of {total}",
 	"ai.transcript.progressLinesOther": "{count} lines",
 	"ai.transcript.progressLinesOne": "1 line",
-	"ai.transcript.toLatest": "Back to the latest message",
+	"ai.transcript.toLatest": "Scroll to the latest message",
 	/* Une pièce jointe encore en lecture : l'envoi attend. */
 	"ai.attach.remove": "Remove {name}",
 	"ai.attach.reading": "Reading the document…",

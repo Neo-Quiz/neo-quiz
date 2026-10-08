@@ -614,37 +614,98 @@
 	padding: 1px 0;
 }
 
-/* "Back to the latest": a round chevron that floats above the composer. */
+/* "Scroll to the latest message": a round button that floats above the
+   composer, centred over the thread. Rest face = three dots (the typing
+   indicator animates only while a generation runs); hover or focus = arrow. */
 .qbd-ai-fil-bas {
 	position: sticky;
 	bottom: 10px;
 	align-self: center;
 	display: grid;
 	place-items: center;
-	width: 30px;
-	height: 30px;
-	margin-top: -30px;
+	flex-shrink: 0;
+	width: 34px;
+	height: 34px;
+	margin-top: -34px;
 	padding: 0;
-	border: 1px solid var(--background-modifier-border);
+	border: 1px solid var(--background-modifier-border-hover, rgb(255 255 255 / 0.28));
 	border-radius: 50%;
-	background: var(--background-secondary);
-	color: var(--text-muted);
+	background: var(--background-primary);
+	color: var(--text-normal);
 	box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
 	cursor: pointer;
 	z-index: 2;
+	opacity: 0;
+	transform: scale(0.85);
+	visibility: hidden;
+	pointer-events: none;
+	transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms, background-color 120ms ease;
 }
 
-.qbd-ai-fil-bas:hover {
-	color: var(--text-normal);
+.qbd-ai-fil-bas.is-visible {
+	opacity: 1;
+	transform: none;
+	visibility: visible;
+	pointer-events: auto;
+	transition-delay: 0s;
 }
 
-.qbd-ai-fil-bas[hidden] {
-	display: none;
+.qbd-ai-fil-bas > * { grid-area: 1 / 1; }
+
+.qbd-ai-fil-bas-points {
+	display: flex;
+	gap: 3px;
 }
 
-.qbd-ai-fil-bas svg {
-	width: 16px;
-	height: 16px;
+.qbd-ai-fil-bas-point {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--text-muted);
+}
+
+.qbd-ai-fil-bas-point:nth-child(2) { background: var(--interactive-accent); }
+
+.qbd-ai-fil-bas.is-working .qbd-ai-fil-bas-point {
+	animation: qbd-ai-fil-bas-point 1.2s ease-in-out infinite;
+}
+.qbd-ai-fil-bas.is-working .qbd-ai-fil-bas-point:nth-child(2) { animation-delay: 0.15s; }
+.qbd-ai-fil-bas.is-working .qbd-ai-fil-bas-point:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes qbd-ai-fil-bas-point {
+	0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+	30% { opacity: 1; transform: translateY(-2px); }
+}
+
+.qbd-ai-fil-bas-fleche {
+	display: grid;
+	place-items: center;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.qbd-ai-fil-bas-fleche svg {
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-ai-fil-bas:hover,
+.qbd-ai-fil-bas:focus-visible {
+	background: var(--background-modifier-hover);
+}
+
+.qbd-ai-fil-bas:hover .qbd-ai-fil-bas-points,
+.qbd-ai-fil-bas:focus-visible .qbd-ai-fil-bas-points { opacity: 0; }
+.qbd-ai-fil-bas:hover .qbd-ai-fil-bas-fleche,
+.qbd-ai-fil-bas:focus-visible .qbd-ai-fil-bas-fleche { opacity: 1; }
+
+/* Without a running generation the dots mean nothing: show the arrow at rest. */
+.qbd-ai-fil-bas:not(.is-working) .qbd-ai-fil-bas-points { opacity: 0; }
+.qbd-ai-fil-bas:not(.is-working) .qbd-ai-fil-bas-fleche { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-fil-bas { transition: none; }
+	.qbd-ai-fil-bas.is-working .qbd-ai-fil-bas-point { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -477,7 +477,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.transcript.progressQuizOf": "Quiz {n} / {total}",
 	"ai.transcript.progressLinesOther": "{count} lignes",
 	"ai.transcript.progressLinesOne": "1 ligne",
-	"ai.transcript.toLatest": "Revenir au dernier message",
+	"ai.transcript.toLatest": "Aller au dernier message",
 	"ai.attach.remove": "Retirer {name}",
 	"ai.attach.reading": "Lecture du document…",
 	"ai.attach.readFailed": "Lecture impossible",

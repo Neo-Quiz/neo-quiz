@@ -30,6 +30,7 @@ const KNOWN = {
 	"qbd-cta3d-reflet": "phone-off",
 	"qbd-folder-spin": "transient", "qbd-folder-sweep": "transient", // a folder row while its file opens
 	"qbd-generating-pulse": "transient", "qbd-generating-spin": "transient", // the rail while a generation runs
+	"qbd-ai-fil-bas-point": "transient", // typing dots of the scroll-to-bottom button, only while a generation runs
 	"quiz-timer-pulse": "transient", // the timer of a test about to end
 	"nqm-spin": "transient", // Moodle window spinner
 	"nq-perle-reflet": "phone-off",

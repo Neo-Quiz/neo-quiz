@@ -13,9 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A round "scroll to the latest message" button in the Generate conversation: it appears once you scroll up, shows typing dots while a generation runs and an arrow on hover.
+
 ### Changed
 
 - On the phone, the question editor is marked "Soon" and explains instead of opening.
+- On a folder page, Learn and Test are separate cards; each shows its progress ring (not a play arrow) and a blue type chip.
 
 ### Fixed
 

@@ -102,6 +102,9 @@ export function creerVueFile(opts: {
 	let desabonnerTranscript: (() => void) | null = null;
 	/** The key of the last item painted; "" forces the return to the bottom. */
 	let dernierPeint = "";
+	/* The "scroll to bottom" button and whether a generation runs in the shown chat. */
+	let boutonBas: HTMLElement | null = null;
+	let travaille = false;
 	let desabonnerChats: (() => void) | null = null;
 	let desabonnerDistant: (() => void) | null = null;
 	/** Re-reads the other devices' generations files while this page is on screen. */
@@ -592,6 +595,8 @@ export function creerVueFile(opts: {
 		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
 		const visibles = items.flatMap(i => (i.kind === "live" ? i.lines.filter(l => l.etat !== "arret") : []));
 		const enCours = visibles.some(l => l.etat === "cours");
+		travaille = enCours;
+		boutonBas?.classList.toggle("is-working", enCours);
 		if (enCours && horloge === null) {
 			horloge = window.setInterval(() => {
 				if (!zone?.isConnected) { liberer(); return; }
@@ -609,12 +614,25 @@ export function creerVueFile(opts: {
 			   composer): shown once the user scrolled up from the bottom of
 			   the conversation, it glides back down. */
 			const bas = ajouter(parent, "button", "qbd-ai-fil-bas");
+			boutonBas = bas;
 			bas.type = "button";
 			bas.setAttribute("aria-label", t("ai.transcript.toLatest"));
-			host.ui.setIcon(bas, "chevron-down");
-			bas.hidden = true;
+			bas.tabIndex = -1;
+			/* Rest face: three dots (a typing indicator while something runs);
+			   hover or focus swaps them for the arrow. */
+			const points = ajouter(bas, "span", "qbd-ai-fil-bas-points");
+			points.setAttribute("aria-hidden", "true");
+			for (let i = 0; i < 3; i++) ajouter(points, "span", "qbd-ai-fil-bas-point");
+			host.ui.setIcon(ajouter(bas, "span", "qbd-ai-fil-bas-fleche"), "arrow-down");
+			bas.classList.toggle("is-working", travaille);
 			bas.addEventListener("click", () => parent.scrollTo({ top: parent.scrollHeight, behavior: "smooth" }));
-			const majBas = (): void => { bas.hidden = parent.scrollHeight - parent.scrollTop - parent.clientHeight < 120; };
+			/* Shown once the thread is scrolled up by more than a third of its
+			   visible height; a hidden button leaves the tab order. */
+			const majBas = (): void => {
+				const visible = parent.scrollHeight - parent.scrollTop - parent.clientHeight > parent.clientHeight / 3;
+				bas.classList.toggle("is-visible", visible);
+				bas.tabIndex = visible ? 0 : -1;
+			};
 			parent.addEventListener("scroll", majBas, { passive: true });
 			new ResizeObserver(majBas).observe(zone);
 			zone.setAttribute("role", "list");
