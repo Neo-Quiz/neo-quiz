@@ -134,12 +134,10 @@ export function renderQuizGrid(
 	let entryIndex = 0;
 	const entryDelay = (): string => `${100 + entryIndex++ * 45}ms`;
 	const archivedFolders = deps.ctx.settings.quizzesArchivedFolders || [];
-	if (filtered.length === 0 && archivedQuizzes.length === 0 && archivedFolders.length === 0) {
-		const empty = ajouter(treeEl, "div", "qbd-empty-state");
-		ajouter(empty, "p", undefined, t("dashboard.quizzes.empty"));
-		return;
-	}
-
+	/* No early "No quiz found" on an empty quiz list: a folder made with
+	   "New folder" has no quiz yet and must still show as a card, even when it
+	   is the only folder (first run). The check below, made on the FOLDERS,
+	   covers the truly empty page. */
 	// Les deux axes affichent des cartes de MODULE (règle Ahmed 2026-07-18 :
 	// « Recent » ne montre que les dossiers, jamais des quiz). Les dossiers
 	// déclarés par le modal Nouveau dossier / Modifier dossier existent même

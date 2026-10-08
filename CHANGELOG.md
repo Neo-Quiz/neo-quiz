@@ -17,6 +17,10 @@ release notes.
 
 - On the phone, the question editor is marked "Soon" and explains instead of opening.
 
+### Fixed
+
+- A new empty folder shows at once, even before the first quiz exists.
+
 ## [1.20.46] - 2026-10-08
 
 ### Added
