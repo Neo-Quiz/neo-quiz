@@ -464,9 +464,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   « Générer » tourne ici, Ollama pour de bon ; Claude et Codex jusqu'à
 		   ce que l'hôte sache lancer un CLI (tâche 7 — d'ici là, une Notice
 		   « fournisseur indisponible » propre, jamais un composer mort). */
-		/* The AI page and every entry that leads to it (rail, Home, folder
-		   menus) are guarded by this: nothing generates on a phone or tablet. */
-		canOpen: (vue) => vue !== "ai" || !currentHost().platform.isMobile,
+		/* Every view opens, the phone's Generate tab included: on a phone it
+		   follows the PC's generations and opens the quizzes they made (the
+		   composer waits for the phone-to-PC requests, stage 3). */
+		canOpen: () => true,
 		/* The Moodle window (a modal over the page). PC only. */
 		openMoodle: pont().moodle && !currentHost().platform.isMobile ? () => openMoodleModal() : undefined,
 		reviewStore: deps.reviewStore,

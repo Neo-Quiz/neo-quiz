@@ -25,8 +25,6 @@ interface PontBarre {
 	surBarreClic(rappel: (index: number) => void): void;
 }
 
-import { currentHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
 import { nextTab } from "../../../../src/swipe";
 
 const ACTIVE = "qbd-nav-item--active";
@@ -172,12 +170,9 @@ export function installBarreNative(pont: PontBarre): void {
 	pont.surBarreClic((index) => {
 		const btn = boutons()[index];
 		if (!btn) return;
-		/* Generate is not served on the phone yet: the bar shows the tap (the
-		   ripple) and the page says why, instead of going nowhere. */
-		if (btn.classList.contains(PLACEHOLDER)) {
-			currentHost().ui.notice(t("dashboard.nav.generateOnPc"));
-			return;
-		}
+		/* A placeholder tab is inert: the bar shows the tap (the ripple) and
+		   goes nowhere. */
+		if (btn.classList.contains(PLACEHOLDER)) return;
 		/* A modal (the Settings page) covers the page but not the bar: a tap on
 		   a tab closes it first, then goes to the tab (the click on a page that
 		   is still under a modal went nowhere). */

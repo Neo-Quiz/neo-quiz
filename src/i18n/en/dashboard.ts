@@ -29,7 +29,6 @@ export const EN_DASHBOARD = {
 	// côté application avant la tranche 4) : rendue désactivée, jamais masquée.
 	"dashboard.nav.soon": "Coming soon",
 	/* A phone tap on the placeholder Generate tab (the page shows it, the bar does not navigate). */
-	"dashboard.nav.generateOnPc": "Generation runs from your PC for now.",
 
 	/* ── Accueil ── */
 	// A folder card (spec 2026-09-29-home-page-design.md §2).

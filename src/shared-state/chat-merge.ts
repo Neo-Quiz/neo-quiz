@@ -75,6 +75,13 @@ export function relativeToRoot(path: string, rootId: string): string {
 	return rel;
 }
 
+/** Whether a quiz card offers Open: the card names a quiz path. A quiz from a
+    non-default root keeps Open; a card without a path (a written or failed
+    result) does not. */
+export function canOpenCard(path: string): boolean {
+	return path !== "";
+}
+
 export function absoluteInRoot(rel: string, rootId: string): string {
 	if (!isCleanRelativePath(rel) || rel.split("/")[0] === INTERNAL) return "";
 	return rootId ? rootId + "/" + rel : rel;

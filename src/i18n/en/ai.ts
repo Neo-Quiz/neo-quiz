@@ -380,6 +380,8 @@ export const EN_AI = {
 	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
 	"ai.queue.lotSaved": "{count} quizzes, one per document",
 	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
+	"ai.card.missing": "This quiz is not on this device (yet).",
+	"ai.mobile.followOnly": "Start generations from your PC; follow them and open the quizzes here.",
 	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
 	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
 	"ai.queue.saving": "Saving…",

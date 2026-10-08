@@ -18,6 +18,7 @@ import { renderMarkdownPreview } from "../markdown-preview";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import type { ChatRequest } from "./chat-record";
 import type { RunningEntry } from "../shared-state/generations";
+import { canOpenCard } from "../shared-state/chat-merge";
 import { peindreQuestions } from "./generation-kind-vue";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
@@ -76,9 +77,11 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const carte = ajouter(rep, "div", "qbd-ai-resultat");
 		host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
 		ajouter(ajouter(carte, "div", "qbd-ai-resultat-corps"), "div", "qbd-ai-resultat-titre", res.title);
-		const b = ajouter(carte, "button", "qbd-ai-reponse-action", t("ai.queue.open"));
-		b.type = "button";
-		b.addEventListener("click", () => deps.ouvrir(res.path));
+		if (canOpenCard(res.path)) {
+			const b = ajouter(carte, "button", "qbd-ai-reponse-action", t("ai.queue.open"));
+			b.type = "button";
+			b.addEventListener("click", () => deps.ouvrir(res.path));
+		}
 	}
 	if (q.state === "failed" || q.state === "stopped") {
 		const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--echouee");

@@ -192,6 +192,23 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 		const items = L.chatListItems([chatRec], [], NOW, "me", gens(NOW));
 		r.check("the sidebar shows the running indicator for a request running elsewhere", items[0].running, true);
 		r.check("but not when that file is stale", L.chatListItems([chatRec], [], NOW, "me", gens(NOW - 300_000))[0].running, false);
+		// A chat known ONLY from another device's running generation (no chats file has it yet) is listed, running.
+		const onlyRemote = L.chatListItems([], [], NOW, "me", gens(NOW));
+		r.check("a chat known only from a generation running on another device is listed, running, titled by its request", onlyRemote.map(i => [i.id, i.title, i.running]), [["c1", "Q2", true]]);
+		r.check("a stale generation file lists no chat of its own", L.chatListItems([], [], NOW, "me", gens(NOW - 300_000)), []);
+		r.check("a deleted chat is not brought back by a generation running on another device", L.chatListItems([{ ...chatRec, deleted: true, requests: [] }], [], NOW, "me", gens(NOW)), []);
+		// Once the result lands, the chat record has the id: the chat is listed ONCE, as the real chat.
+		const merged = L.chatListItems([chatRec], [], NOW, "me", gens(NOW));
+		r.check("once its chat record lands, the chat is listed once, under the record", merged.map(i => [i.id, i.running]), [["c1", true]]);
 	}
+	r.done();
+});
+
+// The Open button of a quiz card (chat-record-vue.ts): offered when the card names a quiz.
+await withSrcModule(["src/shared-state/chat-merge.ts"], (M) => {
+	const r = makeReporter("Card Open");
+	r.check("Open is offered for a quiz path under the root", M.canOpenCard("Root/A/q.md"), true);
+	r.check("Open is offered for a quiz path of another root (it keeps Open)", M.canOpenCard("Other/q.md"), true);
+	r.check("no Open for a card without a quiz path (a written or failed result)", M.canOpenCard(""), false);
 	r.done();
 });

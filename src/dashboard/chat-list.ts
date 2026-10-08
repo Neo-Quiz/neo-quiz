@@ -12,7 +12,7 @@ import type { ChatRecord } from "./chat-record";
 import { chatTitle, firstLineOf } from "./chat-record";
 import { chatOfLine, isLive } from "./chat-requests";
 import { isStale } from "../shared-state/generations";
-import type { GenerationsFile } from "../shared-state/generations";
+import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
 
 export interface ChatListItem {
 	id: string;
@@ -29,10 +29,10 @@ export interface ChatListItem {
 export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = "", remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = []): ChatListItem[] {
 	const items = new Map<string, ChatListItem>();
 	// A chat with a request running on another device: that device's file, while it is fresh.
-	const runningElsewhere = new Set<string>();
+	const runningElsewhere = new Map<string, RunningEntry>();
 	for (const { file } of remote) {
 		if (isStale(file, now)) continue;
-		for (const e of file.running) runningElsewhere.add(e.chatId);
+		for (const e of file.running) if (!runningElsewhere.has(e.chatId)) runningElsewhere.set(e.chatId, e);
 	}
 	for (const c of chats) {
 		if (!c.deleted) items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && c.origin !== device });
@@ -51,7 +51,13 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		if (isLive(l)) item.running = true;
 		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
 	}
-	for (const id of runningElsewhere) { const item = items.get(id); if (item) item.running = true; }
+	for (const [id, entry] of runningElsewhere) {
+		const item = items.get(id);
+		if (item) { item.running = true; continue; }
+		// Known only from the other device's generation: listed until its chat record lands.
+		if (tombstones.has(id)) continue;
+		items.set(id, { id, title: entry.text, date: entry.startedAt, running: true, origin: entry.from, foreign: !!device && entry.from !== device });
+	}
 	return [...items.values()].sort((a, b) => b.date - a.date);
 }
 

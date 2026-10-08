@@ -17,6 +17,9 @@ release notes.
 - Chats are now kept in the synced folder, so every device lists the chats of the others.
 - A generation running on your PC shows its progress in the chat, on every device.
 
+### Changed
+- On the phone, Generate shows your chats and follows a generation running on the PC, and opens the quizzes it made.
+
 ### Fixed
 - On Android, a quiz you delete (or create, rename, import) leaves or joins the list at once, instead of after leaving and reopening the app.
 - A quiz you delete or move, and the question count after you edit a quiz, now update in the list at once on every device, even where the app has no file watcher.

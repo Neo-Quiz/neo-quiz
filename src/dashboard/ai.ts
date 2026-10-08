@@ -398,7 +398,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ouvrir: (chemin) => {
 			const quiz = deps.scanner.getQuiz(chemin);
 			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
-			else host.ui.notice(t("ai.queue.missing"));
+			else host.ui.notice(t("ai.card.missing"));
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
 		copier: deps.copyText,
@@ -1595,6 +1595,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		let generateBtnRef: HTMLButtonElement | null = null;
 
 		const composer = ajouter(formCol, "div", "qbd-ai-composer");
+		/* On a phone the composer waits (stage 3): it stays built but hidden,
+		   and one line says where a generation starts. */
+		if (host.platform.isMobile) {
+			composer.hidden = true;
+			composer.before(ajouter(formCol, "p", "qbd-ai-mobile-follow", t("ai.mobile.followOnly")));
+		}
 		composer.classList.toggle("qbd-ai-composer--actif", composerActif);
 		const activer = (): void => {
 			composerActif = true;

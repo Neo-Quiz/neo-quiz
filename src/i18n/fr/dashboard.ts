@@ -18,7 +18,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.nav.generate": "Générer",
 	"dashboard.nav.settings": "Réglages",
 	"dashboard.nav.soon": "Bientôt disponible",
-	"dashboard.nav.generateOnPc": "La génération se lance depuis le PC pour l'instant.",
 
 	/* ── Accueil ── */
 	"dashboard.home.openTasksOne": "{count} tâche ouverte",

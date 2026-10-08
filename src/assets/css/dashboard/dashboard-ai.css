@@ -793,6 +793,19 @@
 }
 
 /* ── Composer (champ unique façon chat) ── */
+/* Hidden on a phone, where the composer waits (ai.ts, stage 2). */
+.qbd-ai-composer[hidden] {
+	display: none;
+}
+
+.qbd-ai-mobile-follow {
+	margin: 0;
+	padding: 14px 4px;
+	color: var(--text-muted);
+	font-size: 13px;
+	text-align: center;
+}
+
 .qbd-ai-composer {
 	display: flex;
 	flex-direction: column;
