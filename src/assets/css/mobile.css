@@ -1475,3 +1475,22 @@ html.nq-mobile ::-webkit-scrollbar {
 	animation: none;
 	background-image: none;
 }
+
+/* ══════════════════════════════════════════════════════════
+   TABLET, DESKTOP LAYOUT IN A NARROW PANEL (portrait, 600 to 900 dp).
+   The PC layout keeps the rail on the left, which leaves the panel about
+   570 dp: the Folders toolbar wraps instead of cutting its filters, and the
+   Generate sidebar gives the conversation more room.
+   ══════════════════════════════════════════════════════════ */
+@media (min-width: 600px) and (max-width: 899px) {
+	html.nq-mobile:not(.nq-phone) .qbd-quizzes-group,
+	html.nq-mobile:not(.nq-phone) .qbd-quizzes-group-selects {
+		flex-wrap: wrap;
+	}
+	html.nq-mobile:not(.nq-phone) .qbd-quizzes-group-selects > * {
+		flex: none;
+	}
+	html.nq-mobile:not(.nq-phone) .qbd-ai-lateral {
+		width: 170px;
+	}
+}
