@@ -1,8 +1,8 @@
 {
-  "versionCode": 10,
-  "versionName": "0.2.8",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.8/NeoQuiz-0.2.8.apk",
-  "sha256": "07cca4938204df1e0cbf7e3c81a7b4b94a6203ee75534b840a328f0264fe34af",
-  "size": 55986329,
-  "notes": "Reading cards can show the course diagram; a PC generation shows its reasoning live."
+  "versionCode": 11,
+  "versionName": "0.2.9",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.9/NeoQuiz-0.2.9.apk",
+  "sha256": "7bb9a13ecf0876f9a58a577e19ce91bb06072b0a807e0c0867766a3fc53eb87f",
+  "size": 55988009,
+  "notes": "Tap a quiz picture to open it full size and pinch to zoom."
 }
