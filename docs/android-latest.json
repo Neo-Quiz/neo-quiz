@@ -1,8 +1,8 @@
 {
-  "versionCode": 8,
-  "versionName": "0.2.6",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.6/NeoQuiz-0.2.6.apk",
-  "sha256": "bd7b441d80f883e13313cfc3b77ec2319a0177059aa66cd84d0b221704e7c67c",
-  "size": 55982305,
-  "notes": "The Edit button no longer shows on the phone, where the editor does not open yet."
+  "versionCode": 9,
+  "versionName": "0.2.7",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.7/NeoQuiz-0.2.7.apk",
+  "sha256": "1484b68ec9e15c6f835ab44e03e8ecf2117900e3561e94ae55a225e0f22de580",
+  "size": 55982341,
+  "notes": "Missed Learn questions come back at the end; quiz cards show the progress of a started quiz."
 }
