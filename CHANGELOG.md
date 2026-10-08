@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.44] - 2026-10-08
+
 ### Changed
 - On a phone, a played quiz no longer shows the previous and next arrows: its question takes their room, and the swipe and the beads do the moving.
 - On a phone, a played quiz starts its question closer to the status bar, the beads and the card, so more of each question shows at once.
