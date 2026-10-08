@@ -89,6 +89,14 @@ export function shouldWrite(last: { json: string; at: number } | null, next: Gen
 	return since >= WRITE_EVERY_MS;
 }
 
+/** The device whose generations file was stamped most recently (stale or not), null when none. */
+export function latestDevice(files: ReadonlyArray<{ device: string; file: GenerationsFile }>): string | null {
+	let best: string | null = null;
+	let at = -Infinity;
+	for (const f of files) if (f.file.at > at) { at = f.file.at; best = f.device; }
+	return best;
+}
+
 /** The device whose file is the freshest non-stale one; null when none. */
 export function lastPcSeen(files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number): string | null {
 	const fresh = files.filter(f => !isStale(f.file, now)).sort((a, b) => b.file.at - a.file.at);

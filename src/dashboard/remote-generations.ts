@@ -9,10 +9,24 @@
 ══════════════════════════════════════════════════════════ */
 
 import { LOG_PREFIX } from "../branding";
+import { latestDevice } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import type { RemoteRequest } from "../shared-state/remote-request";
 
 export interface RemoteGenerations { device: string; file: GenerationsFile }
+
+/* The last PC ever seen, kept across sessions (a local view preference, never synced): a phone
+   sends to it when no PC is fresh. Storage may be missing or blocked: then nothing is remembered. */
+const LAST_PC_KEY = "neoquiz.lastPc";
+
+/** The PC seen most recently, fresh or not, or null when none was ever seen. */
+export function lastPcEver(): string | null {
+	try { return globalThis.localStorage?.getItem(LAST_PC_KEY) || null; } catch { return null; }
+}
+
+function rememberPc(device: string): void {
+	try { globalThis.localStorage?.setItem(LAST_PC_KEY, device); } catch { /* not remembered: the next read tries again */ }
+}
 
 let current: RemoteGenerations[] = [];
 let last = "[]";
@@ -25,6 +39,8 @@ export function getRemoteGenerations(): ReadonlyArray<RemoteGenerations> {
 
 /** Keeps `list`. When it differs from the one kept before, the listeners run and true is returned. */
 export function setRemoteGenerations(list: ReadonlyArray<RemoteGenerations>): boolean {
+	const latest = latestDevice(list);
+	if (latest) rememberPc(latest);
 	const json = JSON.stringify(list);
 	if (json === last) return false;
 	last = json;

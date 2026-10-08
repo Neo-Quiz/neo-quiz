@@ -388,6 +388,7 @@ export const EN_AI = {
 	"ai.remote.insideFolderOnly": "Documents must be inside your Neo Quiz folder.",
 	"ai.remote.textOnly": "Only text and Markdown documents can be sent to the PC.",
 	"ai.remote.sendFailed": "The request could not be sent to the PC.",
+	"ai.remote.firstPc": "Open Neo Quiz on your PC once so the phone can find it.",
 	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
 	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
 	"ai.queue.saving": "Saving…",

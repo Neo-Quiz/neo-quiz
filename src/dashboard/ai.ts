@@ -4058,13 +4058,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		demarrage = true;
 		try {
-			await enviquerVersPc({
+			const envoye = await enviquerVersPc({
 				chatId: activeChatId(),
 				text: composerText.trim(),
 				mode: decideByKeywords(composerText) === "practice" ? "practice" : "learn",
 				documents: noteAttachments.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
 			});
-			viderComposer();
+			// No PC ever seen: nothing is written, and the typed text stays for the next try.
+			if (envoye) viderComposer();
+			else host.ui.notice(t("ai.remote.firstPc"));
 		} catch (e) {
 			console.warn(LOG_PREFIX, "request not sent to the PC:", e);
 			host.ui.notice(t("ai.remote.sendFailed"));

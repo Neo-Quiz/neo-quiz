@@ -110,8 +110,8 @@ export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEn
 	if (p.quiz !== undefined && p.quizTotal !== undefined) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.quiz", { n: p.quiz, total: p.quizTotal }));
 }
 
-/** A request the phone sent that no PC has taken yet: its message, then "Waiting for the PC" (or "Expired" past 24 h). `pcOnline` false adds the one line saying the PC does not seem on. */
-export function peindreEnAttente(parent: HTMLElement, item: { key: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcOnline: boolean): void {
+/** A request the phone sent that no PC has taken yet: its message, then "Waiting for the PC" (or "Expired" past 24 h). `pcReachable` false (the PC the request was sent to is not fresh) adds the one line saying the PC does not seem on. */
+export function peindreEnAttente(parent: HTMLElement, item: { key: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcReachable: boolean): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -126,5 +126,5 @@ export function peindreEnAttente(parent: HTMLElement, item: { key: string; reque
 	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), item.state === "expired" ? "alert-circle" : "clock");
 	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
 	ajouter(corps, "span", "qbd-ai-reponse-texte", t(item.state === "expired" ? "ai.remote.expired" : "ai.remote.waiting"));
-	if (item.state === "waiting" && !pcOnline) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.noPc"));
+	if (item.state === "waiting" && !pcReachable) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.noPc"));
 }

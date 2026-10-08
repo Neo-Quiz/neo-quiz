@@ -350,6 +350,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.remote.insideFolderOnly": "Les documents doivent être dans ton dossier Neo Quiz.",
 	"ai.remote.textOnly": "Seuls les documents texte et Markdown peuvent partir vers le PC.",
 	"ai.remote.sendFailed": "La demande n'a pas pu partir vers le PC.",
+	"ai.remote.firstPc": "Ouvrez Neo Quiz une fois sur votre PC pour que le téléphone le trouve.",
 	"ai.queue.saving": "Enregistrement…",
 	"ai.queue.retrySave": "Réessayer l'enregistrement",
 	"ai.queue.openUnsaved": "Ouvrir sans enregistrer",

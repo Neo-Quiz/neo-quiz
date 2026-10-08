@@ -226,6 +226,7 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 		r.check("once the PC reports it running, only the progress item shows", running.map(i => i.kind), ["remote"]);
 		const done = T.threadItems({ id: "c1", origin: "pc", createdAt: 1, updatedAt: 1, requests: [{ id: "w1", at: 1, from: "ph", text: "Q", mode: "learn", documents: [], results: [], state: "done" }] }, [], "c1", [], NOW, [own("w1")]);
 		r.check("once recorded, only the record shows", done.map(i => i.kind), ["record"]);
+		r.check("a pending item carries the PC its request was sent to", T.threadItems(null, [], "c1", [], NOW, [own("w1", { target: "pcX" })]).map(i => i.target), ["pcX"]);
 		r.check("a pending request is never a tour of the context", T.toursOfThread(T.threadItems(null, [], "c1", [], NOW, [own("w1")])), []);
 	}
 	r.done();
@@ -251,5 +252,32 @@ await withSrcModule(["src/dashboard/remote-send.ts"], (S) => {
 	r.check("the internal folder of the sync is never sent", S.refusPourTelephone({ name: "x.md", path: ROOT + "/.neo-quiz/x.md" }, ROOT), "ai.remote.insideFolderOnly");
 	r.check("an image of the folder is refused: text only", S.refusPourTelephone({ name: "schema.png", path: ROOT + "/schema.png" }, ROOT), "ai.remote.textOnly");
 	r.check("a PDF of the folder is refused: text only", S.refusPourTelephone({ name: "cm1.pdf", path: ROOT + "/cm1.pdf" }, ROOT), "ai.remote.textOnly");
+	r.done();
+});
+
+// Where the phone sends: the PC that owns the chat, else the last PC seen fresh, else the origin or the last PC ever seen (even stale). Never none while one was seen.
+await withSrcModule(["src/dashboard/remote-send.ts"], (S) => {
+	const r = makeReporter("Targets and expiry");
+	const NOW = 1_800_000_000_000;
+	const fresh = (device, at = NOW - 1000) => ({ device, file: { v: 1, at, running: [] } });
+	const stale = (device) => ({ device, file: { v: 1, at: NOW - 600_000, running: [] } });
+	r.check("the chat's PC when it is fresh", S.targetOf({ origin: "A" }, [fresh("A"), fresh("B")], NOW, "B"), "A");
+	r.check("another fresh PC when the chat's PC is off", S.targetOf({ origin: "A" }, [stale("A"), fresh("B")], NOW, null), "B");
+	r.check("a new chat: the last PC ever seen, even stale", S.targetOf(null, [stale("A")], NOW, "A"), "A");
+	r.check("the chat's PC, even stale, before the last PC ever seen", S.targetOf({ origin: "A" }, [stale("A")], NOW, "B"), "A");
+	r.check("no PC ever seen: no target at all (never an empty one)", S.targetOf(null, [], NOW, null), null);
+	r.check("a PC is reachable while its file is fresh", S.pcFresh("A", [fresh("A")], NOW), true);
+	r.check("a stale or absent PC is not reachable", [S.pcFresh("A", [stale("A")], NOW), S.pcFresh("B", [fresh("A")], NOW)], [false, false]);
+	r.check("the device seen most recently, stale or not", S.latestDevice([stale("A"), fresh("B", NOW - 5000)]), "B");
+	const own = (id, at) => ({ v: 1, id, at, from: "ph", target: "pc", chatId: "c1", text: "Q", mode: "learn", documents: [] });
+	const rec = new Set(["done"]);
+	const sync = S.ownAfterSync([own("wait", NOW - 1000), own("old", NOW - 25 * 3600e3), own("done", NOW - 1000)], [], rec, NOW);
+	r.check("on disk: a waiting request is kept, not dropped", sync.keep.some(q => q.id === "wait") && !sync.drop.includes("wait"), true);
+	r.check("on disk: a recorded request is dropped and not kept", [sync.drop.includes("done"), sync.keep.some(q => q.id === "done")], [true, false]);
+	r.check("on disk: an expired request is deleted but stays listed (Expired)", [sync.drop.includes("old"), sync.keep.some(q => q.id === "old")], [true, true]);
+	const later = S.ownAfterSync([], sync.keep, rec, NOW + 1000);
+	r.check("an expired request already deleted from disk is still listed this session", later.keep.map(q => q.id), ["old"]);
+	r.check("a remembered waiting request that left the disk is not listed", S.ownAfterSync([], [own("gone", NOW - 1000)], rec, NOW).keep, []);
+	r.check("a remembered request recorded meanwhile is no longer listed", S.ownAfterSync([], sync.keep, new Set(["old"]), NOW).keep, []);
 	r.done();
 });

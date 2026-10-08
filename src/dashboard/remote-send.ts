@@ -1,8 +1,9 @@
 import { newRequestId } from "./chat-requests";
 import type { ChatRecord } from "./chat-record";
 import { isStale, lastPcSeen } from "../shared-state/generations";
+export { latestDevice } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
-import { validateRemote } from "../shared-state/remote-request";
+import { pendingState, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest } from "../shared-state/remote-request";
 import { relativeToRoot } from "../shared-state/chat-merge";
 
@@ -41,4 +42,26 @@ export interface PhoneDocument { name: string; path?: string }
 export function refusPourTelephone(doc: PhoneDocument, rootId: string): "ai.remote.insideFolderOnly" | "ai.remote.textOnly" | null {
 	if (!doc.path || !relativeToRoot(doc.path, rootId)) return "ai.remote.insideFolderOnly";
 	return /\.(md|markdown|txt)$/i.test(doc.name) ? null : "ai.remote.textOnly";
+}
+
+/** Where a request goes: the PC of the chat while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen: an empty target is never written. */
+export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null): string | null {
+	return pickTarget(chat, files, now) ?? (chat?.origin || null) ?? lastSeen;
+}
+
+/** Whether a PC is reachable: its generations file is present and fresh. */
+export function pcFresh(device: string, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number): boolean {
+	return files.some(f => f.device === device && !isStale(f.file, now));
+}
+
+/** The phone's own request files after a sync. `drop`: the ids to delete from disk (recorded in a chat, or expired past 24 h).
+    `keep`: what the phone lists, newest first: the waiting files on disk, and the expired ones (on disk, or deleted this session).
+    A remembered request is listed only while it is still expired and not recorded. */
+export function ownAfterSync(disk: ReadonlyArray<RemoteRequest>, previous: ReadonlyArray<RemoteRequest>, recorded: ReadonlySet<string>, now: number): { keep: RemoteRequest[]; drop: string[] } {
+	const expired = (q: RemoteRequest): boolean => pendingState(q, { recorded: new Set(), running: new Set(), now }) === "expired";
+	const drop = disk.filter(q => recorded.has(q.id) || expired(q)).map(q => q.id);
+	const onDisk = disk.filter(q => !recorded.has(q.id));
+	const ids = new Set(disk.map(q => q.id));
+	const remembered = previous.filter(q => !ids.has(q.id) && !recorded.has(q.id) && expired(q));
+	return { keep: [...onDisk, ...remembered].sort((a, b) => b.at - a.at), drop };
 }
