@@ -492,7 +492,15 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			openIconPicker(anchor, courante, onPick, document.body, suggestions ?? []);
 		},
 		createFolder: (map, quizzes, done) => openCreateFolderModal(ctx, map, quizzes, done),
-		openExistingFolder: (done) => { void ouvrirDossierExistant(done); },
+		openExistingFolder: (done) => {
+			/* A refusal (the picker, the roots, the settings write) is shown, not
+			   dropped as an unhandled rejection; the page refreshes either way. */
+			void ouvrirDossierExistant(done).catch((e) => {
+				console.error("[neo-quiz] opening an existing folder failed:", e);
+				currentHost().ui.notice(t("dashboard.quizzes.openFolderError"));
+				done();
+			});
+		},
 		/* Le SAS des quiz générés : le MÊME calcul que `saveGeneratedQuiz`
 		   (ai.ts, `defaultDestination`) — racine par défaut + `aiOutputFolder`.
 		   Lu à chaque appel : le réglage peut changer sans remonter la coquille. */

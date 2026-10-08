@@ -11,6 +11,7 @@ import { openIconPicker } from "./icon-picker";
 import { moduleIcon } from "./module-icons";
 import { MODULE_PALETTE, moduleAccent } from "./module-color";
 import { suggestIcons } from "./icon-suggest";
+import { saveSettingsReporting } from "./save-settings";
 
 type ModuleEditState = Required<Pick<ModuleOverride, "name" | "ue">>
 	& Omit<ModuleOverride, "name" | "ue">;
@@ -231,7 +232,7 @@ export function openModuleEditModal(
 			// drag du picker). saveSettings ne s'appelle que si un changement a eu
 			// lieu. Le corps du modal, lui, est vidé par l'HÔTE (contrat
 			// `HostModalHandle`) : l'appelant n'a rien à y faire.
-			if (dirty) ctx.saveSettings().catch(() => {});
+			if (dirty) saveSettingsReporting(() => ctx.saveSettings());
 		},
 	});
 }
@@ -321,7 +322,7 @@ export function openNewFolderModal(
 				   folder would show no card and stay unwritable. */
 				overrides[clean] = { ...(overrides[clean] || {}), name: overrides[clean]?.name || clean, path };
 				ctx.settings.quizzesModuleOverrides = overrides;
-				ctx.saveSettings().catch(() => {});
+				saveSettingsReporting(() => ctx.saveSettings());
 				m.close();
 				onCreated();
 			};

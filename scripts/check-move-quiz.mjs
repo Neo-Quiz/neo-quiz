@@ -283,5 +283,34 @@ await withSrcModule(
 		r.check("8. and after a restart", Object.keys(restart.exams()).sort(), ["NeoQuiz/Reseaux", "NeoQuiz/TD"]);
 	}
 
+	/* ── 9. A file gesture started from a menu never fails in silence (2026-10-08).
+	   `void deleteQuiz(...).then(rerender)` dropped a refusal as an unhandled
+	   rejection: no message, and no refresh although the disk may have changed. ── */
+	{
+		const notices = [];
+		hote.installHost({ ui: { notice: (m) => { notices.push(m); } } });
+		const original = console.error;
+		console.error = () => {};
+		let rafraichi = 0;
+		try {
+			await qm.runFileGesture(async () => { throw new Error("disk full"); }, "dashboard.quizzes.deleteError", () => { rafraichi++; });
+			r.check("9. a refused gesture shows a message and still refreshes the page",
+				[notices, rafraichi], [["Could not delete the quiz — see the console for details."], 1]);
+			notices.length = 0;
+			await qm.runFileGesture(async () => {}, "dashboard.quizzes.deleteError", () => { rafraichi++; });
+			r.check("9. a gesture that works says nothing and refreshes once", [notices, rafraichi], [[], 2]);
+		} finally {
+			console.error = original;
+			hote.uninstallHost();
+		}
+		/* The ratchet: no menu entry goes back to a bare `void` over a file
+		   operation, whatever the helper does. */
+		const { readFileSync } = await import("node:fs");
+		const source = readFileSync(new URL("../src/dashboard/quiz-menu.ts", import.meta.url), "utf8");
+		r.check("9. the menu runs delete, move and remove-folder through runFileGesture",
+			[/void deleteQuiz\(/.test(source), /void ctx\.removeExtraRoot/.test(source), /void \(async \(\) => \{\s*const to = await moveQuizTo/.test(source), (source.match(/runFileGesture\(/g) ?? []).length >= 4],
+			[false, false, false, true]);
+	}
+
 	r.done();
 });

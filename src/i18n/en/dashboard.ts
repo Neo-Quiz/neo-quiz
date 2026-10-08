@@ -258,6 +258,10 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moveFolderMissing": "The folder {target} no longer exists.",
 	"dashboard.quizzes.moveQuizError": "Could not move the quiz — see the console for details.",
 	"dashboard.quizzes.moveFolderError": "Could not move the folder — see the console for details.",
+	"dashboard.quizzes.deleteError": "Could not delete the quiz — see the console for details.",
+	"dashboard.quizzes.removeRootError": "Could not remove the folder from Neo Quiz — see the console for details.",
+	"dashboard.quizzes.openFolderError": "Could not open the folder — see the console for details.",
+	"dashboard.quizzes.settingsSaveError": "Your changes could not be saved",
 
 	/* ── Modal « Modifier dossier » (calqué StudySmarter, sans le toggle public) ── */
 	"dashboard.quizzes.moduleEditTitle": "Edit folder",

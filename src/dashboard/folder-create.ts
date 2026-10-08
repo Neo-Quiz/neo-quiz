@@ -12,9 +12,9 @@ import { ImportPathTooLongError, applyPlan, planFor, receiveArchive, scanTarget 
 import type { ReceivedArchive } from "./share-import";
 import type { DiscardReason, ImportPlan } from "./share-plan";
 import { sha256Hex } from "./share-manifest";
-import { LOG_PREFIX } from "../branding";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
+import { saveSettingsReporting } from "./save-settings";
 
 /* ══════════════════════════════════════════════════════════
    CREATE FOLDER — modal « Créer un dossier » calqué sur StudySmarter
@@ -225,7 +225,7 @@ export async function importArchiveAsFolder(
 		path: folderPath,
 	};
 	ctx.settings.quizzesModuleOverrides = overrides;
-	ctx.saveSettings().catch((e) => console.warn(`${LOG_PREFIX} saving the imported folder's settings failed:`, e));
+	saveSettingsReporting(() => ctx.saveSettings());
 	report(plan, folderKey);
 	onDone();
 }

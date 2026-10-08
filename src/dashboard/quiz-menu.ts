@@ -1,6 +1,7 @@
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
+import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
@@ -63,6 +64,24 @@ interface ConfirmSpec {
 	cta: string;
 	/** true = bouton rouge (`qb-btn-danger`) : Delete uniquement. */
 	warning?: boolean;
+}
+
+/**
+ * Runs a file gesture started from a menu (delete a quiz, move it, take a folder
+ * out of the app). A rejection is logged and SHOWN, never dropped: a bare
+ * `void task().then(rerender)` left the user with no message and a stale page
+ * when the host refused (a full disk, a revoked permission, a folder that
+ * moved). The page refreshes in every case, because the disk may have changed
+ * before the failure.
+ */
+export async function runFileGesture(task: () => Promise<unknown>, failureKey: TransKey, rerender: () => void): Promise<void> {
+	try {
+		await task();
+	} catch (e) {
+		console.error("[quiz-blocks] file gesture failed:", e);
+		currentHost().ui.notice(t(failureKey));
+	}
+	rerender();
 }
 
 /**
@@ -539,16 +558,12 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 							   (2026-09-27). The others only move once the first has;
 							   when one fails, `moveQuizTo` says so itself. */
 							const freres = quizFreres(quiz, ctx.scanner.getQuizzes());
-							void (async () => {
+							void runFileGesture(async () => {
 								const to = await moveQuizTo(ctx, quiz, g.path as string, g.name);
-								if (to) for (const f of freres) await moveQuizTo(ctx, f, g.path as string, g.name);
-								return to;
-							})().then(to => {
-								if (to) {
-									currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
-									rerender();
-								}
-							});
+								if (!to) return;
+								for (const f of freres) await moveQuizTo(ctx, f, g.path as string, g.name);
+								currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
+							}, "dashboard.quizzes.moveQuizError", rerender);
 						},
 					});
 					derniereUe = ue.key;
@@ -604,7 +619,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				body: t("dashboard.quizzes.deleteConfirmBody", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
 				cta: t("dashboard.quizzes.deleteConfirmCta"),
 				warning: true,
-			}, () => { void deleteQuiz(ctx, q).then(rerender); });
+			}, () => { void runFileGesture(() => deleteQuiz(ctx, q), "dashboard.quizzes.deleteError", rerender); });
 		};
 		if (freres.length === 0) {
 			items.push({
@@ -821,7 +836,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 					body: t("dashboard.quizzes.removeRootBody"),
 					cta: t("dashboard.quizzes.removeRootCta"),
 					warning: true,
-				}, () => { void ctx.removeExtraRoot?.(racineDeG.id); });
+				}, () => { void runFileGesture(async () => { await ctx.removeExtraRoot?.(racineDeG.id); }, "dashboard.quizzes.removeRootError", rerender); });
 			},
 		});
 		if (!fixe) items.push({

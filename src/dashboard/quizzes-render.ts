@@ -22,6 +22,7 @@ import { suggestIcons } from "./icon-suggest";
 import { renderFolderSections } from "./folder-sections";
 import { renderEmptyFolder } from "./folder-add";
 import { createSelectionView, resetSelection } from "./selection-view";
+import { saveSettingsReporting } from "./save-settings";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES RENDER — extrait de quizzes.ts (Task 4) pour rester
@@ -80,7 +81,7 @@ function renderModuleGrid(deps: GridDeps, parent: HTMLElement, groups: ModuleGro
 				const overrides = { ...(deps.ctx.settings.quizzesModuleOverrides || {}) };
 				overrides[group.folder] = { ...(overrides[group.folder] || {}), icon: name };
 				deps.ctx.settings.quizzesModuleOverrides = overrides;
-				deps.ctx.saveSettings().catch(() => {});
+				saveSettingsReporting(() => deps.ctx.saveSettings());
 				deps.rerender();
 			}, suggestIcons(group.name, group.ue));
 		}

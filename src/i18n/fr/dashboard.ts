@@ -218,6 +218,10 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.moveFolderMissing": "Le dossier {target} n'existe plus.",
 	"dashboard.quizzes.moveQuizError": "Impossible de déplacer le quiz — détails dans la console.",
 	"dashboard.quizzes.moveFolderError": "Impossible de déplacer le dossier — détails dans la console.",
+	"dashboard.quizzes.deleteError": "Impossible de supprimer le quiz — détails dans la console.",
+	"dashboard.quizzes.removeRootError": "Impossible de retirer le dossier de Neo Quiz — détails dans la console.",
+	"dashboard.quizzes.openFolderError": "Impossible d'ouvrir le dossier — détails dans la console.",
+	"dashboard.quizzes.settingsSaveError": "Vos modifications n'ont pas pu être enregistrées",
 
 	/* ── Modal « Modifier dossier » ── */
 	"dashboard.quizzes.moduleEditTitle": "Modifier dossier",
