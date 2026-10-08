@@ -5,6 +5,8 @@
    does the three things CSS cannot:
 
    - the BOTTOM BAR of arrows, a child of the panel under the questions.
+     On a phone (body.is-mobile) there is no bar: the swipe and the beads reach
+     every step, and the room goes to the question.
      Its two buttons MIRROR the current slide's own arrows — disabled state,
      label, icon — and FORWARD their clicks to them: which slide comes next,
      what the last arrow does (results, finishing an exam) stays the
@@ -66,22 +68,33 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		if (found && found !== panel) {
 			panel?.removeEventListener("wheel", onWheel);
 			panel = found;
-			panel.append(bar);
 			/* The mini composer above the bar shows and hides itself: the slides' room follows. */
 			mutations.observe(panel, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
 			resize.observe(panel);
-			// The bar hiding (soft keyboard open, mobile.css) gives its room to the slides.
-			resize.observe(bar);
 			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
 		if (!panel) return;
 
-		const slide = currentSlide(host);
-		const ownPrev = slide?.querySelector<HTMLButtonElement>(".quiz-prev-btn");
-		const ownNext = slide?.querySelector<HTMLButtonElement>(".quiz-next-btn");
-		bar.classList.toggle("is-empty", !ownPrev && !ownNext);
-		mirror(prev, ownPrev);
-		mirror(next, ownNext);
+		/* On a phone (`body.is-mobile`) there is no bar at all: a question swipes
+		   and the beads reach every step, so the room of the bar goes to the slides.
+		   Removed, not hidden: the room below is measured from what is in the panel. */
+		const showBar = !document.body.classList.contains("is-mobile");
+		if (showBar && !bar.isConnected) {
+			panel.append(bar);
+			// The bar hiding (soft keyboard open, mobile.css) gives its room to the slides.
+			resize.observe(bar);
+		} else if (!showBar && bar.isConnected) {
+			resize.unobserve(bar);
+			bar.remove();
+		}
+		if (showBar) {
+			const slide = currentSlide(host);
+			const ownPrev = slide?.querySelector<HTMLButtonElement>(".quiz-prev-btn");
+			const ownNext = slide?.querySelector<HTMLButtonElement>(".quiz-next-btn");
+			bar.classList.toggle("is-empty", !ownPrev && !ownNext);
+			mirror(prev, ownPrev);
+			mirror(next, ownNext);
+		}
 
 		/* A beads row that scrolls sideways (phone, mobile.css) keeps the current
 		   bead centred. Set on the row itself: `scrollIntoView` would also move
@@ -107,7 +120,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		const contentBottom = panelRect.top + (panel.clientTop + panel.clientHeight
 			- parseFloat(getComputedStyle(panel).paddingBottom || "0")) * scale;
 		const trailing = host.getBoundingClientRect().bottom - viewportRect.bottom;
-		const room = (contentBottom - viewportRect.top - trailing) / scale - bar.offsetHeight
+		const room = (contentBottom - viewportRect.top - trailing) / scale - (bar.isConnected ? bar.offsetHeight : 0)
 			- (panel.querySelector<HTMLElement>(":scope > .qz-above-bar:not([hidden])")?.offsetHeight ?? 0);
 		const value = `${Math.max(0, Math.floor(room))}px`;
 		/* Skipping an unchanged value keeps the loop (height → host resized →
@@ -135,6 +148,9 @@ export function attachQuizBars(host: HTMLElement): () => void {
 
 	const resize = new ResizeObserver(schedule);
 	resize.observe(host);
+	/* The phone width (`is-mobile`, main.ts) toggles the bar: the class is the signal. */
+	const bodyClass = new MutationObserver(schedule);
+	bodyClass.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 	const mutations = new MutationObserver(schedule);
 	mutations.observe(host, {
 		subtree: true,
@@ -148,6 +164,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		if (frame) cancelAnimationFrame(frame);
 		resize.disconnect();
 		mutations.disconnect();
+		bodyClass.disconnect();
 		bar.remove();
 		panel?.removeEventListener("wheel", onWheel);
 		panel?.style.removeProperty("--qz-slide-h");

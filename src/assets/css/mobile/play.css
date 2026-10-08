@@ -145,3 +145,18 @@ html.nq-mobile #neo-quiz-root:has(> .qbd-qz) {
 html.nq-mobile #neo-quiz-root > .qbd-qz {
 	padding-top: calc(var(--nq-inset-haut, 0px) + 32px);
 }
+
+/* THE BOTTOM BAR OF ARROWS IS GONE ON A PHONE (2026-10-08): a question swipes
+   and the beads reach every step, and the bar is no longer drawn
+   (ui/quiz-bars.ts), so its room goes to the question. The end of a Learn
+   (results) and of a Test (hand-in) keep their last line clear of the edge
+   with a plain 32 px, not the 96 px that made room for the bar. */
+html.nq-mobile .qz-bottom-bar {
+	display: none;
+}
+
+html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="results"],
+html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="submit"] {
+	padding-bottom: 32px;
+}
+

@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- On a phone, a played quiz no longer shows the previous and next arrows: its question takes their room, and the swipe and the beads do the moving.
+
 ## [1.20.43] - 2026-10-07
 
 ### Changed
