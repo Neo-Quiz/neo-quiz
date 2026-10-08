@@ -595,6 +595,14 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   seul), un résultat jamais perdu ni doublé à la réécriture, l'ancienne archive
   texte importée par question, 200 conversations au plus sans jamais élaguer une
   pierre tombale (une conversation supprimée reviendrait). Dans la CI.
+- `npm run check:chat-sync` — la fusion des conversations entre appareils
+  (`src/shared-state/chat-merge.ts`, pur) : un fichier par appareil lu en
+  entier, les demandes de deux copies réunies sans en perdre une ni la doubler,
+  la métadonnée de la copie la plus récente, une pierre tombale qui ne revient
+  jamais ; ce qu'un appareil peut écrire dans SON fichier (ses conversations,
+  une pierre tombale ou une copie d'une conversation d'un autre appareil ne
+  portant que les demandes qu'aucun autre fichier ne tient, origine conservée) ;
+  un chemin stocké hostile ne devient jamais une cible d'Ouvrir. Dans la CI.
 - `npm run check:code-packages` — le proxy de paquets Python du principal
   (`apps/windows/electron/paquets-python.ts`), sur un transport injecté : un
   fichier que le `pyodide-lock.json` du pack ne nomme pas ne déclenche AUCUNE

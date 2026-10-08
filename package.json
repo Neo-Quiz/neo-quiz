@@ -39,6 +39,7 @@
     "check:generation-kind": "node scripts/check-generation-kind.mjs",
     "check:folder-suggest": "node scripts/check-folder-suggest.mjs",
     "check:chat-store": "node scripts/check-chat-store.mjs",
+    "check:chat-sync": "node scripts/check-chat-sync.mjs",
     "check:chat-thread": "node scripts/check-chat-thread.mjs",
     "check:explain": "node scripts/check-explain.mjs",
     "check:web-channel": "node scripts/check-web-channel.mjs",

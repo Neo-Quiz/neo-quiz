@@ -320,6 +320,11 @@ jobs:
       # once, and a reload keeps the active chat.
       - name: Chat store
         run: npm run check:chat-store
+      # THE CHAT MERGE: the per-device chat files merged on read (requests
+      # unioned, a deleted chat stays deleted), what a device may write (its
+      # own chats, a tombstone or a copy of a foreign chat), and the path rule.
+      - name: Chat sync
+        run: npm run check:chat-sync
       # THE CHATS, pure cores: lines grouped into requests (one bubble per
       # send), reconciled into records without erasing an answer, the thread
       # and the list derived from record + live lines, the follow-up context.
