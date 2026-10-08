@@ -18,6 +18,8 @@ object Channels {
         "android.fichierRecu",
         "android.barre",
         "android.haptique",
+        "android.partagerPrompt",
+        "android.lirePressePapier",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",

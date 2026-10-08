@@ -35,3 +35,13 @@ class ClipboardChannel(private val sink: ClipboardSink) {
         const val MAX_CHARS = 1_000_000
     }
 }
+
+/**
+ * Text of the primary clip. Only ever called from the `android.lirePressePapier` handler (an explicit
+ * tap on the page); Android 10+ answers null when the app has no focus, which reads as empty.
+ */
+class AndroidClipboardSource(private val context: Context) : ClipboardSource {
+    override fun get(): String? =
+        context.getSystemService(ClipboardManager::class.java).primaryClip
+            ?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+}
