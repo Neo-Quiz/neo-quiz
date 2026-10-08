@@ -148,7 +148,8 @@ function report(plan: ImportPlan, name: string): void {
 			images > 0 ? t(images === 1 ? "share.import.added.images.one" : "share.import.added.images", { count: images }) : "",
 		].filter(Boolean);
 		const what = parts.length === 2 ? t("share.import.added.and", { a: parts[0], b: parts[1] }) : parts[0];
-		ui.notice(t("share.import.added", { name, what }));
+		/* One file reads "1 quiz ajouté" in French, not "1 quiz ajoutés". */
+		ui.notice(t(plan.writes.length === 1 ? "share.import.added.single" : "share.import.added", { name, what }));
 	} else if (plan.duplicates.length > 0 && plan.discarded.length === 0) {
 		ui.notice(t("share.import.nothing"));
 	} else if (plan.discarded.length === 0 || plan.discarded.every(d => d.reason === "unsupported-type")) {

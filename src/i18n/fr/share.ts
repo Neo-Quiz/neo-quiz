@@ -2,6 +2,7 @@ import type { EN_SHARE } from "../en/share";
 
 export const FR_SHARE: Record<keyof typeof EN_SHARE, string> = {
 	"share.import.added": "{name} : {what} ajoutés",
+	"share.import.added.single": "{name} : {what} ajouté",
 	"share.import.added.notes.one": "{count} quiz",
 	"share.import.added.notes": "{count} quiz",
 	"share.import.added.images.one": "{count} image",

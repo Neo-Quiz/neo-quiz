@@ -612,3 +612,16 @@ await withSrcModule(
 		[true, false, false]);
 	r.done();
 }
+
+/* One imported file is announced in the singular ("1 quiz ajouté"), not with
+   the plural agreement of a batch (2026-10-08). */
+{
+	const r = makeReporter("Import notice: singular for one file");
+	const fr = readFileSync(join(HERE, "..", "src", "i18n", "fr", "share.ts"), "utf8");
+	const en = readFileSync(join(HERE, "..", "src", "i18n", "en", "share.ts"), "utf8");
+	const code = readFileSync(join(HERE, "..", "src", "dashboard", "folder-create.ts"), "utf8");
+	r.check("both languages define the singular line, and the report picks it for one write",
+		[/"share\.import\.added\.single": "\{name\} : \{what\} ajouté",/.test(fr), /"share\.import\.added\.single"/.test(en), /writes\.length === 1 \? "share\.import\.added\.single"/.test(code)],
+		[true, true, true]);
+	r.done();
+}

@@ -2,6 +2,7 @@
    none is silent. Reasons for a left-out file are plain words. */
 export const EN_SHARE = {
 	"share.import.added": "{name}: {what} added",
+	"share.import.added.single": "{name}: {what} added",
 	"share.import.added.notes.one": "{count} quiz",
 	"share.import.added.notes": "{count} quizzes",
 	"share.import.added.images.one": "{count} image",
