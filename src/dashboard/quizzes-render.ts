@@ -251,7 +251,7 @@ export function renderModuleDrill(
 	const grid = ajouter(principal, "div", "qbd-home-grid qbd-quizzes-drill-grid");
 	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
 	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
-	const cartes = regrouperParCours(inModule, true);
+	const cartes = regrouperParCours(inModule, false);
 	/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture (« Ajouter du
 	   contenu ») veut un chemin du contrat (correctif 2026-09-17), et
 	   `renderFolderPlanning` en a besoin pour le même geste dans son propre
@@ -285,14 +285,13 @@ export function renderModuleDrill(
 			statsFreres: freres.map(f => stats[f.path]),
 			// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
 			showPath: false,
-			// L'avancement vit dans l'onglet « Progression » du dossier.
-			showRing: false,
-			onPlay: (q) => ctx.openQuiz(q),
+			// The progress ring replaces the play arrow (play lives on the quiz page).
+			showRing: true,
 			// Absent côté application (menus et modals = tranche 2.6) : la
 			// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
 			// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
 			// correction 1, tâche 6).
-			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map) : undefined,
+			onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map, undefined, true) : undefined,
 			accent,
 			entryIndex: index,
 		});

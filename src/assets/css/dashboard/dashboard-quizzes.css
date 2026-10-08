@@ -1049,6 +1049,24 @@
 	font-size: 12px;
 	line-height: 16px;
 }
+/* The type chip: filled blue, readable on the dark card, with a shape per
+   type (Learn = round pill, Test/Exam = squarer rectangle). No frame. */
+.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn {
+	border: 0;
+	background: color-mix(in srgb, var(--qbd-state-progress) 85%, #000);
+	color: #fff;
+	font-weight: 600;
+}
+.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn:hover {
+	background: color-mix(in srgb, var(--qbd-state-progress) 95%, #000);
+}
+.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--learn .qbd-quiz-card-mode-btn {
+	border-radius: 999px;
+}
+.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--practice .qbd-quiz-card-mode-btn,
+.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--exam .qbd-quiz-card-mode-btn {
+	border-radius: 5px;
+}
 .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-icon svg {
 	width: 14px;
 	height: 14px;

@@ -216,7 +216,7 @@ export function renderQuizCard(
 	const bas = ajouter(body, "div", "qbd-quiz-card-modes");
 	const modes = [quiz, ...freres].sort(parMode);
 	for (const q of modes) {
-		const wrap = ajouter(bas, "span", "qbd-quiz-card-type qbd-quiz-card-mode");
+		const wrap = ajouter(bas, "span", `qbd-quiz-card-type qbd-quiz-card-mode qbd-quiz-card-mode--${q.mode}`);
 		const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
 		btn.type = "button";
 		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), quizModeIcon(q.mode));

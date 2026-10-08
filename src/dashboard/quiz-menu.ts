@@ -501,8 +501,8 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
     `buildModuleCardMenu`, est l'ancre où poser ce sous-menu — absent (appelant
     qui ne le fournirait pas encore), pas d'entrée « Déplacer vers » : un
     sous-menu sans rien où s'ancrer ne s'ouvrirait nulle part. */
-export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement) => ActionMenuItem[] {
-	return (quiz, anchorEl) => {
+export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement, solo?: boolean) => ActionMenuItem[] {
+	return (quiz, anchorEl, solo) => {
 		/* Capturés dans des constantes : le rétrécissement de type d'un `if`
 		   sur `ctx.shareQuiz` ne survivrait pas jusqu'au `onClick`. */
 		const { shareQuiz, renameQuiz } = ctx;
@@ -619,7 +619,9 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		   not tell whether the Learn, the Test or both would be removed. A
 		   submenu names each quiz by its type, then offers all of them. Every
 		   path still confirms, and goes through `deleteQuizCore`. */
-		const freres = quizFreres(quiz, ctx.scanner.getQuizzes());
+		/* `solo`: the card stands for this one quiz only (the folder page
+		   shows one card per quiz), so Delete removes just it. */
+		const freres = solo ? [] : quizFreres(quiz, ctx.scanner.getQuizzes());
 		const confirmerUn = (q: QuizIndexEntry): void => {
 			openConfirm({
 				title: t("dashboard.quizzes.deleteConfirmTitle"),

@@ -581,8 +581,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   même `ctx` : le menu « ⋯ » ne demande que `DashboardShellCtx` depuis
 		   la tranche 3 (tâche 9), et c'est l'hôte qui l'OUVRE (`openActionMenu`,
 		   portalé au `<body>`) avec le `rerender` de la page qui l'affiche. */
-		openCardMenu: (quiz, anchor, rerender, map, extra) => {
-			const items = buildQuizCardMenu(ctx, rerender, map)(quiz, anchor);
+		openCardMenu: (quiz, anchor, rerender, map, extra, solo) => {
+			const items = buildQuizCardMenu(ctx, rerender, map)(quiz, anchor, solo);
 			// The page's own lines first, a rule before the card's.
 			if (extra?.length && items[0]) items[0] = { ...items[0], sepBefore: true };
 			openActionMenu(anchor, [...(extra ?? []), ...items]);

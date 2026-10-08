@@ -267,7 +267,7 @@ export interface DashboardShellCtx {
 	   liste les dossiers connus groupés par UE, tirés de la même table que
 	   `openModuleMenu`. `extra`: lines put above the card's own, a quiz's
 	   page in editing ("Vocabulary", detail.ts). */
-	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[]) => void;
+	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[], solo?: boolean) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —
 	    autant de modals que l'application n'a pas encore. Absente = pas de
