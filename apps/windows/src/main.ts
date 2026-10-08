@@ -31,7 +31,7 @@ import { createChatFiles } from "./host/chat-files";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
 import { createDevicePublisher } from "../../../src/dashboard/device-publisher";
-import { checkClaudeCode, claudeModelsOffered } from "../../../src/dashboard/ai-providers";
+import { checkClaudeCode, claudeModelsOffered, getProvider } from "../../../src/dashboard/ai-providers";
 import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
 import { addFailedRequest } from "../../../src/dashboard/chat-requests";
@@ -677,7 +677,8 @@ async function demarrer(): Promise<void> {
 				providerSwitch: {
 					claudeAvailable: async () => (await checkClaudeCode(true)).ok,
 					// The same save the provider picker uses (guarded in the main process); ONLY the provider changes.
-					apply: () => reglagesIa.save({ aiProvider: "claude-code" }),
+					claudeDefaultModel: () => getProvider("claude-code").defaultModel,
+					apply: patch => reglagesIa.save(patch),
 					applied: () => { void devicePublisher?.check(); },
 					takenLog: {
 						async read() {

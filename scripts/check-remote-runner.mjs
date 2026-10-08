@@ -245,7 +245,8 @@ await withSrcModule(["src/dashboard/remote-runner.ts"], async (RU) => {
 		};
 		if (withSwitch) deps.providerSwitch = {
 			claudeAvailable: async () => cli,
-			apply: async () => { if (refuse) throw new Error("refused"); st.patches.push({ aiProvider: "claude-code" }); st.settings = { ...st.settings, aiProvider: "claude-code" }; },
+			claudeDefaultModel: () => "claude-default",
+			apply: async (p) => { if (refuse) throw new Error("refused"); st.patches.push(p); st.settings = { ...st.settings, ...p }; },
 			applied: () => { st.applied++; },
 			takenLog: { read: async () => structuredClone(st.log), write: async (l) => { st.log = structuredClone(l); } },
 		};
@@ -255,8 +256,8 @@ await withSrcModule(["src/dashboard/remote-runner.ts"], async (RU) => {
 		const { st, deps } = rig(); st.incoming = [setting("lq3k2-set001", { fromName: "Pixel" })];
 		const run = RU.createRemoteRunner(deps); await run.scan();
 		r.check("the provider is now Claude Code", st.settings.aiProvider, "claude-code");
-		r.check("the patch holds aiProvider and nothing else", st.patches, [{ aiProvider: "claude-code" }]);
-		r.check("model, effort and folder are untouched", { aiModel: st.settings.aiModel, aiEffort: st.settings.aiEffort, aiOutputFolder: st.settings.aiOutputFolder }, { aiModel: "m1", aiEffort: "high", aiOutputFolder: "Gen" });
+		r.check("the patch holds the provider and Claude's default model, nothing else", st.patches, [{ aiProvider: "claude-code", aiModel: "claude-default" }]);
+		r.check("the stale model is reset; effort and folder are untouched", { aiModel: st.settings.aiModel, aiEffort: st.settings.aiEffort, aiOutputFolder: st.settings.aiOutputFolder }, { aiModel: "claude-default", aiEffort: "high", aiOutputFolder: "Gen" });
 		r.check("the PC says who set it", [st.notes.length, st.notes[0][1].includes("Pixel"), st.notes[0][1].includes("Claude Code")], [1, true, true]);
 		r.check("the device file is republished", st.applied, 1);
 		r.check("nothing is queued or recorded as a failed generation", [st.sent.length, st.failures.length], [0, 0]);

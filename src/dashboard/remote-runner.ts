@@ -71,8 +71,10 @@ export interface RunnerDeps {
 	providerSwitch?: {
 		/** Whether the Claude Code CLI runs on this PC. */
 		claudeAvailable(): Promise<boolean>;
-		/** Sets ONLY `aiProvider` to "claude-code", through the same settings path as the provider picker (the main-process guard applies). Rejects when the write is refused. */
-		apply(): Promise<void>;
+		/** The model the provider picker sets when it picks Claude Code. */
+		claudeDefaultModel(): string;
+		/** Applies the patch through the same settings path as the provider picker (the main-process guard applies). Rejects when the write is refused. */
+		apply(patch: { aiProvider: "claude-code"; aiModel: string }): Promise<void>;
 		/** Runs after a successful switch (the device file is republished). */
 		applied(): void;
 		/** Separate local log of the switches taken (never synced), with its own hourly limit. */
@@ -181,7 +183,8 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		if (deps.settings().aiProvider === "claude-code") return;
 		if (!(await sw.claudeAvailable())) { say(t("ai.remote.providerNoCli")); return; }
 		try {
-			await sw.apply();
+			// Exactly what the picker sets (provider + its default model, so no stale model id of another provider survives); no effort, path or folder.
+			await sw.apply({ aiProvider: "claude-code", aiModel: sw.claudeDefaultModel() });
 		} catch (e) {
 			console.warn(LOG_PREFIX, "provider switch refused:", e);
 			say(t("ai.remote.providerRefused"));
