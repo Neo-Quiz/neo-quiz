@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -112,5 +112,19 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	const p = fold(createTranscriptDecoder("claude")(prive));
 	r.check("claude: private reasoning keeps its size, no text, never backwards", [p.thinking, p.thinkingTokens, p.started], ["", 4250, true]);
 	r.check("a fresh transcript has no reasoning size", transcriptVide().thinkingTokens, 0);
+	// What the model read: fresh input + cache, from message_start's usage.
+	const lu = fold(createTranscriptDecoder("claude")(line({ type: "stream_event", event: { type: "message_start", message: { usage: { input_tokens: 2, cache_creation_input_tokens: 180000, cache_read_input_tokens: 2141 } } } })));
+	r.check("claude: the input read is fresh input plus cache", lu.inputTokens, 182143);
+	r.check("claude: a message_start without usage adds nothing", fold(createTranscriptDecoder("claude")(line({ type: "stream_event", event: { type: "message_start", message: {} } }))).inputTokens, 0);
+	// The first character of the answer starts the writing clock, once.
+	const w = transcriptVide();
+	appliquer(w, { kind: "text", text: "" }, 5);
+	appliquer(w, { kind: "text", text: "[" }, 10);
+	appliquer(w, { kind: "text", text: "{" }, 99);
+	r.check("writingSince: the first non-empty text, never moved", w.writingSince, 10);
+	// The time left: from the finished questions' pace, only once two are done.
+	r.check("time left: none before two finished questions, nor without a total, nor past it",
+		[tempsRestant(2, 10, 0, 60_000), tempsRestant(5, undefined, 0, 60_000), tempsRestant(12, 10, 0, 60_000), tempsRestant(5, 10, undefined, 60_000)], [null, null, null, null]);
+	r.check("time left: 4 done in 2 min, 6 to go = 3 min", tempsRestant(5, 10, 0, 120_000), 180_000);
 	r.done();
 });

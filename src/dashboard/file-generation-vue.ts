@@ -39,7 +39,7 @@ import type { TransKey } from "../i18n";
 import { t } from "../i18n";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
-import { quizProgress } from "./transcript";
+import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { mathifyElement } from "../engine/mathjax";
 
@@ -73,8 +73,13 @@ function texteTravail(modele: string, ecoule: number): string {
     reasoning text is shown (a model that shares it has its own line). */
 function texteActivite(tr: Transcript | null | undefined): string {
 	// Once the answer is being written, the transcript's own lines take over.
-	if (!tr || tr.thinking || tr.text || tr.thinkingTokens <= 0) return "";
-	return t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) });
+	if (!tr || tr.text) return "";
+	/* What it read, then how long it has reasoned: a twelve-minute wait over
+	   "~180k tokens read" explains itself. */
+	const parts: string[] = [];
+	if (tr.inputTokens > 0) parts.push(t("ai.queue.inputTokens", { count: compterJetons(tr.inputTokens) }));
+	if (!tr.thinking && tr.thinkingTokens > 0) parts.push(t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) }));
+	return parts.join(" · ");
 }
 
 const TEXTE_ETAPE: Record<EtapeGeneration, TransKey> = {
@@ -383,6 +388,11 @@ export function creerVueFile(opts: {
 		const total = l.demande.count;
 		parts.push(total ? t("ai.transcript.progressQuestionOf", { n: p.question, total }) : t("ai.transcript.progressQuestion", { n: p.question }));
 		parts.push(t(lignes === 1 ? "ai.transcript.progressLinesOne" : "ai.transcript.progressLinesOther", { count: lignes }));
+		/* The time left, from the pace of the questions already written (one
+		   pass over several documents has no single total: none shown). */
+		const tr = opts.file.transcript(l.id);
+		const reste = p.quiz === null ? tempsRestant(p.question, total, tr?.writingSince, Date.now()) : null;
+		if (reste !== null) parts.push(reste < 60_000 ? t("ai.transcript.etaUnderMinute") : t("ai.transcript.etaMinutes", { n: Math.round(reste / 60_000) }));
 		return parts.join(" · ");
 	}
 

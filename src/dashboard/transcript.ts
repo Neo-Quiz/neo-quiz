@@ -32,6 +32,9 @@ export type TranscriptEvent =
 	    Opus 5.5 streams `thinking_delta`s whose text is empty, measured on
 	    2026-10-08). The total so far, not a delta. */
 	| { kind: "thinkingTokens"; total: number }
+	/** The size of what the model was given to read (the request and its
+	    documents), in tokens, from the first message's usage. */
+	| { kind: "input"; tokens: number }
 	| { kind: "text"; text: string }
 	| { kind: "tool"; name: string }
 	| { kind: "done" };
@@ -44,6 +47,11 @@ export interface Transcript {
 	thinking: string;
 	/** Estimated tokens of reasoning so far (0 when the CLI sends none). */
 	thinkingTokens: number;
+	/** Tokens the model was given to read (0 until the CLI says). */
+	inputTokens: number;
+	/** When the first character of the answer arrived (`Date.now()`), to
+	    estimate the time left from the questions already written. */
+	writingSince?: number;
 	text: string;
 	tools: string[];
 	done: boolean;
@@ -55,15 +63,16 @@ export interface Transcript {
 const MAX_CHARS = 200_000;
 
 export function transcriptVide(): Transcript {
-	return { started: false, thinking: "", thinkingTokens: 0, text: "", tools: [], done: false };
+	return { started: false, thinking: "", thinkingTokens: 0, inputTokens: 0, text: "", tools: [], done: false };
 }
 
 function borner(s: string): string {
 	return s.length > MAX_CHARS ? s.slice(s.length - MAX_CHARS) : s;
 }
 
-/** Folds one event into the transcript (in place, and returned). */
-export function appliquer(t: Transcript, ev: TranscriptEvent): Transcript {
+/** Folds one event into the transcript (in place, and returned). `now`: the
+    time of the event, for `writingSince`. */
+export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date.now()): Transcript {
 	switch (ev.kind) {
 		case "start":
 			t.started = true;
@@ -78,8 +87,13 @@ export function appliquer(t: Transcript, ev: TranscriptEvent): Transcript {
 			// Never backwards: two runs of an answer (a retry) restart the CLI's count.
 			if (ev.total > t.thinkingTokens) t.thinkingTokens = ev.total;
 			break;
+		case "input":
+			t.started = true;
+			if (ev.tokens > t.inputTokens) t.inputTokens = ev.tokens;
+			break;
 		case "text":
 			t.started = true;
+			if (t.writingSince === undefined && ev.text) t.writingSince = now;
 			t.text = borner(t.text + ev.text);
 			break;
 		case "tool":
@@ -117,6 +131,14 @@ function claudeEvents(line: Rec): TranscriptEvent[] {
 	const event = rec(line.event);
 	if (!event) return [];
 	const eventType = str(event.type);
+	if (eventType === "message_start") {
+		// What the model read: fresh input, plus what the prompt cache served or stored.
+		const usage = rec(rec(event.message)?.usage);
+		if (!usage) return [];
+		const n = (k: string): number => { const v = usage[k]; return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0; };
+		const tokens = n("input_tokens") + n("cache_creation_input_tokens") + n("cache_read_input_tokens");
+		return tokens > 0 ? [{ kind: "input", tokens: Math.round(tokens) }] : [];
+	}
 	if (eventType === "content_block_delta") {
 		const delta = rec(event.delta);
 		const deltaType = delta ? str(delta.type) : null;
@@ -279,4 +301,16 @@ export function quizProgress(text: string, opts: { batch?: boolean } = {}): Quiz
 		} else if (key === "document" && opts.batch) { docs++; questions = 0; }
 	}
 	return { quiz: opts.batch && docs > 0 ? docs : null, question: Math.max(0, questions) };
+}
+
+/**
+ * The time left to write a quiz of `total` questions, in ms, from the pace of
+ * the questions already FINISHED (the one being written, `question`, is not):
+ * `null` until two are done, or without a known total. Never negative.
+ */
+export function tempsRestant(question: number, total: number | null | undefined, writingSince: number | undefined, now: number): number | null {
+	if (writingSince === undefined || !total || question < 3 || question > total) return null;
+	const faites = question - 1;
+	const parQuestion = Math.max(0, now - writingSince) / faites;
+	return Math.round(parQuestion * (total - faites));
 }

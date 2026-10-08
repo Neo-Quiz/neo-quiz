@@ -16,7 +16,8 @@ release notes.
 ### Changed
 
 - A generation no longer stops after 15 minutes: it runs until the model is done, and Stop ends it whenever you want.
-- While Claude reasons, the working line changes its words every few seconds and counts the reasoning tokens, on the PC and on a phone or tablet that sent the request.
+- While Claude works, the working line changes its words every few seconds and shows how much it read and how long it has reasoned, on the PC and on a phone or tablet that sent the request.
+- While a quiz is being written, its progress line estimates the time left.
 
 ### Fixed
 
