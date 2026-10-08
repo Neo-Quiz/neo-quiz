@@ -289,6 +289,7 @@ const pont: Pont = {
 		surFichierRecu: (rappel) => abonner<void>("android.fichierRecu", () => rappel()),
 		partagerPrompt: (texte, fichiers) => appeler<boolean>("android.partagerPrompt", [texte, fichiers.map((f) => ({ name: f.nom, base64: toBase64(f.octets) }))]),
 		lirePressePapier: () => appeler<string | null>("android.lirePressePapier"),
+		format24h: () => appeler<boolean>("android.format24h"),
 	},
 
 	code: {

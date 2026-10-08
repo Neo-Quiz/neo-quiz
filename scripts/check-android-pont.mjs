@@ -116,7 +116,7 @@ function main() {
 	const pont = stripComments(read(PONT));
 
 	// 1. channels
-	const sent = new Set([...shim.matchAll(/appeler(?:<[^()]*>)?\(\s*"([A-Za-z.]+)"/g)].map((m) => m[1]));
+	const sent = new Set([...shim.matchAll(/appeler(?:<[^()]*>)?\(\s*"([A-Za-z0-9.]+)"/g)].map((m) => m[1]));
 	const kotlinSrc = stripComments(read(CHANNELS));
 	const listed = new Set(strings(kotlinSrc.slice(kotlinSrc.indexOf("setOf("))));
 	if (sent.size === 0) fail("no channel found in the shim (parser broken?)");

@@ -20,6 +20,7 @@ release notes.
 
 ### Changed
 
+- On the phone, the clock follows the phone's 12/24-hour setting; the Time format option is gone.
 - On the phone, the Generate page follows the Claude app layout, with the PC's status next to +.
 - On the phone, the question editor is marked "Soon" and explains instead of opening.
 - On a folder page, Learn and Test are separate cards; each shows its progress ring (not a play arrow) and a blue type chip.

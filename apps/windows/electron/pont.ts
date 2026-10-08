@@ -547,6 +547,8 @@ export interface Pont {
 		partagerPrompt(texte: string, fichiers: Array<{ nom: string; octets: Uint8Array }>): Promise<boolean>;
 		/** The clipboard text, read ONLY now, on the user's tap; null when empty. Rejects over 1 000 000 characters. */
 		lirePressePapier(): Promise<string | null>;
+		/** True when the phone's own system clock is set to 24-hour. */
+		format24h(): Promise<boolean>;
 	};
 
 	/**

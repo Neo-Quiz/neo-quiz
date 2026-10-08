@@ -20,6 +20,7 @@ object Channels {
         "android.haptique",
         "android.partagerPrompt",
         "android.lirePressePapier",
+        "android.format24h",
         "surveiller",
         "fichiers.read",
         "fichiers.readCached",

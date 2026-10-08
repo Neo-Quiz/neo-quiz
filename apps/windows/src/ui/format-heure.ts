@@ -20,10 +20,30 @@ export function lireFormatHeure(brut: unknown): HourCycle {
 	return brut === "12h" ? "12h" : "24h";
 }
 
+/** The phone's own 12/24-hour system setting; 24 h when it cannot be read. */
+async function formatHeureTelephone(): Promise<HourCycle> {
+	try {
+		return (await pont().android!.format24h()) ? "24h" : "12h";
+	} catch {
+		return "24h";
+	}
+}
+
+/** Android: the clock follows the phone, the stored `timeFormat` is ignored (not deleted). */
 export async function chargerFormatHeure(): Promise<HourCycle> {
+	if (pont().android) return formatHeureTelephone();
 	return lireFormatHeure(await pont().reglages.lire(CLE_REGLAGES_HEURE));
 }
 
 export async function reglerFormatHeure(format: HourCycle): Promise<void> {
 	await pont().reglages.ecrire(CLE_REGLAGES_HEURE, format);
+}
+
+/** Android: when the app returns to the foreground with a different system clock, calls `onChange`. */
+export function suivreFormatHeureTelephone(current: () => HourCycle, onChange: () => void): void {
+	if (!pont().android) return;
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState !== "visible") return;
+		void formatHeureTelephone().then(f => { if (f !== current()) onChange(); });
+	});
 }

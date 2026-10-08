@@ -47,6 +47,7 @@ class BridgeTest {
             }, { null }).handlers() +
             BackChannel { }.handlers() +
             NavBarChannel({ _ -> }, { }).handlers() +
+            HourFormatChannel { true }.handlers() +
             com.ahmedmili.neoquiz.notify.CalendarChannel(com.ahmedmili.neoquiz.notify.DueCalendar(object : com.ahmedmili.neoquiz.notify.DueCalendar.Storage {
                 override fun read(): String? = null
                 override fun write(raw: String) {}

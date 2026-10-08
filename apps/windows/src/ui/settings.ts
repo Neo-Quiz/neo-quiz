@@ -367,9 +367,8 @@ export function renderSettings(
 		setHourCycle(format);
 		void reglerFormatHeure(format).then(() => deps.onTimeFormatChanged());
 	};
-	if (mobile) {
-		ligneChoix(general, "clock", t("app.settings.timeFormat"), formats, currentHourCycle(), changerFormat);
-	} else {
+	// PHONE: no option, the clock follows the phone's own 12/24-hour setting (`format-heure.ts`).
+	if (!mobile) {
 		createSelect(row(general, t("app.settings.timeFormat")), { value: currentHourCycle(), options: formats, onChange: changerFormat });
 	}
 
