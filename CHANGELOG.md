@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.51] - 2026-10-08
+
 ### Added
 
 - Tap a picture of a quiz to open it full size, then pinch, scroll or double-tap to zoom in and out.
