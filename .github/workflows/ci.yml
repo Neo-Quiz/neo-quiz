@@ -347,6 +347,11 @@ jobs:
       - name: Remote request
         run: npm run check:remote-request
 
+      # The remote flow: the phone's sender core builds only requests the PC's
+      # validator accepts, picks a live PC, and knows which request files settled.
+      - name: Remote runner
+        run: npm run check:remote-runner
+
       # A generation survives a reload of its page: its CLI is detached, not
       # killed, and attached again by the same window only; unclaimed, it is
       # stopped after the delay; a closed window stops its runs at once.

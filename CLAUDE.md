@@ -529,6 +529,15 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   périphérique Windows, caractères bidi/invisibles/pleine chasse, NFD), puis
   l'admission (une à la fois, 6 par heure, jamais deux fois la même) et l'état
   « en attente ». Dans la CI.
+- `npm run check:remote-runner` — le flux distant, côté téléphone pour
+  l'instant (`src/dashboard/remote-send.ts`) : une demande construite passe le
+  validateur du PC (même schéma, aucune dérive), texte/documents/chemin/chat
+  hors règle refusés avant écriture, la cible est l'origine du chat si elle est
+  vivante sinon le PC le plus frais (aucune : le relais), et seules les
+  demandes déjà inscrites dans un fichier de chat sont supprimables. Les
+  fichiers eux-mêmes (`requests/<appareil>/`) sont tenus par
+  `check:chat-files` (jamais son propre dossier en entrée, copies de conflit
+  ignorées, taille bornée avant `JSON.parse`). Dans la CI.
 - `npm run check:generations` â ce qu'un PC publie sur ce qu'il gÃ©nÃ¨re en ce moment
   (`src/shared-state/generations.ts`, fichier `.neo-quiz/generations/<appareil>.json`) :
   un fichier datÃ© de plus de deux minutes, ou de plus de deux minutes dans le futur

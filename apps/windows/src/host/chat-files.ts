@@ -1,10 +1,12 @@
 import { LOG_PREFIX } from "../../../../src/branding";
-import { REVIEW_DIR } from "../../../../src/review/paths";
-import { CHATS_DIR, GENERATIONS_DIR, chatsFromFile, chatsToFile } from "../../../../src/shared-state/chat-merge";
+import { REVIEW_DIR, isConflictCopy } from "../../../../src/review/paths";
+import { CHATS_DIR, GENERATIONS_DIR, REQUESTS_DIR, chatsFromFile, chatsToFile } from "../../../../src/shared-state/chat-merge";
 import { boundChats, readChats } from "../../../../src/dashboard/chat-record";
 import type { ChatRecord } from "../../../../src/dashboard/chat-record";
 import { readGenerations as parseGenerations } from "../../../../src/shared-state/generations";
 import type { GenerationsFile } from "../../../../src/shared-state/generations";
+import { DEVICE, MAX_REQUEST_CHARS, SLUG, validateRemote } from "../../../../src/shared-state/remote-request";
+import type { RemoteRequest } from "../../../../src/shared-state/remote-request";
 import type { SharedFs } from "./shared-state";
 
 /* ══════════════════════════════════════════════════════════
@@ -17,7 +19,10 @@ import type { SharedFs } from "./shared-state";
 /** A chat file past this is not read (a chat file is a few hundred KB at most). */
 export const MAX_FILE_CHARS = 2_000_000;
 
-export interface ChatFilesDeps { fs: SharedFs; rootId: string; deviceId: string; now?: () => number }
+/** A request file read from another device, not yet validated (the validator is the PC runner's). */
+export interface IncomingFile { fileDevice: string; fileId: string; raw: unknown }
+
+export interface ChatFilesDeps { fs: SharedFs & { listDir(dir: string): Promise<Array<{ name: string; isFolder: boolean }>> }; rootId: string; deviceId: string; now?: () => number }
 
 export interface ChatFiles {
 	/** This device's id. */
@@ -38,6 +43,14 @@ export interface ChatFiles {
 	readGenerations(): Promise<Array<{ device: string; file: GenerationsFile }>>;
 	/** Removes our generations file (app closing cleanly). */
 	clearGenerations(): Promise<void>;
+	/** Writes `requests/<our device>/<id>.json` (temp file, remove, rename). */
+	writeRequest(req: RemoteRequest): Promise<void>;
+	/** Our own valid requests, newest first. */
+	listOwnRequests(): Promise<RemoteRequest[]>;
+	/** Deletes one of OUR requests (only the writer deletes). */
+	deleteOwnRequest(id: string): Promise<void>;
+	/** Every `*.json` under `requests/<other device>/` as parsed JSON, size-bounded; conflict copies and torn files skipped. */
+	readIncoming(): Promise<IncomingFile[]>;
 }
 
 /** A generations file is a few KB; past this it is not read. */
@@ -166,5 +179,65 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 
 	const clearGenerations = (): Promise<void> => enqueue(async () => { if (await fs.exists(genOwn)) await fs.remove(genOwn); });
 
-	return { device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations };
+	const reqDir = `${rootId}/${REVIEW_DIR}/${REQUESTS_DIR}`;
+	const ownReqDir = `${reqDir}/${deviceId}`;
+
+	async function readIncoming(): Promise<IncomingFile[]> {
+		let senders: Array<{ name: string; isFolder: boolean }>;
+		try { senders = await fs.listDir(reqDir); } catch { return []; }
+		const out: IncomingFile[] = [];
+		for (const s of senders) {
+			if (!s.isFolder || !DEVICE.test(s.name) || s.name.toLowerCase() === deviceId.toLowerCase()) continue;
+			let names: string[];
+			try { names = (await fs.list(`${reqDir}/${s.name}`)).map(baseName); } catch { continue; }
+			for (const n of names) {
+				// A Syncthing conflict copy duplicates a request, it is never a second one.
+				if (!n.endsWith(".json") || isConflictCopy(n) || !SLUG.test(n.slice(0, -5))) continue;
+				try {
+					const raw = await fs.read(`${reqDir}/${s.name}/${n}`);
+					if (raw.length > MAX_REQUEST_CHARS) continue;
+					out.push({ fileDevice: s.name, fileId: n.slice(0, -5), raw: JSON.parse(raw) });
+				} catch { console.warn(`${LOG_PREFIX} request file unreadable, ignored:`, s.name, n); }
+			}
+		}
+		return out;
+	}
+
+	const writeRequest = (req: RemoteRequest): Promise<void> => enqueue(async () => {
+		if (!SLUG.test(req.id)) throw new Error("request id refused");
+		if (req.from.toLowerCase() !== deviceId.toLowerCase()) throw new Error("request is not ours");
+		const body = JSON.stringify(req);
+		if (body.length > MAX_REQUEST_CHARS) throw new Error("request too large");
+		const target = `${ownReqDir}/${req.id}.json`;
+		await fs.mkdirs(ownReqDir);
+		await fs.write(`${target}.tmp`, body);
+		if (await fs.exists(target)) await fs.remove(target);
+		await fs.rename(`${target}.tmp`, target);
+	});
+
+	const deleteOwnRequest = (id: string): Promise<void> => enqueue(async () => {
+		if (!SLUG.test(id)) throw new Error("request id refused");
+		await fs.remove(`${ownReqDir}/${id}.json`);
+	});
+
+	async function listOwnRequests(): Promise<RemoteRequest[]> {
+		let names: string[];
+		try { names = (await fs.list(ownReqDir)).map(baseName); } catch { return []; }
+		const out: RemoteRequest[] = [];
+		for (const n of names) {
+			if (!n.endsWith(".json") || isConflictCopy(n)) continue;
+			try {
+				const raw = await fs.read(`${ownReqDir}/${n}`);
+				if (raw.length > MAX_REQUEST_CHARS) continue;
+				const parsed: unknown = JSON.parse(raw);
+				const o = (parsed && typeof parsed === "object" ? parsed : {}) as { target?: unknown; at?: unknown };
+				// Only the schema is judged here: age and target are not the sender's concern.
+				const v = validateRemote(parsed, { device: String(o.target), fileDevice: deviceId, fileId: n.slice(0, -5), now: Number(o.at) });
+				if (v.ok) out.push(v.request);
+			} catch { /* a torn own request is simply not listed */ }
+		}
+		return out.sort((a, b) => b.at - a.at);
+	}
+
+	return { writeRequest, listOwnRequests, deleteOwnRequest, readIncoming, device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations };
 }

@@ -162,5 +162,45 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		r.check("no generations folder: nothing, no throw", await empty.readGenerations(), []);
 		await empty.clearGenerations();
 	}
+	// 12. Requests
+	{
+		const ME = "22222222-2222-4222-8222-222222222222", PC = "11111111-1111-4111-8111-111111111111";
+		const RD = "Root/.neo-quiz/requests";
+		const req = (id, over = {}) => ({ v: 1, id, at: 1, from: ME, target: PC, chatId: "chat-1234", text: "t", mode: "learn", documents: [], ...over });
+		const fs = memFs(new Map([
+			[`${RD}/${PC}/foreign-1.json`, JSON.stringify(req("foreign-1", { from: PC, target: ME }))],
+			[`${RD}/${PC}/bad.json`, "{ torn"],
+			[`${RD}/${PC}/big-0001.json`, JSON.stringify("x".repeat(100_001))],
+			[`${RD}/${PC}/a.sync-conflict-20261008-1-AB.json`, JSON.stringify(req("dup"))],
+			[`${RD}/${PC}/note.txt`, "x"],
+			[`${RD}/${PC}/Bad_Name.json`, JSON.stringify(req("Bad_Name"))],
+			[`${RD}/not-a-device/odd-0001.json`, JSON.stringify(req("odd-0001"))],
+			[`${RD}/${ME}/own-0001.json`, JSON.stringify(req("own-0001"))],
+			[`${RD}/${ME}/torn-0001.json`, "{ torn"],
+		]));
+		const cf = make(fs, ME); await cf.load();
+		const incoming = await quiet(() => cf.readIncoming());
+		r.check("only other devices' valid-JSON, bounded, non-conflict, slug-named files come in", incoming.map(i => [i.fileDevice, i.fileId]), [[PC, "foreign-1"]]);
+		r.check("our own directory is not incoming", incoming.some(i => i.fileDevice === ME), false);
+		await cf.writeRequest(req("new-0002"));
+		r.check("a request is written under our own directory through a temp file", [fs.files.has(`${RD}/${ME}/new-0002.json`), fs.writes.includes(`${RD}/${ME}/new-0002.json.tmp`), fs.writes.includes(`${RD}/${ME}/new-0002.json`)], [true, true, false]);
+		r.check("own valid requests are listed, torn ones not", (await quiet(() => cf.listOwnRequests())).map(q => q.id).sort(), ["new-0002", "own-0001"]);
+		await cf.deleteOwnRequest("own-0001");
+		r.check("only our request is deleted", [fs.files.has(`${RD}/${ME}/own-0001.json`), fs.files.has(`${RD}/${PC}/foreign-1.json`)], [false, true]);
+		let refused = false;
+		try { await cf.deleteOwnRequest("../chats/me"); } catch { refused = true; }
+		r.check("an id that is not a slug never reaches a path", refused, true);
+		refused = false;
+		try { await cf.writeRequest(req("big-0003", { text: "y".repeat(100_000) })); } catch { refused = true; }
+		r.check("an oversized request (valid id) is refused before writing", [refused, fs.files.has(`${RD}/${ME}/big-0003.json`)], [true, false]);
+		refused = false;
+		try { await cf.writeRequest(req("../x")); } catch { refused = true; }
+		r.check("a request whose id is not a slug is refused", refused, true);
+		refused = false;
+		try { await cf.writeRequest(req("fake-0004", { from: PC })); } catch { refused = true; }
+		r.check("a request claiming another sender is not written under our directory", refused, true);
+		const none = make(memFs(), ME);
+		r.check("no requests folder: nothing, no throw", [await none.readIncoming(), await none.listOwnRequests()], [[], []]);
+	}
 	r.done();
 });
