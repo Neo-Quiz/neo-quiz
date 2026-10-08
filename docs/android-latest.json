@@ -1,8 +1,8 @@
 {
-  "versionCode": 7,
-  "versionName": "0.2.5",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.5/NeoQuiz-0.2.5.apk",
-  "sha256": "fcb2ba61768050010eec4ef696ff0ca01a4fe69093f37d1d648fdc22e5362a31",
-  "size": 55981889,
-  "notes": "Phone Generate page like the Claude app, PC status and model choice, tablet desktop layout, wallpaper and folder fixes"
+  "versionCode": 8,
+  "versionName": "0.2.6",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.6/NeoQuiz-0.2.6.apk",
+  "sha256": "bd7b441d80f883e13313cfc3b77ec2319a0177059aa66cd84d0b221704e7c67c",
+  "size": 55982305,
+  "notes": "The Edit button no longer shows on the phone, where the editor does not open yet."
 }
