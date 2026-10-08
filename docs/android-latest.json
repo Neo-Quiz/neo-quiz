@@ -1,8 +1,8 @@
 {
-  "versionCode": 6,
-  "versionName": "0.2.4",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.4/NeoQuiz-0.2.4.apk",
-  "sha256": "ae2f792c7780342a11c254962340b1b61a8672633849bb4a1ed0834cf3a6e7bb",
-  "size": 55929349,
-  "notes": "Neo Quiz pour Android 0.2.4 : gestion des dossiers et des quiz fiabilisée (supprimer, déplacer, modifier, importer), dossier reçu avec son nom et sa couleur, Générer suit les chats du PC."
+  "versionCode": 7,
+  "versionName": "0.2.5",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.5/NeoQuiz-0.2.5.apk",
+  "sha256": "fcb2ba61768050010eec4ef696ff0ca01a4fe69093f37d1d648fdc22e5362a31",
+  "size": 55981889,
+  "notes": "Phone Generate page like the Claude app, PC status and model choice, tablet desktop layout, wallpaper and folder fixes"
 }
