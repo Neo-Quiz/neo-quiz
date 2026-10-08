@@ -72,3 +72,90 @@ await withSrcModule(["src/dashboard/relay.ts", "src/dashboard/ai-client.ts", "sr
 	r.check("a code expression is data, never run", ok("```quiz-blocks\n[ { prompt: (()=>1)(), options: ['a'] } ]\n```").ok, false);
 	r.done();
 });
+
+await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests.ts"], async (F, CR) => {
+	const r = makeReporter("Relay flow");
+	const q = `[ { prompt: "Q1", options: ["a","b"], correctIndex: 0, explain: "x" } ]`;
+	const entry = { path: "Root/Generated/Lists - Practice.md", title: "Lists - Practice", basename: "Lists - Practice", mtime: 1 };
+	function rig(over = {}) {
+		const saved = [], shared = []; let chats = [];
+		const deps = {
+			device: "phone-0001", rootId: "Root", now: () => 5000,
+			share: async (text, files) => { shared.push([text, files.map(f => f.nom)]); return true; },
+			readClipboard: async () => "```quiz-blocks\n" + q + "\n```",
+			readDocument: async (rel) => rel.endsWith("gone.md") ? null : ({ name: rel.split("/").pop(), content: "DOC " + rel, bytes: new TextEncoder().encode("DOC " + rel) }),
+			save: async (e) => { saved.push(e); return entry; },
+			scanner: {}, reglages: () => ({ aiOutputFolder: "Generated" }),
+			chats: { get: () => chats, set: (l) => { chats = l; } }, ...over,
+		};
+		return { deps, saved, shared, chats: () => chats };
+	}
+	const req = { chatId: "chat-1234", text: "Make a test on lists", documents: [{ path: "Python/cm1.md" }], destination: "" };
+
+	{ const g = rig();
+		const s = await F.startRelay(g.deps, req);
+		r.check("the prompt and the documents are shared; a Test is chosen from the words", [g.shared.length, g.shared[0][1], s.mode], [1, ["cm1.md"], "practice"]);
+		const out = await F.pasteAnswer(g.deps, s);
+		r.check("a valid paste saves one quiz and answers with its title and path", [out.ok, out.title, out.path], [true, "Lists - Practice", "Root/Generated/Lists - Practice.md"]);
+		r.check("it is saved like a generated quiz: the request text and document names, the chosen mode", [g.saved.length, g.saved[0].modeDemande, g.saved[0].demande.notes.map(n => n.name)], [1, "practice", ["cm1.md"]]);
+		const rec = g.chats().find(c => c.id === "chat-1234").requests[0];
+		r.check("the request is recorded in OUR chat, from this device, with the quiz card", [g.chats()[0].origin, rec.from, rec.state, rec.results, rec.documents], ["phone-0001", "phone-0001", "done", [{ kind: "quiz", title: "Lists - Practice", path: "Root/Generated/Lists - Practice.md" }], [{ name: "cm1.md", path: "Root/Python/cm1.md" }]]);
+		r.check("the request id is the session's", rec.id, s.requestId);
+		const again = await F.pasteAnswer(g.deps, s);
+		r.check("a second paste on a consumed session saves nothing more and says so", [again.ok, again.reason, g.saved.length, g.chats()[0].requests.length], [false, "already-saved", 1, 1]);
+	}
+	{ const g = rig({ readClipboard: async () => "I cannot do that." });
+		const out = await F.pasteAnswer(g.deps, await F.startRelay(g.deps, req));
+		r.check("a paste with no quiz saves nothing and says why", [out.ok, out.reason, g.saved.length, g.chats().length], [false, "none", 0, 0]);
+	}
+	{ const g = rig({ readClipboard: async () => null });
+		const out = await F.pasteAnswer(g.deps, await F.startRelay(g.deps, req));
+		r.check("an empty clipboard saves nothing", [out.reason, g.saved.length], ["clipboard-empty", 0]);
+	}
+	{ const g = rig({ readClipboard: async () => "```json5\n// neo-quiz someoneelse9\n" + q + "\n```" });
+		const out = await F.pasteAnswer(g.deps, await F.startRelay(g.deps, req));
+		r.check("an answer for another request is not saved", [out.reason, g.saved.length], ["other-request", 0]);
+	}
+	{ const g = rig({ save: async () => null });
+		const s = await F.startRelay(g.deps, req);
+		const out = await F.pasteAnswer(g.deps, s);
+		r.check("a save that fails is reported, nothing recorded", [out.reason, g.chats().length], ["save-failed", 0]);
+		g.deps.save = async () => entry;
+		r.check("a failed save does not consume the session: a retry works", (await F.pasteAnswer(g.deps, s)).ok, true);
+	}
+	{ const g = rig();
+		const s = await F.startRelay(g.deps, { ...req, documents: [{ path: "Python/gone.md" }] });
+		r.check("an unreadable document stops the relay before anything is shared", [s, g.shared.length], [null, 0]);
+		const h = rig({ share: async () => false });
+		r.check("a share sheet that did not open gives no session", await F.startRelay(h.deps, req), null);
+	}
+	{ const g = rig({ readClipboard: async () => "```quiz-blocks\n[ { prompt: \"Q\", options: [\"a\",\"b\"], correctIndex: 0, explain: \"x\", explainHtml: \"<img src=x onerror=alert(1)>\" } ]\n```" });
+		await F.pasteAnswer(g.deps, await F.startRelay(g.deps, req));
+		r.check("the questions reach the saver as parsed data (sanitised at render)", g.saved.length, 1);
+	}
+	{ // A PC chat: the phone's copy keeps the PC's origin; ownToWrite keeps only requests no other file holds.
+		const g = rig();
+		const pc = { id: "chat-1234", origin: "pc-0001", createdAt: 1, updatedAt: 1, requests: [{ id: "old", at: 1, from: "pc-0001", text: "x", mode: "learn", documents: [], results: [], state: "done" }] };
+		g.deps.chats.set([pc]);
+		const out = await F.pasteAnswer(g.deps, await F.startRelay(g.deps, req));
+		const c = g.chats()[0];
+		r.check("relay into a PC chat keeps the PC origin and appends the request", [out.ok, c.origin, c.requests.map(x => x.id).length, c.requests.at(-1).from], [true, "pc-0001", 2, "phone-0001"]);
+	}
+	{ // The bytes of a document, bounded, through the bridge.
+		const fs = (size, bytes) => ({ size: async () => size, readBinary: async () => bytes });
+		const ok = await F.readRelayDocument(fs(3, new TextEncoder().encode("abc")), "Root", "Python/cm1.md");
+		r.check("a document is read as text and bytes", [ok?.name, ok?.content, ok?.bytes.length], ["cm1.md", "abc", 3]);
+		r.check("an oversized document is refused before reading", await F.readRelayDocument(fs(9_000_000, new Uint8Array(1)), "Root", "Python/cm1.md"), null);
+		r.check("a binary document is refused", await F.readRelayDocument(fs(2, new Uint8Array([0xff, 0xfe])), "Root", "Python/cm1.md"), null);
+		r.check("a path escaping the root is refused", await F.readRelayDocument(fs(3, new Uint8Array(3)), "Root", "../x.md"), null);
+	}
+	{ // appendRequest: the one helper under the relay and addFailedRequest.
+		const rq = { id: "r1", at: 10, from: "p", text: "t", mode: "learn", documents: [], results: [], state: "done" };
+		const made = CR.appendRequest([], "c1", rq, "p", 50);
+		r.check("appendRequest creates an unknown chat with the device as origin", [made[0].origin, made[0].updatedAt, made[0].requests.length], ["p", 50, 1]);
+		const twice = CR.appendRequest(made, "c1", rq, "p", 99);
+		r.check("appendRequest is idempotent on the request id", [twice[0].updatedAt, twice[0].requests.length], [50, 1]);
+		r.check("appendRequest leaves a deleted chat deleted", CR.appendRequest([{ ...made[0], deleted: true }], "c1", { ...rq, id: "r2" }, "p", 60)[0].requests.length, 1);
+	}
+	r.done();
+});

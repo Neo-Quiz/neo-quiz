@@ -194,8 +194,6 @@ export function resumeSource(req: ChatRequest): { text: string; genre: "learn" |
     thread says why. Creates the chat (origin = this PC) when unknown;
     idempotent on the request id; a deleted chat stays deleted. */
 export function addFailedRequest(chats: readonly ChatRecord[], req: RemoteRequest, device: string, rootId: string, now: number, error: string): ChatRecord[] {
-	const idx = chats.findIndex(c => c.id === req.chatId);
-	if (idx >= 0 && (chats[idx].deleted || chats[idx].requests.some(q => q.id === req.id))) return [...chats];
 	const request: ChatRequest = {
 		id: req.id, at: req.at, from: req.from, text: req.text, mode: req.mode,
 		documents: req.documents.map(d => {
@@ -205,8 +203,18 @@ export function addFailedRequest(chats: readonly ChatRecord[], req: RemoteReques
 		}),
 		results: [], state: "failed", error,
 	};
+	return appendRequest(chats, req.chatId, request, device, now);
+}
+
+/** A request added to a chat, in time order: the one helper under the relay
+    and the failed remote requests. Creates the chat (origin = `device`) when
+    unknown; never changes the origin of a known one; idempotent on the request
+    id (`updatedAt` untouched); a deleted chat stays deleted. */
+export function appendRequest(chats: readonly ChatRecord[], chatId: string, request: ChatRequest, device: string, now: number): ChatRecord[] {
+	const idx = chats.findIndex(c => c.id === chatId);
+	if (idx >= 0 && (chats[idx].deleted || chats[idx].requests.some(q => q.id === request.id))) return [...chats];
 	const list = [...chats];
 	if (idx >= 0) list[idx] = { ...chats[idx], updatedAt: now, requests: [...chats[idx].requests, request].sort((a, b) => a.at - b.at) };
-	else list.push({ id: req.chatId, origin: device, createdAt: now, updatedAt: now, title: deriveTitle(request) || undefined, requests: [request] });
+	else list.push({ id: chatId, origin: device, createdAt: now, updatedAt: now, title: deriveTitle(request) || undefined, requests: [request] });
 	return list;
 }
