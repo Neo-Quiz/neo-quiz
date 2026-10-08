@@ -97,6 +97,18 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		const saved = JSON.parse(fs.files.get(`${D}/me.json`)).chats;
 		r.check("200 newest live chats kept, the tombstone is never dropped", [saved.filter(c => !c.deleted).length, saved.some(c => c.id === "dead")], [200, true]);
 	}
+	// 6b. Size cap: the file we write is always one we can read back
+	{
+		const fs = memFs(); const cf = make(fs); await cf.load();
+		const big = Array.from({ length: 200 }, (_, i) => chat("c" + i, i + 1, "me", [rq("r" + i, { results: [{ kind: "text", text: "x".repeat(20000) }] })]));
+		await cf.saveOwn([...big, { ...chat("dead", 1, "me", []), deleted: true }]);
+		const raw = fs.files.get(`${D}/me.json`);
+		const ids = JSON.parse(raw).chats.map(c => c.id);
+		r.check("an oversized list is cut under 1.8M characters", raw.length <= 1_800_000, true);
+		r.check("the newest chat and the tombstone are kept, the oldest dropped", [ids.includes("c199"), ids.includes("dead"), ids.includes("c0")], [true, true, false]);
+		const cf2 = make(fs); await cf2.load();
+		r.check("the cut file is read back (not locked, not wiped)", cf2.own().length > 0, true);
+	}
 	// 7. Our own unreadable file is never replaced by a partial list
 	{
 		const fs = memFs(new Map([[`${D}/me.json`, "{ torn"]]));

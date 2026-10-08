@@ -18,6 +18,8 @@ import type { SharedFs } from "./shared-state";
 
 /** A chat file past this is not read (a chat file is a few hundred KB at most). */
 export const MAX_FILE_CHARS = 2_000_000;
+/** A save stays under this (margin below the read cap): the oldest live chats leave until it fits, so our own file never becomes unreadable to us. */
+export const MAX_WRITE_CHARS = 1_800_000;
 
 /** A request file read from another device, not yet validated (the validator is the PC runner's). */
 export interface IncomingFile { fileDevice: string; fileId: string; raw: unknown }
@@ -148,9 +150,18 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 	function saveOwn(chats: ReadonlyArray<ChatRecord>): Promise<void> {
 		return enqueue(async () => {
 			if (locked) throw new Error(`own chats file unreadable: ${ownPath}`);
-			const kept = boundChats(chats);
+			let kept = boundChats(chats);
+			let json = JSON.stringify({ v: 1, chats: chatsToFile(kept, rootId) });
+			// Over the cap: drop the OLDEST live chat (the newest, the one on screen, stays; tombstones are never dropped).
+			while (json.length > MAX_WRITE_CHARS) {
+				const live = kept.filter(c => !c.deleted);
+				if (live.length <= 1) break;
+				const oldest = live.reduce((a, b) => (b.updatedAt < a.updatedAt ? b : a));
+				kept = kept.filter(c => c !== oldest);
+				json = JSON.stringify({ v: 1, chats: chatsToFile(kept, rootId) });
+			}
 			await fs.mkdirs(dir);
-			await fs.write(`${ownPath}.tmp`, JSON.stringify({ v: 1, chats: chatsToFile(kept, rootId) }));
+			await fs.write(`${ownPath}.tmp`, json);
 			if (await fs.exists(ownPath)) await fs.remove(ownPath);
 			await fs.rename(`${ownPath}.tmp`, ownPath);
 			own = [...kept];
