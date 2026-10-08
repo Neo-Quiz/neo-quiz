@@ -66,6 +66,7 @@ import { cleModule, libelleModule } from "../review/catalogue";
 import { viserPromptExam } from "./settings";
 import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
+import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
 import { monterBoutonRail, monterBanniereMajAndroid } from "./mise-a-jour";
 import { noterVue } from "./reprise";
@@ -524,6 +525,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			if (!absolu) return false;
 			try { return await pont().systeme.ouvrir(absolu); } catch { return false; }
 		},
+		/* The folder in the system's file manager: PC only. On a phone `openPath`
+		   hands a FILE to another app (a FileProvider link and a type), and a
+		   folder has neither: the menu entry always failed (2026-10-08). */
+		openFolder: estMobile() ? undefined : (path) => ctx.openPath!(path),
 		/* Une note de VAULT s'ouvre dans Obsidian, par l'URI `obsidian://open`
 		   (le principal la remet à `shell.openExternal`, comme un lien web).
 		   Le nom du vault est le nom de son dossier — c'est ainsi qu'Obsidian

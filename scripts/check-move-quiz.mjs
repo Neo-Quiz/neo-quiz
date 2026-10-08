@@ -312,5 +312,25 @@ await withSrcModule(
 			[false, false, false, true]);
 	}
 
+	/* ── 10. "Open folder" is offered only where the host can show a folder
+	   (2026-10-08). On a phone `openPath` opens FILES (a FileProvider link and a
+	   type), a folder has neither, and the entry always failed with "Could not
+	   open". ── */
+	{
+		const roots = [{ id: "NeoQuiz", name: "Neo Quiz" }];
+		const paths = { roots: () => roots, rootOf: () => roots[0], defaultRoot: () => roots[0], localPath: (p) => p.split("/").slice(1).join("/"), contractPath: (id, l) => id + "/" + l };
+		hote.installHost({ paths, ui: { notice() {} }, fs: {} });
+		try {
+			const g = { folder: "Alpha", name: "Alpha", path: "NeoQuiz/Alpha", quizzes: [] };
+			const labels = (extra) => qm.buildModuleCardMenu({ settings: {}, scanner: { getQuizzes: () => [] }, openPath: async () => true, ...extra }, () => {}, {})(g).map(i => i.label);
+			r.check("10. a host with openPath but no openFolder (a phone) shows no 'Open folder' entry",
+				labels({}).includes("Open folder"), false);
+			r.check("10. a host with openFolder (the PC) shows it",
+				labels({ openFolder: async () => true }).includes("Open folder"), true);
+		} finally {
+			hote.uninstallHost();
+		}
+	}
+
 	r.done();
 });

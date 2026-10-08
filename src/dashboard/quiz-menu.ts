@@ -746,11 +746,11 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		   son chemin. Tout tient à `g.path` — un groupe DÉCLARÉ sans quiz ni
 		   dossier n'en a pas, et deux entrées qui ne mèneraient nulle part
 		   valent moins que leur absence (même règle que Partager). */
-		if (g.path && ctx.openPath) items.push({
+		if (g.path && ctx.openFolder) items.push({
 			icon: "folder-open",
 			label: t("dashboard.quizzes.menuOpenFolder"),
 			onClick: () => {
-				void ctx.openPath?.(g.path as string).then(ok => {
+				void ctx.openFolder?.(g.path as string).then(ok => {
 					if (!ok) host.ui.notice(t("dashboard.folder.openFailed", { name: g.name }));
 				});
 			},

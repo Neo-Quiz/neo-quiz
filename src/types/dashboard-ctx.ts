@@ -362,6 +362,11 @@ export interface DashboardShellCtx {
 	    dit. Absent = les documents ne s'ouvrent pas d'un clic (le greffon :
 	    Obsidian les ouvre lui-même depuis l'explorateur). */
 	openPath?: (path: string) => Promise<boolean>;
+	/** Shows a FOLDER (contract path) in the system's file manager. Absent where no
+	    file manager can be asked to show one: on a phone `openPath` opens FILES only,
+	    and a "Open folder" entry that always fails with "Could not open" is worse
+	    than no entry (2026-10-08). `false` = not opened, and the caller says so. */
+	openFolder?: (path: string) => Promise<boolean>;
 	/** Le chemin ABSOLU d'un fichier du dossier (chemin du contrat), tel que
 	    le système l'écrit — c'est ce qu'on colle dans un explorateur ou un
 	    terminal, là où le chemin du contrat ne désigne rien hors de

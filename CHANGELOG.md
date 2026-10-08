@@ -26,6 +26,7 @@ release notes.
 - Deleting a quiz, moving it, taking a folder out of the app, opening a folder and saving a folder's name or colour now say so when they fail, instead of doing nothing.
 - On Android, a shared folder opened with Neo Quiz from another app keeps its name, colour, icon and unit, like one imported from the Import button.
 - Importing a single quiz now says "1 quiz ajouté" in French, not "1 quiz ajoutés".
+- On Android, a folder's menu no longer offers "Open folder", which could never work on a phone.
 
 ## [1.20.44] - 2026-10-08
 
