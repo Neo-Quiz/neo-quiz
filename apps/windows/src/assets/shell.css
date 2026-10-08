@@ -201,6 +201,13 @@ body::before {
 	filter: brightness(var(--nq-fond-luminosite, 0.85)) blur(var(--nq-fond-flou, 0px));
 }
 
+/* PHONE: the panel there has no live backdrop blur (too costly on a phone's
+   GPU, `mobile.css`), so the PC panel's 24 px blur is applied once to the
+   static wallpaper layer instead, on top of the user's own blur setting. */
+body.is-mobile::before {
+	filter: brightness(var(--nq-fond-luminosite, 0.85)) blur(calc(var(--nq-fond-flou, 0px) + 24px));
+}
+
 body::after {
 	background:
 		linear-gradient(
