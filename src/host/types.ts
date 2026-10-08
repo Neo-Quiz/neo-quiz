@@ -109,6 +109,9 @@ export interface HostFs {
 	    de servir un cache. Obsidian a `cachedRead` ; un hôte sans cache peut
 	    renvoyer `read`. */
 	readCached(path: string): Promise<string>;
+	/** Like `read`, but rejects when the file is over `maxBytes`, checked WHILE reading
+	    (a synced file may grow between a `size` check and the read). */
+	readBounded(path: string, maxBytes: number): Promise<string>;
 	/** CRÉE OU REMPLACE : le contenu est écrit, que la cible existe ou non.
 	    Ne rejette JAMAIS parce qu'elle existe déjà — un hôte dont l'API de
 	    création refuse une cible présente (`vault.create` sous Obsidian) doit

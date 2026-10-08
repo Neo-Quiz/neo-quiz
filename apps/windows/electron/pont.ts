@@ -313,7 +313,8 @@ export interface Pont {
 	demarrer(racines: string[]): Promise<void>;
 
 	fichiers: {
-		read(abs: string): Promise<string>;
+		/** `max`: bytes; the main process rejects a file over it WHILE reading. */
+		read(abs: string, max?: number): Promise<string>;
 		/** Pas de cache : le processus principal n'en a pas — voir
 		    `fichiers.ts`. Présente pour que l'hôte du rendu ait la méthode que
 		    le contrat nomme, sans inventer d'alias. */

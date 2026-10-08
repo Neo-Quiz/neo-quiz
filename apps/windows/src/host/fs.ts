@@ -553,6 +553,9 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		},
 		/* PAS de cache : le principal n'en a pas non plus (`fichiers.ts`), et
 		   le contrat prévoit explicitement ce cas. */
+		async readBounded(path, maxBytes) {
+			return await pont().fichiers.read(abs(path), maxBytes);
+		},
 		async readCached(path) {
 			return await pont().fichiers.readCached(abs(path));
 		},

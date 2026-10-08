@@ -37,7 +37,8 @@ import * as path from "node:path";
     `statEntree` — internes, voir plus haut et plus bas. */
 export interface PrimitivesFichiers {
 	/** Lit un fichier texte. Rejette si absent ou illisible. */
-	read(chemin: string): Promise<string>;
+	/** `maxOctets`: the read itself is bounded (rejects when the file is over it, even if it grew after a size check). */
+	read(chemin: string, maxOctets?: number): Promise<string>;
 	/** Lit des OCTETS. Rejette si absent ou illisible. Sert
 	    `HostFs.externe.readBinary` (les images jointes hors vault). */
 	readBinary(chemin: string): Promise<Uint8Array>;
@@ -256,8 +257,16 @@ export async function statEntree(chemin: string): Promise<{ isFile: boolean; mti
 /** Construit les primitives de fichiers du processus principal. */
 export function creerFichiers(): PrimitivesFichiers {
 	const primitives: PrimitivesFichiers = {
-		async read(chemin) {
-			return await fs.readFile(chemin, "utf-8");
+		async read(chemin, maxOctets) {
+			if (maxOctets === undefined) return await fs.readFile(chemin, "utf-8");
+			const h = await fs.open(chemin, "r");
+			try {
+				// One byte more than the cap: reading it proves the file is over, whatever its size said.
+				const buf = Buffer.alloc(maxOctets + 1);
+				const { bytesRead } = await h.read(buf, 0, maxOctets + 1, 0);
+				if (bytesRead > maxOctets) throw new Error("file too large");
+				return buf.subarray(0, bytesRead).toString("utf-8");
+			} finally { await h.close(); }
 		},
 		/* `new Uint8Array(buffer)` et non le `Buffer` de Node : un `Buffer` peut
 		   être une VUE sur un tampon partagé plus grand (le pool de Node pour

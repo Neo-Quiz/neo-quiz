@@ -114,7 +114,7 @@ const pont: Pont = {
 	demarrer: (racines) => appeler("demarrer", [racines]),
 
 	fichiers: {
-		read: (abs) => appeler("fichiers.read", [abs]),
+		read: (abs, max) => appeler("fichiers.read", max === undefined ? [abs] : [abs, max]),
 		readCached: (abs) => appeler("fichiers.readCached", [abs]),
 		readBinary: async (abs) => fromBase64(await appeler<string>("fichiers.readBinary", [abs])),
 		write: (abs, contenu) => appeler("fichiers.write", [abs, contenu]),

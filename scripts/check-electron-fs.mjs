@@ -524,6 +524,14 @@ await withSrcModule("apps/windows/electron/fichiers.ts", async ({ creerFichiers,
 			r.check("readBinary rend les octets en Uint8Array, jamais un Buffer",
 				[lu.constructor.name, [...lu]], ["Uint8Array", [0, 255, 7]]);
 		});
+		await cas(r, "read with a max rejects a file over it, whatever a size check said", async () => {
+			const p = join(dir, "m-borne.txt");
+			await fichiers.write(p, "0123456789");
+			const lu = await fichiers.read(p, 10);
+			let rejete = false;
+			try { await fichiers.read(p, 9); } catch { rejete = true; }
+			r.check("read with a max rejects a file over it, whatever a size check said", [lu, rejete, await fichiers.read(p)], ["0123456789", true, "0123456789"]);
+		});
 	} finally {
 		// `finally` : le dossier temporaire doit disparaître même si un cas a
 		// jeté une erreur inattendue, pas seulement un échec d'assertion.

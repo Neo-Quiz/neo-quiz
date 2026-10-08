@@ -12,6 +12,7 @@ function memFs(files = new Map()) {
 	const writes = [], reads = [];
 	return {
 		files, writes, reads,
+		readBounded: async (p, max) => { reads.push(p); if (!files.has(p)) throw new Error("ENOENT " + p); const d = files.get(p); if (Buffer.byteLength(d) > max) throw new Error("file too large"); return d; },
 		size: async (p) => files.has(p) ? Buffer.byteLength(files.get(p)) : null,
 		exists: async (p) => files.has(p),
 		read: async (p) => { reads.push(p); if (!files.has(p)) throw new Error("ENOENT " + p); return files.get(p); },
@@ -218,6 +219,10 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		const fin = await quiet(() => make(floodFs, ME).readIncoming());
 		r.check("1000 request files and 20 sender folders: at most 8 senders x 20 files are read", [floodFs.reads.length <= 8 * 20, fin.length <= 160], [true, true]);
 		r.check("the first names are the ones examined, no more than 20 per sender", [fin.filter(i => i.fileDevice === PC).length, fin.find(i => i.fileDevice === PC)?.fileId], [20, "f00000"]);
+		// A file that grows after its size check: the bounded read itself refuses it
+		const liar = memFs(new Map([[`${RD}/${PC}/grow-0001.json`, "x".repeat(4 * 100_000 + 1)]]));
+		liar.size = async () => 10; let unbounded = false; const rawRead = liar.read; liar.read = async (p) => { unbounded = true; return rawRead(p); };
+		r.check("a file that outgrew its size check is refused by the bounded read, never read unbounded", [await quiet(() => make(liar, ME).readIncoming()), unbounded], [[], false]);
 		const none = make(memFs(), ME);
 		r.check("no requests folder: nothing, no throw", [await none.readIncoming(), await none.listOwnRequests()], [[], []]);
 	}

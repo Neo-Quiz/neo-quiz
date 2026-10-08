@@ -50,7 +50,7 @@ const pont: Pont = {
 	},
 
 	fichiers: {
-		read: abs => ipcRenderer.invoke(CANAUX.read, abs),
+		read: (abs, max) => ipcRenderer.invoke(CANAUX.read, abs, max),
 		readCached: abs => ipcRenderer.invoke(CANAUX.readCached, abs),
 		write: (abs, contenu) => ipcRenderer.invoke(CANAUX.write, abs, contenu),
 		lirePourEcriture: abs => ipcRenderer.invoke(CANAUX.lirePourEcriture, abs),

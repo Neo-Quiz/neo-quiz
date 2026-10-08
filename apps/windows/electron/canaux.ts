@@ -381,7 +381,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	/* CHAQUE canal `fichiers.*` passe par `borner` — la seule porte vers une
 	   primitive. Un chemin hors périmètre REJETTE avec sa cause ; la primitive
 	   ne voit jamais la chaîne brute du rendu. */
-	ipcMain.handle(CANAUX.read, async (_e, abs: unknown) => fichiers.read(await perimetre.borner(abs)));
+	ipcMain.handle(CANAUX.read, async (_e, abs: unknown, max: unknown) => {
+		const borne = typeof max === "number" && Number.isInteger(max) && max >= 0 && max <= 64_000_000 ? max : undefined;
+		return fichiers.read(await perimetre.borner(abs), borne);
+	});
 	ipcMain.handle(CANAUX.readCached, async (_e, abs: unknown) => fichiers.readCached(await perimetre.borner(abs)));
 
 	/* Every write of the app is announced to the sync, which scans it at once

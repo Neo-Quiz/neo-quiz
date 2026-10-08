@@ -45,6 +45,16 @@ class FilesChannel(
 
     suspend fun read(abs: String): String = perimeter.check(abs).readText(Charsets.UTF_8)
 
+    /** Rejects a file over [max] bytes while reading (it may have grown after a size check). */
+    suspend fun readBounded(abs: String, max: Long): String {
+        val f = perimeter.check(abs)
+        f.inputStream().use { input ->
+            val bytes = input.readNBytes((max + 1).coerceAtMost(Int.MAX_VALUE.toLong() - 8).toInt())
+            if (bytes.size > max) throw java.io.IOException("file too large")
+            return String(bytes, Charsets.UTF_8)
+        }
+    }
+
     suspend fun readBinary(abs: String): String =
         Base64.getEncoder().encodeToString(perimeter.check(abs).readBytes())
 
@@ -155,7 +165,7 @@ class FilesChannel(
     }
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
-        "fichiers.read" to { a -> read(a.path(0)) },
+        "fichiers.read" to { a -> val max = a.optLong(1, -1L); if (max >= 0) readBounded(a.path(0), max) else read(a.path(0)) },
         "fichiers.readCached" to { a -> read(a.path(0)) },
         "fichiers.readBinary" to { a -> readBinary(a.path(0)) },
         "fichiers.write" to { a -> write(a.path(0), a.text(1)).also { onWrite(a.path(0)) } },

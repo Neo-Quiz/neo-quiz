@@ -620,7 +620,7 @@ async function demarrer(): Promise<void> {
 						// Size first: the document is a synced file another device may have made huge.
 						const size = await currentHost().fs.size(path);
 						if (size === null || size > 4_000_000) return null;
-						const content = await currentHost().fs.read(path);
+						const content = await currentHost().fs.readBounded(path, 4_000_000);
 						return content.length > 1_000_000 ? null : { name: rel.slice(rel.lastIndexOf("/") + 1), content, path, source: "vault" };
 					} catch { return null; }
 				},

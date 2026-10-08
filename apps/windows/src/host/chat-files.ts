@@ -77,7 +77,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 	async function readOne(path: string): Promise<ChatRecord[] | null> {
 		try {
 			if (!(await smallEnough(path, MAX_FILE_CHARS))) { console.warn(`${LOG_PREFIX} chat file too large or unreadable, ignored:`, path); return null; }
-			const raw = await fs.read(path);
+			const raw = await fs.readBounded(path, 4 * MAX_FILE_CHARS);
 			if (raw.length > MAX_FILE_CHARS) { console.warn(`${LOG_PREFIX} chat file too large, ignored:`, path); return null; }
 			const parsed: unknown = JSON.parse(raw);
 			// A valid envelope with every chat dropped is still a valid file; anything else is not one.
@@ -132,7 +132,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		locked = true;
 		try {
 			if (!(await smallEnough(ownPath, MAX_FILE_CHARS))) return;
-			const raw = await fs.read(ownPath);
+			const raw = await fs.readBounded(ownPath, 4 * MAX_FILE_CHARS);
 			if (raw.trim()) await fs.write(`${ownPath}.corrupt-${clock()}`, raw);
 		} catch { /* kept aside is best effort */ }
 	}
@@ -177,7 +177,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 			if (!n.endsWith(".json") || n === ownName) continue;
 			try {
 				if (!(await smallEnough(`${genDir}/${n}`, MAX_GENERATIONS_CHARS))) continue;
-				const raw = await fs.read(`${genDir}/${n}`);
+				const raw = await fs.readBounded(`${genDir}/${n}`, 4 * MAX_GENERATIONS_CHARS);
 				if (raw.length > MAX_GENERATIONS_CHARS) continue;
 				const file = parseGenerations(JSON.parse(raw));
 				if (file) out.push({ device: n.slice(0, -5), file });
@@ -213,7 +213,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 			for (const n of candidates.slice(0, MAX_REQUEST_FILES)) {
 				try {
 					if (!(await smallEnough(`${reqDir}/${s.name}/${n}`, MAX_REQUEST_CHARS))) continue;
-					const raw = await fs.read(`${reqDir}/${s.name}/${n}`);
+					const raw = await fs.readBounded(`${reqDir}/${s.name}/${n}`, 4 * MAX_REQUEST_CHARS);
 					if (raw.length > MAX_REQUEST_CHARS) continue;
 					out.push({ fileDevice: s.name, fileId: n.slice(0, -5), raw: JSON.parse(raw) });
 				} catch { console.warn(`${LOG_PREFIX} request file unreadable, ignored:`, s.name, n); }
@@ -247,7 +247,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 			if (!n.endsWith(".json") || isConflictCopy(n)) continue;
 			try {
 				if (!(await smallEnough(`${ownReqDir}/${n}`, MAX_REQUEST_CHARS))) continue;
-				const raw = await fs.read(`${ownReqDir}/${n}`);
+				const raw = await fs.readBounded(`${ownReqDir}/${n}`, 4 * MAX_REQUEST_CHARS);
 				if (raw.length > MAX_REQUEST_CHARS) continue;
 				const parsed: unknown = JSON.parse(raw);
 				const o = (parsed && typeof parsed === "object" ? parsed : {}) as { target?: unknown; at?: unknown };

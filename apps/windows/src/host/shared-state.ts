@@ -44,6 +44,8 @@ export interface SharedFs {
 	read(path: string): Promise<string>;
 	/** Size in bytes without reading the file; null when absent or unreadable. */
 	size(path: string): Promise<number | null>;
+	/** Read that rejects past `maxBytes`, enforced by the reader itself. */
+	readBounded(path: string, maxBytes: number): Promise<string>;
 	write(path: string, data: string): Promise<void>;
 	append(path: string, data: string): Promise<void>;
 	list(dir: string): Promise<string[]>;
