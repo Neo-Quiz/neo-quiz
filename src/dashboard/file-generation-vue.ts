@@ -72,13 +72,13 @@ function texteTravail(modele: string, ecoule: number): string {
 /** The activity next to the working line: the reasoning's size, while no
     reasoning text is shown (a model that shares it has its own line). */
 function texteActivite(tr: Transcript | null | undefined): string {
-	// Once the answer is being written, the transcript's own lines take over.
-	if (!tr || tr.text) return "";
+	if (!tr) return "";
 	/* What it read, then how long it has reasoned: a twelve-minute wait over
-	   "~180k tokens read" explains itself. */
+	   "~180k tokens read" explains itself. Once the answer is being written,
+	   the reasoning's size moves to the transcript's own line. */
 	const parts: string[] = [];
 	if (tr.inputTokens > 0) parts.push(t("ai.queue.inputTokens", { count: compterJetons(tr.inputTokens) }));
-	if (!tr.thinking && tr.thinkingTokens > 0) parts.push(t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) }));
+	if (!tr.text && !tr.thinking && tr.thinkingTokens > 0) parts.push(t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) }));
 	return parts.join(" · ");
 }
 

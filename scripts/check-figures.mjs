@@ -27,7 +27,11 @@ await withSrcModule("src/dashboard/figures.ts", async ({ lireFigure, documentDeF
 		["CM2 - UML.pdf", "CM2 - UML.pdf", "Café.pdf"]);
 	r.check("a document that is not a PDF, or not attached, gives no figure",
 		[documentDeFigure("Notes.md", docs), documentDeFigure("Autre.pdf", docs)], [null, null]);
-	r.check("the image name: the PDF without extension and the page, no forbidden character",
+	r.check("a name the model shortened: the only PDF attached, or the only one that contains it",
+		[documentDeFigure("CE_TI303_2627.pdf", [{ name: "CE_TI303_2627_sujet_5003338037.pdf" }, { name: "Notes.md" }])?.name, documentDeFigure("CM2 - UML (cours).pdf", docs)?.name],
+		["CE_TI303_2627_sujet_5003338037.pdf", "CM2 - UML.pdf"]);
+	r.check("an ambiguous or too short name among several PDFs gives no figure",
+		[documentDeFigure("CM", [{ name: "CM1.pdf" }, { name: "CM2.pdf" }]), documentDeFigure("pdf", docs), documentDeFigure("", [{ name: "A.pdf" }])], [null, null, null]);	r.check("the image name: the PDF without extension and the page, no forbidden character",
 		[nomImageFigure("CM2 - UML.pdf", 7), nomImageFigure("a/b:c*?.pdf", 1), nomImageFigure(".pdf", 2)],
 		["CM2 - UML - p7.png", "a b c - p1.png", "figure - p2.png"]);
 

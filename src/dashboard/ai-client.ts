@@ -406,7 +406,7 @@ const LEARN_SOURCES = `SOURCES OF THE READINGS: when the content comes from atta
 
 /** A reading may SHOW a page of an attached PDF (2026-10-08): the model
     names the page, the application draws it (dashboard/figures.ts). */
-const LEARN_FIGURES = `FIGURES OF THE READINGS: when an attached PDF has, on a page, a diagram, schema, table or figure that helps understand a reading (its text on that page reads like the labels of a drawing: boxes, arrows, multiplicities, axis names, a table's cells), that "read" card may show the page itself: add "figure": the PDF's file name and ONE page, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading. Explain the figure in the reading's text, so that it makes sense with it. At most one figure per reading, only where the picture really helps, and never a figure for a document that is not a PDF.
+const LEARN_FIGURES = `FIGURES OF THE READINGS: a course PDF often holds diagrams, schemas and tables, and its text shows where: on such a page the words read like the labels of a drawing (boxes, arrows, multiplicities such as 0..* or 1, stereotypes such as «include», actor and state names, axis names, a table's cells). When a "read" card explains a notion that one of those pages DRAWS, the card shows that page: add "figure": the PDF's file name EXACTLY as written in its "--- name ---" header, then ONE page from its "[p. N]" marks, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading, so the reading's text explains what the figure shows. Give a figure to EVERY reading whose notion is drawn on a page of the documents; none to a reading with no such page, and never a figure for a document that is not a PDF. One figure per reading.
 
 `;
 

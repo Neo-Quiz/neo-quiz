@@ -89,11 +89,14 @@ export interface DemandeTexte<I extends { file: File } = { file: File }> {
    porter à un modèle. */
 export function composerDemande(msg: DemandeTexte): { source: "image" | "text" | "topic"; prompt: string } {
 	// images → vision ; notes/fichiers attachés → texte source ; sinon sujet.
-	// Chaque source texte est délimitée par son nom (l'IA distingue les
-	// documents d'un envoi multi-notes).
+	// Each text source opens with its name, a single one too (2026-10-08):
+	// a Learn cites its pages ("cite") and names the PDF page it shows
+	// ("figure") by the document's FILE NAME, which the model only knows from
+	// this header. Without it, a lone PDF was cited under a name the model
+	// made up from its first line, and no figure could be matched.
 	const source = msg.images.length > 0 ? "image" : msg.notes.length > 0 ? "text" : "topic";
 	const notesBlock = msg.notes
-		.map(n => (msg.notes.length > 1 ? "--- " + n.name + " ---\n" : "") + n.content)
+		.map(n => "--- " + n.name + " ---\n" + n.content)
 		.join("\n\n");
 	// Repli quand des images sont envoyées SANS consigne : instruction au
 	// modèle (pas de l'UI) → anglais, et surtout « dans leur langue ».

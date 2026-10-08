@@ -40,7 +40,17 @@ export function lireFigure(valeur: unknown): { document: string; page: number } 
 export function documentDeFigure<T extends { name: string }>(nom: string, documents: readonly T[]): T | null {
 	const cle = (s: string): string => s.normalize("NFC").trim().toLowerCase().replace(/\.pdf$/, "");
 	const voulu = cle(nom);
-	return documents.find(d => /\.pdf$/i.test(d.name) && cle(d.name) === voulu) ?? null;
+	const pdfs = documents.filter(d => /\.pdf$/i.test(d.name));
+	const exact = pdfs.find(d => cle(d.name) === voulu);
+	if (exact) return exact;
+	/* A name the model shortened ("CE_TI303_2627.pdf" for
+	   "CE_TI303_2627_sujet_5003338037.pdf"): the only PDF attached, or the
+	   only one whose name contains it (or is contained in it). Ambiguous:
+	   no figure. */
+	if (!voulu) return null;
+	if (pdfs.length === 1) return pdfs[0];
+	const proches = pdfs.filter(d => { const k = cle(d.name); return voulu.length >= 4 && (k.includes(voulu) || voulu.includes(k)); });
+	return proches.length === 1 ? proches[0] : null;
 }
 
 /** The PNG's file name: the PDF's name without extension and the page,
