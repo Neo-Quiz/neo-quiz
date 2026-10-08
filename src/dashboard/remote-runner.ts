@@ -114,19 +114,14 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 			deps.notify(t("ai.remote.notifyTitle", { device: req.fromName || t("ai.remote.unknownDevice") }).slice(0, NOTIFY_TITLE_MAX), message.slice(0, NOTIFY_BODY_MAX));
 			return true;
 		};
+		// A phone request never forces Claude Code over the PC's own provider: refused when the PC (frozen at admission) is not on Claude Code.
+		if (frozen.aiProvider !== "claude-code") return failAndNotify(t("ai.remote.pcNotClaudeCode"));
 		// The requested model must be in the PC's CURRENT Claude list: otherwise refused, never swapped for another.
 		if (req.model !== undefined && !(await deps.claudeModels()).includes(req.model)) {
 			return failAndNotify(t("ai.remote.modelNotOffered", { model: req.model }));
 		}
-		const ownClaude = frozen.aiProvider === "claude-code";
-		const s = {
-			...frozen,
-			aiProvider: "claude-code",
-			// No `model`: the PC's own Claude model when it uses Claude Code, else "" (the Claude default).
-			aiModel: req.model ?? (ownClaude ? frozen.aiModel : ""),
-			// An effort chosen for another provider means nothing to Claude Code.
-			aiEffort: ownClaude ? frozen.aiEffort : undefined,
-		};
+		// No `model`: the PC's own Claude model.
+		const s = { ...frozen, aiModel: req.model ?? frozen.aiModel };
 		const notes: NoteAttachment[] = [];
 		for (const d of req.documents) {
 			const note = await deps.readDocument(d.path);

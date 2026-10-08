@@ -151,12 +151,11 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 	{ // Tool-free providers only (a remote request never reaches a provider with live tools)
 		r.check("allow-list: Claude without image and Ollama pass", [RU.remoteProviderAllowed("claude-code", 0), RU.remoteProviderAllowed("ollama")], [true, true]);
 		r.check("allow-list: Codex, Antigravity, unknown, empty and Claude with an image are refused", ["codex", "antigravity-cli", "evil", "", undefined].map(p => RU.remoteProviderAllowed(p)).concat(RU.remoteProviderAllowed("claude-code", 1)), [false, false, false, false, false, false]);
-		{ // A remote line ALWAYS runs with Claude Code, whatever the PC's own provider is
+		{ // A remote line never forces Claude Code over the PC's own provider: refused, recorded, notified
 			for (const p of ["codex", "antigravity-cli", "ollama", "", "evil"]) {
 				const c = rig({ settings: () => ({ aiProvider: p, aiModel: "gpt-x", aiEffort: "xhigh" }) }); c.setIncoming([file("lq3k2-cdx001")]);
 				await RU.createRemoteRunner(c.deps).scan();
-				r.check("PC on '" + p + "': the line runs with Claude Code, its default model, no foreign effort", c.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel, d.reglages.aiEffort]), [["claude-code", "", undefined]]);
-				r.check("and every provider the queue would run passes its allow-list", c.sent.every(d => RU.remoteProviderAllowed(d.reglages.aiProvider, 0)), true);
+				r.check("PC on '" + p + "': refused, nothing queued, the reason recorded in the chat and notified", [c.sent.length, c.failures.length, c.failures[0]?.[1].includes("Claude Code"), c.notes.length, c.log.list.map(e => e.reported)], [0, 1, true, 1, [true]]);
 			}
 			const own = rig(); own.setIncoming([file("lq3k2-own001")]);
 			await RU.createRemoteRunner(own.deps).scan();
@@ -166,7 +165,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 			r.check("a model in the PC's list is used", ok.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel]), [["claude-code", "sonnet"]]);
 			const ollamaPc = rig({ settings: () => ({ aiProvider: "ollama", aiModel: "qwen3:8b" }) }); ollamaPc.setIncoming([file("lq3k2-mod002", { model: "haiku" })]);
 			await RU.createRemoteRunner(ollamaPc.deps).scan();
-			r.check("PC on Ollama + requested model: Claude Code with that model", ollamaPc.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel]), [["claude-code", "haiku"]]);
+			r.check("PC on Ollama + requested model: refused for the provider, never run on Claude", [ollamaPc.sent.length, ollamaPc.failures.length], [0, 1]);
 			for (const m of ["claude-opus-9", "fable", "OPUS", "sonnet "]) {
 				const bad = rig(); bad.setIncoming([file("lq3k2-mod003", { model: m })]);
 				await RU.createRemoteRunner(bad.deps).scan();

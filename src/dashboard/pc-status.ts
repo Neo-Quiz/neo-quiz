@@ -20,7 +20,7 @@ import { pendingState } from "../shared-state/remote-request";
 
 export type PcTone = "ok" | "off" | "error";
 /** Why the tone is what it is: the window says it in words. */
-export type PcReason = "running" | "ready" | "paused" | "away" | "never" | "failed" | "expired";
+export type PcReason = "running" | "ready" | "paused" | "away" | "never" | "failed" | "expired" | "notClaude";
 
 export interface PcStatus {
 	tone: PcTone;
@@ -84,5 +84,7 @@ export function pcStatus(i: PcStatusInput): PcStatus {
 	if (device && expired) return { ...base, tone: "error", reason: "expired", provider: lastLabel };
 	if (!device) return { ...base, tone: "off", reason: "never", provider: null };
 	if (!reachable) return { ...base, tone: "off", reason: i.peers.length > 0 && i.peers.every(p => p.paused) ? "paused" : "away", provider: lastLabel };
+	// The PC says its provider is not Claude Code: it will refuse every phone request (a file without `provider` says nothing, never a guess).
+	if (info?.provider && info.provider !== "claude-code") return { ...base, tone: "error", reason: "notClaude", provider: lastLabel };
 	return { ...base, tone: "ok", reason: running.length > 0 ? "running" : "ready", provider: live ?? lastLabel };
 }

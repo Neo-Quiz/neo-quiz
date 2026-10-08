@@ -27,7 +27,11 @@ const TEXT_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e
 
 export type DeviceKind = "laptop" | "desktop";
 export interface ModelEntry { id: string; label: string }
-export interface DeviceFile { v: 1; device: string; name: string; kind: DeviceKind; claudeModels: ModelEntry[]; updatedAt: number }
+/** `provider` is the PC's own AI provider id (`claude-code`, `ollama`...), optional: a file from an older version has none. */
+export interface DeviceFile { v: 1; device: string; name: string; kind: DeviceKind; claudeModels: ModelEntry[]; provider?: string; updatedAt: number }
+/** A provider id as a device file may carry it. */
+const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const cleanProvider = (x: unknown): string | undefined => typeof x === "string" && PROVIDER_ID.test(x) ? x : undefined;
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 
@@ -58,18 +62,20 @@ export function cleanModels(list: unknown): ModelEntry[] {
 	return out;
 }
 
+const withProvider = (provider: string | undefined): { provider?: string } => provider ? { provider } : {};
+
 /** Reads one device file. `fileDevice` is the id taken from the file name: the file must say the same. Null when unusable. */
 export function readDevice(raw: unknown, fileDevice: string): DeviceFile | null {
 	if (!isObj(raw) || raw.v !== 1) return null;
 	if (typeof raw.device !== "string" || raw.device.toLowerCase() !== fileDevice.toLowerCase()) return null;
 	if (raw.kind !== "laptop" && raw.kind !== "desktop") return null;
 	if (typeof raw.updatedAt !== "number" || !Number.isFinite(raw.updatedAt)) return null;
-	return { v: 1, device: fileDevice, name: cleanText(raw.name, MAX_NAME), kind: raw.kind, claudeModels: cleanModels(raw.claudeModels), updatedAt: raw.updatedAt };
+	return { v: 1, device: fileDevice, name: cleanText(raw.name, MAX_NAME), kind: raw.kind, claudeModels: cleanModels(raw.claudeModels), ...withProvider(cleanProvider(raw.provider)), updatedAt: raw.updatedAt };
 }
 
 /** The file a PC writes for itself. Names and models are cleaned the same way a reader would. */
-export function buildDevice(i: { device: string; name: string; kind: DeviceKind; models: ReadonlyArray<{ id: string; label: string }> }, now: number): DeviceFile {
-	return { v: 1, device: i.device, name: cleanText(i.name, MAX_NAME), kind: i.kind, claudeModels: cleanModels(i.models), updatedAt: now };
+export function buildDevice(i: { device: string; name: string; kind: DeviceKind; models: ReadonlyArray<{ id: string; label: string }>; provider?: string }, now: number): DeviceFile {
+	return { v: 1, device: i.device, name: cleanText(i.name, MAX_NAME), kind: i.kind, claudeModels: cleanModels(i.models), ...withProvider(cleanProvider(i.provider)), updatedAt: now };
 }
 
 /** What counts as a change: everything but `updatedAt`. */

@@ -638,6 +638,7 @@ async function demarrer(): Promise<void> {
 			device: idAppareil,
 			info: async () => (await pont().appareil?.infos().catch(() => null)) ?? null,
 			models: () => claudeModelsOffered(),
+			provider: () => reglagesIa.get().aiProvider,
 			write: f => chatFiles.writeDevice(f),
 			readOwn: () => chatFiles.readOwnDevice(),
 		});

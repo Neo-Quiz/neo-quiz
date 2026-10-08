@@ -5,7 +5,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/shared-state/devices.ts", "src/dashboard/device-publisher.ts"], async (D, P) => {
+await withSrcModule(["src/shared-state/devices.ts", "src/dashboard/device-publisher.ts", "src/dashboard/pc-status.ts"], async (D, P, PS) => {
 	const r = makeReporter("Device files");
 	const PC = "11111111-1111-4111-8111-111111111111";
 	const good = (over = {}) => ({ v: 1, device: PC, name: "Aero", kind: "laptop", claudeModels: [{ id: "opus", label: "Opus 5" }], updatedAt: 5, ...over });
@@ -71,5 +71,16 @@ await withSrcModule(["src/shared-state/devices.ts", "src/dashboard/device-publis
 	const safe = [0x20, 0x7e, 0xa0, 0xac, 0xae, 0x200a, 0x2010, 0x2027, 0x202f, 0x205f, 0x2070, 0xfefe, 0xff00, 0xffef];
 	r.check("TEXT_UNSAFE: each range edge is refused", unsafe.filter(c => nameOf(c) !== ""), []);
 	r.check("TEXT_UNSAFE: the neighbours just outside the ranges are kept", safe.filter(c => nameOf(c) === ""), []);
+	// The optional provider: validated like the other labels, published, and a non-Claude PC is red on the phone.
+	r.check("provider: a good id is kept, garbage or absent is dropped (never an error)", [read(good({ provider: "ollama" })).provider, read(good({ provider: "Evil;rm" })).provider, read(good({ provider: 5 })).provider, "provider" in read(good())], ["ollama", undefined, undefined, false]);
+	let prov = "claude-code";
+	const provDisk = [];
+	const provPub = P.createDevicePublisher({ device: PC, info: async () => ({ name: "Aero", kind: "laptop" }), models: () => [], provider: () => prov, write: async f => { provDisk.push(f); } });
+	await provPub.check(); await provPub.check(); prov = "ollama"; await provPub.check();
+	r.check("the publisher writes the provider and rewrites when it changes", provDisk.map(f => f.provider), ["claude-code", "ollama"]);
+	const g = { device: PC, file: { v: 1, at: 1000, running: [] } };
+	const status = provider => PS.pcStatus({ chat: null, files: [g], now: 1500, lastEver: PC, peerConnected: true, peers: [], chats: [], own: [], device: "ph", devices: [D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [], provider }, 1)] });
+	r.check("a reachable PC whose provider is not Claude Code is red with that reason", [status("ollama").tone, status("ollama").reason], ["error", "notClaude"]);
+	r.check("Claude Code, or a file without provider: not red", [status("claude-code").reason, status(undefined).reason], ["ready", "ready"]);
 	r.done();
 });
