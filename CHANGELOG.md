@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A Learn generated from PDFs can show, on a reading, the course page that holds the diagram it explains.
+
 ### Changed
 
 - A generation no longer stops after 15 minutes: it runs until the model is done, and Stop ends it whenever you want.

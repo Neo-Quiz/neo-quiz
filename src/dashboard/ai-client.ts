@@ -404,6 +404,12 @@ const LEARN_SOURCES = `SOURCES OF THE READINGS: when the content comes from atta
 
 `;
 
+/** A reading may SHOW a page of an attached PDF (2026-10-08): the model
+    names the page, the application draws it (dashboard/figures.ts). */
+const LEARN_FIGURES = `FIGURES OF THE READINGS: when an attached PDF has, on a page, a diagram, schema, table or figure that helps understand a reading (its text on that page reads like the labels of a drawing: boxes, arrows, multiplicities, axis names, a table's cells), that "read" card may show the page itself: add "figure": the PDF's file name and ONE page, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading. Explain the figure in the reading's text, so that it makes sense with it. At most one figure per reading, only where the picture really helps, and never a figure for a document that is not a PDF.
+
+`;
+
 /** The instructions of one step of an exam preparation ("/exam"). */
 function blocPreparation(p: PreparationExamen | undefined, learn: boolean): string {
 	if (!p) return "";
@@ -608,7 +614,7 @@ ${categorieBloc}
 
 	NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.
 
-${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
+${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
 	${blocLot}${quantite}
 

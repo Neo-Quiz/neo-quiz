@@ -844,10 +844,13 @@ export interface HostPdf {
 	 * — pour la vignette d'une carte de pièce jointe et l'aperçu d'une modale
 	 * (référence claude.ai, Ahmed 2026-09-17). `max` borne le nombre de pages
 	 * rendues ; `total` est le nombre de pages du document, rendues ou non.
+	 * `first` (1 par défaut) : la première page rendue — une FIGURE d'une
+	 * carte de lecture générée ne veut qu'UNE page, au milieu du cours
+	 * (2026-10-08).
 	 * OPTIONNEL, comme le membre lui-même : un hôte qui sait lire le texte
 	 * mais pas dessiner rend la carte sans vignette et l'aperçu en texte.
 	 */
-	renderPages?(data: Uint8Array, opts: { width: number; max?: number }): Promise<{ pages: string[]; total: number }>;
+	renderPages?(data: Uint8Array, opts: { width: number; max?: number; first?: number }): Promise<{ pages: string[]; total: number }>;
 }
 
 /**

@@ -76,6 +76,11 @@ export const PLAFOND_ETAPES_COURTES = 4;
  */
 export function estLectureCourte(item: unknown): boolean {
 	if (roleDe(item) !== "read" || styleDeLecture(item) !== "etapes" || retenirDeLecture(item) !== null) return false;
+	/* A reading that carries a document (`passage`, a figure drawn from a
+	   course page: dashboard/figures.ts) keeps its screen: the light version
+	   above a question shows only the text, and the picture would be lost. */
+	const support = (item as { passage?: unknown; passageHtml?: unknown });
+	if ((typeof support.passage === "string" && support.passage.trim()) || (typeof support.passageHtml === "string" && support.passageHtml.trim())) return false;
 	if (estMethode(item)) return true;
 	const etapes = etapesDeLecture(item).length || paragraphes(String((item as { prompt?: unknown }).prompt ?? "")).length;
 	if (etapes > PLAFOND_ETAPES_COURTES) return false;

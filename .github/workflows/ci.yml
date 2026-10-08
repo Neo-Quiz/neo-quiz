@@ -50,6 +50,8 @@ jobs:
       # result of a Claude stream-json output is always found.
       - name: Generation transcript decoding
         run: npm run check:transcript
+      - name: Figures of a generated reading
+        run: npm run check:figures
 
       # THE "EXPLAIN" PROMPT of a question: its choices, its expected answer
       # and the learner's go with it, never a raw placeholder.

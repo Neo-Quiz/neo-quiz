@@ -39,6 +39,7 @@ import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
 import { appliquer, transcriptVide } from "./transcript";
+import { figuresParHote } from "./figures";
 import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
@@ -345,7 +346,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			   as before the queue. Done BEFORE the quiz is kept with the request,
 			   so a retried save (which never calls the model again) writes the
 			   same Learn. */
-			const questions = d.mode === "learn" ? completerConfigLearn(brut) : brut;
+			/* The pages a reading names as its figure are drawn into the quiz's
+			   folder BEFORE the quiz is kept with the request: a retried save
+			   writes the same note, with the same pictures. */
+			const questions = await figuresParHote(d.mode === "learn" ? completerConfigLearn(brut) : brut, d.notes, dossier);
 			if (!questions.length) throw new Error(t("ai.error.checkSettings"));
 			const usage = client.lastUsage;
 			if (usage && deps.recordUsage) {
@@ -385,10 +389,13 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	    merged and completed as a single quiz would be, then kept WITH the
 	    request before any note is written, as for one quiz. */
 	async function produireLot(ligne: LigneGeneration, d: DemandeFile, client: AiClient, deps: DepsFile, lot: { document: string; questions: unknown[]; titre?: string }[], liens: ProduitGeneration["liens"]): Promise<void> {
-		const quiz = lot.map(q => {
+		const dossier = d.destination || dossierParDefaut(d.reglages.aiOutputFolder);
+		const quiz = await Promise.all(lot.map(async q => {
 			const brut = fusionnerConfigsFinales(q.questions);
-			return { ...q, questions: d.mode === "learn" ? completerConfigLearn(brut) : brut };
-		});
+			// Each quiz draws only from ITS document.
+			const documents = d.notes.filter(n => n.name === q.document);
+			return { ...q, questions: await figuresParHote(d.mode === "learn" ? completerConfigLearn(brut) : brut, documents.length ? documents : d.notes, dossier) };
+		}));
 		if (quiz.some(q => !q.questions.length)) throw new Error(t("ai.error.checkSettings"));
 		const usage = client.lastUsage;
 		if (usage && deps.recordUsage) {

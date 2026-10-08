@@ -83,10 +83,11 @@ export function createWindowsPdf(): HostPdf {
 			const doc = await ouvrirDocument(pdfjs, data);
 			try {
 				const total = doc.numPages;
-				const nombre = Math.min(total, Math.max(0, opts.max ?? total));
+				const premiere = Math.max(1, Math.floor(opts.first ?? 1));
+				const derniere = Math.min(total, premiere - 1 + Math.max(0, opts.max ?? total));
 				const pages: string[] = [];
 				let echelle: number | null = null;
-				for (let i = 1; i <= nombre; i++) {
+				for (let i = premiere; i <= derniere; i++) {
 					const page = await doc.getPage(i);
 					if (!page.getViewport || !page.render) break;
 					if (echelle === null) echelle = opts.width / page.getViewport({ scale: 1 }).width;

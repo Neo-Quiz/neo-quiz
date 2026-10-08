@@ -58,6 +58,8 @@ await withSrcModule(["src/lecture-etape.ts"], (le) => {
 		[le.estLectureCourte({ role: "read", lecture: "etapes", prompt: "Un.\n\nDeux." }), le.estLectureCourte({ role: "read", lecture: "etapes", prompt: "1.\n\n2.\n\n3.\n\n4.\n\n5." })], [true, false]);
 	r.check("méthode : seul `methode: true` compte ; jamais sur une page",
 		[le.estLectureCourte({ role: "read", lecture: "etapes", prompt: mots(90), methode: "true" }), le.estLectureCourte({ role: "read", lecture: "page", prompt: "x", methode: true })], [false, false]);
+	r.check("estLectureCourte : une lecture courte qui porte un support (une figure) garde son écran",
+		[le.estLectureCourte({ role: "read", lecture: "etapes", prompt: "Un.", passage: "![[cours - p3.png]]" }), le.estLectureCourte({ role: "read", lecture: "etapes", prompt: "Un.", passageHtml: "<p>x</p>" }), le.estLectureCourte({ role: "read", lecture: "etapes", prompt: "Un.", passage: "  " })], [false, false, true]);
 	r.check("brouillon de l'éditeur : style et méthode lus dans `_extraFields`",
 		le.estLectureCourte({ role: "read", prompt: mots(90), _extraFields: { lecture: "etapes", etapes: ["a"], methode: true } }), true);
 
