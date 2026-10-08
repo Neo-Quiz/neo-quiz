@@ -234,7 +234,7 @@ export interface DashboardShellCtx {
 	/** La session EN COURS d'un quiz (reprendre là où on s'était arrêté) :
 	    numéro 1-based de la question courante, total, heure d'écriture.
 	    Absent côté hôte sans reprise : pas de « Reprendre ». */
-	sessionOf?(path: string): { question: number; total: number; ecrite: number } | null;
+	sessionOf?(path: string): { question: number; total: number; ecrite: number; answered: number } | null;
 	/** La couleur d'AMBIANCE de l'hôte (2026-09-26) : « Mes quiz » l'appelle
 	    à chaque rendu avec l'accent du dossier ouvert, `null` hors dossier.
 	    L'application en teinte la lueur autour de son panneau central.

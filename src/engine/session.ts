@@ -49,6 +49,17 @@ export interface EtatQuestion {
 	enAttente?: boolean;
 }
 
+/** A question of a snapshot holds an answer: a verdict, a check, written
+    text or a selection with something in it. The card's progress ring counts
+    these while the quiz is under way. */
+export function aUneReponse(q: EtatQuestion | undefined): boolean {
+	if (!q) return false;
+	if (q.verdict || q.verifiee || q.verifieeLearn || q.jnsp || q.texte?.trim()) return true;
+	const sel = q.selection;
+	if (sel === null || sel === undefined || sel === "") return false;
+	return Array.isArray(sel) ? sel.some(v => v !== null && v !== "") : true;
+}
+
 export interface SessionQuiz {
 	v: 1;
 	/** Identifier of the current question; null off a question. */

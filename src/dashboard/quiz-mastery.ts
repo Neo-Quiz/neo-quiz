@@ -32,7 +32,13 @@ export interface QuizStateInfo {
     complétion — SOURCE UNIQUE, partagée par la pastille d'état de la carte
     (quiz-card.ts) et l'agrégat « Progrès » du drill-down (quizzes-render.ts) :
     mêmes seuils partout, jamais deux implémentations qui pourraient diverger. */
-export function computeQuizState(quiz: QuizIndexEntry, stats: QuizStatRecord | null | undefined): QuizStateInfo {
+export function computeQuizState(
+	quiz: QuizIndexEntry,
+	stats: QuizStatRecord | null | undefined,
+	/** The quiz's live SESSION (`DashboardShellCtx.sessionOf`): the questions
+	    answered so far, out of `total`. */
+	session?: { answered: number; total: number } | null,
+): QuizStateInfo {
 	const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 	const done = stats ? stats.questionsDone : 0;
 	const best = stats ? stats.bestScore : 0;
@@ -41,6 +47,13 @@ export function computeQuizState(quiz: QuizIndexEntry, stats: QuizStatRecord | n
 	if (stats && total > 0 && done >= total) {
 		return { state: best >= MASTERY_THRESHOLD ? "mastered" : "review", pct };
 	}
-	if (done > 0) return { state: "progress", pct };
+	/* A quiz under way exists only in its session snapshot: the stats are
+	   written when it ends. Without this a Learn half done showed 0 % on its
+	   card (2026-10-08). Counted as the end screen counts ("20 / 45
+	   answered"); never 100 % while a session is open. */
+	const enCours = session && session.total > 0
+		? Math.min(99, Math.max(0, Math.round(session.answered / session.total * 100)))
+		: 0;
+	if (done > 0 || enCours > 0) return { state: "progress", pct: Math.max(pct, enCours) };
 	return { state: "fresh", pct };
 }

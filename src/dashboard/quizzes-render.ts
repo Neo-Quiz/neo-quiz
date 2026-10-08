@@ -296,6 +296,7 @@ export function renderModuleDrill(
 			const cardEl = renderQuizCard(cardsEl, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
 				freres,
 				statsFreres: freres.map(f => stats[f.path]),
+				sessionOf: ctx.sessionOf,
 				// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
 				showPath: false,
 				// The progress ring replaces the play arrow (play lives on the quiz page).

@@ -19,7 +19,6 @@ import {
 	applyCheck,
 	applyNeutralCheck,
 	beginRetry,
-	dueRetryOnPage,
 	emptyLearnState,
 	learnSummary,
 	nextLearnMove,
@@ -135,31 +134,12 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 		}
 		refresh(qi);
 		ctx.stepScrollNext?.(qi);
-		retryDueOnPage(qi);
 		return true;
 	}
 
 	function selfVerdict(qi: number, rating: TextOnlyRating): void {
 		if (!isGraded(qi) || s().locked) return;
 		applyCheck(s(), qi, rating === "understood");
-		retryDueOnPage(qi);
-	}
-
-	/** Where the step page of `qi` goes on: the first question of the next
-	    page (`"end"` past the last), which the retry returns to. */
-	function pageResume(page: NonNullable<ReturnType<EngineCtx["stepOf"]>>): number | "end" {
-		const members = stepMembers(page);
-		return ctx.questionSuivante(members[members.length - 1]) ?? "end";
-	}
-
-	/** In a step page a missed question that is due comes back at the bottom
-	    of the SAME page, live, without a press on "Next step". */
-	function retryDueOnPage(qi: number): void {
-		const page = ctx.stepOf?.(qi);
-		if (!page || s().locked) return;
-		const members = stepMembers(page);
-		const due = dueRetryOnPage(s(), n => members.includes(n), qi);
-		if (due !== null) startRetry(due, pageResume(page), false);
 	}
 
 	/** The retried card opens again, its answer cleared and its options
@@ -202,7 +182,7 @@ export function createLearnHandlers(ctx: EngineCtx): LearnHandlers {
 				if (n !== qi && s().learnRetrying[n] && !s().learnChecked[n]) s().learnRetrying[n] = false;
 			}
 		}
-		const move = nextLearnMove(s(), qi, q => (page ? ctx.stepOf(q)?.step ?? null : ctx.sliceOfQuestion(q)), q => ctx.questionSuivante(q));
+		const move = nextLearnMove(s(), qi, q => ctx.questionSuivante(q));
 		if (move.kind === "retry") {
 			startRetry(move.qi, move.resume);
 			return { kind: "retry" };

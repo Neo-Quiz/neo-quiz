@@ -60,6 +60,7 @@ import type { StatsStore } from "../../../../src/dashboard/stats-store";
 import type { ReviewStore } from "../../../../src/review/review-store";
 import type { ModuleGroup, ModuleOverride } from "../../../../src/dashboard/quiz-modules";
 import { numeroDeReprise } from "../../../../src/lecture-etape";
+import { aUneReponse } from "../../../../src/engine/session";
 import { sharedState } from "../host/shared-state";
 import { rebaseModules, resoudreCleExamens } from "../../../../src/shared-state/merge";
 import { addFolder, removeFolder, ecrireReglage, enregistrerExamen as enregistrerExamenReglage, estVaultObsidian, examens, lienAvecRacines, lireReglage, pickFolder, renommerExamens, retirerExamen as retirerExamenReglage, savedFolders } from "../host/folder";
@@ -499,7 +500,11 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			const lecon = !!quiz.lecon;
 			// Une lecture restée un écran n'a pas de numéro (2026-09-26) :
 			// `numeroDeReprise` annonce la question qui la suit.
-			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite };
+			/* The questions ANSWERED so far, as the end screen counts them
+			   ("20 / 45 answered"): the card's ring reads them, the stats only
+			   being written when the quiz ends. Readings never count. */
+			const answered = quiz.items.filter(it => it.role !== "read" && aUneReponse(s.questions[it.id])).length;
+			return { question: numeroDeReprise(quiz.items, lecon, i), total: quiz.questions, ecrite: s.ecrite, answered };
 		},
 		ambiance: (accent) => poserLueur(accent),
 		sheetStack: sheets,

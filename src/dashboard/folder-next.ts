@@ -33,7 +33,7 @@ export function renderNextStep(parent: HTMLElement, ctx: DashboardShellCtx, ordr
 	   fini — le plus récemment quitté — se reprend là où on s'était arrêté. */
 	const entames = ordre
 		.map(q => ({ q, s: ctx.sessionOf?.(q.path) ?? null }))
-		.filter((x): x is { q: QuizIndexEntry; s: { question: number; total: number; ecrite: number } } => x.s !== null)
+		.filter((x): x is { q: QuizIndexEntry; s: { question: number; total: number; ecrite: number; answered: number } } => x.s !== null)
 		.sort((a, b) => b.s.ecrite - a.s.ecrite);
 	if (entames[0]) {
 		const { q, s } = entames[0];

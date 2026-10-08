@@ -3,9 +3,10 @@
    docs/superpowers/specs/2026-09-28-learn-retry-design.md).
 
    In a Learn quiz each question is checked on its own card. A question
-   missed on its first check is QUEUED and comes back later — never at once:
-   once two other questions have been checked since the miss, or when the
-   learner leaves its step, whichever comes first. Right on a retry, it is
+   missed on its first check is QUEUED and comes back at the END, once the
+   last question is passed. Until 2026-10-08 it came back two checks later
+   or when its step was left: the learner was sent back mid-quiz, between
+   two swipes, with no idea why, which broke their focus. Right on a retry, it is
    "retried" (orange); wrong again, it goes back in the queue, three retries
    at most, after which it stays "missed" (red) and leaves the queue: the
    spaced scheduler brings it back in a later session, where the evidence
@@ -25,8 +26,6 @@ export const LEARN_VERDICTS: readonly LearnVerdict[] = ["none", "first", "retrie
 export type LearnLoopState = Pick<QuizState,
 	"learnVerdicts" | "learnMisses" | "learnRetrying" | "learnChecked" | "learnPending" | "learnQueue" | "learnResume" | "learnRetryQi">;
 
-/** Other questions to check before a missed one comes back. */
-export const RETRY_LAG = 2;
 /** Retries per question and session: the third miss of a retry gives up. */
 export const MAX_RETRIES = 3;
 
@@ -99,48 +98,30 @@ export type LearnMove =
 /**
  * Where "next" leads from question `current`. The normal target is the
  * resume point when the learner is away on a retry, else the question after
- * `current` (`null` past the last). A queued question comes back when it is
- * due (RETRY_LAG checks since its miss), or when the move would leave its
- * step; past the last question every queued one comes back first. A question
- * never comes back straight after its own miss, except as the very last
- * thing left before the end — better than dropping its retry.
+ * `current` (`null` past the last). Queued questions come back only past the
+ * last question, in the order they were missed; never in the middle of the
+ * quiz. One missed on the last card comes back too, as the last thing left.
  */
 export function nextLearnMove(
 	s: LearnLoopState,
 	current: number,
-	stepOf: (qi: number) => number | null,
 	next: (qi: number) => number | null,
 ): LearnMove {
 	/* A retry left WITHOUT being checked (the learner jumped away by a bead
-	   or the previous arrow) goes back in the queue, due at once: it is not
-	   lost, and it is not red forever for want of a second chance. */
+	   or the previous arrow) goes back in the queue: it is not lost, and it
+	   is not red forever for want of a second chance. */
 	s.learnRetrying.forEach((retrying, qi) => {
 		if (retrying && qi !== current && !s.learnChecked[qi] && !s.learnQueue.some(e => e.qi === qi)) {
-			s.learnQueue.push({ qi, since: RETRY_LAG });
+			s.learnQueue.push({ qi, since: 0 });
 		}
 	});
 	// The resume point only holds on the retried card itself.
 	const away = s.learnResume !== null && s.learnRetryQi === current;
 	if (!away) s.learnResume = null;
 	const target = away ? (s.learnResume === "end" ? null : s.learnResume as number) : next(current);
-	const leaving = target === null || stepOf(target) !== stepOf(current);
-	const others = s.learnQueue.filter(e => e.qi !== current);
-	const pick = others.find(e => e.since >= RETRY_LAG)
-		?? (leaving ? others.find(e => stepOf(e.qi) === stepOf(current)) : undefined)
-		?? (target === null ? others[0] ?? s.learnQueue[0] : undefined);
-	if (pick) return { kind: "retry", qi: pick.qi, resume: target ?? "end" };
+	const pick = target === null ? s.learnQueue.find(e => e.qi !== current) ?? s.learnQueue[0] : undefined;
+	if (pick) return { kind: "retry", qi: pick.qi, resume: "end" };
 	return { kind: "go", qi: target };
-}
-
-/**
- * In a step page nothing is left behind: a queued question of the page
- * comes back at its bottom as soon as it is due (RETRY_LAG checks since its
- * miss), without waiting for the learner to press "Next step". `null` when
- * none is due. `onPage` says which questions share the page; `current` (the
- * card just checked) is never picked.
- */
-export function dueRetryOnPage(s: LearnLoopState, onPage: (qi: number) => boolean, current: number): number | null {
-	return s.learnQueue.find(e => e.qi !== current && onPage(e.qi) && e.since >= RETRY_LAG)?.qi ?? null;
 }
 
 /** The learner arrives on a queued question: it leaves the queue and opens

@@ -146,6 +146,9 @@ export function renderQuizCard(
 		    per mode; `statsFreres` in the same order. */
 		freres?: QuizIndexEntry[];
 		statsFreres?: Array<QuizStatRecord | null | undefined>;
+		/** The live session of a quiz (`DashboardShellCtx.sessionOf`): a quiz
+		    under way counts in the ring before its stats are written. */
+		sessionOf?: (path: string) => { answered: number; total: number } | null;
 	}
 ): HTMLDivElement {
 	/* Anatomie UNIQUE depuis le contrat visuel du 2026-07-28 : l'accueil et
@@ -164,7 +167,8 @@ export function renderQuizCard(
 	   review when one is, in progress as soon as one has started (average
 	   percentage), fresh otherwise. */
 	const freres = opts?.freres ?? [];
-	const infos = [computeQuizState(quiz, stats), ...freres.map((f, i) => computeQuizState(f, opts?.statsFreres?.[i]))];
+	const session = (p: string) => opts?.sessionOf?.(p) ?? null;
+	const infos = [computeQuizState(quiz, stats, session(quiz.path)), ...freres.map((f, i) => computeQuizState(f, opts?.statsFreres?.[i], session(f.path)))];
 	const { state, pct } = infos.length === 1 ? infos[0]
 		: infos.every(x => x.state === "mastered") ? { state: "mastered" as const, pct: 100 }
 		: infos.some(x => x.state === "review") ? { state: "review" as const, pct: 100 }

@@ -23,6 +23,8 @@ release notes.
 
 - The update window no longer stays above every other window, and says so when an update does not finish.
 - "Delete folder" replaces "Delete module quizzes" in a folder's menu: the folder goes to the trash and its card no longer stays behind, empty.
+- In a Learn, the questions you got wrong come back only at the end, never in the middle of the quiz.
+- A quiz card's ring shows the progress of a quiz you have started, not 0 % until you finish it.
 
 ## [1.20.47] - 2026-10-08
 
