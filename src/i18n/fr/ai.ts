@@ -413,6 +413,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.remote.unknownDevice": "ton téléphone",
 	"ai.remote.interrupted": "L'appli du PC a été fermée avant la fin.",
 	"ai.remote.noProvider": "Aucun fournisseur d'IA n'est configuré sur le PC.",
+	"ai.remote.providerNotAllowed": "Les demandes du téléphone ne tournent qu'avec Claude ou Ollama sur le PC : choisis-en un dans Générer sur le PC.",
 	"ai.remote.missingDocument": "Document introuvable sur le PC : {path}",
 	"ai.remote.onDevice": "En cours sur un autre appareil",
 	"ai.remote.progress": "Question {n} / {total}",

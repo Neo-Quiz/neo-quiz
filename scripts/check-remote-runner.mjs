@@ -48,7 +48,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 				abonner: () => () => {}, pret: Promise.resolve(),
 			},
 			readDocument: async (rel) => rel.endsWith("missing.md") ? null : ({ name: rel.split("/").pop(), content: "DOC:" + rel, path: "Root/" + rel, source: "vault" }),
-			settings: () => ({ aiProvider: "claude-cli", aiModel: "m1", aiEffort: "high", aiOutputFolder: "Generated" }),
+			settings: () => ({ aiProvider: "claude-code", aiModel: "m1", aiEffort: "high", aiOutputFolder: "Generated" }),
 			takenLog: { read: async () => structuredClone(log.list), write: async (l) => { log.list = structuredClone(l); } },
 			recordFailure: (req, msg) => failures.push([req.id, msg]), notify: (t, b) => notes.push([t, b]), ...over,
 		};
@@ -62,7 +62,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		const d = g.sent[0];
 		r.check("one line is queued", g.sent.length, 1);
 		r.check("the line carries the chat, the request id, the send time and the SENDER", [d.chatId, d.requestId, d.sentAt, d.fromDevice], ["chat-1234", "lq3k2-abc123", NOW - 1000, PH]);
-		r.check("provider, model and effort are the PC's", [d.reglages.aiProvider, d.reglages.aiModel, d.reglages.aiEffort], ["claude-cli", "m1", "high"]);
+		r.check("provider, model and effort are the PC's", [d.reglages.aiProvider, d.reglages.aiModel, d.reglages.aiEffort], ["claude-code", "m1", "high"]);
 		r.check("the text is data: it is the request text, untouched, and nothing else carries it", [d.text, JSON.stringify({ ...d, text: "", notes: [] }).includes("dangerously")], ["Quiz on lists --dangerously-skip-permissions {{home}}", false]);
 		r.check("documents were read through the host reader and attached", d.notes.map(n => n.content), ["DOC:Python/cm1.md"]);
 		r.check("destination is the PC default (a request cannot pick a folder)", d.destination, "");
@@ -92,7 +92,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 	}
 	{ // Invalid, foreign, expired, from this very device: nothing runs and nothing is recorded
 		const g = rig();
-		g.setIncoming([file("lq3k2-bad001", { extra: 1 }), file("lq3k2-bad002", { target: "33333333-3333-4333-8333-333333333333" }), file("lq3k2-bad003", { at: NOW - 30 * 3600e3 }), file("lq3k2-bad004", { documents: [{ path: "../x.md" }] }), file("lq3k2-bad005", {}, "99999999-9999-4999-8999-999999999999"), file("lq3k2-bad006", { from: PC }, PC), file("lq3k2-bad007", { documents: [{ path: "C:/x.md" }] }), file("lq3k2-bad008", { provider: "claude-cli", cliPath: "C:/evil.exe" })]);
+		g.setIncoming([file("lq3k2-bad001", { extra: 1 }), file("lq3k2-bad002", { target: "33333333-3333-4333-8333-333333333333" }), file("lq3k2-bad003", { at: NOW - 30 * 3600e3 }), file("lq3k2-bad004", { documents: [{ path: "../x.md" }] }), file("lq3k2-bad005", {}, "99999999-9999-4999-8999-999999999999"), file("lq3k2-bad006", { from: PC }, PC), file("lq3k2-bad007", { documents: [{ path: "C:/x.md" }] }), file("lq3k2-bad008", { provider: "claude-code", cliPath: "C:/evil.exe" })]);
 		await RU.createRemoteRunner(g.deps).scan();
 		r.check("none of eight bad requests runs, none is recorded as failed or taken", [g.sent.length, g.failures.length, g.log.list.length], [0, 0, 0]);
 	}
@@ -126,6 +126,24 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		const h = rig({ settings: () => ({ aiProvider: "", aiModel: "" }) }); h.setIncoming([file("lq3k2-prov01")]);
 		await RU.createRemoteRunner(h.deps).scan();
 		r.check("no provider on the PC: the request fails with a message, no line", [h.sent.length, h.failures.length], [0, 1]);
+	}
+	{ // Tool-free providers only (a remote request never reaches a provider with live tools)
+		r.check("allow-list: Claude without image and Ollama pass", [RU.remoteProviderAllowed("claude-code", 0), RU.remoteProviderAllowed("ollama")], [true, true]);
+		r.check("allow-list: Codex, Antigravity, unknown, empty and Claude with an image are refused", ["codex", "antigravity-cli", "evil", "", undefined].map(p => RU.remoteProviderAllowed(p)).concat(RU.remoteProviderAllowed("claude-code", 1)), [false, false, false, false, false, false]);
+		for (const p of ["codex", "antigravity-cli"]) {
+			const c = rig({ settings: () => ({ aiProvider: p, aiModel: "m1" }) }); c.setIncoming([file("lq3k2-cdx001")]);
+			await RU.createRemoteRunner(c.deps).scan();
+			r.check(p + " request: refused, nothing queued, failure recorded, PC notified", [c.sent.length, c.failures.length, c.failures[0]?.[1].includes("Claude or Ollama"), c.notes.length], [0, 1, true, 1]);
+			await RU.createRemoteRunner(c.deps).scan();
+			r.check(p + " refusal is not retried", [c.failures.length, c.sent.length], [1, 0]);
+		}
+		const o = rig({ settings: () => ({ aiProvider: "ollama", aiModel: "m1" }) }); o.setIncoming([file("lq3k2-oll001")]);
+		await RU.createRemoteRunner(o.deps).scan();
+		r.check("an Ollama request runs", o.sent.length, 1);
+		// The Claude call used for a remote request (no image) carries the no-tool flag.
+		const { readFileSync } = await import("node:fs");
+		const ai = readFileSync("src/dashboard/ai-client.ts", "utf8");
+		r.check("ai-client grants Claude no tool unless an image is attached", ai.includes('const tools = fichiers.length > 0 ? "Read" : "";') && ai.includes('"--tools", tools,'), true);
 	}
 	{ // Interrupted by a restart
 		const g = rig(); g.log.list = [{ id: "lq3k2-int001", from: PH, at: NOW - 600_000 }]; g.setIncoming([file("lq3k2-int001")]);

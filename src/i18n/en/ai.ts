@@ -455,6 +455,7 @@ export const EN_AI = {
 	"ai.remote.unknownDevice": "your phone",
 	"ai.remote.interrupted": "The PC app was closed before this finished.",
 	"ai.remote.noProvider": "No AI provider is set up on the PC.",
+	"ai.remote.providerNotAllowed": "Phone requests run only with Claude or Ollama on the PC: choose one in Generate on the PC.",
 	"ai.remote.missingDocument": "Document not found on the PC: {path}",
 	"ai.remote.onDevice": "Running on another device",
 	"ai.remote.progress": "Question {n} / {total}",

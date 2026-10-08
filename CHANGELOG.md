@@ -16,6 +16,7 @@ release notes.
 ### Added
 
 - Your PC runs generations requested from your phone, and tells you when one starts.
+- Phone requests run on the PC only with Claude or Ollama; with another provider the request fails with a clear message.
 
 ### Changed
 

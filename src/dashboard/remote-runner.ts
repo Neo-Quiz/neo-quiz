@@ -39,6 +39,20 @@ const INTERRUPTED_AFTER_MS = 10_000;
 const NOTIFY_TITLE_MAX = 80;
 const NOTIFY_BODY_MAX = 200;
 
+/** Providers PROVEN tool-free in this code base: Claude Code launched with
+    `--tools ""` (only when no image is attached: `ai-client.ts` then grants
+    `Read`) and Ollama (an HTTP completion, no process). Codex has an
+    always-on shell tool whose read-only sandbox still READS the whole disk,
+    and Antigravity is an agent with tools: a request typed on another device
+    (attacker text, if that device is compromised) must never reach them. */
+const TOOL_FREE_PROVIDERS: readonly string[] = ["claude-code", "ollama"];
+
+/** Whether a REMOTE request may run with this provider. Unknown or empty: refused. */
+export function remoteProviderAllowed(provider: string | undefined, imageCount = 0): boolean {
+	if (!provider || !TOOL_FREE_PROVIDERS.includes(provider)) return false;
+	return !(provider === "claude-code" && imageCount > 0);
+}
+
 export interface TakenLogEntry extends TakenEntry { reported?: true }
 
 export interface RunnerDeps {
@@ -96,6 +110,13 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		if (!s.aiProvider) {
 			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
 			deps.recordFailure(req, t("ai.remote.noProvider"));
+			return true;
+		}
+		if (!remoteProviderAllowed(s.aiProvider, 0)) {
+			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
+			const message = t("ai.remote.providerNotAllowed");
+			deps.recordFailure(req, message);
+			deps.notify(t("ai.remote.notifyTitle", { device: req.fromName || t("ai.remote.unknownDevice") }).slice(0, NOTIFY_TITLE_MAX), message);
 			return true;
 		}
 		const notes: NoteAttachment[] = [];
