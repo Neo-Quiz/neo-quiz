@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- On the phone, the question editor is marked "Soon" and explains instead of opening.
+
 ## [1.20.46] - 2026-10-08
 
 ### Added

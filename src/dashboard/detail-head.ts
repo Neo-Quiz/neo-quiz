@@ -53,6 +53,8 @@ export interface EnteteDeps {
 	kicker: string;
 	/** True in editing: the toggle button says "Done", otherwise "Edit". */
 	editing: boolean;
+	/** The editor cannot open here (a phone): the button carries a "Soon" badge. */
+	editorLocked?: boolean;
 	onBack(): void;
 	onToggleEditing(): void;
 	/** Actions of every mode (Generate page: "Insert"), before "Edit". */
@@ -150,8 +152,9 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
 
 	// Edit ↔ Done: the SAME page switches. Neutral: the main action stays
 	// "Start the quiz", next to it.
-	const edit = bouton(actions, "qbd-qz-edit", deps.editing ? "check" : "square-pen",
-		t(deps.editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"));
+	const edit = bouton(actions, "qbd-qz-edit" + (deps.editorLocked ? " is-soon" : ""), deps.editing ? "check" : "square-pen",
+		t(deps.editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"),
+		deps.editorLocked ? t("dashboard.quiz.editorSoon") : undefined);
 	poserBouton3dNeutre(edit);
 	edit.addEventListener("click", () => deps.onToggleEditing());
 

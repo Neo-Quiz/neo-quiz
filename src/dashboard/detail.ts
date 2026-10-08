@@ -422,7 +422,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   chaque demande — c'est là que la prochaine viendra. */
 		if (spec.startEditing) {
 			spec.startEditing = false;
-			editing = true;
+			if (!editorLocked()) editing = true;
 		}
 		const entering = !!spec.animateEntry;
 		spec.animateEntry = false;
@@ -527,6 +527,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			// page keeps its usage line.
 			kicker: spec.stats ? dossierDuQuiz(spec.stats.path) : spec.subtitle,
 			editing,
+			editorLocked: editorLocked(),
 			/* In editing, the arrow goes back to the quiz's FICHE, like "Done",
 			   not out of the page: leaving the editor lands on the quiz, and the
 			   fiche's own arrow then goes back to the folder. Without a fiche
@@ -548,11 +549,19 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		});
 	}
 
+	/** The question editor is not ready on a phone yet (2026-10-08): the
+	    button stays, marked "Soon", and explains instead of opening a screen
+	    that does not fit. Quizzes are still made there by generating. */
+	function editorLocked(): boolean {
+		return currentHost().platform.isMobile;
+	}
+
 	/** Bascule consultation ⇄ édition AVEC transition : le corps s'estompe et
 	    glisse légèrement, puis la page se repeint dans l'autre mode et entre.
 	    Sans ce délai, la bascule est un saut sec — et c'est le bouton sur
 	    lequel on revient le plus souvent. */
 	function toggleEditing(page: HTMLElement): void {
+		if (!editing && editorLocked()) { currentHost().ui.notice(t("dashboard.quiz.editorSoonNotice")); return; }
 		editing = !editing;
 		/* L'édition ouvre sur une question ; en sortir ramène à la FICHE, qui
 		   est la consultation du quiz — l'aperçu à deux colonnes, qu'on prenait
@@ -685,7 +694,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			lecon: estLecon(),
 			stat: statOf(quiz),
 			origine: origineDe(quiz),
-			onEditQuestion: (i) => { activeIdx = i; toggleEditing(page); },
+			onEditQuestion: editorLocked() ? undefined : (i) => { activeIdx = i; toggleEditing(page); },
 			attirer: () => entete?.attirer(),
 		});
 		return true;

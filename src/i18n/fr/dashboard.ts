@@ -295,6 +295,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quiz.back": "Retour",
 	"dashboard.quiz.editor": "Modifier",
 	"dashboard.quiz.editDone": "Terminé",
+	"dashboard.quiz.editorSoon": "Bientôt",
+	"dashboard.quiz.editorSoonNotice": "La modification des questions arrive bientôt sur téléphone. Tu peux déjà générer des quiz ici.",
 	"dashboard.quiz.moveUp": "Déplacer vers le haut",
 	"dashboard.quiz.moveDown": "Déplacer vers le bas",
 	"dashboard.quiz.welcomeProgress": "{done} sur {total} questions faites",
