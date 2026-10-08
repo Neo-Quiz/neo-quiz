@@ -441,6 +441,12 @@ export const EN_AI = {
 	"ai.thread.stopped": "Stopped",
 	"ai.thread.failed": "This request failed",
 	"ai.side.running": "Generating",
+	/* Progress of a request running on another device, read from its generations file. */
+	"ai.remote.onDevice": "Running on another device",
+	"ai.remote.progress": "Question {n} / {total}",
+	"ai.remote.progressNoTotal": "Question {n}",
+	"ai.remote.quiz": "Quiz {n} / {total}",
+	"ai.remote.paused": "Paused: the PC is not reachable",
 	"ai.side.otherDevice": "Started on another device",
 	"ai.explain.button": "Explain",
 	"ai.explain.buttonTip": "Ask Claude Code or Codex to explain this question",

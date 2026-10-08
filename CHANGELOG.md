@@ -15,6 +15,7 @@ release notes.
 
 ### Added
 - Chats are now kept in the synced folder, so every device lists the chats of the others.
+- A generation running on your PC shows its progress in the chat, on every device.
 
 ### Fixed
 - On Android, a quiz you delete (or create, rename, import) leaves or joins the list at once, instead of after leaving and reopening the app.

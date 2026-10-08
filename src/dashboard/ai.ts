@@ -38,6 +38,7 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
+import { getRemoteGenerations } from "./remote-generations";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { rankFolders, suggestFolders } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
@@ -390,7 +391,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const id = activeChatId();
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
-	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id); };
+	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations()); };
 	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null;
 	const vueFile = creerVueFile({
 		file: fileGen,

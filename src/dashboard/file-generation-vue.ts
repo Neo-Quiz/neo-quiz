@@ -28,7 +28,8 @@ import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
 import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
-import { peindrePieces, peindreTourEnregistre } from "./chat-record-vue";
+import { peindrePieces, peindreProgressionDistante, peindreTourEnregistre } from "./chat-record-vue";
+import { getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { peindreQuestions } from "./generation-kind-vue";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
@@ -64,6 +65,8 @@ const TEXTE_ETAPE: Record<EtapeGeneration, TransKey> = {
 
 /* L'URL d'aperçu d'une image partie avec la demande, une par fichier : la
    page a rendu la sienne en vidant le composer. */
+/** How often the Generate page re-reads the other devices' generations files while it is on screen. */
+const REMOTE_EVERY_MS = 15_000;
 const urlsImages = new WeakMap<File, string>();
 function urlImage(f: File): string {
 	let u = urlsImages.get(f);
@@ -96,6 +99,9 @@ export function creerVueFile(opts: {
 	/** The key of the last item painted; "" forces the return to the bottom. */
 	let dernierPeint = "";
 	let desabonnerChats: (() => void) | null = null;
+	let desabonnerDistant: (() => void) | null = null;
+	/** Re-reads the other devices' generations files while this page is on screen. */
+	let relecture: number | null = null;
 
 	const affichee = (): boolean => !!zone?.isConnected;
 
@@ -110,6 +116,9 @@ export function creerVueFile(opts: {
 		desabonnerTranscript = null;
 		desabonnerChats?.();
 		desabonnerChats = null;
+		desabonnerDistant?.();
+		desabonnerDistant = null;
+		if (relecture !== null) { window.clearInterval(relecture); relecture = null; }
 		arreterHorloge();
 		zone = null;
 	}
@@ -528,8 +537,9 @@ export function creerVueFile(opts: {
 		// Always full width (2026-09-30): no chat layout any more.
 		zone.classList.add("qbd-ai-file--full");
 		const { id: chatId, record } = opts.chat();
-		const items = threadItems(record, opts.file.lignes(), chatId);
+		const items = threadItems(record, opts.file.lignes(), chatId, getRemoteGenerations());
 		for (const item of items) {
+			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale); continue; }
 			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
@@ -605,6 +615,12 @@ export function creerVueFile(opts: {
 			if (!desabonner) desabonner = opts.file.abonner(peindre, affichee);
 			if (!desabonnerTranscript) desabonnerTranscript = opts.file.abonnerTranscript(surTranscript);
 			if (!desabonnerChats) desabonnerChats = onChatsChanged(peindre);
+			if (!desabonnerDistant) desabonnerDistant = onRemoteGenerations(peindre);
+			if (relecture === null) relecture = window.setInterval(() => {
+				if (!zone?.isConnected) { liberer(); return; }
+				void refreshRemoteGenerations();
+			}, REMOTE_EVERY_MS);
+			void refreshRemoteGenerations();
 			dernierPeint = ""; // un rendu neuf de la page : on se cale en bas
 			peindre();
 		},

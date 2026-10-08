@@ -400,6 +400,12 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.thread.stopped": "Arrêtée",
 	"ai.thread.failed": "Cette demande a échoué",
 	"ai.side.running": "Génération en cours",
+	/* Avancement d'une demande lancée sur un autre appareil, lu dans son fichier de générations. */
+	"ai.remote.onDevice": "En cours sur un autre appareil",
+	"ai.remote.progress": "Question {n} / {total}",
+	"ai.remote.progressNoTotal": "Question {n}",
+	"ai.remote.quiz": "Quiz {n} / {total}",
+	"ai.remote.paused": "En pause : le PC est injoignable",
 	"ai.side.otherDevice": "Lancé sur un autre appareil",
 	"ai.explain.button": "Expliquer",
 	"ai.explain.buttonTip": "Demander à Claude Code ou Codex de t'expliquer cette question",

@@ -17,6 +17,7 @@ import { mathifyElement } from "../engine/mathjax";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import type { ChatRequest } from "./chat-record";
+import type { RunningEntry } from "../shared-state/generations";
 import { peindreQuestions } from "./generation-kind-vue";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
@@ -84,4 +85,24 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), q.state === "failed" ? "alert-triangle" : "square");
 		ajouter(rep, "span", "qbd-ai-reponse-texte", q.state === "failed" ? (q.error || t("ai.thread.failed")) : t("ai.thread.stopped"));
 	}
+}
+
+/** A request running on ANOTHER device (`remote` items of the thread): its
+    message, then its progress read from that device's file. Never a stop
+    button or a transcript: only the PC that runs it can show those. A stale
+    file reads "paused" and never shows progress. */
+export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEntry, stale: boolean): void {
+	const host = currentHost();
+	const tour = ajouter(parent, "div", "qbd-ai-tour");
+	tour.setAttribute("role", "listitem");
+	tour.dataset.distante = entry.requestId;
+	if (entry.text.trim()) ajouter(ajouter(tour, "div", "qbd-ai-message"), "div", "qbd-ai-bulle", entry.text.trim());
+	const rep = ajouter(tour, "div", stale ? "qbd-ai-reponse" : "qbd-ai-reponse qbd-ai-reponse--cours");
+	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), stale ? "pause" : "loader");
+	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
+	ajouter(corps, "span", "qbd-ai-reponse-etape", t("ai.remote.onDevice"));
+	if (stale) { ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.paused")); return; }
+	const p = entry.progress;
+	ajouter(corps, "span", "qbd-ai-reponse-texte", p.total ? t("ai.remote.progress", { n: p.question, total: p.total }) : t("ai.remote.progressNoTotal", { n: p.question }));
+	if (p.quiz !== undefined && p.quizTotal !== undefined) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.quiz", { n: p.quiz, total: p.quizTotal }));
 }

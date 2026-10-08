@@ -13,21 +13,39 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { TourPrecedent } from "./conversation-context";
 import type { ChatRecord, ChatRequest } from "./chat-record";
 import { groupLines } from "./chat-requests";
+import { isStale } from "../shared-state/generations";
+import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
 
 export type ThreadItem =
 	| { kind: "live"; key: string; at: number; lines: LigneGeneration[] }
-	| { kind: "record"; key: string; at: number; request: ChatRequest };
+	| { kind: "record"; key: string; at: number; request: ChatRequest }
+	/** A request running on ANOTHER device, read from its generations file. `stale`: that file is too old to mean a running PC. */
+	| { kind: "remote"; key: string; at: number; entry: RunningEntry; device: string; stale: boolean };
 
 /** A line sent before send times were kept goes after everything recorded. */
 const UNKNOWN_TIME = Number.MAX_SAFE_INTEGER;
 
-export function threadItems(chat: ChatRecord | null, lines: readonly LigneGeneration[], chatId: string): ThreadItem[] {
+export function threadItems(chat: ChatRecord | null, lines: readonly LigneGeneration[], chatId: string, remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = [], now: number = Date.now()): ThreadItem[] {
 	// A group whose lines were all stopped is not shown live: its record entry ("stopped") is.
 	const groups = groupLines(lines).filter(g => g.chatId === chatId && g.lines.some(l => l.etat !== "arret"));
 	const liveKeys = new Set(groups.map(g => g.key));
 	const items: ThreadItem[] = groups.map(g => ({ kind: "live", key: g.key, at: g.lines[0].demande.sentAt ?? UNKNOWN_TIME, lines: g.lines }));
+	const recorded = new Set<string>();
 	if (chat && !chat.deleted) {
-		for (const q of chat.requests) if (!liveKeys.has(q.id)) items.push({ kind: "record", key: q.id, at: q.at, request: q });
+		for (const q of chat.requests) {
+			recorded.add(q.id);
+			if (!liveKeys.has(q.id)) items.push({ kind: "record", key: q.id, at: q.at, request: q });
+		}
+	}
+	// Another device's request: shown only while neither this window nor the record has it.
+	if (!chat?.deleted) {
+		for (const { device, file } of remote) {
+			const stale = isStale(file, now);
+			for (const entry of file.running) {
+				if (entry.chatId !== chatId || liveKeys.has(entry.requestId) || recorded.has(entry.requestId)) continue;
+				items.push({ kind: "remote", key: entry.requestId, at: entry.startedAt, entry, device, stale });
+			}
+		}
 	}
 	return items.sort((a, b) => a.at - b.at);
 }
@@ -41,7 +59,9 @@ export const MAX_CONTEXT_REQUESTS = 12;
     of the quizzes); a recorded one only what the record keeps (document
     names, quiz titles and files, written answers). */
 export function toursOfThread(items: readonly ThreadItem[]): TourPrecedent[] {
-	return items.slice(-MAX_CONTEXT_REQUESTS).map((item): TourPrecedent => {
+	// A request running elsewhere has no content here yet: it is not context.
+	const own = items.filter((i): i is Exclude<ThreadItem, { kind: "remote" }> => i.kind !== "remote");
+	return own.slice(-MAX_CONTEXT_REQUESTS).map((item): TourPrecedent => {
 		if (item.kind === "record") {
 			const q = item.request;
 			return {

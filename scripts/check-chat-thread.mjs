@@ -175,5 +175,23 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 		const items = L.chatListItems([mk("a", "me"), mk("b", "pc")], [], 10, "me");
 		r.check("the list marks the chats started on another device", items.map(i => [i.id, i.foreign]).sort(), [["a", false], ["b", true]]);
 	}
+	// Phase 2: progress read from another device's generations file
+	{
+		const chatRec = { id: "c1", origin: "pc", createdAt: 1, updatedAt: 5, requests: [{ id: "done1", at: 1, from: "pc", text: "Q1", mode: "learn", documents: [], results: [], state: "done" }] };
+		const entry = (over = {}) => ({ requestId: "run1", chatId: "c1", from: "ph", text: "Q2", mode: "learn", startedAt: 10, provider: "p", model: "m", progress: { question: 12, total: 20 }, ...over });
+		const gens = (at) => [{ device: "pc", file: { v: 1, at, running: [entry()] } }];
+		const NOW = 1_000_000;
+		const live = T.threadItems(chatRec, [], "c1", gens(NOW - 1000), NOW);
+		r.check("a request running on another device appears after the recorded ones, with its progress",
+			live.map(i => [i.kind, i.key]), [["record", "done1"], ["remote", "run1"]]);
+		r.check("not stale while fresh", live.at(-1).stale, false);
+		r.check("an old file shows the entry as paused", T.threadItems(chatRec, [], "c1", gens(NOW - 300_000), NOW).at(-1).stale, true);
+		r.check("the entry of another chat is not in this thread", T.threadItems(chatRec, [], "other", gens(NOW), NOW).some(i => i.kind === "remote"), false);
+		const recorded = { ...chatRec, requests: [...chatRec.requests, { ...chatRec.requests[0], id: "run1" }] };
+		r.check("once recorded, the request is shown from the record only", T.threadItems(recorded, [], "c1", gens(NOW), NOW).map(i => i.kind), ["record", "record"]);
+		const items = L.chatListItems([chatRec], [], NOW, "me", gens(NOW));
+		r.check("the sidebar shows the running indicator for a request running elsewhere", items[0].running, true);
+		r.check("but not when that file is stale", L.chatListItems([chatRec], [], NOW, "me", gens(NOW - 300_000))[0].running, false);
+	}
 	r.done();
 });

@@ -11,6 +11,8 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { ChatRecord } from "./chat-record";
 import { chatTitle, firstLineOf } from "./chat-record";
 import { chatOfLine, isLive } from "./chat-requests";
+import { isStale } from "../shared-state/generations";
+import type { GenerationsFile } from "../shared-state/generations";
 
 export interface ChatListItem {
 	id: string;
@@ -24,8 +26,14 @@ export interface ChatListItem {
 	foreign: boolean;
 }
 
-export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = ""): ChatListItem[] {
+export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = "", remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = []): ChatListItem[] {
 	const items = new Map<string, ChatListItem>();
+	// A chat with a request running on another device: that device's file, while it is fresh.
+	const runningElsewhere = new Set<string>();
+	for (const { file } of remote) {
+		if (isStale(file, now)) continue;
+		for (const e of file.running) runningElsewhere.add(e.chatId);
+	}
 	for (const c of chats) {
 		if (!c.deleted) items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && c.origin !== device });
 	}
@@ -43,6 +51,7 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		if (isLive(l)) item.running = true;
 		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
 	}
+	for (const id of runningElsewhere) { const item = items.get(id); if (item) item.running = true; }
 	return [...items.values()].sort((a, b) => b.date - a.date);
 }
 

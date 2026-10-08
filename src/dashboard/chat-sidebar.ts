@@ -25,6 +25,7 @@ import type { ChatListItem } from "./chat-list";
 import { closableLines, groupLines, reconcileChats } from "./chat-requests";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
 import { getChats, importLegacyOnce, removeChat, setChats } from "./chat-store";
+import { getRemoteGenerations, onRemoteGenerations } from "./remote-generations";
 
 /** Days listed by date; anything older is in the folded section. */
 const JOURS_RECENTS = 30;
@@ -61,6 +62,8 @@ export function suivreConversations(file: FileGenerationApp): void {
 	file.abonner(() => synchroniser(file), () => false);
 	// A chat switch lets the replies of the chat just left go, and repaints.
 	onChatsChanged(() => synchroniser(file));
+	// A generation running on another device lights the chat's mark, like a local one.
+	onRemoteGenerations(repeindre);
 	synchroniser(file);
 }
 
@@ -127,7 +130,7 @@ export function poserListeChats(parent: HTMLElement): void {
 		const haut = liste.scrollTop;
 		liste.replaceChildren();
 		const maintenant = Date.now();
-		const jours = groupItemsByDay(chatListItems(getChats(), fileSuivie?.lignes() ?? [], maintenant, chatDevice()), maintenant, JOURS_RECENTS);
+		const jours = groupItemsByDay(chatListItems(getChats(), fileSuivie?.lignes() ?? [], maintenant, chatDevice(), getRemoteGenerations()), maintenant, JOURS_RECENTS);
 		for (const j of jours.filter(j => !j.old)) poserJour(liste, j.kind, j.day, j.chats);
 		const anciens = jours.filter(j => j.old);
 		if (anciens.length) {
