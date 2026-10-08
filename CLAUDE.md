@@ -382,6 +382,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   modèle », et `refreshCliCaches` remplit bien l'instantané que les deux
   lecteurs SYNCHRONES (`getCodexModels`, `isFableOffered`) lisent — sans quoi le
   menu resterait à jamais sur son repli embarqué, sans une erreur.
+- `npm run check:code-fit` — la TAILLE DU CODE sur téléphone (`src/code-fit.ts`) :
+  une ligne qui tient garde la taille normale, une ligne trop longue se réduit à
+  la largeur du bloc sans passer sous 11 px ni au-dessus de la taille normale
+  (arrondi VERS LE BAS pour tenir vraiment), un pincement borné entre 11 et 22 px,
+  et une valeur mémorisée abîmée retombe sur l'ajustement automatique. Dans la CI.
 - `npm run check:md`, `check:export` — rendu markdown des champs texte, écriture
   d'un bloc. Ils chargent le CODE RÉEL, jamais une réplique. **Pas de framework de
   test au-delà** ; ne pas en ajouter pour du code qu'une lecture suffit à juger.

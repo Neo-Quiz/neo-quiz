@@ -362,6 +362,10 @@ jobs:
       - name: Quiz catalogue scanner
         run: npm run check:scanner
 
+      # The phone code-block size: fit down to 11 px, pinch between 11 and 22 px.
+      - name: Phone code block size
+        run: npm run check:code-fit
+
       # The pure scheduler core stays pure and correct.
       - name: Review scheduler core
         run: npm run check:scheduler

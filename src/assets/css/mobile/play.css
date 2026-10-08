@@ -185,3 +185,8 @@ html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="submit"]
 	padding-bottom: 32px;
 }
 
+/* A code block on a phone: one finger scrolls it sideways, two fingers pinch its
+   size (ui/code-fit.ts). The browser must not take a pinch for a page zoom. */
+html.nq-mobile pre.quiz-md-code {
+	touch-action: pan-x pan-y;
+}
