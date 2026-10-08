@@ -15,12 +15,14 @@ release notes.
 
 ### Added
 
+- On the phone, pick the Claude Code model for requests sent to your PC; the PC icon shows a laptop or a desktop.
 - A round "scroll to the latest message" button in the Generate conversation: it appears once you scroll up, shows typing dots while a generation runs and an arrow on hover.
 - Switching conversation restores the provider and model last used in it.
 
 ### Changed
 
 - On the phone, the clock follows the phone's 12/24-hour setting; the Time format option is gone.
+- Folder pages list Learn quizzes, then Tests, each card showing its creation date.
 - On the phone, the Generate page follows the Claude app layout, with the PC's status next to +.
 - On the phone, the question editor is marked "Soon" and explains instead of opening.
 - On a folder page, Learn and Test are separate cards; each shows its progress ring (not a play arrow) and a blue type chip.

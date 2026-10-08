@@ -306,53 +306,77 @@
 	line-height: 1.35;
 	color: var(--text-normal);
 }
-.is-mobile .qbd-ai-pc-row {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding: 10px 2px;
-	border-bottom: 1px solid var(--background-modifier-border);
-	min-width: 0;
-}
-.is-mobile .qbd-ai-pc-row-cle {
-	font-size: 13px;
-	color: var(--text-muted);
-}
-.is-mobile .qbd-ai-pc-row-valeur {
-	font-size: 15px;
-	color: var(--text-normal);
-	overflow-wrap: anywhere;
-}
-.is-mobile .qbd-ai-pc-row.is-error .qbd-ai-pc-row-valeur {
-	color: var(--text-error);
-}
-.is-mobile .qbd-ai-pc-devices-titre {
-	margin-top: 16px;
-	font-size: 13px;
-	color: var(--text-muted);
-}
 .is-mobile .qbd-ai-pc-device {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
 	gap: 12px;
-	padding: 10px 2px;
+	width: 100%;
+	min-height: 48px;
+	padding: 8px 4px;
+	border: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	text-align: left;
 	min-width: 0;
 }
+.is-mobile .qbd-ai-pc-device-icone svg {
+	width: 22px;
+	height: 22px;
+}
 .is-mobile .qbd-ai-pc-device-nom {
+	flex: 1 1 auto;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 15px;
+	font-size: 16px;
 }
-.is-mobile .qbd-ai-pc-device-etat {
+/* The small state dot: blue available, grey away, red a problem. */
+.is-mobile .qbd-ai-pc-dot {
 	flex: none;
-	font-size: 13px;
-	color: var(--text-faint);
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--text-faint);
 }
-.is-mobile .qbd-ai-pc-device-etat[data-on="true"] {
+.is-mobile .qbd-ai-pc-dot[data-tone="ok"] { background: var(--interactive-accent); }
+.is-mobile .qbd-ai-pc-dot[data-tone="error"] { background: var(--text-error); }
+.is-mobile .qbd-ai-pc-device-coche {
+	flex: none;
+	width: 20px;
+	height: 20px;
 	color: var(--interactive-accent);
+}
+.is-mobile .qbd-ai-pc-device-coche svg {
+	width: 20px;
+	height: 20px;
+}
+/* "Claude Code · <model>": a compact pill like the Claude app's model chip. */
+.is-mobile .qbd-ai-model-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: 0 1 auto;
+	min-width: 0;
+	min-height: 36px;
+	padding: 0 12px;
+	border: none;
+	border-radius: 18px;
+	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-size: 14px;
+	white-space: nowrap;
+}
+.is-mobile .qbd-ai-model-pill[hidden] { display: none; }
+.is-mobile .qbd-ai-model-pill-texte {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.is-mobile .qbd-ai-model-pill-chevron svg {
+	width: 14px;
+	height: 14px;
 }
 .is-mobile .qbd-ai-pc-note {
 	margin: 8px 0 0;

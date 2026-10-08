@@ -18,7 +18,10 @@ import { activeChatId, chatDevice, onChatsChanged } from "./chat-session";
 import { getChats } from "./chat-store";
 import { pcStatus } from "./pc-status";
 import type { PcStatus } from "./pc-status";
-import { getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations } from "./remote-generations";
+import { chooseDevice, chosenPc, getDevices, getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations, remoteModel, setRemoteModel } from "./remote-generations";
+import { deviceInfo, pcIcon, soleOnlinePc } from "../shared-state/devices";
+import { isStale } from "../shared-state/generations";
+import { openActionMenu } from "./ui-select";
 import { ilYA } from "./sync-page";
 
 /** The drawer survives a repaint of the page only while it stays open: a chosen chat closes it. */
@@ -104,22 +107,22 @@ export function poserBarreHaute(container: HTMLElement, lateral: HTMLElement, op
 
 /* ── The PC icon next to "+" ── */
 
-/** The icon of the PC everywhere (button, window): the one place to change it. */
-const ICONE_PC = "laptop";
-
 const pcBoutons = new Set<() => void>();
 let abonne = false;
 
 function etatPc(chat: () => ChatRecord | null): PcStatus {
 	return pcStatus({
 		chat: chat(), files: getRemoteGenerations(), now: Date.now(), lastEver: lastPcEver(), peerConnected: getPeerConnected(),
-		peers: getPairedPeers(), chats: getChats(), own: getOwnRequests(), device: chatDevice(),
+		peers: getPairedPeers(), chats: getChats(), own: getOwnRequests(), device: chatDevice(), devices: getDevices(), chosen: chosenPc(),
 	});
 }
 
 const phrase = (s: PcStatus): string => t(("ai.pc.state." + s.reason) as "ai.pc.state.ready");
 
-/** The PC button, right after "+": its colour is the PC's status, a tap opens the window. */
+/** The icon of the target PC: a laptop or a desktop from its device file (a laptop when unknown). Its colour is the state. */
+const iconeDe = (s: PcStatus): string => pcIcon(s.kind ? { kind: s.kind } : null);
+
+/** The PC button, right after "+": its icon is the PC's kind, its colour is the PC's status, a tap opens the window. */
 export function poserBoutonPc(parent: HTMLElement, chat: () => ChatRecord | null): HTMLButtonElement {
 	const host = currentHost();
 	const b = ajouter(parent, "button", "qbd-ai-composer-pc");
@@ -128,7 +131,7 @@ export function poserBoutonPc(parent: HTMLElement, chat: () => ChatRecord | null
 	// The same bubble as the provider one, above the icon while no PC is available; a tap opens the window.
 	const bulle = ajouter(parent, "button", "qbd-ai-provider-nudge", t("ai.pc.nudge"));
 	bulle.type = "button";
-	bulle.addEventListener("click", () => ouvrirFenetrePc(etatPc(chat)));
+	bulle.addEventListener("click", () => ouvrirFenetrePc(chat));
 	const placer = (): void => {
 		requestAnimationFrame(() => {
 			if (bulle.hidden) return;
@@ -148,7 +151,7 @@ export function poserBoutonPc(parent: HTMLElement, chat: () => ChatRecord | null
 		b.dataset.tone = s.tone;
 		b.title = phrase(s);
 		b.replaceChildren();
-		host.ui.setIcon(ajouter(b, "span", "qbd-ai-composer-pc-icone"), ICONE_PC);
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-composer-pc-icone"), iconeDe(s));
 	};
 	pcBoutons.add(peindre);
 	if (!abonne) {
@@ -158,41 +161,82 @@ export function poserBoutonPc(parent: HTMLElement, chat: () => ChatRecord | null
 		onChatsChanged(tout);
 	}
 	peindre();
-	b.addEventListener("click", () => ouvrirFenetrePc(etatPc(chat)));
+	b.addEventListener("click", () => ouvrirFenetrePc(chat));
 	return b;
 }
 
-/** The window: name, state in words, last sight, what runs, the provider, the paired devices. */
-function ouvrirFenetrePc(s: PcStatus): void {
+/** The window: one plain list of the PCs (icon, name, a small state dot); a tap makes one the target, the target is checked. */
+function ouvrirFenetrePc(chat: () => ChatRecord | null): void {
 	requireHost("modals").open({
 		className: "qbd-ai-pc-modal",
-		title: s.name ?? t("ai.pc.title"),
+		title: t("ai.pc.nudge"),
 		onOpen: (m) => {
 			const c = m.contentEl;
-			const etat = ajouter(c, "div", "qbd-ai-pc-state");
-			etat.dataset.tone = s.tone;
-			currentHost().ui.setIcon(ajouter(etat, "span", "qbd-ai-pc-state-icone"), ICONE_PC);
-			ajouter(etat, "span", "qbd-ai-pc-state-texte", phrase(s));
-			const ligne = (cle: string, valeur: string, erreur = false): void => {
-				const l = ajouter(c, "div", "qbd-ai-pc-row" + (erreur ? " is-error" : ""));
-				ajouter(l, "span", "qbd-ai-pc-row-cle", cle);
-				ajouter(l, "span", "qbd-ai-pc-row-valeur", valeur);
-			};
-			const vu = getPeerConnected() ? t("ai.pc.seenNow") : s.seenAt === null ? t("ai.pc.seenNever") : ilYA(s.seenAt);
-			ligne(t("ai.pc.lastSeenLabel"), vu);
-			if (s.error) ligne(t("ai.pc.error"), s.error, true);
-			ligne(t("ai.pc.runningNow"), s.running.length > 0 ? s.running.map(r => r.text).join(" · ") : t("ai.pc.idle"));
-			ligne(t("ai.pc.provider"), s.provider ?? t("ai.pc.providerUnknown"));
-			const pairs = getPairedPeers();
-			if (pairs.length > 0) {
-				ajouter(c, "div", "qbd-ai-pc-devices-titre", t("ai.pc.devices"));
-				for (const p of pairs) {
-					const l = ajouter(c, "div", "qbd-ai-pc-device");
-					ajouter(l, "span", "qbd-ai-pc-device-nom", p.name || t("ai.pc.fallbackName"));
-					ajouter(l, "span", "qbd-ai-pc-device-etat", p.paused ? t("ai.pc.devicePaused") : p.connected ? t("ai.pc.deviceOn") : t("ai.pc.deviceOff")).dataset.on = String(p.connected && !p.paused);
+			const peindre = (): void => {
+				c.replaceChildren();
+				const s = etatPc(chat);
+				const now = Date.now();
+				const files = getRemoteGenerations();
+				const devices = getDevices();
+				const seul = soleOnlinePc(getPairedPeers(), devices);
+				// The device files, plus the target itself when it only has a generations file (an older PC app).
+				const liste = devices.map(d => ({ id: d.device, name: d.name || t("ai.pc.fallbackName"), kind: d.kind }));
+				if (s.device && !deviceInfo(devices, s.device)) liste.push({ id: s.device, name: s.name || t("ai.pc.fallbackName"), kind: "laptop" as const });
+				if (liste.length === 0) {
+					ajouter(c, "p", "qbd-ai-pc-note", t("ai.pc.state.never"));
+					return;
 				}
-				ajouter(c, "p", "qbd-ai-pc-note", t("ai.pc.usedNote"));
-			}
+				for (const d of liste) {
+					const choisi = d.id === s.device;
+					const f = files.find(x => x.device === d.id);
+					const tone = choisi ? s.tone : (f && !isStale(f.file, now)) || seul === d.id ? "ok" : "off";
+					const l = ajouter(c, "button", "qbd-ai-pc-device");
+					l.type = "button";
+					l.setAttribute("role", "radio");
+					l.setAttribute("aria-checked", String(choisi));
+					currentHost().ui.setIcon(ajouter(l, "span", "qbd-ai-pc-device-icone"), pcIcon({ kind: d.kind }));
+					ajouter(l, "span", "qbd-ai-pc-device-nom", d.name);
+					ajouter(l, "span", "qbd-ai-pc-dot").dataset.tone = tone;
+					const coche = ajouter(l, "span", "qbd-ai-pc-device-coche");
+					if (choisi) currentHost().ui.setIcon(coche, "check");
+					l.addEventListener("click", () => { chooseDevice(d.id); peindre(); });
+				}
+				// One short line for the selected device.
+				if (s.device) ajouter(c, "p", "qbd-ai-pc-note", phrase(s));
+			};
+			peindre();
 		},
 	});
+}
+
+/* ── The model pill: "Claude Code · <model>" ── */
+
+/** The Claude models the target PC lists in its device file, empty when it has none (or no PC is known). */
+function modelesDuPc(chat: () => ChatRecord | null): Array<{ id: string; label: string }> {
+	const s = etatPc(chat);
+	return deviceInfo(getDevices(), s.device)?.claudeModels ?? [];
+}
+
+/** The pill in the composer's bottom row. The only provider is Claude Code; a tap lists the target PC's own Claude models (the same menu component as the other action menus). The choice is a phone setting, sent as the request's optional `model`. */
+export function poserPuceModele(parent: HTMLElement, chat: () => ChatRecord | null): HTMLButtonElement {
+	const b = ajouter(parent, "button", "qbd-ai-model-pill");
+	b.type = "button";
+	const peindre = (): void => {
+		if (!b.isConnected) { pcBoutons.delete(peindre); return; }
+		const modeles = modelesDuPc(chat);
+		const choix = remoteModel();
+		const courant = modeles.find(m => m.id === choix);
+		b.hidden = modeles.length === 0;
+		b.replaceChildren();
+		ajouter(b, "span", "qbd-ai-model-pill-texte", courant ? t("ai.model.pill", { model: courant.label }) : t("ai.model.pillDefault"));
+		currentHost().ui.setIcon(ajouter(b, "span", "qbd-ai-model-pill-chevron"), "chevron-down");
+	};
+	pcBoutons.add(peindre);
+	b.addEventListener("click", () => {
+		const modeles = modelesDuPc(chat);
+		const choix = remoteModel();
+		openActionMenu(b, modeles.map(m => ({ label: m.label, checked: m.id === choix, onClick: () => { setRemoteModel(m.id); } })), { className: "qbd-menu-claude" });
+	});
+	peindre();
+	return b;
 }

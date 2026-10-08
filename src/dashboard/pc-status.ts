@@ -10,7 +10,9 @@
 
 import type { ChatRecord } from "./chat-record";
 import type { PairedPeer } from "./remote-generations";
-import { pcReachable, pickTarget } from "./remote-send";
+import { pcReachable, pickTarget, preferredPc } from "./remote-send";
+import { deviceInfo } from "../shared-state/devices";
+import type { DeviceFile, DeviceKind } from "../shared-state/devices";
 import { isStale } from "../shared-state/generations";
 import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
 import type { RemoteRequest } from "../shared-state/remote-request";
@@ -25,6 +27,8 @@ export interface PcStatus {
 	reason: PcReason;
 	/** The journal id of the PC a request would go to, null when none was ever seen. */
 	device: string | null;
+	/** Its computer kind from its device file, null when unknown (the icon then defaults to a laptop). */
+	kind: DeviceKind | null;
 	/** Its name when it can be told (a single paired device, or a single connected one), else null. */
 	name: string | null;
 	/** Epoch ms of the last sign of life, null when never. */
@@ -46,6 +50,10 @@ export interface PcStatusInput {
 	chats: ReadonlyArray<ChatRecord>;
 	own: ReadonlyArray<RemoteRequest>;
 	device: string;
+	/** The device files read from the synced folder (name, kind, models). */
+	devices?: ReadonlyArray<DeviceFile>;
+	/** The PC tapped in the PC window, if any. */
+	chosen?: string | null;
 }
 
 /** The name of the PC when it is unambiguous: the only paired device, else the only connected one. */
@@ -58,7 +66,9 @@ export function pcName(peers: ReadonlyArray<PairedPeer>): string | null {
 const label = (provider?: string, model?: string): string | null => [provider, model].filter(Boolean).join(" · ") || null;
 
 export function pcStatus(i: PcStatusInput): PcStatus {
-	const device = pickTarget(i.chat, i.files, i.now, i.lastEver);
+	const devices = i.devices ?? [];
+	const device = pickTarget(i.chat, i.files, i.now, i.lastEver, preferredPc(i.chosen ?? null, devices, i.peers));
+	const info = deviceInfo(devices, device);
 	const file = device ? i.files.find(f => f.device === device)?.file ?? null : null;
 	const peerSeen = i.peers.reduce<number | null>((m, p) => p.seenAt !== null && (m === null || p.seenAt > m) ? p.seenAt : m, null);
 	const seenAt = i.peerConnected ? i.now : file?.at ?? peerSeen;
@@ -67,7 +77,7 @@ export function pcStatus(i: PcStatusInput): PcStatus {
 	const mine = i.chats.flatMap(c => c.requests).filter(r => r.from === i.device).sort((a, b) => b.at - a.at);
 	const newest = mine[0];
 	const lastLabel = label(newest?.provider, newest?.model);
-	const base = { device, name: pcName(i.peers), seenAt, running, error: null as string | null };
+	const base = { device, kind: info?.kind ?? null, name: info?.name || pcName(i.peers), seenAt, running, error: null as string | null };
 	const live = running[0] ? label(running[0].provider, running[0].model) : null;
 	const expired = i.own.some(q => pendingState(q, { recorded: new Set(), running: new Set(), now: i.now }) === "expired");
 	if (device && newest?.state === "failed" && newest.error) return { ...base, tone: "error", reason: "failed", provider: lastLabel, error: newest.error };

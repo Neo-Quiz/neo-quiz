@@ -37,12 +37,12 @@ import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
 import { settingsOnSwitch } from "./chat-settings";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
-import { poserBarreHaute, poserBoutonPc } from "./phone-chat";
+import { poserBarreHaute, poserBoutonPc, poserPuceModele } from "./phone-chat";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { getOwnRequests, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
+import { chosenPc, getDevices, getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
-import { pcReachable, pickTarget, refusPourTelephone } from "./remote-send";
+import { pcReachable, pickTarget, preferredPc, refusPourTelephone } from "./remote-send";
 import { pasteAnswer, RelayRefused, startRelay } from "./relay-flow";
 import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
@@ -2125,8 +2125,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// Groupe droite : logo fournisseur, sélecteur modèle + effort, puis
 		// bouton d'envoi.
 		const composerTools = ajouter(composerBottom, "div", "qbd-ai-composer-tools");
-		buildProviderControl(composerTools);
-		if (buildModelControl) buildModelControl(composerTools);
+		/* Phone: the only provider is Claude Code on the PC, so the brand and
+		   model controls give way to one pill listing the PC's own Claude models. */
+		if (host.platform.isMobile) poserPuceModele(composerTools, () => chatSurEcran().record);
+		else {
+			buildProviderControl(composerTools);
+			if (buildModelControl) buildModelControl(composerTools);
+		}
 		// L'icône Options est à droite du modèle (2026-09-23).
 		composerTools.appendChild(optsBtn);
 
@@ -2238,7 +2243,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   part. Seul le bouton du fournisseur reste actif, et une bulle posée
 		   juste au-dessus de lui le désigne. Choisir un fournisseur redessine
 		   tout le composer (`render`) : l'état se pose donc une seule fois. */
-		if (!provider) {
+		if (!provider && !host.platform.isMobile) {
 			composer.classList.add("qbd-ai-composer--sans-fournisseur");
 			composerInput.disabled = true;
 			addBtn.disabled = true;
@@ -4119,13 +4124,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function pcJoignable(): boolean {
 		const now = Date.now();
 		const files = getRemoteGenerations();
-		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver());
+		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver(), preferredPc(chosenPc(), getDevices(), getPairedPeers()));
 		return pcReachable(cible, files, now, getPeerConnected());
 	}
 
 	/** Phone: a request can be sent when a PC was ever seen (the chat's, else the last one). The request then waits for that PC. */
 	function pcConnu(): boolean {
-		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now(), lastPcEver()) !== null;
+		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now(), lastPcEver(), preferredPc(chosenPc(), getDevices(), getPairedPeers())) !== null;
 	}
 
 	/** The relay card for the chat on screen; null without a session or when the session belongs to another chat. */
