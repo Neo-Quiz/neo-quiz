@@ -1023,6 +1023,15 @@ html.nq-mobile body.is-mobile .modal-container > .nq-reglages-modal {
 	overflow: visible;
 }
 
+/* Settings is a full page on a phone, not a dialog: the dialog's scale-in
+   (1.05 to 1) and fade read as an odd zoom there (2026-10-08). It opens and
+   closes at once, like any other page; the reduced-motion path already
+   proves the close works without an animation. */
+body.is-mobile .modal-container > .modal.nq-reglages-modal,
+body.is-mobile .modal-container > .modal.nq-reglages-modal.qbd-closing {
+	animation: none !important;
+}
+
 .is-mobile .nq-set {
 	display: block;
 	height: auto;
