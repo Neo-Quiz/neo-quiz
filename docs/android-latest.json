@@ -1,8 +1,8 @@
 {
-  "versionCode": 9,
-  "versionName": "0.2.7",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.7/NeoQuiz-0.2.7.apk",
-  "sha256": "1484b68ec9e15c6f835ab44e03e8ecf2117900e3561e94ae55a225e0f22de580",
-  "size": 55982341,
-  "notes": "Missed Learn questions come back at the end; quiz cards show the progress of a started quiz."
+  "versionCode": 10,
+  "versionName": "0.2.8",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.8/NeoQuiz-0.2.8.apk",
+  "sha256": "07cca4938204df1e0cbf7e3c81a7b4b94a6203ee75534b840a328f0264fe34af",
+  "size": 55986329,
+  "notes": "Reading cards can show the course diagram; a PC generation shows its reasoning live."
 }
