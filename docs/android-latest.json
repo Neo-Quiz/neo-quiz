@@ -1,8 +1,8 @@
 {
-  "versionCode": 4,
-  "versionName": "0.2.2",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.2/NeoQuiz-0.2.2.apk",
-  "sha256": "0bdaeab7f8a935e641c44d3d481c820023503995bc86a55f606cf08d27daeb82",
-  "size": 55920329,
-  "notes": "Neo Quiz pour Android 0.2.2 : plus de flèches dans un quiz (on swipe), haut de l'écran compacté, code qui s'adapte à l'écran et se zoome au pincement."
+  "versionCode": 5,
+  "versionName": "0.2.3",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.3/NeoQuiz-0.2.3.apk",
+  "sha256": "add575ae6eea58253c3f0dc62cca7de55049a9daa8bca528b76088533783c0ef",
+  "size": 55921597,
+  "notes": "Neo Quiz pour Android 0.2.3 : un quiz supprimé, créé ou importé apparaît ou disparaît aussitôt de la liste."
 }
