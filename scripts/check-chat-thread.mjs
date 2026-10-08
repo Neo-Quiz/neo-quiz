@@ -209,7 +209,9 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 		// A chat known ONLY from another device's running generation (no chats file has it yet) is listed, running.
 		const onlyRemote = L.chatListItems([], [], NOW, "me", gens(NOW));
 		r.check("a chat known only from a generation running on another device is listed, running, titled by its request", onlyRemote.map(i => [i.id, i.title, i.running]), [["c1", "Q2", true]]);
-		r.check("a stale generation file lists no chat of its own", L.chatListItems([], [], NOW, "me", gens(NOW - 300_000)), []);
+		r.check("a stale generation file keeps its new chat listed, paused", L.chatListItems([], [], NOW, "me", gens(NOW - 300_000)).map(i => [i.id, i.running]), [["c1", false]]);
+		r.check("a generation file older than 24 h lists no chat of its own", L.chatListItems([], [], NOW, "me", gens(NOW - 25 * 3600e3)), []);
+		r.check("a deleted chat is not kept by a stale generation file", L.chatListItems([{ ...chatRec, deleted: true, requests: [] }], [], NOW, "me", gens(NOW - 300_000)), []);
 		r.check("a deleted chat is not brought back by a generation running on another device", L.chatListItems([{ ...chatRec, deleted: true, requests: [] }], [], NOW, "me", gens(NOW)), []);
 		// Once the result lands, the chat record has the id: the chat is listed ONCE, as the real chat.
 		const merged = L.chatListItems([chatRec], [], NOW, "me", gens(NOW));

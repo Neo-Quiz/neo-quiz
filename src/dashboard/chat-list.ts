@@ -11,7 +11,7 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { ChatRecord } from "./chat-record";
 import { chatTitle, firstLineOf } from "./chat-record";
 import { chatOfLine, isLive } from "./chat-requests";
-import { isStale } from "../shared-state/generations";
+import { isDead, isStale } from "../shared-state/generations";
 import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
 
 export interface ChatListItem {
@@ -30,8 +30,13 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 	const items = new Map<string, ChatListItem>();
 	// A chat with a request running on another device: that device's file, while it is fresh.
 	const runningElsewhere = new Map<string, RunningEntry>();
+	const pausedElsewhere = new Map<string, RunningEntry>();
 	for (const { file } of remote) {
-		if (isStale(file, now)) continue;
+		if (isStale(file, now)) {
+			// A stale file: its new chats stay listed (paused) until the file is a day old.
+			if (!isDead(file, now)) for (const e of file.running) if (!pausedElsewhere.has(e.chatId)) pausedElsewhere.set(e.chatId, e);
+			continue;
+		}
 		for (const e of file.running) if (!runningElsewhere.has(e.chatId)) runningElsewhere.set(e.chatId, e);
 	}
 	for (const c of chats) {
@@ -57,6 +62,10 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		// Known only from the other device's generation: listed until its chat record lands.
 		if (tombstones.has(id)) continue;
 		items.set(id, { id, title: entry.text, date: entry.startedAt, running: true, origin: entry.from, foreign: !!device && entry.from !== device });
+	}
+	for (const [id, entry] of pausedElsewhere) {
+		if (items.has(id) || tombstones.has(id)) continue;
+		items.set(id, { id, title: entry.text, date: entry.startedAt, running: false, origin: entry.from, foreign: !!device && entry.from !== device });
 	}
 	return [...items.values()].sort((a, b) => b.date - a.date);
 }

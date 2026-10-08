@@ -9,7 +9,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { LOG_PREFIX } from "../branding";
-import { latestDevice } from "../shared-state/generations";
+import { latestDevice, staleKey } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import type { RemoteRequest } from "../shared-state/remote-request";
 
@@ -30,6 +30,7 @@ function rememberPc(device: string): void {
 
 let current: RemoteGenerations[] = [];
 let last = "[]";
+let lastStale = "";
 const listeners = new Set<() => void>();
 
 /** The last list read. Empty until the first read. */
@@ -38,12 +39,15 @@ export function getRemoteGenerations(): ReadonlyArray<RemoteGenerations> {
 }
 
 /** Keeps `list`. When it differs from the one kept before, the listeners run and true is returned. */
-export function setRemoteGenerations(list: ReadonlyArray<RemoteGenerations>): boolean {
+export function setRemoteGenerations(list: ReadonlyArray<RemoteGenerations>, now: number = Date.now()): boolean {
 	const latest = latestDevice(list);
 	if (latest) rememberPc(latest);
 	const json = JSON.stringify(list);
-	if (json === last) return false;
+	// A file that stops changing (its PC was killed) goes stale with the clock alone: that is a change too.
+	const stale = staleKey(list, now);
+	if (json === last && stale === lastStale) return false;
 	last = json;
+	lastStale = stale;
 	current = [...list];
 	for (const cb of [...listeners]) {
 		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "remote generations listener failed:", e); }

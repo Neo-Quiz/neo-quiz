@@ -26,6 +26,11 @@ await withSrcModule("src/shared-state/generations.ts", (G) => {
 	r.check("2 minutes old is stale", G.isStale(file(1_000_000), 1_000_000 + 121_000), true);
 	r.check("stamped in the future (skew) is stale", G.isStale(file(1_000_000 + 600_000), 1_000_000), true);
 	r.check("slightly ahead (a few seconds of skew) is still live", G.isStale(file(1_000_000 + 5_000), 1_000_000), false);
+	const pcs = [{ device: "a", file: file(1_000_000) }, { device: "b", file: file(900_000) }];
+	r.check("staleKey names the stale devices", G.staleKey(pcs, 1_050_000), "b");
+	r.check("staleKey changes when a file goes stale with the clock alone", G.staleKey(pcs, 1_050_000) !== G.staleKey(pcs, 1_130_000), true);
+	r.check("staleKey is the same while nothing changes state", G.staleKey(pcs, 1_050_000), G.staleKey(pcs, 1_060_000));
+	r.check("dead after 24 h", [G.isDead(file(0), 24 * 3600e3), G.isDead(file(0), 24 * 3600e3 + 1)], [false, true]);
 
 	// Throttle
 	const f1 = file(1000);
@@ -101,5 +106,18 @@ await withSrcModule("src/dashboard/generations-publisher.ts", async (P) => {
 	const stop = P.publishGenerations({ queue, write: async () => { n++; }, device: "pc" });
 	stop();
 	r.check("an app that never generated writes nothing, even on stop", n, 0);
+	r.done();
+});
+
+await withSrcModule("src/dashboard/remote-generations.ts", (R) => {
+	const r = makeReporter("Generations - remote list repaints on staleness");
+	const list = [{ device: "pc", file: { v: 1, at: 1_000_000, running: [] } }];
+	let repaints = 0;
+	R.onRemoteGenerations(() => { repaints++; });
+	r.check("first list: changed", R.setRemoteGenerations(list, 1_010_000), true);
+	r.check("same list, still fresh: quiet", R.setRemoteGenerations(list, 1_040_000), false);
+	r.check("same list, now stale: repaints", R.setRemoteGenerations(list, 1_130_000), true);
+	r.check("same list, still stale: quiet again", R.setRemoteGenerations(list, 1_200_000), false);
+	r.check("listener ran twice only", repaints, 2);
 	r.done();
 });

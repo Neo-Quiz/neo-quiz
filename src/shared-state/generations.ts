@@ -58,6 +58,18 @@ export function isStale(f: GenerationsFile, now: number): boolean {
 	return now - f.at > STALE_MS || f.at - now > FUTURE_TOLERANCE_MS;
 }
 
+/** A stale file older than this is a dead entry: its chats are no longer listed on their own. */
+export const DEAD_MS = 24 * 3_600_000;
+
+export function isDead(f: GenerationsFile, now: number): boolean {
+	return now - f.at > DEAD_MS;
+}
+
+/** The devices whose file is stale, as a stable key: a change of key means a PC went away or came back. */
+export function staleKey(files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number): string {
+	return files.filter(f => isStale(f.file, now)).map(f => f.device).sort().join("|");
+}
+
 type Line = RequestGroup["lines"][number];
 const live = (l: Line): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
 
