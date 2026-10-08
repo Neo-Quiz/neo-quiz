@@ -518,6 +518,34 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   ne se publie pas ; ce qui est publié reste, et se corrige par la version
   suivante.
 
+- `npm run check:chat-store` — le MAGASIN DES CHATS et le chat actif
+  (`src/dashboard/chat-store.ts`, `chat-session.ts`), sur un faux stockage : un
+  stockage plein ou refusé ne lève jamais et ne fait jamais perdre le chat le
+  plus récent (le plus ancien chat vivant part en premier, une tombe jamais) ;
+  un chat supprimé ne revient pas ; l'archive d'avant n'est importée qu'une
+  fois et sa clé reste pour un retour en arrière ; une valeur stockée ou un
+  identifiant actif hostile ne casse pas la page ; un rechargement n'oublie pas
+  le chat à l'écran. Dans la CI.
+- `npm run check:chat-thread` — les noyaux PURS des chats de la page « Générer »
+  (`chat-requests.ts`, `chat-thread.ts`, `chat-list.ts`,
+  `conversation-context.ts`, `remote-send.ts`) : les lignes de la file groupées
+  en demandes (une demande à plusieurs quiz n'est pas dessinée comme plusieurs),
+  une réponse close n'efface pas une réponse du journal, un chat supprimé ne
+  revient pas d'une sauvegarde tardive, une réponse finie n'est pas masquée
+  tant qu'une sœur tourne, le contexte d'une relance ; et, pour le téléphone,
+  `pcReachable` : un fichier de génération frais dit « en cours », mais un PC
+  OISIF n'écrit rien (Syncthing réplique chaque écriture), donc une connexion
+  Syncthing d'un appareil appairé suffit à le dire joignable. Dans la CI.
+- `npm run check:chat-archives` — l'ancien lecteur d'archives de chats
+  (`chat-archives.ts`) et la recherche : une conversation sans réponse n'est pas
+  enregistrée, une conversation continuée n'apparaît pas deux fois, la liste est
+  bornée, un stockage plein ne perd pas le chat le plus récent, une valeur
+  abîmée donne une liste vide, les jours de la barre latérale se lisent en
+  heure locale. Dans la CI.
+- `npm run check:move-quiz` — « Déplacer vers » du menu ⋯ d'une carte
+  (`moveQuizTo`, `quiz-menu.ts`) : un dossier connu du catalogue mais disparu du
+  disque affiche un message nommé sans rien écrire, une collision de nom garde
+  son message dédié, toute autre panne n'affiche plus « existe déjà ».
 - `npm run check:shared-state` — l'état partagé PAR APPAREIL dans le dossier
   synchronisé (`src/shared-state/merge.ts`, hôte Windows
   `apps/windows/src/host/shared-state.ts`) : fusion pure des examens et des
