@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.47] - 2026-10-08
+
 ### Added
 
 - From the phone, set your PC to Claude Code when it is on another provider.
