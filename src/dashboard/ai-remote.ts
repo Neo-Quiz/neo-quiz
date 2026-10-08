@@ -15,8 +15,9 @@ import { LOG_PREFIX } from "../branding";
 import { currentHost } from "../host/current";
 import { chatDevice, notifyChatsChanged } from "./chat-session";
 import { getChats } from "./chat-store";
-import { getOwnRequests, getRemoteGenerations, lastPcEver, setOwnRequests } from "./remote-generations";
-import { buildRequest, ownAfterSync, targetOf } from "./remote-send";
+import { chosenPc, getDevices, getOwnRequests, getPairedPeers, getRemoteGenerations, lastPcEver, remoteModel, setOwnRequests } from "./remote-generations";
+import { deviceInfo } from "../shared-state/devices";
+import { buildRequest, modelFor, ownAfterSync, preferredPc, targetOf } from "./remote-send";
 import type { RemoteRequest } from "../shared-state/remote-request";
 
 /** The request files of the host (`ChatFiles` of `host/chat-files.ts`, the parts the phone uses). */
@@ -57,9 +58,10 @@ export async function enviquerVersPc(input: { chatId: string; text: string; mode
 	if (!files) throw new Error("request files not ready");
 	const now = Date.now();
 	const chat = getChats().find(c => c.id === input.chatId) ?? null;
-	const target = targetOf(chat, getRemoteGenerations(), now, lastPcEver());
+	const target = targetOf(chat, getRemoteGenerations(), now, lastPcEver(), preferredPc(chosenPc(), getDevices(), getPairedPeers()));
 	if (!target) return false;
-	const req = buildRequest(input, { device: chatDevice(), target, now });
+	const model = modelFor(remoteModel(), deviceInfo(getDevices(), target));
+	const req = buildRequest(model ? { ...input, model } : input, { device: chatDevice(), target, now });
 	await files.writeRequest(req);
 	setOwnRequests(await files.listOwnRequests());
 	notifyChatsChanged();

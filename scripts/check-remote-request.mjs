@@ -19,10 +19,17 @@ await withSrcModule("src/shared-state/remote-request.ts", (R) => {
 	for (const [n, raw] of [["null", null], ["array", []], ["string", "x"], ["v2", good({ v: 2 })], ["missing text", (() => { const g = good(); delete g.text; return g; })()]]) {
 		r.check("invalid: " + n, [v(raw).ok, v(raw).reason], [false, "invalid"]);
 	}
-	// Unknown fields rejected (spec): a request cannot carry a provider, a model, a path to a CLI, a setting
-	for (const extra of ["provider", "model", "effort", "cliPath", "settings", "args", "flags", "destination", "reglages"]) {
+	// Unknown fields rejected (spec): a request cannot carry a provider, a path to a CLI, a setting (its one choice is the optional `model`, below)
+	for (const extra of ["provider", "effort", "cliPath", "settings", "args", "flags", "destination", "reglages"]) {
 		r.check("unknown field refused: " + extra, v({ ...good(), [extra]: "x" }).reason, "invalid");
 	}
+	// The optional Claude model: bounded string, CLI-safe charset, never a leading dash.
+	r.check("a model id is kept", v(good({ model: "claude-opus-5:1" })).request.model, "claude-opus-5:1");
+	r.check("no model: the field is absent", "model" in v(good()).request, false);
+	for (const [n, m] of [["with a space", "opus 5"], ["with a quote", "a'b"], ["with a slash", "a/b"], ["bracket", "opus[1m]"], ["leading dash (an option)", "--dangerous"], ["a single dash", "-p"], ["empty", ""], ["number", 5], ["array", ["opus"]], ["object", {}], ["null", null], ["65 characters", "a".repeat(65)], ["newline", "opus" + String.fromCharCode(10)], ["percent", "a%41"], ["unicode", "opusé"]]) {
+		r.check("model refused: " + n, v(good({ model: m })).reason, "invalid");
+	}
+	r.check("a 64-character model is accepted", v(good({ model: "a".repeat(64) })).ok, true);
 	r.check("unknown field inside a document refused", v(good({ documents: [{ path: "a.md", content: "x" }] })).reason, "invalid");
 	// Identity
 	r.check("file name must equal the id", v(good(), ctx({ fileId: "other-id-123" })).reason, "invalid");

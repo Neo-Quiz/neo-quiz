@@ -185,6 +185,8 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.menuDeleteAll": "Supprimer les {count}",
 	"dashboard.quizzes.deleteCourseConfirmBody": "Supprimer les {count} quiz de « {title} » et leurs stats ?",
 	"dashboard.quizzes.archivedSection": "Archivés",
+	"dashboard.quizzes.sectionLearn": "Apprendre",
+	"dashboard.quizzes.sectionTests": "Tests",
 	"dashboard.quizzes.renameTitle": "Renommer le quiz",
 	"dashboard.quizzes.pathCopied": "Chemin copié",
 	"dashboard.quizzes.pathCopyFailed": "Le chemin n'a pas pu être copié",

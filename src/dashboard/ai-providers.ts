@@ -1,4 +1,5 @@
 import { currentHost, requireHost } from "../host/current";
+import { cleanModels } from "../shared-state/devices";
 import { t, currentLang } from "../i18n";
 import type { Lang } from "../i18n";
 import type { OuvertureWeb } from "./ai-web";
@@ -1368,6 +1369,12 @@ export function getClaudeModels(plan?: ClaudePlanHint): ModelDef[] {
 		: CLAUDE_CODE_MODELS.filter(m => m.value !== "fable");
 	// L'alias EST le nom de famille (« opus ») : un libellé appris le remplace.
 	return rangerCreditsEnTete(models.map(m => labels[m.value] ? { ...m, label: labels[m.value] } : m));
+}
+
+/** The Claude Code models THIS machine's own CLI cache offers right now (cache re-read first, never a hard-coded list): selectable ones only, ids the request charset allows. This is both what a PC publishes in its device file and the list a remote request's `model` is checked against. */
+export async function claudeModelsOffered(): Promise<Array<{ id: string; label: string }>> {
+	await refreshCliCaches();
+	return cleanModels(getClaudeModels().filter(m => !m.disabled).map(m => ({ id: m.value, label: m.label })));
 }
 
 /** Les modèles plus anciens : la section `overflow` du catalogue, précédée

@@ -117,6 +117,9 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 	r.check("claude sans outil, et avec Read pour les images", [argumentsAutorises("claude", claude("claude-opus-4-1", ""), m), argumentsAutorises("claude", claude("opus[1m]", "Read"), m)], [true, true]);
 	r.check("codex, rapide ou non, avec 0 à 3 images", [argumentsAutorises("codex", codex(false, 0), m), argumentsAutorises("codex", codex(true, 1), m), argumentsAutorises("codex", codex(false, 3), m)], [true, true, true]);
 
+	// A remote request's model reaches the CLI ONLY in the model slot of the fixed shape: ids of a PC's list pass, an option-looking one never does.
+	r.check("claude: the model ids a PC offers pass in the model slot", ["opus", "sonnet", "claude-opus-5:1", "claude-sonnet-4.5"].map(x => argumentsAutorises("claude", claude(x, ""), m)), [true, true, true, true]);
+	r.check("claude: a model that is an option, a flag or has a space is refused", ["--dangerously-skip-permissions", "-p", "opus --mcp-config", "a b", "%x"].map(x => argumentsAutorises("claude", claude(x, ""), m)), [false, false, false, false, false]);
 	r.check("claude + --dangerously-skip-permissions : refusé", argumentsAutorises("claude", [...claude("sonnet", ""), "--dangerously-skip-permissions"], m), false);
 	r.check("claude: the old one-object json output, or the stream without its partial messages: refused",
 		[argumentsAutorises("claude", ["-p", "--output-format", "json", "--model", "sonnet", "--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"], m),
@@ -460,6 +463,24 @@ await withSrcModule("apps/windows/electron/process.ts", ({ citerPs }) => {
 				executer(`$v = ${citerPs(valeur)}; [Console]::Out.Write($v)`), valeur);
 		}
 	}
+	r.done();
+});
+
+/* ── THIS COMPUTER'S NAME AND KIND (appareil.ts): one constant script, two words out, failure = laptop, probed once. */
+await withSrcModule("apps/windows/electron/appareil.ts", async ({ lireType, nomPropre, creerInfosAppareil, SCRIPT_TYPE }) => {
+	const r = makeReporter("Appareil: type et nom");
+	const NL = String.fromCharCode(10);
+	r.check("desktop and laptop are read as such", [lireType("desktop" + NL), lireType("laptop")], ["desktop", "laptop"]);
+	r.check("anything else (junk, empty, null, a number, a longer line) is a laptop", [lireType("Desktop!"), lireType(""), lireType(null), lireType(7), lireType("desktop laptop")], ["laptop", "laptop", "laptop", "laptop", "laptop"]);
+	r.check("the script is constant: no environment variable, no interpolation, no argument", /\$env:|\$\{|\$args/.test(SCRIPT_TYPE), false);
+	r.check("the name is one clean line of 64 characters at most", [nomPropre("PC-" + NL + "A"), nomPropre("x".repeat(100)).length, nomPropre(5), nomPropre("  Aero  ")], ["PC-A", 64, "", "Aero"]);
+	let lancements = 0;
+	const infos = creerInfosAppareil({ executer: async () => { lancements++; return "desktop"; }, nom: () => "Tour" });
+	const [a, b] = await Promise.all([infos(), infos()]);
+	await infos();
+	r.check("the probe runs once for any number of calls", [a.kind, a.name, b.kind, lancements], ["desktop", "Tour", "desktop", 1]);
+	const casse = creerInfosAppareil({ executer: async () => { throw new Error("x"); }, nom: () => { throw new Error("y"); } });
+	r.check("a failing probe and name never reject: laptop, empty name", await casse(), { name: "", kind: "laptop" });
 	r.done();
 });
 

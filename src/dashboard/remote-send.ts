@@ -5,11 +5,13 @@ export { latestDevice } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import { pendingState, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest } from "../shared-state/remote-request";
+import { deviceInfo, soleOnlinePc } from "../shared-state/devices";
+import type { DeviceFile } from "../shared-state/devices";
 import { relativeToRoot } from "../shared-state/chat-merge";
 
 /* The phone's sender core (pure): builds a request the PC's own validator accepts, picks the PC, and says which of our request files can go. */
 
-export interface SendInput { chatId: string; text: string; mode: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }> }
+export interface SendInput { chatId: string; text: string; mode: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }>; model?: string }
 
 export function buildRequest(input: SendInput, ctx: { device: string; target: string; deviceName?: string; now: number; newId?: () => string }): RemoteRequest {
 	const id = (ctx.newId ?? newRequestId)();
@@ -17,14 +19,17 @@ export function buildRequest(input: SendInput, ctx: { device: string; target: st
 	if (ctx.deviceName) req.fromName = ctx.deviceName.slice(0, 64);
 	if (input.types?.length) req.types = [...input.types];
 	if (input.count) req.count = input.count;
+	if (input.model) req.model = input.model;
 	// The PC's own validator is the single judge: a request it would refuse is never written.
 	const verdict = validateRemote(req, { device: ctx.target, fileDevice: ctx.device, fileId: id, now: ctx.now });
 	if (!verdict.ok) throw new Error("request refused: " + verdict.reason);
 	return verdict.request;
 }
 
-/** Where a request goes: the chat's PC while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen. */
-export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastEver: string | null = null): string | null {
+/** Where a request goes: the preferred PC (chosen by hand, else the only one online), else the chat's PC while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen. */
+export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastEver: string | null = null, preferred: string | null = null): string | null {
+	// The PC tapped in the PC window, or the only one online (`preferred`, see `preferredPc`), wins over everything.
+	if (preferred) return preferred;
 	if (chat) {
 		const own = files.find(f => f.device === chat.origin);
 		if (own && !isStale(own.file, now)) return chat.origin;
@@ -46,8 +51,19 @@ export function refusPourTelephone(doc: PhoneDocument, rootId: string): "ai.remo
 }
 
 /** Where a request goes (see `pickTarget`). Null only when no PC was ever seen: an empty target is never written. */
-export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null): string | null {
-	return pickTarget(chat, files, now, lastSeen);
+export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null, preferred: string | null = null): string | null {
+	return pickTarget(chat, files, now, lastSeen, preferred);
+}
+
+/** The PC the phone prefers: the one tapped in the PC window while it still has a device file, else the only paired PC online (matched by name), else null. */
+export function preferredPc(chosen: string | null, devices: ReadonlyArray<DeviceFile>, peers: ReadonlyArray<{ name: string; connected: boolean; paused: boolean }>): string | null {
+	if (chosen && deviceInfo(devices, chosen)) return deviceInfo(devices, chosen)!.device;
+	return soleOnlinePc(peers, devices);
+}
+
+/** The model a request carries: the phone's choice, only while the target PC lists it (its device file); else none, and the PC uses its own default. */
+export function modelFor(choice: string | null, info: DeviceFile | null): string | undefined {
+	return choice && info?.claudeModels.some(m => m.id === choice) ? choice : undefined;
 }
 
 /** Whether a PC is reachable: its generations file is present and fresh. */

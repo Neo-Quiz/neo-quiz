@@ -1,4 +1,5 @@
 import { isCleanRelativePath } from "./chat-merge";
+import { MODEL_ID } from "./devices";
 
 /* ══════════════════════════════════════════════════════════
    A REQUEST SENT BY A DEVICE THAT CANNOT GENERATE (PURE)
@@ -7,8 +8,9 @@ import { isCleanRelativePath } from "./chat-merge";
    the target PC only. THE SECURITY BOUNDARY (spec, "The PC side of a remote
    request"): a synced file makes the PC launch a CLI, so everything is
    checked here before anything runs: strict schema with unknown fields
-   REJECTED (a request cannot name a provider, a model, a CLI path or a
-   setting), sizes, relative document paths limited to text documents outside
+   REJECTED (a request cannot name a provider, a CLI path or a setting; its
+   one choice is an optional Claude `model` id, bounded here, and the runner
+   accepts it only if it is in the PC's own current list), sizes, relative document paths limited to text documents outside
    the internal folder, sender = directory, target = this device, age. The
    request text is data for the prompt; nothing here ever reaches an argument.
    No DOM, no host, no clock: `now` is always an input.
@@ -24,6 +26,8 @@ export const MAX_REQUEST_CHARS = 100_000;
 export interface RemoteRequest {
 	v: 1; id: string; at: number; from: string; fromName?: string; target: string; chatId: string;
 	text: string; mode: "learn" | "practice"; types?: string[]; count?: number; documents: Array<{ path: string }>;
+	/** A Claude Code model id, only ever compared with the PC's own current list. */
+	model?: string;
 }
 export type Refusal = "invalid" | "wrong-target" | "wrong-sender" | "future" | "expired";
 export type Verdict = { ok: true; request: RemoteRequest } | { ok: false; reason: Refusal };
@@ -32,7 +36,7 @@ export type Verdict = { ok: true; request: RemoteRequest } | { ok: false; reason
 export const SLUG = /^[a-z0-9][a-z0-9-]{3,63}$/;
 /** Shape of a device id (the directory a request is found under). */
 export const DEVICE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KEYS = new Set(["v", "id", "at", "from", "fromName", "target", "chatId", "text", "mode", "types", "count", "documents"]);
+const KEYS = new Set(["v", "id", "at", "from", "fromName", "target", "chatId", "text", "mode", "types", "count", "documents", "model"]);
 const DOCUMENT_EXTENSION = /\.(md|markdown|txt)$/i;
 /** Drive letters and streams (`:`), wildcards, controls (C0, DEL, C1), invisible and bidi characters
     (zero width, line/paragraph separators, directional overrides and isolates, BOM, soft hyphen),
@@ -96,6 +100,11 @@ export function validateRemote(raw: unknown, ctx: { device: string; fileDevice: 
 	if (raw.count !== undefined) {
 		if (typeof raw.count !== "number" || !Number.isInteger(raw.count) || raw.count < 1 || raw.count > 100) return invalid;
 		out.count = raw.count;
+	}
+	if (raw.model !== undefined) {
+		// Same shape the CLI template accepts (no leading dash, no space or quote): charset [A-Za-z0-9._:-], 64 at most.
+		if (typeof raw.model !== "string" || !MODEL_ID.test(raw.model)) return invalid;
+		out.model = raw.model;
 	}
 	return { ok: true, request: out };
 }

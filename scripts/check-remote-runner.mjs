@@ -19,6 +19,20 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	r.check("more than 10 documents are refused when building", refuses(input({ documents: Array.from({ length: 11 }, (_, i) => ({ path: `d${i}.md` })) })), "refused");
 	r.check("a document outside the synced folder is refused when building", refuses(input({ documents: [{ path: "../x.md" }] })), "refused");
 	r.check("a chat id that is not a slug is refused when building", refuses(input({ chatId: "Chat 1" })), "refused");
+	// The optional model and the target preference
+	const withModel = S.buildRequest(input({ model: "sonnet" }), ctx);
+	r.check("a request with a model passes the PC's validator and carries it", [R.validateRemote(withModel, { device: PC, fileDevice: PH, fileId: "lq3k2-abc123", now: NOW + 1000 }).ok, withModel.model], [true, "sonnet"]);
+	r.check("a malformed model is refused when building", refuses(input({ model: "--tools" })), "refused");
+	const info = { claudeModels: [{ id: "opus", label: "Opus" }] };
+	r.check("modelFor: the choice only while the PC lists it", [S.modelFor("opus", info), S.modelFor("sonnet", info), S.modelFor(null, info), S.modelFor("opus", null)], ["opus", undefined, undefined, undefined]);
+	const dev = (device, name) => ({ device, name, kind: "laptop", claudeModels: [], updatedAt: 1 }), peer = (name, connected = true, paused = false) => ({ name, connected, paused });
+	r.check("preferred: the PC tapped by hand while it has a device file", S.preferredPc("pcB", [dev("pcA", "A"), dev("pcB", "B")], [peer("A")]), "pcB");
+	r.check("preferred: a chosen PC with no device file is ignored", S.preferredPc("gone", [dev("pcA", "A")], [peer("A")]), "pcA");
+	r.check("preferred: the only paired PC online is picked by itself", S.preferredPc(null, [dev("pcA", "A"), dev("pcB", "B")], [peer("a"), peer("B", false)]), "pcA");
+	r.check("preferred: two online, none chosen: no guess", S.preferredPc(null, [dev("pcA", "A"), dev("pcB", "B")], [peer("A"), peer("B")]), null);
+	r.check("preferred: a paused peer is not online; two files of one name: no guess", [S.preferredPc(null, [dev("pcA", "A")], [peer("A", true, true)]), S.preferredPc(null, [dev("pcA", "A"), dev("pcC", "A")], [peer("A")])], [null, null]);
+	const g0 = (device, at) => ({ device, file: { v: 1, at, running: [] } });
+	r.check("target: the preferred PC wins over the chat's fresh PC and the freshest one", S.pickTarget({ origin: "pcA" }, [g0("pcA", NOW - 1000), g0("pcB", NOW - 500)], NOW, null, "pcC"), "pcC");
 	r.check("a generated request id matches the slug", R.SLUG.test(S.buildRequest(input(), { ...ctx, newId: undefined }).id), true);
 
 	const gens = (device, at) => ({ device, file: { v: 1, at, running: [] } });
@@ -51,6 +65,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 			},
 			readDocument: async (rel) => rel.endsWith("missing.md") ? null : ({ name: rel.split("/").pop(), content: "DOC:" + rel, path: "Root/" + rel, source: "vault" }),
 			settings: () => ({ aiProvider: "claude-code", aiModel: "m1", aiEffort: "high", aiOutputFolder: "Generated" }),
+			claudeModels: async () => ["opus", "sonnet", "haiku"],
 			takenLog: { read: async () => structuredClone(log.list), write: async (l) => { log.list = structuredClone(l); } },
 			recordFailure: (req, msg) => failures.push([req.id, msg]), notify: (t, b) => notes.push([t, b]), ...over,
 		};
@@ -130,34 +145,46 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		r.check("a missing document fails the request with a message, nothing runs", [g.sent.length, g.failures.map(f => f[0]), g.failures[0][1].includes("missing.md")], [0, ["lq3k2-doc001"], true]);
 		await RU.createRemoteRunner(g.deps).scan();
 		r.check("and it is reported once", g.failures.length, 1);
-		const h = rig({ settings: () => ({ aiProvider: "", aiModel: "" }) }); h.setIncoming([file("lq3k2-prov01")]);
-		await RU.createRemoteRunner(h.deps).scan();
-		r.check("no provider on the PC: the request fails with a message, no line", [h.sent.length, h.failures.length], [0, 1]);
 	}
 	{ // Tool-free providers only (a remote request never reaches a provider with live tools)
 		r.check("allow-list: Claude without image and Ollama pass", [RU.remoteProviderAllowed("claude-code", 0), RU.remoteProviderAllowed("ollama")], [true, true]);
 		r.check("allow-list: Codex, Antigravity, unknown, empty and Claude with an image are refused", ["codex", "antigravity-cli", "evil", "", undefined].map(p => RU.remoteProviderAllowed(p)).concat(RU.remoteProviderAllowed("claude-code", 1)), [false, false, false, false, false, false]);
-		for (const p of ["codex", "antigravity-cli"]) {
-			const c = rig({ settings: () => ({ aiProvider: p, aiModel: "m1" }) }); c.setIncoming([file("lq3k2-cdx001")]);
-			await RU.createRemoteRunner(c.deps).scan();
-			r.check(p + " request: refused, nothing queued, failure recorded, PC notified", [c.sent.length, c.failures.length, c.failures[0]?.[1].includes("Claude or Ollama"), c.notes.length], [0, 1, true, 1]);
-			await RU.createRemoteRunner(c.deps).scan();
-			r.check(p + " refusal is not retried", [c.failures.length, c.sent.length], [1, 0]);
+		{ // A remote line ALWAYS runs with Claude Code, whatever the PC's own provider is
+			for (const p of ["codex", "antigravity-cli", "ollama", "", "evil"]) {
+				const c = rig({ settings: () => ({ aiProvider: p, aiModel: "gpt-x", aiEffort: "xhigh" }) }); c.setIncoming([file("lq3k2-cdx001")]);
+				await RU.createRemoteRunner(c.deps).scan();
+				r.check("PC on '" + p + "': the line runs with Claude Code, its default model, no foreign effort", c.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel, d.reglages.aiEffort]), [["claude-code", "", undefined]]);
+				r.check("and every provider the queue would run passes its allow-list", c.sent.every(d => RU.remoteProviderAllowed(d.reglages.aiProvider, 0)), true);
+			}
+			const own = rig(); own.setIncoming([file("lq3k2-own001")]);
+			await RU.createRemoteRunner(own.deps).scan();
+			r.check("no model requested, PC on Claude: the PC's own Claude model", own.sent.map(d => d.reglages.aiModel), ["m1"]);
+			const ok = rig(); ok.setIncoming([file("lq3k2-mod001", { model: "sonnet" })]);
+			await RU.createRemoteRunner(ok.deps).scan();
+			r.check("a model in the PC's list is used", ok.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel]), [["claude-code", "sonnet"]]);
+			const ollamaPc = rig({ settings: () => ({ aiProvider: "ollama", aiModel: "qwen3:8b" }) }); ollamaPc.setIncoming([file("lq3k2-mod002", { model: "haiku" })]);
+			await RU.createRemoteRunner(ollamaPc.deps).scan();
+			r.check("PC on Ollama + requested model: Claude Code with that model", ollamaPc.sent.map(d => [d.reglages.aiProvider, d.reglages.aiModel]), [["claude-code", "haiku"]]);
+			for (const m of ["claude-opus-9", "fable", "OPUS", "sonnet "]) {
+				const bad = rig(); bad.setIncoming([file("lq3k2-mod003", { model: m })]);
+				await RU.createRemoteRunner(bad.deps).scan();
+				r.check("model '" + m + "' not in the PC's list: refused, nothing queued, recorded, PC notified", [bad.sent.length, bad.failures.length, bad.failures[0]?.[1].includes(m), bad.notes.length], m.endsWith(" ") ? [0, 0, undefined, 0] : [0, 1, true, 1]);
+			}
+			const again = rig(); again.setIncoming([file("lq3k2-mod004", { model: "nope" })]);
+			await RU.createRemoteRunner(again.deps).scan(); await RU.createRemoteRunner(again.deps).scan();
+			r.check("a refused model is reported once and never retried", [again.failures.length, again.sent.length], [1, 0]);
+			const live = ["opus"];
+			const moving = rig({ claudeModels: async () => live }); moving.setIncoming([file("lq3k2-mod005", { model: "sonnet" })]);
+			await RU.createRemoteRunner(moving.deps).scan();
+			r.check("the list is read at admission: a model the PC no longer offers is refused", moving.sent.length, 0);
 		}
-		{ // The provider is frozen once: a switch to Codex while a document is read changes nothing, and Codex-at-read is refused
+		{ // The provider is frozen once: a switch during the document read changes nothing about the model choice
 			const live = { aiProvider: "claude-code", aiModel: "m1" };
-			const g = rig({ settings: () => live, readDocument: async (rel) => { live.aiProvider = "codex"; return { name: "cm1.md", content: "x", path: "Root/" + rel, source: "vault" }; } });
+			const g = rig({ settings: () => live, readDocument: async (rel) => { live.aiModel = "changed"; return { name: "cm1.md", content: "x", path: "Root/" + rel, source: "vault" }; } });
 			g.setIncoming([file("lq3k2-race01")]);
 			await RU.createRemoteRunner(g.deps).scan();
-			r.check("a provider switched to Codex during the document read does not change the frozen copy", g.sent.map(d => d.reglages.aiProvider), ["claude-code"]);
-			const h = rig({ settings: () => live, readDocument: async (rel) => { live.aiProvider = "claude-code"; return { name: "cm1.md", content: "x", path: "Root/" + rel, source: "vault" }; } });
-			live.aiProvider = "codex"; h.setIncoming([file("lq3k2-race02")]);
-			await RU.createRemoteRunner(h.deps).scan();
-			r.check("a provider that is Codex at admission is refused even if switched back later", [h.sent.length, h.failures.length], [0, 1]);
+			r.check("a setting changed during the document read does not change the frozen copy", g.sent.map(d => d.reglages.aiModel), ["m1"]);
 		}
-		const o = rig({ settings: () => ({ aiProvider: "ollama", aiModel: "m1" }) }); o.setIncoming([file("lq3k2-oll001")]);
-		await RU.createRemoteRunner(o.deps).scan();
-		r.check("an Ollama request runs", o.sent.length, 1);
 		// The Claude call used for a remote request (no image) carries the no-tool flag.
 		const { readFileSync } = await import("node:fs");
 		const ai = readFileSync("src/dashboard/ai-client.ts", "utf8");

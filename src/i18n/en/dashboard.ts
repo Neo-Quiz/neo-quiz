@@ -220,6 +220,8 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.menuDeleteAll": "Delete all {count}",
 	"dashboard.quizzes.deleteCourseConfirmBody": "Remove the {count} quizzes of “{title}” and their stats?",
 	"dashboard.quizzes.archivedSection": "Archived",
+	"dashboard.quizzes.sectionLearn": "Learn",
+	"dashboard.quizzes.sectionTests": "Tests",
 	"dashboard.quizzes.renameTitle": "Rename quiz",
 	"dashboard.quizzes.pathCopied": "Path copied",
 	"dashboard.quizzes.pathCopyFailed": "Could not copy the path",

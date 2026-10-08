@@ -8,8 +8,13 @@
      ignored and never recorded.
    - The request text is DATA: it is the `text` of the line and nothing else.
      It never reaches an argument, a path, a flag or a setting.
-   - Provider, model, effort and the destination folder are the PC's own
-     current choice (`figerReglages(settings())`, destination ""). Types are
+   - A remote line ALWAYS runs with Claude Code (the no-tool call shape), whatever
+     the PC's own provider is. The model is the request's optional `model` only
+     if it is in the PC's CURRENT Claude list (`claudeModels`), else the request
+     is refused with a recorded message and a notification (never replaced,
+     never passed through); without `model`, the PC's own Claude default. The
+     rest (effort, destination "") is the PC's own frozen choice
+     (`figerReglages(settings())`). Types are
      kept only when canonical; the documents are read through the host
      (the bridge perimeter) from RELATIVE paths the validator already cleaned.
    - Exactly once: the local taken log (never synced) is written BEFORE the
@@ -53,6 +58,8 @@ export interface RunnerDeps {
 	/** Reads one RELATIVE document path through the host (perimeter); null when missing, unreadable or over 1 MB. */
 	readDocument(rel: string): Promise<NoteAttachment | null>;
 	settings(): AiSettings;
+	/** The Claude model ids THIS PC's CLI cache offers now (selectable ones). */
+	claudeModels(): Promise<ReadonlyArray<string>>;
 	/** The local log of requests taken (settings key `remoteTaken`, never synced). */
 	takenLog: { read(): Promise<TakenLogEntry[]>; write(list: TakenLogEntry[]): Promise<void> };
 	/** Records a failure for a request that never produced a line (no provider, unreadable document, interrupted). */
@@ -100,19 +107,26 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		}
 		if (admit(req, { taken: log, busy: live() }, deps.now()) !== "run") return false;
 		// ONE frozen copy for the whole admission: the live settings may change while documents are read.
-		const s = figerReglages(deps.settings());
-		if (!s.aiProvider) {
+		const frozen = figerReglages(deps.settings());
+		const failAndNotify = (message: string): true => {
 			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
-			deps.recordFailure(req, t("ai.remote.noProvider"));
-			return true;
-		}
-		if (!remoteProviderAllowed(s.aiProvider, 0)) {
-			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
-			const message = t("ai.remote.providerNotAllowed");
 			deps.recordFailure(req, message);
-			deps.notify(t("ai.remote.notifyTitle", { device: req.fromName || t("ai.remote.unknownDevice") }).slice(0, NOTIFY_TITLE_MAX), message);
+			deps.notify(t("ai.remote.notifyTitle", { device: req.fromName || t("ai.remote.unknownDevice") }).slice(0, NOTIFY_TITLE_MAX), message.slice(0, NOTIFY_BODY_MAX));
 			return true;
+		};
+		// The requested model must be in the PC's CURRENT Claude list: otherwise refused, never swapped for another.
+		if (req.model !== undefined && !(await deps.claudeModels()).includes(req.model)) {
+			return failAndNotify(t("ai.remote.modelNotOffered", { model: req.model }));
 		}
+		const ownClaude = frozen.aiProvider === "claude-code";
+		const s = {
+			...frozen,
+			aiProvider: "claude-code",
+			// No `model`: the PC's own Claude model when it uses Claude Code, else "" (the Claude default).
+			aiModel: req.model ?? (ownClaude ? frozen.aiModel : ""),
+			// An effort chosen for another provider means nothing to Claude Code.
+			aiEffort: ownClaude ? frozen.aiEffort : undefined,
+		};
 		const notes: NoteAttachment[] = [];
 		for (const d of req.documents) {
 			const note = await deps.readDocument(d.path);
