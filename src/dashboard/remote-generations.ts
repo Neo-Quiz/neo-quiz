@@ -57,6 +57,22 @@ export function onRemoteGenerations(cb: () => void): () => void {
 	return () => { listeners.delete(cb); };
 }
 
+let peerConnected = false;
+
+/** Whether the embedded Syncthing is connected to at least one paired device, as last reported by the Sync state. */
+export function getPeerConnected(): boolean {
+	return peerConnected;
+}
+
+/** Keeps the connection state; listeners run only when it changed (a PC going on or off repaints the "away" notes). */
+export function setPeerConnected(connected: boolean): void {
+	if (connected === peerConnected) return;
+	peerConnected = connected;
+	for (const cb of [...listeners]) {
+		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "remote generations listener failed:", e); }
+	}
+}
+
 let ownRequests: RemoteRequest[] = [];
 
 /** The phone's own requests still waiting on disk (not yet taken or recorded), as last read. */

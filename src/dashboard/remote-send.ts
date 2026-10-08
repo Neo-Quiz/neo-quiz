@@ -55,6 +55,12 @@ export function pcFresh(device: string, files: ReadonlyArray<{ device: string; f
 	return files.some(f => f.device === device && !isStale(f.file, now));
 }
 
+/** Whether a request sent to `device` will be picked up: a fresh generations file means it is running; otherwise an idle PC writes nothing, so a connected paired device (Syncthing) with a PC ever seen counts as reachable. The generations file is named by the journal device id, not the Syncthing id, so the connection is checked on any paired device. */
+export function pcReachable(device: string | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, peerConnected: boolean): boolean {
+	if (device === null) return false;
+	return pcFresh(device, files, now) || peerConnected;
+}
+
 /** The phone's own request files after a sync. `drop`: the ids to delete from disk (recorded in a chat, or expired past 24 h).
     `keep`: what the phone lists, newest first: the waiting files on disk, and the expired ones (on disk, or deleted this session).
     A remembered request is listed only while it is still expired and not recorded. */

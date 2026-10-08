@@ -41,6 +41,7 @@ import type { RelayDeps } from "../../../src/dashboard/relay-flow";
 import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
 import { notifyPc } from "./host/notify";
 import { ecrireReglage, lireReglage } from "./host/folder";
+import { setPeerConnected } from "../../../src/dashboard/remote-generations";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
@@ -715,6 +716,13 @@ async function demarrer(): Promise<void> {
 			}
 		};
 		pont().sync?.surDonneesRecues(() => { void rechargerApresSync(); });
+		/* Reachability of a PC from the phone: an idle PC writes nothing, so the
+		   connection of the paired devices (the Sync page's own state) is what says it is on. */
+		const suivreConnexion = (e: { appareils: Array<{ connecte: boolean; enPause?: boolean }> }): void => {
+			setPeerConnected(e.appareils.some(x => x.connecte && !x.enPause));
+		};
+		void pont().sync?.etat().then(suivreConnexion).catch(() => {});
+		pont().sync?.surEtat(suivreConnexion);
 		/* A `neo-quiz://pair` link clicked in the browser (the pairing page of
 		   the site): the settings open on Sync with "Add a device" filled in.
 		   Read once at start (a link that launched the app) and at each push

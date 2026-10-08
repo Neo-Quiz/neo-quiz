@@ -268,6 +268,11 @@ await withSrcModule(["src/dashboard/remote-send.ts"], (S) => {
 	r.check("no PC ever seen: no target at all (never an empty one)", S.targetOf(null, [], NOW, null), null);
 	r.check("a PC is reachable while its file is fresh", S.pcFresh("A", [fresh("A")], NOW), true);
 	r.check("a stale or absent PC is not reachable", [S.pcFresh("A", [stale("A")], NOW), S.pcFresh("B", [fresh("A")], NOW)], [false, false]);
+	r.check("idle PC: stale file but a paired device connected = reachable", S.pcReachable("A", [stale("A")], NOW, true), true);
+	r.check("idle PC: no file at all but connected = reachable", S.pcReachable("A", [], NOW, true), true);
+	r.check("nothing connected and a stale file = not reachable", S.pcReachable("A", [stale("A")], NOW, false), false);
+	r.check("a fresh file is reachable even when not connected", S.pcReachable("A", [fresh("A")], NOW, false), true);
+	r.check("no PC ever seen is never reachable", S.pcReachable(null, [], NOW, true), false);
 	r.check("the device seen most recently, stale or not", S.latestDevice([stale("A"), fresh("B", NOW - 5000)]), "B");
 	const own = (id, at) => ({ v: 1, id, at, from: "ph", target: "pc", chatId: "c1", text: "Q", mode: "learn", documents: [] });
 	const rec = new Set(["done"]);

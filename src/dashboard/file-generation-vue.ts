@@ -30,8 +30,8 @@ import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
 import { peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
-import { getOwnRequests, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
-import { pcFresh } from "./remote-send";
+import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
+import { pcReachable } from "./remote-send";
 import { peindreQuestions } from "./generation-kind-vue";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
@@ -544,7 +544,7 @@ export function creerVueFile(opts: {
 		const remote = getRemoteGenerations();
 		const items = threadItems(record, opts.file.lignes(), chatId, remote, Date.now(), getOwnRequests());
 		for (const item of items) {
-			if (item.kind === "pending") { peindreEnAttente(zone, item, pcFresh(item.target, remote, Date.now())); continue; }
+			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected())); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale); continue; }
 			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the

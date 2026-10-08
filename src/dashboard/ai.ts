@@ -38,9 +38,9 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { getOwnRequests, getRemoteGenerations, lastPcEver } from "./remote-generations";
+import { getOwnRequests, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
-import { pcFresh, pickTarget, refusPourTelephone } from "./remote-send";
+import { pcReachable, pickTarget, refusPourTelephone } from "./remote-send";
 import { pasteAnswer, startRelay } from "./relay-flow";
 import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
@@ -4085,7 +4085,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const now = Date.now();
 		const files = getRemoteGenerations();
 		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver());
-		return cible !== null && pcFresh(cible, files, now);
+		return pcReachable(cible, files, now, getPeerConnected());
 	}
 
 	/** Phone: a request can be sent when a PC was ever seen (the chat's, else the last one). The request then waits for that PC. */
