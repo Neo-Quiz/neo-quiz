@@ -220,7 +220,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 			try { names = (await fs.list(`${reqDir}/${s.name}`)).map(baseName); } catch { continue; }
 			// Request ids start with a base-36 timestamp: sorted by name, the OLDEST come first.
 			for (const n of names) if (n.endsWith(".json") && isConflictCopy(n)) console.warn(`${LOG_PREFIX} request file ignored (conflict copy):`, s.name, n);
-				const candidates = names.filter(n => n.endsWith(".json") && !isConflictCopy(n) && SLUG.test(n.slice(0, -5))).sort();
+			const candidates = names.filter(n => n.endsWith(".json") && !isConflictCopy(n) && SLUG.test(n.slice(0, -5))).sort();
 			if (candidates.length > MAX_REQUEST_FILES) console.warn(`${LOG_PREFIX} too many request files from ${s.name}, only the first ${MAX_REQUEST_FILES} are examined`);
 			for (const n of candidates.slice(0, MAX_REQUEST_FILES)) {
 				try {
@@ -260,7 +260,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 			try {
 				if (!(await smallEnough(`${ownReqDir}/${n}`, MAX_REQUEST_CHARS))) continue;
 				const raw = await fs.readBounded(`${ownReqDir}/${n}`, 4 * MAX_REQUEST_CHARS);
-				if (raw.length > MAX_REQUEST_CHARS) { console.warn(`${LOG_PREFIX} request file ignored (too large):`, s.name, n); continue; }
+				if (raw.length > MAX_REQUEST_CHARS) continue;
 				const parsed: unknown = JSON.parse(raw);
 				const o = (parsed && typeof parsed === "object" ? parsed : {}) as { target?: unknown; at?: unknown };
 				// Only the schema is judged here: age and target are not the sender's concern.
