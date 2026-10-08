@@ -20,8 +20,6 @@ import com.ahmedmili.neoquiz.ui.QrScanner
 import com.ahmedmili.neoquiz.update.UpdateChannel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -104,23 +102,8 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
 
     var bridge: Bridge? = null
     val scan = ScanChannel(perimeter) { event -> bridge?.emit("evenement", event) }
-    /* The page learns of its OWN writes through file events, as on the PC where a live
-       watcher (chokidar) reports them; Android has none (a rescan runs on return to the
-       foreground and after Syncthing receives), so a quiz deleted on the phone stayed
-       listed until the app came back (2026-10-08). A write the catalogue can see is
-       followed by one rescan, coalesced over 150 ms so an import costs one walk; a path
-       under a dot folder (`.neo-quiz` journals, `.trash`) is never in the catalogue. */
-    val rescanLock = Any()
-    var rescanJob: Job? = null
-    val afterOwnWrite = { path: String ->
-        if (ScanChannel.visibleToCatalogue(path)) synchronized(rescanLock) {
-            rescanJob?.cancel()
-            rescanJob = scope.launch {
-                delay(150)
-                scan.rescan()
-            }
-        }
-    }
+    // The page's own writes, moves and removals reach it as file events (see `OwnWriteRescan`).
+    val ownWrites = OwnWriteRescan(scope, scan::rescan)
     // The synced folder is offered first while it is not a root.
     val suggested = { documents.takeIf { it.isDirectory && !perimeter.contains(it.path) } }
     val codeSandbox = CodeSandbox(activity, scope)
@@ -162,7 +145,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val created = Bridge(
         scope,
-        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + IncomingChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { hub.signalWrite(it); afterOwnWrite(it) }.handlers() + scan.handlers() +
+        Unavailable.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + IncomingChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { ownWrites.onWrite(it); hub.signalWrite(it) }.handlers() + scan.handlers() +
             settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers(),
     )
     bridge = created
