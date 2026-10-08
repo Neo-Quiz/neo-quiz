@@ -53,7 +53,7 @@ export interface EnteteDeps {
 	kicker: string;
 	/** True in editing: the toggle button says "Done", otherwise "Edit". */
 	editing: boolean;
-	/** The editor cannot open here (a phone): the button carries a "Soon" badge. */
+	/** The editor cannot open here (a phone): no Edit button is drawn. */
 	editorLocked?: boolean;
 	onBack(): void;
 	onToggleEditing(): void;
@@ -151,12 +151,15 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
 	for (const a of deps.actions) action(a, false);
 
 	// Edit ↔ Done: the SAME page switches. Neutral: the main action stays
-	// "Start the quiz", next to it.
-	const edit = bouton(actions, "qbd-qz-edit" + (deps.editorLocked ? " is-soon" : ""), deps.editing ? "check" : "square-pen",
-		t(deps.editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"),
-		deps.editorLocked ? t("dashboard.quiz.editorSoon") : undefined);
-	poserBouton3dNeutre(edit);
-	edit.addEventListener("click", () => deps.onToggleEditing());
+	// "Start the quiz", next to it. Where the editor cannot open (a phone)
+	// there is no button at all: a "Soon" button that only showed a notice
+	// took half the row from "Start the quiz" (2026-10-08).
+	if (!deps.editorLocked) {
+		const edit = bouton(actions, "qbd-qz-edit", deps.editing ? "check" : "square-pen",
+			t(deps.editing ? "dashboard.quiz.editDone" : "dashboard.quiz.editor"));
+		poserBouton3dNeutre(edit);
+		edit.addEventListener("click", () => deps.onToggleEditing());
+	}
 
 	let reflet: SVGSVGElement | null = null;
 	const start = deps.start;

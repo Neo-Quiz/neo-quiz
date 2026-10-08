@@ -343,7 +343,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quiz.back": "Back",
 	"dashboard.quiz.editor": "Edit",
 	"dashboard.quiz.editDone": "Done",
-	"dashboard.quiz.editorSoon": "Soon",
 	"dashboard.quiz.editorSoonNotice": "Editing questions on the phone is coming soon. You can still generate quizzes here.",
 	"dashboard.quiz.moveUp": "Move up",
 	"dashboard.quiz.moveDown": "Move down",
