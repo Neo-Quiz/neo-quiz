@@ -1,0 +1,341 @@
+/* The Generate page on a phone, laid out like the Claude app chat
+   (2026-10-08, owner request: users land in a layout they know).
+   Phone only (.is-mobile): the desktop page is untouched. Loaded after
+   tools.css, whose older "list above the page" rules these replace.
+
+   - top bar: menu, the chat title, "new conversation";
+   - the nav (search, new, generated, chats) is a LEFT DRAWER over a scrim;
+   - empty state: the greeting centred, the composer at the bottom;
+   - composer: a rounded field, "+" and the PC icon on the left (the PC
+     icon colour is the PC status), send on the right. */
+
+/* ── Top bar ── */
+.is-mobile .qbd-ai-topbar {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+	min-height: 56px;
+	padding: 4px 8px 0;
+	box-sizing: border-box;
+}
+.is-mobile .qbd-ai-topbar-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+}
+.is-mobile .qbd-ai-topbar-btn svg {
+	width: 24px;
+	height: 24px;
+	stroke-width: 1.6;
+}
+.is-mobile .qbd-ai-topbar-btn:disabled {
+	opacity: 0.4;
+}
+.is-mobile .qbd-ai-topbar-title {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	text-align: center;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: 16px;
+	color: var(--text-muted);
+}
+
+/* ── Drawer ── */
+.is-mobile .qbd-ai-drawer-titre {
+	flex: none;
+	padding: 4px 12px 14px;
+	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+	font-size: 30px;
+	line-height: 1.1;
+	color: var(--text-normal);
+}
+.is-mobile .qbd-ai-lateral.qbd-ai-drawer {
+	position: fixed;
+	z-index: 61;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: min(84vw, 340px);
+	max-height: none;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	gap: 2px;
+	padding: calc(env(safe-area-inset-top, 0px) + 16px) 12px 12px;
+	background: var(--background-primary);
+	box-shadow: 0 0 40px rgb(0 0 0 / 0.45);
+	transform: translateX(-104%);
+	visibility: hidden;
+	transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), visibility 0s linear 0.25s;
+	overflow: hidden;
+}
+.is-mobile .qbd-ai-lateral.qbd-ai-drawer.is-open {
+	transform: none;
+	visibility: visible;
+	transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), visibility 0s;
+}
+.is-mobile .qbd-ai-scrim {
+	position: fixed;
+	z-index: 60;
+	inset: 0;
+	background: rgb(0 0 0 / 0.5);
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+.is-mobile .qbd-ai-scrim.is-open {
+	opacity: 1;
+	visibility: visible;
+	transition: opacity 0.25s ease, visibility 0s;
+}
+.is-mobile .qbd-ai-lateral.qbd-ai-drawer .qbd-ai-lateral-recherche,
+.is-mobile .qbd-ai-lateral.qbd-ai-drawer .qbd-ai-lateral-item {
+	flex: none;
+	flex-basis: auto;
+	width: 100%;
+	min-height: 52px;
+	padding: 0 12px;
+	gap: 16px;
+	border: none;
+	border-radius: 12px;
+	background: transparent;
+	font-size: 17px;
+	color: var(--text-normal);
+}
+.is-mobile .qbd-ai-drawer .qbd-ai-lateral-recherche {
+	color: var(--text-muted);
+}
+.is-mobile .qbd-ai-drawer .qbd-ai-lateral-icone svg {
+	width: 22px;
+	height: 22px;
+	stroke-width: 1.5;
+}
+.is-mobile .qbd-ai-drawer .qbd-ai-chats {
+	flex: 1 1 0;
+	flex-basis: 0;
+	max-height: none;
+	min-height: 0;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.is-mobile .qbd-ai-drawer .qbd-ai-chats-jour {
+	padding: 14px 12px 6px;
+	font-size: 14px;
+	color: var(--text-muted);
+}
+.is-mobile .qbd-ai-drawer .qbd-ai-chat-ouvrir {
+	font-size: 17px;
+	min-height: 48px;
+}
+/* A chat open: the old "short list on top" is gone, the drawer keeps all its room. */
+.is-mobile .qbd-content:has(> .qbd-ai-stage--conversation) .qbd-ai-drawer .qbd-ai-chats {
+	max-height: none;
+}
+
+/* ── Empty state: the greeting centred in the room above the composer ── */
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--idle,
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--error {
+	padding: 8px 12px 12px;
+}
+.is-mobile .qbd-ai-stage--idle::before,
+.is-mobile .qbd-ai-stage--idle::after,
+.is-mobile .qbd-ai-stage--error::before,
+.is-mobile .qbd-ai-stage--error::after {
+	flex: 0 0 0;
+}
+/* Auto margins above and below the greeting: it takes the middle of the free
+   room, and the composer lands at the bottom of the page. */
+.is-mobile .qbd-ai-stage--idle > .qbd-ai-title-row {
+	margin: auto 0;
+}
+.is-mobile .qbd-ai-title-row {
+	flex-direction: column;
+	gap: 14px;
+	text-align: center;
+}
+.is-mobile .qbd-ai-title-icon svg {
+	width: 40px;
+	height: 40px;
+	stroke-width: 1.4;
+}
+.is-mobile .qbd-ai-title {
+	font-size: 30px;
+	line-height: 1.2;
+	margin: 0;
+}
+
+/* ── Composer: rounded field, "+" and the PC on the left, send on the right ── */
+.is-mobile .qbd-ai-stage .qbd-ai-composer {
+	width: 100%;
+	margin-top: 0;
+	padding: 16px 14px 12px 18px;
+	border-radius: 28px;
+	gap: 10px;
+}
+.is-mobile .qbd-ai-stage .qbd-ai-composer-input {
+	font-size: 17px;
+	line-height: 1.4;
+	min-height: 26px;
+}
+.is-mobile .qbd-ai-composer-bottom {
+	gap: 8px;
+}
+.is-mobile .qbd-ai-composer-add,
+.is-mobile .qbd-ai-composer-pc {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+}
+.is-mobile .qbd-ai-composer-add svg,
+.is-mobile .qbd-ai-composer-pc svg {
+	width: 20px;
+	height: 20px;
+	stroke-width: 1.6;
+}
+.is-mobile .qbd-ai-composer-send {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+}
+/* The PC status: blue when it is available, grey when it is not, red when something is wrong. */
+.is-mobile .qbd-ai-composer-pc[data-tone="ok"],
+.is-mobile .qbd-ai-pc-state[data-tone="ok"] {
+	color: var(--interactive-accent);
+}
+.is-mobile .qbd-ai-composer-pc[data-tone="off"],
+.is-mobile .qbd-ai-pc-state[data-tone="off"] {
+	color: var(--text-faint);
+}
+.is-mobile .qbd-ai-composer-pc[data-tone="error"],
+.is-mobile .qbd-ai-pc-state[data-tone="error"] {
+	color: var(--text-error);
+}
+.is-mobile .qbd-ai-composer-pc[data-tone="ok"] { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent) !important; }
+.is-mobile .qbd-ai-composer-pc[data-tone="error"] { background: color-mix(in srgb, var(--text-error) 16%, transparent) !important; }
+
+/* The relay row under the composer: a quiet line, not a second card. */
+.is-mobile .qbd-ai-relay {
+	padding: 0 6px;
+}
+
+/* ── The PC window ── */
+.is-mobile .qbd-ai-pc-state {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	border-radius: 14px;
+	background: color-mix(in srgb, currentColor 12%, transparent);
+	margin-bottom: 14px;
+}
+.is-mobile .qbd-ai-pc-state-icone svg {
+	width: 26px;
+	height: 26px;
+}
+.is-mobile .qbd-ai-pc-state-texte {
+	font-size: 15px;
+	line-height: 1.35;
+	color: var(--text-normal);
+}
+.is-mobile .qbd-ai-pc-row {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 2px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	min-width: 0;
+}
+.is-mobile .qbd-ai-pc-row-cle {
+	font-size: 13px;
+	color: var(--text-muted);
+}
+.is-mobile .qbd-ai-pc-row-valeur {
+	font-size: 15px;
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+.is-mobile .qbd-ai-pc-row.is-error .qbd-ai-pc-row-valeur {
+	color: var(--text-error);
+}
+.is-mobile .qbd-ai-pc-devices-titre {
+	margin-top: 16px;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+.is-mobile .qbd-ai-pc-device {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 2px;
+	min-width: 0;
+}
+.is-mobile .qbd-ai-pc-device-nom {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 15px;
+}
+.is-mobile .qbd-ai-pc-device-etat {
+	flex: none;
+	font-size: 13px;
+	color: var(--text-faint);
+}
+.is-mobile .qbd-ai-pc-device-etat[data-on="true"] {
+	color: var(--interactive-accent);
+}
+.is-mobile .qbd-ai-pc-note {
+	margin: 8px 0 0;
+	font-size: 13px;
+	color: var(--text-muted);
+}
+
+/* ── Thread: the user bubbles on the right, the answers on the left in
+   serif without a bubble, like the Claude app ── */
+.is-mobile .qbd-ai-fil {
+	scrollbar-width: none;
+}
+.is-mobile .qbd-ai-fil::-webkit-scrollbar {
+	display: none;
+}
+.is-mobile .qbd-ai-bulle {
+	padding: 12px 16px;
+	border-radius: 20px;
+	font-size: 16px;
+	line-height: 1.4;
+}
+.is-mobile .qbd-ai-chat-prose {
+	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+	font-size: 17px;
+	line-height: 1.55;
+}
+.is-mobile .qbd-ai-lateral.qbd-ai-drawer .qbd-ai-lateral-recherche {
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}

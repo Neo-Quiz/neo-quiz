@@ -36,7 +36,8 @@ import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserC
 import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
 import { settingsOnSwitch } from "./chat-settings";
-import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
+import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
+import { poserBarreHaute, poserBoutonPc } from "./phone-chat";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
@@ -1096,6 +1097,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			ouvrirSession: (id) => setActiveChat(id),
 		}));
 		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
+		/* Phone: the Claude app's layout. The nav becomes a left drawer, the top
+		   bar carries the menu and "new conversation" (`phone-chat.ts`). */
+		if (host.platform.isMobile) {
+			const barre = poserBarreHaute(container, lateral, { peutCreer: chatAContenu, creer: () => { startNewChat(); } });
+			const majDrawer = majNouvelle;
+			majNouvelle = () => { majDrawer(); barre.majNouveau(); };
+		}
 		if (deps.openGenerated) {
 			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");
 			genere.type = "button";
@@ -2049,6 +2057,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		addBtn.type = "button";
 		addBtn.setAttribute("aria-label", t("ai.composer.addContent"));
 		host.ui.setIcon(addBtn, "plus");
+		// Phone: the PC's status, right next to "+".
+		if (host.platform.isMobile) poserBoutonPc(composerBottom, () => chatSurEcran().record);
 
 		/* No Learn | Test selector any more (spec 2026-10-07-generate-auto-kind):
 		   the kind is decided when the request is sent (`decideGenre`). */

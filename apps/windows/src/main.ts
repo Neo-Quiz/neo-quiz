@@ -41,7 +41,7 @@ import type { RelayDeps } from "../../../src/dashboard/relay-flow";
 import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
 import { notifyPc } from "./host/notify";
 import { ecrireReglage, lireReglage } from "./host/folder";
-import { setPeerConnected } from "../../../src/dashboard/remote-generations";
+import { setPairedPeers, setPeerConnected } from "../../../src/dashboard/remote-generations";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
@@ -718,8 +718,9 @@ async function demarrer(): Promise<void> {
 		pont().sync?.surDonneesRecues(() => { void rechargerApresSync(); });
 		/* Reachability of a PC from the phone: an idle PC writes nothing, so the
 		   connection of the paired devices (the Sync page's own state) is what says it is on. */
-		const suivreConnexion = (e: { appareils: Array<{ connecte: boolean; enPause?: boolean }> }): void => {
+		const suivreConnexion = (e: { appareils: Array<{ id: string; nom: string; connecte: boolean; enPause?: boolean; vuLe: number | null }> }): void => {
 			setPeerConnected(e.appareils.some(x => x.connecte && !x.enPause));
+			setPairedPeers(e.appareils.map(x => ({ id: x.id, name: x.nom, connected: x.connecte, paused: !!x.enPause, seenAt: x.vuLe })));
 		};
 		void pont().sync?.etat().then(suivreConnexion).catch(() => {});
 		pont().sync?.surEtat(suivreConnexion);

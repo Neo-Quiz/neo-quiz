@@ -77,6 +77,26 @@ export function setPeerConnected(connected: boolean): void {
 	}
 }
 
+/** A device paired through Sync, as the Sync page reports it (names are the remote's own: text only). */
+export interface PairedPeer { id: string; name: string; connected: boolean; paused: boolean; seenAt: number | null }
+
+let peers: PairedPeer[] = [];
+
+/** The paired devices as last reported by the Sync state. */
+export function getPairedPeers(): ReadonlyArray<PairedPeer> {
+	return peers;
+}
+
+/** Keeps the paired devices; listeners run only when the list changed. */
+export function setPairedPeers(list: ReadonlyArray<PairedPeer>): void {
+	const next = list.map(p => ({ ...p, name: p.name.slice(0, 64) }));
+	if (JSON.stringify(next) === JSON.stringify(peers)) return;
+	peers = next;
+	for (const cb of [...listeners]) {
+		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "remote generations listener failed:", e); }
+	}
+}
+
 let ownRequests: RemoteRequest[] = [];
 
 /** The phone's own requests still waiting on disk (not yet taken or recorded), as last read. */
