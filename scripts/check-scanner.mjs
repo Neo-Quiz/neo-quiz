@@ -41,7 +41,9 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 			listMarkdown: () => [fichierHote],
 			readCached: async () => content,
 			read: async () => content,
-			getFile: (p) => (p === fichierHote.path ? fichierHote : null),
+			/* Every other path of the run (renamed, Exam notes) exists too: the scanner
+			   only drops a note the mirror no longer knows. */
+			getFile: (p) => (p === fichierHote.path ? fichierHote : { path: p }),
 		},
 		watcher: {
 			/* Le scanner doit RENDRE son désabonnement et l'appeler au
@@ -207,6 +209,33 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	r.check("Learn : un glossaire dans la configuration ne change ni le compte ni les identifiants des questions",
 		[learnAvecGlossaire?.questions, learnAvecGlossaire?.items.map(it => it.id)],
 		[learnSansGlossaire?.questions, learnSansGlossaire?.items.map(it => it.id)]);
+
+	/* A delete landing while a scan's read is in flight must not be undone by
+	   that scan: "Delete both" on a course card writes then trashes each note,
+	   and the late read re-indexed the trashed note (card stayed on screen). */
+	{
+		const note = { path: "Cours/jetee.md", name: "jetee.md", basename: "jetee", extension: "md", mtime: 1 };
+		let present = true;
+		let liberer;
+		const lecture = new Promise(res => { liberer = res; });
+		const hoteSuppr = {
+			fs: {
+				listMarkdown: () => [note],
+				readCached: () => lecture,
+				read: () => lecture,
+				getFile: (p) => (present && p === note.path ? note : null),
+			},
+			watcher: { onChange: () => () => {} },
+		};
+		const sSuppr = createScanner(hoteSuppr);
+		const enCours = sSuppr.scanFile(note);
+		present = false;
+		liberer("```quiz-blocks\n[{ title: 'Q', prompt: 'P', options: ['a', 'b'], correctIndex: 0 }]\n```");
+		await enCours;
+		r.check("un scan dont la note a été supprimée pendant la lecture ne la réindexe pas",
+			sSuppr.getQuiz(note.path), null);
+		sSuppr.destroy();
+	}
 
 	/* DÉSABONNEMENT : un scanner détruit ne doit plus rien écouter. Seule
 	   protection contre le rechargement du greffon, où deux scanners

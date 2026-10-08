@@ -27,6 +27,7 @@ release notes.
 
 - On the phone, "Quiz deleted" no longer suggests Ctrl+Z.
 - Undo after deleting both quizzes of a course no longer brings back earlier deletions.
+- Deleting both quizzes of a course now removes its card at once.
 
 ## [1.20.45] - 2026-10-08
 
