@@ -381,7 +381,13 @@ export const EN_AI = {
 	"ai.queue.lotSaved": "{count} quizzes, one per document",
 	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
 	"ai.card.missing": "This quiz is not on this device (yet).",
-	"ai.mobile.followOnly": "Start generations from your PC; follow them and open the quizzes here.",
+	/* The phone's composer sends a request to the PC; the bubble waits until the PC takes it. */
+	"ai.remote.waiting": "Waiting for the PC",
+	"ai.remote.expired": "Expired",
+	"ai.remote.noPc": "Your PC does not seem to be on.",
+	"ai.remote.insideFolderOnly": "Documents must be inside your Neo Quiz folder.",
+	"ai.remote.textOnly": "Only text and Markdown documents can be sent to the PC.",
+	"ai.remote.sendFailed": "The request could not be sent to the PC.",
 	/* Le modèle a répondu mais la note n'a pas pu être écrite : le quiz est
 	   gardé, on réécrit sans relancer la génération, ou on l'ouvre tel quel. */
 	"ai.queue.saving": "Saving…",

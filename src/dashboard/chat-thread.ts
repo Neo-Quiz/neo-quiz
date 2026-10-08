@@ -15,17 +15,21 @@ import type { ChatRecord, ChatRequest } from "./chat-record";
 import { groupLines } from "./chat-requests";
 import { isStale } from "../shared-state/generations";
 import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
+import { pendingState } from "../shared-state/remote-request";
+import type { RemoteRequest } from "../shared-state/remote-request";
 
 export type ThreadItem =
 	| { kind: "live"; key: string; at: number; lines: LigneGeneration[] }
 	| { kind: "record"; key: string; at: number; request: ChatRequest }
 	/** A request running on ANOTHER device, read from its generations file. `stale`: that file is too old to mean a running PC. */
-	| { kind: "remote"; key: string; at: number; entry: RunningEntry; device: string; stale: boolean };
+	| { kind: "remote"; key: string; at: number; entry: RunningEntry; device: string; stale: boolean }
+	/** A request the phone sent and no PC has taken yet (its own file). `expired`: past the 24 h age limit. */
+	| { kind: "pending"; key: string; at: number; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" };
 
 /** A line sent before send times were kept goes after everything recorded. */
 const UNKNOWN_TIME = Number.MAX_SAFE_INTEGER;
 
-export function threadItems(chat: ChatRecord | null, lines: readonly LigneGeneration[], chatId: string, remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = [], now: number = Date.now()): ThreadItem[] {
+export function threadItems(chat: ChatRecord | null, lines: readonly LigneGeneration[], chatId: string, remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = [], now: number = Date.now(), pending: ReadonlyArray<RemoteRequest> = []): ThreadItem[] {
 	// A group whose lines were all stopped is not shown live: its record entry ("stopped") is.
 	const groups = groupLines(lines).filter(g => g.chatId === chatId && g.lines.some(l => l.etat !== "arret"));
 	const liveKeys = new Set(groups.map(g => g.key));
@@ -38,13 +42,24 @@ export function threadItems(chat: ChatRecord | null, lines: readonly LigneGenera
 		}
 	}
 	// Another device's request: shown only while neither this window nor the record has it.
+	const runningElsewhere = new Set<string>();
 	if (!chat?.deleted) {
 		for (const { device, file } of remote) {
 			const stale = isStale(file, now);
 			for (const entry of file.running) {
+				runningElsewhere.add(entry.requestId);
 				if (entry.chatId !== chatId || liveKeys.has(entry.requestId) || recorded.has(entry.requestId)) continue;
 				items.push({ kind: "remote", key: entry.requestId, at: entry.startedAt, entry, device, stale });
 			}
+		}
+	}
+	// The phone's own requests of this chat that no PC has taken yet. A recorded or running one is shown from there.
+	if (!chat?.deleted) {
+		for (const req of pending) {
+			if (req.chatId !== chatId || liveKeys.has(req.id) || recorded.has(req.id) || runningElsewhere.has(req.id)) continue;
+			const state = pendingState(req, { recorded: new Set(), running: new Set(), now });
+			if (state !== "waiting" && state !== "expired") continue;
+			items.push({ kind: "pending", key: req.id, at: req.at, request: { text: req.text, documents: req.documents.map(d => ({ path: d.path })) }, state });
 		}
 	}
 	return items.sort((a, b) => a.at - b.at);
@@ -60,7 +75,7 @@ export const MAX_CONTEXT_REQUESTS = 12;
     names, quiz titles and files, written answers). */
 export function toursOfThread(items: readonly ThreadItem[]): TourPrecedent[] {
 	// A request running elsewhere has no content here yet: it is not context.
-	const own = items.filter((i): i is Exclude<ThreadItem, { kind: "remote" }> => i.kind !== "remote");
+	const own = items.filter((i): i is Exclude<ThreadItem, { kind: "remote" | "pending" }> => i.kind !== "remote" && i.kind !== "pending");
 	return own.slice(-MAX_CONTEXT_REQUESTS).map((item): TourPrecedent => {
 		if (item.kind === "record") {
 			const q = item.request;

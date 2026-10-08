@@ -38,7 +38,10 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { getRemoteGenerations } from "./remote-generations";
+import { getOwnRequests, getRemoteGenerations } from "./remote-generations";
+import { enviquerVersPc } from "./ai-remote";
+import { refusPourTelephone } from "./remote-send";
+import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { rankFolders, suggestFolders } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
@@ -391,7 +394,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const id = activeChatId();
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
-	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations()); };
+	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations(), Date.now(), getOwnRequests()); };
 	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null;
 	const vueFile = creerVueFile({
 		file: fileGen,
@@ -782,6 +785,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   passent par ici. Une génération de la FILE ne bloque rien : le
 		   composer est libre dès l'envoi. */
 		if (phase === "web" || phase === "connexion") return false;
+		// The phone needs no provider of its own: the PC that owns the chat runs the request (`ai-remote.ts`).
+		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture);
 		const providerId = settings().aiProvider || "";
 		if (!providerId) return false;
 		// Un fournisseur desktop-only (Claude Code CLI) est inutilisable sur
@@ -1595,12 +1600,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		let generateBtnRef: HTMLButtonElement | null = null;
 
 		const composer = ajouter(formCol, "div", "qbd-ai-composer");
-		/* On a phone the composer waits (stage 3): it stays built but hidden,
-		   and one line says where a generation starts. */
-		if (host.platform.isMobile) {
-			composer.hidden = true;
-			composer.before(ajouter(formCol, "p", "qbd-ai-mobile-follow", t("ai.mobile.followOnly")));
-		}
+		/* On a phone the composer SENDS to the PC (`ai-remote.ts`): the PC-only
+		   controls (provider, model, options, suggestions, update banner) are
+		   hidden by the page's phone class, never built out of the layout. */
+		if (host.platform.isMobile) formCol.classList.add("qbd-ai-form--phone");
 		composer.classList.toggle("qbd-ai-composer--actif", composerActif);
 		const activer = (): void => {
 			composerActif = true;
@@ -2911,6 +2914,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// already); by default, the epoch at the time of this call.
 		epoque: number = epochPreset
 	): Promise<void> {
+		// The phone sends only documents of the Neo Quiz folder, picked from it: a file of the device itself has no place there.
+		if (host.platform.isMobile && !origin) { host.ui.notice(t("ai.remote.insideFolderOnly")); return; }
 		const imgs: File[] = [];
 		const rejected: string[] = [];
 		const lectures: Promise<void>[] = [];
@@ -3003,6 +3008,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const epoque = epochPreset;
 		const f = host.fs.getFile(path);
 		if (!f) return;
+		if (host.platform.isMobile) {
+			const motif = refusPourTelephone({ name: f.name, path: f.path }, host.paths.defaultRoot().id);
+			if (motif) { host.ui.notice(t(motif)); return; }
+		}
 		const ext = f.extension.toLowerCase();
 		if (ext === "md" || ext === "txt") { await attachNoteVaultFile(f); return; }
 		// Un PDF : sa carte AVANT la lecture disque.
@@ -4038,7 +4047,35 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return tuiles;
 	}
 
+	/** The phone's send: the request goes to the PC that owns the chat (`ai-remote.ts`); nothing runs here. */
+	async function envoyerVersPc(container: HTMLElement | null): Promise<void> {
+		if (demarrage) return;
+		const rootId = host.paths.defaultRoot().id;
+		if (images.length > 0) { host.ui.notice(t("ai.remote.textOnly")); return; }
+		for (const note of noteAttachments) {
+			const motif = refusPourTelephone(note, rootId);
+			if (motif) { host.ui.notice(t(motif)); return; }
+		}
+		demarrage = true;
+		try {
+			await enviquerVersPc({
+				chatId: activeChatId(),
+				text: composerText.trim(),
+				mode: decideByKeywords(composerText) === "practice" ? "practice" : "learn",
+				documents: noteAttachments.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
+			});
+			viderComposer();
+		} catch (e) {
+			console.warn(LOG_PREFIX, "request not sent to the PC:", e);
+			host.ui.notice(t("ai.remote.sendFailed"));
+		} finally {
+			demarrage = false;
+		}
+		render(container);
+	}
+
 	async function startGeneration(container: HTMLElement | null): Promise<void> {
+		if (host.platform.isMobile) { await envoyerVersPc(container); return; }
 		/* VERROU d'abord, et de façon synchrone : sans lui, Entrée ou un
 		   second clic pendant l'attente ci-dessous envoyait la MÊME demande
 		   une seconde fois (revue codex 2026-07-31). */

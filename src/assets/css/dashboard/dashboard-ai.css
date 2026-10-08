@@ -793,17 +793,14 @@
 }
 
 /* ── Composer (champ unique façon chat) ── */
-/* Hidden on a phone, where the composer waits (ai.ts, stage 2). */
-.qbd-ai-composer[hidden] {
+/* On a phone the composer sends to the PC (ai-remote.ts): what only a PC
+   can act on is hidden here, the composer keeps its text, "+" and send. */
+.qbd-ai-form--phone .qbd-ai-suggestions,
+.qbd-ai-form--phone .qbd-ai-model-hint,
+.qbd-ai-form--phone .qbd-cli-maj,
+.qbd-ai-form--phone .qbd-ai-composer-dest,
+.qbd-ai-form--phone .qbd-ai-composer-tools > :not(.qbd-ai-composer-send) {
 	display: none;
-}
-
-.qbd-ai-mobile-follow {
-	margin: 0;
-	padding: 14px 4px;
-	color: var(--text-muted);
-	font-size: 13px;
-	text-align: center;
 }
 
 .qbd-ai-composer {

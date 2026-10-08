@@ -205,6 +205,14 @@
 	100% { transform: rotate(360deg) scale(1); }
 }
 
+/* The state lines of a request on another device or waiting for the PC: one per line. */
+.qbd-ai-remote-corps {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
 /* Le texte d'état balayé d'un reflet, comme « Réflexion… » de claude.ai. */
 .qbd-ai-reponse-etape {
 	background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 35%, var(--text-normal) 50%, var(--text-muted) 65%, var(--text-muted) 100%);

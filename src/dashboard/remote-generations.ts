@@ -10,6 +10,7 @@
 
 import { LOG_PREFIX } from "../branding";
 import type { GenerationsFile } from "../shared-state/generations";
+import type { RemoteRequest } from "../shared-state/remote-request";
 
 export interface RemoteGenerations { device: string; file: GenerationsFile }
 
@@ -38,6 +39,18 @@ export function setRemoteGenerations(list: ReadonlyArray<RemoteGenerations>): bo
 export function onRemoteGenerations(cb: () => void): () => void {
 	listeners.add(cb);
 	return () => { listeners.delete(cb); };
+}
+
+let ownRequests: RemoteRequest[] = [];
+
+/** The phone's own requests still waiting on disk (not yet taken or recorded), as last read. */
+export function setOwnRequests(list: RemoteRequest[]): void {
+	ownRequests = [...list];
+}
+
+/** The own requests as last set. Empty until the first read. */
+export function getOwnRequests(): ReadonlyArray<RemoteRequest> {
+	return ownRequests;
 }
 
 let reader: (() => Promise<ReadonlyArray<RemoteGenerations>>) | null = null;

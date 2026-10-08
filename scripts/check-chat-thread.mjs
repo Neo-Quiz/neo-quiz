@@ -215,6 +215,19 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 		const merged = L.chatListItems([chatRec], [], NOW, "me", gens(NOW));
 		r.check("once its chat record lands, the chat is listed once, under the record", merged.map(i => [i.id, i.running]), [["c1", true]]);
 	}
+	// Phase 3: the phone's own waiting requests
+	{
+		const NOW = 1_800_000_000_000;
+		const own = (id, over = {}) => ({ v: 1, id, at: NOW - 1000, from: "ph", target: "pc", chatId: "c1", text: "Q " + id, mode: "learn", documents: [], ...over });
+		const items = T.threadItems(null, [], "c1", [], NOW, [own("w1"), own("w2", { chatId: "other" }), own("w3", { at: NOW - 30 * 3600e3 })]);
+		r.check("a waiting request of this chat is shown; another chat's is not; an old one is expired",
+			items.map(i => [i.key, i.kind === "pending" ? i.state : i.kind]), [["w3", "expired"], ["w1", "waiting"]]);
+		const running = T.threadItems(null, [], "c1", [{ device: "pc", file: { v: 1, at: NOW, running: [{ requestId: "w1", chatId: "c1", from: "ph", text: "Q", mode: "learn", startedAt: NOW, provider: "p", model: "m", progress: { question: 1 } }] } }], NOW, [own("w1")]);
+		r.check("once the PC reports it running, only the progress item shows", running.map(i => i.kind), ["remote"]);
+		const done = T.threadItems({ id: "c1", origin: "pc", createdAt: 1, updatedAt: 1, requests: [{ id: "w1", at: 1, from: "ph", text: "Q", mode: "learn", documents: [], results: [], state: "done" }] }, [], "c1", [], NOW, [own("w1")]);
+		r.check("once recorded, only the record shows", done.map(i => i.kind), ["record"]);
+		r.check("a pending request is never a tour of the context", T.toursOfThread(T.threadItems(null, [], "c1", [], NOW, [own("w1")])), []);
+	}
 	r.done();
 });
 
@@ -224,5 +237,19 @@ await withSrcModule(["src/shared-state/chat-merge.ts"], (M) => {
 	r.check("Open is offered for a quiz path under the root", M.canOpenCard("Root/A/q.md"), true);
 	r.check("Open is offered for a quiz path of another root (it keeps Open)", M.canOpenCard("Other/q.md"), true);
 	r.check("no Open for a card without a quiz path (a written or failed result)", M.canOpenCard(""), false);
+	r.done();
+});
+
+// What the phone may send from its composer: a text or Markdown document inside the Neo Quiz folder, and only those.
+await withSrcModule(["src/dashboard/remote-send.ts"], (S) => {
+	const r = makeReporter("Phone documents");
+	const ROOT = "C:/Neo Quiz";
+	r.check("a Markdown document of the folder can go", S.refusPourTelephone({ name: "cours.md", path: ROOT + "/Python/cours.md" }, ROOT), null);
+	r.check("a text document of the folder can go", S.refusPourTelephone({ name: "notes.txt", path: ROOT + "/notes.txt" }, ROOT), null);
+	r.check("a document outside the folder is refused", S.refusPourTelephone({ name: "cours.md", path: "D:/Cours/cours.md" }, ROOT), "ai.remote.insideFolderOnly");
+	r.check("a document with no path (picked from the device) is refused", S.refusPourTelephone({ name: "cours.md" }, ROOT), "ai.remote.insideFolderOnly");
+	r.check("the internal folder of the sync is never sent", S.refusPourTelephone({ name: "x.md", path: ROOT + "/.neo-quiz/x.md" }, ROOT), "ai.remote.insideFolderOnly");
+	r.check("an image of the folder is refused: text only", S.refusPourTelephone({ name: "schema.png", path: ROOT + "/schema.png" }, ROOT), "ai.remote.textOnly");
+	r.check("a PDF of the folder is refused: text only", S.refusPourTelephone({ name: "cm1.pdf", path: ROOT + "/cm1.pdf" }, ROOT), "ai.remote.textOnly");
 	r.done();
 });
