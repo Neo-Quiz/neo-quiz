@@ -254,7 +254,7 @@ for (const avecImage of [false, true]) {
 		   version future, ou un site retiré. */
 		settings: () => ({ aiProvider: avecImage ? "claude-web" : "un-site-sans-web" }),
 		aiProviders: { estCanalWeb: () => true, getCanal: () => ({ label: "site", web: avecImage ? {} : undefined }) },
-		host: { ui: { notice: () => {} } }, t: cle => cle,
+		host: { ui: { notice: () => {} }, platform: { isMobile: false } }, t: cle => cle,
 		/* La tuile vidéo (2026-09-22) : `startGeneration` attend désormais
 		   `prets()` avant la capture. Sans transcription en vol ici, la
 		   réponse est immédiate et ne joint rien — exactement ce que ces
