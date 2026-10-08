@@ -91,6 +91,9 @@ export interface DemandeFile extends DemandeTexte {
 	requestId?: string;
 	/** Epoch ms of the send. */
 	sentAt?: number;
+	/** The device that SENT this request when it is not this one (a request
+	    from the phone, run by the PC). Absent: sent from this device. */
+	fromDevice?: string;
 }
 
 /** Ce qu'une génération a rapporté, de quoi écrire la note sans le modèle. */

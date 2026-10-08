@@ -519,6 +519,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   `apps/windows/src/host/shared-state.ts`) : fusion pure des examens et des
   tentatives, un fichier par racine et par appareil, migration unique, copies
   de conflit Syncthing, déplacements. Dans la CI.
+- `npm run check:generations` â ce qu'un PC publie sur ce qu'il gÃ©nÃ¨re en ce moment
+  (`src/shared-state/generations.ts`, fichier `.neo-quiz/generations/<appareil>.json`) :
+  un fichier datÃ© de plus de deux minutes, ou de plus de deux minutes dans le futur
+  (horloge fausse), est pÃ©rimÃ© ; Ã©criture au plus toutes les 5 s, Ã  chaque bout,
+  et un rafraÃ®chissement toutes les 60 s ; une entrÃ©e illisible est Ã©cartÃ©e. Dans la CI.
 - `npm run check:electron-syncthing` — le Syncthing embarqué
   (`apps/windows/electron/syncthing*.ts`) : seul le dossier `neo-quiz` est
   accepté, et seulement d'un appareil appairé par le propriétaire ; l'ID saisi

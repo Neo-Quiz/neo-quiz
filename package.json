@@ -96,6 +96,7 @@
     "check:historique-nav": "node scripts/check-historique-nav.mjs",
     "check:langue": "node scripts/check-langue.mjs",
     "check:shared-state": "node scripts/check-shared-state.mjs",
+    "check:generations": "node scripts/check-generations.mjs",
     "check:stats": "node scripts/check-stats.mjs",
     "check:swipe": "node scripts/check-swipe.mjs",
     "check:selection": "node scripts/check-selection.mjs",

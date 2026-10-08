@@ -254,6 +254,11 @@ jobs:
       - name: Shared state
         run: npm run check:shared-state
 
+      # WHAT A PC IS GENERATING (synced folder): staleness by its stamp (clock
+      # skew included), the 5 s write throttle, a hostile file read as nothing.
+      - name: Generations
+        run: npm run check:generations
+
       # THE FOLDER LIST: picked folders persist, the default one stays first.
       - name: Folders
         run: npm run check:folders
