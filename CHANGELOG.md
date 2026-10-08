@@ -16,6 +16,7 @@ release notes.
 ### Added
 
 - A round "scroll to the latest message" button in the Generate conversation: it appears once you scroll up, shows typing dots while a generation runs and an arrow on hover.
+- Switching conversation restores the provider and model last used in it.
 
 ### Changed
 

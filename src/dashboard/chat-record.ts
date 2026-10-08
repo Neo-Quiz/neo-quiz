@@ -42,6 +42,11 @@ export interface ChatRequest {
 	error?: string;
 	/** Set when clarifying questions were asked: kept with the request, shown under it. */
 	clarify?: ChatClarify;
+	/** The provider, model and effort the request was sent with (frozen at the send). Plain labels,
+	    compared against the app's own lists when the chat is reopened; never executed or used as a path. */
+	provider?: string;
+	model?: string;
+	effort?: string;
 }
 
 export interface ChatRecord {
@@ -61,6 +66,9 @@ export const LEGACY_CHAT_ID = "queue-before-chats";
 export const MAX_CHATS = 200;
 /** A written answer is bounded: a chat is a few kilobytes, never a transcript. */
 export const MAX_RESULT_TEXT = 20_000;
+
+/** Bound of a stored provider / model / effort label. */
+export const MAX_LABEL = 100;
 
 const isStr = (x: unknown): x is string => typeof x === "string";
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
@@ -97,6 +105,12 @@ function readClarify(x: unknown): ChatClarify | null {
 	return clarify;
 }
 
+/** A stored label: a non-empty string without control characters, at most `MAX_LABEL` long; anything else is dropped. */
+export function readLabel(x: unknown): string | undefined {
+	if (!isStr(x) || x.length < 1 || x.length > MAX_LABEL || /[\u0000-\u001f\u007f]/.test(x)) return undefined;
+	return x;
+}
+
 function readRequest(x: unknown): ChatRequest | null {
 	if (!isObj(x) || !isStr(x.id) || !isNum(x.at) || !isStr(x.from) || !isStr(x.text)) return null;
 	if (x.mode !== "learn" && x.mode !== "practice") return null;
@@ -110,6 +124,10 @@ function readRequest(x: unknown): ChatRequest | null {
 	if (isStr(x.error)) req.error = x.error;
 	const clarify = readClarify(x.clarify);
 	if (clarify) req.clarify = clarify;
+	const provider = readLabel(x.provider), model = readLabel(x.model), effort = readLabel(x.effort);
+	if (provider) req.provider = provider;
+	if (model) req.model = model;
+	if (effort) req.effort = effort;
 	return req;
 }
 

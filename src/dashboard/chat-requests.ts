@@ -14,7 +14,7 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { ChatClarify, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
 import { absoluteInRoot } from "../shared-state/chat-merge";
 import type { RemoteRequest } from "../shared-state/remote-request";
-import { LEGACY_CHAT_ID, deriveTitle, mergeResults } from "./chat-record";
+import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel } from "./chat-record";
 
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
 export const isTerminal = (l: LigneGeneration): boolean => l.etat === "prete" || l.etat === "echouee" || l.etat === "arret";
@@ -104,6 +104,12 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	};
 	// The questions asked under the request stay with it.
 	if (old?.clarify) req.clarify = old.clarify;
+	// The settings frozen at the send stay as first recorded.
+	const frozen = first.reglages;
+	const provider = readLabel(old?.provider ?? frozen?.aiProvider), model = readLabel(old?.model ?? frozen?.aiModel), effort = readLabel(old?.effort ?? frozen?.aiEffort);
+	if (provider) req.provider = provider;
+	if (model) req.model = model;
+	if (effort) req.effort = effort;
 	const error = failed?.erreur ?? old?.error;
 	if (error && state === "failed") req.error = error;
 	return req;

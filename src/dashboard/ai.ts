@@ -35,6 +35,7 @@ import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categor
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
+import { settingsOnSwitch } from "./chat-settings";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
@@ -441,12 +442,37 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		majNouvelle();
 	}, () => !!stageRef?.isConnected);
 	/* Switching or starting a chat: the page follows (conversation <-> home). */
+	let chatVu = activeChatId();
 	const desabonnerChats = onChatsChanged(() => {
 		if (!stageRef || !stageRef.isConnected) return;
+		/* Another chat opened: the composer takes the provider, model and effort
+		   of the last request sent in it (nothing for a new or older chat). */
+		const idActif = activeChatId();
+		if (idActif !== chatVu) {
+			chatVu = idActif;
+			const patch = settingsOnSwitch(getChats().find(c => c.id === idActif && !c.deleted), {
+				providerOffered: (id) => !!aiProviders.getCanal(id) && aiProviders.canalVisible(id, settings().aiCanauxPayantsMasques)
+					&& !(aiProviders.getProvider(id).desktopOnly && host.platform.isMobile),
+				models: modelesDe,
+				defaultModel: (id) => aiProviders.getProvider(id).defaultModel,
+				efforts: (id, m) => aiProviders.getEfforts(id, m).map(e => e.value),
+				current: { provider: settings().aiProvider || "", model: settings().aiModel || "", effort: settings().aiEffort || "" },
+			});
+			if (patch) { void saveSettings(patch).then(() => { if (stageRef?.isConnected && (phase === "idle" || phase === "error")) void render(containerRef); }); return; }
+		}
 		if ((phase === "idle" || phase === "error") && chatAContenu() !== modeConversation) { void render(containerRef); return; }
 		updateGenerateBtn(boutonEnvoi);
 		majNouvelle();
 	});
+
+	/** The model values a provider offers right now (disabled ones and sites excluded). */
+	const modelesDe = (id: string): string[] => {
+		if (aiProviders.estCanalWeb(id)) return [];
+		const plan = deps.usage?.claudePlan();
+		if (id === "claude-code") return [...aiProviders.getClaudeModels(plan), ...aiProviders.getClaudeMoreModels(plan)].filter(m => !m.disabled).map(m => m.value);
+		if (id === "ollama") return aiProviders.resolveOllamaSelection(settings().aiOllamaModels, settings().aiOllamaCatalog).map(m => m.value);
+		return aiProviders.getDefaultModels(id).filter(m => !m.disabled).map(m => m.value);
+	};
 
 	/** « Ouvrir sans enregistrer » : le quiz d'une ligne dont seule la note a
 	    échoué s'affiche dans la page résultat (la même que pour un site), avec

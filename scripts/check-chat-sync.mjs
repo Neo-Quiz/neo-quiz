@@ -34,6 +34,12 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("a tie on updatedAt: the tombstone wins, whatever the order",
 		[M.mergeChats([[chat("a", 5, "pc", [rq("r", 1)])], [chat("a", 5, "pc", [], { deleted: true })]])[0].deleted, M.mergeChats([[chat("a", 5, "pc", [], { deleted: true })], [chat("a", 5, "pc", [rq("r", 1)])]])[0].deleted], [true, true]);
 
+	const withS = rq("s1", 1, { provider: "claude-code", model: "opus", effort: "max" });
+	const m1 = M.mergeChats([[chat("a", 9, "ph", [withS])], [chat("a", 5, "ph", [rq("s2", 2)])]])[0].requests;
+	r.check("settings of a request survive the merge unchanged", [m1[0].provider, m1[0].model, m1[0].effort, m1[1].provider], ["claude-code", "opus", "max", undefined]);
+	r.check("settings survive the path conversion of a file",
+		M.chatsFromFile(M.chatsToFile([chat("a", 1, "pc", [withS])], ""), "")[0].requests[0].model, "opus");
+
 	// What a device may write.
 	const mine = chat("m", 5, "ph"), foreign = chat("f", 5, "pc", [rq("r", 1)]);
 	r.check("own file: own chats only, a live foreign chat is never copied",

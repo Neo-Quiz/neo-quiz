@@ -288,3 +288,32 @@ await withSrcModule(["src/dashboard/remote-send.ts"], (S) => {
 	r.check("a remembered request recorded meanwhile is no longer listed", S.ownAfterSync([], sync.keep, new Set(["old"]), NOW).keep, []);
 	r.done();
 });
+
+await withSrcModule(["src/dashboard/chat-settings.ts"], (S) => {
+	const r = makeReporter("Settings on chat switch");
+	const rq = (id, over = {}) => ({ id, at: 1, from: "pc", text: "t", mode: "learn", documents: [], results: [], state: "done", ...over });
+	const MODELS = { "claude-code": ["opus", "sonnet"], codex: ["gpt-5.5", "gpt-5.4"], site: [] };
+	const EFF = { opus: ["low", "high", "max"], "gpt-5.5": ["low", "high"] };
+	const env = (current, over = {}) => ({
+		providerOffered: (id) => id in MODELS && id !== "gone",
+		models: (id) => MODELS[id] ?? [],
+		defaultModel: (id) => MODELS[id]?.[0] ?? "",
+		efforts: (id, m) => EFF[m] ?? [],
+		current, ...over,
+	});
+	const cur = { provider: "claude-code", model: "sonnet", effort: "low" };
+	const chat = (...requests) => ({ requests });
+	r.check("a valid triple is applied", S.settingsOnSwitch(chat(rq("a", { provider: "codex", model: "gpt-5.5", effort: "high" })), env(cur)), { aiProvider: "codex", aiModel: "gpt-5.5", aiEffort: "high" });
+	r.check("the LAST request with settings wins", S.settingsOnSwitch(chat(rq("a", { provider: "codex", model: "gpt-5.4" }), rq("b", { provider: "claude-code", model: "opus", effort: "max" }), rq("c")), env(cur)), { aiModel: "opus", aiEffort: "max" });
+	r.check("an empty chat changes nothing", S.settingsOnSwitch(chat(), env(cur)), null);
+	r.check("no chat changes nothing", S.settingsOnSwitch(null, env(cur)), null);
+	r.check("a chat without recorded settings changes nothing", S.settingsOnSwitch(chat(rq("a")), env(cur)), null);
+	r.check("an unavailable provider changes nothing", S.settingsOnSwitch(chat(rq("a", { provider: "gone", model: "x", effort: "high" })), env(cur)), null);
+	r.check("an unknown provider changes nothing", S.settingsOnSwitch(chat(rq("a", { provider: "../etc", model: "x" })), env(cur)), null);
+	r.check("an unknown model on a valid other provider: the provider's default model, no effort", S.settingsOnSwitch(chat(rq("a", { provider: "codex", model: "nope", effort: "high" })), env(cur)), { aiProvider: "codex", aiModel: "gpt-5.5" });
+	r.check("an unknown model on the same provider keeps the current model", S.settingsOnSwitch(chat(rq("a", { provider: "claude-code", model: "nope", effort: "max" })), env(cur)), null);
+	r.check("an effort not valid for the model is not applied", S.settingsOnSwitch(chat(rq("a", { provider: "claude-code", model: "opus", effort: "ultra" })), env(cur)), { aiModel: "opus" });
+	r.check("a site provider (no models) is applied alone", S.settingsOnSwitch(chat(rq("a", { provider: "site", model: "x" })), env(cur)), { aiProvider: "site", aiModel: "" });
+	r.check("already on those settings: nothing to save", S.settingsOnSwitch(chat(rq("a", { provider: "claude-code", model: "sonnet", effort: "low" })), env(cur)), null);
+	r.done();
+});

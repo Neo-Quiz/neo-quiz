@@ -34,6 +34,14 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	const longue = C.readChats({ v: 1, chats: [chat("a", 1, { requests: [req("r", 1, { results: [{ kind: "text", text: "x".repeat(C.MAX_RESULT_TEXT + 50) }] })] })] })[0].requests[0].results[0].text.length;
 	r.check("a text answer is bounded", longue, C.MAX_RESULT_TEXT);
 
+	// Provider, model, effort: labels frozen at the send.
+	const lu = (over) => C.readChats({ v: 1, chats: [chat("a", 1, { requests: [req("r", 1, over)] })] })[0].requests[0];
+	r.check("settings round trip", [lu({ provider: "codex", model: "gpt-5.5", effort: "high" })].map(q => [q.provider, q.model, q.effort])[0], ["codex", "gpt-5.5", "high"]);
+	r.check("an old request without settings stays valid", [lu({}).provider, lu({}).model, lu({}).effort], [undefined, undefined, undefined]);
+	r.check("garbage settings are dropped one by one, the request kept",
+		[lu({ provider: 3, model: "x".repeat(C.MAX_LABEL + 1), effort: "hi" + String.fromCharCode(10) + "gh" })].map(q => [q.id, q.provider, q.model, q.effort])[0], ["r", undefined, undefined, undefined]);
+	r.check("an empty label is dropped", lu({ provider: "", model: "m" }).provider, undefined);
+
 	// Results merge: nothing lost, nothing doubled.
 	const q1 = { kind: "quiz", title: "A", path: "a.md" }, q2 = { kind: "quiz", title: "B", path: "b.md" }, t1 = { kind: "text", text: "plan" };
 	r.check("merge keeps the old ones and adds the new ones", C.mergeResults([q1], [q2, t1]), [q1, q2, t1]);
@@ -117,6 +125,11 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	// The queue's record of the same request keeps the questions and their answers.
 	const ligne = { id: 1, etat: "prete", demande: { text: "Python", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
 	const rec = Q.recordRequest({ key: "r1", chatId: "c1", lines: [ligne] }, "d1", 50, ok.chats[0].requests[0]);
+	const frozen = { ...ligne, demande: { ...ligne.demande, reglages: { aiProvider: "codex", aiModel: "gpt-5.5", aiEffort: "high" } } };
+	const recS = Q.recordRequest({ key: "r1", chatId: "c1", lines: [frozen] }, "d1", 50);
+	r.check("the settings frozen at the send are recorded", [recS.provider, recS.model, recS.effort], ["codex", "gpt-5.5", "high"]);
+	const recS2 = Q.recordRequest({ key: "r1", chatId: "c1", lines: [{ ...frozen, demande: { ...frozen.demande, reglages: { aiProvider: "ollama", aiModel: "m", aiEffort: "low" } } }] }, "d1", 60, recS);
+	r.check("a request already recorded keeps its first settings", [recS2.provider, recS2.model], ["codex", "gpt-5.5"]);
 	r.check("recording the generation keeps the questions and answers", [rec.clarify.answers, rec.results.length], [answers, 1]);
 	r.done();
 });
