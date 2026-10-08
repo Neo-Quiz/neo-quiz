@@ -1,10 +1,10 @@
-/* Phone-only fixes (html.nq-mobile / .is-mobile) for the play screens, from the
+/* Phone-only fixes (html.nq-phone / .is-mobile) for the play screens, from the
    2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css. */
 
 /* The numbered beads: 8 of them (7 steps and the flag) must all fit at 360 px.
    The coarse-pointer sizes (40 px beads, 44 px pitch) overflowed the row and cut
    the flag, so a phone keeps 32 px beads 4 px apart. */
-html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+html.nq-phone #neo-quiz-root > .qbd-qz .quiz-nav {
 	--perle: 32px;
 	gap: 4px;
 	padding-left: 10px;
@@ -14,27 +14,27 @@ html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
 /* The « Expliquer » row (ui/explain.ts) cancels the panel gap with -16 px, so
    the slide's last 12 px slid under its button: the last option of a revue was
    half-covered. -4 px keeps the row tight under the slide without overlap. */
-html.nq-mobile .qz-explain-row {
+html.nq-phone .qz-explain-row {
 	margin-top: -4px;
 }
 
 /* Rich content in a question or a lecture: a long word, URL or list item wraps
    in the card instead of running off the screen. */
-html.nq-mobile .quiz-md-p,
-html.nq-mobile .quiz-md-liste li,
-html.nq-mobile .quiz-md-citation {
+html.nq-phone .quiz-md-p,
+html.nq-phone .quiz-md-liste li,
+html.nq-phone .quiz-md-citation {
 	overflow-wrap: anywhere;
 }
 
 /* A display formula wider than the card scrolls in its own box (like a code
    block) instead of being cut by the step page. */
-html.nq-mobile .math-block {
+html.nq-phone .math-block {
 	display: block;
 	max-width: 100%;
 	overflow-x: auto;
 }
 
-html.nq-mobile .math-inline {
+html.nq-phone .math-inline {
 	display: inline-block;
 	max-width: 100%;
 	overflow-x: auto;
@@ -42,17 +42,17 @@ html.nq-mobile .math-inline {
 }
 
 /* An image never wider than the card. */
-html.nq-mobile .quiz-md img,
-html.nq-mobile .quiz-md-p img {
+html.nq-phone .quiz-md img,
+html.nq-phone .quiz-md-p img {
 	max-width: 100%;
 	height: auto;
 }
 
 /* Touch targets of the play screens below 40 px (the code run button, the
    verdict icons of a text answer, the numbered buttons of the hand-in screen). */
-html.nq-mobile .quiz-code-run-btn,
-html.nq-mobile .quiz-textonly-verdict-icon-btn,
-html.nq-mobile .quiz-submit-perle {
+html.nq-phone .quiz-code-run-btn,
+html.nq-phone .quiz-textonly-verdict-icon-btn,
+html.nq-phone .quiz-submit-perle {
 	min-width: 40px;
 	min-height: 40px;
 }
@@ -63,7 +63,7 @@ html.nq-mobile .quiz-submit-perle {
    393 px), and the drop hint beside it was squeezed to a one-letter column.
    The pill now takes at most half the row and wraps, with a 12 px radius (a
    999 px capsule over two lines reads as a blob). The drop hint keeps the rest. */
-html.nq-mobile .quiz-slot-label {
+html.nq-phone .quiz-slot-label {
 	flex: 0 1 50%;
 	max-width: 50%;
 	min-width: 0;
@@ -77,7 +77,7 @@ html.nq-mobile .quiz-slot-label {
 /* The program's answer field of a terminal question (type "text" with
    terminalVariant): 26 px tall at 393 px, below the 40 px target. It keeps its
    rows and grows with its text, but never starts below 40 px. */
-html.nq-mobile .quiz-textarea.quiz-textarea-program {
+html.nq-phone .quiz-textarea.quiz-textarea-program {
 	min-height: 40px;
 }
 
@@ -86,8 +86,8 @@ html.nq-mobile .quiz-textarea.quiz-textarea-program {
    scroll inside their slide. Their last line ended under the bottom bar at
    rest, so the slide keeps 96 px of room below its content: the bar (44 px
    beads, 28 px inset) sits over the bottom of the slide. */
-html.nq-mobile .quiz-track-item[data-slide-kind="results"],
-html.nq-mobile .quiz-track-item[data-slide-kind="submit"] {
+html.nq-phone .quiz-track-item[data-slide-kind="results"],
+html.nq-phone .quiz-track-item[data-slide-kind="submit"] {
 	padding-bottom: 96px;
 }
 
@@ -95,7 +95,7 @@ html.nq-mobile .quiz-track-item[data-slide-kind="submit"] {
    questions pushed "Retour" and "Voir le score" under the fold of a 393 px
    phone; the action bar now stays at the foot of the slide while the beads
    scroll beneath it, so the way out is always in reach. */
-html.nq-mobile .quiz-submit-card .quiz-actions {
+html.nq-phone .quiz-submit-card .quiz-actions {
 	position: sticky;
 	bottom: 0;
 	z-index: 1;
@@ -110,21 +110,21 @@ html.nq-mobile .quiz-submit-card .quiz-actions {
    its columns were squeezed until a "Commande" column wrapped one letter per
    line. Each cell keeps a readable minimum and inline code stays on one line,
    so a wide table scrolls sideways in its wrap (lecture.css) instead. */
-html.nq-mobile .quiz-lecture-tableau th,
-html.nq-mobile .quiz-lecture-tableau td,
-html.nq-mobile .quiz-md-table th,
-html.nq-mobile .quiz-md-table td {
+html.nq-phone .quiz-lecture-tableau th,
+html.nq-phone .quiz-lecture-tableau td,
+html.nq-phone .quiz-md-table th,
+html.nq-phone .quiz-md-table td {
 	min-width: 9ch;
 }
 
-html.nq-mobile .quiz-lecture-tableau code,
-html.nq-mobile .quiz-md-table code {
+html.nq-phone .quiz-lecture-tableau code,
+html.nq-phone .quiz-md-table code {
 	white-space: nowrap;
 }
 
 /* A markdown table has no scrolling wrap of its own: on a phone it becomes its
    own sideways scroller, so the cell minimum above never widens the page. */
-html.nq-mobile .quiz-md-table {
+html.nq-phone .quiz-md-table {
 	display: block;
 	max-width: 100%;
 	overflow-x: auto;
@@ -138,7 +138,7 @@ html.nq-mobile .quiz-md-table {
    keeps its 16 px from the screen's bottom. The panel's own padding-top was
    16 px, so it becomes inset + 32 px (inset + 16 px of room, then the 16 px it
    already had). */
-html.nq-mobile #neo-quiz-root:has(> .qbd-qz) {
+html.nq-phone #neo-quiz-root:has(> .qbd-qz) {
 	padding-top: 0;
 }
 
@@ -148,26 +148,26 @@ html.nq-mobile #neo-quiz-root:has(> .qbd-qz) {
    the first card 8 px under the beads (4 px of bead shadow room, 4 px of card
    margin). The panel still starts at the top of the screen: its colour goes
    up under the status bar. */
-html.nq-mobile #neo-quiz-root > .qbd-qz {
+html.nq-phone #neo-quiz-root > .qbd-qz {
 	padding-top: calc(var(--nq-inset-haut, 0px) + 16px);
 }
 
 /* The beads: 8 px above them (the header line ends where the row starts, and
    its own padding is the 8 px), 4 px below them for the shadow, and no margin
    under the row. The slide starts right under the row. */
-html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav {
+html.nq-phone #neo-quiz-root > .qbd-qz .quiz-nav {
 	padding-top: 8px;
 	padding-bottom: 4px;
 	margin-bottom: 0;
 }
 
-html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-track-item > .quiz-card {
+html.nq-phone #neo-quiz-root > .qbd-qz .quiz-track-item > .quiz-card {
 	margin-top: 4px;
 }
 
 /* The test clock sits on the cross: the cross moved up with the header. Its
    centre is inset + 30 px (cross top inset + 8 px, radius 22 px), and the pill is 34 px tall. */
-html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-exam-timer {
+html.nq-phone #neo-quiz-root > .qbd-qz .quiz-exam-timer {
 	top: calc(var(--nq-inset-haut, 0px) + 13px);
 }
 
@@ -176,18 +176,18 @@ html.nq-mobile #neo-quiz-root > .qbd-qz .quiz-exam-timer {
    (ui/quiz-bars.ts), so its room goes to the question. The end of a Learn
    (results) and of a Test (hand-in) keep their last line clear of the edge
    with a plain 32 px, not the 96 px that made room for the bar. */
-html.nq-mobile .qz-bottom-bar {
+html.nq-phone .qz-bottom-bar {
 	display: none;
 }
 
-html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="results"],
-html.nq-mobile #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="submit"] {
+html.nq-phone #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="results"],
+html.nq-phone #neo-quiz-root .qbd-qz .quiz-track-item[data-slide-kind="submit"] {
 	padding-bottom: 32px;
 }
 
 /* A code block on a phone: one finger scrolls it sideways, two fingers pinch its
    size (ui/code-fit.ts). The browser must not take a pinch for a page zoom. */
-html.nq-mobile pre.quiz-md-code {
+html.nq-phone pre.quiz-md-code {
 	touch-action: pan-x pan-y;
 }
 
@@ -197,16 +197,16 @@ html.nq-mobile pre.quiz-md-code {
    `plt.bar(bureaux["nom"], bureaux["chiffre_affaires"])` still scrolled at
    the 11 px floor of the code fit (ui/code-fit.ts). The text of the step keeps
    its indent; only the code runs under the number. */
-html.nq-mobile .quiz-lecture-etape-texte > .quiz-code-block,
-html.nq-mobile .quiz-lecture-etape-texte > .quiz-md-code {
+html.nq-phone .quiz-lecture-etape-texte > .quiz-code-block,
+html.nq-phone .quiz-lecture-etape-texte > .quiz-md-code {
 	margin-left: -48px;
 	width: calc(100% + 48px);
 	max-width: none;
 	box-sizing: border-box;
 }
 
-html.nq-mobile .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-code-block,
-html.nq-mobile .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-md-code {
+html.nq-phone .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-code-block,
+html.nq-phone .quiz-lecture--courte .quiz-lecture-etape-texte > .quiz-md-code {
 	margin-left: -36px;
 	width: calc(100% + 36px);
 }

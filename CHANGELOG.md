@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- On tablets, Neo Quiz uses the desktop layout in landscape and portrait.
+
 ## [1.20.47] - 2026-10-08
 
 ### Added

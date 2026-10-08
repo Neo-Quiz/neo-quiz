@@ -26,6 +26,7 @@ interface PontBarre {
 }
 
 import { nextTab } from "../../../../src/swipe";
+import { PHONE_LAYOUT_QUERY } from "../../../../src/phone-layout";
 
 const ACTIVE = "qbd-nav-item--active";
 const PLACEHOLDER = "qbd-nav-item--placeholder";
@@ -191,6 +192,6 @@ export function installBarreNative(pont: PontBarre): void {
 	const racine = document.getElementById("neo-quiz-root") ?? document.body;
 	new MutationObserver(planifier).observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
 	new MutationObserver(planifier).observe(document.body, { attributes: true, attributeFilter: ["class"], childList: true });
-	window.matchMedia("(max-width: 600px)").addEventListener("change", planifier);
+	window.matchMedia(PHONE_LAYOUT_QUERY).addEventListener("change", planifier);
 	planifier();
 }

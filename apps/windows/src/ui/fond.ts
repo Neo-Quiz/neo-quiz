@@ -27,6 +27,7 @@ import { ajouter } from "../../../../src/dom";
 import { BORNES_EFFETS_FOND, estImageDeFond, normaliserEffetsFond, suivante } from "./fond-pur";
 import type { EffetsFond } from "./fond-pur";
 import { FONDS_EMBARQUES, fondEmbarque, fondsParCategorie, urlFondEmbarque, urlVignetteEmbarquee } from "./fonds-catalogue";
+import { phoneLayoutNow } from "../../../../src/phone-layout";
 
 /**
  * LE RÉGLAGE A DEUX FORMES, et elles ne se confondent pas :
@@ -339,7 +340,7 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 	currentHost().ui.setIcon(retirer, "x");
 	/* ON A PHONE, a Neo Calendar row (2026-10-04): "Wallpaper" as its label,
 	   the picture on the right, a chevron; no remove cross (the list offers "none"). */
-	const mobile = currentHost().platform.isMobile;
+	const mobile = phoneLayoutNow();
 	if (mobile) {
 		retirer.remove();
 		currentHost().ui.setIcon(ajouter(rangee, "span", "nq-set-onglet-chevron"), "chevron-right");

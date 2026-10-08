@@ -37,6 +37,7 @@ import { mountMoodleSettings } from "./moodle-settings";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
 import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
+import { phoneLayoutNow } from "../../../../src/phone-layout";
 
 type Category = "general" | "sync" | "ai" | "appearance" | "languages" | "moodle";
 
@@ -226,6 +227,8 @@ export function renderSettings(
 	/* No AI category on a phone or tablet: generation and the Explain button are
 	   not offered there (`HostPlatform.isMobile`). */
 	const mobile = currentHost().platform.isMobile;
+	/* LAYOUT apart from capabilities: the one-page phone layout (title bar, tiles) only below 600 dp. */
+	const phone = phoneLayoutNow();
 	const categories = CATEGORIES.filter(c => (c.id !== "sync" || sync) && (c.id !== "ai" || !mobile) && (c.id !== "moodle" || (!mobile && !!pont().moodle)));
 	for (const c of categories) {
 		const tab = ajouter(nav, "button", "nq-set-onglet");
@@ -252,7 +255,7 @@ export function renderSettings(
 	   shown; the arrow (and the phone's back key, `retour-android.ts`) goes
 	   back from Sync to the page, and from the page closes Settings. */
 	let barreTitre: HTMLElement | null = null;
-	if (mobile) {
+	if (phone) {
 		const barre = document.createElement("div");
 		barre.className = "nq-set-barre";
 		shell.prepend(barre);
@@ -290,7 +293,7 @@ export function renderSettings(
 	}
 
 	function show(id: Category): void {
-		if (mobile) {
+		if (phone) {
 			shell.classList.remove("is-principal");
 			shell.classList.add("is-categorie");
 			if (barreTitre) barreTitre.textContent = t(categories.find(c => c.id === id)!.label);
@@ -343,7 +346,7 @@ export function renderSettings(
 	];
 	// The restart never returns: nothing to chain after it.
 	const changerLangue = (valeur: string): void => { void reglerLangue(lireLangue(valeur)).then(() => pont().systeme.relancer()); };
-	const langueSelect = mobile
+	const langueSelect = phone
 		? ligneChoix(general, "languages", t("settings.language.name"), langues, "auto", changerLangue)
 		: createSelect(row(general, t("settings.language.name")), { value: "auto", options: langues, onChange: changerLangue });
 	void chargerLangue().then(l => langueSelect.setValue(l));
@@ -507,7 +510,7 @@ export function renderSettings(
 	const moodlePage = pages.get("moodle");
 	const demonterMoodle = moodlePage ? mountMoodleSettings(moodlePage, () => { root.closest(".modal")?.querySelector<HTMLElement>(".modal-close-button")?.click(); }) : () => undefined;
 
-	if (mobile) montrerPrincipal();
+	if (phone) montrerPrincipal();
 	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
 		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];

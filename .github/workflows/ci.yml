@@ -234,6 +234,10 @@ jobs:
       - name: Swipe
         run: npm run check:swipe
 
+      # PHONE vs DESKTOP layout on Android: width < 600 dp only, never the platform.
+      - name: Phone layout
+        run: npm run check:phone-layout
+
       # SELECTING quiz cards (Ctrl/Shift+click, long press, Escape, a page that
       # changes under the selection): the pure rules behind the folder page.
       - name: Card selection

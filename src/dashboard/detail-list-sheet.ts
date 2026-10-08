@@ -1,6 +1,7 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
+import { phoneLayoutNow } from "../phone-layout";
 
 /* ══════════════════════════════════════════════════════════
    THE QUESTION LIST AS A BOTTOM SHEET (phone, editor)
@@ -9,7 +10,7 @@ import { t } from "../i18n";
    being edited: it is a sheet that rises from the bottom bar, opened by a
    button (`.qbd-qz-list-toggle`) over the page and closed by a tap on the
    scrim, on a question, or by the Back key (`retour-android.ts` clicks the
-   button). Only the HOST decides (`HostPlatform.isMobile`); the layout itself
+   button). Only the layout decides (`phoneLayoutNow`, width < 600 dp); the layout itself
    is `mobile.css`, under `.qbd-qz-body--sheet`.
 ══════════════════════════════════════════════════════════ */
 
@@ -17,7 +18,7 @@ import { t } from "../i18n";
     the button and the scrim the first time, and refreshing the question count
     shown on the button. A no-op off mobile. */
 export function mountListSheet(listCol: HTMLElement, count: number): void {
-	if (!currentHost().platform.isMobile) return;
+	if (!phoneLayoutNow()) return;
 	const body = listCol.parentElement;
 	if (!body) return;
 	body.classList.add("qbd-qz-body--sheet");

@@ -1,14 +1,17 @@
 /* ══════════════════════════════════════════════════════════
    PHONE AND TABLET (the Android app; the Windows app never matches).
 
-   Two switches, both set by `apps/windows/src/main.ts` only when the host
-   says `HostPlatform.isMobile`:
+   Three switches, set by `apps/windows/src/main.ts` (`src/phone-layout.ts`):
 
-   - `body.is-mobile`, the class Obsidian sets on its own mobile shell, which
-     the shared CSS already styles (single-column grids, taller targets, ...).
-     It follows the PHONE width (<= 600 px) only: a tablet (800 and 1280 CSS
-     px) keeps the desktop layout, with the rail on the left.
-   - `html.nq-mobile`, for what holds on both: no title bar.
+   - `html.nq-mobile` (the host says `HostPlatform.isMobile`), for what holds
+     on a phone AND a tablet: no title bar, status-bar inset, no scrollbars,
+     the platform font.
+   - `body.is-mobile` and `html.nq-phone` (the SAME condition: viewport
+     narrower than 600 CSS px = dp), the PHONE LAYOUT: bottom bar, sheets,
+     single column, the document as the scroller. From 600 dp (a tablet, in
+     portrait and in landscape) neither is set and the page has the desktop
+     layout, with the rail on the left. `.is-mobile` is the class Obsidian
+     sets on its own mobile shell, which the shared CSS already styles.
 
    WHY `.is-mobile` WAS NEVER ENOUGH ON ITS OWN. Home and Folders rendered
    BLANK on the emulator: the app never set `.is-mobile`, so `dashboard-base.css`
@@ -766,13 +769,13 @@ html.nq-mobile .modal-container > .modal {
       Not converted, on purpose: the played quiz (a fixed three-floor
       column whose slides scroll on their own, quiz-bars.css) and modals.
    ══════════════════════════════════════════════════════════ */
-html.nq-mobile,
-html.nq-mobile body {
+html.nq-phone,
+html.nq-phone body {
 	height: auto;
 	min-height: 100%;
 }
 
-html.nq-mobile body {
+html.nq-phone body {
 	overflow-x: clip;
 }
 
@@ -1050,8 +1053,8 @@ body.is-mobile .modal-container > .modal.nq-reglages-modal.qbd-closing {
    quiz is played the root is the visible viewport again, and the slides
    scroll in their own box (quiz-bars.css).
    ══════════════════════════════════════════════════════════ */
-html.nq-mobile:has(#neo-quiz-root > .qbd-qz),
-html.nq-mobile:has(#neo-quiz-root > .qbd-qz) body {
+html.nq-phone:has(#neo-quiz-root > .qbd-qz),
+html.nq-phone:has(#neo-quiz-root > .qbd-qz) body {
 	height: 100%;
 	overflow: hidden;
 }

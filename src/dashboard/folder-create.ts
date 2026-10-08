@@ -15,6 +15,7 @@ import { sha256Hex } from "./share-manifest";
 import { makeDefault } from "../editor/utils";
 import { exportAllWithFence } from "../editor/export";
 import { saveSettingsReporting } from "./save-settings";
+import { phoneLayoutNow } from "../phone-layout";
 
 /* ══════════════════════════════════════════════════════════
    CREATE FOLDER — modal « Créer un dossier » calqué sur StudySmarter
@@ -79,7 +80,7 @@ export function openCreateFolderModal(
 			}
 			/* Import has its own button beside "New folder" on a PC; a phone
 			   has no room for a third floating button, so it stays here. */
-			if (currentHost().platform.isMobile) {
+			if (phoneLayoutNow()) {
 				createOptionCard(m, c, "download", "#a78bfa", t("dashboard.quizzes.createImportTitle"), t("dashboard.quizzes.createImportDesc"),
 					() => void importSharedFolder(ctx, map, quizzes, onDone));
 			}

@@ -21,6 +21,7 @@ import type { ModuleGroup } from "./quiz-modules";
 import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { peindreIconeCategorie, libelleCategorie } from "./categorie-affichage";
+import { phoneLayoutNow } from "../phone-layout";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES VIEW — Dashboard
@@ -538,7 +539,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   makes `position: fixed` relative to itself on a phone, and they
 			   ended up under the last card. Removed at each render; hidden by
 			   CSS whenever the folders grid is not on screen. */
-			const mobile = currentHost().platform.isMobile;
+			const mobile = phoneLayoutNow();
 			if (!mobile && ctx.openMoodle) {
 				const moodle = ajouter(selects, "button", "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
 				moodle.type = "button";

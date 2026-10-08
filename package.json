@@ -104,6 +104,7 @@
     "check:devices": "node scripts/check-devices.mjs",
     "check:stats": "node scripts/check-stats.mjs",
     "check:swipe": "node scripts/check-swipe.mjs",
+    "check:phone-layout": "node scripts/check-phone-layout.mjs",
     "check:selection": "node scripts/check-selection.mjs",
     "check:overscroll": "node scripts/check-overscroll.mjs",
     "check:idle-animations": "node scripts/check-idle-animations.mjs",

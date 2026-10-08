@@ -81,6 +81,7 @@ import { openInstallModal } from "./ai-install-modal";
 import type { InstallProvider } from "./ai-install-modal";
 import { creerTuilesVideo, type TuilesVideo } from "./video-tile";
 import { liensNonLus } from "../video/youtube";
+import { phoneLayoutNow } from "../phone-layout";
 
 /* ══════════════════════════════════════════════════════════
    AI VIEW — Dashboard
@@ -1100,7 +1101,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
 		/* Phone: the Claude app's layout. The nav becomes a left drawer, the top
 		   bar carries the menu and "new conversation" (`phone-chat.ts`). */
-		if (host.platform.isMobile) {
+		if (phoneLayoutNow()) {
 			const barre = poserBarreHaute(container, lateral, { peutCreer: chatAContenu, creer: () => { startNewChat(); } });
 			const majDrawer = majNouvelle;
 			majNouvelle = () => { majDrawer(); barre.majNouveau(); };

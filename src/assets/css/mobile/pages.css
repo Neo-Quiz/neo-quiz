@@ -1,4 +1,4 @@
-/* Phone-only fixes (html.nq-mobile / .is-mobile) for the pages screens, from the
+/* Phone-only fixes (html.nq-phone / .is-mobile) for the pages screens, from the
    2026-10-07 responsive audit at 360, 393 and 430 px. Loaded after mobile.css.
 
    Every rule here is scoped to a phone class: the Windows layout does not move.

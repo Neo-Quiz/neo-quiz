@@ -10,6 +10,7 @@ import "./assets/moodle-modal.css";
 import "./assets/math.css";
 import { setLanguage, setHourCycle, currentHourCycle, t } from "../../../src/i18n";
 import { chargerLangue } from "./ui/langue";
+import { PHONE_LAYOUT_QUERY } from "../../../src/phone-layout";
 import { chargerFormatHeure, suivreFormatHeureTelephone } from "./ui/format-heure";
 import { LOG_PREFIX } from "../../../src/branding";
 import { createScanner } from "../../../src/dashboard/scanner";
@@ -540,10 +541,32 @@ async function demarrer(): Promise<void> {
 		installKeyboardState();
 		installBarreNative((window as unknown as { neoPlatform: Parameters<typeof installBarreNative>[0] }).neoPlatform);
 		(window as unknown as { neoPlatform: { surRetour(g: () => boolean): void } }).neoPlatform.surRetour(retourAndroid);
-		const etroit = window.matchMedia("(max-width: 600px)");
-		const suivre = (): void => { document.body.classList.toggle("is-mobile", etroit.matches); };
+		/* PHONE LAYOUT = width < 600 dp (`src/phone-layout.ts`); the platform only
+		   decides capabilities. `is-mobile` (body) and `nq-phone` (html) are the
+		   two CSS switches of the phone layout. */
+		const etroit = window.matchMedia(PHONE_LAYOUT_QUERY);
+		const etroitAuDepart = etroit.matches;
+		const suivre = (): void => {
+			document.body.classList.toggle("is-mobile", etroit.matches);
+			document.documentElement.classList.toggle("nq-phone", etroit.matches);
+		};
 		suivre();
-		etroit.addEventListener("change", suivre);
+		/* The layout is decided at render (bottom bar or rail, sheets, phone chat...):
+		   when the width crosses 600 dp (a split window, a phone turned sideways) the
+		   page reloads to build the other one. Never while a quiz is played: it waits
+		   for the quiz to be left (the session photo keeps the quiz anyway). */
+		const rechargerSiBascule = (): boolean => {
+			if (etroit.matches === etroitAuDepart) return true;
+			if (root.querySelector(":scope > .qbd-qz")) return false;
+			location.reload();
+			return true;
+		};
+		etroit.addEventListener("change", () => {
+			suivre();
+			if (rechargerSiBascule()) return;
+			const obs = new MutationObserver(() => { if (rechargerSiBascule()) obs.disconnect(); });
+			obs.observe(root, { childList: true });
+		});
 	} else monterBarreTitre(document.body, {
 		/* DIRECTEMENT la fonction : elle ne ferme plus sur l'écran courant
 		   depuis que les Réglages sont une modale posée par-dessus lui. La

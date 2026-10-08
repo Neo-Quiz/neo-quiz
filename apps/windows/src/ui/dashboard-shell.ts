@@ -88,6 +88,7 @@ import type { DerniereVue } from "./reprise";
 import type { SessionsApp } from "../review/sessions";
 import { testSetups } from "../review/test-setups";
 import { createMovedPrefix } from "../review/folder-move";
+import { phoneLayoutNow } from "../../../../src/phone-layout";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES DES PAGES « ACCUEIL » / « MES QUIZ »
@@ -1090,7 +1091,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
 	const tabKey = (b: HTMLElement) => b.dataset.nav ?? "settings";
 	const tabTarget = (dir: "next" | "prev"): HTMLElement | null => {
-		if (!currentHost().platform.isMobile || sheets.depth() > 0) return null;
+		if (!phoneLayoutNow() || sheets.depth() > 0) return null;
 		const btns = tabButtons();
 		const current = btns.find(b => b.classList.contains("qbd-nav-item--active"));
 		const target = current && nextTab(tabKey(current), dir, btns.map(tabKey));
