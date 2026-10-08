@@ -5,7 +5,7 @@ export { latestDevice } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import { pendingState, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest } from "../shared-state/remote-request";
-import { deviceInfo, soleOnlinePc } from "../shared-state/devices";
+import { deviceInfo } from "../shared-state/devices";
 import type { DeviceFile } from "../shared-state/devices";
 import { relativeToRoot } from "../shared-state/chat-merge";
 
@@ -26,15 +26,15 @@ export function buildRequest(input: SendInput, ctx: { device: string; target: st
 	return verdict.request;
 }
 
-/** Where a request goes: the preferred PC (chosen by hand, else the only one online), else the chat's PC while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen. */
-export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastEver: string | null = null, preferred: string | null = null): string | null {
-	// The PC tapped in the PC window, or the only one online (`preferred`, see `preferredPc`), wins over everything.
+/** Where a request goes: the PC chosen by hand (while it still has a device file), else the chat's PC while fresh, else the last PC seen fresh, else the only PC online by name (`sole`, a name match, so the last resort: it never overrides the chat's origin), else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen. */
+export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastEver: string | null = null, preferred: string | null = null, sole: string | null = null): string | null {
+	// The PC tapped in the PC window (`preferred`, see `preferredPc`) wins over everything.
 	if (preferred) return preferred;
 	if (chat) {
 		const own = files.find(f => f.device === chat.origin);
 		if (own && !isStale(own.file, now)) return chat.origin;
 	}
-	return lastPcSeen(files, now) ?? (chat?.origin || null) ?? lastEver;
+	return lastPcSeen(files, now) ?? sole ?? (chat?.origin || null) ?? lastEver;
 }
 
 export function settled(own: ReadonlyArray<Pick<RemoteRequest, "id">>, chats: ReadonlyArray<ChatRecord>): string[] {
@@ -51,14 +51,13 @@ export function refusPourTelephone(doc: PhoneDocument, rootId: string): "ai.remo
 }
 
 /** Where a request goes (see `pickTarget`). Null only when no PC was ever seen: an empty target is never written. */
-export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null, preferred: string | null = null): string | null {
-	return pickTarget(chat, files, now, lastSeen, preferred);
+export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null, preferred: string | null = null, sole: string | null = null): string | null {
+	return pickTarget(chat, files, now, lastSeen, preferred, sole);
 }
 
-/** The PC the phone prefers: the one tapped in the PC window while it still has a device file, else the only paired PC online (matched by name), else null. */
-export function preferredPc(chosen: string | null, devices: ReadonlyArray<DeviceFile>, peers: ReadonlyArray<{ name: string; connected: boolean; paused: boolean }>): string | null {
-	if (chosen && deviceInfo(devices, chosen)) return deviceInfo(devices, chosen)!.device;
-	return soleOnlinePc(peers, devices);
+/** The PC the user chose by hand, while it still has a device file, else null. The name-matched sole online PC is NOT here: it is the last resort of `pickTarget`. */
+export function preferredPc(chosen: string | null, devices: ReadonlyArray<DeviceFile>): string | null {
+	return chosen ? deviceInfo(devices, chosen)?.device ?? null : null;
 }
 
 /** The model a request carries: the phone's choice, only while the target PC lists it (its device file); else none, and the PC uses its own default. */

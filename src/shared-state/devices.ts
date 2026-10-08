@@ -23,7 +23,7 @@ const MAX_LABEL = 80;
 export const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 /** The device id shape (a file name `<uuid>.json`); a conflict copy never matches. */
 const DEVICE_FILE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.json$/i;
-const TEXT_UNSAFE = /[\u0000-\u001f\u007f-\u009f­​-‏\u2028-‮⁠-⁯﻿￰-￿]/;
+const TEXT_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff0-\uffff]/;
 
 export type DeviceKind = "laptop" | "desktop";
 export interface ModelEntry { id: string; label: string }

@@ -15,6 +15,7 @@
 
 import { execFile } from "node:child_process";
 import * as os from "node:os";
+import { POWERSHELL_PARTAGE } from "./partage";
 
 /** The constant script. Prints `laptop` or `desktop`. */
 export const SCRIPT_TYPE = `$ErrorActionPreference = 'Stop'
@@ -57,7 +58,7 @@ export function executerType(): Promise<string | null> {
 	return new Promise(resolve => {
 		try {
 			const encode = Buffer.from(SCRIPT_TYPE, "utf16le").toString("base64");
-			execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
+			execFile(POWERSHELL_PARTAGE(), ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
 				{ windowsHide: true, timeout: DELAI_TYPE_MS, maxBuffer: 1024 },
 				(err, stdout) => resolve(err ? null : String(stdout)));
 		} catch {

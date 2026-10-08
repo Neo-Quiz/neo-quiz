@@ -26,11 +26,13 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	const info = { claudeModels: [{ id: "opus", label: "Opus" }] };
 	r.check("modelFor: the choice only while the PC lists it", [S.modelFor("opus", info), S.modelFor("sonnet", info), S.modelFor(null, info), S.modelFor("opus", null)], ["opus", undefined, undefined, undefined]);
 	const dev = (device, name) => ({ device, name, kind: "laptop", claudeModels: [], updatedAt: 1 }), peer = (name, connected = true, paused = false) => ({ name, connected, paused });
-	r.check("preferred: the PC tapped by hand while it has a device file", S.preferredPc("pcB", [dev("pcA", "A"), dev("pcB", "B")], [peer("A")]), "pcB");
-	r.check("preferred: a chosen PC with no device file is ignored", S.preferredPc("gone", [dev("pcA", "A")], [peer("A")]), "pcA");
-	r.check("preferred: the only paired PC online is picked by itself", S.preferredPc(null, [dev("pcA", "A"), dev("pcB", "B")], [peer("a"), peer("B", false)]), "pcA");
-	r.check("preferred: two online, none chosen: no guess", S.preferredPc(null, [dev("pcA", "A"), dev("pcB", "B")], [peer("A"), peer("B")]), null);
-	r.check("preferred: a paused peer is not online; two files of one name: no guess", [S.preferredPc(null, [dev("pcA", "A")], [peer("A", true, true)]), S.preferredPc(null, [dev("pcA", "A"), dev("pcC", "A")], [peer("A")])], [null, null]);
+	r.check("preferred: the PC tapped by hand while it has a device file", S.preferredPc("pcB", [dev("pcA", "A"), dev("pcB", "B")]), "pcB");
+	r.check("preferred: a chosen PC with no device file is ignored (null, never the sole online PC)", [S.preferredPc("gone", [dev("pcA", "A")]), S.preferredPc(null, [dev("pcA", "A")])], [null, null]);
+	const gs = (device, at) => ({ device, file: { v: 1, at, running: [] } });
+	r.check("sole online PC never overrides a fresh chat origin", S.pickTarget({ origin: "pcA" }, [gs("pcA", NOW - 1000), gs("pcB", NOW - 500)], NOW, null, null, "pcB"), "pcA");
+	r.check("sole online PC never overrides the last PC seen fresh", S.pickTarget(null, [gs("pcA", NOW - 1000)], NOW, null, null, "pcB"), "pcA");
+	r.check("sole online PC comes before a stale origin and the last PC ever", S.pickTarget({ origin: "pcA" }, [gs("pcA", NOW - 900_000)], NOW, "pcA", null, "pcB"), "pcB");
+	r.check("the explicit choice still wins over the sole online PC", S.pickTarget(null, [], NOW, null, "pcC", "pcB"), "pcC");
 	const g0 = (device, at) => ({ device, file: { v: 1, at, running: [] } });
 	r.check("target: the preferred PC wins over the chat's fresh PC and the freshest one", S.pickTarget({ origin: "pcA" }, [g0("pcA", NOW - 1000), g0("pcB", NOW - 500)], NOW, null, "pcC"), "pcC");
 	r.check("a generated request id matches the slug", R.SLUG.test(S.buildRequest(input(), { ...ctx, newId: undefined }).id), true);

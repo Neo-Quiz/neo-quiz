@@ -38,6 +38,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { execFile } from "node:child_process";
+import { POWERSHELL_PARTAGE } from "./partage";
 
 /** The constant script. Prints one line: `<cost> <roaming> <over> <approaching>`, or `none`. */
 export const SCRIPT_COUT = `$ErrorActionPreference = 'Stop'
@@ -100,7 +101,7 @@ export function executerPowerShell(): Promise<string | null> {
 	return new Promise(resolve => {
 		try {
 			const encode = Buffer.from(SCRIPT_COUT, "utf16le").toString("base64");
-			execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
+			execFile(POWERSHELL_PARTAGE(), ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode],
 				{ windowsHide: true, timeout: DELAI_MS, maxBuffer: 4096 },
 				(err, stdout) => resolve(err ? null : String(stdout)));
 		} catch {

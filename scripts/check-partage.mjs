@@ -27,6 +27,10 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 		[String.raw`D:\Win\System32\WindowsPowerShell\v1.0\powershell.exe`, String.raw`D:\Win\System32\taskkill.exe`, String.raw`C:\Windows\System32\taskkill.exe`]);
 	const src = readFileSync(new URL("../apps/windows/electron/partage.ts", import.meta.url), "utf8");
 	r.check("partage.ts never starts a bare powershell.exe or taskkill", [/(spawn|lancer)\(\s*"(powershell|taskkill)/.test(src), /(spawn|lancer)\(\s*POWERSHELL_PARTAGE\(\)/.test(src), /spawn\(outilSysteme\("taskkill\.exe"\)/.test(src)], [false, true, true]);
+	for (const f of ["appareil.ts", "connexion-limitee.ts"]) {
+		const s2 = readFileSync(new URL("../apps/windows/electron/" + f, import.meta.url), "utf8");
+		r.check(f + " launches PowerShell by its full System32 path", [/execFile\(\s*"powershell/.test(s2), /execFile\(\s*POWERSHELL_PARTAGE\(\)/.test(s2)], [false, true]);
+	}
 	r.check("un nom de zip ordinaire passe tel quel", nomPartage("XTI301 - Écosystème Python.zip"), "XTI301 - Écosystème Python.zip");
 	r.check("un .md passe", nomPartage("CM1.md"), "CM1.md");
 	r.check("une apostrophe typographique reste dans le NOM (le script ne le voit jamais)", nomPartage("L’an.md"), "L’an.md");

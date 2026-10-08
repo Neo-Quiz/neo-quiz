@@ -3,8 +3,8 @@ import { buildDevice, contentKey, shouldWriteDevice } from "../shared-state/devi
 import type { DeviceFile, DeviceKind } from "../shared-state/devices";
 
 /* Publishes this PC's own device file (name, kind, Claude models) in the synced folder.
-   `check()` is a local comparison and writes ONLY when the content differs from the last
-   successful write (the first call writes): no timer here, an idle app writes nothing. */
+   `check()` writes ONLY when the content differs from the last successful write (the first
+   call writes) or, with `readOwn`, from what is on disk: no timer here, an idle app writes nothing. */
 
 export interface DevicePublisherDeps {
 	device: string;
@@ -13,7 +13,7 @@ export interface DevicePublisherDeps {
 	/** The Claude models this PC's own CLI cache offers right now. */
 	models(): Promise<ReadonlyArray<{ id: string; label: string }>> | ReadonlyArray<{ id: string; label: string }>;
 	write(file: DeviceFile): Promise<void>;
-	/** Our own file as left on disk by a previous run (null when none or unreadable): a restart or a page reload with the same content writes nothing. */
+	/** Our own file as it is on disk right now (null when none or unreadable): read at every check, so a restart writes nothing when identical and a file overwritten by a peer is restored. */
 	readOwn?(): Promise<DeviceFile | null>;
 	now?: () => number;
 }
@@ -26,11 +26,11 @@ export function createDevicePublisher(deps: DevicePublisherDeps): { check(): Pro
 			const info = await deps.info();
 			if (!info) return false;
 			const next = buildDevice({ device: deps.device, name: info.name, kind: info.kind, models: await deps.models() }, (deps.now ?? Date.now)());
-			if (lastKey === null && deps.readOwn) {
+			// The file on disk is re-read at EVERY check, not only the first: a paired peer may overwrite our own file, and a fake would otherwise persist because we only rewrite when our in-memory content changes. Identical on disk: no write (an idle app writes nothing).
+			if (deps.readOwn) {
 				const onDisk = await deps.readOwn().catch(() => null);
 				if (onDisk && contentKey(onDisk) === contentKey(next)) { lastKey = contentKey(next); return false; }
-			}
-			if (!shouldWriteDevice(lastKey, next)) return false;
+			} else if (!shouldWriteDevice(lastKey, next)) return false;
 			await deps.write(next);
 			lastKey = contentKey(next);
 			return true;

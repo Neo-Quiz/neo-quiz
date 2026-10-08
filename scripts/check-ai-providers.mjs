@@ -395,6 +395,10 @@ await withSrcModule(
 				{ pro: !!fableDe({ name: "Pro" })?.disabled, max: !!fableDe({ name: "Max" })?.disabled,
 				  resoluPro: providers.resolveClaudeModel("fable", { name: "Pro" }), resoluMax: providers.resolveClaudeModel("fable", { name: "Max" }) },
 				{ pro: true, max: false, resoluPro: "opus", resoluMax: "fable" });
+			/* A remote request carries no plan: on the no-catalogue fallback Fable is not "disabled" (plan unknown) but may be billed in credits, so it is never offered. */
+			r.check("remote offer: Fable is visible in the plan-less fallback list yet never offered to a remote request",
+				{ visible: !!fableDe(undefined), offered: (await providers.claudeModelsOffered()).some(m => m.id === "fable") },
+				{ visible: true, offered: false });
 		}
 
 		/* LE CATALOGUE DE CLAUDE CODE est la source des modèles (bug du

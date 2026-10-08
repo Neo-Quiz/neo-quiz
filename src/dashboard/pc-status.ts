@@ -11,7 +11,7 @@
 import type { ChatRecord } from "./chat-record";
 import type { PairedPeer } from "./remote-generations";
 import { pcReachable, pickTarget, preferredPc } from "./remote-send";
-import { deviceInfo } from "../shared-state/devices";
+import { deviceInfo, soleOnlinePc } from "../shared-state/devices";
 import type { DeviceFile, DeviceKind } from "../shared-state/devices";
 import { isStale } from "../shared-state/generations";
 import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
@@ -67,7 +67,7 @@ const label = (provider?: string, model?: string): string | null => [provider, m
 
 export function pcStatus(i: PcStatusInput): PcStatus {
 	const devices = i.devices ?? [];
-	const device = pickTarget(i.chat, i.files, i.now, i.lastEver, preferredPc(i.chosen ?? null, devices, i.peers));
+	const device = pickTarget(i.chat, i.files, i.now, i.lastEver, preferredPc(i.chosen ?? null, devices), soleOnlinePc(i.peers, devices));
 	const info = deviceInfo(devices, device);
 	const file = device ? i.files.find(f => f.device === device)?.file ?? null : null;
 	const peerSeen = i.peers.reduce<number | null>((m, p) => p.seenAt !== null && (m === null || p.seenAt > m) ? p.seenAt : m, null);

@@ -50,8 +50,26 @@ await withSrcModule(["src/shared-state/devices.ts", "src/dashboard/device-publis
 	const again = P.createDevicePublisher({ device: PC, info: async () => ({ name: "Aero", kind: "laptop" }), models: () => [{ id: "opus", label: "Opus 5" }], write: async f => { disk.push(f); }, readOwn: async () => D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [{ id: "opus", label: "Opus 5" }] }, 1) });
 	await again.check(); await again.check();
 	r.check("after a restart with the same content on disk: nothing is written", disk.length, 0);
-	const changed = P.createDevicePublisher({ device: PC, info: async () => ({ name: "Aero", kind: "desktop" }), models: () => [], write: async f => { disk.push(f); }, readOwn: async () => D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [] }, 1) });
+	let stale = D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [] }, 1);
+	const changed = P.createDevicePublisher({ device: PC, info: async () => ({ name: "Aero", kind: "desktop" }), models: () => [], write: async f => { disk.push(f); stale = f; }, readOwn: async () => stale });
 	await changed.check(); await changed.check();
 	r.check("after a restart with a different content on disk: one write", disk.length, 1);
+	// A peer overwrites our own file: restored at the next check, and an identical file costs no write.
+	let onDisk = D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [{ id: "opus", label: "Opus 5" }] }, 1);
+	const fixes = [];
+	const guard = P.createDevicePublisher({ device: PC, info: async () => ({ name: "Aero", kind: "laptop" }), models: () => [{ id: "opus", label: "Opus 5" }], write: async f => { fixes.push(f); onDisk = f; }, readOwn: async () => onDisk });
+	await guard.check(); await guard.check();
+	r.check("own file identical on disk: nothing written, however many checks", fixes.length, 0);
+	onDisk = D.buildDevice({ device: PC, name: "Fake", kind: "desktop", models: [{ id: "evil", label: "Evil" }] }, 2);
+	await guard.check();
+	r.check("a file overwritten on disk by a peer is rewritten at the next check", [fixes.length, fixes[0].name, onDisk.name], [1, "Aero", "Aero"]);
+	await guard.check(); await guard.check();
+	r.check("and once restored, idle checks write nothing again", fixes.length, 1);
+	// TEXT_UNSAFE: every edge of every range still matches, and the characters just outside do not.
+	const nameOf = c => D.buildDevice({ device: PC, name: "a" + String.fromCharCode(c) + "b", kind: "laptop", models: [] }, 1).name;
+	const unsafe = [0x00, 0x1f, 0x7f, 0x9f, 0xad, 0x200b, 0x200f, 0x2028, 0x202e, 0x2060, 0x206f, 0xfeff, 0xfff0, 0xffff];
+	const safe = [0x20, 0x7e, 0xa0, 0xac, 0xae, 0x200a, 0x2010, 0x2027, 0x202f, 0x205f, 0x2070, 0xfefe, 0xff00, 0xffef];
+	r.check("TEXT_UNSAFE: each range edge is refused", unsafe.filter(c => nameOf(c) !== ""), []);
+	r.check("TEXT_UNSAFE: the neighbours just outside the ranges are kept", safe.filter(c => nameOf(c) === ""), []);
 	r.done();
 });

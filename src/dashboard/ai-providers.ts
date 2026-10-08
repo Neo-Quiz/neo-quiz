@@ -1374,7 +1374,8 @@ export function getClaudeModels(plan?: ClaudePlanHint): ModelDef[] {
 /** The Claude Code models THIS machine's own CLI cache offers right now (cache re-read first, never a hard-coded list): selectable ones only, ids the request charset allows. This is both what a PC publishes in its device file and the list a remote request's `model` is checked against. */
 export async function claudeModelsOffered(): Promise<Array<{ id: string; label: string }>> {
 	await refreshCliCaches();
-	return cleanModels(getClaudeModels().filter(m => !m.disabled).map(m => ({ id: m.value, label: m.label })));
+	// No plan is known here. On the no-catalogue fallback, Fable is only "disabled" for a KNOWN Pro plan, yet it is billed in usage credits unless the plan is Max: it is never offered to a remote request.
+	return cleanModels(getClaudeModels().filter(m => !m.disabled && m.value !== "fable").map(m => ({ id: m.value, label: m.label })));
 }
 
 /** Les modèles plus anciens : la section `overflow` du catalogue, précédée
