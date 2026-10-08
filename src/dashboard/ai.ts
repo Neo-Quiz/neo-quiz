@@ -38,9 +38,9 @@ import { contexteConversation, documentsHeritiers } from "./conversation-context
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat } from "./chat-session";
 import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
-import { getOwnRequests, getRemoteGenerations } from "./remote-generations";
+import { getOwnRequests, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
-import { pickTarget, refusPourTelephone } from "./remote-send";
+import { pcFresh, pickTarget, refusPourTelephone } from "./remote-send";
 import { pasteAnswer, startRelay } from "./relay-flow";
 import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
@@ -803,7 +803,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   composer est libre dès l'envoi. */
 		if (phase === "web" || phase === "connexion") return false;
 		// The phone needs no provider of its own: the PC that owns the chat runs the request (`ai-remote.ts`).
-		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture) && pcJoignable();
+		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture) && pcConnu();
 		const providerId = settings().aiProvider || "";
 		if (!providerId) return false;
 		// Un fournisseur desktop-only (Claude Code CLI) est inutilisable sur
@@ -2143,7 +2143,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			relayBtn.addEventListener("click", () => { if (relais) void collerReponse(); else void partagerViaAppli(); });
 			relaisBtnRef = relayBtn;
 			majBoutonRelais();
-			if (!pcJoignable()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.noPc"));
+			if (!pcConnu()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.firstPc"));
+			else if (!pcJoignable()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.noPc"));
 		}
 
 		// PAS d'attribut accept : le dialogue Windows affiche alors « Tous
@@ -4079,9 +4080,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return tuiles;
 	}
 
-	/** Phone: is a PC reachable for the chat on screen (its origin, else the freshest one)? Without one, the composer leads with the relay. */
+	/** Phone: is a PC reachable now (its file present and fresh) for the chat on screen? Without one, the composer leads with the relay and says so. */
 	function pcJoignable(): boolean {
-		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now()) !== null;
+		const now = Date.now();
+		const files = getRemoteGenerations();
+		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver());
+		return cible !== null && pcFresh(cible, files, now);
+	}
+
+	/** Phone: a request can be sent when a PC was ever seen (the chat's, else the last one). The request then waits for that PC. */
+	function pcConnu(): boolean {
+		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now(), lastPcEver()) !== null;
 	}
 
 	/** The relay card for the chat on screen; null without a session or when the session belongs to another chat. */

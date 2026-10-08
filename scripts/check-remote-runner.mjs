@@ -25,7 +25,9 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	r.check("target: the origin of an existing chat when it is alive", S.pickTarget({ origin: "pcA" }, [gens("pcA", NOW - 1000), gens("pcB", NOW - 500)], NOW), "pcA");
 	r.check("target: the freshest PC when the origin is silent", S.pickTarget({ origin: "pcA" }, [gens("pcA", NOW - 900_000), gens("pcB", NOW - 500)], NOW), "pcB");
 	r.check("target: the freshest PC for a chat started on the phone", S.pickTarget(null, [gens("pcA", NOW - 5000), gens("pcB", NOW - 500)], NOW), "pcB");
-	r.check("target: none when every PC is stale (the composer offers the relay)", S.pickTarget(null, [gens("pcA", NOW - 900_000)], NOW), null);
+	r.check("target: none when every PC is stale and none was ever seen", S.pickTarget(null, [gens("pcA", NOW - 900_000)], NOW, null), null);
+	r.check("target: the last PC ever seen when every PC is stale (Send stays enabled)", S.pickTarget(null, [gens("pcA", NOW - 900_000)], NOW, "pcA"), "pcA");
+	r.check("target: the chat's PC, stale, before the last PC ever seen", S.pickTarget({ origin: "pcB" }, [gens("pcA", NOW - 900_000)], NOW, "pcA"), "pcB");
 	const chat = (reqs) => ({ id: "c", origin: "pc", createdAt: 1, updatedAt: 1, requests: reqs.map(id => ({ id })) });
 	r.check("settled: our request found in a chat file can be deleted, the others stay", S.settled([{ id: "a" }, { id: "b" }], [chat(["a", "z"])]), ["a"]);
 	r.done();

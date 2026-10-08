@@ -23,12 +23,13 @@ export function buildRequest(input: SendInput, ctx: { device: string; target: st
 	return verdict.request;
 }
 
-export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number): string | null {
+/** Where a request goes: the chat's PC while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen. */
+export function pickTarget(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastEver: string | null = null): string | null {
 	if (chat) {
 		const own = files.find(f => f.device === chat.origin);
 		if (own && !isStale(own.file, now)) return chat.origin;
 	}
-	return lastPcSeen(files, now);
+	return lastPcSeen(files, now) ?? (chat?.origin || null) ?? lastEver;
 }
 
 export function settled(own: ReadonlyArray<Pick<RemoteRequest, "id">>, chats: ReadonlyArray<ChatRecord>): string[] {
@@ -44,9 +45,9 @@ export function refusPourTelephone(doc: PhoneDocument, rootId: string): "ai.remo
 	return /\.(md|markdown|txt)$/i.test(doc.name) ? null : "ai.remote.textOnly";
 }
 
-/** Where a request goes: the PC of the chat while fresh, else the last PC seen fresh, else the chat's PC (even stale), else the last PC ever seen (even stale). Null only when no PC was ever seen: an empty target is never written. */
+/** Where a request goes (see `pickTarget`). Null only when no PC was ever seen: an empty target is never written. */
 export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{ device: string; file: GenerationsFile }>, now: number, lastSeen: string | null): string | null {
-	return pickTarget(chat, files, now) ?? (chat?.origin || null) ?? lastSeen;
+	return pickTarget(chat, files, now, lastSeen);
 }
 
 /** Whether a PC is reachable: its generations file is present and fresh. */
