@@ -13,6 +13,7 @@
 
 import { LOG_PREFIX } from "../branding";
 import { readArchivedChats } from "./chat-archives";
+import { mergeChats, ownToWrite } from "../shared-state/chat-merge";
 import type { ChatRecord } from "./chat-record";
 import { boundChats, chatsFromArchive, readChats } from "./chat-record";
 
@@ -69,6 +70,11 @@ function write(list: readonly ChatRecord[], storage: Store | null): boolean {
     write only means the chats are not kept after the session. */
 export function setChats(list: readonly ChatRecord[], storage: Store | null = safeStorage()): boolean {
 	cache = { storage, list: boundChats(list) };
+	if (backend) {
+		// Synced mode: the own file is the store; the old window key stays frozen for a rollback.
+		scheduleSave(cache.list);
+		return true;
+	}
 	const ok = write(list, storage);
 	if (!ok) console.warn(LOG_PREFIX, "chats not saved (storage full or refused)");
 	return ok;
@@ -100,4 +106,84 @@ export function importLegacyOnce(origin: string, storage: Store | null = safeSto
 	} catch {
 		return 0;
 	}
+}
+
+/* ── Phase 2: the synced files (`.neo-quiz/chats/<device>.json`) ── */
+
+export interface ChatBackend {
+	device: string;
+	own(): ChatRecord[];
+	others(): ChatRecord[][];
+	saveOwn(chats: ReadonlyArray<ChatRecord>): Promise<void>;
+}
+
+const SYNCED_FLAG = "neo-quiz.chats-synced";
+const SAVE_DELAY_MS = 400;
+
+let backend: ChatBackend | null = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saving: Promise<void> = Promise.resolve();
+/** Writes queued or running. */
+let inFlight = 0;
+/** The last write failed: memory holds an edit the file does not. */
+let saveFailed = false;
+
+const viewOf = (b: ChatBackend): ChatRecord[] => mergeChats([b.own(), ...b.others()]);
+
+function scheduleSave(list: readonly ChatRecord[]): void {
+	const b = backend;
+	if (!b) return;
+	if (saveTimer) clearTimeout(saveTimer);
+	saveTimer = setTimeout(() => { saveTimer = null; void writeNow(b, list); }, SAVE_DELAY_MS);
+}
+
+function writeNow(b: ChatBackend, list: readonly ChatRecord[]): Promise<void> {
+	inFlight++;
+	saving = saving
+		.then(() => b.saveOwn(ownToWrite(list, b.device, b.others())))
+		.then(() => { saveFailed = false; })
+		.catch(e => { saveFailed = true; console.warn(LOG_PREFIX, "chats not saved to the synced folder:", e); })
+		.finally(() => { inFlight--; });
+	return saving;
+}
+
+/** Switches the store to the synced files. Imports the window-storage chats
+    ONCE (flag set only after the file write succeeded; the old key is kept for
+    a rollback). A failed write propagates after the merged view is in place. */
+export async function attachChatBackend(b: ChatBackend, storage: Store | null = safeStorage()): Promise<void> {
+	backend = b;
+	saveFailed = false;
+	try {
+		if (storage && !storage.getItem(SYNCED_FLAG)) {
+			const local = parse(storage).filter(c => c.origin === b.device || c.deleted);
+			if (local.length) await b.saveOwn(ownToWrite(mergeChats([local, b.own()]), b.device, b.others()));
+			storage.setItem(SYNCED_FLAG, "1");
+		}
+	} finally {
+		cache = { storage, list: viewOf(b) };
+	}
+}
+
+/** Re-merges after the backend re-read the other devices' files; true when the
+    view changed. Skipped while a save is pending or failed: it would revert the
+    latest edit. */
+export function reloadFromBackend(): boolean {
+	if (!backend || saveTimer || inFlight > 0 || saveFailed) return false;
+	const next = viewOf(backend);
+	const same = JSON.stringify(next) === JSON.stringify(cache?.list ?? []);
+	if (!same) cache = { storage: cache?.storage ?? null, list: next };
+	return !same;
+}
+
+/** Resolves when the last debounced own-file write is done. */
+export async function flushChats(): Promise<void> {
+	if (saveTimer && backend) { clearTimeout(saveTimer); saveTimer = null; await writeNow(backend, cache?.list ?? []); return; }
+	await saving;
+}
+
+export function detachChatBackend(): void {
+	backend = null;
+	if (saveTimer) clearTimeout(saveTimer);
+	saveTimer = null;
+	saveFailed = false;
 }

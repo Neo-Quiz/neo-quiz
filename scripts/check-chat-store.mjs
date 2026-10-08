@@ -24,7 +24,7 @@ const legacy0 = JSON.stringify([{ id: "o", date: 7, title: "O", turns: [{ role: 
 const req = (id, at, text = "t") => ({ id, at, from: "d1", text, mode: "practice", documents: [], results: [], state: "done" });
 const chat = (id, updatedAt, text = "t") => ({ id, origin: "d1", createdAt: 1, updatedAt, requests: [req("r1", 1, text)] });
 
-await withSrcModule("src/dashboard/chat-store.ts", (S) => {
+await withSrcModule("src/dashboard/chat-store.ts", async (S) => {
 	const r = makeReporter("Chat store");
 	let s = memory();
 	r.check("empty storage: no chats", S.getChats(s), []);
@@ -106,6 +106,82 @@ await withSrcModule("src/dashboard/chat-store.ts", (S) => {
 		r.check("retry in the same session: flag set only once the chats are on disk", [m.m.has("neo-quiz.chats-imported"), JSON.parse(m.m.get("neo-quiz.chats") ?? '{"chats":[]}').chats.map(c => c.id)], [true, ["old"]]);
 	}
 	r.check("nothing to import: still no throw, flag set", (() => { const m = memory(); S.importLegacyOnce("dev", m); return m.m.has("neo-quiz.chats-imported"); })(), true);
+
+	// 9. Synced backend (phase 2)
+	{
+		const rq = (id, over = {}) => ({ id, at: 1, from: "me", text: "t", mode: "learn", documents: [], results: [], state: "done", ...over });
+		const chat = (id, updatedAt, origin, requests = [rq("r")], over = {}) => ({ id, origin, createdAt: 1, updatedAt, requests, ...over });
+		const backend = (own, others) => {
+			const saved = [];
+			return { saved, device: "me", own: () => own, others: () => others, saveOwn: async (c) => { saved.push(structuredClone(c)); } };
+		};
+		const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, m }; };
+
+		// 9a. merged view
+		S.detachChatBackend();
+		let st = mem(); let b = backend([chat("mine", 5, "me")], [[chat("theirs", 6, "pc")]]);
+		await S.attachChatBackend(b, st);
+		r.check("the store lists own and other devices' chats", S.getChats(st).map(c => c.id).sort(), ["mine", "theirs"]);
+
+		// 9b. an edit of a foreign chat is never written, a delete of it is a tombstone in OUR file
+		S.setChats([...S.getChats(st).map(c => c.id === "theirs" ? { ...c, title: "edited" } : c)], st);
+		await S.flushChats();
+		r.check("a live foreign chat is not copied into our file", b.saved.at(-1).map(c => c.id), ["mine"]);
+		S.removeChat("theirs", 9, st); await S.flushChats();
+		r.check("deleting a foreign chat writes its tombstone in our file", b.saved.at(-1).map(c => [c.id, c.deleted === true]), [["mine", false], ["theirs", true]]);
+		r.check("a backend never touches window storage", st.m.has("neo-quiz.chats"), false);
+
+		// 9c. migration of window storage, once
+		S.detachChatBackend();
+		st = mem(); st.setItem("neo-quiz.chats", JSON.stringify({ v: 1, chats: [chat("old", 3, "me"), chat("alien", 3, "someone-else")] }));
+		b = backend([], []);
+		await S.attachChatBackend(b, st);
+		r.check("window-storage chats are moved to our file once (own origin only)", b.saved.at(-1).map(c => c.id), ["old"]);
+		r.check("the flag is set after the write and the old key is kept", [st.getItem("neo-quiz.chats-synced"), st.getItem("neo-quiz.chats") !== null], ["1", true]);
+		S.detachChatBackend();
+		const b2 = backend(b.saved.at(-1), []);
+		const before = b2.saved.length;
+		await S.attachChatBackend(b2, st);
+		r.check("a second attach does not import again", b2.saved.length, before);
+
+		// 9d. a failed first write leaves the flag unset (retry at next start), the view stays
+		S.detachChatBackend();
+		st = mem(); st.setItem("neo-quiz.chats", JSON.stringify({ v: 1, chats: [chat("old", 3, "me")] }));
+		const failing = { ...backend([chat("kept", 2, "me")], []), saveOwn: async () => { throw new Error("disk"); } };
+		await S.attachChatBackend(failing, st).catch(() => {});
+		r.check("a failed migration write does not set the flag", st.getItem("neo-quiz.chats-synced"), null);
+		r.check("a failed migration still shows the readable chats", S.getChats(st).map(c => c.id), ["kept"]);
+
+		// 9e. reload picks up another device's change
+		S.detachChatBackend();
+		st = mem(); const others = [[chat("p", 1, "pc")]]; b = backend([], others);
+		await S.attachChatBackend(b, st);
+		others[0].push(chat("q", 2, "pc"));
+		r.check("reload reports a change and lists the new chat", [S.reloadFromBackend(), S.getChats(st).map(c => c.id).sort()], [true, ["p", "q"]]);
+		r.check("a reload with nothing new reports no change", S.reloadFromBackend(), false);
+
+		// 9f. a reload never reverts an edit that is pending or failed to save
+		S.detachChatBackend();
+		st = mem(); const o2 = [[chat("p", 1, "pc")]]; b = backend([chat("mine", 1, "me")], o2);
+		await S.attachChatBackend(b, st);
+		S.setChats(S.getChats(st).map(c => c.id === "mine" ? { ...c, title: "new", updatedAt: 5 } : c), st);
+		o2[0].push(chat("q", 2, "pc"));
+		r.check("reload is skipped while a save is pending", [S.reloadFromBackend(), S.getChats(st).find(c => c.id === "mine").title], [false, "new"]);
+		await S.flushChats();
+		r.check("reload resumes once the save succeeded", S.reloadFromBackend(), true);
+		S.detachChatBackend();
+		let fail = true;
+		const flakyBackend = { ...backend([chat("mine", 1, "me")], o2), saveOwn: async () => { if (fail) throw new Error("disk"); } };
+		await S.attachChatBackend(flakyBackend, st);
+		S.setChats(S.getChats(st).map(c => c.id === "mine" ? { ...c, title: "edit", updatedAt: 6 } : c), st);
+		await S.flushChats();
+		o2[0].push(chat("z", 3, "pc"));
+		r.check("reload is skipped after a failed save, the edit stays", [S.reloadFromBackend(), S.getChats(st).find(c => c.id === "mine").title], [false, "edit"]);
+		fail = false;
+		S.setChats(S.getChats(st), st); await S.flushChats();
+		r.check("the next change retries and reload resumes", S.reloadFromBackend(), true);
+		S.detachChatBackend();
+	}
 	r.done();
 });
 
