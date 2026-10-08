@@ -61,9 +61,9 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 	}
 
 	/** Names to read: every `.json` (conflict copies included, read-only); a `.json.tmp` stands in for a missing `.json`. */
-	async function sources(): Promise<string[]> {
+	async function sources(): Promise<string[] | null> {
 		let names: Set<string>;
-		try { names = new Set((await fs.list(dir)).map(baseName)); } catch (e) { console.warn(`${LOG_PREFIX} chats folder unreadable:`, e); return []; }
+		try { names = new Set((await fs.list(dir)).map(baseName)); } catch (e) { console.warn(`${LOG_PREFIX} chats folder unreadable:`, e); return null; }
 		const out = new Set<string>();
 		for (const n of names) {
 			if (n.endsWith(".json")) out.add(n);
@@ -89,10 +89,15 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 
 	async function load(): Promise<void> {
 		const names = await sources();
-		others = await readOther(names);
+		others = await readOther(names ?? []);
 		locked = false;
 		own = [];
-		if (!names.includes(ownName)) return;
+		if (names) { if (!names.includes(ownName)) return; }
+		else {
+			// The listing failed: our file is only known absent when both probes say so; otherwise stay locked.
+			const present = await Promise.all([ownPath, `${ownPath}.tmp`].map(p => fs.exists(p).then(x => x, () => true)));
+			if (!present.some(Boolean)) return;
+		}
 		const list = await readNamed(ownPath);
 		if (list) { own = list; return; }
 		locked = true;
@@ -102,7 +107,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		} catch { /* kept aside is best effort */ }
 	}
 
-	const refresh = async (): Promise<void> => { others = await readOther(await sources()); };
+	const refresh = async (): Promise<void> => { others = await readOther((await sources()) ?? []); };
 
 	const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
 		const run = queue.then(job, job);

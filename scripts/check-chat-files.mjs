@@ -118,6 +118,23 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		const cf = make(fs); await quiet(() => cf.load());
 		r.check("a folder that cannot be listed gives empty lists, no throw", [cf.own(), cf.others()], [[], []]);
 	}
+	// 9b. A failed listing never unlocks a save over an existing own file
+	{
+		const fs = memFs(new Map([[`${D}/me.json`, file([chat("good", 1, "me")])]]));
+		fs.list = async () => { throw new Error("EIO"); };
+		const cf = make(fs); await quiet(() => cf.load());
+		r.check("a failed listing still reads an existing own file", cf.own().map(c => c.id), ["good"]);
+		const fs2 = memFs(new Map([[`${D}/me.json`, "{ torn"]]));
+		fs2.list = async () => { throw new Error("EIO"); };
+		const cf2 = make(fs2); await quiet(() => cf2.load());
+		let rej2 = false;
+		try { await cf2.saveOwn([chat("n", 1, "me")]); } catch { rej2 = true; }
+		r.check("failed listing and unreadable own file: save refuses, bytes kept", [rej2, fs2.files.get(`${D}/me.json`)], [true, "{ torn"]);
+		const fs3 = memFs(); fs3.list = async () => { throw new Error("EIO"); };
+		const cf3 = make(fs3); await quiet(() => cf3.load());
+		await cf3.saveOwn([chat("n", 1, "me")]);
+		r.check("failed listing with no own file: first save is allowed", fs3.files.has(`${D}/me.json`), true);
+	}
 	// 10. A failed save rejects its own caller only
 	{
 		const fs = memFs(); const cf = make(fs); await cf.load();
