@@ -1890,7 +1890,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   débounce relit le même texte et ne fait rien quand il n'a pas
 		   changé. */
 		tuilesVideo.suivreTexte(composerText);
-		composerInput.rows = 2;
+		composerInput.rows = host.platform.isMobile ? 1 : 2;
 		const autoGrow = () => {
 			composerInput.style.height = "auto";
 			composerInput.style.height = Math.min(composerInput.scrollHeight, 220) + "px";
@@ -2168,19 +2168,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		boutonEnvoi = sendBtn;
 		updateGenerateBtn(generateBtnRef);
 
-		/* Phone with the relay (Android): the secondary action sits under the
-		   composer, always there. It leads when no PC is reachable, and it
-		   reads the clipboard only on its own tap (`collerReponse`). */
+		/* Phone with the relay (Android): "Through an AI app" lives in the "+"
+		   menu; once a request is out, "Paste the answer" is a compact pill in
+		   the bottom row (that step must stay visible). It reads the clipboard
+		   only on its own tap (`collerReponse`). */
 		relaisBtnRef = null;
 		if (host.platform.isMobile && deps.relay) {
-			const relayRow = ajouter(composer, "div", "qbd-ai-relay");
-			const relayBtn = ajouter(relayRow, "button", "qbd-ai-relay-btn");
+			const relayBtn = ajouter(composerBottom, "button", "qbd-ai-relay-btn");
+			composerBottom.insertBefore(relayBtn, composerTools);
 			relayBtn.type = "button";
-			relayBtn.addEventListener("click", () => { if (relais) void collerReponse(); else void partagerViaAppli(); });
+			relayBtn.addEventListener("click", () => { if (relais) void collerReponse(); });
 			relaisBtnRef = relayBtn;
 			majBoutonRelais();
-			if (!pcConnu()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.firstPc"));
-			else if (!pcJoignable()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.noPc"));
 		}
 
 		// PAS d'attribut accept : le dialogue Windows affiche alors « Tous
@@ -4154,10 +4153,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (!b) return;
 		const colle = relais !== null;
 		b.replaceChildren();
-		host.ui.setIcon(ajouter(b, "span", "qbd-ai-relay-icone"), colle ? "clipboard-paste" : "share-2");
-		ajouter(b, "span", "qbd-ai-relay-label", t(colle ? "ai.relay.paste" : "ai.relay.action"));
-		b.classList.toggle("qbd-ai-relay-btn--principal", colle || !pcJoignable());
-		b.disabled = relaisOccupe || (!colle && !(composerText.trim() || noteAttachments.length > 0));
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-relay-icone"), "clipboard-paste");
+		ajouter(b, "span", "qbd-ai-relay-label", t("ai.relay.paste"));
+		b.classList.add("qbd-ai-relay-btn--principal");
+		b.hidden = !colle;
+		b.disabled = relaisOccupe;
 	}
 
 	/** Phone relay, share: the composer's request and documents go to an AI app; the composer is cleared once the sheet opened. */

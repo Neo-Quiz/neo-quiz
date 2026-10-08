@@ -705,7 +705,7 @@ export const EN_AI = {
 	"ai.pc.state.ready": "Available: requests are taken right away",
 	"ai.pc.state.paused": "Not available: sync with the PC is paused",
 	"ai.pc.state.away": "Not available: your PC is not reachable, requests wait until it is back",
-	"ai.pc.state.never": "Not available: your PC was never seen",
+	"ai.pc.state.never": "Open Neo Quiz on your PC once so the phone can find it.",
 	"ai.pc.state.failed": "Problem: the last request did not work",
 	"ai.pc.state.expired": "Problem: a request was not taken and expired",
 	"ai.pc.seenNow": "Connected now",

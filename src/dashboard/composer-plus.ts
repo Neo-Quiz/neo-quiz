@@ -16,6 +16,8 @@ export interface MenuPlusDeps {
 	ajouterFichiers(): void;
 	/** Le champ du composer, où « Mentionner » tape le « @ ». */
 	champ: HTMLTextAreaElement;
+	/** Phone only: the relay through an AI app (share the request). Absent: no such entry. */
+	relais?: { disabled: boolean; onClick(): void };
 }
 
 export function ouvrirMenuPlus(ancre: HTMLElement, deps: MenuPlusDeps): void {
@@ -25,6 +27,7 @@ export function ouvrirMenuPlus(ancre: HTMLElement, deps: MenuPlusDeps): void {
 		{ icon: "paperclip", label: t("ai.add.files"), hint: deps.raccourci, onClick: deps.ajouterFichiers },
 		{ icon: "at-sign", label: t("ai.add.mention"), hint: "@", sepBefore: true, onClick: () => taperArobase(deps.champ) }
 	];
+	if (deps.relais) items.push({ icon: "share-2", label: t("ai.relay.action"), sepBefore: true, disabled: deps.relais.disabled, onClick: deps.relais.onClick });
 	openActionMenu(ancre, items, { className: "qbd-menu-claude qbd-ai-plus-menu" });
 }
 

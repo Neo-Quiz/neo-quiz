@@ -73,7 +73,7 @@
 	flex-direction: column;
 	flex-wrap: nowrap;
 	gap: 2px;
-	padding: calc(env(safe-area-inset-top, 0px) + 16px) 12px 12px;
+	padding: calc(var(--nq-inset-haut, 0px) + 16px) 12px 12px;
 	background: var(--background-primary);
 	box-shadow: 0 0 40px rgb(0 0 0 / 0.45);
 	transform: translateX(-104%);
@@ -179,13 +179,27 @@
 	margin: 0;
 }
 
-/* ── Composer: rounded field, "+" and the PC on the left, send on the right ── */
+/* ── Composer: one compact card like the Claude app's — the field on top,
+   ONE row below: "+" and the PC on the left, send (white disc) on the right ── */
 .is-mobile .qbd-ai-stage .qbd-ai-composer {
 	width: 100%;
 	margin-top: 0;
-	padding: 16px 14px 12px 18px;
+	/* Measured on the Claude app capture (393 css px wide): 16 px side margins,
+	   card about 96 px tall, 28 px corners, 8 px inner padding around the
+	   buttons, a thin light outline over a card a little lighter than the page. */
+	padding: 12px 8px 8px 14px;
 	border-radius: 28px;
-	gap: 10px;
+	gap: 6px;
+	border: 1px solid rgb(255 255 255 / 0.16);
+	background: color-mix(in srgb, var(--background-primary) 82%, white 6%);
+	box-sizing: border-box;
+}
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--idle,
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--error,
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--conversation {
+	/* .qbd-content already pads 14 px: 14 + 2 = the 16 px margin of the Claude card. */
+	padding-left: 2px;
+	padding-right: 2px;
 }
 .is-mobile .qbd-ai-stage .qbd-ai-composer-input {
 	font-size: 17px;
@@ -201,8 +215,8 @@
 	align-items: center;
 	justify-content: center;
 	flex: none;
-	width: 40px;
-	height: 40px;
+	width: 36px;
+	height: 36px;
 	padding: 0;
 	border: none;
 	border-radius: 50%;
@@ -216,10 +230,43 @@
 	height: 20px;
 	stroke-width: 1.6;
 }
-.is-mobile .qbd-ai-composer-send {
-	width: 40px;
-	height: 40px;
+/* The tools cell pushes send to the right; send is always there (white disc,
+   dimmed when there is nothing to send). */
+.is-mobile .qbd-ai-composer-tools {
+	margin-left: auto;
+}
+.is-mobile .qbd-ai-composer-send,
+.is-mobile .qbd-ai-composer--sans-fournisseur .qbd-ai-composer-send.is-visible {
+	display: inline-flex;
+	width: 36px;
+	height: 36px;
 	border-radius: 50%;
+	background: #f4f4f2 !important;
+	color: #141414;
+}
+.is-mobile .qbd-ai-composer-send svg {
+	width: 22px;
+	height: 22px;
+}
+.is-mobile .qbd-ai-composer-send:disabled,
+.is-mobile .qbd-ai-composer-send.qbd-ai-composer-send--disabled {
+	opacity: 0.35;
+}
+/* "Paste the answer": a compact pill in the row, shown only while a relay answer is awaited. */
+.is-mobile .qbd-ai-relay-btn {
+	flex: 0 1 auto;
+	min-width: 0;
+	min-height: 36px;
+	padding: 0 12px;
+	border-radius: 18px;
+	white-space: nowrap;
+}
+.is-mobile .qbd-ai-relay-btn[hidden] {
+	display: none;
+}
+.is-mobile .qbd-ai-relay-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 /* The PC status: blue when it is available, grey when it is not, red when something is wrong. */
 .is-mobile .qbd-ai-composer-pc[data-tone="ok"],
@@ -236,11 +283,6 @@
 }
 .is-mobile .qbd-ai-composer-pc[data-tone="ok"] { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent) !important; }
 .is-mobile .qbd-ai-composer-pc[data-tone="error"] { background: color-mix(in srgb, var(--text-error) 16%, transparent) !important; }
-
-/* The relay row under the composer: a quiet line, not a second card. */
-.is-mobile .qbd-ai-relay {
-	padding: 0 6px;
-}
 
 /* ── The PC window ── */
 .is-mobile .qbd-ai-pc-state {

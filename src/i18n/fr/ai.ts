@@ -642,7 +642,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.pc.state.ready": "Disponible : les demandes sont prises tout de suite",
 	"ai.pc.state.paused": "Indisponible : la synchronisation avec le PC est en pause",
 	"ai.pc.state.away": "Indisponible : ton PC est injoignable, les demandes attendent son retour",
-	"ai.pc.state.never": "Indisponible : ton PC n'a jamais été vu",
+	"ai.pc.state.never": "Ouvre Neo Quiz une fois sur ton PC pour que le téléphone le trouve.",
 	"ai.pc.state.failed": "Problème : la dernière demande n'a pas abouti",
 	"ai.pc.state.expired": "Problème : une demande n'a pas été prise et a expiré",
 	"ai.pc.seenNow": "Connecté maintenant",
