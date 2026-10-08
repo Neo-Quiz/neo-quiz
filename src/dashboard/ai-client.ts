@@ -1308,7 +1308,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				   `--output-format json` used to print (`claudeResultDuFlux`). */
 				args: [
 					"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
-					"--tools", tools, "--no-session-persistence", "--setting-sources", "",
+					"--tools", tools, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config",
 				],
 				marqueur,
 				stdin: fullPrompt,

@@ -70,6 +70,8 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 				"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
 				"--tools", (t: string) => t === "" || t === "Read",
 				"--no-session-persistence", "--setting-sources", "",
+				// No --mcp-config, and --strict-mcp-config: the account's connectors are not even listed.
+				"--strict-mcp-config",
 			]);
 		case "codex": {
 			if (m === null) return false;

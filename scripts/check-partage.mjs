@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 	const j = (nom) => `{{nq-${m}:${nom}}}`;
-	const claude = (modele, outils) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele, "--tools", outils, "--no-session-persistence", "--setting-sources", ""];
+	const claude = (modele, outils) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele, "--tools", outils, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"];
 	const codex = (rapide, images) => ["exec", "--json", "-m", "gpt-5.1-codex", "-c", "model_reasoning_effort=high",
 		...(rapide ? ["-c", "service_tier=priority"] : []),
 		"-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "-C", j("home"), "-o", j("sortie"),
@@ -119,8 +119,10 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 
 	r.check("claude + --dangerously-skip-permissions : refusé", argumentsAutorises("claude", [...claude("sonnet", ""), "--dangerously-skip-permissions"], m), false);
 	r.check("claude: the old one-object json output, or the stream without its partial messages: refused",
-		[argumentsAutorises("claude", ["-p", "--output-format", "json", "--model", "sonnet", "--tools", "", "--no-session-persistence", "--setting-sources", ""], m),
+		[argumentsAutorises("claude", ["-p", "--output-format", "json", "--model", "sonnet", "--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"], m),
 			argumentsAutorises("claude", claude("sonnet", "").filter(x => x !== "--include-partial-messages"), m)], [false, false]);
+	r.check("claude without --strict-mcp-config (connectors listed): refused", argumentsAutorises("claude", claude("sonnet", "").filter(x => x !== "--strict-mcp-config"), m), false);
+	r.check("claude + --strict-mcp-config + --mcp-config: refused", argumentsAutorises("claude", [...claude("sonnet", ""), "--mcp-config", "{}"], m), false);
 	r.check("claude + --mcp-config : refusé", argumentsAutorises("claude", [...claude("sonnet", ""), "--mcp-config", "{}"], m), false);
 	r.check("claude avec un outil autre que Read : refusé", argumentsAutorises("claude", claude("sonnet", "Bash"), m), false);
 	r.check("claude, un modèle qui est une option : refusé", argumentsAutorises("claude", claude("--dangerously-skip-permissions", ""), m), false);
