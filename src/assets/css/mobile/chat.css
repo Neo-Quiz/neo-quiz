@@ -186,12 +186,14 @@
 	margin-top: 0;
 	/* Measured on the Claude app capture (393 css px wide): 16 px side margins,
 	   card about 96 px tall, 28 px corners, 8 px inner padding around the
-	   buttons, a thin light outline over a card a little lighter than the page. */
+	   buttons, a thin light outline. The COLOURS are the app's, not Claude's
+	   grey and white (2026-10-08): the card is the app's dark surface, the
+	   outline a light tint of its text colour, the send button its accent. */
 	padding: 12px 8px 8px 14px;
 	border-radius: 28px;
 	gap: 6px;
-	border: 1px solid rgb(255 255 255 / 0.16);
-	background: color-mix(in srgb, var(--background-primary) 82%, white 6%);
+	border: 1px solid color-mix(in srgb, var(--text-normal) 18%, transparent);
+	background: var(--background-primary);
 	box-sizing: border-box;
 }
 .is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--idle,
@@ -242,8 +244,8 @@
 	width: 36px;
 	height: 36px;
 	border-radius: 50%;
-	background: #f4f4f2 !important;
-	color: #141414;
+	background: var(--interactive-accent) !important;
+	color: var(--text-on-accent, #fff);
 }
 .is-mobile .qbd-ai-composer-send svg {
 	width: 22px;
