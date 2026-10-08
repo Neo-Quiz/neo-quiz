@@ -21,6 +21,7 @@ release notes.
 ### Changed
 
 - From the phone, send a generation request to your PC; the PC runs it and the phone notifies you when the quiz is ready.
+- On the phone, generate through Claude, ChatGPT or another AI app: Neo Quiz shares the request, you paste the answer back and the quiz is created.
 
 ## [1.20.45] - 2026-10-08
 

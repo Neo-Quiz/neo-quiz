@@ -13,6 +13,7 @@
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
+import type { TransKey } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
@@ -20,6 +21,7 @@ import type { ChatRequest } from "./chat-record";
 import type { RunningEntry } from "../shared-state/generations";
 import { canOpenCard } from "../shared-state/chat-merge";
 import { peindreQuestions } from "./generation-kind-vue";
+import type { PasteOutcome } from "./relay-flow";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
     else the name cut IN THE MIDDLE so the extension always shows). */
@@ -127,4 +129,71 @@ export function peindreEnAttente(parent: HTMLElement, item: { key: string; reque
 	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
 	ajouter(corps, "span", "qbd-ai-reponse-texte", t(item.state === "expired" ? "ai.remote.expired" : "ai.remote.waiting"));
 	if (item.state === "waiting" && !pcReachable) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.noPc"));
+}
+
+/** Why a pasted answer was refused: every refusal of the relay, and the flow's own. */
+export type RefusRelais = Extract<PasteOutcome, { ok: false }>["reason"];
+
+const MESSAGE_REFUS: Record<RefusRelais, TransKey> = {
+	"clipboard-empty": "ai.relay.err.clipboard-empty",
+	"empty": "ai.relay.err.empty",
+	"too-large": "ai.relay.err.too-large",
+	"none": "ai.relay.err.none",
+	"several": "ai.relay.err.several",
+	"other-request": "ai.relay.err.other-request",
+	"invalid": "ai.relay.err.invalid",
+	"no-questions": "ai.relay.err.no-questions",
+	"format": "ai.relay.err.format",
+	"save-failed": "ai.relay.err.save-failed",
+	"already-saved": "ai.relay.err.already-saved",
+};
+
+/** The line shown under the paste button for a refusal. The first line of the
+    detail is kept for `invalid` only (where the text breaks). The `format`
+    detail is a list of internal codes, never shown. */
+export function erreurRelais(refus: { reason: RefusRelais; detail?: string }): { message: string; detail?: string } {
+	const premiere = refus.detail?.split("\n")[0].trim();
+	const detail = refus.reason === "invalid" && premiere ? premiere : undefined;
+	return { message: t(MESSAGE_REFUS[refus.reason]), detail };
+}
+
+/** The relay card of a request shared to an AI app and not yet answered. */
+export interface RelaisVue {
+	text: string;
+	documents: Array<{ name: string; path?: string }>;
+	/** The refusal of the last paste, null when none. */
+	erreur: { message: string; detail?: string } | null;
+	/** A paste is being read: the buttons wait. */
+	occupe: boolean;
+	coller(): void;
+	annuler(): void;
+}
+
+/** A request shared to an AI app: its message, the hint, the paste (primary) and cancel (quiet) buttons, and the last refusal. */
+export function peindreRelais(parent: HTMLElement, r: RelaisVue): void {
+	const host = currentHost();
+	const tour = ajouter(parent, "div", "qbd-ai-tour");
+	tour.setAttribute("role", "listitem");
+	tour.dataset.relais = "1";
+	const message = ajouter(tour, "div", "qbd-ai-message");
+	if (r.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), r.documents);
+	if (r.text.trim()) ajouter(message, "div", "qbd-ai-bulle", r.text.trim());
+	const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-relais");
+	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "share-2");
+	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
+	ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.relay.hint"));
+	if (r.erreur) {
+		ajouter(corps, "span", "qbd-ai-relais-erreur", r.erreur.message);
+		if (r.erreur.detail) ajouter(corps, "span", "qbd-ai-relais-detail", r.erreur.detail);
+	}
+	const actions = ajouter(corps, "div", "qbd-ai-relais-actions");
+	const coller = ajouter(actions, "button", "qbd-ai-relais-coller");
+	coller.type = "button";
+	coller.disabled = r.occupe;
+	host.ui.setIcon(ajouter(coller, "span", "qbd-ai-relais-icone"), "clipboard-paste");
+	ajouter(coller, "span", "qbd-ai-relais-label", t("ai.relay.paste"));
+	coller.addEventListener("click", () => r.coller());
+	const annuler = ajouter(actions, "button", "qbd-ai-relais-annuler", t("ai.relay.cancel"));
+	annuler.type = "button";
+	annuler.addEventListener("click", () => r.annuler());
 }

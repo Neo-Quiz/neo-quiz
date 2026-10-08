@@ -4576,3 +4576,59 @@
 .qbd-cli-maj-erreur-btn:hover:not(:disabled) { border-color: var(--interactive-accent); }
 .qbd-cli-maj-erreur-btn:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .qbd-cli-maj-erreur-btn .qbd-cli-maj-bouton-icone svg { width: 13px; height: 13px; }
+
+/* The phone's relay (Android): the action under the composer, always there.
+   It leads over Send when no PC is reachable. Text buttons, no tile: the
+   composer is already one. */
+.qbd-ai-relay {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 4px 4px 0;
+}
+
+.qbd-ai-relay-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 40px;
+	padding: 0 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: 0.95em;
+	cursor: pointer;
+}
+
+.qbd-ai-relay-btn:hover {
+	background: var(--background-modifier-hover);
+}
+
+.qbd-ai-relay-btn--principal {
+	border-color: transparent;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.qbd-ai-relay-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.qbd-ai-relay-icone {
+	display: inline-flex;
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-ai-relay-icone svg {
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-ai-relay-note {
+	color: var(--text-muted);
+	font-size: 0.9em;
+}

@@ -34,6 +34,10 @@ import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-run
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
 import { addFailedRequest } from "../../../src/dashboard/chat-requests";
 import { getChats, setChats } from "../../../src/dashboard/chat-store";
+import { chatDevice } from "../../../src/dashboard/chat-session";
+import { enregistrerQuiz } from "../../../src/dashboard/generation-demande";
+import { readRelayDocument } from "../../../src/dashboard/relay-flow";
+import type { RelayDeps } from "../../../src/dashboard/relay-flow";
 import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
 import { notifyPc } from "./host/notify";
 import { ecrireReglage, lireReglage } from "./host/folder";
@@ -305,6 +309,7 @@ export function mount(root: HTMLElement, scanner: Scanner, store: ReviewStore, s
 		statsStore: stats,
 		reviewStore: store,
 		aiSettings: reglagesIa,
+		relay: relaisDuTelephone(scanner),
 		cheminDuContrat: (absolu) => carteCourante?.depuisAbsolu(absolu) ?? null,
 		cheminAbsolu: (contrat) => carteCourante?.absolu(contrat) ?? null,
 		onOpenQuiz: (entry) => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); },
@@ -402,6 +407,24 @@ function ouvrirReglages(onClosed?: () => void): void {
  * aujourd'hui, mais un futur écran non-coquille), l'ancien comportement
  * s'applique : démontage complet, pas de pile.
  */
+/** The phone's relay through an AI app (Task 20): Android only. The request goes out by the share sheet, the answer comes back from the clipboard on the user's tap. */
+function relaisDuTelephone(scanner: Scanner): RelayDeps | undefined {
+	if (!estMobile()) return undefined;
+	const android = pont().android;
+	if (!android) return undefined;
+	const racine = currentHost().paths.defaultRoot().id;
+	return {
+		device: chatDevice(), rootId: racine, now: () => Date.now(),
+		share: (texte, fichiers) => android.partagerPrompt(texte, fichiers),
+		readClipboard: () => android.lirePressePapier(),
+		readDocument: (rel) => readRelayDocument(currentHost().fs, racine, rel),
+		save: enregistrerQuiz,
+		scanner,
+		reglages: () => reglagesIa.get(),
+		chats: { get: () => getChats(), set: (liste) => { setChats(liste); } },
+	};
+}
+
 async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStore, stats: StatsStore, sessions: SessionsApp, entry: QuizIndexEntry): Promise<void> {
 	if (!soumettre("ouvrir", () => { void ouvrirQuiz(root, scanner, store, stats, sessions, entry); })) return;
 	const sortants = ecransDe(root);

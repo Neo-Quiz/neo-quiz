@@ -159,3 +159,12 @@ await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests
 	}
 	r.done();
 });
+
+// Section 3: the refusal messages of the phone's relay, in both dictionaries.
+await withSrcModule(["src/i18n/en/ai.ts", "src/i18n/fr/ai.ts"], (EN, FR) => {
+	const r = makeReporter("Relay messages");
+	const reasons = ["empty", "too-large", "none", "several", "other-request", "invalid", "no-questions", "format", "clipboard-empty", "save-failed", "already-saved"];
+	r.check("every refusal has an English message", reasons.filter(x => !(("ai.relay.err." + x) in EN.EN_AI)), []);
+	r.check("every refusal has a French message", reasons.filter(x => !(("ai.relay.err." + x) in FR.FR_AI)), []);
+	r.done();
+});

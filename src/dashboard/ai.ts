@@ -40,7 +40,11 @@ import { getChats, setChats } from "./chat-store";
 import { threadItems, toursOfThread } from "./chat-thread";
 import { getOwnRequests, getRemoteGenerations } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
-import { refusPourTelephone } from "./remote-send";
+import { pickTarget, refusPourTelephone } from "./remote-send";
+import { pasteAnswer, startRelay } from "./relay-flow";
+import type { RelayDeps, RelaySession } from "./relay-flow";
+import { erreurRelais } from "./chat-record-vue";
+import type { RelaisVue } from "./chat-record-vue";
 import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { rankFolders, suggestFolders } from "./folder-suggest";
@@ -280,6 +284,8 @@ export interface AiPageDeps {
 	/** Le presse-papiers par l'hôte (le modal d'installation copie une
 	    commande) ; dans la fenêtre de l'app, `navigator.clipboard` est refusé. */
 	copyText?(texte: string): Promise<boolean>;
+	/** The phone's relay through an AI app (Android only, `relay-flow.ts`). Absent: no such action. */
+	relay?: RelayDeps;
 }
 
 /** Handlers de la vue « Générer » — retour de createAiHandlers(deps). */
@@ -394,8 +400,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const id = activeChatId();
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
+	const nomDuChemin = (p: string): string => p.slice(p.lastIndexOf("/") + 1);
 	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations(), Date.now(), getOwnRequests()); };
-	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null;
+	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null || relaisAffiche() !== null;
+	/* ── THE PHONE'S RELAY (Android): the request goes to an AI app through the
+	   share sheet, the answer comes back from the clipboard on an explicit tap.
+	   One session at a time, in memory: a reload loses it, the prompt stays on
+	   the clipboard. ── */
+	let relais: RelaySession | null = null;
+	let relaisErreur: { message: string; detail?: string } | null = null;
+	let relaisOccupe = false;
+	let relaisBtnRef: HTMLButtonElement | null = null;
+
 	const vueFile = creerVueFile({
 		file: fileGen,
 		ouvrir: (chemin) => {
@@ -409,6 +425,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		attente: () => attenteGenre,
 		repondre: (id, reponses) => repondreQuestions(id, reponses),
 		reprenable: (id) => reprenable(id),
+		relais: () => relaisAffiche(),
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -786,7 +803,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   composer est libre dès l'envoi. */
 		if (phase === "web" || phase === "connexion") return false;
 		// The phone needs no provider of its own: the PC that owns the chat runs the request (`ai-remote.ts`).
-		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture);
+		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture) && pcJoignable();
 		const providerId = settings().aiProvider || "";
 		if (!providerId) return false;
 		// Un fournisseur desktop-only (Claude Code CLI) est inutilisable sur
@@ -2114,6 +2131,20 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		generateBtnRef = sendBtn;
 		boutonEnvoi = sendBtn;
 		updateGenerateBtn(generateBtnRef);
+
+		/* Phone with the relay (Android): the secondary action sits under the
+		   composer, always there. It leads when no PC is reachable, and it
+		   reads the clipboard only on its own tap (`collerReponse`). */
+		relaisBtnRef = null;
+		if (host.platform.isMobile && deps.relay) {
+			const relayRow = ajouter(composer, "div", "qbd-ai-relay");
+			const relayBtn = ajouter(relayRow, "button", "qbd-ai-relay-btn");
+			relayBtn.type = "button";
+			relayBtn.addEventListener("click", () => { if (relais) void collerReponse(); else void partagerViaAppli(); });
+			relaisBtnRef = relayBtn;
+			majBoutonRelais();
+			if (!pcJoignable()) ajouter(relayRow, "span", "qbd-ai-relay-note", t("ai.remote.noPc"));
+		}
 
 		// PAS d'attribut accept : le dialogue Windows affiche alors « Tous
 		// les fichiers (*.*) » (référence claude.ai, capture Ahmed) au lieu
@@ -3917,6 +3948,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	}
 
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
+		majBoutonRelais();
 		majAvisCategorie();
 		planifierSuggestions();
 		if (!btn) return;
@@ -4045,6 +4077,98 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			tuiles.push({ name: note.name, thumb: note.thumb, cible });
 		}
 		return tuiles;
+	}
+
+	/** Phone: is a PC reachable for the chat on screen (its origin, else the freshest one)? Without one, the composer leads with the relay. */
+	function pcJoignable(): boolean {
+		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now()) !== null;
+	}
+
+	/** The relay card for the chat on screen; null without a session or when the session belongs to another chat. */
+	function relaisAffiche(): RelaisVue | null {
+		if (!relais || relais.request.chatId !== activeChatId()) return null;
+		return {
+			text: relais.request.text,
+			documents: relais.request.documents.map(d => ({ name: nomDuChemin(d.path), path: d.path })),
+			erreur: relaisErreur,
+			occupe: relaisOccupe,
+			coller: () => { void collerReponse(); },
+			annuler: () => {
+				if (relaisOccupe) return;
+				relais = null;
+				relaisErreur = null;
+				majBoutonRelais();
+				vueFile.repeindre();
+			},
+		};
+	}
+
+	/** The relay button: "Through an AI app" to share, "Paste the answer" once a request is out. */
+	function majBoutonRelais(): void {
+		const b = relaisBtnRef;
+		if (!b) return;
+		const colle = relais !== null;
+		b.replaceChildren();
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-relay-icone"), colle ? "clipboard-paste" : "share-2");
+		ajouter(b, "span", "qbd-ai-relay-label", t(colle ? "ai.relay.paste" : "ai.relay.action"));
+		b.classList.toggle("qbd-ai-relay-btn--principal", colle || !pcJoignable());
+		b.disabled = relaisOccupe || (!colle && !(composerText.trim() || noteAttachments.length > 0));
+	}
+
+	/** Phone relay, share: the composer's request and documents go to an AI app; the composer is cleared once the sheet opened. */
+	async function partagerViaAppli(): Promise<void> {
+		if (!deps.relay || demarrage || relaisOccupe) return;
+		const rootId = host.paths.defaultRoot().id;
+		if (images.length > 0) { host.ui.notice(t("ai.remote.textOnly")); return; }
+		for (const note of noteAttachments) {
+			const motif = refusPourTelephone(note, rootId);
+			if (motif) { host.ui.notice(t(motif)); return; }
+		}
+		demarrage = true;
+		try {
+			const session = await startRelay(deps.relay, {
+				chatId: activeChatId(),
+				text: composerText.trim(),
+				mode: decideByKeywords(composerText) === "practice" ? "practice" : "learn",
+				documents: noteAttachments.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
+				destination,
+			});
+			if (session) { relais = session; relaisErreur = null; viderComposer(); }
+			else host.ui.notice(t("ai.relay.shareFailed"));
+		} catch (e) {
+			console.warn(LOG_PREFIX, "relay not shared:", e);
+			host.ui.notice(t("ai.relay.shareFailed"));
+		} finally {
+			demarrage = false;
+		}
+		render(containerRef);
+	}
+
+	/** Phone relay, paste: the clipboard is read here, on this tap only (`pasteAnswer`). A refusal keeps the card for another paste; a saved quiz ends the session and the record shows it. */
+	async function collerReponse(): Promise<void> {
+		const s = relais;
+		if (!deps.relay || !s || relaisOccupe) return;
+		relaisOccupe = true;
+		majBoutonRelais();
+		vueFile.repeindre();
+		try {
+			const issue = await pasteAnswer(deps.relay, s);
+			if (issue.ok) {
+				relais = null;
+				relaisErreur = null;
+				host.ui.notice(t("ai.relay.ok", { title: issue.title }));
+			} else {
+				relaisErreur = erreurRelais(issue);
+				if (issue.reason === "already-saved") relais = null;
+			}
+		} catch (e) {
+			console.warn(LOG_PREFIX, "relay answer not saved:", e);
+			relaisErreur = erreurRelais({ reason: "save-failed" });
+		} finally {
+			relaisOccupe = false;
+		}
+		majBoutonRelais();
+		vueFile.repeindre();
 	}
 
 	/** The phone's send: the request goes to the PC that owns the chat (`ai-remote.ts`); nothing runs here. */

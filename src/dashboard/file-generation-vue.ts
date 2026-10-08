@@ -28,7 +28,8 @@ import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
 import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
-import { peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreTourEnregistre } from "./chat-record-vue";
+import { peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
+import type { RelaisVue } from "./chat-record-vue";
 import { getOwnRequests, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcFresh } from "./remote-send";
 import { peindreQuestions } from "./generation-kind-vue";
@@ -91,6 +92,8 @@ export function creerVueFile(opts: {
 	repondre?: (requestId: string, answers: string[][]) => void;
 	/** May the pending card of this request still be answered (its state survived)? */
 	reprenable?: (requestId: string) => boolean;
+	/** The request shared to an AI app (phone relay) waiting for its answer, for the chat on screen; shown last. */
+	relais?: () => RelaisVue | null;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -579,9 +582,11 @@ export function creerVueFile(opts: {
 			host.ui.setIcon(logo, "sparkles");
 			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.clarify.deciding"));
 		}
+		const relais = opts.relais?.() ?? null;
+		if (relais) peindreRelais(zone, relais);
 		/* A NEW item is read from the key of the last one, not from the count: a
 		   reply closed while a request goes out leaves the count unchanged. */
-		const dernier = attente ? "waiting" : items.length ? items[items.length - 1].key : "";
+		const dernier = relais ? "relais" : attente ? "waiting" : items.length ? items[items.length - 1].key : "";
 		const nouveau = dernier !== dernierPeint;
 		dernierPeint = dernier;
 		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;

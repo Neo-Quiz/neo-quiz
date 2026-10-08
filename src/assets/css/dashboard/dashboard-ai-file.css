@@ -1421,3 +1421,64 @@
 .qbd-ai-suggest-icone { display: inline-flex; color: var(--interactive-accent); }
 .qbd-ai-suggest-icone svg { width: 14px; height: 14px; }
 .qbd-ai-suggest-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The relay card: the request is out, the answer is pasted from the clipboard. */
+.qbd-ai-relais-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.qbd-ai-relais-coller {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 40px;
+	padding: 0 14px;
+	border: none;
+	border-radius: 10px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	cursor: pointer;
+}
+
+.qbd-ai-relais-coller:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.qbd-ai-relais-annuler {
+	min-height: 40px;
+	padding: 0 12px;
+	border: none;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.qbd-ai-relais-annuler:hover {
+	color: var(--text-normal);
+}
+
+.qbd-ai-relais-icone {
+	display: inline-flex;
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-ai-relais-icone svg {
+	width: 18px;
+	height: 18px;
+}
+
+.qbd-ai-relais-erreur {
+	color: var(--text-error);
+}
+
+.qbd-ai-relais-detail {
+	color: var(--text-muted);
+	font-size: 0.9em;
+}

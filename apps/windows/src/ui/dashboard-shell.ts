@@ -42,6 +42,7 @@ import { createHomeHandlers } from "../../../../src/dashboard/home";
 import { createQuizzesHandlers } from "../../../../src/dashboard/quizzes";
 import { createDetailHandlers } from "../../../../src/dashboard/detail";
 import { createAiHandlers } from "../../../../src/dashboard/ai";
+import type { RelayDeps } from "../../../../src/dashboard/relay-flow";
 import { aiSettingsDefaults } from "../../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { openIconPicker } from "../../../../src/dashboard/icon-picker";
@@ -367,6 +368,8 @@ export interface MonterDashboardDeps {
 	reviewStore: ReviewStore;
 	/** Les réglages IA de l'application (`main.ts`), pour la page « Générer ». */
 	aiSettings: AiSettingsHost;
+	/** The phone's relay through an AI app (Android only, built in `main.ts`). Absent: no such action. */
+	relay?: RelayDeps;
 	/** Traduit un chemin ABSOLU du disque en chemin du CONTRAT, ou `null` s'il
 	    ne relève d'aucune racine ouverte. C'est `depuisAbsolu` de la carte des
 	    racines (`main.ts`), passée et non recopiée : elle porte la règle « la
@@ -712,6 +715,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		},
 		quizFolders: () => dossiersDeQuiz(),
 		copyText: copierTexte,
+		relay: deps.relay,
 		// The pencil of the "/exam" tile: the Settings, on its prompt.
 		openExamPromptSettings: () => { viserPromptExam(); deps.onOpenSettings(); },
 		// The "/exam" menu: every upcoming exam of every folder, nearest first.
