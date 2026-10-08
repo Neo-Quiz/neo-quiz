@@ -1049,23 +1049,27 @@
 	font-size: 12px;
 	line-height: 16px;
 }
-/* The type chip: filled blue, readable on the dark card, with a shape per
-   type (Learn = round pill, Test/Exam = squarer rectangle). No frame. */
+/* The type chip: GLASS in the app's accent (2026-10-08: the filled blue
+   clashed with the theme): a translucent accent tint, a hairline accent edge,
+   light accent text. Learn = round pill; Test/Exam = the same chip, only a
+   little less rounded. */
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn {
-	border: 0;
-	background: color-mix(in srgb, var(--qbd-state-progress) 85%, #000);
-	color: #fff;
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 38%, transparent);
+	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	backdrop-filter: var(--qbd-glass-blur-dense);
+	-webkit-backdrop-filter: var(--qbd-glass-blur-dense);
+	color: color-mix(in srgb, var(--interactive-accent) 45%, var(--text-normal));
 	font-weight: 600;
 }
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn:hover {
-	background: color-mix(in srgb, var(--qbd-state-progress) 95%, #000);
+	background: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
 }
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--learn .qbd-quiz-card-mode-btn {
 	border-radius: 999px;
 }
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--practice .qbd-quiz-card-mode-btn,
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--exam .qbd-quiz-card-mode-btn {
-	border-radius: 5px;
+	border-radius: 8px;
 }
 .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-icon svg {
 	width: 14px;
