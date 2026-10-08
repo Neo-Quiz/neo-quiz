@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.49] - 2026-10-08
+
 ### Fixed
 
 - In a Learn, the questions you got wrong come back only at the end, never in the middle of the quiz.
