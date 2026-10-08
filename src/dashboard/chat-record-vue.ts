@@ -12,8 +12,14 @@
 
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
-import { t } from "../i18n";
+import { currentLang, t } from "../i18n";
 import type { TransKey } from "../i18n";
+
+/** "4.2K", "4,2 k": a token count as the reader's language writes it short. */
+export function compterJetons(n: number): string {
+	try { return new Intl.NumberFormat(currentLang(), { notation: "compact", maximumFractionDigits: 1 }).format(n); }
+	catch { return String(Math.round(n)); }
+}
 import { mathifyElement } from "../engine/mathjax";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
@@ -108,7 +114,10 @@ export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEn
 	ajouter(corps, "span", "qbd-ai-reponse-etape", t("ai.remote.onDevice"));
 	if (stale) { ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.paused")); return; }
 	const p = entry.progress;
-	ajouter(corps, "span", "qbd-ai-reponse-texte", p.total ? t("ai.remote.progress", { n: p.question, total: p.total }) : t("ai.remote.progressNoTotal", { n: p.question }));
+	/* Before the first question, the PC's model is reasoning: its size says it
+	   is at work (2026-10-08), where "Question 0" said nothing. */
+	if (p.question === 0 && p.thinking) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.thinking", { count: compterJetons(p.thinking) }));
+	else ajouter(corps, "span", "qbd-ai-reponse-texte", p.total ? t("ai.remote.progress", { n: p.question, total: p.total }) : t("ai.remote.progressNoTotal", { n: p.question }));
 	if (p.quiz !== undefined && p.quizTotal !== undefined) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.quiz", { n: p.quiz, total: p.quizTotal }));
 }
 

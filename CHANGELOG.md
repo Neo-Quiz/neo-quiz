@@ -13,6 +13,15 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A generation no longer stops after 15 minutes: it runs until the model is done, and Stop ends it whenever you want.
+- While Claude reasons, the working line changes its words every few seconds and counts the reasoning tokens, on the PC and on a phone or tablet that sent the request.
+
+### Fixed
+
+- The effort chosen for Claude Code is now really applied to the generation.
+
 ## [1.20.49] - 2026-10-08
 
 ### Fixed

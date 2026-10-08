@@ -65,6 +65,15 @@ await withSrcModule("src/shared-state/generations.ts", (G) => {
 
 	r.check("last PC seen: the freshest non-stale file", G.lastPcSeen([{ device: "a", file: file(1000) }, { device: "b", file: file(50_000) }, { device: "c", file: file(0) }], 60_000), "b");
 	r.check("last PC seen: none when all are stale", G.lastPcSeen([{ device: "a", file: file(1000) }], 900_000), null);
+	// The reasoning size of a PC's run (2026-10-08): kept when sane, dropped otherwise, rounded when published.
+	r.check("progress.thinking: a sane count is read, a negative, huge or text one dropped",
+		[1200, -5, 50_000_000, "900"].map(v => G.readGenerations(file(1, [entry({ progress: { question: 0, thinking: v } })]))?.running[0].progress.thinking),
+		[1200, undefined, undefined, undefined]);
+	r.check("entry: the reasoning size is published rounded to the hundred, absent at 0",
+		[G.entryOfGroup({ key: "r1", chatId: "c1", lines: [line(1, "cours")] }, () => "", "ph", () => 4249).progress.thinking,
+			G.entryOfGroup({ key: "r1", chatId: "c1", lines: [line(1, "cours")] }, () => "", "ph", () => 0).progress.thinking,
+			G.entryOfGroup({ key: "r1", chatId: "c1", lines: [line(1, "attente")] }, () => "", "ph", () => 4249).progress.thinking],
+		[4200, undefined, undefined]);
 	r.done();
 });
 

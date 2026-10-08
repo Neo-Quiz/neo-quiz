@@ -28,7 +28,7 @@ import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
 import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
-import { peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
+import { compterJetons, peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcReachable } from "./remote-send";
@@ -56,6 +56,25 @@ export interface VueFile {
 function duree(ms: number): string {
 	const s = Math.max(0, Math.floor(ms / 1000));
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** How long each word of the working line stays (`ai.queue.verbs`). */
+const MOT_MS = 4000;
+
+/** "Opus 5.5 · Weighing the options…": the word follows the elapsed time, so
+    every repaint and the clock's tick agree on it without any state. */
+function texteTravail(modele: string, ecoule: number): string {
+	const mots = t("ai.queue.verbs").split("|").map(m => m.trim()).filter(Boolean);
+	const verb = mots.length ? mots[Math.floor(Math.max(0, ecoule) / MOT_MS) % mots.length] : "";
+	return t("ai.queue.workingVerb", { model: modele, verb });
+}
+
+/** The activity next to the working line: the reasoning's size, while no
+    reasoning text is shown (a model that shares it has its own line). */
+function texteActivite(tr: Transcript | null | undefined): string {
+	// Once the answer is being written, the transcript's own lines take over.
+	if (!tr || tr.thinking || tr.text || tr.thinkingTokens <= 0) return "";
+	return t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) });
 }
 
 const TEXTE_ETAPE: Record<EtapeGeneration, TransKey> = {
@@ -250,8 +269,19 @@ export function creerVueFile(opts: {
 			const etape = l.etat === "enregistrement" ? "enregistrement" : (opts.file.etape(l.id) ?? "preparation");
 			const idModele = l.demande.reglages.aiModel || fournisseur?.defaultModel || "";
 			const nomModele = fournisseur ? (idModele ? aiProviders.libelleModele(providerId, idModele) : fournisseur.name) : "";
-			const texte = etape === "redaction" && nomModele ? t("ai.queue.working", { model: nomModele }) : t(TEXTE_ETAPE[etape]);
-			ajouter(rep, "span", "qbd-ai-reponse-etape", texte);
+			const debut = l.debut ?? Date.now();
+			const travail = etape === "redaction" && !!nomModele;
+			const texte = travail ? texteTravail(nomModele, Date.now() - debut) : t(TEXTE_ETAPE[etape]);
+			const etiquette = ajouter(rep, "span", "qbd-ai-reponse-etape", texte);
+			if (travail && l.etat === "cours") { etiquette.dataset.modele = nomModele; etiquette.dataset.debut = String(debut); }
+			/* What the model has done so far, updated with each chunk
+			   (`surTranscript`): its reasoning's size while its text stays
+			   private. Empty until the CLI says anything. */
+			if (l.etat === "cours") {
+				const activite = ajouter(rep, "span", "qbd-ai-reponse-activite");
+				activite.dataset.ligne = String(l.id);
+				activite.textContent = texteActivite(opts.file.transcript(l.id));
+			}
 			if (l.etat === "cours") {
 				const temps = ajouter(rep, "span", "qbd-ai-file-temps", duree(Date.now() - (l.debut ?? Date.now())));
 				temps.dataset.debut = String(l.debut ?? Date.now());
@@ -392,8 +422,23 @@ export function creerVueFile(opts: {
 
 		const specs: SpecLigne[] = [];
 		// Nothing said yet: the working line above already shows the model at work.
-		if (tr.thinking || texte || tr.tools.length > 0) {
+		if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
 			const ecrit = !!texte;
+			/* PRIVATE reasoning (Claude Code with Opus 5.5 sends its size, not
+			   its text): one line with the size, and a click says why there is
+			   no text. While the model still only thinks, the working line
+			   above shows the same count, live. */
+			if (!tr.thinking && tr.thinkingTokens > 0 && (ecrit || !vivant)) {
+				const count = compterJetons(tr.thinkingTokens);
+				specs.push({
+					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.privateThinkingLive" : "ai.transcript.privateThought", { count }), ouvertParDefaut: false,
+					detail: corps => {
+						const el = (corps.firstElementChild as HTMLElement | null) ?? ajouter(corps, "div", "qbd-ai-transcript-reflexion");
+						const v = t("ai.transcript.privateThinkingNote");
+						if (el.textContent !== v) el.textContent = v;
+					},
+				});
+			}
 			if (tr.thinking) {
 				specs.push({
 					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), ouvertParDefaut: vivant && !ecrit,
@@ -523,6 +568,8 @@ export function creerVueFile(opts: {
 		if (!l || !tr) return;
 		const fil = defileur();
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 120;
+		const activite = zone.querySelector<HTMLElement>(`.qbd-ai-reponse-activite[data-ligne="${id}"]`);
+		if (activite) { const v = texteActivite(tr); if (activite.textContent !== v) activite.textContent = v; }
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
 		// First chunk of a run painted before its transcript existed: one repaint.
 		if (!bloc) { if (enCours(l)) peindre(); return; }
@@ -602,6 +649,10 @@ export function creerVueFile(opts: {
 				if (!zone?.isConnected) { liberer(); return; }
 				zone.querySelectorAll<HTMLElement>(".qbd-ai-file-temps").forEach(el => {
 					el.textContent = duree(Date.now() - Number(el.dataset.debut));
+				});
+				zone.querySelectorAll<HTMLElement>(".qbd-ai-reponse-etape[data-modele]").forEach(el => {
+					const texte = texteTravail(el.dataset.modele ?? "", Date.now() - Number(el.dataset.debut));
+					if (el.textContent !== texte) el.textContent = texte;
 				});
 			}, 1000);
 		} else if (!enCours) arreterHorloge();

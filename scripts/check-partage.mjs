@@ -139,6 +139,18 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 	r.check("codex, un jeton d'un AUTRE marqueur : refusé", argumentsAutorises("codex", codex(false, 0), "f".repeat(32)), false);
 	r.check("codex, une image hors ordre : refusé", argumentsAutorises("codex", [...codex(false, 0), "-i", j("fichier:2")], m), false);
 	r.check("codex, un modèle avec % : refusé (repli cmd.exe)", argumentsAutorises("codex", codex(false, 0).map(a => a === "gpt-5.1-codex" ? "a%CMDCMDLINE%" : a), m), false);
+	/* The composer's effort (2026-10-08): `--effort <level>` right after the
+	   model, one of the five levels of `claude --help`, nothing else. */
+	const avecEffort = (niveau, outils = "") => { const a = claude("opus", outils); a.splice(7, 0, "--effort", niveau); return a; };
+	r.check("claude: each documented effort level passes, with or without Read",
+		[...["low", "medium", "high", "xhigh", "max"].map(n => argumentsAutorises("claude", avecEffort(n), m)), argumentsAutorises("claude", avecEffort("high", "Read"), m)], [true, true, true, true, true, true]);
+	r.check("claude: an unknown level, an option or an empty level in the effort slot is refused",
+		["ultracode", "--dangerously-skip-permissions", "", "high --mcp-config", "HIGH"].map(n => argumentsAutorises("claude", avecEffort(n), m)), [false, false, false, false, false]);
+	r.check("claude: --effort elsewhere than after the model, twice, or without its level, is refused", [
+		argumentsAutorises("claude", [...claude("opus", ""), "--effort", "high"], m),
+		argumentsAutorises("claude", (() => { const a = avecEffort("high"); a.splice(9, 0, "--effort", "low"); return a; })(), m),
+		argumentsAutorises("claude", avecEffort("high").filter((x, i) => i !== 8), m),
+	], [false, false, false]);
 	r.check("ollama ne passe jamais par process.run", argumentsAutorises("ollama", ["run", "x"], m), false);
 	r.check("un argument non-chaîne : refusé", argumentsAutorises("claude", [1], m), false);
 	r.check("pas de tableau : refusé", argumentsAutorises("claude", "--version", m), false);

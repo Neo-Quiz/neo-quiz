@@ -21,7 +21,7 @@ export function publishGenerations(deps: PublisherDeps): () => void {
 
 	const snapshot = (): GenerationsFile => {
 		const entries = groupLines(deps.queue.lignes())
-			.map(g => entryOfGroup(g, id => deps.queue.transcript(id)?.text ?? "", deps.device))
+			.map(g => entryOfGroup(g, id => deps.queue.transcript(id)?.text ?? "", deps.device, id => deps.queue.transcript(id)?.thinkingTokens ?? 0))
 			.filter((e): e is NonNullable<typeof e> => !!e);
 		return { v: 1, at: clock(), running: entries };
 	};

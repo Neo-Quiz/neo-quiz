@@ -97,5 +97,20 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("progress: a lot cut inside the first document", qp("[{ document: 'a.md', title: 'A', quiz: [{ prompt: '1' }, { prompt: '2'", true), { quiz: 1, question: 2 });
 	r.check("progress: a `document` key is ignored outside a lot", qp("[{ document: 'x', prompt: 'A' }, { prompt: 'B' }]"), { quiz: null, question: 2 });
 
+	/* PRIVATE reasoning (Claude Code + Opus 5.5, measured 2026-10-08): empty
+	   `thinking_delta`s and a running `system`/`thinking_tokens` estimate. The
+	   size is kept, never decreasing; an empty delta adds no text; a bad
+	   estimate is ignored. */
+	const prive = [
+		line({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "thinking_delta", thinking: "", estimated_tokens: 50 } } }),
+		line({ type: "system", subtype: "thinking_tokens", estimated_tokens: 50, estimated_tokens_delta: 50 }),
+		line({ type: "system", subtype: "thinking_tokens", estimated_tokens: 4250, estimated_tokens_delta: 4200 }),
+		line({ type: "system", subtype: "thinking_tokens", estimated_tokens: "9999" }),
+		line({ type: "system", subtype: "thinking_tokens", estimated_tokens: -3 }),
+		line({ type: "system", subtype: "thinking_tokens", estimated_tokens: 100 }),
+	].join("");
+	const p = fold(createTranscriptDecoder("claude")(prive));
+	r.check("claude: private reasoning keeps its size, no text, never backwards", [p.thinking, p.thinkingTokens, p.started], ["", 4250, true]);
+	r.check("a fresh transcript has no reasoning size", transcriptVide().thinkingTokens, 0);
 	r.done();
 });

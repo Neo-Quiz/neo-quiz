@@ -234,6 +234,17 @@
 	color: var(--text-faint);
 }
 
+/* The model's activity next to the working line (reasoning size): muted,
+   as Claude Code's "↓ 4.2k tokens". Empty, it takes no room. */
+.qbd-ai-reponse-activite {
+	font-variant-numeric: tabular-nums;
+	font-size: 13px;
+	color: var(--text-faint);
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.qbd-ai-reponse-activite:empty { display: none; }
+
 .qbd-ai-reponse--echouee { align-items: flex-start; }
 .qbd-ai-reponse--echouee .qbd-ai-reponse-icone { color: var(--text-error); margin-top: 1px; }
 

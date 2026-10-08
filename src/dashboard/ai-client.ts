@@ -41,17 +41,21 @@ import type { TranscriptEvent } from "./transcript";
      employait `fetch` plutôt que `requestUrl`).
 ══════════════════════════════════════════════════════════ */
 
-/* Délai avant abandon d'un CLI. 3 min ne suffisaient pas : un modèle à
-   raisonnement, nourri de plusieurs notes jointes (~20 k tokens d'entrée) et
-   qui doit produire des questions avec leçon et explication, dépasse
-   couramment les 7 min — mesuré le 2026-07-31 sur le projet TOBEADMIN, où la
-   génération partait à la poubelle alors qu'elle se serait terminée. La
-   valeur est UNE constante, injectée dans le message d'erreur : le texte ne
-   peut plus mentir sur la durée réellement appliquée. */
-const CLI_TIMEOUT_MS = 900000;
+/* NO TIME LIMIT on a generation (2026-10-08). A fixed limit (3 min, then
+   15 min) killed runs that were still working: a reasoning model fed eighteen
+   course PDFs thought for more than 12 minutes and was killed at 15, a minute
+   after it had started writing, and everything it had produced was lost. The
+   run now lasts as long as the model works, as in MonoCode; the user stops it
+   with Stop, and the live transcript shows that it is working. */
 /** The clarify call of "Generate" gives up after this long (the default question shows). */
 const DECIDE_TIMEOUT_MS = 30000;
-const CLI_TIMEOUT_MIN = String(Math.round(CLI_TIMEOUT_MS / 60000));
+
+/** The effort levels `claude --effort` accepts. "ultracode" is a Claude Code
+    mode, not a level: it runs at the highest one. */
+function claudeEffortArg(effort: string): string | null {
+	if (effort === "ultracode") return "max";
+	return /^(low|medium|high|xhigh|max)$/.test(effort) ? effort : null;
+}
 
 /** Le NOM du fichier que Codex écrit avec `-o`, relu par l'hôte et rendu dans
     `sortie`. Le chemin absolu, lui, ne quitte jamais l'hôte : les arguments
@@ -977,7 +981,6 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			args: spec.args,
 			stdin: spec.stdin,
 			signal: ac.signal,
-			timeoutMs: CLI_TIMEOUT_MS,
 			marqueur: spec.marqueur,
 			fichiers: spec.fichiers,
 			sortieFichier: spec.sortieFichier,
@@ -1175,9 +1178,6 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.antigravityNotInstalled"));
 			}
-			if (e.killed || detail.includes("etimedout")) {
-				return new Error(t("ai.err.antigravityTimeout", { minutes: CLI_TIMEOUT_MIN }));
-			}
 			if (detail.includes("authentication required") || detail.includes("authentication failed") || detail.includes("sign in") || detail.includes("unauthorized") || detail.includes("401")) {
 				/* Le bouton « Se connecter » de la carte d'erreur, comme pour
 				   Claude et Codex : la sonde est `agy models`
@@ -1246,9 +1246,16 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		return lire(await callClaudeCodeTexte(model, systemPrompt, userPrompt, images));
 	}
 
+	/** The effort chosen in the composer, as `claude --effort` reads it. It
+	    was never passed before 2026-10-08 (the CLI had no such flag when the
+	    picker was added): every run took the CLI's default, and a "medium"
+	    chosen in the app still thought at the CLI's level. */
+	const effortClaude = (): string | null => claudeEffortArg(resolveEffort("claude-code", settings.get().aiEffort));
+
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
-	    prose answer for `chat` (2026-09-29). */
-	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<string> {
+	    prose answer for `chat` (2026-09-29). `effort`: the level passed to the
+	    CLI, the composer's by default. */
+	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort: string | null = effortClaude()): Promise<string> {
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.claudeDesktopOnly"));
 		}
@@ -1290,9 +1297,6 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.claudeNotInstalled"));
 			}
-			if (e.killed || detail.includes("etimedout")) {
-				return new Error(t("ai.err.claudeTimeout", { minutes: CLI_TIMEOUT_MIN }));
-			}
 			if (detail.includes("login") || detail.includes("api key") || detail.includes("authentication") || detail.includes("credential")) {
 				return erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
 			}
@@ -1308,6 +1312,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				   `--output-format json` used to print (`claudeResultDuFlux`). */
 				args: [
 					"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
+					...(effort ? ["--effort", effort] : []),
 					"--tools", tools, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config",
 				],
 				marqueur,
@@ -1432,9 +1437,6 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			const detail = ((e.stderr || "") + " " + (e.stdout || "") + " " + e.message).toLowerCase();
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.codexNotInstalled"));
-			}
-			if (e.killed || detail.includes("etimedout")) {
-				return new Error(t("ai.err.codexTimeout", { minutes: CLI_TIMEOUT_MIN }));
 			}
 			if (detail.includes("not logged in") || detail.includes("login") || detail.includes("unauthorized") || detail.includes("401") || detail.includes("credential") || detail.includes("authenticat")) {
 				return erreurConnexion("codex", t("ai.err.codexNotLoggedIn"));
@@ -1851,7 +1853,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			const plusBas = (id: string, m?: string): string => getEfforts(id, m)[0]?.value ?? "";
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);
-				return await callClaudeCodeTexte(model, system, user);
+				return await callClaudeCodeTexte(model, system, user, [], claudeEffortArg(plusBas("claude-code", model)));
 			}
 			if (provider === "codex") {
 				model = resolveCodexModel(model);

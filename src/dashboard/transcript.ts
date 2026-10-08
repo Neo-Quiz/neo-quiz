@@ -27,6 +27,11 @@ export type TranscriptTool = "claude" | "codex";
 export type TranscriptEvent =
 	| { kind: "start"; model?: string }
 	| { kind: "thinking"; text: string }
+	/** How many tokens the model has reasoned so far, an ESTIMATE the CLI
+	    sends while it keeps the reasoning itself to itself (Claude Code with
+	    Opus 5.5 streams `thinking_delta`s whose text is empty, measured on
+	    2026-10-08). The total so far, not a delta. */
+	| { kind: "thinkingTokens"; total: number }
 	| { kind: "text"; text: string }
 	| { kind: "tool"; name: string }
 	| { kind: "done" };
@@ -37,6 +42,8 @@ export interface Transcript {
 	started: boolean;
 	model?: string;
 	thinking: string;
+	/** Estimated tokens of reasoning so far (0 when the CLI sends none). */
+	thinkingTokens: number;
 	text: string;
 	tools: string[];
 	done: boolean;
@@ -48,7 +55,7 @@ export interface Transcript {
 const MAX_CHARS = 200_000;
 
 export function transcriptVide(): Transcript {
-	return { started: false, thinking: "", text: "", tools: [], done: false };
+	return { started: false, thinking: "", thinkingTokens: 0, text: "", tools: [], done: false };
 }
 
 function borner(s: string): string {
@@ -65,6 +72,11 @@ export function appliquer(t: Transcript, ev: TranscriptEvent): Transcript {
 		case "thinking":
 			t.started = true;
 			t.thinking = borner(t.thinking + ev.text);
+			break;
+		case "thinkingTokens":
+			t.started = true;
+			// Never backwards: two runs of an answer (a retry) restart the CLI's count.
+			if (ev.total > t.thinkingTokens) t.thinkingTokens = ev.total;
 			break;
 		case "text":
 			t.started = true;
@@ -95,6 +107,12 @@ function claudeEvents(line: Rec): TranscriptEvent[] {
 	const type = str(line.type);
 	if (type === "system" && str(line.subtype) === "init") return [{ kind: "start", model: str(line.model) ?? undefined }];
 	if (type === "result") return [{ kind: "done" }];
+	/* The reasoning's SIZE while its text stays private: `system` /
+	   `thinking_tokens` carries the running estimate (`estimated_tokens`). */
+	if (type === "system" && str(line.subtype) === "thinking_tokens") {
+		const total = line.estimated_tokens;
+		return typeof total === "number" && Number.isFinite(total) && total > 0 ? [{ kind: "thinkingTokens", total: Math.round(total) }] : [];
+	}
 	if (type !== "stream_event") return [];
 	const event = rec(line.event);
 	if (!event) return [];

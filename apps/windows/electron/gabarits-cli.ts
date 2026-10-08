@@ -25,6 +25,8 @@
 const MODELE = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,99}$/;
 /** Un niveau d'effort Codex : `minimal`, `low`, `medium`, `high`, `xhigh`… */
 const EFFORT = /^[a-z]{1,16}$/;
+/** A level of `claude --effort`, exactly the ones its help lists. */
+const EFFORT_CLAUDE = /^(low|medium|high|xhigh|max)$/;
 /** Le marqueur de `nouveauMarqueur` (`src/host/jetons.ts`) : 32 hexadécimaux. */
 const MARQUEUR = /^[0-9a-f]{32}$/;
 
@@ -66,13 +68,20 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 			   `--include-partial-messages` adds the text as it is written.
 			   Three output options, no capability: the plain `json` form is
 			   gone, so there is still exactly one shape. */
-			return correspond(a, [
-				"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
-				"--tools", (t: string) => t === "" || t === "Read",
-				"--no-session-persistence", "--setting-sources", "",
-				// No --mcp-config, and --strict-mcp-config: the account's connectors are not even listed.
-				"--strict-mcp-config",
-			]);
+			{
+				const tete: Piece[] = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele];
+				/* The composer's effort (2026-10-08): `--effort` and ONE of the
+				   five levels the CLI documents, or nothing (the CLI's default).
+				   A level only changes how long the model reasons. */
+				const effort: Piece[] = ["--effort", (e: string) => EFFORT_CLAUDE.test(e)];
+				const fin: Piece[] = [
+					"--tools", (t: string) => t === "" || t === "Read",
+					"--no-session-persistence", "--setting-sources", "",
+					// No --mcp-config, and --strict-mcp-config: the account's connectors are not even listed.
+					"--strict-mcp-config",
+				];
+				return correspond(a, [...tete, ...fin]) || correspond(a, [...tete, ...effort, ...fin]);
+			}
 		case "codex": {
 			if (m === null) return false;
 			const tete: Piece[] = ["exec", "--json", "-m", modele, "-c", (c: string) => c.startsWith("model_reasoning_effort=") && EFFORT.test(c.slice("model_reasoning_effort=".length))];

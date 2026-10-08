@@ -18,13 +18,17 @@ export const WRITE_EVERY_MS = 5_000;
 const KEEP_ALIVE_MS = 60_000;
 const MAX_ENTRIES = 20;
 const MAX_TEXT = 200;
+/** A reasoning estimate above this is not one: dropped. */
+const MAX_THINKING = 10_000_000;
 /** A clock a few seconds ahead of ours is normal; more is skew. */
 const FUTURE_TOLERANCE_MS = STALE_MS;
 
 export interface RunningEntry {
 	requestId: string; chatId: string; from: string; text: string; mode: "learn" | "practice";
 	startedAt: number; provider: string; model: string;
-	progress: { question: number; total?: number; quiz?: number; quizTotal?: number };
+	/** `thinking`: estimated tokens the model has reasoned so far (2026-10-08),
+	    so a phone sees the PC at work before the first question is written. */
+	progress: { question: number; total?: number; quiz?: number; quizTotal?: number; thinking?: number };
 }
 export interface GenerationsFile { v: 1; at: number; running: RunningEntry[] }
 
@@ -42,6 +46,7 @@ function readEntry(x: unknown): RunningEntry | null {
 	if (count(x.progress.total)) p.total = x.progress.total;
 	if (count(x.progress.quiz)) p.quiz = x.progress.quiz;
 	if (count(x.progress.quizTotal)) p.quizTotal = x.progress.quizTotal;
+	if (isNum(x.progress.thinking) && x.progress.thinking > 0 && x.progress.thinking <= MAX_THINKING) p.thinking = Math.round(x.progress.thinking);
 	return {
 		requestId: x.requestId, chatId: x.chatId, from: x.from, text: x.text.slice(0, MAX_TEXT), mode: x.mode,
 		startedAt: x.startedAt, provider: x.provider.slice(0, 80), model: x.model.slice(0, 120), progress: p,
@@ -74,7 +79,7 @@ type Line = RequestGroup["lines"][number];
 const live = (l: Line): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
 
 /** The entry a queue group publishes, or null when none of its lines is still live. */
-export function entryOfGroup(g: RequestGroup, transcriptText: (lineId: number) => string, device: string): RunningEntry | null {
+export function entryOfGroup(g: RequestGroup, transcriptText: (lineId: number) => string, device: string, thinkingTokens: (lineId: number) => number = () => 0): RunningEntry | null {
 	const lines = g.lines.filter(live);
 	if (!lines.length) return null;
 	const l = lines.find(x => x.etat !== "attente") ?? lines[0];
@@ -84,6 +89,11 @@ export function entryOfGroup(g: RequestGroup, transcriptText: (lineId: number) =
 	const progress: RunningEntry["progress"] = { question: p.question };
 	if (d.count) progress.total = d.count;
 	if (batch && p.quiz !== null) { progress.quiz = p.quiz; progress.quizTotal = d.notes.length; }
+	/* Rounded to the hundred: the file is rewritten when its content changes,
+	   and an estimate that moves by 50 tokens would rewrite it every 5 s for
+	   nothing a reader can see. */
+	const thinking = l.etat === "attente" ? 0 : Math.round(thinkingTokens(l.id) / 100) * 100;
+	if (thinking > 0) progress.thinking = thinking;
 	return {
 		requestId: g.key, chatId: g.chatId, from: d.fromDevice ?? device, text: firstLineOf(d.text).slice(0, MAX_TEXT),
 		mode: d.mode === "practice" ? "practice" : "learn", startedAt: l.debut ?? d.sentAt ?? 0,
