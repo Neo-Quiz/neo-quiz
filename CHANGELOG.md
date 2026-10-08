@@ -15,6 +15,7 @@ release notes.
 
 ### Added
 
+- From the phone, set your PC to Claude Code when it is on another provider.
 - On the phone, pick the Claude Code model for requests sent to your PC; the PC icon shows a laptop or a desktop.
 - A round "scroll to the latest message" button in the Generate conversation: it appears once you scroll up, shows typing dots while a generation runs and an arrow on hover.
 - Switching conversation restores the provider and model last used in it.

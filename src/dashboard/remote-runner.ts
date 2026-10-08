@@ -25,7 +25,7 @@
    No DOM here; the clock and every effect are injected.
 ══════════════════════════════════════════════════════════ */
 
-import { LOG_PREFIX } from "../branding";
+import { LOG_PREFIX, PRODUCT_NAME } from "../branding";
 import type { AiSettings } from "../types/dashboard-ctx";
 import { figerReglages } from "./file-generation-app";
 import type { DemandeFile, FileGenerationApp } from "./file-generation-app";
@@ -34,6 +34,8 @@ import { categorieChoisie, indicesCategorie } from "./categorie-quiz";
 import type { NoteAttachment } from "./generation-demande";
 import { admit, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest, TakenEntry } from "../shared-state/remote-request";
+import { admitSetting, isSettingRaw, validateSetting } from "../shared-state/remote-setting";
+import type { SettingRequest } from "../shared-state/remote-setting";
 import { t } from "../i18n";
 import { remoteProviderAllowed } from "./remote-providers";
 export { remoteProviderAllowed };
@@ -65,6 +67,17 @@ export interface RunnerDeps {
 	/** Records a failure for a request that never produced a line (no provider, unreadable document, interrupted). */
 	recordFailure(req: RemoteRequest, message: string): void;
 	notify(title: string, body: string): void;
+	/** Provider switch asked by the phone (`remote-setting.ts`). Absent: setting requests are ignored. */
+	providerSwitch?: {
+		/** Whether the Claude Code CLI runs on this PC. */
+		claudeAvailable(): Promise<boolean>;
+		/** Sets ONLY `aiProvider` to "claude-code", through the same settings path as the provider picker (the main-process guard applies). Rejects when the write is refused. */
+		apply(): Promise<void>;
+		/** Runs after a successful switch (the device file is republished). */
+		applied(): void;
+		/** Separate local log of the switches taken (never synced), with its own hourly limit. */
+		takenLog: { read(): Promise<TakenLogEntry[]>; write(list: TakenLogEntry[]): Promise<void> };
+	};
 }
 
 const sameEntry = (e: { id: string; from?: string }, r: { id: string; from: string }): boolean =>
@@ -149,6 +162,35 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		return true;
 	}
 
+	/** A provider switch: never touches anything but `aiProvider`, once per id. */
+	async function setting(file: { fileDevice: string; fileId: string; raw: unknown }, sw: NonNullable<RunnerDeps["providerSwitch"]>): Promise<void> {
+		const v = validateSetting(file.raw, { device: deps.device, fileDevice: file.fileDevice, fileId: file.fileId, now: deps.now() });
+		if (!v.ok) {
+			const key = file.fileDevice + "/" + file.fileId;
+			if (!refused.has(key)) { refused.add(key); console.warn(LOG_PREFIX, "setting request ignored:", file.fileDevice, file.fileId, v.reason); }
+			return;
+		}
+		const req: SettingRequest = v.request;
+		const log = await sw.takenLog.read();
+		if (admitSetting(req, log, deps.now()) !== "run") return;
+		const device = (req.fromName || t("ai.remote.unknownDevice")).slice(0, 64);
+		const say = (body: string): void => deps.notify(PRODUCT_NAME.slice(0, NOTIFY_TITLE_MAX), body.slice(0, NOTIFY_BODY_MAX));
+		// Written BEFORE anything is applied or said: a crash loses this request, it never applies one twice.
+		log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
+		await sw.takenLog.write(pruned(log, deps.now()));
+		if (deps.settings().aiProvider === "claude-code") return;
+		if (!(await sw.claudeAvailable())) { say(t("ai.remote.providerNoCli")); return; }
+		try {
+			await sw.apply();
+		} catch (e) {
+			console.warn(LOG_PREFIX, "provider switch refused:", e);
+			say(t("ai.remote.providerRefused"));
+			return;
+		}
+		say(t("ai.remote.providerSet", { device }));
+		sw.applied();
+	}
+
 	async function scan(): Promise<void> {
 		if (scanning) { again = true; return; }
 		scanning = true;
@@ -158,7 +200,10 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 				again = false;
 				const log = await deps.takenLog.read();
 				let changed = false;
-				for (const f of await deps.readIncoming()) if (await one(f, log)) changed = true;
+				for (const f of await deps.readIncoming()) {
+					if (isSettingRaw(f.raw)) { if (deps.providerSwitch) await setting(f, deps.providerSwitch); }
+					else if (await one(f, log)) changed = true;
+				}
 				if (changed) await deps.takenLog.write(pruned(log, deps.now()));
 			} while (again);
 		} catch (e) {

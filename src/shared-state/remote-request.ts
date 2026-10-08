@@ -46,7 +46,8 @@ const FORBIDDEN_IN_PATH = /[:<>"|?*\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f
 const DEVICE_NAME = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i;
 /** A short 8.3 name (`PROGRA~1`) designates another file than the one written. */
 const SHORT_NAME = /~[0-9]/;
-const NAME_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff0-\uffff]/;
+/** Characters refused in a device name or a type label (controls, invisible and bidi characters). */
+export const NAME_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff0-\uffff]/;
 /** Text keeps tab, newline and carriage return; every other control character is refused. */
 const TEXT_UNSAFE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 

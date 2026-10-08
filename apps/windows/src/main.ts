@@ -31,7 +31,7 @@ import { createChatFiles } from "./host/chat-files";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
 import { createDevicePublisher } from "../../../src/dashboard/device-publisher";
-import { claudeModelsOffered } from "../../../src/dashboard/ai-providers";
+import { checkClaudeCode, claudeModelsOffered } from "../../../src/dashboard/ai-providers";
 import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
 import { addFailedRequest } from "../../../src/dashboard/chat-requests";
@@ -674,6 +674,20 @@ async function demarrer(): Promise<void> {
 				},
 				recordFailure: (req, message) => { setChats(addFailedRequest(getChats(), req, idAppareil, racineChats.id, Date.now(), message)); },
 				notify: (title, body) => { void notifyPc(title, body); },
+				providerSwitch: {
+					claudeAvailable: async () => (await checkClaudeCode(true)).ok,
+					// The same save the provider picker uses (guarded in the main process); ONLY the provider changes.
+					apply: () => reglagesIa.save({ aiProvider: "claude-code" }),
+					applied: () => { void devicePublisher?.check(); },
+					takenLog: {
+						async read() {
+							const raw = await lireReglage<unknown>("remoteSettingTaken");
+							if (!Array.isArray(raw)) return [];
+							return raw.filter((e): e is TakenLogEntry => !!e && typeof e.id === "string" && typeof e.from === "string" && typeof e.at === "number" && Number.isFinite(e.at)).slice(-MAX_TAKEN);
+						},
+						write: list => ecrireReglage("remoteSettingTaken", list),
+					},
+				},
 			});
 			remoteScan = () => { void runner.scan(); void devicePublisher?.check(); };
 			const timer = setInterval(remoteScan, 60_000);

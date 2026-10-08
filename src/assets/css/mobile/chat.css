@@ -384,6 +384,19 @@
 	color: var(--text-muted);
 }
 
+.is-mobile .qbd-ai-pc-set {
+	margin-top: 12px;
+	min-height: 44px;
+	padding: 0 16px;
+	border: none;
+	border-radius: 22px;
+	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	box-shadow: none !important;
+	color: var(--text-normal);
+	font-size: 15px;
+}
+.is-mobile .qbd-ai-pc-set:disabled { color: var(--text-muted); }
+
 /* ── Thread: the user bubbles on the right, the answers on the left in
    serif without a bubble, like the Claude app ── */
 .is-mobile .qbd-ai-fil {

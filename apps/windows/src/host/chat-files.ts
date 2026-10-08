@@ -9,6 +9,8 @@ import { DEVICES_DIR, MAX_DEVICE_CHARS, deviceOfFileName, readDevice } from "../
 import type { DeviceFile } from "../../../../src/shared-state/devices";
 import { DEVICE, MAX_REQUEST_CHARS, SLUG, validateRemote } from "../../../../src/shared-state/remote-request";
 import type { RemoteRequest } from "../../../../src/shared-state/remote-request";
+import { validateSetting } from "../../../../src/shared-state/remote-setting";
+import type { SettingRequest } from "../../../../src/shared-state/remote-setting";
 import type { SharedFs } from "./shared-state";
 
 /* ══════════════════════════════════════════════════════════
@@ -54,9 +56,11 @@ export interface ChatFiles {
 	/** Every OTHER device's valid device file, read bounded and strictly; conflict copies and garbage skipped. */
 	readDevices(): Promise<DeviceFile[]>;
 	/** Writes `requests/<our device>/<id>.json` (temp file, remove, rename). */
-	writeRequest(req: RemoteRequest): Promise<void>;
+	writeRequest(req: RemoteRequest | SettingRequest): Promise<void>;
 	/** Our own valid requests, newest first. */
 	listOwnRequests(): Promise<RemoteRequest[]>;
+	/** Our own valid setting requests (provider switches), newest first; generation requests are not listed here. */
+	listOwnSettings(): Promise<SettingRequest[]>;
 	/** Deletes one of OUR requests (only the writer deletes). */
 	deleteOwnRequest(id: string): Promise<void>;
 	/** Every `*.json` under `requests/<other device>/` as parsed JSON, size-bounded; conflict copies and torn files skipped. */
@@ -279,7 +283,7 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		return out;
 	}
 
-	const writeRequest = (req: RemoteRequest): Promise<void> => enqueue(async () => {
+	const writeRequest = (req: RemoteRequest | SettingRequest): Promise<void> => enqueue(async () => {
 		if (!SLUG.test(req.id)) throw new Error("request id refused");
 		if (req.from.toLowerCase() !== deviceId.toLowerCase()) throw new Error("request is not ours");
 		const body = JSON.stringify(req);
@@ -316,5 +320,25 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		return out.sort((a, b) => b.at - a.at);
 	}
 
-	return { writeRequest, listOwnRequests, deleteOwnRequest, readIncoming, device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations, writeDevice, readDevices, readOwnDevice };
+	async function listOwnSettings(): Promise<SettingRequest[]> {
+		let names: string[];
+		try { names = (await fs.list(ownReqDir)).map(baseName); } catch { return []; }
+		const out: SettingRequest[] = [];
+		for (const n of names) {
+			if (!n.endsWith(".json") || isConflictCopy(n)) continue;
+			try {
+				if (!(await smallEnough(`${ownReqDir}/${n}`, MAX_REQUEST_CHARS))) continue;
+				const raw = await fs.readBounded(`${ownReqDir}/${n}`, 4 * MAX_REQUEST_CHARS);
+				if (raw.length > MAX_REQUEST_CHARS) continue;
+				const parsed: unknown = JSON.parse(raw);
+				const o = (parsed && typeof parsed === "object" ? parsed : {}) as { target?: unknown; at?: unknown };
+				// Only the schema is judged here, as for generation requests: age and target are not the sender's concern.
+				const v = validateSetting(parsed, { device: String(o.target), fileDevice: deviceId, fileId: n.slice(0, -5), now: Number(o.at) });
+				if (v.ok) out.push(v.request);
+			} catch { /* a torn own request is simply not listed */ }
+		}
+		return out.sort((a, b) => b.at - a.at);
+	}
+
+	return { writeRequest, listOwnRequests, listOwnSettings, deleteOwnRequest, readIncoming, device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations, writeDevice, readDevices, readOwnDevice };
 }

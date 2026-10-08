@@ -13,6 +13,7 @@ import { latestDevice, staleKey } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import type { DeviceFile } from "../shared-state/devices";
 import type { RemoteRequest } from "../shared-state/remote-request";
+import type { SettingRequest } from "../shared-state/remote-setting";
 
 export interface RemoteGenerations { device: string; file: GenerationsFile }
 
@@ -108,6 +109,17 @@ export function setOwnRequests(list: RemoteRequest[]): void {
 /** The own requests as last set. Empty until the first read. */
 export function getOwnRequests(): ReadonlyArray<RemoteRequest> {
 	return ownRequests;
+}
+
+let ownSettings: SettingRequest[] = [];
+
+/** The phone's own provider-switch requests still on disk, as last read. */
+export function setOwnSettings(list: SettingRequest[]): void {
+	ownSettings = [...list];
+}
+
+export function getOwnSettings(): ReadonlyArray<SettingRequest> {
+	return ownSettings;
 }
 
 let reader: (() => Promise<ReadonlyArray<RemoteGenerations>>) | null = null;

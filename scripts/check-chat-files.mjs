@@ -199,6 +199,13 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		await cf.writeRequest(req("new-0002"));
 		r.check("a request is written under our own directory through a temp file", [fs.files.has(`${RD}/${ME}/new-0002.json`), fs.writes.includes(`${RD}/${ME}/new-0002.json.tmp`), fs.writes.includes(`${RD}/${ME}/new-0002.json`)], [true, true, false]);
 		r.check("own valid requests are listed, torn ones not", (await quiet(() => cf.listOwnRequests())).map(q => q.id).sort(), ["new-0002", "own-0001"]);
+		const setReq = (id, over = {}) => ({ v: 1, id, kind: "setProvider", from: ME, target: PC, at: Date.now(), provider: "claude-code", ...over });
+		await cf.writeRequest(setReq("set-0001"));
+		fs.files.set(`${RD}/${ME}/set-bad1.json`, JSON.stringify(setReq("set-bad1", { provider: "ollama" })));
+		r.check("a setting request is written like a request and listed apart (a bad one is not)", [fs.files.has(`${RD}/${ME}/set-0001.json`), (await quiet(() => cf.listOwnSettings())).map(q => q.id), (await quiet(() => cf.listOwnRequests())).some(q => q.id === "set-0001")], [true, ["set-0001"], false]);
+		const inc2 = await quiet(() => cf.readIncoming());
+		await cf.deleteOwnRequest("set-0001"); fs.files.delete(`${RD}/${ME}/set-bad1.json`);
+		r.check("our own setting files are never read as incoming", inc2.some(i => i.fileDevice === ME), false);
 		await cf.deleteOwnRequest("own-0001");
 		r.check("only our request is deleted", [fs.files.has(`${RD}/${ME}/own-0001.json`), fs.files.has(`${RD}/${PC}/foreign-1.json`)], [false, true]);
 		let refused = false;

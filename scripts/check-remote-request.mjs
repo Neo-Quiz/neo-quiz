@@ -125,3 +125,41 @@ await withSrcModule("src/shared-state/remote-request.ts", (R) => {
 	r.check("same sender and id (any case) is known", R.admit({ id: "same", from: B }, { taken: [{ id: "same", from: BU, at: NOW }], busy: false }, NOW), "known");
 	r.done();
 });
+
+// SETTING REQUESTS (`remote-setting.ts`): the phone asks a PC to switch to Claude Code, and nothing else.
+await withSrcModule(["src/shared-state/remote-setting.ts", "src/shared-state/remote-request.ts"], (S, R) => {
+	const r = makeReporter("Remote setting request");
+	const PC = "11111111-1111-4111-8111-111111111111", PH = "22222222-2222-4222-8222-222222222222", NOW = 1_800_000_000_000;
+	const good = (over = {}) => ({ v: 1, id: "lq3k2-set001", kind: "setProvider", from: PH, target: PC, at: NOW - 1000, provider: "claude-code", ...over });
+	const cx = (over = {}) => ({ device: PC, fileDevice: PH, fileId: "lq3k2-set001", now: NOW, ...over });
+	const v = (raw, c = cx()) => S.validateSetting(raw, c);
+	r.check("a good setting request is accepted", v(good()).ok, true);
+	r.check("an optional device name is kept", v(good({ fromName: "Pixel" })).request.fromName, "Pixel");
+	r.check("it is recognised by its kind only", [S.isSettingRaw(good()), S.isSettingRaw({ kind: "other" }), S.isSettingRaw(null), S.isSettingRaw([])], [true, false, false, false]);
+	for (const p of ["ollama", "codex", "Claude-Code", "claude-code ", "", null, 1, ["claude-code"], {}]) r.check("provider refused: " + JSON.stringify(p), v(good({ provider: p })).reason, "invalid");
+	r.check("no provider at all is refused", (() => { const g = good(); delete g.provider; return v(g).reason; })(), "invalid");
+	for (const extra of ["model", "effort", "aiModel", "cliPath", "settings", "aiProvider", "destination", "text"]) r.check("extra field refused: " + extra, v({ ...good(), [extra]: "x" }).reason, "invalid");
+	r.check("an own __proto__ key is refused", v(JSON.parse('{"v":1,"id":"lq3k2-set001","kind":"setProvider","from":"' + PH + '","target":"' + PC + '","at":' + (NOW - 1000) + ',"provider":"claude-code","__proto__":{"x":1}}')).reason, "invalid");
+	r.check("a wrong kind is refused", v(good({ kind: "setModel" })).reason, "invalid");
+	r.check("v2 is refused", v(good({ v: 2 })).reason, "invalid");
+	for (const [n, raw] of [["null", null], ["array", []], ["string", "x"]]) r.check("invalid: " + n, v(raw).reason, "invalid");
+	r.check("the file name must equal the id", v(good(), cx({ fileId: "other-id-123" })).reason, "invalid");
+	r.check("the directory must equal `from`", v(good(), cx({ fileDevice: "33333333-3333-4333-8333-333333333333" })).reason, "wrong-sender");
+	r.check("our own folder is never a sender", v(good({ from: PC }), cx({ fileDevice: PC })).reason, "wrong-sender");
+	r.check("another PC's request is not ours", v(good({ target: "33333333-3333-4333-8333-333333333333" })).reason, "wrong-target");
+	r.check("25 h old is expired, 23 h is fine", [v(good({ at: NOW - 25 * 3600e3 })).reason, v(good({ at: NOW - 23 * 3600e3 })).ok], ["expired", true]);
+	r.check("an hour ahead is refused, 4 minutes tolerated", [v(good({ at: NOW + 3600e3 })).reason, v(good({ at: NOW + 4 * 60e3 })).ok], ["future", true]);
+	r.check("a non-numeric time is invalid", v(good({ at: "now" })).reason, "invalid");
+	r.check("an oversized or unsafe device name is refused", [v(good({ fromName: "x".repeat(65) })).reason, v(good({ fromName: "a‮b" })).reason, v(good({ fromName: 5 })).reason], ["invalid", "invalid", "invalid"]);
+	r.check("a generation request never accepts the setting kind (and vice versa)", [R.validateRemote({ ...good(), chatId: "chat-1234", text: "x", mode: "learn", documents: [] }, { device: PC, fileDevice: PH, fileId: "lq3k2-set001", now: NOW }).reason, v({ v: 1, id: "lq3k2-set001", from: PH, target: PC, at: NOW, chatId: "chat-1234", text: "x", mode: "learn", documents: [] }).reason], ["invalid", "invalid"]);
+	r.check("the phone builds one the PC accepts", S.validateSetting(S.buildSetting({ device: PH, target: PC, id: "lq3k2-set001", now: NOW }), cx()).ok, true);
+	r.check("building a request for itself is refused", (() => { try { S.buildSetting({ device: PH, target: PH, id: "lq3k2-set001", now: NOW }); return "built"; } catch { return "refused"; } })(), "refused");
+	// Admission
+	const e = (id, at) => ({ id, from: PH, at });
+	r.check("a fresh id runs", S.admitSetting({ id: "a-b-c-d", from: PH }, [], NOW), "run");
+	r.check("the same sender and id (any case) is known", S.admitSetting({ id: "a-b-c-d", from: PH.toUpperCase() }, [e("a-b-c-d", NOW)], NOW), "known");
+	r.check("three an hour run, the fourth waits", [2, 3].map(n => S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: n }, (_, i) => e("old-" + i + "xxx", NOW - 60_000)), NOW)), ["run", "rate"]);
+	r.check("an entry older than an hour does not count", S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: 3 }, (_, i) => e("old-" + i + "xxx", NOW - 2 * 3600e3)), NOW), "run");
+	r.check("a corrupt time counts as recent", S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: 3 }, (_, i) => e("old-" + i + "xxx", NaN)), NOW), "rate");
+	r.done();
+});

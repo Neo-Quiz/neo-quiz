@@ -46,6 +46,11 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	r.check("target: the chat's PC, stale, before the last PC ever seen", S.pickTarget({ origin: "pcB" }, [gens("pcA", NOW - 900_000)], NOW, "pcA"), "pcB");
 	const chat = (reqs) => ({ id: "c", origin: "pc", createdAt: 1, updatedAt: 1, requests: reqs.map(id => ({ id })) });
 	r.check("settled: our request found in a chat file can be deleted, the others stay", S.settled([{ id: "a" }, { id: "b" }], [chat(["a", "z"])]), ["a"]);
+	const sq = (id, at, target = PC) => ({ id, at, target });
+	const withProvider = (provider) => [{ device: PC, name: "PC", kind: "laptop", claudeModels: [], provider, updatedAt: 1 }];
+	r.check("settingsToDrop: gone once the PC's device file says Claude Code", S.settingsToDrop([sq("a-b-c-d", NOW)], withProvider("claude-code"), NOW), ["a-b-c-d"]);
+	r.check("settingsToDrop: kept while the PC is on another provider or has no file", [S.settingsToDrop([sq("a-b-c-d", NOW)], withProvider("ollama"), NOW), S.settingsToDrop([sq("a-b-c-d", NOW)], [], NOW)], [[], []]);
+	r.check("settingsToDrop: dropped after 24 h whatever the file says", S.settingsToDrop([sq("a-b-c-d", NOW - 25 * 3600e3)], withProvider("ollama"), NOW), ["a-b-c-d"]);
 	r.done();
 });
 
@@ -220,6 +225,77 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		r.check("the recorded request says it came from the phone", rec.from, PH);
 		const own = CR.recordRequest({ key: "r2", chatId: "c1", lines: [{ ...ligne, demande: { ...ligne.demande, fromDevice: undefined } }] }, PC, 50);
 		r.check("a request without fromDevice is ours", own.from, PC);
+	}
+	r.done();
+});
+
+// PROVIDER SWITCH asked by the phone (`remote-setting.ts`): sets ONLY aiProvider, once per id, never without the CLI.
+await withSrcModule(["src/dashboard/remote-runner.ts"], async (RU) => {
+	const r = makeReporter("Remote provider switch");
+	const PC = "11111111-1111-4111-8111-111111111111", PH = "22222222-2222-4222-8222-222222222222", NOW = 1_800_000_000_000;
+	const setting = (id, over = {}, dev = PH) => ({ fileDevice: dev, fileId: id, raw: { v: 1, id, kind: "setProvider", from: PH, target: PC, at: NOW - 1000, provider: "claude-code", ...over } });
+	function rig({ provider = "ollama", cli = true, refuse = false, withSwitch = true } = {}) {
+		const st = { settings: { aiProvider: provider, aiModel: "m1", aiEffort: "high", aiOutputFolder: "Gen" }, log: [], notes: [], applied: 0, patches: [], incoming: [], sent: [], failures: [] };
+		const deps = {
+			device: PC, now: () => NOW, readIncoming: async () => st.incoming, recordedIds: () => new Set(),
+			queue: { lignes: () => [], envoyer: (d) => st.sent.push(d), abonner: () => () => {}, pret: Promise.resolve() },
+			readDocument: async () => null, settings: () => st.settings, claudeModels: async () => [],
+			takenLog: { read: async () => [], write: async () => {} },
+			recordFailure: (q, m) => st.failures.push([q.id, m]), notify: (t, b) => st.notes.push([t, b]),
+		};
+		if (withSwitch) deps.providerSwitch = {
+			claudeAvailable: async () => cli,
+			apply: async () => { if (refuse) throw new Error("refused"); st.patches.push({ aiProvider: "claude-code" }); st.settings = { ...st.settings, aiProvider: "claude-code" }; },
+			applied: () => { st.applied++; },
+			takenLog: { read: async () => structuredClone(st.log), write: async (l) => { st.log = structuredClone(l); } },
+		};
+		return { st, deps };
+	}
+	{ // Applied once, only the provider changes
+		const { st, deps } = rig(); st.incoming = [setting("lq3k2-set001", { fromName: "Pixel" })];
+		const run = RU.createRemoteRunner(deps); await run.scan();
+		r.check("the provider is now Claude Code", st.settings.aiProvider, "claude-code");
+		r.check("the patch holds aiProvider and nothing else", st.patches, [{ aiProvider: "claude-code" }]);
+		r.check("model, effort and folder are untouched", { aiModel: st.settings.aiModel, aiEffort: st.settings.aiEffort, aiOutputFolder: st.settings.aiOutputFolder }, { aiModel: "m1", aiEffort: "high", aiOutputFolder: "Gen" });
+		r.check("the PC says who set it", [st.notes.length, st.notes[0][1].includes("Pixel"), st.notes[0][1].includes("Claude Code")], [1, true, true]);
+		r.check("the device file is republished", st.applied, 1);
+		r.check("nothing is queued or recorded as a failed generation", [st.sent.length, st.failures.length], [0, 0]);
+		r.check("the id is logged, keyed on the sender", st.log.map(e => [e.from, e.id]), [[PH, "lq3k2-set001"]]);
+		await run.scan(); await RU.createRemoteRunner(deps).scan();
+		r.check("never applied twice for the same id (rescan, restart)", [st.patches.length, st.notes.length], [1, 1]);
+		st.settings = { ...st.settings, aiProvider: "ollama" }; await RU.createRemoteRunner(deps).scan();
+		r.check("not even after the owner changed the provider back (the log is the memory)", st.settings.aiProvider, "ollama");
+	}
+	{ // Already on Claude Code: nothing to do, nothing said
+		const { st, deps } = rig({ provider: "claude-code" }); st.incoming = [setting("lq3k2-set002")];
+		await RU.createRemoteRunner(deps).scan();
+		r.check("no write, no notification, but the id is taken", [st.patches.length, st.notes.length, st.log.length], [0, 0, 1]);
+	}
+	{ // CLI missing: refused with a notification, setting unchanged
+		const { st, deps } = rig({ cli: false }); st.incoming = [setting("lq3k2-set003")];
+		const run = RU.createRemoteRunner(deps); await run.scan(); await run.scan();
+		r.check("provider unchanged, one refusal notification, no republish", [st.settings.aiProvider, st.patches.length, st.notes.length, st.applied], ["ollama", 0, 1, 0]);
+	}
+	{ // The save is refused by the guard: unchanged, told
+		const { st, deps } = rig({ refuse: true }); st.incoming = [setting("lq3k2-set004")];
+		await RU.createRemoteRunner(deps).scan();
+		r.check("a refused write leaves the provider and says so", [st.settings.aiProvider, st.notes.length, st.applied], ["ollama", 1, 0]);
+	}
+	{ // Rate limit: three an hour
+		const { st, deps } = rig(); st.incoming = Array.from({ length: 5 }, (_, i) => setting("lq3k2-rate0" + i));
+		await RU.createRemoteRunner(deps).scan();
+		r.check("three are admitted, two wait", st.log.length, 3);
+	}
+	{ // Invalid ones do nothing
+		const { st, deps } = rig();
+		st.incoming = [setting("lq3k2-bad001", { provider: "ollama" }), setting("lq3k2-bad002", { model: "opus" }), setting("lq3k2-bad003", { target: "33333333-3333-4333-8333-333333333333" }), setting("lq3k2-bad004", { at: NOW - 30 * 3600e3 }), setting("lq3k2-bad005", { at: NOW + 3600e3 }), setting("lq3k2-bad006", {}, "99999999-9999-4999-8999-999999999999"), setting("lq3k2-bad007", { from: PC }, PC), setting("lq3k2-bad008", { aiProvider: "x" })];
+		await RU.createRemoteRunner(deps).scan();
+		r.check("eight bad requests: nothing applied, said or logged", [st.patches.length, st.notes.length, st.log.length, st.settings.aiProvider], [0, 0, 0, "ollama"]);
+	}
+	{ // Without the switch wired (older host), a setting request is ignored and never runs as a generation
+		const { st, deps } = rig({ withSwitch: false }); st.incoming = [setting("lq3k2-set005")];
+		await RU.createRemoteRunner(deps).scan();
+		r.check("ignored when the host has no switch", [st.patches.length, st.sent.length, st.failures.length], [0, 0, 0]);
 	}
 	r.done();
 });

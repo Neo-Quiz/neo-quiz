@@ -471,6 +471,11 @@ export const EN_AI = {
 	/* Progress of a request running on another device, read from its generations file. */
 	"ai.remote.notifyTitle": "Request from {device}",
 	"ai.remote.unknownDevice": "your phone",
+	"ai.remote.providerNoCli": "Could not switch Neo Quiz to Claude Code: Claude Code was not found on this PC.",
+	"ai.remote.providerRefused": "Could not switch Neo Quiz to Claude Code: the setting was refused.",
+	"ai.remote.providerSet": "{device} set Neo Quiz to Claude Code",
+	"ai.pc.setClaude": "Set to Claude Code",
+	"ai.pc.setClaudeSent": "Waiting for your PC to switch",
 	"ai.remote.interrupted": "The PC app was closed before this finished.",
 	"ai.remote.pcNotClaudeCode": "Set Neo Quiz on your PC to Claude Code to run phone requests.",
 	"ai.remote.modelNotOffered": "The PC does not offer the model {model} right now. Pick another one.",

@@ -429,6 +429,11 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	/* Avancement d'une demande lancée sur un autre appareil, lu dans son fichier de générations. */
 	"ai.remote.notifyTitle": "Demande de {device}",
 	"ai.remote.unknownDevice": "ton téléphone",
+	"ai.remote.providerNoCli": "Impossible de régler Neo Quiz sur Claude Code : Claude Code est introuvable sur ce PC.",
+	"ai.remote.providerRefused": "Impossible de régler Neo Quiz sur Claude Code : le réglage a été refusé.",
+	"ai.remote.providerSet": "{device} a réglé Neo Quiz sur Claude Code",
+	"ai.pc.setClaude": "Régler sur Claude Code",
+	"ai.pc.setClaudeSent": "En attente du changement sur ton PC",
 	"ai.remote.interrupted": "L'appli du PC a été fermée avant la fin.",
 	"ai.remote.pcNotClaudeCode": "Règle Neo Quiz sur ton PC sur Claude Code pour exécuter les demandes du téléphone.",
 	"ai.remote.modelNotOffered": "Le PC ne propose pas le modèle {model} en ce moment. Choisis-en un autre.",

@@ -18,11 +18,12 @@ import { activeChatId, chatDevice, onChatsChanged } from "./chat-session";
 import { getChats } from "./chat-store";
 import { pcStatus } from "./pc-status";
 import type { PcStatus } from "./pc-status";
-import { chooseDevice, chosenPc, getDevices, getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations, remoteModel, setRemoteModel } from "./remote-generations";
+import { chooseDevice, chosenPc, getDevices, getOwnRequests, getOwnSettings, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations, remoteModel, setRemoteModel } from "./remote-generations";
 import { deviceInfo, pcIcon, soleOnlinePc } from "../shared-state/devices";
 import { isStale } from "../shared-state/generations";
 import { openActionMenu } from "./ui-select";
 import { ilYA } from "./sync-page";
+import { demanderClaudeCode } from "./ai-remote";
 
 /** The drawer survives a repaint of the page only while it stays open: a chosen chat closes it. */
 let tiroirOuvert = false;
@@ -203,6 +204,18 @@ function ouvrirFenetrePc(chat: () => ChatRecord | null): void {
 				}
 				// One short line for the selected device.
 				if (s.device) ajouter(c, "p", "qbd-ai-pc-note", phrase(s));
+				// The one remote setting: a PC on another provider can be set to Claude Code from here.
+				if (s.device && s.reason === "notClaude") {
+					const cible = s.device;
+					const envoye = getOwnSettings().some(q => q.target.toLowerCase() === cible.toLowerCase());
+					const b = ajouter(c, "button", "qbd-ai-pc-set", envoye ? t("ai.pc.setClaudeSent") : t("ai.pc.setClaude"));
+					b.type = "button";
+					b.disabled = envoye;
+					b.addEventListener("click", () => {
+						b.disabled = true;
+						demanderClaudeCode(cible).then(peindre, (e: unknown) => { console.warn("setting request not sent:", e); peindre(); });
+					});
+				}
 			};
 			peindre();
 		},

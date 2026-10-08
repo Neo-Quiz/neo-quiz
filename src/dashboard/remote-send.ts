@@ -7,6 +7,8 @@ import { pendingState, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest } from "../shared-state/remote-request";
 import { deviceInfo } from "../shared-state/devices";
 import type { DeviceFile } from "../shared-state/devices";
+import type { SettingRequest } from "../shared-state/remote-setting";
+import { MAX_AGE_MS } from "../shared-state/remote-request";
 import { relativeToRoot } from "../shared-state/chat-merge";
 
 /* The phone's sender core (pure): builds a request the PC's own validator accepts, picks the PC, and says which of our request files can go. */
@@ -86,4 +88,9 @@ export function ownAfterSync(disk: ReadonlyArray<RemoteRequest>, previous: Reado
 	const ids = new Set(disk.map(q => q.id));
 	const remembered = previous.filter(q => !ids.has(q.id) && !recorded.has(q.id) && expired(q));
 	return { keep: [...onDisk, ...remembered].sort((a, b) => b.at - a.at), drop };
+}
+
+/** The ids of the phone's own provider-switch files to delete: the target PC's device file now says Claude Code, or the request is older than 24 h. */
+export function settingsToDrop(own: ReadonlyArray<Pick<SettingRequest, "id" | "target" | "at">>, devices: ReadonlyArray<DeviceFile>, now: number): string[] {
+	return own.filter(q => deviceInfo(devices, q.target)?.provider === "claude-code" || !Number.isFinite(q.at) || now - q.at > MAX_AGE_MS).map(q => q.id);
 }

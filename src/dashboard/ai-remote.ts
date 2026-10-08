@@ -15,16 +15,21 @@ import { LOG_PREFIX } from "../branding";
 import { currentHost } from "../host/current";
 import { chatDevice, notifyChatsChanged } from "./chat-session";
 import { getChats } from "./chat-store";
-import { chosenPc, getDevices, getOwnRequests, getPairedPeers, getRemoteGenerations, lastPcEver, remoteModel, setOwnRequests } from "./remote-generations";
+import { chosenPc, getDevices, getOwnRequests, getOwnSettings, setOwnSettings, getPairedPeers, getRemoteGenerations, lastPcEver, remoteModel, setOwnRequests } from "./remote-generations";
 import { deviceInfo, soleOnlinePc } from "../shared-state/devices";
 import { buildRequest, modelFor, ownAfterSync, preferredPc, targetOf } from "./remote-send";
 import type { RemoteRequest } from "../shared-state/remote-request";
+import { buildSetting } from "../shared-state/remote-setting";
+import type { SettingRequest } from "../shared-state/remote-setting";
+import { settingsToDrop } from "./remote-send";
+import { newRequestId } from "./chat-requests";
 
 /** The request files of the host (`ChatFiles` of `host/chat-files.ts`, the parts the phone uses). */
 export interface RequestFiles {
-	writeRequest(req: RemoteRequest): Promise<void>;
 	listOwnRequests(): Promise<RemoteRequest[]>;
 	deleteOwnRequest(id: string): Promise<void>;
+	writeRequest(req: RemoteRequest | SettingRequest): Promise<void>;
+	listOwnSettings(): Promise<SettingRequest[]>;
 }
 
 let files: RequestFiles | null = null;
@@ -45,6 +50,12 @@ export async function refreshOwnRequests(): Promise<void> {
 		const recorded = new Set(getChats().flatMap(c => c.requests.map(q => q.id)));
 		const { keep, drop } = ownAfterSync(disk, getOwnRequests(), recorded, Date.now());
 		for (const id of drop) await files.deleteOwnRequest(id).catch(() => {});
+		// Provider switches: gone once the PC's device file says Claude Code, or after 24 h.
+		const settings = await files.listOwnSettings();
+		const gone = settingsToDrop(settings, getDevices(), Date.now());
+		for (const id of gone) await files.deleteOwnRequest(id).catch(() => {});
+		const waiting = settings.filter(q => !gone.includes(q.id));
+		if (JSON.stringify(waiting) !== JSON.stringify(getOwnSettings())) { setOwnSettings(waiting); notifyChatsChanged(); }
 		const before = JSON.stringify(getOwnRequests());
 		setOwnRequests(keep);
 		if (JSON.stringify(keep) !== before) notifyChatsChanged();
@@ -66,4 +77,14 @@ export async function enviquerVersPc(input: { chatId: string; text: string; mode
 	setOwnRequests(await files.listOwnRequests());
 	notifyChatsChanged();
 	return true;
+}
+
+/** Asks `target` (a PC whose device file says it is not on Claude Code) to switch to Claude Code. One request waits at a time per PC. Throws when it cannot be written. */
+export async function demanderClaudeCode(target: string): Promise<void> {
+	if (!files) throw new Error("request files not ready");
+	if (getOwnSettings().some(q => q.target.toLowerCase() === target.toLowerCase())) return;
+	const req = buildSetting({ device: chatDevice(), target, id: newRequestId(), now: Date.now() });
+	await files.writeRequest(req);
+	setOwnSettings(await files.listOwnSettings());
+	notifyChatsChanged();
 }
