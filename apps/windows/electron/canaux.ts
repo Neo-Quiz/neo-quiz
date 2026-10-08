@@ -50,7 +50,7 @@ import { absoluDepuisContrat, contratDepuisAbsolu, creerIndex, renameDirVersAbso
 import type { EvenementSurveillant, Index } from "./index-fichiers";
 import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
-import { cleanNotification, createNotificationGate } from "./notification";
+import { createNotificationGate, prepareNotification } from "./notification";
 import { validerReglagesIa } from "./garde-ia";
 import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/garde";
 import { siteVerifie, verifierSite } from "./moodle/compat";
@@ -832,8 +832,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	/* Only two strings cross: no icon, URL, action or click handler comes from the page. */
 	const porteNotification = createNotificationGate();
 	ipcMain.handle(CANAUX.notificationAfficher, (_e, titre: unknown, corps: unknown) => {
-		const propre = cleanNotification(titre, corps);
-		if (!propre || !Notification.isSupported() || !porteNotification.allow()) return false;
+		if (!Notification.isSupported()) return false;
+		const propre = prepareNotification(porteNotification, titre, corps);
+		if (!propre) return false;
 		new Notification({ title: propre.title, body: propre.body, silent: false }).show();
 		return true;
 	});
