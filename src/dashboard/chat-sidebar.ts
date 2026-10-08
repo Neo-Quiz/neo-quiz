@@ -88,6 +88,14 @@ export function poserListeChats(parent: HTMLElement): void {
 		ouvrir.title = chat.title || "";
 		if (actif) ouvrir.setAttribute("aria-current", "true");
 		ouvrir.addEventListener("click", () => setActiveChat(chat.id));
+		if (chat.foreign) {
+			// Started on another device: the synced folder brought it here.
+			const autre = ajouter(item, "span", "qbd-ai-chat-autre");
+			autre.title = t("ai.side.otherDevice");
+			autre.setAttribute("role", "img");
+			autre.setAttribute("aria-label", t("ai.side.otherDevice"));
+			host.ui.setIcon(autre, "monitor-smartphone");
+		}
 		if (chat.running) {
 			// A request is waiting or running in this chat: it goes on whatever is on screen.
 			const marque = ajouter(item, "span", "qbd-ai-chat-actif");
@@ -119,7 +127,7 @@ export function poserListeChats(parent: HTMLElement): void {
 		const haut = liste.scrollTop;
 		liste.replaceChildren();
 		const maintenant = Date.now();
-		const jours = groupItemsByDay(chatListItems(getChats(), fileSuivie?.lignes() ?? [], maintenant), maintenant, JOURS_RECENTS);
+		const jours = groupItemsByDay(chatListItems(getChats(), fileSuivie?.lignes() ?? [], maintenant, chatDevice()), maintenant, JOURS_RECENTS);
 		for (const j of jours.filter(j => !j.old)) poserJour(liste, j.kind, j.day, j.chats);
 		const anciens = jours.filter(j => j.old);
 		if (anciens.length) {

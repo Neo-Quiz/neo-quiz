@@ -169,5 +169,11 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 	r.check("several quizzes of one request: ONE record item with both results", T.threadItems(multiRec, [], "c1").map(i => [i.kind, i.request.results.length]), [["record", 2]]);
 	const both = T.toursOfThread(T.threadItems(multiRec, multi, "c1"));
 	r.check("in the record AND live: the context lists the request once", both.length, 1);
+	// Phase 2: a chat of another device is flagged, and a running indicator also comes from that device's generations (Task 7)
+	{
+		const mk = (id, origin) => ({ id, origin, createdAt: 1, updatedAt: 5, requests: [{ id: "r", at: 1, from: origin, text: "Q", mode: "learn", documents: [], results: [], state: "done" }] });
+		const items = L.chatListItems([mk("a", "me"), mk("b", "pc")], [], 10, "me");
+		r.check("the list marks the chats started on another device", items.map(i => [i.id, i.foreign]).sort(), [["a", false], ["b", true]]);
+	}
 	r.done();
 });

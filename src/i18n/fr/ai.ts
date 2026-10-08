@@ -400,6 +400,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.thread.stopped": "Arrêtée",
 	"ai.thread.failed": "Cette demande a échoué",
 	"ai.side.running": "Génération en cours",
+	"ai.side.otherDevice": "Lancé sur un autre appareil",
 	"ai.explain.button": "Expliquer",
 	"ai.explain.buttonTip": "Demander à Claude Code ou Codex de t'expliquer cette question",
 	"ai.explain.answerFirst": "Réponds d'abord à la question pour te la faire expliquer",

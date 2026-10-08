@@ -441,6 +441,7 @@ export const EN_AI = {
 	"ai.thread.stopped": "Stopped",
 	"ai.thread.failed": "This request failed",
 	"ai.side.running": "Generating",
+	"ai.side.otherDevice": "Started on another device",
 	"ai.explain.button": "Explain",
 	"ai.explain.buttonTip": "Ask Claude Code or Codex to explain this question",
 	"ai.explain.answerFirst": "Answer the question first to have it explained",

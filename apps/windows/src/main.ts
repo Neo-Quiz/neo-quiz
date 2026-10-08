@@ -27,6 +27,8 @@ import type { ReviewStore } from "../../../src/review/review-store";
 import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
 import { loadSharedState, sharedState } from "./host/shared-state";
+import { createChatFiles } from "./host/chat-files";
+import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
 import type { SessionsApp } from "./review/sessions";
@@ -571,6 +573,18 @@ async function demarrer(): Promise<void> {
 		   runs inside, before anything reads them. Loaded before the shell is
 		   mounted so the first review plan already sees the exam horizon. */
 		await loadSharedState(ouvertes.map(r => r.id), idAppareil);
+		/* Chats and generation progress live in the synced folder, one file per
+		   device (`host/chat-files.ts`); the store moves onto them here, before the
+		   Generate page can be shown. A failure leaves the window-storage chats
+		   working (the store only switches once `attachChatBackend` ran). */
+		let chatSync: Awaited<ReturnType<typeof startChatSync>> | null = null;
+		const racineChats = currentHost().paths.defaultRoot();
+		const chatFiles = createChatFiles({ fs: currentHost().fs, rootId: racineChats.id, deviceId: idAppareil });
+		try {
+			chatSync = await startChatSync({ files: chatFiles });
+		} catch (e) {
+			console.warn(LOG_PREFIX, "chat sync not started:", e);
+		}
 		/* Without this load, the very first mount of the shell (below) would see
 		   empty page settings (no folder expanded, default axis) instead of
 		   those of the previous session. */
@@ -610,6 +624,7 @@ async function demarrer(): Promise<void> {
 					   `SharedState.refresh`). */
 					await sharedState().refresh(() => stats.reload());
 					relireExamens();
+					await chatSync?.afterSync();
 				} while (rechargeDemandee);
 				adopterOverrides(avantOverrides);
 				demonterCourant?.repaint?.();
@@ -686,6 +701,8 @@ async function demarrer(): Promise<void> {
 		   photographie la session juste avant une fermeture qui saute le
 		   démontage normal. */
 		window.addEventListener("beforeunload", () => { void sessions.vider(); });
+		// The chat files' debounced write (`chat-store.ts`, 400 ms): launched here on a reload.
+		window.addEventListener("beforeunload", () => { void chatSync?.flush(); });
 		await pont().fenetre.surFermeture(async () => {
 			try {
 				await demonter();
@@ -696,6 +713,8 @@ async function demarrer(): Promise<void> {
 			}
 			store.destroy();
 			stats.destroy();
+			// Awaited: the chat file is written before the window closes.
+			await chatSync?.flush();
 			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
 			await sessions.vider();
 		});

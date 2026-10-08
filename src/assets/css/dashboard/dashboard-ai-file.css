@@ -886,6 +886,18 @@
 	width: 15px;
 	height: 15px;
 }
+/* A chat started on another device: a small device mark, before its delete button. */
+.qbd-ai-chat-autre {
+	display: inline-flex;
+	flex: none;
+	padding: 6px;
+	margin-right: 2px;
+	color: var(--text-muted);
+}
+.qbd-ai-chat-autre svg {
+	width: 15px;
+	height: 15px;
+}
 /* A request is waiting or running in this chat: a turning mark (the plan's
    own animation), where the delete button would be. */
 .qbd-ai-chat-actif {
