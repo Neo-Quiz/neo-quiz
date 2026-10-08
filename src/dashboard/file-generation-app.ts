@@ -40,6 +40,7 @@ import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
 import { appliquer, transcriptVide } from "./transcript";
 import type { Transcript } from "./transcript";
+import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
@@ -268,6 +269,13 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 
 	async function executer(ligne: LigneGeneration): Promise<void> {
 		const d = ligne.demande;
+		// Defence in depth: a line from another device never launches a provider with live tools.
+		if (d.fromDevice && !remoteProviderAllowed(d.reglages.aiProvider, d.images.length)) {
+			file = F.echouer(file, ligne.id, t("ai.remote.providerNotAllowed"));
+			file = F.solder(file, ligne.id);
+			pomper();
+			return;
+		}
 		const deps = lireDeps();
 		/* Le client lit les réglages FIGÉS de la demande par-dessus les
 		   réglages vivants : le reste (adresse Ollama, plans appris…) suit

@@ -30,6 +30,8 @@ import type { NoteAttachment } from "./generation-demande";
 import { admit, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest, TakenEntry } from "../shared-state/remote-request";
 import { t } from "../i18n";
+import { remoteProviderAllowed } from "./remote-providers";
+export { remoteProviderAllowed };
 
 /** Entries older than this are dropped: past the 24 h age limit a request is refused anyway. */
 export const TAKEN_KEEP_MS = 25 * 3600 * 1000;
@@ -38,20 +40,6 @@ export const MAX_TAKEN = 200;
 const INTERRUPTED_AFTER_MS = 10_000;
 const NOTIFY_TITLE_MAX = 80;
 const NOTIFY_BODY_MAX = 200;
-
-/** Providers PROVEN tool-free in this code base: Claude Code launched with
-    `--tools ""` (only when no image is attached: `ai-client.ts` then grants
-    `Read`) and Ollama (an HTTP completion, no process). Codex has an
-    always-on shell tool whose read-only sandbox still READS the whole disk,
-    and Antigravity is an agent with tools: a request typed on another device
-    (attacker text, if that device is compromised) must never reach them. */
-const TOOL_FREE_PROVIDERS: readonly string[] = ["claude-code", "ollama"];
-
-/** Whether a REMOTE request may run with this provider. Unknown or empty: refused. */
-export function remoteProviderAllowed(provider: string | undefined, imageCount = 0): boolean {
-	if (!provider || !TOOL_FREE_PROVIDERS.includes(provider)) return false;
-	return !(provider === "claude-code" && imageCount > 0);
-}
 
 export interface TakenLogEntry extends TakenEntry { reported?: true }
 
@@ -106,7 +94,8 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 			return false;
 		}
 		if (admit(req, { taken: log, busy: live() }, deps.now()) !== "run") return false;
-		const s = deps.settings();
+		// ONE frozen copy for the whole admission: the live settings may change while documents are read.
+		const s = figerReglages(deps.settings());
 		if (!s.aiProvider) {
 			log.push({ id: req.id, from: req.from, at: deps.now(), reported: true });
 			deps.recordFailure(req, t("ai.remote.noProvider"));
@@ -136,7 +125,7 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		const types = (req.types ?? []).filter(x => CANONICAL_TYPES.includes(x));
 		const demande: DemandeFile = {
 			text: req.text, notes, images: [], mode: req.mode, count: req.count ?? null,
-			type: normalizeTypes(types), destination: "", reglages: figerReglages(s),
+			type: normalizeTypes(types), destination: "", reglages: s,
 			categorie: categorieChoisie("auto", indicesCategorie(notes, req.text, s.aiOutputFolder ?? "")),
 			chatId: req.chatId, requestId: req.id, sentAt: req.at, fromDevice: req.from,
 		};

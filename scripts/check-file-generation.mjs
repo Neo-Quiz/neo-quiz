@@ -404,6 +404,19 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const l2 = file.lignes()[0];
 	r.check("a wrong count of quizzes: the line fails with the reason, nothing is saved",
 		[l2.etat, l2.echec, /2 quizzes for 3 documents/.test(l2.erreur ?? ""), ecrits.size], ["echouee", "generation", true, 0]);
+	r.check("the Claude call carries --strict-mcp-config and no --mcp-config", [appels[0].args.includes("--strict-mcp-config"), appels[0].args.includes("--mcp-config")], [true, false]);
+	/* Defence in depth: a line from another device never launches a provider with live tools. */
+	file.fermer(l2.id);
+	const avant = appels.length;
+	file.envoyer({ ...demande, parDocument: false, notes: [], fromDevice: "phone-1", reglages: { ...reglages, aiProvider: "codex" } });
+	await attendre();
+	const l3 = file.lignes()[0];
+	r.check("a remote line on Codex fails at launch and no CLI is started", [l3.etat, appels.length - avant], ["echouee", 0]);
+	file.fermer(l3.id);
+	reponse = "```json5\n[" + [bloc(noms3[0], 1)].join(",\n") + "]\n```";
+	file.envoyer({ ...demande, parDocument: false, notes: [], fromDevice: "phone-1" });
+	await attendre();
+	r.check("a remote line on Claude does launch", appels.length - avant, 1);
 	hote.uninstallHost();
 	delete globalThis.document;
 	r.done();

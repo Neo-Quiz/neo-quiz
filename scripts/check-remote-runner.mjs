@@ -137,13 +137,24 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 			await RU.createRemoteRunner(c.deps).scan();
 			r.check(p + " refusal is not retried", [c.failures.length, c.sent.length], [1, 0]);
 		}
+		{ // The provider is frozen once: a switch to Codex while a document is read changes nothing, and Codex-at-read is refused
+			const live = { aiProvider: "claude-code", aiModel: "m1" };
+			const g = rig({ settings: () => live, readDocument: async (rel) => { live.aiProvider = "codex"; return { name: "cm1.md", content: "x", path: "Root/" + rel, source: "vault" }; } });
+			g.setIncoming([file("lq3k2-race01")]);
+			await RU.createRemoteRunner(g.deps).scan();
+			r.check("a provider switched to Codex during the document read does not change the frozen copy", g.sent.map(d => d.reglages.aiProvider), ["claude-code"]);
+			const h = rig({ settings: () => live, readDocument: async (rel) => { live.aiProvider = "claude-code"; return { name: "cm1.md", content: "x", path: "Root/" + rel, source: "vault" }; } });
+			live.aiProvider = "codex"; h.setIncoming([file("lq3k2-race02")]);
+			await RU.createRemoteRunner(h.deps).scan();
+			r.check("a provider that is Codex at admission is refused even if switched back later", [h.sent.length, h.failures.length], [0, 1]);
+		}
 		const o = rig({ settings: () => ({ aiProvider: "ollama", aiModel: "m1" }) }); o.setIncoming([file("lq3k2-oll001")]);
 		await RU.createRemoteRunner(o.deps).scan();
 		r.check("an Ollama request runs", o.sent.length, 1);
 		// The Claude call used for a remote request (no image) carries the no-tool flag.
 		const { readFileSync } = await import("node:fs");
 		const ai = readFileSync("src/dashboard/ai-client.ts", "utf8");
-		r.check("ai-client grants Claude no tool unless an image is attached", ai.includes('const tools = fichiers.length > 0 ? "Read" : "";') && ai.includes('"--tools", tools,'), true);
+		r.check("ai-client grants Claude no tool unless an image is attached", ai.includes('const tools = fichiers.length > 0 ? "Read" : "";') && ai.includes('"--tools", tools,') && ai.includes('"--strict-mcp-config"'), true);
 	}
 	{ // Interrupted by a restart
 		const g = rig(); g.log.list = [{ id: "lq3k2-int001", from: PH, at: NOW - 600_000 }]; g.setIncoming([file("lq3k2-int001")]);
