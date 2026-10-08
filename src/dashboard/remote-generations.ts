@@ -11,6 +11,7 @@
 import { LOG_PREFIX } from "../branding";
 import { latestDevice, staleKey } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
+import type { DeviceFile } from "../shared-state/devices";
 import type { RemoteRequest } from "../shared-state/remote-request";
 
 export interface RemoteGenerations { device: string; file: GenerationsFile }
@@ -124,5 +125,67 @@ export async function refreshRemoteGenerations(): Promise<boolean> {
 	} catch (e) {
 		console.warn(LOG_PREFIX, "remote generations not read:", e);
 		return false;
+	}
+}
+
+/* ── The other devices' own files (`devices/<device>.json`): name, kind, Claude models ── */
+
+let devices: DeviceFile[] = [];
+let devicesReader: (() => Promise<DeviceFile[]>) | null = null;
+
+/** The device files as last read. Empty until the first read. */
+export function getDevices(): ReadonlyArray<DeviceFile> {
+	return devices;
+}
+
+/** The host's read of the other devices' files, set once the synced folder is there. */
+export function setDevicesReader(read: () => Promise<DeviceFile[]>): void {
+	devicesReader = read;
+}
+
+/** Reads the device files now; listeners run only when the list changed. A failed read keeps the last list. */
+export async function refreshDevices(): Promise<boolean> {
+	if (!devicesReader) return false;
+	try {
+		const next = [...await devicesReader()].sort((a, b) => a.device.localeCompare(b.device));
+		if (JSON.stringify(next) === JSON.stringify(devices)) return false;
+		devices = next;
+		for (const cb of [...listeners]) {
+			try { cb(); } catch (e) { console.warn(LOG_PREFIX, "devices listener failed:", e); }
+		}
+		return true;
+	} catch (e) {
+		console.warn(LOG_PREFIX, "devices not read:", e);
+		return false;
+	}
+}
+
+/* The PC the owner tapped in the PC window: a local view preference (never synced), like the last PC seen. */
+const CHOSEN_PC_KEY = "neoquiz.chosenPc";
+
+/** The PC chosen by hand, or null. */
+export function chosenPc(): string | null {
+	try { return globalThis.localStorage?.getItem(CHOSEN_PC_KEY) || null; } catch { return null; }
+}
+
+/** Remembers the chosen PC and repaints the listeners. */
+export function chooseDevice(device: string): void {
+	try { globalThis.localStorage?.setItem(CHOSEN_PC_KEY, device); } catch { /* not remembered */ }
+	for (const cb of [...listeners]) {
+		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "devices listener failed:", e); }
+	}
+}
+
+/* The Claude model the phone asks for (a phone setting, local). Sent only while the target PC lists it. */
+const REMOTE_MODEL_KEY = "neoquiz.remoteModel";
+
+export function remoteModel(): string | null {
+	try { return globalThis.localStorage?.getItem(REMOTE_MODEL_KEY) || null; } catch { return null; }
+}
+
+export function setRemoteModel(id: string): void {
+	try { globalThis.localStorage?.setItem(REMOTE_MODEL_KEY, id); } catch { /* not remembered */ }
+	for (const cb of [...listeners]) {
+		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "devices listener failed:", e); }
 	}
 }

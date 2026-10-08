@@ -30,6 +30,8 @@ import { loadSharedState, sharedState } from "./host/shared-state";
 import { createChatFiles } from "./host/chat-files";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
+import { createDevicePublisher } from "../../../src/dashboard/device-publisher";
+import { claudeModelsOffered } from "../../../src/dashboard/ai-providers";
 import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
 import { addFailedRequest } from "../../../src/dashboard/chat-requests";
@@ -629,6 +631,16 @@ async function demarrer(): Promise<void> {
 		   ask for a scan. */
 		let remoteScan: (() => void) | null = null;
 		let stopRemote: (() => void) | null = null;
+		/* This PC's device file (name, kind, Claude models): written at start and
+		   only when its content changes; `check()` is a local comparison, so the
+		   60 s pass below costs no write while nothing changed. */
+		const devicePublisher = estMobile() ? null : createDevicePublisher({
+			device: idAppareil,
+			info: async () => (await pont().appareil?.infos().catch(() => null)) ?? null,
+			models: () => claudeModelsOffered(),
+			write: f => chatFiles.writeDevice(f),
+			readOwn: () => chatFiles.readOwnDevice(),
+		});
 		onQueueCreated(queue => {
 			stopGenerations = publishGenerations({ queue, write: f => chatFiles.writeGenerations(f), device: idAppareil });
 			if (estMobile()) return;
@@ -650,6 +662,7 @@ async function demarrer(): Promise<void> {
 					} catch { return null; }
 				},
 				settings: () => reglagesIa.get(),
+				claudeModels: async () => (await claudeModelsOffered()).map(m => m.id),
 				takenLog: {
 					async read() {
 						const raw = await lireReglage<unknown>("remoteTaken");
@@ -661,7 +674,7 @@ async function demarrer(): Promise<void> {
 				recordFailure: (req, message) => { setChats(addFailedRequest(getChats(), req, idAppareil, racineChats.id, Date.now(), message)); },
 				notify: (title, body) => { void notifyPc(title, body); },
 			});
-			remoteScan = () => { void runner.scan(); };
+			remoteScan = () => { void runner.scan(); void devicePublisher?.check(); };
 			const timer = setInterval(remoteScan, 60_000);
 			stopRemote = () => { clearInterval(timer); remoteScan = null; };
 			remoteScan();

@@ -101,6 +101,7 @@
     "check:langue": "node scripts/check-langue.mjs",
     "check:shared-state": "node scripts/check-shared-state.mjs",
     "check:generations": "node scripts/check-generations.mjs",
+    "check:devices": "node scripts/check-devices.mjs",
     "check:stats": "node scripts/check-stats.mjs",
     "check:swipe": "node scripts/check-swipe.mjs",
     "check:selection": "node scripts/check-selection.mjs",

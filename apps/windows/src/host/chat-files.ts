@@ -5,6 +5,8 @@ import { boundChats, readChats } from "../../../../src/dashboard/chat-record";
 import type { ChatRecord } from "../../../../src/dashboard/chat-record";
 import { readGenerations as parseGenerations } from "../../../../src/shared-state/generations";
 import type { GenerationsFile } from "../../../../src/shared-state/generations";
+import { DEVICES_DIR, MAX_DEVICE_CHARS, deviceOfFileName, readDevice } from "../../../../src/shared-state/devices";
+import type { DeviceFile } from "../../../../src/shared-state/devices";
 import { DEVICE, MAX_REQUEST_CHARS, SLUG, validateRemote } from "../../../../src/shared-state/remote-request";
 import type { RemoteRequest } from "../../../../src/shared-state/remote-request";
 import type { SharedFs } from "./shared-state";
@@ -45,6 +47,12 @@ export interface ChatFiles {
 	readGenerations(): Promise<Array<{ device: string; file: GenerationsFile }>>;
 	/** Removes our generations file (app closing cleanly). */
 	clearGenerations(): Promise<void>;
+	/** Rewrites this device's `devices/<device>.json` (temp file, remove, rename). */
+	writeDevice(file: DeviceFile): Promise<void>;
+	/** Our own device file as a previous run left it, null when absent or unreadable. */
+	readOwnDevice(): Promise<DeviceFile | null>;
+	/** Every OTHER device's valid device file, read bounded and strictly; conflict copies and garbage skipped. */
+	readDevices(): Promise<DeviceFile[]>;
 	/** Writes `requests/<our device>/<id>.json` (temp file, remove, rename). */
 	writeRequest(req: RemoteRequest): Promise<void>;
 	/** Our own valid requests, newest first. */
@@ -206,6 +214,43 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 
 	const clearGenerations = (): Promise<void> => enqueue(async () => { if (await fs.exists(genOwn)) await fs.remove(genOwn); });
 
+	const devDir = `${rootId}/${REVIEW_DIR}/${DEVICES_DIR}`;
+	const devOwn = `${devDir}/${ownName}`;
+
+	async function readDevices(): Promise<DeviceFile[]> {
+		let names: string[];
+		try { names = (await fs.list(devDir)).map(baseName); } catch { return []; }
+		const out: DeviceFile[] = [];
+		for (const n of names) {
+			// Only `<uuid>.json`: a Syncthing conflict copy or a temp file never matches, our own file is not read back.
+			const id = deviceOfFileName(n);
+			if (!id || n === ownName) continue;
+			try {
+				if (!(await smallEnough(`${devDir}/${n}`, MAX_DEVICE_CHARS))) continue;
+				const raw = await fs.readBounded(`${devDir}/${n}`, 4 * MAX_DEVICE_CHARS);
+				if (raw.length > MAX_DEVICE_CHARS) continue;
+				const file = readDevice(JSON.parse(raw), id);
+				if (file) out.push(file);
+			} catch { console.warn(`${LOG_PREFIX} device file unreadable, ignored:`, n); }
+		}
+		return out;
+	}
+
+	async function readOwnDevice(): Promise<DeviceFile | null> {
+		try {
+			if (!(await smallEnough(devOwn, MAX_DEVICE_CHARS))) return null;
+			const raw = await fs.readBounded(devOwn, 4 * MAX_DEVICE_CHARS);
+			return raw.length > MAX_DEVICE_CHARS ? null : readDevice(JSON.parse(raw), deviceId);
+		} catch { return null; }
+	}
+
+	const writeDevice = (file: DeviceFile): Promise<void> => enqueue(async () => {
+		await fs.mkdirs(devDir);
+		await fs.write(`${devOwn}.tmp`, JSON.stringify(file));
+		if (await fs.exists(devOwn)) await fs.remove(devOwn);
+		await fs.rename(`${devOwn}.tmp`, devOwn);
+	});
+
 	const reqDir = `${rootId}/${REVIEW_DIR}/${REQUESTS_DIR}`;
 	const ownReqDir = `${reqDir}/${deviceId}`;
 
@@ -271,5 +316,5 @@ export function createChatFiles(deps: ChatFilesDeps): ChatFiles {
 		return out.sort((a, b) => b.at - a.at);
 	}
 
-	return { writeRequest, listOwnRequests, deleteOwnRequest, readIncoming, device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations };
+	return { writeRequest, listOwnRequests, deleteOwnRequest, readIncoming, device: deviceId, load, refresh, own: () => [...own], others: () => others.map(l => [...l]), saveOwn, writeGenerations, readGenerations, clearGenerations, writeDevice, readDevices, readOwnDevice };
 }

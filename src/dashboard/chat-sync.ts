@@ -1,8 +1,9 @@
 import { LOG_PREFIX } from "../branding";
 import { notifyChatsChanged } from "./chat-session";
 import { attachChatBackend, flushChats, reloadFromBackend } from "./chat-store";
+import type { DeviceFile } from "../shared-state/devices";
 import type { ChatBackend } from "./chat-store";
-import { refreshRemoteGenerations, setRemoteReader } from "./remote-generations";
+import { refreshDevices, refreshRemoteGenerations, setDevicesReader, setRemoteReader } from "./remote-generations";
 import type { RemoteGenerations } from "./remote-generations";
 import { OWN_REQUESTS_EVERY_MS, refreshOwnRequests, setRequestFiles } from "./ai-remote";
 import type { RequestFiles } from "./ai-remote";
@@ -13,6 +14,8 @@ export interface ChatSyncDeps {
 		refresh(): Promise<void>;
 		/** Every other device's generations file (`generations/<device>.json`), read fresh. */
 		readGenerations(): Promise<RemoteGenerations[]>;
+		/** Every other device's `devices/<device>.json`, read bounded and strictly. */
+		readDevices(): Promise<DeviceFile[]>;
 	};
 }
 
@@ -25,6 +28,8 @@ export async function startChatSync(deps: ChatSyncDeps): Promise<{ afterSync(): 
 		console.warn(LOG_PREFIX, "chats not moved to the synced folder yet (will retry at next start):", e);
 	}
 	setRemoteReader(() => deps.files.readGenerations());
+	setDevicesReader(() => deps.files.readDevices());
+	void refreshDevices();
 	// The phone's own requests: read now, after each delivery, and every few seconds while it is open.
 	setRequestFiles(deps.files);
 	void refreshOwnRequests();
@@ -37,6 +42,7 @@ export async function startChatSync(deps: ChatSyncDeps): Promise<{ afterSync(): 
 			if (changed) notifyChatsChanged();
 			// The generations repaint their listeners themselves; only the chats are reported here.
 			await refreshRemoteGenerations();
+			await refreshDevices();
 			await refreshOwnRequests();
 			return changed;
 		},

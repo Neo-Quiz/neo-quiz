@@ -39,6 +39,7 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, screen, shell } from "electron";
 import * as os from "node:os";
+import { infosAppareil } from "./appareil";
 import * as path from "node:path";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -229,7 +230,7 @@ function versDisque(racinesAbs: string[], ev: EvenementSurveillant): EvenementDi
 	const absolu = absoluDepuisContrat(racinesAbs, contrat);
 	if (!absolu) return null;
 	const abs = normaliser(absolu);
-	return ev.kind === "delete" ? { kind: "delete", abs } : { kind: ev.kind, abs, mtime: ev.file.mtime };
+	return ev.kind === "delete" ? { kind: "delete", abs } : { kind: ev.kind, abs, mtime: ev.file.mtime, ...(ev.file.ctime ? { ctime: ev.file.ctime } : {}) };
 }
 
 /** Le `mtime` que l'écriture vient de produire — voir « LES QUATRE ÉCRITURES
@@ -841,6 +842,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		new Notification({ title: propre.title, body: propre.body, silent: false }).show();
 		return true;
 	});
+
+	// No argument crosses: the answer is the cached name and kind of this computer.
+	ipcMain.handle(CANAUX.appareilInfos, () => infosAppareil());
 
 	ipcMain.handle(CANAUX.systemeRelancer, async () => {
 		app.relaunch();

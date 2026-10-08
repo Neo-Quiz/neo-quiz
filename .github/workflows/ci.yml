@@ -259,6 +259,11 @@ jobs:
       - name: Generations
         run: npm run check:generations
 
+      # THE DEVICE FILES (synced folder): a PC publishes name, kind and Claude
+      # models only at start and on a content change; every reader is strict.
+      - name: Device files
+        run: npm run check:devices
+
       # THE FOLDER LIST: picked folders persist, the default one stays first.
       - name: Folders
         run: npm run check:folders

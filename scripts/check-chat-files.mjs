@@ -238,5 +238,26 @@ await withSrcModule("apps/windows/src/host/chat-files.ts", async (C) => {
 		const none = make(memFs(), ME);
 		r.check("no requests folder: nothing, no throw", [await none.readIncoming(), await none.listOwnRequests()], [[], []]);
 	}
+	{ // Device files: read bounded and strictly, never our own, never a conflict copy; ours written through a temp file
+		const DD = "Root/.neo-quiz/devices";
+		const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ME2 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+		const dev = (id, over = {}) => JSON.stringify({ v: 1, device: id, name: "Aero", kind: "laptop", claudeModels: [{ id: "opus", label: "Opus" }], updatedAt: 1, ...over });
+		const fs2 = memFs(new Map([
+			[DD + "/" + A + ".json", dev(A)],
+			[DD + "/" + B + ".json", "{ torn"],
+			[DD + "/" + ME2 + ".json", dev(ME2)],
+			[DD + "/" + A + ".sync-conflict-20260101-000000-ABCDEFG.json", dev(A, { name: "Copy" })],
+			[DD + "/huge.json", "x".repeat(200_000)],
+			[DD + "/dddddddd-dddd-4ddd-8ddd-dddddddddddd.json", dev(A)],
+		]));
+		const seen = await quiet(() => make(fs2, ME2).readDevices());
+		r.check("other devices' valid device files are read; ours, torn, conflict copies, foreign names and mismatches are skipped", seen.map(d => d.device), [A]);
+		const big = memFs(new Map([[DD + "/" + A + ".json", "x".repeat(4 * 20_000 + 1)]]));
+		r.check("an oversized device file is never read", [await quiet(() => make(big, ME2).readDevices()), big.reads.length], [[], 0]);
+		const w = memFs(); const mine = make(w, ME2);
+		await mine.writeDevice({ v: 1, device: ME2, name: "Aero", kind: "desktop", claudeModels: [], updatedAt: 3 });
+		r.check("our device file is written through a temp file, never in place", [JSON.parse(w.files.get(DD + "/" + ME2 + ".json")).kind, w.writes.includes(DD + "/" + ME2 + ".json.tmp"), w.writes.includes(DD + "/" + ME2 + ".json")], ["desktop", true, false]);
+		r.check("no devices folder: nothing, no throw", await make(memFs(), ME2).readDevices(), []);
+	}
 	r.done();
 });

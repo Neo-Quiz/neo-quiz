@@ -125,6 +125,8 @@ export interface EntreeDisque {
 	/** Date de modification, ms depuis l'époque. `0` quand elle n'a pas été
 	    demandée — voir `Pont.fichiers.liste`. */
 	mtime: number;
+	/** Birth time, ms since the epoch; same rule as `mtime` (0 when not asked). */
+	ctime?: number;
 }
 
 /**
@@ -152,8 +154,8 @@ export interface EntreeDisque {
  * d'équivalent rendu pour les dossiers, à la différence des fichiers.
  */
 export type EvenementDisque =
-	| { kind: "create"; abs: string; mtime: number }
-	| { kind: "modify"; abs: string; mtime: number }
+	| { kind: "create"; abs: string; mtime: number; ctime?: number }
+	| { kind: "modify"; abs: string; mtime: number; ctime?: number }
 	| { kind: "delete"; abs: string }
 	| { kind: "renameDir"; fromAbs: string; toAbs: string };
 
@@ -519,6 +521,12 @@ export interface Pont {
 	    (`notification.ts`). `false` when refused or unsupported. */
 	notification?: {
 		afficher(titre: string, corps: string): Promise<boolean>;
+	};
+
+	/** This computer's name and kind (Windows only; absent on the phone). No
+	    argument crosses; the answer is read once (`appareil.ts`). */
+	appareil?: {
+		infos(): Promise<{ name: string; kind: "laptop" | "desktop" }>;
 	};
 
 	/**
@@ -1080,6 +1088,7 @@ export const CANAUX = {
 	partageEnregistrer: "neo:partage/enregistrer",
 	partageNatif: "neo:partage/natif",
 	notificationAfficher: "neo:notification/afficher",
+	appareilInfos: "neo:appareil/infos",
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
 	syncOublier: "neo:sync/oublier",
