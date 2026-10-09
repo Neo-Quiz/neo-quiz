@@ -209,6 +209,9 @@ interface Message {
     `verdict` is the app's judgement BEFORE anything is shown. */
 interface CardProposal {
 	verdict: CardEditResult | QuestionEditResult;
+	/** The card as it was when the proposal was judged: the write expects it,
+	    so an older proposal applied after another one is refused as stale. */
+	base: Record<string, unknown>;
 	etat: "pending" | "applied";
 	occupe: boolean;
 	message?: string;
@@ -687,7 +690,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						const question = "rows" in edit.verdict;
 						const res: BlockRewrite = bloc === undefined
 							? { ok: false, reason: "failed" }
-							: await (question ? saveQuestionEdit : saveCardEdit)(deps.chemin, bloc, qi, questions[qi], edit.verdict.fields);
+							: await (question ? saveQuestionEdit : saveCardEdit)(deps.chemin, bloc, qi, edit.base, edit.verdict.fields);
 						if (!res.ok || bloc === undefined) { edit.message = echec(res); return; }
 						edit.avant = bloc;
 						edit.apres = res.block;
@@ -831,6 +834,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 								verdict: conv.lecture
 									? validateCardEdit(questions[qi], decoupe.raw, sanitizeQuizHtml)
 									: validateQuestionEdit(questions[qi], decoupe.raw, sanitizeQuizHtml, ordreDe(qi)),
+								base: JSON.parse(JSON.stringify(questions[qi])) as Record<string, unknown>,
 								etat: "pending",
 								occupe: false,
 							};

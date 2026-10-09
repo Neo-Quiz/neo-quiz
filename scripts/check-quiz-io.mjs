@@ -822,6 +822,23 @@ await withSrcModule(
 				[res.ok, premierEcart(v.contenu, note({ source: ["[", "\t{ title: 'Division', prompt: 'y?', options: ['a', 'b'], correctIndex: 0 },", "]"].join(LF) }))], [true, "identiques"]);
 		}
 
+		// f. two proposals judged on the same question: once the first is applied,
+		//    the second (judged on the card as it WAS) is refused as stale
+		{
+			const depart = note({ source: ["[", Q, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			const premiere = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, question, { prompt: "First rewrite?" });
+			const apres = v.contenu;
+			const seconde = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, question, { explain: "Second rewrite." });
+			r.check("16f. the first proposal is written", premiere.ok, true);
+			r.check("16f. the older second one is refused as stale, nothing written", [seconde.ok, seconde.reason, v.contenu === apres], [false, "stale", true]);
+			const lecture = vault(note({ source: ["[", LECTURE, "]"].join(LF) }));
+			const carteLue = { id: "r1", role: "read", title: "Lists", prompt: "Read me." };
+			await io.saveCardEdit(lecture.chemin, bloc(lecture.contenu), 0, carteLue, { prompt: "Read me, simply." });
+			const vieille = await io.saveCardEdit(lecture.chemin, bloc(lecture.contenu), 0, carteLue, { title: "Lists again" });
+			r.check("16f. the same for a reading card", [vieille.ok, vieille.reason], [false, "stale"]);
+		}
+
 		// e. an edit that would not read back as asked is never written: a key written
 		//    twice in the note (JSON5 keeps the LAST one, the edit replaces the first)
 		{

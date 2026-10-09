@@ -56,6 +56,23 @@ export function applyQuestionEdit(source: string, qi: number, expected: Record<s
 	});
 }
 
+/**
+ * The card at `qi` in `source` is no longer `expected`: the note changed
+ * under a proposal judged on an older version of it (another proposal was
+ * applied since, or the card was edited elsewhere). The caller reports it as
+ * STALE, not as a failure. An unreadable block is not "moved": it fails.
+ */
+export function cardMoved(source: string, qi: number, expected: Record<string, unknown>): boolean {
+	try {
+		const old = parseQuizSource(source, { logErrors: false }) as unknown as Record<string, unknown>[];
+		const config = findQuizModeConfigIndex(old);
+		const card = old[qi + (config >= 0 && config <= qi ? 1 : 0)];
+		return !!card && canon(card) !== canon(expected);
+	} catch {
+		return false;
+	}
+}
+
 function applyFields(source: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>, accept: (card: Record<string, unknown>) => boolean): string | null {
 	try {
 		const eol = source.includes("\r\n") ? "\r\n" : "\n";
