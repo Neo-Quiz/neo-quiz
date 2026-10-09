@@ -92,7 +92,7 @@ function empreinteAppel(tool: string, args: readonly string[], stdin: string, ma
 }
 import { creerPartageFichier, ecrireTemporaire, lancerPartageNatif, nomPartage, octetsPartage, verrouEnregistrer, verrouNatif, verrouSync } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
-import { CAPTURE_MIN_INTERVAL_MS, captureRect, createRateGate, htmlBytes, htmlFileName } from "./frame-export";
+import { CAPTURE_MIN_INTERVAL_MS, captureRect, createRateGate, htmlBytes, htmlFileName, htmlSaveTarget } from "./frame-export";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
    l'exception nommée au `CLAUDE.md` du dépôt : `check:host` juge la
@@ -851,10 +851,17 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			const fenetre = BrowserWindow.fromWebContents(e.sender);
 			const choice = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options);
 			if (choice.canceled || !choice.filePath) return null;
-			// The extension is FORCED: the place is the user's, the file's nature is not.
-			const dest = path.extname(choice.filePath).toLowerCase() === ".html" ? choice.filePath : `${choice.filePath}.html`;
-			await fsp.writeFile(dest, content);
-			return dest;
+			/* The extension is FORCED: the place is the user's, the file's nature
+			   is not. A name completed with `.html` was never confirmed in the
+			   dialog: written exclusively, an existing file there is refused. */
+			const target = htmlSaveTarget(choice.filePath);
+			try {
+				await fsp.writeFile(target.path, content, { flag: target.flag });
+			} catch (err) {
+				if ((err as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`save refused: "${target.path}" already exists`);
+				throw err;
+			}
+			return target.path;
 		} finally {
 			verrouEnregistrer.rendre(jeton);
 		}

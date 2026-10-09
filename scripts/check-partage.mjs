@@ -558,7 +558,7 @@ await withSrcModule("apps/windows/electron/connexion-limitee.ts", async ({ lireC
    window (or a malformed, NaN, negative or extra-keyed rectangle reaching
    `capturePage`), a capture loop, a saved page whose extension the window
    chose (`.bat`), a name that is a path or a device name, a page over the cap. */
-await withSrcModule(["apps/windows/electron/frame-export.ts", "src/engine/html-frame-core.ts"], ({ captureRect, htmlFileName, htmlBytes, createRateGate, FRAME_HTML_MAX_BYTES, CAPTURE_MIN_INTERVAL_MS }, core) => {
+await withSrcModule(["apps/windows/electron/frame-export.ts", "src/engine/html-frame-core.ts"], async ({ captureRect, htmlFileName, htmlBytes, htmlSaveTarget, createRateGate, FRAME_HTML_MAX_BYTES, CAPTURE_MIN_INTERVAL_MS }, core) => {
 	const r = makeReporter("Interactive page export: rectangle, name, bytes, rate");
 	const win = { width: 1200, height: 800 };
 	r.check("a rectangle inside the window passes, rounded outward", captureRect({ x: 10.4, y: 20.6, width: 300.2, height: 100 }, 1, win), { x: 10, y: 20, width: 301, height: 101 });
@@ -602,7 +602,36 @@ await withSrcModule(["apps/windows/electron/frame-export.ts", "src/engine/html-f
 	r.check("the capture channel validates the rectangle and the rate BEFORE capturing, from the sender's own page",
 		[/captureRect\(raw, e\.sender\.getZoomFactor\(\)/.test(corps), corps.indexOf("captureGate()") < corps.indexOf("capturePage"), /e\.sender\.capturePage\(rect\)/.test(corps), /clipboard\.write\(\[new ClipboardItem\(\{ "image\/png"/.test(corps)], [true, true, true, true]);
 	const save = canaux.slice(canaux.indexOf("CANAUX.frameHtmlSave"), canaux.indexOf("const partageFichier"));
-	r.check("the save channel writes only where the NATIVE dialog said, with .html forced",
-		[/htmlFileName\(name\)/.test(save), /htmlBytes\(bytes\)/.test(save), /dialog\.showSaveDialog/.test(save), /`\$\{choice\.filePath\}\.html`/.test(save), (save.match(/writeFile\(/g) || []).length], [true, true, true, true, 1]);
+	r.check("the save channel writes only where the NATIVE dialog said, with .html forced and the target's flag",
+		[/htmlFileName\(name\)/.test(save), /htmlBytes\(bytes\)/.test(save), /dialog\.showSaveDialog/.test(save), /htmlSaveTarget\(choice\.filePath\)/.test(save),
+			/writeFile\(target\.path, content, \{ flag: target\.flag \}\)/.test(save), /=== "EEXIST"\) throw new Error\(/.test(save), (save.match(/writeFile\(/g) || []).length],
+		[true, true, true, true, true, true, 1]);
+
+	/* A name completed with `.html` AFTER the dialog was never confirmed there:
+	   prevented, silently replacing an existing `x.html` the user never saw
+	   when they typed `x`. Real files in a fresh temp folder. */
+	r.check("a path the user picked as .html is written as is (the dialog asked before replacing)",
+		[htmlSaveTarget(String.raw`C:\d\page.html`), htmlSaveTarget(String.raw`C:\d\page.HTML`)],
+		[{ path: String.raw`C:\d\page.html`, flag: "w" }, { path: String.raw`C:\d\page.HTML`, flag: "w" }]);
+	r.check("a completed name is created exclusively (wx), whatever the chosen extension",
+		[htmlSaveTarget(String.raw`C:\d\page`), htmlSaveTarget(String.raw`C:\d\run.bat`), htmlSaveTarget(String.raw`C:\d\.html`), htmlSaveTarget(String.raw`C:\x.html\page`)],
+		[{ path: String.raw`C:\d\page.html`, flag: "wx" }, { path: String.raw`C:\d\run.bat.html`, flag: "wx" }, { path: String.raw`C:\d\.html.html`, flag: "wx" }, { path: String.raw`C:\x.html\page.html`, flag: "wx" }]);
+	const { mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = await mkdtemp(join(tmpdir(), "nq-check-frame-save-"));
+	try {
+		await writeFile(join(dir, "page.html"), "USER FILE");
+		const target = htmlSaveTarget(join(dir, "page"));
+		let code = null;
+		try { await writeFile(target.path, "<p>page</p>", { flag: target.flag }); } catch (err) { code = err.code; }
+		r.check("an existing file behind a completed name is refused (EEXIST) and left intact",
+			[code, await readFile(join(dir, "page.html"), "utf8")], ["EEXIST", "USER FILE"]);
+		const neuf = htmlSaveTarget(join(dir, "neuf"));
+		await writeFile(neuf.path, "<p>new</p>", { flag: neuf.flag });
+		r.check("a completed name with no file there is written", await readFile(join(dir, "neuf.html"), "utf8"), "<p>new</p>");
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 	r.done();
 });

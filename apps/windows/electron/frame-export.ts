@@ -76,6 +76,16 @@ export function htmlFileName(raw: unknown): string | null {
 	return stem + ".html";
 }
 
+/** Where and how the page is written, from the path the "Save as" dialog
+    returned. A path already ending in `.html` is the file the user picked (the
+    dialog itself asked before replacing it): plain write. Any other path gets
+    `.html` appended, which names a file the dialog NEVER showed: it is created
+    exclusively (`wx`), so an existing file there is refused, never replaced. */
+export function htmlSaveTarget(chosen: string): { path: string; flag: "w" | "wx" } {
+	const base = chosen.slice(Math.max(chosen.lastIndexOf("/"), chosen.lastIndexOf("\\")) + 1);
+	return /.\.html$/i.test(base) ? { path: chosen, flag: "w" } : { path: `${chosen}.html`, flag: "wx" };
+}
+
 /** The page bytes, or null when not bytes, empty, or over the cap. */
 export function htmlBytes(raw: unknown): Uint8Array | null {
 	if (!(raw instanceof Uint8Array)) return null;
