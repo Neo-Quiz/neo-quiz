@@ -238,9 +238,22 @@ export function annulerReprise<D, R>(file: FileGeneration<D, R>, id: number, err
 }
 
 /** When a paused line becomes due: reset time plus the margin; null for a
-    line that is not paused or whose reset time is unknown. */
+    line that is not paused or whose reset time is unknown or not a finite
+    number (a stored "abc" would otherwise give NaN, a timer of 0 ms, and a
+    loop). */
 export function echeance<D, R>(l: LigneFile<D, R>): number | null {
-	return l.etat === "pause" && l.pause?.reprise != null ? l.pause.reprise + MARGE_REPRISE_MS : null;
+	const reprise = l.etat === "pause" ? l.pause?.reprise : null;
+	return typeof reprise === "number" && Number.isFinite(reprise) ? reprise + MARGE_REPRISE_MS : null;
+}
+
+/** A pause read back from storage: a provider that is not text becomes "",
+    a reset time that is not a finite number becomes null (manual resume). */
+function pauseRelue(p: unknown): PauseLimite {
+	const o = typeof p === "object" && p !== null ? (p as { fournisseur?: unknown; reprise?: unknown }) : {};
+	return {
+		fournisseur: typeof o.fournisseur === "string" ? o.fournisseur : "",
+		reprise: typeof o.reprise === "number" && Number.isFinite(o.reprise) ? o.reprise : null,
+	};
 }
 
 /** Every paused line whose time has come goes back to `attente`. `ids` are
@@ -280,11 +293,14 @@ export function completer<D, R>(file: FileGeneration<D, R>, id: number, demande:
     already told to die. A line running whose answer had already arrived
     (`aProduit`) only has its note left to write: `enregistrement`. Every
     other line keeps its state — the caller runs the `cours` line again,
-    which attaches to its CLI still running (`HostProcess.run`, `reprise`). */
+    which attaches to its CLI still running (`HostProcess.run`, `reprise`).
+    A paused line's `pause` is validated (`pauseRelue`). */
 export function restaurer<D, R>(file: FileGeneration<D, R>, aProduit: (demande: D) => boolean): FileGeneration<D, R> {
 	const lignes = file.lignes
 		.filter(l => l.etat !== "arret")
-		.map(l => (l.etat === "cours" && aProduit(l.demande) ? { id: l.id, etat: "enregistrement" as const, demande: l.demande } : l));
+		.map(l => (l.etat === "cours" && aProduit(l.demande) ? { id: l.id, etat: "enregistrement" as const, demande: l.demande }
+			: l.etat === "pause" ? { id: l.id, etat: "pause" as const, demande: l.demande, pause: pauseRelue(l.pause) }
+			: l));
 	const plusGrand = lignes.reduce((m, l) => Math.max(m, l.id), 0);
 	return { lignes, prochainId: Math.max(file.prochainId, plusGrand + 1) };
 }

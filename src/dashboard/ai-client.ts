@@ -1,3 +1,4 @@
+import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
 import { jetonFichier, jetonHome, jetonSortie, nouveauMarqueur } from "../host/jetons";
@@ -21,7 +22,7 @@ import { complementCategorie } from "./categorie-prompt";
 import { clarifyPrompt } from "./generation-kind";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
-import { UsageLimitError, detectUsageLimit } from "./usage-limit";
+import { UsageLimitError, cliErrorText, detectUsageLimit } from "./usage-limit";
 import type { TranscriptEvent } from "./transcript";
 
 /* ══════════════════════════════════════════════════════════
@@ -422,6 +423,7 @@ STYLES OF THE INTERACTIVE PAGES, chosen by the content and MIXED when that helps
 - EXPLORABLE (the default whenever a notion has values, parameters or choices the learner can vary): the learner changes something on a drawing or a control and SEES the consequence at once, the explanatory sentence rewriting itself live ("what if I put 0..1 here instead of 1..*?"). Learning becomes active: they understand by trying. Examples: click a multiplicity to cycle through 1, 0..1, 0..*, 1..* and the sentence says what it now means; a slider for a parameter; a toggle between two cases; a step button that advances a process.
 - STRUCTURED COURSE (when there are symbols or a list of things to memorize): a table "symbol · name · what to remember", each symbol DRAWN in SVG as it appears in the course, then a short "traps" box.
 - ANNOTATED DIAGRAM (when the notion is a drawing): the explanation placed ON the diagram, with numbered markers and short labels next to the parts they describe, never far from them.
+${SIMULATOR_GUIDE}
 `;
 const LEARN_FIGURES = `FIGURES OF THE READINGS: a course PDF often holds diagrams, schemas and tables, and its text shows where: on such a page the words read like the labels of a drawing (boxes, arrows, multiplicities such as 0..* or 1, stereotypes such as «include», actor and state names, axis names, a table's cells). When a "read" card explains a notion that one of those pages DRAWS, the card shows that page: add "figure": the PDF's file name EXACTLY as written in its "--- name ---" header, then ONE page from its "[p. N]" marks, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading, so the reading's text explains what the figure shows. Give a figure to EVERY reading whose notion is drawn on a page of the documents; none to a reading with no such page, and never a figure for a document that is not a PDF. One figure per reading.
 
@@ -1321,8 +1323,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.claudeNotInstalled"));
 			}
-			/* A usage limit is told apart BEFORE the generic failure: the queue pauses the line until the window resets. */
-			const limite = detectUsageLimit((e.stderr || "") + " " + (e.stdout || "") + " " + e.message, Date.now());
+			/* A usage limit is told apart BEFORE the generic failure: the queue pauses the line until the window resets.
+			   Never read in raw stdout (the MODEL's output): only its structured error events (`cliErrorText`). */
+			const limite = detectUsageLimit((e.stderr || "") + " " + cliErrorText(e.stdout || "") + " " + e.message, Date.now());
 			if (limite) return new UsageLimitError("claude", limite.resetAt, t("ai.err.claudeRateLimit"));
 			if (detail.includes("login") || detail.includes("api key") || detail.includes("authentication") || detail.includes("credential")) {
 				return erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
@@ -1467,7 +1470,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.codexNotInstalled"));
 			}
-			const limite = detectUsageLimit((e.stderr || "") + " " + (e.stdout || "") + " " + e.message, Date.now());
+			const limite = detectUsageLimit((e.stderr || "") + " " + cliErrorText(e.stdout || "") + " " + e.message, Date.now());
 			if (limite) return new UsageLimitError("codex", limite.resetAt, t("ai.err.codexRateLimit"));
 			if (detail.includes("not logged in") || detail.includes("login") || detail.includes("unauthorized") || detail.includes("401") || detail.includes("credential") || detail.includes("authenticat")) {
 				return erreurConnexion("codex", t("ai.err.codexNotLoggedIn"));

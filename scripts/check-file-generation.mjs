@@ -10,6 +10,8 @@
  *
  *     npm run check:file-generation
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/dashboard/file-generation.ts", (F) => {
@@ -560,6 +562,16 @@ await withSrcModule(["src/dashboard/file-generation.ts", "src/dashboard/usage-li
 	// Reload: the paused line comes back as it was.
 	const rechargee = F.restaurer(JSON.parse(JSON.stringify(g)), () => false);
 	r.check("une page rechargée garde la pause et son heure", [etats(rechargee), F.ligne(rechargee, 1).pause], ["x1:pause y1:pause", { fournisseur: "codex", reprise: null }]);
+	// A stored reset time that is not a number ("abc"): NaN would arm a 0 ms timer that re-arms forever.
+	const abimee = JSON.parse(JSON.stringify(f));
+	abimee.lignes.find(l => l.etat === "pause").pause.reprise = "abc";
+	const relue = F.restaurer(abimee, () => false);
+	r.check("une file restaurée dont la reprise vaut « abc » : reprise null, aucune échéance, aucune boucle",
+		[F.ligne(relue, 1).etat, F.ligne(relue, 1).pause, F.prochaineEcheance(relue), F.reprendreEchues(relue, reset + 60000).ids, F.prochaineEcheance(abimee), F.echeance(abimee.lignes.find(l => l.etat === "pause"))],
+		["pause", { fournisseur: "codex", reprise: null }, null, [], null, null]);
+	const autres = JSON.parse(JSON.stringify(f));
+	autres.lignes.find(l => l.etat === "pause").pause = { fournisseur: 5, reprise: Infinity };
+	r.check("un fournisseur qui n'est pas du texte et une reprise infinie sont réparés à la relecture", F.ligne(F.restaurer(autres, () => false), 1).pause, { fournisseur: "", reprise: null });
 	const apresArret = F.reprendreEchues(F.restaurer(JSON.parse(JSON.stringify(f)), () => false), reset + 60000);
 	r.check("application fermée puis rouverte après l'heure : la ligne repart au démarrage", [apresArret.ids, F.ligne(apresArret.file, 1).etat], [[1], "attente"]);
 
@@ -583,6 +595,35 @@ await withSrcModule(["src/dashboard/file-generation.ts", "src/dashboard/usage-li
 		r.check("pas une limite : « " + s + " »", det(s), null);
 	}
 	r.check("une valeur qui n'est pas du texte n'est jamais une limite", [det(undefined), det(null), det(42)], [null, null, null]);
+	// Bare "usage limit" / "limit reached" are gone: only the CLIs' full forms.
+	for (const s of ["token limit reached", "Error: context limit reached", "the usage limit of this API is documented", "rate limit"]) {
+		r.check("pas une limite d'usage : « " + s + " »", det(s), null);
+	}
+	// A reset time that is not finite, or more than 8 days away, is never waited for.
+	r.check("« try again in 99999 days » : limite reconnue, heure null", det("You've hit your usage limit. Try again in 99999 days."), { resetAt: null });
+	r.check("une pipe à 9999999999 (an 2286) : heure null", det("Claude AI usage limit reached|9999999999"), { resetAt: null });
+	r.check("7 jours : gardé ; 9 jours : null", [det("You've hit your usage limit. Try again in 7 days.")?.resetAt, det("You've hit your usage limit. Try again in 9 days.")?.resetAt], [now + 7 * 86400000, null]);
+	r.check("la borne est de 8 jours", L.RESET_MAX_MS, 8 * 86400000);
+	// stdout is the MODEL's output: only structured error events are read from it.
+	const sortieModele = [
+		JSON.stringify({ type: "thread.started", thread_id: "t" }),
+		JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "A rate limit caps requests; once you hit your usage limit, the API says: usage limit reached." } }),
+		"You've hit your usage limit (plain line)",
+		JSON.stringify({ type: "turn.completed", usage: {} }),
+	].join("\n");
+	r.check("une sortie du modèle qui parle de « rate limit » / « usage limit » n'est pas une limite d'usage", [L.cliErrorText(sortieModele), det(L.cliErrorText(sortieModele))], ["", null]);
+	const fluxCodex = JSON.stringify({ type: "turn.failed", error: { message: "You've hit your usage limit. Try again in 52 minutes." } });
+	const fluxErreur = JSON.stringify({ type: "error", message: "Weekly limit reached" });
+	const fluxClaude = JSON.stringify({ type: "result", is_error: true, result: "Claude AI usage limit reached|1791600000" });
+	const fluxClaudeOk = JSON.stringify({ type: "result", is_error: false, result: "usage limit reached in this quiz" });
+	r.check("les événements d'ERREUR du flux, eux, sont lus (Codex turn.failed, error ; Claude result is_error)",
+		[det(L.cliErrorText(fluxCodex))?.resetAt, det(L.cliErrorText(fluxErreur)) !== null, det(L.cliErrorText(fluxClaude))?.resetAt, L.cliErrorText(fluxClaudeOk)],
+		[now + 52 * 60000, true, 1791600000000, ""]);
+	// The wiring: ai-client never hands raw stdout to detectUsageLimit.
+	const client = readFileSync(join(process.cwd(), "src", "dashboard", "ai-client.ts"), "utf8");
+	const appels = client.split("\n").filter(l => l.includes("detectUsageLimit("));
+	r.check("ai-client : deux appels sur les erreurs d'un CLI, et aucun ne lit stdout brut",
+		[appels.filter(l => l.includes("e.stderr")).length, appels.some(l => /stdout/.test(l.split("cliErrorText(e.stdout || \"\")").join("")))], [2, false]);
 
 	r.check("la ligne d'usage : la fenêtre pleine donne l'heure", L.resetFromRows([{ usedPercent: 40, resetsAt: now + 1000 }, { usedPercent: 100, resetsAt: now + 5000 }], now), now + 5000);
 	r.check("deux fenêtres pleines : la DERNIÈRE à se remettre à zéro", L.resetFromRows([{ usedPercent: 100, resetsAt: now + 5000 }, { usedPercent: 100, resetsAt: now + 9000 }], now), now + 9000);

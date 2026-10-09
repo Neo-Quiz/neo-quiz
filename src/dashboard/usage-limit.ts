@@ -20,8 +20,35 @@ export interface UsageLimitHit {
 	resetAt: number | null;
 }
 
-/** MonoCode's patterns, plus the bare "usage limit" both CLIs print. */
-const LIMIT = /(?:usage|spending|monthly|weekly|daily|5-hour|five-hour|session) limit (?:reached|exceeded|hit)|hit your (?:usage )?limit|usage limit|(?:quota|credits?) (?:exceeded|exhausted|depleted)|insufficient[_ ](?:quota|credits)|credit balance is too low|limit reached/i;
+/** MonoCode's patterns, in their FULL forms only: a bare "usage limit" or
+    "limit reached" also matches "token limit reached" or a sentence about
+    limits, and would pause a line that only failed. */
+const LIMIT = /(?:usage|spending|monthly|weekly|daily|5-hour|five-hour|session) limit (?:reached|exceeded|hit)|hit your (?:usage )?limit|(?:quota|credits?) (?:exceeded|exhausted|depleted)|insufficient[_ ](?:quota|credits)|credit balance is too low/i;
+
+/** No plan window lasts longer than a week: a reset further than this is a
+    misread (or a hostile message), never a time to wait for. */
+export const RESET_MAX_MS = 8 * 86400000;
+
+/** The error messages a CLI's STDOUT carries as structured events, and
+    nothing else: stdout is mostly the MODEL's output, which may talk about
+    limits without any limit being hit. Codex `exec --json`: `error` and
+    `turn.failed` events; Claude Code `stream-json`: a `result` event with
+    `is_error`. */
+export function cliErrorText(stdout: string): string {
+	const out: string[] = [];
+	for (const line of String(stdout || "").split("\n")) {
+		const s = line.trim();
+		if (!s.startsWith("{")) continue;
+		let evt: unknown;
+		try { evt = JSON.parse(s); } catch { continue; }
+		if (typeof evt !== "object" || evt === null) continue;
+		const e = evt as { type?: unknown; message?: unknown; error?: { message?: unknown }; is_error?: unknown; result?: unknown };
+		if (e.type === "error" && typeof e.message === "string") out.push(e.message);
+		else if (e.type === "turn.failed" && typeof e.error?.message === "string") out.push(e.error.message);
+		else if (e.type === "result" && e.is_error === true && typeof e.result === "string") out.push(e.result);
+	}
+	return out.join("\n");
+}
 
 const MOIS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
@@ -73,7 +100,9 @@ function parseHeureLocale(texte: string, now: number): number | null {
 }
 
 /** Null when `texte` is not a usage limit; otherwise the reset time if the
-    message states it. Only a time in the FUTURE counts. */
+    message states it. Only a finite time in the FUTURE, at most
+    `RESET_MAX_MS` away, counts. `texte` must be the CLI's error text
+    (stderr, the error message, `cliErrorText`), never its raw stdout. */
 export function detectUsageLimit(texte: string, now: number): UsageLimitHit | null {
 	if (typeof texte !== "string" || !LIMIT.test(texte)) return null;
 	const epoch = /\|\s*(\d{10})\b/.exec(texte);
@@ -84,7 +113,7 @@ export function detectUsageLimit(texte: string, now: number): UsageLimitHit | nu
 		if (delai !== null) resetAt = now + delai;
 	}
 	if (resetAt === null) resetAt = parseHeureLocale(texte, now);
-	return { resetAt: resetAt !== null && resetAt > now ? resetAt : null };
+	return { resetAt: resetAt !== null && Number.isFinite(resetAt) && resetAt > now && resetAt <= now + RESET_MAX_MS ? resetAt : null };
 }
 
 /** The reset to wait for, read from the usage line: the window that is full.
