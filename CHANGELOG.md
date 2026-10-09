@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.58] - 2026-10-09
+
 ### Fixed
 
 - In the picture viewer, « Real size » works on a picture shown larger than its own pixels, and the bar stays readable over a zoomed white picture.
