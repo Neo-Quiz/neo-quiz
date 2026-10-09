@@ -159,7 +159,7 @@ export function formatCountdown(resetsAt: number | null, now: number): string | 
 /** Moment absolu du réarmement (« mer. 07:00 ») — ce que claude.ai affiche pour
     les fenêtres longues, où un « dans 5 j » ne dit pas quand on est débloqué.
     Formaté par Intl dans la langue de l'UI, pas par une table de jours maison. */
-export function formatResetMoment(resetsAt: number | null, lang: string): string | null {
+export function formatResetMoment(resetsAt: number | null, lang: string, weekday: "short" | "long" = "short"): string | null {
 	if (resetsAt == null) return null;
 	try {
 		/* ARRONDI À LA MINUTE : l'API renvoie un instant à la seconde près, qui
@@ -169,7 +169,7 @@ export function formatResetMoment(resetsAt: number | null, lang: string): string
 		const minute = Math.round(resetsAt / 60000) * 60000;
 		// L'heure suit le réglage (24 h par défaut), pas la langue (`hourOptions`).
 		return new Intl.DateTimeFormat(lang, {
-			weekday: "short", minute: "2-digit", ...hourOptions()
+			weekday, minute: "2-digit", ...hourOptions()
 		}).format(new Date(minute));
 	} catch {
 		return null;
@@ -232,4 +232,42 @@ export function usageRowLabel(row: UsageRow): string {
     contrainte, celle qui décide s'il reste de la marge. */
 export function tightestRow(rows: UsageRow[]): UsageRow | null {
 	return rows.slice().sort((a, b) => b.usedPercent - a.usedPercent)[0] || null;
+}
+
+/* ── The always-visible status line under the composer ── */
+
+/** Colour level of a window: accent, then orange from 75 %, red from 90 %. */
+export type UsageLevel = "ok" | "warn" | "high";
+
+export function usageLevel(percent: number): UsageLevel {
+	if (!Number.isFinite(percent)) return "ok";
+	if (percent >= 90) return "high";
+	if (percent >= 75) return "warn";
+	return "ok";
+}
+
+/** The windows the line shows: the session and the weekly "all models" window
+    of Claude, the windows of Codex. Per-model weekly rows stay in the detail
+    screen. Shortest window first. */
+export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
+	const span = (r: UsageRow): number => r.kind === "session" ? 300 : r.kind === "weekly-all" ? 10080 : (r.windowMinutes || Number.MAX_SAFE_INTEGER);
+	return rows
+		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window")
+		.sort((a, b) => span(a) - span(b));
+}
+
+/** Short window label: "5h" / "7d" ("7j" in French), translated at render time. */
+export function usageShortLabel(row: UsageRow): string {
+	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
+	if (mins >= 1440) return t("ai.usage.shortDays", { n: Math.round(mins / 1440) });
+	if (mins > 0) return t("ai.usage.shortHours", { n: Math.max(1, Math.round(mins / 60)) });
+	return t("ai.usage.windowPlan");
+}
+
+/** Time left before the reset: a countdown within 24 h ("56 min"), the weekday
+    and time beyond ("Wednesday 07:00", in the UI locale). null when unknown or past. */
+export function usageResetText(resetsAt: number | null, now: number, lang: string): string | null {
+	if (resetsAt == null || resetsAt <= now) return null;
+	if (resetsAt - now >= 86400000) return formatResetMoment(resetsAt, lang, "long");
+	return formatCountdown(resetsAt, now);
 }

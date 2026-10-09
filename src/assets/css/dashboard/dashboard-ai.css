@@ -4632,3 +4632,72 @@
 	color: var(--text-muted);
 	font-size: 0.9em;
 }
+
+/* ── Plan status line under the composer (text, not a tile) ──
+   "5h ━━━ 40 % (56 min)  7d ━━━ 52 % (Wednesday 07:00)". Small and muted;
+   the bar is a thin track, accent then orange from 75 % and red from 90 %. */
+.qbd-ai-usage-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 18px;
+	min-height: 18px;
+	padding: 6px 4px 0;
+	font-size: 12px;
+	line-height: 16px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-ai-usage-line[hidden] {
+	display: none;
+}
+
+.qbd-ai-usage-win {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	white-space: nowrap;
+}
+
+.qbd-ai-usage-name {
+	color: var(--text-faint);
+}
+
+.qbd-ai-usage-bar {
+	position: relative;
+	display: inline-block;
+	width: 84px;
+	height: 3px;
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+	overflow: hidden;
+}
+
+.qbd-ai-usage-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	border-radius: 2px;
+	background: var(--interactive-accent);
+}
+
+.qbd-ai-usage-bar[data-level="warn"] .qbd-ai-usage-fill {
+	background: var(--color-orange, #e0953a);
+}
+
+.qbd-ai-usage-bar[data-level="high"] .qbd-ai-usage-fill {
+	background: var(--color-red, #e5484d);
+}
+
+.qbd-ai-usage-reset {
+	color: var(--text-faint);
+}
+
+.is-mobile .qbd-ai-usage-line {
+	gap: 2px 14px;
+	font-size: 11px;
+}
+
+.is-mobile .qbd-ai-usage-bar {
+	width: 56px;
+}

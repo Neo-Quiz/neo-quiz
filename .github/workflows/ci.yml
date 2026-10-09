@@ -409,6 +409,10 @@ jobs:
       - name: Phone code block size
         run: npm run check:code-fit
 
+      # The plan status line: colour thresholds, windows shown, time before reset.
+      - name: Usage line formats
+        run: npm run check:usage-format
+
       # The pure scheduler core stays pure and correct.
       - name: Review scheduler core
         run: npm run check:scheduler

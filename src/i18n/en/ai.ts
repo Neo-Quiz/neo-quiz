@@ -82,6 +82,10 @@ export const EN_AI = {
 	"ai.usage.windowHours": "{n} h",
 	"ai.usage.windowDays": "{n} d",
 	"ai.usage.windowPlan": "Plan",
+	"ai.usage.shortHours": "{n}h",
+	"ai.usage.shortDays": "{n}d",
+	"ai.usage.linePercent": "{n}%",
+	"ai.usage.lineLabel": "Plan usage",
 
 	/* ── Options de génération ── */
 	/* Libellés des types de questions. La VALEUR envoyée au modèle reste

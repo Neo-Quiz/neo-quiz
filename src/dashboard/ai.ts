@@ -70,6 +70,8 @@ import { attachMentionPicker } from "./mention-picker";
 import type { MentionPickerHandle } from "./mention-picker";
 import { formatTokens, formatCost, formatDuration, totalTokens, tightestRow, usageRowLabel, providerPublishesPlan } from "./usage-format";
 import type { AiUsage, AiUsageEntry, PlanUsage } from "./usage-format";
+import { mountUsageLine } from "./usage-line";
+import type { UsageLine } from "./usage-line";
 import { scanPromptPaths, MAX_PROMPT_PATHS } from "./prompt-paths";
 import { createQuizPage } from "./detail";
 import type { QuizPageHandlers } from "./detail";
@@ -443,6 +445,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if ((phase === "idle" || phase === "error") && chatAContenu() !== modeConversation) { void render(containerRef); return; }
 		updateGenerateBtn(boutonEnvoi);
 		majNouvelle();
+		const running = fileGen.lignes().filter(l => l.etat === "cours").length;
+		if (running < runningBefore) planLine?.refresh();
+		runningBefore = running;
 	}, () => !!stageRef?.isConnected);
 	/* Switching or starting a chat: the page follows (conversation <-> home). */
 	let chatVu = activeChatId();
@@ -771,6 +776,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   passer la souris ne déclenche jamais de lecture réseau, c'est le modal
 	   qui va chercher des chiffres frais quand on l'ouvre. */
 	let lastPlan: PlanUsage | null = null;
+	/* The plan status line under the composer (one at a time: the page redraws
+	   the composer often). Refreshed when a generation or reply ends. */
+	let planLine: UsageLine | null = null;
+	let runningBefore = 0;
 
 	// Le type de questions a DEUX faces, à ne jamais confondre : une VALEUR
 	// canonique, envoyée telle quelle au modèle (ai-client la compare à
@@ -2122,6 +2131,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				}
 			});
 			usageBtn.addEventListener("click", () => void openUsage(usage));
+		}
+
+		/* Plan status line, right under the composer: always visible, no click.
+		   Only for a provider that publishes a plan, on a host that can read it. */
+		planLine?.destroy();
+		planLine = null;
+		const planTool = settings().aiProvider === "claude-code" ? "claude" : settings().aiProvider === "codex" ? "codex" : null;
+		const readPlan = host.process?.usageCompte;
+		if (planTool && readPlan) {
+			const slot = ajouter(formCol, "div", "qbd-ai-usage-slot");
+			composer.after(slot);
+			planLine = mountUsageLine(slot, planTool, (tool) => readPlan.call(host.process, tool));
 		}
 
 		// Groupe droite : logo fournisseur, sélecteur modèle + effort, puis

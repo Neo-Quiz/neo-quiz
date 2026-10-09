@@ -66,6 +66,10 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.usage.windowHours": "{n} h",
 	"ai.usage.windowDays": "{n} j",
 	"ai.usage.windowPlan": "Forfait",
+	"ai.usage.shortHours": "{n}h",
+	"ai.usage.shortDays": "{n}j",
+	"ai.usage.linePercent": "{n} %",
+	"ai.usage.lineLabel": "Usage du forfait",
 
 	/* ── Options de génération ── */
 	"ai.type.mixed": "Auto",
