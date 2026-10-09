@@ -11,7 +11,7 @@ import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { chatDevice } from "./chat-session";
 import { getDevices, getOwnDeviceName } from "./remote-generations";
-import { ROLE_ICON, deviceLabel, resolveDevice } from "../shared-state/request-origin";
+import { ROLE_ICON, deviceLabel, originLineNeeded, resolveDevice } from "../shared-state/request-origin";
 import type { DeviceRef, DeviceWords, OriginContext, RequestStatus } from "../shared-state/request-origin";
 
 export function originContext(): OriginContext {
@@ -45,6 +45,7 @@ function segment(parent: HTMLElement, d: DeviceRef, text: string): void {
 
 /** "Sent from A · Run on B" under the message, with the icon of each kind of device. One device that sent and ran it: one segment. */
 export function peindreOrigine(parent: HTMLElement, sender: DeviceRef, runner: DeviceRef): void {
+	if (!originLineNeeded(sender, runner)) return;
 	const ligne = ajouter(parent, "div", "qbd-ai-origine");
 	if (sender.id.toLowerCase() === runner.id.toLowerCase()) {
 		segment(ligne, runner, t("ai.origin.sameDevice", { device: labelOf(runner) }));
