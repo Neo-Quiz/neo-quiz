@@ -1,8 +1,8 @@
 {
-  "versionCode": 20,
-  "versionName": "0.2.18",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.18/NeoQuiz-0.2.18.apk",
-  "sha256": "f03f3766201ad5486f942f44ec25032e4168af401fe2678a25baf42aa802bfa7",
-  "size": 55994657,
-  "notes": "Explain on every answered question, Resume with progress, plan usage under the composer"
+  "versionCode": 21,
+  "versionName": "0.2.19",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.19/NeoQuiz-0.2.19.apk",
+  "sha256": "2b4a26ef0b9cc51a95d882455a2271fe3cfccb8dabeed5ff6d4c4d5b1207b240",
+  "size": 55998449,
+  "notes": "Explain on reading cards, with rewrite on request"
 }
