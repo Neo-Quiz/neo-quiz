@@ -20,6 +20,7 @@ release notes.
 ### Changed
 
 - The Explain window answers like a tutor: it spots the likely reasoning error behind a wrong answer, explains step by step, says why each wrong option is wrong, cites the course with its page, shows the course picture it refers to (click to enlarge), and ends with a short check question. It knows how often you missed the question, and its answers are no longer cut at 1500 characters. The plan usage line replaces the gauge button under its composer, as on the Generate page.
+- Readings no longer start with a giant drop cap letter.
 
 ### Fixed
 
