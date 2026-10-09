@@ -323,6 +323,10 @@ await withSrcModule(["src/question-edit.ts", "src/explain-prompt.ts"], ({ valida
 			!!juge(trous, { cloze: "Use {{extend}} then {{len}}." }).answerChange, !!juge(trous, { cloze: "First {{push|append}}, then {{len}}." }).answerChange,
 			!!juge(classement, { correctOrder: [0, 1, 2] }).answerChange, !!juge(paires, { correctMap: [2, 0] }).answerChange, !!juge(carte, { answer: "other" }).answerChange],
 		[true, true, false, true, false, true, true, true]);
+	r.check("options that MOVE or change in number are said so; a reworded option in place or a new statement is not",
+		[juge(single, { options: ["3", "3.5", "4"], correctIndex: 0 }).reordered, juge(single, { options: ["3.5", "3", "4", "5"] }).reordered, juge(classement, { possibilities: ["b", "a", "c"], correctOrder: [2, 1, 0] }).reordered,
+			juge(single, { options: ["3.5", "3 (floor)", "4"] }).reordered, juge(single, { prompt: "New?" }).reordered],
+		[true, true, true, false, false]);
 	r.check("the answer indices never show as a raw row, the options are lettered",
 		juge(single, { options: ["3.5", "3", "4", "5"], correctIndex: 1 }).rows, [{ field: "options", before: "A. 3.5\nB. 3\nC. 4", after: "A. 3.5\nB. 3\nC. 4\nD. 5" }]);
 

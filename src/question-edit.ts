@@ -52,7 +52,9 @@ export interface QuestionEditRow { field: string; before: string; after: string 
 export interface AnswerChange { from: string; to: string }
 
 export type QuestionEditResult =
-	| { ok: true; fields: Q; rows: QuestionEditRow[]; answerChange: AnswerChange | null }
+	/** `reordered`: options (or items, rows, choices) moved or changed in
+	    number; the learner's stored answer to it no longer means anything. */
+	| { ok: true; fields: Q; rows: QuestionEditRow[]; answerChange: AnswerChange | null; reordered: boolean }
 	| { ok: false; reason: QuestionEditRefusal };
 
 /** Keys that decide WHAT a question is: proposing one is changing its kind. */
@@ -372,7 +374,23 @@ export function validateQuestionEdit(original: Q, raw: string, sanitizeHtml: (ht
 	const answerChange = answerChanged(kind, original, after)
 		? { from: reponseAttendue(original, o), to: reponseAttendue(after, o) }
 		: null;
-	return { ok: true, fields: verdict.fields, rows, answerChange };
+	return { ok: true, fields: verdict.fields, rows, answerChange, reordered: itemsMoved(original, verdict.fields) };
+}
+
+/** The lists whose INDICES a learner's answer is stored by (session.ts:
+    options by their original index, items, rows, choices). */
+const INDEXED_LISTS = ["options", "optionHtml", "possibilities", "rows", "choices"];
+
+/** Does a list an answer points into change its order or its length? Then
+    the stored answer points at other texts: it must be dropped, not judged.
+    A reworded item in place does not count. */
+export function itemsMoved(original: Q, fields: Q): boolean {
+	return INDEXED_LISTS.some(k => {
+		if (!isArr(fields[k]) || !isArr(original[k])) return false;
+		const a = (original[k] as unknown[]).map(x => norm(k.endsWith("Html") ? htmlEnTexte(x) : x));
+		const b = (fields[k] as unknown[]).map(x => norm(k.endsWith("Html") ? htmlEnTexte(x) : x));
+		return a.length !== b.length || b.some((x, i) => x !== a[i] && a.includes(x));
+	});
 }
 
 /**

@@ -249,7 +249,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	    returns its questions again. Absent: neither a reading nor a question
 	    can be rewritten. `aReviser`: the right answer of question `qi`
 	    changed; `garderEcran`: a handed-in quiz keeps its screen. */
-	recharger?: (note: string, qi: number, opts?: { aReviser?: boolean; garderEcran?: boolean }) => Promise<Record<string, unknown>[]>;
+	recharger?: (note: string, qi: number, opts?: { aReviser?: boolean; oublierReponse?: boolean; garderEcran?: boolean }) => Promise<Record<string, unknown>[]>;
 	/** The learner's attempts and misses on question `qi`, from the review journal (read only). */
 	historique?: (qi: number) => { attempts: number; misses: number } | null;
 }): () => void {
@@ -673,12 +673,16 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 				   learner's answer is judged again (`aReviser`). A handed-in quiz
 				   keeps its results on screen: only the note changes. */
 				const verrouille = (): boolean => !conv.lecture && hote.classList.contains("quiz-is-locked");
-				const relire = async (aReviser: boolean): Promise<void> => {
+				const relire = async (edit: CardProposal): Promise<void> => {
 					note = await host.fs.read(deps.chemin);
 					conv.perime = true;
-					if (deps.recharger) questions = await deps.recharger(note, qi, { aReviser, garderEcran: verrouille() });
+					/* Options that MOVED: the stored answer points at other texts, it is
+					   dropped (`oublierReponse`); a new right answer: it is judged again. */
+					const deplacees = optionsDeplacees(edit);
+					if (deps.recharger) questions = await deps.recharger(note, qi, { aReviser: changeLaReponse(edit) || deplacees, oublierReponse: deplacees, garderEcran: verrouille() });
 				};
 				const changeLaReponse = (edit: CardProposal): boolean => edit.verdict.ok && "rows" in edit.verdict && edit.verdict.answerChange !== null;
+				const optionsDeplacees = (edit: CardProposal): boolean => edit.verdict.ok && "rows" in edit.verdict && edit.verdict.reordered;
 				const echec = (res: BlockRewrite): string => t(res.ok ? "ai.explain.cardApplied" : res.reason === "stale" ? "ai.explain.cardStale" : "ai.explain.cardFailed");
 				const appliquer = async (edit: CardProposal): Promise<void> => {
 					if (edit.occupe || edit.etat !== "pending" || !edit.verdict.ok) return;
@@ -695,8 +699,8 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						edit.avant = bloc;
 						edit.apres = res.block;
 						edit.etat = "applied";
-						edit.message = t(!question ? "ai.explain.cardApplied" : verrouille() ? "ai.explain.question.appliedKept" : changeLaReponse(edit) ? "ai.explain.question.reviewed" : "ai.explain.question.applied");
-						await relire(changeLaReponse(edit));
+						edit.message = t(!question ? "ai.explain.cardApplied" : verrouille() ? "ai.explain.question.appliedKept" : optionsDeplacees(edit) ? "ai.explain.question.reordered" : changeLaReponse(edit) ? "ai.explain.question.reviewed" : "ai.explain.question.applied");
+						await relire(edit);
 					} catch (e) {
 						console.warn(`${LOG_PREFIX} Explain: card edit failed:`, e);
 						if (edit.etat !== "applied") edit.message = t("ai.explain.cardFailed");
@@ -715,7 +719,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						if (!res.ok) { edit.message = echec(res); return; }
 						edit.etat = "pending";
 						edit.message = t("ai.explain.cardUndone");
-						await relire(changeLaReponse(edit));
+						await relire(edit);
 					} catch (e) {
 						console.warn(`${LOG_PREFIX} Explain: card undo failed:`, e);
 						edit.message = t("ai.explain.cardFailed");

@@ -281,7 +281,7 @@ export async function openQuizPage(
 	   judged again (`marquerARevoir`). `garderEcran`: a handed-in Test keeps
 	   its results on screen (re-rendering would start a new attempt); only the
 	   questions the chat sees are read again. */
-	const recharger = async (nouvelle: string, qi: number, opts: { aReviser?: boolean; garderEcran?: boolean } = {}): Promise<Record<string, unknown>[]> => {
+	const recharger = async (nouvelle: string, qi: number, opts: { aReviser?: boolean; oublierReponse?: boolean; garderEcran?: boolean } = {}): Promise<Record<string, unknown>[]> => {
 		const m = nouvelle.match(QUIZ_BLOCK_RE);
 		if (!m) throw new Error("no quiz block");
 		const quiz = parseQuizSource(m[1]);
@@ -297,7 +297,7 @@ export async function openQuizPage(
 		hote.replaceChildren();
 		const puits = sessions?.puits(entry.path);
 		const lue = sessions?.lire(entry.path) ?? null;
-		const gardee = lue && id && opts.aReviser ? marquerARevoir(lue, id) : lue;
+		const gardee = lue && id && opts.aReviser ? marquerARevoir(lue, id, opts.oublierReponse) : lue;
 		const initiale: SessionQuiz = { ...(gardee ?? { v: 1, questions: {} }), v: 1, courante: id, ecrite: Date.now() } as SessionQuiz;
 		await renderInteractiveQuiz({
 			container: hote,

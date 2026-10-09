@@ -548,6 +548,7 @@ export const EN_AI = {
 	"ai.explain.question.applied": "Question updated.",
 	"ai.explain.question.appliedKept": "Question updated in the note. Your handed-in results stay as they are; the new version shows at the next attempt.",
 	"ai.explain.question.reviewed": "Question updated. Its right answer changed: your answer to it is judged again, and the question is marked to review.",
+	"ai.explain.question.reordered": "Question updated. Its options moved: your answer to it is cleared, and the question is marked to review.",
 	"ai.explain.question.answerChange": "The right answer changes:",
 	"ai.explain.question.becomes": "becomes",
 	"ai.explain.question.before": "Before",

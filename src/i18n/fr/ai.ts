@@ -503,6 +503,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.explain.question.applied": "Question mise à jour.",
 	"ai.explain.question.appliedKept": "Question mise à jour dans la note. Tes résultats rendus restent tels quels ; la nouvelle version s'affiche à la prochaine tentative.",
 	"ai.explain.question.reviewed": "Question mise à jour. Sa bonne réponse a changé : ta réponse est rejugée, et la question est marquée à revoir.",
+	"ai.explain.question.reordered": "Question mise à jour. Ses options ont changé de place : ta réponse est effacée, et la question est marquée à revoir.",
 	"ai.explain.question.answerChange": "La bonne réponse change :",
 	"ai.explain.question.becomes": "devient",
 	"ai.explain.question.before": "Avant",

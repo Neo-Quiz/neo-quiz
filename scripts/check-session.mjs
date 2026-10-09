@@ -243,6 +243,10 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, marque
 	const texte = restaurer(marquerARevoir(photo, "c"), ids, base);
 	r.check("a written answer keeps its text, its check and rating are withdrawn, no verdict invented",
 		[texte.textOnlyAnswers[2], texte.textOnlyChecked[2], texte.textOnlyRatings[2], texte.learnVerdicts[2], texte.learnQueue.length], ["str", false, null, "none", 1]);
+	const oubliee = marquerARevoir(photo, "a", true);
+	const backO = restaurer(JSON.parse(JSON.stringify(oubliee)), ids, base);
+	r.check("options that moved: the answer and its shuffle are dropped, the question still marked to review",
+		[oubliee.questions.a.selection, oubliee.questions.a.melange, backO.selections[0], backO.learnVerdicts[0], backO.recorded[0]], [undefined, undefined, null, "missed", true]);
 	r.check("a question without state, or unknown, leaves the snapshot as it was", [marquerARevoir(photo, "zz"), photo.questions.a.verdict], [photo, "first"]);
 	r.done();
 });
