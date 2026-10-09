@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.68] - 2026-10-09
+
 ### Added
 
 - Claude Code can now read and search the files of a quiz's folder itself, with read-only tools, once you trust that folder: Neo Quiz asks the first time, every file it reads or search it runs shows in a folded "AI work" block (refused steps included), and Settings › AI lists the trusted folders with Remove.
