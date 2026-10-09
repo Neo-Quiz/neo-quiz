@@ -498,6 +498,15 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
 				vu, { nom: "image-1.png", contenu: "OCTETS-IMAGE", stdin: true });
 		});
 
+		await cas(r, "the attachments-folder token is the folder that holds the attachments", async () => {
+			let vu = null;
+			await avecFichiers({ ...specImage, args: ["--add-dir", jeton(MARQ, "pieces"), "-i", jeton(MARQ, "fichier:1")] }, async resolu => {
+				vu = { meme: resolu.args[3].startsWith(resolu.args[1]) && resolu.args[3].length > resolu.args[1].length, existe: existsSync(resolu.args[1]) };
+				return null;
+			}, envMaisonSeule);
+			r.check("the attachments-folder token is the folder that holds the attachments", vu, { meme: true, existe: true });
+		});
+
 		await cas(r, "le jeton du dossier personnel rend le dossier personnel DONNÉ, pas celui de la machine", async () => {
 			/* `USERPROFILE`/`HOME` sont des paramètres exprès : `homedir()` ne
 			   suit pas `HOME` sous Windows, et un cas qui ne peut pas fabriquer
@@ -918,7 +927,7 @@ await withSrcModule("apps/windows/electron/process.ts", async ({
  * même sujet se lancent moins souvent qu'une.
  */
 await withSrcModule("src/host/jetons.ts", async ({
-	jetonFichier, jetonHome, jetonSortie, nomDeFichierSur, nouveauMarqueur, substituerJetons,
+	jetonFichier, jetonHome, jetonPieces, jetonSortie, nomDeFichierSur, nouveauMarqueur, substituerJetons,
 }) => {
 	const r = makeReporter("Jetons de pièces jointes (code partagé)");
 	const MARQ = "0123456789abcdef0123456789abcdef";
@@ -968,6 +977,14 @@ await withSrcModule("src/host/jetons.ts", async ({
 			marqueurInvalide: nomDuJet(() => substituerJetons("x", { ...valeurs, marqueur: "PAS.HEXA*" })),
 		},
 		{ indexHorsBornes: "refuse", sortieAbsente: "refuse", maisonAbsente: "refuse", marqueurInvalide: "refuse" });
+
+	/* THE ATTACHMENTS FOLDER (2026-10-09): `--add-dir` of Claude Code with
+	   read-only tools names it, and it names a folder only when the call has
+	   attachments — never the home folder or a chosen path in its place. */
+	r.check("the attachments-folder token names the temporary folder, and refuses when there is none",
+		[jetonPieces(MARQ), substituerJetons(jetonPieces(MARQ), { ...valeurs, pieces: "/tmp/x" }),
+			nomDuJet(() => substituerJetons(jetonPieces(MARQ), valeurs)), nomDuJet(() => substituerJetons(jetonPieces(MARQ), { ...valeurs, pieces: "" }))],
+		["{{nq-" + MARQ + ":pieces}}", "/tmp/x", "refuse", "refuse"]);
 
 	/* REMPLACEMENT PAR FONCTION, jamais par chaîne : un chemin qui contient
 	   `$&` ou `$1` serait réécrit par `String.replace`. Le dépôt a déjà payé ce
@@ -1028,7 +1045,7 @@ await withSrcModule("src/host/jetons.ts", async ({
  * juste après : le cas recevrait la réponse du vrai CLI au lieu de celle du
  * faux (défaut vécu, ronde 2 de la tâche 4).
  */
-await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle, resoudreExecutable, run, tuerArbre }) => {
+await withSrcModule(["apps/windows/electron/process.ts", "src/host/claude-outils.ts"], async ({ ollamaInstalle, resoudreExecutable, run, tuerArbre }, { ARGS_IMAGES_CLAUDE }) => {
 	const r = makeReporter("Électron — lancer un CLI");
 	const racine = mkdtempSync(join(tmpdir(), "quiz-lancer-"));
 	const maison = join(racine, "maison");
@@ -1416,6 +1433,21 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle,
 				{ code: res.code, vivant: true }, { code: 2, vivant: true });
 		});
 
+		await cas(r, "the pictures-only Claude form runs IN the attachments folder, never the home folder, and needs a picture", async () => {
+			/* 2026-10-09: its `Read(./**)` and `--restricted` are relative to the
+			   working directory. Run in the home folder (as before), a Read of
+			   any file there was one prompt injection away. */
+			const faux = poserFauxCli("claude", "process.stdout.write(process.cwd() + '|' + require('fs').readdirSync('.').join(','));");
+			const marq = "0123456789abcdef0123456789abcdef";
+			const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_IMAGES_CLAUDE];
+			const res = await run({ tool: "claude", args, stdin: "", marqueur: marq, fichiers: [{ nom: "photo.png", base64: "AAAA" }] }, { env: envDe(faux.dossier) });
+			const [cwd, contenu] = res.stdout.split("|");
+			const sansImage = await nomDuRejet(run({ tool: "claude", args, stdin: "", marqueur: marq }, { env: envDe(faux.dossier) }));
+			r.check("the pictures-only Claude form runs IN the attachments folder, never the home folder, and needs a picture",
+				{ dossierTemporaire: /neo-quiz-cli-/.test(cwd ?? ""), pasLaMaison: cwd !== envDe(faux.dossier).USERPROFILE, contenu, sansImage },
+				{ dossierTemporaire: true, pasLaMaison: true, contenu: "photo.png", sansImage: "refuse" });
+		});
+
 		await cas(r, "ollamaInstalle cherche ollama dans le PATH étendu, comme run", async () => {
 			/* Revue finale, I2. La première écriture faisait un `spawn("ollama")`
 			   nu sur le `PATH` donné : un Ollama installé par npm ou à un
@@ -1571,6 +1603,21 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle,
 			plusDeLectureDeReglage: !source.includes("cheminCliRegle("),
 		},
 		{ pasDeCheminRecu: true, pasDOptionChemin: true, plusDeLectureDeReglage: true });
+	/* THE WORKING FOLDER (2026-10-09): `cwd` reaches `run` only from the
+	   main process's own judgment of the folder (`dossierOutilsJuge`), and
+	   only for the read-only tools form; the folder the window sent is never
+	   passed on as such. */
+	const formeOutils = corps ? corps.indexOf("argumentsAvecOutils(") : -1;
+	const juge = corps ? corps.indexOf("dossierOutilsJuge(s.dossier)") : -1;
+	r.check("the working folder of a run comes only from the main process's judgment, for the tools form, before the launch",
+		{
+			formeAvantJuge: formeOutils >= 0 && juge > formeOutils,
+			jugeAvantLancement: juge >= 0 && lancement > juge,
+			cwdDuJuge: corps !== null && /cwd = await dossierOutilsJuge\(s\.dossier\);/.test(corps),
+			jamaisLeDossierRecu: corps !== null && !/cwd\s*:\s*s\.dossier/.test(corps) && !/cwd = s\.dossier/.test(corps),
+			reglageReserve: /String\(cle\) === CLE_CONFIANCE_IA\) throw/.test(source) && (source.match(/CLE_CONFIANCE_IA\) throw/g) || []).length === 2,
+		},
+		{ formeAvantJuge: true, jugeAvantLancement: true, cwdDuJuge: true, jamaisLeDossierRecu: true, reglageReserve: true });
 	r.done();
 }
 

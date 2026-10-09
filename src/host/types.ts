@@ -582,7 +582,26 @@ export interface HostProcess {
 		    the SAME run (its output replayed, then its result) instead of a
 		    new one. A host that cannot keep a run alive ignores it. */
 		reprise?: string;
+		/** THE FOLDER the CLI works in (2026-10-09), a CONTRACT path: only
+		    the read-only tools form of Claude Code sends one, after
+		    `trustFolder` said `trusted`. The host passes it on as a disk
+		    path (the Windows host converts it before the bridge) and runs the
+		    CLI there only if the folder is still trusted and opened; any
+		    other call runs in the home folder, as before. */
+		dossier?: string;
 	}): Promise<{ stdout: string; stderr: string; code: number | null; sortie?: string }>;
+	/** May Claude Code work INSIDE this folder (a CONTRACT path), with
+	    read-only tools (2026-10-09)? A folder already trusted answers at
+	    once; otherwise the HOST asks the user in a native dialog of its own,
+	    which the page can neither word nor answer. `trusted`: run with tools
+	    in that folder; `refused` or `unavailable` (not an opened folder, or a
+	    host that has no such dialog): run without any tool, as before.
+	    Optional: a host without it never runs a CLI with tools. */
+	trustFolder?(dossier: string): Promise<"trusted" | "refused" | "unavailable">;
+	/** The trusted folders, as disk paths to show (Settings › AI). */
+	trustedFolders?(): Promise<string[]>;
+	/** Takes one of `trustedFolders` off the list. */
+	untrustFolder?(dossier: string): Promise<void>;
 	/** Le fichier de cache/config du CLI, à un chemin FIXE tenu par l'hôte
 	    (Codex : `$CODEX_HOME` ou `~/.codex/models_cache.json` ; Claude :
 	    `~/.claude.json`), HORS de toute racine — c'est pourquoi `HostFs` ne

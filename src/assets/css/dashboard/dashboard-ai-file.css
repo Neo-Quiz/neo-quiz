@@ -625,6 +625,31 @@
 	padding: 1px 0;
 }
 
+/* The AI's work, as a terminal shows it: `Read(cours/ch1.md)` then, under
+   it, `└ 120 lines`. A refused step is in the warning colour, an error in
+   the error colour: what the AI could not do is as visible as what it did. */
+.qbd-ai-transcript-detail .qbd-ai-transcript-etape {
+	font-family: var(--font-monospace);
+	font-size: 12.5px;
+	line-height: 1.45;
+	padding: 2px 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.qbd-ai-transcript-etape-appel { color: var(--text-normal); }
+.qbd-ai-transcript-etape-nom { font-weight: 600; }
+.qbd-ai-transcript-etape-resultat {
+	color: var(--text-muted);
+	padding-left: 2ch;
+}
+.qbd-ai-transcript-etape[data-statut="refused"] .qbd-ai-transcript-etape-appel,
+.qbd-ai-transcript-etape[data-statut="refused"] .qbd-ai-transcript-etape-resultat {
+	color: var(--text-warning, var(--color-orange, #fb923c));
+}
+.qbd-ai-transcript-etape[data-statut="error"] .qbd-ai-transcript-etape-resultat {
+	color: var(--text-error);
+}
+
 /* "Scroll to the latest message": a round button that floats above the
    composer, centred over the thread. Rest face = three dots (the typing
    indicator animates only while a generation runs); hover or focus = arrow. */

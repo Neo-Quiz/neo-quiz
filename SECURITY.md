@@ -19,5 +19,8 @@ Only the latest release receives fixes; the desktop app updates itself.
   Any way for the app window to read, write or open a file outside them is a
   vulnerability.
 - **AI generation runs the CLIs you installed** (Claude Code, Codex, Ollama)
-  without any tool: the model cannot open files or run commands. Any way to
-  make it do so is a vulnerability.
+  without any tool: the model cannot open files or run commands. The one
+  exception is Claude Code in a folder you trusted in the app's native
+  dialog: it may read and search the files of that folder and its
+  sub-folders, and nothing else. Any way to make a model run a command,
+  write a file, or read outside a trusted folder is a vulnerability.

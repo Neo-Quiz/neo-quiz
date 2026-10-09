@@ -41,7 +41,7 @@ import type { TransKey } from "../i18n";
 import { currentLang, t } from "../i18n";
 import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
-import type { Transcript } from "./transcript";
+import type { ToolStep, Transcript } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { mathifyElement } from "../engine/mathjax";
@@ -476,13 +476,17 @@ export function creerVueFile(opts: {
 				});
 			}
 			if (tr.tools.length) {
+				/* THE AI'S WORK (2026-10-09): every tool call as a terminal shows
+				   it, `Read(path)` then `└ 120 lines`, folded by default; the
+				   refused ones in the warning colour. Text only (`textContent`
+				   through `ajouter`): a path or an error is never HTML here. */
+				const etapes = tr.tools.length + tr.toolsHidden;
+				const refusees = tr.tools.filter(s => s.status === "refused").length;
+				const libelle = t(etapes === 1 ? "ai.transcript.workOne" : "ai.transcript.workOther", { count: etapes })
+					+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
 				specs.push({
-					cle: "tools", icone: "wrench", libelle: t(tr.tools.length === 1 ? "ai.transcript.toolsOne" : "ai.transcript.toolsOther", { count: tr.tools.length }), ouvertParDefaut: false,
-					detail: corps => {
-						if (corps.childElementCount === tr.tools.length) return;
-						corps.replaceChildren();
-						for (const nom of tr.tools) ajouter(corps, "div", "qbd-ai-transcript-outil", nom);
-					},
+					cle: "tools", icone: "terminal", libelle, ouvertParDefaut: false,
+					detail: corps => peindreEtapes(corps, tr),
 				});
 			}
 			if (ecrit) {
@@ -561,6 +565,50 @@ export function creerVueFile(opts: {
 				rang++;
 			}
 		}
+	}
+
+	/** The result line under a step: `└ 120 lines`, `└ Refused: …`. */
+	function resultatEtape(s: ToolStep): string {
+		if (s.status === "running") return t("ai.transcript.stepRunning");
+		if (s.status === "refused") return s.detail ? t("ai.transcript.stepRefused", { detail: s.detail }) : t("ai.transcript.stepRefusedBare");
+		if (s.status === "error") return s.detail ? t("ai.transcript.stepError", { detail: s.detail }) : t("ai.transcript.stepErrorBare");
+		if (s.unit === "image") return t("ai.transcript.stepImage");
+		const n = s.count ?? 0;
+		if (s.unit === "files") return t(n === 1 ? "ai.transcript.stepFilesOne" : "ai.transcript.stepFilesOther", { count: n });
+		return t(n === 1 ? "ai.transcript.stepLinesOne" : "ai.transcript.stepLinesOther", { count: n });
+	}
+
+	/** Paints the steps IN PLACE: a chunk only changes the lines that moved. */
+	function peindreEtapes(corps: HTMLElement, tr: Transcript): void {
+		tr.tools.forEach((s, i) => {
+			let el = corps.children[i] as HTMLElement | undefined;
+			if (!el || !el.classList.contains("qbd-ai-transcript-etape")) {
+				el = document.createElement("div");
+				el.className = "qbd-ai-transcript-etape";
+				const appel = ajouter(el, "div", "qbd-ai-transcript-etape-appel");
+				ajouter(appel, "span", "qbd-ai-transcript-etape-nom");
+				ajouter(appel, "span", "qbd-ai-transcript-etape-entree");
+				ajouter(el, "div", "qbd-ai-transcript-etape-resultat");
+				corps.insertBefore(el, corps.children[i] ?? null);
+			}
+			if (el.dataset.statut !== s.status) el.dataset.statut = s.status;
+			const nom = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-nom");
+			const entree = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-entree");
+			const res = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-resultat");
+			if (nom && nom.textContent !== s.name) nom.textContent = s.name;
+			const e = "(" + s.input + ")";
+			if (entree && entree.textContent !== e) entree.textContent = e;
+			const r = "└ " + resultatEtape(s);
+			if (res && res.textContent !== r) res.textContent = r;
+		});
+		// The steps past the cap: one line that says how many.
+		let fin = corps.children[tr.tools.length] as HTMLElement | undefined;
+		if (tr.toolsHidden > 0) {
+			if (!fin) fin = ajouter(corps, "div", "qbd-ai-transcript-outil");
+			const v = t("ai.transcript.stepsHidden", { count: tr.toolsHidden });
+			if (fin.textContent !== v) fin.textContent = v;
+		}
+		while (corps.children.length > tr.tools.length + (tr.toolsHidden > 0 ? 1 : 0)) corps.lastElementChild?.remove();
 	}
 
 	function peindreTranscript(parent: HTMLElement, l: LigneGeneration): void {

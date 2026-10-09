@@ -74,7 +74,10 @@ export type RequeteReseau = Omit<HostNetRequest, "signal">;
 /** Un appel de CLI tel qu'il TRAVERSE le pont : la spec de `HostProcess.run`
     sans son `signal`, pour exactement la même raison que `RequeteReseau`.
     DÉRIVÉE du contrat, jamais recopiée : un champ ajouté là-bas (les pièces
-    jointes de la tâche 4 en sont un) doit faire rougir la compilation ici. */
+    jointes de la tâche 4 en sont un) doit faire rougir la compilation ici.
+    One field changes meaning on the way: `dossier` is a contract path in
+    the shared code and an ABSOLUTE path here (the renderer host converts
+    it), judged again by the main process (`canaux.ts`). */
 export type RequeteCli = Omit<Parameters<HostProcess["run"]>[0], "signal">;
 
 /**
@@ -831,6 +834,18 @@ export interface Pont {
 		    at the end, sent to the window that asked and to no other. */
 		run(spec: RequeteCli, requeteId: number, flux?: boolean): Promise<ResultatCli>;
 		annuler(requeteId: number): Promise<void>;
+		/** ASKS the main process whether Claude Code may work in this folder
+		    (absolute path) with read-only tools (2026-10-09). The main process
+		    answers at once for a folder already trusted; otherwise it shows
+		    ITS native dialog, and only the user's click there trusts the
+		    folder. The window never answers: it only gets the verdict.
+		    `indisponible`: the folder is not a folder inside the perimeter. */
+		confiance(dossier: string): Promise<"approuve" | "refuse" | "indisponible">;
+		/** The trusted folders, as shown in the dialog (Settings › AI). */
+		confianceListe(): Promise<string[]>;
+		/** Takes a folder off the trusted list: it only REMOVES a capability,
+		    so no confirmation is asked. */
+		confianceRetirer(dossier: string): Promise<void>;
 		lireCache(tool: "claude" | "codex"): Promise<{ mtimeMs: number; json: unknown; catalogue?: unknown } | null>;
 		ollamaInstalle(): Promise<boolean>;
 		demarrerOllama(): Promise<boolean>;
@@ -1162,6 +1177,9 @@ export const CANAUX = {
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
 	processusAnnuler: "neo:process/annuler",
+	processusConfiance: "neo:process/confiance",
+	processusConfianceListe: "neo:process/confiance-liste",
+	processusConfianceRetirer: "neo:process/confiance-retirer",
 	/** PUSHED by the main process: a chunk of the standard output of a run
 	    started with `flux` (live transcript, 2026-09-29). */
 	processusFlux: "neo:process/flux",

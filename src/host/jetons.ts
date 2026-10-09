@@ -79,6 +79,14 @@ export function jetonSortie(marqueur: string): string {
 	return "{{nq-" + marqueur + ":sortie}}";
 }
 
+/** The token of the temporary folder that holds this call's attachments
+    (2026-10-09): Claude Code with tools is confined to its working
+    directory, and `--add-dir <this folder>` lets it read the pictures. It
+    names a folder only when the call has attachments. */
+export function jetonPieces(marqueur: string): string {
+	return "{{nq-" + marqueur + ":pieces}}";
+}
+
 /** Le jeton du dossier personnel. */
 export function jetonHome(marqueur: string): string {
 	return "{{nq-" + marqueur + ":home}}";
@@ -103,6 +111,8 @@ export interface ValeursJetons {
 	sortie: string;
 	/** Le dossier personnel. */
 	maison: string;
+	/** The temporary folder of the attachments; absent or "" when there is none. */
+	pieces?: string;
 }
 
 /**
@@ -121,12 +131,16 @@ export function substituerJetons(texte: string, valeurs: ValeursJetons): string 
 	if (!MARQUEUR_VALIDE.test(valeurs.marqueur)) {
 		throw refus("marqueur de jetons invalide : " + valeurs.marqueur);
 	}
-	const motif = new RegExp("\\{\\{nq-" + valeurs.marqueur + ":(?:fichier:(\\d+)|sortie|home)\\}\\}", "g");
+	const motif = new RegExp("\\{\\{nq-" + valeurs.marqueur + ":(?:fichier:(\\d+)|sortie|home|pieces)\\}\\}", "g");
 	return texte.replace(motif, (jeton: string, index: string | undefined) => {
 		if (index === undefined) {
 			if (jeton.endsWith(":home}}")) {
 				if (!valeurs.maison) throw refus("jeton " + jeton + " : aucun dossier personnel");
 				return valeurs.maison;
+			}
+			if (jeton.endsWith(":pieces}}")) {
+				if (!valeurs.pieces) throw refus("token " + jeton + ": no attachment, so no attachments folder");
+				return valeurs.pieces;
 			}
 			if (!valeurs.sortie) throw refus("jeton " + jeton + " : aucun fichier de sortie demandé");
 			return valeurs.sortie;

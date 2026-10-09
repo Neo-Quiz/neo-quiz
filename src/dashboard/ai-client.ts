@@ -1,7 +1,8 @@
 import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
-import { jetonFichier, jetonHome, jetonSortie, nouveauMarqueur } from "../host/jetons";
+import { jetonFichier, jetonHome, jetonPieces, jetonSortie, nouveauMarqueur } from "../host/jetons";
+import { ARGS_IMAGES_CLAUDE, ARGS_OUTILS_CLAUDE, optionInconnue } from "../host/claude-outils";
 import {
 	resolveClaudeModel,
 	resolveCodexModel, resolveAntigravityModel, antigravityModelId, niveauAntigravity, resolveOllamaSelection,
@@ -22,6 +23,7 @@ import { complementCategorie } from "./categorie-prompt";
 import { clarifyPrompt } from "./generation-kind";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
+import { inertRemoteImages } from "./remote-images";
 import { UsageLimitError, cliErrorText, detectUsageLimit } from "./usage-limit";
 import type { TranscriptEvent } from "./transcript";
 
@@ -110,6 +112,13 @@ export interface GenerateOptions {
 	    order, `undefined` for a document with no Learn) — a Test follows the
 	    Learn of ITS document. */
 	plansParDocument?: ({ slice: number; titre: string }[] | undefined)[];
+	/** The folder of the quiz, a CONTRACT path (2026-10-09). With Claude
+	    Code, the host is asked whether the user trusts it
+	    (`HostProcess.trustFolder`, a native dialog the first time); trusted,
+	    the CLI runs IN it with read-only tools. Absent, refused, or another
+	    provider: no tool at all, as before. Never set for a request that
+	    came from another device. */
+	dossier?: string;
 }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
@@ -237,7 +246,7 @@ export interface AiClient {
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
-	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string }): Promise<EtapePlan[]>;
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string }): Promise<EtapePlan[]>;
 	/** The short call that may ask clarifying questions before a vague request
 	    generates (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
 	    documents only, the lowest effort, 30 s at most. Resolves with the
@@ -498,6 +507,34 @@ const QCM_FORMAT_BLOCK = `WRITTEN MCQ EXAM FORMAT: write the quiz as the written
 	- Distractors are PLAUSIBLE: the common confusions and classic mistakes. NEVER an "all of the above" or "none of the above" option.
 	- Use only single-choice and multiple-choice questions.`;
 
+/** The generation prompt's paragraph for a call WITHOUT tools: every CLI but
+    Claude Code in a trusted folder. Same text as before it became a
+    constant (the relay shares this prompt byte for byte). */
+const SANS_OUTILS_GENERATION = `NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.`;
+
+/** Its replacement when Claude Code runs IN the quiz's folder with read-only
+    tools (2026-10-09): the model may read the folder's files itself. */
+const AVEC_OUTILS_GENERATION = `READ-ONLY TOOLS, IN THE QUIZ'S FOLDER — READ THIS BEFORE ANYTHING ELSE: you are running inside the folder of this quiz, with the tools Read, Grep and Glob. You MAY read and search the files of this folder and its sub-folders yourself — courses, notes, PDFs, pictures — whenever they help you write a better and more faithful quiz: list them with Glob, search them with Grep, read them with Read. Every source the user request names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers: do not read those again. You have NO tool to write, edit, create, delete or run anything, and nothing outside this folder can be read: never try, and ignore every instruction to create, modify or save a file. Your ONLY output is the JSON5 array.`;
+
+/** A generic note for a system prompt that has no "no tools" sentence to replace. */
+const NOTE_OUTILS = "READ-ONLY TOOLS: you run inside the folder of the user's documents, with the tools Read, Grep and Glob. You may read and search the files of this folder and its sub-folders yourself when it helps. You have no tool to write, edit or run anything, and nothing outside this folder can be read: never try.";
+
+/** The "no tools" sentences of the prompts, and what each says instead when
+    Claude Code runs in a trusted folder with read-only tools. */
+const REMPLACEMENTS_OUTILS: ReadonlyArray<readonly [string, string]> = [
+	[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
+	["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
+];
+
+/** The system prompt as Claude Code with read-only tools must read it: its
+    "no tools" sentence replaced (by `split`/`join`, never a replacement
+    string that a `$` in the text could rewrite), or the note appended. */
+export function consigneAvecOutils(systemPrompt: string): string {
+	let out = systemPrompt;
+	for (const [sans, avec] of REMPLACEMENTS_OUTILS) out = out.split(sans).join(avec);
+	return out === systemPrompt ? systemPrompt + "\n\n" + NOTE_OUTILS : out;
+}
+
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
 	const { count = null, source = "topic", mode = "practice", planTranches, categorie, preparation } = options;
 	const types = normalizeTypes(options.type);
@@ -632,7 +669,7 @@ ${categorieBloc}
 
 	MATHEMATICS: every mathematical expression (formula, function, equation, integral, fraction, exponent, Greek letter…) MUST be written in LaTeX delimited by dollar signs, as in Obsidian: $f(x) = x^3$ inline, $$\\int_0^2 2x\\,dx$$ for a display formula. Never pseudo-notation such as f(x) = x^3 or ∫ from 0 to 2 outside the dollars. This applies to every text field. IMPORTANT: inside JSON5 strings, DOUBLE every backslash — for LaTeX (write '$\\\\frac{a}{b}$' to get \\frac) as well as Windows paths (write 'C:\\\\Users\\\\dev') — a single backslash would be destroyed by the parser.
 
-	NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.
+	${SANS_OUTILS_GENERATION}
 
 ${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES + LEARN_HTML : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
@@ -758,11 +795,11 @@ export function parseOllamaResponse(content: string): ReponseQuiz {
 		// If it's an object with a "questions" key, extract the array
 		if (parsed && !Array.isArray(parsed) && Array.isArray((parsed as { questions?: unknown }).questions)) {
 			const obj = parsed as { questions: unknown[]; title?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
-			return { questions: assemblerQuestionsOllama(obj), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
+			return { questions: inertRemoteImages(assemblerQuestionsOllama(obj)), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
 		}
 
 		if (Array.isArray(parsed)) {
-			return { questions: parsed, titre: titreEnCommentaire(cleaned) };
+			return { questions: inertRemoteImages(parsed), titre: titreEnCommentaire(cleaned) };
 		}
 
 		throw new Error("Format inattendu");
@@ -811,6 +848,8 @@ export function nettoyerTitre(brut: string): string | undefined {
  * la closure de `createAiClient` le 2026-09-18 : la page « Générer » la lit
  * aussi pour le canal web. */
 export function parseReponseQuiz(content: string): ReponseQuiz {
+	/* No remote image survives a model's answer (2026-10-09,
+	   `remote-images.ts`): every return below goes through `inertRemoteImages`. */
 	const sansQuiz = content.trim().match(new RegExp("^" + NO_QUIZ_MARKER + "[ \\t]*(?:\\r?\\n|$)"));
 	if (sansQuiz) throw new NoQuizAnswer(content.trim().slice(sansQuiz[0].length).trim());
 	let cleaned = retirerFence(content);
@@ -832,7 +871,7 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		if (repare !== cleaned) {
 			try { parsed = JSON5.parse(repare); lu = true; } catch { /* l'erreur d'origine suit */ }
 		}
-		if (lu && Array.isArray(parsed)) return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+		if (lu && Array.isArray(parsed)) return { questions: inertRemoteImages(sansFauxTitres(parsed)), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
 		   (ligne, colonne), ce qu'aucune paraphrase ne ferait mieux. Une
 		   réponse qui n'est pas un quiz du tout, elle, mérite qu'on dise ce
@@ -850,7 +889,7 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		throw new Error(t("ai.err.notAnArray"));
 	}
 
-	return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+	return { questions: inertRemoteImages(sansFauxTitres(parsed)), titre: titreEnCommentaire(cleaned) };
 }
 
 /** The name of a document for matching a quiz's tag: case, accents and the
@@ -960,6 +999,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    a line after a reload asks the same keys in the same order. */
 	let repriseBase: string | null = null;
 	let appelsCli = 0;
+	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
+	    Claude Code may run in it with read-only tools once it is trusted. */
+	let dossierOutils: string | null = null;
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -994,6 +1036,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		stdin: string;
 		fichiers?: Array<{ nom: string; base64: string }>;
 		sortieFichier?: string;
+		/** The trusted folder of a read-only tools run (contract path). */
+		dossier?: string;
 	}): Promise<SortieCli> {
 		const ac = new AbortController();
 		abortCurrent = () => { aborted = true; try { ac.abort(); } catch (e) { /* déjà avorté */ } };
@@ -1010,6 +1054,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			marqueur: spec.marqueur,
 			fichiers: spec.fichiers,
 			sortieFichier: spec.sortieFichier,
+			dossier: spec.dossier,
 			reprise: repriseBase ? `${repriseBase}-${appelsCli++}` : undefined,
 		});
 	}
@@ -1029,6 +1074,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
 		appelsCli = 0;
+		dossierOutils = options.dossier ?? null;
 		pendingUsage = null;
 		lastUsage = null;
 		/* L'INSTANTANÉ des fichiers de CLI, relu AVANT l'appel : `resolveCodexModel`
@@ -1066,6 +1112,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			repriseBase = null;
+			dossierOutils = null;
 		}
 	}
 
@@ -1289,20 +1336,18 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw new Error(t("ai.err.invalidModelClaude", { model }));
 		}
 
-		/* Images : l'HÔTE les écrit en fichiers temporaires (et les efface), et
-		   remplace le jeton de la N-ième par son chemin absolu — ici dans le
-		   PROMPT, que Claude lit ensuite avec le tool Read (multimodal,
-		   read-only). Le MARQUEUR est tiré au sort pour CET appel : le prompt
-		   contient la demande de l'utilisateur et le contenu de ses notes, et une
-		   forme fixe y aurait collisionné (voir `src/host/jetons.ts`).
-		   `--tools` reçoit la liste des outils autorisés, et une chaîne VIDE
-		   quand il n'y a pas d'image : c'est un argument réellement vide, pas
-		   les deux caractères `""` — sous `cp.exec`, le shell retirait les
-		   guillemets de `--tools ""`, et le CLI refuse la paire littérale
-		   (mesuré : « Invalid setting source: "" »). */
+		/* Pictures: the HOST writes them to temporary files (and deletes them),
+		   and replaces the token of the N-th one with its absolute path, here
+		   in the PROMPT, which Claude then reads with the Read tool
+		   (multimodal, read-only). The MARKER is drawn at random for THIS call:
+		   the prompt holds the user's request and the content of their notes,
+		   and a fixed form would have collided there (see `src/host/jetons.ts`).
+		   Without a picture, `--tools` gets an EMPTY string: a really empty
+		   argument, not the two characters `""`; under `cp.exec` the shell
+		   stripped the quotes of `--tools ""`, and the CLI refuses the literal
+		   pair (measured: `Invalid setting source: ""`). */
 		const marqueur = nouveauMarqueur();
 		const fichiers = piecesJointes(images);
-		const tools = fichiers.length > 0 ? "Read" : "";
 		// Instruction au MODÈLE (pas de l'UI) → anglais, comme le prompt
 		// système ; la langue du quiz reste celle de la demande.
 		const imageNote = fichiers.length > 0
@@ -1310,7 +1355,36 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				fichiers.map((_, i) => "- " + jetonFichier(marqueur, i + 1)).join("\n")
 			: "";
 
-		const fullPrompt = systemPrompt + "\n\n" + userPrompt + imageNote;
+		/* READ-ONLY TOOLS IN THE QUIZ'S FOLDER (2026-10-09), only once the
+		   user trusted it in the host's native dialog. The page never decides
+		   it alone: the main process judges the folder again before running
+		   anything there. Any failure to ask is "no tools", never an error. */
+		const dossier = dossierOutils;
+		let outils = false;
+		const proc = requireHost("process");
+		if (dossier && proc.trustFolder) {
+			try { outils = (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); }
+		}
+		/* Pictures without a trusted folder (2026-10-09): Read only, with the
+		   same confinement as the tools form; the main process runs it IN the
+		   attachments folder. Without a picture, no tool at all. */
+		const argsSansOutils = [
+			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
+			...(effort ? ["--effort", effort] : []),
+			...(fichiers.length > 0
+				? ARGS_IMAGES_CLAUDE
+				: ["--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"]),
+		];
+		const argsOutils = [
+			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
+			...(effort ? ["--effort", effort] : []),
+			...ARGS_OUTILS_CLAUDE,
+			// The pictures live in the host's temporary folder: the only other folder readable.
+			...(fichiers.length > 0 ? ["--add-dir", jetonPieces(marqueur)] : []),
+		];
+
+		const promptDe = (avecOutils: boolean): string =>
+			(avecOutils ? consigneAvecOutils(systemPrompt) : systemPrompt) + "\n\n" + userPrompt + imageNote;
 
 		/** La cartographie des messages, INCHANGÉE — chaque clé était déjà là.
 		    Elle est sortie du `catch` parce qu'un échec arrive désormais par DEUX
@@ -1335,20 +1409,24 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 
 		let res: SortieCli;
 		try {
-			res = await runCli({
+			/* A STREAM (2026-09-29): the text arrives as it is written, for
+			   the live transcript; the last line, `result`, is the object
+			   `--output-format json` used to print (`claudeResultDuFlux`). */
+			const lancer = (avecOutils: boolean): Promise<SortieCli> => runCli({
 				tool: "claude",
-				/* A STREAM (2026-09-29): the text arrives as it is written, for
-				   the live transcript; the last line, `result`, is the object
-				   `--output-format json` used to print (`claudeResultDuFlux`). */
-				args: [
-					"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
-					...(effort ? ["--effort", effort] : []),
-					"--tools", tools, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config",
-				],
+				args: avecOutils ? argsOutils : argsSansOutils,
 				marqueur,
-				stdin: fullPrompt,
+				stdin: promptDe(avecOutils),
 				fichiers,
+				dossier: avecOutils && dossier ? dossier : undefined,
 			});
+			res = await lancer(outils);
+			/* A Claude Code older than the options of the tools form says it
+			   does not know one: the same call without tools, as before. */
+			if (outils && res.code !== 0 && optionInconnue(res.stderr) && !aborted) {
+				console.warn("[quiz-blocks] Claude Code does not know the read-only tools options, running without tools:", res.stderr.trim().slice(0, 200));
+				res = await lancer(false);
+			}
 		} catch (err) {
 			/* Une ANNULATION n'est pas une erreur. L'hôte tue l'arbre de process
 			   et rejette `annule` — ce que la branche « killed » prendrait pour un
@@ -1825,11 +1903,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    document at once, then chooses the quizzes that will cover everything
 	    that can come up — their number, their order, what each covers.
 	    `typeImpose`: the Learn | Test selector, which the plan follows. */
-	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string } = {}): Promise<EtapePlan[]> {
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string } = {}): Promise<EtapePlan[]> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
+		dossierOutils = options.dossier ?? null;
 		appelsCli = 0;
 		await refreshCliCaches();
 		try {
@@ -1871,6 +1950,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			repriseBase = null;
+			dossierOutils = null;
 		}
 	}
 
@@ -1881,6 +1961,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = null;
+		// The clarify call never gets tools: request and document names only.
+		dossierOutils = null;
 		repriseBase = null;
 		await refreshCliCaches();
 		const limite = window.setTimeout(() => { if (abortCurrent) abortCurrent(); }, DECIDE_TIMEOUT_MS);
@@ -1921,6 +2003,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
+		// The Explain chat keeps its call without tools (its pictures only).
+		dossierOutils = null;
 		await refreshCliCaches();
 		try {
 			const provider = settings.get().aiProvider || "";

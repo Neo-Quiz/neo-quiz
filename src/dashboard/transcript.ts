@@ -36,8 +36,33 @@ export type TranscriptEvent =
 	    documents), in tokens, from the first message's usage. */
 	| { kind: "input"; tokens: number }
 	| { kind: "text"; text: string }
-	| { kind: "tool"; name: string }
+	/** A tool call: begun (`content_block_start`, name only), then its
+	    input known (the whole `assistant` message). Same `id`: one step. */
+	| { kind: "tool"; name: string; id?: string; input?: string }
+	/** What a tool call gave back (`tool_result`), summed up: never the
+	    content itself, only its size, or the first line of an error. */
+	| { kind: "toolResult"; id: string; status: Exclude<ToolStatus, "running">; count?: number; unit?: ToolUnit; detail?: string }
 	| { kind: "done" };
+
+/** Where a tool call stands. `refused`: the CLI denied it (permission rule,
+    outside the folder, a tool it does not have); `error`: it ran and failed. */
+export type ToolStatus = "running" | "ok" | "error" | "refused";
+/** What the size of a result counts. */
+export type ToolUnit = "lines" | "files" | "image";
+
+/** One step of the AI's work, as a terminal shows it: `Read(cours/ch1.md)`
+    then `└ 120 lines`. */
+export interface ToolStep {
+	id: string;
+	name: string;
+	/** The key input, short: the path read, the pattern searched. */
+	input: string;
+	status: ToolStatus;
+	count?: number;
+	unit?: ToolUnit;
+	/** The first line of an error or a refusal. */
+	detail?: string;
+}
 
 /** What a view paints: the reasoning and the answer as written so far, the
     tools called, and whether the CLI has started and finished. */
@@ -53,7 +78,10 @@ export interface Transcript {
 	    estimate the time left from the questions already written. */
 	writingSince?: number;
 	text: string;
-	tools: string[];
+	/** Every tool call, in order (at most `MAX_STEPS`). */
+	tools: ToolStep[];
+	/** Tool calls past `MAX_STEPS`, counted but not kept. */
+	toolsHidden: number;
 	done: boolean;
 }
 
@@ -61,9 +89,17 @@ export interface Transcript {
    stream must not grow the window's memory without end. Past the cap, the
    START is dropped: the end is what is being written. */
 const MAX_CHARS = 200_000;
+/** The steps kept, and the length of what each says (the stream is not trusted). */
+export const MAX_STEPS = 300;
+const MAX_INPUT = 240;
+const MAX_DETAIL = 200;
 
 export function transcriptVide(): Transcript {
-	return { started: false, thinking: "", thinkingTokens: 0, inputTokens: 0, text: "", tools: [], done: false };
+	return { started: false, thinking: "", thinkingTokens: 0, inputTokens: 0, text: "", tools: [], toolsHidden: 0, done: false };
+}
+
+function couper(s: string, max: number): string {
+	return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 function borner(s: string): string {
@@ -96,10 +132,30 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 			if (t.writingSince === undefined && ev.text) t.writingSince = now;
 			t.text = borner(t.text + ev.text);
 			break;
-		case "tool":
+		case "tool": {
 			t.started = true;
-			t.tools.push(ev.name);
+			const deja = ev.id ? t.tools.find(s => s.id === ev.id) : undefined;
+			if (deja) {
+				if (ev.name) deja.name = couper(ev.name, 80);
+				if (ev.input) deja.input = couper(ev.input, MAX_INPUT);
+			} else if (t.tools.length < MAX_STEPS) {
+				t.tools.push({ id: ev.id ?? "", name: couper(ev.name, 80), input: couper(ev.input ?? "", MAX_INPUT), status: "running" });
+			} else {
+				t.toolsHidden++;
+			}
 			break;
+		}
+		case "toolResult": {
+			const s = t.tools.find(x => x.id === ev.id);
+			if (!s) break;
+			// A refusal is never turned back into a plain error by a later event.
+			if (s.status === "refused" && ev.status !== "refused") break;
+			s.status = ev.status;
+			if (ev.count !== undefined) s.count = ev.count;
+			if (ev.unit !== undefined) s.unit = ev.unit;
+			if (ev.detail !== undefined) s.detail = couper(ev.detail, MAX_DETAIL);
+			break;
+		}
 		case "done":
 			t.done = true;
 			break;
@@ -117,10 +173,165 @@ function str(v: unknown): string | null {
 	return typeof v === "string" ? v : null;
 }
 
-function claudeEvents(line: Rec): TranscriptEvent[] {
+/** What the decoder of one run remembers between lines: the CLI's working
+    folder (to show paths relative to it) and the name of each tool call
+    (to say what its result counts). Bounded: the stream is not trusted. */
+interface EtatDecodeur {
+	cwd: string;
+	noms: Map<string, string>;
+}
+
+const sansSeparateurs = (p: string): string => p.replace(/\\/g, "/");
+
+/** `chemin` relative to the CLI's folder when it lies inside it, else as is. */
+function relatif(chemin: string, cwd: string): string {
+	const p = sansSeparateurs(chemin);
+	const base = sansSeparateurs(cwd).replace(/\/+$/, "");
+	if (base && p.toLowerCase().startsWith(base.toLowerCase() + "/")) return p.slice(base.length + 1);
+	if (base && p.toLowerCase() === base.toLowerCase()) return ".";
+	return p;
+}
+
+/** The key input of a tool call, short: what a terminal shows in `Read(…)`. */
+export function resumeEntree(name: string, input: unknown, cwd = ""): string {
+	const e = rec(input);
+	if (!e) return "";
+	const s = (k: string): string | null => str(e[k]);
+	const chemin = (k: string): string | null => { const v = s(k); return v ? relatif(v, cwd) : null; };
+	let out: string;
+	switch (name) {
+		case "Read": case "Write": case "Edit": case "MultiEdit": case "NotebookEdit":
+			out = chemin("file_path") ?? chemin("notebook_path") ?? "";
+			break;
+		case "Glob": case "Grep": {
+			const motif = s("pattern") ?? "";
+			const ou = chemin("path");
+			const filtre = s("glob");
+			out = [motif, filtre ? "glob: " + filtre : "", ou && ou !== "." ? "in " + ou : ""].filter(Boolean).join(", ");
+			break;
+		}
+		case "Bash": case "PowerShell":
+			out = s("command") ?? "";
+			break;
+		case "WebFetch":
+			out = s("url") ?? "";
+			break;
+		case "WebSearch":
+			out = s("query") ?? "";
+			break;
+		default: {
+			const premier = Object.values(e).find(v => typeof v === "string");
+			out = typeof premier === "string" ? premier : "";
+		}
+	}
+	return couper(out.replace(/\s+/g, " ").trim(), MAX_INPUT);
+}
+
+/** The text of a `tool_result`'s content (a string, or text blocks), and
+    whether it holds a picture. */
+function contenuResultat(content: unknown): { texte: string; image: boolean } {
+	if (typeof content === "string") return { texte: content, image: false };
+	if (!Array.isArray(content)) return { texte: "", image: false };
+	let texte = "";
+	let image = false;
+	for (const c of content) {
+		const r = rec(c);
+		if (!r) continue;
+		if (str(r.type) === "image") image = true;
+		const t = str(r.text);
+		if (t && texte.length < 1_000_000) texte += (texte ? "\n" : "") + t;
+	}
+	return { texte, image };
+}
+
+/** A refusal the CLI words in the result itself (measured on Claude Code
+    2.1.296): a permission denied, a path outside the working folders, a
+    tool the session does not have. */
+const REFUS = /permission to use .* (has been )?denied|denied because|is outside .*(working|confines)|--restricted confines|no such tool available|is disabled for this session|not allowed/i;
+
+/** The summary of one `tool_result`. `refuseParMeta`: the CLI's own
+    permission decision said "reject". */
+export function resumeResultat(name: string, content: unknown, isError: boolean, refuseParMeta = false): { status: Exclude<ToolStatus, "running">; count?: number; unit?: ToolUnit; detail?: string } {
+	const { texte, image } = contenuResultat(content);
+	const premiereLigne = texte.replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0] ?? "";
+	// Only the head of the text: a refusal is worded at the start, and a regex with `.*` on a megabyte of output is slow.
+	if (refuseParMeta || (isError && REFUS.test(texte.slice(0, 4000)))) return { status: "refused", detail: couper(premiereLigne, MAX_DETAIL) };
+	if (isError) return { status: "error", detail: couper(premiereLigne, MAX_DETAIL) };
+	if (image) return { status: "ok", unit: "image" };
+	const lignes = texte.replace(/\s+$/, "").split("\n").filter(l => l.trim() !== "");
+	if (name === "Glob" || name === "Grep") {
+		const trouve = /^Found (\d+) files?/i.exec(lignes[0] ?? "");
+		if (trouve) return { status: "ok", count: Number(trouve[1]), unit: "files" };
+		if (/^No (files|matches) found/i.test(lignes[0] ?? "")) return { status: "ok", count: 0, unit: name === "Glob" ? "files" : "lines" };
+		return { status: "ok", count: lignes.length, unit: name === "Glob" ? "files" : "lines" };
+	}
+	/* Read numbers its lines ("3\t"), the empty line after a final newline
+	   included: a 2-line file came back as 3 numbered lines (measured). */
+	if (name === "Read") while (lignes.length && /^\s*\d+([\t→]\s*)?$/.test(lignes[lignes.length - 1])) lignes.pop();
+	return { status: "ok", count: lignes.length, unit: "lines" };
+}
+
+function retenirNom(etat: EtatDecodeur, id: string, nom: string): void {
+	if (etat.noms.size >= 2000) return;
+	etat.noms.set(id, nom);
+}
+
+function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	const type = str(line.type);
-	if (type === "system" && str(line.subtype) === "init") return [{ kind: "start", model: str(line.model) ?? undefined }];
-	if (type === "result") return [{ kind: "done" }];
+	if (type === "system" && str(line.subtype) === "init") {
+		etat.cwd = str(line.cwd) ?? "";
+		return [{ kind: "start", model: str(line.model) ?? undefined }];
+	}
+	if (type === "result") {
+		/* The final list of what the CLI denied: a refusal it did not word
+		   in the result (or a result line lost) still shows as refused. */
+		const refus: TranscriptEvent[] = [];
+		if (Array.isArray(line.permission_denials)) {
+			for (const d of line.permission_denials.slice(0, MAX_STEPS)) {
+				const id = str(rec(d)?.tool_use_id);
+				if (id) refus.push({ kind: "toolResult", id, status: "refused" });
+			}
+		}
+		return [...refus, { kind: "done" }];
+	}
+	/* The WHOLE message of each block (`--verbose`): a tool call's input is
+	   complete only here. Its text is NOT taken: the partial chunks below
+	   already carried it, and taking it twice would double the answer. */
+	if (type === "assistant") {
+		const contenu = rec(line.message)?.content;
+		if (!Array.isArray(contenu)) return [];
+		const out: TranscriptEvent[] = [];
+		for (const c of contenu.slice(0, 50)) {
+			const b = rec(c);
+			if (!b || (str(b.type) !== "tool_use" && str(b.type) !== "server_tool_use")) continue;
+			const id = str(b.id) ?? "";
+			const name = str(b.name) ?? "tool";
+			if (id) retenirNom(etat, id, name);
+			out.push({ kind: "tool", name, id: id || undefined, input: resumeEntree(name, b.input, etat.cwd) });
+		}
+		return out;
+	}
+	if (type === "user") {
+		const contenu = rec(line.message)?.content;
+		if (!Array.isArray(contenu)) return [];
+		const rejetes = new Set<string>();
+		if (Array.isArray(line.tool_result_meta)) {
+			for (const m of line.tool_result_meta.slice(0, 50)) {
+				const r = rec(m);
+				const id = str(r?.id);
+				if (id && str(rec(r?.permission_decision)?.decision) === "reject") rejetes.add(id);
+			}
+		}
+		const out: TranscriptEvent[] = [];
+		for (const c of contenu.slice(0, 50)) {
+			const b = rec(c);
+			if (!b || str(b.type) !== "tool_result") continue;
+			const id = str(b.tool_use_id);
+			if (!id) continue;
+			out.push({ kind: "toolResult", id, ...resumeResultat(etat.noms.get(id) ?? "", b.content, b.is_error === true, rejetes.has(id)) });
+		}
+		return out;
+	}
 	/* The reasoning's SIZE while its text stays private: `system` /
 	   `thinking_tokens` carries the running estimate (`estimated_tokens`). */
 	if (type === "system" && str(line.subtype) === "thinking_tokens") {
@@ -156,7 +367,10 @@ function claudeEvents(line: Rec): TranscriptEvent[] {
 		const block = rec(event.content_block);
 		const blockType = block ? str(block.type) : null;
 		if (blockType === "tool_use" || blockType === "server_tool_use" || blockType === "mcp_tool_use") {
-			return [{ kind: "tool", name: str(block?.name) ?? blockType }];
+			const id = str(block?.id) ?? "";
+			const name = str(block?.name) ?? blockType;
+			if (id) retenirNom(etat, id, name);
+			return [{ kind: "tool", name, id: id || undefined }];
 		}
 	}
 	return [];
@@ -166,14 +380,30 @@ function codexEvents(line: Rec): TranscriptEvent[] {
 	const type = str(line.type);
 	if (type === "thread.started") return [{ kind: "start" }];
 	if (type === "turn.completed" || type === "turn.failed") return [{ kind: "done" }];
-	if (type !== "item.completed") return [];
+	if (type !== "item.completed" && type !== "item.started") return [];
 	const item = rec(line.item);
 	if (!item) return [];
 	const itemType = str(item.type);
+	if (itemType === "command_execution") {
+		/* A command Codex ran in its read-only sandbox: one step, begun at
+		   `item.started`, closed at `item.completed` with its exit code. */
+		const id = str(item.id) ?? "";
+		const tool: TranscriptEvent = { kind: "tool", name: "Shell", id: id || undefined, input: couper((str(item.command) ?? "").replace(/\s+/g, " ").trim(), MAX_INPUT) };
+		// Without an id, the start and the end cannot be told apart: one step, at the end.
+		if (!id) return type === "item.completed" ? [tool] : [];
+		if (type === "item.started") return [tool];
+		const code = item.exit_code;
+		const sortie = str(item.aggregated_output) ?? "";
+		const lignes = sortie.replace(/\s+$/, "").split("\n").filter(l => l.trim() !== "").length;
+		const fin: TranscriptEvent = typeof code === "number" && code !== 0
+			? { kind: "toolResult", id, status: "error", detail: couper(sortie.trim().split("\n")[0] ?? "", MAX_DETAIL) }
+			: { kind: "toolResult", id, status: "ok", count: lignes, unit: "lines" };
+		return [tool, fin];
+	}
+	if (type !== "item.completed") return [];
 	const text = str(item.text);
 	if (itemType === "reasoning" && text) return [{ kind: "thinking", text: text + "\n\n" }];
 	if (itemType === "agent_message" && text) return [{ kind: "text", text }];
-	if (itemType === "command_execution") return [{ kind: "tool", name: str(item.command) ?? "command" }];
 	return [];
 }
 
@@ -184,7 +414,8 @@ function codexEvents(line: Rec): TranscriptEvent[] {
  */
 export function createTranscriptDecoder(tool: TranscriptTool): (chunk: string) => TranscriptEvent[] {
 	let tail = "";
-	const map = tool === "claude" ? claudeEvents : codexEvents;
+	const etat: EtatDecodeur = { cwd: "", noms: new Map() };
+	const map = tool === "claude" ? (l: Rec) => claudeEvents(l, etat) : codexEvents;
 	return (chunk: string): TranscriptEvent[] => {
 		tail += chunk;
 		const lines = tail.split("\n");

@@ -50,7 +50,10 @@ function erreurCli(nom: string, message: string): Error {
 	return e;
 }
 
-export function createWindowsProcess(): HostProcess {
+/** `absolu`: a contract path to a disk path (`carte.absolu`), for the
+    folder a CLI works in; without it no folder crosses, and no run gets
+    tools. */
+export function createWindowsProcess(absolu?: (contrat: string) => string | null): HostProcess {
 	return {
 		async run(spec) {
 			const id = prochainId++;
@@ -59,6 +62,9 @@ export function createWindowsProcess(): HostProcess {
 			   le principal ne voie l'appel. Le reste est recopié champ par champ —
 			   `RequeteCli` (`pont.ts`) dit exactement ce qui passe. */
 			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, onStdout, reprise } = spec;
+			/* The working folder crosses as a DISK path; the main process judges
+			   it again (trusted, opened) before running anything there. */
+			const dossier = spec.dossier && absolu ? absolu(spec.dossier) ?? undefined : undefined;
 			/* Déjà annulé avant l'envoi : rien à lancer. Le contrat nomme cette
 			   issue `annule`, et le principal n'a pas à voir partir un CLI que
 			   personne n'attend plus. */
@@ -78,7 +84,7 @@ export function createWindowsProcess(): HostProcess {
 				: null;
 			try {
 				const res = await pont().processus.run(
-					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, reprise },
+					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, reprise, dossier },
 					id,
 					!!onStdout,
 				);
@@ -94,6 +100,20 @@ export function createWindowsProcess(): HostProcess {
 		   `name`, c'est précisément pourquoi `run` passe par une enveloppe — et
 		   ça suffit à l'appelant (`ai-providers.ts`), qui ne lit pas le nom : il
 		   rattrape tout rejet et retombe sur son repli embarqué. */
+		/* The page only ASKS: the main process shows its own native dialog
+		   and keeps the answer. */
+		async trustFolder(dossier) {
+			const abs = absolu ? absolu(dossier) : null;
+			if (!abs) return "unavailable";
+			const verdict = await pont().processus.confiance(abs);
+			return verdict === "approuve" ? "trusted" : verdict === "refuse" ? "refused" : "unavailable";
+		},
+		trustedFolders() {
+			return pont().processus.confianceListe();
+		},
+		untrustFolder(dossier) {
+			return pont().processus.confianceRetirer(dossier);
+		},
 		lireCache(tool) {
 			return pont().processus.lireCache(tool);
 		},

@@ -139,6 +139,9 @@ const pont: Pont = {
 	processus: {
 		run: (spec, requeteId, flux) => ipcRenderer.invoke(CANAUX.processusRun, spec, requeteId, flux === true),
 		annuler: requeteId => ipcRenderer.invoke(CANAUX.processusAnnuler, requeteId),
+		confiance: dossier => ipcRenderer.invoke(CANAUX.processusConfiance, dossier),
+		confianceListe: () => ipcRenderer.invoke(CANAUX.processusConfianceListe),
+		confianceRetirer: dossier => ipcRenderer.invoke(CANAUX.processusConfianceRetirer, dossier),
 		lireCache: tool => ipcRenderer.invoke(CANAUX.processusLireCache, tool),
 		ollamaInstalle: () => ipcRenderer.invoke(CANAUX.processusOllamaInstalle),
 		demarrerOllama: () => ipcRenderer.invoke(CANAUX.processusDemarrerOllama),
