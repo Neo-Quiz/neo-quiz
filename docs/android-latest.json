@@ -1,8 +1,8 @@
 {
-  "versionCode": 23,
-  "versionName": "0.2.21",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.21/NeoQuiz-0.2.21.apk",
-  "sha256": "c8de04ecc1609bf53aa5af9627b410f0efb02944c16a032c7c124accd560171e",
-  "size": 56008941,
-  "notes": "Interactive pages in readings and Explain"
+  "versionCode": 24,
+  "versionName": "0.2.22",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.22/NeoQuiz-0.2.22.apk",
+  "sha256": "a3aef4e027e7c2d99cd63d6e0d852e3b9b0717b6bc21269a3ca202cf70e027d3",
+  "size": 56010013,
+  "notes": "Explain opens as a full-screen sheet"
 }
