@@ -2012,16 +2012,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// pièce jointe) ne doivent lui être volés.
 			if (mentions && mentions.isOpen()) return;
 			if (commandeExam && commandeExam.isOpen()) return;
-			// Backspace en tout début de champ (rien à gauche du caret,
-			// aucune sélection) : retire la DERNIÈRE pièce jointe —
-			// convention chips (Gmail, Slack). Un Backspace avec du texte à
-			// gauche du caret garde son comportement normal.
-			if (e.key === "Backspace" && composerInput.selectionStart === 0 && composerInput.selectionEnd === 0
-				&& (noteAttachments.length > 0 || images.length > 0)) {
-				e.preventDefault();
-				removeLastAttachment();
-				return;
-			}
 			if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
 			e.preventDefault();
 			if (canGenerate()) void startGeneration(containerRef);
@@ -2948,22 +2938,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		for (const file of files) {
 			if (!file.type.startsWith("image/")) continue;
 			images.push({ file, url: URL.createObjectURL(file) });
-		}
-		render(containerRef);
-	}
-
-	/* Retire la dernière pièce jointe (bonus Backspace, cf. keydown du
-	   composer). Priorité à la dernière NOTE : c'est elle qui vit
-	   visuellement contre le caret (chip superposée à la 1ʳᵉ ligne, ou
-	   repliée juste au-dessus) ; à défaut, la dernière image. */
-	function removeLastAttachment(): void {
-		if (noteAttachments.length > 0) {
-			noteAttachments.pop();
-		} else if (images.length > 0) {
-			const removed = images.pop();
-			if (removed) URL.revokeObjectURL(removed.url);
-		} else {
-			return;
 		}
 		render(containerRef);
 	}
