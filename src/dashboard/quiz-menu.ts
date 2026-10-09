@@ -653,7 +653,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		const freres = solo ? [] : quizFreres(quiz, ctx.scanner.getQuizzes());
 		const confirmerUn = (q: QuizIndexEntry): void => {
 			openConfirm({
-				title: t("dashboard.quizzes.deleteConfirmTitle"),
+				title: t("dashboard.quizzes.deleteConfirmTitle", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
 				/* With its type (2026-09-29): the Learn and the Test of a course
 				   share their title, and "Delete « CM1 »?" did not say which. */
 				body: t("dashboard.quizzes.deleteConfirmBody", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
@@ -687,7 +687,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 						danger: true,
 						onClick: () => {
 							openConfirm({
-								title: t("dashboard.quizzes.deleteConfirmTitle"),
+								title: t("dashboard.quizzes.deleteCourseConfirmTitle", { count: cours.length, title: quiz.title }),
 								body: t("dashboard.quizzes.deleteCourseConfirmBody", { count: cours.length, title: quiz.title }),
 								cta: t("dashboard.quizzes.deleteConfirmCta"),
 								warning: true,
@@ -885,7 +885,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 			danger: true,
 			onClick: () => {
 				openConfirm({
-					title: t("dashboard.quizzes.deleteFolderConfirmTitle"),
+					title: t("dashboard.quizzes.deleteFolderConfirmTitle", { name: g.name }),
 					body: t(trashableFolder(ctx, g) ? "dashboard.quizzes.deleteFolderConfirmBody" : "dashboard.quizzes.deleteFolderConfirmBodyNoDisk", { name: g.name }),
 					cta: t("dashboard.quizzes.deleteConfirmCta"),
 					warning: true,
