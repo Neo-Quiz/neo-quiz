@@ -683,14 +683,10 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   est construit dans la fenêtre, écrit et lancé par le principal
 		   (`electron/partage.ts`). */
 		shareQuiz: (cible) => ouvrirPartage(cible),
-		/* renameQuiz : ABSENT À DESSEIN. `renameQuiz` exige de réécrire
-		   les wikilinks ENTRANTS ([[ancien nom]]), ce que seul l'index de liens
-		   d'Obsidian sait faire (`fileManager.renameFile`) ; le poser sur
-		   `HostFs.rename` déplacerait la note et casserait ces liens EN
-		   SILENCE — une entrée absente vaut mieux qu'une entrée qui ment
-		   (`types/dashboard-ctx.ts`). Il reste optionnel côté
-		   `DashboardShellCtx` pour que cette absence soit un état PRÉVU, pas
-		   une erreur de compilation. */
+		/* Rename: no host member. "Rename" and "Duplicate" of the "⋯" menu are
+		   built on the contract in shared code (`renameQuizzes`,
+		   `duplicateQuizzes`, quiz-menu.ts), so this window and Android have
+		   them alike. Incoming [[links]] are not rewritten. */
 	};
 
 	const nav = createNavHandlers(ctx);

@@ -199,11 +199,6 @@ export function renderQuizCard(
 			t(totalReadings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: totalReadings }));
 	}
 
-	if (opts?.showDate) {
-		const created = quizCreationTime([quiz, ...freres]);
-		if (created > 0) ajouter(compte, "span", "qbd-quiz-card-date", formatCardDate(created));
-	}
-
 	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans
 	// la grille d'un dossier, le dossier EST le titre de la page (2026-09-24).
 	// N'affiche que le DOSSIER PARENT (dernier segment), jamais le chemin
@@ -263,7 +258,13 @@ export function renderQuizCard(
 			else if (typeof onOpen === "function") onOpen(q);
 		});
 	}
-	// stopPropagation : ouvrir le menu ne doit PAS aussi ouvrir la fiche.
+	/* Creation date (folder pages): right of the type pills, left of the "⋯",
+	   small and faint (2026-10-09). The count line keeps only the counts. */
+	if (opts?.showDate) {
+		const created = quizCreationTime([quiz, ...freres]);
+		if (created > 0) ajouter(bas, "span", "qbd-quiz-card-date", formatCardDate(created));
+	}
+	// stopPropagation: opening the menu must NOT also open the quiz.
 	if (opts?.onMenu) {
 		const onMenu = opts.onMenu;
 		const moreBtn = ajouter(bas, "button", "qbd-card-more");
@@ -274,6 +275,7 @@ export function renderQuizCard(
 			e.stopPropagation();
 			onMenu(quiz, moreBtn);
 		});
+		openMenuOnRightClick(card, () => onMenu(quiz, moreBtn));
 	}
 
 	// Ouverture (navigation laissée à l'appelant)
@@ -292,6 +294,25 @@ export function renderQuizCard(
 	});
 
 	return card;
+}
+
+/**
+ * A right click on a card opens EXACTLY its "⋯" menu, anchored on the "⋯"
+ * button: no system menu, no selection, nothing else (2026-10-09). A touch
+ * long press stays the selection gesture (`selection-view.ts`): the
+ * `contextmenu` it fires only loses the system menu. The Menu key and
+ * Shift+F10 (no pointer) open the card's menu too. Shared with the folder
+ * cards (`module-card.ts`).
+ */
+export function openMenuOnRightClick(card: HTMLElement, open: () => void): void {
+	let touch = false;
+	card.addEventListener("pointerdown", (e) => { touch = e.pointerType === "touch"; });
+	card.addEventListener("contextmenu", (e) => {
+		e.preventDefault();
+		if (touch) return;
+		e.stopPropagation();
+		open();
+	});
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";

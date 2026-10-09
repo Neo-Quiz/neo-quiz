@@ -1038,10 +1038,10 @@
 	display: flex;
 	align-items: baseline;
 }
-/* Creation date: pushed to the right edge of the count line, muted. */
+/* Creation date: on the bottom row, right of the type pills and left of the
+   "⋯" (which keeps `margin-left: auto`), small and muted; the row's
+   `align-items: center` lines it up with the pills. */
 .qbd-quiz-card-date {
-	margin-left: auto;
-	padding-left: 8px;
 	flex-shrink: 0;
 	font-size: 12px;
 	color: var(--text-faint);

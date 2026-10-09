@@ -380,5 +380,97 @@ await withSrcModule(
 		r.check("11. a folder holding the generated-quizzes folder is never trashed", holder.trashed, []);
 	}
 
+	/* ── 12. "Rename" and "Duplicate" of a quiz card (2026-10-09). A rename is a
+	   move into the same folder: the note gets the new name with its mode
+	   suffix, history, stats and the session follow; a taken name (any case)
+	   or a forbidden one writes nothing. A duplicate is the same bytes under
+	   "<title> (copy)", then "(copy 2)", with NO progress of any kind. ── */
+	{
+		/** An in-memory disk on a case-insensitive file system, like Windows. */
+		const disk = (initial) => {
+			const files = new Map(Object.entries(initial));
+			const find = (p) => [...files.keys()].find(k => k.toLowerCase() === p.toLowerCase());
+			const writes = [];
+			return {
+				files, writes,
+				fs: {
+					exists: async (p) => find(p) !== undefined || [...files.keys()].some(k => k.toLowerCase().startsWith(p.toLowerCase() + "/")),
+					getFile: (p) => (files.has(p) ? { path: p } : null),
+					listDir: async (d) => [...files.keys()].filter(k => k.startsWith(d + "/") && !k.slice(d.length + 1).includes("/"))
+						.map(k => ({ name: k.slice(d.length + 1), path: k, isFolder: false })),
+					readBinary: async (p) => files.get(p),
+					writeBinary: async (p, data) => { writes.push(p); files.set(p, data); },
+					rename: async (a, b) => {
+						if (!files.has(a)) throw new Error(`ENOENT ${a}`);
+						if (find(b) !== undefined) throw new Error(`${b} existe déjà`);
+						writes.push(b); files.set(b, files.get(a)); files.delete(a);
+					},
+				},
+			};
+		};
+		const bytes = (s) => new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(s)]);
+		const learn = { path: "NeoQuiz/Cours/CM1 — Learn.md", basename: "CM1 — Learn", title: "CM1", mode: "learn" };
+		const test = { path: "NeoQuiz/Cours/CM1 — Practice.md", basename: "CM1 — Practice", title: "CM1", mode: "practice" };
+		const content = bytes("```quiz-blocks\r\n[{ prompt: 'x' }]\r\n```\r\n![[img.png]]\r\n");
+		const run = async (d, gesture) => {
+			const notices = [], moved = [], prefixes = [];
+			const stats = { [learn.path]: { bestScore: 90, questionsDone: 4, totalQuestions: 4, lastPlayed: 2000, attempts: 2 } };
+			const store = ss.createStatsStore({ getStats: () => structuredClone(stats), saveStats: async () => {} });
+			store.load();
+			const ctx = {
+				statsStore: store,
+				reviewStore: { moved: async (a, b) => { moved.push([a, b]); } },
+				movedPrefix: async (a, b) => { prefixes.push([a, b]); },
+				scanner: { getQuizzes: () => [learn, test] },
+			};
+			hote.installHost({ fs: d.fs, ui: { notice: (m) => { notices.push(m); } } });
+			let result;
+			try { result = await gesture(ctx); } finally { hote.uninstallHost(); }
+			return { result, notices, moved, prefixes, store };
+		};
+		const start = () => disk({ [learn.path]: content, [test.path]: bytes("test"), "NeoQuiz/Cours/Autre — Learn.md": bytes("a") });
+
+		const a = start();
+		const ra = await run(a, (ctx) => qm.renameQuizzes(ctx, [learn], "Réseaux: TCP"));
+		const to = "NeoQuiz/Cours/Réseaux- TCP — Learn.md";
+		r.check("12a. rename: the note is renamed in place, its suffix kept, forbidden characters replaced",
+			[ra.result, a.files.has(learn.path), a.files.get(to) === content], [true, false, true]);
+		r.check("12a. rename: history, stats and session follow the note",
+			[ra.moved, ra.prefixes, ra.store.getRecord(to)?.bestScore, ra.store.getRecord(learn.path)], [[[learn.path, to]], [[learn.path, to]], 90, null]);
+
+		const b = start();
+		const rb = await run(b, (ctx) => qm.renameQuizzes(ctx, [learn], "autre"));
+		r.check("12b. a name taken in another case: refused with a message, nothing written",
+			[rb.result, b.writes, rb.notices, rb.moved], [false, [], ["A file with this name already exists in this folder."], []]);
+
+		const c = start();
+		const rc = await run(c, (ctx) => qm.renameQuizzes(ctx, [learn], "con"));
+		const rc2 = await run(c, (ctx) => qm.renameQuizzes(ctx, [learn], "  ..  "));
+		r.check("12c. a Windows device name or an empty name: refused, nothing written",
+			[rc.result, rc.notices, rc2.result, rc2.notices, c.writes],
+			[false, ["Windows reserves this name. Choose another one."], false, ["Type a name."], []]);
+
+		const d = start();
+		const rd = await run(d, (ctx) => qm.renameQuizzes(ctx, [learn, test], "CM2"));
+		r.check("12d. a course card: both modes renamed, each with its own suffix (they stay paired)",
+			[rd.result, [...d.files.keys()].sort()], [true, ["NeoQuiz/Cours/Autre — Learn.md", "NeoQuiz/Cours/CM2 — Learn.md", "NeoQuiz/Cours/CM2 — Practice.md"]]);
+
+		const e = start();
+		const re = await run(e, (ctx) => qm.renameQuizzes(ctx, [learn], "cm1"));
+		r.check("12e. a change of case only goes through (a direct rename would collide with itself)",
+			[re.result, [...e.files.keys()].includes("NeoQuiz/Cours/cm1 — Learn.md"), e.files.has(learn.path)], [true, true, false]);
+
+		const f = start();
+		const r1 = await run(f, () => qm.duplicateQuizzes([learn]));
+		const r2 = await run(f, () => qm.duplicateQuizzes([learn]));
+		const copy1 = "NeoQuiz/Cours/CM1 (copy) — Learn.md", copy2 = "NeoQuiz/Cours/CM1 (copy 2) — Learn.md";
+		r.check("12f. duplicate: \"(copy)\" then \"(copy 2)\", suffix kept, the original untouched",
+			[r1.result, r2.result, f.files.get(learn.path) === content], [[copy1], [copy2], true]);
+		r.check("12f. duplicate: the same bytes (BOM, CRLF, embeds)",
+			[copy1, copy2].map(p => f.files.has(p) && Buffer.from(f.files.get(p)).equals(Buffer.from(content))), [true, true]);
+		r.check("12f. duplicate: no progress copied (no history, stats nor session moved or written)",
+			[r1.moved, r1.prefixes, r1.store.getRecord(copy1), r1.store.getRecord(learn.path)?.bestScore], [[], [], null, 90]);
+	}
+
 	r.done();
 });

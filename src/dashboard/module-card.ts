@@ -7,6 +7,7 @@ import { moduleIcon } from "./module-icons";
 import { poserLogoObsidian } from "./brand-icons";
 import { couperCheminAuMilieu } from "./file-icons";
 import { moduleAccent } from "./module-color";
+import { openMenuOnRightClick } from "./quiz-card";
 
 /* ══════════════════════════════════════════════════════════
    MODULE CARD — une carte = un MODULE (dossier de quiz). Design
@@ -125,6 +126,8 @@ export function renderModuleCard(
 			e.stopPropagation();
 			onMenu(group, moreBtn);
 		});
+		// A right click opens this same menu (quiz-card.ts).
+		openMenuOnRightClick(card, () => onMenu(group, moreBtn));
 	}
 
 	card.addEventListener("click", () => onOpen(group));

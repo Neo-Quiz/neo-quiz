@@ -20,31 +20,31 @@ import { parMode, quizFreres } from "./course-pairs";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
 import { openShareChooser } from "./share-choose";
+import { baseNameVerdict, fitsPath, NAME_MAX } from "./share-names";
+import { separerNomDeNote } from "../quiz-format";
 
 /* ══════════════════════════════════════════════════════════
-   QUIZ MENU — contenu du menu ⋯ des cartes de « Mes quiz ».
-   Dérivé de la capture StudySmarter d'Ahmed (Excalidraw, 2026-07-18) :
-   Share / Edit / Rename / Archive / Delete (rouge), adaptés au plugin :
-   - Share    → copie le bloc ```quiz-blocks``` dans le presse-papier ;
-   - Rename   → renomme la NOTE (le titre d'un quiz EST son basename,
-                cf. scanner.ts) — carte de quiz seulement, la carte de
-                module renomme déjà via « Edit » ;
-   - Archive  → masque le quiz partout, revient via la pilule « Archivés » ;
-   - Delete   → supprime le bloc de la note (corbeille si la note ne
-                contenait que lui) + ses stats, après confirmation.
-   (« Pause study reminders » retiré le 2026-07-21 à la demande d'Ahmed —
-   avec sa mécanique : sans entrée de menu, un quiz déjà suspendu serait
-   resté hors du « À faire » sans aucun moyen de le reprendre.)
+   QUIZ MENU — the "⋯" menu of the cards of "My quizzes" (also opened by a
+   right click on the card). From the StudySmarter reference (2026-07-18):
+   Share / Edit / Rename / Archive / Delete (red), adapted:
+   - Share     → the share window (a quiz's note, or a folder's archive);
+   - Rename    → renames the NOTE (a quiz's title IS its name, scanner.ts),
+                 quiz cards only: a folder card renames through "Edit";
+   - Duplicate → a byte-for-byte copy of the note, "<title> (copy)";
+   - Archive   → folders only (`folder-archive.ts`);
+   - Delete    → removes the block from the note (to the trash when the note
+                 held nothing else) and its stats, after a confirmation.
+   ("Pause study reminders" was removed on 2026-07-21, with its mechanism:
+   without a menu entry, a quiz already paused would have stayed out of
+   "To do" with no way to resume it.)
 
-   Tranche 3 (tâche 9) : ce module ne connaît plus Obsidian. La suppression
-   passe par `HostFs` (`process`, `trash`), les deux modales par
-   `HostModals`. Partager et Renommer, eux, ne sont PAS des opérations du
-   contrat : elles restent des membres OPTIONNELS du ctx (`shareQuiz?`,
-   `renameQuiz?`), remplis par le greffon et absents de l'application — voir
-   leur justification dans `types/dashboard-ctx.ts`. Le menu de la fenêtre
-   a donc DEUX entrées sur quatre (Éditer, Supprimer), et pas une ligne
-   grise de plus : une entrée absente se lit comme un hôte qui fait autre
-   chose, une entrée désactivée comme une panne.
+   This module knows no host: files go through `HostFs`, modals through
+   `HostModals`. Share stays an OPTIONAL ctx member (`shareQuiz?`). Rename
+   was one too, absent from the app on purpose while only Obsidian could
+   rewrite incoming links; since the plugin was removed (2026-10-01) the app
+   is the host, and Rename is built on the contract (`renameQuizzes`). An
+   absent entry reads as a host doing something else, a greyed one as a
+   failure: entries a host cannot honour are left out, never greyed.
 ══════════════════════════════════════════════════════════ */
 
 /* `isFolderArchived`/`setFolderArchived` ont déménagé dans `folder-archive.ts`
@@ -127,35 +127,18 @@ function openConfirm(spec: ConfirmSpec, onConfirm: () => void): void {
 	});
 }
 
-/* ── Renommage d'un quiz ──
-   Le titre d'un quiz EST le basename de sa note (scanner.ts) : renommer =
-   renommer le fichier, via `ctx.renameQuiz` — que le greffon remplit avec
-   `fileManager.renameFile`, jamais `vault.rename`, pour qu'Obsidian réécrive
-   les liens entrants ([[ancien nom]]) tout seul. `HostFs.rename` ne convient
-   pas (il déplace des octets sans rien réécrire), d'où le membre optionnel du
-   ctx plutôt qu'un appel au contrat : voir `types/dashboard-ctx.ts`.
-   Les stats suivent : stats-store écoute l'évènement de renommage du
-   surveillant (il couvre donc AUSSI un renommage fait à la main dans
-   l'explorateur).
-
-   RÉPARTITION DES GARDES. La modale ne fait que ce que les deux hôtes savent
-   faire pareil : assainir le nom, ignorer un nom vide ou inchangé, vérifier
-   que la note existe encore (`fs.getFile`). La collision avec un fichier
-   déjà présent, le renommage lui-même et l'AFFICHAGE de la cause d'un échec
-   (Notice « existe déjà », « impossible ») appartiennent à l'hôte, dans
-   `renameQuiz` : lui seul sait comment son index voit la cible. Le rappel
-   rend `true` si renommé, `false` sinon — la modale se ferme sur `true`,
-   RESTE OUVERTE sur `false` pour que l'utilisateur corrige le nom au lieu
-   de le retaper. */
-function openRenameQuizModal(
-	quiz: QuizIndexEntry,
-	renameQuiz: (quiz: QuizIndexEntry, nom: string) => Promise<boolean>,
-	onDone: () => void,
-): void {
-	let name = quiz.basename;
+/* ── The rename modal ──
+   The field holds the quiz's TITLE (without its mode suffix, put back by
+   `renameQuizzes`). The modal only ignores an empty or unchanged name and a
+   note gone since the menu opened; the name rules, the collision test and the
+   message for each refusal belong to `renameQuizzes`. On `false` the modal
+   STAYS OPEN so the user fixes the name instead of retyping it. */
+function openRenameQuizModal(ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], onDone: () => void): void {
+	const quiz = quizzes[0];
+	let name = quiz.title;
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
-		// t() AU RENDU (à l'ouverture), jamais dans une constante de haut niveau.
+		// t() at render (on open), never in a top-level constant.
 		title: t("dashboard.quizzes.renameTitle"),
 		onOpen: (m) => {
 			const c = m.contentEl;
@@ -164,24 +147,28 @@ function openRenameQuizModal(
 			input.type = "text";
 			input.value = name;
 			input.addEventListener("input", () => { name = input.value; });
-			// Sélection du nom entier : le cas courant est de tout retaper.
+			// The whole name selected: the usual case is to retype it.
 			window.setTimeout(() => { input.focus(); input.select(); }, 0);
+			// Incoming [[links]] in other notes are not rewritten: said once, quietly.
+			ajouter(c, "p", "qbd-medit-hint", t("dashboard.quizzes.renameLinksHint"));
 
+			let busy = false;
 			const apply = async (): Promise<void> => {
-				// Mêmes caractères interdits que freeNotePath (folder-create.ts).
-				const nom = name.trim().replace(/[\\/:*?"<>|]/g, "-");
-				if (!nom || nom === quiz.basename) { m.close(); return; }
-				// La note a disparu entre l'ouverture du menu et le clic : rien à
-				// corriger dans le nom, la modale se ferme (conduite d'avant).
+				if (busy) return;
+				if (!name.trim() || name.trim() === quiz.title) { m.close(); return; }
+				// The note vanished between the menu and the click: nothing to fix in the name.
 				if (!currentHost().fs.getFile(quiz.path)) {
 					currentHost().ui.notice(t("dashboard.detail.fileNotFound"));
 					m.close();
 					return;
 				}
-				// `false` : l'hôte a déjà dit pourquoi ; le nom saisi reste à
-				// l'écran pour être corrigé.
-				if (!await renameQuiz(quiz, nom)) return;
+				busy = true;
+				try {
+					// `false`: the reason is already shown; the typed name stays to be fixed.
+					if (!await renameQuizzes(ctx, quizzes, name)) return;
+				} finally { busy = false; }
 				m.close();
+				currentHost().ui.notice(t("dashboard.quizzes.renamed"));
 				onDone();
 			};
 			const save = ajouter(c, "button", "qbd-medit-save", t("dashboard.quizzes.renameCta"));
@@ -468,56 +455,199 @@ export async function moveQuizTo(ctx: DashboardShellCtx, quiz: QuizIndexEntry, t
 		return null;
 	}
 	const to = await freeNotePath(targetFolder, basename);
+	return await relocateQuiz(ctx, quiz, to, "dashboard.quizzes.moveQuizExists", "dashboard.quizzes.moveQuizError") ? to : null;
+}
+
+/**
+ * Moves or renames ONE quiz note to `to`, then carries everything keyed by its
+ * path: the review log, the stats, and what the host keeps under that path
+ * (sessions, test setups). The ONE path of "Move to", of a Test's mode change
+ * and of "Rename": a rename is a move into the same folder, so history,
+ * progress and the session follow it exactly as they follow a move.
+ *
+ * `existsKey` / `errorKey`: the message for a name collision and for any other
+ * failure. `false` once that message is shown; nothing else was changed.
+ */
+async function relocateQuiz(ctx: DashboardShellCtx, quiz: QuizIndexEntry, to: string, existsKey: TransKey, errorKey: TransKey): Promise<boolean> {
+	const host = currentHost();
 	try {
-		await host.fs.rename(quiz.path, to);
+		if (sameFileName(quiz.path, to)) await renameCaseOnly(quiz.path, to);
+		else await host.fs.rename(quiz.path, to);
 	} catch (e) {
-		/* REVUE (2026-09-27) : le `catch` affichait TOUJOURS « existe déjà »,
-		   y compris pour une panne disque ou un permis refusé sans rapport
-		   avec un homonyme. L'hôte (`apps/windows/electron/fichiers.ts`) pose un message reconnaissable pour
-		   la collision (« <chemin> existe déjà ») — seul ce cas garde le
-		   toast précis ; tout le reste devient un échec générique, la cause
-		   réelle dans la console pour qui doit diagnostiquer. */
-		/* RE-REVUE (2026-09-27, Mineur 7) : classer par SOUS-CHAÎNE plutôt que
-		   par une propriété `code: "EEXIST"` posée par les deux hôtes — laissé
-		   ainsi volontairement. `moveQuizTo` s'exécute dans le RENDU de
-		   l'application, et l'erreur qu'il reçoit a alors déjà traversé l'IPC
-		   Electron (`ipcRenderer.invoke`), qui ne reconstruit qu'un `Error`
-		   nu (`name`, `message`, `stack`) — une propriété `code` posée côté
-		   principal ne survit pas au passage et se lirait `undefined` ici,
-		   sans qu'aucun test ne le révèle (le contrôle du greffon ne passe,
-		   lui, jamais par l'IPC). La sous-chaîne, elle, EST le message et
-		   franchit l'IPC intacte (revue précédente, confirmé). Un message
-		   `EPERM` qui contiendrait par hasard « existe déjà » (un chemin
-		   pathologique) resterait mal classé, mais c'est le risque le plus
-		   faible des deux. */
+		/* The host puts a recognisable message on a collision ("<path> existe
+		   déjà", `apps/windows/electron/fichiers.ts`): only that case keeps the
+		   precise toast; anything else (a full disk, a refused permission) is a
+		   generic failure, its real cause in the console. Classified by
+		   SUBSTRING on purpose (re-review 2026-09-27, Minor 7): this runs in the
+		   renderer, and the error has crossed Electron's IPC, which rebuilds a
+		   bare `Error` (`name`, `message`, `stack`): a `code` property set by the
+		   main process would read `undefined` here. The message does cross. */
 		const message = e instanceof Error ? e.message : String(e);
 		if (message.includes("existe déjà")) {
-			host.ui.notice(t("dashboard.quizzes.moveQuizExists"));
+			host.ui.notice(t(existsKey));
 		} else {
-			console.error("[quiz-blocks] déplacement de quiz impossible :", quiz.path, "->", to, e);
-			host.ui.notice(t("dashboard.quizzes.moveQuizError"));
+			console.error("[quiz-blocks] could not move the quiz:", quiz.path, "->", to, e);
+			host.ui.notice(t(errorKey));
 		}
-		return null;
+		return false;
 	}
-	// Historique de révision : même appel que `moveModuleTo`, qui sait déjà
-	// distinguer un déplacement DANS la même racine (un renommage, réécrit en
-	// place) d'un déplacement ENTRE deux racines (transposé).
+	// Review history: the same call as `moveModuleTo`, which already tells a
+	// move WITHIN one root (rewritten in place) from one BETWEEN two roots.
 	await ctx.reviewStore?.moved(quiz.path, to);
-	/* STATS (indexées par chemin) : `statsStore` n'est PAS optionnel sur ctx,
-	   on l'appelle donc sans garde. Nécessaire ici et pas seulement souhaitable :
-	   un hôte dont `HostFs.rename` n'émet aucun évènement de renommage
-	   (le contrat ne l'y oblige pas) laisserait `statsStore.renamed` sans appelant. Idempotent : si l'évènement finissait quand même
-	   par arriver (détecteur de renommage de l'app), le second appel ne
-	   trouve plus l'ancienne clé et ne fait rien. */
+	/* STATS (keyed by path). Needed here, not just nice to have: a host whose
+	   `HostFs.rename` emits no rename event (the contract does not require
+	   one) would leave `statsStore.renamed` without a caller. Idempotent: if
+	   the event still comes (the app's rename detector), the second call no
+	   longer finds the old key and does nothing. */
 	ctx.statsStore.renamed(quiz.path, to);
 	/* Everything the host keeps under this path (saved sessions, remembered
 	   test setups; exams and folder settings for a folder move): the host
 	   renames its own keys (`DashboardShellCtx.movedPrefix`). Before
 	   2026-10-01 a session in progress stayed indexed under the OLD path after a
-	   move and never resumed, an accepted limit while the session store was
-	   not reachable from this shared module. */
+	   move and never resumed. */
 	await ctx.movedPrefix?.(quiz.path, to);
-	return to;
+	return true;
+}
+
+/** Two paths that name the same file on a case-insensitive file system
+    (Windows, Android's shared storage): NFC, case folded. */
+function sameFileName(a: string, b: string): boolean {
+	return a !== b && a.normalize("NFC").toLowerCase() === b.normalize("NFC").toLowerCase();
+}
+
+/** "cm1" -> "CM1": the target IS the source on a case-insensitive disk, so the
+    host's no-overwrite rename refuses it. Through a hidden temporary name, and
+    back to the source if the second step fails. */
+async function renameCaseOnly(from: string, to: string): Promise<void> {
+	const fs = currentHost().fs;
+	const tmp = `${parentFolder(to)}/.renaming-${Date.now().toString(36)}.md`;
+	await fs.rename(from, tmp);
+	try {
+		await fs.rename(tmp, to);
+	} catch (e) {
+		await fs.rename(tmp, from).catch(() => undefined);
+		throw e;
+	}
+}
+
+/* ── Rename / duplicate a quiz ──
+   A quiz's title IS its note's name without the mode suffix (`titreSansMode`,
+   scanner.ts). The field shows that TITLE, the one the card shows; the suffix
+   (" — Learn", " — Practice", " — Exam") is put back automatically. Showing it
+   would let a slip in the field remove it, and a note without its suffix stops
+   pairing with the other modes of its course (`course-pairs.ts`) and loses the
+   type the file explorer reads.
+
+   Name rules: those of a share (`share-names.ts`: NFC, forbidden and invisible
+   characters, Windows device names, length). A name already in the folder, in
+   any case, is refused with a message and nothing is written: unlike "Move to"
+   or "New quiz", a name the user typed is never turned into "Name (2)".
+
+   Incoming wikilinks ([[old name]]) in other notes are NOT rewritten: no host
+   keeps an index of incoming links since the Obsidian plugin was removed
+   (2026-10-01). The modal says so in one line. */
+
+/** The suffix a note's name carries after its title (" — Exam"), or "". */
+function modeSuffix(quiz: QuizIndexEntry): string {
+	const parts = separerNomDeNote(quiz.basename, quiz.mode);
+	return parts ? quiz.basename.slice(parts.base.length, quiz.basename.length - parts.counter.length) : "";
+}
+
+function parentFolder(path: string): string {
+	return path.slice(0, Math.max(0, path.lastIndexOf("/")));
+}
+
+function inFolder(folder: string, name: string): string {
+	return folder ? `${folder}/${name}` : name;
+}
+
+/** Is a file named `name` (with extension) already in `folder`, in any case? */
+async function nameTaken(folder: string, name: string): Promise<boolean> {
+	const host = currentHost();
+	const target = name.normalize("NFC").toLowerCase();
+	const entries = await host.fs.listDir(folder);
+	if (entries.some(e => e.name.normalize("NFC").toLowerCase() === target)) return true;
+	return host.fs.exists(inFolder(folder, name));
+}
+
+export type QuizNameVerdict = { ok: true; basename: string } | { ok: false; key: TransKey };
+
+/** The note name `title` gives `quiz` (its mode suffix kept), or why it cannot. */
+export function quizNoteName(quiz: QuizIndexEntry, title: string): QuizNameVerdict {
+	const v = baseNameVerdict(title);
+	if (!v.ok) return { ok: false, key: v.reason === "empty" ? "dashboard.quizzes.renameEmpty" : "dashboard.quizzes.renameReserved" };
+	const basename = v.name + modeSuffix(quiz);
+	if (basename.length > NAME_MAX || !fitsPath(parentFolder(quiz.path), basename + ".md")) return { ok: false, key: "dashboard.quizzes.renameTooLong" };
+	return { ok: true, basename };
+}
+
+/**
+ * Renames the quizzes of a card (one quiz, or the modes of a course, which
+ * keep their pairing) to `title`, each keeping its own mode suffix. Every
+ * target is checked BEFORE the first rename: a refused name writes nothing.
+ * `true` once renamed; `false` after showing why (the modal then stays open
+ * for the name to be fixed).
+ */
+export async function renameQuizzes(ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], title: string): Promise<boolean> {
+	const host = currentHost();
+	const targets: Array<{ quiz: QuizIndexEntry; to: string }> = [];
+	for (const quiz of quizzes) {
+		const v = quizNoteName(quiz, title);
+		if (!v.ok) { host.ui.notice(t(v.key)); return false; }
+		const folder = parentFolder(quiz.path);
+		const to = inFolder(folder, `${v.basename}.md`);
+		if (to === quiz.path) continue;
+		if (!sameFileName(quiz.path, to) && await nameTaken(folder, `${v.basename}.md`)) {
+			host.ui.notice(t("dashboard.quizzes.renameExists"));
+			return false;
+		}
+		targets.push({ quiz, to });
+	}
+	for (const { quiz, to } of targets) {
+		if (!await relocateQuiz(ctx, quiz, to, "dashboard.quizzes.renameExists", "dashboard.quizzes.renameError")) return false;
+	}
+	return true;
+}
+
+/** Most copies tried before giving up (" (copy 2)" ... " (copy 999)"). */
+const COPY_ATTEMPTS = 999;
+
+/**
+ * Duplicates the quizzes of a card: the same note, byte for byte, in the same
+ * folder, as "<title> (copy)" — then "(copy 2)", "(copy 3)"... — each keeping
+ * its mode suffix, under the same rules and collision test as a rename. A
+ * course is copied whole, under ONE copy number, so the copies pair together.
+ * Only the note: an image cited by a relative path in the same folder stays
+ * valid, and nothing keyed by the old path (history, stats, session,
+ * attempts) is carried: the copy has another path, so other review keys
+ * (`keyOfQuestion`), and starts as a new quiz. The new paths, or `null` after
+ * showing why.
+ */
+export async function duplicateQuizzes(quizzes: QuizIndexEntry[]): Promise<string[] | null> {
+	const host = currentHost();
+	if (quizzes.length === 0) return null;
+	const word = t("dashboard.quizzes.copyWord");
+	for (let n = 1; n <= COPY_ATTEMPTS; n++) {
+		const mark = n === 1 ? ` (${word})` : ` (${word} ${n})`;
+		const targets: string[] = [];
+		let taken = false;
+		for (const quiz of quizzes) {
+			// A long title is cut so that the mark and the suffix still fit.
+			const room = NAME_MAX - mark.length - modeSuffix(quiz).length;
+			const v = quizNoteName(quiz, quiz.title.slice(0, Math.max(1, room)).trimEnd() + mark);
+			if (!v.ok) { host.ui.notice(t(v.key)); return null; }
+			const folder = parentFolder(quiz.path);
+			if (await nameTaken(folder, `${v.basename}.md`)) { taken = true; break; }
+			targets.push(inFolder(folder, `${v.basename}.md`));
+		}
+		if (taken) continue;
+		for (const [i, quiz] of quizzes.entries()) {
+			await host.fs.writeBinary(targets[i], await host.fs.readBinary(quiz.path));
+		}
+		return targets;
+	}
+	host.ui.notice(t("dashboard.quizzes.duplicateError"));
+	return null;
 }
 
 /* ── Menus ── */
@@ -534,7 +664,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 	return (quiz, anchorEl, solo) => {
 		/* Capturés dans des constantes : le rétrécissement de type d'un `if`
 		   sur `ctx.shareQuiz` ne survivrait pas jusqu'au `onClick`. */
-		const { shareQuiz, renameQuiz } = ctx;
+		const { shareQuiz } = ctx;
 		const items: ActionMenuItem[] = [];
 		// Poussée seulement si l'hôte sait partager : une entrée grise se lit
 		// comme une panne, une entrée absente comme un hôte qui fait autre
@@ -616,15 +746,26 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		// « Keep exam mode » (a Test only): checkable, written into the note.
 		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
 		if (keepExam) items.push(keepExam);
-		// Même règle que Partager : sans `renameQuiz`, pas d'entrée. Rendre
-		// « Renommer » sur `HostFs.rename` casserait les liens entrants en
-		// silence — une entrée qui n'existe pas vaut mieux qu'une qui ment.
-		if (renameQuiz) items.push({
-			// « text-cursor-input » et non un crayon : « Edit » (pencil) ouvre
-			// déjà l'éditeur de questions — deux crayons se confondraient.
+		/* Rename and Duplicate act on the quizzes of the CARD: the modes of a
+		   course together (the copies and the new names keep them paired), a
+		   single quiz on a folder page (`solo`). Both go through the contract
+		   (`HostFs.rename`, `readBinary`/`writeBinary`), so every host has them. */
+		const deLaCarte = solo ? [quiz] : [quiz, ...quizFreres(quiz, ctx.scanner.getQuizzes())];
+		items.push({
+			// "text-cursor-input", not a pencil: "Edit" (pencil) already opens
+			// the question editor, two pencils would be confused.
 			icon: "text-cursor-input",
 			label: t("dashboard.quizzes.menuRename"),
-			onClick: () => { openRenameQuizModal(quiz, renameQuiz, rerender); },
+			onClick: () => { openRenameQuizModal(ctx, deLaCarte, rerender); },
+		});
+		items.push({
+			icon: "copy-plus",
+			label: t("dashboard.quizzes.menuDuplicate"),
+			onClick: () => {
+				void runFileGesture(async () => {
+					if (await duplicateQuizzes(deLaCarte)) currentHost().ui.notice(t("dashboard.quizzes.duplicated"));
+				}, "dashboard.quizzes.duplicateError", rerender);
+			},
 		});
 		/* « Copier le chemin » — le chemin ABSOLU, comme le Ctrl+Maj+C de
 		   l'explorateur (Ahmed, 2026-09-17). Sans `absolutePath`, pas d'entrée :
