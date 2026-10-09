@@ -16,6 +16,7 @@
 import type { ArchivedChat } from "./chat-archives";
 import type { ClarifyOption, ClarifyQuestion } from "./generation-kind";
 import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex } from "./generation-kind";
+import { NAME_UNSAFE } from "../shared-state/remote-request";
 
 export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
@@ -34,6 +35,10 @@ export interface ChatRequest {
 	at: number;
 	/** The device that SENT it (always this device in phase 1). */
 	from: string;
+	/** The name the sending device gave itself, kept when no device file names it (a phone). */
+	fromName?: string;
+	/** The PC that RAN the request, when it is not the sender (a phone request). Absent: the sender ran it. */
+	on?: string;
 	text: string;
 	mode: ChatMode;
 	documents: ChatDocument[];
@@ -122,6 +127,8 @@ function readRequest(x: unknown): ChatRequest | null {
 		results: x.results.map(readResult).filter((d): d is ChatResult => !!d),
 	};
 	if (isStr(x.error)) req.error = x.error;
+	if (isStr(x.fromName) && x.fromName.length > 0 && x.fromName.length <= 64 && !NAME_UNSAFE.test(x.fromName)) req.fromName = x.fromName;
+	if (isStr(x.on) && x.on.length > 0 && x.on.length <= 64) req.on = x.on;
 	const clarify = readClarify(x.clarify);
 	if (clarify) req.clarify = clarify;
 	const provider = readLabel(x.provider), model = readLabel(x.model), effort = readLabel(x.effort);

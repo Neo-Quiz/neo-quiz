@@ -143,6 +143,8 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.settings.explainHint": "Dans la fenêtre Expliquer, tu écris ta propre question. En coulisses, chaque message emporte tout le quiz (la question d'où tu l'as ouverte est marquée, avec ta réponse), le texte des notes et des PDF de son dossier et ses images.",
 	"app.settings.examPrompt": "Prompt de /exam",
 	"app.settings.examPromptHint": "La demande que /exam écrit pour toi une fois l'examen choisi. {exam}, {module} et {date} sont remplacés par ceux de l'examen ; ce que tu tapes dans le composer s'ajoute dessous.",
+	"app.settings.silence": "Mode silence",
+	"app.settings.silenceHint": "Ni son ni notification quand un quiz ou une explication est prêt.",
 	"app.settings.explainMaxChars": "Longueur maximale de l'explication",
 	"app.settings.explainMaxCharsHint": "En caractères. Le fournisseur d'IA est prié de rester en dessous.",
 	"app.settings.navFolders": "Dossiers",

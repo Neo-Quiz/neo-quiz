@@ -43,8 +43,9 @@ import { readRelayDocument } from "../../../src/dashboard/relay-flow";
 import type { RelayDeps } from "../../../src/dashboard/relay-flow";
 import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
 import { notifyPc } from "./host/notify";
+import { armerNotificationsFin, chargerSilence } from "./ui/notif-fin";
 import { ecrireReglage, lireReglage } from "./host/folder";
-import { setPairedPeers, setPeerConnected } from "../../../src/dashboard/remote-generations";
+import { setOwnDeviceName, setPairedPeers, setPeerConnected } from "../../../src/dashboard/remote-generations";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
@@ -669,6 +670,7 @@ async function demarrer(): Promise<void> {
 		onQueueCreated(queue => {
 			stopGenerations = publishGenerations({ queue, write: f => chatFiles.writeGenerations(f), device: idAppareil });
 			if (estMobile()) return;
+			armerNotificationsFin(queue);
 			const runner = createRemoteRunner({
 				device: idAppareil,
 				now: () => Date.now(),
@@ -726,6 +728,7 @@ async function demarrer(): Promise<void> {
 		/* Same for the AI settings: the "Generate" page reads the provider and
 		   model of the previous session on its first render. */
 		await chargerReglagesIa();
+		await chargerSilence();
 		const store = await creerJournalApp(currentHost(), scanner);
 		/* Les STATISTIQUES par quiz : à côté du journal, mais un système
 		   distinct (spec de l'ordonnanceur §9.1 — voir `review/stats.ts`).
@@ -776,7 +779,8 @@ async function demarrer(): Promise<void> {
 		pont().sync?.surDonneesRecues(() => { void rechargerApresSync(); });
 		/* Reachability of a PC from the phone: an idle PC writes nothing, so the
 		   connection of the paired devices (the Sync page's own state) is what says it is on. */
-		const suivreConnexion = (e: { appareils: Array<{ id: string; nom: string; connecte: boolean; enPause?: boolean; vuLe: number | null }> }): void => {
+		const suivreConnexion = (e: { nom?: string; appareils: Array<{ id: string; nom: string; connecte: boolean; enPause?: boolean; vuLe: number | null }> }): void => {
+			if (e.nom) setOwnDeviceName(e.nom);
 			setPeerConnected(e.appareils.some(x => x.connecte && !x.enPause));
 			setPairedPeers(e.appareils.map(x => ({ id: x.id, name: x.nom, connected: x.connecte, paused: !!x.enPause, seenAt: x.vuLe })));
 		};

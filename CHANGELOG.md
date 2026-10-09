@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Each request in a Generate chat now says who sent it and where it ran ("Sent from Xiaomi 13T Pro · Run on DESKTOP-1U89520 (this device)", with a phone, laptop or monitor icon) and its state there (waiting, running, done, stopped, failed with the reason); the chat list shows the sender device icon. A phone now sends its name with each request.
+- A chime and a native notification when a quiz or an Explain answer is ready while the window is not in front, with a "Silent mode" switch in Settings (desktop).
+
 ## [1.20.64] - 2026-10-09
 
 ### Changed

@@ -33,6 +33,7 @@ import type { AiSettings } from "../../../../src/types/dashboard-ctx";
 import { monterReglagesFond } from "./fond";
 import { monterReglagesComptes } from "./comptes";
 import { mountLanguagePackSettings } from "./language-packs";
+import { reglerSilence, silenceActif } from "./notif-fin";
 import { mountMoodleSettings } from "./moodle-settings";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
@@ -368,6 +369,14 @@ export function renderSettings(
 	// PHONE: no option, the clock follows the phone's own 12/24-hour setting (`format-heure.ts`).
 	if (!mobile) {
 		createSelect(row(general, t("app.settings.timeFormat")), { value: currentHourCycle(), options: formats, onChange: changerFormat });
+	}
+
+	/* DESKTOP: "Silent mode" cuts the sound and the notification shown when a
+	   quiz or an explanation is ready while this window is not in front. The
+	   phone has its own native notifications. */
+	if (!mobile) {
+		const silence = switchInput(row(general, t("app.settings.silence"), t("app.settings.silenceHint"), "label"), silenceActif());
+		silence.addEventListener("change", () => { void reglerSilence(silence.checked); });
 	}
 
 	/* PHONE: the in-app updater (version, manual check). The desktop's menu has its own. */

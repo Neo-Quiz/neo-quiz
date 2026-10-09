@@ -156,7 +156,7 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 			text: req.text, notes, images: [], mode: req.mode, count: req.count ?? null,
 			type: normalizeTypes(types), destination: "", reglages: s,
 			categorie: categorieChoisie("auto", indicesCategorie(notes, req.text, s.aiOutputFolder ?? "")),
-			chatId: req.chatId, requestId: req.id, sentAt: req.at, fromDevice: req.from,
+			chatId: req.chatId, requestId: req.id, sentAt: req.at, fromDevice: req.from, ...(req.fromName ? { fromName: req.fromName } : {}),
 		};
 		deps.queue.envoyer(demande);
 		const title = t("ai.remote.notifyTitle", { device: req.fromName || t("ai.remote.unknownDevice") }).slice(0, NOTIFY_TITLE_MAX);

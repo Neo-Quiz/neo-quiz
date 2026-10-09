@@ -16,6 +16,8 @@
    like the queue it follows: the page is rebuilt, the chats are not.
 ══════════════════════════════════════════════════════════ */
 
+import { ROLE_ICON, resolveDevice } from "../shared-state/request-origin";
+import { labelOf, originContext } from "./request-origin-vue";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
@@ -92,12 +94,14 @@ export function poserListeChats(parent: HTMLElement): void {
 		if (actif) ouvrir.setAttribute("aria-current", "true");
 		ouvrir.addEventListener("click", () => setActiveChat(chat.id));
 		if (chat.foreign) {
-			// Started on another device: the synced folder brought it here.
+			// Sent from another device: the icon of that kind of device, and who it was.
+			const de = resolveDevice(chat.sender, originContext(), { name: chat.senderName, sender: true, runnerId: chat.origin });
+			const texte = t("ai.side.sentFrom", { device: labelOf(de) });
 			const autre = ajouter(item, "span", "qbd-ai-chat-autre");
-			autre.title = t("ai.side.otherDevice");
+			autre.title = texte;
 			autre.setAttribute("role", "img");
-			autre.setAttribute("aria-label", t("ai.side.otherDevice"));
-			host.ui.setIcon(autre, "monitor-smartphone");
+			autre.setAttribute("aria-label", texte);
+			host.ui.setIcon(autre, ROLE_ICON[de.role]);
 		}
 		if (chat.running) {
 			// A request is waiting or running in this chat: it goes on whatever is on screen.

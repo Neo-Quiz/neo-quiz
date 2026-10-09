@@ -15,7 +15,7 @@ import { LOG_PREFIX } from "../branding";
 import { currentHost } from "../host/current";
 import { chatDevice, notifyChatsChanged } from "./chat-session";
 import { getChats } from "./chat-store";
-import { chosenPc, getDevices, getOwnRequests, getOwnSettings, setOwnSettings, getPairedPeers, getRemoteGenerations, lastPcEver, remoteModel, setOwnRequests } from "./remote-generations";
+import { chosenPc, getDevices, getOwnDeviceName, getOwnRequests, getOwnSettings, setOwnSettings, getPairedPeers, getRemoteGenerations, lastPcEver, remoteModel, setOwnRequests } from "./remote-generations";
 import { deviceInfo, soleOnlinePc } from "../shared-state/devices";
 import { buildRequest, modelFor, ownAfterSync, preferredPc, targetOf } from "./remote-send";
 import type { RemoteRequest } from "../shared-state/remote-request";
@@ -72,7 +72,7 @@ export async function enviquerVersPc(input: { chatId: string; text: string; mode
 	const target = targetOf(chat, getRemoteGenerations(), now, lastPcEver(), preferredPc(chosenPc(), getDevices()), soleOnlinePc(getPairedPeers(), getDevices()));
 	if (!target) return false;
 	const model = modelFor(remoteModel(), deviceInfo(getDevices(), target));
-	const req = buildRequest(model ? { ...input, model } : input, { device: chatDevice(), target, now });
+	const req = buildRequest(model ? { ...input, model } : input, { device: chatDevice(), target, deviceName: getOwnDeviceName(), now });
 	await files.writeRequest(req);
 	setOwnRequests(await files.listOwnRequests());
 	notifyChatsChanged();

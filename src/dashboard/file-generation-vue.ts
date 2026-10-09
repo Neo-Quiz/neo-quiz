@@ -30,6 +30,8 @@ import { threadItems } from "./chat-thread";
 import type { ChatRecord } from "./chat-record";
 import { compterJetons, peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
+import { peindreOrigine, refsOf } from "./request-origin-vue";
+import { chatDevice } from "./chat-session";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcReachable } from "./remote-send";
 import { peindreQuestions } from "./generation-kind-vue";
@@ -605,8 +607,8 @@ export function creerVueFile(opts: {
 		const items = threadItems(record, opts.file.lignes(), chatId, remote, Date.now(), getOwnRequests());
 		for (const item of items) {
 			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected())); continue; }
-			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale); continue; }
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
+			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");
@@ -616,6 +618,8 @@ export function creerVueFile(opts: {
 			const tour = ajouter(zone, "div", "qbd-ai-tour");
 			tour.setAttribute("role", "listitem");
 			peindreMessage(tour, montrees[0], lignes);
+			const refs = refsOf(montrees[0].demande.fromDevice ?? chatDevice(), montrees[0].demande.fromName, chatDevice());
+			peindreOrigine(tour, refs.sender, refs.runner);
 			// The question that was asked before this request generated stays under it, answered.
 			const clarify = record?.requests.find(q => q.id === item.key)?.clarify;
 			if (clarify) peindreQuestions(tour, clarify, undefined, item.key);
