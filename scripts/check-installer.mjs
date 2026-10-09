@@ -884,9 +884,9 @@ await withSrcModule(["apps/windows/installer/diagnosis.ts", "src/i18n.ts", "apps
 	await telechargerAvecReessais(paquet, transport(false), [0]);
 	r.check("un fichier gardé qui ne correspond plus est retéléchargé", telecharges, 1);
 	r.check("le travailleur ne réutilise un fichier qu'après l'avoir revérifié, et supprime sinon",
-		[travailleurInstallateur.includes("if (await fichierConforme(cheminPaquet, p)) return true;"),
-			/await rm\(cheminPaquet, \{ force: true \}\);\s*return false;/.test(travailleurInstallateur),
-			travailleurInstallateur.includes("garderPaquet = telechargementVerifie;")],
+		[travailleurInstallateur.includes("if (await fichierConforme(chemin, p)) return true;"),
+			/await rm\(chemin, \{ force: true \}\);\s*return false;/.test(travailleurInstallateur),
+			travailleurInstallateur.includes("garderPaquet = telechargementVerifie && !eleve;")],
 		[true, true, true]);
 
 	// 5. What crosses the pipe is rebuilt, never trusted.
@@ -902,5 +902,96 @@ await withSrcModule(["apps/windows/installer/diagnosis.ts", "src/i18n.ts", "apps
 		[renduInstallateur.includes("installer.error."), renduInstallateur.includes("rendreErreur(contenu, diagnostic);"),
 			renduInstallateur.includes("window.neoInstaller.retry()")],
 		[false, true, true]);
+	r.done();
+});
+
+/* THE DOWNLOADED PACKAGE, BETWEEN ITS CHECK AND ITS LAUNCH (review of
+   fa614be2). Prevented: an ELEVATED worker reusing `%TEMP%\neo-quiz-installer-
+   cache` (a fixed folder any process of the user can write: a file swapped in
+   after the check runs as administrator); a launch that is not preceded by its
+   own verification, or a slow folder measure sitting between the two;
+   `tasklist` launched from whatever `%SystemRoot%` says; older packages piling
+   up in the cache, and the kept one outliving the window. Real files, in a
+   fresh folder under the system temp directory; nothing is ever launched. */
+await withSrcModule(["apps/windows/installer/worker.ts", "apps/windows/installer/probe.ts"], async (
+	{ dossierTelechargement, nettoyerCache, lancerVerifie, cheminCache },
+	{ racineSystemeFiable },
+) => {
+	const { mkdtemp, writeFile, readdir, mkdir, rm } = await import("node:fs/promises");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { createHash } = await import("node:crypto");
+	const r = makeReporter("Installateur : paquet téléchargé, cache et élévation");
+	const base = await mkdtemp(join(tmpdir(), "nq-check-installer-"));
+	try {
+		const cache = join(base, "neo-quiz-installer-cache");
+		const courant = "neo-quiz-setup-1.2.3.exe";
+
+		// M1. Elevated: a fresh folder each time, never the cache.
+		const e1 = await dossierTelechargement(true, courant, base);
+		const e2 = await dossierTelechargement(true, courant, base);
+		r.check("élevé : un dossier mkdtemp NEUF à chaque fois, jamais le cache",
+			[e1 !== e2, e1 !== cache, e2 !== cache, (await readdir(e1)).length], [true, true, true, 0]);
+		r.check("non élevé : le cache, et rien d'autre", await dossierTelechargement(false, courant, base), cache);
+		r.check("le cache du principal est celui du travailleur non élevé", cheminCache(courant, base), join(cache, courant));
+		r.check("une charge sans `eleve: false` explicite est lue comme élevée",
+			[travailleurInstallateur.includes("eleve: v.eleve !== false"), principalInstallateur.includes("paquet: paquetCourant, eleve };")], [true, true]);
+		r.check("élevé : aucun fichier gardé n'est relu, rien n'est gardé, le dossier neuf est retiré",
+			[travailleurInstallateur.includes("if (eleve) return false;"), travailleurInstallateur.includes("garderPaquet = telechargementVerifie && !eleve;"),
+				travailleurInstallateur.includes("if (eleve && dossierPaquet) await rm(dossierPaquet, { recursive: true, force: true });")],
+			[true, true, true]);
+
+		// M1. Verified right before the launch.
+		const octets = Buffer.from("MZ fake package bytes");
+		const paquet = { version: "1.2.3", nom: courant, url: "u", taille: octets.length, sha512: createHash("sha512").update(octets).digest("base64"), tailleInstallee: null };
+		const fichier = join(e1, courant);
+		await writeFile(fichier, octets);
+		let lances = 0;
+		await lancerVerifie(fichier, paquet, async () => { lances++; });
+		r.check("un paquet conforme est lancé", lances, 1);
+		await writeFile(fichier, Buffer.from("MZ fake package bytez"));
+		let erreur = null;
+		try { await lancerVerifie(fichier, paquet, async () => { lances++; }); } catch (e) { erreur = e; }
+		r.check("un paquet changé après le téléchargement (même taille) n'est JAMAIS lancé : intégrité",
+			[lances, erreur?.code], [1, "integrity"]);
+		await writeFile(fichier, Buffer.concat([octets, Buffer.from("x")]));
+		erreur = null;
+		try { await lancerVerifie(fichier, paquet, async () => { lances++; }); } catch (e) { erreur = e; }
+		r.check("un paquet d'une autre taille n'est jamais lancé", [lances, erreur?.code], [1, "integrity"]);
+		const iMesure = travailleurInstallateur.indexOf("const initial = await tailleDossier(charge.dossier);");
+		const iLancement = travailleurInstallateur.indexOf("() => lancerVerifie(chemin, paquet, () => lancerNsis(");
+		r.check("chaque lancement de NSIS passe par lancerVerifie, et la mesure du dossier vient AVANT",
+			[iMesure > 0, iLancement > iMesure, (travailleurInstallateur.match(/lancerNsis\(/g) || []).length], [true, true, 2]);
+
+		// F1. %SystemRoot% accepted only as X:\Windows.
+		r.check(String.raw`SystemRoot : X:\Windows accepté, toute casse, tout lecteur`,
+			[String.raw`C:\Windows`, String.raw`c:\windows`, String.raw`D:\WINDOWS`].map(racineSystemeFiable), [String.raw`C:\Windows`, String.raw`c:\windows`, String.raw`D:\WINDOWS`]);
+		r.check("SystemRoot : tout le reste refusé (tasklist n'est pas lancé)",
+			[String.raw`C:\Windows\ `.trim(), String.raw`C:\Temp\Windows`, String.raw`C:\Windows\..\Temp`, String.raw`\\evil\share\Windows`, "C:/Windows", String.raw`C:\Windows` + "\0", String.raw`CC:\Windows`, String.raw`C:\Windows` + "\n", "", undefined, null, 42]
+				.map(racineSystemeFiable),
+			[null, null, null, null, null, null, null, null, null, null, null, null]);
+		r.check("le travailleur n'appelle isAppRunning qu'avec une racine acceptée",
+			[travailleurInstallateur.includes("const racineSysteme = racineSystemeFiable(process.env.SystemRoot);"),
+				travailleurInstallateur.includes('step === "install" && racineSysteme ? await isAppRunning(racineSysteme) : false')],
+			[true, true]);
+
+		// F2. Older packages removed at start; the kept one removed on quit.
+		await writeFile(join(cache, "neo-quiz-setup-1.2.2.exe"), "old");
+		await writeFile(join(cache, "NEO-QUIZ-SETUP-1.0.0.EXE"), "old");
+		await writeFile(join(cache, courant), "current");
+		await writeFile(join(cache, "notes.txt"), "other");
+		await mkdir(join(cache, "neo-quiz-setup-9.9.9.exe"));
+		await nettoyerCache(cache, courant);
+		r.check("démarrage : les paquets d'autres versions partent, le courant, un autre fichier et un dossier restent",
+			(await readdir(cache)).sort(), [courant, "neo-quiz-setup-9.9.9.exe", "notes.txt"].sort());
+		await nettoyerCache(join(base, "absent"), courant);
+		r.check("un cache absent ne fait rien échouer", true, true);
+		r.check("le travailleur non élevé nettoie le cache avant de s'en servir",
+			travailleurInstallateur.includes("await nettoyerCache(cache, nomCourant);"), true);
+		r.check("à la fermeture du bootstrapper, le paquet gardé est supprimé",
+			/app\.on\("will-quit", \(\) => \{\s*if \(!paquetCourant\) return;\s*try \{ rmSync\(cheminCache\(paquetCourant\.nom\), \{ force: true \}\); \}/.test(principalInstallateur), true);
+	} finally {
+		await rm(base, { recursive: true, force: true });
+	}
 	r.done();
 });

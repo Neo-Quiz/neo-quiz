@@ -11,7 +11,7 @@
 
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { access, lstat, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { get } from "node:https";
 import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -33,7 +33,7 @@ import {
 	type PaquetInstallable,
 } from "./noyau";
 import { tailleDossier, tailleTemporairesNsis } from "./sondage";
-import { appendLog, isAppRunning } from "./probe";
+import { appendLog, isAppRunning, racineSystemeFiable } from "./probe";
 import type {
 	ChargeTravailleur,
 	CodeErreurInstallateur,
@@ -100,7 +100,8 @@ function decoderCharge(encoded: string): ChargeTravailleur | null {
 		   garde la portée de l'élévation étroite. */
 		if (parse(dossier).root === dossier) return null;
 		if (!paquetValide(v.paquet)) return null;
-		return { secret: v.secret, dossier, paquet: v.paquet };
+		/* Only an explicit `false` lets the worker use the shared cache. */
+		return { secret: v.secret, dossier, paquet: v.paquet, eleve: v.eleve !== false };
 	} catch {
 		return null;
 	}
@@ -239,7 +240,7 @@ async function telecharger(
 /** Is the file at `chemin` exactly the published package? Size, then the
     sha512 of every byte: a download kept from a failed attempt is reused only
     on this proof, so "Try again" never relaxes the integrity check. */
-async function fichierConforme(chemin: string, paquet: PaquetInstallable): Promise<boolean> {
+export async function fichierConforme(chemin: string, paquet: PaquetInstallable): Promise<boolean> {
 	try {
 		if ((await stat(chemin)).size !== paquet.taille) return false;
 		const hash = createHash("sha512");
@@ -394,11 +395,62 @@ async function terminerTube(socket: Socket): Promise<void> {
 	await new Promise<void>(resolvePromise => socket.end(resolvePromise));
 }
 
-/** Where a downloaded package waits between attempts. The name is the
-    validated package name (`neo-quiz-setup-X.Y.Z.exe`), never a path received
-    from elsewhere; the file is only ever launched after `fichierConforme`. */
-function cheminCache(nom: string): string {
-	return join(tmpdir(), "neo-quiz-installer-cache", nom);
+const NOM_CACHE = "neo-quiz-installer-cache";
+
+/** Where a downloaded package waits between attempts (non-elevated worker
+    only). The name is the validated package name (`neo-quiz-setup-X.Y.Z.exe`),
+    never a path received from elsewhere; the file is only ever launched after
+    `fichierConforme`. The window process removes it when it quits
+    (`main.ts`, `will-quit`). */
+export function cheminCache(nom: string, base = tmpdir()): string {
+	return join(base, NOM_CACHE, nom);
+}
+
+/** Removes from the cache every package (`neo-quiz-setup-*.exe`) that is not
+    `nomCourant`: an older version left by a failed attempt would otherwise
+    stay in %TEMP% forever. Only plain files are removed; best effort. */
+export async function nettoyerCache(dossierCache: string, nomCourant: string): Promise<void> {
+	let noms: string[];
+	try { noms = await readdir(dossierCache); } catch { return; }
+	for (const nom of noms) {
+		if (!/^neo-quiz-setup-.+\.exe$/i.test(nom) || nom.toLowerCase() === nomCourant.toLowerCase()) continue;
+		const chemin = join(dossierCache, nom);
+		try {
+			if ((await lstat(chemin)).isFile()) await rm(chemin, { force: true });
+		} catch {
+			// A file still held (antivirus scan) is retried on the next start.
+		}
+	}
+}
+
+/** The folder the package is downloaded into. A worker at the user's level
+    uses the cache (older versions removed first), so "Try again" can skip the
+    download. An ELEVATED worker never reads nor reuses that fixed folder: any
+    process of the user can write there, and a file swapped in after the check
+    would run as administrator. It downloads into a fresh `mkdtemp` folder,
+    keeps nothing, and verifies the file again right before the launch
+    (`lancerVerifie`). */
+export async function dossierTelechargement(eleve: boolean, nomCourant: string, base = tmpdir()): Promise<string> {
+	if (eleve) return await mkdtemp(join(base, "neo-quiz-installer-"));
+	const cache = join(base, NOM_CACHE);
+	await mkdir(cache, { recursive: true });
+	await nettoyerCache(cache, nomCourant);
+	return cache;
+}
+
+/** Verifies size and sha512 of `chemin`, then launches it AT ONCE: nothing
+    slow (no folder measure, no wait) sits between the check and the launch,
+    so the window in which a swapped file could be launched stays as short as
+    a single hash. A file that no longer matches is never launched. */
+export async function lancerVerifie(
+	chemin: string,
+	paquet: PaquetInstallable,
+	lancer: () => Promise<void>,
+): Promise<void> {
+	if (!(await fichierConforme(chemin, paquet))) {
+		throw new ErreurTravailleur("integrity", { message: "package changed between download and launch" });
+	}
+	await lancer();
 }
 
 /** Entry point called by `main.ts` when the portable was relaunched with the
@@ -430,7 +482,9 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 		if (commande.type === "annuler") annulation.abort();
 	});
 
-	const cheminPaquet = cheminCache(charge.paquet.nom);
+	const eleve = charge.eleve;
+	let dossierPaquet: string | null = null;
+	let cheminPaquet: string | null = null;
 	/* The step running when a failure happens, and whether the package was
 	   already downloaded AND verified: "Try again" then resumes at the
 	   installation (see `diagnosis.ts`, `resumeFrom`). */
@@ -438,9 +492,11 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 	let telechargementVerifie = false;
 	let garderPaquet = false;
 	try {
-		await mkdir(join(tmpdir(), "neo-quiz-installer-cache"), { recursive: true });
+		dossierPaquet = await dossierTelechargement(eleve, charge.paquet.nom);
+		const chemin = join(dossierPaquet, charge.paquet.nom);
+		cheminPaquet = chemin;
 		const paquet = await telechargerAvecReessais(charge.paquet, {
-			telecharger: p => telecharger(p, cheminPaquet, annulation.signal, recus => {
+			telecharger: p => telecharger(p, chemin, annulation.signal, recus => {
 				envoyer(socket, { type: "telechargement", recus, total: p.taille });
 			}),
 			relirePaquet: async () => {
@@ -453,11 +509,12 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			attendre: ms => annulation.signal.aborted ? Promise.resolve() : attendre(ms),
 			journal: message => { void journaliser(message); },
 			dejaVerifie: async p => {
-				try { await access(cheminPaquet); } catch { return false; }
+				if (eleve) return false;
+				try { await access(chemin); } catch { return false; }
 				envoyer(socket, { type: "verification" });
-				if (await fichierConforme(cheminPaquet, p)) return true;
+				if (await fichierConforme(chemin, p)) return true;
 				/* A kept file that no longer matches is never launched. */
-				await rm(cheminPaquet, { force: true });
+				await rm(chemin, { force: true });
 				return false;
 			},
 		});
@@ -475,22 +532,24 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			await terminerTube(socket);
 			return 0;
 		}
-		/* Measured BEFORE the launch: it tells whether NSIS will first remove an
-		   old version (one more blind step, which the scale accounts for) and it
-		   is the starting floor of the copy into place. */
+		/* Measured BEFORE the final verification, never between it and the
+		   launch: it tells whether NSIS will first remove an old version (one
+		   more blind step, which the scale accounts for) and it is the starting
+		   floor of the copy into place. */
 		const initial = await tailleDossier(charge.dossier);
 		/* Only a launch that never started is retried (Defender still holds the
 		   fresh file: EBUSY/EACCES/EPERM). A NSIS run that started and failed
-		   is never replayed automatically: it may have changed the installation. */
+		   is never replayed automatically: it may have changed the installation.
+		   Every launch, retried or not, is preceded by its own verification. */
 		await reessayer(
-			() => lancerNsis(
-				cheminPaquet,
+			() => lancerVerifie(chemin, paquet, () => lancerNsis(
+				chemin,
 				charge.dossier,
 				{ paquet: paquet.taille, installe: paquet.tailleInstallee, initial },
 				pourcent => {
 					envoyer(socket, { type: "installation", pourcent });
 				},
-			),
+			)),
 			erreur => erreur instanceof ErreurTravailleur && erreur.nonLance,
 			attendre,
 			message => { void journaliser(`NSIS launch: ${message}`); },
@@ -530,21 +589,27 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 		const step: InstallerStep = erreur instanceof ErreurTravailleur && erreur.nonLance ? "launch"
 			: faits.exitCode !== undefined ? "install"
 			: etape;
-		const appRunning = step === "install" ? await isAppRunning() : false;
+		/* `tasklist` is run from %SystemRoot% only when that value is a plain
+		   `X:\Windows`: an elevated worker must not launch whatever another
+		   value points at. Otherwise the app is not asked about (the cause
+		   reads "Windows refused"). */
+		const racineSysteme = racineSystemeFiable(process.env.SystemRoot);
+		const appRunning = step === "install" && racineSysteme ? await isAppRunning(racineSysteme) : false;
+		/* A verified package is kept for "Try again" by a non-elevated worker
+		   only; anything else (partial, wrong digest, elevated) is removed. */
+		garderPaquet = telechargementVerifie && !eleve;
 		const detail: InstallerErrorDetail = {
 			...faits,
 			step,
-			...(telechargementVerifie ? { downloadVerified: true } : {}),
+			...(garderPaquet ? { downloadVerified: true } : {}),
 			...(appRunning ? { appRunning: true } : {}),
 		};
-		/* A verified package is kept for "Try again"; anything else (partial,
-		   wrong digest) is removed. */
-		garderPaquet = telechargementVerifie;
 		await journaliser(`installation failed (${code}) ${JSON.stringify(detail)}: ${erreur instanceof Error ? erreur.stack ?? erreur.message : String(erreur)}`);
 		envoyer(socket, { type: "erreur", code, detail });
 		await terminerTube(socket);
 		return 1;
 	} finally {
-		if (!garderPaquet) await rm(cheminPaquet, { force: true });
+		if (eleve && dossierPaquet) await rm(dossierPaquet, { recursive: true, force: true });
+		else if (!garderPaquet && cheminPaquet) await rm(cheminPaquet, { force: true });
 	}
 }

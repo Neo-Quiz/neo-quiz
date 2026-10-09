@@ -11,6 +11,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { rmSync } from "node:fs";
 import { access, rm, statfs, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
@@ -33,7 +34,7 @@ import {
 } from "./protocole";
 import { diagnose, parseErrorDetail, resumeFrom, retryAction, retryPlan, technicalDetails } from "./diagnosis";
 import { activeVpn, appendLog, dnsWorksElsewhere, LOG_PATH } from "./probe";
-import { ErreurTravailleur, executerTravailleur, lirePaquetPublie, lireTexteGithub } from "./worker";
+import { cheminCache, ErreurTravailleur, executerTravailleur, lirePaquetPublie, lireTexteGithub } from "./worker";
 
 const DRAPEAU_TRAVAILLEUR = "--neo-quiz-installer-worker";
 /** Écrit à côté de l'exécutable extrait quand la fenêtre a peint son premier
@@ -504,7 +505,7 @@ async function demarrerInstallation(dossier: string, repriseInstallation = false
 
 	const nomTube = `\\\\.\\pipe\\neo-quiz-installer-${randomUUID()}`;
 	const secret = randomBytes(32).toString("hex");
-	const charge: ChargeTravailleur = { secret, dossier: resolve(dossier), paquet: paquetCourant };
+	const charge: ChargeTravailleur = { secret, dossier: resolve(dossier), paquet: paquetCourant, eleve };
 	const encodee = Buffer.from(JSON.stringify(charge), "utf8").toString("base64url");
 
 	try {
@@ -787,6 +788,13 @@ if (travailleur) {
 		});
 		app.on("window-all-closed", () => {
 			if (!installationActive) app.quit();
+		});
+		/* A package kept for "Try again" after a failure has no use once the
+		   window is gone: it is removed when the bootstrapper quits, instead of
+		   staying in %TEMP%. Synchronous, so it runs before the process ends. */
+		app.on("will-quit", () => {
+			if (!paquetCourant) return;
+			try { rmSync(cheminCache(paquetCourant.nom), { force: true }); } catch { /* best effort */ }
 		});
 	}
 }

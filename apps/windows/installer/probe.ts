@@ -54,11 +54,19 @@ export async function dnsWorksElsewhere(timeoutMs = 4_000): Promise<boolean> {
 	}
 }
 
+/** `%SystemRoot%` when it is a plain `X:\Windows` (any drive, any case),
+    else null. The variable belongs to whoever launched the worker: an
+    elevated worker that trusted any value would run
+    `<value>\System32\tasklist.exe` as administrator, wherever it points. */
+export function racineSystemeFiable(value: unknown): string | null {
+	return typeof value === "string" && /^[A-Za-z]:\\Windows$/i.test(value) ? value : null;
+}
+
 /** Is `neo-quiz.exe` running? Asked only after NSIS failed, to tell "the app
     is open" from "Windows refused". `tasklist` from System32 with constant
-    arguments: nothing from a file, a message or the user reaches the command. */
-export async function isAppRunning(timeoutMs = 5_000): Promise<boolean> {
-	const system = process.env.SystemRoot ?? "C:\\Windows";
+    arguments: nothing from a file, a message or the user reaches the command.
+    `system` is a root that `racineSystemeFiable` accepted. */
+export async function isAppRunning(system: string, timeoutMs = 5_000): Promise<boolean> {
 	return await new Promise<boolean>(resolvePromise => {
 		let output = "";
 		let done = false;

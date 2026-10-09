@@ -174,6 +174,11 @@ export interface ChargeTravailleur {
 	secret: string;
 	dossier: string;
 	paquet: PaquetInstallable;
+	/** Launched through the UAC (`main.ts`, `elevationRequise`). An elevated
+	    worker never touches the shared download cache (`worker.ts`,
+	    `dossierTelechargement`); a payload that does not say `false` is read
+	    as elevated. */
+	eleve: boolean;
 }
 
 export type MessageTravailleur =
