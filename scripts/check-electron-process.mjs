@@ -1817,12 +1817,15 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ environnementEn
    fois ; une requête du serveur reçoit un refus, jamais un accord. */
 let tuerArbreReel;
 await withSrcModule("apps/windows/electron/process.ts", (p) => { tuerArbreReel = p.tuerArbre; });
-await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/codex-resets.ts"], async ({ codexResets, oublierLectures, classerErreurServeur }) => {
+await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/codex-resets.ts"], async ({ codexResets, oublierLectures, oublierCadence, classerErreurServeur, CADENCE_CONSUME_MS }) => {
 	const r = makeReporter("Électron — les resets gratuits de Codex (faux app-server)");
 	const tmp = mkdtempSync(join(tmpdir(), "nq-resets-"));
 	const faux = join(process.cwd(), "scripts", "fixtures", "fake-codex-app-server.mjs");
 	const vivant = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 	let n = 0;
+	/* The cadence clock: every scenario starts 11 min after the previous one
+	   unless it passes its own; a consume is confirmed unless told otherwise. */
+	let horloge = 0;
 	/** One scenario: its own log; returns what the fake saw. */
 	const scenario = async (mode, requete, extra = {}) => {
 		const log = join(tmp, "log-" + (++n) + ".jsonl");
@@ -1832,7 +1835,10 @@ await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/cod
 			lancement: extra.lancement ?? ((args) => ({ executable: process.execPath, args: [faux, ...args] })),
 			delaiTotalMs: extra.total, delaiRequeteMs: extra.requete,
 			tuer: async (pid) => { tues.push(pid); await tuerArbreReel(pid); },
+			confirmer: "confirmer" in extra ? extra.confirmer : async () => true,
+			maintenant: () => horloge,
 		};
+		horloge += extra.avance ?? CADENCE_CONSUME_MS + 60000;
 		const resultat = await codexResets(requete, deps);
 		const evs = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)) : [];
 		return { resultat, evs, tues, log };
@@ -1920,10 +1926,38 @@ await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/cod
 	r.check("two probes sent together run one after the other (start, answer, start, answer)",
 		ev2.filter(e => e.ev === "start" || e.ev === "answer").map(e => e.ev), ["start", "answer", "start", "answer"]);
 
-	// 10. Server error messages.
+	// 10. The native confirmation and the cadence of a consume.
+	oublierCadence();
+	await scenario("normal", { action: "read" });
+	const montres = [];
+	const non = await scenario("normal", { action: "consume", creditId: "credit-1" }, { confirmer: async (credit) => { montres.push(credit); return false; } });
+	r.check("consume declined in the native box: `declined`, and the fake codex receives NOTHING", [non.resultat, non.evs.length], [{ ok: false, error: "declined" }, 0]);
+	r.check("the box is given the credit as the last read showed it (title, description)", [montres.length, montres[0]?.id, montres[0]?.title, montres[0]?.description], [1, "credit-1", "Full reset (Weekly + 5 hr)", "<img src=x onerror=alert(1)> Thanks for using Codex!"]);
+	const sansBoite = await scenario("normal", { action: "consume", creditId: "credit-1" }, { confirmer: undefined });
+	r.check("no confirmation wired: nothing is ever spent", [sansBoite.resultat, sansBoite.evs.length], [{ ok: false, error: "declined" }, 0]);
+	const oui = await scenario("normal", { action: "consume", creditId: "credit-1" });
+	r.check("consume accepted: ONE consume reaches the fake", [oui.resultat.ok, oui.evs.filter(e => e.ev === "recv" && e.method === "account/rateLimitResetCredit/consume").length], [true, 1]);
+	await scenario("normal", { action: "read" }, { avance: 1000 });
+	let demande = 0;
+	const tot = await scenario("normal", { action: "consume", creditId: "credit-2" }, { avance: 60000, confirmer: async () => { demande++; return true; } });
+	r.check("a second consume before 10 minutes: `too-soon`, no box, no process", [tot.resultat, demande, tot.evs.length], [{ ok: false, error: "too-soon" }, 0, 0]);
+	const apres = await scenario("normal", { action: "consume", creditId: "credit-2" }, { avance: CADENCE_CONSUME_MS });
+	r.check("10 minutes later the consume goes through", apres.resultat, { ok: true, action: "consume", outcome: "reset" });
+	r.check("the cadence is ten minutes", CADENCE_CONSUME_MS, 600000);
+
+	// 11. Output decoded as a stream: a character split across two chunks stays whole.
+	oublierLectures();
+	const coupe = await scenario("split", { action: "read" });
+	r.check("a UTF-8 character split between two chunks is read whole", coupe.resultat.resets?.credits[0].title, "Réinitialisation complète");
+
+	// 12. A process that already exited is not killed (its pid may be someone else's).
+	const mortTot = await scenario("die", { action: "read" });
+	r.check("the server exits on its own: no kill on a dead pid", [mortTot.resultat, mortTot.tues], [{ ok: false, error: "unavailable" }, []]);
+
+	// 13. Server error messages.
 	r.check("an authentication error is told apart", [classerErreurServeur("chatgpt authentication required"), classerErreurServeur("boom")], ["not-signed-in", "unavailable"]);
 
-	// 11. The module never touches auth.json, and sends only two methods.
+	// 14. The module never touches auth.json, and sends only two methods.
 	const src = readFileSync(join(process.cwd(), "apps", "windows", "electron", "codex-resets.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 	r.check("codex-resets.ts never names auth.json nor reads a file", [/auth\.json/.test(src), /readFile|writeFile|createReadStream/.test(src)], [false, false]);
 	r.check("the only two methods it can send are the two named ones", [...new Set([...src.matchAll(/"(account\/[A-Za-z/]+)"/g)].map(m => m[1]))].sort(), ["account/rateLimitResetCredit/consume", "account/rateLimits/read"]);

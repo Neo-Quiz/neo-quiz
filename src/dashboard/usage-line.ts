@@ -100,6 +100,7 @@ const OUTCOME_KEYS = {
 	reset: "ai.usage.resetOutcomeReset", nothingToReset: "ai.usage.resetOutcomeNothing", noCredit: "ai.usage.resetOutcomeNoCredit", alreadyRedeemed: "ai.usage.resetOutcomeAlready",
 	"not-installed": "ai.usage.resetErrNotInstalled", "not-signed-in": "ai.usage.resetErrNotSignedIn", timeout: "ai.usage.resetErrTimeout",
 	unavailable: "ai.usage.resetErrUnavailable", refused: "ai.usage.resetErrStale", "unknown-credit": "ai.usage.resetErrStale",
+	declined: "ai.usage.resetErrDeclined", "too-soon": "ai.usage.resetErrTooSoon",
 } as const;
 
 /** Redraws of every live mount: a reading started by a mount the page has since

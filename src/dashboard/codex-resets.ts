@@ -30,7 +30,9 @@ export type ResetOutcome = "reset" | "nothingToReset" | "noCredit" | "alreadyRed
 /** What the window may ask: the action and a credit id, nothing else. */
 export type ResetsRequest = { action: "read" } | { action: "consume"; creditId: string };
 
-export type ResetsError = "not-installed" | "not-signed-in" | "unavailable" | "timeout" | "refused" | "unknown-credit";
+/** `declined`: the user said no in the native confirmation; `too-soon`: a
+    consume was sent less than 10 minutes ago (main-process cadence). */
+export type ResetsError = "not-installed" | "not-signed-in" | "unavailable" | "timeout" | "refused" | "unknown-credit" | "declined" | "too-soon";
 
 export type ResetsResult =
 	| { ok: true; action: "read"; resets: ResetsRead }

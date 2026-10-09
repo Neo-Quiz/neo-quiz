@@ -62,6 +62,7 @@ import type { Perimetre } from "./perimetre";
 import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
 import { deconnecterCompte, etatComptes, usageCompte } from "./comptes";
 import { codexResets } from "./codex-resets";
+import type { ResetCredit } from "../../../src/dashboard/codex-resets";
 import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
@@ -1332,8 +1333,29 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	});
 
 	/* Banked resets: the request is judged in `codexResets` (action, credit id
-	   seen in the last read); a refusal is a result, not a thrown error. */
-	ipcMain.handle(CANAUX.comptesResets, (_e, requete: unknown) => codexResets(requete));
+	   seen in the last read, cadence); a refusal is a result, not a thrown
+	   error. A consume is confirmed HERE, in a native modal box written and
+	   translated by the main process (same door as `garderReglagesIa`): a
+	   compromised window can neither word it nor answer it. The credit's
+	   title and description are the server's, as the last read gave them,
+	   shown as plain text. `cancelId` = no: closing the box is a refusal. */
+	const texteDialogue = (v: string | null): string => (v ?? "").replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ").trim();
+	const confirmerReset = async (credit: ResetCredit): Promise<boolean> => {
+		const options = {
+			type: "question" as const,
+			title: t("app.codexReset.title"),
+			message: t("app.codexReset.message"),
+			detail: [texteDialogue(credit.title) || t("app.codexReset.fallbackTitle"), texteDialogue(credit.description)].filter(Boolean).join("\n"),
+			buttons: [t("app.codexReset.spend"), t("app.codexReset.cancel")],
+			defaultId: 1,
+			cancelId: 1,
+			noLink: true,
+		};
+		const parent = deps.fenetreCourante();
+		const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+		return response === 0;
+	};
+	ipcMain.handle(CANAUX.comptesResets, (_e, requete: unknown) => codexResets(requete, { confirmer: confirmerReset }));
 
 	ipcMain.handle(CANAUX.comptesDeconnecter, (_e, tool: unknown): Promise<"ok" | "echec" | "indisponible"> => {
 		if (!estOutilAutorise(tool)) {

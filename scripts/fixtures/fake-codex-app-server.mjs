@@ -3,7 +3,9 @@
 // receives. It never touches a real account, a real credit, or auth.json.
 // Behaviour is chosen by environment variables:
 //   FAKE_LOG      file that receives one JSON line per event
-//   FAKE_MODE     normal | hang | serverreq | slow
+//   FAKE_MODE     normal | hang | serverreq | slow | split (the read answer
+//                 arrives in two chunks cut inside a UTF-8 character) | die
+//                 (exits on receiving the method, without answering)
 //   FAKE_OUTCOME  the `outcome` that consume answers
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -33,6 +35,14 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 	if (m.method === "initialize") return send({ id: m.id, result: { userAgent: "fake" } });
 	if (m.method === "initialized") return;
 	if (mode === "hang") return;
+	if (mode === "die") process.exit(3);
+	if (mode === "split" && m.method === "account/rateLimits/read") {
+		const octets = Buffer.from(JSON.stringify({ id: m.id, result: { rateLimitResetCredits: { availableCount: 1, credits: [{ id: "credit-9", status: "available", title: "Réinitialisation complète" }] } } }) + "\n", "utf8");
+		const coupe = octets.indexOf(Buffer.from("é", "utf8")) + 1;
+		process.stdout.write(octets.subarray(0, coupe));
+		setTimeout(() => process.stdout.write(octets.subarray(coupe)), 150);
+		return;
+	}
 	const answer = (result) => { log({ ev: "answer", method: m.method }); send({ id: m.id, result }); };
 	const reply = (result) => (mode === "slow" ? setTimeout(() => answer(result), 300) : answer(result));
 	if (mode === "serverreq") send({ id: 900, method: "item/commandExecution/requestApproval", params: { command: "calc" } });

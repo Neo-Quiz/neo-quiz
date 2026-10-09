@@ -16,6 +16,10 @@
    executable is resolved from its NAME on the PATH like every other Codex
    launch, and its arguments are the exact form of `gabarits-cli.ts`. This
    module never reads nor writes `auth.json`: Codex uses its own sign-in.
+   A consume is spent only after a NATIVE confirmation (`confirmer`, a modal
+   message box written and translated in the main process, so a compromised
+   window can neither word it nor answer it), and at most once every
+   `CADENCE_CONSUME_MS`: the window cannot drain the banked credits.
    Never call `consume` on a real account from a test: `check:electron-process`
    runs a FAKE app-server.
 ══════════════════════════════════════════════════════════ */
@@ -27,12 +31,14 @@ import { existsSync } from "node:fs";
 import { LOG_PREFIX } from "../../../src/branding";
 import { ligneCmd } from "../../../src/host/cli-args";
 import { parseConsumeOutcome, parseResetCredits, readResetsRequest, spendable } from "../../../src/dashboard/codex-resets";
-import type { ResetsError, ResetsResult } from "../../../src/dashboard/codex-resets";
+import type { ResetCredit, ResetsError, ResetsResult } from "../../../src/dashboard/codex-resets";
 import { ARGS_CODEX_APP_SERVER, argumentsAppServer } from "./gabarits-cli";
 import { dossierPersonnel, environnementEnfant, resoudreExecutable, tuerArbre } from "./process";
 
 export const DELAI_TOTAL_MS = 15000;
 export const DELAI_REQUETE_MS = 12000;
+/** At most one consume this often, whatever the window asks. */
+export const CADENCE_CONSUME_MS = 10 * 60 * 1000;
 /** More buffered output than this without a newline is not Codex: dropped. */
 const LIGNE_MAX = 4 * 1024 * 1024;
 
@@ -44,15 +50,24 @@ export interface DepsResets {
 	delaiTotalMs?: number;
 	delaiRequeteMs?: number;
 	tuer?: (pid: number | undefined) => Promise<void>;
+	/** The native confirmation of a consume, given the credit as the last read
+	    showed it; true spends. Absent: nothing is ever spent. */
+	confirmer?: (credit: ResetCredit) => Promise<boolean>;
+	/** The clock of the consume cadence (a check passes its own). */
+	maintenant?: () => number;
 }
 
 class ErreurResets extends Error {
 	constructor(readonly code: ResetsError, message: string) { super(message); }
 }
 
-/** The ids of the credits the LAST read showed; a consume must name one. */
-let idsVus = new Set<string>();
-export function oublierLectures(): void { idsVus = new Set(); }
+/** The credits the LAST read showed, by id; a consume must name one. */
+let creditsVus = new Map<string, ResetCredit>();
+/** When the last consume was sent, null before any. */
+let dernierConsume: number | null = null;
+export function oublierLectures(): void { creditsVus = new Map(); }
+/** For checks only: forgets the cadence. */
+export function oublierCadence(): void { dernierConsume = null; }
 
 let file: Promise<unknown> = Promise.resolve();
 
@@ -126,8 +141,10 @@ async function appeler(methode: "account/rateLimits/read" | "account/rateLimitRe
 			envoyer({ id: m.id, error: { code: -32601, message: "Method not found" } });
 		}
 	};
-	enfant.stdout?.on("data", (d: unknown) => {
-		tampon += String(d);
+	// Decoded as a stream: a character split across two chunks stays whole.
+	enfant.stdout?.setEncoding("utf8");
+	enfant.stdout?.on("data", (d: string) => {
+		tampon += d;
 		if (tampon.length > LIGNE_MAX) { echouerTout(new ErreurResets("unavailable", "response too long")); return; }
 		let i: number;
 		while ((i = tampon.indexOf("\n")) >= 0) {
@@ -165,8 +182,10 @@ async function appeler(methode: "account/rateLimits/read" | "account/rateLimitRe
 	} finally {
 		if (delai) clearTimeout(delai);
 		echouerTout(new ErreurResets("unavailable", "closed"));
-		// The whole tree, on every outcome; awaited so a probe never overlaps the next.
-		await tuer(enfant.pid);
+		/* The whole tree, on every outcome; awaited so a probe never overlaps
+		   the next. Not once the process has exited: its pid may already
+		   belong to another program. */
+		if (enfant.exitCode === null && enfant.signalCode === null) await tuer(enfant.pid);
 	}
 }
 
@@ -180,23 +199,30 @@ function enResultat(e: unknown): ResetsResult {
 export function codexResets(raw: unknown, deps: DepsResets = {}): Promise<ResetsResult> {
 	const req = readResetsRequest(raw);
 	if (!req) return Promise.resolve({ ok: false, error: "refused" });
-	if (req.action === "consume" && !idsVus.has(req.creditId)) return Promise.resolve({ ok: false, error: "unknown-credit" });
+	if (req.action === "consume" && !creditsVus.has(req.creditId)) return Promise.resolve({ ok: false, error: "unknown-credit" });
 	return enfiler(async (): Promise<ResetsResult> => {
 		try {
 			if (req.action === "read") {
 				const resultat = await appeler("account/rateLimits/read", {}, deps);
 				// A Codex without the banked-reset fields has none to show.
 				const resets = parseResetCredits(resultat) ?? { availableCount: 0, credits: [] };
-				idsVus = new Set(spendable(resets).map(c => c.id));
+				creditsVus = new Map(spendable(resets).map(c => [c.id, c]));
 				return { ok: true, action: "read", resets };
 			}
 			// Re-checked inside the queue: an earlier probe may have used it.
-			if (!idsVus.has(req.creditId)) return { ok: false, error: "unknown-credit" };
+			const credit = creditsVus.get(req.creditId);
+			if (!credit) return { ok: false, error: "unknown-credit" };
+			const maintenant = deps.maintenant ?? Date.now;
+			// The cadence is judged BEFORE the dialog: the window cannot spam modals either.
+			if (dernierConsume !== null && maintenant() - dernierConsume < CADENCE_CONSUME_MS) return { ok: false, error: "too-soon" };
+			if (!deps.confirmer || !(await deps.confirmer(credit))) return { ok: false, error: "declined" };
+			// Counted once sent: a consume that times out may still have been spent.
+			dernierConsume = maintenant();
 			const resultat = await appeler("account/rateLimitResetCredit/consume", { idempotencyKey: randomUUID(), creditId: req.creditId }, deps);
 			const outcome = parseConsumeOutcome(resultat);
 			if (!outcome) return { ok: false, error: "unavailable" };
 			// Spent, or known to be unusable: a new read must show it again.
-			idsVus.delete(req.creditId);
+			creditsVus.delete(req.creditId);
 			return { ok: true, action: "consume", outcome };
 		} catch (e) {
 			return enResultat(e);

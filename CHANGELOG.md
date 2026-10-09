@@ -26,6 +26,7 @@ release notes.
 - Generated Learn readings favour interactive pages: explorable diagrams where you change a value and see what it means, symbol tables with each symbol drawn, and annotated diagrams, mixed when that helps.
 - A finished quiz saves its results automatically, once per attempt (a "Retry saving" button appears only if the save fails). The results screen offers "Delete these results" instead, after a confirmation: the file goes to the trash and the attempt leaves the progress history. Deleting an attempt from a folder's progress also moves its results file to the trash.
 - The plan usage block now shows a plain empty track at 0 %, sinks and rebounds on press, its popover bars fill in on opening, and the popover shows the account email of Claude Code and Codex under its title (never the plan), read at most every 10 minutes and only once the popover is opened.
+- Spending a banked Codex reset now also asks in a native Windows dialog, which shows the reset's title and description, with Cancel as the default; at most one reset can be spent every 10 minutes.
 
 ### Fixed
 

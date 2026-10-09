@@ -122,6 +122,8 @@ export const EN_AI = {
 	"ai.usage.resetErrTimeout": "Codex did not answer in time.",
 	"ai.usage.resetErrUnavailable": "Could not reach Codex.",
 	"ai.usage.resetErrStale": "This reset is no longer listed. Refresh and try again.",
+	"ai.usage.resetErrDeclined": "The reset was not spent.",
+	"ai.usage.resetErrTooSoon": "A reset was spent less than 10 minutes ago. Try again later.",
 
 	/* ── Options de génération ── */
 	/* Libellés des types de questions. La VALEUR envoyée au modèle reste

@@ -106,6 +106,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.usage.resetErrTimeout": "Codex n'a pas répondu à temps.",
 	"ai.usage.resetErrUnavailable": "Impossible de joindre Codex.",
 	"ai.usage.resetErrStale": "Ce reset n'est plus listé. Actualisez puis réessayez.",
+	"ai.usage.resetErrDeclined": "Le reset n'a pas été dépensé.",
+	"ai.usage.resetErrTooSoon": "Un reset a été dépensé il y a moins de 10 minutes. Réessayez plus tard.",
 
 	/* ── Options de génération ── */
 	"ai.type.mixed": "Auto",
