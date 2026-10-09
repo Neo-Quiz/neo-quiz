@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.61] - 2026-10-09
+
 ### Added
 
 - PDF sources under a Learn's title: one chip per document its cards cite, which opens the PDF in a built-in viewer (lazy pages, zoom, page counter, selectable text); a reading's source line opens the PDF at its page. Works on PC and Android.
