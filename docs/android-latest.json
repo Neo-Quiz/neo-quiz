@@ -1,8 +1,8 @@
 {
-  "versionCode": 24,
-  "versionName": "0.2.22",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.22/NeoQuiz-0.2.22.apk",
-  "sha256": "a3aef4e027e7c2d99cd63d6e0d852e3b9b0717b6bc21269a3ca202cf70e027d3",
-  "size": 56010013,
-  "notes": "Explain opens as a full-screen sheet"
+  "versionCode": 25,
+  "versionName": "0.2.23",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.23/NeoQuiz-0.2.23.apk",
+  "sha256": "f0bad0db94ce3479fbe18ca919e68ec50560bc44d2036af2f5239bf400652822",
+  "size": 56012161,
+  "notes": "Plan usage details on tap"
 }
