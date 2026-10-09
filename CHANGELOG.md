@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.59] - 2026-10-09
+
 ### Changed
 
 - A quiz you already started now shows "Resume" instead of "Start the quiz" on its page, with a thin progress bar along the bottom of the button.
