@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.55] - 2026-10-09
+
 ### Added
 
 - Several chats can generate at the same time; requests inside one chat still run one after the other.
