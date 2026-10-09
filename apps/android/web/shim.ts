@@ -183,6 +183,11 @@ const pont: Pont = {
 	processus: {
 		run: (spec, requeteId, flux) => appeler("processus.run", [spec, requeteId, flux]),
 		annuler: (requeteId) => appeler("processus.annuler", [requeteId]),
+		/* No CLI on a phone, so no folder is ever trusted for one: answered
+		   here, without a channel (2026-10-09). */
+		confiance: async () => "indisponible" as const,
+		confianceListe: async () => [],
+		confianceRetirer: async () => {},
 		lireCache: (tool) => appeler("processus.lireCache", [tool]),
 		ollamaInstalle: () => appeler("processus.ollamaInstalle"),
 		demarrerOllama: () => appeler("processus.demarrerOllama"),

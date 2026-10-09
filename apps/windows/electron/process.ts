@@ -1624,7 +1624,7 @@ export async function avecFichiers<T>(
 		const marqueur = spec.marqueur;
 		const remplacer = (s: string): string => marqueur === undefined
 			? s
-			: substituerJetons(s, { marqueur, chemins, sortie: cheminSortie, maison: dossierPersonnel(env) });
+			: substituerJetons(s, { marqueur, chemins, sortie: cheminSortie, maison: dossierPersonnel(env), pieces: fichiers.length > 0 ? dossier : "" });
 		const resultat = await executer({ args: spec.args.map(remplacer), stdin: remplacer(spec.stdin) });
 		let sortie: string | undefined;
 		if (cheminSortie) {
@@ -2194,6 +2194,11 @@ export async function run(spec: {
 	marqueur?: string;
 	fichiers?: FichierJoint[];
 	sortieFichier?: string;
+	/** The working directory, ALREADY JUDGED by the caller (2026-10-09):
+	    only the read-only tools form of Claude Code gets one, a folder the
+	    user trusted and that is inside the perimeter (`canaux.ts`). Absent:
+	    the home folder, as every call before. */
+	cwd?: string;
 }, options: {
 	env?: NodeJS.ProcessEnv;
 	/** Les deux coutures de `lancer`, transmises telles quelles. */
@@ -2270,7 +2275,7 @@ export async function run(spec: {
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
 				env: environnementEnfant(env),
-				cwd: dossierPersonnel(env),
+				cwd: spec.cwd ?? dossierPersonnel(env),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
 				surStdout: options.surStdout,

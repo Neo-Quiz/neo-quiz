@@ -73,7 +73,8 @@ import type { Reglages } from "./reglages";
 import { autoriserHote, fetchBorne, retirerHote } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
-import { argumentsAutorises } from "./gabarits-cli";
+import { argumentsAutorises, argumentsAvecOutils } from "./gabarits-cli";
+import { ajouterApprouve, CLE_CONFIANCE_IA, dossierCanonique, estApprouve, jugerDossierOutils, lireApprouves, retirerApprouve } from "./confiance-ia";
 import { creerReprises, estCleReprise } from "./resumable-runs";
 
 /** How long a generation whose page reloaded waits to be claimed again
@@ -543,7 +544,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (cle === CLE_DOSSIER_DEFAUT) await verifierDossierDefaut(perimetre, valeur);
 		/* `syncActif` decides whether a binary is launched at startup: only the
 		   main process writes it (after a first pairing). */
-		if (reglageReserve(String(cle))) throw new Error("réglage refusé : " + String(cle) + " n'est écrit que par le processus principal");
+		if (reglageReserve(String(cle)) || String(cle) === CLE_CONFIANCE_IA) throw new Error("réglage refusé : " + String(cle) + " n'est écrit que par le processus principal");
 		await reglagesOuErreur().ecrire(String(cle), valeur);
 	});
 
@@ -640,7 +641,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.reglagesSupprimer, (_e, cle: string) => {
 		/* Removing `syncRoot` would let the next start pin the (renderer-changeable)
 		   default folder as the shared one: same refusal as the write. */
-		if (reglageReserve(String(cle))) throw new Error("réglage refusé : " + String(cle) + " n'est supprimé que par le processus principal");
+		if (reglageReserve(String(cle)) || String(cle) === CLE_CONFIANCE_IA) throw new Error("réglage refusé : " + String(cle) + " n'est supprimé que par le processus principal");
 		return reglagesOuErreur().supprimer(String(cle));
 	});
 
@@ -1493,6 +1494,83 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 
 	   L'ENVELOPPE (`ResultatCli`, `pont.ts`) et non un rejet : l'IPC perd le
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
+
+	/* ─── TRUSTED FOLDERS (2026-10-09, `confiance-ia.ts`) ───
+	   The window ASKS; the main process words the question, shows it in a
+	   native dialog, and writes the answer to a settings key the generic
+	   write refuses. A folder refused in the dialog is not asked again until
+	   the app restarts (one question per folder and session, as a terminal
+	   asks once). One dialog at a time: a second ask for the same folder
+	   waits for the first answer, an ask for another folder waits its turn. */
+	const refusesSession = new Set<string>();
+	const questionsEnCours = new Map<string, Promise<"approuve" | "refuse">>();
+	let fileDialogues: Promise<unknown> = Promise.resolve();
+	const approuves = async () => lireApprouves(await reglagesOuErreur().lire(CLE_CONFIANCE_IA));
+	/** The resolved working folder of a tools run, or `undefined` when the
+	    folder it names is not a folder, not in the perimeter, or not trusted. */
+	async function dossierOutilsJuge(dossier: unknown): Promise<string | undefined> {
+		const c = await dossierCanonique(dossier);
+		const ok = jugerDossierOutils({
+			reel: c?.real ?? null,
+			estDossier: c !== null,
+			dansPerimetre: c !== null && await perimetre.contient(c.real),
+			approuves: await approuves(),
+		});
+		return ok && c ? path.resolve(c.real) : undefined;
+	}
+	async function poserQuestionConfiance(c: { path: string; real: string }): Promise<"approuve" | "refuse"> {
+		const options = {
+			type: "question" as const,
+			title: t("app.aiTrust.title"),
+			message: t("app.aiTrust.message", { folder: c.path.replace(/\//g, path.sep) }),
+			detail: t("app.aiTrust.detail"),
+			buttons: [t("app.aiTrust.trust"), t("app.aiTrust.cancel")],
+			defaultId: 1,
+			cancelId: 1,
+			noLink: true,
+		};
+		const parent = deps.fenetreCourante();
+		const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+		if (response !== 0) {
+			refusesSession.add(c.real.toLowerCase());
+			return "refuse";
+		}
+		const liste = ajouterApprouve(await approuves(), { path: c.path, real: c.real, at: new Date().toISOString() });
+		await reglagesOuErreur().ecrire(CLE_CONFIANCE_IA, liste);
+		console.log(LOG_PREFIX, "dossier approuvé pour l'IA:", c.real);
+		return "approuve";
+	}
+	ipcMain.handle(CANAUX.processusConfiance, async (_e, dossier: unknown): Promise<"approuve" | "refuse" | "indisponible"> => {
+		const c = await dossierCanonique(dossier);
+		if (!c || !(await perimetre.contient(c.real))) return "indisponible";
+		if (estApprouve(c.real, await approuves())) return "approuve";
+		const cle = c.real.toLowerCase();
+		if (refusesSession.has(cle)) return "refuse";
+		const enCours = questionsEnCours.get(cle);
+		if (enCours) return enCours;
+		const question = fileDialogues.then(async () => {
+			// Answered while waiting in line (another ask trusted it): no second dialog.
+			if (estApprouve(c.real, await approuves())) return "approuve" as const;
+			if (refusesSession.has(cle)) return "refuse" as const;
+			return poserQuestionConfiance(c);
+		});
+		fileDialogues = question.catch(() => undefined);
+		questionsEnCours.set(cle, question);
+		try {
+			return await question;
+		} finally {
+			questionsEnCours.delete(cle);
+		}
+	});
+	ipcMain.handle(CANAUX.processusConfianceListe, async (): Promise<string[]> =>
+		(await approuves()).map(a => a.path.replace(/\//g, path.sep)));
+	ipcMain.handle(CANAUX.processusConfianceRetirer, async (_e, dossier: unknown): Promise<void> => {
+		if (typeof dossier !== "string") return;
+		const avant = await approuves();
+		const apres = retirerApprouve(avant, dossier);
+		if (apres.length !== avant.length) await reglagesOuErreur().ecrire(CLE_CONFIANCE_IA, apres);
+	});
+
 	const cliEnVol = new Map<number, { controleur: AbortController; page: Electron.WebContents; reprenable: boolean }>();
 	/* A PAGE THAT GOES AWAY TAKES ITS CLIs WITH IT (2026-09-30): a reload of
 	   the window (update, crash, Ctrl+R) left the running Claude Code going
@@ -1544,6 +1622,22 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			return { ok: false, nom: "refuse", message: "arguments refusés pour " + tool };
 		}
 		const args = s.args as string[];
+		/* THE READ-ONLY TOOLS FORM RUNS IN ITS FOLDER, AND ONLY THERE
+		   (2026-10-09). The form alone proves nothing about where the CLI
+		   runs: the folder it names must resolve on the disk to a folder,
+		   lie inside the perimeter, and be covered by a folder the user
+		   trusted in the native dialog. The CLI then runs IN that folder,
+		   resolved. Any other form ignores `dossier` and runs in the home
+		   folder, as before: a folder can never give tools to a call that
+		   did not ask for the tools form. */
+		let cwd: string | undefined;
+		if (argumentsAvecOutils(tool, args, s.marqueur)) {
+			cwd = await dossierOutilsJuge(s.dossier);
+			if (!cwd) {
+				console.warn(LOG_PREFIX, "CLI refusé, outils hors d'un dossier approuvé:", tool);
+				return { ok: false, nom: "refuse", message: "outils refusés : dossier non approuvé" };
+			}
+		}
 		const fichiers = Array.isArray(s.fichiers)
 			? s.fichiers
 				.filter((f): f is { nom: string; base64: string } =>
@@ -1570,7 +1664,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   random for each call (`nouveauMarqueur`), so the replay of a line
 		   after a reload carries a new one in its tokens — the rest must be
 		   the same for an attach. */
-		const empreinte = cleReprise ? empreinteAppel(tool, args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
+		const empreinte = cleReprise ? empreinteAppel(cwd ? tool + "@" + cwd : tool, args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
 		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, empreinte, surStdout ?? null) : null;
 		if (rattache) {
 			const enVolRattache = { controleur: rattache.controleur, page: expediteur, reprenable: true };
@@ -1598,6 +1692,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 					fichiers,
 					sortieFichier: typeof s.sortieFichier === "string" ? s.sortieFichier : undefined,
 					signal: controleur.signal,
+					cwd,
 				}, { surStdout: emettre });
 				return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
 			} catch (e) {

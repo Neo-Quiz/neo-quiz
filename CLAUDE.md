@@ -985,7 +985,23 @@ du réseau et hors réseau local demande une confirmation NATIVE, et
 `aiMentionExtraFolders` doit déjà être au périmètre. Sans elle, un rendu
 compromis obtenait un hôte Internet dans la liste au lancement suivant.
 
-Le CLI est lancé **sans aucun outil** : le modèle ne peut ouvrir aucun fichier. C'est
+Le CLI est lancé **sans aucun outil**, SAUF Claude Code dans un **dossier de confiance**
+(depuis le 2026-10-09) : avant la première génération qui vise un dossier, le
+PRINCIPAL pose sa question NATIVE (« Faire confiance » / « Annuler »,
+`canaux.ts`) et garde la réponse (chemin et `realpath`) sous la clé réservée
+`aiTrustedFolders` (`confiance-ia.ts`) ; le rendu ne fait que demander. Approuvé,
+le CLI tourne avec `cwd` = ce dossier, jugé par le principal (résolu, au
+périmètre, couvert par un dossier approuvé), et la forme d'appel unique de
+`gabarits-cli.ts` (`argumentsAvecOutils`) : `--tools Read,Grep,Glob`,
+`--allowedTools Read(./**)`, `--disallowedTools` (Bash, Write, Edit, Task,
+WebFetch, WebSearch, `mcp__*`…), `--permission-mode dontAsk`,
+`--permission-prompts none`, `--restricted`, `--setting-sources ""`,
+`--settings {"disableAllHooks":true}`, `--strict-mcp-config` avec un
+`--mcp-config` vide, et `--add-dir` du seul dossier des pièces jointes. Chaque
+appel d'outil et son résultat (refus compris) s'affichent dans le bloc replié
+« Travail de l'IA » (`transcript.ts`). Codex, Antigravity, Ollama, le chat
+« Expliquer », la clarification et toute demande venue d'un autre appareil
+restent sans outil. Sinon, le modèle ne peut ouvrir aucun fichier. C'est
 l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
 dans le composer (vault, chemin absolu, racine externe configurée) et
 `startGeneration` les attache via les mêmes fonctions que le picker « @ ». Un chemin

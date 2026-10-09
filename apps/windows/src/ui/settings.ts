@@ -440,6 +440,36 @@ export function renderSettings(
 	   would come back by itself as soon as a channel becomes paid. */
 	if (!unPayant) payants.remove();
 
+	/* TRUSTED FOLDERS (2026-10-09): where Claude Code may read and search
+	   the files with read-only tools. Only the main process's native dialog
+	   adds one; here they are listed, and "Remove" takes one off (removing
+	   only takes a capability away, so it asks nothing). */
+	const proc = currentHost().process;
+	if (!mobile && proc?.trustedFolders && proc.untrustFolder) {
+		const confiance = section(aiPage, t("app.settings.trustedFolders"), t("app.settings.trustedFoldersHint"));
+		const carte = card(confiance);
+		const peindreConfiance = async (): Promise<void> => {
+			let dossiers: string[] = [];
+			try { dossiers = await proc.trustedFolders!(); } catch { dossiers = []; }
+			carte.replaceChildren();
+			if (!dossiers.length) {
+				ajouter(ajouter(carte, "div", "nq-set-ligne"), "span", "nq-set-ligne-aide", t("app.settings.trustedFoldersEmpty"));
+				return;
+			}
+			for (const d of dossiers) {
+				const retirer = ajouter(row(carte, d), "button", "nq-reglages-changer", t("app.settings.trustedFolderRemove"));
+				retirer.type = "button";
+				retirer.setAttribute("aria-label", t("app.settings.trustedFolderRemoveLabel", { folder: d }));
+				retirer.addEventListener("click", async () => {
+					retirer.disabled = true;
+					try { await proc.untrustFolder!(d); } catch (e) { console.warn("[neo-quiz] trusted folder not removed:", e); }
+					await peindreConfiance();
+				});
+			}
+		};
+		void peindreConfiance();
+	}
+
 	/* No "Generation layout" any more (2026-09-30): the conversation is always
 	   full width, so everything Claude Code or Codex does shows. */
 

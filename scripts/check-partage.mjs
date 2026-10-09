@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutorises, argumentsAppServer, ARGS_CODEX_APP_SERVER }) => {
+await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsAppServer, ARGS_CODEX_APP_SERVER }, { ARGS_OUTILS_CLAUDE }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 	const j = (nom) => `{{nq-${m}:${nom}}}`;
@@ -157,11 +157,106 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 		argumentsAutorises("claude", (() => { const a = avecEffort("high"); a.splice(9, 0, "--effort", "low"); return a; })(), m),
 		argumentsAutorises("claude", avecEffort("high").filter((x, i) => i !== 8), m),
 	], [false, false, false]);
+	/* READ-ONLY TOOLS IN A TRUSTED FOLDER (2026-10-09): exactly one tail of
+	   options, measured on Claude Code 2.1.296; anything that would give the
+	   model a command, a write, a server or a bypass is refused. */
+	const FIN_OUTILS = ["--tools", "Read,Grep,Glob", "--allowedTools", "Read(./**)",
+		"--disallowedTools", "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*",
+		"--permission-mode", "dontAsk", "--permission-prompts", "none", "--restricted", "--no-session-persistence",
+		"--setting-sources", "", "--settings", "{\"disableAllHooks\":true}", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}"];
+	const outils = (modele = "haiku", effort = null, pieces = false) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
+		...(effort ? ["--effort", effort] : []), ...FIN_OUTILS, ...(pieces ? ["--add-dir", j("pieces")] : [])];
+	const remplacer = (a, de, vers) => a.map(x => (x === de ? vers : x));
+	r.check("claude with read-only tools: accepted with and without effort, with the attachments folder",
+		[argumentsAvecOutils("claude", outils(), m), argumentsAvecOutils("claude", outils("opus", "high"), m), argumentsAvecOutils("claude", outils("sonnet", null, true), m),
+			argumentsAutorises("claude", outils(), m), argumentsAutorises("claude", outils("opus", "max", true), m)], [true, true, true, true, true]);
+	r.check("claude with tools: the plain forms are NOT the tools form (they run in the home folder, no folder judged)",
+		[argumentsAvecOutils("claude", claude("sonnet", ""), m), argumentsAvecOutils("claude", claude("sonnet", "Read"), m), argumentsAvecOutils("codex", outils(), m)], [false, false, false]);
+	r.check("claude with tools: Bash, Write or WebFetch allowed, or Bash no longer denied, is refused", [
+		remplacer(outils(), "Read,Grep,Glob", "Read,Grep,Glob,Bash"),
+		remplacer(outils(), "Read,Grep,Glob", "default"),
+		remplacer(outils(), "Read(./**)", "Read"),
+		remplacer(outils(), "Read(./**)", "Bash"),
+		remplacer(outils(), "Read(./**)", "Read(./**),WebFetch"),
+		remplacer(outils(), "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*", "Write,Edit"),
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false, false, false]);
+	r.check("claude with tools: a permission bypass in any form is refused", [
+		remplacer(outils(), "dontAsk", "bypassPermissions"),
+		remplacer(outils(), "dontAsk", "acceptEdits"),
+		remplacer(outils(), "dontAsk", "auto"),
+		remplacer(outils(), "none", "host"),
+		[...outils(), "--dangerously-skip-permissions"],
+		[...outils(), "--allow-dangerously-skip-permissions"],
+		outils().filter(x => x !== "--restricted"),
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false, false, false, false]);
+	r.check("claude with tools: an MCP configuration that is not empty, or no strict MCP, is refused", [
+		remplacer(outils(), "{\"mcpServers\":{}}", "{\"mcpServers\":{\"x\":{\"command\":\"calc.exe\"}}}"),
+		remplacer(outils(), "{\"mcpServers\":{}}", "C:/x/mcp.json"),
+		outils().filter(x => x !== "--strict-mcp-config"),
+		[...outils(), "--mcp-config", "{}"],
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false]);
+	r.check("claude with tools: settings or setting sources that let hooks run are refused", [
+		remplacer(outils(), "{\"disableAllHooks\":true}", "{\"disableAllHooks\":false}"),
+		remplacer(outils(), "{\"disableAllHooks\":true}", "{\"hooks\":{}}"),
+		(() => { const a = outils(); a[a.indexOf("--setting-sources") + 1] = "project"; return a; })(),
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false]);
+	r.check("claude with tools: --add-dir only on the attachments token of THIS call, never a chosen folder", [
+		[...outils(), "--add-dir", "C:/Users"],
+		[...outils(), "--add-dir", `{{nq-${"f".repeat(32)}:pieces}}`],
+		[...outils(), "--add-dir", j("home")],
+		[...outils(), "--add-dir", j("pieces"), "--add-dir", j("pieces")],
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false]);
+	r.check("the page's list of tools options (src/host/claude-outils.ts) is exactly the form accepted here",
+		argumentsAvecOutils("claude", ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_OUTILS_CLAUDE], m), true);
 	r.check("ollama ne passe jamais par process.run", argumentsAutorises("ollama", ["run", "x"], m), false);
 	r.check("un argument non-chaîne : refusé", argumentsAutorises("claude", [1], m), false);
 	r.check("pas de tableau : refusé", argumentsAutorises("claude", "--version", m), false);
 	r.done();
 });
+
+/* THE FOLDER OF A RUN WITH TOOLS (2026-10-09, `confiance-ia.ts`): the
+   read-only tools form runs only in a folder that resolves, lies in the
+   perimeter, and was trusted by the user. A real temporary tree: a junction
+   inside a trusted folder that points outside must not carry the trust. */
+{
+	const { mkdtempSync, mkdirSync, writeFileSync: ecrire, symlinkSync, rmSync, realpathSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	await withSrcModule("apps/windows/electron/confiance-ia.ts", async ({ jugerDossierOutils, dossierCanonique, lireApprouves, ajouterApprouve, retirerApprouve, estApprouve }) => {
+		const r = makeReporter("Run with tools: the folder (trusted, opened, resolved)");
+		const base = realpathSync(mkdtempSync(join(tmpdir(), "nq-confiance-")));
+		try {
+			const cours = join(base, "cours");
+			const sous = join(cours, "chap1");
+			const dehors = join(base, "dehors");
+			mkdirSync(sous, { recursive: true });
+			mkdirSync(dehors);
+			ecrire(join(cours, "note.md"), "x");
+			let jonction = null;
+			try { symlinkSync(dehors, join(cours, "lien"), "junction"); jonction = join(cours, "lien"); } catch { /* no junction on this system */ }
+			const c = await dossierCanonique(cours);
+			const approuves = ajouterApprouve([], { path: c.path, real: c.real, at: "2026-10-09T00:00:00.000Z" });
+			const juger = async (chemin, dansPerimetre = true) => {
+				const k = await dossierCanonique(chemin);
+				return jugerDossierOutils({ reel: k?.real ?? null, estDossier: k !== null, dansPerimetre: k !== null && dansPerimetre, approuves });
+			};
+			r.check("a trusted folder and its sub-folder pass", [await juger(cours), await juger(sous), await juger(join(sous, ".."))], [true, true, true]);
+			r.check("a folder outside the trusted one is refused, even through ..", [await juger(dehors), await juger(join(cours, "..", "dehors")), await juger(base)], [false, false, false]);
+			r.check("a trusted folder OUT of the perimeter is refused", await juger(cours, false), false);
+			r.check("a file, a missing folder, a relative path or no string are refused", [await juger(join(cours, "note.md")), await juger(join(cours, "absent")), await juger("cours"), await juger(42), await juger(null)], [false, false, false, false, false]);
+			if (jonction) r.check("a junction inside the trusted folder that points outside is judged where it leads: refused", await juger(jonction), false);
+			r.check("nothing trusted: refused", jugerDossierOutils({ reel: c.real, estDossier: true, dansPerimetre: true, approuves: [] }), false);
+			r.check("a stored list that is damaged reads as empty, entries without a real absolute path are dropped",
+				[lireApprouves("x").length, lireApprouves([{ path: "a" }, { path: "b", real: "relatif" }, null]).length, lireApprouves([{ path: c.path, real: c.real, at: "" }]).length], [0, 0, 1]);
+			r.check("the same folder is not added twice, and Remove takes it off by its shown path",
+				[ajouterApprouve(approuves, approuves[0]).length, retirerApprouve(approuves, c.path.replace(/\//g, "\\")).length], [1, 0]);
+			r.check("a sibling whose name starts like the trusted one is not covered", estApprouve(c.real + "-copie", approuves), false);
+		} finally {
+			rmSync(base, { recursive: true, force: true });
+		}
+		r.done();
+	});
+}
 
 /* L'AUTRE BOUT du partage : l'import d'une archive REÇUE. */
 await withSrcModule("src/dashboard/zip.ts", ({ nomNoteImportee }) => {

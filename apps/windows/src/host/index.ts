@@ -146,7 +146,7 @@ export function createWindowsHost(carte: CarteRacines, index: MiroirDisque): Hos
 		net: createWindowsNet(),
 		/* Extrait dans `./process.ts`, comme `net.ts` : un passe-plat vers le
 		   pont, dont `run` rejette `indisponible` jusqu'à la tâche 7. */
-		process: createWindowsProcess(),
+		process: createWindowsProcess(p => carte.absolu(p)),
 		/* Extraite dans `./platform.ts` (PURE, donc éprouvable), comme `roots.ts`
 		   et pour la même raison : ce fichier-ci importe MathLive. */
 		platform: createWindowsPlatform(),

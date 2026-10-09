@@ -361,6 +361,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				documents, plansParDocument: liens?.map(l => l?.plan),
+				/* The quiz's folder: Claude Code may read it with read-only tools
+				   once the user trusts it. Never for a request from another
+				   device: nobody at this PC asked for it. */
+				dossier: d.fromDevice ? undefined : dossier,
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
@@ -473,6 +477,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			etapeDe(ligne.id, "redaction");
 			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mixte ? undefined : d.mode, {
+				dossier: d.fromDevice ? undefined : (d.destination || dossierParDefaut(d.reglages.aiOutputFolder)),
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
