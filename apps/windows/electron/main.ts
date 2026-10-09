@@ -437,8 +437,12 @@ function creerFenetre(): void {
 		if (e.isMainFrame) return;
 		if (e.url === "about:srcdoc" || e.url === "about:blank") return;
 		e.preventDefault();
-		console.warn(LOG_PREFIX, "navigation de sous-cadre refusée:", e.url);
+		console.warn(LOG_PREFIX, "sub-frame navigation refused:", e.url);
 	});
+	/* The CSP of those pages does not cover WebRTC: a page could still reach a
+	   STUN server and leak the reader's IP. Nothing in the app uses WebRTC, so
+	   only proxied traffic is allowed (2026-10-09 security review). */
+	fenetre.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
 
 	/* REMISE À ZÉRO DE L'ARMEMENT — défaut laissé par la tâche 3, relevé à sa
 	   revue. `choisirDossier` recharge par `location.reload()` (une navigation
