@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Explain is now a resizable side panel like claude.ai: the quiz stays visible and usable beside it, and on a phone it is a full-screen sheet that no longer overflows the screen.
+
 ## [1.20.62] - 2026-10-09
 
 ### Added

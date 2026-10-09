@@ -43,7 +43,7 @@ import type { ImageJointe } from "../../../../src/explain-images";
 import { poserImagesCitees } from "./explain-images";
 import { CARD_EDIT_MAX_CHARS, consigneEditionCarte, splitCardEdit, validateCardEdit } from "../../../../src/explain-edit";
 import type { CardEditResult, CardFields } from "../../../../src/explain-edit";
-import { renderInlineText, sanitizeQuizHtml } from "../../../../src/engine/sanitizer";
+import { renderInlineText, sanitizeQuizHtml, stripInlineMarkdown } from "../../../../src/engine/sanitizer";
 import { restoreBlock, saveCardEdit } from "../../../../src/dashboard/detail-io";
 import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
@@ -51,6 +51,96 @@ import { lireCours } from "./explain-cours";
 import type { Cours } from "./explain-cours";
 import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
+
+/* THE SIDE PANEL (2026-10-09). The window is a panel on the right edge, like
+   the artifact panel of claude.ai: the modal host still gives it its life
+   cycle (Escape, the close button, focus), and the class below turns its
+   container into a column that does not cover the quiz. The quiz area shrinks
+   by the panel's width (`body.nq-explain-open`, quiz-bars.css). */
+const CLE_LARGEUR = "nq-explain-width";
+const LARGEUR_MIN = 420;
+const LARGEUR_MAX = 760;
+
+function bornerLargeur(w: number): number {
+	// Never wider than the window leaves room for: 320 px at least stay for the quiz.
+	return Math.round(Math.max(LARGEUR_MIN, Math.min(LARGEUR_MAX, w, window.innerWidth - 320)));
+}
+
+function largeurInitiale(): number {
+	try {
+		const v = Number(window.localStorage.getItem(CLE_LARGEUR));
+		if (Number.isFinite(v) && v > 0) return bornerLargeur(v);
+	} catch { /* storage refused: the default width */ }
+	return bornerLargeur(window.innerWidth * 0.44);
+}
+
+function poserLargeur(w: number): void {
+	document.documentElement.style.setProperty("--nq-explain-w", w + "px");
+}
+
+/** The plain text of a question's prompt, for the panel's subtitle. */
+function texteQuestion(q: Record<string, unknown> | undefined): string {
+	const brut = typeof q?.prompt === "string" ? q.prompt : typeof q?.title === "string" ? q.title : "";
+	return stripInlineMarkdown(brut).replace(/\s+/g, " ").trim();
+}
+
+let nettoyagePanneau: (() => void) | null = null;
+
+function monterPanneau(panneau: HTMLElement, sousTitre: string): void {
+	nettoyagePanneau?.();
+	const conteneur = panneau.parentElement;
+	if (!conteneur) return;
+	conteneur.classList.add("nq-explain-conteneur");
+	// Not a modal: the quiz beside it stays usable.
+	panneau.setAttribute("aria-modal", "false");
+	poserLargeur(largeurInitiale());
+	document.body.classList.add("nq-explain-open");
+	const titre = panneau.querySelector<HTMLElement>(".modal-title");
+	if (titre) {
+		const texte = titre.querySelector<HTMLElement>(".modal-title-text");
+		if (texte) texte.classList.add("nq-explain-titre");
+		if (sousTitre) ajouter(titre, "span", "nq-explain-sous-titre", sousTitre).title = sousTitre;
+	}
+	// The width handle on the left edge.
+	const poignee = ajouter(panneau, "div", "nq-explain-poignee");
+	poignee.setAttribute("role", "separator");
+	poignee.setAttribute("aria-orientation", "vertical");
+	let courante = largeurInitiale();
+	// Until the learner drags the handle, the default follows the window (44 %).
+	let choisie = false;
+	try { choisie = Number(window.localStorage.getItem(CLE_LARGEUR)) > 0; } catch { /* default */ }
+	const surRedim = (): void => { courante = choisie ? bornerLargeur(courante) : largeurInitiale(); poserLargeur(courante); };
+	window.addEventListener("resize", surRedim);
+	const bouger = (e: PointerEvent): void => {
+		choisie = true;
+		courante = bornerLargeur(window.innerWidth - e.clientX);
+		poserLargeur(courante);
+	};
+	const finir = (): void => {
+		document.body.classList.remove("nq-explain-redimension");
+		window.removeEventListener("pointermove", bouger);
+		window.removeEventListener("pointerup", finir);
+		window.removeEventListener("pointercancel", finir);
+		if (!choisie) return;
+		try { window.localStorage.setItem(CLE_LARGEUR, String(courante)); } catch { /* storage refused: not kept */ }
+	};
+	poignee.addEventListener("pointerdown", (e) => {
+		e.preventDefault();
+		document.body.classList.add("nq-explain-redimension");
+		window.addEventListener("pointermove", bouger);
+		window.addEventListener("pointerup", finir);
+		window.addEventListener("pointercancel", finir);
+	});
+	// The quiz gets its width back as soon as the closing slide starts.
+	const obs = new MutationObserver(() => { if (conteneur.classList.contains("qbd-closing")) document.body.classList.remove("nq-explain-open"); });
+	obs.observe(conteneur, { attributes: true, attributeFilter: ["class"] });
+	nettoyagePanneau = () => { obs.disconnect(); window.removeEventListener("resize", surRedim); finir(); nettoyagePanneau = null; };
+}
+
+function demonterPanneau(): void {
+	nettoyagePanneau?.();
+	document.body.classList.remove("nq-explain-open");
+}
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const NL = String.fromCharCode(10);
@@ -438,6 +528,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			title: t("ai.explain.title"),
 			onOpen: (m) => {
 				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
+				monterPanneau(m.panelEl, texteQuestion(questions[qi]));
 				const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
 				const champ = ajouter(composer, "textarea", "nq-explain-champ");
 				champ.rows = 1;
@@ -785,7 +876,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 				champ.focus();
 			},
 			// Closing the window keeps the conversation; only the painting stops.
-			onClose: () => { window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
+			onClose: () => { demonterPanneau(); window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
 		});
 	}
 

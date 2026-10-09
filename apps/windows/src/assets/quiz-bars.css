@@ -479,17 +479,13 @@
    A sober thread in one centred column: the learner's messages in rounded
    bubbles on the right, the answers in FULL width with no bubble, a rounded
    composer at the bottom with the plan line under it, readable type. */
-.nq-explain-modal {
-	width: min(860px, calc(100vw - 32px));
-	height: min(760px, 88vh);
-}
 .nq-explain-modal .modal-content {
 	gap: 10px;
 	padding-bottom: 6px;
 }
 .nq-explain-fil {
 	width: 100%;
-	max-width: 740px;
+	max-width: 680px;
 	margin: 0 auto;
 	gap: 26px;
 	padding: 8px 10px 14px;
@@ -514,9 +510,10 @@
 	color: var(--text-faint);
 }
 .nq-explain-modal .qbd-ai-chat-prose {
-	font-size: 15.5px;
-	line-height: 1.72;
+	font-size: 16px;
+	line-height: 1.65;
 	letter-spacing: 0.005em;
+	min-width: 0;
 }
 .nq-explain-modal .qbd-ai-chat-prose > :first-child { margin-top: 0; }
 .nq-explain-modal .qbd-ai-chat-prose p { margin: 0 0 0.9em; }
@@ -537,7 +534,7 @@
 .nq-explain-modal .qbd-ai-chat-prose h4 { font-size: 1.05em; }
 .nq-explain-composer {
 	width: 100%;
-	max-width: 740px;
+	max-width: 680px;
 	margin: 0 auto;
 	padding: 12px 14px 8px 18px;
 	border: 1px solid var(--background-modifier-border);
@@ -552,15 +549,145 @@
 }
 .nq-explain-modal .qbd-ai-usage-slot {
 	width: 100%;
-	max-width: 740px;
+	max-width: 680px;
 	margin: 0 auto;
 	font-size: 12px;
 	color: var(--text-faint);
 }
 @media (max-width: 480px) {
-	.nq-explain-modal { width: calc(100vw - 16px); height: 92vh; }
 	.nq-explain-fil { gap: 20px; padding: 6px 4px 10px; }
 	.nq-explain-msg-user { max-width: 92%; }
-	.nq-explain-modal .qbd-ai-chat-prose { font-size: 15px; }
+	.nq-explain-modal .qbd-ai-chat-prose { font-size: 15.5px; }
 	.nq-explain-composer { border-radius: 20px; padding: 10px 10px 6px 14px; }
 }
+
+/* ══ THE EXPLAIN SIDE PANEL, LIKE THE ARTIFACT PANEL OF claude.ai (2026-10-09) ══
+   The window is a column on the right edge, under the title bar, full height.
+   It does not cover the quiz: the root loses the panel's width
+   (`body.nq-explain-open`), so the engine's track is recomputed by its
+   ResizeObserver and the current card stays aligned. `ui/explain.ts` sets
+   `--nq-explain-w` (44 % of the window, 420 to 760 px, kept in localStorage)
+   and the left handle drags it. The modal host still owns Escape and the
+   close button; its container is made click-through so the quiz stays usable.
+   `html body:not(.nq-x)` raises the specificity above modal.css and mobile.css. */
+:root { --nq-explain-w: 640px; }
+html body:not(.nq-x) .modal-container.nq-explain-conteneur {
+	inset: var(--nq-barre-hauteur) 0 0 auto;
+	width: var(--nq-explain-w);
+	padding: 0;
+	align-items: stretch;
+	justify-content: stretch;
+	pointer-events: none;
+}
+.nq-explain-conteneur > .modal-bg { display: none; }
+.modal-container.nq-explain-conteneur > .modal.nq-explain-modal {
+	pointer-events: auto;
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+	height: 100%;
+	max-height: none;
+	padding: 0;
+	border-width: 0 0 0 1px;
+	border-radius: 0;
+	box-shadow: -10px 0 30px -18px rgba(0, 0, 0, 0.45);
+	animation: nq-explain-glisse-in 250ms cubic-bezier(0, 0, 0, 1);
+}
+.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing {
+	animation: nq-explain-glisse-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes nq-explain-glisse-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes nq-explain-glisse-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+.nq-explain-modal .modal-title {
+	flex: none;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	min-width: 0;
+	margin: 0;
+	padding: 14px 52px 12px 20px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.nq-explain-modal .nq-explain-titre { font-size: 15px; }
+.nq-explain-sous-titre {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12.5px;
+	font-weight: 400;
+	color: var(--text-faint);
+}
+.nq-explain-modal .modal-content {
+	padding: 0 20px 10px;
+	overflow-y: hidden;
+}
+
+/* The width handle, on the panel's left edge. */
+.nq-explain-poignee {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -4px;
+	width: 9px;
+	z-index: 2;
+	cursor: col-resize;
+	touch-action: none;
+}
+.nq-explain-poignee::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 4px;
+	width: 2px;
+	background: transparent;
+	transition: background 0.15s ease;
+}
+.nq-explain-poignee:hover::after,
+.nq-explain-redimension .nq-explain-poignee::after {
+	background: var(--interactive-accent);
+}
+body.nq-explain-redimension { cursor: col-resize; user-select: none; }
+body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
+
+/* The quiz keeps the room the panel leaves. */
+#neo-quiz-root { transition: padding-right 250ms cubic-bezier(0, 0, 0, 1); }
+body.nq-explain-open #neo-quiz-root { padding-right: var(--nq-explain-w); }
+body.nq-explain-redimension #neo-quiz-root { transition: none; }
+
+/* An interactive page takes the whole answer column. */
+.nq-explain-modal .nq-html-frame { margin: 12px 0; width: 100%; }
+.nq-explain-modal .qbd-ai-chat-reponse { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal,
+	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing { animation: none !important; }
+	#neo-quiz-root { transition: none; }
+}
+
+/* PHONE (and any window under 700 px): a full-screen sheet over the quiz.
+   The 88 px left padding that modal.css reserves for the rail pushed the
+   361 px window out of a 393 px screen (it started at x=52); the sheet
+   has no padding at all and fills the screen from the status bar down. */
+@media (max-width: 700px) {
+	html body:not(.nq-x) .modal-container.nq-explain-conteneur {
+		inset: 0;
+		width: 100%;
+		padding: var(--nq-inset-haut, 0px) 0 0;
+		box-sizing: border-box;
+	}
+	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal {
+		border-width: 0;
+		box-shadow: none;
+		animation-name: nq-explain-monte-in;
+	}
+	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing { animation-name: nq-explain-monte-out; }
+	body.nq-explain-open #neo-quiz-root { padding-right: 0; }
+	.nq-explain-poignee { display: none; }
+	.nq-explain-modal .modal-content { padding: 0 12px 8px; }
+	.nq-explain-modal .modal-title { padding: 12px 48px 10px 16px; }
+}
+@keyframes nq-explain-monte-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes nq-explain-monte-out { from { transform: translateY(0); } to { transform: translateY(100%); } }
