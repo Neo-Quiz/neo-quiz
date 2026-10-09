@@ -1,8 +1,8 @@
 {
-  "versionCode": 26,
-  "versionName": "0.2.24",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.24/NeoQuiz-0.2.24.apk",
-  "sha256": "34b5d3a1a4e7cbed07477b66e57a538ecac20ada7081a60747153841afb0f5a3",
-  "size": 56048765,
-  "notes": "Interactive pages on Android, AI assistant, progress merged per question"
+  "versionCode": 27,
+  "versionName": "0.2.25",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.25/NeoQuiz-0.2.25.apk",
+  "sha256": "07520f50fdd71f606974328d810fe3bbcd373915ccb76ac7ab6bdaa98b40b657",
+  "size": 56054533,
+  "notes": "Security fixes for quiz HTML, attachments kept on Backspace"
 }
