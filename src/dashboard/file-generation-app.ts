@@ -1,11 +1,12 @@
 /* ══════════════════════════════════════════════════════════
    LA FILE DE GÉNÉRATION, CÔTÉ APPLICATION
 
-   Tient la file (`file-generation.ts`, le noyau pur) et l'EXÉCUTE : une
-   génération à la fois, dans l'ordre d'envoi, par le chemin qu'empruntait
-   la page « Générer » — `createAiClient` pour lancer le CLI (le verrou par
-   outil et les gabarits restent ceux du processus principal), puis
-   `enregistrerQuiz` pour écrire la note.
+   Holds the queue (`file-generation.ts`, the pure core) and RUNS it: every
+   chat side by side, one generation at a time inside a chat, in send order
+   (`demarrerPrets`, 2026-10-09), through the path the Generate page used
+   before: `createAiClient` to launch the CLI (the per-tool lock and the
+   templates stay those of the main process), then `enregistrerQuiz` to
+   write the note.
 
    UNE SEULE FILE PAR FENÊTRE, au niveau du MODULE : elle survit aux
    changements de page, et même au démontage de la coquille quand un quiz se
@@ -43,6 +44,7 @@ import { figuresParHote } from "./figures";
 import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
+import { LEGACY_CHAT_ID } from "./chat-record";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -202,7 +204,16 @@ export function onQueueCreated(cb: (q: FileGenerationApp) => void): void {
 function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	let file: FileGeneration<DemandeFile, ResultatFile> = F.fileVide();
 	const abonnes = new Set<{ ecouteur: () => void; affichee: () => boolean }>();
-	let clientCourant: AiClient | null = null;
+	/** The client of each RUNNING line (2026-10-09, concurrent chats): Stop
+	    aborts that line's run only. */
+	const clients = new Map<number, AiClient>();
+	/** What may run at once: one line per chat, 8 in all, Antigravity and
+	    requests from another device one at a time (spec 2026-10-09). */
+	const REGLES: F.ReglesDemarrage<DemandeFile> = {
+		max: 8,
+		chat: d => d.chatId ?? LEGACY_CHAT_ID,
+		groupe: d => (d.fromDevice ? "remote" : d.reglages.aiProvider === "antigravity-cli" ? "antigravity" : null),
+	};
 	const etapes = new Map<number, EtapeGeneration>();
 	/* The transcripts, by line, and who repaints them. Chunks arrive many
 	   times a second: the listeners hear of it once per 80 ms at most. */
@@ -258,12 +269,12 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		return [...abonnes].some(a => { try { return a.affichee(); } catch { return false; } });
 	}
 
-	/** Démarre la suivante si la place est libre. */
+	/** Starts every line the rules allow (`demarrerPrets`). */
 	function pomper(): void {
-		const { file: suivante, ligne } = F.demarrerSuivant(file, Date.now());
+		const { file: suivante, lignes } = F.demarrerPrets(file, Date.now(), REGLES);
 		file = suivante;
 		publier();
-		if (ligne) void executer(ligne);
+		for (const ligne of lignes) void executer(ligne);
 	}
 
 	const tourne = (id: number): boolean => F.ligne(file, id)?.etat === "cours";
@@ -286,7 +297,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			save: (patch) => deps.settings.save(patch),
 		};
 		const client = createAiClient(figes);
-		clientCourant = client;
+		clients.set(ligne.id, client);
 		if (d.planifier) { await planifier(ligne, client); return; }
 		try {
 			// « Lecture du document… » quand la demande en porte un.
@@ -377,7 +388,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			// Un arrêt voulu n'est pas un échec : `solder` retire la ligne.
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
-			if (clientCourant === client) clientCourant = null;
+			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
 			pomper();
@@ -445,7 +456,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const e = err as Error & { aborted?: boolean };
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
-			if (clientCourant === client) clientCourant = null;
+			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
 			pomper();
@@ -538,7 +549,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			/* Le même geste que l'ancien bouton Stop : `abort` tue l'arbre du
 			   CLI. La place ne se libère qu'au retour de la génération
 			   (`solder`, dans `executer`), le verrou du CLI rendu. */
-			if (r.arreter) clientCourant?.abort();
+			if (r.arreter) clients.get(id)?.abort();
 			publier();
 		},
 		reessayer(id) {
