@@ -96,7 +96,7 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 	panneau.setAttribute("aria-modal", "false");
 	poserLargeur(largeurInitiale());
 	document.body.classList.add("nq-explain-open");
-	document.querySelector(".nq-explain-rail-btn")?.classList.add("qbd-nav-item--active");
+	document.querySelector(".qz-explain-btn-icone")?.classList.add("is-active");
 	const titre = panneau.querySelector<HTMLElement>(".modal-title");
 	if (titre) {
 		// No title in the header: the question under it is the header.
@@ -148,7 +148,7 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 function demonterPanneau(): void {
 	nettoyagePanneau?.();
 	document.body.classList.remove("nq-explain-open");
-	document.querySelector(".nq-explain-rail-btn")?.classList.remove("qbd-nav-item--active");
+	document.querySelector(".qz-explain-btn-icone")?.classList.remove("is-active");
 }
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -482,21 +482,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	boutonQuiz.classList.add("qz-explain-btn-icone");
 	boutonQuiz.hidden = true;
 	peindreLogoBouton();
-	/* The right rail (desktop): a mirror of the navigation rail, one button with the
-	   provider's logo and "AI". It opens and closes the chat; on a phone the icon
-	   above the card does that instead. */
-	const rail = ajouter(document.body, "div", "nq-explain-rail");
-	const boutonRail = ajouter(rail, "button", "qbd-nav-item nq-explain-rail-btn");
-	boutonRail.type = "button";
-	boutonRail.title = t("ai.explain.button");
-	boutonRail.setAttribute("aria-label", t("ai.explain.button"));
-	const logoRail = ajouter(boutonRail, "span", "qbd-nav-icon qz-explain-btn-logo");
-	ajouter(boutonRail, "span", "qbd-nav-label", t("ai.explain.railLabel"));
-	boutons.add({ bouton: boutonRail, logo: logoRail });
-	peindreLogoBouton();
-	document.body.classList.add("nq-explain-rail-on");
 	let uniteCourante: Unite | null = null;
-	/* One toggle for both AI buttons (the rail and the icon on a phone): open the
+	/* One toggle for both AI buttons (the icon on the quiz card): open the
 	   window on the unit on screen, or close it when it is already open. */
 	const basculer = (): void => {
 		// Open: the window's own close button (the host's, as Escape). Closed: the unit on screen.
@@ -505,7 +492,6 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const u = uniteCourante ?? lesUnites()[0] ?? null;
 		if (u) ouvrirDepuis(u.juge, u.qi);
 	};
-	boutonRail.addEventListener("click", basculer);
 	boutonQuiz.addEventListener("click", basculer);
 	/* The units: each card of a step page of a Learn, and the single card of
 	   any other question slide. `juge` is the element whose classes say
@@ -937,7 +923,5 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 		observateur.disconnect();
 		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
 		boutonQuiz.remove();
-		rail.remove();
-		document.body.classList.remove("nq-explain-rail-on");
 	};
 }

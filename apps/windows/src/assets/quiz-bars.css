@@ -215,20 +215,6 @@
 	height: 16px;
 }
 
-.qbd-qz-explain-icon {
-	display: inline-flex;
-}
-
-/* The accent only for the fallback sparkles: a brand logo keeps its colour. */
-.qbd-qz-explain-icon:not(.qbd-provider-logo) {
-	color: var(--interactive-accent);
-}
-
-.qbd-qz-explain-icon svg {
-	width: 15px;
-	height: 15px;
-}
-
 /* The explanation window: the conversation scrolls, the field stays below. */
 .nq-explain-modal {
 	width: min(760px, calc(100vw - 32px));
@@ -271,14 +257,6 @@
 	align-items: flex-end;
 	gap: 8px;
 	max-width: 80%;
-}
-
-/* The provider's logo in "Explain", at the size of the former icon. */
-.qbd-qz-explain-icon.qbd-provider-logo,
-.qbd-qz-explain-icon.qbd-provider-logo svg,
-.qbd-qz-explain-icon.qbd-provider-logo img {
-	width: 15px;
-	height: 15px;
 }
 
 /* Nothing said yet: the history is empty, the composer is centred in the
@@ -440,7 +418,7 @@
 :root { --nq-explain-w: 38vw; }
 html body:not(.nq-x) .modal-container.nq-explain-conteneur {
 	/* `--nq-panel-gap` is scoped to the quiz root, not to this container: the fallback is the same 16 px. */
-	inset: var(--nq-barre-hauteur) calc(var(--nq-panel-gap, 16px) + 88px) var(--nq-barre-hauteur) auto;
+	inset: var(--nq-barre-hauteur) var(--nq-panel-gap, 16px) var(--nq-barre-hauteur) auto;
 	width: var(--nq-explain-w);
 	padding: 0;
 	align-items: stretch;
@@ -467,15 +445,15 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-m
 	border-radius: var(--nq-panel-radius);
 	box-shadow: none;
 	overflow: hidden;
-	animation: nq-explain-glisse-in 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+	animation: nq-explain-glisse-in 500ms cubic-bezier(0.36, 0.66, 0, 1) backwards;
 }
-.nq-explain-modal .modal-content { animation: nq-explain-fondu 300ms ease 140ms both; }
-.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing {
-	animation: nq-explain-glisse-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+.nq-explain-modal .modal-content { animation: nq-explain-fondu 500ms cubic-bezier(0.36, 0.66, 0, 1) backwards; }
+html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing {
+	animation: nq-explain-glisse-out 400ms cubic-bezier(0.36, 0.66, 0, 1) forwards;
 }
-@keyframes nq-explain-glisse-in { from { opacity: 0; transform: translateX(24px) scale(0.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes nq-explain-glisse-in { from { transform: translateX(calc(var(--nq-explain-w) + var(--nq-panel-gap, 16px))) scaleX(0.97); } to { transform: none; } }
 @keyframes nq-explain-fondu { from { opacity: 0; } to { opacity: 1; } }
-@keyframes nq-explain-glisse-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
+@keyframes nq-explain-glisse-out { from { transform: none; } to { transform: translateX(calc(var(--nq-explain-w) + var(--nq-panel-gap, 16px))) scaleX(0.97); } }
 
 .nq-explain-modal .modal-title {
 	flex: none;
@@ -544,7 +522,9 @@ body.nq-explain-redimension { cursor: col-resize; user-select: none; }
 body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
 
 /* The quiz card gives up the width of the Explain card and the gap between them. */
-#neo-quiz-root > .qbd-qz { position: relative; transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1), margin 380ms cubic-bezier(0.22, 1, 0.36, 1); }
+#neo-quiz-root > .qbd-qz { position: relative; transition: width 500ms cubic-bezier(0.36, 0.66, 0, 1), margin 500ms cubic-bezier(0.36, 0.66, 0, 1); }
+/* The closing is a little quicker, on the same curve (the class goes at the start of the slide out). */
+body:not(.nq-explain-open) #neo-quiz-root > .qbd-qz { transition: width 400ms cubic-bezier(0.36, 0.66, 0, 1), margin 400ms cubic-bezier(0.36, 0.66, 0, 1); }
 @media (min-width: 701px) {
 	body.nq-explain-open:not(.is-mobile) #neo-quiz-root > .qbd-qz {
 		width: calc(100% - var(--nq-explain-w) - 3 * var(--nq-panel-gap));
@@ -610,26 +590,58 @@ body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
 }
 .qz-explain-btn[hidden] { display: none; }
 
-/* THE RIGHT RAIL (2026-10-09): a mirror of the navigation rail on the right
-   edge, the same width (88 px), one button, shown on a quiz page only
-   (`body.nq-explain-rail-on`, ui/explain.ts). Its button is the rail's own
-   (`.qbd-nav-item`, dashboard-nav.css), active while the chat is open. The
-   quiz root reserves the rail's width so the quiz card keeps its place. On a
-   phone the rail is absent: the icon above the card opens the sheet instead. */
-.nq-explain-rail {
-	position: fixed;
-	top: var(--nq-barre-hauteur);
-	right: 0;
-	bottom: var(--nq-barre-hauteur);
-	z-index: 85;
-	width: 88px;
-	box-sizing: border-box;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	padding-top: 12px;
+/* THE DESKTOP BUTTON (2026-10-09): the logo alone, no label, in the top right
+   band of the quiz card, on the header line (`body:not(.is-mobile)`; the phone
+   keeps the rules above). The band is the strip between the scrollbar of the
+   questions and the card's right edge: the button is centred in it
+   (`--qz-explain-right`, measured). Sober: no face, no depth; a light
+   background on hover, and the accent tint while the chat is open. */
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone {
+	top: 18px;
+	right: var(--qz-explain-right, 36px);
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--text-muted);
+	box-shadow: none;
+	transform: none;
+	transition: background-color 0.15s ease, color 0.15s ease;
 }
-body:not(.nq-explain-rail-on) .nq-explain-rail,
-.is-mobile .nq-explain-rail { display: none; }
-body:not(.is-mobile) .qz-explain-btn-icone { display: none; }
-body.nq-explain-rail-on:not(.is-mobile) #neo-quiz-root { padding-right: 88px; }
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:hover {
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-normal);
+}
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:active {
+	transform: none;
+	box-shadow: none;
+}
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone.is-active {
+	background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+	color: var(--interactive-accent);
+}
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo .qbd-provider-logo,
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo svg {
+	width: 20px;
+	height: 20px;
+}
+
+/* THE FADES (2026-10-09): the questions scroll under a soft edge, not a hard
+   cut above the arrows. `ui/quiz-bars.ts` sets the two classes on the slide
+   that scrolls, from a passive scroll listener: the bottom fades only while
+   more lies below, the top only once the question has been scrolled. */
+#neo-quiz-root > .qbd-qz .quiz-track-item.is-overflow-bottom {
+	-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+	mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+}
+#neo-quiz-root > .qbd-qz .quiz-track-item.is-overflow-top {
+	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px);
+	mask-image: linear-gradient(to bottom, transparent, #000 24px);
+}
+#neo-quiz-root > .qbd-qz .quiz-track-item.is-overflow-top.is-overflow-bottom {
+	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 48px), transparent);
+	mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 48px), transparent);
+}

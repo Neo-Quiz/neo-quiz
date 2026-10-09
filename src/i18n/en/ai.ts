@@ -558,8 +558,6 @@ export const EN_AI = {
 	"ai.reqstatus.failed": "Failed on {device}",
 	"ai.reqstatus.failedWhy": "Failed on {device}: {reason}",
 	"ai.explain.button": "Ask the AI",
-	"ai.explain.buttonTip": "Ask the AI",
-	"ai.explain.railLabel": "AI",
 	"ai.explain.answerFirst": "Answer the question first to have it explained",
 	"ai.explain.asked": "Explain this question to me: {question}",
 	"ai.explain.ownQuestion": "Write your question",

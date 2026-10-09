@@ -28,6 +28,15 @@ function currentSlide(host: HTMLElement): HTMLElement | null {
 	return host.querySelector<HTMLElement>('.quiz-track > .quiz-track-item[aria-hidden="false"]');
 }
 
+/** The soft edges of the scrolling question (quiz-bars.css): the bottom fades only while
+ *  more lies below, the top once the question has been scrolled. */
+function paintFade(slide: HTMLElement | null): void {
+	if (!slide) return;
+	const below = slide.scrollHeight - slide.clientHeight - slide.scrollTop;
+	slide.classList.toggle("is-overflow-top", slide.scrollTop > 2);
+	slide.classList.toggle("is-overflow-bottom", below > 2);
+}
+
 /** Adds the bar of arrows to the quiz panel around `host`; returns how to remove it. */
 export function attachQuizBars(host: HTMLElement): () => void {
 	let panel: HTMLElement | null = null;
@@ -73,6 +82,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
 		if (!panel) return;
+		paintFade(currentSlide(host));
 
 		/* On a phone (`body.is-mobile`) there is no bar at all: a question swipes
 		   and the beads reach every step, so the room of the bar goes to the slides.
@@ -156,9 +166,16 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		attributes: true,
 		attributeFilter: ["aria-hidden", "disabled", "aria-label"],
 	});
+	/* Passive, and captured: `scroll` does not bubble, and each question is its own scroller. */
+	const onScroll = (event: Event): void => {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.classList.contains("quiz-track-item")) paintFade(target);
+	};
+	host.addEventListener("scroll", onScroll, { capture: true, passive: true });
 	schedule();
 
 	return () => {
+		host.removeEventListener("scroll", onScroll, { capture: true });
 		if (frame) cancelAnimationFrame(frame);
 		resize.disconnect();
 		mutations.disconnect();
