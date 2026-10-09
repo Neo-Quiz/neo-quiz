@@ -315,6 +315,13 @@ html.nq-mobile .modal-container {
 	color: var(--text-normal);
 }
 
+/* An EMPTY folder has no "New quiz" pill (quizzes.ts): the menu is then the
+   row's only child and `justify-content: flex-start` threw it to the far left.
+   Alone, it stays at the right edge, as on the desktop header. */
+.is-mobile .qbd-root .qbd-quizzes-folder-hero .qbd-folder-more-btn:first-child {
+	margin-left: auto;
+}
+
 /* The Documents / Links / Notes tile: tabs shrink to the tile, the label of
    the tabs that are not open gives way to the icon and the count. */
 .is-mobile .qbd-folder-tabs {
