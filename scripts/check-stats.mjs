@@ -7,7 +7,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentativesDe, MAX_TENTATIVES }) => {
+await withSrcModule(["src/dashboard/stats-store.ts", "src/results-files.ts"], async ({ createStatsStore, tentativesDe, MAX_TENTATIVES }, rf) => {
 	const r = makeReporter("Stats — historique des tentatives");
 	const fabriquer = (initial = {}) => {
 		let ecrit = null;
@@ -106,6 +106,44 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	r.check("an attempt keeps its results file, another has none", [avecLien.results, "results" in sansLien], ["R/k-1.json", false]);
 	r.check("the store's return names the attempt carrying the file", recFichier.tentatives.find(x => x.results === "R/k-1.json")?.date, avecLien.date);
 	r.check("a deletion hands back the file to trash", sFichier.supprimerTentative("k.md", avecLien.date)?.results, "R/k-1.json");
+
+	/* Undo of that deletion (folder progress): the file's bytes are read
+	   BEFORE the trash and written back at the same path, and the COMPLETE
+	   attempt returns, link included. Without bytes, the link is dropped. */
+	{
+		const R = "C/.neo-quiz/results";
+		const F = `${R}/2026-10-09_10-00-00_k_qcm-abc123.json`;
+		const disk = new Map([[F, new Uint8Array([1, 2, 3])]]);
+		let failRead = false;
+		const fs = {
+			exists: async (p) => disk.has(p),
+			read: async (p) => { if (!disk.has(p)) throw new Error("absent"); return new TextDecoder().decode(disk.get(p)); },
+			readBinary: async (p) => { if (failRead || !disk.has(p)) throw new Error("unreadable"); return disk.get(p); },
+			writeBinary: async (p, d) => { disk.set(p, d); },
+			trash: async (p) => { disk.delete(p); },
+		};
+		const { store: sUndo } = fabriquer();
+		sUndo.updateRecord("C/k.md", { bestScore: 60, questionsDone: 1, totalQuestions: 1, results: F });
+		const [att] = tentativesDe(sUndo.getRecord("C/k.md"));
+		const gone = sUndo.supprimerTentative("C/k.md", att.date);
+		let kept = null;
+		await rf.readThenTrashResultsFile(fs, R, "C/k.md", gone.results, (b) => { kept = b; });
+		r.check("deleting reads the bytes, then trashes the file", [kept && [...kept], disk.has(F)], [[1, 2, 3], false]);
+		const back = await rf.restoreResultsFile(fs, R, "C/k.md", gone, kept);
+		sUndo.restaurerTentative("C/k.md", back);
+		r.check("Undo writes the same bytes back at the same path", disk.has(F) && [...disk.get(F)], [1, 2, 3]);
+		r.check("Undo restores the COMPLETE attempt, results link included", tentativesDe(sUndo.getRecord("C/k.md"))[0].results, F);
+
+		failRead = true;
+		kept = null;
+		const trashed = await rf.readThenTrashResultsFile(fs, R, "C/k.md", F, (b) => { kept = b; });
+		r.check("an unreadable file is still deleted", [trashed, disk.has(F), kept], [true, false, null]);
+		const noBytes = await rf.restoreResultsFile(fs, R, "C/k.md", gone, null);
+		r.check("without bytes, Undo restores the attempt without the link", [noBytes.date, "results" in noBytes, disk.has(F)], [gone.date, false, false]);
+		disk.set(F, new Uint8Array([9]));
+		const present = await rf.restoreResultsFile(fs, R, "C/k.md", gone, new Uint8Array([1]));
+		r.check("a file already back at its path is never overwritten", [present.results, [...disk.get(F)]], [F, [9]]);
+	}
 
 	/* RELOAD (the synced folder delivered other devices' attempts): the store
 	   takes the host's table again, UNLESS a save of its own is still pending:

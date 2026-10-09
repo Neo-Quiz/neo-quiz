@@ -13,15 +13,37 @@ import type { ResultsSaveState } from "./types/quiz";
 
    That path comes back from a synced file another device wrote: it is never
    trusted. `isDeletableResultsPath` is the ONLY gate before a `trash`: a
-   `.json` directly inside the results folder, never the `latest.json` mirror,
-   never a sub-folder, never a quiz note.
+   `.json` directly inside the results folder, named for THIS quiz (several
+   quizzes of one folder share that results folder: an attempt forged for one
+   quiz must not trash another quiz's results), never the `latest.json`
+   mirror, never a sub-folder, never a quiz note.
 ══════════════════════════════════════════════════════════ */
 
 /** The mirror of the last save, rewritten at each save (external tooling). */
 export const RESULTS_MIRROR = "latest.json";
 
-/** Whether `path` names a results file this app may move to the trash. */
-export function isDeletableResultsPath(path: unknown, resultsDir: string): path is string {
+/** The slug a quiz's results file names carry: the note's name without its
+    extension, folded to `[a-z0-9-]` (the saver builds `<stamp>_<slug>_<mode>-
+    <random>.json` with it). The slug never contains `_`, so `_<slug>_` cannot
+    match inside another quiz's longer slug. */
+export function resultsSlug(quizPath: unknown): string {
+	const source = String(quizPath || "quiz");
+	const fileName = source.split(/[\\/]/).pop() || source;
+	const base = fileName.replace(/\.[^.]+$/, "") || "quiz";
+	const slug = base
+		.normalize("NFD")
+		.replace(/[̀-ͯ]/g, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 80);
+	return slug || "quiz";
+}
+
+/** Whether `path` names a results file of the quiz `quizPath` that this app
+    may move to the trash. A file saved before the quiz was renamed carries
+    the old slug and is left in place (refusing is the safe side). */
+export function isDeletableResultsPath(path: unknown, resultsDir: string, quizPath: string): path is string {
 	if (typeof path !== "string" || typeof resultsDir !== "string" || !resultsDir) return false;
 	const dir = resultsDir.replace(/\/+$/, "");
 	if (!dir || !path.startsWith(dir + "/")) return false;
@@ -29,14 +51,15 @@ export function isDeletableResultsPath(path: unknown, resultsDir: string): path 
 	if (!name || name.length > 255 || name === RESULTS_MIRROR) return false;
 	// One segment only, no stream (`x.json:evil`), no control character.
 	if (/[\\/:\u0000-\u001f]/.test(name) || name.startsWith(".")) return false;
+	if (typeof quizPath !== "string" || !quizPath || !name.includes(`_${resultsSlug(quizPath)}_`)) return false;
 	return name.endsWith(".json");
 }
 
 /** Moves a results file (and the mirror, when it mirrors that file) to the
     host's trash. Returns whether the file itself was trashed; a path that
     fails the gate throws, an absent file returns `false`. */
-export async function trashResultsFile(fs: Pick<HostFs, "exists" | "read" | "trash">, resultsDir: string, path: string): Promise<boolean> {
-	if (!isDeletableResultsPath(path, resultsDir)) throw new Error(`not a results file: ${path}`);
+export async function trashResultsFile(fs: Pick<HostFs, "exists" | "read" | "trash">, resultsDir: string, quizPath: string, path: string): Promise<boolean> {
+	if (!isDeletableResultsPath(path, resultsDir, quizPath)) throw new Error(`not a results file: ${path}`);
 	const dir = resultsDir.replace(/\/+$/, "");
 	let trashed = false;
 	if (await fs.exists(path)) {
@@ -51,6 +74,34 @@ export async function trashResultsFile(fs: Pick<HostFs, "exists" | "read" | "tra
 		}
 	} catch (_) { /* the mirror is best-effort, like its write */ }
 	return trashed;
+}
+
+/** Deleting an attempt from the folder progress: the file's BYTES are read
+    first and handed to `keep`, so "Undo" can write them back (the file in the
+    trash is not reachable through the contract). A failed read does not stop
+    the deletion. */
+export async function readThenTrashResultsFile(fs: Pick<HostFs, "exists" | "read" | "readBinary" | "trash">, resultsDir: string, quizPath: string, path: string, keep: (bytes: Uint8Array) => void): Promise<boolean> {
+	if (!isDeletableResultsPath(path, resultsDir, quizPath)) throw new Error(`not a results file: ${path}`);
+	try { keep(await fs.readBinary(path)); } catch (_) { /* deleted all the same, Undo drops the link */ }
+	return trashResultsFile(fs, resultsDir, quizPath, path);
+}
+
+/** "Undo" of an attempt deletion: the attempt to restore, WITH its results
+    link when the file is back at its path (written again from `bytes` when
+    absent), without it otherwise. A path that fails the gate was never
+    trashed: the attempt comes back as it was. */
+export async function restoreResultsFile<T extends { results?: unknown }>(fs: Pick<HostFs, "exists" | "writeBinary">, resultsDir: string, quizPath: string, attempt: T, bytes: Uint8Array | null): Promise<T> {
+	const path = attempt.results;
+	if (!isDeletableResultsPath(path, resultsDir, quizPath)) return attempt;
+	const { results: _gone, ...unlinked } = attempt;
+	try {
+		if (await fs.exists(path)) return attempt;
+		if (!bytes) return unlinked as T;
+		await fs.writeBinary(path, bytes);
+		return attempt;
+	} catch (_) {
+		return unlinked as T;
+	}
 }
 
 /** The state before any hand-in (or after "Start over"). `attempt` only grows:

@@ -11,7 +11,7 @@ import type {
 import { t } from "../i18n";
 import { LOG_PREFIX } from "../branding";
 import { reservePath } from "../unique-path";
-import { RESULTS_MIRROR, canStartResultsSave, handedInResults, resetResultsSave, trashResultsFile } from "../results-files";
+import { RESULTS_MIRROR, canStartResultsSave, handedInResults, resetResultsSave, resultsSlug, trashResultsFile } from "../results-files";
 
 export interface OptionEntry {
 	index: number;
@@ -110,17 +110,6 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 			if (text) return text;
 		}
 		return "";
-	}
-
-	function slugify(value: unknown): string {
-		const slug = String(value ?? "quiz")
-			.normalize("NFD")
-			.replace(/[\u0300-\u036f]/g, "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "")
-			.slice(0, 80);
-		return slug || "quiz";
 	}
 
 	function pad(n: number): string {
@@ -454,7 +443,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	function planPath(): string | null {
 		if (!ctx.sourcePath) return null;
 		const mode = ctx.textOnly?.isTextOnlyMode?.() ? "training" : "qcm";
-		const base = `${RESULTS_DIR}/${formatLocalTimestamp(new Date())}_${slugify(sourceBaseName())}_${mode}`;
+		const base = `${RESULTS_DIR}/${formatLocalTimestamp(new Date())}_${resultsSlug(ctx.sourcePath)}_${mode}`;
 		for (let n = 0; n < 20; n++) {
 			const path = `${base}-${Math.random().toString(36).slice(2, 8).padEnd(6, "0")}.json`;
 			if (reservePath(path)) return path;
@@ -538,11 +527,18 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		if (state.status !== "saved") return;
 		const { attempt, path } = state;
 		ctx.quizState.resultsSave = { ...state, status: "saving" };
+		/* Written in place, not through a hidden temporary file renamed over it:
+		   `HostFs.rename` refuses an existing target, so a rename can never
+		   replace the file. A failed rewrite may leave the file half-written:
+		   the state says "failed" so that "Retry" writes it again in full. */
 		writeAttempt(attempt, path).then(
 			() => { if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "saved" }; },
 			(error) => {
 				console.warn(LOG_PREFIX, "results file not rewritten", path, error);
-				if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "saved" };
+				if (!current(attempt)) return;
+				ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "failed", error: errorText(error) };
+				ctx.host.ui.notice(t("engine.result.saveError", { message: errorText(error) }));
+				rerender();
 			});
 	}
 
@@ -559,7 +555,7 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		ctx.quizState.resultsSave = { ...state, status: "deleting" };
 		rerender();
 		try {
-			await trashResultsFile(ctx.host.fs, RESULTS_DIR, path);
+			await trashResultsFile(ctx.host.fs, RESULTS_DIR, ctx.sourcePath, path);
 			if (attemptDate !== null && ctx.sourcePath) ctx.statsSink?.supprimerTentative?.(ctx.sourcePath, attemptDate);
 			if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "deleted", error: null };
 		} catch (error) {

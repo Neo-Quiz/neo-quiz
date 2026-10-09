@@ -1389,20 +1389,28 @@ await withSrcModule(["src/results-files.ts", "src/engine/results-save.ts"], asyn
 	const { isDeletableResultsPath, noResultsSave, handedInResults, resetResultsSave, canStartResultsSave, attemptDateOf } = rf;
 	const r = makeReporter("Results files - gate, idempotence, deletion");
 	const D = "Cours/.neo-quiz/results";
-	r.check("a .json directly in the results folder is deletable", isDeletableResultsPath(`${D}/2026-10-09_quiz_qcm-abc123.json`, D), true);
-	r.check("a trailing slash on the folder changes nothing", isDeletableResultsPath(`${D}/x.json`, `${D}/`), true);
-	r.check("never the quiz note", isDeletableResultsPath("Cours/Quiz.md", D), false);
-	r.check("never a note inside the folder", isDeletableResultsPath(`${D}/x.md`, D), false);
-	r.check("never the latest.json mirror", isDeletableResultsPath(`${D}/latest.json`, D), false);
-	r.check("never a sub-folder", isDeletableResultsPath(`${D}/sub/x.json`, D), false);
-	r.check("never a traversal", isDeletableResultsPath(`${D}/../../Quiz.json`, D), false);
-	r.check("never a backslash", isDeletableResultsPath(`${D}/..\\x.json`, D), false);
-	r.check("never a stream", isDeletableResultsPath(`${D}/x.json:evil`, D), false);
-	r.check("never a hidden name", isDeletableResultsPath(`${D}/.json`, D), false);
-	r.check("never a sibling folder sharing the prefix", isDeletableResultsPath(`${D}-evil/x.json`, D), false);
-	r.check("never another quiz folder's results", isDeletableResultsPath("Autre/.neo-quiz/results/x.json", D), false);
-	r.check("never a non-string", isDeletableResultsPath(42, D), false);
-	r.check("never with an empty folder", isDeletableResultsPath("/x.json", ""), false);
+	const Q = "Cours/Quiz.md";
+	const N = (slug) => `${D}/2026-10-09_10-00-00_${slug}_qcm-abc123.json`;
+	r.check("a .json directly in the results folder is deletable", isDeletableResultsPath(N("quiz"), D, Q), true);
+	r.check("a trailing slash on the folder changes nothing", isDeletableResultsPath(N("quiz"), `${D}/`, Q), true);
+	r.check("never the quiz note", isDeletableResultsPath("Cours/Quiz.md", D, Q), false);
+	r.check("never a note inside the folder", isDeletableResultsPath(`${D}/x_quiz_.md`, D, Q), false);
+	r.check("never the latest.json mirror", isDeletableResultsPath(`${D}/latest.json`, D, Q), false);
+	r.check("never a sub-folder", isDeletableResultsPath(`${D}/sub/x_quiz_.json`, D, Q), false);
+	r.check("never a traversal", isDeletableResultsPath(`${D}/../../x_quiz_.json`, D, Q), false);
+	r.check("never a backslash", isDeletableResultsPath(`${D}/..\\x_quiz_.json`, D, Q), false);
+	r.check("never a stream", isDeletableResultsPath(`${D}/x_quiz_.json:evil`, D, Q), false);
+	r.check("never a hidden name", isDeletableResultsPath(`${D}/._quiz_.json`, D, Q), false);
+	r.check("never a sibling folder sharing the prefix", isDeletableResultsPath(`${D}-evil/x_quiz_.json`, D, Q), false);
+	r.check("never another quiz folder's results", isDeletableResultsPath("Autre/.neo-quiz/results/x_quiz_.json", D, Q), false);
+	r.check("never a non-string", isDeletableResultsPath(42, D, Q), false);
+	r.check("never with an empty folder", isDeletableResultsPath("/x_quiz_.json", "", Q), false);
+	/* The results folder is shared by the quizzes of one folder: an attempt
+	   forged for "Quiz" never reaches "Autre" nor "Quiz 2"'s results. */
+	r.check("never another quiz's file in the shared folder", isDeletableResultsPath(N("autre"), D, Q), false);
+	r.check("never a quiz whose slug starts with this one's", isDeletableResultsPath(N("quiz-2"), D, Q), false);
+	r.check("the slug is the saver's (accents, case, spaces)", rf.resultsSlug("Cours/Réseaux TCP — Learn.md"), "reseaux-tcp-learn");
+	r.check("never without a quiz path", isDeletableResultsPath(N("quiz"), D, ""), false);
 
 	const s0 = noResultsSave();
 	const s1 = handedInResults(s0, `${D}/a.json`, 5);
@@ -1448,7 +1456,7 @@ await withSrcModule(["src/results-files.ts", "src/engine/results-save.ts"], asyn
 	const saver = createResultsSaver(ctx);
 	const own = () => [...files.keys()].filter(p => !p.endsWith("/latest.json"));
 	const path1 = saver.planPath();
-	r.check("the planned file sits in the results folder", isDeletableResultsPath(path1, D), true);
+	r.check("the planned file sits in the results folder", isDeletableResultsPath(path1, D, Q), true);
 	saver.handIn(path1, 1000);
 	await Promise.all([saver.autoSave(), saver.autoSave()]);
 	await saver.autoSave();
@@ -1458,6 +1466,15 @@ await withSrcModule(["src/results-files.ts", "src/engine/results-save.ts"], asyn
 	saver.refreshSaved();
 	await new Promise(res => setTimeout(res, 0));
 	r.check("an answer judged after the save rewrites the SAME file", [own(), ctx.quizState.resultsSave.status], [[path1], "saved"]);
+	/* A failed REWRITE (the file may be half-written) says "failed", so that
+	   Retry writes the whole file again; it never claims "saved". */
+	failWrites = 1;
+	saver.refreshSaved();
+	await new Promise(res => setTimeout(res, 0));
+	r.check("a failed rewrite is 'failed' with its reason", [ctx.quizState.resultsSave.status, ctx.quizState.resultsSave.error], ["failed", "disk full"]);
+	await saver.autoSave({ retry: true });
+	r.check("Retry after a failed rewrite writes the same file in full", [ctx.quizState.resultsSave.status, own(), JSON.parse(files.get(path1)).attemptDate], ["saved", [path1], 1000]);
+	notices.length = 0;
 
 	saver.reset();
 	const path2 = saver.planPath();

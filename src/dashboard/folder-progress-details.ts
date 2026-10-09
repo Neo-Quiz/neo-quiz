@@ -8,7 +8,7 @@ import { quizDeLaCarte, type CarteCours } from "./course-pairs";
 import { computeQuizState } from "./quiz-mastery";
 import { quizModeLabel } from "./quiz-card";
 import { formatDateHeure } from "./format-date";
-import { isDeletableResultsPath, trashResultsFile } from "../results-files";
+import { isDeletableResultsPath, readThenTrashResultsFile, restoreResultsFile } from "../results-files";
 import { LOG_PREFIX } from "../branding";
 
 /* ══════════════════════════════════════════════════════════
@@ -59,11 +59,18 @@ export function duesDuDossier(ctx: DashboardShellCtx, inModule: QuizIndexEntry[]
 export const questions = (n: number): string =>
 	t(n === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: n });
 
-/** Une tentative supprimée mais pas encore confirmée : montrée en place
-    (« Tentative supprimée » + Annuler) jusqu'au prochain rendu de la page —
-    survit donc au redessin de la LIGNE (chevron compris), pas à celui de la
-    page entière. Clé : `chemin::date`. */
-type EnAttenteAnnulation = Map<string, Tentative>;
+/** A deleted attempt not yet confirmed: shown in place ("Attempt deleted" +
+    Undo) until the next render of the page — so it survives a redraw of the
+    LINE (chevron included), not of the whole page. Key: `path::date`. It
+    keeps the COMPLETE attempt (results link included), the bytes of its
+    results file read before the trash (`null`: none, or unreadable), and the
+    trash in flight, which Undo waits for. */
+interface AttemptPendingUndo {
+	tentative: Tentative;
+	bytes: Uint8Array | null;
+	trashing: Promise<void>;
+}
+type EnAttenteAnnulation = Map<string, AttemptPendingUndo>;
 
 export function renderListeCours(parent: HTMLElement, ctx: DashboardShellCtx, cartes: CarteCours[], stats: Record<string, QuizStatRecord>): void {
 	if (cartes.length === 0) return;
@@ -112,7 +119,7 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 	ajouter(ligne, "span", "qbd-folder-course-pct", `${valeur}%`);
 
 	const reelles = tentativesDe(rec);
-	const attentes = [...enAttente.entries()].filter(([cle]) => cle.startsWith(q.path + "::")).map(([, tt]) => tt);
+	const attentes = [...enAttente.entries()].filter(([cle]) => cle.startsWith(q.path + "::")).map(([, e]) => e.tentative);
 	if (reelles.length === 0 && attentes.length === 0) return;
 
 	const toutesLibres = reelles.length > 0 && reelles.every(tt => tt.pct === null);
@@ -162,12 +169,10 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 		const annuler = ajouter(row, "button", "qbd-folder-attempt-undo", t("dashboard.quizzes.attemptUndo"));
 		annuler.type = "button";
 		annuler.addEventListener("click", () => {
+			const entree = registre.get(cle);
+			if (!entree) return;
 			registre.delete(cle);
-			// Its results file already went to the trash: the attempt comes
-			// back without the link (the file is recovered from the trash).
-			const { results: _gone, ...sansFichier } = tentative;
-			ctx.statsStore.restaurerTentative(q.path, sansFichier);
-			redessiner();
+			void undoAttemptDeletion(ctx, q.path, entree).then(redessiner);
 		});
 		return;
 	}
@@ -184,21 +189,37 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 	supprimer.addEventListener("click", () => {
 		const retiree = ctx.statsStore.supprimerTentative(q.path, tentative.date);
 		if (!retiree) return;
-		registre.set(cle, retiree);
+		const entree: AttemptPendingUndo = { tentative: retiree, bytes: null, trashing: Promise.resolve() };
+		entree.trashing = trashAttemptResults(q.path, entree);
+		registre.set(cle, entree);
 		redessiner();
-		trashAttemptResults(q.path, retiree);
 	});
 }
 
 /** Deleting an attempt also moves its saved results file (2026-10-09) to the
-    host's trash. `results` comes from a synced file: only a `.json` directly
-    in THIS quiz's results folder is touched (`isDeletableResultsPath`). */
-function trashAttemptResults(quizPath: string, tentative: Tentative): void {
+    host's trash, after reading its bytes for Undo. `results` comes from a
+    synced file: only a `.json` directly in this quiz's results folder AND
+    named for this quiz is touched (`isDeletableResultsPath`) — the folder is
+    shared by the quizzes of one folder. */
+async function trashAttemptResults(quizPath: string, entree: AttemptPendingUndo): Promise<void> {
 	const host = currentHost();
 	const dir = host.paths.resultsDirFor(quizPath);
-	if (!isDeletableResultsPath(tentative.results, dir)) return;
-	trashResultsFile(host.fs, dir, tentative.results).catch((e: unknown) => {
-		console.warn(LOG_PREFIX, "results file of a deleted attempt not trashed", tentative.results, e);
+	const path = entree.tentative.results;
+	if (!isDeletableResultsPath(path, dir, quizPath)) return;
+	try {
+		await readThenTrashResultsFile(host.fs, dir, quizPath, path, (bytes) => { entree.bytes = bytes; });
+	} catch (e: unknown) {
+		console.warn(LOG_PREFIX, "results file of a deleted attempt not trashed", path, e);
 		host.ui.notice(t("engine.result.deleteError", { message: (e as { message?: string })?.message || t("engine.result.unknownError") }));
-	});
+	}
+}
+
+/** Undo: the results file is written back at its path from the bytes read
+    before the trash (when it is no longer there), then the COMPLETE attempt
+    returns — without its link only when the file could not come back. */
+async function undoAttemptDeletion(ctx: DashboardShellCtx, quizPath: string, entree: AttemptPendingUndo): Promise<void> {
+	await entree.trashing;
+	const host = currentHost();
+	const restored = await restoreResultsFile(host.fs, host.paths.resultsDirFor(quizPath), quizPath, entree.tentative, entree.bytes);
+	ctx.statsStore.restaurerTentative(quizPath, restored);
 }
