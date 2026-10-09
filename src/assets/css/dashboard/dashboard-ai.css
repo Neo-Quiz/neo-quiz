@@ -4675,7 +4675,51 @@
 	display: block;
 	cursor: pointer;
 	border-radius: 8px;
-	transition: background-color 120ms ease;
+	/* Release: a soft rebound back to full size. */
+	transition: background-color 120ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Press: sinks fast, and the hover wash brightens a little. */
+.qbd-ai-usage-line:active,
+.qbd-ai-usage-line.is-pressed {
+	transform: scale(0.97);
+	transition: background-color 120ms ease, transform 90ms ease-out;
+	background: color-mix(in srgb, var(--text-normal) 11%, transparent);
+}
+
+.qbd-ai-usage-updated {
+	transition: opacity 150ms ease;
+}
+
+.qbd-ai-usage-updated.is-reading {
+	opacity: 0.45;
+}
+
+.qbd-usage-pop-refresh.is-reading svg {
+	animation: qbd-usage-spin 600ms ease-in-out 1;
+}
+
+@keyframes qbd-usage-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Popover bars fill from 0 once, on opening (finite, not "both"/"forwards":
+   the inline width is the end state). */
+.qbd-usage-pop-bar .qbd-ai-usage-fill.is-filling {
+	animation: qbd-usage-fill 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes qbd-usage-fill {
+	from { width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-usage-line,
+	.qbd-ai-usage-line:active,
+	.qbd-ai-usage-line.is-pressed { transition: background-color 120ms ease; transform: none; }
+	.qbd-ai-usage-updated { transition: none; }
+	.qbd-usage-pop-refresh.is-reading svg,
+	.qbd-usage-pop-bar .qbd-ai-usage-fill.is-filling { animation: none; }
 }
 
 .qbd-ai-usage-line:hover,
@@ -4765,6 +4809,24 @@
 .qbd-usage-pop-sub {
 	color: var(--text-faint);
 	line-height: 16px;
+}
+
+.qbd-usage-pop-email {
+	display: flex;
+	min-width: 0;
+	color: var(--text-faint);
+	line-height: 16px;
+	white-space: nowrap;
+}
+
+.qbd-usage-pop-email-local {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.qbd-usage-pop-email-domain {
+	flex: none;
 }
 
 .qbd-usage-pop-refresh {
@@ -4869,6 +4931,14 @@
 	min-width: 5px;
 	border-radius: 999px;
 	background: var(--interactive-accent);
+}
+
+.qbd-ai-usage-bar[data-empty="true"] {
+	background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+}
+
+.qbd-ai-usage-bar[data-empty="true"] .qbd-ai-usage-fill {
+	display: none;
 }
 
 .qbd-ai-usage-bar[data-level="warn"] .qbd-ai-usage-fill {

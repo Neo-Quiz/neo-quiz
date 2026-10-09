@@ -40,6 +40,29 @@ const cadenceOf = (tool: UsageTool): Cadence => {
 	return c;
 };
 const enVol = new Map<UsageTool, Promise<void>>();
+
+/** Account address per tool, read through the same host call as Settings >
+    Accounts (`process.etatComptes`, one CLI launch). At most one read per 10
+    minutes, started by the first popover opening only, never while the page is
+    hidden. The plan is deliberately never read here. */
+const EMAIL_MS = 10 * 60000;
+const emails = new Map<UsageTool, { email: string | null; at: number }>();
+const emailEnVol = new Set<UsageTool>();
+function loadEmail(tool: UsageTool, done: () => void): void {
+	const cur = emails.get(tool);
+	if (emailEnVol.has(tool) || document.visibilityState !== "visible") return;
+	if (cur && Date.now() - cur.at < EMAIL_MS) return;
+	const proc = currentHost().process;
+	if (!proc || !currentHost().platform.isDesktopApp) return;
+	emailEnVol.add(tool);
+	proc.etatComptes([tool]).then(list => {
+		const c = list.find(e => e.outil === tool);
+		emails.set(tool, { email: c && c.connecte ? c.email : null, at: Date.now() });
+	}).catch(() => { emails.set(tool, { email: null, at: Date.now() }); }).finally(() => {
+		emailEnVol.delete(tool);
+		done();
+	});
+}
 /** Redraws of every live mount: a reading started by a mount the page has since
     replaced must still paint the one that replaced it. */
 const redraws = new Set<() => void>();
@@ -74,6 +97,8 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(win, "span", "qbd-ai-usage-name", usageShortLabel(row));
 			const bar = ajouter(win, "span", "qbd-ai-usage-bar");
 			bar.dataset.level = usageLevel(row.usedPercent);
+			// At 0 % the bar is a plain empty track: no fill, so no min-width dot.
+			if (pct === 0) bar.dataset.empty = "true";
 			const fill = ajouter(bar, "span", "qbd-ai-usage-fill");
 			fill.style.width = pct + "%";
 			ajouter(win, "span", "qbd-ai-usage-pct", t("ai.usage.linePercent", { n: pct }));
@@ -82,15 +107,19 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(win, "span", "qbd-ai-usage-reset", reset ? "(" + reset + ")" : "");
 		}
 		if (cur) {
-			const upd = ajouter(el, "div", "qbd-ai-usage-updated", t("ai.usage.updated", { age: formatAge(cur.at, now) }));
+			const upd = ajouter(el, "div", "qbd-ai-usage-updated" + (enVol.has(tool) ? " is-reading" : ""), t("ai.usage.updated", { age: formatAge(cur.at, now) }));
 			// A click on the age refreshes by hand (same cadence rule), without opening the popover.
-			upd.addEventListener("click", (e) => { e.stopPropagation(); load(true); });
+			upd.addEventListener("click", (e) => { e.stopPropagation(); load(true); draw(); });
 		}
 		drawPop();
 	};
 
 	/* ── Popover ── */
 	let pop: HTMLElement | null = null;
+	/** When the popover opened: its bars fill from 0 during the first 450 ms
+	    only (a redraw inside that window resumes the fill via a negative delay). */
+	let openedAt = 0;
+	const FILL_MS = 450;
 	const place = (): void => {
 		if (!pop) return;
 		const r = el.getBoundingClientRect();
@@ -118,6 +147,15 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		const titles = ajouter(head, "div", "qbd-usage-pop-titles");
 		ajouter(titles, "div", "qbd-usage-pop-title", t(tool === "claude" ? "ai.usage.popoverTitleClaude" : "ai.usage.popoverTitleCodex"));
 		if (cur) ajouter(titles, "div", "qbd-usage-pop-sub", t("ai.usage.updated", { age: formatAge(cur.at, now) }));
+		const mail = emails.get(tool)?.email;
+		if (mail) {
+			// Middle truncation: the local part shrinks, the domain stays whole.
+			const at = mail.lastIndexOf("@");
+			const line = ajouter(titles, "div", "qbd-usage-pop-email");
+			line.title = mail;
+			ajouter(line, "span", "qbd-usage-pop-email-local", at > 0 ? mail.slice(0, at) : mail);
+			if (at > 0) ajouter(line, "span", "qbd-usage-pop-email-domain", mail.slice(at));
+		}
 		const refresh = ajouter(head, "button", "qbd-usage-pop-refresh") as HTMLButtonElement;
 		refresh.type = "button";
 		refresh.setAttribute("aria-label", t("ai.usage.refresh"));
@@ -125,6 +163,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		refresh.title = verdict.ok ? t("ai.usage.refresh") : t("ai.usage.availableIn", { when: usageWaitText(verdict.waitMs) });
 		refresh.disabled = enVol.has(tool) || !verdict.ok;
 		currentHost().ui.setIcon(refresh, "refresh-cw");
+		if (enVol.has(tool)) refresh.classList.add("is-reading");
 		refresh.addEventListener("click", () => { load(true); drawPop(); });
 		if (!verdict.ok && verdict.reason === "backoff") ajouter(pop, "div", "qbd-usage-pop-note", t("ai.usage.rateLimited", { when: usageWaitText(verdict.waitMs) }));
 		for (const row of cur ? usageStatusRows(cur.rows) : []) {
@@ -135,7 +174,15 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(top, "span", "qbd-usage-pop-used", t("ai.usage.used", { n: pct }));
 			const bar = ajouter(sec, "div", "qbd-ai-usage-bar qbd-usage-pop-bar");
 			bar.dataset.level = usageLevel(row.usedPercent);
-			ajouter(bar, "span", "qbd-ai-usage-fill").style.width = pct + "%";
+			// At 0 % the bar is a plain empty track: no fill, so no min-width dot.
+			if (pct === 0) bar.dataset.empty = "true";
+			const fill = ajouter(bar, "span", "qbd-ai-usage-fill");
+			fill.style.width = pct + "%";
+			const elapsed = now - openedAt;
+			if (elapsed < FILL_MS) {
+				fill.classList.add("is-filling");
+				fill.style.animationDelay = -elapsed + "ms";
+			}
 			const meta = ajouter(sec, "div", "qbd-usage-pop-meta");
 			ajouter(meta, "span", "", t("ai.usage.remaining", { n: usageRemainingPercent(row.usedPercent) }));
 			const when = usageResetIn(row.resetsAt, now);
@@ -176,14 +223,19 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		document.addEventListener("pointerdown", onDocDown, true);
 		document.addEventListener("keydown", onKey, true);
 		window.addEventListener("resize", place);
+		openedAt = Date.now();
 		drawPop();
+		loadEmail(tool, () => { if (pop) drawPop(); });
 		load(true);
 		startSec();
 	};
 	el.addEventListener("click", togglePop);
 	el.addEventListener("keydown", (e) => {
-		if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePop(); }
+		if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.classList.add("is-pressed"); togglePop(); }
 	});
+	// Keyboard gets the same press-and-rebound as the pointer's :active.
+	el.addEventListener("keyup", () => el.classList.remove("is-pressed"));
+	el.addEventListener("blur", () => el.classList.remove("is-pressed"));
 
 	const load = (force: boolean): void => {
 		const cur = cache.get(tool);
