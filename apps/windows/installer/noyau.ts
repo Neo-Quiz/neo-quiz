@@ -474,6 +474,10 @@ export interface TransportTelechargement {
 	telecharger(paquet: PaquetInstallable): Promise<void>;
 	attendre(ms: number): Promise<void>;
 	journal(message: string): void;
+	/** Is this package already on disk from a previous attempt, with its size
+	    and sha512 checked again just now? Then "Try again" resumes at the
+	    installation instead of downloading it once more. */
+	dejaVerifie?(paquet: PaquetInstallable): Promise<boolean>;
 }
 
 /** Downloads `initial`, retrying on network or integrity failures. Before
@@ -486,6 +490,10 @@ export async function telechargerAvecReessais(
 	delais: readonly number[] = DELAIS_REESSAI_MS,
 ): Promise<PaquetInstallable> {
 	let paquet = initial;
+	if (await transport.dejaVerifie?.(paquet)) {
+		transport.journal("verified package kept from the previous attempt, download skipped");
+		return paquet;
+	}
 	for (let essai = 0; ; essai++) {
 		try {
 			await transport.telecharger(paquet);

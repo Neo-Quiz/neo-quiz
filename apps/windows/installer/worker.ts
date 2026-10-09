@@ -10,12 +10,12 @@
 ══════════════════════════════════════════════════════════ */
 
 import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { access, appendFile, mkdtemp, readdir, rm } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { access, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { get } from "node:https";
 import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, parse, resolve } from "node:path";
+import { isAbsolute, join, parse, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -33,33 +33,40 @@ import {
 	type PaquetInstallable,
 } from "./noyau";
 import { tailleDossier, tailleTemporairesNsis } from "./sondage";
+import { appendLog, isAppRunning } from "./probe";
 import type {
 	ChargeTravailleur,
 	CodeErreurInstallateur,
 	CommandeTravailleur,
+	InstallerErrorDetail,
+	InstallerStep,
 	MessageTravailleur,
 } from "./protocole";
 
 const USER_AGENT = "Neo-Quiz-Installer";
 const MAX_REDIRECTIONS = 5;
 
-class ErreurTravailleur extends Error {
-	/** `detail` names the real cause (errno, HTTP status) for the log only. */
-	constructor(readonly code: CodeErreurInstallateur, readonly detail?: string, readonly nonLance = false) {
-		super(detail ? `${code}: ${detail}` : code);
+/** The raw facts of a failure (errno, HTTP status, host, exit code): they go
+    to the window, where `diagnosis.ts` names the cause, and to the log. */
+type FaitsErreur = Omit<InstallerErrorDetail, "step" | "downloadVerified" | "appRunning">;
+
+export class ErreurTravailleur extends Error {
+	constructor(readonly code: CodeErreurInstallateur, readonly faits: FaitsErreur = {}, readonly nonLance = false) {
+		super([code, faits.errno, faits.http && `HTTP ${faits.http}`, faits.host, faits.message].filter(Boolean).join(": "));
 	}
 }
 
-/** Best-effort log next to the temp files: the worker has no console, and a
-    bare "installation could not continue" says nothing about the cause. */
-async function journaliser(message: string): Promise<void> {
-	try {
-		await appendFile(join(tmpdir(), "neo-quiz-installer.log"), `${new Date().toISOString()} ${message}
-`);
-	} catch {
-		// Logging must never fail the installation.
-	}
+/** The errno (or OpenSSL code) of a Node error, never a guess. */
+function errnoDe(erreur: unknown): string | undefined {
+	const code = (erreur as { code?: unknown } | null)?.code;
+	return typeof code === "string" ? code : undefined;
 }
+
+const journaliser = appendLog;
+
+/** A socket silent this long is dead: a VPN or proxy that drops the
+    connection without closing it would otherwise freeze the bar forever. */
+const DELAI_INACTIVITE_MS = 30_000;
 
 const attendre = (ms: number): Promise<void> => new Promise(resolvePromise => setTimeout(resolvePromise, ms));
 
@@ -106,7 +113,9 @@ function hoteTelechargementAutorise(url: URL): boolean {
 
 async function ouvrirReponse(url: URL, signal: AbortSignal, redirections = 0): Promise<IncomingMessage> {
 	if (!hoteTelechargementAutorise(url) || redirections > MAX_REDIRECTIONS) {
-		throw new ErreurTravailleur("network", "download host or redirect limit");
+		/* A redirect outside GitHub is what a captive portal or a filtering
+		   proxy does: a network block, named as such. */
+		throw new ErreurTravailleur("network", { errno: "EREDIRECT", host: url.hostname, message: "redirected outside GitHub or too many redirects" });
 	}
 	return await new Promise<IncomingMessage>((resolvePromise, reject) => {
 		const requete = get(url, { signal, headers: { "User-Agent": USER_AGENT, Accept: "application/octet-stream" } }, reponse => {
@@ -117,7 +126,7 @@ async function ouvrirReponse(url: URL, signal: AbortSignal, redirections = 0): P
 				try {
 					suivante = new URL(reponse.headers.location, url);
 				} catch {
-					reject(new ErreurTravailleur("network"));
+					reject(new ErreurTravailleur("network", { errno: "EREDIRECT", host: url.hostname, message: "invalid redirect" }));
 					return;
 				}
 				void ouvrirReponse(suivante, signal, redirections + 1).then(resolvePromise, reject);
@@ -125,16 +134,57 @@ async function ouvrirReponse(url: URL, signal: AbortSignal, redirections = 0): P
 			}
 			if (code !== 200) {
 				reponse.resume();
-				reject(new ErreurTravailleur("network", `HTTP ${code} for ${url.pathname}`));
+				reject(new ErreurTravailleur("network", { http: code, host: url.hostname, message: url.pathname }));
 				return;
 			}
 			resolvePromise(reponse);
 		});
+		requete.setTimeout(DELAI_INACTIVITE_MS, () => {
+			requete.destroy(Object.assign(new Error(`no data for ${DELAI_INACTIVITE_MS / 1000} s`), { code: "ETIMEDOUT" }));
+		});
 		requete.once("error", erreur => {
 			if (signal.aborted) reject(erreur);
-			else reject(new ErreurTravailleur("network", (erreur as NodeJS.ErrnoException).code ?? erreur.message));
+			else reject(new ErreurTravailleur("network", { errno: errnoDe(erreur), host: url.hostname, message: erreur.message }));
 		});
 	});
+}
+
+/** A small text file of the release (`latest.yml`), through the SAME network
+    stack as the download: the main process reads the release with it, and
+    "Try again" uses it as its quick connection test, so a test that passes
+    means the download can pass too. Bounded in time and size. */
+export async function lireTexteGithub(url: string, delaiMs = 15_000): Promise<string> {
+	const controleur = new AbortController();
+	let expire = false;
+	const minuterie = setTimeout(() => { expire = true; controleur.abort(); }, delaiMs);
+	try {
+		const reponse = await ouvrirReponse(new URL(url), controleur.signal);
+		let texte = "";
+		for await (const morceau of reponse) {
+			texte += String(morceau);
+			if (texte.length > 64 * 1024) {
+				reponse.destroy();
+				throw new ErreurTravailleur("network", { errno: "EBADRELEASE", message: "latest.yml larger than 64 KB" });
+			}
+		}
+		return texte;
+	} catch (erreur) {
+		if (expire) {
+			throw new ErreurTravailleur("network", { errno: "ETIMEDOUT", host: new URL(url).hostname, message: `no answer within ${delaiMs / 1000} s` });
+		}
+		if (erreur instanceof ErreurTravailleur) throw erreur;
+		throw new ErreurTravailleur("network", { errno: errnoDe(erreur), message: String((erreur as Error)?.message ?? erreur) });
+	} finally {
+		clearTimeout(minuterie);
+	}
+}
+
+/** The release `latest.yml` describes. A file that is not a valid
+    description (an HTML page a proxy serves with 200) is `EBADRELEASE`. */
+export async function lirePaquetPublie(version: unknown, delaiMs?: number): Promise<PaquetInstallable> {
+	const paquet = resoudrePaquet(await lireTexteGithub(urlLatestYml(version), delaiMs));
+	if (!paquet) throw new ErreurTravailleur("release", { errno: "EBADRELEASE", message: "latest.yml does not describe one installer" });
+	return paquet;
 }
 
 async function telecharger(
@@ -167,17 +217,36 @@ async function telecharger(
 		await pipeline(reponse, observer, createWriteStream(destination, { flags: "wx" }), { signal });
 	} catch (erreur) {
 		if (signal.aborted || erreur instanceof ErreurTravailleur) throw erreur;
-		/* A reset or truncated body mid-download is a network failure, not a
-		   generic one; a refused write (antivirus, disk) is an installation one. */
-		const errno = (erreur as NodeJS.ErrnoException).code ?? String(erreur);
-		const ecriture = /^(EPERM|EACCES|EBUSY|ENOSPC|EROFS|EMFILE)$/.test(errno);
-		throw new ErreurTravailleur(ecriture ? "installation" : "network", `${errno} while downloading`);
+		/* A reset or truncated body mid-download is a network failure (before
+		   desktop-v1.20.61 it surfaced as "could not continue"); a refused write
+		   (antivirus, full disk) is an installation one. */
+		const errno = errnoDe(erreur) ?? "EUNKNOWN";
+		const ecriture = /^(EPERM|EACCES|EBUSY|ENOSPC|EROFS|EMFILE|ENOENT)$/.test(errno);
+		throw new ErreurTravailleur(ecriture ? "installation" : "network", {
+			errno,
+			host: new URL(paquet.url).hostname,
+			message: `${String((erreur as Error)?.message ?? erreur)} after ${recus} of ${paquet.taille} bytes`,
+		});
 	}
 	if (recus !== paquet.taille) {
-		throw new ErreurTravailleur("integrity", `size ${recus}, expected ${paquet.taille}`);
+		throw new ErreurTravailleur("integrity", { message: `size ${recus}, expected ${paquet.taille}` });
 	}
 	if (hash.digest("base64") !== paquet.sha512) {
-		throw new ErreurTravailleur("integrity", "sha512 differs from latest.yml");
+		throw new ErreurTravailleur("integrity", { message: "sha512 differs from latest.yml" });
+	}
+}
+
+/** Is the file at `chemin` exactly the published package? Size, then the
+    sha512 of every byte: a download kept from a failed attempt is reused only
+    on this proof, so "Try again" never relaxes the integrity check. */
+async function fichierConforme(chemin: string, paquet: PaquetInstallable): Promise<boolean> {
+	try {
+		if ((await stat(chemin)).size !== paquet.taille) return false;
+		const hash = createHash("sha512");
+		for await (const morceau of createReadStream(chemin)) hash.update(morceau as Buffer);
+		return hash.digest("base64") === paquet.sha512;
+	} catch {
+		return false;
 	}
 }
 
@@ -232,8 +301,9 @@ async function lancerNsis(
 		const terminer = (): void => clearInterval(minuterie);
 		enfant.once("error", erreur => {
 			terminer();
-			/* nonLance: the installer never started (file locked by Defender). */
-			reject(new ErreurTravailleur("installation", (erreur as NodeJS.ErrnoException).code ?? erreur.message, true));
+			/* nonLance: the installer never started (file locked or deleted by an
+			   antivirus, or blocked by Windows). */
+			reject(new ErreurTravailleur("installation", { errno: errnoDe(erreur) ?? "UNKNOWN", message: erreur.message }, true));
 		});
 		enfant.once("exit", code => {
 			terminer();
@@ -241,7 +311,7 @@ async function lancerNsis(
 				surProgression(100);
 				resolvePromise();
 			} else {
-				reject(new ErreurTravailleur("installation", `NSIS exit code ${code}`));
+				reject(new ErreurTravailleur("installation", { exitCode: code ?? -1, message: `NSIS exit code ${code}` }));
 			}
 		});
 	});
@@ -324,9 +394,16 @@ async function terminerTube(socket: Socket): Promise<void> {
 	await new Promise<void>(resolvePromise => socket.end(resolvePromise));
 }
 
-/** Point d'entrée appelé par `main.ts` quand le portable a été relancé avec
-    le drapeau privé du travailleur. Retourne un code de processus, sans jamais
-    afficher de chaîne brute à l'utilisateur. */
+/** Where a downloaded package waits between attempts. The name is the
+    validated package name (`neo-quiz-setup-X.Y.Z.exe`), never a path received
+    from elsewhere; the file is only ever launched after `fichierConforme`. */
+function cheminCache(nom: string): string {
+	return join(tmpdir(), "neo-quiz-installer-cache", nom);
+}
+
+/** Entry point called by `main.ts` when the portable was relaunched with the
+    worker's private flag. Returns a process exit code; it never shows a raw
+    string to the user, it sends the raw FACTS of a failure to the window. */
 export async function executerTravailleur(nomTube: string, chargeEncodee: string): Promise<number> {
 	const charge = decoderCharge(chargeEncodee);
 	if (!charge) {
@@ -342,6 +419,7 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 		return 3;
 	}
 	envoyer(socket, { type: "auth", secret: charge.secret });
+	await journaliser(`worker started for ${charge.paquet.nom} into ${charge.dossier}`);
 
 	const annulation = new AbortController();
 	let dossierExistait = true;
@@ -352,29 +430,44 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 		if (commande.type === "annuler") annulation.abort();
 	});
 
-	const temporaire = await mkdtemp(join(tmpdir(), "neo-quiz-installer-"));
-	const cheminPaquet = join(temporaire, charge.paquet.nom);
+	const cheminPaquet = cheminCache(charge.paquet.nom);
+	/* The step running when a failure happens, and whether the package was
+	   already downloaded AND verified: "Try again" then resumes at the
+	   installation (see `diagnosis.ts`, `resumeFrom`). */
+	let etape: InstallerStep = "download";
+	let telechargementVerifie = false;
+	let garderPaquet = false;
 	try {
+		await mkdir(join(tmpdir(), "neo-quiz-installer-cache"), { recursive: true });
 		const paquet = await telechargerAvecReessais(charge.paquet, {
 			telecharger: p => telecharger(p, cheminPaquet, annulation.signal, recus => {
 				envoyer(socket, { type: "telechargement", recus, total: p.taille });
 			}),
 			relirePaquet: async () => {
 				try {
-					const reponse = await fetch(urlLatestYml(charge.paquet.version), { headers: { "User-Agent": USER_AGENT } });
-					return reponse.ok ? resoudrePaquet(await reponse.text()) : null;
+					return await lirePaquetPublie(charge.paquet.version);
 				} catch {
 					return null;
 				}
 			},
 			attendre: ms => annulation.signal.aborted ? Promise.resolve() : attendre(ms),
 			journal: message => { void journaliser(message); },
+			dejaVerifie: async p => {
+				try { await access(cheminPaquet); } catch { return false; }
+				envoyer(socket, { type: "verification" });
+				if (await fichierConforme(cheminPaquet, p)) return true;
+				/* A kept file that no longer matches is never launched. */
+				await rm(cheminPaquet, { force: true });
+				return false;
+			},
 		});
 		if (annulation.signal.aborted) {
 			envoyer(socket, { type: "annule" });
 			await terminerTube(socket);
 			return 0;
 		}
+		telechargementVerifie = true;
+		etape = "launch";
 
 		envoyer(socket, { type: "verification" });
 		if (annulation.signal.aborted) {
@@ -382,13 +475,13 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			await terminerTube(socket);
 			return 0;
 		}
-		/* Mesurée AVANT le lancement : elle dit si NSIS aura d'abord une
-		   ancienne version à retirer — une étape aveugle de plus, que le barème
-		   prend en compte — et elle sert de creux de départ à la mise en place. */
+		/* Measured BEFORE the launch: it tells whether NSIS will first remove an
+		   old version (one more blind step, which the scale accounts for) and it
+		   is the starting floor of the copy into place. */
 		const initial = await tailleDossier(charge.dossier);
 		/* Only a launch that never started is retried (Defender still holds the
 		   fresh file: EBUSY/EACCES/EPERM). A NSIS run that started and failed
-		   is never replayed: it may have changed the installation. */
+		   is never replayed automatically: it may have changed the installation. */
 		await reessayer(
 			() => lancerNsis(
 				cheminPaquet,
@@ -409,11 +502,14 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			return 0;
 		}
 
+		etape = "postcheck";
 		const executable = join(charge.dossier, "neo-quiz.exe");
 		try {
 			await access(executable);
-		} catch {
-			throw new ErreurTravailleur("installation");
+		} catch (erreur) {
+			/* NSIS said 0 but the app is not there: removed right after being
+			   written, which is what an antivirus quarantine looks like. */
+			throw new ErreurTravailleur("installation", { errno: errnoDe(erreur), message: "neo-quiz.exe missing after a successful setup" });
 		}
 		envoyer(socket, { type: "termine", executable });
 		await terminerTube(socket);
@@ -426,15 +522,29 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			return 0;
 		}
 		const code = erreur instanceof ErreurTravailleur ? erreur.code : "generic";
-		await journaliser(`installation failed (${code}): ${erreur instanceof Error ? erreur.stack ?? erreur.message : String(erreur)}`);
-		envoyer(socket, { type: "erreur", code });
+		const faits: FaitsErreur = erreur instanceof ErreurTravailleur
+			? erreur.faits
+			: { errno: errnoDe(erreur), message: String((erreur as Error)?.message ?? erreur).slice(0, 300) };
+		/* NSIS started then failed: is the app open (its files locked)? Asked
+		   only here, and only of `tasklist` with constant arguments. */
+		const step: InstallerStep = erreur instanceof ErreurTravailleur && erreur.nonLance ? "launch"
+			: faits.exitCode !== undefined ? "install"
+			: etape;
+		const appRunning = step === "install" ? await isAppRunning() : false;
+		const detail: InstallerErrorDetail = {
+			...faits,
+			step,
+			...(telechargementVerifie ? { downloadVerified: true } : {}),
+			...(appRunning ? { appRunning: true } : {}),
+		};
+		/* A verified package is kept for "Try again"; anything else (partial,
+		   wrong digest) is removed. */
+		garderPaquet = telechargementVerifie;
+		await journaliser(`installation failed (${code}) ${JSON.stringify(detail)}: ${erreur instanceof Error ? erreur.stack ?? erreur.message : String(erreur)}`);
+		envoyer(socket, { type: "erreur", code, detail });
 		await terminerTube(socket);
 		return 1;
 	} finally {
-		await rm(temporaire, { recursive: true, force: true });
-		/* `dirname` est volontairement touché ici par le typechecker via cet
-		   import utilisé : il rappelle que `cheminPaquet` reste dans notre
-		   dossier temporaire et n'est jamais supprimé par un chemin reçu. */
-		void dirname(cheminPaquet);
+		if (!garderPaquet) await rm(cheminPaquet, { force: true });
 	}
 }

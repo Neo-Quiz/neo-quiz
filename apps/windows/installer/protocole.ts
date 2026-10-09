@@ -21,6 +21,9 @@ export const CANAUX_INSTALLATEUR = {
 	ouvrirLien: "neo-installer:ouvrir-lien",
 	ouvrirApplication: "neo-installer:ouvrir-application",
 	fermer: "neo-installer:fermer",
+	retry: "neo-installer:retry",
+	copy: "neo-installer:copy",
+	copyLogPath: "neo-installer:copy-log-path",
 	etat: "neo-installer:etat",
 } as const;
 
@@ -67,10 +70,87 @@ export type EtatInstallateur =
 	| { phase: "installation"; pourcent: number | null }
 	| { phase: "demarrage" }
 	| { phase: "annule" }
-	| { phase: "erreur"; code: CodeErreurInstallateur };
+	| { phase: "retrying"; action: RetryAction }
+	/* `diagnosis` is absent only for the UAC refusal (`elevation`), which has
+	   its own blocking dialog. */
+	| { phase: "erreur"; code: CodeErreurInstallateur; diagnosis?: InstallerDiagnosis };
+
+/** The step that was running when an attempt failed. */
+export type InstallerStep =
+	| "init"
+	| "worker"
+	| "download"
+	| "verify"
+	| "launch"
+	| "install"
+	| "postcheck"
+	| "open"
+	| "connection";
+
+/** What the worker (or the main process) observed when a step failed: the raw
+    facts only, never a sentence. `diagnosis.ts` turns them into a cause. */
+export interface InstallerErrorDetail {
+	step: InstallerStep;
+	/** Node errno or OpenSSL code: `ECONNRESET`, `CERT_HAS_EXPIRED`, `ENOSPC`... */
+	errno?: string;
+	http?: number;
+	host?: string;
+	/** NSIS exit code, or the worker's own exit code before it connected. */
+	exitCode?: number;
+	/** A short raw message, for the technical details only. */
+	message?: string;
+	/** Was `neo-quiz.exe` running when NSIS failed? */
+	appRunning?: boolean;
+	/** The package was fully downloaded AND verified before the failure. */
+	downloadVerified?: boolean;
+}
+
+/** The closed list of causes the window can explain. `unknown` is the last
+    resort, never a default for something a rule can name. */
+export type InstallerCause =
+	| "offline"
+	| "blocked"
+	| "tlsInspection"
+	| "integrity"
+	| "publishing"
+	| "server"
+	| "diskFull"
+	| "antivirus"
+	| "windowsRefused"
+	| "appOpen"
+	| "launch"
+	| "unknown";
+
+/** Where "Try again" resumes. */
+export type RetryResume = "init" | "download" | "install" | "open";
+
+export interface InstallerDiagnosis {
+	cause: InstallerCause;
+	/** Display name of an active VPN (`NordLynx`), or null. */
+	vpn: string | null;
+	/** NSIS exit code, shown in the `windowsRefused` explanation. */
+	exitCode: number | null;
+	/** The same cause as the attempt this one retried. */
+	again: boolean;
+	resume: RetryResume;
+	/** Raw technical lines, shown under "Technical details" and copied as is. */
+	details: string;
+}
+
+export type RetryAction = "connection" | "release" | "download" | "install" | "open";
+
+export type InitResult =
+	| { ok: true; infos: InfosInitialesInstallateur }
+	| { ok: false; diagnosis: InstallerDiagnosis };
 
 export interface PontInstallateur {
-	initialiser(): Promise<InfosInitialesInstallateur>;
+	initialiser(): Promise<InitResult>;
+	/** Retries from the step that failed (main decides, from its last diagnosis). */
+	retry(): Promise<void>;
+	/** Writes a bounded text to the clipboard. */
+	copy(text: string): void;
+	/** Copies the log file path; the renderer never names a path. */
+	copyLogPath(): void;
 	choisirDossier(courant: string): Promise<ChoixDossierInstallateur | null>;
 	espaceDisque(dossier: string): Promise<InfosDisqueInstallateur>;
 	installer(dossier: string): Promise<void>;
@@ -103,7 +183,7 @@ export type MessageTravailleur =
 	| { type: "installation"; pourcent: number | null }
 	| { type: "termine"; executable: string }
 	| { type: "annule" }
-	| { type: "erreur"; code: CodeErreurInstallateur };
+	| { type: "erreur"; code: CodeErreurInstallateur; detail?: InstallerErrorDetail };
 
 export type CommandeTravailleur = { type: "annuler" };
 

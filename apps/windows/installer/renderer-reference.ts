@@ -5,11 +5,12 @@ import { poserIcone } from "../src/host/ui";
 import { poserGlyphe } from "../src/ui/glyphes-fenetre";
 import type { PageLegale } from "./noyau";
 import { formatOctets, formatPourcent, libellesProgression as libellesPartages, type LibellesProgression } from "./presentation";
+import { diagnosisTexts, retryAction, retryPlan, retryStatus } from "./diagnosis";
 import type {
-	CodeErreurInstallateur,
 	EtatInstallateur,
 	InfosDisqueInstallateur,
 	InfosInitialesInstallateur,
+	InstallerDiagnosis,
 } from "./protocole";
 
 /* La page PRÊTE reste celle déjà validée à l'écran. Les autres phases ont leur
@@ -25,6 +26,11 @@ let confirmationAnnulation = false;
 let annulationDemandee = false;
 let affichage100Jusqua = 0;
 let minuterieDemarrage: ReturnType<typeof setTimeout> | null = null;
+/** Error screen: technical details unfolded, and the last "copied" feedback. */
+let detailsOuverts = false;
+let copieFaite: "details" | "log" | null = null;
+/** Status under the loading spinner while "Try again" re-reads the release. */
+let statutChargement: string | null = null;
 
 function ajouter<K extends keyof HTMLElementTagNameMap>(
 	parent: HTMLElement,
@@ -39,21 +45,27 @@ function ajouter<K extends keyof HTMLElementTagNameMap>(
 	return element;
 }
 
-function libelleErreur(code: CodeErreurInstallateur): string {
-	switch (code) {
-		case "release": return t("installer.error.release");
-		case "network": return t("installer.error.network");
-		case "elevation": return t("installer.error.elevation");
-		case "integrity": return t("installer.error.integrity");
-		case "installation": return t("installer.error.installation");
-		case "launch": return t("installer.error.launch");
-		default: return t("installer.error.generic");
-	}
+/** A failure seen by the WINDOW itself (an IPC call that rejected): no worker
+    facts, so the cause is unknown, but the step and message still show. */
+function diagnosticLocal(etape: string, erreur: unknown): InstallerDiagnosis {
+	return {
+		cause: "unknown",
+		vpn: null,
+		exitCode: null,
+		again: false,
+		resume: infos ? "download" : "init",
+		details: `cause: unknown\nstep: window (${etape})\nmessage: ${String((erreur as Error)?.message ?? erreur).slice(0, 300)}`,
+	};
+}
+
+function afficherErreur(diagnosis: InstallerDiagnosis): void {
+	etat = { phase: "erreur", code: "generic", diagnosis };
+	rendre();
 }
 
 function phaseInstallationActive(): boolean {
 	return etat.phase === "elevation" || etat.phase === "telechargement" ||
-		etat.phase === "verification" || etat.phase === "installation";
+		etat.phase === "verification" || etat.phase === "installation" || etat.phase === "retrying";
 }
 
 function rendreBarreTitre(parent: HTMLElement): void {
@@ -115,20 +127,9 @@ function rendreBoutonInstallation(parent: HTMLElement): void {
 }
 
 function rendreAction(parent: HTMLElement): void {
-	if (etat.phase === "erreur") {
-		/* Le refus UAC a son propre dialogue bloquant : afficher en plus le
-		   bouton de nouvelle tentative derrière lui créerait deux actions
-		   concurrentes pour le même état. */
-		if (etat.code === "elevation") return;
-		ajouter(parent, "p", "nqi-error", libelleErreur(etat.code));
-		const bouton = ajouter(parent, "button", "nqi-primary", t("installer.retry"));
-		bouton.type = "button";
-		bouton.addEventListener("click", () => {
-			if (infos) lancerInstallation();
-			else void initialiser();
-		});
-		return;
-	}
+	/* The UAC refusal has its own blocking dialog; every other failure has its
+	   own screen (`rendreErreur`). */
+	if (etat.phase === "erreur") return;
 	if (!infos) return;
 	if (etat.phase === "pret" || etat.phase === "annule") {
 		rendreBoutonInstallation(parent);
@@ -238,9 +239,77 @@ function rendreDejaInstalle(parent: HTMLElement): void {
 function rendreChargement(parent: HTMLElement): void {
 	const etape = ajouter(parent, "section", "nqi-loading-stage");
 	etape.setAttribute("role", "status");
-	etape.setAttribute("aria-label", t("installer.preparing"));
+	etape.setAttribute("aria-label", statutChargement ?? t("installer.preparing"));
 	const anneau = ajouter(etape, "div", "nqi-loading-spinner");
 	anneau.setAttribute("aria-hidden", "true");
+	if (statutChargement) ajouter(etape, "p", "nqi-loading-status", statutChargement);
+}
+
+/** A failed attempt: a short title naming the cause, one sentence of
+    explanation, one or two numbered steps, then the raw facts on demand
+    (with "Copy") and the log path. "Try again" resumes where it failed. */
+function rendreErreur(parent: HTMLElement, diagnostic: InstallerDiagnosis): void {
+	const textes = diagnosisTexts(diagnostic);
+	const etape = ajouter(parent, "section", "nqi-error-stage");
+	etape.setAttribute("role", "alert");
+	ajouter(etape, "h1", "nqi-error-title", textes.title);
+
+	const bloc = ajouter(etape, "div", "nqi-diagnosis");
+	const carte = ajouter(bloc, "div", "nqi-diagnosis-card");
+	if (textes.again) ajouter(carte, "p", "nqi-diagnosis-again", textes.again);
+	ajouter(carte, "p", "nqi-diagnosis-body", textes.body);
+	const liste = ajouter(carte, "ol", "nqi-diagnosis-steps");
+	for (const pas of textes.steps) ajouter(liste, "li", undefined, pas);
+
+	const liens = ajouter(bloc, "div", "nqi-diagnosis-links");
+	const basculer = ajouter(liens, "button", "nqi-link",
+		t(detailsOuverts ? "installer.diagnosis.hideDetails" : "installer.diagnosis.showDetails"));
+	basculer.type = "button";
+	basculer.setAttribute("aria-expanded", String(detailsOuverts));
+	basculer.addEventListener("click", () => {
+		detailsOuverts = !detailsOuverts;
+		copieFaite = null;
+		rendre();
+	});
+	const journal = ajouter(liens, "button", "nqi-link", t("installer.diagnosis.copyLogPath"));
+	journal.type = "button";
+	journal.addEventListener("click", () => {
+		window.neoInstaller.copyLogPath();
+		copieFaite = "log";
+		rendre();
+	});
+	if (copieFaite === "log") ajouter(liens, "span", "nqi-link-done", t("installer.diagnosis.logPathCopied"));
+
+	if (detailsOuverts) {
+		const details = ajouter(bloc, "div", "nqi-diagnosis-details");
+		ajouter(details, "pre", "nqi-diagnosis-raw", diagnostic.details);
+		const copier = ajouter(details, "button", "nqi-diagnosis-copy",
+			t(copieFaite === "details" ? "installer.diagnosis.copied" : "installer.diagnosis.copy"));
+		copier.type = "button";
+		copier.addEventListener("click", () => {
+			window.neoInstaller.copy(diagnostic.details);
+			copieFaite = "details";
+			rendre();
+		});
+	}
+
+	rendreCommentaires(etape, "nqi-progress-feedback");
+	const actions = ajouter(etape, "div", "nqi-actions");
+	const reessayer = ajouter(actions, "button", "nqi-primary", t("installer.retry"));
+	reessayer.type = "button";
+	reessayer.autofocus = true;
+	reessayer.addEventListener("click", () => {
+		detailsOuverts = false;
+		copieFaite = null;
+		if (!infos) {
+			const reseau = diagnostic.cause === "offline" || diagnostic.cause === "blocked" || diagnostic.cause === "tlsInspection";
+			void initialiser(reseau ? "connection" : "release");
+			return;
+		}
+		etat = { phase: "retrying", action: retryAction(retryPlan(diagnostic)) };
+		rendre();
+		void window.neoInstaller.retry().catch(erreur => afficherErreur(diagnosticLocal("retry", erreur)));
+	});
 }
 
 function ouvrirConfirmationAnnulation(): void {
@@ -254,10 +323,9 @@ function confirmerAnnulation(): void {
 	confirmationAnnulation = false;
 	annulationDemandee = true;
 	rendre();
-	void window.neoInstaller.annuler().catch(() => {
+	void window.neoInstaller.annuler().catch(erreur => {
 		annulationDemandee = false;
-		etat = { phase: "erreur", code: "generic" };
-		rendre();
+		afficherErreur(diagnosticLocal("cancel", erreur));
 	});
 }
 
@@ -292,6 +360,7 @@ function libellesProgression(): LibellesProgression {
 	if (annulationDemandee) {
 		return { pourcent: null, statut: t("installer.status.cancelling"), detail: null };
 	}
+	if (etat.phase === "retrying") return { pourcent: null, statut: retryStatus(etat.action), detail: null };
 	return libellesPartages(etat, debitTelechargement);
 }
 
@@ -420,9 +489,11 @@ function rendre(): void {
 	   La classe d'entrée n'est posée QUE lorsque l'étape change ; un rendu
 	   déclenché par autre chose — la modale de confirmation qui s'ouvre, une
 	   erreur d'élévation — ne rejoue rien derrière elle. */
+	const diagnostic = etat.phase === "erreur" ? etat.diagnosis : undefined;
 	const etape = chargement ? "chargement"
 		: etat.phase === "demarrage" ? "demarrage"
 		: phaseInstallationActive() ? "progression"
+		: diagnostic ? "erreur"
 		: infos?.dejaInstalle ? "dejaInstalle"
 		: "panneau";
 	const changeEtape = etape !== derniereEtapeRendue;
@@ -443,10 +514,16 @@ function rendre(): void {
 		return;
 	}
 
-	if (etat.phase === "elevation" || etat.phase === "telechargement" || etat.phase === "verification" || etat.phase === "installation") {
+	if (etat.phase === "elevation" || etat.phase === "telechargement" || etat.phase === "verification" || etat.phase === "installation" || etat.phase === "retrying") {
 		rendreEtapeProgression(contenu);
 		marquerEntree();
 		if (confirmationAnnulation) rendreConfirmationAnnulation(root);
+		return;
+	}
+
+	if (diagnostic) {
+		rendreErreur(contenu, diagnostic);
+		marquerEntree();
 		return;
 	}
 
@@ -481,13 +558,12 @@ function lancerInstallation(): void {
 		? { phase: "elevation" }
 		: { phase: "telechargement", recus: 0, total: infos.tailleTelechargement };
 	rendre();
-	void window.neoInstaller.installer(infos.dossier).catch(() => {
-		etat = { phase: "erreur", code: "generic" };
-		rendre();
-	});
+	void window.neoInstaller.installer(infos.dossier).catch(erreur => afficherErreur(diagnosticLocal("install", erreur)));
 }
 
-async function initialiser(): Promise<void> {
+/** `nouvelEssai`: "Try again" after a failed start, which says what it does. */
+async function initialiser(nouvelEssai: "connection" | "release" | null = null): Promise<void> {
+	statutChargement = nouvelEssai ? retryStatus(nouvelEssai) : null;
 	chargement = true;
 	etat = { phase: "pret" };
 	infos = null;
@@ -503,19 +579,25 @@ async function initialiser(): Promise<void> {
 	}
 	rendre();
 	try {
-		infos = await window.neoInstaller.initialiser();
+		const resultat = await window.neoInstaller.initialiser();
+		if (!resultat.ok) {
+			etat = { phase: "erreur", code: "release", diagnosis: resultat.diagnosis };
+			return;
+		}
+		infos = resultat.infos;
 		try {
 			disque = await window.neoInstaller.espaceDisque(infos.dossier);
 		} catch {
 			disque = null;
 		}
 		etat = { phase: "pret" };
-	} catch {
+	} catch (erreur) {
 		infos = null;
 		disque = null;
-		etat = { phase: "erreur", code: "release" };
+		etat = { phase: "erreur", code: "release", diagnosis: diagnosticLocal("init", erreur) };
 	} finally {
 		chargement = false;
+		statutChargement = null;
 		rendre();
 	}
 }
@@ -580,6 +662,8 @@ window.neoInstaller.surEtat(nouvelEtat => {
 	if (nouvelEtat.phase === "erreur") {
 		confirmationAnnulation = false;
 		annulationDemandee = false;
+		detailsOuverts = false;
+		copieFaite = null;
 	}
 	const phasePrecedente = etat.phase;
 	etat = nouvelEtat;

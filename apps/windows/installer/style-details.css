@@ -439,3 +439,151 @@
 	transform: translateY(1px);
 	filter: brightness(.96);
 }
+
+/* A FAILED ATTEMPT: the cause, what to do, and the raw facts on demand.
+   Before 2026-10-09 the error was one red line ("could not continue") above
+   "Try again": nothing said why, nor what to change before retrying. Same
+   surfaces as the rest of the window: the location card's flat navy, the
+   26 px title of the progress step, the bottom-right primary button. */
+/* A flow column, not absolute rows: a title that wraps (a long VPN name)
+   pushes the card down instead of covering it. The bottom padding keeps the
+   feedback link and "Try again" clear. */
+.nqi-error-stage {
+	position: absolute;
+	inset: 48px 0 0;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 30px 48px 92px;
+}
+
+.nqi-error-title {
+	margin: 0;
+	font-size: 24px;
+	line-height: 1.2;
+	font-weight: 400;
+	color: #f7f9ff;
+}
+
+.nqi-diagnosis {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.nqi-diagnosis-card {
+	padding: 18px 24px 18px;
+	border-radius: 15px;
+	background: rgba(26, 34, 56, .90);
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+.nqi-diagnosis-again {
+	margin: 0 0 8px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: #ffb3bc;
+}
+
+.nqi-diagnosis-body {
+	margin: 0;
+	font-size: 13.5px;
+	line-height: 1.5;
+	color: rgba(226, 234, 250, .92);
+}
+
+.nqi-diagnosis-steps {
+	margin: 12px 0 0;
+	padding-left: 22px;
+	font-size: 13.5px;
+	line-height: 1.5;
+	color: #f5f8ff;
+}
+
+.nqi-diagnosis-steps li + li { margin-top: 4px; }
+.nqi-diagnosis-steps li::marker { color: #7fb0ff; font-weight: 600; }
+
+.nqi-diagnosis-links {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 22px;
+}
+
+.nqi-link {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #7fb0ff;
+	font-size: 12.5px;
+	font-weight: 520;
+	cursor: pointer;
+}
+
+.nqi-link:hover,
+.nqi-link:focus-visible { text-decoration: underline; }
+.nqi-link:focus-visible { outline: 2px solid rgba(146, 185, 255, .9); outline-offset: 2px; border-radius: 3px; }
+
+.nqi-link-done {
+	font-size: 12px;
+	color: rgba(166, 184, 216, .85);
+}
+
+.nqi-diagnosis-details {
+	position: relative;
+	min-height: 0;
+	border-radius: 10px;
+	background: rgba(2, 6, 14, .62);
+}
+
+.nqi-diagnosis-raw {
+	margin: 0;
+	padding: 10px 84px 10px 14px;
+	max-height: 100%;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: "Cascadia Mono", Consolas, monospace;
+	font-size: 11px;
+	line-height: 1.45;
+	color: rgba(207, 218, 239, .86);
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+.nqi-diagnosis-copy {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	height: 26px;
+	padding: 0 12px;
+	border: 1px solid rgba(126, 168, 255, .50);
+	border-radius: 999px;
+	background: rgba(7, 15, 29, .62);
+	color: #7fb0ff;
+	font-size: 11.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.nqi-diagnosis-copy:hover { border-color: rgba(126, 168, 255, .88); color: #a8caff; }
+.nqi-diagnosis-copy:focus-visible { outline: 2px solid rgba(146, 185, 255, .9); outline-offset: 2px; }
+
+.nqi-error-stage .nqi-progress-feedback {
+	left: 48px;
+	bottom: 36px;
+}
+
+.nqi-loading-status {
+	margin: 18px 0 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: rgba(245, 248, 255, .91);
+}
+
+/* The retry status sits under the spinner. */
+.nqi-loading-stage { flex-direction: column; }

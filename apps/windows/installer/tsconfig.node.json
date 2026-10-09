@@ -15,5 +15,5 @@
 		"forceConsistentCasingInFileNames": true,
 		"types": ["node"]
 	},
-	"include": ["main.ts", "main-ui.ts", "preload.ts", "worker.ts", "protocole.ts", "noyau.ts", "sondage.ts"]
+	"include": ["main.ts", "main-ui.ts", "preload.ts", "worker.ts", "protocole.ts", "noyau.ts", "sondage.ts", "diagnosis.ts", "probe.ts"]
 }

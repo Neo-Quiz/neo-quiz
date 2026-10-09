@@ -34,6 +34,7 @@ release notes.
 - Interactive HTML pages (readings and "Explain" answers) now run on Android: the page is served from the app under its own restrictive policy instead of inheriting the app's, so clicks work and the frame height follows the content.
 - Each request in a Generate chat now says who sent it and where it ran ("Sent from Xiaomi 13T Pro · Run on DESKTOP-1U89520 (this device)", with a phone, laptop or monitor icon) and its state there (waiting, running, done, stopped, failed with the reason); the chat list shows the sender device icon. A phone now sends its name with each request.
 - A chime and a native notification when a quiz or an Explain answer is ready while the window is not in front, with a "Silent mode" switch in Settings (desktop).
+- The installer no longer stops on "The installation could not continue": it names the cause (no Internet, a VPN, proxy or firewall blocking GitHub, with the VPN named when one is active, intercepted HTTPS, an altered download, a version still being published, GitHub down, a full disk, an antivirus blocking the installer, Windows refusing the setup, Neo Quiz still open), says what to do in one or two steps, and shows the technical details with a Copy button and the log file path. "Try again" resumes where it failed: a verified download is checked again but not fetched again, a network block is tested first and reported at once if still there, and a stalled connection now fails after 30 seconds instead of hanging.
 
 ## [1.20.64] - 2026-10-09
 

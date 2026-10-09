@@ -115,9 +115,10 @@ await withSrcModule("apps/windows/installer/noyau.ts", ({ resoudrePaquet, paquet
 	/* Le principal doit passer SA version, pas relire la constante de repli :
 	   sinon l'épinglage existe dans le noyau et ne sert à personne. */
 	r.check("source : le principal lit l'URL épinglée sur sa propre version",
-		[principalInstallateur.includes("await fetch(urlLatestYml(app.getVersion())"),
-			principalInstallateur.includes("await fetch(URL_LATEST_YML")],
-		[true, false]);
+		[principalInstallateur.includes("await lirePaquetPublie(app.getVersion())"),
+			travailleurInstallateur.includes("await lireTexteGithub(urlLatestYml(version), delaiMs)"),
+			principalInstallateur.includes("lirePaquetPublie(URL_LATEST_YML")],
+		[true, true, false]);
 
 	/* Le `latest.yml` d'electron-builder, tel que publié pour desktop-v1.0.16
 	   (le vrai fichier, empreinte comprise) : le sous-ensemble YAML que le
@@ -767,5 +768,139 @@ await withSrcModule("apps/windows/installer/noyau.ts", async ({ telechargerAvecR
 	appels = 0;
 	try { await reessayer(async () => { appels++; throw { nonLance: true }; }, e => !!e.nonLance, async () => {}, () => {}, sans); } catch { /* expected */ }
 	r.check("verrou permanent : borné à 4 lancements", appels, 4);
+	r.done();
+});
+
+/* WHY AN ATTEMPT FAILED, AND WHAT "TRY AGAIN" DOES (`installer/diagnosis.ts`).
+   A friend's PC showed only "The installation could not continue" and a
+   "Try again" that started everything over: no cause, no action. Every cause
+   of the closed list is reached here from a simulated error, an active VPN is
+   NAMED, `unknown` is only the last resort, and a download already verified
+   is never fetched again. */
+await withSrcModule(["apps/windows/installer/diagnosis.ts", "src/i18n.ts", "apps/windows/installer/noyau.ts"], async (
+	{ diagnose, detectVpn, diagnosisTexts, parseErrorDetail, resumeFrom, retryPlan, retryAction, technicalDetails },
+	{ setLanguage },
+	{ telechargerAvecReessais },
+) => {
+	const r = makeReporter("Installateur : diagnostic d'un échec et reprise");
+	const ctx = (extra = {}) => ({ vpn: null, dnsElsewhere: true, diskShort: false, ...extra });
+	const d = (detail, extra, code) => diagnose(detail, ctx(extra), code);
+
+	// 1. Every cause, from simulated errors.
+	r.check("pas d'Internet : ENOTFOUND / EAI_AGAIN, et le DNS d'un autre hôte échoue aussi",
+		[d({ step: "download", errno: "ENOTFOUND" }, { dnsElsewhere: false }), d({ step: "init", errno: "EAI_AGAIN" }, { dnsElsewhere: false }),
+			d({ step: "download", errno: "ENETUNREACH" })],
+		["offline", "offline", "offline"]);
+	r.check("VPN, proxy ou pare-feu : reset, délai, refus, redirection hors GitHub, 407, DNS de GitHub seul",
+		[d({ step: "download", errno: "ECONNRESET" }), d({ step: "download", errno: "ETIMEDOUT" }), d({ step: "init", errno: "ECONNREFUSED" }),
+			d({ step: "download", errno: "EREDIRECT" }), d({ step: "download", http: 407 }), d({ step: "init", errno: "ENOTFOUND" }, { dnsElsewhere: true }),
+			d({ step: "download", errno: "ERR_STREAM_PREMATURE_CLOSE" }), d({ step: "init", errno: "EBADRELEASE" })],
+		Array(8).fill("blocked"));
+	r.check("inspection TLS : certificat non vérifiable, auto-signé, CERT_*",
+		[d({ step: "init", errno: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" }), d({ step: "download", errno: "SELF_SIGNED_CERT_IN_CHAIN" }),
+			d({ step: "download", errno: "CERT_HAS_EXPIRED" }), d({ step: "init", errno: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" })],
+		Array(4).fill("tlsInspection"));
+	r.check("téléchargement altéré : code integrity", d({ step: "download", message: "sha512 differs" }, {}, "integrity"), "integrity");
+	r.check("version en cours de publication : 404 sur le paquet ou latest.yml",
+		[d({ step: "download", http: 404 }), d({ step: "init", http: 404 })], ["publishing", "publishing"]);
+	r.check("GitHub en panne : 5xx ou 429", [d({ step: "download", http: 503 }), d({ step: "init", http: 429 })], ["server", "server"]);
+	r.check("disque plein : ENOSPC, ou NSIS en échec avec trop peu d'espace",
+		[d({ step: "download", errno: "ENOSPC" }), d({ step: "install", exitCode: 2 }, { diskShort: true })], ["diskFull", "diskFull"]);
+	r.check("antivirus : écriture refusée, lancement refusé, fichier disparu, app absente après NSIS, travailleur refusé",
+		[d({ step: "download", errno: "EPERM" }), d({ step: "launch", errno: "EBUSY" }), d({ step: "launch", errno: "ENOENT" }),
+			d({ step: "postcheck" }), d({ step: "worker", errno: "EACCES", exitCode: -1 })],
+		Array(5).fill("antivirus"));
+	r.check("installation refusée par Windows : code de sortie NSIS", d({ step: "install", exitCode: 2 }), "windowsRefused");
+	r.check("application ouverte : NSIS en échec et neo-quiz.exe en cours", d({ step: "install", exitCode: 2, appRunning: true }), "appOpen");
+	r.check("installée mais pas ouverte", d({ step: "open" }), "launch");
+
+	// 2. `unknown` is the LAST resort only.
+	const nommes = ["ENOTFOUND", "EAI_AGAIN", "ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EHOSTUNREACH", "EPIPE", "CERT_UNTRUSTED",
+		"SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "ENOSPC", "EPERM", "EACCES", "EBUSY", "EREDIRECT"];
+	r.check("« inconnue » jamais pour une erreur réseau, TLS, disque ou fichier connue",
+		nommes.filter(errno => d({ step: "download", errno }) === "unknown"), []);
+	r.check("« inconnue » seulement sans aucun fait exploitable",
+		[d({ step: "worker", exitCode: 3 }), d({ step: "download" }), d({ step: "worker", errno: "EMFILE" })],
+		["unknown", "unknown", "unknown"]);
+
+	// 3. The VPN is NAMED.
+	const up = [{ internal: false }];
+	r.check("VPN détecté par le nom de son interface active",
+		["NordLynx", "ProtonVPN", "CloudflareWARP", "Tailscale", "ZeroTier One [8056c2e21c000001]", "Cisco AnyConnect Secure Mobility Client Connection",
+			"OpenVPN TAP-Windows6", "Mullvad", "wg0", "FortiClient", "PANGP Virtual Ethernet Adapter", "Hamachi", "OpenVPN Wintun"]
+			.map(nom => detectVpn({ "Wi-Fi": up, [nom]: up })?.name ?? null),
+		["NordLynx", "ProtonVPN", "Cloudflare WARP", "Tailscale", "ZeroTier", "Cisco AnyConnect",
+			"OpenVPN", "Mullvad", "WireGuard", "FortiClient", "GlobalProtect", "Hamachi", "OpenVPN"]);
+	r.check("pas de VPN : Wi-Fi, Ethernet, boucle locale ; une interface VPN sans adresse externe ne compte pas",
+		[detectVpn({ "Wi-Fi": up, "Ethernet 3": up, "Loopback Pseudo-Interface 1": [{ internal: true }] }), detectVpn({ NordLynx: [{ internal: true }] }), detectVpn({ NordLynx: undefined })],
+		[null, null, null]);
+	const nordlynx = detectVpn({ "Wi-Fi": up, NordLynx: up });
+	setLanguage("fr");
+	const fr = diagnosisTexts({ cause: "blocked", vpn: nordlynx.name, again: false, exitCode: null });
+	const frEncore = diagnosisTexts({ cause: "blocked", vpn: "NordLynx", again: true, exitCode: null });
+	r.check("le message NOMME le VPN, et l'action dit de le désactiver puis Réessayer",
+		[fr.body, fr.steps], ["Votre VPN (NordLynx) semble bloquer le téléchargement depuis GitHub.",
+			["Désactivez NordLynx le temps de l'installation.", "Puis cliquez sur Réessayer."]]);
+	r.check("un nouvel essai encore bloqué le dit tout de suite", frEncore.title, "Toujours bloqué : votre VPN (NordLynx) est encore actif");
+	r.check("inspection TLS avec VPN : le VPN est nommé aussi",
+		diagnosisTexts({ cause: "tlsInspection", vpn: "Cloudflare WARP", again: false, exitCode: null }).body.includes("Cloudflare WARP"), true);
+	const causes = ["offline", "blocked", "tlsInspection", "integrity", "publishing", "server", "diskFull", "antivirus", "windowsRefused", "appOpen", "launch", "unknown"];
+	const textesComplets = langue => {
+		setLanguage(langue);
+		return causes.filter(cause => [false, true].some(vpn => {
+			const x = diagnosisTexts({ cause, vpn: vpn ? "NordLynx" : null, again: false, exitCode: 2 });
+			return [x.title, x.body, ...x.steps].some(texte => !texte || texte.startsWith("installer.") || texte.includes("{")) || x.steps.length < 1;
+		}));
+	};
+	r.check("chaque cause a titre, explication et étapes, en anglais et en français (aucune clé brute, aucun {trou})",
+		[textesComplets("en"), textesComplets("fr")], [[], []]);
+	setLanguage("en");
+	r.check("anglais : le VPN nommé aussi", diagnosisTexts({ cause: "blocked", vpn: "NordLynx", again: false, exitCode: null }).body,
+		"Your VPN (NordLynx) seems to block the download from GitHub.");
+
+	// 4. Resume at the step that failed; integrity never relaxed.
+	r.check("reprise : téléchargement vérifié -> installation ; sinon téléchargement ; ouverture -> ouverture ; démarrage -> démarrage",
+		[resumeFrom({ step: "install", exitCode: 2, downloadVerified: true }, "windowsRefused"), resumeFrom({ step: "download", errno: "ECONNRESET" }, "blocked"),
+			resumeFrom({ step: "open", downloadVerified: true }, "launch"), resumeFrom({ step: "init", errno: "ENOTFOUND" }, "offline")],
+		["install", "download", "open", "init"]);
+	r.check("plan : réseau/TLS testent d'abord la connexion, publication/intégrité relisent latest.yml",
+		["blocked", "tlsInspection", "offline", "publishing", "integrity", "antivirus"].map(cause => {
+			const p = retryPlan({ cause, resume: "download" });
+			return [p.testConnection, p.reloadRelease, retryAction(p)];
+		}),
+		[[true, false, "connection"], [true, false, "connection"], [true, false, "connection"], [false, true, "release"], [false, true, "release"], [false, false, "download"]]);
+	r.check("plan : une reprise à l'installation l'annonce", retryAction(retryPlan({ cause: "windowsRefused", resume: "install" })), "install");
+	const paquet = { version: "1.2.3", nom: "neo-quiz-setup-1.2.3.exe", url: "u", taille: 100, sha512: "a", tailleInstallee: null };
+	let telecharges = 0;
+	const transport = verifie => ({
+		telecharger: async () => { telecharges++; },
+		relirePaquet: async () => paquet,
+		attendre: async () => {},
+		journal: () => {},
+		dejaVerifie: async () => verifie,
+	});
+	await telechargerAvecReessais(paquet, transport(true), [0]);
+	r.check("un téléchargement déjà vérifié (taille et sha512 revérifiés) n'est pas refait", telecharges, 0);
+	await telechargerAvecReessais(paquet, transport(false), [0]);
+	r.check("un fichier gardé qui ne correspond plus est retéléchargé", telecharges, 1);
+	r.check("le travailleur ne réutilise un fichier qu'après l'avoir revérifié, et supprime sinon",
+		[travailleurInstallateur.includes("if (await fichierConforme(cheminPaquet, p)) return true;"),
+			/await rm\(cheminPaquet, \{ force: true \}\);\s*return false;/.test(travailleurInstallateur),
+			travailleurInstallateur.includes("garderPaquet = telechargementVerifie;")],
+		[true, true, true]);
+
+	// 5. What crosses the pipe is rebuilt, never trusted.
+	r.check("détail reçu du tube : étape inconnue refusée, champs bornés, hôte et errno filtrés",
+		[parseErrorDetail({ step: "nope" }), parseErrorDetail({ step: "download", errno: "bad errno", host: "evil host/x", http: 9999, message: "x".repeat(500), __proto__: { appRunning: true } })],
+		[null, { step: "download", message: "x".repeat(300) }]);
+	const brut = technicalDetails("blocked", { step: "download", errno: "ECONNRESET", host: "release-assets.githubusercontent.com" },
+		{ vpn: "NordLynx", vpnInterface: "NordLynx", dnsElsewhere: true, diskShort: false, version: "1.2.3", logPath: "C:\\t\\neo-quiz-installer.log" });
+	r.check("détails techniques : cause, étape, erreur, hôte, VPN, journal",
+		["cause: blocked", "step: download", "error: ECONNRESET", "host: release-assets.githubusercontent.com", "vpn: NordLynx (NordLynx)", "log: C:\\t\\neo-quiz-installer.log"]
+			.every(ligne => brut.split("\n").includes(ligne)), true);
+	r.check("la fenêtre ne montre plus la ligne générique : plus de clé installer.error.*, un écran d'erreur par cause",
+		[renduInstallateur.includes("installer.error."), renduInstallateur.includes("rendreErreur(contenu, diagnostic);"),
+			renduInstallateur.includes("window.neoInstaller.retry()")],
+		[false, true, true]);
 	r.done();
 });

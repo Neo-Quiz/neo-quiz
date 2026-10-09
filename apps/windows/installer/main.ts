@@ -15,21 +15,27 @@ import { access, rm, statfs, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { spawn } from "node:child_process";
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain } from "electron";
 import { setLanguage, t } from "../../../src/i18n";
 import { PRODUCT_NAME } from "../../../src/branding";
-import { langueDepuisLocale, NOM_EXECUTABLE, resoudrePaquet, urlLatestYml, type LangueInstallateur, type PaquetInstallable } from "./noyau";
+import { langueDepuisLocale, NOM_EXECUTABLE, urlLatestYml, type LangueInstallateur, type PaquetInstallable } from "./noyau";
 import {
 	CANAUX_INSTALLATEUR,
 	type ChargeTravailleur,
 	type CodeErreurInstallateur,
 	type EtatInstallateur,
+	type InitResult,
+	type InstallerCause,
+	type InstallerDiagnosis,
+	type InstallerErrorDetail,
+	type InstallerStep,
 	type MessageTravailleur,
 } from "./protocole";
-import { executerTravailleur } from "./worker";
+import { diagnose, parseErrorDetail, resumeFrom, retryAction, retryPlan, technicalDetails } from "./diagnosis";
+import { activeVpn, appendLog, dnsWorksElsewhere, LOG_PATH } from "./probe";
+import { ErreurTravailleur, executerTravailleur, lirePaquetPublie, lireTexteGithub } from "./worker";
 
 const DRAPEAU_TRAVAILLEUR = "--neo-quiz-installer-worker";
-const USER_AGENT = "Neo-Quiz-Installer";
 /** Écrit à côté de l'exécutable extrait quand la fenêtre a peint son premier
     écran : le conteneur portable, qui affichait jusque-là ce même écran en
     image (`installer/ecran-initial.bmp`), retire alors la sienne. Même nom que
@@ -97,7 +103,10 @@ function decoderMessage(ligne: string): MessageTravailleur | null {
 					? { type: "installation", pourcent: v.pourcent } : null;
 			case "termine": return typeof v.executable === "string" ? { type: "termine", executable: v.executable } : null;
 			case "annule": return { type: "annule" };
-			case "erreur": return { type: "erreur", code: codeErreur(v.code) };
+			case "erreur": {
+				const detail = parseErrorDetail(v.detail);
+				return detail ? { type: "erreur", code: codeErreur(v.code), detail } : { type: "erreur", code: codeErreur(v.code) };
+			}
 			default: return null;
 		}
 	} catch {
@@ -189,20 +198,81 @@ function dossierValide(dossier: string): boolean {
 	return parse(normalise).root !== normalise;
 }
 
-/** Le `latest.yml` de la release dont ce bootstrapper est issu
-    (`urlLatestYml`, `installer/noyau.ts`), lu par github.com et non par
-    l'API REST : SANS le quota de 60 requêtes par heure et par IP (voir
-    `URL_LATEST_YML`). `app.getVersion()` est la version d'apps/windows/
-    package.json, celle que porte le nom du fichier. `fetch` suit lui-même
-    la redirection vers le stockage des assets. */
+/** The `latest.yml` of the release this bootstrapper comes from
+    (`urlLatestYml`, `installer/noyau.ts`), read through github.com and not
+    the REST API: WITHOUT the 60 requests per hour and per IP quota (see
+    `URL_LATEST_YML`). `app.getVersion()` is the version of
+    apps/windows/package.json, the one the file name carries. Read through the
+    worker's HTTPS stack (`lirePaquetPublie`), so a failure carries the same
+    raw facts (errno, HTTP status, host) as a failed download. */
 async function chargerPaquet(): Promise<PaquetInstallable> {
-	const reponse = await fetch(urlLatestYml(app.getVersion()), {
-		headers: { "User-Agent": USER_AGENT },
-	});
-	if (!reponse.ok) throw new Error("release indisponible");
-	const paquet = resoudrePaquet(await reponse.text());
-	if (!paquet) throw new Error("release invalide");
-	return paquet;
+	return await lirePaquetPublie(app.getVersion());
+}
+
+/* ─────────── diagnosis of a failure ─────────── */
+
+/** The last diagnosis shown: "Try again" resumes from it. */
+let dernierDiagnostic: InstallerDiagnosis | null = null;
+/** The cause of the attempt being retried, to say "still blocked". */
+let causeReessayee: InstallerCause | null = null;
+/** The installed executable, when only its opening failed. */
+let executableInstalle: string | null = null;
+/** A retry is testing the connection or re-reading the release, before any
+    worker exists; Cancel must still stop it. */
+let reessaiEnCours = false;
+let reessaiAnnule = false;
+
+/** The raw facts of any error, for the window's diagnosis. */
+function faitsDe(erreur: unknown, step: InstallerStep): InstallerErrorDetail {
+	if (erreur instanceof ErreurTravailleur) return { ...erreur.faits, step };
+	const code = (erreur as { code?: unknown } | null)?.code;
+	const cause = (erreur as { cause?: { code?: unknown } } | null)?.cause?.code;
+	const errno = typeof code === "string" ? code : typeof cause === "string" ? cause : undefined;
+	return parseErrorDetail({ step, errno, message: String((erreur as Error)?.message ?? erreur) }) ?? { step };
+}
+
+/** Names the cause from the raw facts plus what this PC shows right now: an
+    active VPN interface, DNS for another host (offline or GitHub alone
+    blocked?), free space at the install location. */
+async function diagnostiquer(detail: InstallerErrorDetail, code?: CodeErreurInstallateur): Promise<InstallerDiagnosis> {
+	const vpn = activeVpn();
+	const reseau = detail.errno !== undefined && detail.http === undefined && code !== "integrity" &&
+		(detail.step === "init" || detail.step === "download" || detail.step === "connection");
+	const dnsElsewhere = reseau ? await dnsWorksElsewhere() : null;
+	let diskShort = false;
+	if (paquetCourant && (detail.step === "install" || detail.errno === "ENOSPC")) {
+		try {
+			const besoin = paquetCourant.taille + (paquetCourant.tailleInstallee ?? paquetCourant.taille);
+			diskShort = await espaceDisponible(dossierCourant) < besoin;
+		} catch {
+			// Unknown free space is not a full disk.
+		}
+	}
+	const contexte = { vpn: vpn?.name ?? null, dnsElsewhere, diskShort };
+	const cause = diagnose(detail, contexte, code);
+	const diagnostic: InstallerDiagnosis = {
+		cause,
+		vpn: contexte.vpn,
+		exitCode: detail.exitCode ?? null,
+		again: causeReessayee === cause,
+		resume: resumeFrom(detail, cause),
+		details: technicalDetails(cause, detail, {
+			...contexte,
+			vpnInterface: vpn?.iface ?? null,
+			version: app.getVersion(),
+			logPath: LOG_PATH,
+		}),
+	};
+	causeReessayee = null;
+	dernierDiagnostic = diagnostic;
+	await appendLog(`main: ${code ?? "error"} diagnosed as ${cause}\n${diagnostic.details}`);
+	return diagnostic;
+}
+
+/** Ends the session and shows the diagnosed failure. */
+async function signalerErreur(code: CodeErreurInstallateur, detail: InstallerErrorDetail): Promise<void> {
+	nettoyerSession();
+	envoyerEtat({ phase: "erreur", code, diagnosis: await diagnostiquer(detail, code) });
 }
 
 function nettoyerSession(): void {
@@ -238,13 +308,11 @@ async function traiterMessage(message: MessageTravailleur): Promise<void> {
 			envoyerEtat({ phase: "annule" });
 			return;
 		case "erreur":
-			nettoyerSession();
-			envoyerEtat({ phase: "erreur", code: message.code });
+			await signalerErreur(message.code, message.detail ?? { step: "worker", message: "error without detail" });
 			return;
 		case "termine": {
 			if (!isAbsolute(message.executable)) {
-				nettoyerSession();
-				envoyerEtat({ phase: "erreur", code: "installation" });
+				await signalerErreur("installation", { step: "postcheck", message: "worker sent a relative executable path" });
 				return;
 			}
 			/* L'installation est finie mais le bootstrapper RESTE à l'écran : le
@@ -252,10 +320,10 @@ async function traiterMessage(message: MessageTravailleur): Promise<void> {
 			   s'initialise caché. Il ne disparaît qu'une fois la vraie fenêtre de
 			   l'application devenue visible, donc réellement prête. */
 			envoyerEtat({ phase: "demarrage" });
+			executableInstalle = message.executable;
 			const lancee = await lancerApplicationEtAttendre(message.executable);
 			if (!lancee) {
-				nettoyerSession();
-				envoyerEtat({ phase: "erreur", code: "launch" });
+				await signalerErreur("launch", { step: "open", downloadVerified: true, message: "the app window did not become visible within 30 s" });
 				return;
 			}
 			nettoyerSession();
@@ -373,20 +441,20 @@ async function lancerApplicationEtAttendre(executable: string): Promise<boolean>
 	});
 }
 
-async function lancerTravailleur(nomTube: string, charge: string, eleve: boolean): Promise<number> {
+async function lancerTravailleur(nomTube: string, charge: string, eleve: boolean): Promise<{ code: number; errno?: string }> {
 	/* Le conteneur portable a déjà extrait Electron pour afficher l'UI.
 	   Relancer PORTABLE_EXECUTABLE_FILE referait cette extraction (~100 Mo
 	   dans les versions actuelles) avant le premier octet téléchargé.
 	   Le binaire déjà extrait contient exactement la même app packagée et reste
 	   vivant tant que cette fenêtre l'est : il peut donc servir de travailleur. */
 	const executable = process.execPath;
-	if (!isAbsolute(executable)) return -1;
+	if (!isAbsolute(executable)) return { code: -1 };
 	const script = [
 		"$ErrorActionPreference='Stop'",
 		"$a=@('--neo-quiz-installer-worker',$env:NQ_INSTALLER_PIPE,$env:NQ_INSTALLER_PAYLOAD)",
 		"try { $p=Start-Process -FilePath $env:NQ_INSTALLER_EXE -ArgumentList $a -Verb RunAs -PassThru -Wait; exit $p.ExitCode } catch { exit 1223 }",
 	].join("; ");
-	return await new Promise<number>(resolvePromise => {
+	return await new Promise<{ code: number; errno?: string }>(resolvePromise => {
 		const enfant = eleve
 			? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
 				windowsHide: true,
@@ -403,23 +471,36 @@ async function lancerTravailleur(nomTube: string, charge: string, eleve: boolean
 				stdio: "ignore",
 			});
 		processusLancement = enfant;
-		const terminer = (code: number): void => {
+		const terminer = (resultat: { code: number; errno?: string }): void => {
 			if (processusLancement === enfant) processusLancement = null;
-			resolvePromise(code);
+			resolvePromise(resultat);
 		};
-		enfant.once("error", () => terminer(-1));
-		enfant.once("exit", code => terminer(code ?? -1));
+		/* A refused process creation (antivirus, Smart App Control) is named by
+		   its errno instead of a bare -1. */
+		enfant.once("error", erreur => terminer({ code: -1, errno: (erreur as NodeJS.ErrnoException).code ?? "UNKNOWN" }));
+		enfant.once("exit", code => terminer({ code: code ?? -1 }));
 	});
 }
 
-async function demarrerInstallation(dossier: string): Promise<void> {
-	if (installationActive || !paquetCourant || !dossierValide(dossier)) {
-		envoyerEtat({ phase: "erreur", code: "generic" });
+/** `repriseInstallation`: the package is already downloaded and verified (the
+    worker checks it again), so the window says so instead of a 0 % download. */
+async function demarrerInstallation(dossier: string, repriseInstallation = false): Promise<void> {
+	/* A second click while an attempt runs is ignored, never turned into an
+	   error over the running one. */
+	if (installationActive) return;
+	if (!paquetCourant) {
+		await signalerErreur("release", { step: "init", message: "no release loaded" });
+		return;
+	}
+	if (!dossierValide(dossier)) {
+		await signalerErreur("generic", { step: "worker", message: "invalid install folder" });
 		return;
 	}
 	installationActive = true;
 	const eleve = await elevationRequise(dossier);
-	envoyerEtat(eleve ? { phase: "elevation" } : { phase: "telechargement", recus: 0, total: paquetCourant.taille });
+	envoyerEtat(eleve ? { phase: "elevation" }
+		: repriseInstallation ? { phase: "retrying", action: "install" }
+		: { phase: "telechargement", recus: 0, total: paquetCourant.taille });
 
 	const nomTube = `\\\\.\\pipe\\neo-quiz-installer-${randomUUID()}`;
 	const secret = randomBytes(32).toString("hex");
@@ -428,36 +509,127 @@ async function demarrerInstallation(dossier: string): Promise<void> {
 
 	try {
 		await ecouterTravailleur(nomTube, secret);
-	} catch {
-		nettoyerSession();
-		envoyerEtat({ phase: "erreur", code: "generic" });
+	} catch (erreur) {
+		await signalerErreur("generic", { step: "worker", message: `pipe: ${String(erreur)}`.slice(0, 300) });
 		return;
 	}
 
-	const code = await lancerTravailleur(nomTube, encodee, eleve);
-	/* Le travailleur envoie lui-même tout échec APRÈS authentification. Si
-	   aucun socket n'a jamais été authentifié, le seul événement visible est
-	   le refus ou l'échec de l'élévation Windows — ou, sans élévation, un
-	   travailleur qui n'a pas démarré. */
+	const { code, errno } = await lancerTravailleur(nomTube, encodee, eleve);
+	/* The worker reports every failure AFTER it authenticated. When no socket
+	   ever authenticated, what is visible is the refusal of the Windows
+	   elevation (1223, from the PowerShell script), or a worker that did not
+	   start: its spawn errno or exit code, named in the diagnosis. */
 	if (installationActive && !socketTravailleur && code !== 0) {
-		nettoyerSession();
-		envoyerEtat({ phase: "erreur", code: eleve ? "elevation" : "generic" });
+		if (eleve && code === 1223) {
+			nettoyerSession();
+			envoyerEtat({ phase: "erreur", code: "elevation" });
+			return;
+		}
+		await signalerErreur("generic", { step: "worker", exitCode: code, ...(errno ? { errno } : {}), message: "the installer worker stopped before connecting" });
 	}
 }
 
+/** "Try again": resumes at the step that failed, from the last diagnosis.
+    A network, proxy or TLS cause first gets a quick request to GitHub, so a
+    block still in place is said at once instead of after a new download; a
+    version being published re-reads `latest.yml`; a verified download is not
+    fetched again; a failed opening only reopens the app. */
+async function reessayerInstallation(): Promise<void> {
+	if (installationActive) return;
+	const precedent = dernierDiagnostic;
+	if (!precedent) {
+		await demarrerInstallation(dossierCourant);
+		return;
+	}
+	const plan = retryPlan(precedent);
+	causeReessayee = precedent.cause;
+	reessaiEnCours = true;
+	reessaiAnnule = false;
+	try {
+		await reessayerSelonPlan(plan, precedent.resume === "install");
+	} finally {
+		reessaiEnCours = false;
+	}
+}
+
+async function reessayerSelonPlan(plan: ReturnType<typeof retryPlan>, downloadVerified: boolean): Promise<void> {
+	if (plan.resume === "open") {
+		envoyerEtat({ phase: "demarrage" });
+	} else {
+		envoyerEtat({ phase: "retrying", action: retryAction(plan) });
+	}
+
+	if (plan.resume === "open") {
+		if (executableInstalle && await lancerApplicationEtAttendre(executableInstalle)) {
+			fermetureAutorisee = true;
+			fenetre?.close();
+			app.quit();
+			return;
+		}
+		await signalerErreur("launch", { step: "open", downloadVerified: true, message: "the app window did not become visible within 30 s" });
+		return;
+	}
+	if (plan.testConnection) {
+		try {
+			await lireTexteGithub(urlLatestYml(app.getVersion()), 8_000);
+		} catch (erreur) {
+			if (reessaiAnnule) return;
+			await signalerErreur("network", { ...faitsDe(erreur, "connection"), ...(downloadVerified ? { downloadVerified } : {}) });
+			return;
+		}
+		if (reessaiAnnule) return;
+	}
+	if (plan.reloadRelease) {
+		try {
+			paquetCourant = await chargerPaquet();
+		} catch (erreur) {
+			if (reessaiAnnule) return;
+			await signalerErreur(erreur instanceof ErreurTravailleur ? erreur.code : "release",
+				{ ...faitsDe(erreur, "connection"), ...(downloadVerified ? { downloadVerified } : {}) });
+			return;
+		}
+		if (reessaiAnnule) return;
+	}
+	await demarrerInstallation(dossierCourant, plan.resume === "install");
+}
+
 function installerCanaux(): void {
-	ipcMain.handle(CANAUX_INSTALLATEUR.initialiser, async () => {
-		paquetCourant = await chargerPaquet();
+	ipcMain.handle(CANAUX_INSTALLATEUR.initialiser, async (): Promise<InitResult> => {
+		/* Called again by "Try again" after a failed start: same cause again
+		   is "still blocked". */
+		if (dernierDiagnostic?.resume === "init") causeReessayee = dernierDiagnostic.cause;
 		const dossier = dossierDefaut();
 		dossierCourant = dossier;
+		try {
+			paquetCourant = await chargerPaquet();
+		} catch (erreur) {
+			return { ok: false, diagnosis: await diagnostiquer(faitsDe(erreur, "init"), "release") };
+		}
+		causeReessayee = null;
+		dernierDiagnostic = null;
 		return {
-			version: paquetCourant.version,
-			tailleTelechargement: paquetCourant.taille,
-			dossier,
-			espaceDisponible: await espaceDisponible(dossier),
-			dejaInstalle: await installationPresente(dossier),
-			elevationRequise: await elevationRequise(dossier),
+			ok: true,
+			infos: {
+				version: paquetCourant.version,
+				tailleTelechargement: paquetCourant.taille,
+				dossier,
+				espaceDisponible: await espaceDisponible(dossier),
+				dejaInstalle: await installationPresente(dossier),
+				elevationRequise: await elevationRequise(dossier),
+			},
 		};
+	});
+	ipcMain.handle(CANAUX_INSTALLATEUR.retry, async () => {
+		await reessayerInstallation();
+	});
+	/* The clipboard is written by main: the sandboxed window has no reliable
+	   clipboard access. Bounded text only; the log path is composed here, the
+	   window never names a path. */
+	ipcMain.on(CANAUX_INSTALLATEUR.copy, (_event, texte: unknown) => {
+		if (typeof texte === "string") clipboard.writeText(texte.slice(0, 8_000));
+	});
+	ipcMain.on(CANAUX_INSTALLATEUR.copyLogPath, () => {
+		clipboard.writeText(LOG_PATH);
 	});
 	ipcMain.handle(CANAUX_INSTALLATEUR.choisirDossier, async (_event, courant: unknown) => {
 		if (typeof courant !== "string" || !dossierValide(courant) || !fenetre) return null;
@@ -473,13 +645,23 @@ function installerCanaux(): void {
 	});
 	ipcMain.handle(CANAUX_INSTALLATEUR.installer, async (_event, dossier: unknown) => {
 		if (typeof dossier !== "string") {
-			envoyerEtat({ phase: "erreur", code: "generic" });
+			await signalerErreur("generic", { step: "worker", message: "install folder is not a string" });
 			return;
 		}
+		/* A fresh click is a first attempt, not a retry. */
+		causeReessayee = null;
 		await demarrerInstallation(dossier);
 	});
 	ipcMain.handle(CANAUX_INSTALLATEUR.annuler, async () => {
-		if (!installationActive) return;
+		if (!installationActive) {
+			/* Cancel during a retry's connection test: nothing to stop but the
+			   test itself, which then starts nothing. */
+			if (reessaiEnCours) {
+				reessaiAnnule = true;
+				envoyerEtat({ phase: "annule" });
+			}
+			return;
+		}
 		if (socketTravailleur) {
 			socketTravailleur.write(`${JSON.stringify({ type: "annuler" })}\n`);
 			return;

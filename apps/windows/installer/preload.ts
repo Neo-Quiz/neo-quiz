@@ -8,12 +8,15 @@ import {
 	type ChoixDossierInstallateur,
 	type EtatInstallateur,
 	type InfosDisqueInstallateur,
-	type InfosInitialesInstallateur,
+	type InitResult,
 	type PontInstallateur,
 } from "./protocole";
 
 const pont: PontInstallateur = {
-	initialiser: () => ipcRenderer.invoke(CANAUX_INSTALLATEUR.initialiser) as Promise<InfosInitialesInstallateur>,
+	initialiser: () => ipcRenderer.invoke(CANAUX_INSTALLATEUR.initialiser) as Promise<InitResult>,
+	retry: () => ipcRenderer.invoke(CANAUX_INSTALLATEUR.retry) as Promise<void>,
+	copy: (text: string) => ipcRenderer.send(CANAUX_INSTALLATEUR.copy, text),
+	copyLogPath: () => ipcRenderer.send(CANAUX_INSTALLATEUR.copyLogPath),
 	choisirDossier: (courant: string) =>
 		ipcRenderer.invoke(CANAUX_INSTALLATEUR.choisirDossier, courant) as Promise<ChoixDossierInstallateur | null>,
 	espaceDisque: (dossier: string) =>
