@@ -28,8 +28,8 @@ android {
         applicationId = "com.ahmedmili.neoquiz"
         minSdk = 30
         targetSdk = 35
-        versionCode = 22
-        versionName = "0.2.20"
+        versionCode = 23
+        versionName = "0.2.21"
         ndk { abiFilters += "arm64-v8a" }
     }
 
