@@ -705,3 +705,67 @@ await withSrcModule("apps/windows/installer/presentation.ts", ({ libellesProgres
 		[{ phase: "verification" }, { phase: "installation", pourcent: null }, { phase: "installation", pourcent: 63 }]);
 	r.done();
 });
+
+/* TRANSIENT FAILURES ON A FRESH PC (`noyau.ts`, retries). A first run on a
+   new machine failed with "The installation could not continue" and the
+   second run worked: a package being uploaded (404, stale digest) or a file
+   still held by Defender. Bounded retries, integrity never relaxed. */
+await withSrcModule("apps/windows/installer/noyau.ts", async ({ telechargerAvecReessais, reessayer, telechargementReessayable }) => {
+	const r = makeReporter("Installateur : réessais bornés (transport simulé)");
+	const paquet = (sha512, taille = 100) => ({ version: "1.2.3", nom: "neo-quiz-setup-1.2.3.exe", url: "u", taille, sha512, tailleInstallee: null });
+	const erreur = code => Object.assign(new Error(code), { code });
+	const sans = [0, 0, 0];
+	const attentes = [];
+	const transport = (essais, relu) => {
+		const lancés = [];
+		return {
+			lancés,
+			relirePaquet: async () => relu(),
+			telecharger: async p => { lancés.push(p.sha512); const e = essais.shift(); if (e) throw e(p); },
+			attendre: async ms => { attentes.push(ms); },
+			journal: () => {},
+		};
+	};
+	// 1. stale latest.yml then consistent: second read gives the right digest.
+	let t = transport([p => (p.sha512 === "vieux" ? erreur("integrity") : null)], () => paquet("neuf"));
+	let res = await telechargerAvecReessais(paquet("vieux"), t, sans);
+	r.check("empreinte périmée puis cohérente : réussite après relecture de latest.yml",
+		[res.sha512, t.lancés], ["neuf", ["vieux", "neuf"]]);
+	// 2. 404 then 200.
+	t = transport([() => erreur("network")], () => paquet("a"));
+	res = await telechargerAvecReessais(paquet("a"), t, sans);
+	r.check("404 puis 200 : réussite au second essai", t.lancés.length, 2);
+	// 3. digest always wrong: bounded, final integrity error, one attempt per delay + 1.
+	t = transport([1, 2, 3, 4, 5].map(() => () => erreur("integrity")), () => paquet("a"));
+	let final = null;
+	try { await telechargerAvecReessais(paquet("a"), t, sans); } catch (e) { final = e.code; }
+	r.check("empreinte toujours fausse : échec final `integrity`, 4 essais au plus",
+		[final, t.lancés.length], ["integrity", 4]);
+	// 4. delays grow and are respected.
+	attentes.length = 0;
+	t = transport([() => erreur("network"), () => erreur("network"), () => erreur("network")], () => null);
+	await telechargerAvecReessais(paquet("a"), t);
+	r.check("délais croissants entre les essais", attentes, [1000, 3000, 8000]);
+	// 5. other versions or other failures are never adopted / retried.
+	t = transport([() => erreur("integrity"), () => erreur("integrity")], () => ({ ...paquet("pirate"), version: "9.9.9" }));
+	final = null;
+	try { await telechargerAvecReessais(paquet("a"), t, [0]); } catch (e) { final = e.code; }
+	r.check("un paquet d'une AUTRE version n'est jamais adopté (même empreinte retéléchargée, échec)",
+		[final, t.lancés], ["integrity", ["a", "a"]]);
+	t = transport([() => erreur("installation")], () => paquet("a"));
+	final = null;
+	try { await telechargerAvecReessais(paquet("a"), t, sans); } catch (e) { final = e.code; }
+	r.check("une erreur d'écriture n'est pas rejouée", [final, t.lancés.length, telechargementReessayable("installation")], ["installation", 1, false]);
+	// 6. launch: lock then success; started-and-failed never replayed.
+	let appels = 0;
+	await reessayer(async () => { if (++appels < 3) throw { nonLance: true }; }, e => !!e.nonLance, async () => {}, () => {}, sans);
+	r.check("verrou au lancement puis succès : lancé au 3e essai", appels, 3);
+	appels = 0;
+	final = null;
+	try { await reessayer(async () => { appels++; throw { nonLance: false }; }, e => !!e.nonLance, async () => {}, () => {}, sans); } catch { final = "echec"; }
+	r.check("NSIS démarré puis en échec : jamais rejoué", [appels, final], [1, "echec"]);
+	appels = 0;
+	try { await reessayer(async () => { appels++; throw { nonLance: true }; }, e => !!e.nonLance, async () => {}, () => {}, sans); } catch { /* expected */ }
+	r.check("verrou permanent : borné à 4 lancements", appels, 4);
+	r.done();
+});

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The installer no longer gives up on a first run when the download hits a transient problem (connection reset, a release still being uploaded, a file Defender still holds): it re-reads the release information and retries a few times, never relaxing the integrity check, and its error messages now say to try again in a minute.
+
 ## [1.20.60] - 2026-10-09
 
 ### Added

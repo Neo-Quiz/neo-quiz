@@ -444,3 +444,83 @@ export type PageLegale = keyof typeof PAGES_LEGALES;
 export function urlLegale(page: PageLegale): string {
 	return `${SITE}${PAGES_LEGALES[page]}`;
 }
+
+/* ══════════════════════════════════════════════════════════
+   RETRIES (pure core, injected transport)
+
+   Two transient failures hit a fresh PC and disappear on a second run:
+   - the package download (connection reset, a 404 or a stale `latest.yml`
+     right after a publication, bytes that do not match the published
+     size/sha512 because the asset was still being replaced);
+   - the NSIS launch (`spawn` refused while Defender still scans the file
+     that was just written: EBUSY / EACCES / EPERM).
+   Retries are bounded and targeted. The integrity check is NEVER relaxed:
+   a package whose digest differs is retried from scratch, and after the last
+   attempt it fails with `integrity` without anything having been launched.
+══════════════════════════════════════════════════════════ */
+
+/** Waits before the 2nd, 3rd and 4th attempt. */
+export const DELAIS_REESSAI_MS: readonly number[] = [1_000, 3_000, 8_000];
+
+/** Error codes worth another attempt when downloading. */
+export function telechargementReessayable(code: unknown): boolean {
+	return code === "network" || code === "integrity";
+}
+
+export interface TransportTelechargement {
+	/** Re-reads the pinned `latest.yml`; `null` when unreadable or invalid. */
+	relirePaquet(): Promise<PaquetInstallable | null>;
+	/** Downloads and verifies; throws an error carrying a `code`. */
+	telecharger(paquet: PaquetInstallable): Promise<void>;
+	attendre(ms: number): Promise<void>;
+	journal(message: string): void;
+}
+
+/** Downloads `initial`, retrying on network or integrity failures. Before
+    each retry `latest.yml` is read again: if the publication finished or was
+    replaced meanwhile, the new size/sha512 are used. A package of ANOTHER
+    version is never adopted. Returns the package that was verified. */
+export async function telechargerAvecReessais(
+	initial: PaquetInstallable,
+	transport: TransportTelechargement,
+	delais: readonly number[] = DELAIS_REESSAI_MS,
+): Promise<PaquetInstallable> {
+	let paquet = initial;
+	for (let essai = 0; ; essai++) {
+		try {
+			await transport.telecharger(paquet);
+			return paquet;
+		} catch (erreur) {
+			const code = (erreur as { code?: unknown } | null)?.code;
+			transport.journal(`download attempt ${essai + 1} failed: ${String(code ?? erreur)}`);
+			if (!telechargementReessayable(code) || essai >= delais.length) throw erreur;
+			await transport.attendre(delais[essai]);
+			const relu = await transport.relirePaquet();
+			if (relu && relu.version === paquet.version) {
+				if (relu.sha512 !== paquet.sha512 || relu.taille !== paquet.taille) {
+					transport.journal("latest.yml changed since the first read, using the new digest");
+				}
+				paquet = relu;
+			}
+		}
+	}
+}
+
+/** Runs `operation`, retrying only while `reessayable(erreur)` is true. */
+export async function reessayer<T>(
+	operation: () => Promise<T>,
+	reessayable: (erreur: unknown) => boolean,
+	attendre: (ms: number) => Promise<void>,
+	journal: (message: string) => void,
+	delais: readonly number[] = DELAIS_REESSAI_MS,
+): Promise<T> {
+	for (let essai = 0; ; essai++) {
+		try {
+			return await operation();
+		} catch (erreur) {
+			if (!reessayable(erreur) || essai >= delais.length) throw erreur;
+			journal(`attempt ${essai + 1} failed (${String((erreur as { cause?: unknown })?.cause ?? erreur)}), retrying`);
+			await attendre(delais[essai]);
+		}
+	}
+}

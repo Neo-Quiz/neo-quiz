@@ -11,7 +11,7 @@
 
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { access, mkdtemp, readdir, rm } from "node:fs/promises";
+import { access, appendFile, mkdtemp, readdir, rm } from "node:fs/promises";
 import { get } from "node:https";
 import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -23,8 +23,12 @@ import type { IncomingMessage } from "node:http";
 import {
 	argumentsNsis,
 	paquetInstallable,
+	reessayer,
+	resoudrePaquet,
 	suivre,
 	suiviInitial,
+	telechargerAvecReessais,
+	urlLatestYml,
 	type BaremeInstallation,
 	type PaquetInstallable,
 } from "./noyau";
@@ -40,10 +44,24 @@ const USER_AGENT = "Neo-Quiz-Installer";
 const MAX_REDIRECTIONS = 5;
 
 class ErreurTravailleur extends Error {
-	constructor(readonly code: CodeErreurInstallateur) {
-		super(code);
+	/** `detail` names the real cause (errno, HTTP status) for the log only. */
+	constructor(readonly code: CodeErreurInstallateur, readonly detail?: string, readonly nonLance = false) {
+		super(detail ? `${code}: ${detail}` : code);
 	}
 }
+
+/** Best-effort log next to the temp files: the worker has no console, and a
+    bare "installation could not continue" says nothing about the cause. */
+async function journaliser(message: string): Promise<void> {
+	try {
+		await appendFile(join(tmpdir(), "neo-quiz-installer.log"), `${new Date().toISOString()} ${message}
+`);
+	} catch {
+		// Logging must never fail the installation.
+	}
+}
+
+const attendre = (ms: number): Promise<void> => new Promise(resolvePromise => setTimeout(resolvePromise, ms));
 
 /** Le paquet est REVALIDÉ par le noyau, jamais cru : l'URL doit être celle
     que la version implique, sinon un principal compromis ferait télécharger
@@ -88,7 +106,7 @@ function hoteTelechargementAutorise(url: URL): boolean {
 
 async function ouvrirReponse(url: URL, signal: AbortSignal, redirections = 0): Promise<IncomingMessage> {
 	if (!hoteTelechargementAutorise(url) || redirections > MAX_REDIRECTIONS) {
-		throw new ErreurTravailleur("network");
+		throw new ErreurTravailleur("network", "download host or redirect limit");
 	}
 	return await new Promise<IncomingMessage>((resolvePromise, reject) => {
 		const requete = get(url, { signal, headers: { "User-Agent": USER_AGENT, Accept: "application/octet-stream" } }, reponse => {
@@ -107,14 +125,14 @@ async function ouvrirReponse(url: URL, signal: AbortSignal, redirections = 0): P
 			}
 			if (code !== 200) {
 				reponse.resume();
-				reject(new ErreurTravailleur("network"));
+				reject(new ErreurTravailleur("network", `HTTP ${code} for ${url.pathname}`));
 				return;
 			}
 			resolvePromise(reponse);
 		});
 		requete.once("error", erreur => {
 			if (signal.aborted) reject(erreur);
-			else reject(new ErreurTravailleur("network"));
+			else reject(new ErreurTravailleur("network", (erreur as NodeJS.ErrnoException).code ?? erreur.message));
 		});
 	});
 }
@@ -125,6 +143,8 @@ async function telecharger(
 	signal: AbortSignal,
 	surProgression: (recus: number) => void,
 ): Promise<void> {
+	/* A previous attempt may have left a partial file (flag "wx" below). */
+	await rm(destination, { force: true });
 	const reponse = await ouvrirReponse(new URL(paquet.url), signal);
 	/* sha512 en base64 : l'empreinte de `latest.yml`, celle qu'electron-updater
 	   vérifie aussi, et que `check:package` compare à l'exe avant publication. */
@@ -143,9 +163,21 @@ async function telecharger(
 			rappel(null, morceau);
 		},
 	});
-	await pipeline(reponse, observer, createWriteStream(destination, { flags: "wx" }), { signal });
-	if (recus !== paquet.taille || hash.digest("base64") !== paquet.sha512) {
-		throw new ErreurTravailleur("integrity");
+	try {
+		await pipeline(reponse, observer, createWriteStream(destination, { flags: "wx" }), { signal });
+	} catch (erreur) {
+		if (signal.aborted || erreur instanceof ErreurTravailleur) throw erreur;
+		/* A reset or truncated body mid-download is a network failure, not a
+		   generic one; a refused write (antivirus, disk) is an installation one. */
+		const errno = (erreur as NodeJS.ErrnoException).code ?? String(erreur);
+		const ecriture = /^(EPERM|EACCES|EBUSY|ENOSPC|EROFS|EMFILE)$/.test(errno);
+		throw new ErreurTravailleur(ecriture ? "installation" : "network", `${errno} while downloading`);
+	}
+	if (recus !== paquet.taille) {
+		throw new ErreurTravailleur("integrity", `size ${recus}, expected ${paquet.taille}`);
+	}
+	if (hash.digest("base64") !== paquet.sha512) {
+		throw new ErreurTravailleur("integrity", "sha512 differs from latest.yml");
 	}
 }
 
@@ -198,9 +230,10 @@ async function lancerNsis(
 		   assez souvent pour que ce soit un glissement et non des sauts. */
 		const minuterie = setInterval(() => { void sonder(); }, 150);
 		const terminer = (): void => clearInterval(minuterie);
-		enfant.once("error", () => {
+		enfant.once("error", erreur => {
 			terminer();
-			reject(new ErreurTravailleur("installation"));
+			/* nonLance: the installer never started (file locked by Defender). */
+			reject(new ErreurTravailleur("installation", (erreur as NodeJS.ErrnoException).code ?? erreur.message, true));
 		});
 		enfant.once("exit", code => {
 			terminer();
@@ -208,7 +241,7 @@ async function lancerNsis(
 				surProgression(100);
 				resolvePromise();
 			} else {
-				reject(new ErreurTravailleur("installation"));
+				reject(new ErreurTravailleur("installation", `NSIS exit code ${code}`));
 			}
 		});
 	});
@@ -296,12 +329,16 @@ async function terminerTube(socket: Socket): Promise<void> {
     afficher de chaîne brute à l'utilisateur. */
 export async function executerTravailleur(nomTube: string, chargeEncodee: string): Promise<number> {
 	const charge = decoderCharge(chargeEncodee);
-	if (!charge) return 2;
+	if (!charge) {
+		await journaliser("worker payload rejected (exit 2)");
+		return 2;
+	}
 
 	let socket: Socket;
 	try {
 		socket = await ouvrirTube(nomTube);
-	} catch {
+	} catch (erreur) {
+		await journaliser(`worker could not open the pipe (exit 3): ${String(erreur)}`);
 		return 3;
 	}
 	envoyer(socket, { type: "auth", secret: charge.secret });
@@ -318,8 +355,20 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 	const temporaire = await mkdtemp(join(tmpdir(), "neo-quiz-installer-"));
 	const cheminPaquet = join(temporaire, charge.paquet.nom);
 	try {
-		await telecharger(charge.paquet, cheminPaquet, annulation.signal, recus => {
-			envoyer(socket, { type: "telechargement", recus, total: charge.paquet.taille });
+		const paquet = await telechargerAvecReessais(charge.paquet, {
+			telecharger: p => telecharger(p, cheminPaquet, annulation.signal, recus => {
+				envoyer(socket, { type: "telechargement", recus, total: p.taille });
+			}),
+			relirePaquet: async () => {
+				try {
+					const reponse = await fetch(urlLatestYml(charge.paquet.version), { headers: { "User-Agent": USER_AGENT } });
+					return reponse.ok ? resoudrePaquet(await reponse.text()) : null;
+				} catch {
+					return null;
+				}
+			},
+			attendre: ms => annulation.signal.aborted ? Promise.resolve() : attendre(ms),
+			journal: message => { void journaliser(message); },
 		});
 		if (annulation.signal.aborted) {
 			envoyer(socket, { type: "annule" });
@@ -337,13 +386,21 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 		   ancienne version à retirer — une étape aveugle de plus, que le barème
 		   prend en compte — et elle sert de creux de départ à la mise en place. */
 		const initial = await tailleDossier(charge.dossier);
-		await lancerNsis(
-			cheminPaquet,
-			charge.dossier,
-			{ paquet: charge.paquet.taille, installe: charge.paquet.tailleInstallee, initial },
-			pourcent => {
-				envoyer(socket, { type: "installation", pourcent });
-			},
+		/* Only a launch that never started is retried (Defender still holds the
+		   fresh file: EBUSY/EACCES/EPERM). A NSIS run that started and failed
+		   is never replayed: it may have changed the installation. */
+		await reessayer(
+			() => lancerNsis(
+				cheminPaquet,
+				charge.dossier,
+				{ paquet: paquet.taille, installe: paquet.tailleInstallee, initial },
+				pourcent => {
+					envoyer(socket, { type: "installation", pourcent });
+				},
+			),
+			erreur => erreur instanceof ErreurTravailleur && erreur.nonLance,
+			attendre,
+			message => { void journaliser(`NSIS launch: ${message}`); },
 		);
 		if (annulation.signal.aborted) {
 			if (!installationExistante) await nettoyerInstallationFraiche(charge.dossier, !dossierExistait);
@@ -369,6 +426,7 @@ export async function executerTravailleur(nomTube: string, chargeEncodee: string
 			return 0;
 		}
 		const code = erreur instanceof ErreurTravailleur ? erreur.code : "generic";
+		await journaliser(`installation failed (${code}): ${erreur instanceof Error ? erreur.stack ?? erreur.message : String(erreur)}`);
 		envoyer(socket, { type: "erreur", code });
 		await terminerTube(socket);
 		return 1;
