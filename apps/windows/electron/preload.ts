@@ -161,6 +161,7 @@ const pont: Pont = {
 		},
 		comptesEtat: outils => ipcRenderer.invoke(CANAUX.comptesEtat, outils),
 		comptesUsage: tool => ipcRenderer.invoke(CANAUX.comptesUsage, tool),
+		comptesResets: requete => ipcRenderer.invoke(CANAUX.comptesResets, requete),
 		comptesDeconnecter: tool => ipcRenderer.invoke(CANAUX.comptesDeconnecter, tool),
 		comptesUsageTerminal: tool => ipcRenderer.invoke(CANAUX.comptesUsageTerminal, tool),
 		surNavigateurOuvert(rappel) {

@@ -45,6 +45,7 @@ import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 import { LEGACY_CHAT_ID } from "./chat-record";
+import { UsageLimitError, resetFromRows } from "./usage-limit";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -156,6 +157,11 @@ export interface FileGenerationApp {
 	envoyer(demande: DemandeFile): void;
 	annuler(id: number): void;
 	reessayer(id: number): void;
+	/** A line paused on a usage limit: "Resume now" (every line paused on the
+	    same provider restarts its turn). */
+	reprendre(id: number): void;
+	/** A paused line: "Cancel the resume" turns it into a failed line. */
+	annulerReprise(id: number): void;
 	/** Réécrit la note d'une ligne dont seul l'enregistrement a échoué. */
 	reessayerEnregistrement(id: number): void;
 	fermer(id: number): void;
@@ -212,6 +218,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	const REGLES: F.ReglesDemarrage<DemandeFile> = {
 		max: 8,
 		chat: d => d.chatId ?? LEGACY_CHAT_ID,
+		fournisseur: d => d.reglages.aiProvider ?? "",
 		groupe: d => (d.fromDevice ? "remote" : d.reglages.aiProvider === "antigravity-cli" ? "antigravity" : null),
 	};
 	const etapes = new Map<number, EtapeGeneration>();
@@ -251,7 +258,35 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	const differees: DemandeFile[] = [];
 	let derniereGardee: FileGeneration<DemandeFile, ResultatFile> | null = null;
 
+	/** The clock of the paused lines: one timer, aimed at the next due time
+	    (the delay is capped, the timer is then armed again). */
+	let minuteurReprise: ReturnType<typeof setTimeout> | null = null;
+	function armerReprise(): void {
+		if (minuteurReprise !== null) clearTimeout(minuteurReprise);
+		minuteurReprise = null;
+		const due = F.prochaineEcheance(file);
+		if (due === null) return;
+		minuteurReprise = setTimeout(() => { minuteurReprise = null; pomper(); }, Math.min(Math.max(due - Date.now(), 0) + 50, 2 ** 31 - 1));
+	}
+
+	/** A CLI refused on a usage limit: the line pauses until the window
+	    resets. The time comes from the CLI's message, else from the usage
+	    line (the window that is full), else the user resumes by hand. */
+	async function pauserSurLimite(ligne: LigneGeneration, err: UsageLimitError): Promise<void> {
+		let reprise = err.resetAt;
+		if (reprise === null) {
+			try {
+				const lu = await currentHost().process?.usageCompte(err.tool);
+				reprise = lu ? resetFromRows(lu.rows, Date.now()) : null;
+			} catch { reprise = null; }
+		}
+		// Stopped while the usage was read: nothing to pause.
+		if (!tourne(ligne.id)) return;
+		file = F.mettreEnPause(file, ligne.id, { fournisseur: ligne.demande.reglages.aiProvider ?? "", reprise });
+	}
+
 	function publier(): void {
+		armerReprise();
 		if (restauree && file !== derniereGardee) {
 			derniereGardee = file;
 			void garderFile(file);
@@ -269,8 +304,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		return [...abonnes].some(a => { try { return a.affichee(); } catch { return false; } });
 	}
 
-	/** Starts every line the rules allow (`demarrerPrets`). */
+	/** Starts every line the rules allow (`demarrerPrets`), after waking the
+	    paused lines whose limit has reset (reset time + 30 s). */
 	function pomper(): void {
+		file = F.reprendreEchues(file, Date.now()).file;
 		const { file: suivante, lignes } = F.demarrerPrets(file, Date.now(), REGLES);
 		file = suivante;
 		publier();
@@ -379,6 +416,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, "enregistrement");
 			await enregistrer(ligne.id, complete);
 		} catch (err) {
+			if (err instanceof UsageLimitError && tourne(ligne.id)) { await pauserSurLimite(ligne, err); return; }
 			/* Asked for no quiz: the prose is the answer, shown in place of a quiz. */
 			if (err instanceof NoQuizAnswer) {
 				if (tourne(ligne.id)) file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte: err.texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
@@ -453,6 +491,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const texte = t(nbPoints ? "ai.exam.planIntroPoints" : "ai.exam.planIntro", { count: quiz.length, points: nbPoints }) + "\n\n" + quiz.map((e, i) => `${i + 1}. **${e.titre}**${e.focus ? " — " + e.focus : ""}${e.points.length ? ` (${e.points.length})` : ""}`).join("\n");
 			file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
 		} catch (err) {
+			if (err instanceof UsageLimitError && tourne(ligne.id)) { await pauserSurLimite(ligne, err); return; }
 			const e = err as Error & { aborted?: boolean };
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
@@ -550,6 +589,18 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			   CLI. La place ne se libère qu'au retour de la génération
 			   (`solder`, dans `executer`), le verrou du CLI rendu. */
 			if (r.arreter) clients.get(id)?.abort();
+			publier();
+		},
+		reprendre(id) {
+			const avant = file;
+			file = F.reprendre(file, id);
+			if (file === avant) return;
+			pomper();
+		},
+		annulerReprise(id) {
+			const avant = file;
+			file = F.annulerReprise(file, id, t("ai.queue.limitCancelled"));
+			if (file === avant) return;
 			publier();
 		},
 		reessayer(id) {

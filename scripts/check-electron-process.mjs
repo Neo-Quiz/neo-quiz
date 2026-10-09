@@ -1806,3 +1806,128 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ environnementEn
 		env.AGY_CLI_DISABLE_AUTO_UPDATE, "true");
 	r.done();
 });
+
+/* ── CODEX BANKED RESETS (`codex-resets.ts`, 2026-10-09) ──
+   CE QU'IL EMPÊCHE. Sur un FAUX `codex app-server` (jamais le vrai compte,
+   jamais `consume` sur un vrai crédit) : le lancement est l'unique forme
+   `app-server`, la séquence est `initialize` (experimentalApi) puis
+   `initialized` puis UNE méthode ; la fenêtre ne dépense qu'un crédit que la
+   dernière lecture lui a montré ; une requête hors forme n'atteint pas le
+   processus ; l'ARBRE est tué sur chaque issue ; les sondes passent une à la
+   fois ; une requête du serveur reçoit un refus, jamais un accord. */
+let tuerArbreReel;
+await withSrcModule("apps/windows/electron/process.ts", (p) => { tuerArbreReel = p.tuerArbre; });
+await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/codex-resets.ts"], async ({ codexResets, oublierLectures, classerErreurServeur }) => {
+	const r = makeReporter("Électron — les resets gratuits de Codex (faux app-server)");
+	const tmp = mkdtempSync(join(tmpdir(), "nq-resets-"));
+	const faux = join(process.cwd(), "scripts", "fixtures", "fake-codex-app-server.mjs");
+	const vivant = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+	let n = 0;
+	/** One scenario: its own log; returns what the fake saw. */
+	const scenario = async (mode, requete, extra = {}) => {
+		const log = join(tmp, "log-" + (++n) + ".jsonl");
+		const tues = [];
+		const deps = {
+			env: { ...process.env, FAKE_LOG: log, FAKE_MODE: mode, ...(extra.env || {}) },
+			lancement: extra.lancement ?? ((args) => ({ executable: process.execPath, args: [faux, ...args] })),
+			delaiTotalMs: extra.total, delaiRequeteMs: extra.requete,
+			tuer: async (pid) => { tues.push(pid); await tuerArbreReel(pid); },
+		};
+		const resultat = await codexResets(requete, deps);
+		const evs = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)) : [];
+		return { resultat, evs, tues, log };
+	};
+
+	// 1. A read.
+	oublierLectures();
+	const lu = await scenario("normal", { action: "read" });
+	const recv = lu.evs.filter(e => e.ev === "recv");
+	const pidLu = lu.evs.find(e => e.ev === "start")?.pid;
+	r.check("read: ok with the three credits and their server text",
+		[lu.resultat.ok, lu.resultat.resets?.availableCount, lu.resultat.resets?.credits.map(c => c.id), lu.resultat.resets?.credits[0].title],
+		[true, 2, ["credit-1", "credit-2", "credit-3"], "Full reset (Weekly + 5 hr)"]);
+	r.check("read: the launch is exactly `app-server`", lu.evs.find(e => e.ev === "start")?.argv, ["app-server"]);
+	r.check("read: initialize, initialized, then ONE method, nothing else",
+		recv.map(e => e.method), ["initialize", "initialized", "account/rateLimits/read"]);
+	r.check("read: initialize asks for the experimental API", recv[0].params.capabilities, { experimentalApi: true });
+	r.check("read: `initialized` is a notification (no id)", recv[1].keys.includes("id"), false);
+	r.check("read: the tree killer was called with the pid, and the pid is dead", [lu.tues, vivant(pidLu)], [[pidLu], false]);
+
+	// 2. Consume of a credit the last read showed.
+	const lance = (outcome, id = "credit-1") => scenario("normal", { action: "consume", creditId: id }, { env: { FAKE_OUTCOME: outcome } });
+	const dep = await lance("reset");
+	const c = dep.evs.filter(e => e.ev === "recv");
+	r.check("consume (FAKE server): outcome reset", dep.resultat, { ok: true, action: "consume", outcome: "reset" });
+	r.check("consume: initialize, initialized, then the consume only", c.map(e => e.method), ["initialize", "initialized", "account/rateLimitResetCredit/consume"]);
+	r.check("consume: params are exactly an idempotency key (uuid) and the credit id",
+		[Object.keys(c[2].params).sort(), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(c[2].params.idempotencyKey), c[2].params.creditId], [["creditId", "idempotencyKey"], true, "credit-1"]);
+	r.check("consume: killed too", dep.tues.length, 1);
+	const encore = await scenario("normal", { action: "consume", creditId: "credit-1" });
+	r.check("the same credit cannot be spent twice without a new read (no launch)", [encore.resultat, encore.evs.length], [{ ok: false, error: "unknown-credit" }, 0]);
+
+	// 3. Not shown by the last read: refused before any launch.
+	oublierLectures();
+	const sansLecture = await scenario("normal", { action: "consume", creditId: "credit-1" });
+	r.check("consume with no read at all: refused, no process", [sansLecture.resultat, sansLecture.evs.length], [{ ok: false, error: "unknown-credit" }, 0]);
+	await scenario("normal", { action: "read" });
+	const inconnu = await scenario("normal", { action: "consume", creditId: "credit-999" });
+	r.check("consume of an id the read did not show: refused, no process", [inconnu.resultat, inconnu.evs.length], [{ ok: false, error: "unknown-credit" }, 0]);
+	const redeemed = await scenario("normal", { action: "consume", creditId: "credit-3" });
+	r.check("consume of a credit that is not available (redeemed): refused, no process", [redeemed.resultat, redeemed.evs.length], [{ ok: false, error: "unknown-credit" }, 0]);
+
+	// 4. Each outcome, and an unknown one.
+	for (const o of ["nothingToReset", "noCredit", "alreadyRedeemed"]) {
+		await scenario("normal", { action: "read" });
+		const x = await lance(o);
+		r.check("outcome " + o + " is passed on", x.resultat, { ok: true, action: "consume", outcome: o });
+	}
+	await scenario("normal", { action: "read" });
+	const bizarre = await lance("somethingElse");
+	r.check("an unknown outcome is an error, never a success", bizarre.resultat, { ok: false, error: "unavailable" });
+
+	// 5. Requests of the wrong shape never reach the process.
+	const mauvaises = [null, "read", 3, [], {}, { action: "x" }, { action: "read", method: "turn/start" }, { action: "read", creditId: "credit-1" },
+		{ action: "consume" }, { action: "consume", creditId: "" }, { action: "consume", creditId: "a b" }, { action: "consume", creditId: "../x" },
+		{ action: "consume", creditId: "x".repeat(129) }, { action: "consume", creditId: 5 }, { action: "consume", creditId: "credit-1", params: {} }, { action: "consume", creditId: "-rf" }];
+	const refus = [];
+	for (const m of mauvaises) {
+		const x = await scenario("normal", m);
+		refus.push([JSON.stringify(x.resultat), x.evs.length]);
+	}
+	r.check("sixteen malformed requests: all refused, none launches anything", refus, mauvaises.map(() => [JSON.stringify({ ok: false, error: "refused" }), 0]));
+
+	// 6. Timeouts and the kill on a hang.
+	const pendu = await scenario("hang", { action: "read" }, { requete: 300, total: 2000 });
+	const pidPendu = pendu.evs.find(e => e.ev === "start").pid;
+	r.check("a server that never answers: timeout, and the tree is killed", [pendu.resultat, pendu.tues, vivant(pidPendu)], [{ ok: false, error: "timeout" }, [pidPendu], false]);
+	const total = await scenario("slow", { action: "read" }, { requete: 5000, total: 150 });
+	r.check("the overall timeout cuts a slow answer, and the tree is killed", [total.resultat, total.tues.length], [{ ok: false, error: "timeout" }, 1]);
+
+	// 7. A request FROM the server is refused.
+	const serveur = await scenario("serverreq", { action: "read" });
+	const rep = serveur.evs.find(e => e.ev === "response-to-server");
+	r.check("a request from the server gets an error answer, never a grant", [rep?.msg.id, rep?.msg.result, typeof rep?.msg.error?.message], [900, undefined, "string"]);
+
+	// 8. Not installed.
+	const absent = await scenario("normal", { action: "read" }, { lancement: () => null });
+	r.check("no codex on the machine: not-installed", absent.resultat, { ok: false, error: "not-installed" });
+
+	// 9. One probe at a time.
+	const log2 = join(tmp, "log-queue.jsonl");
+	const dep2 = { env: { ...process.env, FAKE_LOG: log2, FAKE_MODE: "slow" }, lancement: (args) => ({ executable: process.execPath, args: [faux, ...args] }), tuer: tuerArbreReel };
+	await Promise.all([codexResets({ action: "read" }, dep2), codexResets({ action: "read" }, dep2)]);
+	const ev2 = readFileSync(log2, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l));
+	r.check("two probes sent together run one after the other (start, answer, start, answer)",
+		ev2.filter(e => e.ev === "start" || e.ev === "answer").map(e => e.ev), ["start", "answer", "start", "answer"]);
+
+	// 10. Server error messages.
+	r.check("an authentication error is told apart", [classerErreurServeur("chatgpt authentication required"), classerErreurServeur("boom")], ["not-signed-in", "unavailable"]);
+
+	// 11. The module never touches auth.json, and sends only two methods.
+	const src = readFileSync(join(process.cwd(), "apps", "windows", "electron", "codex-resets.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+	r.check("codex-resets.ts never names auth.json nor reads a file", [/auth\.json/.test(src), /readFile|writeFile|createReadStream/.test(src)], [false, false]);
+	r.check("the only two methods it can send are the two named ones", [...new Set([...src.matchAll(/"(account\/[A-Za-z/]+)"/g)].map(m => m[1]))].sort(), ["account/rateLimitResetCredit/consume", "account/rateLimits/read"]);
+
+	rmSync(tmp, { recursive: true, force: true });
+	r.done();
+});

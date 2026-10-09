@@ -61,6 +61,7 @@ import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre
 import type { Perimetre } from "./perimetre";
 import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
 import { deconnecterCompte, etatComptes, usageCompte } from "./comptes";
+import { codexResets } from "./codex-resets";
 import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { Outil } from "./process";
@@ -1329,6 +1330,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		}
 		return usageCompte(tool);
 	});
+
+	/* Banked resets: the request is judged in `codexResets` (action, credit id
+	   seen in the last read); a refusal is a result, not a thrown error. */
+	ipcMain.handle(CANAUX.comptesResets, (_e, requete: unknown) => codexResets(requete));
 
 	ipcMain.handle(CANAUX.comptesDeconnecter, (_e, tool: unknown): Promise<"ok" | "echec" | "indisponible"> => {
 		if (!estOutilAutorise(tool)) {

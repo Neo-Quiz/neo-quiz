@@ -94,7 +94,7 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 	let scanning = false, again = false;
 	/** Ids already logged as invalid, so the console is not spammed on every scan. */
 	const refused = new Set<string>();
-	const live = (): boolean => deps.queue.lignes().some(l => !!l.demande.fromDevice && (l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement"));
+	const live = (): boolean => deps.queue.lignes().some(l => !!l.demande.fromDevice && (l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement" || l.etat === "pause"));
 	const inQueue = (id: string): boolean => deps.queue.lignes().some(l => l.demande.requestId === id);
 
 	/** True when the log changed. */

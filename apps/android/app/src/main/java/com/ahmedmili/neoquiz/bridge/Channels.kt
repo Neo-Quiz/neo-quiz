@@ -65,6 +65,7 @@ object Channels {
         "processus.replacerTerminal",
         "processus.comptesEtat",
         "processus.comptesUsage",
+        "processus.comptesResets",
         "processus.comptesDeconnecter",
         "processus.comptesUsageTerminal",
         "fenetre.prete",

@@ -21,6 +21,7 @@ import { complementCategorie } from "./categorie-prompt";
 import { clarifyPrompt } from "./generation-kind";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
+import { UsageLimitError, detectUsageLimit } from "./usage-limit";
 import type { TranscriptEvent } from "./transcript";
 
 /* ══════════════════════════════════════════════════════════
@@ -1320,6 +1321,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.claudeNotInstalled"));
 			}
+			/* A usage limit is told apart BEFORE the generic failure: the queue pauses the line until the window resets. */
+			const limite = detectUsageLimit((e.stderr || "") + " " + (e.stdout || "") + " " + e.message, Date.now());
+			if (limite) return new UsageLimitError("claude", limite.resetAt, t("ai.err.claudeRateLimit"));
 			if (detail.includes("login") || detail.includes("api key") || detail.includes("authentication") || detail.includes("credential")) {
 				return erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
 			}
@@ -1391,6 +1395,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		if (data.is_error) {
 			const msg = String(data.result || t("ai.err.unknown"));
 			const msgLower = msg.toLowerCase();
+			const limite = detectUsageLimit(msg, Date.now());
+			if (limite) throw new UsageLimitError("claude", limite.resetAt, t("ai.err.claudeRateLimit"));
 			if (msgLower.includes("login") || msgLower.includes("api key") || msgLower.includes("credential")) {
 				throw erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
 			}
@@ -1461,6 +1467,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.codexNotInstalled"));
 			}
+			const limite = detectUsageLimit((e.stderr || "") + " " + (e.stdout || "") + " " + e.message, Date.now());
+			if (limite) return new UsageLimitError("codex", limite.resetAt, t("ai.err.codexRateLimit"));
 			if (detail.includes("not logged in") || detail.includes("login") || detail.includes("unauthorized") || detail.includes("401") || detail.includes("credential") || detail.includes("authenticat")) {
 				return erreurConnexion("codex", t("ai.err.codexNotLoggedIn"));
 			}

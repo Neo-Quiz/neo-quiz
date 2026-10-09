@@ -7,7 +7,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-cadence.ts"], ({ usageLevel, usageStatusRows, usageResetText, usageWindowTitle, usageRemainingPercent, usageResetIn, usageWaitText }, { newCadence, cadenceVerdict, cadenceSuccess, cadenceRateLimited }) => {
+await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-cadence.ts", "src/dashboard/codex-resets.ts"], ({ usageLevel, usageStatusRows, usageResetText, usageWindowTitle, usageRemainingPercent, usageResetIn, usageWaitText }, { newCadence, cadenceVerdict, cadenceSuccess, cadenceRateLimited }, { parseResetCredits, parseConsumeOutcome, readResetsRequest, isCreditId, spendable }) => {
 	const r = makeReporter("Usage line formats");
 
 	r.check("0 % : ok", usageLevel(0), "ok");
@@ -89,6 +89,36 @@ await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-caden
 	cadenceRateLimited(b, T + 16 * 60000, null);
 	const rv = cadenceVerdict(b, T + 16 * 60000);
 	r.check("cadence: success resets the back-off to 60 s", rv.ok === false && rv.waitMs === 60000, true);
+
+	// Codex banked resets: the pure parser and the request judge (simulated JSON-RPC results).
+	const server = {
+		rateLimitResetCredits: {
+			availableCount: 2,
+			credits: [
+				{ id: "c-1", resetType: "codexRateLimits", status: "available", expiresAt: 1795000000, title: "Full reset (Weekly + 5 hr)", description: "<b>x</b> Thanks!" },
+				{ id: "c-2", status: "redeemed", expires_at: "2026-12-01T00:00:00Z" },
+				{ id: "bad id with spaces", status: "available" },
+				{ status: "available" },
+				"junk",
+			],
+		},
+	};
+	const parsed = parseResetCredits(server);
+	r.check("resets: count and the credits with a usable id (junk and bad ids dropped)", [parsed.availableCount, parsed.credits.map(c => c.id)], [2, ["c-1", "c-2"]]);
+	r.check("resets: title and description come from the server as plain strings", [parsed.credits[0].title, parsed.credits[0].description], ["Full reset (Weekly + 5 hr)", "<b>x</b> Thanks!"]);
+	r.check("resets: seconds, ISO strings and the snake_case key all read as epoch ms", [parsed.credits[0].expiresAt, parsed.credits[1].expiresAt], [1795000000000, Date.parse("2026-12-01T00:00:00Z")]);
+	r.check("resets: only the available credits are spendable", spendable(parsed).map(c => c.id), ["c-1"]);
+	r.check("resets: the snake_case container and count are read", parseResetCredits({ rate_limit_reset_credits: { available_count: 3 } }), { availableCount: 3, credits: [] });
+	r.check("resets: a result without the field is null (older Codex)", [parseResetCredits({ rateLimits: {} }), parseResetCredits(null), parseResetCredits("x"), parseResetCredits({ rateLimitResetCredits: { availableCount: "2" } })], [null, null, null, null]);
+	r.check("resets: a negative or huge count is clamped", [parseResetCredits({ rateLimitResetCredits: { availableCount: -4 } }).availableCount, parseResetCredits({ rateLimitResetCredits: { availableCount: 1e9 } }).availableCount], [0, 999]);
+	r.check("resets: the four outcomes read, anything else is null",
+		["reset", "nothingToReset", "noCredit", "alreadyRedeemed", "RESET", "ok", 1, null].map(o => parseConsumeOutcome({ outcome: o })), ["reset", "nothingToReset", "noCredit", "alreadyRedeemed", null, null, null, null]);
+	r.check("resets: no outcome at all is null", [parseConsumeOutcome({}), parseConsumeOutcome(null)], [null, null]);
+	r.check("resets: the request judge accepts exactly read and consume+id",
+		[readResetsRequest({ action: "read" }), readResetsRequest({ action: "consume", creditId: "c-1" })], [{ action: "read" }, { action: "consume", creditId: "c-1" }]);
+	r.check("resets: the request judge refuses extra keys, bad ids, other actions",
+		[{ action: "read", x: 1 }, { action: "consume", creditId: "c 1" }, { action: "consume", creditId: "c-1", method: "m" }, { action: "exec" }, [], null].map(readResetsRequest), [null, null, null, null, null, null]);
+	r.check("resets: a credit id is short and id-shaped", ["a", "A1._:-x", "x".repeat(128)].map(isCreditId).concat(["", "-a", "a b", "x".repeat(129), "a/b"].map(isCreditId)), [true, true, true, false, false, false, false, false]);
 
 	r.done();
 });

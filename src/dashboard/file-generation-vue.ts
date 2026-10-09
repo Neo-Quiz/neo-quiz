@@ -36,7 +36,8 @@ import { peindreQuestions } from "./generation-kind-vue";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
-import { t } from "../i18n";
+import { currentLang, t } from "../i18n";
+import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
@@ -301,6 +302,18 @@ export function creerVueFile(opts: {
 			host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "clock");
 			ajouter(rep, "span", "qbd-ai-reponse-texte", t("ai.queue.waiting"));
 			boutonIcone(ajouter(rep, "span", "qbd-ai-reponse-fin"), "square", t("ai.queue.cancel"), () => opts.file.annuler(l.id));
+			return;
+		}
+		if (l.etat === "pause") {
+			/* PAUSED ON A USAGE LIMIT: the clock resumes it (reset time + 30 s),
+			   the user can resume now or cancel the resume. */
+			host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "pause");
+			const corps = ajouter(rep, "div", "qbd-ai-reponse-corps");
+			const reprise = l.pause?.reprise ?? null;
+			ajouter(corps, "div", "qbd-ai-reponse-texte", reprise !== null ? t("ai.queue.limitPaused", { when: formatResume(reprise, Date.now(), currentLang()) }) : t("ai.queue.limitPausedManual"));
+			const actions = ajouter(corps, "div", "qbd-ai-reponse-actions");
+			bouton(actions, t("ai.queue.limitResumeNow"), () => opts.file.reprendre(l.id));
+			bouton(actions, t("ai.queue.limitCancelResume"), () => opts.file.annulerReprise(l.id));
 			return;
 		}
 		if (l.etat === "prete" && l.resultat) {

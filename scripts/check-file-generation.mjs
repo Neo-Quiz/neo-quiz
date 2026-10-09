@@ -482,3 +482,113 @@ await withSrcModule("src/dashboard/ai-settings-host.ts", (S) => {
 	r.check("les réglages par défaut ne portent aucun choix persisté", S.aiSettingsDefaults().aiComposerDestination, "");
 	r.done();
 });
+
+/* ── LA PAUSE SUR LIMITE D'USAGE (2026-10-09) ──
+   CE QU'IL EMPÊCHE. Une génération refusée sur la limite du forfait qui
+   échoue en rouge, ou pire, qui laisse partir les autres demandes du MÊME
+   fournisseur contre le même mur ; une reprise qui n'arrive jamais (ou qui
+   arrive avant le reset) ; une ligne qui perd son rang à la reprise ; une
+   limite annoncée qui n'a pas de mot (reset inconnu : jamais deviné). */
+await withSrcModule(["src/dashboard/file-generation.ts", "src/dashboard/usage-limit.ts"], (F, L) => {
+	const r = makeReporter("File de génération — pause sur limite d'usage");
+	const MIN = 60000;
+	const base = Date.UTC(2026, 9, 9, 18, 0, 0);
+	// Requests: "chat/provider/name". Two chats on Codex, one on Claude.
+	const d = (chat, fournisseur, nom) => ({ chat, fournisseur, nom });
+	const regles = { max: 8, chat: x => x.chat, groupe: () => null, fournisseur: x => x.fournisseur };
+	const etats = f => f.lignes.map(l => `${l.demande.nom}:${l.etat}`).join(" ");
+
+	let f = F.fileVide();
+	for (const x of [d("A", "codex", "a1"), d("B", "codex", "b1"), d("C", "claude-code", "c1"), d("D", "codex", "d1")]) f = F.ajouter(f, x).file;
+	f = F.demarrerPrets(f, base, { ...regles, max: 2 }).file;
+	r.check("départ : a1 et b1 tournent", etats(f), "a1:cours b1:cours c1:attente d1:attente");
+
+	// a1 hits the Codex limit, reset at 23:00.
+	const reset = base + 5 * 60 * MIN;
+	f = F.mettreEnPause(f, 1, { fournisseur: "codex", reprise: reset });
+	r.check("a1 passe en pause, avec son heure de reprise", [F.ligne(f, 1).etat, F.ligne(f, 1).pause], ["pause", { fournisseur: "codex", reprise: reset }]);
+	r.check("a1 en pause, b1 tourne toujours", F.ligne(f, 2).etat, "cours");
+	r.check("mettre en pause une ligne qui n'est pas en cours ne fait rien", etats(F.mettreEnPause(f, 3, { fournisseur: "claude-code", reprise: null })), etats(f));
+
+	// b1 finishes: d1 (Codex) must NOT start, c1 (Claude) may.
+	f = F.terminer(f, 2, { titre: "b1" });
+	const apres = F.demarrerPrets(f, base + MIN, regles);
+	r.check("les lignes sœurs du même fournisseur ne démarrent pas, l'autre fournisseur oui", [apres.lignes.map(l => l.demande.nom), etats(apres.file)], [["c1"], "a1:pause b1:prete c1:cours d1:attente"]);
+	r.check("sans la règle fournisseur (ancien appelant), rien ne bloque", F.demarrerPrets(f, base + MIN, { ...regles, fournisseur: undefined }).lignes.map(l => l.demande.nom), ["c1", "d1"]);
+	f = apres.file;
+
+	// A paused line holds its chat.
+	f = F.ajouter(f, d("A", "claude-code", "a2")).file;
+	r.check("une pause garde son chat : une demande du même chat attend, même sur un autre fournisseur", F.demarrerPrets(f, base + MIN, regles).lignes.map(l => l.demande.nom), []);
+
+	// The clock.
+	r.check("l'échéance = reset + 30 s", F.echeance(F.ligne(f, 1)), reset + 30000);
+	r.check("prochaine échéance de la file", F.prochaineEcheance(f), reset + 30000);
+	r.check("avant l'échéance : rien ne repart", F.reprendreEchues(f, reset + 29999).ids, []);
+	const due = F.reprendreEchues(f, reset + 30000);
+	r.check("à l'échéance : la ligne repart, EN PLACE", [due.ids, etats(due.file)], [[1], "a1:attente b1:prete c1:cours d1:attente a2:attente"]);
+	const relance = F.demarrerPrets(due.file, reset + 30000, regles);
+	r.check("la ligne reprise démarre la première de son fournisseur (son rang est gardé), puis les sœurs suivent leur chat", relance.lignes.map(l => l.demande.nom), ["a1", "d1"]);
+	r.check("la reprise efface la pause (et le départ repose l'heure)", [F.ligne(due.file, 1).pause, relance.lignes[0].debut], [undefined, reset + 30000]);
+
+	// Unknown reset time: never resumed by the clock.
+	let g = F.fileVide();
+	g = F.ajouter(g, d("A", "codex", "x1")).file;
+	g = F.ajouter(g, d("B", "codex", "y1")).file;
+	g = F.demarrerPrets(g, base, regles).file;
+	g = F.mettreEnPause(g, 1, { fournisseur: "codex", reprise: null });
+	r.check("heure inconnue : pas d'échéance, jamais reprise par l'horloge", [F.prochaineEcheance(g), F.reprendreEchues(g, base + 1e12).ids], [null, []]);
+
+	// Manual resume: every line paused on the provider restarts.
+	g = F.mettreEnPause(g, 2, { fournisseur: "codex", reprise: base + 999 * MIN });
+	const m = F.reprendre(g, 1);
+	r.check("« Reprendre maintenant » relance toutes les pauses du fournisseur (sinon une sœur encore en pause bloquerait la ligne choisie)", etats(m), "x1:attente y1:attente");
+	r.check("reprendre une ligne qui n'est pas en pause ne fait rien", etats(F.reprendre(m, 1)), etats(m));
+	let h = F.ajouter(F.ajouter(F.fileVide(), d("A", "codex", "p")).file, d("B", "claude-code", "q")).file;
+	h = F.demarrerPrets(h, base, regles).file;
+	h = F.mettreEnPause(F.mettreEnPause(h, 1, { fournisseur: "codex", reprise: null }), 2, { fournisseur: "claude-code", reprise: null });
+	r.check("reprendre ne touche pas un autre fournisseur", etats(F.reprendre(h, 1)), "p:attente q:pause");
+	r.check("une file qui n'a que des pauses n'est pas occupée", F.occupee(h), false);
+
+	// Cancel the resume.
+	const c = F.annulerReprise(g, 1, "Stopped");
+	r.check("« Annuler la reprise » : la ligne échoue avec son message, « Réessayer » reste possible", [F.ligne(c, 1).etat, F.ligne(c, 1).erreur, F.ligne(c, 1).echec, etats(F.reessayer(c, 1))], ["echouee", "Stopped", "generation", "y1:pause x1:attente"]);
+	r.check("annuler la reprise d'une ligne qui n'est pas en pause ne fait rien", etats(F.annulerReprise(c, 1, "x")), etats(c));
+	r.check("la croix ne ferme pas une ligne en pause", etats(F.fermer(g, 1)), etats(g));
+	r.check("le ■ retire une ligne en pause", etats(F.annuler(g, 1).file), "y1:pause");
+
+	// Reload: the paused line comes back as it was.
+	const rechargee = F.restaurer(JSON.parse(JSON.stringify(g)), () => false);
+	r.check("une page rechargée garde la pause et son heure", [etats(rechargee), F.ligne(rechargee, 1).pause], ["x1:pause y1:pause", { fournisseur: "codex", reprise: null }]);
+	const apresArret = F.reprendreEchues(F.restaurer(JSON.parse(JSON.stringify(f)), () => false), reset + 60000);
+	r.check("application fermée puis rouverte après l'heure : la ligne repart au démarrage", [apresArret.ids, F.ligne(apresArret.file, 1).etat], [[1], "attente"]);
+
+	/* ── Detection (MonoCode's patterns + what each CLI says about WHEN) ── */
+	const now = new Date(2026, 9, 9, 20, 15, 0).getTime();
+	const local = (h, min, jour = 9, mois = 9) => new Date(2026, mois, jour, h, min, 0).getTime();
+	const det = (s) => L.detectUsageLimit(s, now);
+	r.check("Claude: la forme à pipe (epoch en secondes)", det("Claude AI usage limit reached|1791600000")?.resetAt, 1791600000000);
+	r.check("Codex: « try again at » avec date complète", det("You've hit your usage limit. Upgrade to Pro, or try again at Oct 12th, 2026 2:00 PM.")?.resetAt, local(14, 0, 12));
+	r.check("Codex: « try again at » sans date, heure future : aujourd'hui", det("You've hit your usage limit. Try again at 11:00 PM.")?.resetAt, local(23, 0));
+	r.check("heure déjà passée aujourd'hui : demain", det("usage limit reached. Resets 3am")?.resetAt, local(3, 0, 10));
+	r.check("« resets at 3:16 AM »", det("5-hour limit reached · resets at 3:16 AM")?.resetAt, local(3, 16, 10));
+	r.check("« try again in 4 days 2 hours 3 minutes »", det("You've hit your usage limit. Try again in 4 days 2 hours 3 minutes.")?.resetAt, now + (4 * 1440 + 2 * 60 + 3) * 60000);
+	r.check("« in 52 minutes »", det("usage limit reached, try again in 52 minutes")?.resetAt, now + 52 * 60000);
+	r.check("une limite sans heure : reconnue, heure inconnue (jamais devinée)", det("You have hit your usage limit"), { resetAt: null });
+	r.check("une heure passée dans la pipe : reconnue, heure inconnue", det("usage limit reached|1700000000"), { resetAt: null });
+	for (const s of ["credit balance is too low", "Weekly limit reached", "quota exceeded", "insufficient_quota", "You hit your limit", "monthly limit exceeded"]) {
+		r.check("reconnu : « " + s + " »", det(s) !== null, true);
+	}
+	for (const s of ["Not logged in. Please run /login", "ENOENT codex not found", "invalid JSON5 at 3:4", "", "Network error: ETIMEDOUT"]) {
+		r.check("pas une limite : « " + s + " »", det(s), null);
+	}
+	r.check("une valeur qui n'est pas du texte n'est jamais une limite", [det(undefined), det(null), det(42)], [null, null, null]);
+
+	r.check("la ligne d'usage : la fenêtre pleine donne l'heure", L.resetFromRows([{ usedPercent: 40, resetsAt: now + 1000 }, { usedPercent: 100, resetsAt: now + 5000 }], now), now + 5000);
+	r.check("deux fenêtres pleines : la DERNIÈRE à se remettre à zéro", L.resetFromRows([{ usedPercent: 100, resetsAt: now + 5000 }, { usedPercent: 100, resetsAt: now + 9000 }], now), now + 9000);
+	r.check("aucune fenêtre pleine, ou reset passé ou inconnu : null", [L.resetFromRows([{ usedPercent: 40, resetsAt: now + 5 }], now), L.resetFromRows([{ usedPercent: 100, resetsAt: now - 1 }], now), L.resetFromRows([{ usedPercent: 100, resetsAt: null }], now), L.resetFromRows([], now)], [null, null, null, null]);
+	const e = new L.UsageLimitError("codex", 5, "m");
+	r.check("UsageLimitError porte l'outil et l'heure", [e instanceof Error, e.tool, e.resetAt, e.name], [true, "codex", 5, "UsageLimitError"]);
+	r.check("l'heure de reprise s'écrit « 23:00 » en français, avec le jour au-delà d'aujourd'hui", [L.formatResume(local(23, 0), now, "fr"), /12/.test(L.formatResume(local(14, 0, 12), now, "fr")) && /14:00/.test(L.formatResume(local(14, 0, 12), now, "fr"))], ["23:00", true]);
+	r.done();
+});

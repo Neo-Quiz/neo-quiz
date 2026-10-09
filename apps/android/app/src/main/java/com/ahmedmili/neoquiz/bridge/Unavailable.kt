@@ -30,6 +30,7 @@ object Unavailable {
         "processus.replacerTerminal" to { null },
         "processus.comptesEtat" to { emptyList<Any>() },
         "processus.comptesUsage" to { mapOf("rows" to emptyList<Any>(), "error" to mapOf("kind" to "unavailable"), "mesureAt" to null) },
+        "processus.comptesResets" to { mapOf("ok" to false, "error" to "unavailable") },
         "processus.comptesDeconnecter" to { "indisponible" },
         "processus.comptesUsageTerminal" to { "indisponible" },
         // The window is the activity: nothing to arm, move or close from the page.

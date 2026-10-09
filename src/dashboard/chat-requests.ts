@@ -16,7 +16,7 @@ import { absoluteInRoot } from "../shared-state/chat-merge";
 import type { RemoteRequest } from "../shared-state/remote-request";
 import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel } from "./chat-record";
 
-export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement";
+export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement" || l.etat === "pause";
 export const isTerminal = (l: LigneGeneration): boolean => l.etat === "prete" || l.etat === "echouee" || l.etat === "arret";
 export const chatOfLine = (l: LigneGeneration): string => l.demande.chatId ?? LEGACY_CHAT_ID;
 

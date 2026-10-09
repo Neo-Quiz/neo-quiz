@@ -190,6 +190,7 @@ const pont: Pont = {
 		replacerTerminal: (ancre) => appeler("processus.replacerTerminal", [ancre]),
 		comptesEtat: (outils) => appeler("processus.comptesEtat", [outils]),
 		comptesUsage: (tool) => appeler("processus.comptesUsage", [tool]),
+		comptesResets: (requete) => appeler("processus.comptesResets", [requete]),
 		comptesDeconnecter: (tool) => appeler("processus.comptesDeconnecter", [tool]),
 		comptesUsageTerminal: (tool) => appeler("processus.comptesUsageTerminal", [tool]),
 	},

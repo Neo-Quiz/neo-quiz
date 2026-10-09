@@ -49,6 +49,7 @@
 import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun } from "../../../src/host/types";
 import type { CodeLanguage } from "../../../src/code-languages";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
+import type { ResetsRequest, ResetsResult } from "../../../src/dashboard/codex-resets";
 import type { EtatSync, LigneJournal } from "../../../src/dashboard/sync-etat";
 export type { EtatSync } from "../../../src/dashboard/sync-etat";
 export type { EtatMiseAJour, PhaseMiseAJour } from "./mise-a-jour-etat";
@@ -854,6 +855,10 @@ export interface Pont {
 		/** Les quotas d'un compte. Le jeton qui les obtient ne quitte jamais le
 		    principal. */
 		comptesUsage(tool: "claude" | "codex"): Promise<UsageRead>;
+		/** Codex banked resets: `read` lists them, `consume` spends one. The
+		    request is judged by the main process (action + a credit id seen in
+		    the last read); nothing else crosses. */
+		comptesResets(requete: ResetsRequest): Promise<ResetsResult>;
 		/** Déconnecte un compte, sans terminal. Le NOM est jugé par
 		    `estOutilAutorise` avant tout, comme `run` et `connecter`. */
 		comptesDeconnecter(tool: Outil): Promise<"ok" | "echec" | "indisponible">;
@@ -1161,6 +1166,7 @@ export const CANAUX = {
 	processusReplacerTerminal: "neo:process/replacer-terminal",
 	comptesEtat: "neo:comptes/etat",
 	comptesUsage: "neo:comptes/usage",
+	comptesResets: "neo:comptes/resets",
 	comptesDeconnecter: "neo:comptes/deconnecter",
 	comptesUsageTerminal: "neo:comptes/usage-terminal",
 	miseAJourEtatLire: "neo:mise-a-jour/etat-lire",

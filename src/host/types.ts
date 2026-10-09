@@ -17,6 +17,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { UsageRead } from "../dashboard/usage-format";
+import type { ResetsRequest, ResetsResult } from "../dashboard/codex-resets";
 import type { CodeLanguage } from "../code-languages";
 
 /** Un fichier vu par l'hôte. Volontairement plat et sérialisable. */
@@ -657,6 +658,9 @@ export interface HostProcess {
 	etatComptes(outils?: EtatCompte["outil"][]): Promise<EtatCompte[]>;
 	/** Les quotas du forfait, pour les deux fournisseurs qui les publient. */
 	usageCompte(tool: "claude" | "codex"): Promise<UsageRead>;
+	/** Codex banked resets (desktop app only, hence optional): `read` lists
+	    them, `consume` spends one. The host judges the request. */
+	codexResets?(requete: ResetsRequest): Promise<ResetsResult>;
 	/** Déconnecte le compte d'un CLI. Vaut pour TOUTE la machine : c'est le
 	    compte de l'outil, pas celui de l'application. L'appelant confirme. */
 	deconnecterCli(tool: CliTool): Promise<"ok" | "echec" | "indisponible">;

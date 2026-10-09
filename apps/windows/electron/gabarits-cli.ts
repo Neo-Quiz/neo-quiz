@@ -39,6 +39,19 @@ function correspond(args: readonly string[], forme: readonly Piece[]): boolean {
 
 const modele = (a: string): boolean => MODELE.test(a);
 
+/** The one launch of `codex app-server` (banked resets,
+    `codex-resets.ts`): exactly one word. It is deliberately NOT accepted by
+    `argumentsAutorises`: through `process.run` the window would own the stdin
+    of an app-server, i.e. the whole JSON-RPC surface (command execution
+    included). Only the main-process module launches it, and it speaks only
+    `initialize`, `initialized` and one of two methods. */
+export const ARGS_CODEX_APP_SERVER: readonly string[] = ["app-server"];
+
+/** True when `args` is exactly the app-server launch. */
+export function argumentsAppServer(tool: string, args: unknown): boolean {
+	return tool === "codex" && Array.isArray(args) && args.length === ARGS_CODEX_APP_SERVER.length && args.every((a, i) => a === ARGS_CODEX_APP_SERVER[i]);
+}
+
 /** Vrai si `args` est un appel que la fenêtre a le droit de demander à
     `tool`. `marqueur` est celui de la requête : un jeton qui en porte un
     autre n'est pas reconnu. */

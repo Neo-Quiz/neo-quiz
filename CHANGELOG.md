@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- The Codex usage popover lists your banked resets (title, description and time left, as Codex states them) and spends one after an explicit confirmation, then reads the limits again.
+- A generation that hits the usage limit of Claude Code or Codex now pauses instead of failing: the line shows when it resumes by itself (the reset time plus 30 seconds, also after a restart), the other requests on the same provider wait, and you can resume now or cancel the resume.
+
 ### Changed
 
 - Generated Learn readings favour interactive pages: explorable diagrams where you change a value and see what it means, symbol tables with each symbol drawn, and annotated diagrams, mixed when that helps.

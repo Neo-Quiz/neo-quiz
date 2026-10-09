@@ -130,6 +130,9 @@ export function createWindowsProcess(): HostProcess {
 		usageCompte(tool) {
 			return pont().processus.comptesUsage(tool);
 		},
+		codexResets(requete) {
+			return pont().processus.comptesResets(requete);
+		},
 		deconnecterCli(tool) {
 			return pont().processus.comptesDeconnecter(tool);
 		},

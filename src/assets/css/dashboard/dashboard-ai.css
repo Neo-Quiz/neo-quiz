@@ -4910,6 +4910,74 @@
 	color: var(--text-faint);
 }
 
+/* Codex banked resets, in the usage popover. Flat rows: no tile inside the popover. */
+.qbd-usage-pop-resets {
+	padding: 12px 0 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.qbd-usage-pop-resets-title {
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.qbd-usage-reset-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 6px 0;
+}
+
+.qbd-usage-reset-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.qbd-usage-reset-name { font-weight: 600; overflow-wrap: anywhere; }
+.qbd-usage-reset-desc { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.qbd-usage-reset-expiry { color: var(--text-faint); font-size: 12px; }
+.qbd-usage-reset-question { color: var(--text-normal); font-weight: 600; margin-top: 2px; }
+
+.qbd-usage-reset-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: 4px;
+}
+
+.qbd-usage-reset-btn {
+	height: 28px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 6px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.qbd-usage-reset-btn.is-primary,
+.qbd-usage-reset-row:not(.is-confirming) .qbd-usage-reset-btn { color: var(--interactive-accent); }
+
+.qbd-usage-reset-btn:hover:not(:disabled) { background: var(--background-modifier-hover) !important; }
+.qbd-usage-reset-btn:disabled { opacity: 0.5; cursor: default; }
+
+.qbd-usage-reset-message {
+	margin-top: 6px;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+/* A generation paused on the usage limit (file de génération). */
+.qbd-ai-reponse--pause { align-items: flex-start; }
+.qbd-ai-reponse--pause .qbd-ai-reponse-icone { color: var(--text-muted); margin-top: 1px; }
+
 .qbd-ai-usage-pct {
 	text-align: right;
 }

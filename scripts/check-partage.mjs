@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutorises }) => {
+await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutorises, argumentsAppServer, ARGS_CODEX_APP_SERVER }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 	const j = (nom) => `{{nq-${m}:${nom}}}`;
@@ -113,6 +113,12 @@ await withSrcModule("apps/windows/electron/gabarits-cli.ts", ({ argumentsAutoris
 		...Array.from({ length: images }, (_, i) => ["-i", j("fichier:" + (i + 1))]).flat()];
 	const agy = ["--input-format", "stream-json", "--output-format", "stream-json"];
 
+	r.check("codex app-server (banked resets): the one form is the single word, for codex only",
+		[ARGS_CODEX_APP_SERVER.length, argumentsAppServer("codex", ["app-server"]), argumentsAppServer("claude", ["app-server"]), argumentsAppServer("agy", ["app-server"])], [1, true, false, false]);
+	r.check("codex app-server: anything added, removed or moved is refused",
+		[["app-server", "--listen"], ["app-server", "-c", "x=1"], [], ["--app-server"], ["app-server "], ["App-Server"], "app-server", null].map(a => argumentsAppServer("codex", a)), [false, false, false, false, false, false, false, false]);
+	r.check("codex app-server is NOT a form the window can launch through process.run (it would own the app-server stdin)",
+		[argumentsAutorises("codex", ["app-server"], m), argumentsAutorises("codex", ["app-server"], undefined), argumentsAutorises("claude", ["app-server"], m)], [false, false, false]);
 	r.check("les sondes de version passent", ["claude", "codex", "agy"].map(o => argumentsAutorises(o, ["--version"], undefined)), [true, true, true]);
 	r.check("agy models passe", argumentsAutorises("agy", ["models"], undefined), true);
 	r.check("the update of Claude Code and Codex passes, as the bare word", [argumentsAutorises("claude", ["update"], undefined), argumentsAutorises("codex", ["update"], undefined)], [true, true]);

@@ -27,9 +27,27 @@
      minutes et du quota ;
    - `enregistrement` : nouvel essai d'écriture de la note, SANS relancer le
      CLI. Il n'occupe pas la file : aucun processus ne tourne.
+   - `pause`   : the CLI refused on a USAGE LIMIT (2026-10-09). No process
+     runs, so it does not occupy the queue; it holds its chat, and blocks
+     every waiting line of the SAME PROVIDER (the limit is the account's)
+     until the window resets: `reprise` + `MARGE_REPRISE_MS`, or never when
+     the reset time is unknown (the user resumes). It goes back to `attente`
+     IN PLACE (so it keeps its rank), by the clock (`reprendreEchues`) or by
+     hand (`reprendre`); `annulerReprise` turns it into a failed line.
 ══════════════════════════════════════════════════════════ */
 
-export type EtatLigne = "attente" | "cours" | "arret" | "enregistrement" | "prete" | "echouee";
+export type EtatLigne = "attente" | "cours" | "arret" | "enregistrement" | "prete" | "echouee" | "pause";
+
+/** What a paused line waits for. */
+export interface PauseLimite {
+	/** The provider whose limit was hit (`aiProvider`): its other lines wait too. */
+	readonly fournisseur: string;
+	/** Epoch ms when the window resets, null when unknown (manual resume). */
+	readonly reprise: number | null;
+}
+
+/** Providers can still refuse right at the reset: the line restarts this long after. */
+export const MARGE_REPRISE_MS = 30000;
 
 export interface LigneFile<D, R> {
 	readonly id: number;
@@ -45,6 +63,8 @@ export interface LigneFile<D, R> {
 	readonly erreur?: string;
 	/** Ce qui a échoué sur une ligne `echouee`. */
 	readonly echec?: "generation" | "enregistrement";
+	/** The usage limit a `pause` line waits for. */
+	readonly pause?: PauseLimite;
 }
 
 export interface FileGeneration<D, R> {
@@ -105,6 +125,9 @@ export interface ReglesDemarrage<D> {
 	/** A group whose lines run one at a time across chats (Antigravity,
 	    remote requests), or null. */
 	groupe(demande: D): string | null;
+	/** The provider a request runs on: while one of its lines is paused on a
+	    usage limit, none of the provider's waiting lines starts. Optional. */
+	fournisseur?(demande: D): string;
 }
 
 /**
@@ -117,7 +140,10 @@ export interface ReglesDemarrage<D> {
  */
 export function demarrerPrets<D, R>(file: FileGeneration<D, R>, maintenant: number, regles: ReglesDemarrage<D>): { file: FileGeneration<D, R>; lignes: LigneFile<D, R>[] } {
 	const actives = file.lignes.filter(l => l.etat === "cours" || l.etat === "arret");
-	const chats = new Set(actives.map(l => regles.chat(l.demande)));
+	// A paused line holds its chat (a chat stays a conversation) and blocks its provider.
+	const pauses = file.lignes.filter(l => l.etat === "pause");
+	const chats = new Set([...actives, ...pauses].map(l => regles.chat(l.demande)));
+	const bloques = new Set(pauses.map(l => l.pause?.fournisseur).filter((f): f is string => typeof f === "string"));
 	const groupes = new Set(actives.map(l => regles.groupe(l.demande)).filter((g): g is string => g !== null));
 	let nombre = actives.length;
 	const parties: LigneFile<D, R>[] = [];
@@ -127,6 +153,7 @@ export function demarrerPrets<D, R>(file: FileGeneration<D, R>, maintenant: numb
 		const chat = regles.chat(l.demande);
 		const groupe = regles.groupe(l.demande);
 		if (chats.has(chat) || (groupe !== null && groupes.has(groupe))) continue;
+		if (regles.fournisseur && bloques.has(regles.fournisseur(l.demande))) continue;
 		chats.add(chat);
 		if (groupe !== null) groupes.add(groupe);
 		nombre++;
@@ -174,7 +201,7 @@ export function reessayerEnregistrement<D, R>(file: FileGeneration<D, R>, id: nu
     processus à tuer. Sans effet sur une ligne terminée : c'est la croix. */
 export function annuler<D, R>(file: FileGeneration<D, R>, id: number): { file: FileGeneration<D, R>; arreter: boolean } {
 	const l = ligne(file, id);
-	if (l?.etat === "attente") return { file: retirer(file, id), arreter: false };
+	if (l?.etat === "attente" || l?.etat === "pause") return { file: retirer(file, id), arreter: false };
 	if (l?.etat === "cours") return { file: remplacer(file, id, x => ({ id: x.id, etat: "arret", demande: x.demande })), arreter: true };
 	return { file, arreter: false };
 }
@@ -183,6 +210,51 @@ export function annuler<D, R>(file: FileGeneration<D, R>, id: number): { file: F
     libère pour la suivante. Sans effet sur une ligne qui n'est pas en `arret`. */
 export function solder<D, R>(file: FileGeneration<D, R>, id: number): FileGeneration<D, R> {
 	return ligne(file, id)?.etat === "arret" ? retirer(file, id) : file;
+}
+
+/** The running line hit a usage limit: it pauses, with no process left. Same
+    guard as `echouer`. A paused line keeps its request (`demande`). */
+export function mettreEnPause<D, R>(file: FileGeneration<D, R>, id: number, pause: PauseLimite): FileGeneration<D, R> {
+	if (ligne(file, id)?.etat !== "cours") return file;
+	return remplacer(file, id, l => ({ id: l.id, etat: "pause", demande: l.demande, pause }));
+}
+
+/** "Resume now": the limit is the ACCOUNT's, so every line paused on the same
+    provider as `id` waits its turn again, each IN PLACE (a sibling still
+    paused would keep blocking the one the user chose). Without effect on a
+    line that is not paused. */
+export function reprendre<D, R>(file: FileGeneration<D, R>, id: number): FileGeneration<D, R> {
+	const cible = ligne(file, id);
+	if (cible?.etat !== "pause") return file;
+	const f = cible.pause?.fournisseur;
+	return { ...file, lignes: file.lignes.map(l => (l.etat === "pause" && l.pause?.fournisseur === f ? { id: l.id, etat: "attente" as const, demande: l.demande } : l)) };
+}
+
+/** "Cancel the resume": the paused line becomes a failed one, which "Try
+    again" (`reessayer`) can still send back to the queue. */
+export function annulerReprise<D, R>(file: FileGeneration<D, R>, id: number, erreur: string): FileGeneration<D, R> {
+	if (ligne(file, id)?.etat !== "pause") return file;
+	return remplacer(file, id, l => ({ id: l.id, etat: "echouee", demande: l.demande, erreur, echec: "generation" }));
+}
+
+/** When a paused line becomes due: reset time plus the margin; null for a
+    line that is not paused or whose reset time is unknown. */
+export function echeance<D, R>(l: LigneFile<D, R>): number | null {
+	return l.etat === "pause" && l.pause?.reprise != null ? l.pause.reprise + MARGE_REPRISE_MS : null;
+}
+
+/** Every paused line whose time has come goes back to `attente`. `ids` are
+    the lines resumed. */
+export function reprendreEchues<D, R>(file: FileGeneration<D, R>, maintenant: number): { file: FileGeneration<D, R>; ids: number[] } {
+	const ids = file.lignes.filter(l => { const e = echeance(l); return e !== null && maintenant >= e; }).map(l => l.id);
+	if (!ids.length) return { file, ids };
+	return { file: { ...file, lignes: file.lignes.map(l => (ids.includes(l.id) ? { id: l.id, etat: "attente" as const, demande: l.demande } : l)) }, ids };
+}
+
+/** The next moment a paused line comes due, null when none will. */
+export function prochaineEcheance<D, R>(file: FileGeneration<D, R>): number | null {
+	const dues = file.lignes.map(echeance).filter((e): e is number => e !== null);
+	return dues.length ? Math.min(...dues) : null;
 }
 
 /** « Réessayer » : la MÊME demande repart en fin de file, derrière celles

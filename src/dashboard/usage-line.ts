@@ -6,6 +6,8 @@ import { cadenceRateLimited, cadenceSuccess, cadenceVerdict, newCadence } from "
 import type { Cadence } from "./usage-cadence";
 import { formatAge, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
 import type { UsageRead } from "./usage-format";
+import { spendable } from "./codex-resets";
+import type { ResetOutcome, ResetsError, ResetsRead } from "./codex-resets";
 
 /* ══════════════════════════════════════════════════════════
    THE PLAN STATUS BLOCK under the composer: one small text row per window
@@ -63,6 +65,43 @@ function loadEmail(tool: UsageTool, done: () => void): void {
 		done();
 	});
 }
+/* ── Codex banked resets (popover section, Codex only) ──
+   Read through the main process (`host.process.codexResets`, which launches
+   `codex app-server`); at most one read every 30 s, forced after a spend. The
+   confirmation is in two steps: "Use" turns the row into "Spend this reset
+   now?" and ONLY "Confirm" calls `consume`. Shared by every mount like the
+   cache above. */
+const RESETS_GAP_MS = 30000;
+interface ResetsState {
+	data: ResetsRead | null;
+	at: number;
+	reading: boolean;
+	/** The credit whose row asks "Spend this reset now?". */
+	confirming: string | null;
+	spending: boolean;
+	/** The last result or error, shown under the list. */
+	message: ResetOutcome | ResetsError | null;
+}
+const resets: ResetsState = { data: null, at: 0, reading: false, confirming: null, spending: false, message: null };
+const canResets = (tool: UsageTool): boolean => tool === "codex" && !!currentHost().process?.codexResets;
+
+function loadResets(tool: UsageTool, force: boolean, done: () => void): void {
+	const proc = currentHost().process;
+	if (!canResets(tool) || !proc?.codexResets || resets.reading || document.visibilityState !== "visible") return;
+	if (!force && resets.at && Date.now() - resets.at < RESETS_GAP_MS) return;
+	resets.reading = true;
+	proc.codexResets({ action: "read" }).then(r => {
+		resets.at = Date.now();
+		if (r.ok && r.action === "read") resets.data = r.resets;
+	}).catch(() => { resets.at = Date.now(); }).finally(() => { resets.reading = false; done(); });
+}
+
+const OUTCOME_KEYS = {
+	reset: "ai.usage.resetOutcomeReset", nothingToReset: "ai.usage.resetOutcomeNothing", noCredit: "ai.usage.resetOutcomeNoCredit", alreadyRedeemed: "ai.usage.resetOutcomeAlready",
+	"not-installed": "ai.usage.resetErrNotInstalled", "not-signed-in": "ai.usage.resetErrNotSignedIn", timeout: "ai.usage.resetErrTimeout",
+	unavailable: "ai.usage.resetErrUnavailable", refused: "ai.usage.resetErrStale", "unknown-credit": "ai.usage.resetErrStale",
+} as const;
+
 /** Redraws of every live mount: a reading started by a mount the page has since
     replaced must still paint the one that replaced it. */
 const redraws = new Set<() => void>();
@@ -164,7 +203,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		refresh.disabled = enVol.has(tool) || !verdict.ok;
 		currentHost().ui.setIcon(refresh, "refresh-cw");
 		if (enVol.has(tool)) refresh.classList.add("is-reading");
-		refresh.addEventListener("click", () => { load(true); drawPop(); });
+		refresh.addEventListener("click", () => { load(true); loadResets(tool, false, () => redraws.forEach(f => f())); drawPop(); });
 		if (!verdict.ok && verdict.reason === "backoff") ajouter(pop, "div", "qbd-usage-pop-note", t("ai.usage.rateLimited", { when: usageWaitText(verdict.waitMs) }));
 		for (const row of cur ? usageStatusRows(cur.rows) : []) {
 			const pct = Math.max(0, Math.min(100, Math.round(row.usedPercent)));
@@ -188,8 +227,69 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			const when = usageResetIn(row.resetsAt, now);
 			ajouter(meta, "span", "", when ? t("ai.usage.resetsIn", { when }) : "");
 		}
+		drawResets(now);
 		place();
 	}
+	/** The banked resets section. Texts from the server go in as TEXT. */
+	function drawResets(now: number): void {
+		if (!pop || !canResets(tool)) return;
+		const count = resets.data?.availableCount ?? 0;
+		if (count <= 0 && !resets.message) return;
+		const sec = ajouter(pop, "div", "qbd-usage-pop-resets");
+		if (count > 0) {
+			ajouter(sec, "div", "qbd-usage-pop-resets-title", t("ai.usage.resetsAvailable", { n: count }));
+			const credits = resets.data ? spendable(resets.data) : [];
+			// A server that gives only a count: generic rows, nothing to spend by id.
+			const rows = credits.length ? credits : Array.from({ length: count }, () => null);
+			for (const c of rows) {
+				const row = ajouter(sec, "div", "qbd-usage-reset-row");
+				const info = ajouter(row, "div", "qbd-usage-reset-info");
+				ajouter(info, "div", "qbd-usage-reset-name", c?.title ?? t("ai.usage.resetFallbackTitle"));
+				if (c?.description) ajouter(info, "div", "qbd-usage-reset-desc", c.description);
+				const when = c ? usageResetIn(c.expiresAt, now) : null;
+				if (when) ajouter(info, "div", "qbd-usage-reset-expiry", t("ai.usage.resetExpires", { when }));
+				if (!c) { ajouter(info, "div", "qbd-usage-reset-desc", t("ai.usage.resetFallbackNote")); continue; }
+				const actions = ajouter(row, "div", "qbd-usage-reset-actions");
+				const btn = (label: string, primary: boolean, on: () => void): void => {
+					const b = ajouter(actions, "button", "qbd-usage-reset-btn" + (primary ? " is-primary" : ""), label) as HTMLButtonElement;
+					b.type = "button";
+					b.disabled = resets.spending;
+					b.addEventListener("click", on);
+				};
+				if (resets.confirming === c.id) {
+					row.classList.add("is-confirming");
+					ajouter(info, "div", "qbd-usage-reset-question", t("ai.usage.resetConfirmQuestion"));
+					btn(t("ai.usage.resetCancel"), false, () => { resets.confirming = null; redraws.forEach(f => f()); });
+					btn(resets.spending ? t("ai.usage.resetSpending") : t("ai.usage.resetConfirm"), true, () => spendReset(c.id));
+				} else {
+					btn(t("ai.usage.resetUse"), false, () => { resets.confirming = c.id; resets.message = null; redraws.forEach(f => f()); });
+				}
+			}
+		}
+		if (resets.message) {
+			const msg = ajouter(sec, "div", "qbd-usage-reset-message", t(OUTCOME_KEYS[resets.message]));
+			msg.setAttribute("role", "status");
+		}
+	}
+	/** Only the Confirm button gets here. Then: the credits are read again
+	    (forced) and the limits at the next free slot of the shared cadence. */
+	function spendReset(creditId: string): void {
+		const proc = currentHost().process;
+		if (!proc?.codexResets || resets.spending) return;
+		resets.spending = true;
+		redraws.forEach(f => f());
+		proc.codexResets({ action: "consume", creditId }).then(r => {
+			resets.message = r.ok && r.action === "consume" ? r.outcome : r.ok ? "unavailable" : r.error;
+		}).catch(() => { resets.message = "unavailable"; }).finally(() => {
+			resets.spending = false;
+			resets.confirming = null;
+			rereadLimits = true;
+			loadResets(tool, true, () => redraws.forEach(f => f()));
+			redraws.forEach(f => f());
+		});
+	}
+	/** A forced re-read of the limits waits for the 30 s gap and any back-off. */
+	let rereadLimits = false;
 	/* While the popover is open and the page visible, the "available in N s"
 	   countdown moves every second; nothing else runs per second. */
 	let secTimer: ReturnType<typeof setInterval> | null = null;
@@ -197,7 +297,17 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	const startSec = (): void => {
 		stopSec();
 		if (!pop || document.visibilityState !== "visible") return;
-		secTimer = setInterval(() => { if (pop) drawPop(); else stopSec(); }, 1000);
+		/* A redraw replaces the popover's buttons, so it runs only while
+		   something moves: the "available in N s" countdown (and the tick after
+		   it), or a limits re-read waiting for its slot. */
+		let waited = false;
+		secTimer = setInterval(() => {
+			if (!pop) { stopSec(); return; }
+			const waiting = !cadenceVerdict(cadenceOf(tool), Date.now()).ok;
+			if (rereadLimits && !waiting) { rereadLimits = false; load(true); }
+			if (waiting || waited || rereadLimits) drawPop();
+			waited = waiting;
+		}, 1000);
 	};
 	const onDocDown = (e: Event): void => {
 		const n = e.target as Node;
@@ -225,7 +335,9 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		window.addEventListener("resize", place);
 		openedAt = Date.now();
 		drawPop();
+		resets.message = null;
 		loadEmail(tool, () => { if (pop) drawPop(); });
+		loadResets(tool, false, () => redraws.forEach(f => f()));
 		load(true);
 		startSec();
 	};
