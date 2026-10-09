@@ -22,6 +22,7 @@ import { keepExamMenuItem } from "./exam-keep-menu";
 import { openShareChooser } from "./share-choose";
 import { baseNameVerdict, fitsPath, NAME_MAX } from "./share-names";
 import { separerNomDeNote } from "../quiz-format";
+import { LOG_PREFIX } from "../branding";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — the "⋯" menu of the cards of "My quizzes" (also opened by a
@@ -517,15 +518,21 @@ function sameFileName(a: string, b: string): boolean {
 
 /** "cm1" -> "CM1": the target IS the source on a case-insensitive disk, so the
     host's no-overwrite rename refuses it. Through a hidden temporary name, and
-    back to the source if the second step fails. */
+    back to the source if the second step fails. If going back fails too, the
+    note is left under the hidden name: a notice names it, never silence. */
 async function renameCaseOnly(from: string, to: string): Promise<void> {
-	const fs = currentHost().fs;
+	const host = currentHost();
 	const tmp = `${parentFolder(to)}/.renaming-${Date.now().toString(36)}.md`;
-	await fs.rename(from, tmp);
+	await host.fs.rename(from, tmp);
 	try {
-		await fs.rename(tmp, to);
+		await host.fs.rename(tmp, to);
 	} catch (e) {
-		await fs.rename(tmp, from).catch(() => undefined);
+		try {
+			await host.fs.rename(tmp, from);
+		} catch (back) {
+			console.error(LOG_PREFIX, "case-only rename left the note under its temporary name", tmp, back);
+			host.ui.notice(t("dashboard.quizzes.renameStranded", { path: tmp }));
+		}
 		throw e;
 	}
 }
@@ -641,8 +648,22 @@ export async function duplicateQuizzes(quizzes: QuizIndexEntry[]): Promise<strin
 			targets.push(inFolder(folder, `${v.basename}.md`));
 		}
 		if (taken) continue;
+		/* Written under a hidden temporary name, then renamed: `rename` refuses
+		   an existing target atomically, so a file that appeared at the target
+		   since `nameTaken` (another window, a synced device) is never
+		   overwritten. A direct `writeBinary` replaced it. */
 		for (const [i, quiz] of quizzes.entries()) {
-			await host.fs.writeBinary(targets[i], await host.fs.readBinary(quiz.path));
+			const tmp = inFolder(parentFolder(targets[i]), `.duplicating-${Math.random().toString(36).slice(2, 10)}.md`);
+			await host.fs.writeBinary(tmp, await host.fs.readBinary(quiz.path));
+			try {
+				await host.fs.rename(tmp, targets[i]);
+			} catch (e) {
+				await host.fs.remove(tmp).catch((r: unknown) => console.warn(LOG_PREFIX, "temporary copy not removed", tmp, r));
+				const message = e instanceof Error ? e.message : String(e);
+				if (!message.includes("existe déjà")) throw e;
+				host.ui.notice(t("dashboard.quizzes.renameExists"));
+				return null;
+			}
 		}
 		return targets;
 	}

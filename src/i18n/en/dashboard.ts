@@ -237,6 +237,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.renameTooLong": "This name is too long.",
 	"dashboard.quizzes.renameExists": "A file with this name already exists in this folder.",
 	"dashboard.quizzes.renameError": "Could not rename the quiz — see the console for details.",
+	"dashboard.quizzes.renameStranded": "The rename failed halfway: the note is now named \"{path}\". Rename it by hand.",
 	"dashboard.quizzes.renameLinksHint": "Links to this quiz in other notes are not updated.",
 	"dashboard.quizzes.renamed": "Quiz renamed",
 	"dashboard.quizzes.menuDuplicate": "Duplicate",

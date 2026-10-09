@@ -202,6 +202,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.renameTooLong": "Ce nom est trop long.",
 	"dashboard.quizzes.renameExists": "Un fichier de ce nom existe déjà dans ce dossier.",
 	"dashboard.quizzes.renameError": "Impossible de renommer le quiz — détails dans la console.",
+	"dashboard.quizzes.renameStranded": "Le renommage s'est arrêté en chemin : la note s'appelle maintenant « {path} ». Renomme-la à la main.",
 	"dashboard.quizzes.renameLinksHint": "Les liens vers ce quiz dans d'autres notes ne sont pas mis à jour.",
 	"dashboard.quizzes.renamed": "Quiz renommé",
 	"dashboard.quizzes.menuDuplicate": "Dupliquer",

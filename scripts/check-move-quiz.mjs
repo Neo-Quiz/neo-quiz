@@ -400,6 +400,7 @@ await withSrcModule(
 						.map(k => ({ name: k.slice(d.length + 1), path: k, isFolder: false })),
 					readBinary: async (p) => files.get(p),
 					writeBinary: async (p, data) => { writes.push(p); files.set(p, data); },
+					remove: async (p) => { files.delete(p); },
 					rename: async (a, b) => {
 						if (!files.has(a)) throw new Error(`ENOENT ${a}`);
 						if (find(b) !== undefined) throw new Error(`${b} existe déjà`);
@@ -470,6 +471,34 @@ await withSrcModule(
 			[copy1, copy2].map(p => f.files.has(p) && Buffer.from(f.files.get(p)).equals(Buffer.from(content))), [true, true]);
 		r.check("12f. duplicate: no progress copied (no history, stats nor session moved or written)",
 			[r1.moved, r1.prefixes, r1.store.getRecord(copy1), r1.store.getRecord(learn.path)?.bestScore], [[], [], null, 90]);
+
+		/* 12g. A file appears at the copy's name AFTER the free-name test (another
+		   window, a synced device): the copy goes through a hidden temporary
+		   file and a rename that refuses an existing target — the newcomer is
+		   never overwritten, the temporary file is removed, the collision said. */
+		const g = start();
+		const theirs = bytes("theirs");
+		const renameG = g.fs.rename;
+		g.fs.rename = async (a, b) => { if (b === copy1 && !g.files.has(copy1)) g.files.set(copy1, theirs); return renameG(a, b); };
+		const rg = await run(g, () => qm.duplicateQuizzes([learn]));
+		r.check("12g. duplicate racing a new file: refused, the collision said",
+			[rg.result, rg.notices], [null, ["A file with this name already exists in this folder."]]);
+		r.check("12g. duplicate racing a new file: the newcomer kept, no temporary file left",
+			[g.files.get(copy1) === theirs, [...g.files.keys()].some(k => k.includes("/.duplicating-"))], [true, false]);
+
+		/* 12h. A change of case whose second step AND its way back both fail:
+		   the note is left under its hidden temporary name, and a notice NAMES
+		   that file (never a silent catch). */
+		const h = start();
+		const renameH = h.fs.rename;
+		h.fs.rename = async (a, b) => { if (a.includes("/.renaming-")) throw new Error("EBUSY"); return renameH(a, b); };
+		const original = console.error;
+		console.error = () => {};
+		let rh;
+		try { rh = await run(h, (ctx) => qm.renameQuizzes(ctx, [learn], "cm1")); } finally { console.error = original; }
+		const stranded = [...h.files.keys()].find(k => k.includes("/.renaming-"));
+		r.check("12h. a stranded case rename: refused, a notice names the temporary file",
+			[rh.result, !!stranded && rh.notices.some(n => n.includes(stranded))], [false, true]);
 	}
 
 	r.done();
