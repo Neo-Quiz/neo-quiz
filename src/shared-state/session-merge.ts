@@ -20,8 +20,10 @@ import type { EtatQuestion, SessionQuiz } from "../engine/session";
    - a snapshot without `depuis` (written before this existed) is an
      attempt begun at an unknown date: it merges with the others, unless
      a reset point is later than it;
-   - per question id, the most advanced entry wins (checked over not
-     checked, then answered over not, then the latest snapshot);
+   - per question id, the entry with the latest `rejugee` wins first (its
+     judgement withdrawn by a change of right answer, 2026-10-09); then the
+     most advanced entry (checked over not checked, then answered over not,
+     then the latest snapshot);
    - the other fields come from the latest snapshot; `courante` never makes
      a reopened quiz go back: see `choisirCourante`.
 ══════════════════════════════════════════════════════════ */
@@ -45,6 +47,31 @@ function aReponse(q: EtatQuestion): boolean {
 /** 3 checked and settled, 2 checked but missed (waiting for its retry),
     1 answered, 0 untouched. */
 const avance = (q: EtatQuestion): number => (estVerifiee(q) ? (q.verdict === "missed" ? 2 : 3) : aReponse(q) ? 1 : 0);
+
+/** When the question's judgement was withdrawn; -Infinity: never. */
+const rejugeeDe = (q: EtatQuestion): number => (typeof q.rejugee === "number" && Number.isFinite(q.rejugee) ? q.rejugee : -Infinity);
+
+/**
+ * `jouee` (a snapshot the engine just took, which never writes `rejugee`)
+ * with the withdrawal stamps `vue` (the merge this device sees) holds: each
+ * question keeps the latest stamp, an absent question gets an entry with
+ * its stamp only. Without it, the device's next write would drop the stamp
+ * and the other devices' older entries would win again. PURE.
+ */
+export function porterRejugees(jouee: SessionQuiz, vue: SessionQuiz | null): SessionQuiz {
+	if (!vue) return jouee;
+	let questions: Record<string, EtatQuestion> | null = null;
+	for (const [id, v] of Object.entries(vue.questions)) {
+		if (!isRecord(v)) continue;
+		const r = rejugeeDe(v);
+		if (r === -Infinity) continue;
+		const q = jouee.questions[id];
+		if (q && isRecord(q) && rejugeeDe(q) >= r) continue;
+		questions ??= { ...jouee.questions };
+		questions[id] = { ...(isRecord(q) ? q : {}), rejugee: r };
+	}
+	return questions ? { ...jouee, questions } : jouee;
+}
 
 const nbVerifiees = (p: SessionQuiz): number => Object.values(p.questions).filter(q => isRecord(q) && estVerifiee(q)).length;
 
@@ -102,8 +129,12 @@ export function fusionnerPhotos(entrees: readonly EntreeSession[], ids?: readonl
 		for (const [id, q] of Object.entries(p.questions)) {
 			if (!isRecord(q)) continue;
 			const cur = questions[id];
-			// Sorted by age: on a tie in progress the later snapshot replaces.
-			if (!cur || avance(q) >= avance(cur)) { questions[id] = q; source[id] = p.ecrite; }
+			/* A WITHDRAWN judgement (`rejugee`, the right answer changed under the
+			   learner) outranks every entry stamped earlier or not at all, however
+			   advanced: otherwise another device's old "right" comes back. Equal
+			   stamps compare progress; sorted by age, a tie goes to the later. */
+			const r = rejugeeDe(q), rc = cur ? rejugeeDe(cur) : -Infinity;
+			if (!cur || r > rc || (r === rc && avance(q) >= avance(cur))) { questions[id] = q; source[id] = p.ecrite; }
 		}
 	}
 	const recente = parRecence[parRecence.length - 1];

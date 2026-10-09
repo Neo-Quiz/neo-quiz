@@ -135,6 +135,7 @@ export function consigneExplication(lecture: boolean): string {
 		"3. Say why the right answer is right AND why each option the learner chose wrongly is wrong.",
 		"4. Give one concrete example or an analogy.",
 		"5. End with ONE short check question the learner can answer in their head, without giving its answer.",
+		"You are the learner's ASSISTANT on this quiz, not only a tutor: when they ask you to improve this question, or when you find a real error in it (a wrong expected answer, an ambiguous or wrong option), say so plainly with your reason, and follow the IMPROVING instruction below when it is given. Never change anything without a written reason.",
 		...commun,
 	].join("\n");
 }

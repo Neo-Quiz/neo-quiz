@@ -214,3 +214,136 @@ await withSrcModule(["src/explain-prompt.ts", "src/explain-images.ts", "src/mark
 	r.check("a hostile name comes out as inert text once rendered", [html.includes("<img"), html.includes("<script"), html.includes("&lt;img")], [false, false, true]);
 	r.done();
 });
+
+/* ─────────── Improving a QUESTION from the assistant chat (2026-10-09) ─────────── */
+
+await withSrcModule(["src/question-edit.ts", "src/explain-prompt.ts"], ({ validateQuestionEdit, checkQuestionFields, questionEditFields, questionKind, consigneEditionQuestion, LIMITS }, { consigneExplication }) => {
+	const r = makeReporter("Assistant: a question improved by the chat");
+	let sanitized = 0;
+	const sanitize = (h) => { sanitized++; return h.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, ""); };
+	const juge = (o, json, ordre) => validateQuestionEdit(o, typeof json === "string" ? json : JSON.stringify(json), sanitize, ordre);
+	const motif = (o, json) => { const v = juge(o, json); return v.ok ? "ok" : v.reason; };
+	const x = (n) => "x".repeat(n);
+
+	const single = { id: "q1", title: "Division", prompt: "What is `7 // 2`?", options: ["3.5", "3", "4"], correctIndex: 1, explain: "Floor division.", hint: "Rounds down." };
+	const multi = { id: "q2", prompt: "Which are even?", options: ["1", "2", "4"], multiSelect: true, correctIndices: [1, 2], explain: "Divisible by two." };
+	const texte = { id: "q3", type: "text", prompt: "Type of 'a'?", answer: "str", acceptedAnswers: ["string"] };
+	const nombre = { id: "q4", type: "text", numeric: true, prompt: "2 + 2?", answer: "4" };
+	const trous = { id: "q5", prompt: "Fill in", cloze: "Use {{append|push}} then {{len}}." };
+	const classement = { id: "q6", prompt: "Order", ordering: true, possibilities: ["a", "b", "c"], correctOrder: [2, 0, 1] };
+	const paires = { id: "q7", prompt: "Match", matching: true, rows: ["x", "y"], choices: ["1", "2", "3"], correctMap: [1, 0] };
+	const carte = { id: "q8", flashcard: true, prompt: "front", answer: "back" };
+	const html = { id: "q9", promptHtml: "<p>Old</p>", explainHtml: "<p>why</p>", options: ["a", "b"], correctIndex: 0 };
+	const sansId = { title: "Division", prompt: "x?", options: ["a", "b"], correctIndex: 0 };
+	const lecture = { id: "r1", role: "read", title: "R", prompt: "text" };
+
+	// ── kinds and whitelists
+	r.check("each kind of question is recognised, a reading is not a question",
+		[single, multi, texte, nombre, trous, classement, paires, carte, html, lecture].map(questionKind),
+		["single", "multiple", "text", "text", "cloze", "ordering", "matching", "flashcard", "single", null]);
+	r.check("whitelist of a single choice: statement, explanation, hint, title, options, right answer",
+		questionEditFields(single), ["title", "prompt", "explain", "hint", "options", "correctIndex"]);
+	r.check("whitelist follows the form the question uses: promptHtml, explainHtml",
+		questionEditFields(html), ["title", "promptHtml", "explainHtml", "hint", "options", "correctIndex"]);
+	r.check("whitelists of the other kinds", [questionEditFields(multi).slice(4), questionEditFields(texte).slice(4), questionEditFields(trous).slice(4), questionEditFields(classement).slice(4), questionEditFields(paires).slice(4), questionEditFields(carte).slice(4)],
+		[["options", "correctIndices"], ["answer", "acceptedAnswers"], ["cloze"], ["possibilities", "correctOrder"], ["rows", "choices", "correctMap"], ["answer"]]);
+
+	const ancien = { id: "m1", prompt: "Even?", options: ["1", "2", "4"], multiSelect: true, correctIndexes: [1] };
+	r.check("an old quiz's `correctIndexes` is the key it edits, and its answer is read from it",
+		[questionEditFields(ancien).slice(4), motif(ancien, { correctIndexes: [1, 2] }), motif(ancien, { correctIndices: [1, 2] })], [["options", "correctIndexes"], "ok", "field"]);
+
+	// ── a valid proposal
+	const ok = juge(single, { prompt: "What does `7 // 2` give in Python?" });
+	r.check("a rephrased statement is proposed, with its before/after and no change of answer",
+		[ok.ok, ok.rows, ok.answerChange], [true, [{ field: "prompt", before: "What is `7 // 2`?", after: "What does `7 // 2` give in Python?" }], null]);
+
+	// ── forbidden fields, kind changes
+	r.check("a field outside the whitelist is refused: id, slice, topic, passage, glossary, a prototype key, another kind's answer",
+		[motif(single, { id: "q9" }), motif(single, { prompt: "x", slice: 2 }), motif(single, { topic: "t" }), motif(single, { passage: "p" }), motif(single, { glossary: [] }),
+			motif(single, '{"__proto__":{"prompt":"x"}}'), motif(single, { correctIndices: [0] }), motif(texte, { options: ["a", "b"] })],
+		["field", "kind", "field", "field", "field", "field", "field", "field"]);
+	r.check("a change of kind is refused: type, multiSelect, ordering, cloze, flashcard, role",
+		[motif(single, { type: "text" }), motif(single, { multiSelect: true, correctIndices: [0, 1] }), motif(single, { ordering: true }), motif(single, { cloze: "{{a}}" }), motif(single, { flashcard: true }), motif(single, { role: "read" })],
+		new Array(6).fill("kind"));
+	r.check("`prompt` on a question that shows `promptHtml` (and the reverse) is refused",
+		[motif(html, { prompt: "x" }), motif(single, { promptHtml: "<p>x</p>" }), motif(single, { explainHtml: "<p>x</p>" })], ["field", "field", "field"]);
+	r.check("a reading is not a question", [motif(lecture, { prompt: "y" }), checkQuestionFields(lecture, { prompt: "y" }, sanitize).reason], ["notQuestion", "notQuestion"]);
+	r.check("invalid JSON or nothing", [motif(single, "{prompt:"), motif(single, "[1]"), motif(single, "null"), motif(single, {})], ["json", "json", "json", "empty"]);
+
+	// ── the right answers stay inside the options
+	r.check("a right answer outside the options is refused",
+		[motif(single, { correctIndex: 3 }), motif(single, { correctIndex: -1 }), motif(multi, { correctIndices: [0, 5] }), motif(classement, { correctOrder: [0, 1, 5] }), motif(paires, { correctMap: [0, 9] }),
+			motif(single, { options: ["a", "b"], correctIndex: 2 })],
+		["bounds", "bounds", "bounds", "bounds", "bounds", "bounds"]);
+	r.check("shorter options that leave the right answer out are refused", motif({ ...single, correctIndex: 2 }, { options: ["a", "b"] }), "bounds");
+	r.check("at least one right answer",
+		[motif(multi, { correctIndices: [] }), motif(trous, { cloze: "No blank left." }), motif({ id: "t", type: "text", prompt: "?", answer: "a" }, { answer: " " })], ["noAnswer", "noAnswer", "type"]);
+	r.check("no duplicate option (spacing and case ignored), no right answer twice",
+		[motif(single, { options: ["3", "3 ", "4"] }), motif(single, { options: ["Three", "three", "4"] }), motif(multi, { correctIndices: [1, 1] }), motif(classement, { possibilities: ["a", "a", "c"] }), motif(paires, { rows: ["x", "X"] })],
+		["duplicate", "duplicate", "duplicate", "duplicate", "duplicate"]);
+	r.check("an ordering, a matching, the options and a cloze stay complete",
+		[motif(single, { options: ["only"], correctIndex: 0 }), motif(classement, { correctOrder: [0, 1] }), motif(classement, { possibilities: ["a", "b", "c", "d"] }), motif(paires, { correctMap: [0] }),
+			motif(trous, { cloze: "Use {{append}} then {{len}} and {{pop}}." }), motif(single, { options: new Array(11).fill(0).map((_, i) => "o" + i) })],
+		["incomplete", "incomplete", "incomplete", "incomplete", "incomplete", "incomplete"]);
+	r.check("wrong value types", [motif(single, { correctIndex: "1" }), motif(single, { correctIndex: 1.5 }), motif(single, { hint: [] }), motif(single, { hint: ["a", "b", "c", "d", "e"] }), motif(single, { options: ["a", ""] }), motif(single, { title: "  " }), motif(nombre, { answer: "four" })],
+		new Array(7).fill("type"));
+	r.check("a numeric answer that is a number passes", motif(nombre, { answer: "5" }), "ok");
+
+	// ── options shown from `optionHtml` (the engine shows it before `options`)
+	const avecHtml = { id: "h1", prompt: "?", options: ["a", "b", "c"], optionHtml: ["<b>a</b>", "<b>b</b>", "<b>c</b>"], correctIndex: 0 };
+	r.check("whitelist: optionHtml when the question has it", questionEditFields(avecHtml).includes("optionHtml"), true);
+	r.check("new options or a new right answer without optionHtml are refused",
+		[motif(avecHtml, { options: ["a", "b", "d"] }), motif(avecHtml, { correctIndex: 1 }), motif({ ...avecHtml, multiSelect: true, correctIndices: [0] }, { correctIndices: [1] })], ["incomplete", "incomplete", "incomplete"]);
+	r.check("optionHtml of another length, or an option moved without its HTML, is refused",
+		[motif(avecHtml, { options: ["a", "b", "d"], optionHtml: ["<b>a</b>", "<b>b</b>"] }), motif(avecHtml, { options: ["b", "a", "c"], optionHtml: ["<b>a</b>", "<b>b</b>", "<b>c</b>"], correctIndex: 1 })], ["incomplete", "incomplete"]);
+	r.check("options and right answer sent with a coherent optionHtml pass",
+		[motif(avecHtml, { options: ["b", "a", "c"], optionHtml: ["<b>b</b>", "<b>a</b>", "<b>c</b>"], correctIndex: 1 }), motif(avecHtml, { correctIndex: 2, optionHtml: avecHtml.optionHtml }), motif(avecHtml, { prompt: "Better?" })], ["ok", "ok", "ok"]);
+	r.check("the instruction asks for optionHtml when the question has it", [consigneEditionQuestion(avecHtml).includes("whole \"optionHtml\""), consigneEditionQuestion(single).includes("optionHtml")], [true, false]);
+
+	// ── lengths
+	r.check("the statement up to its limit passes, one more character is too long",
+		[motif(single, { prompt: x(LIMITS.prompt) }), motif(single, { prompt: x(LIMITS.prompt + 1) }), motif(single, { options: ["a", "b", x(LIMITS.option + 1)] })], ["ok", "tooLong", "tooLong"]);
+	const long = { ...single, prompt: x(5000) };
+	r.check("a statement already longer may grow by 25 %", [motif(long, { prompt: x(6250) }), motif(long, { prompt: x(6251) })], ["ok", "tooLong"]);
+
+	// ── the identity of the question
+	const titreSeul = juge(sansId, { title: "Renamed", prompt: "y?" });
+	r.check("a question without an id keeps its title (its id is the slug of the title)",
+		[titreSeul.ok, "title" in (titreSeul.fields ?? {}), motif(sansId, { title: "Renamed" }), juge(single, { title: "Renamed" }).fields?.title], [true, false, "empty", "Renamed"]);
+	r.check("an identical proposal is said so", motif(single, { prompt: single.prompt, hint: "Rounds down." }), "unchanged");
+	r.check("only the fields that change are written", Object.keys(juge(single, { prompt: single.prompt, explain: "Better." }).fields), ["explain"]);
+
+	// ── a change of the right answer is said, with the letters on screen
+	r.check("a new right answer: B becomes C, in the note's order", juge(single, { correctIndex: 2 }).answerChange, { from: "B. 3", to: "C. 4" });
+	r.check("… and in the order on screen when the options are shuffled", juge(single, { correctIndex: 2 }, [2, 0, 1]).answerChange, { from: "C. 3", to: "A. 4" });
+	r.check("a reworded right option, or an option only moved, is not a change of answer",
+		[juge(single, { options: ["3.5", "3 (floor)", "4"] }).answerChange, juge(single, { options: ["3", "3.5", "4"], correctIndex: 0 }).answerChange], [null, null]);
+	r.check("every kind says when its answer changes",
+		[!!juge(multi, { correctIndices: [2] }).answerChange, !!juge(texte, { answer: "string" }).answerChange, !!juge(texte, { acceptedAnswers: ["String"] }).answerChange,
+			!!juge(trous, { cloze: "Use {{extend}} then {{len}}." }).answerChange, !!juge(trous, { cloze: "First {{push|append}}, then {{len}}." }).answerChange,
+			!!juge(classement, { correctOrder: [0, 1, 2] }).answerChange, !!juge(paires, { correctMap: [2, 0] }).answerChange, !!juge(carte, { answer: "other" }).answerChange],
+		[true, true, false, true, false, true, true, true]);
+	r.check("options that MOVE or change in number are said so; a reworded option in place or a new statement is not",
+		[juge(single, { options: ["3", "3.5", "4"], correctIndex: 0 }).reordered, juge(single, { options: ["3.5", "3", "4", "5"] }).reordered, juge(classement, { possibilities: ["b", "a", "c"], correctOrder: [2, 1, 0] }).reordered,
+			juge(single, { options: ["3.5", "3 (floor)", "4"] }).reordered, juge(single, { prompt: "New?" }).reordered],
+		[true, true, true, false, false]);
+	r.check("the answer indices never show as a raw row, the options are lettered",
+		juge(single, { options: ["3.5", "3", "4", "5"], correctIndex: 1 }).rows, [{ field: "options", before: "A. 3.5\nB. 3\nC. 4", after: "A. 3.5\nB. 3\nC. 4\nD. 5" }]);
+
+	// ── HTML goes through the gate
+	sanitized = 0;
+	const sale = juge(html, { promptHtml: "<p onclick=\"evil()\">New</p><script>alert(1)</script>" });
+	r.check("promptHtml is the sanitizer's output, shown as text in the preview",
+		[sale.ok, sale.fields?.promptHtml, sale.rows?.[0].after, sanitized > 0], [true, "<p>New</p>", "New", true]);
+	r.check("an HTML field that is empty once sanitized is refused", motif(html, { promptHtml: "<script>x</script>" }), "type");
+
+	// ── the instruction
+	const consigne = consigneEditionQuestion(single);
+	r.check("the instruction: the tag, the whitelist, indices from 0 not the letters, a written reason, the current fields, nothing before the click",
+		[consigne.includes("<card-edit>"), consigne.includes("title, prompt, explain, hint, options, correctIndex"), consigne.includes("NOT the letters on screen"), consigne.includes("never a change without a written reason"),
+			consigne.includes('"correctIndex":1'), consigne.includes('"id"'), consigne.includes("nothing is written before they click"), consigne.includes("REAL error")],
+		[true, true, true, true, true, false, true, true]);
+	r.check("the tutor is the assistant: it may improve the question, only with a reason",
+		[/ASSISTANT/.test(consigneExplication(false)), /written reason/.test(consigneExplication(false)), /ASSISTANT/.test(consigneExplication(true))], [true, true, false]);
+	r.done();
+});

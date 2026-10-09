@@ -1,0 +1,72 @@
+/* The before/after of a question the assistant proposes to change
+   (`ui/question-edit-view.ts`), inside the `.nq-explain-edit` box. */
+.nq-qedit {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	font-size: 13.5px;
+}
+.nq-qedit-reponse {
+	padding: 8px 10px;
+	border-left: 3px solid var(--text-warning);
+	border-radius: 8px;
+	background: var(--background-primary);
+}
+.nq-qedit-reponse-titre {
+	font-weight: 700;
+	color: var(--text-warning);
+	margin-bottom: 4px;
+}
+.nq-qedit-reponse-ligne {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 6px;
+}
+.nq-qedit-reponse-ligne > span > p {
+	display: inline;
+	margin: 0;
+}
+.nq-qedit-fleche {
+	color: var(--text-muted);
+}
+.nq-qedit-libelle {
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+.nq-qedit-champ .nq-qedit-avant,
+.nq-qedit-champ .nq-qedit-apres {
+	padding: 4px 8px;
+	border-radius: 6px;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.nq-qedit-champ .nq-qedit-avant {
+	color: var(--text-muted);
+	text-decoration: line-through;
+	text-decoration-color: var(--text-error);
+}
+.nq-qedit-champ .nq-qedit-apres {
+	border-left: 2px solid var(--text-success);
+}
+.nq-qedit-tag {
+	display: block;
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-decoration: none;
+}
+.nq-qedit-reponse .nq-qedit-avant {
+	text-decoration: line-through;
+	text-decoration-color: var(--text-error);
+}
+.nq-qedit-reponse .nq-qedit-apres {
+	font-weight: 600;
+}
+.nq-qedit p {
+	margin: 0 0 4px;
+}
+.nq-qedit pre {
+	max-width: 100%;
+	overflow-x: auto;
+}

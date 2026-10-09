@@ -44,7 +44,10 @@ import { poserImagesCitees } from "./explain-images";
 import { CARD_EDIT_MAX_CHARS, consigneEditionCarte, splitCardEdit, validateCardEdit } from "../../../../src/explain-edit";
 import type { CardEditResult, CardFields } from "../../../../src/explain-edit";
 import { renderInlineText, sanitizeQuizHtml, stripInlineMarkdown } from "../../../../src/engine/sanitizer";
-import { restoreBlock, saveCardEdit } from "../../../../src/dashboard/detail-io";
+import { QUESTION_EDIT_ROOM, consigneEditionQuestion, validateQuestionEdit } from "../../../../src/question-edit";
+import type { QuestionEditRefusal, QuestionEditResult } from "../../../../src/question-edit";
+import { peindreAvantApres } from "./question-edit-view";
+import { restoreBlock, saveCardEdit, saveQuestionEdit } from "../../../../src/dashboard/detail-io";
 import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { lireCours } from "./explain-cours";
@@ -206,14 +209,18 @@ interface Message {
 	lecture?: boolean;
 	erreur?: string;
 	arrete?: boolean;
-	/** A new version of the reading card proposed by this answer. */
+	/** A new version of the reading card, or a change of the question, proposed by this answer. */
 	edit?: CardProposal;
 }
 
-/** The proposal of a new version of a reading card, from a `<card-edit>` block.
+/** The proposal of a new version of a reading card, or of a change of a
+    question (`verdict` then has `rows`), from a `<card-edit>` block.
     `verdict` is the app's judgement BEFORE anything is shown. */
 interface CardProposal {
-	verdict: CardEditResult;
+	verdict: CardEditResult | QuestionEditResult;
+	/** The card as it was when the proposal was judged: the write expects it,
+	    so an older proposal applied after another one is refused as stale. */
+	base: Record<string, unknown>;
 	etat: "pending" | "applied";
 	occupe: boolean;
 	message?: string;
@@ -236,6 +243,8 @@ interface Conversation {
 	repeindre: (() => void) | null;
 	/** The question is a reading card: the chat may rewrite it. */
 	lecture: boolean;
+	/** The question was changed (or put back) since the context was built. */
+	perime?: boolean;
 }
 
 export function monterBoutonExpliquer(hote: HTMLElement, deps: {
@@ -246,8 +255,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	chemin: string;
 	note: string;
 	/** Re-renders the quiz page on a rewritten note, on the same screen, and
-	    returns its questions again. Absent: a reading cannot be rewritten. */
-	recharger?: (note: string, qi: number) => Promise<Record<string, unknown>[]>;
+	    returns its questions again. Absent: neither a reading nor a question
+	    can be rewritten. `aReviser`: the right answer of question `qi`
+	    changed; `garderEcran`: a handed-in quiz keeps its screen. */
+	recharger?: (note: string, qi: number, opts?: { aReviser?: boolean; oublierReponse?: boolean; garderEcran?: boolean }) => Promise<Record<string, unknown>[]>;
 	/** The learner's attempts and misses on question `qi`, from the review journal (read only). */
 	historique?: (qi: number) => { attempts: number; misses: number } | null;
 }): () => void {
@@ -458,9 +469,19 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
 		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: slide ? maReponse(slide) : "", correct: slide ? estJuste(slide) : null, history: q.role === "read" ? null : deps.historique?.(qi) ?? null });
 		const avecConsigne = base + "\n" + consigneExplication(q.role === "read");
-		/* A reading card may be rewritten by the chat (only if the app can re-render the page). */
-		return q.role === "read" && deps.recharger ? avecConsigne + "\n" + consigneEditionCarte(q) : avecConsigne;
+		/* A reading card may be rewritten, and a question improved, by the chat
+		   (only if the app can re-render the page). */
+		if (!deps.recharger) return avecConsigne;
+		return avecConsigne + "\n" + (q.role === "read" ? consigneEditionCarte(q) : consigneEditionQuestion(q));
 	};
+	/* The element that holds question `qi` now (its card in a step page, else
+	   its slide): the page may have been rendered again since it was opened. */
+	const elementDe = (qi: number): HTMLElement | null =>
+		hote.querySelector<HTMLElement>(`.quiz-card[data-card-qi="${qi}"]:not(.quiz-step-read)`)
+		?? hote.querySelector<HTMLElement>(`.quiz-track > .quiz-track-item[data-qi="${qi}"]`);
+	/* The order the options of `qi` are shown in (position → index in the question). */
+	const ordreDe = (qi: number): number[] =>
+		[...(elementDe(qi)?.querySelectorAll<HTMLElement>(".quiz-option[data-orig]") ?? [])].map(o => Number(o.dataset.orig));
 	/* The course (notes, PDFs, pictures) is read ONCE per quiz page, at the
 	   first opening of the window or the first send, then reused. */
 	let cours: Promise<Cours> | null = null;
@@ -684,11 +705,22 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 				   (`validateCardEdit`); the write is the note's own path
 				   (`saveCardEdit`: compare-and-swap on the block) and happens on
 				   the click only. The page is then rendered again where the learner
-				   was (`deps.recharger`). */
-				const relire = async (): Promise<void> => {
+				   was (`deps.recharger`).
+				   A QUESTION (2026-10-09) goes the same way: `validateQuestionEdit`,
+				   then `saveQuestionEdit`. When its right answer changes, the
+				   learner's answer is judged again (`aReviser`). A handed-in quiz
+				   keeps its results on screen: only the note changes. */
+				const verrouille = (): boolean => !conv.lecture && hote.classList.contains("quiz-is-locked");
+				const relire = async (edit: CardProposal): Promise<void> => {
 					note = await host.fs.read(deps.chemin);
-					if (deps.recharger) questions = await deps.recharger(note, qi);
+					conv.perime = true;
+					/* Options that MOVED: the stored answer points at other texts, it is
+					   dropped (`oublierReponse`); a new right answer: it is judged again. */
+					const deplacees = optionsDeplacees(edit);
+					if (deps.recharger) questions = await deps.recharger(note, qi, { aReviser: changeLaReponse(edit) || deplacees, oublierReponse: deplacees, garderEcran: verrouille() });
 				};
+				const changeLaReponse = (edit: CardProposal): boolean => edit.verdict.ok && "rows" in edit.verdict && edit.verdict.answerChange !== null;
+				const optionsDeplacees = (edit: CardProposal): boolean => edit.verdict.ok && "rows" in edit.verdict && edit.verdict.reordered;
 				const echec = (res: BlockRewrite): string => t(res.ok ? "ai.explain.cardApplied" : res.reason === "stale" ? "ai.explain.cardStale" : "ai.explain.cardFailed");
 				const appliquer = async (edit: CardProposal): Promise<void> => {
 					if (edit.occupe || edit.etat !== "pending" || !edit.verdict.ok) return;
@@ -697,15 +729,16 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 					conv.repeindre?.();
 					try {
 						const bloc = note.match(QUIZ_BLOCK_RE)?.[1];
+						const question = "rows" in edit.verdict;
 						const res: BlockRewrite = bloc === undefined
 							? { ok: false, reason: "failed" }
-							: await saveCardEdit(deps.chemin, bloc, qi, questions[qi], edit.verdict.fields);
+							: await (question ? saveQuestionEdit : saveCardEdit)(deps.chemin, bloc, qi, edit.base, edit.verdict.fields);
 						if (!res.ok || bloc === undefined) { edit.message = echec(res); return; }
 						edit.avant = bloc;
 						edit.apres = res.block;
 						edit.etat = "applied";
-						edit.message = t("ai.explain.cardApplied");
-						await relire();
+						edit.message = t(!question ? "ai.explain.cardApplied" : verrouille() ? "ai.explain.question.appliedKept" : optionsDeplacees(edit) ? "ai.explain.question.reordered" : changeLaReponse(edit) ? "ai.explain.question.reviewed" : "ai.explain.question.applied");
+						await relire(edit);
 					} catch (e) {
 						console.warn(`${LOG_PREFIX} Explain: card edit failed:`, e);
 						if (edit.etat !== "applied") edit.message = t("ai.explain.cardFailed");
@@ -724,7 +757,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						if (!res.ok) { edit.message = echec(res); return; }
 						edit.etat = "pending";
 						edit.message = t("ai.explain.cardUndone");
-						await relire();
+						await relire(edit);
 					} catch (e) {
 						console.warn(`${LOG_PREFIX} Explain: card undo failed:`, e);
 						edit.message = t("ai.explain.cardFailed");
@@ -741,11 +774,27 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						: r === "lossy" ? "ai.explain.cardRefused.lossy"
 						: r === "notReading" ? "ai.explain.cardRefused.notReading"
 						: "ai.explain.cardRefused.type");
+				/* "Apply", then "Undo" once applied, and the outcome next to it. */
+				const boutonProposition = (boite: HTMLElement, edit: CardProposal, appliquerCle: "ai.explain.cardApply" | "ai.explain.question.apply"): void => {
+					const actions = ajouter(boite, "div", "nq-explain-edit-actions");
+					const bouton = ajouter(actions, "button", "nq-explain-edit-btn", t(edit.etat === "applied" ? "ai.explain.cardUndo" : appliquerCle));
+					bouton.type = "button";
+					bouton.disabled = edit.occupe;
+					bouton.addEventListener("click", () => { void (edit.etat === "applied" ? annuler(edit) : appliquer(edit)); });
+					if (edit.message) ajouter(actions, "span", "nq-explain-edit-msg", edit.message);
+				};
 				const peindreProposition = (rep: HTMLElement, edit: CardProposal): void => {
 					const boite = ajouter(rep, "div", "nq-explain-edit");
 					if (!edit.verdict.ok) {
 						boite.classList.add("nq-explain-edit-refus");
-						ajouter(boite, "div", undefined, motif(edit.verdict.reason));
+						ajouter(boite, "div", undefined, conv.lecture ? motif(edit.verdict.reason) : t(`ai.explain.questionRefused.${edit.verdict.reason as QuestionEditRefusal}`));
+						return;
+					}
+					if ("rows" in edit.verdict) {
+						/* A question: the before/after, the change of right answer first. */
+						ajouter(boite, "div", "nq-explain-edit-titre", t("ai.explain.question.title"));
+						peindreAvantApres(boite, edit.verdict);
+						boutonProposition(boite, edit, "ai.explain.question.apply");
 						return;
 					}
 					ajouter(boite, "div", "nq-explain-edit-titre", t("ai.explain.cardTitle"));
@@ -770,12 +819,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						}
 					}
 					if (apercu.textContent?.includes("$")) void mathifyElement(apercu);
-					const actions = ajouter(boite, "div", "nq-explain-edit-actions");
-					const bouton = ajouter(actions, "button", "nq-explain-edit-btn", t(edit.etat === "applied" ? "ai.explain.cardUndo" : "ai.explain.cardApply"));
-					bouton.type = "button";
-					bouton.disabled = edit.occupe;
-					bouton.addEventListener("click", () => { void (edit.etat === "applied" ? annuler(edit) : appliquer(edit)); });
-					if (edit.message) ajouter(actions, "span", "nq-explain-edit-msg", edit.message);
+					boutonProposition(boite, edit, "ai.explain.cardApply");
 				};
 
 				/* THE HISTORY, painted from the conversation. Only the last answer
@@ -801,9 +845,10 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse") : msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
 						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
 						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-						/* On a reading card, the `<card-edit>` block is not text for the
-						   learner: it is cut out (even half written) and shown as a proposal. */
-						const decoupe = conv.lecture ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
+						/* The `<card-edit>` block (a reading rewritten, a question improved) is
+						   not text for the learner: it is cut out (even half written) and
+						   shown as a proposal. */
+						const decoupe = conv.lecture || deps.recharger ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
 						else if (decoupe.shown) {
 							/* A fenced ```html block is shown as an interactive page in a
@@ -827,7 +872,14 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						}
 						else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
 						if (!msg.erreur && !msg.enCours && decoupe.raw !== null) {
-							msg.edit ??= { verdict: validateCardEdit(questions[qi], decoupe.raw, sanitizeQuizHtml), etat: "pending", occupe: false };
+							msg.edit ??= {
+								verdict: conv.lecture
+									? validateCardEdit(questions[qi], decoupe.raw, sanitizeQuizHtml)
+									: validateQuestionEdit(questions[qi], decoupe.raw, sanitizeQuizHtml, ordreDe(qi)),
+								base: JSON.parse(JSON.stringify(questions[qi])) as Record<string, unknown>,
+								etat: "pending",
+								occupe: false,
+							};
 							peindreProposition(rep, msg.edit);
 						}
 					}
@@ -865,6 +917,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						conv.repeindre?.();
 						/* A rewritten card changes what the model must see: rebuilt from the current questions. */
 						if (conv.lecture) conv.contexte = contexteDe(null, qi) ?? conv.contexte;
+						else if (conv.perime) { conv.contexte = contexteDe(elementDe(qi), qi) ?? conv.contexte; conv.perime = false; }
 						const images = lu.nomsImages.length
 							? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + lu.nomsImages.map((n, i) => `${i + 1}. ${n}`).join("; ")
 							: "";
@@ -874,7 +927,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 							images: lu.images,
 							imageNames: lu.nomsImages,
 							/* A reading card may come back whole in a `<card-edit>` block, on top of the explanation. */
-							maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (conv.lecture ? CARD_EDIT_MAX_CHARS + 400 : 0),
+							maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (conv.lecture ? CARD_EDIT_MAX_CHARS + 400 : deps.recharger ? QUESTION_EDIT_ROOM : 0),
 							onTranscript: (ev) => {
 								if (ev.kind !== "text") return;
 								rep.text += ev.text;

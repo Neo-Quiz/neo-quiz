@@ -748,6 +748,123 @@ await withSrcModule(
 		}
 	}
 
+	/* ─────────── 16. IMPROVING ONE QUESTION (the assistant chat, 2026-10-09) ─────────── */
+
+	{
+		/* The learner clicked "Apply to the question": only that question
+		   changes, in the note's own text, through the same compare-and-swap;
+		   its id never moves; "Undo" gives the note back byte for byte. The
+		   write runs the whitelist and the coherence rules AGAIN on the note's
+		   own copy: a caller that skipped the proposal's judgement still cannot
+		   write a forbidden field. Every expected note is written by hand. */
+		const RE_BLOC = new RegExp(FENCE + "quiz-blocks[^\\n]*\\n([\\s\\S]*?)\\r?\\n[ \\t]*" + FENCE);
+		const bloc = (contenu) => contenu.match(RE_BLOC)[1];
+		const LECTURE = "\t{ id: 'r1', role: 'read', title: 'Lists', prompt: 'Read me.' },";
+		const Q = "\t{ id: 'q1', title: 'Division', prompt: 'What is 7 // 2?', // statement\n\t\toptions: ['3.5', '3', '4'], correctIndex: 1, explain: \"Floor $1$ division.\" },";
+		const Q_NEUVE = "\t{ id: 'q1', title: 'Division', prompt: 'What does 7 // 2 give?', // statement\n\t\toptions: [\"3.5\",\"3\",\"4\",\"5\"], correctIndex: 2, explain: \"Floor $1$ division.\" },";
+		const AUTRE = "\t{ id: 'q2', title: 'Unite', prompt: \"" + ENONCE_PIEGE + "\", options: ['un', 'deux'], correctIndex: 0 }, // keep me";
+		const CONFIG = "\t{ mode: 'learn', glossary: [] },";
+		const question = { id: "q1", title: "Division", prompt: "What is 7 // 2?", options: ["3.5", "3", "4"], correctIndex: 1, explain: "Floor $1$ division." };
+		const champs = { prompt: "What does 7 // 2 give?", options: ["3.5", "3", "4", "5"], correctIndex: 2 };
+		const ecrire = (v, qi = 1, attendue = question, f = champs) => io.saveQuestionEdit(v.chemin, bloc(v.contenu), qi, attendue, f);
+
+		// a. LF and CRLF, config first: only the question moves; undo restores the note byte for byte
+		for (const [nom, eol] of [["LF", LF], ["CRLF", CRLF]]) {
+			const depart = note({ source: ["[", CONFIG, LECTURE, Q, "", AUTRE, "]"].join(LF), eol });
+			const v = vault(depart);
+			const avant = bloc(v.contenu);
+			const res = await ecrire(v);
+			r.check("16a " + nom + ". the write succeeds", res.ok, true);
+			r.check("16a " + nom + ". only the question changed, its comment and every other byte are the note's",
+				premierEcart(v.contenu, note({ source: ["[", CONFIG, LECTURE, Q_NEUVE, "", AUTRE, "]"].join(LF), eol })), "identiques");
+			const relu = JSON5.parse(bloc(v.contenu));
+			r.check("16a " + nom + ". the id and the title are kept", [relu[2].id, relu[2].title, relu[2].correctIndex], ["q1", "Division", 2]);
+			const retour = await io.restoreBlock(v.chemin, res.block, avant);
+			r.check("16a " + nom + ". undo gives the note back byte for byte", [retour.ok, premierEcart(v.contenu, depart)], [true, "identiques"]);
+		}
+
+		// b. a note changed in the meantime is refused
+		{
+			const v = vault(note({ source: ["[", Q, AUTRE, "]"].join(LF) }));
+			const lu = bloc(v.contenu);
+			const dehors = note({ source: ["[", Q, AUTRE.replace("keep me", "changed outside"), "]"].join(LF) });
+			v.contenu = dehors;
+			const res = await io.saveQuestionEdit(v.chemin, lu, 0, question, champs);
+			r.check("16b. a block changed since the page read it is refused, as stale", [res.ok, res.reason], [false, "stale"]);
+			r.check("16b. … and the note keeps the other writer's version", v.contenu, dehors);
+		}
+
+		// c. what the write refuses on its own, even from a caller that skipped the proposal's judgement
+		{
+			const depart = note({ source: ["[", LECTURE, Q, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			const refus = async (f, qi = 1, attendue = question) => (await ecrire(v, qi, attendue, f)).ok;
+			r.check("16c. a forbidden field (id, role, slice, another kind's key) is refused",
+				[await refus({ id: "q9" }), await refus({ role: "read" }), await refus({ slice: 2 }), await refus({ correctIndices: [0] })], [false, false, false, false]);
+			r.check("16c. a change of type is refused", [await refus({ type: "text", answer: "3" }), await refus({ multiSelect: true })], [false, false]);
+			r.check("16c. a right answer outside the options, no right answer, duplicate options are refused",
+				[await refus({ correctIndex: 3 }), await refus({ options: ["a", "a", "b"] }), await refus({ options: ["only"] })], [false, false, false]);
+			r.check("16c. a reading is not rewritten as a question", await refus({ prompt: "x" }, 0, { id: "r1", role: "read", title: "Lists", prompt: "Read me." }), false);
+			r.check("16c. a question that is no longer the one the page saw is refused", await refus(champs, 1, { ...question, prompt: "Other" }), false);
+			r.check("16c. no field is refused", await refus({}), false);
+			r.check("16c. … and the note was never touched", v.contenu, depart);
+		}
+
+		// d. a question WITHOUT an id: its title is its id (quiz-ids.ts) and never moves
+		{
+			const SANS = "\t{ title: 'Division', prompt: 'x?', options: ['a', 'b'], correctIndex: 0 },";
+			const depart = note({ source: ["[", SANS, "]"].join(LF) });
+			const v = vault(depart);
+			const sans = { title: "Division", prompt: "x?", options: ["a", "b"], correctIndex: 0 };
+			r.check("16d. a new title on a question without an id is refused at the write", (await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, sans, { title: "Renamed" })).ok, false);
+			const res = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, sans, { prompt: "y?" });
+			r.check("16d. its statement may change, its title stays",
+				[res.ok, premierEcart(v.contenu, note({ source: ["[", "\t{ title: 'Division', prompt: 'y?', options: ['a', 'b'], correctIndex: 0 },", "]"].join(LF) }))], [true, "identiques"]);
+		}
+
+		// g. an OLD quiz writes `correctIndexes`; the engine's copy of the card also
+		//    carries the `correctIndices` it adds. The note's card still matches,
+		//    and the write keeps the note's own key.
+		{
+			const ANCIEN = "\t{ id: 'm1', prompt: 'Even?', options: ['1', '2', '4'], multiSelect: true, correctIndexes: [1] },";
+			const v = vault(note({ source: ["[", ANCIEN, "]"].join(LF) }));
+			const commeLaNote = { id: "m1", prompt: "Even?", options: ["1", "2", "4"], multiSelect: true, correctIndexes: [1] };
+			const commeLeMoteur = { ...commeLaNote, correctIndices: [1] };
+			const res = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, commeLeMoteur, { correctIndexes: [1, 2] });
+			r.check("16g. an old `correctIndexes` quiz, with the engine's copy as expected: written",
+				[res.ok, premierEcart(v.contenu, note({ source: ["[", "\t{ id: 'm1', prompt: 'Even?', options: ['1', '2', '4'], multiSelect: true, correctIndexes: [1,2] },", "]"].join(LF) }))], [true, "identiques"]);
+			r.check("16g. … and with the note's copy too", (await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, { ...commeLaNote, correctIndexes: [1, 2] }, { prompt: "Which are even?" })).ok, true);
+		}
+
+		// f. two proposals judged on the same question: once the first is applied,
+		//    the second (judged on the card as it WAS) is refused as stale
+		{
+			const depart = note({ source: ["[", Q, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			const premiere = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, question, { prompt: "First rewrite?" });
+			const apres = v.contenu;
+			const seconde = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, question, { explain: "Second rewrite." });
+			r.check("16f. the first proposal is written", premiere.ok, true);
+			r.check("16f. the older second one is refused as stale, nothing written", [seconde.ok, seconde.reason, v.contenu === apres], [false, "stale", true]);
+			const lecture = vault(note({ source: ["[", LECTURE, "]"].join(LF) }));
+			const carteLue = { id: "r1", role: "read", title: "Lists", prompt: "Read me." };
+			await io.saveCardEdit(lecture.chemin, bloc(lecture.contenu), 0, carteLue, { prompt: "Read me, simply." });
+			const vieille = await io.saveCardEdit(lecture.chemin, bloc(lecture.contenu), 0, carteLue, { title: "Lists again" });
+			r.check("16f. the same for a reading card", [vieille.ok, vieille.reason], [false, "stale"]);
+		}
+
+		// e. an edit that would not read back as asked is never written: a key written
+		//    twice in the note (JSON5 keeps the LAST one, the edit replaces the first)
+		{
+			const DOUBLE = "\t{ id: 'q1', prompt: 'first', prompt: 'second', options: ['a', 'b'], correctIndex: 0 },";
+			const depart = note({ source: ["[", DOUBLE, "]"].join(LF) });
+			const v = vault(depart);
+			const lue = { id: "q1", prompt: "second", options: ["a", "b"], correctIndex: 0 };
+			r.check("16e. a duplicated key: refused, the note untouched",
+				[(await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, lue, { prompt: "third" })).ok, v.contenu === depart], [false, true]);
+		}
+	}
+
 	r.done();
 	hote.uninstallHost();
 });

@@ -47,6 +47,12 @@ export interface EtatQuestion {
 	reprise?: boolean;
 	verifieeLearn?: boolean;
 	enAttente?: boolean;
+	/** When this question's judgement was WITHDRAWN (ms; `marquerARevoir`):
+	    its right answer or its options changed under the learner. The merge
+	    across devices prefers the latest such stamp before progress
+	    (shared-state/session-merge.ts), or another device's older "right"
+	    would bring the withdrawn judgement back. Never written by the engine. */
+	rejugee?: number;
 }
 
 /** A question of a snapshot holds an answer: a verdict, a check, written
@@ -353,4 +359,34 @@ export interface SessionSink {
     only on a question. The hint use is kept (`hintSeen`). PURE. */
 export function canSnapshot(o: { exam: boolean; locked: boolean; onQuestion: boolean }): boolean {
 	return !o.exam && !o.locked && o.onQuestion;
+}
+
+/**
+ * The RIGHT ANSWER of question `id` changed under the learner (the assistant
+ * chat rewrote it, 2026-10-09). The answer they gave was judged against the
+ * old key, so that judgement is withdrawn: the question reopens unchecked,
+ * their selection or text kept so that checking again judges it against the
+ * new key, and in a Learn it is marked TO REVIEW (missed, back in the retry
+ * queue). The review journal is not touched: `journalisee` stays, so a new
+ * check writes no second line. A question without state is left alone.
+ * `quand` stamps the withdrawal (`rejugee`), which outranks every older
+ * entry of that question when devices merge their snapshots.
+ * `oublier`: its options (or items) MOVED, so the stored selection, kept by
+ * original index, points at other texts: it is dropped with the shuffle
+ * that went with it, instead of being judged again. PURE: returns a new
+ * snapshot.
+ */
+export function marquerARevoir(photo: SessionQuiz, id: string, quand: number, oublier = false): SessionQuiz {
+	const e = photo.questions[id];
+	if (!e) return photo;
+	const { verifiee: _v, verifieeLearn: _vl, enAttente: _a, note: _n, reprise: _r, ...reste } = e;
+	const q: EtatQuestion = { ...reste, rejugee: quand };
+	if (oublier) { delete q.selection; delete q.melange; }
+	const out: SessionQuiz = { ...photo, questions: { ...photo.questions, [id]: q } };
+	if (e.verdict) {
+		q.verdict = "missed";
+		q.ratees = Math.max(e.ratees ?? 0, 1);
+		out.file = [...(photo.file ?? []).filter(f => f.id !== id), { id, depuis: 0 }];
+	}
+	return out;
 }

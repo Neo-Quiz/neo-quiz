@@ -9,7 +9,7 @@ import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { applyKeepExam, type KeepExam } from "./exam-keep";
-import { applyCardEdit } from "./card-edit";
+import { applyCardEdit, applyQuestionEdit, cardMoved } from "./card-edit";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL I/O — lecture / écriture du bloc quiz-blocks d'une note
@@ -257,9 +257,12 @@ export type BlockRewrite = { ok: true; block: string } | { ok: false; reason: "s
  * may be replayed), COMPARE-AND-SWAP on the block (`expectedBlock` is what the
  * caller last read or wrote: anything else means the note changed, and nothing
  * is written), the fences and line endings of the note, a replacement by
- * FUNCTION (never `$1` patterns). `compute` returns the new source or null.
+ * FUNCTION (never `$1` patterns). `compute` returns the new source, null
+ * (refused) or `STALE` (the card is no longer the one the proposal was judged
+ * on: another proposal was applied since).
  */
-async function rewriteBlock(path: string, expectedBlock: string, compute: (source: string) => string | null): Promise<BlockRewrite> {
+const STALE = Symbol("stale");
+async function rewriteBlock(path: string, expectedBlock: string, compute: (source: string) => string | null | typeof STALE): Promise<BlockRewrite> {
 	try {
 		let result: BlockRewrite = { ok: false, reason: "failed" };
 		await currentHost().fs.process(path, (content) => {
@@ -268,6 +271,7 @@ async function rewriteBlock(path: string, expectedBlock: string, compute: (sourc
 			if (!actual) return content;
 			if (actual[1] !== expectedBlock) { result = { ok: false, reason: "stale" }; return content; }
 			const next = compute(actual[1]);
+			if (next === STALE) { result = { ok: false, reason: "stale" }; return content; }
 			if (next === null) return content;
 			result = { ok: true, block: next };
 			if (next === actual[1]) return content;
@@ -284,10 +288,20 @@ async function rewriteBlock(path: string, expectedBlock: string, compute: (sourc
 /**
  * Rewrites ONE reading card (text fields only, `applyCardEdit`) after the
  * learner clicked "Apply" in the Explain chat. Nothing else of the note moves.
- * `expected` is the card as the page read it.
+ * `expected` is the card the proposal was judged on: once the note's card is
+ * no longer that one, the write is refused as stale.
  */
 export function saveCardEdit(path: string, expectedBlock: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>): Promise<BlockRewrite> {
-	return rewriteBlock(path, expectedBlock, (source) => applyCardEdit(source, qi, expected, fields));
+	return rewriteBlock(path, expectedBlock, (source) => (cardMoved(source, qi, expected) ? STALE : applyCardEdit(source, qi, expected, fields)));
+}
+
+/**
+ * Rewrites ONE question (whitelisted fields only, `applyQuestionEdit`) after
+ * the learner clicked "Apply to the question" in the assistant chat. Same
+ * compare-and-swap; nothing else of the note moves.
+ */
+export function saveQuestionEdit(path: string, expectedBlock: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>): Promise<BlockRewrite> {
+	return rewriteBlock(path, expectedBlock, (source) => (cardMoved(source, qi, expected) ? STALE : applyQuestionEdit(source, qi, expected, fields)));
 }
 
 /**

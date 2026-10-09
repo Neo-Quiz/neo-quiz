@@ -1,7 +1,7 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import { REVIEW_DIR, isConflictCopy } from "../../../../src/review/paths";
 import type { SessionQuiz } from "../../../../src/engine/session";
-import { derniereEcriture, fusionnerPhotos } from "../../../../src/shared-state/session-merge";
+import { derniereEcriture, fusionnerPhotos, porterRejugees } from "../../../../src/shared-state/session-merge";
 import type { SharedFs } from "./shared-state";
 
 /* ══════════════════════════════════════════════════════════
@@ -213,7 +213,11 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 			/* What is written is the MERGE of what this device sees, not its local
 			   view alone: a device that reopened an old snapshot would republish it. */
 			const autres = toutes.filter(e => e !== r.own[chemin]);
-			r.own[chemin] = fusionnerPhotos([jouee, ...autres]) ?? jouee;
+			/* The engine never writes `rejugee`: the withdrawals this device sees
+			   (its own file included) are carried onto what it plays, or its own
+			   next write would let another device's older "right" win again. */
+			const portee = porterRejugees(jouee, courante);
+			r.own[chemin] = fusionnerPhotos([portee, ...autres]) ?? portee;
 			toucher(chemin);
 		},
 		effacer(chemin) {

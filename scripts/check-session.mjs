@@ -212,3 +212,42 @@ await withSrcModule("src/engine/session.ts", ({ photographier, restaurer }) => {
 	r.check("the queue keeps its lag", back.learnQueue, [{ qi: 4, since: 1 }]);
 	r.done();
 });
+
+/* The right answer of a question changed under the learner (the assistant
+   chat, 2026-10-09): its judgement is withdrawn, the answer kept to be judged
+   again, the question marked to review in a Learn, the journal flag kept so
+   that no second review line is written. */
+await withSrcModule("src/engine/session.ts", ({ photographier, restaurer, marquerARevoir }) => {
+	const r = makeReporter("Session - a right answer changed");
+	const ids = ["a", "b", "c"];
+	const n = ids.length;
+	const maps = [[1, 0, 2], [0, 1], null];
+	const base = { selections: [null, null, ""], shuffleMap: maps };
+	const etat = {
+		selections: [1, 0, ""], shuffleMap: maps,
+		textOnlyAnswers: ["", "", "str"], textOnlyChecked: [false, false, true],
+		textOnlyRatings: [null, null, "understood"], lessonPreSkipped: new Array(n).fill(false),
+		hintSeen: [true, false, false], recorded: [true, true, true],
+		learnVerdicts: ["first", "missed", "none"], learnMisses: [0, 1, 0],
+		learnRetrying: new Array(n).fill(false), learnChecked: [true, true, false],
+		learnPending: new Array(n).fill(false), learnQueue: [{ qi: 1, since: 2 }],
+		learnResume: null, learnRetryQi: null,
+	};
+	const photo = photographier(etat, ids, 0, 5);
+	const apres = marquerARevoir(photo, "a", 7);
+	const back = restaurer(JSON.parse(JSON.stringify(apres)), ids, base);
+	r.check("the answer stays, its check is withdrawn", [back.selections[0], back.learnChecked[0]], [1, false]);
+	r.check("in a Learn it is marked to review: missed, back in the retry queue", [back.learnVerdicts[0], back.learnMisses[0], back.learnQueue.map(e => e.qi)], ["missed", 1, [1, 0]]);
+	r.check("the journal flag and the hint use stay (no second review line)", [back.recorded[0], back.hintSeen[0]], [true, true]);
+	r.check("the other questions are untouched", [back.learnVerdicts[1], back.learnChecked[1], back.learnQueue[0]], ["missed", true, { qi: 1, since: 2 }]);
+	const texte = restaurer(marquerARevoir(photo, "c", 7), ids, base);
+	r.check("a written answer keeps its text, its check and rating are withdrawn, no verdict invented",
+		[texte.textOnlyAnswers[2], texte.textOnlyChecked[2], texte.textOnlyRatings[2], texte.learnVerdicts[2], texte.learnQueue.length], ["str", false, null, "none", 1]);
+	r.check("the withdrawal is stamped on that question only", [apres.questions.a.rejugee, apres.questions.b.rejugee], [7, undefined]);
+	const oubliee = marquerARevoir(photo, "a", 7, true);
+	const backO = restaurer(JSON.parse(JSON.stringify(oubliee)), ids, base);
+	r.check("options that moved: the answer and its shuffle are dropped, the question still marked to review",
+		[oubliee.questions.a.selection, oubliee.questions.a.melange, backO.selections[0], backO.learnVerdicts[0], backO.recorded[0]], [undefined, undefined, null, "missed", true]);
+	r.check("a question without state, or unknown, leaves the snapshot as it was", [marquerARevoir(photo, "zz", 7), photo.questions.a.verdict], [photo, "first"]);
+	r.done();
+});
