@@ -676,6 +676,22 @@ await withSrcModule(["src/shared-state/session-merge.ts", "apps/windows/src/host
 	const fb = { v: 1, courante: null, ecrite: 20, file: [{ id: "q3", depuis: 1 }], questions: { q2: { ...ok, verdict: "retried" }, q3: { verifieeLearn: true, verdict: "missed" } } };
 	r.check("the retry queue: both devices' entries, minus a question settled elsewhere", sm.fusionnerPhotos([fa, fb]).file.map(e => e.id).sort(), ["q1", "q3"]);
 
+	// A judgement WITHDRAWN (the right answer changed, `rejugee`): it outranks every entry
+	// stamped earlier or not at all, however advanced, and equal stamps compare progress.
+	const juste = { v: 1, courante: null, ecrite: 10, questions: { q1: { ...ok, selection: 1 } } };
+	const rejuge = { v: 1, courante: null, ecrite: 20, questions: { q1: { selection: 1, verdict: "missed", ratees: 1, rejugee: 15 } } };
+	r.check("a withdrawn judgement beats another device's older 'right'", sm.fusionnerPhotos([juste, rejuge]).questions.q1, rejuge.questions.q1);
+	r.check("... even when that one was written later (a device not yet synced)", sm.fusionnerPhotos([{ ...juste, ecrite: 30 }, rejuge]).questions.q1.rejugee, 15);
+	const recoche = { v: 1, courante: null, ecrite: 40, questions: { q1: { ...ok, selection: 2, rejugee: 15 } } };
+	r.check("after the withdrawal, a new check with the same stamp wins by progress", sm.fusionnerPhotos([rejuge, recoche, juste]).questions.q1.selection, 2);
+	r.check("a later withdrawal beats an earlier one", sm.fusionnerPhotos([recoche, { ...rejuge, ecrite: 50, questions: { q1: { ...rejuge.questions.q1, rejugee: 45 } } }]).questions.q1.rejugee, 45);
+	// The engine never writes `rejugee`: what a device plays carries the stamps it sees.
+	const vue = { v: 1, courante: null, ecrite: 20, questions: { q1: { selection: 1, rejugee: 15 }, q2: { rejugee: 12 } } };
+	const joue = { v: 1, courante: "q1", ecrite: 60, questions: { q1: { ...ok, selection: 0 } } };
+	r.check("the stamps the device sees are carried onto what it plays, absent questions included",
+		sm.porterRejugees(joue, vue).questions, { q1: { ...ok, selection: 0, rejugee: 15 }, q2: { rejugee: 12 } });
+	r.check("nothing to carry: the same snapshot", [sm.porterRejugees(joue, null) === joue, sm.porterRejugees(joue, juste) === joue], [true, true]);
+
 	// Tombstones.
 	r.check("a tombstone newer than every snapshot leaves the quiz reset", sm.fusionnerPhotos([laptop, phone, { tombe: true, ecrite: 2_000 }]), null);
 	r.check("a snapshot after the tombstone counts alone", Object.keys(sm.fusionnerPhotos([laptop, { tombe: true, ecrite: 1_200 }, phone]).questions).length, 6);
@@ -723,6 +739,19 @@ await withSrcModule(["src/shared-state/session-merge.ts", "apps/windows/src/host
 	await portable.ecrire();
 	await tel.refresh();
 	r.check("both devices then agree on the new attempt", [Object.keys(tel.toutes()[P].questions).sort(), Object.keys(portable.toutes()[P].questions).sort()], [["q1", "q2"], ["q1", "q2"]]);
+	// A withdrawn judgement survives the device's next ordinary write (the engine never writes
+	// `rejugee`) and the other device's older "right" entry.
+	const J = "R/rejuge.md";
+	files.set("R/.neo-quiz/sessions/tel3.json", JSON.stringify({ [J]: { v: 1, courante: "q1", ecrite: 100, questions: { q1: { ...ok, selection: 1 } } } }));
+	const pc3 = mkDev("pc3", 200);
+	await pc3.load();
+	pc3.poser(J, { v: 1, courante: "q1", ecrite: 1, questions: { q1: { selection: 1, verdict: "missed", ratees: 1, rejugee: 150 } } });
+	pc3.poser(J, { v: 1, courante: "q2", ecrite: 1, questions: { q1: { selection: 1, verdict: "missed", ratees: 1 }, q2: { selection: 0 } } });
+	await pc3.ecrire();
+	const pc3b = mkDev("pc3", 400);
+	await pc3b.load();
+	r.check("a withdrawn judgement survives the next write and the other device's older 'right'",
+		[pc3b.toutes()[J].questions.q1.verdict, pc3b.toutes()[J].questions.q1.rejugee, JSON.parse(files.get("R/.neo-quiz/sessions/pc3.json"))[J].questions.q1.rejugee], ["missed", 150, 150]);
 	// Two devices start a never-played quiz at once, neither seeing the other (Syncthing not through,
 	// the phone's clock ahead): no restart happened, so neither may drop the other's answers.
 	const N = "R/neuf.md";

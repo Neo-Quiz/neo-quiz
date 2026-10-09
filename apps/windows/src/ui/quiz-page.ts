@@ -297,8 +297,12 @@ export async function openQuizPage(
 		hote.replaceChildren();
 		const puits = sessions?.puits(entry.path);
 		const lue = sessions?.lire(entry.path) ?? null;
-		const gardee = lue && id && opts.aReviser ? marquerARevoir(lue, id, opts.oublierReponse) : lue;
+		const rejugee = lue && id && opts.aReviser ? marquerARevoir(lue, id, Date.now(), opts.oublierReponse) : null;
+		const gardee = rejugee ?? lue;
 		const initiale: SessionQuiz = { ...(gardee ?? { v: 1, questions: {} }), v: 1, courante: id, ecrite: Date.now() } as SessionQuiz;
+		/* Written at once: the withdrawal must reach the synced files with its
+		   stamp (`rejugee`), not wait for the next answer. */
+		if (rejugee && puits) puits.enregistrer(initiale);
 		await renderInteractiveQuiz({
 			container: hote,
 			quiz,
