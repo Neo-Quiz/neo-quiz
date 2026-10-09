@@ -126,18 +126,25 @@ export function escapeAttr(s: string): string {
 	return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export interface FrameLabels { title: string; showCode: string; hideCode: string; tooLarge: string }
+export interface FrameLabels { title: string; tooLarge: string }
 
-/** The markup of one frame: its toolbar, the iframe and the (hidden) source. With `byRoute` (the host publishes
+/** The name a saved page is offered under: the given one (a card title), else the page's own `<title>`, else
+    `fallback`. Only a short single line; the main process sanitises it again into a file name. */
+export function frameFileName(name: string | undefined, source: string, fallback: string): string {
+	const title = /<title[^>]*>([^<]{1,200})<\/title>/i.exec(source)?.[1];
+	const pick = [name, title].map(v => (v ?? "").replace(/[*_`$#]/g, "").replace(/\s+/g, " ").trim()).find(v => v.length > 0);
+	return (pick ?? fallback).slice(0, 100);
+}
+
+/** The markup of one frame: the iframe and its (hidden) source, which the ⋯ menu shows and saves. With `byRoute` (the host publishes
     pages, `HostPlatform.publishHtmlFrame`) the document waits in `data-nq-doc` and `brancherCadres` points the
     iframe at its route; it is never loaded as `srcdoc` first. */
-export function frameMarkup(source: unknown, theme: FrameTheme, labels: FrameLabels, byRoute = false): string {
+export function frameMarkup(source: unknown, theme: FrameTheme, labels: FrameLabels, byRoute = false, name = ""): string {
 	const doc = buildSrcdoc(source, theme);
 	if (!doc.ok) return doc.reason === "tooLarge" ? `<div class="nq-html-frame nq-html-frame--refused">${escapeAttr(labels.tooLarge)}</div>` : "";
 	const code = escapeAttr(String(source));
-	return `<div class="nq-html-frame" data-nq-frame="1">`
+	return `<div class="nq-html-frame" data-nq-frame="1"${name.trim() ? ` data-nq-name="${escapeAttr(name.trim().slice(0, 200))}"` : ""}>`
 		+ `<iframe class="nq-html-frame-view" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" allow="" title="${escapeAttr(labels.title)}" ${byRoute ? "data-nq-doc" : "srcdoc"}="${escapeAttr(doc.srcdoc)}" style="height:120px"></iframe>`
-		+ `<button type="button" class="nq-html-frame-code" aria-expanded="false" data-show="${escapeAttr(labels.showCode)}" data-hide="${escapeAttr(labels.hideCode)}">${escapeAttr(labels.showCode)}</button>`
 		+ `<pre class="nq-html-frame-source" hidden><code>${code}</code></pre></div>`;
 }
 

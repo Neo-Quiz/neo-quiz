@@ -3,10 +3,44 @@
    CSP, height message). It takes the height of its content: never an inner
    scrollbar, the page scrolls instead. */
 .nq-html-frame {
+	position: relative;
 	display: block;
 	margin: 16px 0;
 	max-width: 100%;
 }
+
+/* The ⋯ menu of a page (copy as image, download as HTML): small, top right,
+   a dark translucent disc so it never hides a control of the page for long.
+   Shown on hover or focus; always on touch screens, which have no hover. */
+.nq-html-frame-more {
+	appearance: none;
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.45);
+	color: #fff;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 120ms ease, background-color 120ms ease;
+}
+.nq-html-frame-more svg { width: 16px; height: 16px; }
+.nq-html-frame:hover > .nq-html-frame-more,
+.nq-html-frame-more:focus-visible,
+.nq-html-frame-more:focus { opacity: 1; }
+.nq-html-frame-more:hover { background: rgba(0, 0, 0, 0.62); }
+@media (hover: none) { .nq-html-frame-more { opacity: 1; } }
+body.is-mobile .nq-html-frame-more { opacity: 1; }
+/* Out of the picture while "Copy as image" captures the frame. */
+.nq-html-frame.is-capturing > .nq-html-frame-more { visibility: hidden; transition: none; }
 
 .nq-html-frame-view {
 	display: block;
@@ -18,37 +52,50 @@
 	overflow: hidden;
 }
 
-.nq-html-frame-code {
+/* The page source: kept in the markup for the ⋯ menu ("View the code",
+   "Download as HTML"), never shown in place. */
+.nq-html-frame-source { display: none; }
+
+/* The ⋯ menu: a label beside each icon, on one line, never squeezed. */
+.qbd-select-menu.qbd-action-menu.nq-frame-menu {
+	width: max-content;
+	min-width: 220px;
+	max-width: calc(100vw - 16px);
+}
+.nq-frame-menu .qbd-select-option-label { white-space: nowrap; }
+
+/* "View the code": the source in the centred modal, Tokyo Night (.quiz-md-code),
+   scrolling vertically inside, a Copy button over its top right corner. */
+.modal.nq-html-code-modal { width: min(900px, 100%); }
+.nq-html-code { position: relative; }
+.nq-html-code-pre.quiz-md-code {
+	margin: 0;
+	max-height: min(65vh, 640px);
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.nq-html-code-copy {
 	appearance: none;
-	display: block;
-	margin: 6px 0 0 auto;
-	padding: 2px 6px;
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
 	border: 0;
-	border-radius: 6px;
-	background: transparent;
-	color: var(--text-muted);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.08);
+	color: #c0caf5;
 	font: inherit;
 	font-size: 12.5px;
 	cursor: pointer;
 }
-.nq-html-frame-code:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover);
-}
-
-.nq-html-frame-source {
-	margin: 6px 0 0;
-	max-height: 360px;
-	overflow: auto;
-	padding: 10px 12px;
-	border-radius: 10px;
-	background: var(--background-secondary);
-	font-size: 12.5px;
-	line-height: 1.5;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
-.nq-html-frame-source[hidden] { display: none; }
+.nq-html-code-copy:hover { background: rgba(255, 255, 255, 0.16); }
+.nq-html-code-copy svg { width: 14px; height: 14px; }
+body.is-mobile .nq-html-code-pre.quiz-md-code { scrollbar-width: none; }
 
 .nq-html-frame--refused,
 .nq-html-frame--pending {

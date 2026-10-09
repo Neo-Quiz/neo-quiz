@@ -19,7 +19,7 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 		FRAME_SANDBOX, FRAME_CSP, FRAME_MAX_BYTES, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT, FRAME_DEFAULT_THEME,
 		buildSrcdoc, acceptHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
 	} = m;
-	const labels = { title: "T", showCode: "Show", hideCode: "Hide", tooLarge: "Too large" };
+	const labels = { title: "T", tooLarge: "Too large" };
 
 	// --- sandbox -------------------------------------------------------
 	r.check("sandbox attribute is exactly allow-scripts", FRAME_SANDBOX, "allow-scripts");

@@ -21,7 +21,7 @@ object FileShare {
     /** The same bound as `SHARE_MAX_BYTES` (`src/dashboard/zip.ts`) and `TAILLE_MAX_PARTAGE`. */
     const val MAX_BYTES = 16 * 1024 * 1024
     private val EXTENSIONS = mapOf("zip" to "application/zip", "md" to "text/markdown")
-    private val FORBIDDEN = Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]")
+    internal val FORBIDDEN = Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]")
 
     /** Windows device names (reserved for every extension): COPY of `RESERVED` in `src/dashboard/share-names.ts`, pinned by `check:android-pont`. */
     private val RESERVED = Regex("^(con|prn|aux|nul|conin\\$|conout\\$|com[0-9¹²³]|lpt[0-9¹²³])$", RegexOption.IGNORE_CASE)
@@ -57,6 +57,43 @@ object FileShare {
 }
 
 /**
+ * The rules of `frameHtml.save`, mirror of `htmlFileName` / `htmlBytes` in
+ * `apps/windows/electron/frame-export.ts`: an interactive page's SOURCE, shared
+ * as `<name>.html` (the extension is FORCED, whatever the page wrote), at most
+ * the page cap of the frame (`FRAME_MAX_BYTES`, pinned by `check:android-pont`).
+ * The `.zip`/`.md` list of [FileShare] is NOT widened: this is its own channel.
+ */
+object FrameHtmlShare {
+    const val MAX_BYTES = 200 * 1024
+    const val MIME = "text/html"
+
+    /** The file name, or null when nothing usable is left. */
+    fun name(raw: Any?): String? {
+        if (raw !is String) return null
+        var stem = java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFC)
+            .replace(FileShare.FORBIDDEN, "-")
+            .replace(Regex("\\.html?$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("^[\\s.]+|[\\s.]+$"), "")
+            .trim()
+        if (stem.length > 100) stem = stem.substring(0, 100).replace(Regex("[\\s.]+$"), "")
+        if (stem.isEmpty() || FileShare.isReservedName(stem)) return null
+        return "$stem.html"
+    }
+
+    /** The decoded bytes, or null when empty, malformed or over the bound (checked BEFORE decoding). */
+    fun bytes(base64: Any?): ByteArray? {
+        if (base64 !is String || base64.isEmpty()) return null
+        if (base64.length > (MAX_BYTES / 3 + 1) * 4) return null
+        val out = try {
+            Base64.getDecoder().decode(base64)
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+        return if (out.isNotEmpty() && out.size <= MAX_BYTES) out else null
+    }
+}
+
+/**
  * `partage.enregistrer` on Android: the file goes to the system SHARE SHEET (the
  * phone has no "save as" dialog, and the sheet offers Files, Drive, Discord,
  * mail...). It is written under [dir] (a folder of the app's cache that the
@@ -76,6 +113,18 @@ class ShareChannel(
         val clean = FileShare.name(name)
         val bytes = FileShare.bytes(base64)
         if (clean == null || bytes == null) throw IllegalArgumentException("partage refusé : nom ou contenu invalide")
+        return share(clean, bytes, FileShare.mime(clean))
+    }
+
+    /** `frameHtml.save`: an interactive page's source to the share sheet, under the same guard. */
+    suspend fun saveFrameHtml(name: Any?, base64: Any?): String? {
+        val clean = FrameHtmlShare.name(name)
+        val bytes = FrameHtmlShare.bytes(base64)
+        if (clean == null || bytes == null) throw IllegalArgumentException("save refused: invalid name or content")
+        return share(clean, bytes, FrameHtmlShare.MIME)
+    }
+
+    private suspend fun share(clean: String, bytes: ByteArray, mime: String): String? {
         val t = now()
         val before = last.get()
         if (before != 0L && t - before < MIN_INTERVAL_MS || !last.compareAndSet(before, t)) throw IllegalStateException(BUSY)
@@ -86,7 +135,7 @@ class ShareChannel(
             folder = File(dir, UUID.randomUUID().toString()).apply { mkdirs() }
             val file = File(folder, clean)
             file.writeBytes(bytes)
-            sent = sender.send(file, FileShare.mime(clean))
+            sent = sender.send(file, mime)
             return if (sent) clean else null
         } finally {
             // The guard is ALWAYS released when the share did not reach the sheet (failure, no app to
@@ -107,6 +156,7 @@ class ShareChannel(
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
         "partage.enregistrer" to { a -> enregistrer(a.opt(0), a.opt(1)) },
+        "frameHtml.save" to { a -> saveFrameHtml(a.opt(0), a.opt(1)) },
     )
 
     companion object {

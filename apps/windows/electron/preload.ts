@@ -103,6 +103,12 @@ const pont: Pont = {
 	partage: {
 		enregistrer: (nom, octets) => ipcRenderer.invoke(CANAUX.partageEnregistrer, nom, octets),
 	},
+	frameImage: {
+		copy: rect => ipcRenderer.invoke(CANAUX.frameImageCopy, rect),
+	},
+	frameHtml: {
+		save: (name, bytes) => ipcRenderer.invoke(CANAUX.frameHtmlSave, name, bytes),
+	},
 	partageNatif: process.platform !== "win32" ? undefined : {
 		fichier: (nom, octets) => ipcRenderer.invoke(CANAUX.partageNatif, nom, octets),
 	},

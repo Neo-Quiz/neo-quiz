@@ -200,6 +200,13 @@ function main() {
 	const ktMaxExpr = /const val MAX_BYTES = (\d+) \* 1024 \+ (\d+) \* 1024/.exec(frameKt);
 	const tsMaxPage = /FRAME_MAX_BYTES = (\d+) \* 1024/.exec(frameTs)?.[1];
 	if (!ktMaxExpr || ktMaxExpr[1] !== tsMaxPage) fail(`frame document cap does not start from the page cap: TS ${tsMaxPage} KB / Kotlin ${ktMaxExpr?.[1]} KB`);
+	// "Download as HTML" of a page: the Kotlin share of the page source has the page cap, forces `.html` and
+	// `text/html`, and keeps its own rules apart from the `.zip`/`.md` list of `partage.enregistrer`.
+	const ktFrameHtml = /object FrameHtmlShare \{[\s\S]*?\r?\n\}/.exec(share)?.[0] ?? "";
+	const ktHtmlMax = /const val MAX_BYTES = (\d+) \* 1024\r?\n/.exec(ktFrameHtml)?.[1];
+	if (!ktFrameHtml || ktHtmlMax !== tsMaxPage) fail(`frame HTML save cap differs: TS ${tsMaxPage} KB / Kotlin ${ktHtmlMax} KB`);
+	if (!ktFrameHtml.includes('const val MIME = "text/html"') || !ktFrameHtml.includes('return "$stem.html"')) fail("Kotlin frame HTML save does not force .html / text/html");
+	if (!/FRAME_HTML_MAX_BYTES = FRAME_MAX_BYTES;/.test(read("apps/windows/electron/frame-export.ts"))) fail("frame-export.ts cap is not the frame page cap");
 
 	console.log(`check:android-pont  channels sent ${sent.size}, listed ${listed.size}, Pont leaves ${pontLeaves.size}, shim leaves ${shimLeaves.size}, executable extensions ${windows.size}`);
 }

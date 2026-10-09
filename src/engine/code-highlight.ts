@@ -263,8 +263,10 @@ export interface ResultatColoration { html: string; colore: number }
  * colorer dans le texte en cours (son budget cumulé, déjà plafonné par
  * `PLAFOND_CARACTERES_PAR_BLOC` s'il le souhaite) ; cette fonction ne colore
  * jamais plus que `min(capMax, PLAFOND_CARACTERES_PAR_BLOC)`.
+ * `plafond`: a single block shown on its own (the source of an interactive
+ * page, `html-frame.ts`) may raise the per-block cap; quiz text never does.
  */
-export function colorerCode(code: string, langueBrute: string, echapper: (texte: string) => string, capMax: number): ResultatColoration | null {
+export function colorerCode(code: string, langueBrute: string, echapper: (texte: string) => string, capMax: number, plafond = PLAFOND_CARACTERES_PAR_BLOC): ResultatColoration | null {
 	if (capMax <= 0) return null;
 	const cle = langueBrute.trim().toLowerCase();
 	// The catalogue's grammar for a recognized tag (its lookup is guarded
@@ -274,7 +276,7 @@ export function colorerCode(code: string, langueBrute: string, echapper: (texte:
 	const langue = codeLanguageOf(cle)?.grammar ?? cle;
 	if (!refractor.registered(langue)) return null;
 	try {
-		const cap = Math.min(capMax, PLAFOND_CARACTERES_PAR_BLOC);
+		const cap = Math.min(capMax, plafond);
 		const aColorer = code.length > cap ? couperSansCasserSurrogate(code, cap) : code;
 		const reste = code.slice(aColorer.length);
 		const arbre = refractor.highlight(aColorer, langue);

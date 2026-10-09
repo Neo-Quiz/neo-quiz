@@ -12,6 +12,12 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { HostPlatform } from "../../../../src/host/types";
+import type { Pont } from "../../electron/pont";
+
+/** The bridge, when this module runs in a window (`globalThis`: the check loads it outside any). */
+function pont(): Pick<Pont, "frameImage" | "frameHtml"> | undefined {
+	return (globalThis as { window?: { neo?: Pick<Pont, "frameImage" | "frameHtml"> } }).window?.neo;
+}
 
 /** Ce que Chromium dit du système. `globalThis.navigator` et non `navigator`
     nu : ce module est chargé par le contrôle hors de toute fenêtre, et rend
@@ -63,6 +69,15 @@ export function createWindowsPlatform(): HostPlatform {
 		get publishHtmlFrame(): HostPlatform["publishHtmlFrame"] {
 			const android = estMobile() ? (globalThis as { window?: { neo?: { android?: { publierCadre(doc: string): Promise<string | null> } } } }).window?.neo?.android : undefined;
 			return android ? (doc: string) => android.publierCadre(doc) : undefined;
+		},
+		/* The ⋯ menu of an interactive page (`src/engine/html-frame.ts`): only what the bridge offers. */
+		get copyFrameImage(): HostPlatform["copyFrameImage"] {
+			const img = pont()?.frameImage;
+			return img ? rect => img.copy(rect) : undefined;
+		},
+		get saveFrameHtml(): HostPlatform["saveFrameHtml"] {
+			const html = pont()?.frameHtml;
+			return html ? (name, doc) => html.save(name, new TextEncoder().encode(doc)) : undefined;
 		},
 	};
 }

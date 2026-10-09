@@ -17,6 +17,7 @@ release notes.
 
 - Rename and Duplicate a quiz from the "⋯" menu of its card. A rename keeps the type suffix of the note, refuses a name already taken in the folder, and keeps the review history, progress and saved session; a duplicate is a fresh copy named "(copy)", without any progress. Links to the quiz from other notes are not updated.
 - A right click on a quiz card or a folder card opens its "⋯" menu.
+- Interactive pages (readings and "Explain" answers) have a "⋯" menu at their top right: "View the code" shows the page source in a window with a Copy button, "Copy as image" copies the page as it is on screen, and "Download as HTML" saves its source. On Android, the page is shared as an .html file and "Copy as image" is not offered. The "View the code" link under the page is gone.
 - The Codex usage popover lists your banked resets (title, description and time left, as Codex states them) and spends one after an explicit confirmation, then reads the limits again.
 - A generation that hits the usage limit of Claude Code or Codex now pauses instead of failing: the line shows when it resumes by itself (the reset time plus 30 seconds, also after a restart), the other requests on the same provider wait, and you can resume now or cancel the resume.
 

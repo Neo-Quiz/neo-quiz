@@ -551,3 +551,58 @@ await withSrcModule("apps/windows/electron/connexion-limitee.ts", async ({ lireC
 	}
 	r.done();
 });
+
+/* EXPORTING AN INTERACTIVE PAGE (`apps/windows/electron/frame-export.ts`):
+   "Copy as image" takes only a rectangle from the window, "Download as HTML"
+   only a name and bounded bytes. Prevented: a capture of anything outside the
+   window (or a malformed, NaN, negative or extra-keyed rectangle reaching
+   `capturePage`), a capture loop, a saved page whose extension the window
+   chose (`.bat`), a name that is a path or a device name, a page over the cap. */
+await withSrcModule(["apps/windows/electron/frame-export.ts", "src/engine/html-frame-core.ts"], ({ captureRect, htmlFileName, htmlBytes, createRateGate, FRAME_HTML_MAX_BYTES, CAPTURE_MIN_INTERVAL_MS }, core) => {
+	const r = makeReporter("Interactive page export: rectangle, name, bytes, rate");
+	const win = { width: 1200, height: 800 };
+	r.check("a rectangle inside the window passes, rounded outward", captureRect({ x: 10.4, y: 20.6, width: 300.2, height: 100 }, 1, win), { x: 10, y: 20, width: 301, height: 101 });
+	r.check("the zoom factor of the MAIN process scales CSS pixels to DIP", captureRect({ x: 10, y: 20, width: 100, height: 50 }, 1.25, win), { x: 12, y: 25, width: 126, height: 63 });
+	r.check("the whole window passes", captureRect({ x: 0, y: 0, width: 1200, height: 800 }, 1, win), { x: 0, y: 0, width: 1200, height: 800 });
+	r.check("one pixel of rounding past the edge is clamped, not refused", captureRect({ x: 0, y: 0, width: 1201, height: 800.5 }, 1, win), { x: 0, y: 0, width: 1200, height: 800 });
+	r.check("a rectangle leaving the window is refused", [captureRect({ x: 1000, y: 0, width: 300, height: 10 }, 1, win), captureRect({ x: 0, y: 700, width: 10, height: 200 }, 1, win), captureRect({ x: 0, y: 0, width: 1000, height: 700 }, 1.5, win)], [null, null, null]);
+	r.check("a negative origin is refused", [captureRect({ x: -1, y: 0, width: 10, height: 10 }, 1, win), captureRect({ x: 0, y: -5, width: 10, height: 10 }, 1, win)], [null, null]);
+	r.check("an empty or negative size is refused", [captureRect({ x: 0, y: 0, width: 0, height: 10 }, 1, win), captureRect({ x: 0, y: 0, width: 10, height: -3 }, 1, win), captureRect({ x: 0, y: 0, width: 0.4, height: 10 }, 1, win)], [null, null, null]);
+	r.check("non-finite or non-number values are refused",
+		[NaN, Infinity, -Infinity, "10", null, undefined, 10n].map(v => captureRect({ x: v, y: 0, width: 10, height: 10 }, 1, win)), [null, null, null, null, null, null, null]);
+	r.check("anything but a plain object of exactly four keys is refused",
+		[captureRect(null, 1, win), captureRect([0, 0, 10, 10], 1, win), captureRect("0,0,10,10", 1, win), captureRect({ x: 0, y: 0, width: 10 }, 1, win), captureRect({ x: 0, y: 0, width: 10, height: 10, path: String.raw`C:\x` }, 1, win)], [null, null, null, null, null]);
+	r.check("a bogus zoom is refused", [captureRect({ x: 0, y: 0, width: 10, height: 10 }, 0, win), captureRect({ x: 0, y: 0, width: 10, height: 10 }, NaN, win), captureRect({ x: 0, y: 0, width: 10, height: 10 }, 9, win), captureRect({ x: 0, y: 0, width: 10, height: 10 }, "1", win)], [null, null, null, null]);
+	r.check("a window with no size refuses everything", captureRect({ x: 0, y: 0, width: 10, height: 10 }, 1, { width: 0, height: 0 }), null);
+
+	r.check("a plain title gets .html", htmlFileName("Pile d'appel"), "Pile d'appel.html");
+	r.check(".html is never doubled, .htm becomes .html", [htmlFileName("x.html"), htmlFileName("x.HTM")], ["x.html", "x.html"]);
+	r.check("the window cannot choose the extension: .bat stays part of the name", htmlFileName("run.bat"), "run.bat.html");
+	r.check("separators become dashes: a name, never a path", htmlFileName(String.raw`..\..\Startup\x`), "-..-Startup-x.html");
+	r.check("forbidden characters and controls become dashes", htmlFileName('a:b*c?"<>|\u0001d'), "a-b-c------d.html");
+	r.check("a Windows device name is refused", [htmlFileName("CON"), htmlFileName("nul.txt"), htmlFileName("com1.html")], [null, null, null]);
+	r.check("an empty, dotted or non-string name is refused", [htmlFileName(""), htmlFileName(" . . "), htmlFileName(".html"), htmlFileName(42), htmlFileName(null)], [null, null, null, null, null]);
+	r.check("a long name is cut to 100 characters before the extension", htmlFileName("a".repeat(300)), "a".repeat(100) + ".html");
+
+	r.check("the cap is the frame page cap (200 KB)", [FRAME_HTML_MAX_BYTES, FRAME_HTML_MAX_BYTES === core.FRAME_MAX_BYTES], [200 * 1024, true]);
+	r.check("bytes up to the cap pass", htmlBytes(new Uint8Array(FRAME_HTML_MAX_BYTES))?.length, FRAME_HTML_MAX_BYTES);
+	r.check("cap + 1 byte, empty, or not bytes is refused", [htmlBytes(new Uint8Array(FRAME_HTML_MAX_BYTES + 1)), htmlBytes(new Uint8Array(0)), htmlBytes("<p>x</p>"), htmlBytes([60, 112])], [null, null, null, null]);
+
+	let now = 0;
+	const gate = createRateGate(CAPTURE_MIN_INTERVAL_MS, () => now);
+	const seq = [gate()];
+	now = 500; seq.push(gate());
+	now = 999; seq.push(gate());
+	now = 1000; seq.push(gate());
+	now = 1001; seq.push(gate());
+	r.check("one capture per second at most", [CAPTURE_MIN_INTERVAL_MS, seq], [1000, [true, false, false, true, false]]);
+
+	const canaux = readFileSync(new URL("../apps/windows/electron/canaux.ts", import.meta.url), "utf8");
+	const corps = canaux.slice(canaux.indexOf("CANAUX.frameImageCopy"), canaux.indexOf("CANAUX.frameHtmlSave"));
+	r.check("the capture channel validates the rectangle and the rate BEFORE capturing, from the sender's own page",
+		[/captureRect\(raw, e\.sender\.getZoomFactor\(\)/.test(corps), corps.indexOf("captureGate()") < corps.indexOf("capturePage"), /e\.sender\.capturePage\(rect\)/.test(corps), /clipboard\.write\(\[new ClipboardItem\(\{ "image\/png"/.test(corps)], [true, true, true, true]);
+	const save = canaux.slice(canaux.indexOf("CANAUX.frameHtmlSave"), canaux.indexOf("const partageFichier"));
+	r.check("the save channel writes only where the NATIVE dialog said, with .html forced",
+		[/htmlFileName\(name\)/.test(save), /htmlBytes\(bytes\)/.test(save), /dialog\.showSaveDialog/.test(save), /`\$\{choice\.filePath\}\.html`/.test(save), (save.match(/writeFile\(/g) || []).length], [true, true, true, true, 1]);
+	r.done();
+});

@@ -509,6 +509,23 @@ export interface Pont {
 		enregistrer(nom: string, octets: Uint8Array): Promise<string | null>;
 	};
 
+	/** An interactive page (`src/engine/html-frame.ts`), copied as an image:
+	    the window gives only a rectangle in CSS pixels; the main process
+	    validates it, captures that part of the window and puts the PNG in the
+	    clipboard (`frame-export.ts`). `false` when refused or rate-limited
+	    (one per second). Absent on Android. */
+	frameImage?: {
+		copy(rect: { x: number; y: number; width: number; height: number }): Promise<boolean>;
+	};
+
+	/** An interactive page's SOURCE, saved as `.html`: a name and bytes (at
+	    most 200 KB). Windows: the native "Save as" dialog, `.html` forced, and
+	    the chosen path is returned (`null` when cancelled). Android: the system
+	    share sheet, and the file name is returned. */
+	frameHtml?: {
+		save(name: string, bytes: Uint8Array): Promise<string | null>;
+	};
+
 	/** Windows only: the file in Windows' own Share panel (Discord, WhatsApp,
 	    Outlook, Nearby Share…), opened by the main process
 	    (`partage.ts`, `lancerPartageNatif`). Same inputs as `partage`: a
@@ -1094,6 +1111,8 @@ export const CANAUX = {
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",
 	partageNatif: "neo:partage/natif",
+	frameImageCopy: "neo:frame-image/copy",
+	frameHtmlSave: "neo:frame-html/save",
 	notificationAfficher: "neo:notification/afficher",
 	appareilInfos: "neo:appareil/infos",
 	syncEtatLire: "neo:sync/etat-lire",

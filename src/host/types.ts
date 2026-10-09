@@ -418,6 +418,12 @@ export interface HostPlatform {
 	    with a CSP of its own (`engine/html-frame-core.ts`); `null` when refused. Absent on the desktop app, where
 	    the page goes by `srcdoc`. */
 	publishHtmlFrame?(doc: string): Promise<string | null>;
+	/** OPTIONAL. Copies the part of the window inside `rect` (CSS pixels of the viewport) to the clipboard as an
+	    image: the ⋯ menu of an interactive page. `false` when refused. Absent where no capture exists (Android). */
+	copyFrameImage?(rect: { x: number; y: number; width: number; height: number }): Promise<boolean>;
+	/** OPTIONAL. Saves an interactive page's source as `<name>.html` (desktop: native "Save as"; Android: share
+	    sheet). Resolves `null` when the user cancelled. */
+	saveFrameHtml?(name: string, html: string): Promise<string | null>;
 }
 
 /**

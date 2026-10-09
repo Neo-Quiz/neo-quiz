@@ -37,7 +37,7 @@
    réussi.
 ══════════════════════════════════════════════════════════ */
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, Notification, screen, shell } from "electron";
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, net, Notification, screen, shell } from "electron";
 import * as os from "node:os";
 import { infosAppareil } from "./appareil";
 import * as path from "node:path";
@@ -92,6 +92,7 @@ function empreinteAppel(tool: string, args: readonly string[], stdin: string, ma
 }
 import { creerPartageFichier, ecrireTemporaire, lancerPartageNatif, nomPartage, octetsPartage, verrouEnregistrer, verrouNatif, verrouSync } from "./partage";
 import { creerAttente, jetonValide } from "./attente-collage";
+import { CAPTURE_MIN_INTERVAL_MS, captureRect, createRateGate, htmlBytes, htmlFileName } from "./frame-export";
 /* LA LECTURE D'UNE VIDÉO (tâche 4) : `ID_VIDEO` vient du noyau pur
    (`src/video/`, sans Node) et est importé PAR LE PRINCIPAL — c'est
    l'exception nommée au `CLAUDE.md` du dépôt : `check:host` juge la
@@ -819,6 +820,44 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!propre || !contenu) throw new Error("partage refusé : nom ou contenu invalide");
 		if (process.platform !== "win32") return false;
 		return partageFichier.demander(propre, contenu);
+	});
+	/* AN INTERACTIVE PAGE, EXPORTED (`./frame-export.ts`). The image: a
+	   rectangle only, validated against THIS process's zoom and window size,
+	   captured from the sender's own page, at most once per second. */
+	const captureGate = createRateGate(CAPTURE_MIN_INTERVAL_MS);
+	ipcMain.handle(CANAUX.frameImageCopy, async (e, raw: unknown) => {
+		const fenetre = BrowserWindow.fromWebContents(e.sender);
+		if (!fenetre || fenetre.isDestroyed()) return false;
+		const b = fenetre.getContentBounds();
+		const rect = captureRect(raw, e.sender.getZoomFactor(), { width: b.width, height: b.height });
+		if (!rect || !captureGate()) return false;
+		const image = await e.sender.capturePage(rect);
+		if (image.isEmpty()) return false;
+		// Electron 44: the clipboard API is the async ClipboardItem one (no more `writeImage`).
+		await clipboard.write([new ClipboardItem({ "image/png": new Blob([new Uint8Array(image.toPNG())], { type: "image/png" }) })]);
+		return true;
+	});
+	/* The page source: a name (`.html` forced) and bounded bytes; the place is
+	   the user's choice in the NATIVE dialog, which is what grants the write.
+	   One dialog at a time, shared with the share "Save as". */
+	ipcMain.handle(CANAUX.frameHtmlSave, async (e, name: unknown, bytes: unknown) => {
+		const fileName = htmlFileName(name);
+		const content = htmlBytes(bytes);
+		if (!fileName || !content) throw new Error("save refused: invalid name or content");
+		const jeton = verrouEnregistrer.prendre();
+		if (jeton === null) throw new Error(PARTAGE_OCCUPE);
+		try {
+			const options = { defaultPath: path.join(app.getPath("downloads"), fileName), filters: [{ name: "HTML", extensions: ["html"] }] };
+			const fenetre = BrowserWindow.fromWebContents(e.sender);
+			const choice = fenetre ? await dialog.showSaveDialog(fenetre, options) : await dialog.showSaveDialog(options);
+			if (choice.canceled || !choice.filePath) return null;
+			// The extension is FORCED: the place is the user's, the file's nature is not.
+			const dest = path.extname(choice.filePath).toLowerCase() === ".html" ? choice.filePath : `${choice.filePath}.html`;
+			await fsp.writeFile(dest, content);
+			return dest;
+		} finally {
+			verrouEnregistrer.rendre(jeton);
+		}
 	});
 	const partageFichier = creerPartageFichier({ verrou: verrouNatif, ecrire: ecrireTemporaire, centre: () => centreFenetre() });
 	/** The middle of the app window, where the native panel is centred. */

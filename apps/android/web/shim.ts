@@ -159,6 +159,12 @@ const pont: Pont = {
 		enregistrer: (nom, octets) => appeler("partage.enregistrer", [nom, toBase64(octets)]),
 	},
 
+	/* An interactive page's source as `.html`, to the share sheet (`ShareChannel.saveFrameHtml`). No
+	   `frameImage`: the phone has no window capture, so "Copy as image" is not offered there. */
+	frameHtml: {
+		save: (name, bytes) => appeler<string | null>("frameHtml.save", [name, toBase64(bytes)]),
+	},
+
 	systeme: {
 		ouvrir: (abs) => appeler("systeme.ouvrir", [abs]),
 		copierTexte: (texte) => appeler("systeme.copierTexte", [texte]),

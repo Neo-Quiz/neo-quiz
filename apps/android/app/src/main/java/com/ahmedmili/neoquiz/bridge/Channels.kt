@@ -46,6 +46,7 @@ object Channels {
         "reglages.ecrire",
         "reglages.supprimer",
         "partage.enregistrer",
+        "frameHtml.save",
         "systeme.ouvrir",
         "systeme.copierTexte",
         "systeme.vaultsObsidian",
