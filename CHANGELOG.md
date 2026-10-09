@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.67] - 2026-10-09
+
 ### Changed
 
 - The plan usage bars use claude.ai's colours: blue, amber from 75 % and red from 90 %, with a track tinted to match.
