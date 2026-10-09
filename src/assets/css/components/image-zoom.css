@@ -1,135 +1,146 @@
 /* ══════════════════════════════════════════════════════════
-   AN IMAGE OF A QUIZ, LARGER (engine/image-zoom.ts, 2026-10-08)
-   The pictures of a card say they open (zoom-in cursor); the modal is as
-   large as the window allows, its scene clips the zoomed picture, and the
-   browser's own gestures (scroll, page zoom) are off inside it.
+   THE PICTURE VIEWER (engine/image-zoom.ts, redone 2026-10-09)
+   Over the whole window, as Windows Photos: a dark backdrop, the picture
+   growing out of its thumbnail, a floating bar. Only Windows' own cursors:
+   the system hand on a picture that opens, the system four-way arrow on a
+   zoomed picture that drags.
 ══════════════════════════════════════════════════════════ */
 
 .quiz-card img:not(.quiz-option img){
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
-.modal.qbd-image-modal{
-  width: min(1400px, calc(100vw - 32px));
-  height: min(900px, 90vh);
-  max-height: 90vh;
-}
-
-.qbd-image-modal .modal-content{
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.qbd-visionneuse{
+  position: fixed;
+  inset: 0;
+  /* Above the dialogs (90), under the toasts (100). */
+  z-index: 95;
   overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+  cursor: default;
+  background: rgb(0 0 0 / calc(0.9 * var(--voile-opacite, 1)));
+  opacity: 0;
+  transition: opacity 180ms ease;
+  -webkit-app-region: no-drag;
 }
 
-.qbd-image-scene{
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+.qbd-visionneuse.is-ouvert{
+  opacity: 1;
+}
+
+.qbd-visionneuse.is-fermeture{
+  opacity: 0;
+  transition-duration: 220ms;
+}
+
+.qbd-visionneuse-image{
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  max-height: none;
+  transform-origin: 0 0;
+  will-change: transform;
+  border-radius: 4px;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 0.5);
+  -webkit-user-drag: none;
+}
+
+.qbd-visionneuse-image.is-anime{
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qbd-visionneuse.is-zoome .qbd-visionneuse-image{
+  cursor: move;
+}
+
+/* The floating bar: top right on a computer, bottom centre on a phone. */
+.qbd-visionneuse-barre{
+  position: absolute;
+  top: calc(12px + var(--nq-inset-haut, 0px));
+  right: 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  touch-action: none;
-  cursor: zoom-in;
-  user-select: none;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgb(28 28 30 / 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  color: rgb(255 255 255 / 0.9);
+  transition: opacity 180ms ease;
 }
 
-.qbd-image-scene.is-zoomed{
-  cursor: grab;
+.qbd-visionneuse.is-saisie .qbd-visionneuse-barre{
+  opacity: 0.35;
 }
 
-.qbd-image-zoom{
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  transform-origin: 0 0;
-  border-radius: 8px;
-  pointer-events: none;
-}
-
-.qbd-image-barre{
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-}
-
-.qbd-image-bouton{
+.qbd-visionneuse-bouton,
+.qbd-visionneuse-niveau{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
   height: 36px;
-  padding: 0;
+  border: 0;
   border-radius: 8px;
-  color: var(--text-muted);
   background: transparent;
+  color: inherit;
+  box-shadow: none;
+  cursor: pointer;
+  font: inherit;
 }
 
-.qbd-image-bouton:hover{
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
+.qbd-visionneuse-bouton{
+  width: 36px;
+  padding: 0;
 }
 
-.qbd-image-bouton svg{
+.qbd-visionneuse-niveau{
+  min-width: 58px;
+  padding: 0 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.qbd-visionneuse-bouton:hover,
+.qbd-visionneuse-niveau:hover{
+  background: rgb(255 255 255 / 0.12);
+}
+
+.qbd-visionneuse-bouton:focus-visible,
+.qbd-visionneuse-niveau:focus-visible{
+  outline: 2px solid rgb(255 255 255 / 0.7);
+  outline-offset: -2px;
+}
+
+.qbd-visionneuse-bouton svg{
   width: 18px;
   height: 18px;
 }
 
-/* The zoomed picture never covers the close button (it overflows the
-   scene's box while it is being transformed). */
-.qbd-image-modal .modal-close-button{
-  z-index: 2;
-  background: var(--background-primary);
+.is-mobile .qbd-visionneuse-barre{
+  top: auto;
+  right: auto;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
 }
 
-.qbd-image-modal .modal-content{
-  padding-top: 30px;
+.is-mobile .qbd-visionneuse-bouton,
+.is-mobile .qbd-visionneuse-niveau{
+  height: 44px;
 }
 
-
-/* The zoom buttons are flat: no 3D button in a modal. */
-.qbd-image-modal .qbd-image-bouton,
-.qbd-image-modal .qbd-image-bouton:hover,
-.qbd-image-modal .qbd-image-bouton:active{
-  border: 0;
-  box-shadow: none;
-  transform: none;
+.is-mobile .qbd-visionneuse-bouton{
+  width: 44px;
 }
 
-/* On a phone the picture is a full page, as Settings is (mobile.css): the
-   layer covers the screen from under the status bar, the panel has no
-   gutter, frame nor corner, and mobile.css's 16 px dialog margins and
-   bounded height do not apply (its rules win on specificity otherwise). */
-body.is-mobile .modal-container:has(> .qbd-image-modal){
-  padding: var(--nq-inset-haut, 0px) 0 0;
-  align-items: stretch;
-  background: var(--background-primary);
-}
-
-.is-mobile .modal-container:has(> .qbd-image-modal) > .modal-bg{
-  display: none;
-}
-
-html.nq-mobile body.is-mobile .modal-container > .modal.qbd-image-modal,
-body.is-mobile .modal-container > .modal.qbd-image-modal{
-  margin: 0;
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  height: auto;
-  max-height: none;
-  align-self: stretch;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 8px 4px 12px;
-}
-
-body.is-mobile .modal-container > .modal.qbd-image-modal,
-body.is-mobile .modal-container > .modal.qbd-image-modal.qbd-closing{
-  animation: none !important;
+@media (prefers-reduced-motion: reduce){
+  .qbd-visionneuse,
+  .qbd-visionneuse-image.is-anime{
+    transition: none;
+  }
 }

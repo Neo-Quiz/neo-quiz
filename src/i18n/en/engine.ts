@@ -25,6 +25,8 @@ export const EN_ENGINE = {
 	"engine.image.zoomIn": "Zoom in",
 	"engine.image.zoomOut": "Zoom out",
 	"engine.image.fit": "Fit to the window",
+	"engine.image.actualSize": "Real size",
+	"engine.image.viewer": "Picture",
 	"engine.passage.expand": "Show the document",
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */

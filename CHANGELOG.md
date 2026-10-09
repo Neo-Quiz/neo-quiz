@@ -15,6 +15,8 @@ release notes.
 
 ### Changed
 
+- A quiz picture opens in a full-window viewer: it grows out of its thumbnail, zooms with the wheel, a pinch or a double click, drags with momentum, and has a bar with the zoom level, fit, real size and close; Windows' own cursors.
+
 - A wrong answer in a Learn no longer shows « Keep going »: the answer marked wrong and the explanation say it.
 
 ## [1.20.55] - 2026-10-09

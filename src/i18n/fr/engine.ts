@@ -18,6 +18,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.image.zoomIn": "Zoomer",
 	"engine.image.zoomOut": "Dézoomer",
 	"engine.image.fit": "Ajuster à la fenêtre",
+	"engine.image.actualSize": "Taille réelle",
+	"engine.image.viewer": "Image",
 	"engine.passage.expand": "Afficher le document",
 
 	"engine.lecture.keyPoints": "À retenir",
