@@ -285,6 +285,17 @@ await withSrcModule(["src/question-edit.ts", "src/explain-prompt.ts"], ({ valida
 		new Array(7).fill("type"));
 	r.check("a numeric answer that is a number passes", motif(nombre, { answer: "5" }), "ok");
 
+	// ── options shown from `optionHtml` (the engine shows it before `options`)
+	const avecHtml = { id: "h1", prompt: "?", options: ["a", "b", "c"], optionHtml: ["<b>a</b>", "<b>b</b>", "<b>c</b>"], correctIndex: 0 };
+	r.check("whitelist: optionHtml when the question has it", questionEditFields(avecHtml).includes("optionHtml"), true);
+	r.check("new options or a new right answer without optionHtml are refused",
+		[motif(avecHtml, { options: ["a", "b", "d"] }), motif(avecHtml, { correctIndex: 1 }), motif({ ...avecHtml, multiSelect: true, correctIndices: [0] }, { correctIndices: [1] })], ["incomplete", "incomplete", "incomplete"]);
+	r.check("optionHtml of another length, or an option moved without its HTML, is refused",
+		[motif(avecHtml, { options: ["a", "b", "d"], optionHtml: ["<b>a</b>", "<b>b</b>"] }), motif(avecHtml, { options: ["b", "a", "c"], optionHtml: ["<b>a</b>", "<b>b</b>", "<b>c</b>"], correctIndex: 1 })], ["incomplete", "incomplete"]);
+	r.check("options and right answer sent with a coherent optionHtml pass",
+		[motif(avecHtml, { options: ["b", "a", "c"], optionHtml: ["<b>b</b>", "<b>a</b>", "<b>c</b>"], correctIndex: 1 }), motif(avecHtml, { correctIndex: 2, optionHtml: avecHtml.optionHtml }), motif(avecHtml, { prompt: "Better?" })], ["ok", "ok", "ok"]);
+	r.check("the instruction asks for optionHtml when the question has it", [consigneEditionQuestion(avecHtml).includes("whole \"optionHtml\""), consigneEditionQuestion(single).includes("optionHtml")], [true, false]);
+
 	// ── lengths
 	r.check("the statement up to its limit passes, one more character is too long",
 		[motif(single, { prompt: x(LIMITS.prompt) }), motif(single, { prompt: x(LIMITS.prompt + 1) }), motif(single, { options: ["a", "b", x(LIMITS.option + 1)] })], ["ok", "tooLong", "tooLong"]);

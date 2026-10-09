@@ -221,8 +221,20 @@ export function checkQuestionFields(original: Q, given: Q, sanitizeHtml: (html: 
 		if (!isArr(options) || options.length < 2 || options.length > MAX_OPTIONS) return no("incomplete");
 		if (!distinct(options)) return no("duplicate");
 		if (isArr(original.optionHtml)) {
+			/* The engine shows `optionHtml[i]` BEFORE `options[i]` (engine/cards.ts
+			   `optionContentHtml`): new options, or a new right answer, without
+			   their HTML would show the old texts against the new key. So a change
+			   of either carries a whole `optionHtml`, as long as the options, and
+			   an option that only moved keeps its own HTML. */
 			const html = m.optionHtml;
+			if (("options" in given || "correctIndex" in given || indicesKey(original) in given) && !("optionHtml" in given)) return no("incomplete");
 			if (!isArr(html) || html.length !== options.length) return no("incomplete");
+			const oldOptions = (original.options as unknown[]).map(norm);
+			const oldHtml = original.optionHtml as unknown[];
+			for (let i = 0; i < options.length; i++) {
+				const j = oldOptions.indexOf(norm(options[i]));
+				if (j >= 0 && norm(htmlEnTexte(html[i])) !== norm(htmlEnTexte(oldHtml[j]))) return no("incomplete");
+			}
 		}
 		if (kind === "single") {
 			if (!int(m.correctIndex)) return no("noAnswer");
@@ -379,6 +391,7 @@ export function consigneEditionQuestion(q: Q): string {
 	if (kind === "single") rules.push("\"correctIndex\" is the index (from 0) of the ONE right option in \"options\".");
 	if (kind === "multiple") rules.push(`"${indicesKey(q)}" lists the indices (from 0) of every right option in "options", at least one.`);
 	if (kind === "single" || kind === "multiple") rules.push("Options are distinct, 2 to 10. When you change \"options\", send the whole list, and send the right answer again if an option moved.");
+	if ((kind === "single" || kind === "multiple") && isArr(q.optionHtml)) rules.push("This question shows \"optionHtml\" (one HTML per option): whenever you change \"options\" or the right answer, also send the whole \"optionHtml\", same length and same order as \"options\".");
 	if (kind === "text") rules.push("\"answer\" is the expected answer; \"acceptedAnswers\" may list other accepted forms.");
 	if (kind === "cloze") rules.push("\"cloze\" is the whole text with each blank as {{answer|variant}}; keep the same number of blanks.");
 	if (kind === "ordering") rules.push("\"correctOrder\" lists every index of \"possibilities\" once, in the right order.");
