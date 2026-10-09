@@ -514,6 +514,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.reqstatus.failedWhy": "Échec sur {device} : {reason}",
 	"ai.explain.button": "Demander à l'IA",
 	"ai.explain.buttonTip": "Demander à l'IA",
+	"ai.explain.railLabel": "IA",
 	"ai.explain.answerFirst": "Réponds d'abord à la question pour te la faire expliquer",
 	"ai.explain.asked": "Explique-moi cette question : {question}",
 	"ai.explain.ownQuestion": "Écris ta question",

@@ -59,12 +59,13 @@ import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line"
    in quiz-bars.css place it and shrink the quiz card beside it
    (`body.nq-explain-open`). Its width is kept in localStorage. */
 const CLE_LARGEUR = "nq-explain-width";
-const LARGEUR_MIN = 320;
+const LARGEUR_MIN = 360;
+const LARGEUR_MAX = 640;
 const QUIZ_MIN = 360;
 
 function bornerLargeur(w: number): number {
 	// The quiz card keeps QUIZ_MIN px whatever the window width.
-	return Math.round(Math.max(LARGEUR_MIN, Math.min(w, window.innerWidth - QUIZ_MIN - 48)));
+	return Math.round(Math.max(LARGEUR_MIN, Math.min(w, LARGEUR_MAX, window.innerWidth - QUIZ_MIN - 48)));
 }
 
 function largeurInitiale(): number {
@@ -72,7 +73,7 @@ function largeurInitiale(): number {
 		const v = Number(window.localStorage.getItem(CLE_LARGEUR));
 		if (Number.isFinite(v) && v > 0) return bornerLargeur(v);
 	} catch { /* storage refused: the default width */ }
-	return bornerLargeur(window.innerWidth * 0.4);
+	return bornerLargeur(window.innerWidth * 0.38);
 }
 
 function poserLargeur(w: number): void {
@@ -95,6 +96,7 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 	panneau.setAttribute("aria-modal", "false");
 	poserLargeur(largeurInitiale());
 	document.body.classList.add("nq-explain-open");
+	document.querySelector(".nq-explain-rail-btn")?.classList.add("qbd-nav-item--active");
 	const titre = panneau.querySelector<HTMLElement>(".modal-title");
 	if (titre) {
 		// No title in the header: the question under it is the header.
@@ -146,6 +148,7 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 function demonterPanneau(): void {
 	nettoyagePanneau?.();
 	document.body.classList.remove("nq-explain-open");
+	document.querySelector(".nq-explain-rail-btn")?.classList.remove("qbd-nav-item--active");
 }
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -479,7 +482,27 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	boutonQuiz.classList.add("qz-explain-btn-icone");
 	boutonQuiz.hidden = true;
 	peindreLogoBouton();
+	/* The right rail (desktop): a mirror of the navigation rail, one button with the
+	   provider's logo and "AI". It opens and closes the chat; on a phone the icon
+	   above the card does that instead. */
+	const rail = ajouter(document.body, "div", "nq-explain-rail");
+	const boutonRail = ajouter(rail, "button", "qbd-nav-item nq-explain-rail-btn");
+	boutonRail.type = "button";
+	boutonRail.title = t("ai.explain.button");
+	boutonRail.setAttribute("aria-label", t("ai.explain.button"));
+	const logoRail = ajouter(boutonRail, "span", "qbd-nav-icon qz-explain-btn-logo");
+	ajouter(boutonRail, "span", "qbd-nav-label", t("ai.explain.railLabel"));
+	boutons.add({ bouton: boutonRail, logo: logoRail });
+	peindreLogoBouton();
+	document.body.classList.add("nq-explain-rail-on");
 	let uniteCourante: Unite | null = null;
+	boutonRail.addEventListener("click", () => {
+		// Open: the window's own close button (the host's, as Escape). Closed: the unit on screen.
+		const fermer = document.querySelector<HTMLElement>(".nq-explain-modal .modal-close-button");
+		if (fermer) { fermer.click(); return; }
+		const u = uniteCourante ?? lesUnites()[0] ?? null;
+		if (u) ouvrirDepuis(u.juge, u.qi);
+	});
 	boutonQuiz.addEventListener("click", () => { if (uniteCourante) ouvrirDepuis(uniteCourante.juge, uniteCourante.qi); });
 	/* The units: each card of a step page of a Learn, and the single card of
 	   any other question slide. `juge` is the element whose classes say
@@ -907,5 +930,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 		observateur.disconnect();
 		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
 		boutonQuiz.remove();
+		rail.remove();
+		document.body.classList.remove("nq-explain-rail-on");
 	};
 }
