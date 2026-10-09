@@ -204,6 +204,8 @@ export const EN_APP = {
 	"app.settings.explainHint": "In the Explain window you write your own question. Behind the scenes, every message carries the whole quiz (the question you opened it from marked, with your answer), the text of the notes and PDFs of its folder and its pictures.",
 	"app.settings.examPrompt": "/exam prompt",
 	"app.settings.examPromptHint": "The request /exam writes for you once an exam is picked. {exam}, {module} and {date} are replaced by the exam's own; what you type in the composer is added under it.",
+	"app.settings.silence": "Silent mode",
+	"app.settings.silenceHint": "No sound and no notification when a quiz or an explanation is ready.",
 	"app.settings.explainMaxChars": "Longest explanation",
 	"app.settings.explainMaxCharsHint": "In characters. The AI provider is asked to stay under it.",
 	"app.settings.navFolders": "Folders",

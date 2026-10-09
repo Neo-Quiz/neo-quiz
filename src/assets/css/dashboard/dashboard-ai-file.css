@@ -978,6 +978,34 @@
 	width: 15px;
 	height: 15px;
 }
+/* Under a request: who sent it, where it ran, and its state there. */
+.qbd-ai-origine {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 4px 8px;
+	margin: 4px 2px 8px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+.qbd-ai-origine-seg {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.qbd-ai-origine-icone {
+	display: inline-flex;
+}
+.qbd-ai-origine-icone svg {
+	width: 13px;
+	height: 13px;
+}
+.qbd-ai-statut {
+	margin: 4px 2px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
 /* A request is waiting or running in this chat: a turning mark (the plan's
    own animation), where the delete button would be. */
 .qbd-ai-chat-actif {

@@ -102,6 +102,11 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 		results: mergeResults(old?.results ?? [], terminal.flatMap(resultsOfLine)),
 		state,
 	};
+	// A request sent from another device keeps who sent it and where it ran.
+	const fromName = old?.fromName ?? first.fromName;
+	if (fromName) req.fromName = fromName;
+	const on = old?.on ?? (req.from !== device ? device : undefined);
+	if (on) req.on = on;
 	// The questions asked under the request stay with it.
 	if (old?.clarify) req.clarify = old.clarify;
 	// The settings frozen at the send stay as first recorded.
@@ -201,7 +206,7 @@ export function resumeSource(req: ChatRequest): { text: string; genre: "learn" |
     idempotent on the request id; a deleted chat stays deleted. */
 export function addFailedRequest(chats: readonly ChatRecord[], req: RemoteRequest, device: string, rootId: string, now: number, error: string): ChatRecord[] {
 	const request: ChatRequest = {
-		id: req.id, at: req.at, from: req.from, text: req.text, mode: req.mode,
+		id: req.id, at: req.at, from: req.from, ...(req.fromName ? { fromName: req.fromName } : {}), on: device, text: req.text, mode: req.mode,
 		documents: req.documents.map(d => {
 			const path = absoluteInRoot(d.path, rootId);
 			const name = d.path.slice(d.path.lastIndexOf("/") + 1);

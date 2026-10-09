@@ -28,6 +28,8 @@ import type { RunningEntry } from "../shared-state/generations";
 import { canOpenCard } from "../shared-state/chat-merge";
 import { peindreQuestions } from "./generation-kind-vue";
 import type { PasteOutcome } from "./relay-flow";
+import { recordOrigin } from "../shared-state/request-origin";
+import { originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
     else the name cut IN THE MIDDLE so the extension always shows). */
@@ -50,7 +52,7 @@ export function peindrePieces(parent: HTMLElement, notes: readonly { name: strin
 	}
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { ouvrir(path: string): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; ouvrir(path: string): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -61,6 +63,9 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		if (q.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), q.documents);
 		if (q.text.trim()) ajouter(message, "div", "qbd-ai-bulle", q.text.trim());
 	}
+	// Who sent it and where it ran (a record always has both).
+	const { sender, runner } = recordOrigin(q, deps.chatOrigin, originContext());
+	peindreOrigine(tour, sender, runner);
 	if (q.clarify) {
 		const id = q.id;
 		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
@@ -94,7 +99,9 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 	if (q.state === "failed" || q.state === "stopped") {
 		const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--echouee");
 		host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), q.state === "failed" ? "alert-triangle" : "square");
-		ajouter(rep, "span", "qbd-ai-reponse-texte", q.state === "failed" ? (q.error || t("ai.thread.failed")) : t("ai.thread.stopped"));
+		ajouter(rep, "span", "qbd-ai-reponse-texte", statusText(q.state, runner, q.error));
+	} else if (q.results.length) {
+		ajouter(tour, "div", "qbd-ai-statut", statusText("done", runner));
 	}
 }
 
@@ -102,16 +109,18 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
     message, then its progress read from that device's file. Never a stop
     button or a transcript: only the PC that runs it can show those. A stale
     file reads "paused" and never shows progress. */
-export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEntry, stale: boolean): void {
+export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEntry, stale: boolean, device: string): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
 	tour.dataset.distante = entry.requestId;
 	if (entry.text.trim()) ajouter(ajouter(tour, "div", "qbd-ai-message"), "div", "qbd-ai-bulle", entry.text.trim());
+	const { sender, runner } = refsOf(entry.from, undefined, device);
+	peindreOrigine(tour, sender, runner);
 	const rep = ajouter(tour, "div", stale ? "qbd-ai-reponse" : "qbd-ai-reponse qbd-ai-reponse--cours");
 	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), stale ? "pause" : "loader");
 	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
-	ajouter(corps, "span", "qbd-ai-reponse-etape", t("ai.remote.onDevice"));
+	ajouter(corps, "span", "qbd-ai-reponse-etape", statusText(stale ? "paused" : "running", runner));
 	if (stale) { ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.paused")); return; }
 	const p = entry.progress;
 	/* Before the first question, the PC's model is reasoning: its size says it
@@ -122,7 +131,7 @@ export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEn
 }
 
 /** A request the phone sent that no PC has taken yet: its message, then "Waiting for the PC" (or "Expired" past 24 h). `pcReachable` false (the PC the request was sent to is not fresh) adds the one line saying the PC does not seem on. */
-export function peindreEnAttente(parent: HTMLElement, item: { key: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcReachable: boolean): void {
+export function peindreEnAttente(parent: HTMLElement, item: { key: string; target: string; from: string; fromName?: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcReachable: boolean): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -133,10 +142,12 @@ export function peindreEnAttente(parent: HTMLElement, item: { key: string; reque
 		peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), notes);
 	}
 	if (item.request.text.trim()) ajouter(message, "div", "qbd-ai-bulle", item.request.text.trim());
+	const refs = refsOf(item.from, item.fromName, item.target);
+	peindreOrigine(tour, refs.sender, refs.runner);
 	const rep = ajouter(tour, "div", item.state === "expired" ? "qbd-ai-reponse qbd-ai-reponse--echouee" : "qbd-ai-reponse qbd-ai-reponse--cours");
 	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), item.state === "expired" ? "alert-circle" : "clock");
 	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
-	ajouter(corps, "span", "qbd-ai-reponse-texte", t(item.state === "expired" ? "ai.remote.expired" : "ai.remote.waiting"));
+	ajouter(corps, "span", "qbd-ai-reponse-texte", statusText(item.state, refs.runner));
 	if (item.state === "waiting" && !pcReachable) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.noPc"));
 }
 

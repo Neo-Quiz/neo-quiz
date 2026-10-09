@@ -201,3 +201,14 @@ export function setRemoteModel(id: string): void {
 		try { cb(); } catch (e) { console.warn(LOG_PREFIX, "devices listener failed:", e); }
 	}
 }
+
+let ownDeviceName = "";
+
+/** The name this device gave itself in Settings, Sync (a phone's model by default), as last reported by the Sync state. */
+export function getOwnDeviceName(): string {
+	return ownDeviceName;
+}
+
+export function setOwnDeviceName(name: string): void {
+	ownDeviceName = name.trim().slice(0, 64);
+}

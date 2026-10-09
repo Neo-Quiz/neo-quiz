@@ -24,7 +24,7 @@ export type ThreadItem =
 	/** A request running on ANOTHER device, read from its generations file. `stale`: that file is too old to mean a running PC. */
 	| { kind: "remote"; key: string; at: number; entry: RunningEntry; device: string; stale: boolean }
 	/** A request the phone sent and no PC has taken yet (its own file). `expired`: past the 24 h age limit. */
-	| { kind: "pending"; key: string; at: number; target: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" };
+	| { kind: "pending"; key: string; at: number; target: string; from: string; fromName?: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" };
 
 /** A line sent before send times were kept goes after everything recorded. */
 const UNKNOWN_TIME = Number.MAX_SAFE_INTEGER;
@@ -59,7 +59,7 @@ export function threadItems(chat: ChatRecord | null, lines: readonly LigneGenera
 			if (req.chatId !== chatId || liveKeys.has(req.id) || recorded.has(req.id) || runningElsewhere.has(req.id)) continue;
 			const state = pendingState(req, { recorded: new Set(), running: new Set(), now });
 			if (state !== "waiting" && state !== "expired") continue;
-			items.push({ kind: "pending", key: req.id, at: req.at, target: req.target, request: { text: req.text, documents: req.documents.map(d => ({ path: d.path })) }, state });
+			items.push({ kind: "pending", key: req.id, at: req.at, target: req.target, from: req.from, ...(req.fromName ? { fromName: req.fromName } : {}), request: { text: req.text, documents: req.documents.map(d => ({ path: d.path })) }, state });
 		}
 	}
 	return items.sort((a, b) => a.at - b.at);

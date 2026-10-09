@@ -11,6 +11,7 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { ChatRecord } from "./chat-record";
 import { chatTitle, firstLineOf } from "./chat-record";
 import { chatOfLine, isLive } from "./chat-requests";
+import { chatSender } from "../shared-state/request-origin";
 import { isDead, isStale } from "../shared-state/generations";
 import type { GenerationsFile, RunningEntry } from "../shared-state/generations";
 
@@ -22,8 +23,11 @@ export interface ChatListItem {
 	running: boolean;
 	/** The device that started the chat ("" for a chat that exists only in the queue). */
 	origin: string;
-	/** Started on another device than `device` (never true for a chat only in the queue). */
+	/** Sent from another device than `device` (never true for a chat only in the queue). */
 	foreign: boolean;
+	/** The device that SENT the chat's first request (`origin` when there is none), and the name it gave itself. */
+	sender: string;
+	senderName?: string;
 }
 
 export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = "", remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = []): ChatListItem[] {
@@ -40,7 +44,9 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		for (const e of file.running) if (!runningElsewhere.has(e.chatId)) runningElsewhere.set(e.chatId, e);
 	}
 	for (const c of chats) {
-		if (!c.deleted) items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && c.origin !== device });
+		if (c.deleted) continue;
+		const s = chatSender(c.requests, c.origin);
+		items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && s.id !== device, sender: s.id, ...(s.name ? { senderName: s.name } : {}) });
 	}
 	const tombstones = new Set(chats.filter(c => c.deleted).map(c => c.id));
 	for (const l of lines) {
@@ -50,7 +56,7 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		let item = items.get(id);
 		if (!item) {
 			const d = l.demande;
-			item = { id, title: firstLineOf(d.text) || d.notes[0]?.name || "", date: d.sentAt ?? now, running: false, origin: "", foreign: false };
+			item = { id, title: firstLineOf(d.text) || d.notes[0]?.name || "", date: d.sentAt ?? now, running: false, origin: "", foreign: false, sender: "" };
 			items.set(id, item);
 		}
 		if (isLive(l)) item.running = true;
@@ -61,11 +67,11 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		if (item) { item.running = true; continue; }
 		// Known only from the other device's generation: listed until its chat record lands.
 		if (tombstones.has(id)) continue;
-		items.set(id, { id, title: entry.text, date: entry.startedAt, running: true, origin: entry.from, foreign: !!device && entry.from !== device });
+		items.set(id, { id, title: entry.text, date: entry.startedAt, running: true, origin: entry.from, foreign: !!device && entry.from !== device, sender: entry.from });
 	}
 	for (const [id, entry] of pausedElsewhere) {
 		if (items.has(id) || tombstones.has(id)) continue;
-		items.set(id, { id, title: entry.text, date: entry.startedAt, running: false, origin: entry.from, foreign: !!device && entry.from !== device });
+		items.set(id, { id, title: entry.text, date: entry.startedAt, running: false, origin: entry.from, foreign: !!device && entry.from !== device, sender: entry.from });
 	}
 	return [...items.values()].sort((a, b) => b.date - a.date);
 }

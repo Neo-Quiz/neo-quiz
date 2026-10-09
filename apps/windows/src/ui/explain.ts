@@ -48,6 +48,7 @@ import { restoreBlock, saveCardEdit } from "../../../../src/dashboard/detail-io"
 import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { lireCours } from "./explain-cours";
+import { annoncerExplication } from "./notif-fin";
 import type { Cours } from "./explain-cours";
 import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
@@ -844,6 +845,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 							},
 						});
 						rep.text = reponse;
+						annoncerExplication();
 						conv.historique.push({ role: "assistant", text: reponse });
 					} catch (err) {
 						const e = err as Error & { aborted?: boolean };

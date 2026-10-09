@@ -317,3 +317,68 @@ await withSrcModule(["src/dashboard/chat-settings.ts"], (S) => {
 	r.check("already on those settings: nothing to save", S.settingsOnSwitch(chat(rq("a", { provider: "claude-code", model: "sonnet", effort: "low" })), env(cur)), null);
 	r.done();
 });
+
+await withSrcModule(["src/shared-state/request-origin.ts"], (O) => {
+	const r = makeReporter("Where a request came from and where it runs");
+	const PC = "8c957e3f-a544-46d4-9772-cae57e52c76b", LAPTOP = "79de58ad-fd6c-4020-8e83-b7526b694511", PHONE = "242c713d-3dd4-4f3e-bdc9-9f1597a3bb01";
+	const devices = [{ device: PC, name: "DESKTOP-1U89520", kind: "desktop" }, { device: LAPTOP, name: "LAPTOP-A3U7EC1B", kind: "laptop" }];
+	const ctx = { self: PC, devices };
+	const words = { phone: "a phone", pc: "a PC", self: "this device" };
+	const label = d => O.deviceLabel(d, words);
+
+	// A phone request run by this PC, recorded before names were kept (the real chat "9").
+	const old = O.recordOrigin({ from: PHONE }, PC, ctx);
+	r.check("an old phone request: a phone sent it (no file), the chat's PC ran it", [old.sender.role, old.runner.id, old.runner.role, old.runner.self], ["phone", PC, "desktop", true]);
+	r.check("no name anywhere: a readable word, not an id", [label(old.sender), label(old.runner)], ["a phone", "DESKTOP-1U89520 (this device)"]);
+	const named = O.recordOrigin({ from: PHONE, fromName: "Xiaomi 13T Pro", on: PC }, PC, ctx);
+	r.check("the name the phone sent is used", label(named.sender), "Xiaomi 13T Pro");
+	r.check("a device file wins over the name carried by the request", label(O.recordOrigin({ from: LAPTOP, fromName: "other", on: PC }, PC, ctx).sender), "LAPTOP-A3U7EC1B");
+	r.check("icons by kind: smartphone, laptop, monitor", [O.ROLE_ICON[named.sender.role], O.ROLE_ICON[O.recordOrigin({ from: LAPTOP, on: PC }, PC, ctx).sender.role], O.ROLE_ICON[named.runner.role]], ["smartphone", "laptop", "monitor"]);
+	r.check("the recorded runner wins over the chat's origin", O.runnerOf({ from: PHONE, on: LAPTOP }, PC), LAPTOP);
+	const local = O.recordOrigin({ from: PC }, PC, ctx);
+	r.check("sent and run on the same PC: one device", [local.sender.id === local.runner.id, local.sender.role], [true, "desktop"]);
+	r.check("seen from the laptop, the PC is not 'this device'", label(O.recordOrigin({ from: PC }, PC, { ...ctx, self: LAPTOP }).runner), "DESKTOP-1U89520");
+	r.check("on the phone itself, the sender is 'this device' under its own name", label(O.resolveDevice(PHONE, { self: PHONE, selfName: "Xiaomi 13T Pro", devices }, { sender: true, runnerId: PC })), "Xiaomi 13T Pro (this device)");
+	r.check("ids compare without case", O.resolveDevice(PC.toUpperCase(), ctx).self, true);
+	r.check("the sidebar's sender is the first request's sender, else the chat's origin",
+		[O.chatSender([{ from: PHONE, fromName: "Xiaomi" }], PC), O.chatSender([], PC)], [{ id: PHONE, name: "Xiaomi" }, { id: PC }]);
+	r.done();
+});
+
+await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-requests.ts", "src/dashboard/chat-list.ts"], (C, Q, L) => {
+	const r = makeReporter("Sender and runner in the record and the sidebar");
+	const PC = "pc-1", PHONE = "phone-1";
+	const demande = { text: "9", notes: [], images: [], mode: "learn", chatId: "c1", requestId: "r1", sentAt: 10, fromDevice: PHONE, fromName: "Xiaomi 13T Pro" };
+	const rec = Q.recordRequest(Q.groupLines([{ id: 1, etat: "arret", demande }])[0], PC, 100);
+	r.check("a phone request run here keeps who sent it, its name, and where it ran", [rec.from, rec.fromName, rec.on, rec.state], [PHONE, "Xiaomi 13T Pro", PC, "stopped"]);
+	const here = Q.recordRequest(Q.groupLines([{ id: 1, etat: "prete", demande: { ...demande, fromDevice: undefined, fromName: undefined }, resultat: { titre: "A", chemin: "a.md" } }])[0], PC, 100);
+	r.check("a request sent and run here carries neither", ["fromName" in here, "on" in here], [false, false]);
+	const back = C.readChats({ v: 1, chats: [{ id: "c1", origin: PC, createdAt: 1, updatedAt: 2, requests: [{ ...rec, fromName: "x‮y" }] }] })[0].requests[0];
+	r.check("a stored name with bidi controls is dropped, the rest is read back", [back.fromName, back.on, back.from], [undefined, PC, PHONE]);
+	const items = L.chatListItems([{ id: "c1", origin: PC, createdAt: 1, updatedAt: 2, requests: [rec] }], [], 5, PC);
+	r.check("a chat sent from the phone is marked foreign on the PC that ran it, with the sender's name", [items[0].foreign, items[0].sender, items[0].senderName], [true, PHONE, "Xiaomi 13T Pro"]);
+	r.check("the same chat is not foreign on the phone", L.chatListItems([{ id: "c1", origin: PC, createdAt: 1, updatedAt: 2, requests: [rec] }], [], 5, PHONE)[0].foreign, false);
+	r.done();
+});
+
+await withSrcModule(["src/dashboard/finish-notify.ts"], (N) => {
+	const r = makeReporter("When to tell the user something finished");
+	const base = { silence: false, foreground: false, recent: [], now: 10_000_000 };
+	r.check("window hidden, not silent: notify", N.decideNotify(base), { notify: true });
+	r.check("window in front: nothing", N.decideNotify({ ...base, foreground: true }), { notify: false, reason: "foreground" });
+	r.check("silent mode cuts everything, hidden window or not", [N.decideNotify({ ...base, silence: true }), N.decideNotify({ ...base, silence: true, foreground: true })], [{ notify: false, reason: "silence" }, { notify: false, reason: "silence" }]);
+	r.check("two within 2 s: the second is refused (the main process would drop it)", N.decideNotify({ ...base, recent: [base.now - 1000] }), { notify: false, reason: "limit" });
+	r.check("2 s apart is allowed", N.decideNotify({ ...base, recent: [base.now - 2000] }), { notify: true });
+	const full = Array.from({ length: N.NOTIFY_MAX_PER_HOUR }, (_, i) => base.now - 60_000 - i * 1000);
+	r.check("30 in the last hour: refused", N.decideNotify({ ...base, recent: full }), { notify: false, reason: "limit" });
+	r.check("30 but the oldest left the hour: allowed again", N.decideNotify({ ...base, recent: [...full.slice(0, -1), base.now - 3_600_001] }), { notify: true });
+	r.check("remembering drops what left the hour", N.remember([1, base.now - 5000], base.now), [base.now - 5000, base.now]);
+	const L = (id, etat, resultat) => ({ id, etat, resultat, demande: {} });
+	const seen = new Set();
+	N.newlyReady(seen, [L(1, "prete", { titre: "Old", chemin: "o.md" })]);
+	r.check("a line already ready at start announces nothing later", N.newlyReady(seen, [L(1, "prete", { titre: "Old", chemin: "o.md" })]), []);
+	r.check("a line that becomes ready is announced once", [N.newlyReady(seen, [L(2, "cours")]).length, N.newlyReady(seen, [L(2, "prete", { titre: "Q", chemin: "q.md" })]).map(l => l.id), N.newlyReady(seen, [L(2, "prete", { titre: "Q", chemin: "q.md" })]).length], [0, [2], 0]);
+	r.check("a failed or stopped line is not 'ready'", N.newlyReady(seen, [L(3, "echouee"), L(4, "arret")]), []);
+	r.check("what a line announces: the quiz title, or a plain answer", [N.readyKind({ resultat: { titre: " Pointers ", chemin: "p.md" } }), N.readyKind({ resultat: { titre: "", chemin: "", texte: "hi" } })], [{ kind: "quiz", title: "Pointers" }, { kind: "text" }]);
+	r.done();
+});
