@@ -1,8 +1,8 @@
 {
-  "versionCode": 17,
-  "versionName": "0.2.15",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.15/NeoQuiz-0.2.15.apk",
-  "sha256": "02dd67ddcb370dbd2cdf66d9d19ee0575e5c1a86c199a12ea03a3528b3603880",
-  "size": 55991669,
-  "notes": "\"Full-screen picture viewer with pinch zoom.\""
+  "versionCode": 18,
+  "versionName": "0.2.16",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.16/NeoQuiz-0.2.16.apk",
+  "sha256": "2f93f8307431687a7babc8e69577b25124a32b48089f62af5875616e678dd273",
+  "size": 55992749,
+  "notes": "\"New picture viewer.\""
 }
