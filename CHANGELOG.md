@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Reading cards of a Learn now have an "Explain" button. The chat can rewrite the card on request ("make it simpler", "add an example"): it shows a preview, and the card changes only when you click "Apply to the card", with an "Undo" to put the previous version back. Readings may also be about 50 % longer (up to 1800 characters).
+
 ## [1.20.59] - 2026-10-09
 
 ### Changed

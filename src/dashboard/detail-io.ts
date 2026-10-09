@@ -9,6 +9,7 @@ import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { applyKeepExam, type KeepExam } from "./exam-keep";
+import { applyCardEdit } from "./card-edit";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL I/O — lecture / écriture du bloc quiz-blocks d'une note
@@ -245,4 +246,55 @@ export function questionText(q: DraftQuestion): string {
 		.replace(/^\s*#{1,6}\s+/gm, "")
 		.replace(/\s+/g, " ")
 		.trim();
+}
+
+/** Outcome of a block rewrite made from the "Explain" chat. */
+export type BlockRewrite = { ok: true; block: string } | { ok: false; reason: "stale" | "failed" };
+
+/**
+ * The shared body of the two card writes below, with the guarantees of
+ * `saveKeepExam`: `fs.process` (an indivisible read-modify-write whose callback
+ * may be replayed), COMPARE-AND-SWAP on the block (`expectedBlock` is what the
+ * caller last read or wrote: anything else means the note changed, and nothing
+ * is written), the fences and line endings of the note, a replacement by
+ * FUNCTION (never `$1` patterns). `compute` returns the new source or null.
+ */
+async function rewriteBlock(path: string, expectedBlock: string, compute: (source: string) => string | null): Promise<BlockRewrite> {
+	try {
+		let result: BlockRewrite = { ok: false, reason: "failed" };
+		await currentHost().fs.process(path, (content) => {
+			result = { ok: false, reason: "failed" };
+			const actual = content.match(QUIZ_BLOCK_RE);
+			if (!actual) return content;
+			if (actual[1] !== expectedBlock) { result = { ok: false, reason: "stale" }; return content; }
+			const next = compute(actual[1]);
+			if (next === null) return content;
+			result = { ok: true, block: next };
+			if (next === actual[1]) return content;
+			const at = actual[0].indexOf("\n") + 1;
+			const block = actual[0].slice(0, at) + next + actual[0].slice(at + actual[1].length);
+			return content.replace(QUIZ_BLOCK_RE, () => block);
+		});
+		return result;
+	} catch {
+		return { ok: false, reason: "failed" };
+	}
+}
+
+/**
+ * Rewrites ONE reading card (text fields only, `applyCardEdit`) after the
+ * learner clicked "Apply" in the Explain chat. Nothing else of the note moves.
+ * `expected` is the card as the page read it.
+ */
+export function saveCardEdit(path: string, expectedBlock: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>): Promise<BlockRewrite> {
+	return rewriteBlock(path, expectedBlock, (source) => applyCardEdit(source, qi, expected, fields));
+}
+
+/**
+ * "Undo" of the above: puts back `original`, the block as it was BEFORE the
+ * edit, byte for byte. Refused (nothing written) when the block is no longer
+ * the one `saveCardEdit` wrote.
+ */
+export function restoreBlock(path: string, expectedBlock: string, original: string): Promise<BlockRewrite> {
+	return rewriteBlock(path, expectedBlock, () => original);
 }

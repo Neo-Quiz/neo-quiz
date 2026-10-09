@@ -649,6 +649,105 @@ await withSrcModule(
 			JSON5.parse(keepMod.applyKeepExam(["[", Q1, "]"].join(LF), { minutes: 300 })).at(-1), { mode: "exam", examDurationMinutes: 300 });
 	}
 
+	/* ─────────── 15. REWRITING ONE READING CARD (the "Explain" chat, 2026-10-09) ─────────── */
+
+	{
+		/* The learner clicked "Apply" on a card the chat rewrote: only that card
+		   changes, in the note's own text (quotes, comments, line endings kept),
+		   through the same compare-and-swap as every other write; "Undo" puts the
+		   note back byte for byte. Every expected note is written out by hand. */
+		const RE_BLOC = new RegExp(FENCE + "quiz-blocks[^\\n]*\\n([\\s\\S]*?)\\r?\\n[ \\t]*" + FENCE);
+		const bloc = (contenu) => contenu.match(RE_BLOC)[1];
+		const LECTURE = "\t{ id: 'r1', role: 'read', title: 'Lists', promptHtml: \"<p>Old $1$ text</p>\", etapes: ['a', \"b\"], cite: 'CM1.pdf, p. 3' },";
+		const LECTURE_NEUVE = "\t{ id: 'r1', role: 'read', title: 'Lists, simply', promptHtml: \"<p>New $1$ &amp; more</p>\", etapes: [\"a\",\"b\",\"c\"], cite: 'CM1.pdf, p. 3' },";
+		const AUTRE = "\t{ id: 'q1', title: 'Unite', prompt: \"" + ENONCE_PIEGE + "\", options: ['un', 'deux'], correctIndex: 0 }, // keep me";
+		const CONFIG = "\t{ mode: 'learn', glossary: [] },";
+		const carte = { id: "r1", role: "read", title: "Lists", promptHtml: "<p>Old $1$ text</p>", etapes: ["a", "b"], cite: "CM1.pdf, p. 3" };
+		const champs = { title: "Lists, simply", promptHtml: "<p>New $1$ &amp; more</p>", etapes: ["a", "b", "c"] };
+		const ecrire = (v, qi = 0, attendue = carte, f = champs) => io.saveCardEdit(v.chemin, bloc(v.contenu), qi, attendue, f);
+
+		// a. config last, LF: only the card moves; undo restores the note byte for byte
+		for (const [nom, eol] of [["LF", LF], ["CRLF", CRLF]]) {
+			const depart = note({ source: ["[", "\t// ── intro ──", LECTURE, "", AUTRE, CONFIG, "]"].join(LF), eol });
+			const v = vault(depart);
+			const avant = bloc(v.contenu);
+			const res = await ecrire(v);
+			r.check("15a " + nom + ". the write succeeds", res.ok, true);
+			r.check("15a " + nom + ". only the card changed, every other byte is the note's",
+				premierEcart(v.contenu, note({ source: ["[", "\t// ── intro ──", LECTURE_NEUVE, "", AUTRE, CONFIG, "]"].join(LF), eol })), "identiques");
+			r.check("15a " + nom + ". the block it reports is the one written", res.ok && res.block === bloc(v.contenu), true);
+			const retour = await io.restoreBlock(v.chemin, res.block, avant);
+			r.check("15a " + nom + ". undo succeeds", retour.ok, true);
+			r.check("15a " + nom + ". … and gives the note back byte for byte", premierEcart(v.contenu, depart), "identiques");
+		}
+
+		// b. the configuration object FIRST: the card's index among the questions is shifted by one in the block
+		{
+			const depart = note({ source: ["[", CONFIG, LECTURE, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			r.check("15b. config first: the right card is rewritten", (await ecrire(v)).ok, true);
+			r.check("15b. … and nothing else",
+				premierEcart(v.contenu, note({ source: ["[", CONFIG, LECTURE_NEUVE, AUTRE, "]"].join(LF) })), "identiques");
+		}
+
+		// c. a note changed in the meantime is refused, whatever the change
+		{
+			const depart = note({ source: ["[", LECTURE, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			const lu = bloc(v.contenu);
+			const dehors = note({ source: ["[", LECTURE, AUTRE.replace("keep me", "changed outside"), "]"].join(LF) });
+			v.contenu = dehors;
+			const res = await io.saveCardEdit(v.chemin, lu, 0, carte, champs);
+			r.check("15c. a block changed since the page read it is refused, as stale", [res.ok, res.reason], [false, "stale"]);
+			r.check("15c. … and the note keeps the other writer's version", v.contenu, dehors);
+		}
+
+		// d. text OUTSIDE the block moving does not matter: the block is the unit
+		{
+			const v = vault(note({ source: ["[", LECTURE, "]"].join(LF) }));
+			const lu = bloc(v.contenu);
+			v.contenu = v.contenu.replace("Texte apres le bloc.", "Texte modifie.");
+			r.check("15d. a change outside the block does not refuse the write", (await io.saveCardEdit(v.chemin, lu, 0, carte, champs)).ok, true);
+			r.check("15d. … and is kept", v.contenu.includes("Texte modifie."), true);
+		}
+
+		// e. cases that must not write
+		{
+			const depart = note({ source: ["[", LECTURE, AUTRE, "]"].join(LF) });
+			const v = vault(depart);
+			r.check("15e. a card that is no longer the one the page saw is refused",
+				(await ecrire(v, 0, { ...carte, title: "Other" })).ok, false);
+			r.check("15e. a question that is not a reading is refused, even when it is exactly the card the caller passed",
+				(await ecrire(v, 1, { id: "q1", title: "Unite", prompt: ENONCE_PIEGE, options: ["un", "deux"], correctIndex: 0 }, { prompt: "rewritten" })).ok, false);
+			r.check("15e. an index past the end is refused", (await ecrire(v, 9)).ok, false);
+			r.check("15e. no field is refused", (await ecrire(v, 0, carte, {})).ok, false);
+			r.check("15e. … and the note was never touched", v.contenu, depart);
+		}
+
+		// f. undo is refused once the block moved on
+		{
+			const v = vault(note({ source: ["[", LECTURE, AUTRE, "]"].join(LF) }));
+			const avant = bloc(v.contenu);
+			const res = await ecrire(v);
+			const ecrite = v.contenu;
+			const plus = ecrite.replace("keep me", "edited after");
+			v.contenu = plus;
+			const retour = await io.restoreBlock(v.chemin, res.block, avant);
+			r.check("15f. undo of a block edited since is refused", [retour.ok, retour.reason], [false, "stale"]);
+			r.check("15f. … and the later edit is kept", v.contenu, plus);
+		}
+
+		// g. a key the card lacks is added after its last entry, quotes of the note
+		{
+			const sans = "\t{ id: 'r1', role: 'read', title: 'Lists', etapes: ['a'] },";
+			const v = vault(note({ source: ["[", sans, "]"].join(LF) }));
+			const res = await io.saveCardEdit(v.chemin, bloc(v.contenu), 0, { id: "r1", role: "read", title: "Lists", etapes: ["a"] }, { prompt: "It's new" });
+			r.check("15g. a missing key is added", res.ok, true);
+			r.check("15g. … after the last entry, in the quote of the title",
+				premierEcart(v.contenu, note({ source: ["[", "\t{ id: 'r1', role: 'read', title: 'Lists', etapes: ['a'], prompt: 'It\\'s new' },", "]"].join(LF) })), "identiques");
+		}
+	}
+
 	r.done();
 	hote.uninstallHost();
 });

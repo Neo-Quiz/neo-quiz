@@ -414,3 +414,53 @@
 	justify-content: flex-start;
 	margin-top: 14px;
 }
+
+/* A new version of a reading card proposed by the chat: a preview, then
+   "Apply to the card" (flat, as everything inside a modal). */
+.nq-explain-edit {
+	margin-top: 10px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-secondary);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.nq-explain-edit-refus {
+	color: var(--text-muted);
+	font-size: 13px;
+}
+.nq-explain-edit-titre {
+	font-weight: 600;
+	font-size: 13px;
+}
+.nq-explain-edit-apercu {
+	font-size: 13.5px;
+}
+.nq-explain-edit-apercu h4 {
+	margin: 0 0 6px;
+}
+.nq-explain-edit-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.nq-explain-edit-btn {
+	padding: 6px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent, #fff);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+.nq-explain-edit-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.nq-explain-edit-msg {
+	color: var(--text-muted);
+	font-size: 12.5px;
+}

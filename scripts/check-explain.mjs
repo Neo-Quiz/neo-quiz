@@ -84,3 +84,84 @@ await withSrcModule("src/explain-course.ts", ({ sansQuiz, estCite, ordreCours, a
 	r.check("over the size: skipped, a smaller one after it still fits", choisirImages(gros, new Map()).map(f => f.name), ["a.png", "c.png"]);
 	r.done();
 });
+
+/* ─────────── Rewriting a reading card from the chat (2026-10-09) ─────────── */
+
+await withSrcModule(["src/explain-edit.ts", "src/explain-prompt.ts", "src/lecture-style.ts"], ({ splitCardEdit, validateCardEdit, cardTextLength, consigneEditionCarte, CARD_EDIT_MAX_CHARS, CARD_EDIT_GROWTH }, { contexteQuiz }, { READING_MAX_CHARS }) => {
+	const r = makeReporter("Explain: a reading card rewritten by the chat");
+	const x = (n) => "x".repeat(n);
+	const original = { id: "r1", role: "read", title: "Lists", promptHtml: "<p>" + x(700) + "</p>", etapes: ["first step", "second step"], cite: "CM1.pdf, p. 3", figure: "CM1.pdf, p. 4" };
+	let sanitized = 0;
+	/* A stand-in for `sanitizeQuizHtml` (linkedom cannot hold a <template>, see check-windows-host): it drops scripts and handlers and counts its calls. */
+	const sanitize = (h) => { sanitized++; return h.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, ""); };
+	const juge = (o, json) => validateCardEdit(o, typeof json === "string" ? json : JSON.stringify(json), sanitize);
+	const motif = (o, json) => { const v = juge(o, json); return v.ok ? "ok" : v.reason; };
+
+	r.check("the limits: 1800 characters for a reading (it was about 1200), +25 % at most for a rewrite",
+		[READING_MAX_CHARS, CARD_EDIT_GROWTH, CARD_EDIT_MAX_CHARS], [1800, 1.25, 2250]);
+
+	// ── reading the block out of the answer
+	const bloc = (j) => "<card-edit>" + j + "</card-edit>";
+	const a = splitCardEdit("Here it is.\n" + bloc('{"title":"T"}') + "\nHope it helps.");
+	r.check("the block is cut out of the text and its JSON found", [a.shown, a.raw, a.pending], ["Here it is.\n\nHope it helps.", '{"title":"T"}', false]);
+	const b = splitCardEdit("Working on it.\n<card-edit>{\"title\": \"T");
+	r.check("a block still being written is hidden, not shown", [b.shown, b.raw, b.pending], ["Working on it.", null, true]);
+	r.check("a fence around the JSON is removed", splitCardEdit(bloc("```json\n{\"title\":\"T\"}\n```")).raw, '{"title":"T"}');
+	r.check("no block: the text as is", [splitCardEdit("Just an answer.").shown, splitCardEdit("Just an answer.").raw], ["Just an answer.", null]);
+	r.check("two blocks: the last one wins", splitCardEdit(bloc('{"title":"A"}') + bloc('{"title":"B"}')).raw, '{"title":"B"}');
+
+	// ── what is refused
+	r.check("a valid rewrite with an example is proposed", motif(original, { title: "Lists, simply", promptHtml: "<p>" + x(900) + "</p>", etapes: ["a", "b", "c"] }), "ok");
+	r.check("invalid JSON", [motif(original, "{title: 'T'"), motif(original, "not json"), motif(original, "[1]"), motif(original, "null"), motif(original, "\"str\"")], ["json", "json", "json", "json", "json"]);
+	r.check("an empty object", motif(original, {}), "empty");
+	r.check("a field that is not the text of the reading: refused",
+		["cite", "figure", "id", "role", "slice", "options", "correctIndex", "explain", "answer", "methode", "tableau"].map(k => motif(original, { title: "T", [k]: "x" })),
+		new Array(11).fill("field"));
+	r.check("a prototype key is a forbidden field", motif(original, '{"__proto__":{"title":"x"}}'), "field");
+	r.check("another question: its id or its own keys are refused", [motif(original, { id: "q2", title: "Other" }), motif(original, { prompt: "x", options: ["a"], correctIndex: 0 })], ["field", "field"]);
+	r.check("the card must be a reading", motif({ ...original, role: "recall" }, { title: "T" }), "notReading");
+	r.check("`prompt` on a card that uses `promptHtml` (and the reverse) is refused",
+		[motif(original, { prompt: "text" }), motif({ id: "r2", role: "read", title: "T", prompt: x(700) }, { promptHtml: "<p>x</p>" })], ["field", "field"]);
+	r.check("wrong types: a title, a text, steps, key points", [
+		motif(original, { title: 3 }), motif(original, { title: "  " }), motif(original, { promptHtml: 3 }), motif(original, { promptHtml: "<script>x</script>" }),
+		motif(original, { etapes: "a" }), motif(original, { etapes: [] }), motif(original, { etapes: ["a", ""] }), motif(original, { etapes: new Array(13).fill("s") }),
+		motif(original, { retenir: { forme: "cartes", items: [] } }), motif(original, { retenir: "x" }),
+	], new Array(10).fill("type"));
+	r.check("key points of either form are accepted",
+		[motif(original, { retenir: { forme: "cartes", items: [{ recto: "a", verso: "b" }] } }), motif(original, { retenir: { forme: "recap", items: ["fact", "fact two"] } })], ["ok", "ok"]);
+
+	// ── length: the limit +25 %, and no loss of more than 30 %
+	const fixe = { id: "r3", role: "read", title: "T", promptHtml: "<p>" + x(100) + "</p>" };
+	const faitLe = (n) => ({ promptHtml: "<p>" + x(n) + "</p>" });
+	const ajuste = (cible) => faitLe(cible - cardTextLength({ title: "T" }));
+	r.check("exactly the limit +25 % passes, one more character is too long",
+		[motif(fixe, ajuste(CARD_EDIT_MAX_CHARS)), motif(fixe, ajuste(CARD_EDIT_MAX_CHARS + 1))], ["ok", "tooLong"]);
+	const grande = { id: "r4", role: "read", title: "T", promptHtml: "<p>" + x(1000) + "</p>" };
+	const avant = cardTextLength(grande);
+	const seuil = Math.ceil(avant * 0.7);
+	r.check("losing exactly 30 % passes, losing more is refused",
+		[motif(grande, ajuste(seuil)), motif(grande, ajuste(seuil - 1))], ["ok", "lossy"]);
+	r.check("a short title alone is judged on the whole card, not on its own", motif(original, { title: "Short" }), "ok");
+	r.check("steps cut to almost nothing lose too much", motif({ ...grande, promptHtml: undefined, prompt: undefined, etapes: [x(500), x(500)] }, { etapes: ["only one"] }), "lossy");
+
+	// ── HTML goes through the gate
+	sanitized = 0;
+	const sale = juge(original, { promptHtml: "<p onclick=\"evil()\">" + x(700) + "</p><script>alert(1)</script>" });
+	r.check("promptHtml is the sanitizer's output, never the raw model text",
+		[sale.ok, sale.ok && sale.fields.promptHtml.includes("script"), sale.ok && sale.fields.promptHtml.includes("onclick"), sale.ok && sale.fields.promptHtml.includes(x(700)), sanitized > 0], [true, false, false, true, true]);
+
+	// ── the context the model gets
+	const q2 = { title: "Q", prompt: "?", options: ["a", "b"], correctIndex: 0, explain: "why" };
+	const lecture = { ...original, etapes: ["Do this", "Then that"], retenir: { forme: "recap", items: ["keep me"] } };
+	const ctx = contexteQuiz([lecture, q2], { quiz: "CM1", courant: 0 });
+	const q1 = ctx.slice(ctx.indexOf("[Q1]"), ctx.indexOf("[Q2]"));
+	r.check("a reading on screen: marked, with its text, steps, key points, source and figure",
+		[q1.includes("QUESTION ON SCREEN"), q1.includes("reading card"), q1.includes("1. Do this"), q1.includes("- keep me"), q1.includes("Source: CM1.pdf, p. 3"), q1.includes("Figure shown above the card: CM1.pdf, p. 4"), q1.includes("Learner's answer")],
+		[true, true, true, true, true, true, false]);
+	r.check("a reading that is not on screen does not carry the source", contexteQuiz([lecture, q2], { quiz: "", courant: 1 }).includes("Source:"), false);
+	const consigne = consigneEditionCarte(lecture);
+	r.check("the instruction: the tag, the limit, every piece of information kept, the card's current fields, nothing written before the click",
+		[consigne.includes("<card-edit>"), consigne.includes("under 1800 characters"), consigne.includes("2250"), consigne.includes("EVERY piece of information"), consigne.includes("promptHtml"), consigne.includes('"etapes":["Do this","Then that"]'), consigne.includes("nothing is written before they click"), consigne.includes("CM1.pdf")],
+		[true, true, true, true, true, true, true, false]);
+	r.done();
+});

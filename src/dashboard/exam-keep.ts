@@ -26,7 +26,7 @@ import { findQuizModeConfigIndex, normalizeQuizMode, parseQuizSource } from "../
 export type KeepExam = { minutes: number } | null;
 
 /** One member of a list (an array element or an object entry) in the text. */
-interface Item {
+export interface Item {
 	/** First character of the member (for an entry, its key). */
 	start: number;
 	/** One past its last character (for an entry, its value). */
@@ -38,7 +38,7 @@ interface Item {
 	valueStart?: number;
 }
 
-interface Edit { start: number; end: number; text: string }
+export interface Edit { start: number; end: number; text: string }
 
 const isSpace = (c: string): boolean => c === " " || c === "\t" || c === "\n" || c === "\r";
 
@@ -93,7 +93,7 @@ function skipValue(s: string, i: number): number {
 
 /** The members of the array or object opened at `open`, and the index of its
     closing bracket. `entries`: an object, whose members have keys. */
-function members(s: string, open: number, entries: boolean): { items: Item[]; close: number } {
+export function members(s: string, open: number, entries: boolean): { items: Item[]; close: number } {
 	const closer = entries ? "}" : "]";
 	const items: Item[] = [];
 	let i = open + 1;
@@ -124,7 +124,7 @@ function members(s: string, open: number, entries: boolean): { items: Item[]; cl
 }
 
 /** The top-level array of a block's source. */
-function topArray(s: string): { open: number; close: number; items: Item[] } {
+export function topArray(s: string): { open: number; close: number; items: Item[] } {
 	const open = skipTrivia(s, 0);
 	if (s[open] !== "[") throw new Error("not an array");
 	const { items, close } = members(s, open, false);
@@ -186,10 +186,10 @@ function afterCommaPosition(s: string, it: Item): number {
 	return /^\s*(\/\/.*)?$/.test(s.slice(p, e)) ? e : p;
 }
 
-const quoteOf = (s: string, at: number): string => (s[at] === '"' ? '"' : "'");
+export const quoteOf = (s: string, at: number): string => (s[at] === '"' ? '"' : "'");
 
 /** Inserts the entries `texts` ("key: value") right after entry `k`. */
-function insertAfterEntry(s: string, items: Item[], k: number, texts: string[], eol: string): Edit {
+export function insertAfterEntry(s: string, items: Item[], k: number, texts: string[], eol: string): Edit {
 	const it = items[k];
 	const indent = lineIndent(s, it.start);
 	if (it.comma >= 0) {
@@ -228,7 +228,7 @@ function appendConfig(s: string, items: Item[], minutes: number, eol: string): E
 	return { start: last.end, end: last.end, text: "," + lead + element };
 }
 
-function apply(s: string, edits: Edit[]): string {
+export function apply(s: string, edits: Edit[]): string {
 	/* Two deletions can overlap (the last entry takes the previous entry's comma
 	   with it, and that entry may itself be deleted): they merge into one, or
 	   the second cut would eat a character the first already removed. */
@@ -246,7 +246,7 @@ function apply(s: string, edits: Edit[]): string {
 }
 
 /** A parsed value with its object keys sorted, for comparing two parses. */
-function canon(v: unknown): string {
+export function canon(v: unknown): string {
 	return JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x)
 		? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)))
 		: x));

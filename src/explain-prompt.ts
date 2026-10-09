@@ -12,6 +12,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { parseCloze } from "./engine/cloze";
+import { retenirDeLecture } from "./lecture-style";
 
 type Q = Record<string, unknown>;
 
@@ -106,13 +107,26 @@ function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAn
 	if (passage) lignes.push(`Document shown: ${passage}`);
 	const choices = choix(q, courant ? extra.ordre : undefined);
 	if (choices) lignes.push(`Choices:\n${choices}`);
+	if (lecture) {
+		const etapes = liste(q.etapes).filter(Boolean);
+		if (etapes.length) lignes.push("Steps:\n" + etapes.map((e, i) => `${i + 1}. ${e}`).join("\n"));
+		const retenir = retenirDeLecture(q);
+		if (retenir?.forme === "cartes") lignes.push("Key points:\n" + retenir.items.map(c => `- ${c.recto}: ${c.verso}`).join("\n"));
+		else if (retenir?.forme === "recap") lignes.push("Key points:\n" + retenir.items.map(i => `- ${i}`).join("\n"));
+		if (courant) {
+			const cite = texte(q.cite);
+			if (cite) lignes.push(`Source: ${cite}`);
+			const figure = texte(q.figure);
+			if (figure) lignes.push(`Figure shown above the card: ${figure}`);
+		}
+	}
 	if (!lecture) {
 		const bonne = reponseAttendue(q, courant ? extra.ordre : undefined);
 		if (bonne) lignes.push(`Expected answer: ${bonne}`);
 		const why = texte(q.explain) || htmlEnTexte(q.explainHtml);
 		if (why) lignes.push(`Explanation: ${why}`);
 	}
-	if (courant) {
+	if (courant && !lecture) {
 		const mine = (extra.myAnswer ?? "").trim();
 		lignes.push(`Learner's answer: ${mine || "(none)"}`);
 		if (extra.correct === true) lignes.push("The learner's answer is RIGHT.");

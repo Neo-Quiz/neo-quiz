@@ -189,3 +189,11 @@ export function motsDeLecture(item: unknown): number {
 	else if (r?.forme === "recap") n += mots(r.items.join(" "));
 	return n;
 }
+
+/** The most characters a reading card may hold (title, text, steps and key
+    points together, HTML tags not counted): what the Learn generation prompt
+    asks for, and the base of the guard on a card the "Explain" chat rewrites
+    (`explain-edit.ts`). Before 2026-10-09 no cap was written anywhere (the
+    readings of a real Learn run 1000 to 1400 characters, 1200 is the usual
+    figure taken as the old reference); it is now 1800, 50 % above. */
+export const READING_MAX_CHARS = 1800;

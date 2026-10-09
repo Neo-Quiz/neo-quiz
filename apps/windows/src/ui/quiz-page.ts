@@ -25,7 +25,9 @@ import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
 import { renderInteractiveQuiz } from "../../../../src/engine";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
-import { extractExamOptions, parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
+import { extractExamOptions, findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
+import { idsForRawItems } from "../../../../src/quiz-ids";
+import type { SessionQuiz } from "../../../../src/engine/session";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { monterBoutonExpliquer } from "./explain";
 import { ajouter } from "../../../../src/dom";
@@ -254,8 +256,38 @@ export async function openQuizPage(
 	/* The two bars that stay in place while a question scrolls (`ui/quiz-bars.ts`). */
 	const detachBars = attachQuizBars(hote);
 	/* "Explain" in the header, right: not in an Exam (it hides with the clock). */
+	/* A reading card rewritten by the Explain chat: the page is rendered AGAIN on
+	   the new note, in the same host, and resumes on that card. The engine reopens
+	   where a session snapshot says (`courante`, the card's id), the answers
+	   already given included; with none to keep, a snapshot without answers
+	   carries only the position. Nothing leaves the screen but its content. */
+	const recharger = async (nouvelle: string, qi: number): Promise<Record<string, unknown>[]> => {
+		const m = nouvelle.match(QUIZ_BLOCK_RE);
+		if (!m) throw new Error("no quiz block");
+		const quiz = parseQuizSource(m[1]);
+		const jouees = extractExamOptions(quiz).questions as unknown as Record<string, unknown>[];
+		const config = findQuizModeConfigIndex(quiz);
+		const id = idsForRawItems(quiz)[qi + (config >= 0 && config <= qi ? 1 : 0)] ?? null;
+		hote.__quizDestroy?.();
+		hote.replaceChildren();
+		const puits = sessions?.puits(entry.path);
+		const gardee = sessions?.lire(entry.path) ?? null;
+		const initiale: SessionQuiz = { ...(gardee ?? { v: 1, questions: {} }), v: 1, courante: id, ecrite: Date.now() } as SessionQuiz;
+		await renderInteractiveQuiz({
+			container: hote,
+			quiz,
+			sourcePath: entry.path,
+			statsSink,
+			reviewSink,
+			sessionSink: puits ? { initiale, enregistrer: (s) => puits.enregistrer(s), effacer: () => puits.effacer() } : undefined,
+			testSetup: setupPage?.host,
+		});
+		source = nouvelle;
+		questionsJouees = jouees;
+		return jouees;
+	};
 	const demonterExpliquer = aiSettings && questionsJouees.length
-		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source })
+		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source, recharger })
 		: null;
 	let fait = false;
 	return {

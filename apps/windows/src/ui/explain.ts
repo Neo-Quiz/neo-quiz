@@ -36,6 +36,12 @@ import type { OpenProviderMenuOptions, ProviderBrandOption } from "../../../../s
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
 import { contexteQuiz } from "../../../../src/explain-prompt";
+import { CARD_EDIT_MAX_CHARS, consigneEditionCarte, splitCardEdit, validateCardEdit } from "../../../../src/explain-edit";
+import type { CardEditResult, CardFields } from "../../../../src/explain-edit";
+import { renderInlineText, sanitizeQuizHtml } from "../../../../src/engine/sanitizer";
+import { restoreBlock, saveCardEdit } from "../../../../src/dashboard/detail-io";
+import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
+import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { lireCours } from "./explain-cours";
 import type { Cours } from "./explain-cours";
 import { attacherUsage } from "./comptes";
@@ -93,6 +99,20 @@ interface Message {
 	lecture?: boolean;
 	erreur?: string;
 	arrete?: boolean;
+	/** A new version of the reading card proposed by this answer. */
+	edit?: CardProposal;
+}
+
+/** The proposal of a new version of a reading card, from a `<card-edit>` block.
+    `verdict` is the app's judgement BEFORE anything is shown. */
+interface CardProposal {
+	verdict: CardEditResult;
+	etat: "pending" | "applied";
+	occupe: boolean;
+	message?: string;
+	/** The block as it was before the edit, and as the edit wrote it (for the undo). */
+	avant?: string;
+	apres?: string;
 }
 
 /** The conversation about ONE question: it lives as long as the quiz page, so
@@ -107,6 +127,8 @@ interface Conversation {
 	contexte: string;
 	/** Repaints the window; null while it is closed. */
 	repeindre: (() => void) | null;
+	/** The question is a reading card: the chat may rewrite it. */
+	lecture: boolean;
 }
 
 export function monterBoutonExpliquer(hote: HTMLElement, deps: {
@@ -116,8 +138,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	/** The path of the quiz note and its text, to find its folder and what it cites. */
 	chemin: string;
 	note: string;
+	/** Re-renders the quiz page on a rewritten note, on the same screen, and
+	    returns its questions again. Absent: a reading cannot be rewritten. */
+	recharger?: (note: string, qi: number) => Promise<Record<string, unknown>[]>;
 }): () => void {
 	const host = currentHost();
+	/* The questions and the note, as the page last read them: a rewritten card
+	   replaces both (`appliquerCarte`). */
+	let questions = deps.questions;
+	let note = deps.note;
 	/* One button under EACH answered question, inside its own card (no row above
 	   the arrows any more: the card keeps all the room). It only shows once that
 	   question has been corrected (Check in a Learn, the hand-in of a Test):
@@ -314,17 +343,20 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 
 	/* The quiz with the question of the clicked button marked, and the learner's
 	   answer to THAT question (read on its own slide). */
-	const contexteDe = (slide: HTMLElement, qi: number): string | null => {
-		if (!deps.questions[qi]) return null;
-		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
+	const contexteDe = (slide: HTMLElement | null, qi: number): string | null => {
+		const q = questions[qi];
+		if (!q) return null;
+		const ordre = slide ? [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig)) : [];
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
-		return contexteQuiz(deps.questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: maReponse(slide), correct: estJuste(slide) });
+		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: slide ? maReponse(slide) : "", correct: slide ? estJuste(slide) : null });
+		/* A reading card may be rewritten by the chat (only if the app can re-render the page). */
+		return q.role === "read" && deps.recharger ? base + "\n" + consigneEditionCarte(q) : base;
 	};
 	/* The course (notes, PDFs, pictures) is read ONCE per quiz page, at the
 	   first opening of the window or the first send, then reused. */
 	let cours: Promise<Cours> | null = null;
 	let coursPret = false;
-	const coursDuQuiz = (): Promise<Cours> => (cours ??= lireCours(deps.chemin, deps.note, deps.questions)
+	const coursDuQuiz = (): Promise<Cours> => (cours ??= lireCours(deps.chemin, note, questions)
 		/* A course that could not be read whole is read again at the next message. */
 		.then((c) => { coursPret = true; if (c.incomplet) cours = null; return c; })
 		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; cours = null; return { texte: "", images: [], nomsImages: [], incomplet: true }; }));
@@ -336,18 +368,21 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		/* The units: each card of a step page of a Learn, and the single card of
 		   any other question slide. `juge` is the element whose classes say
 		   whether the question is corrected, `qi` the question it holds. */
-		const unites: Array<{ carte: HTMLElement; juge: HTMLElement; qi: number }> = [];
+		const unites: Array<{ carte: HTMLElement; juge: HTMLElement; qi: number; lecture?: boolean }> = [];
 		for (const slide of hote.querySelectorAll<HTMLElement>('.quiz-track > .quiz-track-item[data-slide-kind="question"]')) {
 			if (slide.classList.contains("quiz-step-page")) {
+				/* A reading card has nothing to correct: its button is there from the start. */
+				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi].quiz-step-read")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi), lecture: true });
 				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]:not(.quiz-step-read)")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi) });
 			} else {
 				const carte = slide.querySelector<HTMLElement>(":scope > .quiz-card");
 				if (carte && slide.dataset.qi !== undefined) unites.push({ carte, juge: slide, qi: Number(slide.dataset.qi) });
 			}
 		}
-		for (const { carte, juge, qi } of unites) {
+		for (const { carte, juge, qi, lecture } of unites) {
 			const present = carte.querySelector(":scope > .qz-explain-carte");
-			const veut = !examen && !!deps.questions[qi] && corrigee(juge);
+			const q = questions[qi];
+			const veut = !examen && !!q && (lecture ? q.role === "read" : corrigee(juge));
 			if (veut && !present) {
 				const zone = ajouter(carte, "div", "qz-explain-carte");
 				const b = creerBouton(zone);
@@ -364,7 +399,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const conversationDe = (qi: number): Conversation => {
 		let c = conversations.get(qi);
 		if (!c) {
-			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, contexte: "", repeindre: null };
+			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, contexte: "", repeindre: null, lecture: questions[qi]?.role === "read" };
 			conversations.set(qi, c);
 		}
 		return c;
@@ -495,6 +530,104 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 					});
 				});
 
+				/* REWRITING A READING CARD. The proposal is judged before it is shown
+				   (`validateCardEdit`); the write is the note's own path
+				   (`saveCardEdit`: compare-and-swap on the block) and happens on
+				   the click only. The page is then rendered again where the learner
+				   was (`deps.recharger`). */
+				const relire = async (): Promise<void> => {
+					note = await host.fs.read(deps.chemin);
+					if (deps.recharger) questions = await deps.recharger(note, qi);
+				};
+				const echec = (res: BlockRewrite): string => t(res.ok ? "ai.explain.cardApplied" : res.reason === "stale" ? "ai.explain.cardStale" : "ai.explain.cardFailed");
+				const appliquer = async (edit: CardProposal): Promise<void> => {
+					if (edit.occupe || edit.etat !== "pending" || !edit.verdict.ok) return;
+					edit.occupe = true;
+					edit.message = undefined;
+					conv.repeindre?.();
+					try {
+						const bloc = note.match(QUIZ_BLOCK_RE)?.[1];
+						const res: BlockRewrite = bloc === undefined
+							? { ok: false, reason: "failed" }
+							: await saveCardEdit(deps.chemin, bloc, qi, questions[qi], edit.verdict.fields);
+						if (!res.ok || bloc === undefined) { edit.message = echec(res); return; }
+						edit.avant = bloc;
+						edit.apres = res.block;
+						edit.etat = "applied";
+						edit.message = t("ai.explain.cardApplied");
+						await relire();
+					} catch (e) {
+						console.warn(`${LOG_PREFIX} Explain: card edit failed:`, e);
+						if (edit.etat !== "applied") edit.message = t("ai.explain.cardFailed");
+					} finally {
+						edit.occupe = false;
+						conv.repeindre?.();
+					}
+				};
+				const annuler = async (edit: CardProposal): Promise<void> => {
+					if (edit.occupe || edit.etat !== "applied" || edit.avant === undefined || edit.apres === undefined) return;
+					edit.occupe = true;
+					edit.message = undefined;
+					conv.repeindre?.();
+					try {
+						const res = await restoreBlock(deps.chemin, edit.apres, edit.avant);
+						if (!res.ok) { edit.message = echec(res); return; }
+						edit.etat = "pending";
+						edit.message = t("ai.explain.cardUndone");
+						await relire();
+					} catch (e) {
+						console.warn(`${LOG_PREFIX} Explain: card undo failed:`, e);
+						edit.message = t("ai.explain.cardFailed");
+					} finally {
+						edit.occupe = false;
+						conv.repeindre?.();
+					}
+				};
+				const motif = (r: string): string => t(
+					r === "json" ? "ai.explain.cardRefused.json"
+						: r === "empty" ? "ai.explain.cardRefused.empty"
+						: r === "field" ? "ai.explain.cardRefused.field"
+						: r === "tooLong" ? "ai.explain.cardRefused.tooLong"
+						: r === "lossy" ? "ai.explain.cardRefused.lossy"
+						: r === "notReading" ? "ai.explain.cardRefused.notReading"
+						: "ai.explain.cardRefused.type");
+				const peindreProposition = (rep: HTMLElement, edit: CardProposal): void => {
+					const boite = ajouter(rep, "div", "nq-explain-edit");
+					if (!edit.verdict.ok) {
+						boite.classList.add("nq-explain-edit-refus");
+						ajouter(boite, "div", undefined, motif(edit.verdict.reason));
+						return;
+					}
+					ajouter(boite, "div", "nq-explain-edit-titre", t("ai.explain.cardTitle"));
+					const f: CardFields = edit.verdict.fields;
+					const apercu = ajouter(boite, "div", "qbd-ai-preview-md markdown-preview-view nq-explain-edit-apercu");
+					/* Every text is rendered through the sanitizer's gates: the Markdown
+					   preview and the inline renderer escape, and `promptHtml` already
+					   went through `sanitizeQuizHtml` in the verdict. */
+					if (typeof f.title === "string") ajouter(apercu, "h4").innerHTML = renderInlineText(f.title);
+					if (typeof f.prompt === "string") ajouter(apercu, "div").innerHTML = renderMarkdownPreview(f.prompt);
+					if (typeof f.promptHtml === "string") ajouter(apercu, "div").innerHTML = f.promptHtml;
+					if (Array.isArray(f.etapes)) {
+						const ol = ajouter(apercu, "ol");
+						for (const e of f.etapes as string[]) ajouter(ol, "li").innerHTML = renderMarkdownPreview(e);
+					}
+					if (f.retenir && typeof f.retenir === "object") {
+						const items = (f.retenir as { items?: unknown[] }).items ?? [];
+						const ul = ajouter(apercu, "ul");
+						for (const it of items) {
+							const c = it as { recto?: string; verso?: string } | string;
+							ajouter(ul, "li").innerHTML = renderInlineText(typeof c === "string" ? c : `${c.recto ?? ""} : ${c.verso ?? ""}`);
+						}
+					}
+					if (apercu.textContent?.includes("$")) void mathifyElement(apercu);
+					const actions = ajouter(boite, "div", "nq-explain-edit-actions");
+					const bouton = ajouter(actions, "button", "nq-explain-edit-btn", t(edit.etat === "applied" ? "ai.explain.cardUndo" : "ai.explain.cardApply"));
+					bouton.type = "button";
+					bouton.disabled = edit.occupe;
+					bouton.addEventListener("click", () => { void (edit.etat === "applied" ? annuler(edit) : appliquer(edit)); });
+					if (edit.message) ajouter(actions, "span", "nq-explain-edit-msg", edit.message);
+				};
+
 				/* THE HISTORY, painted from the conversation. Only the last answer
 				   changes while it is written; every message is repainted with it,
 				   which is cheap at the length of these conversations. */
@@ -518,12 +651,19 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse") : msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
 						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
 						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
+						/* On a reading card, the `<card-edit>` block is not text for the
+						   learner: it is cut out (even half written) and shown as a proposal. */
+						const decoupe = conv.lecture ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
-						else if (msg.text) {
-							prose.innerHTML = renderMarkdownPreview(msg.text);
-							if (msg.text.includes("$")) void mathifyElement(prose);
+						else if (decoupe.shown) {
+							prose.innerHTML = renderMarkdownPreview(decoupe.shown);
+							if (decoupe.shown.includes("$")) void mathifyElement(prose);
 						}
 						else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
+						if (!msg.erreur && !msg.enCours && decoupe.raw !== null) {
+							msg.edit ??= { verdict: validateCardEdit(questions[qi], decoupe.raw, sanitizeQuizHtml), etat: "pending", occupe: false };
+							peindreProposition(rep, msg.edit);
+						}
 					}
 					if (bas) fil.scrollTop = fil.scrollHeight;
 				};
@@ -557,6 +697,8 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						const lu = await coursDuQuiz();
 						rep.lecture = false;
 						conv.repeindre?.();
+						/* A rewritten card changes what the model must see: rebuilt from the current questions. */
+						if (conv.lecture) conv.contexte = contexteDe(null, qi) ?? conv.contexte;
 						const images = lu.nomsImages.length
 							? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + lu.nomsImages.map((n, i) => `${i + 1}. ${n}`).join("; ")
 							: "";
@@ -565,7 +707,8 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 							context: conv.contexte + (lu.texte ? "\n\n=== COURSE ===\n" + lu.texte : "") + images,
 							images: lu.images,
 							imageNames: lu.nomsImages,
-							maxChars: deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT,
+							/* A reading card may come back whole in a `<card-edit>` block, on top of the explanation. */
+							maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (conv.lecture ? CARD_EDIT_MAX_CHARS + 400 : 0),
 							onTranscript: (ev) => {
 								if (ev.kind !== "text") return;
 								rep.text += ev.text;
